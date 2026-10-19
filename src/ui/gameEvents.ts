@@ -7,8 +7,9 @@
  * Every event names the player (`playerId`), the data set, the game's playthrough
  * (`d.RandomGameID`, `doc/SAVES.md` → "A playthrough") and the build. Nothing else about
  * the player is sent: no address, no browser fingerprint. A champion goes by their name as
- * it stands, a reincarnated one's included, and by their portrait's `charID` where the
- * page knows it (`ChampionReport.id`).
+ * it stands, a reincarnated one's included, with the mirror's name REINCARNATE replaced where
+ * the page saw it (`ChampionReport.hero`), and by their portrait's `charID` where the page
+ * knows it (`ChampionReport.id`).
  *
  * The player can turn them off (`GameEventsDeps.enabled`): then nothing is read or sent,
  * the player's id not even drawn. Nor is anything for a player's own set
@@ -46,6 +47,8 @@ export interface ChampionReport {
     id: number | null;
     /** Joined in this page by REINCARNATE. */
     reincarnated?: true;
+    /** A reincarnated champion's name before REINCARNATE, the mirror's, by which the statistics count them. */
+    hero?: string;
 }
 
 /** A champion of a won game, with the four masteries the won screen shows. */
@@ -104,8 +107,8 @@ export interface GameEventsDeps {
 }
 
 export class GameEvents {
-    /** The champions this page saw join by REINCARNATE. */
-    private readonly reincarnated = new WeakSet<Champion>();
+    /** The champions this page saw join by REINCARNATE, and the name their mirror gave them. */
+    private readonly reincarnated = new WeakMap<Champion, string>();
     /** A new game has been read, whose first tick sends `started`. */
     private newGame = false;
     /** A game has been read, whose first tick sends `session` with this play time; `null` for none. */
@@ -147,7 +150,7 @@ export class GameEvents {
 
     /** `GameHost.championJoined`: the party as it now stands. */
     championJoined(joined: JoinedChampion): void {
-        if (joined.reincarnated) this.reincarnated.add(joined.champion);
+        if (joined.reincarnated) this.reincarnated.set(joined.champion, joined.hero);
         this.emit('party', () => ({ champions: this.champions().map((c) => this.report(c)) }));
     }
 
@@ -189,10 +192,11 @@ export class GameEvents {
     }
 
     private report(champion: Champion): ChampionReport {
+        const hero = this.reincarnated.get(champion);
         return {
             name: champion.name,
             id: champion.portraitGraphic ?? null,
-            ...(this.reincarnated.has(champion) ? { reincarnated: true as const } : {}),
+            ...(hero !== undefined ? { reincarnated: true as const, hero } : {}),
         };
     }
 

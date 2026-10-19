@@ -13,6 +13,11 @@ import type { Champion } from './gameTypes';
 export interface JoinedChampion {
   champion: Champion;
   reincarnated: boolean;
+  /**
+   * The name the mirror's text gives them: their own, resurrected, and the one REINCARNATE
+   * replaced with the name typed on its screen.
+   */
+  hero: string;
 }
 
 /**

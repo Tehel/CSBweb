@@ -5,9 +5,10 @@
  *
  * The aggregates are kept as the events arrive, in four tables beside the log, so that an
  * answer is a few indexed queries rather than a pass over every event: `games`, a row per
- * game (a set's playthrough), `deaths`, the lost games per square, `picks`, the names
- * of each game's champions, and `sessions`, the sessions per set and week. A store without
- * them is given them, filled once from its `events`. The answers are cached (`AnswerCache`).
+ * game (a set's playthrough), `deaths`, the lost games per square, `picks`, each game's
+ * champions by their mirror's name, and `sessions`, the sessions per set and week. A store
+ * without them is given them, filled once from its `events`. The answers are cached
+ * (`AnswerCache`).
  *
  * A `session` is never a row of `events`: no player and no time is kept of it, which
  * would be the player's habits. It counts in `sessions`, and raises its game's `played`.
@@ -51,13 +52,26 @@ CREATE TABLE deaths (
     count    INTEGER NOT NULL,
     PRIMARY KEY (data_set, level, x, y)
 ) WITHOUT ROWID;
+`;
+
+/** `picks`, which a store made before its `slot` is given again, from the log. */
+const PICKS_SCHEMA = `
 CREATE TABLE picks (
     data_set    TEXT    NOT NULL,
     playthrough INTEGER NOT NULL,
-    name        TEXT    NOT NULL,
+    name        TEXT    NOT NULL,  -- the mirror's: a reincarnated champion's hero
+    slot        INTEGER NOT NULL,  -- the party's, in the event that made the row
     PRIMARY KEY (data_set, playthrough, name)
 ) WITHOUT ROWID;
 `;
+
+/** The statements that make `picks`' rows (`StatsStore.pickParty`). */
+interface PickStatements {
+    /** A champion who joined in the page: their mirror's name is known. */
+    joined: StatementSync;
+    /** A champion read from a save, `id` null: only where their slot has no row. */
+    read: StatementSync;
+}
 
 /** What a store made before the sessions is given: `games.played`, and `sessions`. */
 const SESSIONS_SCHEMA = `
@@ -154,7 +168,7 @@ export interface SetStats extends StatsSet {
     fastest: Win[];
     /** The lost games on each level, by level: its squares are the level's answer. */
     levels: { level: number; count: number }[];
-    /** The games a champion of each name was in a party of, and won, the most first. */
+    /** The games a champion was in a party of, and won, by their mirror's name (`picks`), the most first. */
     champions: { name: string; games: number; won: number }[];
     /** Sessions, games started and games won per week, the weeks with one. */
     weeks: { week: string; sessions: number; started: number; won: number }[];
@@ -167,7 +181,7 @@ export class StatsStore {
     private readonly start: StatementSync;
     private readonly win: StatementSync;
     private readonly die: StatementSync;
-    private readonly pick: StatementSync;
+    private readonly picks: PickStatements;
     private readonly play: StatementSync;
     private readonly session: StatementSync;
 
@@ -176,7 +190,14 @@ export class StatsStore {
         this.db.exec(EVENTS_SCHEMA);
         const kept = this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'games'").get() !== undefined;
         const played = kept && this.db.prepare("SELECT 1 FROM pragma_table_info('games') WHERE name = 'played'").get() !== undefined;
-        if (!kept) this.db.exec(AGGREGATES_SCHEMA);
+        const slotted = kept && this.db.prepare("SELECT 1 FROM pragma_table_info('picks') WHERE name = 'slot'").get() !== undefined;
+        if (!kept) this.db.exec(AGGREGATES_SCHEMA + PICKS_SCHEMA);
+        if (kept && !slotted) {
+            this.transaction(() => {
+                this.db.exec(`DROP TABLE picks; ${PICKS_SCHEMA}`);
+                this.fillPicks();
+            });
+        }
         if (!played) {
             this.transaction(() => {
                 this.db.exec(SESSIONS_SCHEMA);
@@ -191,7 +212,7 @@ export class StatsStore {
             'UPDATE games SET won = ?, game_time = ?, play_time = ?, champions = ? WHERE data_set = ? AND playthrough = ? AND won IS NULL');
         this.die = this.db.prepare(
             'INSERT INTO deaths (data_set, level, x, y, count) VALUES (?, ?, ?, ?, 1) ON CONFLICT DO UPDATE SET count = count + 1');
-        this.pick = this.db.prepare('INSERT INTO picks (data_set, playthrough, name) VALUES (?, ?, ?) ON CONFLICT DO NOTHING');
+        this.picks = this.preparePicks();
         this.play = this.db.prepare('UPDATE games SET played = MAX(IFNULL(played, ?1), ?1) WHERE data_set = ?2 AND playthrough = ?3');
         this.session = this.db.prepare(`
             INSERT INTO sessions (data_set, week, count) VALUES (?1, ${week('?2')}, 1) ON CONFLICT DO UPDATE SET count = count + 1`);
@@ -293,10 +314,42 @@ export class StatsStore {
             return;
         }
         const champions = payload.champions as CheckedChampion[];
-        for (const champion of champions) this.pick.run(set, playthrough, champion.name);
+        this.pickParty(this.picks, set, playthrough, champions);
         if (event.type === 'won') this.win.run(time, payload.gameTime as number, payload.playTime as number, JSON.stringify(champions), set, playthrough);
         if (event.type === 'lost') this.die.run(set, payload.level as number, payload.x as number, payload.y as number);
         if (event.type === 'won' || event.type === 'lost') this.play.run(payload.playTime as number, set, playthrough);
+    }
+
+    private preparePicks(): PickStatements {
+        return {
+            joined: this.db.prepare('INSERT INTO picks (data_set, playthrough, name, slot) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING'),
+            read: this.db.prepare(`
+                INSERT INTO picks (data_set, playthrough, name, slot) SELECT ?1, ?2, ?3, ?4
+                WHERE NOT EXISTS (SELECT 1 FROM picks WHERE data_set = ?1 AND playthrough = ?2 AND slot = ?4)
+                ON CONFLICT DO NOTHING`),
+        };
+    }
+
+    /**
+     * A game's party, in the order of its slots, its picks: each champion by their mirror's
+     * name, a reincarnated one's `hero`, so that a name typed at REINCARNATE counts as the
+     * champion it renamed. A champion read from a save (`id` null) carries no `hero`, and may
+     * carry a typed name: they count only where their slot has no pick, their join, if it
+     * was seen, having named them already.
+     */
+    private pickParty(picks: PickStatements, set: string, playthrough: number, champions: CheckedChampion[]): void {
+        champions.forEach((champion, slot) => {
+            (champion.id === null ? picks.read : picks.joined).run(set, playthrough, champion.hero ?? champion.name, slot);
+        });
+    }
+
+    /** `picks` filled from the log, in the order its events arrived, its own statements on a table new in this transaction. */
+    private fillPicks(): void {
+        const picks = this.preparePicks();
+        for (const row of this.db.prepare("SELECT data_set, playthrough, payload FROM events WHERE type IN ('party', 'won', 'lost') ORDER BY id").iterate()) {
+            const { champions } = JSON.parse(row.payload as string) as { champions: CheckedChampion[] };
+            this.pickParty(picks, row.data_set as string, row.playthrough as number, champions);
+        }
     }
 
     /** The new tables filled from the log, in the order its events arrived. */

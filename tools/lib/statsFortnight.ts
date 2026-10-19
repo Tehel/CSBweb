@@ -23,9 +23,9 @@ export function event(type: string, player: string, set: string, playthrough: nu
 
 export const day = (date: string, hour = 10) => Date.parse(`${date}T${String(hour).padStart(2, '0')}:00:00Z`);
 
-/** A won game's champion: its masteries are its event's, after `reincarnated` where they were. */
-export const winner = (name: string, id: number | null = 0, reincarnated = false) =>
-    ch(name, id, { ...(reincarnated ? { reincarnated: true } : {}), masteries: [1, 2, 3, 4] });
+/** A won game's champion: its masteries are its event's, after `reincarnated` and `hero` where they were. */
+export const winner = (name: string, id: number | null = 0, hero?: string) =>
+    ch(name, id, { ...(hero !== undefined ? { reincarnated: true, hero } : {}), masteries: [1, 2, 3, 4] });
 export const won = (player: string, playthrough: number, gameTime: number, playTime: number, champions: object[]) =>
     event('won', player, 'dm-atari', playthrough, { gameTime, playTime, champions });
 export const session = (player: string, set: string, playthrough: number, playTime: number) =>
@@ -38,13 +38,15 @@ export const FORTNIGHT: [number, string][] = [
     // A save continued: its play time is under its game's win, which counts.
     [day('2026-10-06', 9), session(P1, 'dm-atari', 1, 200_000)],
     [day('2026-10-05', 11), event('party', P1, 'dm-atari', 1, { champions: [ch('HALK', 3)] })],
-    [day('2026-10-05', 12), event('party', P1, 'dm-atari', 1, { champions: [ch('HALK', 3), ch('WU TSE', 9, { reincarnated: true })] })],
-    // 1,000 ticks in 5 minutes: 18,000 VBLs. WU TSE joined by REINCARNATE.
-    [day('2026-10-07'), won(P1, 1, 1000, 300_000, [winner('HALK', 3), winner('WU TSE', 9, true)])],
+    // WU TSE joined by REINCARNATE, as TSE: a pick of WU TSE.
+    [day('2026-10-05', 12), event('party', P1, 'dm-atari', 1, { champions: [ch('HALK', 3), ch('TSE', 9, { reincarnated: true, hero: 'WU TSE' })] })],
+    // 1,000 ticks in 5 minutes: 18,000 VBLs.
+    [day('2026-10-07'), won(P1, 1, 1000, 300_000, [winner('HALK', 3), winner('TSE', 9, 'WU TSE')])],
     [day('2026-10-08', 9), event('started', P1, 'dm-atari', 1, {})],
     [day('2026-10-06'), event('started', P2, 'dm-atari', 2, {})],
-    [day('2026-10-06', 11), event('party', P2, 'dm-atari', 2, { champions: [ch('HALK', 3), ch('BOB', 1, { reincarnated: true })] })],
-    [day('2026-10-06', 12), event('lost', P2, 'dm-atari', 2, { gameTime: 50, playTime: 60, champions: [ch('HALK', null)], level: 1, x: 2, y: 3 })],
+    [day('2026-10-06', 11), event('party', P2, 'dm-atari', 2, { champions: [ch('HALK', 3), ch('KID', 1, { reincarnated: true, hero: 'BOB' })] })],
+    // A save of it read: KID, unflagged, no pick, BOB's slot having one.
+    [day('2026-10-06', 12), event('lost', P2, 'dm-atari', 2, { gameTime: 50, playTime: 60, champions: [ch('HALK', null), ch('KID', null)], level: 1, x: 2, y: 3 })],
     [day('2026-10-06', 13), event('lost', P2, 'dm-atari', 2, { gameTime: 50, playTime: 90, champions: [ch('HALK', null)], level: 1, x: 2, y: 3 })],
     [day('2026-10-06', 14), event('lost', P2, 'dm-atari', 2, { gameTime: 70, playTime: 99, champions: [ch('HALK', null)], level: 1, x: 4, y: 3 })],
     [day('2026-10-08'), event('started', P3, 'dm-atari', 6, {})],

@@ -219,8 +219,8 @@ async function main(): Promise<void> {
     console.log(`charIDs: HALK ${halk.portraitIndex}, WU TSE ${wuTse.portraitIndex}`);
     check(JSON.stringify(first!.champions) === `[{"name":"HALK","id":${halk.portraitIndex}}]`,
       "HALK resurrected: the party is HALK, by his portrait's charID");
-    check(JSON.stringify(second!.champions) === `[{"name":"HALK","id":${halk.portraitIndex}},{"name":"${TYPED_NAME}","id":${wuTse.portraitIndex},"reincarnated":true}]`,
-      "WU TSE reincarnated: by the name the player typed, WU TSE's charID, flagged");
+    check(JSON.stringify(second!.champions) === `[{"name":"HALK","id":${halk.portraitIndex}},{"name":"${TYPED_NAME}","id":${wuTse.portraitIndex},"reincarnated":true,"hero":"WU TSE"}]`,
+      "WU TSE reincarnated: by the name the player typed, WU TSE's charID, flagged, and the mirror's name");
     check(halk.portraitIndex !== wuTse.portraitIndex, 'two champions, two ids');
     sent.forEach((event) => checkShape(event, 'party'));
 
@@ -236,6 +236,7 @@ async function main(): Promise<void> {
     check(won.champions.map((c) => c.name).join() === `HALK,${TYPED_NAME}`, 'and the party, by their names as they stand');
     check(won.champions[1]!.reincarnated === true && won.champions[0]!.reincarnated === undefined,
       'the reincarnated one flagged, and only that one');
+    check(won.champions[1]!.hero === 'WU TSE' && won.champions[0]!.hero === undefined, "and only that one with the mirror's name");
     const expected = game.ctx.party.state.champions.map((champion) =>
       [0, 1, 2, 3].map((skill) => determineMastery(champion, skill | 0xc000, { partySleeping: false })));
     check(JSON.stringify(won.champions.map((c) => c.masteries)) === JSON.stringify(expected),
@@ -265,7 +266,8 @@ async function main(): Promise<void> {
     const reported = (sent[0]!.payload as WonPayload).champions;
     console.log(`reported: ${JSON.stringify(reported.map(({ name, id }) => ({ name, id })))}`);
     check(reported.map((c) => c.name).join() === names.join(), "a saved game's champions go by their names, renamed or not");
-    check(reported.every((c) => c.id === null && c.reincarnated === undefined), 'with no id, which a save does not keep, and no flag');
+    check(reported.every((c) => c.id === null && c.reincarnated === undefined && c.hero === undefined),
+      "with no id, which a save does not keep, no flag and no mirror's name");
   }
 
   /* ------------------------------------------------- failures ----- */

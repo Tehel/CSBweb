@@ -17,8 +17,8 @@ characters at most, each one a name's.
 ## The page's events
 
 `src/ui/gameEvents.ts`, page-side. The engine sends nothing and stays silent; its one part
-in it is `GameHost.championJoined`, which hands the page the champion and whether they were
-reincarnated.
+in it is `GameHost.championJoined`, which hands the page the champion, whether they were
+reincarnated, and the name their mirror's text gives them (`JoinedChampion.hero`).
 
 **The player id** (`playerId`) is a `crypto.randomUUID()` drawn at first start and kept in
 `localStorage` (`csbweb_player_v1`). If the player clears it, the page draws a new one, and
@@ -51,9 +51,11 @@ game's events link up across loads, sessions and imports. Each event is
 - `lost`, `{ gameTime, playTime, champions, level, x, y }`: the same without the
   masteries, and the square the party died on.
 
-**A champion** is reported as `{ name, id }`, with `reincarnated: true` when they joined in
-this page by REINCARNATE. The name is the one they carry, the mirror's or the one typed on
-the Reincarnate screen, whether the game is played, loaded or RISE's. The id is their
+**A champion** is reported as `{ name, id }`, with `reincarnated: true` and `hero`, the
+mirror's name, when they joined in this page by REINCARNATE. The name is the one they
+carry, the mirror's or the one typed on the Reincarnate screen, whether the game is played,
+loaded or RISE's. A champion read from a save carries no `hero`: a save keeps the typed
+name alone, as CSBWin's does. The id is their
 portrait's `charID` (`Champion.portraitGraphic`: a cell of graphic 26, or past 23 a
 `CSBgraphics.dat` portrait), and `null` for a champion read from a save, who carries the
 portrait's pixels and no id, as in CSBWin. It is stored and not used yet: it is there for a
@@ -96,8 +98,8 @@ takes every event the engine makes as the page sent it.
 4. **`server/events.ts` checks it field by field** and rebuilds it from what passed (400
    otherwise): the player is a UUID, the build a token, the set one of the `data_sets`
    table's (`doc/DEPLOYMENT.md`), every number an integer in its range, at most four
-   champions, a champion's id `null` or an `i16`, a won game's masteries four, and a
-   champion's name 7 characters at most (`CHARDESC.name[8]`, `doc/CSBwin-src/CSB.h:2545`),
+   champions, a champion's id `null` or an `i16`, a won game's masteries four, a `hero`
+   only beside `reincarnated`, and a champion's name and `hero` 7 characters at most (`CHARDESC.name[8]`, `doc/CSBwin-src/CSB.h:2545`),
    not blank, and made of A to Z, the space and the Reincarnate screen's `. , ; :`, or for
    a save edited elsewhere the accented capitals À to Ý, the digits and `! ? ' - /`
    (`NAME`): no control character, bidi override, NUL or markup reaches `api/stats`.
@@ -123,8 +125,13 @@ arrive, in the event's own transaction, so that no answer reads the log:
   and party. A later `won` of the same game, from an earlier save, changes nothing.
 - `deaths`, the `lost` events per set and square: every one, as a party that dies, reloads
   and dies again shows where the dungeon is hard.
-- `picks`, the names of the champions ever in a game's party, from its `party`, `won` and
-  `lost` events.
+- `picks`, the champions ever in a game's party, from its `party`, `won` and `lost`
+  events, by their mirror's name: a reincarnated champion's `hero`, so that the names typed
+  at REINCARNATE count as the champions they renamed. Each row keeps the party's slot it was
+  reported in. A champion read from a save (`id` null), who may carry a typed name and no
+  `hero`, counts only where their slot has no row: their join, if it was seen, named them
+  already. One whose join was not seen, an imported CSBWin save's, counts by the name they
+  carry.
 - `sessions`, the `session` events per set and week (from Monday, UTC): a counter.
 - `games.played`, each game's play time, the largest its `session`, `won` and `lost` events
   reported, whose sum is a set's time played. It lags a session: a session reports what
@@ -138,7 +145,8 @@ time played is its `won` or `lost` event's.
 
 A store without these tables is given them, filled once from its `events`, in the order
 they arrived; one without `played` and `sessions` is given them, `played` from its `won`
-and `lost` events. The sessions before then are lost: the log never held them.
+and `lost` events; one whose `picks` has no `slot` is given them again from its `events`.
+The events sent before `hero` count a reincarnated champion by their typed name. The sessions before then are lost: the log never held them.
 
 ## `api/stats`
 
@@ -154,7 +162,8 @@ a few indexed queries, about 0.1 s at 200,000 events.
 - **`api/stats/<id>`**, a public set (404 for any other): its players, time played,
   sessions, games started and won, games with a party and deaths; its ten fastest wins by game clock, then the earlier,
   each its day, game clock, play time and party with their masteries; its deaths per level;
-  its twenty most picked champions, with the games they were in and won; its sessions, games
+  its twenty most picked champions, by their mirror's name (`picks`), with the games they
+  were in and won; its sessions, games
   started and games won per week.
 - **`api/stats/<id>/<level>`**, the level as its decimal number below 256: the deaths on
   each of its squares, the most first, at most 1,024, which is enough for a heat map on
@@ -167,7 +176,7 @@ save, which sent no `started` and carries no play time, is a win and is not rank
 
 `tools/dump-stats.ts` asserts the checks, the store's aggregates over a scripted fortnight,
 its sessions in no row of the log or of `games`, the same but the sessions' made from the
-log alone and for a store made before the sessions, the cache, and every answer's time and size over 200,000
+log alone and for a store made before the sessions or the picks' slots, the cache, and every answer's time and size over 200,000
 events; `tools/dump-server.ts` the API over HTTP and the store's life in `server.ts`.
 
 ## The page
@@ -187,7 +196,7 @@ count of each on hover. Everything it shows is `api/stats`'s:
   VBLs, as the game runs awake), its play time, its party, a champion who joined by
   REINCARNATE marked `*`, a solo win badged, and its day; its deaths per level, a row a
   level from LEVEL 1 to the deepest died on, as the map dialog numbers them; its preferred
-  champions, each their share of the games with a party, and their win rate once in 10
+  champions, by their mirror's name, each their share of the games with a party, and their win rate once in 10
   games; and its sessions, games started and games won per week.
 
 A chart of weeks runs from the first week answered to the current one, the weeks without

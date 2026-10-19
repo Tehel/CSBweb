@@ -52,13 +52,13 @@ function accepted(body: string): CheckedEvent {
 function checkTheChecks(): void {
     console.log('What api/event accepts:');
     const party = accepted(event('party', P1, 'dm-atari', 7, {
-        champions: [ch('HALK', 3), ch('BOB', 7, { reincarnated: true, note: 'free text' }), ch('ROSE', null), ch("D'AR.-2", 0x7fff)],
+        champions: [ch('HALK', 3), ch('BOB', 7, { reincarnated: true, hero: 'WU TSE', note: 'free text' }), ch('ROSE', null), ch("D'AR.-2", 0x7fff)],
         note: 'free text',
     }, { note: 'free text' }));
     console.log(`  party: ${JSON.stringify(party)}`);
     check(JSON.stringify(party) === JSON.stringify({
         type: 'party', player: P1, set: 'dm-atari', playthrough: 7, build: 'abc1234',
-        payload: { champions: [ch('HALK', 3), ch('BOB', 7, { reincarnated: true }), ch('ROSE', null), ch("D'AR.-2", 0x7fff)] },
+        payload: { champions: [ch('HALK', 3), ch('BOB', 7, { reincarnated: true, hero: 'WU TSE' }), ch('ROSE', null), ch("D'AR.-2", 0x7fff)] },
     }), 'party: rebuilt, unknown fields dropped, every name and id as sent');
     const typed = accepted(event('party', P1, 'csb', 1, { champions: [ch('A B.,;:'), ch('!?/'), ch('ÀÖØÝ')] }));
     check(JSON.stringify(typed.payload) === JSON.stringify({ champions: [ch('A B.,;:'), ch('!?/'), ch('ÀÖØÝ')] }),
@@ -112,6 +112,9 @@ function checkTheChecks(): void {
         [event('party', P1, 'csb', 1, { champions: [ch('HALK', -1)] }), 'bad id'],
         [event('party', P1, 'csb', 1, { champions: [ch('HALK', 0x8000)] }), 'bad id'],
         [event('party', P1, 'csb', 1, { champions: [ch('HALK', 0, { reincarnated: 'yes' })] }), 'bad reincarnated'],
+        [event('party', P1, 'csb', 1, { champions: [ch('BOB', 0, { hero: 'HALK' })] }), 'bad hero'],
+        [event('party', P1, 'csb', 1, { champions: [ch('BOB', 0, { reincarnated: true, hero: 'Halk' })] }), 'bad hero'],
+        [event('party', P1, 'csb', 1, { champions: [ch('BOB', 0, { reincarnated: true, hero: '' })] }), 'bad hero'],
         [event('won', P1, 'csb', 1, { gameTime: 1, playTime: 1, champions: [ch('HALK')] }), 'bad masteries'],
         [event('won', P1, 'csb', 1, { gameTime: 1, playTime: 1, champions: [ch('HALK', 0, { masteries: [1, 1, 1] })] }), 'bad masteries'],
         [event('won', P1, 'csb', 1, { gameTime: 1, playTime: 1, champions: [ch('HALK', 0, { masteries: [1, 1, 1, 64] })] }), 'bad masteries'],
@@ -166,7 +169,7 @@ const EXPECTED_SETS: SetStats[] = [{
         { day: '2026-10-10', gameTime: 120, playTime: 1000, champions: [winner('BOB', 1)] },
         { day: '2026-10-08', gameTime: 500, playTime: 60_000, champions: [winner('ROSE')] },
         { day: '2026-10-09', gameTime: 500, playTime: 600_000, champions: [winner('HALK', 3)] },
-        { day: '2026-10-07', gameTime: 1000, playTime: 300_000, champions: [winner('HALK', 3), winner('WU TSE', 9, true)] },
+        { day: '2026-10-07', gameTime: 1000, playTime: 300_000, champions: [winner('HALK', 3), winner('TSE', 9, 'WU TSE')] },
     ] as SetStats['fastest'],
     levels: [{ level: 1, count: 3 }],
     champions: [
@@ -258,6 +261,18 @@ function checkStore(scratch: string): void {
     const upgraded = store.summary(PUBLIC).sessions;
     store.record(accepted(session(P1, 'dm-atari', 4, 0)), day('2026-10-15'));
     check(upgraded === 0 && store.summary(PUBLIC).sessions === 1, 'and counts the sessions from then on');
+    const slotted = answers(store);
+    db.close();
+
+    // The store as it was before the picks' slots, which counted each name reported.
+    const unslotted = new DatabaseSync(path);
+    unslotted.exec(`DROP TABLE picks;
+        CREATE TABLE picks (data_set TEXT NOT NULL, playthrough INTEGER NOT NULL, name TEXT NOT NULL, PRIMARY KEY (data_set, playthrough, name)) WITHOUT ROWID;
+        INSERT INTO picks VALUES ('dm-atari', 2, 'KID')`);
+    unslotted.close();
+    db = openStore(path);
+    store = new StatsStore(db);
+    check(answers(store) === slotted, "a store made before the picks' slots is given its picks again, from the log, once");
     db.close();
 
     // The store as the first deployed one was: the log alone.

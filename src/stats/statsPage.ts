@@ -19,7 +19,7 @@
  *   party, a champion who joined by REINCARNATE marked, a solo win badged, and its day; the
  *   deaths per level, a row a level from the first to the deepest died on, as the dungeon
  *   descends, `LEVEL 1` its first as the map dialog counts (`mapTitle`); its preferred
- *   champions, each their share of the games with a party, and their win rate once they
+ *   champions, by their mirror's name, a reincarnated one's too, each their share of the games with a party, and their win rate once they
  *   were in `WIN_RATE_GAMES`; the sessions, games started and games won per week.
  *
  * A chart of weeks runs from the first week answered to the current one, the weeks

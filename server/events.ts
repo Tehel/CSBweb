@@ -46,6 +46,8 @@ export interface CheckedChampion {
     name: string;
     id: number | null;
     reincarnated?: true;
+    /** A reincarnated champion's mirror name, which the statistics count them by. */
+    hero?: string;
     masteries?: number[];
 }
 
@@ -113,12 +115,14 @@ function checkChampions(champions: unknown, won: boolean): CheckedChampion[] | s
     const checked: CheckedChampion[] = [];
     for (const champion of champions) {
         if (!isRecord(champion)) return 'bad champion';
-        const { name, id, reincarnated, masteries } = champion;
-        if (typeof name !== 'string' || [...name].length > MAX_NAME || !NAME.test(name) || name.trim() === '') return 'bad name';
+        const { name, id, reincarnated, hero, masteries } = champion;
+        if (!isName(name)) return 'bad name';
         if (id !== null && !isInteger(id, 0, MAX_ID)) return 'bad id';
         if (reincarnated !== undefined && reincarnated !== true) return 'bad reincarnated';
+        if (hero !== undefined && (reincarnated !== true || !isName(hero))) return 'bad hero';
         const kept: CheckedChampion = { name, id };
         if (reincarnated) kept.reincarnated = true;
+        if (hero !== undefined) kept.hero = hero;
         if (won) {
             if (!Array.isArray(masteries) || masteries.length !== MASTERIES || !masteries.every((m) => isInteger(m, 0, MAX_MASTERY))) {
                 return 'bad masteries';
@@ -128,6 +132,10 @@ function checkChampions(champions: unknown, won: boolean): CheckedChampion[] | s
         checked.push(kept);
     }
     return checked;
+}
+
+function isName(value: unknown): value is string {
+    return typeof value === 'string' && [...value].length <= MAX_NAME && NAME.test(value) && value.trim() !== '';
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
