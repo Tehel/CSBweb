@@ -438,16 +438,22 @@ check(atWelcome.last === 'pick add +Add my own', 'the fan-made dungeons end with
 // dialog, the moves, attacks and runes keyed as the player's settings have them, the 24
 // runes the font's (U+E060 to U+E077, `gen-font.ts`). Its chooser's ARROWS makes the
 // settings the ARROWS preset, stored, the sheet shown anew; CSBWIN KEYS puts them back.
-// CLOSE takes the fragment off, and the page's button opens it again. The selection made
-// above is made again after.
-const howToPlay = () => evaluate(`(()=>{const d=document.querySelector('dialog.how-to-play');
+// Its links to print are the sheets `tools/gen-help-sheet.mjs` made for the preset shown,
+// which are there, and the sheet is the text that tool recorded (`sheets.json`): a sheet
+// changed without its files made again fails here. CLOSE takes the fragment off, and the
+// page's button opens it again. The selection made above is made again after.
+const howToPlay = () => evaluate(`(async()=>{const d=document.querySelector('dialog.how-to-play');
   const keys=(s)=>[...d.querySelectorAll(s)].map(c=>[...c.querySelectorAll('.how-key')].map(k=>k.textContent).join(' ')).join();
   return d && { open: d.open, hash: location.hash,
     preset: [...d.querySelectorAll('.how-choice input')].filter(i=>i.checked).map(i=>i.value).join(),
     stored: JSON.parse(localStorage.getItem('csbweb_settings_v2') ?? '{}').keyPreset ?? null,
     moves: keys('.how-pad-cell'), attacks: keys('.how-attacks .how-keys'), runeKeys: keys('.how-rune-table > .how-keys'),
     glyphs: [...d.querySelectorAll('.how-glyph')].map(g=>g.textContent.codePointAt(0).toString(16)).join(),
-    font: getComputedStyle(d.querySelector('.how-glyph')).fontFamily };})()`);
+    font: getComputedStyle(d.querySelector('.how-glyph')).fontFamily,
+    sheet: d.querySelector('.how-sheet').textContent,
+    printed: await Promise.all(['.how-pdf', '.how-png'].map(async (s)=>{const a=d.querySelector(s);
+      const r=a.href ? await fetch(a.href).catch(()=>null) : null; return a.download+(r?.ok ? ' '+r.headers.get('content-type') : ' missing');})) };})()`);
+const printedSheets = JSON.parse(readFileSync(new URL('../src/assets/how-to-play/sheets.json', import.meta.url), 'utf8'));
 await send('Page.navigate', { url: `${APP}?dungeon=nowhere&keepsaves#how-to-play` });
 await wait(2500);
 const help = await howToPlay();
@@ -458,10 +464,15 @@ check(help?.preset === 'csbwin' && help.moves === 'J KP 7,K KP 8,L KP 9,M KP 4,,
   'its sheet keys the moves, the attacks and the runes as the CSBWin preset does, the champions in columns');
 check(help?.glyphs === Array.from({ length: 24 }, (_, i) => (0xe060 + i).toString(16)).join() && /DM Screen/.test(help.font),
   'its runes are the 24 glyphs, in the order the magic panel shows them, in the game\'s font');
+check(help?.sheet === printedSheets['csbwin-qwerty']
+  && help.printed.join() === 'csbweb-how-to-play-csbwin-qwerty.pdf application/pdf,csbweb-how-to-play-csbwin-qwerty.png image/png',
+  'its PDF and PNG to print are the CSBWin preset\'s, in QWERTY, made from the sheet it shows');
 await clickOn('.how-choice input[value="arrows"]');
 const arrows = await howToPlay();
 check(arrows?.preset === 'arrows' && arrows.stored === 'arrows' && arrows.moves === 'DELETE KP 7,UP KP 8,PAGE DOWN KP 9,LEFT KP 4,DOWN KP 5,RIGHT KP 6',
   'ARROWS in its chooser makes the settings the ARROWS preset, stored, and the sheet shows its moves');
+check(arrows?.sheet === printedSheets['arrows-qwerty'] && arrows.printed.join() === 'csbweb-how-to-play-arrows-qwerty.pdf application/pdf,csbweb-how-to-play-arrows-qwerty.png image/png',
+  'its PDF and PNG to print are then the ARROWS preset\'s, made from the sheet it shows');
 await clickOn('.how-choice input[value="csbwin"]');
 check((await howToPlay())?.stored === 'csbwin', 'CSBWIN KEYS puts the preset back');
 await clickOn('#how-close');

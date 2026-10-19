@@ -86,7 +86,8 @@ frames against CSBWin's own screenshots. The retail dungeon uses none of them. F
   games first, FTL's own, then the fans' dungeons, the player's own data sets among them (`DEBT.md` P). Its HOW
   TO PLAY, also at `#how-to-play`, is the newcomer's sheet (`src/ui/howToPlay.ts`): the keys as the player's settings
   have them, with a chooser of the presets' moves, the runes in the game's font with the manual's names, the first
-  steps and the mouse. The map dialog's teleport is behind `?dev`, and so is a move down or up a level whatever is there (`Game.devChangeLevel`). The page has no log of its
+  steps and the mouse, and a PDF and a PNG of it to print, for each preset and each label layout, which
+  `tools/gen-help-sheet.mjs` makes (the frames' probe fails a sheet changed without them made again). The map dialog's teleport is behind `?dev`, and so is a move down or up a level whatever is there (`Game.devChangeLevel`). The page has no log of its
   own: what it reports goes to the console, a move's position at debug level, what F5,
   F9 or the Sleepsave did at info level.
 
@@ -143,9 +144,3 @@ notes of the phases closed up to 2026-09-26; for a phase closed later, its line 
 ## Next Steps (Phased)
 
 Only the phases with work left in them.
-
-### How to play — the sheet to print
-
-⏳ The welcome page's HOW TO PLAY is done but for its downloads: a PDF and a PNG of the
-sheet for each preset and each label layout, made by a tool from the page in headless
-Chrome (`Page.printToPDF`) under a print stylesheet, and offered in the dialog.

@@ -484,7 +484,42 @@ body.welcome {
 .how-rune { display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .how-glyph { font-size: 32px; line-height: 32px; color: var(--p15); }
 .how-rune-name { color: var(--p9); }
-@media (max-width: 900px) {
+.how-print-head { display: none; }
+.how-downloads { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; font-size: 16px; }
+.how-downloads .px { color: var(--p9); }
+.how-downloads a { color: var(--p11); }
+.how-downloads a:hover { color: var(--p9); }
+.how-downloads-note { color: var(--p2); }
+/* The sheet printed, alone on one landscape A4 page, black on white: the dialog in the
+   page's flow, without its chooser, its buttons and its links, the page behind it gone. */
+@media print {
+    @page { size: A4 landscape; margin: 8mm; }
+    body.welcome { background: #fff; color: #000; }
+    body.welcome > :not(dialog.how-to-play) { display: none; }
+    .how-to-play { position: static; width: auto; max-width: none; max-height: none; overflow: visible; margin: 0; border: 0; background: #fff; color: #000; }
+    .how-to-play::backdrop { display: none; }
+    .how-form { padding: 0; gap: 6px; }
+    .how-chooser, #how-close, .how-downloads { display: none; }
+    .how-to-play h2 { color: #000; font-size: 16px; line-height: 16px; }
+    .how-print-head { display: block; margin: 0; font-size: 12px; }
+    .how-sheet {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-areas: "move fight fight magic" "runes runes party party" "start start mouse mouse";
+        gap: 6px 10px;
+        font-size: 12px;
+        line-height: 1.3;
+    }
+    .how-section { gap: 4px; padding: 4px 6px 6px; border: 1px solid #000; break-inside: avoid; }
+    .how-section h3 { color: #000; font-size: 16px; line-height: 16px; }
+    .how-section ul { gap: 1px; padding-left: 14px; }
+    .how-warn, .how-what, .how-row, .how-rune-name, .how-head, .how-glyph { color: #000; }
+    .how-what, .how-row { font-size: 11.5px; }
+    .how-key { padding: 1px 3px; background: #fff; color: #000; border: 1px solid #000; font-size: 8px; line-height: 8px; }
+    .how-pad, .how-attacks, .how-list, .how-rune-table { gap: 3px 6px; }
+    .how-glyph { font-size: 24px; line-height: 24px; }
+    .how-rune-name { font-size: 16px; line-height: 16px; }
+}
+@media screen and (max-width: 900px) {
     .how-sheet { grid-template-columns: minmax(0, 1fr); grid-template-areas: "move" "fight" "magic" "party" "runes" "start" "mouse"; }
 }
 /* A phone's: each row of runes under its name, the six across the width. */

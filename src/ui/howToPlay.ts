@@ -13,6 +13,12 @@
  * manual's, page text as the page's credits are, not a game table read from a file.
  *
  * `#how-to-play` in the page's address opens it, so a link can lead straight to it.
+ *
+ * The sheet prints on one landscape A4 page (`@media print`, `welcomePage.css`), and the
+ * dialog offers it made: a PDF and a PNG for each preset and each layout of the labels,
+ * which `tools/gen-help-sheet.mjs` writes from this page into `src/assets/how-to-play/`,
+ * with the text of each sheet in `sheets.json` there, which `tools/probe-frames.mjs`
+ * holds the page's sheet to, so a sheet changed without its files made again fails.
  */
 import type { Settings } from '../settings/Settings';
 import { type KeyAction, type KeyBindings, type KeyPreset } from '../renderer/ui/Keyboard';
@@ -26,6 +32,9 @@ export interface HowToPlayHost {
 
 /** The address's fragment that opens the dialog. */
 export const HOW_TO_PLAY_HASH = '#how-to-play';
+
+/** The sheets made for printing, `<preset>-<layout>.pdf` and `.png`, by their paths here. */
+const PRINTED = import.meta.glob<string>('../assets/how-to-play/*.{pdf,png}', { query: '?url', import: 'default', eager: true });
 
 /** The presets the chooser offers, each with what it moves the party with. */
 const MOVE_PRESETS: ReadonlyArray<{ preset: Exclude<KeyPreset, 'custom'>; label: string }> = [
@@ -80,6 +89,8 @@ const DIALOG = `
   <fieldset class="how-chooser">
     <legend class="px px2">Move with</legend>
   </fieldset>
+  <p class="how-downloads"><span class="px px2">To print</span><a class="how-pdf">PDF</a><a class="how-png">PNG</a><span class="how-downloads-note"></span></p>
+  <p class="how-print-head"></p>
   <div class="how-sheet"></div>
 </form>`;
 
@@ -91,6 +102,10 @@ export function openHowToPlay(host: HowToPlayHost): void {
     dialog.innerHTML = DIALOG;
     const chooser = dialog.querySelector<HTMLElement>('.how-chooser')!;
     const sheet = dialog.querySelector<HTMLElement>('.how-sheet')!;
+    const printHead = dialog.querySelector<HTMLElement>('.how-print-head')!;
+    const pdf = dialog.querySelector<HTMLAnchorElement>('.how-pdf')!;
+    const png = dialog.querySelector<HTMLAnchorElement>('.how-png')!;
+    const note = dialog.querySelector<HTMLElement>('.how-downloads-note')!;
 
     const choices = MOVE_PRESETS.map(({ preset, label }) => {
         const choice = document.createElement('label');
@@ -118,6 +133,16 @@ export function openHowToPlay(host: HowToPlayHost): void {
         for (const input of choices) input.checked = input.value === keyPreset;
         custom.hidden = keyPreset !== 'custom';
         sheet.replaceChildren(...helpSheet(keyBindings, (code) => keyLabel(code, keyLabels, layout)));
+        // The sheets made are the presets', labelled in the layout the dialog's labels are.
+        const preset = keyPreset === 'custom' ? 'csbwin' : keyPreset;
+        const labels = layout ? (layout.get('KeyQ') === 'a' ? 'azerty' : 'qwerty') : keyLabels;
+        const name = MOVE_PRESETS.find((one) => one.preset === preset)!.label;
+        printHead.textContent = `CSBweb, Dungeon Master in a browser. Moves: ${name}. Labels: ${labels.toUpperCase()}.`;
+        for (const [link, extension] of [[pdf, 'pdf'], [png, 'png']] as const) {
+            link.href = PRINTED[`../assets/how-to-play/${preset}-${labels}.${extension}`] ?? '';
+            link.download = `csbweb-how-to-play-${preset}-${labels}.${extension}`;
+        }
+        note.textContent = keyPreset === 'custom' ? `${name}' sheet: your own keys are not on it.` : `${name}, ${labels.toUpperCase()}`;
     }
     render();
 

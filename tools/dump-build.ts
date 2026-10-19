@@ -6,8 +6,8 @@
  * page, then `--ssr`) into a scratch folder, lists every file,
  * and asserts:
  *   - every file is `index.html`, `stats.html`, the web app manifest, under `assets/`, or the server's
- *     module (`CHECK_MODULE`), of a type the page itself is made of: no `.dat`, no `.pdf`,
- *     nothing of `static/`;
+ *     module (`CHECK_MODULE`), of a type the page itself is made of: no `.dat`, no `.pdf`
+ *     but HOW TO PLAY's sheets to print (`src/assets/how-to-play/`), nothing of `static/`;
  *   - every local `href` and `src` in `index.html` names a file the build holds, the
  *     manifest among them, and the manifest's icons are in it too, at the sizes it says;
  *   - so does every one in `stats.html`, which links no manifest, and loads none of the
@@ -35,6 +35,8 @@ import { dataSetNamed } from './lib/dataSets.ts';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const PAGE_TYPES = new Set(['.html', '.js', '.css', '.ico', '.jpg', '.png', '.ttf', '.woff2', '.img', '.wav', '.webmanifest']);
+/** HOW TO PLAY's sheets to print (`tools/gen-help-sheet.mjs`), the page's only PDFs, as Vite names them. */
+const PRINTED_SHEET = /^assets\/(csbwin|keypad|arrows)-(qwerty|azerty)-[\w-]+\.pdf$/;
 /** The statistics page, Vite's second entry (`vite.config.mts`), and a bound on the script it loads. */
 const STATS_PAGE = 'stats.html';
 const STATS_PAGE_BYTES = 32 * 1024;
@@ -106,7 +108,7 @@ async function main(): Promise<void> {
         console.log('\nChecks:');
         const strays = files.filter((f) => f !== 'index.html' && f !== STATS_PAGE && f !== WEB_MANIFEST && !f.startsWith('assets/') && f !== CHECK_MODULE);
         check(strays.length === 0, `every file is index.html, ${STATS_PAGE}, ${WEB_MANIFEST}, under assets/ or ${CHECK_MODULE}${strays.length ? `: not ${strays.join(', ')}` : ''}`);
-        const foreign = files.filter((f) => !PAGE_TYPES.has(f.slice(f.lastIndexOf('.'))));
+        const foreign = files.filter((f) => !PAGE_TYPES.has(f.slice(f.lastIndexOf('.'))) && !PRINTED_SHEET.test(f));
         check(foreign.length === 0, `every file is of the page's own types${foreign.length ? `: not ${foreign.join(', ')}` : ''}`);
         check(!files.some((f) => f.includes('gamefiles')), 'no game files');
 
