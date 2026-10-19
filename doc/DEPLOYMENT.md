@@ -475,6 +475,25 @@ browser says another site's page sent, by its `Sec-Fetch-Site` or its `Origin`, 
 with 403 (`isCrossSite`, `doc/STATISTICS.md`). A path with a segment that starts with `.`, or holds a `/`, a `\` or a NUL once
 decoded, is refused with 400 before it reaches the disk. A folder is 404, never a listing.
 
+Every answer, the API's and every error's included, carries the same headers
+(`SECURITY_HEADERS`, `server/app.ts`), so nginx adds none:
+
+- `Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline'; img-src
+  'self' blob:; frame-ancestors 'none'; base-uri 'none'`. The page loads its scripts, fonts,
+  game files and API from its own origin only, and no script inline. Its styles may be
+  inline (`index.html`'s `<style>`), its images `blob:` URLs (a set's thumbnail). Vite would
+  inline a small asset as a `data:` URL, which the policy does not fetch, so the one small
+  file the page fetches, `swoosh.img`, is imported `?url&no-inline` (`src/main.ts`).
+- `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, and
+  `Strict-Transport-Security: max-age=31536000`, without `includeSubDomains`, which would
+  bind the VPS's other projects. A browser ignores it over plain HTTP, as the dev server
+  and `tools/check-image.sh` serve.
+
+`tools/check-image.sh` proves the page runs under the policy: the frames are the built
+page's, served by the server with its headers, and the probe fails on anything the policy
+refuses (`tools/probe-frames.mjs`). The dev server sets none: Vite's own page runs inline
+scripts.
+
 **At start-up** it opens the store (making it, and its folder, when missing), checks
 that `index.html` is built, and that the game files' folder and each folder the table's
 sets name exist, which may be none; then it loads the server's module (`loadCheckDataSet`, `server/app.ts`). Any failure prints `Not starting: <why>` and exits with 1, so a bad mount fails

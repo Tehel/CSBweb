@@ -125,7 +125,6 @@ In payoff order: the first row is the next item.
 | R16 | A save's DELETE is told done before its transaction commits | S | ⏳ |
 | W4 | The events table grows without bound | S | ⏳ |
 | W5 | The statistics are pseudonymous, not anonymous | S | ⏳ |
-| W6 | Security headers | S | ⏳ |
 | W7 | The container, the deploy and the Node version | S | ⏳ |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
@@ -571,7 +570,7 @@ open internet behind the VPS's nginx. Its weak point is availability: what an an
 client can make it hold, compute or keep. What holds already: paths (`..`, `%2e%2e`,
 `%00`, dotfiles all refused), the body's size limit, events rebuilt from checked fields
 only, a champion's name of the game's characters, a POST from another site's page
-refused, errors that leak nothing. Each item ships with its check in `tools/dump-server.ts`
+refused, a content security policy and `nosniff` on every answer, errors that leak nothing. Each item ships with its check in `tools/dump-server.ts`
 or `tools/dump-stats.ts`.
 
 ### W2 ⏳ `api/stats` is computed whole at every request
@@ -610,17 +609,6 @@ Paying it: `access_log off` (or a format without the address) for `location =
 /api/event`, in `doc/DEPLOYMENT.md` and on the VPS (the author's); the time stored to the
 minute or coarser; a retention period; the FAQ saying "pseudonymous", and how to reset the
 id.
-
-### W6 ⏳ Security headers
-
-Only a file's answer carries `X-Content-Type-Options: nosniff` (`serveFile`,
-`server/app.ts`); `send`, which answers the API and every error, sets none (`:253-258`). No
-answer carries `Content-Security-Policy`, `frame-ancestors`, `Referrer-Policy` or HSTS.
-
-Paying it: in `send` and `serveFile`, or in nginx: `default-src 'self'; style-src 'self'
-'unsafe-inline'` (the `<style>` in `index.html`), `img-src 'self' data: blob:;
-frame-ancestors 'none'; base-uri 'none'`, and `nosniff` on every answer.
-`tools/check-image.sh` checks the page still runs under it.
 
 ### W7 ⏳ The container, the deploy and the Node version
 

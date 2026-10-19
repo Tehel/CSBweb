@@ -27,7 +27,8 @@
  *   /api/event        POST: a game's event, checked (`events.ts`) and stored (`stats.ts`)
  *   /api/stats        the store's aggregates, as JSON
  *
- * A POST a browser says another site's page sent is refused with 403 (`isCrossSite`).
+ * Every answer, the API's and every error's as a file's, carries `SECURITY_HEADERS`. A POST a
+ * browser says another site's page sent is refused with 403 (`isCrossSite`).
  * Every file answers a conditional GET with 304. A path with a `.` segment, a backslash or
  * a NUL, encoded or not, is refused before it reaches the disk, so no request leaves the
  * three folders. A folder is 404, never a listing.
@@ -188,9 +189,26 @@ export function checkFiles({ distDir, gamefilesDir }: ServerOptions, dataSets: D
     return sets.map((set) => set.id);
 }
 
+/**
+ * What every answer carries. The policy lets the page load only from its own origin
+ * (`default-src`): its scripts, fonts, game files and API, none inline. Its styles may also
+ * be inline, as `index.html`'s `<style>` is; its images may also be `blob:` URLs, as a set's
+ * thumbnail is (`src/ui/welcomePage.ts`). No page may frame it, and no `<base>` move its
+ * relative URLs. No answer is sniffed for another type, no link the page follows names it,
+ * and a browser that has reached it over HTTPS never asks it over HTTP again: nginx's TLS
+ * is the only way in (`doc/DEPLOYMENT.md`), and a browser ignores the header over HTTP.
+ */
+export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
+    'Content-Security-Policy': "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'",
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer',
+    'Strict-Transport-Security': 'max-age=31536000',
+};
+
 /** The server, not yet listening. */
 export function createAppServer(options: ServerOptions, api: ApiOptions): Server {
     return createServer((req, res) => {
+        for (const [name, value] of Object.entries(SECURITY_HEADERS)) res.setHeader(name, value);
         const fail = (error: unknown) => {
             console.error(`${req.method} ${req.url}:`, error);
             if (!res.headersSent) send(res, 500, 'Internal error');
@@ -343,7 +361,6 @@ function serveFile(req: IncomingMessage, res: ServerResponse, path: string, cach
 
     res.setHeader('Content-Type', contentType(path));
     res.setHeader('Content-Length', stats.size);
-    res.setHeader('X-Content-Type-Options', 'nosniff');
     if (req.method === 'HEAD') {
         closeSync(fd);
         res.end();

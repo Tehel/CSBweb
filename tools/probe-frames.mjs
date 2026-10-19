@@ -34,7 +34,8 @@
 // straight into play, its form adding, editing, publishing and deleting a player's own set, the
 // tiles' controls moderating a published one, the book listing its documents, a moderator adding
 // and removing them, and each tile's name in its set's state's colour,
-// to a moderator. See `check` below.
+// to a moderator, and, against a page whose server sends a content security policy
+// (`check-image.sh`), nothing it refuses. See `check` below.
 // A failure there exits 1.
 //
 // Usage:
@@ -161,6 +162,11 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
 
 await send('Runtime.enable');
 await send('Page.enable');
+// What the server's policy refuses (`SECURITY_HEADERS`, `server/app.ts`), said on the
+// console of every page loaded, and checked at the end. The dev server sends no policy.
+await send('Page.addScriptToEvaluateOnNewDocument', { source: `
+  document.addEventListener('securitypolicyviolation', (e) => console.error('CSP: ' + e.effectiveDirective + ' refused ' + e.blockedURI));
+` });
 // The save menu's EXPORT downloads a file. Chrome is told to announce a download and keep
 // none, so the run leaves nothing on the disk.
 await send('Browser.setDownloadBehavior', { behavior: 'deny', eventsEnabled: true });
@@ -1535,6 +1541,8 @@ check(await crtEffect() === 'on', 'the effect is on at the entrance');
 check(await canvasPixels() === entrance, 'the entrance is frame 07');
 await realClick(270, 192); await wait(1500);
 check(await canvasPixels() === credits, 'a real click on the scroll brings up frame 08, the credits');
+
+check(!logs.some((line) => line.startsWith('error: CSP: ')), 'nothing the content security policy refuses');
 
 console.log('--- console errors ---');
 console.log(logs.length ? logs.join('\n') : '(none)');

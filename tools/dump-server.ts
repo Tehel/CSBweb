@@ -26,6 +26,8 @@
  *   - no path leaves the three folders, `..` and `.` raw, percent-encoded or behind a
  *     backslash, and no dot-file is served;
  *   - `/api/health`, and a 405 for a method that is not GET or HEAD;
+ *   - `SECURITY_HEADERS` on every answer: the page, an asset, a 304, a HEAD, the API, and
+ *     every error, a 404, a 400, a 405 and a 403 included;
  *   - `/api/event`: POST only, an event stored (what is stored, `dump-stats` asserts), a bad
  *     one 400, a set added to the table while it runs known at once, a body over 4 KB 413 whether it says so or not, and the rate limit per
  *     forwarded address, 429; a POST a browser says another site's page sent, by its
@@ -101,7 +103,7 @@ import { join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { deflateSync } from 'node:zlib';
 
-import { CHECK_MODULE, checkFiles, createAppServer, fillWalls, pathSegments, type ApiOptions, type ServerOptions } from '../server/app.ts';
+import { CHECK_MODULE, checkFiles, createAppServer, fillWalls, pathSegments, SECURITY_HEADERS, type ApiOptions, type ServerOptions } from '../server/app.ts';
 import { ANYONE, DataSetStore, manifestText, parseModerators } from '../server/dataSets.ts';
 import { RateLimit } from '../server/events.ts';
 import { NOBODY, notificationText } from '../server/notify.ts';
@@ -291,6 +293,30 @@ async function checkAnswers(port: number, manifest: string, gamefilesDir: string
     check((await ask(port, '/assets/nothing.js')).status === 404, 'a missing file is 404');
     check((await ask(port, '/assets')).status === 404, 'a folder is 404, not a listing');
     check((await ask(port, `/${CHECK_MODULE}`)).status === 404, `the server's module, ${CHECK_MODULE}, is not served`);
+
+    console.log('\nThe security headers:');
+    const answers: [string, Promise<Answer>][] = [
+        ['the page', ask(port, '/')],
+        ['an asset', ask(port, '/assets/index-AbC123.js')],
+        ['a 304', ask(port, '/', 'GET', { 'If-None-Match': String(page.headers.etag) })],
+        ['a HEAD', ask(port, '/', 'HEAD')],
+        ['a 404', ask(port, '/assets/nothing.js')],
+        ['a bad path', ask(port, '/%2e%2e/x')],
+        ['a 405', ask(port, '/', 'POST')],
+        ['api/health', ask(port, '/api/health')],
+        ['api/data-sets', ask(port, '/api/data-sets')],
+        ['a bad event', ask(port, '/api/event', 'POST', {}, '{')],
+        ['a cross-site POST', ask(port, '/api/event', 'POST', { 'Sec-Fetch-Site': 'cross-site' }, '{')],
+    ];
+    console.log(`  ${Object.entries(SECURITY_HEADERS).map(([name, value]) => `${name}: ${value}`).join('\n  ')}`);
+    for (const [what, answer] of answers) {
+        const { status, headers } = await answer;
+        const missing = Object.entries(SECURITY_HEADERS).filter(([name, value]) => headers[name.toLowerCase()] !== value).map(([name]) => name);
+        check(missing.length === 0, `${what} (${status}) carries them all${missing.length ? `: not ${missing.join(', ')}` : ''}`);
+    }
+    const policy = SECURITY_HEADERS['Content-Security-Policy']!;
+    check(/default-src 'self'/.test(policy) && !/script-src/.test(policy) && /frame-ancestors 'none'/.test(policy),
+        'the policy: scripts from the page\'s origin only, none inline, and no framing');
 
     console.log('\nThe game files:');
     const file = await ask(port, '/gamefiles/set-a/dungeon.dat');
