@@ -1,27 +1,55 @@
-# Atari ST Disk Reference: Dungeon Master 1.2 (English) and 1.3 (French), and Chaos Strikes Back's utility disk
+# Atari ST Disk Reference: Dungeon Master's six disks, and Chaos Strikes Back's utility disk
 
-What the original Atari ST game disk holds that CSBWin does not: the boot chain, the FTL
-logo animation (`SWOOSH.IMG`) that ran before the title, and how the disk's data files
-differ from the `graphics.dat` and `dungeon.dat` CSBWin ships (`dm-windows/`). The
-English 1.2 disk is the reference throughout; the French 1.3 disk, the same but
-translated, has its own section. The last section is Chaos Strikes Back's utility disk,
-whose champion portraits CSBWin does not port.
+What the original Atari ST game disks hold that CSBWin does not: the boot chain, the FTL
+logo animation (`SWOOSH.IMG`) that ran before the title, what each release changes in
+`dungeon.dat` and `graphics.dat`, and which release CSBWin's own files (`dm-windows/`)
+come from. The English 1.2 disk is the reference for the boot chain and the logo; the
+German 1.2 and French 1.3 disks, the same but translated, have their own sections. The
+last section is Chaos Strikes Back's utility disk, whose champion portraits CSBWin does
+not port.
 
 This is not CSBWin-sourced. The authority is the disk itself. A citation `swoosh.img:$0070`
 is a byte offset into that file, and a citation `boot:$003a` is an offset into the boot
 sector, both taken from a 68000 disassembly. A citation `chaos:$4518` is an offset into
 the code of the utility's program, `CHAOS.FTL`. What is known about TOS (the XBIOS calls,
 the `Dosound` byte codes, the YM2149 registers) is the Atari's documented behaviour and
-is marked as such.
+is marked as such. A citation `map 5 (6,18)` is a square of a disk's `DUNGEON.DAT`, as
+`tools/peek-dungeon.ts --file <it> cell 5 6 18` shows it.
 
-## The disk and the files taken from it
+`doc/dm-versions.html` tells the version history below in a form nicer to read.
 
-`archive/DungeonMaster1v2E.stx` (md5 `279e322b837e98ea258f0b16a736f9ca`, gitignored)
-is a Pasti image: 80 tracks, single-sided, 10 sectors of 512 bytes a track (plus two
-more track records Pasti keeps). Track 0 carries the copy protection: sector 7 is stored
-with fuzzy bits and a CRC error (FDC flags `0x88`), and an extra sector numbered 247
-follows it. Nothing else on the disk is unusual. The filesystem is plain FAT12 (2 sectors
-a cluster, 16 root entries), and the root directory holds six files:
+## The disks
+
+`archive/Game,Dungeon_Master,Atari_ST,Software/` (gitignored) is a collection of the
+Atari ST releases. Its `Floppy Disks STX/` holds six Pasti images of the original disks,
+`Dungeon Master for Atati ST <version>.stx` (sic):
+
+| Version | Image md5 | `GRAPHICS.DAT` | `DUNGEON.DAT` |
+| --- | --- | --- | --- |
+| 1.0 (English) 1987-12-08 | `58286fce…` | 271911, 1987-12-08, `b3cfd84e…` | 33286, 1987-12-08, `ebccb5f9…` |
+| 1.0 (English) 1987-12-11 | `3fd743a3…` | 271918, 1987-12-11, `7eee3969…` | 33314, 1987-12-11, `c4a54af4…` |
+| 1.1 (English) | `5ee3f902…` | 271917, 1988-01-07, `5095a136…` | 33442, 1988-01-07, `e0333c81…` |
+| 1.2 (English) | `279e322b…` | 271918, 1988-02-18, `9ce2eaf7…` | 33442, 1988-03-01, `050fb2cf…` |
+| 1.2 (German) | `97cc99bf…` | 272288, 1988-03-01, `2bdc5f43…` | 33792, 1988-03-01, `cea11d6e…` |
+| 1.3 (French) | `933955a6…` | 271995, 1988-05-20, `0d7af44d…` | 33774, 1988-05-20, `dfd82fb7…` |
+
+The six are alike as disks. Each is single-sided, 10 sectors of 512 bytes a track, 80
+tracks (the five later images keep two more track records). Track 0 carries the copy
+protection: sector 7 is stored with fuzzy bits and a CRC error (FDC flags `0x88`), and an
+extra sector numbered 247 follows it. Nothing else on the disks is unusual. The
+filesystem is plain FAT12 (2 sectors a cluster, 16 root entries), and every root
+directory holds the same six files. `SWOOSH.IMG` and `START.PRG` are byte-identical on all
+six; `BOOTER` and `START.PAK`, the packed program, differ on each. Each disk's six files,
+read through the image's sector records and the FAT, are in the collection's
+`extracted/<version>/`.
+
+The collection's cracked copies agree with the originals where they can be read. The
+`GRAPHICS.DAT` and `DUNGEON.DAT` of `Floppy Disks MSA/…v1.1 (English) Cracked.msa` are
+1.1's. The `GRAPHICS.DAT` of `Floppy Disks ST/…v1.0 (English) 1987-12-08 Cracked
+(42-Crew).st` is CSBWin's, below; its `DUNGEON.DAT` is the 8 December one but for 694
+bytes, all in the text (file bytes 5685-7087), which garble the texts of 55 squares.
+
+The English 1.2 disk's six files:
 
 | File | Size | Date | md5 | What it is |
 | --- | --- | --- | --- | --- |
@@ -243,52 +271,183 @@ intro. There is no setting to turn it off yet.
 above, and `tools/fixtures/swoosh-index.png` pixel for pixel) and the script's timing on a
 headless host.
 
-## The 1.2 data files against CSBWin's
+## What each version changes
 
-`static/gamefiles/dm-windows/graphics.dat` (md5 `0b5e042f…`) is the file CSBWin's DM
-distribution (`DM_Windows_x86-32_20171117.zip`) ships. It is not the 1.2 disk's. Which
-version it comes from is not established. Both have 563 items, and they differ in seven:
+Every disk's `DUNGEON.DAT` has the same header (seed 99, the party at map 0 (1,3) facing
+south, 14 maps), the same level descriptors and the same 12366 bytes of maps but for the
+squares named below. Every `GRAPHICS.DAT` has 563 items. Compared square by square
+(each square's flag byte and its objects, chests' and monsters' contents included) and
+item by item (decompressed), the English releases differ only as follows. Maps are
+numbered from 0, as the files do: map 5 is the game's level 6.
 
-| Item | What it is | 1.2 disk | CSBWin's |
-| --- | --- | --- | --- |
-| 5 | The credits scroll | The text as drawn | Four bytes differ, and from "Dennis Walker" down four lines of the text are corrupted ("Jaros" reads "Jeros") |
-| `0xe8` (232) | Crack Switch (In), front view (`121 + 2*55 + 1`) | The button pushed into the crack | 8 pixels differ, x 11–14, y 2–4: the crack is empty |
-| `0x18c` (396) | A 64x7 graphic, not identified | 261 pixels differ | |
-| `0x22c` | Object names | `BRO POTION`, `MA POTION` | `ANTIVEN POTION`, `MON POTION` |
-| `0x22e` | `Byte4100[55]`, Crack Switch (In)'s coordinate set (raw byte 3201) | **2** | **0** |
-| `0x22f` | `MonsterDescriptor[24]`, byte 14 (the high byte of `word14`) | `$36` | `$26` |
-| `0x22f` | `ObjDesc[62]` (`OBJNI_STAFF_OF_IRRA`), byte 2, `graphicClass` | 11 | 35 |
-| `0x230` | `experienceForAttacking[32]` (SHOOT) | 20 | 9 |
-| `0x230` | `skillNumber[8]` (WAR CRY) | 7 | 14 |
-| `0x230` | `Byte20046[2, 15, 19, 25]` (CHOP, THRUST, BERZERK, MELEE) | 10, 17, 40, 25 | 8, 13, 26, 17 |
-| `0x230` | `Spells[4].byte5` | 18 | 15 |
+### 1.0, 8 December 1987, to 1.0, 11 December 1987
 
-The raw offsets: `Byte4100` starts at byte 3146 of `0x22e` in both files (read through
-`readWallDecorationRectSetIndex`). `MonsterDescriptor` starts at byte 676 of `0x22f`
-(`10340 - 9664`, 26 bytes an entry) and `ObjDesc` at 1958 (`10340 - 8382`, 6 bytes an
-entry). `0x230`'s attack tables start at byte 64 (7 tables of 44 bytes, in `UITables`'
-order) and `Spells` at 1026 (8 bytes an entry).
+`graphics.dat`, three items:
 
-**The Crack Switch.** The 1.2 `graphics.dat` puts Crack Switch (In) in coordinate set 2,
-low on the wall, where Crack Switch (Out) is. The misplaced crack is a property of the
-`graphics.dat` CSBWin ships, not of the original game.
+- **Graphic 232**, Crack Switch (In)'s front view (`121 + 2*55 + 1`): 8 December's crack
+  is empty; 11 December draws the button pushed in, on the 8 pixels (x 11-14, y 2-4)
+  where Crack Switch (Out)'s front view, graphic 222, draws its button.
+- **`0x22e` byte 3201**, `Byte4100[55]`, Crack Switch (In)'s coordinate set: 0 (eye level)
+  becomes 2, low on the wall, where Crack Switch (Out) is.
+- **Graphic 396** (64x7), the floor picture of graphic class 35 (`s5604[35]`, whose
+  `objectGraphicIndex` is 36, drawn as graphic `360 + 36`), which the Torch
+  (`ObjDesc[25]`, weapon 2) and, until 1.1, the Snake Staff use: the torch is redrawn,
+  261 pixels differ. 8 December's has a small dark tip; 11 December's a larger black
+  head.
+
+`dungeon.dat`:
+
+- **Nabi's mirror**, map 0 (17,10), is empty on 8 December. 11 December puts a Staff, a
+  Tunic, Blue Pants and Sandals behind it, all `important`, in records that were free.
+- **Map 1's doors**, nine of them (`DB0.word2`: bit 0 the type, bits 1-4 the ornament,
+  bit 5 opens up, bit 7 fireball, bit 8 axe; `doc/CSBwin-src/CSB.h:825-847`):
+
+  | Square | 8 December | 11 December |
+  | --- | --- | --- |
+  | (1,0) | `0x0067` | `0x0061`: ornament 3 removed |
+  | (3,13) | `0x0027` | `0x0023`: ornament 3 becomes 1 |
+  | (6,1) | `0x0060` | `0x01e0`: breakable by fireball and axe |
+  | (6,5) | `0x0022` | `0x0020`: ornament 1 removed |
+  | (7,22) | `0x01e2` | `0x0060`: ornament 1 removed, no longer breakable |
+  | (11,0) | `0x0007` | `0x01a1`: ornament 3 removed, opens up, breakable |
+  | (17,26) | `0x0000` | `0x0020`: opens up |
+  | (18,20), (25,11) | `0x0024` | `0x0004`: opens sideways |
+
+- **Map 1's wall decoration list** is reordered (`[33,4,35,1,49,51,15,…]` becomes
+  `[33,4,35,51,15,1,49,…]`), and the four actuators at (6,4) and (20,18) that name one
+  are renumbered with it, so every wall shows what it showed.
+- **Map 2's spinners**, the teleporters at (3,8) and (5,0) that send everything back to
+  their own square turned, are inactive on 8 December (flag `0xb0`) and active on 11
+  December (`0xb8`).
+- **Map 2's blue button** at (21,11), whose actuators set the teleporter at (20,14),
+  clear it, and open the door at (22,12), becomes a one-shot button that stays pressed: a
+  once-only actuator with local action 1 (`RotateActuatorList`) is put first, and two of
+  the actuators show ornament 52, the button pushed in, where they showed 16, the button
+  out. The walls at (19,12), (20,11) and (21,13) are given random decorations.
+- **Map 3 (11,26)**, a floor square closed on three sides behind the teleporter at
+  (12,26), becomes an invisible teleporter that takes items, and only items, to map 2
+  (7,15), beside where that teleporter lands the party.
+
+### 1.0, 11 December 1987, to 1.1
+
+`graphics.dat`, three items:
+
+- **`0x22c`**, the object names: `ANTIVEN POTION` becomes `UNVEN POTION`.
+- **`0x22f`**: `MonsterDescriptor[24]` (the dragon), the high byte of `word14`, `$26`
+  becomes `$36`: `word14_12_15`, the distance a monster attacks from
+  (`doc/CSBwin-src/Monster.cpp:4190`), 2 becomes 3. `ObjDesc[62]` (`ObjDesc` is indexed
+  by `DescIndex`, weapons from 23: weapon 39, the Snake Staff, CSB's Cross of Neta), byte
+  2, `graphicClass`, 35 becomes 11: the staff on the floor was drawn as the
+  Torch, and is drawn as the plain staff (graphic 372) the Staff of Claws, the Sling, the
+  Staff, the Yew Staff and the Staff of Manar share.
+- **`0x230`**: `Byte20046`, the stamina an attack costs (`doc/CSBwin-src/Attack.cpp:1721`),
+  CHOP 8 → 10, THRUST 13 → 17, BERZERK 26 → 40, MELEE 17 → 25;
+  `experienceForAttacking[32]`, SHOOT, 9 → 20; `Spells[4].byte5`, the skill OH EW RA
+  uses (`doc/CSBwin-src/Magic.cpp:1215-1218`), 15 (Defend) → 18 (Earth).
+
+`dungeon.dat`:
+
+- **The Lock Picks go.** Alexander's mirror, map 0 (16,7), holds a Sling where it held
+  Lock Picks, and the alcove at map 6 (5,0) loses its Lock Picks. Both misc records (#8,
+  #116) are left free.
+- **The Eye of Time on map 7 (6,17) goes**; its record, weapon #54, is the Sling.
+- **Rocks**: new weapons #104 and #106 lie at map 1 (4,16) and (29,11). #105, also a
+  rock, is free (its next word `0xffff`) and placed nowhere.
+- **Map 5, a skeleton ambush.** Floor actuators at (4,15) and (6,15) open the new false
+  walls at (5,18) and (5,22), onto two new closets, (6,18) and (6,22), holding 2 and 4
+  skeletons. Two more groups, 4 at (6,16) and 1 at (7,14), make 11 new skeletons, all
+  `important`. A new switch at (8,15) toggles the door at (5,15), which only the switch at
+  (4,14), on its other side, did before.
+- **Map 3's doors**: eight that fireball and axe could break no longer can (`0x01e3` →
+  `0x0063` at (2,17), (5,24), (7,15), (11,18), (13,5), (16,9), (24,21), (27,22)); (21,25)
+  and (23,3) become breakable.
+- **Map 7's big switch** at (16,25), a toggle whose rotating actuator showed ornament 51
+  (the green button, pushed in) once pressed, shows 54 (the big switch, pushed in).
+- **Map 7 (30,21)**: the two FUL bombs' power, 0, becomes 120.
+- **Map 11 (23,11)**: the false wall the floor actuator at (24,11) sets becomes a door with
+  a switch.
+- **Map 8 (7,30)**: the wall text `WHEN IS A ROCK / NOT A ROCK` becomes `WHEN IS ROCK /
+  NOT ROCK`, one word shorter.
+
+### 1.1 to 1.2 (English)
+
+`dungeon.dat` differs in four bytes: bit 7 of `word2`, which CSBWin calls `important`
+(`doc/CSBwin-src/CSB.h:1151`), is set on the Sling and the three rocks. `graphics.dat`
+differs in two items: `0x22c` renames `UNVEN POTION` and `MON POTION` to `BRO POTION` and
+`MA POTION`, and in `0x230`, `skillNumber[8]`, WAR CRY's skill, 14 (Influence) becomes 7
+(Parry).
+
+The raw offsets: `Byte4100` starts at byte 3146 of `0x22e` (read through
+`readWallDecorationRectSetIndex`), and `s5604` follows the port's `computeOffsetFromWall`.
+`MonsterDescriptor` starts at byte 676 of `0x22f` (`10340 - 9664`, 26 bytes an entry) and
+`ObjDesc` at 1958 (`10340 - 8382`, 6 bytes an entry). `0x230`'s attack tables start at
+byte 64 (7 tables of 44 bytes, in `UITables`' order) and `Spells` at 1026 (8 bytes an
+entry). Skill numbers are `CHARDESC.skills92`'s, four subskills a class from 4.
+
+## CSBWin's files
+
+`static/gamefiles/dm-windows/graphics.dat` (md5 `0b5e042f…`), the file CSBWin's DM
+distribution (`DM_Windows_x86-32_20171117.zip`) ships, is **the 8 December 1987 disk's
+`GRAPHICS.DAT` with its credits scroll corrupted**. The two differ in item 5 alone, four
+bytes that draw four lines of the text wrong from "Dennis Walker" down ("Jaros" reads
+"Jeros"). It is byte-identical to the 42-Crew cracked copy's (above). Every original
+disk's credits are intact: the corruption came with a copy.
+
+Its `dungeon.dat` is 1.1's: `dm-atari/dungeon.dat` is byte-identical to the 1.1 disk's
+`DUNGEON.DAT`, and `dm-windows/dungeon.dat` is the same dungeon re-saved by CSBWin
+(`doc/PROVEN_FACTS.md` → "DM's two `dungeon.dat` files"). CSBWin's DM is therefore 1.1's
+dungeon over the first 1.0's tables, and against the 1.2 disk it differs in everything
+the sections above list for `graphics.dat`, and in the four `important` bits:
+
+| Item | What it is | 1.2 disk | CSBWin's | Changed in |
+| --- | --- | --- | --- | --- |
+| 5 | The credits scroll | The text as drawn | Corrupted | (the copy) |
+| `0xe8` (232) | Crack Switch (In), front view | The button pushed into the crack | The crack empty | 1.0, 11 December |
+| `0x18c` (396) | Graphic class 35's floor picture (the Torch) | 11 December's | 8 December's | 1.0, 11 December |
+| `0x22e` | `Byte4100[55]` (raw byte 3201) | **2** | **0** | 1.0, 11 December |
+| `0x22c` | Object names | `BRO POTION`, `MA POTION` | `ANTIVEN POTION`, `MON POTION` | 1.1, 1.2 |
+| `0x22f` | `MonsterDescriptor[24]`, byte 14 | `$36` | `$26` | 1.1 |
+| `0x22f` | `ObjDesc[62]`, `graphicClass` | 11 | 35 | 1.1 |
+| `0x230` | `experienceForAttacking[32]` (SHOOT) | 20 | 9 | 1.1 |
+| `0x230` | `Byte20046[2, 15, 19, 25]` | 10, 17, 40, 25 | 8, 13, 26, 17 | 1.1 |
+| `0x230` | `Spells[4].byte5` | 18 | 15 | 1.1 |
+| `0x230` | `skillNumber[8]` (WAR CRY) | 7 | 14 | 1.2 |
 
 **`dm-atari/graphics.dat` is CSBWin's file with 1.2's items 5, 232 and `0x22e`**: the
 credits, the pressed crack's button and the crack's placement, and no other change
 (`doc/PROVEN_FACTS.md` → "`dm-atari/graphics.dat` is CSBWin's with three items from the
-1.2 disk").
+1.2 disk"). The other rows of the table are 1.0's in `dm-atari` as in CSBWin.
 
-`dungeon.dat` is the same size in both (33442 bytes, uncompressed) and differs in four
-bytes: bit 7 of `word2`, which CSBWin calls `important` (`doc/CSBwin-src/CSB.h:1151`), is
-set in the 1.2 file and clear in CSBWin's (`dm-atari/` and `dm-windows/`) for four weapons: a sling (weapon #54, map 0 (16,7))
-and three rocks (weapons #104, #105, #106, map 1).
+## The German 1.2 disk
+
+The 1.2 (German) image (md5 `97cc99bf5b594b8260f42d9d81320308`) is the English 1.2 disk
+translated: its `START.PAK` (95202 bytes, 1988-02-24) and both data files (1988-03-01)
+differ, and nothing in them but the language. Its files are not in the repository.
+
+`dungeon.dat` differs from the English 1.2's only in its text, 1924 words against 1749,
+and the text records that point into it; every other database, the maps and the object
+list are identical. The champions' stats, in their texts, are the same, and so are their
+names and titles but one: WU TSE has no title, where the English disk's is SON OF HEAVEN.
+
+`graphics.dat` differs from the English 1.2's in items 1, 4, 6, 10, 27, 30, 31, 32, 40,
+`0x22c`, `0x230` and `0x232`, the items the French disk translates but for the fonts
+(`0x22d`, graphic 120) and `DecodeText`'s strings (`0x22f`), which the German texts need
+no more of than the English: they spell an umlaut as two letters (`ZURUECK`). Graphic 27
+is 144x78, as in 1.3; graphics 30 and 31 are 64 pixels wide. `0x230` is 1356 bytes, as in
+1.3, its tables the English disk's and its attack names German (`BLOCKIEREN`,
+`SPALTEN`, …). In `0x232`, bytes 875 and 883 (EAU's and NOURRITURE's `x2` in 1.3) are 175
+for both, and bytes 1707, 1709, 1715 and 1717 are 84, 236, 82 and 238.
+
+The two translations keep potion names the English disk renamed in 1.2: the German
+`0x22c` has `GEGENGIFT` and `MON TRANK`, the French `POTION UNVEN` and `POTION MAN`, where
+1.2 has `BRO POTION` and `MA POTION`.
 
 ## The French 1.3 disk
 
-`archive/DungeonMaster1v3Fr.stx` (md5 `933955a6a596081b4bc62655efeafde5`,
-gitignored) has the 1.2 disk's geometry, copy protection, boot sector and six files.
-`SWOOSH.IMG` and `START.PRG` are byte-identical to 1.2's; `BOOTER` (`e9db80a6…`), `START.PAK`
-(95208 bytes, `6131be44…`), `GRAPHICS.DAT` and `DUNGEON.DAT` are not. The two data files are
+The 1.3 (French) image (md5 `933955a6a596081b4bc62655efeafde5`) has the 1.2 disk's
+geometry, copy protection, boot sector and six files. `SWOOSH.IMG` and `START.PRG` are
+byte-identical to 1.2's; `BOOTER` (`e9db80a6…`), `START.PAK` (95208 bytes, `6131be44…`),
+`GRAPHICS.DAT` and `DUNGEON.DAT` are not. The two data files are
 in `static/gamefiles/dm-atari-1.3-fr/`, and both load:
 
 | File | Size | Date | md5 |

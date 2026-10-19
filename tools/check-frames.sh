@@ -114,11 +114,6 @@ else
 fi
 
 # --- probe and compare ---------------------------------------------------------------
-# The probe speaks CDP over the global WebSocket, which Node 22 has by default and
-# Node 20-21 only behind a flag.
-if node -e 'process.exit(typeof WebSocket === "undefined" ? 0 : 1)'; then
-  export NODE_OPTIONS="${NODE_OPTIONS:-} --experimental-websocket"
-fi
 if [ "$update" = 1 ]; then
   node "$root/tools/probe-frames.mjs" "$root/tools/frames" || exit 1
   echo '--- baseline updated; review with: git diff --stat tools/frames ---'

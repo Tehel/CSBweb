@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dungeon Master Versions</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #faf8f5;
+    --bg-raised: #ffffff;
+    --bg-sunken: #f1ede7;
+    --ink: #23201c;
+    --ink-soft: #5c554c;
+    --ink-faint: #8a8177;
+    --rule: #e0d9cf;
+    --accent: #8c3a1e;
+    --accent-bg: #f6ece7;
+    --mystery: #6b4423;
+    --mystery-bg: #f7f0e6;
+    --mystery-rule: #d9c4a3;
+    --stone: #6c6c6c;
+    --measure: 42rem;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    --serif: Charter, "Bitstream Charter", "Iowan Old Style", Georgia, serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17161a;
+      --bg-raised: #1e1d22;
+      --bg-sunken: #131216;
+      --ink: #e6e2dc;
+      --ink-soft: #a9a49c;
+      --ink-faint: #7d786f;
+      --rule: #302e35;
+      --accent: #e8916a;
+      --accent-bg: #2a201c;
+      --mystery: #d8b78a;
+      --mystery-bg: #221d17;
+      --mystery-rule: #4a3d2c;
+      --stone: #5a5a5a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #17161a;
+    --bg-raised: #1e1d22;
+    --bg-sunken: #131216;
+    --ink: #e6e2dc;
+    --ink-soft: #a9a49c;
+    --ink-faint: #7d786f;
+    --rule: #302e35;
+    --accent: #e8916a;
+    --accent-bg: #2a201c;
+    --mystery: #d8b78a;
+    --mystery-bg: #221d17;
+    --mystery-rule: #4a3d2c;
+    --stone: #5a5a5a;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 18px;
+    line-height: 1.62;
+  }
+
+  .page { max-width: var(--measure); margin: 0 auto; padding: 4rem 1.5rem 6rem; }
+
+  header.masthead { margin-bottom: 3rem; }
+  header.masthead h1 {
+    font-size: clamp(2rem, 5.5vw, 2.9rem);
+    line-height: 1.12;
+    margin: 0 0 .9rem;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+  }
+  .standfirst { color: var(--ink-soft); font-size: 1.05rem; margin: 0 0 1.4rem; }
+  .provenance {
+    font-family: var(--mono);
+    font-size: .74rem;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    border-top: 1px solid var(--rule);
+    padding-top: .9rem;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+    line-height: 1.25;
+    margin: 3.4rem 0 1rem;
+    letter-spacing: -0.01em;
+    font-weight: 600;
+  }
+  h2::before {
+    content: "";
+    display: block;
+    width: 2.2rem;
+    height: 2px;
+    background: var(--accent);
+    margin-bottom: 1.1rem;
+    opacity: .8;
+  }
+  h2 .when {
+    display: block;
+    font-family: var(--mono);
+    font-size: .72rem;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 400;
+    margin-top: .35rem;
+  }
+  h3 {
+    font-size: 1.12rem;
+    margin: 2.2rem 0 .6rem;
+    font-weight: 600;
+  }
+
+  p { margin: 0 0 1.05rem; }
+  strong { font-weight: 600; }
+  a { color: var(--accent); }
+
+  code {
+    font-family: var(--mono);
+    font-size: .84em;
+    background: var(--bg-sunken);
+    padding: .12em .38em;
+    border-radius: 3px;
+    border: 1px solid var(--rule);
+  }
+
+  ul, ol { margin: 0 0 1.05rem; padding-left: 1.3rem; }
+  li { margin-bottom: .5rem; }
+
+  hr { border: none; border-top: 1px solid var(--rule); margin: 3rem 0; }
+
+  .lede {
+    font-size: 1.06rem;
+    color: var(--ink-soft);
+    border-left: 3px solid var(--rule);
+    padding-left: 1.1rem;
+    margin: 0 0 1.6rem;
+  }
+
+  /* --- Tables ---------------------------------------------------------- */
+  .table-wrap { overflow-x: auto; margin: 0 0 1.5rem; }
+  table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+  caption {
+    caption-side: bottom;
+    text-align: left;
+    font-size: .82rem;
+    color: var(--ink-faint);
+    padding-top: .7rem;
+    font-style: italic;
+  }
+  th, td {
+    text-align: left;
+    padding: .5rem .7rem;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  thead th {
+    font-size: .72rem;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 600;
+    border-bottom: 1.5px solid var(--rule);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num { font-family: var(--mono); font-size: .84em; white-space: nowrap; }
+  td.name { font-weight: 600; }
+  td.why { color: var(--ink-soft); font-size: .92em; }
+  .arrow { color: var(--ink-faint); padding: 0 .2em; }
+  .up { color: var(--accent); font-weight: 600; }
+
+  /* --- Callouts -------------------------------------------------------- */
+  .note {
+    background: var(--bg-raised);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 1rem 1.2rem;
+    margin: 0 0 1.4rem;
+    font-size: .95rem;
+  }
+  .note p:last-child { margin-bottom: 0; }
+  .label {
+    display: block;
+    font-family: var(--mono);
+    font-size: .68rem;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: .5rem;
+  }
+  .mystery {
+    background: var(--mystery-bg);
+    border: 1px solid var(--mystery-rule);
+    border-left: 3px solid var(--mystery);
+    border-radius: 4px;
+    padding: .95rem 1.15rem;
+    margin: 0 0 1.4rem;
+    font-size: .95rem;
+  }
+  .mystery h4 { margin: 0 0 .45rem; font-size: 1rem; font-weight: 600; color: var(--mystery); }
+  .mystery p { margin-bottom: .6rem; }
+  .mystery p:last-child { margin-bottom: 0; }
+
+  /* --- The timeline ---------------------------------------------------- */
+  .timeline { list-style: none; margin: 0 0 2rem; padding: 0; position: relative; }
+  .timeline::before {
+    content: "";
+    position: absolute;
+    left: 5.4rem;
+    top: .5rem;
+    bottom: .5rem;
+    border-left: 2px solid var(--rule);
+  }
+  .timeline li {
+    display: grid;
+    grid-template-columns: 4.6rem 1.6rem 1fr;
+    gap: 0 .6rem;
+    margin: 0 0 1.1rem;
+    align-items: start;
+  }
+  .timeline .date {
+    font-family: var(--mono);
+    font-size: .74rem;
+    color: var(--ink-faint);
+    text-align: right;
+    padding-top: .25rem;
+    line-height: 1.3;
+  }
+  .timeline .dot {
+    width: .8rem;
+    height: .8rem;
+    margin: .35rem 0 0 .3rem;
+    border-radius: 50%;
+    background: var(--bg);
+    border: 2px solid var(--accent);
+    position: relative;
+    z-index: 1;
+  }
+  .timeline li.lang .dot { border-color: var(--ink-faint); }
+  .timeline .what { font-size: .95rem; line-height: 1.45; }
+  .timeline .what strong { display: block; font-size: 1.02rem; }
+  .timeline .what span { color: var(--ink-soft); }
+
+  /* --- At a glance ----------------------------------------------------- */
+  .factors { display: grid; grid-template-columns: repeat(3, 1fr); gap: .8rem; margin: 0 0 1.6rem; }
+  .factor {
+    background: var(--bg-raised);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: .9rem 1rem;
+    font-size: .9rem;
+    line-height: 1.45;
+  }
+  .factor .big {
+    display: block;
+    font-family: var(--mono);
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: .3rem;
+    letter-spacing: -0.02em;
+  }
+  .factor .what { display: block; font-weight: 600; margin-bottom: .2rem; }
+
+  /* --- Pictures from graphics.dat --------------------------------------- */
+  .sprites {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem 1.4rem;
+    align-items: flex-end;
+    margin: .4rem 0 1.6rem;
+  }
+  figure.sprite { margin: 0; text-align: center; }
+  figure.sprite .swatch {
+    background: var(--stone);
+    border-radius: 3px;
+    padding: .5rem;
+    display: inline-block;
+    line-height: 0;
+  }
+  figure.sprite img { image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
+  figure.sprite img.wall { width: 128px; height: 112px; }
+  figure.sprite img.floor { width: 256px; height: auto; }
+  figure.sprite figcaption {
+    font-family: var(--mono);
+    font-size: .7rem;
+    letter-spacing: .03em;
+    color: var(--ink-faint);
+    margin-top: .45rem;
+    line-height: 1.35;
+  }
+  figure.sprite figcaption b { color: var(--ink); font-weight: 600; }
+  figure.sprite.wrong .swatch { outline: 2px dashed var(--mystery-rule); outline-offset: 2px; }
+  .vs { font-family: var(--mono); color: var(--ink-faint); align-self: center; font-size: 1.2rem; }
+
+  footer.colophon {
+    margin-top: 4rem;
+    padding-top: 1.4rem;
+    border-top: 1px solid var(--rule);
+    font-size: .84rem;
+    color: var(--ink-faint);
+  }
+  footer.colophon p { margin-bottom: .5rem; }
+
+  @media (max-width: 34rem) {
+    body { font-size: 17px; }
+    .page { padding: 2.5rem 1rem 4rem; }
+    .factors { grid-template-columns: 1fr; }
+    .timeline::before { left: 4.4rem; }
+    .timeline li { grid-template-columns: 3.6rem 1.6rem 1fr; }
+    figure.sprite img.wall { width: 96px; height: 84px; }
+    figure.sprite img.floor { width: 192px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="masthead">
+  <h1>Dungeon Master on the Atari ST, version by version</h1>
+  <p class="standfirst">Six original disks, from the first release in December 1987 to
+  the French translation of May 1988. Leaving the translations aside, this is what changed
+  in the dungeon and in the game's tables, and why CSBWin's Dungeon Master is a mix of
+  two releases.</p>
+  <p class="provenance">Read from six original Atari ST disk images · dungeon.dat compared
+  square by square · graphics.dat compared item by item</p>
+</header>
+
+<p class="lede">The short version: <strong>1.0 was patched three days after release, and
+1.1 is the one real rebalance.</strong> Attacks became more tiring, the Dragon attacks from
+further away, the Lock Picks are gone, and a skeleton ambush appeared on level
+6. After that, 1.2 changed four bits and three words, and the translations changed only
+the language.</p>
+
+<ol class="timeline">
+  <li><span class="date">8 Dec<br>1987</span><span class="dot"></span><span class="what"><strong>1.0</strong><span>The first release.</span></span></li>
+  <li><span class="date">11 Dec<br>1987</span><span class="dot"></span><span class="what"><strong>1.0, again</strong><span>Also labelled 1.0, three days later: fixes to the crack switch, the doors of level 2 and a few traps.</span></span></li>
+  <li><span class="date">7 Jan<br>1988</span><span class="dot"></span><span class="what"><strong>1.1</strong><span>The rebalance: stamina costs, the Dragon, the Snake Staff, new items and a new ambush.</span></span></li>
+  <li><span class="date">1 Mar<br>1988</span><span class="dot"></span><span class="what"><strong>1.2</strong><span>Four weapons flagged, WAR CRY trains another skill, two potions renamed.</span></span></li>
+  <li class="lang"><span class="date">1 Mar<br>1988</span><span class="dot"></span><span class="what"><strong>1.2 German</strong><span>The English 1.2, translated.</span></span></li>
+  <li class="lang"><span class="date">20 May<br>1988</span><span class="dot"></span><span class="what"><strong>1.3 French</strong><span>The English 1.2, translated, with a font extended for French.</span></span></li>
+</ol>
+
+<div class="factors">
+  <div class="factor"><span class="big">19</span><span class="what">squares changed</span>between the two 1.0 disks, and 3 items of graphics.dat</div>
+  <div class="factor"><span class="big">28</span><span class="what">squares changed</span>from 1.0 to 1.1, and 3 items of tables</div>
+  <div class="factor"><span class="big">4</span><span class="what">bits changed</span>in the dungeon from 1.1 to 1.2, and 2 items of tables</div>
+</div>
+
+<div class="note">
+  <span class="label">What never changes</span>
+  <p>All six disks use the same copy protection, the same FTL logo and the same launcher.
+  Each one has its own packed game program. The dungeon's shape stays the same:
+  14 levels, the same start, the same walls almost everywhere. Levels are numbered here as
+  the game numbers them, from 1, the Hall of Champions; the files number them from 0.</p>
+</div>
+
+<hr>
+
+<h2>1.0, three days later<span class="when">8 December 1987 → 11 December 1987</span></h2>
+
+<p>Both disks are labelled 1.0, but the second one fixes a handful of things the first got
+wrong.</p>
+
+<h3>The crack switch stays on the wall</h3>
+
+<p>On level 5, a crack in the wall hides a button. On the first disk, pressing it swaps the
+picture for one drawn <em>at eye level</em>, so the crack jumps up the wall, and the
+"pressed" crack is empty. The second disk draws the button pushed into the crack and
+keeps it low, where the crack was.</p>
+
+<div class="sprites">
+  <figure class="sprite"><span class="swatch"><img class="wall" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAcCAYAAAAAwr0iAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAAGYktHRAD/AP8A/6C9p5MAAAAHdElNRQfqChMGICYwE695AAAAJXRFWHRkYXRlOmNyZWF0ZQAyMDI2LTEwLTE5VDA2OjI2OjM2KzAwOjAwWR/mKwAAACV0RVh0ZGF0ZTptb2RpZnkAMjAyNi0xMC0xOVQwNjoyNjozNiswMDowMChCXpcAAAAodEVYdGRhdGU6dGltZXN0YW1wADIwMjYtMTAtMTlUMDY6MzI6MzgrMDA6MDDnDXuvAAAA+ElEQVRIx+2UzQ3DIAyFX6qO4mE8TA4exQeGyTDehV5K6hhoQlVVqsR3CUEy7/nxswCAqmY4zOzw3bYN72BmENH+78cAICKLqmYRWWJtNVHMmNmQAS9MRGiJtbjFiVJIRFUnT4NQ1Wo+isdULxsolO6jeElmXdfuor24hwy0uheRfZxS6tZcFe8a8NsQSSk1xX3t1fi7BvxBBF6H7CojCdxbwh4igpkdTJzdihF2A/7gqGo2s+pu+0S+ZaIZ1dkexjeCmcHMQ9FXCbSE44KtZOIr+HECRbzXRS+VksAn3Q+jqtkbKeORa/d1mDn/1EBMYTKZTCaTv+cBmTCc8/s5mbwAAAAASUVORK5CYII=" alt="The crack with its button out"></span><figcaption><b>Crack (out)</b><br>every version</figcaption></figure>
+  <figure class="sprite wrong"><span class="swatch"><img class="wall" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAcCAYAAAAAwr0iAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAAGYktHRAD/AP8A/6C9p5MAAAAHdElNRQfqChMGICYwE695AAAAJXRFWHRkYXRlOmNyZWF0ZQAyMDI2LTEwLTE5VDA2OjI2OjM2KzAwOjAwWR/mKwAAACV0RVh0ZGF0ZTptb2RpZnkAMjAyNi0xMC0xOVQwNjoyNjozNiswMDowMChCXpcAAAAodEVYdGRhdGU6dGltZXN0YW1wADIwMjYtMTAtMTlUMDY6MzI6MzgrMDA6MDDnDXuvAAAA30lEQVRIx+2U0Q2DMAxEj6qjeBiPk1E8DsN4l/TL1DgJYIQqVcr7IUSEO1/iLAAgIhUOVd0913XFEcwMItre/RgASimLiNRSyhLXNhNmRlVTBrwwEaEn1uMVJ2whETWVHBHFY6qXDRhW/R1GcacMZKqPa66KDw34bciSiX9owB9E4HvIMiaufvvuCXuICKq6M3HWFRk2A/7giEhV1aa3fSJPmehGdbaH8Y5gZjBzKvomgZ5w/GEvmXgL3k7AxEdVjFKxBO5Un0ZEqjdi40zbPQ4z158aiClMJpPJZPL3fADG6Irz1diykwAAAABJRU5ErkJggg==" alt="The pressed crack, empty"></span><figcaption><b>Pressed, 8 Dec</b><br>empty, and drawn at eye level</figcaption></figure>
+  <figure class="sprite"><span class="swatch"><img class="wall" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAcCAYAAAAAwr0iAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAAGYktHRAD/AP8A/6C9p5MAAAAHdElNRQfqChMGICYwE695AAAAJXRFWHRkYXRlOmNyZWF0ZQAyMDI2LTEwLTE5VDA2OjI2OjM2KzAwOjAwWR/mKwAAACV0RVh0ZGF0ZTptb2RpZnkAMjAyNi0xMC0xOVQwNjoyNjozNiswMDowMChCXpcAAAAodEVYdGRhdGU6dGltZXN0YW1wADIwMjYtMTAtMTlUMDY6MzI6MzgrMDA6MDDnDXuvAAAA9ElEQVRIx+2UwQ3DIAxFf6qO4mE8DAdG8SHDMIx3oSci15gkVFWlSrxLAIn8729gAwARqTCo6tu3lIIzmBlEdMztGAByzpuI1Jzz5vd2C82Mqk4ZsMJEhEgs4uEX2kYi6ioBgJQSUkrduhf3qd424NvgxVsyreqIUdxTBqLq930/xlFb2p674kMDtg2eUsrpmZiJf2jAHkQAp3GfFXCHZyRsIaKu51e3YobDgD04IlJVtbvbNpFvmQijuuqhfyOYGcw8FX2XQCTsfxgl41/BjxNo4qMqRqm0BD6pfhoRqdZIG89cu6/DzPWnBnwKi8VisVj8PS/lspzzhEzTYgAAAABJRU5ErkJggg==" alt="The pressed crack with the button pushed in"></span><figcaption><b>Pressed, 11 Dec</b><br>button in, kept low</figcaption></figure>
+</div>
+
+<h3>The torch is redrawn</h3>
+
+<p>The picture of a torch lying on the floor is redrawn: the first disk's has a small dark
+tip, the second's a larger black head. On both 1.0 disks the Snake Staff shares
+the torch's picture, so on the floor it looks like a torch. 1.1 fixes that.</p>
+
+<div class="sprites">
+  <figure class="sprite wrong"><span class="swatch"><img class="floor" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAHCAYAAAC4NEsKAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAAGYktHRAD/AP8A/6C9p5MAAAAHdElNRQfqChMGICYwE695AAAAJXRFWHRkYXRlOmNyZWF0ZQAyMDI2LTEwLTE5VDA2OjI2OjM2KzAwOjAwWR/mKwAAACV0RVh0ZGF0ZTptb2RpZnkAMjAyNi0xMC0xOVQwNjoyNjozNiswMDowMChCXpcAAAAodEVYdGRhdGU6dGltZXN0YW1wADIwMjYtMTAtMTlUMDY6MzI6MzgrMDA6MDDnDXuvAAAAnUlEQVQ4y92Tyw3EIAxEx724mCkmh5SSwxbjYtwLuYAESHhB+Ui7IyHxZ56xBX+sg0ju7ZwqsBukjGX10ju1KdJoTXV8roeKVO5xb/uuhJnJ5QAcbCFqcyOI1T0zgLV2a/xhkAUg+T0DIsDIxMovPaH6t3t98hxJSA94l/mcYq9Cb1HZdH7IXAJRHV4FKo+8GIOQJfKTZhrJqWD9kk4nHE2CTBCsMQAAAABJRU5ErkJggg==" alt="The torch on the floor, 8 December"></span><figcaption><b>Torch, 8 Dec</b></figcaption></figure>
+  <figure class="sprite"><span class="swatch"><img class="floor" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAHCAYAAAC4NEsKAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAAGYktHRAD/AP8A/6C9p5MAAAAHdElNRQfqChMGICYwE695AAAAJXRFWHRkYXRlOmNyZWF0ZQAyMDI2LTEwLTE5VDA2OjI2OjM2KzAwOjAwWR/mKwAAACV0RVh0ZGF0ZTptb2RpZnkAMjAyNi0xMC0xOVQwNjoyNjozNiswMDowMChCXpcAAAAodEVYdGRhdGU6dGltZXN0YW1wADIwMjYtMTAtMTlUMDY6MzI6MzgrMDA6MDDnDXuvAAAApElEQVQ4y92U2w2AMAhFbxNHYRiGcRg/OgzDdBf9okKL8ZHUGO9X33B4NOF/WnXAzG5DRAAg2bV06cmPaKYdrhArUAdKRACAnHPdt2dtID4RAAu2Q/h5Kf29QlyBLaxKRI6qQJWmUVALeygFsGAW6gpwBB9VQbRGrYGnFWDBzpzsbZ7feSINRm/ft0IL7wZtxkY5Gym/YydMdm2BO7ADHX79T9oAjO0/e48zx0MAAAAASUVORK5CYII=" alt="The torch on the floor, 11 December"></span><figcaption><b>Torch, 11 Dec</b></figcaption></figure>
+</div>
+
+<h3>In the dungeon</h3>
+
+<ul>
+  <li><strong>Nabi comes with clothes.</strong> On the first disk Nabi's mirror holds
+  nothing. The second gives Nabi a Staff, a Tunic, Blue Pants and Sandals.</li>
+  <li><strong>Level 2's doors are redone.</strong> Nine doors change: some lose their
+  ornaments, four change the way they open, two become breakable by fireball and axe,
+  and one stops being breakable.</li>
+  <li><strong>Level 3's spinners are switched on.</strong> Two teleporters that turn the
+  party on the spot are inactive on the first disk.</li>
+  <li><strong>Level 3's blue button stays pressed.</strong> The button that opens a door
+  and works a nearby teleporter becomes a one-shot button that shows as pushed in once
+  used.</li>
+  <li><strong>A pocket for lost items.</strong> On level 4, a floor square no one can
+  reach, behind a teleporter, becomes an invisible teleporter for items only. It sends
+  them up to level 3, next to where the visible teleporter lands the party.</li>
+</ul>
+
+<hr>
+
+<h2>1.1, the rebalance<span class="when">11 December 1987 → 7 January 1988</span></h2>
+
+<p>This is the only release that changes how the game plays. Most of the changes are in
+the tables at the end of graphics.dat, where the numbers behind combat and spells
+live.</p>
+
+<h3>Combat</h3>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>What</th><th>1.0</th><th>1.1</th><th>So</th></tr></thead>
+  <tbody>
+    <tr><td class="name">CHOP stamina</td><td class="num">8</td><td class="num up">10</td><td class="why">Four attacks cost more stamina.</td></tr>
+    <tr><td class="name">THRUST stamina</td><td class="num">13</td><td class="num up">17</td><td class="why"></td></tr>
+    <tr><td class="name">MELEE stamina</td><td class="num">17</td><td class="num up">25</td><td class="why"></td></tr>
+    <tr><td class="name">BERZERK stamina</td><td class="num">26</td><td class="num up">40</td><td class="why">Plus a random 0 or 1, as for every attack.</td></tr>
+    <tr><td class="name">SHOOT experience</td><td class="num">9</td><td class="num up">20</td><td class="why">Archery trains more than twice as fast.</td></tr>
+    <tr><td class="name">Dragon's attack range</td><td class="num">2</td><td class="num up">3</td><td class="why">The Dragon attacks from up to 3 squares away instead of 2.</td></tr>
+    <tr><td class="name">OH EW RA's skill</td><td class="num">Defend</td><td class="num up">Earth</td><td class="why">See Through Walls is cast with, and trains, a Wizard skill instead of a Priest one.</td></tr>
+  </tbody>
+  <caption>Stamina is what an attack costs. Experience is what each attack earns before the
+  game's multipliers. The range is how far away a monster can attack from.</caption>
+</table>
+</div>
+
+<h3>The Snake Staff looks like a staff</h3>
+
+<p>On both 1.0 disks the Snake Staff lying on the floor is drawn with the torch's picture.
+In 1.1 it uses the plain staff picture, the same as the Staff, the Yew Staff and the Staff
+of Manar. The ANTIVEN POTION becomes the UNVEN POTION.</p>
+
+<div class="sprites">
+  <figure class="sprite wrong"><span class="swatch"><img class="floor" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAHCAYAAAC4NEsKAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAAGYktHRAD/AP8A/6C9p5MAAAAHdElNRQfqChMGICYwE695AAAAJXRFWHRkYXRlOmNyZWF0ZQAyMDI2LTEwLTE5VDA2OjI2OjM2KzAwOjAwWR/mKwAAACV0RVh0ZGF0ZTptb2RpZnkAMjAyNi0xMC0xOVQwNjoyNjozNiswMDowMChCXpcAAAAodEVYdGRhdGU6dGltZXN0YW1wADIwMjYtMTAtMTlUMDY6MzI6MzgrMDA6MDDnDXuvAAAApElEQVQ4y92U2w2AMAhFbxNHYRiGcRg/OgzDdBf9okKL8ZHUGO9X33B4NOF/WnXAzG5DRAAg2bV06cmPaKYdrhArUAdKRACAnHPdt2dtID4RAAu2Q/h5Kf29QlyBLaxKRI6qQJWmUVALeygFsGAW6gpwBB9VQbRGrYGnFWDBzpzsbZ7feSINRm/ft0IL7wZtxkY5Gym/YydMdm2BO7ADHX79T9oAjO0/e48zx0MAAAAASUVORK5CYII=" alt="The torch's picture"></span><figcaption><b>Snake Staff, 1.0</b><br>the torch's picture</figcaption></figure>
+  <figure class="sprite"><span class="swatch"><img class="floor" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAECAYAAAA+oDmkAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAAGYktHRAD/AP8A/6C9p5MAAAAHdElNRQfqChMGICYwE695AAAAJXRFWHRkYXRlOmNyZWF0ZQAyMDI2LTEwLTE5VDA2OjI2OjM2KzAwOjAwWR/mKwAAACV0RVh0ZGF0ZTptb2RpZnkAMjAyNi0xMC0xOVQwNjoyNjozNiswMDowMChCXpcAAAAodEVYdGRhdGU6dGltZXN0YW1wADIwMjYtMTAtMTlUMDY6MzI6MzgrMDA6MDDnDXuvAAAAV0lEQVQ4y93TsQnAQAiF4V/IKI6TUSwyioXDZBh3McVVAbnuOLivFIunogC4e9HIeDhVJAIg7l6q2gx/7864ROZ/Cdco5rTxYCUAZta+AG/sDrhMjAPLBx8OGFOV8VvxAAAAAElFTkSuQmCC" alt="The plain staff picture"></span><figcaption><b>Snake Staff, 1.1</b><br>the plain staff</figcaption></figure>
+</div>
+
+<h3>Items</h3>
+
+<ul>
+  <li><strong>The Lock Picks are gone.</strong> Alexander's mirror gets a Sling in their place, and the second set, in an alcove on level 7, is
+  removed.</li>
+  <li><strong>Two Rocks on level 2</strong>, to go with the Sling.</li>
+  <li><strong>One Eye of Time fewer.</strong> The one on level 8 is removed.</li>
+  <li><strong>Two FUL bombs on level 8</strong> had a power of 0. They now have 120.</li>
+</ul>
+
+<h3>Level 6: a skeleton ambush</h3>
+
+<p>1.1 adds a whole trap. Two floor plates open two new false walls onto two new closets,
+each holding a group of skeletons. Two more groups wait nearby: 11 skeletons in all. A
+door that could only be opened from one side gets a second switch, on the far side.</p>
+
+<h3>Other fixes</h3>
+
+<ul>
+  <li><strong>Level 4's doors get tougher.</strong> Eight doors that a fireball or an axe
+  could break no longer can, and two others become breakable.</li>
+  <li><strong>Level 8's big switch.</strong> When pressed, it used to turn into a pushed-in
+  <em>green button</em>. Now it shows the big switch pushed in.</li>
+  <li><strong>Level 12</strong>: a false wall becomes a door with a button.</li>
+  <li><strong>Level 9's riddle</strong>, "WHEN IS A ROCK NOT A ROCK", loses its two As.</li>
+</ul>
+
+<div class="sprites">
+  <figure class="sprite"><span class="swatch"><img class="wall" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAcCAYAAAAAwr0iAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAAGYktHRAD/AP8A/6C9p5MAAAAHdElNRQfqChMGICYwE695AAAAJXRFWHRkYXRlOmNyZWF0ZQAyMDI2LTEwLTE5VDA2OjI2OjM2KzAwOjAwWR/mKwAAACV0RVh0ZGF0ZTptb2RpZnkAMjAyNi0xMC0xOVQwNjoyNjozNiswMDowMChCXpcAAAAodEVYdGRhdGU6dGltZXN0YW1wADIwMjYtMTAtMTlUMDY6MzI6MzgrMDA6MDDnDXuvAAAAyklEQVRIx+2TwQ3DIAxFfyqPwjA+ZJQcMooPGcbDeBRL7aEBBRLUpm2kHvwkJAzY/hgDbGDmO4BLx5qjQI0AqCrcHaoKM0OPlNLhfkqpzM2sssdxLDkyw9bZ3e9EBBGpHH+BmWGeZ7g7iKjkvfVu927Qb6kELMuyC/zqGVqY+ZSwSsA0TR9XI6Oqp3yqJjyqQFuJXvC24drz2d6+/05AK+QK1kbvN6G7w90BYMjzbIsIRKSsiQiYGXj+puHIT0Ta/SAIgiAIguC/eAB23JBoa4x6iAAAAABJRU5ErkJggg==" alt="The big switch"></span><figcaption><b>Big switch</b><br>before pressing</figcaption></figure>
+  <figure class="sprite wrong"><span class="swatch"><img class="wall" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAcCAYAAAAAwr0iAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAAGYktHRAD/AP8A/6C9p5MAAAAHdElNRQfqChMGICYwE695AAAAJXRFWHRkYXRlOmNyZWF0ZQAyMDI2LTEwLTE5VDA2OjI2OjM2KzAwOjAwWR/mKwAAACV0RVh0ZGF0ZTptb2RpZnkAMjAyNi0xMC0xOVQwNjoyNjozNiswMDowMChCXpcAAAAodEVYdGRhdGU6dGltZXN0YW1wADIwMjYtMTAtMTlUMDY6MzI6MzgrMDA6MDDnDXuvAAAA8klEQVRIx8WWuw3DMAxEL4FG0TAqPIoKj6JhWGiUFBzFAFM4MgKDCBxSlg4Q4Ia8p68PmKyHtbCUIgAQYwQzY11XU69gBYgxqt//6mmuBMDMnnI/gGfmTeYtaKq1uiFMIiLJOQsAASDtUA5TM08pCcpAiJyzfJtv2yZ4YQyEZn4AjID4aX43xCXzE8SVvn+/AzVVBA4IrNzguo9UU//lB473f5+hNuvyuRWAENE950CFUMxvA1AhRpprELcvuyYikgPCYW4OJGfDZVlMvcy/4x5ZwAXQIwu4AHqthDuStVA6BaBtw7RQ2kPTAcyhtNc1nK43EZPrjBO0+ZwAAAAASUVORK5CYII=" alt="A pushed green button"></span><figcaption><b>Pressed, 1.0</b><br>a green button</figcaption></figure>
+  <figure class="sprite"><span class="swatch"><img class="wall" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAcCAYAAAAAwr0iAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAAGYktHRAD/AP8A/6C9p5MAAAAHdElNRQfqChMGICYwE695AAAAJXRFWHRkYXRlOmNyZWF0ZQAyMDI2LTEwLTE5VDA2OjI2OjM2KzAwOjAwWR/mKwAAACV0RVh0ZGF0ZTptb2RpZnkAMjAyNi0xMC0xOVQwNjoyNjozNiswMDowMChCXpcAAAAodEVYdGRhdGU6dGltZXN0YW1wADIwMjYtMTAtMTlUMDY6MzI6MzgrMDA6MDDnDXuvAAAAwUlEQVRIx+2TQQ7EIAhFfyccpYfhMB6GRQ/jYTwKSWdTCONUO4s2mQUvMRFFwI8CAWbeATw6jhzOqysAAFBK8fmI0T4z+xjZkSUaqroTEQBARHAntVbUWqGqICLPS7Pbret6GfRKKWMU66MF27Z54JhkxFlyZp6emRZQSvkpyV2qAF0LTAELFGVrrU2lbK1N/c2O/f8qoL/JExwP3Yt4nThAVQFgsbnZIgIR8TURMbkX8+/PHb8p7idJkiRJkiT/xRtRV4c4kmXdTQAAAABJRU5ErkJggg==" alt="The big switch pushed in"></span><figcaption><b>Pressed, 1.1</b><br>the switch, pushed in</figcaption></figure>
+</div>
+
+<hr>
+
+<h2>1.2, the last touches<span class="when">7 January 1988 → 1 March 1988</span></h2>
+
+<ul>
+  <li><strong>The dungeon changes by four bits.</strong> The Sling and the three Rocks
+  that 1.1 added are flagged <em>important</em>, like the champions' starting kit.</li>
+  <li><strong>WAR CRY trains Parry</strong>, a Fighter skill, where it trained Influence, a
+  Priest skill.</li>
+  <li><strong>Two potions are renamed:</strong> UNVEN becomes BRO, and MON becomes MA.</li>
+</ul>
+
+<hr>
+
+<h2>The translations<span class="when">German 1.2, 1 March 1988 · French 1.3, 20 May 1988</span></h2>
+
+<p>Both are the English 1.2 translated, and nothing else. Every record in the dungeon
+except the texts is identical, and so is every table. What changes is the words: the
+scrolls, the wall writing, the object and attack names, and the pictures with words drawn
+in them: the title, the entrance's ENTER and RESUME, the end, the save panel, FOOD and
+WATER, the resurrection screen.</p>
+
+<ul>
+  <li><strong>The French disk extends the font.</strong> The texts carry no accents, but
+  French needs the apostrophe, so 1.3 adds it to both fonts. The German disk spells umlauts as
+  two letters (ZURUECK) and needs nothing new.</li>
+  <li><strong>The translators started from older names.</strong> Where English 1.2 says
+  BRO POTION and MA POTION, the German disk says GEGENGIFT (antidote) and MON TRANK, and
+  the French POTION UNVEN and POTION MAN.</li>
+  <li><strong>Wu Tse loses a title</strong> in German. In English Wu Tse is SON OF HEAVEN.</li>
+  <li><strong>The rune names drift in French scrolls:</strong> YAP for YA, DOS for DES,
+  OH EV SAR for OH EW SAR.</li>
+</ul>
+
+<hr>
+
+<h2>Where CSBWin's files come from</h2>
+
+<div class="mystery">
+  <h4>CSBWin plays 1.1's dungeon with the first 1.0's tables</h4>
+  <p>The graphics.dat that ships with CSBWin's Dungeon Master is the <strong>8 December
+  1987</strong> disk's, byte for byte, except for its credits scroll, which is corrupted
+  from "Dennis Walker" down ("Jaros" reads "Jeros"). Every original disk's credits are
+  intact, so the damage came with a copy. A cracked copy of that disk in the same
+  collection has exactly this file.</p>
+  <p>Its dungeon.dat, though, is <strong>1.1</strong>'s. So CSBWin's Dungeon Master has
+  1.1's Sling, Rocks and skeleton ambush, with 1.0's stamina costs, 1.0's Dragon, the
+  jumping crack, the torch's first picture, the Snake Staff drawn as a torch, the
+  ANTIVEN potion, and WAR CRY
+  training Influence.</p>
+</div>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>In CSBWin's graphics.dat</th><th>As on</th><th>Fixed in</th></tr></thead>
+  <tbody>
+    <tr><td class="name">The credits scroll, corrupted</td><td class="why">No original disk</td><td class="why">(a copy)</td></tr>
+    <tr><td class="name">The pressed crack: empty, at eye level</td><td class="why">1.0, 8 December</td><td class="why">1.0, 11 December</td></tr>
+    <tr><td class="name">The torch's floor picture, as first drawn</td><td class="why">1.0, 8 December</td><td class="why">1.0, 11 December</td></tr>
+    <tr><td class="name">Stamina costs, SHOOT experience, the Dragon's range, OH EW RA's skill</td><td class="why">1.0</td><td class="why">1.1</td></tr>
+    <tr><td class="name">The Snake Staff drawn as a torch</td><td class="why">1.0</td><td class="why">1.1</td></tr>
+    <tr><td class="name">ANTIVEN POTION, MON POTION</td><td class="why">1.0</td><td class="why">1.1, 1.2</td></tr>
+    <tr><td class="name">WAR CRY training Influence</td><td class="why">1.0, 1.1</td><td class="why">1.2</td></tr>
+  </tbody>
+  <caption>The port's DM (<code>dm-atari</code>) takes three items from the 1.2 disk: the
+  credits, the pressed crack and its placement. The other rows are still 1.0's there, as in
+  CSBWin.</caption>
+</table>
+</div>
+
+<footer class="colophon">
+  <p>Sources: the six Pasti images of the original disks (1.0 twice, 1.1, 1.2 English and
+  German, 1.3 French), read sector by sector. dungeon.dat was compared square by square,
+  with each square's flag and every object on it, chests' and monsters' contents included.
+  graphics.dat was compared item by item, decompressed. The tables were named from Paul
+  R. Stevens' CSBWin source: <code>Byte20046</code> (stamina, Attack.cpp:1721),
+  <code>experienceForAttacking</code>, <code>MonsterDescriptor.word14</code> (attack
+  range, Monster.cpp:4190), <code>ObjDesc.graphicClass</code>, <code>Spells.byte5</code>
+  (Magic.cpp:1215), <code>SkillNumber</code> and <code>Byte4100</code>.</p>
+  <p>The full detail, with every square and byte offset, is in
+  <code>doc/ATARI_ST_DISK_REFERENCE.md</code>. The pictures are the games' own, drawn
+  through the dungeon palette.</p>
+</footer>
+
+</div>
+</body>
+</html>

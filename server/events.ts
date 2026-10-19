@@ -4,13 +4,13 @@
  * that nothing the server has not checked reaches the store. The player is a UUID, the
  * build a short token, the set one of the `data_sets` table's, every number an integer in its
  * range, and the only text a modified page could store is a champion's name, of 7
- * characters at most.
+ * characters at most, each one the game's (`NAME`).
  */
 
 /** The largest body `api/event` reads. */
 export const MAX_EVENT_BYTES = 4096;
 
-const EVENT_TYPES = ['started', 'party', 'won', 'lost'] as const;
+const EVENT_TYPES = ['started', 'session', 'party', 'won', 'lost'] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
 /** `crypto.randomUUID()`'s form, which `playerId` draws. */
@@ -24,6 +24,14 @@ export function isPlayerId(value: unknown): value is string {
 const BUILD = /^[0-9A-Za-z._-]{1,40}$/;
 /** `CHARDESC.name[8]`, its last byte the terminating NUL (`doc/CSBwin-src/CSB.h:2545`). */
 const MAX_NAME = 7;
+/**
+ * The characters a name is made of: A to Z and the space, as a mirror's names are, the
+ * Reincarnate screen's `. , ; :` (`src/renderer/ui/ReIncarnate.ts`), and, for a name a save
+ * edited elsewhere carries, the accented capitals (Latin-1's À to Ý), the digits and the
+ * punctuation `! ? ' - /`. Never a control character, a bidi override, a NUL (which
+ * `json_extract` cuts) or markup, which `api/stats` would publish.
+ */
+const NAME = /^[A-Z0-9À-ÖØ-Ý .,;:!?'\/-]+$/;
 /** `AddCharacter`'s `charID`, an `i16` (`doc/CSBwin-src/Character.cpp:457`). */
 const MAX_ID = 0x7fff;
 /** A party's slots. */
@@ -38,6 +46,8 @@ export interface CheckedChampion {
     name: string;
     id: number | null;
     reincarnated?: true;
+    /** A reincarnated champion's mirror name, which the statistics count them by. */
+    hero?: string;
     masteries?: number[];
 }
 
@@ -80,6 +90,11 @@ export function checkEvent(body: string, rules: EventRules): CheckedEvent | stri
 
 function checkPayload(type: EventType, payload: Record<string, unknown>): CheckedEvent['payload'] | string {
     if (type === 'started') return {};
+    if (type === 'session') {
+        const { playTime } = payload;
+        if (!isInteger(playTime, 0, Number.MAX_SAFE_INTEGER)) return 'bad playTime';
+        return { playTime };
+    }
 
     const champions = checkChampions(payload.champions, type === 'won');
     if (typeof champions === 'string') return champions;
@@ -100,12 +115,14 @@ function checkChampions(champions: unknown, won: boolean): CheckedChampion[] | s
     const checked: CheckedChampion[] = [];
     for (const champion of champions) {
         if (!isRecord(champion)) return 'bad champion';
-        const { name, id, reincarnated, masteries } = champion;
-        if (typeof name !== 'string' || [...name].length > MAX_NAME) return 'bad name';
+        const { name, id, reincarnated, hero, masteries } = champion;
+        if (!isName(name)) return 'bad name';
         if (id !== null && !isInteger(id, 0, MAX_ID)) return 'bad id';
         if (reincarnated !== undefined && reincarnated !== true) return 'bad reincarnated';
+        if (hero !== undefined && (reincarnated !== true || !isName(hero))) return 'bad hero';
         const kept: CheckedChampion = { name, id };
         if (reincarnated) kept.reincarnated = true;
+        if (hero !== undefined) kept.hero = hero;
         if (won) {
             if (!Array.isArray(masteries) || masteries.length !== MASTERIES || !masteries.every((m) => isInteger(m, 0, MAX_MASTERY))) {
                 return 'bad masteries';
@@ -115,6 +132,10 @@ function checkChampions(champions: unknown, won: boolean): CheckedChampion[] | s
         checked.push(kept);
     }
     return checked;
+}
+
+function isName(value: unknown): value is string {
+    return typeof value === 'string' && [...value].length <= MAX_NAME && NAME.test(value) && value.trim() !== '';
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

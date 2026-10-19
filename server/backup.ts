@@ -14,7 +14,7 @@
  * connection sees it, WAL included, into one self-contained file.
  *
  * The folders are those of every set of the snapshot's, the site's too, since a moderator's
- * edit writes a set a new one (`edit.ts`). A set's folder is complete before its row names
+ * edit writes a set a new one (`edit.ts`), as does a document added or removed (`documents.ts`). A set's folder is complete before its row names
  * it, and never changes after, so each is copied once, into `gamefiles/<dir>/` under
  * `BACKUP_DIR`, through a `.partial` name renamed when whole, and kept: an older snapshot
  * needs the folders of its rows, a deleted set's and an edited set's old one included.

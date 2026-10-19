@@ -69,6 +69,8 @@ keeps what it has, and nothing new goes in.
 ## Tech stack
 
 Vanilla TypeScript (strict, `noUnusedLocals`/`noUnusedParameters`) + Vite. No framework.
+One Node, 24, everywhere: `.nvmrc`, `engines`, `@types/node` and the image's, pinned
+(`doc/DEPLOYMENT.md` → "The image and the stack").
 A single 320×200 `<canvas>` is the whole screen, CSS-scaled to 960×600 with
 `image-rendering: pixelated`. Everything — viewport, inventory, panels, cursor, messages —
 is blitted into one palette-index buffer and converted to RGBA at present time, as CSBWin
@@ -82,8 +84,8 @@ npm run build          # tsc && vite build, and the server's module (--ssr)
 npm test               # the gate: tsc + every asserting tool  (~75s, a worker per core)
 npm test -- --only=dsa,save  # tsc + the tools whose name holds any of these
 npm test -- --frames   # …and the golden frames               (~40s more)
-npm start              # the deployed server, server/, over dist/  (Node >= 22.18)
-bash tools/check-image.sh  # the golden frames against the Docker image (Docker, ~2 min)
+npm start              # the deployed server, server/, over dist/
+bash tools/check-image.sh  # the golden frames against the Docker image (Docker, ~4 min)
 ```
 
 **Build hygiene (non-negotiable):** `npm test` must pass before any commit. It runs
@@ -97,8 +99,7 @@ There is still **no test framework** (`PLAN.md` → "The evidence") — `npm tes
 
 - `tools/check-frames.sh` compares thirty live screen states against `tools/frames/` — the
   cheapest way to prove a renderer or UI change kept every pixel. It starts its own dev
-  server and headless Chrome, so it needs no setup (on Node 20 it turns on
-  `--experimental-websocket` itself; `probe-ui.mjs` needs that flag, or Node 22). It is
+  server and headless Chrome, so it needs no setup. It is
   out of the default run only because it costs a browser and ~40s. Run it before any renderer or UI commit. A frame is
   the 320x200 screen as CSBWin draws it, its palette slots and the palettes they were shown
   through (`tools/lib/frames.mjs`), not the canvas's colours: a slot drawn for another of
@@ -114,9 +115,11 @@ There is still **no test framework** (`PLAN.md` → "The evidence") — `npm tes
   press, and only with MAP VIEW on, the champion dialog opened by a long press on
   the stat bars, where a tap opens the inventory at its release, and fullscreen, entered
   by a tap and by a click, the screen and the effect sized and centred in it, at 16:10
-  and at 4:3; the save store held by another tab; and the welcome page's tiles, its fonts, its selection, where PLAY and
+  and at 4:3; the save store held by another tab; and the welcome page's tiles, its fonts, its selection, its HOW TO PLAY, where PLAY and
   CONTINUE lead, CONTINUE's save read straight into play, and the form that adds a set,
-  and edits, publishes and deletes one, and the tiles that moderate a published one.
+  and edits, publishes and deletes one, the tiles that moderate a published one, and the book that
+  downloads a set's archive and lists its documents, where a moderator adds and removes them;
+  and the statistics page its footer links to, as `api/stats` answers, a click selecting a set.
 - `tools/dump-*.ts` and `tools/watch-*.ts` stand the real engine up against the real game
   files, print what happened, and assert invariants. **They are the regression suite for
   everything the frames cannot see** — tables, AI, damage, timers, movement. `npm test`
@@ -210,8 +213,11 @@ ui/         The page's DOM side: events (the canvas's and the keyboard's listene
             (the save menu's import: a file dropped on the page), fatalMessage (the
             screen an error that ends the game leaves), and gameEvents (what the
             server's statistics are told: a game started, joined, won or lost), and
-            welcomePage (the page without a known `?dungeon=`: the games and the saves)
-            and addDataSetForm (its form that adds, edits, publishes and deletes a player's own data set)
+            welcomePage (the page without a known `?dungeon=`: the games and the saves),
+            addDataSetForm (its form that adds, edits, publishes and deletes a player's own data set)
+            and howToPlay (its HOW TO PLAY: the keys, the runes, the first steps)
+stats/      statsPage: the statistics page, `/stats` (`stats.html`, Vite's second entry): what
+            `api/stats` answers, in the welcome page's look, and none of the game's code
 settings/   Settings: the player's settings, one model the page, the game and the dialogs
             read and change, kept in `localStorage`
 lib/        crt (the CRT effect: a WebGL tube over the canvas, and the pointer read through it),

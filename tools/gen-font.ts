@@ -20,8 +20,12 @@
  * (`drawTextLineIndex`), and a no-break space is the space. A code whose glyph is blank,
  * the at sign, is left out, so the browser draws it in its own. The page's one character
  * the game's font lacks, the middle dot that separates its preview's fields, is the
- * page's own glyph: the colon's upper dot one row down, at the hyphen's height. The other
- * codes, the game's runes and symbols, are not text, and are left out.
+ * page's own glyph: the colon's upper dot one row down, at the hyphen's height. The 24
+ * runes, codes 0x60 to 0x77, a row of six for each step of an incantation
+ * (`DrawSpellMenuCharacters`, `doc/CSBwin-src/CSBCode.cpp:9051-9065`), are in the Private
+ * Use Area at U+E000 plus their code, U+E060 to U+E077, where the How to play sheet
+ * (`src/ui/howToPlay.ts`) draws them. The other codes, the game's symbols, are not text,
+ * and are left out.
  *
  * Run:
  *
@@ -53,6 +57,10 @@ const PIXEL = 128;
 const UNITS_PER_EM = 8 * PIXEL;
 /** The rows above the baseline: the sixth is under it. */
 const ROWS_ABOVE = 5;
+/** The runes: four rows of six from code 96 (`DrawSpellMenuCharacters`), each at U+E000 plus its code. */
+const RUNE_FIRST = 0x60;
+const RUNES = 24;
+const RUNE_CODE_POINT = 0xe000;
 
 /** A glyph of six row bytes, bit 4 its leftmost pixel. */
 function glyphOf(rows: readonly number[]): TtfGlyph {
@@ -105,6 +113,7 @@ function characters(): { drawn: Map<number, number[]>; missing: number[] } {
   }
   drawn.set(0xa0, drawn.get(0x20)!);
   drawn.set(0xb7, [0, 0, rowsOf(0x3a)[1]!, 0, 0, 0]);
+  for (let code = RUNE_FIRST; code < RUNE_FIRST + RUNES; code++) drawn.set(RUNE_CODE_POINT + code, rowsOf(code));
   return { drawn, missing };
 }
 

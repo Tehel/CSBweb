@@ -22,7 +22,8 @@ import { extractGraphicsTables, type GraphicsTables } from './data/tables/Graphi
 import { UtilityDiskMessages, UtilityError } from './engine/Chaos';
 import { GameSaves, drawPlaythrough } from './engine/GameSaves';
 import { loadSwoosh, type Swoosh } from './data/SwooshLoader';
-import swooshImageUrl from './assets/swoosh.img?url';
+// A file, never inlined as a `data:` URL, which the server's policy does not fetch (`SECURITY_HEADERS`).
+import swooshImageUrl from './assets/swoosh.img?url&no-inline';
 import swooshSoundUrl from './assets/swoosh.wav?url';
 import { createCrtEffect, type CrtEffect } from './lib/crt';
 import { NO_FULLSCREEN, createFullscreen, type PageFullscreen } from './lib/fullscreen';
@@ -650,7 +651,8 @@ async function fetchThumbnail(set: DataSet): Promise<Blob | null> {
 function openWelcomePage(manifest: DataSetManifest): Promise<void> {
     const storeRandom = new CsbRandom();
     const draw: DrawPlaythrough = (rows) => drawPlaythrough(storeRandom, rows);
-    return showWelcomePage(document.body, manifest, new BrowserSaveStore(draw), new BrowserDataSetStore(draw), loadManifest);
+    return showWelcomePage(document.body, manifest, new BrowserSaveStore(draw), new BrowserDataSetStore(draw), loadManifest,
+        { settings, keyboardLayout: () => keyboardLayout });
 }
 
 async function init() {

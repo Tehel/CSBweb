@@ -80,14 +80,26 @@ body.welcome {
     margin: 0 auto;
 }
 
-/* The data sets, a tile each, its picture 320x200 at half size, the rows centred, under
-   the buttons. */
+/* The data sets in two sections under the buttons, the official games and the fans'
+   dungeons, each a title, a line, and a grid: a tile each, its picture 320x200 at half
+   size, the rows centred. */
+.welcome-sets {
+    margin-top: 36px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+.welcome-sets[hidden] { display: none; }
+.welcome-sets > h2 { margin: 0; color: var(--p11); text-align: center; }
+.welcome-sets-lead { margin: 0; font-size: 18px; line-height: 1.55; font-style: italic; color: #bdbac8; text-align: center; }
 .welcome-grid {
+    align-self: stretch;
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
     gap: 12px;
-    margin-top: 36px;
+    margin-top: 12px;
 }
 .pick {
     appearance: none;
@@ -118,8 +130,9 @@ body.welcome {
 /* "+ Add my own", the grid's last tile, which opens the form that adds a set. */
 .pick.add .pick-picture { display: flex; align-items: center; justify-content: center; }
 .pick-plus { color: var(--p9); }
-/* A tile's controls along its picture's top edge, from its top right corner: a local
-   set's pen, which edits it, and a published set's tick, cross and eye, which moderate it. */
+/* A tile's controls along its picture's top edge, from its top right corner: every set's
+   triangle, which plays it, then a local set's pen, which edits it, and a published set's
+   book, which lists its documents, and its pen, tick, cross and eye, which moderate it. */
 .pick-cell { position: relative; display: flex; }
 .pick-controls { position: absolute; top: 0; right: 0; display: flex; gap: 3px; }
 .pick-control {
@@ -140,8 +153,31 @@ body.welcome {
 .pick.pending .pick-name { color: var(--p8); }
 .pick-saves { color: var(--p7); padding: 0 3px 3px; }
 
-/* PLAY and CONTINUE, and the save CONTINUE reads, above the grid. */
+/* The moderator's switch, at the window's top right corner, outside the page's column:
+   gold on, grey off. */
+.welcome-moderation {
+    appearance: none;
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    padding: 6px 9px;
+    background: #0b0b16;
+    border: 3px solid #1d1d30;
+    color: var(--p9);
+    cursor: pointer;
+}
+.welcome-moderation[aria-checked="false"] { color: var(--p1); }
+.welcome-moderation:hover { border-color: var(--p9); }
+.welcome-moderation:focus-visible { outline: 3px solid var(--p11); outline-offset: 3px; }
+
+/* PLAY and HOW TO PLAY, then CONTINUE and the save it reads, above the grid. */
 .welcome-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+.welcome-actions-row {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
@@ -274,6 +310,22 @@ body.welcome {
 /* The confirmation DELETE opens. */
 .delete-set { width: min(560px, calc(100vw - 32px)); }
 .delete-set-text { margin: 0; font-size: 18px; line-height: 1.5; }
+/* The dialog a tile's book opens (`showDocuments`): a set's description, its archive, then
+   its documents, a link each, its size, and a moderator's cross. */
+.documents-description { margin: 0; font-size: 18px; line-height: 1.5; white-space: pre-line; overflow-wrap: anywhere; }
+.documents-description:empty { display: none; }
+.documents-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 9px; font-size: 18px; }
+.documents-list li { display: flex; align-items: center; gap: 12px; min-height: 36px; }
+.documents-list a { color: var(--p11); overflow-wrap: anywhere; }
+.documents-list a:hover { color: var(--p9); }
+/* The set's archive, first: a button that reads as a link. */
+.documents-pack { appearance: none; padding: 0; background: none; border: 0; font: inherit; color: var(--p11); text-decoration: underline; cursor: pointer; text-align: left; overflow-wrap: anywhere; }
+.documents-pack:hover { color: var(--p9); }
+.documents-pack:disabled { color: var(--p1); cursor: default; }
+.documents-size { margin-left: auto; font-size: 15px; color: var(--p2); white-space: nowrap; }
+.documents-none { color: var(--p2); }
+.documents-status { margin: 0; font-size: 15px; color: var(--p9); }
+.documents-status:empty { display: none; }
 .add-set-columns { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 24px; }
 .add-set-give { display: flex; flex-direction: column; gap: 10px; }
 .add-set-field { display: grid; grid-template-columns: 150px 1fr; align-items: center; gap: 12px; }
@@ -292,6 +344,7 @@ body.welcome {
 .add-set-id { display: flex; align-items: center; gap: 6px; }
 .add-set-id .px { color: var(--p2); }
 .add-set-check { display: flex; align-items: center; gap: 9px; font-size: 17px; }
+.add-set-check[hidden] { display: none; }
 .add-set-check input { accent-color: var(--p9); width: 18px; height: 18px; margin: 0; flex: none; }
 .add-set-base { margin: 0; padding: 6px 12px 9px; border: 3px solid #1d1d30; display: flex; flex-wrap: wrap; gap: 6px 24px; }
 .add-set-base.disabled { opacity: 0.4; }
@@ -382,9 +435,120 @@ body.welcome {
 .add-set .btn { min-width: 0; width: 162px; padding: 0; font: inherit; }
 .add-set .btn.px { font-family: 'DM Screen', monospace; font-size: 24px; line-height: 24px; }
 
+/* HOW TO PLAY (`src/ui/howToPlay.ts`): the chooser of the moves' keys, then the sheet, its
+   sections on a grid. A key is a cap in the game's font, a rune its glyph in the same font
+   over its name. */
+.how-to-play { width: min(1180px, calc(100vw - 32px)); }
+.how-chooser { margin: 0; padding: 6px 12px 9px; border: 3px solid #1d1d30; display: flex; flex-wrap: wrap; align-items: center; gap: 9px 24px; }
+.how-chooser legend { color: var(--p9); padding: 0 6px; }
+.how-choice { display: flex; align-items: center; gap: 9px; color: var(--p15); cursor: pointer; }
+.how-choice input { accent-color: var(--p9); width: 18px; height: 18px; margin: 0; }
+.how-custom { margin: 0; flex-basis: 100%; font-size: 15px; color: var(--p9); }
+.how-custom[hidden] { display: none; }
+.how-sheet {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-areas: "move fight magic" "runes runes party" "start start mouse";
+    gap: 18px 24px;
+    font-size: 16px;
+    line-height: 1.4;
+}
+.how-move { grid-area: move; }
+.how-fight { grid-area: fight; }
+.how-magic { grid-area: magic; }
+.how-party { grid-area: party; }
+.how-runes { grid-area: runes; }
+.how-start { grid-area: start; }
+.how-mouse { grid-area: mouse; }
+.how-section { display: flex; flex-direction: column; gap: 9px; padding: 9px 12px 12px; border: 3px solid #1d1d30; }
+.how-section h3 { margin: 0; color: var(--p11); }
+.how-section p { margin: 0; }
+.how-section ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.how-warn { color: var(--p9); }
+.how-keys { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.how-key {
+    display: inline-block;
+    min-width: 16px;
+    padding: 3px 5px;
+    background: var(--p5);
+    color: var(--p9);
+    border: 3px solid;
+    border-color: var(--p10) var(--p3) var(--p3) var(--p10);
+    text-align: center;
+    white-space: nowrap;
+}
+.how-pad { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.how-pad-cell { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
+.how-what { font-size: 14px; color: var(--p2); }
+.how-attacks { display: grid; grid-template-columns: auto repeat(4, minmax(0, 1fr)); gap: 6px 9px; align-items: center; justify-items: center; }
+.how-head { color: var(--p15); }
+.how-row { justify-self: start; color: var(--p2); font-size: 14px; }
+.how-list { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 12px; align-items: center; }
+.how-list dt { display: flex; flex-wrap: wrap; gap: 4px; }
+.how-list dd { margin: 0; }
+.how-rune-table { display: grid; grid-template-columns: auto repeat(6, minmax(0, 1fr)); gap: 6px 9px; align-items: center; justify-items: center; }
+.how-rune { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.how-glyph { font-size: 32px; line-height: 32px; color: var(--p15); }
+.how-glyph-inline { font-size: 24px; line-height: 0; letter-spacing: 0.25em; color: var(--p15); }
+.how-rune-name { color: var(--p9); }
+.how-intro { margin: 0; color: var(--p2); }
+.how-print-head { display: none; }
+.how-downloads { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; font-size: 16px; }
+.how-downloads .px { color: var(--p9); }
+.how-downloads a { color: var(--p11); }
+.how-downloads a:hover { color: var(--p9); }
+.how-downloads-note { color: var(--p2); }
+/* The sheet printed, alone on one landscape A4 page, black on white: the dialog in the
+   page's flow, without its chooser, its buttons and its links, the page behind it gone. */
+@media print {
+    @page { size: A4 landscape; margin: 8mm; }
+    body.welcome { background: #fff; color: #000; }
+    body.welcome > :not(dialog.how-to-play) { display: none; }
+    .how-to-play { position: static; width: auto; max-width: none; max-height: none; overflow: visible; margin: 0; border: 0; background: #fff; color: #000; }
+    .how-to-play::backdrop { display: none; }
+    .how-form { padding: 0; gap: 6px; }
+    .how-intro, .how-chooser, #how-close, .how-downloads { display: none; }
+    .how-to-play h2 { color: #000; font-size: 16px; line-height: 16px; }
+    .how-print-head { display: block; margin: 0; font-size: 12px; }
+    .how-sheet {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-areas: "move fight fight magic" "runes runes party party" "runes runes mouse mouse" "start start start start";
+        gap: 6px 10px;
+        font-size: 12px;
+        line-height: 1.3;
+    }
+    .how-section { gap: 4px; padding: 4px 6px 6px; border: 1px solid #000; break-inside: avoid; }
+    .how-section h3 { color: #000; font-size: 16px; line-height: 16px; }
+    .how-section ul { gap: 1px; padding-left: 14px; }
+    .how-warn, .how-what, .how-row, .how-rune-name, .how-head, .how-glyph { color: #000; }
+    .how-what, .how-row { font-size: 11.5px; }
+    .how-key { padding: 1px 3px; background: #fff; color: #000; border: 1px solid #000; font-size: 8px; line-height: 8px; }
+    .how-pad, .how-attacks, .how-list, .how-rune-table { gap: 3px 6px; }
+    .how-glyph { font-size: 24px; line-height: 24px; }
+    .how-glyph-inline { font-size: 16px; color: #000; }
+    .how-rune-name { font-size: 16px; line-height: 16px; }
+}
+@media screen and (max-width: 900px) {
+    .how-sheet { grid-template-columns: minmax(0, 1fr); grid-template-areas: "move" "fight" "magic" "party" "runes" "start" "mouse"; }
+}
+/* A phone's: each row of runes under its name, the six across the width. */
+@media (max-width: 640px) {
+    .how-to-play { width: calc(100% - 16px); max-width: none; max-height: calc(100% - 16px); }
+    .how-form { padding: 12px 6px; }
+    .how-section { padding: 9px 6px 12px; }
+    .how-rune-table { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px 2px; }
+    .how-rune-table .how-corner { display: none; }
+    .how-rune-table .how-row { grid-column: 1 / -1; margin-top: 6px; }
+    /* The font's blank column between letters is two pixels at this size: one is enough. */
+    .how-rune-name { letter-spacing: -1px; }
+    .how-attacks { gap: 6px 4px; }
+}
+
 @media (max-width: 640px) {
     .welcome-page { padding: 24px 16px 0; }
     .welcome-logo { margin-bottom: 24px; }
+    /* Above the logo, which a phone's width leaves no room beside. */
+    .welcome-moderation { position: static; align-self: flex-end; margin-bottom: 12px; }
     .welcome-preview { min-width: 0; width: 100%; }
     .welcome-lead { font-size: 22px; }
     .add-set-form { padding: 16px; }

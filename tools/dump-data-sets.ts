@@ -12,10 +12,10 @@
  *
  * Run: `npm test -- --only=dump-data-sets.ts`
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { chooserSets, dataSetNamed, parseManifest, type DataSet } from '../src/data/DataSets';
+import { chooserSets, dataSetNamed, isDocumentName, parseManifest, type DataSet } from '../src/data/DataSets';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { GameTables } from '../src/engine/GameTables';
@@ -45,16 +45,26 @@ function checkParser(): void {
     ({ id: 'a', name: 'A', ...fields });
   const manifest = (fields: Record<string, unknown> = {}) => JSON.stringify({ default: 'a', dataSets: [set()], ...fields });
 
-  const parsed = parseManifest(manifest({ dataSets: [set({ miniDat: true, hintOracle: false, dmRules: true, thumbnailAsTitle: true }), set({ id: 'b', dir: 'b/c' })] }), 'gamefiles');
+  const parsed = parseManifest(manifest({ dataSets: [set({ miniDat: true, hintOracle: false, dmRules: true, thumbnailAsTitle: true, official: true }), set({ id: 'b', dir: 'b/c' })] }), 'gamefiles');
   console.log(`  parsed: ${parsed.dataSets.map((s) => `${s.id} in ${s.dir}`).join(', ')}; default ${parsed.defaultSet?.id}`);
   check(parsed.dataSets[1]!.dir === 'gamefiles/b/c' && parsed.defaultSet === parsed.dataSets[0],
     'a folder is resolved under the manifest\'s, and the default is one of the sets');
-  check(parsed.dataSets[0]!.miniDat && !parsed.dataSets[0]!.hintOracle && parsed.dataSets[0]!.dmRules && parsed.dataSets[0]!.thumbnailAsTitle, 'the flags are read as written');
+  check(parsed.dataSets[0]!.miniDat && !parsed.dataSets[0]!.hintOracle && parsed.dataSets[0]!.dmRules && parsed.dataSets[0]!.thumbnailAsTitle && parsed.dataSets[0]!.official, 'the flags are read as written');
   const bare = parsed.dataSets[1]!;
-  check(parsed.dataSets[0]!.dir === 'gamefiles/a' && !bare.csbGraphics && !bare.miniDat && !bare.hintOracle && !bare.dmRules && !bare.thumbnailAsTitle && !bare.hidden,
+  check(parsed.dataSets[0]!.dir === 'gamefiles/a' && !bare.csbGraphics && !bare.miniDat && !bare.hintOracle && !bare.dmRules && !bare.thumbnailAsTitle && !bare.hidden && !bare.official,
     'a set\'s "dir" left out is its "id", and a flag left out is false');
   check(dataSetNamed(parsed, null) === null && dataSetNamed(parsed, 'nowhere') === null
     && dataSetNamed(parsed, 'b') === parsed.dataSets[1], 'no ?dungeon=, or an unknown one, is the welcome page; a known one plays itself');
+
+  // Documents: read as written, none where left out, and a name of a document's alone.
+  const documented = parseManifest(manifest({ dataSets: [set({ documents: [{ file: 'Manual.pdf', size: 12 }, { file: "Kid's notes (2).txt", size: 0 }] })] }), '');
+  check(JSON.stringify(documented.dataSets[0]!.documents) === '[{"file":"Manual.pdf","size":12},{"file":"Kid\'s notes (2).txt","size":0}]'
+    && bare.documents.length === 0, 'a set\'s documents are read as written, and "documents" left out is none');
+  const names: [string, boolean][] = [['Manual.PDF', true], ['solution.doc', true], ['a.docx', true], ['readme.md', true], ['map.png', true],
+    ['.hidden.pdf', false], ['page.html', false], ['art.svg', false], ['dungeon.dat', false], ['noext', false], ['.pdf', false],
+    ['a/b.pdf', false], ['a\\b.pdf', false], ['tab\t.txt', false], [`${'x'.repeat(97)}.pdf`, false], [`${'x'.repeat(96)}.pdf`, true]];
+  const misjudged = names.filter(([name, ok]) => isDocumentName(name) !== ok).map(([name]) => name);
+  check(misjudged.length === 0, `isDocumentName takes a file's name of a shown or downloaded kind, at most 100 characters, and nothing else${misjudged.length ? ` (misjudged: ${misjudged.join(', ')})` : ''}`);
 
   // A hidden set: out of the welcome page's grid, but played by its ?dungeon=.
   const hiding = parseManifest(manifest({ dataSets: [set(), set({ id: 'b', dir: 'b', hidden: true }), set({ id: 'c', dir: 'c', hidden: false })] }), '');
@@ -111,6 +121,11 @@ function checkParser(): void {
     [manifest({ dataSets: [set({ authors: 'One' })] }), `data set 'a' has "authors" that are not a list of texts`],
     [manifest({ dataSets: [set({ authors: ['One', 2] })] }), `data set 'a' has "authors" that are not a list of texts`],
     [manifest({ dataSets: [set({ status: 'waiting' })] }), `data set 'a' has a "status" that is neither "approved" nor "pending"`],
+    [manifest({ dataSets: [set({ documents: { file: 'a.pdf', size: 1 } })] }), `data set 'a' has "documents" that are not a list`],
+    [manifest({ dataSets: [set({ documents: [{ file: 'a.html', size: 1 }] })] }), `data set 'a' has "documents" that are not a list`],
+    [manifest({ dataSets: [set({ documents: [{ file: 'a.pdf' }] })] }), `data set 'a' has "documents" that are not a list`],
+    [manifest({ dataSets: [set({ documents: [{ file: 'a.pdf', size: -1 }] })] }), `data set 'a' has "documents" that are not a list`],
+    [manifest({ dataSets: [set({ documents: [{ file: 'a.pdf', size: 1 }, { file: 'a.pdf', size: 2 }] })] }), `data set 'a' names a document twice`],
     [manifest({ dataSets: [set(), set({ dir: 'b' })] }), `two data sets are 'a'`],
     [manifest({ moderator: 'yes' }), '"moderator" is neither true nor false'],
     [manifest({ default: 'b' }), '"default" names none'],
@@ -145,6 +160,8 @@ function main(): void {
       `${set.id}: miniDat says whether the folder holds a mini.dat`);
     check((existsSync(fileOf(set, 'hcsb.hct')) && existsSync(fileOf(set, 'hcsb.dat'))) === set.hintOracle,
       `${set.id}: hintOracle says whether the folder holds hcsb.hct and hcsb.dat`);
+    check(set.documents.every((document) => statSync(fileOf(set, document.file), { throwIfNoEntry: false })?.size === document.size),
+      `${set.id}: the folder holds each of its ${set.documents.length} documents, of the size the manifest says`);
 
     const dungeon = new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync(fileOf(set, 'dungeon.dat'))));
     // A block sets the rules its own way (`readRulesOptions`), so only a file without one

@@ -6,11 +6,11 @@ import type { LocalDataSetRecord } from '../LocalDataSets';
 import { DATA_SETS_STORE, SAVES_STORE, askToPersist, idbDone, idbGet, idbGetAll, idbPut, openSaveDatabase } from './idb';
 import type { DrawPlaythrough, StoredSaveRecord } from './SaveStore';
 
-/** A record as the store may hold it: one stored before `thumbnailAsTitle` has none, for `false`. */
-type StoredDataSetRecord = Omit<LocalDataSetRecord, 'thumbnailAsTitle'> & { thumbnailAsTitle?: boolean };
+/** A record as the store may hold it: one stored before `thumbnailAsTitle` or `official` has none, for `false`. */
+type StoredDataSetRecord = Omit<LocalDataSetRecord, 'thumbnailAsTitle' | 'official'> & { thumbnailAsTitle?: boolean; official?: boolean };
 
 function asRecord(stored: StoredDataSetRecord): LocalDataSetRecord {
-    return { ...stored, thumbnailAsTitle: stored.thumbnailAsTitle ?? false };
+    return { ...stored, thumbnailAsTitle: stored.thumbnailAsTitle ?? false, official: stored.official ?? false };
 }
 
 export class BrowserDataSetStore {

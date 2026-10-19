@@ -7,7 +7,7 @@
  *
  * The form is a publish's (`publish.ts`) but for the id, the URL's: every text field, the
  * files that change, by the name the game reads them under, and `remove` (`EDIT_REMOVE_FIELD`)
- * once per file the set no longer has. Every other file of its folder stays as it is, those
+ * once per file the set no longer has, and `official`, which only a moderator sets. Every other file of its folder stays as it is, those
  * the form does not know too (CSB's `mini.dat`, a readme). Any set is edited, pending,
  * approved or hidden, with an owner or none.
  *
@@ -88,21 +88,12 @@ export async function editDataSet(id: string, form: FormData, viewer: DataSetVie
 
     let dir = set.dir;
     if (changesFiles) {
-        dir = nextDir(gamefilesDir, set.dir);
-        const partial = join(gamefilesDir, `.${id}.${randomUUID()}.partial`);
-        try {
-            // Followed, a link would have the files written through it, into the old folder's.
-            await cp(old, partial, { recursive: true, dereference: true });
+        const written = await writeNextFolder(gamefilesDir, id, set.dir, async (partial) => {
             for (const file of edit.remove) await rm(join(partial, inFolder(file)), { force: true });
             await writeSetFiles(partial, id, edit.files, edit.baseSet, dataSets, gamefilesDir);
-            try {
-                await rename(partial, join(gamefilesDir, dir));
-            } catch {
-                return refuse(409, 'Another edit of the set was written first.');
-            }
-        } finally {
-            await rm(partial, { recursive: true, force: true });
-        }
+        });
+        if (written === null) return refuse(409, 'Another edit of the set was written first.');
+        dir = written;
     }
 
     try {
@@ -112,22 +103,56 @@ export async function editDataSet(id: string, form: FormData, viewer: DataSetVie
             hintOracle: files['hcsb.hct'] !== undefined && files['hcsb.dat'] !== undefined,
             dmRules: record.dmRules,
             thumbnailAsTitle: record.thumbnailAsTitle,
+            official: record.official,
             walls: edit.files['dungeon.dat'] ? walls : null,
         });
     } catch (error) {
         if (dir !== set.dir) await rm(join(gamefilesDir, dir), { recursive: true, force: true });
         throw error;
     }
-    if (dir !== set.dir) {
-        try {
-            await rm(old, { recursive: true, force: true });
-        } catch (error) {
-            console.error(`'${id}' edited into ${dir}, ${set.dir} left (${error instanceof Error ? error.message : String(error)})`);
-        }
-    }
+    if (dir !== set.dir) await deleteOldFolder(gamefilesDir, id, set.dir, dir, 'edited');
     console.log(`'${id}' edited${dir !== set.dir ? `, its files now in ${dir}` : ''}`);
     notify({ name: record.name, activity: 'edited', by: viewer.moderator.name, at: now() });
     return { status: 200, body: { id } };
+}
+
+/**
+ * The set `id`'s folder `dir`, under `gamefilesDir`, written anew with `change` applied, since
+ * a folder never changes once written: copied whole into `.<id>.<uuid>.partial/`, its links
+ * followed, `change` made to the copy, then renamed `<dir>@<n>` (`nextDir`). The new folder's
+ * name, or `null` where another change of the set renamed first; no `.partial` is left
+ * either way. A moderator's edit of the set's files writes one, and a document added or
+ * removed (`documents.ts`).
+ */
+export async function writeNextFolder(gamefilesDir: string, id: string, dir: string, change: (partial: string) => Promise<void>): Promise<string | null> {
+    const next = nextDir(gamefilesDir, dir);
+    const partial = join(gamefilesDir, `.${id}.${randomUUID()}.partial`);
+    try {
+        // Followed, a link would have the files written through it, into the old folder's.
+        await cp(join(gamefilesDir, dir), partial, { recursive: true, dereference: true });
+        await change(partial);
+        try {
+            await rename(partial, join(gamefilesDir, next));
+        } catch {
+            return null;
+        }
+    } finally {
+        await rm(partial, { recursive: true, force: true });
+    }
+    return next;
+}
+
+/**
+ * The set `id`'s old folder `old` deleted, once its row names `dir`, written by
+ * `writeNextFolder`: one that will not go is logged, the set `done`, and left, a folder no
+ * row names.
+ */
+export async function deleteOldFolder(gamefilesDir: string, id: string, old: string, dir: string, done: string): Promise<void> {
+    try {
+        await rm(join(gamefilesDir, old), { recursive: true, force: true });
+    } catch (error) {
+        console.error(`'${id}' ${done} into ${dir}, ${old} left (${error instanceof Error ? error.message : String(error)})`);
+    }
 }
 
 /** The folder an edit of the files of the set in `dir` writes: `<dir>@<n>`, the first `<n>` past `dir`'s own that `gamefilesDir` does not hold. */

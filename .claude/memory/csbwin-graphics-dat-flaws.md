@@ -6,7 +6,10 @@ metadata:
 ---
 
 Custom dungeons' `graphics.dat` files are usually CSBWin's DM file (`dm-windows/`) edited, so
-they carry its three differences from the Atari 1.2 disk, which `dm-atari/` replaces
+they carry its three differences from the Atari 1.2 disk, which `dm-atari/` replaces. CSBWin's
+file is the first 1.0 disk's (8 December 1987) with corrupted credits, so its other
+differences from 1.2 are 1.0's genuine tables (stamina costs, dragon range…), not flaws
+(`doc/ATARI_ST_DISK_REFERENCE.md` → "CSBWin's files"). The three
 (`doc/PROVEN_FACTS.md` → "`dm-atari/graphics.dat` is CSBWin's with three items from the 1.2
 disk"):
 

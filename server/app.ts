@@ -7,6 +7,7 @@
  * imports with their `.ts` extension (`server/tsconfig.json` holds it to that).
  *
  *   /                 dist/index.html               no-cache
+ *   /stats            dist/stats.html, the statistics page, whatever the query  no-cache
  *   /manifest.webmanifest  the installed game's     no-cache
  *   /assets/…         dist/assets/…, hashed names   immutable
  *   /server/…         404: the server's own module (`CHECK_MODULE`), never served
@@ -19,12 +20,18 @@
  *   /api/data-sets/<id>  POST: the set approved, rejected, hidden or shown, by a moderator,
  *                     or withdrawn by its owner (`moderate.ts`); with a form, its text and
  *                     files edited by a moderator (`edit.ts`)
+ *   /api/data-sets/<id>/documents  POST: a document added to the set by a moderator, with a
+ *                     form, or removed, with JSON (`documents.ts`)
  *   /api/data-set-walls  the walls of the sets `api/data-sets` offers the same player
  *                     that keep them, the published ones (`wallsText`)
  *   /api/health       200, for the compose healthcheck
  *   /api/event        POST: a game's event, checked (`events.ts`) and stored (`stats.ts`)
- *   /api/stats        the store's aggregates, as JSON
+ *   /api/stats        the public sets' statistics, as JSON (`StatsStore.summary`)  max-age 30 s
+ *   /api/stats/<id>   a public set's (`StatsStore.setStats`), 404 for any other    max-age 30 s
+ *   /api/stats/<id>/<level>  the deaths on its level's squares (`levelStats`)     max-age 30 s
  *
+ * Every answer, the API's and every error's as a file's, carries `SECURITY_HEADERS`. A POST a
+ * browser says another site's page sent is refused with 403 (`isCrossSite`).
  * Every file answers a conditional GET with 304. A path with a `.` segment, a backslash or
  * a NUL, encoded or not, is refused before it reaches the disk, so no request leaves the
  * three folders. A folder is 404, never a listing.
@@ -36,14 +43,15 @@ import { extname, join } from 'node:path';
 import { pipeline } from 'node:stream';
 import { pathToFileURL } from 'node:url';
 
-import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, PLAYER_ID_HEADER } from '../src/data/DataSets.ts';
+import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, PLAYER_ID_HEADER } from '../src/data/DataSets.ts';
 import { manifestText, samePlayerId, wallsText, type DataSetStore, type DataSetViewer, type Moderator } from './dataSets.ts';
+import { addDocument, removeDocument } from './documents.ts';
 import { editDataSet } from './edit.ts';
 import { checkEvent, isPlayerId, MAX_EVENT_BYTES, type EventRules, type RateLimit } from './events.ts';
 import { MAX_MODERATION_BYTES, moderateDataSet, type ModerationAnswer } from './moderate.ts';
 import type { Notify } from './notify.ts';
 import { MAX_PUBLISH_BYTES, publishDataSet, type CheckDataSet, type PublishAnswer, type ReadDungeonWalls } from './publish.ts';
-import type { StatsStore } from './stats.ts';
+import { AnswerCache, LEVELS, STATS_CACHE_MS, type StatsSet, type StatsStore } from './stats.ts';
 
 export interface ServerOptions {
     /** The built page: `index.html` and `assets/`. */
@@ -125,7 +133,18 @@ const GAMEFILES = 'gamefiles';
 /** The URL prefix of the files shared by link (`ServerOptions.filesDir`). */
 const FILES = 'files';
 
-/** A file's type by its extension, in any case; any other is `application/octet-stream`. */
+/** The API's statistics: `api/stats`, `api/stats/<id>` and `api/stats/<id>/<level>`, the level as its decimal number. */
+const STATS = 'stats';
+
+/** The statistics page, `/stats`: `distDir`'s `stats.html` (`src/stats/statsPage.ts`). */
+const STATS_PAGE = 'stats';
+
+/** The sets the statistics answer for: the approved ones that are not hidden, in the table's order. */
+function publicSets(dataSets: DataSetStore): StatsSet[] {
+    return dataSets.read().dataSets.filter((set) => !set.pending && !set.hidden).map(({ id, name }) => ({ id, name }));
+}
+
+/** A file's type by its extension, in any case (`contentType`); any other is `application/octet-stream`. */
 const CONTENT_TYPES: Record<string, string> = {
     '.7z': 'application/x-7z-compressed',
     '.css': 'text/css; charset=utf-8',
@@ -160,6 +179,11 @@ const CONTENT_TYPES: Record<string, string> = {
     '.zip': 'application/zip',
 };
 
+/** The type `path` is served as, by its extension (`CONTENT_TYPES`): the dev server serves a published set's files by it too. */
+export function contentType(path: string): string {
+    return CONTENT_TYPES[extname(path).toLowerCase()] ?? 'application/octet-stream';
+}
+
 const NO_CACHE = 'no-cache';
 const IMMUTABLE = 'public, max-age=31536000, immutable';
 
@@ -179,27 +203,49 @@ export function checkFiles({ distDir, gamefilesDir }: ServerOptions, dataSets: D
     return sets.map((set) => set.id);
 }
 
+/**
+ * What every answer carries. The policy lets the page load only from its own origin
+ * (`default-src`): its scripts, fonts, game files and API, none inline. Its styles may also
+ * be inline, as `index.html`'s `<style>` is; its images may also be `blob:` URLs, as a set's
+ * thumbnail is (`src/ui/welcomePage.ts`). No page may frame it, and no `<base>` move its
+ * relative URLs. No answer is sniffed for another type, no link the page follows names it,
+ * and a browser that has reached it over HTTPS never asks it over HTTP again: nginx's TLS
+ * is the only way in (`doc/DEPLOYMENT.md`), and a browser ignores the header over HTTP.
+ */
+export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
+    'Content-Security-Policy': "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'",
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer',
+    'Strict-Transport-Security': 'max-age=31536000',
+};
+
 /** The server, not yet listening. */
 export function createAppServer(options: ServerOptions, api: ApiOptions): Server {
+    const statsCache = new AnswerCache(STATS_CACHE_MS, api.now);
     return createServer((req, res) => {
+        for (const [name, value] of Object.entries(SECURITY_HEADERS)) res.setHeader(name, value);
         const fail = (error: unknown) => {
             console.error(`${req.method} ${req.url}:`, error);
             if (!res.headersSent) send(res, 500, 'Internal error');
             else res.destroy();
         };
         try {
-            route(options, api, req, res)?.catch(fail);
+            route(options, api, statsCache, req, res)?.catch(fail);
         } catch (error) {
             fail(error);
         }
     });
 }
 
-function route({ distDir, gamefilesDir, filesDir }: ServerOptions, api: ApiOptions, req: IncomingMessage, res: ServerResponse): Promise<void> | void {
+function route({ distDir, gamefilesDir, filesDir }: ServerOptions, api: ApiOptions, statsCache: AnswerCache, req: IncomingMessage, res: ServerResponse): Promise<void> | void {
     const segments = pathSegments(req.url ?? '');
     if (segments === null) return send(res, 400, 'Bad path');
 
     if (segments[0] === 'api') {
+        if (req.method === 'POST' && isCrossSite(req)) {
+            req.resume();
+            return send(res, 403, 'Cross-site request');
+        }
         if (segments.join('/') === DATA_SETS_ROUTE) {
             if (req.method === 'POST') return receivePublish(gamefilesDir, api, req, res);
             if (req.method !== 'GET' && req.method !== 'HEAD') return refuseMethod(res, 'GET, HEAD, POST');
@@ -218,17 +264,21 @@ function route({ distDir, gamefilesDir, filesDir }: ServerOptions, api: ApiOptio
             if (isForm(req)) return receiveEdit(segments[2]!, gamefilesDir, api, req, res);
             return receiveModeration(segments[2]!, gamefilesDir, api, req, res);
         }
+        if (segments.length === 4 && segments.slice(0, 2).join('/') === DATA_SETS_ROUTE && segments[3] === DOCUMENTS_SEGMENT) {
+            if (req.method !== 'POST') return refuseMethod(res, 'POST');
+            return receiveDocument(segments[2]!, gamefilesDir, api, req, res);
+        }
         const name = segments.length === 2 ? segments[1] : undefined;
         if (name === 'event') {
             if (req.method !== 'POST') return refuseMethod(res, 'POST');
             return receiveEvent(api, req, res);
         }
-        if (name === 'health' || name === 'stats') {
+        if (name === 'health') {
             if (req.method !== 'GET' && req.method !== 'HEAD') return refuseMethod(res);
             res.setHeader('Cache-Control', 'no-store');
-            const body = name === 'health' ? '{"ok":true}' : JSON.stringify(api.store.stats());
-            return send(res, 200, body, 'application/json; charset=utf-8');
+            return send(res, 200, '{"ok":true}', 'application/json; charset=utf-8');
         }
+        if (segments[1] === STATS) return answerStats(segments.slice(2), api, statsCache, req, res);
         return send(res, 404, 'Not found');
     }
 
@@ -241,8 +291,52 @@ function route({ distDir, gamefilesDir, filesDir }: ServerOptions, api: ApiOptio
         return serveFile(req, res, join(filesDir, ...segments.slice(1)), NO_CACHE);
     }
     if (segments.length === 0) return serveFile(req, res, join(distDir, 'index.html'), NO_CACHE);
+    if (segments.length === 1 && segments[0] === STATS_PAGE) return serveFile(req, res, join(distDir, `${STATS_PAGE}.html`), NO_CACHE);
     if (segments[0] === SERVER_DIR) return send(res, 404, 'Not found');
     return serveFile(req, res, join(distDir, ...segments), segments[0] === 'assets' ? IMMUTABLE : NO_CACHE);
+}
+
+/** What `answerStats` needs of the API. */
+export type StatsApi = Pick<ApiOptions, 'dataSets' | 'store'>;
+
+/**
+ * `api/stats/<path>`: the summary for an empty `path`, a public set's for its id, and its
+ * level's for its id and the level, from `statsCache`, which keeps each for `STATS_CACHE_MS`
+ * and says so; 404 for any other. The dev server answers the route with it too
+ * (`vite.config.mts`).
+ */
+export function answerStats(path: string[], api: StatsApi, statsCache: AnswerCache, req: IncomingMessage, res: ServerResponse): void {
+    if (path.length > 2) return send(res, 404, 'Not found');
+    if (req.method !== 'GET' && req.method !== 'HEAD') return refuseMethod(res);
+    const sets = publicSets(api.dataSets);
+    const [id, levelSegment] = path;
+    const set = sets.find((known) => known.id === id);
+    const level = levelSegment === undefined ? undefined : Number(levelSegment);
+    if (id !== undefined && set === undefined) return send(res, 404, 'Not found');
+    if (level !== undefined && !(/^(0|[1-9]\d{0,2})$/.test(levelSegment!) && level < LEVELS)) return send(res, 404, 'Not found');
+    res.setHeader('Cache-Control', `public, max-age=${STATS_CACHE_MS / 1000}`);
+    const body = statsCache.get(path.join('/'), () => JSON.stringify(
+        set === undefined ? api.store.summary(sets) : level === undefined ? api.store.setStats(set) : api.store.levelStats(set, level)));
+    send(res, 200, body, 'application/json; charset=utf-8');
+}
+
+/**
+ * Whether a browser says another site's page sent `req`: its `Sec-Fetch-Site` is neither
+ * `same-origin` nor `none`, or its `Origin` is not the `Host` it asks (`null`, from a
+ * sandboxed or opaque page, included). The page's own `sendBeacon` is a simple request,
+ * which any page could make a visitor's browser send. A client that sends neither header,
+ * a tool, is heard: only a browser can be made to post on another site's behalf.
+ */
+function isCrossSite(req: IncomingMessage): boolean {
+    const site = req.headers['sec-fetch-site'];
+    if (site !== undefined && site !== 'same-origin' && site !== 'none') return true;
+    const origin = req.headers.origin;
+    if (origin === undefined) return false;
+    try {
+        return new URL(origin).host !== req.headers.host;
+    } catch {
+        return true;
+    }
 }
 
 /**
@@ -305,9 +399,8 @@ function serveFile(req: IncomingMessage, res: ServerResponse, path: string, cach
         return;
     }
 
-    res.setHeader('Content-Type', CONTENT_TYPES[extname(path).toLowerCase()] ?? 'application/octet-stream');
+    res.setHeader('Content-Type', contentType(path));
     res.setHeader('Content-Length', stats.size);
-    res.setHeader('X-Content-Type-Options', 'nosniff');
     if (req.method === 'HEAD') {
         closeSync(fd);
         res.end();
@@ -374,11 +467,12 @@ export async function receivePublish(gamefilesDir: string, api: PublishApi, req:
     if (reply !== null) req.resume();
     else {
         const playerId = req.headers[PLAYER_ID_HEADER.toLowerCase()] as string;
+        const { moderator } = dataSetViewer(api, req);
         const form = await readForm(req);
         reply = typeof form === 'string' ? answer(form === 'large' ? 413 : 400, FORM_REFUSALS[form])
             : await publishDataSet(form, playerId, {
                 checkDataSet: api.checkDataSet, dataSets: api.dataSets, gamefilesDir, now: api.now,
-                notify: api.notify, publisher: dataSetViewer(api, req).moderator?.name ?? 'a player',
+                notify: api.notify, publisher: moderator?.name ?? 'a player', moderates: moderator !== null,
             });
     }
     res.setHeader('Cache-Control', 'no-store');
@@ -420,6 +514,36 @@ export async function receiveEdit(id: string, gamefilesDir: string, api: EditApi
         const form = await readForm(req);
         reply = typeof form === 'string' ? { status: form === 'large' ? 413 : 400, body: { error: FORM_REFUSALS[form] } }
             : await editDataSet(id, form, viewer, { checkDataSet: api.checkDataSet, dataSets: api.dataSets, gamefilesDir, notify: api.notify, now: api.now });
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    send(res, reply.status, JSON.stringify(reply.body), 'application/json; charset=utf-8');
+}
+
+/** What `receiveDocument` needs of the API. */
+export type DocumentApi = Pick<ApiOptions, 'dataSets' | 'moderators' | 'now' | 'notify'>;
+
+/**
+ * `POST api/data-sets/<id>/documents`: its asker, refused unless they moderate before the
+ * body is read, then a form of at most `MAX_PUBLISH_BYTES`, a document added, or a JSON body
+ * of at most `MAX_MODERATION_BYTES`, one removed, before `documents.ts` decides. Every
+ * answer is JSON (`ModerationAnswer`). The dev server answers the route with it too
+ * (`vite.config.mts`).
+ */
+export async function receiveDocument(id: string, gamefilesDir: string, api: DocumentApi, req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const viewer = dataSetViewer(api, req);
+    const options = { dataSets: api.dataSets, gamefilesDir, notify: api.notify, now: api.now };
+    let reply: ModerationAnswer;
+    if (!viewer.moderator) {
+        req.resume();
+        reply = { status: 403, body: { error: 'Only a moderator may change a set\'s documents.' } };
+    } else if (isForm(req)) {
+        const form = await readForm(req);
+        reply = typeof form === 'string' ? { status: form === 'large' ? 413 : 400, body: { error: FORM_REFUSALS[form] } }
+            : await addDocument(id, form, viewer, options);
+    } else {
+        const body = await readBody(req, MAX_MODERATION_BYTES);
+        reply = body === null ? { status: 413, body: { error: `The body is larger than ${MAX_MODERATION_BYTES} bytes.` } }
+            : await removeDocument(id, body.toString('utf8'), viewer, options);
     }
     res.setHeader('Cache-Control', 'no-store');
     send(res, reply.status, JSON.stringify(reply.body), 'application/json; charset=utf-8');

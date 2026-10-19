@@ -260,6 +260,9 @@ const CHECKS = [
   // A player's own set, built from a manifest set's files and read through its record:
   // the same files, the same game, tick for tick; its flags from its files; its prefix.
   { tool: 'dump-local-data-set.ts' },
+  // A published set's archive, which the welcome page's book makes: the page's zip read
+  // back by the tool's own reader and by unzip, every set's files in it, byte for byte.
+  { tool: 'dump-data-set-archive.ts' },
   { tool: 'dump-build.ts' },
   // The deployed server: its start-up check, caching, preconditions, refused paths, the
   // statistics' API, and server.ts itself, run as Node runs it, stopped by SIGTERM.

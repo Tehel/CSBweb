@@ -22,9 +22,11 @@
  * until a player's set is published and approved, and the welcome page then offers only to
  * add one. `default` may be `null` or left out, for none. A set's `dir` may be left out, for its `id`.
  * The flags `csbGraphics`,
- * `miniDat`, `hintOracle`, `dmRules`, `thumbnailAsTitle` and `hidden` may each be left out, for `false`, and the manifest
+ * `miniDat`, `hintOracle`, `dmRules`, `thumbnailAsTitle`, `hidden` and `official` may each be left out, for `false`, and the manifest
  * names one only where it is true. A set with `"hidden": true` is left out of the welcome
  * page's grid (`chooserSets`), but for a moderator, and plays all the same by its `?dungeon=`.
+ * A set with `"official": true` is one of FTL's own games, which the welcome page lists in
+ * a section of their own, before the fans' dungeons.
  *
  * A set's `description`, a text, and its `authors`, a list of texts, may each be left out,
  * for `''` and `[]`: what the form that adds a set says of it (`src/ui/addDataSetForm.ts`).
@@ -32,6 +34,10 @@
  * A set's `status` may be `"pending"`, for a set uploaded and not yet approved, which the
  * server offers its owner and the moderators only (`server/dataSets.ts`), or `"approved"`, or
  * be left out, for `"approved"`.
+ *
+ * A set's `documents` may be left out, for none: the files its folder holds beside the game's
+ * for its players to read, a manual or a solution (`DataSetDocument`), which the welcome
+ * page's book lists (`src/ui/welcomePage.ts`). The game reads none of them.
  *
  * `"moderator": true` says that the player asking is one of the site's moderators, which
  * only the server's answer to a moderator says; it may be left out, for `false`.
@@ -103,10 +109,31 @@ export interface DataSet {
      */
     hidden: boolean;
     /**
+     * Whether it is one of FTL's own games, Dungeon Master in any of its versions, its Kid's
+     * dungeon and Chaos Strikes Back, rather than a fan's: the welcome page lists those first,
+     * in a section of their own, in the manifest's order (`src/ui/welcomePage.ts`). Only a
+     * moderator says so (`server/publish.ts`, `server/edit.ts`).
+     */
+    official: boolean;
+    /**
      * Whether it awaits a moderator's approval: the manifest's `"status": "pending"`. The
      * server offers such a set to its owner and the moderators only. A local set is not.
      */
     pending: boolean;
+    /** The documents its folder holds for its players, by name (`DataSetDocument`): none, or several. A local set has none. */
+    documents: readonly DataSetDocument[];
+}
+
+/**
+ * A document of a set's: a file of its folder for its players to read or download from the
+ * welcome page, a manual, a solution, an author's notes, which the game never reads. A
+ * moderator adds and removes them (`server/documents.ts`).
+ */
+export interface DataSetDocument {
+    /** Its file's name in the set's folder, which `isDocumentName` takes. */
+    file: string;
+    /** Its size in bytes. */
+    size: number;
 }
 
 /** What a manifest says, its folders resolved. */
@@ -185,7 +212,41 @@ export const PLAYER_ID_HEADER = 'X-Player-Id';
 export const MODERATION_ACTIONS = ['approve', 'reject', 'hide', 'show'] as const;
 export type ModerationAction = (typeof MODERATION_ACTIONS)[number];
 
-const FLAGS = ['csbGraphics', 'miniDat', 'hintOracle', 'dmRules', 'thumbnailAsTitle', 'hidden'] as const;
+/**
+ * The segment below `DATA_SETS_ROUTE/<id>` where a moderator adds a document to the set,
+ * by a form, and removes one, by `{"remove": "<file>"}` (`server/documents.ts`).
+ */
+export const DOCUMENTS_SEGMENT = 'documents';
+
+/**
+ * The extensions a document may have, in any case: what a browser shows (a PDF, a text, a
+ * picture) or downloads (a word processor's file, an archive). Never one that it would run
+ * as the page's own, HTML or SVG, since a document is served beside the page.
+ */
+export const DOCUMENT_EXTENSIONS = ['.pdf', '.txt', '.md', '.doc', '.docx', '.rtf', '.odt', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.zip'] as const;
+
+/** The longest name a document may have, in characters. */
+export const DOCUMENT_NAME_LIMIT = 100;
+
+/**
+ * Whether `name` may name a document in a set's folder: a file's name of at most
+ * `DOCUMENT_NAME_LIMIT` characters, no `.` first, no `/`, `\` or control character, and one
+ * of `DOCUMENT_EXTENSIONS`. So no game file is one (`dungeon.dat`, `mini.dat`), since those
+ * end in `.dat` or `.hct`; the set's thumbnail, a `.png`, the server refuses as a document's
+ * name (`server/documents.ts`).
+ */
+export function isDocumentName(name: string): boolean {
+    const extension = name.slice(name.lastIndexOf('.')).toLowerCase();
+    return name.length <= DOCUMENT_NAME_LIMIT && !name.startsWith('.') && !/[/\\\x00-\x1f\x7f]/.test(name)
+        && name.lastIndexOf('.') > 0 && (DOCUMENT_EXTENSIONS as readonly string[]).includes(extension);
+}
+
+/** The file of `set`'s document `file`, in its folder, as a URL relative to the page: `3D2D1D/WALKTHROUGH.md`. */
+export function documentPath(set: DataSet, file: string): string {
+    return `${set.dir}/${encodeURIComponent(file)}`;
+}
+
+const FLAGS = ['csbGraphics', 'miniDat', 'hintOracle', 'dmRules', 'thumbnailAsTitle', 'hidden', 'official'] as const;
 
 /**
  * `text`, a manifest whose folders are relative to `base` (`gamefiles` for the page,
@@ -218,14 +279,24 @@ export function parseManifest(text: string, base: string): DataSetManifest {
         if (!Array.isArray(authors) || !authors.every((author) => typeof author === 'string')) {
             throw manifestError(`data set '${id}' has "authors" that are not a list of texts`);
         }
-        const [csbGraphics, miniDat, hintOracle, dmRules, thumbnailAsTitle, hidden] = FLAGS.map((flag) => {
+        const [csbGraphics, miniDat, hintOracle, dmRules, thumbnailAsTitle, hidden, official] = FLAGS.map((flag) => {
             const value = entry[flag] ?? false;
             if (typeof value !== 'boolean') throw manifestError(`data set '${id}' has a "${flag}" that is neither true nor false`);
             return value;
-        }) as [boolean, boolean, boolean, boolean, boolean, boolean];
+        }) as [boolean, boolean, boolean, boolean, boolean, boolean, boolean];
         const status = entry.status ?? 'approved';
         if (status !== 'approved' && status !== 'pending') throw manifestError(`data set '${id}' has a "status" that is neither "approved" nor "pending"`);
-        return { id, name, description, authors: authors as string[], dir: under(base, dir), csbGraphics, miniDat, hintOracle, dmRules, thumbnailAsTitle, hidden, pending: status === 'pending' };
+        const { documents = [] } = entry;
+        if (!Array.isArray(documents) || !documents.every((document) => isRecord(document) && typeof document.file === 'string' && isDocumentName(document.file)
+            && Number.isSafeInteger(document.size) && (document.size as number) >= 0)) {
+            throw manifestError(`data set '${id}' has "documents" that are not a list of {"file", "size"}, each file a document's name`);
+        }
+        const files = documents.map((document) => (document as Record<string, unknown>).file as string);
+        if (new Set(files).size !== files.length) throw manifestError(`data set '${id}' names a document twice`);
+        return {
+            id, name, description, authors: authors as string[], dir: under(base, dir), csbGraphics, miniDat, hintOracle, dmRules, thumbnailAsTitle, hidden, official,
+            pending: status === 'pending', documents: documents.map((document) => ({ file: document.file as string, size: document.size as number })),
+        };
     });
     const twice = dataSets.find((set, i) => dataSets.findIndex((other) => other.id === set.id) !== i);
     if (twice) throw manifestError(`two data sets are '${twice.id}'`);

@@ -11,7 +11,7 @@ the game files and the statistics' API (`doc/STATISTICS.md`). There are no login
 files are mounted from the host, never part of the image.
 
 The setup follows the author's other projects on the same VPS (`linkedin-games/player`
-above all): a two-stage `node:24-alpine` image with no `node_modules`, a loopback-only port
+above all): a two-stage Node 24 Alpine image with no `node_modules`, a loopback-only port
 behind the host's nginx, and a deploy by `docker save`, `scp` and `docker load`.
 
 ## What runs where
@@ -80,7 +80,7 @@ The page ships as it is, debug chrome included. Every URL in it is relative to t
 A manifest lists each set (its `dir` relative to the game files' folder), none at all
 for a new server, and the default set's id or none. A set names only what differs from the defaults: `dir` left out is the set's `id`,
 each flag (`csbGraphics`, `miniDat`, `hintOracle`, `dmRules`, `thumbnailAsTitle`, `hidden`) left out is `false`,
-`description` and `authors` left out are `''` and `[]`, and `status` left out is
+`description`, `authors` and `documents` left out are `''`, `[]` and `[]`, and `status` left out is
 `"approved"`. `src/data/DataSets.ts` parses it, for the page, the tools and the server. The page
 asks the server for it first, at `api/data-sets` (`loadManifest`, `src/main.ts`), and one
 that is missing or malformed ends the boot on `fatalMessage`, saying why.
@@ -134,11 +134,20 @@ ones to everyone, a pending one also to its owner, and every set to a moderator,
 set saying `"status": "pending"` and none naming its owner. A moderator's answer also says
 `"moderator": true`, and the welcome page then lists the hidden sets too, each tile's name
 in its set's state's colour: red pending, purple hidden, cyan a player's own, white
-otherwise. The page names its player in an `X-Player-Id` header, its kept `playerId`
+otherwise. A switch at the page's top right corner, offered to a moderator alone, turns
+that off: the page is then a player's, without the hidden sets, the pending ones or the
+moderation's controls, until it is turned on again (kept in `localStorage`). The page names its player in an `X-Player-Id` header, its kept `playerId`
 (`keptPlayerId`, `src/ui/gameEvents.ts`), and the moderators are those whose ids
 `MODERATOR_PLAYER_IDS` lists. `api/event` takes the events of any
 set in the table. Both read the table at each request, so a row added while the server
 runs is offered at once.
+
+**The official games come first.** A row whose `official` is `1` is one of FTL's own
+games: Dungeon Master in any of its versions, its Kid's dungeon, Chaos Strikes Back. The
+welcome page lists those under "Official games", in the table's `position` order, then
+every other set under "Fan-made dungeons". Only a moderator says a set is official: the
+form offers its checkbox to a moderator alone, and the server refuses it from anyone else
+(`server/publish.ts`, `server/edit.ts`). The site's own rows are marked by hand (below).
 
 **A player publishes their own set** by a `POST` to `api/data-sets` (`server/publish.ts`),
 which PUBLISH sends from the form the pen on its tile opens (`src/ui/addDataSetForm.ts`):
@@ -208,6 +217,52 @@ refuses with 422, and another edit of the set that wrote its folder first with 4
 with nothing changed. Each edit is logged, `'<id>' edited, its files now in <dir>`, and
 notified.
 
+### A set's documents
+
+A set's folder may hold documents for its players beside its game files: a manual, a
+solution, an author's notes (`DataSetDocument`, `src/data/DataSets.ts`), which the game
+never reads. The store lists them in `data_set_documents`, one row per file, its set, its
+name in the folder and its size, and `api/data-sets` gives each set's, by name, in its
+`documents`. A name is a file's of at most 100 characters, with no `.` first and no `/` or
+`\`, ending in `.pdf`, `.txt`, `.md`, `.doc`, `.docx`, `.rtf`, `.odt`, `.jpg`, `.jpeg`,
+`.png`, `.gif`, `.webp` or `.zip` (`isDocumentName`): what a browser shows or downloads,
+never HTML or SVG, which it would run as the page's own. So no game file is a document.
+
+On the welcome page, the book is on every published set's tile. It opens a dialog that
+offers first the set's files as one zip, `<name>.zip`, then lists its documents, each a
+link to the file in the set's folder: a PDF, a text or a picture opens in a new tab, any
+other is downloaded. To a moderator, the dialog adds a document by ADD, a file chosen on
+the drive, and removes one by its cross, once confirmed.
+
+**The archive** is made in the page, from the files the server serves under `gamefiles/`,
+one by one: the server builds nothing, and lists no folder (`src/data/DataSetArchive.ts`,
+`src/core/zip.ts`). It holds what the set says its folder holds, its `dungeon.dat` and
+`graphics.dat`, the `CSBgraphics.dat`, `mini.dat` and Hint Oracle its flags name, its
+thumbnail and its documents, stored uncompressed in one folder of the set's name, each
+dated by its `Last-Modified`: a folder CSBWin plays as its `directory=`, so that a set
+published here can be played elsewhere. A file of the folder the set does not name is left
+out: a readme that is no document, and the port's own files (CSB's `utility-portraits.dat`).
+A file the set is not whole without that does not load leaves no archive, which the dialog
+says. `tools/dump-data-set-archive.ts` checks the zip with a reader of its own and with
+`unzip`, over every set of the repository's manifest. Each is a `POST` to
+`api/data-sets/<id>/documents` (`server/documents.ts`), named in `X-Player-Id`: a
+`multipart/form-data` body of one file, `file`, added under its own name, or a JSON body
+`{"remove": "<file>"}`. Any set of the table takes them, pending or approved, the site's
+too. A change writes the set a new folder, `gamefiles/<dir>@<n>/`, as an edit of its files
+does, and deletes the old one, since a folder never changes once written; an edit carries
+the documents over with every file its form does not know, and a reject deletes them with
+the folder. The server refuses an asker who does not moderate with 403 before it reads the
+body, a form over 32 MiB or a JSON body over 1 KB with 413, a body that is not one file or
+that JSON, a name that is not a document's or is the set's thumbnail's with 400, an
+unknown id or a removal of a file that is not one of the set's documents with 404, and a
+name the folder holds already, a readme or a document, or another change of the set that
+wrote its folder first, with 409, each with nothing changed. Each change is logged, `'<id>'
+given the document '<file>', its files now in <dir>`, and notified.
+
+A file already in a set's folder, a readme uploaded with it, is made a document, and so goes
+in its archive, by its row alone, written by hand as the site's sets are (below). A file copied into a folder by hand
+reaches no backup, which copies each folder once; ADD writes a new folder, which it copies.
+
 A rejected set's folder was copied by the night's backup if it was published before it
 (below). One that will not go is logged, `'<id>' rejected, its folder left (…)`, and is a
 folder no row names, which refuses a new publish of its id until it is deleted by hand.
@@ -225,14 +280,15 @@ through `node:sqlite` (as below, to add the site's sets), and in `gamefiles/`:
 ### Notifications
 
 Each change to the sets is a message to the VPS's ntfy (`server/notify.ts`): a set
-published, approved, rejected, withdrawn by its owner, hidden, shown or edited. It is two
-lines:
+published, approved, rejected, withdrawn by its owner, hidden, shown or edited, or a
+document added or removed. It is two lines:
 
 ```
 Dataset <name>: <added | approved | rejected | withdrawn | shown | hidden | edited>
 By <who> at YYYYMMDD HH:mm
 ```
 
+or, for a document, `Dataset <name>: document <added | removed> (<file>)` first.
 `<name>` is the set's name, not its id. `<who>` is the moderator's alias from
 `MODERATOR_PLAYER_IDS`, or `moderator <n>`, their place in that list, for one without;
 `its owner` for a set withdrawn; `a player` for a set published by someone who does not
@@ -266,6 +322,35 @@ and a set's description and authors are changed in place:
 
 ```bash
 docker-compose exec -T csbweb node --disable-warning=ExperimentalWarning -e "new (require('node:sqlite').DatabaseSync)('/data/stats/stats.db').prepare('UPDATE data_sets SET description = ?, authors = ? WHERE id = ?').run('The original.', JSON.stringify(['FTL Games']), 'dm-atari')" < /dev/null
+```
+
+A file of a set's folder is made a document, listed by its book, by a row of
+`data_set_documents`, its size the file's:
+
+```bash
+docker-compose exec -T csbweb node --disable-warning=ExperimentalWarning -e "
+const db = new (require('node:sqlite').DatabaseSync)('/data/stats/stats.db');
+const dir = db.prepare('SELECT dir FROM data_sets WHERE id = ?').get('towers-of-chaos').dir;
+const size = require('node:fs').statSync('/data/gamefiles/' + dir + '/Readme.txt').size;
+db.prepare('INSERT INTO data_set_documents (data_set, file, size) VALUES (?, ?, ?)').run('towers-of-chaos', 'Readme.txt', size);
+" < /dev/null
+```
+
+The official games are marked, and put in their order, by giving them the places they
+already hold, in the order wanted, through negative ones, since `position` is unique. The
+column exists once the server has run a version that has it:
+
+```bash
+docker-compose exec -T csbweb node --disable-warning=ExperimentalWarning -e "
+const db = new (require('node:sqlite').DatabaseSync)('/data/stats/stats.db');
+const ids = ['dm-atari', 'kids-dungeon', 'csb'];  // the official games, in their order
+const positions = ids.map((id) => db.prepare('SELECT position FROM data_sets WHERE id = ?').get(id).position).sort((a, b) => a - b);
+const place = db.prepare('UPDATE data_sets SET position = ?, official = 1 WHERE id = ?');
+db.exec('BEGIN');
+ids.forEach((id, i) => place.run(-1 - i, id));
+ids.forEach((id, i) => place.run(positions[i], id));
+db.exec('COMMIT');
+" < /dev/null
 ```
 
 Each request reads the table, so a row is offered at once, with no restart; its folder is
@@ -328,9 +413,10 @@ imported by `src/main.ts`, which every set shares, so that every install has it 
 player uploads it, and the installed game's icons, named by its web app manifest,
 `manifest.webmanifest`; the build hashes them, and inlines `swoosh.img`, 3 KB, in the
 bundle. The manifest itself is built beside `index.html` under a name that does not change,
-as a browser keeps an installed app's manifest URL (`webAppManifest`, `vite.config.mts`). A
-build is `index.html`, `manifest.webmanifest` and `assets/`, about 1.4 MB, and the
-server's module.
+as a browser keeps an installed app's manifest URL (`webAppManifest`, `vite.config.mts`).
+The statistics page, `stats.html`, is the page's second entry, which shares none of the
+game's modules and links no manifest. A build is `index.html`, `stats.html`,
+`manifest.webmanifest` and `assets/`, about 1.4 MB, and the server's module.
 
 **The server's module** is the second build, `--ssr`: the page's check of a player's own
 set, `checkLocalDataSet` (`src/data/LocalDataSets.ts`) and every reader under it, bundled
@@ -340,7 +426,8 @@ erasable syntax and the image has no `node_modules`, so it loads this module ins
 reads a set with the page's own readers. It is never served.
 
 `tools/dump-build.ts` builds both into a scratch folder and asserts them: only the page's own file
-types, nothing of `static/`, every file `index.html` names present, the manifest's icons too, no probe handle, and a
+types, nothing of `static/`, every file `index.html` and `stats.html` name present, the manifest's icons too, the
+statistics page loading a few KB of script and none of the game's, no probe handle, and a
 server's module that imports nothing and says of DM's and CSB's files, and of a file that
 does not read, what the source's check says.
 
@@ -358,7 +445,7 @@ it is, stripping the types, so it uses only erasable syntax, marks its type-only
 and names its imports with `.ts`. `server/tsconfig.json` holds it to that, and `npm test`
 runs `tsc` on it beside the root project. The package is an ES module
 (`"type": "module"`), so that Node runs `server.ts` and the page's `DataSets.ts`, whose
-routes and limits the server imports from `../src/data/`. `npm start` runs it locally, on Node 22.18 or later.
+routes and limits the server imports from `../src/data/`. `npm start` runs it locally, on the project's Node (below).
 
 It reads `PORT` (8085), `DIST_DIR` and `GAMEFILES_DIR` (the checkout's `dist/` and
 `static/gamefiles/`), `FILES_DIR` (the checkout's `files/`, which git ignores), and `STATS_DB` (the
@@ -371,6 +458,7 @@ comma-separated `<playerId>[=<alias>]`, spaces around a comma or the `=` ignored
 | Path | What | Caching |
 | --- | --- | --- |
 | `/` | `dist/index.html` | `no-cache` |
+| `/stats` | `dist/stats.html`, the statistics page (`doc/STATISTICS.md`) | `no-cache` |
 | `/manifest.webmanifest` | `dist/manifest.webmanifest`, the installed game's | `no-cache` |
 | `/assets/…` | `dist/assets/…`, hashed names | `immutable` |
 | `/server/…` | 404: `dist/server/` is the server's module | |
@@ -378,14 +466,38 @@ comma-separated `<playerId>[=<alias>]`, spaces around a comma or the `=` ignored
 | `/files/…` | `FILES_DIR/…`, the files shared by link | `no-cache`, ETag and Last-Modified |
 | `/api/data-sets` | the `data_sets` table's sets the `X-Player-Id` may see, as a manifest; POST: a set published | `no-store`, `Vary: X-Player-Id` |
 | `/api/data-sets/<id>` | POST: the set approved, rejected, hidden or shown by a moderator, or withdrawn by its owner; with a form, edited by a moderator | `no-store` |
+| `/api/data-sets/<id>/documents` | POST: a document added to the set by a moderator, with a form, or removed, with JSON | `no-store` |
 | `/api/data-set-walls` | the walls of those of the same sets that keep some: the published ones | `no-store`, `Vary: X-Player-Id` |
 | `/api/health` | `{"ok":true}`, for the healthcheck | `no-store` |
 | `/api/event` | POST: one of the page's events (`doc/STATISTICS.md`) | |
-| `/api/stats` | the statistics' aggregates | `no-store` |
+| `/api/stats` | the public sets' statistics (`doc/STATISTICS.md`) | `public, max-age=30`, kept as long |
+| `/api/stats/<id>` | a public set's | `public, max-age=30`, kept as long |
+| `/api/stats/<id>/<level>` | the deaths on its level's squares | `public, max-age=30`, kept as long |
 
 Every file answers a conditional GET with 304, and only GET and HEAD are allowed, except on
-`api/event`, `api/data-sets`'s POST and `api/data-sets/<id>`, POST only. A path with a segment that starts with `.`, or holds a `/`, a `\` or a NUL once
+`api/event`, `api/data-sets`'s POST, `api/data-sets/<id>` and `api/data-sets/<id>/documents`, POST only. A POST a
+browser says another site's page sent, by its `Sec-Fetch-Site` or its `Origin`, is refused
+with 403 (`isCrossSite`, `doc/STATISTICS.md`). A path with a segment that starts with `.`, or holds a `/`, a `\` or a NUL once
 decoded, is refused with 400 before it reaches the disk. A folder is 404, never a listing.
+
+Every answer, the API's and every error's included, carries the same headers
+(`SECURITY_HEADERS`, `server/app.ts`), so nginx adds none:
+
+- `Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline'; img-src
+  'self' blob:; frame-ancestors 'none'; base-uri 'none'`. The page loads its scripts, fonts,
+  game files and API from its own origin only, and no script inline. Its styles may be
+  inline (`index.html`'s `<style>`), its images `blob:` URLs (a set's thumbnail). Vite would
+  inline a small asset as a `data:` URL, which the policy does not fetch, so the one small
+  file the page fetches, `swoosh.img`, is imported `?url&no-inline` (`src/main.ts`).
+- `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, and
+  `Strict-Transport-Security: max-age=31536000`, without `includeSubDomains`, which would
+  bind the VPS's other projects. A browser ignores it over plain HTTP, as the dev server
+  and `tools/check-image.sh` serve.
+
+`tools/check-image.sh` proves the page runs under the policy: the frames are the built
+page's, served by the server with its headers, and the probe fails on anything the policy
+refuses (`tools/probe-frames.mjs`). The dev server sets none: Vite's own page runs inline
+scripts.
 
 **At start-up** it opens the store (making it, and its folder, when missing), checks
 that `index.html` is built, and that the game files' folder and each folder the table's
@@ -397,7 +509,8 @@ the file, and exits with 0. It logs to stdout. `tools/dump-server.ts` asserts al
 
 ## The image and the stack
 
-`Dockerfile`, two stages on `node:24-alpine`:
+`Dockerfile`, two stages on `NODE_IMAGE`, `node:24.22.0-alpine3.24` pinned by the digest
+of its multi-platform index, so that a rebuild takes the same bytes:
 
 - **The build stage** runs `npm ci && npm run build`, `tsc` included. Its context is an
   allowlist (`.dockerignore`): the page's sources, `server/`, the tools' `.ts` that `tsc`
@@ -412,6 +525,13 @@ the file, and exits with 0. It logs to stdout. `tools/dump-server.ts` asserts al
 `npm test` needs the game files, so it is the gate before a commit, not part of the image's
 build.
 
+**One Node, 24** (the current LTS), everywhere: the image's, `.nvmrc`'s, `package.json`'s
+`engines` (`^24`) and `@types/node`'s (`^24`). `npm test` runs on it: `dump-server` runs
+`server.ts` as Node does, types stripped, and `backup.ts` uses `node:sqlite`'s `backup`.
+Moving it on moves all four at once. The digest is the index's, which
+`docker buildx imagetools inspect node:<version>-alpine<release>` prints as `Digest:`;
+`.nvmrc` names the major, which `nvm use` picks in the checkout.
+
 `docker-compose.yaml` runs `csbweb:latest` as the container `csbweb`:
 
 - **`127.0.0.1:${CSBWEB_PORT:-8085}:8085`, loopback only.** A port published on `0.0.0.0`
@@ -423,6 +543,11 @@ build.
   publishes is written under `gamefiles/`, as its row is in the store, so both folders must
   belong to uid 1000 on the host, as the login user's do. `tools/check-image.sh` mounts each
   of the checkout's game folders read-only in a throwaway one, where the probe's publish writes.
+- **Limits**, on a VPS other projects share: `mem_limit: 512m` and `pids_limit: 100`, what
+  it may take; `read_only: true`, the server writing only to the two mounted folders;
+  `cap_drop: [ALL]`, as it needs no capability (its port is above 1024, its folders its
+  uid's); and `no-new-privileges`. Compose v1 takes them under `version: '3.8'`.
+  `tools/check-image.sh` runs the image with the same, the probe's publish included.
 - `restart: unless-stopped`, a 10 s `stop_grace_period`, a healthcheck on `api/health`
   (busybox's `wget`), and `json-file` logs rotated at 3 × 10 MB.
 - `version: '3.8'`, for the VPS's Compose v1.
@@ -456,13 +581,17 @@ the file, and quoted in the remote command anyway.
 ## Deploying
 
 ```bash
-npm test                       # the gate
+npm test                       # the gate, before the commit
 bash tools/check-image.sh      # optional: the golden frames against the image (Docker, Chrome)
 npm run deploy                 # utils/deploy.sh
 ```
 
-`utils/deploy.sh` builds `csbweb:latest`, with the commit as `CSBWEB_BUILD` (`-dirty` when
-tracked files differ from it), `docker save | gzip`s it, makes `stats/` over SSH as the
+`utils/deploy.sh` deploys a commit: it refuses a working tree that differs from it in what
+the image is built from, the build context (`.dockerignore`'s allowlist, untracked files
+included), the `Dockerfile` or the compose file, and says what differs. A commit has passed
+`npm test`, so a clean tree is a checked one; `NOTES.md` or a document changed beside it
+does not stop a deploy. `npm run deploy -- --dirty` deploys such a tree anyway. It builds
+`csbweb:latest`, with the commit as `CSBWEB_BUILD` (`-dirty` under `--dirty`), `docker save | gzip`s it, makes `stats/` over SSH as the
 login user (so that uid 1000 can write it), `scp`s the image and `docker-compose.yaml` into
 `DEPLOY_DIR`, then loads the image and runs `docker-compose down && docker-compose up -d`.
 
@@ -512,8 +641,8 @@ events. A `cp` of the live file would be unsafe: its WAL holds events the main f
 not have yet.
 
 It then copies the folders the snapshot's sets live in, every set's, into
-`stats/backups/gamefiles/<dir>/`: a moderator's edit writes any set a new folder, the site's
-too. A folder is whole before a row names it and never changes after, so each is copied
+`stats/backups/gamefiles/<dir>/`: a moderator's edit, or a document added or removed, writes
+any set a new folder, the site's too. A folder is whole before a row names it and never changes after, so each is copied
 once, through a `.partial` name renamed when whole, and kept for good, a deleted set's and
 an edited set's old one included, since a snapshot still names it. It prints one JSON line, `backup_ok` with the folders copied and the
 number kept, and exits with 1 when the store cannot be read or a folder cannot be copied

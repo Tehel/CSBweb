@@ -5,7 +5,8 @@
  *
  * - **The left column** is what the player gives: the name, the id (the `<id>` of
  *   `local:<id>`, made from the name until the player writes one), a short description,
- *   the authors, separated by commas, the reincarnation rule (`dmRules`, DM's at first), the graphics a
+ *   the authors, separated by commas, the reincarnation rule (`dmRules`, DM's at first), to a
+ *   moderator alone whether it is an official game, one of FTL's own (`official`, off at first), the graphics a
  *   dungeon without its own `graphics.dat` plays, DM's or CSB's, whichever the manifest
  *   has, and none where it has neither, which leaves a set its own to give, and one area that takes the files: dropped there, several at once, or chosen in
  *   the picker a click on it opens. An image is the thumbnail, if it is 320x200, the
@@ -108,6 +109,9 @@ const AS_TITLE_HINT = "The game opens on this picture, faded in and out, in plac
 const NEW_DUNGEON_NOTE = 'Saved games keep the dungeon they were made in: the new dungeon.dat reaches new games only, '
     + 'and a save of the old one is no longer recognised as this dungeon\'s.';
 
+/** The official game's checkbox, a moderator's. */
+const OFFICIAL_HINT = "One of FTL's own games, listed on the welcome page with them, before the fans' dungeons.";
+
 /** `doc/CSBwin-src/CSBCode.cpp:6796-6841`. */
 const DM_RULES_HINT = 'Every reincarnation adds 12 random attribute points. Without DM rules, as in CSB, the '
     + 'attributes, HP, stamina and mana are first cut by a penalty, so a reincarnated champion ends weaker.';
@@ -133,6 +137,8 @@ const FORM = `
         <input name="authors" maxlength="${LOCAL_DATA_SET_TEXT_LIMITS.authors}" placeholder="Separated by commas" autocomplete="off"></label>
       <label class="add-set-check" title="${DM_RULES_HINT}"><input type="checkbox" name="dmRules" checked>
         <span>DM rules: reincarnation raises attributes</span></label>
+      <label class="add-set-check add-set-official" title="${OFFICIAL_HINT}" hidden><input type="checkbox" name="official">
+        <span>Official game, one of FTL's own</span></label>
       <fieldset class="add-set-base" title="The graphics a dungeon plays when it has no graphics.dat of its own">
         <legend class="px px2">Without graphics.dat</legend>
       </fieldset>
@@ -248,7 +254,9 @@ function openForm(
     dialog.innerHTML = FORM;
     const form = dialog.querySelector('form')!;
     const input = (name: string): HTMLInputElement => form.querySelector<HTMLInputElement>(`[name="${name}"]`)!;
-    const [name, id, authors, dmRules] = ['name', 'id', 'authors', 'dmRules'].map(input);
+    const [name, id, authors, dmRules, official] = ['name', 'id', 'authors', 'dmRules', 'official'].map(input);
+    // Only a moderator says a set is official (`server/publish.ts`).
+    official.closest('label')!.hidden = !manifest.moderator;
     const description = form.querySelector('textarea')!;
     /** On the thumbnail's row, in place of its name: `thumbnailAsTitle`. */
     const asTitle = document.createElement('input');
@@ -287,6 +295,7 @@ function openForm(
         authors.value = editing.authors.join(', ');
         dmRules.checked = editing.dmRules;
         asTitle.checked = editing.thumbnailAsTitle;
+        official.checked = editing.official;
         for (const [about, blob] of Object.entries(editing.files) as [LocalDataSetFile, Blob][]) {
             files[about] = blob instanceof File ? blob : new File([blob], about, { type: blob.type });
         }
@@ -431,7 +440,7 @@ function openForm(
         idWritten = id.value !== '';
         changed();
     });
-    for (const field of [description, authors, dmRules, asTitle]) field.addEventListener('input', changed);
+    for (const field of [description, authors, dmRules, official, asTitle]) field.addEventListener('input', changed);
 
     form.addEventListener('submit', (event) => event.preventDefault());
     form.querySelector('#add-set-cancel')!.addEventListener('click', () => dialog.close());
@@ -503,6 +512,7 @@ function openForm(
             authors: authors.value.split(','),
             dmRules: dmRules.checked,
             thumbnailAsTitle: asTitle.checked,
+            official: official.checked,
             baseSet,
             files: { ...files },
         };
@@ -571,7 +581,7 @@ function openForm(
         const sameFiles = LOCAL_DATA_SET_FILES.every((about) => files[about] === storedFiles[about]);
         return sameFiles && record.name === editing.name && record.description === editing.description
             && record.authors.join('\n') === editing.authors.join('\n') && record.dmRules === editing.dmRules
-            && record.thumbnailAsTitle === editing.thumbnailAsTitle
+            && record.thumbnailAsTitle === editing.thumbnailAsTitle && record.official === editing.official
             && record.baseSet === editing.baseSet;
     }
 
@@ -616,6 +626,7 @@ async function recordForm(record: LocalDataSetRecord, baseSet: string, unchanged
     for (const author of record.authors) body.append('authors', author);
     body.append('dmRules', String(record.dmRules));
     body.append('thumbnailAsTitle', String(record.thumbnailAsTitle));
+    body.append('official', String(record.official));
     body.append('baseSet', record.baseSet ?? baseSet);
     try {
         for (const [about, blob] of Object.entries(record.files) as [LocalDataSetFile, Blob][]) {

@@ -5,18 +5,10 @@
  * `CompressionStream`, a tool's `zlib`, and either is the zlib stream PNG wants.
  */
 
+import { crc32 } from './crc32';
+
 /** The PNG file's signature. */
 const SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-
-const CRC_TABLE = (() => {
-    const table = new Uint32Array(256);
-    for (let n = 0; n < 256; n++) {
-        let c = n;
-        for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-        table[n] = c >>> 0;
-    }
-    return table;
-})();
 
 /** A chunk: its length, its type, `data`, and the CRC of the type and the data. */
 function chunk(type: string, data: Uint8Array): Uint8Array {
@@ -25,9 +17,7 @@ function chunk(type: string, data: Uint8Array): Uint8Array {
     view.setUint32(0, data.length);
     for (let i = 0; i < 4; i++) out[4 + i] = type.charCodeAt(i);
     out.set(data, 8);
-    let crc = 0xffffffff;
-    for (let i = 4; i < 8 + data.length; i++) crc = CRC_TABLE[(crc ^ out[i]) & 0xff] ^ (crc >>> 8);
-    view.setUint32(8 + data.length, (crc ^ 0xffffffff) >>> 0);
+    view.setUint32(8 + data.length, crc32(out.subarray(4, 8 + data.length)));
     return out;
 }
 

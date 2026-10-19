@@ -116,8 +116,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| W2 | `api/stats` is computed whole at every request | S | ⏳ |
-| W3 | `api/event` takes another site's posts, and any name | S | ⏳ |
+| E40 | The statistics page's heat map | M | ⏳ |
 | R6 | A damaged file's counts size allocations and loops | M | ⏳ |
 | R7 | An index from a custom data set can throw | S | ⏳ |
 | R8 | An optional feature's failure ends the game, or the session | S | ⏳ |
@@ -126,8 +125,6 @@ In payoff order: the first row is the next item.
 | R16 | A save's DELETE is told done before its transaction commits | S | ⏳ |
 | W4 | The events table grows without bound | S | ⏳ |
 | W5 | The statistics are pseudonymous, not anonymous | S | ⏳ |
-| W6 | Security headers | S | ⏳ |
-| W7 | The container, the deploy and the Node version | S | ⏳ |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | R12 | Listing the saves reads every save's bytes | M | ⏳ |
@@ -188,7 +185,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C183 · D22 · E40 · F22 · G31 · P13 · R17 · U13 · W8 · X16. An ID recorded and paid in one commit has no
+Next free IDs: C183 · D22 · E41 · F22 · G31 · P13 · R17 · U13 · W8 · X16. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -277,6 +274,17 @@ request, and has one moderator, `DEV_MODERATOR_PLAYER_ID` (`vite.config.mts`), w
 edit and refusal, and `tools/probe-frames.mjs` moderates and edits the set it publishes,
 from the tiles, as that moderator and as its owner.
 
+A published set's files can be taken away: the book on its tile offers them as one zip,
+`<name>.zip`, made in the page from the files the server serves (`src/data/DataSetArchive.ts`),
+a folder CSBWin plays. Then it lists the set's documents, the manuals and solutions its
+folder holds for its players, a link each; to a moderator, it adds a file chosen on the
+drive and removes one
+(`server/documents.ts`, `doc/DEPLOYMENT.md` → "A set's documents"). The store lists them in
+`data_set_documents`, and each change writes the set a new folder, as an edit of its files
+does. `tools/dump-server.ts` asserts each change and refusal, `tools/dump-data-set-archive.ts`
+the archive of every set, and `tools/probe-frames.mjs` downloads the archive, adds and
+removes documents from the book, as the moderator, and reads them as the owner.
+
 The `<id>` is a folder's name (`LOCAL_ID_PATTERN`: lowercase letters, digits, `.`, `-` and
 `_`, at most 40), since publishing makes it the set's folder on the server. No shipped dungeon
 names its `graphics.dat` or `CSBgraphics.dat`, nor expects a `CSBgraphics.dat`, so the
@@ -308,6 +316,12 @@ Decisions taken with the author, for every row:
   description, and rarely a `.dat`. A folder never changes once written, which the backup
   relies on, so a change of files is a new folder, `<dir>@<n>`, and the backup copies every
   set's folder. A new `dungeon.dat` reaches no save already made (P11), which the form says.
+- **A published set is never captive**: the book downloads its files as a zip, built in
+  the page from the files already served, so the server gains no endpoint and no work. A
+  local set's files are the player's already.
+- **Documents are files of the set's folder**, one row each of `data_set_documents`, so a
+  document belongs to one set and the backup copies it with the folder. A moderator adds
+  and removes them, on any published set; a local set has none, and the game reads none.
 
 A custom dungeon reaches what the shipped ones do not, so R7 and R8 matter more now.
 
@@ -554,35 +568,11 @@ The deciphered data handed on by `loadSaveGameState`.
 open internet behind the VPS's nginx. Its weak point is availability: what an anonymous
 client can make it hold, compute or keep. What holds already: paths (`..`, `%2e%2e`,
 `%00`, dotfiles all refused), the body's size limit, events rebuilt from checked fields
-only, errors that leak nothing. Each item ships with its check in `tools/dump-server.ts`
+only, a champion's name of the game's characters, a POST from another site's page
+refused, a content security policy and `nosniff` on every answer, errors that leak nothing, a
+container held to a memory, process and privilege budget, read-only but for its data, and
+statistics aggregated as the events arrive, each answer capped and cached 30 s. Each item ships with its check in `tools/dump-server.ts`
 or `tools/dump-stats.ts`.
-
-### W2 ⏳ `api/stats` is computed whole at every request
-
-Every `GET` or `HEAD` of `api/stats` runs `store.stats()` (`server/app.ts:192-196`): five
-aggregates over the whole events table through the synchronous `DatabaseSync`, with
-`json_each` over every payload and a correlated `MIN` for every win (`server/stats.ts:64-90`),
-returning every won game and every champion name ever. With 200,000 rows it takes 3.6 s,
-during which the server answers nothing, and returns 32 MB. A loop of requests is a denial
-of service.
-
-Paying it: the answer cached for a minute (or computed on a timer), the lists capped (the
-latest or best N wins a set, the top N champions), `api/stats` under a rate limit.
-
-### W3 ⏳ `api/event` takes another site's posts, and any name
-
-- **Cross-origin**: the page posts with `navigator.sendBeacon('api/event', …)`
-  (`src/ui/gameEvents.ts:187`), a `text/plain` simple request, and the server checks
-  neither `Origin` nor `Sec-Fetch-Site`. Any page can make each of its visitors' browsers
-  post invented events, each visitor a rate-limit bucket of their own.
-- **Names**: `checkChampions` asks only that a name be a string of at most `MAX_NAME`
-  characters (`server/events.ts:99`), so control characters, bidi overrides, NUL (which
-  `json_extract` cuts), markup and the empty name are stored, and published by
-  `api/stats`, which E39's public statistics will draw.
-
-Paying it: a `POST` whose `Origin` or `Sec-Fetch-Site` names another site is refused; a
-name is made of the characters the game's font has (A to Z, the accented letters, space,
-punctuation) and is not empty. `dump-stats` checks the refusals.
 
 ### W4 ⏳ The events table grows without bound
 
@@ -592,8 +582,9 @@ a second `won` of the same playthrough, no retention, and an IPv6 client has a /
 addresses. One address can add 43,200 rows a day, about 10 MB, on a disk the VPS shares,
 and SQLite never shrinks.
 
-Paying it: a global budget a day; `started`, `won` and `lost` unique by type, data set and
-playthrough (`INSERT OR IGNORE`); IPv6 counted by its /64; a size check.
+Paying it: a global budget a day; `started` and `won` unique by type, data set and
+playthrough (`INSERT OR IGNORE`), but not `lost`, as every death counts where parties die
+(`doc/STATISTICS.md`); IPv6 counted by its /64; a size check.
 
 ### W5 ⏳ The statistics are pseudonymous, not anonymous
 
@@ -608,36 +599,6 @@ Paying it: `access_log off` (or a format without the address) for `location =
 /api/event`, in `doc/DEPLOYMENT.md` and on the VPS (the author's); the time stored to the
 minute or coarser; a retention period; the FAQ saying "pseudonymous", and how to reset the
 id.
-
-### W6 ⏳ Security headers
-
-Only a file's answer carries `X-Content-Type-Options: nosniff` (`serveFile`,
-`server/app.ts`); `send`, which answers the API and every error, sets none (`:253-258`). No
-answer carries `Content-Security-Policy`, `frame-ancestors`, `Referrer-Policy` or HSTS.
-
-Paying it: in `send` and `serveFile`, or in nginx: `default-src 'self'; style-src 'self'
-'unsafe-inline'` (the `<style>` in `index.html`), `img-src 'self' data: blob:;
-frame-ancestors 'none'; base-uri 'none'`, and `nosniff` on every answer.
-`tools/check-image.sh` checks the page still runs under it.
-
-### W7 ⏳ The container, the deploy and the Node version
-
-- `docker-compose.yaml` sets no `mem_limit`, `pids_limit`, `read_only`, `cap_drop` or
-  `no-new-privileges`, on a VPS shared with other projects (W2 can push the process to
-  hundreds of MB).
-- `utils/deploy.sh` builds and ships a working tree that differs from its commit, only
-  tagging the build `-dirty` (`:28-32`), and runs no check.
-- One Node version is not settled: the image is `node:24-alpine`, a floating tag
-  (`Dockerfile:13`, `:22`); `package.json` has no `engines` and `@types/node` `^22`; there
-  is no `.nvmrc`; `doc/DEPLOYMENT.md` says 22.18 or later; `CLAUDE.md` and
-  `tools/check-frames.sh:117-121` keep a Node 20 workaround, though `npm test` cannot pass
-  on Node 20 (`dump-server` runs `node server/server.ts`, type stripping from 22.18, and
-  `backup.ts` needs `node:sqlite`'s `backup`). The server is tested on Node 22 and runs on
-  24.
-
-Paying it: the limits in the compose file; `deploy.sh` refusing a dirty tree unless forced;
-one Node version (`engines`, `.nvmrc`, `@types/node`, the image pinned to a digest), the
-Node 20 notes gone.
 
 ---
 
@@ -1200,10 +1161,25 @@ the author before any code. What they are to hold:
   It insists that the statistics are anonymous: no player's name, no IP address, no
   browser profiling. A random id, drawn in the browser, is used only for counting
   players. Champions go by the names they carry, which a player can type.
-- **The public statistics**, drawn from the server's `api/stats`, on ABOUT or a page of
-  their own.
+- **The public statistics** are a page of their own, `/stats` (`doc/STATISTICS.md` → "The page"); ABOUT links to it.
 - **CREDITS** is a block of the welcome page (`#credits`). It does not name the data sets'
   authors yet.
+
+### E40 ⏳ The statistics page's heat map
+
+The statistics page is built (`doc/STATISTICS.md` → "The page"), all but a level's heat
+map, as designed with the author:
+
+- **A click on a level's row** of the selected set's deaths per level draws the level from
+  the set's `dungeon.dat` (`DungeonLoader`, rooms in `MapDialog.ts`'s `ROOM_COLORS` as CSS),
+  each square shaded by its deaths (`api/stats/<id>/<level>`), the count on hover. The rows
+  are not clickable yet (`deathsPerLevel`, `src/stats/statsPage.ts`), and the page loads
+  none of the game's code (`tools/dump-build.ts`): the reader of a `dungeon.dat` it needs
+  must stay out of the game's chunk, or the bound there be raised knowingly.
+
+Paying it: the heat map, checked in `tools/probe-frames.mjs`'s statistics block (a level
+opens its map) and by a screenshot over the dev server's fortnight. E39's ABOUT then links
+to the page.
 
 ### E22 ⏸️ Fullscreen filled by a fraction
 
@@ -1645,10 +1621,10 @@ seen working ("good"), which were never seen, and which do not match the English
 those two first. The author reviews the file before it ships.
 
 The French 1.3 program's own strings are the faithful source where they exist. The disk
-image is `archive/DungeonMaster1v3Fr.stx` (gitignored; `doc/ATARI_ST_DISK_REFERENCE.md`
-→ "The French 1.3 disk"). The program is presumably `START.PAK`, packed and not yet
-examined, whose 1.3 differs from 1.2's, so it must be unpacked before its strings can be
-read. It holds only what the 1988 program printed: the CSBWin-only messages (the save
+image is the collection's `Floppy Disks STX/Dungeon Master for Atati ST v1.3 (French).stx`
+(gitignored; `doc/ATARI_ST_DISK_REFERENCE.md` → "The disks", "The French 1.3 disk"). The
+program is presumably `START.PAK`, packed and not yet examined, whose 1.3 differs from
+1.2's, so it must be unpacked before its strings can be read. It holds only what the 1988 program printed: the CSBWin-only messages (the save
 dialog's file menus, DSA texts, the utility, the Hint Oracle) have no French original and
 come from the file above or from the author. Some French words are not strings at all,
 but pictures in `graphics.dat` already drawn in French (RESSUSCITER / RÉINCARNER /

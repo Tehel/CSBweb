@@ -14,8 +14,8 @@
  *     header names them, and no owner named; `"moderator": true` said to each of two
  *     moderators, and to nobody else;
  *   - `/` and `/assets/…`: the page, `no-cache`, and the hashed files, `immutable`, the
- *     fonts as `font/ttf` and `font/woff2`; and `dist/server/`, the server's module, not
- *     served;
+ *     fonts as `font/ttf` and `font/woff2`; `/stats`, the statistics page, `no-cache`; and
+ *     `dist/server/`, the server's module, not served;
  *   - `/gamefiles/…`: ETag and Last-Modified, a 304 for either precondition, HEAD without
  *     a body, and the query ignored; and no descriptor left open on a large file after a
  *     download, a 304, a HEAD, or downloads the client abandons after their first bytes;
@@ -26,9 +26,15 @@
  *   - no path leaves the three folders, `..` and `.` raw, percent-encoded or behind a
  *     backslash, and no dot-file is served;
  *   - `/api/health`, and a 405 for a method that is not GET or HEAD;
- *   - `/api/event`: POST only, an event stored (what is stored, `dump-stats` asserts), a bad
- *     one 400, a set added to the table while it runs known at once, a body over 4 KB 413 whether it says so or not, and the rate limit per
- *     forwarded address, 429; `/api/stats`: the store's aggregates, not cached;
+ *   - `SECURITY_HEADERS` on every answer: the page, an asset, a 304, a HEAD, the API, and
+ *     every error, a 404, a 400, a 405 and a 403 included;
+ *   - `/api/event`: POST only, an event stored (what is stored, `dump-stats` asserts), a
+ *     session counted and no row of the log, a bad one 400, a set added to the table while it runs known at once, a body over 4 KB 413 whether it says so or not, and the rate limit per
+ *     forwarded address, 429; a POST a browser says another site's page sent, by its
+ *     `Sec-Fetch-Site` or its `Origin`, 403, there and on every other POST route, and one
+ *     from the page's own origin heard; `/api/stats`, `/api/stats/<set>` and
+ *     `/api/stats/<set>/<level>`: the store's answers for the public sets, kept 30 s, 404
+ *     for a set not public or a level out of range or not written as its number;
  *   - the API is handed the page's own `checkLocalDataSet`, which `tsc` holds to the
  *     shape `server/publish.ts` types it by (`CheckDataSet`);
  *   - `POST /api/data-sets` (`server/publish.ts`), over DM's and CSB's real files: a set
@@ -50,6 +56,18 @@
  *     moderator (403, a body too large too, unread), a body too large or not a form, an id
  *     in the form, a field missing, a `remove` of no file, twice or of a file given (400), an
  *     unknown id (404), and a set the page's check refuses (422);
+ *   - `POST /api/data-sets/<id>/documents` (`server/documents.ts`): a moderator adds a document
+ *     to a set, a site's whose folder is a link and a pending player's, and removes one,
+ *     each change a new folder, `<id>@2` and on, every other file carried over, the old
+ *     folder deleted and the link's left as it was; `api/data-sets` gives everyone the
+ *     documents, listed by name, with their size, and each is served where `documentPath`
+ *     says, by its type, `nosniff`; each change notified, the file named; every refusal
+ *     answered with nothing changed: an asker who is not a moderator (403, a body too
+ *     large too, unread), a body too large (413), a form that is not one file, a name that
+ *     is not a document's or is the thumbnail's (400), a name the folder holds already, a
+ *     readme or a document (409), an unknown id, and a removal of a file that is not one of
+ *     the set's documents, one that would leave the folder included (404); and a set
+ *     rejected takes its documents with it;
  *   - `POST /api/data-sets/<id>` (`server/moderate.ts`): a moderator approves, hides and
  *     shows a set, a site's too, and rejects a pending one, its row then its folder gone,
  *     and its owner withdraws it while it is pending; and every refusal answered with
@@ -87,15 +105,16 @@ import { join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { deflateSync } from 'node:zlib';
 
-import { CHECK_MODULE, checkFiles, createAppServer, fillWalls, pathSegments, type ApiOptions, type ServerOptions } from '../server/app.ts';
+import { CHECK_MODULE, checkFiles, createAppServer, fillWalls, pathSegments, SECURITY_HEADERS, type ApiOptions, type ServerOptions } from '../server/app.ts';
 import { ANYONE, DataSetStore, manifestText, parseModerators } from '../server/dataSets.ts';
 import { RateLimit } from '../server/events.ts';
-import { NOBODY } from '../server/notify.ts';
+import { NOBODY, notificationText } from '../server/notify.ts';
+import { DOCUMENT_FIELD } from '../server/documents.ts';
 import { MAX_MODERATION_BYTES } from '../server/moderate.ts';
 import { MAX_PUBLISH_BYTES, MAX_PUBLISHED_FILE_BYTES } from '../server/publish.ts';
 import { StatsStore } from '../server/stats.ts';
 import { openStore } from '../server/store.ts';
-import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, LOCAL_DATA_SET_TEXT_LIMITS, parseManifest, PLAYER_ID_HEADER } from '../src/data/DataSets.ts';
+import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, documentPath, LOCAL_DATA_SET_TEXT_LIMITS, parseManifest, PLAYER_ID_HEADER } from '../src/data/DataSets.ts';
 import { checkLocalDataSet, localDataSet, readDungeonWalls } from '../src/data/LocalDataSets.ts';
 import { parsePublishedDungeons } from '../src/data/DungeonSignature.ts';
 import { indexedPng, indexedPngRows } from '../src/core/png.ts';
@@ -202,6 +221,7 @@ function scratchFiles(scratch: string): ServerOptions {
     mkdirSync(join(gamefilesDir, 'set-a'), { recursive: true });
     mkdirSync(join(filesDir, 'sub'), { recursive: true });
     writeFileSync(join(distDir, 'index.html'), '<!doctype html><title>page</title>');
+    writeFileSync(join(distDir, 'stats.html'), '<!doctype html><title>statistics</title>');
     writeFileSync(join(distDir, 'assets', 'index-AbC123.js'), 'console.log(1);');
     writeFileSync(join(distDir, 'manifest.webmanifest'), '{}');
     writeFileSync(join(distDir, 'assets', 'font-AbC123.ttf'), Buffer.from([0, 1, 0, 0]));
@@ -270,12 +290,40 @@ async function checkAnswers(port: number, manifest: string, gamefilesDir: string
         check(font.status === 200 && font.headers['content-type'] === type, `a font, as ${type} (${font.headers['content-type']})`);
     }
     check((await ask(port, '/index.html')).headers['cache-control'] === 'no-cache', '/index.html is no-cache too');
+    const statsPage = await ask(port, '/stats?set=csb');
+    check(statsPage.status === 200 && statsPage.body.includes('<title>statistics</title>') && statsPage.headers['cache-control'] === 'no-cache'
+        && String(statsPage.headers['content-type']).startsWith('text/html'), '/stats is stats.html, the statistics page, whatever the query, no-cache');
+    check((await ask(port, '/stats/csb')).status === 404, 'and nothing under it');
     const webManifest = await ask(port, '/manifest.webmanifest');
     check(webManifest.status === 200 && webManifest.headers['content-type'] === 'application/manifest+json' && webManifest.headers['cache-control'] === 'no-cache',
         `the web app manifest, as application/manifest+json, no-cache (${webManifest.headers['content-type']}, ${webManifest.headers['cache-control']})`);
     check((await ask(port, '/assets/nothing.js')).status === 404, 'a missing file is 404');
     check((await ask(port, '/assets')).status === 404, 'a folder is 404, not a listing');
     check((await ask(port, `/${CHECK_MODULE}`)).status === 404, `the server's module, ${CHECK_MODULE}, is not served`);
+
+    console.log('\nThe security headers:');
+    const answers: [string, Promise<Answer>][] = [
+        ['the page', ask(port, '/')],
+        ['an asset', ask(port, '/assets/index-AbC123.js')],
+        ['a 304', ask(port, '/', 'GET', { 'If-None-Match': String(page.headers.etag) })],
+        ['a HEAD', ask(port, '/', 'HEAD')],
+        ['a 404', ask(port, '/assets/nothing.js')],
+        ['a bad path', ask(port, '/%2e%2e/x')],
+        ['a 405', ask(port, '/', 'POST')],
+        ['api/health', ask(port, '/api/health')],
+        ['api/data-sets', ask(port, '/api/data-sets')],
+        ['a bad event', ask(port, '/api/event', 'POST', {}, '{')],
+        ['a cross-site POST', ask(port, '/api/event', 'POST', { 'Sec-Fetch-Site': 'cross-site' }, '{')],
+    ];
+    console.log(`  ${Object.entries(SECURITY_HEADERS).map(([name, value]) => `${name}: ${value}`).join('\n  ')}`);
+    for (const [what, answer] of answers) {
+        const { status, headers } = await answer;
+        const missing = Object.entries(SECURITY_HEADERS).filter(([name, value]) => headers[name.toLowerCase()] !== value).map(([name]) => name);
+        check(missing.length === 0, `${what} (${status}) carries them all${missing.length ? `: not ${missing.join(', ')}` : ''}`);
+    }
+    const policy = SECURITY_HEADERS['Content-Security-Policy']!;
+    check(/default-src 'self'/.test(policy) && !/script-src/.test(policy) && /frame-ancestors 'none'/.test(policy),
+        'the policy: scripts from the page\'s origin only, none inline, and no framing');
 
     console.log('\nThe game files:');
     const file = await ask(port, '/gamefiles/set-a/dungeon.dat');
@@ -411,7 +459,7 @@ const MODERATORS = ['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-4bbb-
 /** The scratch server's rate limit: events per address and window. */
 const EVENTS_PER_WINDOW = 5;
 
-async function checkEvents(port: number, store: StatsStore): Promise<void> {
+async function checkEvents(port: number, db: DatabaseSync, store: StatsStore): Promise<void> {
     console.log('\nThe statistics:');
     let address = 0;
     /** Each from its own address, so that only the rate limit's own check meets it. */
@@ -419,14 +467,33 @@ async function checkEvents(port: number, store: StatsStore): Promise<void> {
         ask(port, '/api/event', 'POST', { 'Content-Type': 'text/plain;charset=UTF-8', 'X-Real-IP': `10.0.0.${++address}`, ...headers }, body);
     const event = (playthrough: number) => JSON.stringify({ type: 'started', player: PLAYER, set: 'a', playthrough, build: 'test', payload: {} });
 
+    /** The scratch server's one set, public. */
+    const A = { id: 'a', name: 'A' };
+    const started = () => store.summary([A]).started;
     const stored = await post(event(1));
     check(stored.status === 204 && stored.body === '', 'an event: 204, no body');
+    const logged = () => (db.prepare('SELECT COUNT(*) AS n FROM events').get() as { n: number }).n;
+    const before = logged();
+    const session = await post(JSON.stringify({ type: 'session', player: PLAYER, set: 'a', playthrough: 1, build: 'test', payload: { playTime: 60_000 } }));
+    const counted = store.setStats(A);
+    check(session.status === 204 && counted.sessions === 1 && counted.playTime === 60_000 && logged() === before,
+        "a session: 204, counted with its game's play time, and no row of the log");
     const stats = await ask(port, '/api/stats');
     console.log(`  /api/stats: ${stats.body.replace(/"week":"[^"]+"/g, '"week":<this week>')}`);
-    check(stats.status === 200 && String(stats.headers['content-type']).startsWith('application/json') && stats.headers['cache-control'] === 'no-store',
-        '/api/stats: JSON, not cached');
-    check(JSON.stringify(JSON.parse(stats.body)) === JSON.stringify(store.stats()) && store.stats().players === 1, 'the store\'s aggregates, the event in them');
+    check(stats.status === 200 && String(stats.headers['content-type']).startsWith('application/json') && stats.headers['cache-control'] === 'public, max-age=30',
+        '/api/stats: JSON, cached for 30 s');
+    check(stats.body === JSON.stringify(store.summary([A])) && started() === 1, 'the store\'s summary of the public sets, the event in it');
+    const set = await ask(port, '/api/stats/a');
+    const level = await ask(port, '/api/stats/a/0');
+    check(set.status === 200 && set.body === JSON.stringify(store.setStats(A)) && set.headers['cache-control'] === 'public, max-age=30',
+        '/api/stats/a: the set\'s, cached for 30 s');
+    check(level.status === 200 && level.body === JSON.stringify(store.levelStats(A, 0)), '/api/stats/a/0: its level\'s');
+    const unknown = ['/api/stats/b', '/api/stats/a/256', '/api/stats/a/007', '/api/stats/a/-1', '/api/stats/a/x', '/api/stats/a/0/0'];
+    const notFound = await Promise.all(unknown.map((path) => ask(port, path)));
+    check(notFound.every((answer) => answer.status === 404), `an unknown set or level: ${notFound.map((answer) => answer.status).join(' ')}`);
     check((await ask(port, '/api/stats', 'HEAD')).body === '', 'HEAD /api/stats: no body');
+    const posted = await ask(port, '/api/stats', 'POST', {}, '{}');
+    check(posted.status === 405, `POST /api/stats: ${posted.status}`);
 
     const bad = await post(event(-1));
     check(bad.status === 400 && bad.body === 'Bad event: bad playthrough', `a bad event: ${bad.status}, ${bad.body}`);
@@ -435,7 +502,29 @@ async function checkEvents(port: number, store: StatsStore): Promise<void> {
     check((await post(big, { 'Transfer-Encoding': 'chunked' })).status === 413, 'a body over 4 KB, chunked: 413');
     const get = await ask(port, '/api/event');
     check(get.status === 405 && get.headers.allow === 'POST', 'GET on /api/event: 405, with Allow: POST');
-    check(store.stats().players === 1, 'and none of those was stored');
+    check(started() === 1, 'and none of those was stored');
+
+    const host = `127.0.0.1:${port}`;
+    const crossSite: Record<string, string>[] = [
+        { 'Sec-Fetch-Site': 'cross-site' },
+        { 'Sec-Fetch-Site': 'same-site' },
+        { Origin: 'https://elsewhere.example' },
+        { Origin: `http://127.0.0.1:${port + 1}` },
+        { Origin: 'null' },
+        { Origin: 'not a URL' },
+        { 'Sec-Fetch-Site': 'cross-site', Origin: `http://${host}` },
+    ];
+    const refused = await Promise.all(crossSite.map((headers) => post(event(30), headers)));
+    console.log(`  cross-site posts: ${refused.map((answer) => answer.status).join(' ')}`);
+    check(refused.every((answer) => answer.status === 403 && answer.body === 'Cross-site request'), 'a POST another site\'s page sent, by Sec-Fetch-Site or Origin: 403');
+    const routes = [DATA_SETS_ROUTE, `${DATA_SETS_ROUTE}/a`, `${DATA_SETS_ROUTE}/a/${DOCUMENTS_SEGMENT}`];
+    const elsewhere = await Promise.all(routes.map((route) => ask(port, `/${route}`, 'POST', { 'Sec-Fetch-Site': 'cross-site', [PLAYER_ID_HEADER]: MODERATORS[0] }, '{}')));
+    check(elsewhere.every((answer) => answer.status === 403), `and on ${routes.join(', ')}: ${elsewhere.map((answer) => answer.status).join(' ')}`);
+    check(started() === 1, 'none of them stored');
+    const own = await post(event(31), { 'Sec-Fetch-Site': 'same-origin', Origin: `http://${host}` });
+    check(own.status === 204, `a POST from the page's own origin: ${own.status}`);
+    const cached = JSON.parse((await ask(port, '/api/stats')).body) as { started: number };
+    check(started() === 2 && cached.started === 1, `an answer kept for its 30 s: ${cached.started} game started, where the store has ${started()}`);
 
     const answers: number[] = [];
     for (let i = 0; i <= EVENTS_PER_WINDOW; i++) answers.push((await post(event(10 + i), { 'X-Real-IP': '10.1.1.1' })).status);
@@ -499,7 +588,7 @@ async function checkPublish(scratch: string): Promise<void> {
         const dmDungeon = new Uint8Array(readFileSync(`${dm.dir}/dungeon.dat`));
         const thumbnail = new Uint8Array(readFileSync(`${dm.dir}/dm-atari-thumbnail.png`));
         const fields = (id: string, extra: Record<string, string | string[]> = {}): Record<string, string | string[]> => ({
-            id, name: '  My DM ', description: 'Mine. ', authors: ['A Player', ' ', 'Another '], dmRules: 'true', thumbnailAsTitle: 'false', baseSet: 'dm-atari', ...extra,
+            id, name: '  My DM ', description: 'Mine. ', authors: ['A Player', ' ', 'Another '], dmRules: 'true', thumbnailAsTitle: 'false', official: 'false', baseSet: 'dm-atari', ...extra,
         });
         const dmFiles = (): Record<string, File> => ({ 'dungeon.dat': fileOf(dmDungeon, 'dungeon.dat'), thumbnail: fileOf(thumbnail, 'thumbnail.png', 'image/png') });
         let address = 0;
@@ -531,7 +620,7 @@ async function checkPublish(scratch: string): Promise<void> {
         const row = db.prepare('SELECT * FROM data_sets WHERE id = ?').get('my-dm') as Record<string, unknown>;
         console.log(`  its row: ${JSON.stringify({ ...row, owner: row.owner === PLAYER ? '<the player>' : row.owner, walls: row.walls === null ? null : '<its walls>' })}`);
         const dmFolder = { read: async (name: string) => new Uint8Array(readFileSync(`${dm.dir}/${name}`)), where: (name: string) => name };
-        const record = (await checkLocalDataSet({ id: 'my-dm', name: '  My DM ', description: 'Mine. ', authors: ['A Player', ' ', 'Another '], dmRules: true, thumbnailAsTitle: false, baseSet: 'dm-atari', files: dmFiles() },
+        const record = (await checkLocalDataSet({ id: 'my-dm', name: '  My DM ', description: 'Mine. ', authors: ['A Player', ' ', 'Another '], dmRules: true, thumbnailAsTitle: false, official: false, baseSet: 'dm-atari', files: dmFiles() },
             new Set(), (set) => (set === 'dm-atari' ? dmFolder : null), 0)).record!;
         const flags = localDataSet(record);
         const stored = dataSets.read().dataSets.find((set) => set.id === 'my-dm')!;
@@ -544,7 +633,7 @@ async function checkPublish(scratch: string): Promise<void> {
         check(mine.description === record.description && mine.authors.join() === record.authors.join()
             && offered.filter((set) => set.id !== 'my-dm').every((set) => set.description === '' && set.authors.length === 0),
             'api/data-sets gives its description and authors, and empty ones to the sets without');
-        check((['csbGraphics', 'miniDat', 'hintOracle', 'dmRules', 'thumbnailAsTitle', 'hidden'] as const).every((flag) => stored[flag] === flags[flag]), 'its flags are those localDataSet gives the record');
+        check((['csbGraphics', 'miniDat', 'hintOracle', 'dmRules', 'thumbnailAsTitle', 'hidden', 'official'] as const).every((flag) => stored[flag] === flags[flag]), 'its flags are those localDataSet gives the record');
         check(await seen(PLAYER) === 'dm-atari,csb,conflux,my-dm pending' && await seen(MODERATORS[0]) === 'dm-atari,csb,conflux,my-dm pending',
             'it is offered, pending, to its owner and the moderators');
         check(await seen(null) === 'dm-atari,csb,conflux' && await seen(OTHER) === 'dm-atari,csb,conflux', 'and to nobody else');
@@ -581,7 +670,7 @@ async function checkPublish(scratch: string): Promise<void> {
             'a player is given the walls of the sets api/data-sets offers them that keep some: their own pending one, as the page reads it');
         check((await wallsSeen(MODERATORS[0])).ids === 'my-dm (My DM), my-csb (My CSB)' && (await wallsSeen(null)).ids === '',
             'a moderator every published set\'s, and anyone else none while they are pending');
-        dataSets.publish({ id: 'approved', name: 'Approved', description: '', authors: [], csbGraphics: false, hintOracle: false, dmRules: false, thumbnailAsTitle: false,
+        dataSets.publish({ id: 'approved', name: 'Approved', description: '', authors: [], csbGraphics: false, hintOracle: false, dmRules: false, thumbnailAsTitle: false, official: false,
             walls: JSON.parse(dmWalls) }, OTHER);
         db.prepare("UPDATE data_sets SET status = 'approved' WHERE id = 'approved'").run();
         check((await wallsSeen(null)).ids === 'approved (Approved)', 'an approved set\'s, to everyone');
@@ -624,6 +713,8 @@ async function checkPublish(scratch: string): Promise<void> {
         await refused('a file sent as text', 400, () => publish({ ...fields('p1'), 'dungeon.dat': 'bytes' }, {}), "'dungeon.dat' is not one file");
         await refused('dmRules neither true nor false', 400, () => publish(fields('p1', { dmRules: 'on' }), dmFiles()), "'dmRules'");
         await refused('thumbnailAsTitle neither true nor false', 400, () => publish(fields('p1', { thumbnailAsTitle: 'on' }), dmFiles()), "'thumbnailAsTitle'");
+        await refused('official neither true nor false', 400, () => publish(fields('p1', { official: 'on' }), dmFiles()), "'official'");
+        await refused('official from a player who does not moderate', 403, () => publish(fields('p1', { official: 'true' }), dmFiles()), 'Only a moderator');
         await refused('a name too long', 400, () => publish(fields('p1', { name: 'x'.repeat(LOCAL_DATA_SET_TEXT_LIMITS.name + 1) }), dmFiles()), 'name is longer');
         await refused('authors too long', 400, () => publish(fields('p1', { authors: ['x'.repeat(100), 'y'.repeat(LOCAL_DATA_SET_TEXT_LIMITS.authors - 100)] }), dmFiles()), 'authors are longer');
         await refused('a file too large', 413, () => publish(fields('p1'), { ...dmFiles(), 'CSBgraphics.dat': fileOf(new Uint8Array(MAX_PUBLISHED_FILE_BYTES + 1), 'CSBgraphics.dat') }), 'CSBgraphics.dat is larger');
@@ -647,6 +738,11 @@ async function checkPublish(scratch: string): Promise<void> {
         const titled = parseManifest((await ask(port, '/api/data-sets', 'GET', { [PLAYER_ID_HEADER]: PLAYER })).body, '').dataSets;
         check(titled.find((set) => set.id === 'p2')?.thumbnailAsTitle === true && titled.filter((set) => set.id !== 'p2').every((set) => !set.thumbnailAsTitle),
             'a set published with its thumbnail as the title says so in api/data-sets, and the others do not');
+        const officialPublished = await publish(fields('p3', { official: 'true' }), dmFiles(), MODERATORS[0]);
+        const offeredOfficial = parseManifest((await ask(port, '/api/data-sets', 'GET', { [PLAYER_ID_HEADER]: MODERATORS[0] })).body, '').dataSets;
+        console.log(`  an official game, published by a moderator: ${officialPublished.status} ${officialPublished.body}`);
+        check(officialPublished.status === 201 && offeredOfficial.find((set) => set.id === 'p3')?.official === true
+            && offeredOfficial.filter((set) => set.id !== 'p3').every((set) => !set.official), 'a moderator publishes an official game, which api/data-sets says, and of no other set');
 
         // A moderator's edit (`server/edit.ts`): the moderation's route, with a form.
         console.log('\nEditing a set:');
@@ -667,11 +763,13 @@ async function checkPublish(scratch: string): Promise<void> {
         const black = indexedPng(320, 200, [[0, 0, 0]], deflateSync(indexedPngRows(320, 200, new Uint8Array(320 * 200))));
         told.length = 0;
 
-        const textOnly = await edit('my-dm', editFields({ name: 'My Edited DM', description: 'Edited.', authors: ['Someone'] }));
+        const textOnly = await edit('my-dm', editFields({ name: 'My Edited DM', description: 'Edited.', authors: ['Someone'], official: 'true' }));
         const edited = rowOf('my-dm');
         console.log(`  its text: ${textOnly.status} ${textOnly.body}, ${JSON.stringify({ name: edited.name, description: edited.description, authors: edited.authors, dir: edited.dir })}`);
         check(textOnly.status === 200 && textOnly.body === '{"id":"my-dm"}' && edited.name === 'My Edited DM' && edited.description === 'Edited.' && edited.authors.join() === 'Someone',
             'a moderator edits a set\'s text: 200, its row says it');
+        check(edited.official && parseManifest((await ask(port, '/api/data-sets', 'GET', { [PLAYER_ID_HEADER]: PLAYER })).body, '').dataSets.find((set) => set.id === 'my-dm')?.official === true,
+            'and makes it an official game, which api/data-sets says');
         check(edited.pending && edited.owner === PLAYER && edited.dir === 'my-dm' && listing('my-dm') === 'dungeon.dat,graphics.dat,my-dm-thumbnail.png'
             && readFileSync(join(gamefilesDir, 'my-dm', 'my-dm-thumbnail.png')).equals(thumbnail), 'its state and owner kept, and its folder untouched: no file changed');
         check(told.join() === 'My Edited DM: edited by moderator 1', 'the edit is notified, by the moderator\'s name');
@@ -770,7 +868,7 @@ async function checkModeration(scratch: string): Promise<void> {
     checkFiles(options, dataSets);
     const players: [string, string][] = [['p1', PLAYER], ['p2', PLAYER], ['p3', OTHER], ['p4', PLAYER], ['p5', PLAYER]];
     for (const [id, owner] of players) {
-        dataSets.publish({ id, name: id.toUpperCase(), description: '', authors: [], csbGraphics: false, hintOracle: false, dmRules: false, thumbnailAsTitle: false,
+        dataSets.publish({ id, name: id.toUpperCase(), description: '', authors: [], csbGraphics: false, hintOracle: false, dmRules: false, thumbnailAsTitle: false, official: false,
             walls: { shapes: [[1, 1]], signature: ['0'.repeat(64)] } }, owner);
         mkdirSync(join(gamefilesDir, id));
         writeFileSync(join(gamefilesDir, id, 'dungeon.dat'), Buffer.from([1, 2, 3, 4]));
@@ -794,6 +892,10 @@ async function checkModeration(scratch: string): Promise<void> {
         const seen = async (player: string | null) => parseManifest((await ask(port, '/api/data-sets', 'GET', player === null ? {} : { [PLAYER_ID_HEADER]: player })).body, '')
             .dataSets.map((set) => `${set.id}${set.pending ? ' pending' : ''}${set.hidden ? ' hidden' : ''}`).join();
         console.log(`  the table: ${states()}`);
+        const statsSets = (JSON.parse((await ask(port, '/api/stats')).body) as { sets: { id: string }[] }).sets.map((set) => set.id).join();
+        const notPublic = await Promise.all(['site-pending', 'site-hidden', 'p1'].map((id) => ask(port, `/api/stats/${id}`)));
+        check(statsSets === 'dm-atari' && notPublic.every((answer) => answer.status === 404),
+            `the statistics: of the approved sets not hidden alone (${statsSets}), 404 for a pending or hidden one`);
 
         const done = async (label: string, id: string, name: string, player: string, after: () => boolean) => {
             const answer = await moderate(id, action(name), player);
@@ -861,6 +963,145 @@ async function checkModeration(scratch: string): Promise<void> {
     }
 }
 
+/**
+ * `POST /api/data-sets/<id>/documents` (`server/documents.ts`), on a server of its own over a
+ * scratch table: the site's `dm-atari` (the default), its folder a link, as the dev server's
+ * are, and a player's pending `p1`.
+ */
+async function checkDocuments(scratch: string): Promise<void> {
+    console.log('\nA set\'s documents:');
+    const root = join(scratch, 'documents');
+    const distDir = join(root, 'dist');
+    const gamefilesDir = join(root, 'gamefiles');
+    const outside = join(root, 'outside', 'dm');
+    mkdirSync(distDir, { recursive: true });
+    writeFileSync(join(distDir, 'index.html'), '<!doctype html><title>page</title>');
+    mkdirSync(outside, { recursive: true });
+    mkdirSync(gamefilesDir);
+    for (const file of ['dungeon.dat', 'dm-atari-thumbnail.png', 'readme.txt']) writeFileSync(join(outside, file), Buffer.from(file));
+    symlinkSync(outside, join(gamefilesDir, 'dm-atari'));
+    const db = new DatabaseSync(':memory:');
+    const told: string[] = [];
+    const dataSets = filledFrom(JSON.stringify({ default: 'dm-atari', dataSets: [{ id: 'dm-atari', name: 'DM' }] }), new DataSetStore(db));
+    dataSets.publish({ id: 'p1', name: 'P1', description: '', authors: [], csbGraphics: false, hintOracle: false, dmRules: false, thumbnailAsTitle: false, official: false,
+        walls: { shapes: [[1, 1]], signature: ['0'.repeat(64)] } }, PLAYER);
+    mkdirSync(join(gamefilesDir, 'p1'));
+    writeFileSync(join(gamefilesDir, 'p1', 'dungeon.dat'), Buffer.from([1, 2, 3, 4]));
+    const options: ServerOptions = { distDir, gamefilesDir };
+    checkFiles(options, dataSets);
+    const server = createAppServer(options, {
+        checkDataSet: checkLocalDataSet, dataSets, moderators: parseModerators(MODERATORS.join()), store: new StatsStore(db),
+        notify: (event) => told.push(notificationText({ ...event, at: 0 }).split('\n')[0]!),
+        rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000),
+        publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now,
+    });
+    await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+    const port = (server.address() as AddressInfo).port;
+
+    try {
+        const route = (id: string) => `/${DATA_SETS_ROUTE}/${encodeURIComponent(id)}/${DOCUMENTS_SEGMENT}`;
+        /** `files` posted as the form's fields, as the page's `fetch` sends a document. */
+        const add = async (id: string, files: [string, File | string][], player: string | null = MODERATORS[0]) => {
+            const form = new FormData();
+            for (const [key, value] of files) form.append(key, value);
+            const response = await fetch(`http://127.0.0.1:${port}${route(id)}`, { method: 'POST', headers: player === null ? {} : { [PLAYER_ID_HEADER]: player }, body: form });
+            return { status: response.status, body: await response.text() };
+        };
+        const addFile = (id: string, name: string, bytes = Buffer.from(`the bytes of ${name}`), player: string | null = MODERATORS[0]) =>
+            add(id, [[DOCUMENT_FIELD, new File([new Uint8Array(bytes)], name)]], player);
+        const remove = (id: string, body: string, player: string | null = MODERATORS[0]) =>
+            ask(port, route(id), 'POST', { 'Content-Type': 'application/json', ...(player === null ? {} : { [PLAYER_ID_HEADER]: player }) }, body);
+        const rowOf = (id: string) => dataSets.read().dataSets.find((set) => set.id === id)!;
+        const listing = (dir: string) => readdirSync(join(gamefilesDir, dir)).sort().join();
+        const documentsOf = (id: string) => rowOf(id).documents.map((document) => `${document.file}:${document.size}`).join();
+        /** The rows, their folders and documents, the folders on the disk and what the link leads to: compared before and after a refusal. */
+        const states = () => `${dataSets.read().dataSets.map((set) => `${set.id}@${set.dir}[${documentsOf(set.id)}]`).join()} | ${readdirSync(gamefilesDir).sort().join()} | ${readdirSync(outside).sort().join()}`;
+        const seen = async (player: string | null) => parseManifest((await ask(port, '/api/data-sets', 'GET', player === null ? {} : { [PLAYER_ID_HEADER]: player })).body, 'gamefiles')
+            .dataSets.find((set) => set.id === 'dm-atari')!;
+
+        const manual = Buffer.alloc(3000, 7);
+        const added = await addFile('dm-atari', 'Manual.pdf', manual);
+        console.log(`  Manual.pdf added: ${added.status} ${added.body}, ${states()}`);
+        check(added.status === 200 && added.body === '{"id":"dm-atari"}', 'a moderator adds a document: 200');
+        check(rowOf('dm-atari').dir === 'dm-atari@2' && listing('dm-atari@2') === 'Manual.pdf,dm-atari-thumbnail.png,dungeon.dat,readme.txt'
+            && readFileSync(join(gamefilesDir, 'dm-atari@2', 'Manual.pdf')).equals(manual),
+            'it writes the set a new folder, <id>@2, the document in it beside every file of the old one');
+        check(!existsSync(join(gamefilesDir, 'dm-atari')) && readdirSync(outside).sort().join() === 'dm-atari-thumbnail.png,dungeon.dat,readme.txt'
+            && !readdirSync(gamefilesDir).some((name) => name.startsWith('.')), 'the old folder\'s link is deleted, the folder it led to left as it was, and no .partial left');
+        const offered = await seen(null);
+        check(offered.dir === 'gamefiles/dm-atari@2' && JSON.stringify(offered.documents) === '[{"file":"Manual.pdf","size":3000}]',
+            'api/data-sets gives everyone the set\'s new folder and its document, with its size');
+        const served = await ask(port, `/${documentPath(offered, 'Manual.pdf')}`);
+        check(served.status === 200 && served.headers['content-type'] === 'application/pdf' && served.headers['x-content-type-options'] === 'nosniff',
+            `the document is served where documentPath says, as application/pdf (${served.status} ${served.headers['content-type']})`);
+        check(told.join() === 'Dataset DM: document added (Manual.pdf)', `the addition is notified, the file named (${told.join()})`);
+
+        const notes = await addFile('dm-atari', "Kid's notes (2).txt");
+        check(notes.status === 200 && rowOf('dm-atari').dir === 'dm-atari@3' && documentsOf('dm-atari') === `Kid's notes (2).txt:${"the bytes of Kid's notes (2).txt".length},Manual.pdf:3000`
+            && !existsSync(join(gamefilesDir, 'dm-atari@2')), 'a second one, its name with spaces, an apostrophe and brackets: <id>@3, the documents listed by name');
+        const encoded = await ask(port, `/${documentPath(await seen(null), "Kid's notes (2).txt")}`);
+        check(encoded.status === 200 && encoded.body === "the bytes of Kid's notes (2).txt" && String(encoded.headers['content-type']).startsWith('text/plain'),
+            'it is served by its encoded name, as text/plain');
+        check((await addFile('p1', 'Solution.doc')).status === 200 && documentsOf('p1') === `Solution.doc:${'the bytes of Solution.doc'.length}`
+            && rowOf('p1').pending && rowOf('p1').dir === 'p1@2', 'a pending player\'s set takes one too, its state kept');
+        check((await seen(PLAYER)).documents.length === 2, 'and a player is given the documents too');
+
+        const removed = await remove('dm-atari', JSON.stringify({ remove: "Kid's notes (2).txt" }));
+        console.log(`  Kid's notes removed: ${removed.status} ${removed.body}, ${states()}`);
+        check(removed.status === 200 && removed.body === '{"id":"dm-atari"}' && rowOf('dm-atari').dir === 'dm-atari@4' && documentsOf('dm-atari') === 'Manual.pdf:3000'
+            && listing('dm-atari@4') === 'Manual.pdf,dm-atari-thumbnail.png,dungeon.dat,readme.txt' && !existsSync(join(gamefilesDir, 'dm-atari@3')),
+            'a moderator removes a document: a new folder, <id>@4, without its file, the old one deleted');
+        check(told.at(-1) === "Dataset DM: document removed (Kid's notes (2).txt)", 'the removal is notified');
+
+        console.log('  refusals:');
+        const sent = told.length;
+        const refused = async (label: string, status: number, send: () => Promise<{ status: number; body: string }>, says: string) => {
+            const was = states();
+            const answer = await send();
+            console.log(`    ${label}: ${answer.status} ${answer.body}`);
+            check(answer.status === status && answer.body.includes(says) && !answer.body.includes(PLAYER) && states() === was, `${label}: ${status}, nothing changed`);
+        };
+        await refused('the set\'s owner adding one', 403, () => addFile('p1', 'mine.pdf', undefined, PLAYER), 'Only a moderator');
+        await refused('no player', 403, () => addFile('dm-atari', 'a.pdf', undefined, null), 'Only a moderator');
+        await refused('a request too large, from a player', 403, () => ask(port, route('dm-atari'), 'POST',
+            { [PLAYER_ID_HEADER]: PLAYER, 'Content-Type': 'multipart/form-data; boundary=x' }, Buffer.alloc(MAX_PUBLISH_BYTES + 1)), 'Only a moderator');
+        await refused('a player removing one', 403, () => remove('dm-atari', JSON.stringify({ remove: 'Manual.pdf' }), PLAYER), 'Only a moderator');
+        await refused('a request too large', 413, () => ask(port, route('dm-atari'), 'POST',
+            { [PLAYER_ID_HEADER]: MODERATORS[0], 'Content-Type': 'multipart/form-data; boundary=x' }, Buffer.alloc(MAX_PUBLISH_BYTES + 1)), 'request is larger');
+        await refused('a removal too large', 413, () => remove('dm-atari', ' '.repeat(MAX_MODERATION_BYTES + 1)), 'larger than');
+        await refused('a broken form', 400, () => ask(port, route('dm-atari'), 'POST',
+            { [PLAYER_ID_HEADER]: MODERATORS[0], 'Content-Type': 'multipart/form-data; boundary=x' }, '--x\r\nnonsense'), 'not a form');
+        const pdf = (name: string) => new File([new Uint8Array(4)], name);
+        await refused('two files', 400, () => add('dm-atari', [[DOCUMENT_FIELD, pdf('a.pdf')], [DOCUMENT_FIELD, pdf('b.pdf')]]), 'not one file');
+        await refused('a field beside the file', 400, () => add('dm-atari', [[DOCUMENT_FIELD, pdf('a.pdf')], ['name', 'A']]), 'not one file');
+        await refused('a text for the file', 400, () => add('dm-atari', [[DOCUMENT_FIELD, 'a.pdf']]), 'not one file');
+        await refused('no file', 400, () => add('dm-atari', [['other', pdf('a.pdf')]]), 'not one file');
+        for (const name of ['page.html', '.hidden.pdf', 'noext', `${'x'.repeat(97)}.pdf`]) {
+            await refused(`a file named ${name.length > 20 ? `${name.slice(0, 8)}… (${name.length})` : name}`, 400, () => addFile('dm-atari', name), 'A document\'s name ends in');
+        }
+        await refused('the set\'s thumbnail\'s name', 400, () => addFile('dm-atari', 'dm-atari-thumbnail.png'), 'thumbnail');
+        await refused('a file of its folder that is no document', 409, () => addFile('dm-atari', 'readme.txt'), 'holds a file of this name');
+        await refused('a document it has', 409, () => addFile('dm-atari', 'Manual.pdf'), 'holds a file of this name');
+        await refused('an id the table does not hold', 404, () => addFile('nope', 'a.pdf'), 'no set of this id');
+        await refused('a removal that is not JSON', 400, () => remove('dm-atari', 'Manual.pdf'), 'The body is not');
+        await refused('a removal with a key beside', 400, () => remove('dm-atari', JSON.stringify({ remove: 'Manual.pdf', id: 'p1' })), 'The body is not');
+        await refused('a removal of a file that is no document', 404, () => remove('dm-atari', JSON.stringify({ remove: 'readme.txt' })), 'no document of this name');
+        await refused('a removal of another set\'s document', 404, () => remove('dm-atari', JSON.stringify({ remove: 'Solution.doc' })), 'no document of this name');
+        await refused('a removal that leaves the folder', 404, () => remove('dm-atari', JSON.stringify({ remove: '../p1@2/dungeon.dat' })), 'no document of this name');
+        await refused('a removal from an unknown set', 404, () => remove('nope', JSON.stringify({ remove: 'Manual.pdf' })), 'no set of this id');
+        const get = await ask(port, route('dm-atari'), 'GET', { [PLAYER_ID_HEADER]: MODERATORS[0] });
+        check(get.status === 405 && get.headers.allow === 'POST', 'a GET of the documents is 405, POST only');
+        check(told.length === sent, 'and nothing is notified');
+
+        const rejected = await ask(port, `/${DATA_SETS_ROUTE}/p1`, 'POST', { 'Content-Type': 'application/json', [PLAYER_ID_HEADER]: MODERATORS[0] }, JSON.stringify({ action: 'reject' }));
+        const left = (db.prepare("SELECT COUNT(*) AS n FROM data_set_documents WHERE data_set = 'p1'").get() as { n: number }).n;
+        check(rejected.status === 200 && left === 0 && !existsSync(join(gamefilesDir, 'p1@2')), 'a set rejected takes its documents with it, rows and files');
+    } finally {
+        server.close();
+        db.close();
+    }
+}
+
 /** A table made before the publish's columns gains them, its rows kept, read as before. */
 function checkAddedColumns(): void {
     const db = new DatabaseSync(':memory:');
@@ -875,7 +1116,7 @@ function checkAddedColumns(): void {
     const columns = (db.prepare('PRAGMA table_info(data_sets)').all() as { name: string }[]).map((column) => column.name);
     const defaults = (db.prepare('PRAGMA table_info(data_set_defaults)').all() as { name: string }[]).map((column) => column.name);
     const row = db.prepare('SELECT description, authors, walls, thumbnail_as_title FROM data_sets').get() as { description: string; authors: string; walls: string | null; thumbnail_as_title: number };
-    dataSets.publish({ id: 'b', name: 'B', description: '', authors: [], csbGraphics: false, hintOracle: false, dmRules: false, thumbnailAsTitle: false, walls: { shapes: [[1, 1]], signature: ['0'.repeat(64)] } }, PLAYER);
+    dataSets.publish({ id: 'b', name: 'B', description: '', authors: [], csbGraphics: false, hintOracle: false, dmRules: false, thumbnailAsTitle: false, official: false, walls: { shapes: [[1, 1]], signature: ['0'.repeat(64)] } }, PLAYER);
     console.log(`  an older table's columns: ${columns.join(', ')}`);
     check(columns.includes('description') && columns.includes('authors') && columns.includes('walls') && row.description === '' && row.authors === '[]' && row.walls === null
         && columns.includes('thumbnail_as_title') && row.thumbnail_as_title === 0 && !dataSets.read().dataSets[0].thumbnailAsTitle
@@ -1092,10 +1333,11 @@ async function main(): Promise<void> {
         await new Promise<void>((done) => server!.listen(0, '127.0.0.1', done));
         const port = (server.address() as AddressInfo).port;
         await checkAnswers(port, manifest, options.gamefilesDir);
-        await checkEvents(port, store);
+        await checkEvents(port, db, store);
         await checkTableRead(port, db, manifest);
         await checkPublish(scratch);
         await checkModeration(scratch);
+        await checkDocuments(scratch);
         checkAddedColumns();
 
         await checkEntry(scratch, options);

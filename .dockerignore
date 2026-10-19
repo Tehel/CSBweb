@@ -7,6 +7,7 @@
 !tsconfig.json
 !vite.config.mts
 !index.html
+!stats.html
 !src/
 !server/
 !tools/**/*.ts

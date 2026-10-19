@@ -7,12 +7,14 @@ import { dirname, join } from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { DatabaseSync } from 'node:sqlite';
 
-import { dataSetViewer, pathSegments, receiveEdit, receiveModeration, receivePublish } from './server/app';
+import { answerStats, contentType, dataSetViewer, pathSegments, receiveDocument, receiveEdit, receiveModeration, receivePublish } from './server/app';
 import { DataSetStore, manifestText, parseModerators, wallsText } from './server/dataSets';
 import { RateLimit } from './server/events';
 import { NOBODY } from './server/notify';
 import type { CheckDataSet } from './server/publish';
-import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, PLAYER_ID_HEADER, parseManifest } from './src/data/DataSets';
+import { AnswerCache, StatsStore } from './server/stats';
+import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, PLAYER_ID_HEADER, parseManifest } from './src/data/DataSets';
+import { fillFortnight } from './tools/lib/statsFortnight';
 
 /**
  * The build the page's events name (`src/ui/gameEvents.ts`): `CSBWEB_BUILD` where the
@@ -43,16 +45,22 @@ const DEV_MODERATOR_PLAYER_ID = '00000000-0000-4000-8000-000000000001';
  * published and moderated, made again in their order. A GET gets `manifestText` for the
  * player it names, a POST `receivePublish` with the page's own check, the source's
  * (`ssrLoadModule`), and a POST to `api/data-sets/<id>` `receiveModeration`, or
- * `receiveEdit` for a form. `api/data-set-walls` answers `wallsText` over the same store:
- * the published sets'.
+ * `receiveEdit` for a form, and to `api/data-sets/<id>/documents` `receiveDocument`.
+ * `api/data-set-walls` answers `wallsText` over the same store: the published sets'.
  *
  * A published set is written into a scratch folder, made at start and removed at the end,
  * which holds a link to each entry of `static/gamefiles/`, so that a base set's
  * `graphics.dat` and every folder name are where `publishDataSet` looks; its files are
  * served from there under `gamefiles/<id>/`, and an edited set's under its new folder's
- * name. An edit copies a site's folder through its link, and deletes the link, never
- * `static/gamefiles/`. The store is `node:sqlite`'s, in memory:
+ * name. An edit, and a document added or removed, copies a site's folder through its link,
+ * and deletes the link, never `static/gamefiles/`. The store is `node:sqlite`'s, in memory:
  * on a Node without it, a GET answers the manifest and a POST 501.
+ *
+ * `api/stats` is `answerStats` over the same store's public sets, and over statistics made
+ * once, at start, of `dump-stats`' fortnight (`tools/lib/statsFortnight.ts`), which names
+ * `dm-atari` and `csb`: the dev page sends no event, and the statistics page then has
+ * something to show. Nothing is cached, so that a set published shows at once. Without
+ * `node:sqlite`, it is 501.
  */
 function dataSetsRoute(): Plugin {
   const file = resolve(import.meta.dirname, 'tools', 'data-sets.json');
@@ -80,7 +88,7 @@ function dataSetsRoute(): Plugin {
           change(store);
           changes.push(change);
         };
-        const { publish, approve, setHidden, remove, edit } = DataSetStore.prototype;
+        const { publish, approve, setHidden, remove, edit, addDocument, removeDocument } = DataSetStore.prototype;
         store.publish = (set, owner) => {
           keep((kept) => publish.call(kept, set, owner));
           published.add(set.id);
@@ -88,6 +96,14 @@ function dataSetsRoute(): Plugin {
         store.edit = (id, set) => {
           keep((kept) => edit.call(kept, id, set));
           published.add(set.dir);
+        };
+        store.addDocument = (id, dir, document) => {
+          keep((kept) => addDocument.call(kept, id, dir, document));
+          published.add(dir);
+        };
+        store.removeDocument = (id, dir, document) => {
+          keep((kept) => removeDocument.call(kept, id, dir, document));
+          published.add(dir);
         };
         store.approve = (id) => keep((kept) => approve.call(kept, id));
         store.setHidden = (id, hidden) => keep((kept) => setHidden.call(kept, id, hidden));
@@ -98,6 +114,7 @@ function dataSetsRoute(): Plugin {
       server.middlewares.use(`/${DATA_SETS_ROUTE}`, async (req, res, next) => {
         const id = pathSegments(req.url ?? '');
         if (id?.length === 1) return moderate(id[0]!, req, res, next);
+        if (id?.length === 2 && id[1] === DOCUMENTS_SEGMENT) return moderate(id[0]!, req, res, next, true);
         if (req.url !== '/' && !req.url?.startsWith('/?')) return next();
         const json = (status: number, body: string) => {
           res.statusCode = status;
@@ -130,8 +147,8 @@ function dataSetsRoute(): Plugin {
         }
       });
 
-      /** `POST api/data-sets/<id>`: the set `id` moderated, or edited, as `server/app.ts` does it. */
-      const moderate = async (id: string, req: IncomingMessage, res: ServerResponse, next: (error?: unknown) => void) => {
+      /** `POST api/data-sets/<id>`: the set `id` moderated, or edited, or its `documents` changed, as `server/app.ts` does it. */
+      const moderate = async (id: string, req: IncomingMessage, res: ServerResponse, next: (error?: unknown) => void, documents = false) => {
         if (req.method !== 'POST' || !sqlite) {
           res.statusCode = req.method !== 'POST' ? 405 : 501;
           if (req.method !== 'POST') res.setHeader('Allow', 'POST');
@@ -140,7 +157,8 @@ function dataSetsRoute(): Plugin {
         const db = new sqlite.DatabaseSync(':memory:');
         try {
           const api = { checkDataSet, dataSets: openStore(db), moderators, now: Date.now, notify: NOBODY };
-          if (req.headers['content-type']?.startsWith('multipart/form-data')) await receiveEdit(id, scratch, api, req, res);
+          if (documents) await receiveDocument(id, scratch, api, req, res);
+          else if (req.headers['content-type']?.startsWith('multipart/form-data')) await receiveEdit(id, scratch, api, req, res);
           else await receiveModeration(id, scratch, api, req, res);
         } catch (error) {
           next(error);
@@ -148,6 +166,28 @@ function dataSetsRoute(): Plugin {
           db.close();
         }
       };
+
+      const statsDb = sqlite ? new sqlite.DatabaseSync(':memory:') : null;
+      const stats = statsDb ? new StatsStore(statsDb) : null;
+      if (stats) fillFortnight(stats);
+      server.httpServer?.once('close', () => statsDb?.close());
+      const statsCache = new AnswerCache(0, Date.now);
+      server.middlewares.use('/api/stats', (req, res, next) => {
+        const path = pathSegments(req.url ?? '');
+        if (path === null) return next();
+        if (!sqlite || !stats) {
+          res.statusCode = 501;
+          return res.end();
+        }
+        const db = new sqlite.DatabaseSync(':memory:');
+        try {
+          answerStats(path, { dataSets: openStore(db), store: stats }, statsCache, req, res);
+        } catch (error) {
+          next(error);
+        } finally {
+          db.close();
+        }
+      });
 
       server.middlewares.use(`/${DATA_SET_WALLS_ROUTE}`, (req, res, next) => {
         if (req.url !== '/' && !req.url?.startsWith('/?')) return next();
@@ -177,7 +217,8 @@ function dataSetsRoute(): Plugin {
         if (!segments || !published.has(segments[0]!) || (req.method !== 'GET' && req.method !== 'HEAD')) return next();
         const path = join(scratch, ...segments);
         if (!statSync(path, { throwIfNoEntry: false })?.isFile()) return next();
-        res.setHeader('Content-Type', path.endsWith('.png') ? 'image/png' : 'application/octet-stream');
+        res.setHeader('Content-Type', contentType(path));
+        res.setHeader('X-Content-Type-Options', 'nosniff');
         res.setHeader('Cache-Control', 'no-cache');
         if (req.method === 'HEAD') return res.end();
         createReadStream(path).pipe(res);
@@ -206,7 +247,9 @@ function webAppManifest(): Plugin {
   };
   return {
     name: 'csbweb-web-app-manifest',
-    transformIndexHtml: () => [{ tag: 'link', attrs: { rel: 'manifest', href: `./${FILE_NAME}` }, injectTo: 'head' }],
+    // The game's page alone: the statistics page is no app.
+    transformIndexHtml: (_html, { filename }) => filename.endsWith('stats.html') ? []
+      : [{ tag: 'link', attrs: { rel: 'manifest', href: `./${FILE_NAME}` }, injectTo: 'head' }],
     configureServer(server) {
       server.middlewares.use(`/${FILE_NAME}`, (req, res, next) => {
         if (req.url !== '/' && !req.url?.startsWith('/?')) return next();
@@ -252,7 +295,9 @@ export default defineConfig(({ command, isSsrBuild }) => ({
     emptyOutDir: true,
     rollupOptions: {
       input: isSsrBuild ? SERVER_ENTRY : {
-        main: resolve(import.meta.dirname, 'index.html')
+        main: resolve(import.meta.dirname, 'index.html'),
+        // The statistics page, `/stats` (`server/app.ts`): none of the game's code.
+        stats: resolve(import.meta.dirname, 'stats.html'),
       }
     }
   },

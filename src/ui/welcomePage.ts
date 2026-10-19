@@ -4,22 +4,28 @@
  * of the game built: PLAY and CONTINUE are links that load the page again, with the
  * data set, and CONTINUE's save, in its query.
  *
- * - **The grid**: a tile for each set `chooserSets` lists and each of the player's own
+ * - **The grids**: a tile for each set `chooserSets` lists and each of the player's own
  *   (`src/data/LocalDataSets.ts`), its picture the set's thumbnail, or a blank box where
  *   it has none. A manifest set's is in its folder (`thumbnailPath`), its title's last
- *   frame at half size; a local set's is its record's image. The sets the store holds a
- *   save of come first, drawn bright, the one saved last first; the others follow,
- *   dimmed, by name (`tileOrder`). A click selects a tile, and a click on the selected one
+ *   frame at half size; a local set's is its record's image. Two sections hold them, each
+ *   under its title: first **the official games**, FTL's own (`DataSet.official`), in the
+ *   manifest's order, then the player's own; then **the fan-made dungeons**, every other
+ *   set, those the store holds a save of first, the one saved last first, the others
+ *   following by name (`tileOrder`). A set the store holds a save of is drawn bright, any
+ *   other dimmed. A section of no official game is not shown. A click selects a tile, and a click on the selected one
  *   leaves none selected. With no save at all, the manifest's default set is selected,
  *   where it names one, so that PLAY is a first visit's way in. A manifest with no set
- *   leaves the grid nothing but "+ Add my own", and PLAY disabled.
- * - **"+ Add my own"**, the grid's last tile, which is never selected. A click opens the
+ *   leaves the page nothing but "+ Add my own", and PLAY disabled.
+ * - **"+ Add my own"**, the fan-made dungeons' last tile, which is never selected. A click opens the
  *   form that adds a set (`src/ui/addDataSetForm.ts`); the set it adds is stored, and the
  *   page shows it, selected.
  * - **A tile's name says its set's state**: cyan for a local set, red for a pending one,
  *   which awaits a moderator (to its owner and the moderators, the only ones it is
  *   offered), purple for a hidden one (to a moderator, the only one it is listed for), and
  *   white otherwise. Red wins over purple.
+ * - **The triangle** is on every tile, first among the controls along its picture's top
+ *   edge. It is a link that opens the set as PLAY does, without selecting it: its title,
+ *   then its entrance, and never a save, which only CONTINUE opens.
  * - **A local set's tile** has **the pen** on its picture, at its top right corner, which
  *   opens the same form on its record, to edit or delete it. The page then shows the set
  *   edited, selected, or none, for a set deleted.
@@ -36,6 +42,23 @@
  *   pending set too, which the server refuses; never on the default set. The page then
  *   asks for the sets anew and shows them, the selection kept but for a set gone. A
  *   refusal is said in the box beside CONTINUE.
+ * - **The book** is on every published set's tile, after the triangle. It opens a dialog that says the
+ *   set's description, under its title, if it has one, and offers the set's files as one zip, `<name>.zip`, made in the page from the files the server serves
+ *   (`src/data/DataSetArchive.ts`), so that the set can be played in CSBWin; then its
+ *   documents, the files its folder holds for its players (`DataSetDocument`), each a link
+ *   that the browser opens in a new tab, a PDF, a text or a picture, or downloads, a word
+ *   processor's file or an archive. To a
+ *   moderator, each has a cross that removes it, once confirmed, and ADD offers to choose
+ *   a file on the drive to add (`server/documents.ts`); the list then shows the set as the
+ *   server lists it anew, and so does the page once the dialog is closed. A refusal is said
+ *   in the dialog. A local set has none.
+ * - **The moderator's switch**, at the page's top right corner, is offered to a moderator
+ *   alone. Off, the page is the one a player sees (`playerView`): neither a hidden set nor
+ *   a pending one, the moderator's own pending sets included since the page is not told
+ *   who owns a set, and no control a player is not offered. The page is shown again, the
+ *   selection kept but for a set no longer listed, and the switch kept in `localStorage`
+ *   (`MODERATION_KEY`), on until it is turned off. The form a set's pen opens is the
+ *   same either way.
  * - **PLAY** opens the selected set (`?dungeon=<id>`): its title, then its entrance. With
  *   no set selected it is disabled.
  * - **CONTINUE** opens the last save used (`lastUsedSave`) of the selected set, or of every
@@ -43,7 +66,7 @@
  *   disabled. The box beside it shows that save: its set, its party, its level, and when
  *   it was saved.
  *
- * The buttons and the box sit above the grid, which grows with the sets, so that they
+ * The buttons and the box sit above the grids, which grow with the sets, so that they
  * stay on the first screen.
  *
  * A save of a set neither the manifest nor the player's own sets name cannot be played,
@@ -59,13 +82,15 @@
  */
 import './welcomePage.css';
 import logoUrl from '../assets/csbweb-logo.jpg';
+import { archiveName, dataSetArchive, type ReadArchiveFile } from '../data/DataSetArchive';
 import { folderFiles } from '../data/DataSetFiles';
 import {
-    chooserSets, DATA_SETS_ROUTE, PLAYER_ID_HEADER, PNG_HEAD_BYTES, pngSize, thumbnailPath,
+    chooserSets, DATA_SETS_ROUTE, DOCUMENT_EXTENSIONS, DOCUMENTS_SEGMENT, documentPath, isDocumentName, PLAYER_ID_HEADER, PNG_HEAD_BYTES, pngSize, thumbnailPath,
     type DataSet, type DataSetManifest, type ModerationAction,
 } from '../data/DataSets';
 import { localDataSet, type LocalDataSetFile, type LocalDataSetRecord } from '../data/LocalDataSets';
 import { openAddDataSetForm, openPublishedSetForm, type EditedPublishedSet } from './addDataSetForm';
+import { HOW_TO_PLAY_HASH, openHowToPlay, type HowToPlayHost } from './howToPlay';
 import { playerId } from './gameEvents';
 import {
     formatSaveDate, formatSaveTime, lastUsedSave,
@@ -77,11 +102,25 @@ const PAGE = `
 <main class="welcome-page">
   <h1 class="welcome-logo"><img src="${logoUrl}" alt="CSBweb" width="550" height="307"></h1>
   <div class="welcome-actions">
-    <a class="btn px" id="welcome-play">Play</a>
-    <a class="btn px" id="welcome-continue">Continue</a>
-    <div class="welcome-preview px px2" aria-live="polite"></div>
+    <div class="welcome-actions-row">
+      <a class="btn px" id="welcome-play">Play</a>
+      <button type="button" class="btn px" id="welcome-help">How to play</button>
+    </div>
+    <div class="welcome-actions-row">
+      <a class="btn px" id="welcome-continue">Continue</a>
+      <div class="welcome-preview px px2" aria-live="polite"></div>
+    </div>
   </div>
-  <div class="welcome-grid" role="group" aria-label="Dungeons"></div>
+  <section class="welcome-sets welcome-official" aria-labelledby="welcome-official-title">
+    <h2 class="px" id="welcome-official-title">Official games</h2>
+    <p class="welcome-sets-lead">Dungeon Master and Chaos Strikes Back, as FTL Games released them.</p>
+    <div class="welcome-grid" role="group" aria-labelledby="welcome-official-title"></div>
+  </section>
+  <section class="welcome-sets welcome-custom" aria-labelledby="welcome-custom-title">
+    <h2 class="px" id="welcome-custom-title">Fan-made dungeons</h2>
+    <p class="welcome-sets-lead">Custom dungeons built by the community, played on the same engine.</p>
+    <div class="welcome-grid" role="group" aria-labelledby="welcome-custom-title"></div>
+  </section>
   <section class="welcome-about" id="about">
     <p class="welcome-lead">The 1987 dungeon, rebuilt one function at a time from CSBWin. There is nothing to install: open the page and go down the stairs.</p>
     <div class="welcome-columns">
@@ -128,23 +167,46 @@ const PAGE = `
     <p>Dungeon Master © 1987 and Chaos Strikes Back © 1989 FTL Games, Software Heaven, Inc. Their names, pictures, sounds and data files belong to their rights holders, and are served here only to be played. The other dungeons belong to their authors. The engine is a port of CSBWin by Paul R. Stevens. CSBweb is a free, non-commercial fan project, not affiliated with or endorsed by any of them. Rights holders: write to csbweb[at]looten.net, and whatever you ask is taken down.</p>
     <nav class="px px2" aria-label="Footer">
       <a aria-disabled="true" href="#about">About</a>
-      <a aria-disabled="true">Stats</a>
+      <a href="stats">Stats</a>
       <a aria-disabled="true">Source</a>
       <a href="#credits">Credits</a>
     </nav>
   </footer>
 </main>`;
 
-/** The confirmation the cross opens. */
-const CONFIRM_REJECT = `
+/** A confirmation, the cross's on a tile or on a document, its ids each `<prefix>-title`, `-cancel` and `-confirm`. */
+const CONFIRMATION = (prefix: string) => `
 <form class="add-set-form">
-  <h2 class="px" id="reject-set-title"></h2>
+  <h2 class="px" id="${prefix}-title"></h2>
   <p class="delete-set-text"></p>
   <div class="add-set-buttons">
-    <button type="button" class="btn px" id="reject-set-cancel">Cancel</button>
-    <button type="button" class="btn px" id="reject-set-confirm"></button>
+    <button type="button" class="btn px" id="${prefix}-cancel">Cancel</button>
+    <button type="button" class="btn px" id="${prefix}-confirm"></button>
   </div>
 </form>`;
+
+/** The dialog the book opens: the set's description, the documents, then a moderator's ADD, and CLOSE. */
+const DOCUMENTS = `
+<form class="add-set-form">
+  <h2 class="px" id="documents-title"></h2>
+  <p class="documents-description"></p>
+  <ul class="documents-list"></ul>
+  <p class="documents-status" aria-live="polite"></p>
+  <div class="add-set-buttons">
+    <button type="button" class="btn px" id="documents-close">Close</button>
+    <button type="button" class="btn px" id="documents-add">Add</button>
+  </div>
+  <input type="file" id="documents-file" hidden>
+</form>`;
+
+/**
+ * The extensions of the documents a browser shows, which a link opens in a new tab; any
+ * other is downloaded (`DOCUMENT_EXTENSIONS`).
+ */
+const SHOWN_DOCUMENTS = ['.pdf', '.txt', '.md', '.jpg', '.jpeg', '.png', '.gif', '.webp'];
+
+/** Where the moderator's switch is kept: `'off'` once turned off, else on. */
+const MODERATION_KEY = 'csbweb_moderation_v1';
 
 /** Each action, done, as a refusal names it. */
 const DONE: Record<ModerationAction, string> = { approve: 'approved', reject: 'rejected', hide: 'hidden', show: 'shown' };
@@ -153,7 +215,8 @@ const DONE: Record<ModerationAction, string> = { approve: 'approved', reject: 'r
  * Show the welcome page in `body`, in place of whatever it held, for the sets of
  * `manifest` and of `localSets`, and the saves of `store`, the set `select` names selected,
  * where it names one. `loadManifest` asks the server for the manifest again, once a set is
- * published or moderated.
+ * published or moderated. HOW TO PLAY opens its dialog on `help` (`src/ui/howToPlay.ts`),
+ * as the page does where its address ends in `#how-to-play`.
  */
 export async function showWelcomePage(
     body: HTMLElement,
@@ -161,28 +224,38 @@ export async function showWelcomePage(
     store: Pick<SaveStore, 'list'>,
     localSets: Pick<BrowserDataSetStore, 'list' | 'put' | 'remove'>,
     loadManifest: () => Promise<DataSetManifest>,
+    help: HowToPlayHost,
     select: string | null = null,
 ): Promise<void> {
     const records = await localSets.list().catch(() => [] as LocalDataSetRecord[]);
     const local = records.map((record) => ({ set: localDataSet(record), record, thumbnail: record.files.thumbnail ?? null }));
-    const allSets = [...manifest.dataSets, ...local.map(({ set }) => set)];
+    const moderating = manifest.moderator && moderationOn();
+    // The manifest the page shows: a player's, but where a moderator moderates.
+    const viewed = manifest.moderator && !moderating ? playerView(manifest) : manifest;
+    const allSets = [...viewed.dataSets, ...local.map(({ set }) => set)];
     const known = new Set(allSets.map((set) => set.id));
     const rows = (await store.list(null).catch(() => [] as SaveEntry[])).filter((row) => known.has(row.dataSet));
 
     body.classList.add('welcome');
     body.innerHTML = PAGE;
-    const grid = body.querySelector<HTMLElement>('.welcome-grid')!;
+    const officialSection = body.querySelector<HTMLElement>('.welcome-official')!;
+    const officialGrid = officialSection.querySelector<HTMLElement>('.welcome-grid')!;
+    const customGrid = body.querySelector<HTMLElement>('.welcome-custom .welcome-grid')!;
     const play = body.querySelector<HTMLAnchorElement>('#welcome-play')!;
     const resume = body.querySelector<HTMLAnchorElement>('#welcome-continue')!;
     const preview = body.querySelector<HTMLElement>('.welcome-preview')!;
+    body.querySelector('#welcome-help')!.addEventListener('click', () => openHowToPlay(help));
 
     const thumbnails = new Map<DataSet, string | Blob | null>([
-        ...chooserSets(manifest).map((set) => [set, thumbnailPath(set)] as const),
+        ...chooserSets(viewed).map((set) => [set, thumbnailPath(set)] as const),
         ...local.map(({ set, thumbnail }) => [set, thumbnail] as const),
     ]);
-    const sets = tileOrder([...thumbnails.keys()], rows);
+    const listed = [...thumbnails.keys()];
+    const official = listed.filter((set) => set.official);
+    const sets = [...official, ...tileOrder(listed.filter((set) => !set.official), rows)];
+    officialSection.hidden = official.length === 0;
     let selected: DataSet | null = sets.find((set) => set.id === select)
-        ?? (rows.length === 0 && manifest.defaultSet && sets.includes(manifest.defaultSet) ? manifest.defaultSet : null);
+        ?? (rows.length === 0 && viewed.defaultSet && sets.includes(viewed.defaultSet) ? viewed.defaultSet : null);
     const tiles = sets.map((set) => {
         const saves = rows.filter((row) => row.dataSet === set.id).length;
         const tile = document.createElement('button');
@@ -199,15 +272,22 @@ export async function showWelcomePage(
         if (record) tile.classList.add('local');
         if (set.pending) tile.classList.add('pending');
         if (set.hidden) tile.classList.add('hidden');
-        const controls = record ? [control('pick-edit', `Edit ${record.name}`, PEN, () => openForm({ record, saves }))] : moderation(set);
-        grid.append(controls.length > 0 ? withControls(tile, controls) : tile);
+        const controls = record ? [control('pick-edit', `Edit ${record.name}`, PEN, () => openForm({ record, saves }))]
+            : [control('pick-documents', `Documents of ${set.name}`, BOOK, () => openDocuments(set)), ...moderation(set)];
+        (set.official ? officialGrid : customGrid).append(withControls(tile, [playControl(set), ...controls]));
         return { set, tile };
     });
-    grid.append(addTile(() => openForm(null)));
+    customGrid.append(addTile(() => openForm(null)));
+    if (manifest.moderator) {
+        body.querySelector('.welcome-page')!.prepend(moderationSwitch(moderating, () => {
+            keepModeration(!moderating);
+            again(selected?.id ?? null);
+        }));
+    }
 
     /** The page shown again, `select` selected, for the manifest `shown`. */
     function again(select: string | null, shown = manifest): void {
-        void showWelcomePage(body, shown, store, localSets, loadManifest, select);
+        void showWelcomePage(body, shown, store, localSets, loadManifest, help, select);
     }
 
     /** The form that adds a set, or edits `edited`'s, with its `saves`; the page shown again after it. */
@@ -227,9 +307,20 @@ export async function showWelcomePage(
         );
     }
 
+    /**
+     * The dialog the book opens on `set`'s documents; the page shown again as the server
+     * lists the sets once it is closed, where a document was added or removed, the selection kept.
+     */
+    function openDocuments(set: DataSet): void {
+        const keep = selected?.id ?? null;
+        showDocuments(set, viewed.moderator, loadManifest, (asked) => {
+            if (asked) again(keep, asked);
+        });
+    }
+
     /** The controls of a published `set` the viewer may use: the pen, and the tick and the cross, or the eye. */
     function moderation(set: DataSet): HTMLElement[] {
-        const { moderator } = manifest;
+        const { moderator } = viewed;
         const pen = moderator ? [control('pick-edit', `Edit ${set.name}`, PEN, () => void editPublished(set))] : [];
         if (!set.pending) {
             return !moderator ? [] : set.hidden
@@ -295,20 +386,74 @@ export async function showWelcomePage(
             line('preview-party', save.champions.map((name) => name.trim()).filter((name) => name !== '').join(' · ')),
             line('preview-when', `Level ${save.level} · ${formatSaveDate(save.savedAt)} ${formatSaveTime(save.savedAt)}`),
         ] : [
-            line('preview-none', set ? 'No saved game of this dungeon' : 'No saved game yet'),
+            line('preview-none', set ? 'No saved game here yet' : 'No saved game yet'),
         ]));
     }
     update();
+    // The address at `#how-to-play` opens HOW TO PLAY, as the page is shown and as the
+    // fragment changes on it. One handler, the last page's: the page is shown anew often.
+    const helpAsked = () => {
+        if (window.location.hash === HOW_TO_PLAY_HASH && !document.querySelector('dialog.how-to-play')) openHowToPlay(help);
+    };
+    window.onhashchange = helpAsked;
+    helpAsked();
+}
+
+/** Whether the moderator's switch is on: on but where it was turned off, or `localStorage` cannot be read. */
+function moderationOn(): boolean {
+    try {
+        return localStorage.getItem(MODERATION_KEY) !== 'off';
+    } catch {
+        return true;
+    }
+}
+
+/** The moderator's switch kept `on` or off, where `localStorage` keeps it. */
+function keepModeration(on: boolean): void {
+    try {
+        if (on) localStorage.removeItem(MODERATION_KEY);
+        else localStorage.setItem(MODERATION_KEY, 'off');
+    } catch {
+        // The switch then holds for this page alone.
+    }
+}
+
+/**
+ * The moderator's `manifest` as a player is answered it (`server/dataSets.ts`): without the
+ * pending sets, which the page cannot tell the moderator's own from, and not a moderator's,
+ * so without the hidden sets either (`chooserSets`).
+ */
+function playerView(manifest: DataSetManifest): DataSetManifest {
+    return { ...manifest, dataSets: manifest.dataSets.filter((set) => !set.pending), moderator: false };
+}
+
+/** The moderator's switch, `on` or off, which calls `toggle` once clicked. */
+function moderationSwitch(on: boolean, toggle: () => void): HTMLElement {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'welcome-moderation px px2';
+    button.setAttribute('role', 'switch');
+    button.setAttribute('aria-checked', String(on));
+    button.textContent = on ? 'Moderator on' : 'Moderator off';
+    button.addEventListener('click', toggle);
+    return button;
 }
 
 /**
  * `action` sent to `api/data-sets/<id>` about the set `id`, by the player whose `playerId`
  * this is: `null` once done, else why not, as the server says it.
  */
-async function moderateDataSet(id: string, action: ModerationAction): Promise<string | null> {
-    const response = await fetch(`${DATA_SETS_ROUTE}/${encodeURIComponent(id)}`, {
-        method: 'POST', headers: { [PLAYER_ID_HEADER]: playerId(), 'Content-Type': 'application/json' }, body: JSON.stringify({ action }),
-    }).catch(() => null);
+function moderateDataSet(id: string, action: ModerationAction): Promise<string | null> {
+    return postToSet(`${DATA_SETS_ROUTE}/${encodeURIComponent(id)}`, { 'Content-Type': 'application/json' }, JSON.stringify({ action }));
+}
+
+/**
+ * `body` posted to `route`, a set's (`server/moderate.ts`, `server/documents.ts`), by the
+ * player whose `playerId` this is, with `headers`: `null` once done, else why not, as the
+ * server says it.
+ */
+async function postToSet(route: string, headers: Record<string, string>, body: string | FormData): Promise<string | null> {
+    const response = await fetch(route, { method: 'POST', headers: { [PLAYER_ID_HEADER]: playerId(), ...headers }, body }).catch(() => null);
     if (!response) return 'the server cannot be reached.';
     if (response.ok) return null;
     const answer = await response.json().catch(() => null) as { error?: unknown } | null;
@@ -337,7 +482,7 @@ async function publishedRecord(set: DataSet): Promise<EditedPublishedSet['record
     }
     return {
         id: set.id, name: set.name, description: set.description, authors: [...set.authors], dmRules: set.dmRules,
-        thumbnailAsTitle: set.thumbnailAsTitle, baseSet: null, files,
+        thumbnailAsTitle: set.thumbnailAsTitle, official: set.official, baseSet: null, files,
     };
 }
 
@@ -346,18 +491,26 @@ async function publishedRecord(set: DataSet): Promise<EditedPublishedSet['record
  * CANCEL and REJECT, or WITHDRAW for its owner, which closes it and calls `go`.
  */
 function confirmReject(set: DataSet, withdraw: boolean, go: () => void): void {
-    const dialog = document.createElement('dialog');
-    dialog.className = 'add-set delete-set reject-set';
-    dialog.setAttribute('aria-labelledby', 'reject-set-title');
-    dialog.innerHTML = CONFIRM_REJECT;
     const verb = withdraw ? 'Withdraw' : 'Reject';
-    dialog.querySelector('#reject-set-title')!.textContent = `${verb} ${set.name}?`;
-    dialog.querySelector('.delete-set-text')!.textContent = withdraw
+    confirmation('reject-set', `${verb} ${set.name}?`, withdraw
         ? 'The site deletes the files you published. A set of yours kept in this browser stays.'
-        : 'The site deletes its files. Its owner may publish it again.';
-    const confirm = dialog.querySelector<HTMLButtonElement>('#reject-set-confirm')!;
+        : 'The site deletes its files. Its owner may publish it again.', verb, go);
+}
+
+/**
+ * A confirmation, its ids prefixed with `prefix` and its dialog of that class: `title`,
+ * `text`, and CANCEL and `verb`, which closes it and calls `go`.
+ */
+function confirmation(prefix: string, title: string, text: string, verb: string, go: () => void): void {
+    const dialog = document.createElement('dialog');
+    dialog.className = `add-set delete-set ${prefix}`;
+    dialog.setAttribute('aria-labelledby', `${prefix}-title`);
+    dialog.innerHTML = CONFIRMATION(prefix);
+    dialog.querySelector(`#${prefix}-title`)!.textContent = title;
+    dialog.querySelector('.delete-set-text')!.textContent = text;
+    const confirm = dialog.querySelector<HTMLButtonElement>(`#${prefix}-confirm`)!;
     confirm.textContent = verb;
-    dialog.querySelector('#reject-set-cancel')!.addEventListener('click', () => dialog.close());
+    dialog.querySelector(`#${prefix}-cancel`)!.addEventListener('click', () => dialog.close());
     confirm.addEventListener('click', () => {
         dialog.close();
         go();
@@ -365,6 +518,146 @@ function confirmReject(set: DataSet, withdraw: boolean, go: () => void): void {
     dialog.addEventListener('close', () => dialog.remove());
     document.body.append(dialog);
     dialog.showModal();
+}
+
+/**
+ * The dialog the book opens on `set`'s files: first its archive, `<name>.zip`, which is
+ * made and downloaded once clicked, then its documents, each a link, with its size; to a
+ * `moderator`, a cross on each, which removes it once confirmed, and ADD, which sends the
+ * file chosen on the drive. After a change, the list is the set as `loadManifest` gives it
+ * anew, its folder a new one. `closed` is called once it is closed, with the last manifest
+ * asked for, or `null` where nothing changed.
+ */
+function showDocuments(shown: DataSet, moderator: boolean, loadManifest: () => Promise<DataSetManifest>, closed: (asked: DataSetManifest | null) => void): void {
+    let set = shown;
+    let asked: DataSetManifest | null = null;
+    const dialog = document.createElement('dialog');
+    dialog.className = 'add-set delete-set documents';
+    dialog.setAttribute('aria-labelledby', 'documents-title');
+    dialog.innerHTML = DOCUMENTS;
+    dialog.querySelector('#documents-title')!.textContent = `${set.name}: documents`;
+    const list = dialog.querySelector<HTMLElement>('.documents-list')!;
+    const status = dialog.querySelector<HTMLElement>('.documents-status')!;
+    const add = dialog.querySelector<HTMLButtonElement>('#documents-add')!;
+    const input = dialog.querySelector<HTMLInputElement>('#documents-file')!;
+    const route = `${DATA_SETS_ROUTE}/${encodeURIComponent(set.id)}/${DOCUMENTS_SEGMENT}`;
+
+    const description = dialog.querySelector<HTMLElement>('.documents-description')!;
+    const render = () => {
+        description.textContent = set.description;
+        const archive = document.createElement('li');
+        archive.className = 'documents-archive';
+        const name = `${archiveName(set)}.zip`;
+        const pack = document.createElement('button');
+        pack.type = 'button';
+        pack.className = 'documents-pack';
+        pack.textContent = name;
+        pack.addEventListener('click', () => void (async () => {
+            status.textContent = `Packing ${name}…`;
+            pack.disabled = true;
+            try {
+                downloadFile(name, await dataSetArchive(set, servedFile(set)));
+                status.textContent = '';
+            } catch (error) {
+                status.textContent = `${name} could not be made: ${error instanceof Error ? error.message : String(error)}`;
+            }
+            pack.disabled = false;
+        })());
+        archive.append(pack, line('documents-size', 'every file'));
+        list.replaceChildren(archive, ...set.documents.map(({ file, size }) => {
+            const item = document.createElement('li');
+            const link = document.createElement('a');
+            link.href = documentPath(set, file);
+            link.textContent = file;
+            if (SHOWN_DOCUMENTS.includes(file.slice(file.lastIndexOf('.')).toLowerCase())) {
+                link.target = '_blank';
+                link.rel = 'noopener';
+            } else {
+                link.download = file;
+            }
+            item.append(link, line('documents-size', formatSize(size)));
+            if (moderator) item.append(control('documents-remove', `Remove ${file}`, CROSS, () => confirmation('remove-document', `Remove ${file}?`,
+                'The site deletes the file. The night\'s backup keeps a copy.', 'Remove', () => void change(`Removing ${file}…`,
+                    () => postToSet(route, { 'Content-Type': 'application/json' }, JSON.stringify({ remove: file }))))));
+            return item;
+        }));
+        if (set.documents.length === 0 && moderator) {
+            const none = document.createElement('li');
+            none.className = 'documents-none';
+            none.textContent = 'No document yet.';
+            list.append(none);
+        }
+    };
+
+    /** `send` done, `doing` said meanwhile, then the list as the server gives it anew; or the refusal said. */
+    const change = async (doing: string, send: () => Promise<string | null>) => {
+        status.textContent = doing;
+        for (const button of dialog.querySelectorAll<HTMLButtonElement>('.documents-remove, #documents-add')) button.disabled = true;
+        const error = await send();
+        if (error === null) {
+            try {
+                asked = await loadManifest();
+                set = asked.dataSets.find((one) => one.id === set.id) ?? set;
+                status.textContent = '';
+            } catch {
+                status.textContent = 'Done, but the site does not list the sets anew.';
+            }
+        } else {
+            status.textContent = `${doing.slice(0, -1)} failed: ${error}`;
+        }
+        render();
+        add.disabled = false;
+    };
+
+    if (!moderator) add.remove();
+    add.addEventListener('click', () => input.click());
+    input.addEventListener('change', () => {
+        const file = input.files?.[0];
+        input.value = '';
+        if (!file) return;
+        if (!isDocumentName(file.name)) {
+            status.textContent = `${file.name} cannot be a document: a document's name ends in ${DOCUMENT_EXTENSIONS.join(', ')}, and starts with no '.'.`;
+            return;
+        }
+        const form = new FormData();
+        form.append('file', file);
+        void change(`Sending ${file.name}…`, () => postToSet(route, {}, form));
+    });
+    dialog.querySelector('#documents-close')!.addEventListener('click', () => dialog.close());
+    dialog.addEventListener('close', () => {
+        dialog.remove();
+        closed(asked);
+    });
+    render();
+    document.body.append(dialog);
+    dialog.showModal();
+}
+
+/** The files of the published `set`'s folder as the server serves them, each with its date, its `Last-Modified`, or now. */
+function servedFile(set: DataSet): ReadArchiveFile {
+    return async (file) => {
+        const response = await fetch(documentPath(set, file)).catch(() => null);
+        if (!response?.ok) return null;
+        const modified = new Date(response.headers.get('Last-Modified') ?? Date.now());
+        return { bytes: new Uint8Array(await response.arrayBuffer()), modified: Number.isNaN(modified.getTime()) ? new Date() : modified };
+    };
+}
+
+/** `bytes` downloaded as the browser does its downloads, under `name`: a link to them, clicked (`downloadSaveFile`). */
+function downloadFile(name: string, bytes: Uint8Array<ArrayBuffer>): void {
+    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/zip' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+/** `bytes` as a document's size: `512 B`, `40 KB`, `3.2 MB`. */
+function formatSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 /** `tile` with `controls` along its picture's top edge, from its top right corner. */
@@ -390,6 +683,17 @@ function control(className: string, label: string, svg: string, click: () => voi
     return button;
 }
 
+/** The triangle on `set`'s tile: a link to the set, as PLAY's (`pageQuery`), its save none. */
+function playControl(set: DataSet): HTMLElement {
+    const anchor = document.createElement('a');
+    anchor.className = 'pick-control pick-play';
+    anchor.href = pageQuery(set.id, null);
+    anchor.title = `Play ${set.name}`;
+    anchor.setAttribute('aria-label', anchor.title);
+    anchor.innerHTML = PLAY;
+    return anchor;
+}
+
 /** The pen's pixels, 11 by 11, in the page's palette (`welcomePage.css`). */
 const PEN_PIXELS = [
     '.........ee',
@@ -405,6 +709,36 @@ const PEN_PIXELS = [
     'tw.........',
 ];
 const PEN = pixelArt(PEN_PIXELS, { e: 'p10', m: 'p13', B: 'p11', b: 'p9', d: 'p5', w: 'p13', t: 'p1' });
+
+/** The triangle, which plays a set. */
+const PLAY = pixelArt([
+    '...y.......',
+    '...yy......',
+    '...yyy.....',
+    '...yyyy....',
+    '...yyyyy...',
+    '...yyyyyy..',
+    '...yyyyy...',
+    '...yyyy....',
+    '...yyy.....',
+    '...yy......',
+    '...y.......',
+], { y: 'p9' });
+
+/** The book, which opens a set's documents. */
+const BOOK = pixelArt([
+    '...........',
+    '..cccccccc.',
+    '.dcccccccc.',
+    '.dcyyyyycc.',
+    '.dcccccccc.',
+    '.dcccccccc.',
+    '.dcccccccc.',
+    '.dcccccccc.',
+    '.dcccccccc.',
+    '.dwwwwwwww.',
+    '..dddddddd.',
+], { d: 'p3', c: 'p5', y: 'p9', w: 'p13' });
 
 /** The tick, which approves a pending set. */
 const TICK = pixelArt([

@@ -1,6 +1,9 @@
 #!/bin/bash
 # Build the image, ship it to the VPS and restart the stack there (`doc/DEPLOYMENT.md`).
-# The author runs it by hand, after `npm test`.
+# The author runs it by hand:
+#
+#   npm run deploy              # the commit, as it is
+#   npm run deploy -- --dirty   # the working tree, though it differs from its commit
 #
 # The target is read from a gitignored `.env` at the repository's root, so the repository
 # names no host, login or path:
@@ -16,6 +19,13 @@
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 
+dirty=0
+case "${1:-}" in
+  '') ;;
+  --dirty) dirty=1 ;;
+  *) echo "usage: utils/deploy.sh [--dirty]" >&2; exit 2 ;;
+esac
+
 [ -f "$root/.env" ] || { echo "no .env at $root: it names DEPLOY_HOST and DEPLOY_DIR" >&2; exit 1; }
 set -a
 # shellcheck source=/dev/null
@@ -24,9 +34,20 @@ set +a
 : "${DEPLOY_HOST:?DEPLOY_HOST is not set in .env}"
 : "${DEPLOY_DIR:?DEPLOY_DIR is not set in .env}"
 
-# The build the page's events name: the commit, marked when the tracked files differ from it.
+# The image is built from the working tree, so it is its commit's only where nothing it
+# takes differs: the build context (`.dockerignore`'s allowlist, untracked files included),
+# the Dockerfile and the compose file. A commit is one `npm test` passed (`CLAUDE.md`), so
+# that tree is a checked one. With `--dirty`, the build the page's events name is marked.
 build="$(git -C "$root" rev-parse --short HEAD)"
-[ -z "$(git -C "$root" status --porcelain --untracked-files=no)" ] || build="$build-dirty"
+mapfile -t context < <(sed -n 's/^!/:(glob)/p' "$root/.dockerignore" | sed 's|/$|/**|')
+changed="$(git -C "$root" status --porcelain -- Dockerfile docker-compose.yaml "${context[@]}")"
+if [ -n "$changed" ]; then
+  if [ "$dirty" = 0 ]; then
+    printf 'the image would differ from %s:\n%s\ncommit, or deploy it anyway with --dirty\n' "$build" "$changed" >&2
+    exit 1
+  fi
+  build="$build-dirty"
+fi
 
 echo "building csbweb:latest ($build)"
 docker build --build-arg CSBWEB_BUILD="$build" -t csbweb:latest "$root"

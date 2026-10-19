@@ -32,8 +32,10 @@
 // in it and out of it, and in the installed app's window, the save store held by another tab, and the welcome
 // page: its tiles and their order, its fonts, its selection, where PLAY and CONTINUE go, and CONTINUE's save read
 // straight into play, its form adding, editing, publishing and deleting a player's own set, the
-// tiles' controls moderating a published one, and each tile's name in its set's state's colour,
-// to a moderator. See `check` below.
+// tiles' controls moderating a published one, the book listing its documents, a moderator adding
+// and removing them, and each tile's name in its set's state's colour,
+// to a moderator, the statistics page its footer links to, and, against a page whose server sends a content security policy
+// (`check-image.sh`), nothing it refuses. See `check` below.
 // A failure there exits 1.
 //
 // Usage:
@@ -160,6 +162,11 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
 
 await send('Runtime.enable');
 await send('Page.enable');
+// What the server's policy refuses (`SECURITY_HEADERS`, `server/app.ts`), said on the
+// console of every page loaded, and checked at the end. The dev server sends no policy.
+await send('Page.addScriptToEvaluateOnNewDocument', { source: `
+  document.addEventListener('securitypolicyviolation', (e) => console.error('CSP: ' + e.effectiveDirective + ' refused ' + e.blockedURI));
+` });
 // The save menu's EXPORT downloads a file. Chrome is told to announce a download and keep
 // none, so the run leaves nothing on the disk.
 await send('Browser.setDownloadBehavior', { behavior: 'deny', eventsEnabled: true });
@@ -202,12 +209,15 @@ await wait(2500);
 const firstVisit = await evaluate(`({tiles: [...document.querySelectorAll('.pick[data-set]')].map(t=>t.dataset.set+(t.classList.contains('dim')?'':'*')+(t.getAttribute('aria-pressed')==='true'?'!':'')).join(','),
   play: document.getElementById('welcome-play').getAttribute('href'),
   resume: document.getElementById('welcome-continue').getAttribute('href'),
-  above: !!(document.querySelector('.welcome-actions').compareDocumentPosition(document.querySelector('.welcome-grid')) & Node.DOCUMENT_POSITION_FOLLOWING)})`);
+  above: !!(document.querySelector('.welcome-actions').compareDocumentPosition(document.querySelector('.welcome-grid')) & Node.DOCUMENT_POSITION_FOLLOWING),
+  sections: [...document.querySelectorAll('.welcome-sets')].map(s=>s.querySelector('h2').textContent+':'+[...s.querySelectorAll('.pick')].map(t=>t.dataset.set??'add').join('/')).join('|')})`);
 console.log('state: welcome page, no save');
 console.log('  ', JSON.stringify(firstVisit));
-check(firstVisit.tiles === 'csb,conflux-3.5,dm-atari!,kids-dungeon,towers-of-chaos' && /dungeon=dm-atari/.test(firstVisit.play ?? '')
+check(firstVisit.tiles === 'dm-atari!,kids-dungeon,csb,conflux-3.5,towers-of-chaos' && /dungeon=dm-atari/.test(firstVisit.play ?? '')
   && firstVisit.resume === null && firstVisit.above,
-  'no save: the tiles by name, dm-atari selected, PLAY opens it, CONTINUE disabled, the buttons above the grid');
+  'no save: the official games in the manifest\'s order, then the others by name, dm-atari selected, PLAY opens it, CONTINUE disabled, the buttons above the grids');
+check(firstVisit.sections === 'Official games:dm-atari/kids-dungeon/csb|Fan-made dungeons:conflux-3.5/towers-of-chaos/add',
+  'two sections, each under its title: the official games, then the fan-made dungeons, "+ Add my own" last');
 
 // A new server's answer, no set and no default: the grid holds only "+ Add my own", PLAY
 // and CONTINUE are disabled, and the form it opens has no base set to offer.
@@ -221,17 +231,18 @@ await send('Fetch.disable');
 onPaused = null;
 const noSet = await evaluate(`(() => {
   const tiles = [...document.querySelectorAll('.welcome-grid .pick')].map(t=>t.classList.contains('add')?'add':t.dataset.set).join(',');
+  const official = document.querySelector('.welcome-official').checkVisibility();
   const play = document.getElementById('welcome-play'), resume = document.getElementById('welcome-continue');
   document.querySelector('.pick.add').click();
   const form = document.querySelector('dialog.add-set[open]');
   return {tiles, play: play.getAttribute('href') ?? (play.getAttribute('aria-disabled') && 'disabled'),
     resume: resume.getAttribute('href') ?? (resume.getAttribute('aria-disabled') && 'disabled'),
-    form: !!form, bases: form ? form.querySelectorAll('.add-set-base').length : -1};
+    form: !!form, bases: form ? form.querySelectorAll('.add-set-base').length : -1, official};
 })()`);
 console.log('state: welcome page, no set');
 console.log('  ', JSON.stringify(noSet));
-check(noSet.tiles === 'add' && noSet.play === 'disabled' && noSet.resume === 'disabled' && noSet.form && noSet.bases === 0,
-  'no set: only "+ Add my own", PLAY and CONTINUE disabled, and its form offers no base set');
+check(noSet.tiles === 'add' && noSet.play === 'disabled' && noSet.resume === 'disabled' && noSet.form && noSet.bases === 0 && !noSet.official,
+  'no set: only "+ Add my own", PLAY and CONTINUE disabled, no section of official games, and its form offers no base set');
 // `?intro=0` skips the title animation and the dungeon entrance
 // (`src/renderer/intro/BootSequence.ts`), so the six frames below still open on the
 // adventure screen. The entrance gets frames of its own at the end.
@@ -362,11 +373,12 @@ const welcome = () => evaluate(`(()=>{const q=(s)=>[...document.querySelectorAll
       return i && i.complete && i.naturalWidth===320 && i.naturalHeight===200
         && (i.src.endsWith('/'+t.dataset.set+'-thumbnail.png') || t.dataset.set.startsWith('local:') && i.src.startsWith('blob:'));}),
     saves: q('.pick[data-set]').map(t=>t.querySelector('.pick-saves')?.textContent ?? ''),
-    last: (()=>{const t=document.querySelector('.welcome-grid').lastElementChild;
+    last: (()=>{const t=document.querySelector('.welcome-custom .welcome-grid').lastElementChild;
       return t.className+(t.disabled?' disabled':'')+(t.hasAttribute('aria-pressed')?' pressed':'')+' '+t.textContent;})(),
     gameFiles: performance.getEntriesByType('resource').map(e=>e.name).filter(n=>/\.dat$/i.test(n)).length };})()`);
+// The element scrolled into view first, should the page have grown under it.
 const clickOn = async (selector) => {
-  const p = await evaluate(`(()=>{const r=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();
+  const p = await evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});e.scrollIntoView({block:'nearest'});const r=e.getBoundingClientRect();
     return {x:r.left+r.width/2, y:r.top+r.height/2};})()`);
   for (const type of ['mousePressed', 'mouseReleased'])
     await send('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: 1 });
@@ -376,7 +388,7 @@ console.log('state: welcome page');
 const atWelcome = await welcome();
 console.log('  ', JSON.stringify(atWelcome));
 const saveId = /[?&]save=([^&]+)/.exec(atWelcome.resume ?? '')?.[1];
-check(!atWelcome.canvas && atWelcome.tiles === 'dm-atari*,csb,conflux-3.5,kids-dungeon,towers-of-chaos',
+check(!atWelcome.canvas && atWelcome.tiles === 'dm-atari*,kids-dungeon,csb,conflux-3.5,towers-of-chaos',
   'an unknown ?dungeon= is the welcome page, no game canvas, its tiles the sets not hidden, the one with a save bright and first, the others by name, none selected');
 check(atWelcome.pictures.length === 5 && atWelcome.pictures.every(Boolean) && atWelcome.gameFiles === 0,
   'each tile shows its set\'s 320x200 thumbnail, <id>-thumbnail.png, and the page fetches no .dat');
@@ -415,14 +427,63 @@ check(fonts.spectral && fonts.google === 0, 'the prose is in Spectral, regular a
 await clickOn('.pick[data-set="csb"]');
 const atCsb = await welcome();
 check(atCsb.tiles.includes('csb!') && /dungeon=csb/.test(atCsb.play ?? '') && !/save=/.test(atCsb.play ?? '')
-  && atCsb.resume === null && atCsb.preview.join() === 'No saved game of this dungeon',
+  && atCsb.resume === null && atCsb.preview.join() === 'No saved game here yet',
   'a set with no save selected: PLAY opens it, CONTINUE is disabled');
 await clickOn('.pick[data-set="csb"]');
 check((await welcome()).play === null, 'a click on the selected tile selects none');
 await clickOn('.pick[data-set="dm-atari"]');
 const atDm = await welcome();
 check(atDm.tiles.startsWith('dm-atari*!') && atDm.resume === atWelcome.resume, 'dm-atari selected: CONTINUE reads its last save');
-check(atWelcome.last === 'pick add +Add my own', 'the grid ends with "+ Add my own", never selected');
+check(atWelcome.last === 'pick add +Add my own', 'the fan-made dungeons end with "+ Add my own", never selected');
+// HOW TO PLAY (`src/ui/howToPlay.ts`): the page opened at `#how-to-play` shows its
+// dialog, the moves, attacks and runes keyed as the player's settings have them, the 24
+// runes the font's (U+E060 to U+E077, `gen-font.ts`). Its chooser's ARROWS makes the
+// settings the ARROWS preset, stored, the sheet shown anew; CSBWIN KEYS puts them back.
+// Its links to print are the sheets `tools/gen-help-sheet.mjs` made for the preset shown,
+// which are there, and the sheet is the text that tool recorded (`sheets.json`): a sheet
+// changed without its files made again fails here. CLOSE takes the fragment off, and the
+// page's button opens it again. The selection made above is made again after.
+const howToPlay = () => evaluate(`(async()=>{const d=document.querySelector('dialog.how-to-play');
+  const keys=(s)=>[...d.querySelectorAll(s)].map(c=>[...c.querySelectorAll('.how-key')].map(k=>k.textContent).join(' ')).join();
+  return d && { open: d.open, hash: location.hash,
+    preset: [...d.querySelectorAll('.how-choice input')].filter(i=>i.checked).map(i=>i.value).join(),
+    stored: JSON.parse(localStorage.getItem('csbweb_settings_v2') ?? '{}').keyPreset ?? null,
+    moves: keys('.how-pad-cell'), attacks: keys('.how-attacks .how-keys'), runeKeys: keys('.how-rune-table > .how-keys'),
+    glyphs: [...d.querySelectorAll('.how-glyph')].map(g=>g.textContent.codePointAt(0).toString(16)).join(),
+    font: getComputedStyle(d.querySelector('.how-glyph')).fontFamily,
+    sheet: d.querySelector('.how-sheet').textContent,
+    printed: await Promise.all(['.how-pdf', '.how-png'].map(async (s)=>{const a=d.querySelector(s);
+      const r=a.href ? await fetch(a.href).catch(()=>null) : null; return a.download+(r?.ok ? ' '+r.headers.get('content-type') : ' missing');})) };})()`);
+const printedSheets = JSON.parse(readFileSync(new URL('../src/assets/how-to-play/sheets.json', import.meta.url), 'utf8'));
+await send('Page.navigate', { url: `${APP}?dungeon=nowhere&keepsaves#how-to-play` });
+await wait(2500);
+const help = await howToPlay();
+console.log('  ', JSON.stringify(help));
+check(help?.open === true && help.hash === '#how-to-play', 'the page at #how-to-play opens HOW TO PLAY');
+check(help?.preset === 'csbwin' && help.moves === 'J KP 7,K KP 8,L KP 9,M KP 4,, KP 5,. KP 6'
+  && help.attacks === 'Q,W,E,R,A,S,D,F,Z,X,C,V' && help.runeKeys === '1,2,3,4,5,6',
+  'its sheet keys the moves, the attacks and the runes as the CSBWin preset does, the champions in columns');
+check(help?.glyphs === Array.from({ length: 24 }, (_, i) => (0xe060 + i).toString(16)).join() && /DM Screen/.test(help.font),
+  'its runes are the 24 glyphs, in the order the magic panel shows them, in the game\'s font');
+check(help?.sheet === printedSheets['csbwin-qwerty']
+  && help.printed.join() === 'csbweb-how-to-play-csbwin-qwerty.pdf application/pdf,csbweb-how-to-play-csbwin-qwerty.png image/png',
+  'its PDF and PNG to print are the CSBWin preset\'s, in QWERTY, made from the sheet it shows');
+await clickOn('.how-choice input[value="arrows"]');
+const arrows = await howToPlay();
+check(arrows?.preset === 'arrows' && arrows.stored === 'arrows' && arrows.moves === 'DELETE KP 7,UP KP 8,PAGE DOWN KP 9,LEFT KP 4,DOWN KP 5,RIGHT KP 6',
+  'ARROWS in its chooser makes the settings the ARROWS preset, stored, and the sheet shows its moves');
+check(arrows?.sheet === printedSheets['arrows-qwerty'] && arrows.printed.join() === 'csbweb-how-to-play-arrows-qwerty.pdf application/pdf,csbweb-how-to-play-arrows-qwerty.png image/png',
+  'its PDF and PNG to print are then the ARROWS preset\'s, made from the sheet it shows');
+await clickOn('.how-choice input[value="csbwin"]');
+check((await howToPlay())?.stored === 'csbwin', 'CSBWIN KEYS puts the preset back');
+await clickOn('#how-close');
+check(await evaluate(`!document.querySelector('dialog.how-to-play') && location.hash === '' && /dungeon=nowhere/.test(location.search)`),
+  'CLOSE closes it, and takes #how-to-play off the address');
+await clickOn('#welcome-help');
+const reopened = await howToPlay();
+check(reopened?.open === true && reopened.hash === '#how-to-play', 'the page\'s HOW TO PLAY opens it');
+await clickOn('#how-close');
+await clickOn('.pick[data-set="dm-atari"]');
 // The form that adds a set (`src/ui/addDataSetForm.ts`), which "+ Add my own" opens: its
 // checklist, a row each for the name, the id and the six files, crossed where needed and
 // missing or wrong, checked where right. CANCEL closes it. Then the player's own set
@@ -451,6 +512,7 @@ const form = () => evaluate(`(()=>{const d=document.querySelector('dialog.add-se
     asTitle: (l=>!l?'':l.querySelector('input').checked?'on':'off')(d.querySelector('.add-set-checklist .add-set-as-title')),
     title: d.querySelector('#add-set-title').textContent, name: d.querySelector('[name=name]').value,
     fixedId: d.querySelector('[name=id]').readOnly, dmRules: d.querySelector('[name=dmRules]').checked, deletable: !d.querySelector('.add-set-delete').hidden,
+    official: (c=>c.closest('label').checkVisibility()?(c.checked?'on':'off'):'hidden')(d.querySelector('[name=official]')),
     removable: [...d.querySelectorAll('.add-set-checklist li')].filter(li=>!li.querySelector('.add-set-remove').hidden).map(li=>li.dataset.about).join(),
     height: d.getBoundingClientRect().height };})()`);
 const inForm = (body) => evaluate(`(async()=>{const d=document.querySelector('dialog.add-set');${body};return 1;})()`);
@@ -465,8 +527,8 @@ const opened = await form();
 console.log('  form:', JSON.stringify(opened));
 check(opened?.open === true && !opened.confirm && opened.title === 'Add my own dungeon' && !opened.fixedId && !opened.deletable && opened.dmRules && opened.base === 'dm-atari*,csb' && opened.problems.length === 0 && opened.holds === ''
   && opened.rows === 'namex,idx,dungeon.datx,graphics.dat+,CSBgraphics.dat,hcsb.hct,hcsb.dat,thumbnail'
-  && opened.generate === 'on' && opened.thumbnail === 'Generate from data' && opened.asTitle === '',
-  '"+ Add my own" opens the form, DM rules checked: the name, the id and dungeon.dat crossed, DM\'s graphics.dat checked, the thumbnail offered from it, CONFIRM held');
+  && opened.generate === 'on' && opened.thumbnail === 'Generate from data' && opened.asTitle === '' && opened.official === 'hidden',
+  '"+ Add my own" opens the form, DM rules checked, no official game\'s checkbox to a player: the name, the id and dungeon.dat crossed, DM\'s graphics.dat checked, the thumbnail offered from it, CONFIRM held');
 check(opened.height <= 600, 'the form is on one screen');
 await inForm(`d.querySelector('#add-set-cancel').click()`);
 check(await form() === null, 'CANCEL closes it');
@@ -568,8 +630,8 @@ await send('Page.navigate', { url: `${APP}?dungeon=nowhere&keepsaves` });
 await wait(2500);
 const withLocal = await welcome();
 console.log('  local set:', JSON.stringify(withLocal));
-check(withLocal.tiles === `dm-atari*,local:${MINE}*,csb,conflux-3.5,kids-dungeon,towers-of-chaos`
-  && withLocal.saves[1] === '1 save' && withLocal.pictures.length === 6 && withLocal.pictures.every(Boolean)
+check(withLocal.tiles === `dm-atari*,kids-dungeon,csb,local:${MINE}*,conflux-3.5,towers-of-chaos`
+  && withLocal.saves[3] === '1 save' && withLocal.pictures.length === 6 && withLocal.pictures.every(Boolean)
   && withLocal.gameFiles === 0 && withLocal.last === atWelcome.last,
   "a local set's tile: its save counted, bright, its picture the record's image, the add tile still last");
 await clickOn(`.pick[data-set="local:${MINE}"]`);
@@ -651,15 +713,28 @@ check(await form() === null && tilesOf(afterPublish).includes(`${MINE}!`) && til
   && afterPublish.pictures.every(Boolean) && publishedRecord.name === 'My Edited Dungeon' && publishedRecord.saves === edited.saves,
   'PUBLISH sends the set: the form closes, the page shows it pending and selected, its thumbnail from its folder, beside the local set, which stays with its saves');
 // A tile's controls (`src/ui/welcomePage.ts`): what each set's tile offers this viewer,
-// each control's class and label, by set.
+// each control's class and label, by set, but the triangle, which every tile has first: a
+// link to the set as PLAY's, its save none, labelled with its name. The triangles are
+// checked once, here; the "+ Add my own" tile has none.
 const controlsOf = () => evaluate(`Object.fromEntries([...document.querySelectorAll('.pick[data-set]')].map(t=>[t.dataset.set,
-  [...(t.closest('.pick-cell')?.querySelectorAll('.pick-control')??[])].map(b=>b.className.replace('pick-control ','')+':'+b.getAttribute('aria-label')).join()]))`);
+  [...(t.closest('.pick-cell')?.querySelectorAll('.pick-control:not(.pick-play)')??[])].map(b=>b.className.replace('pick-control ','')+':'+b.getAttribute('aria-label')).join()]))`);
+const triangles = await evaluate(`(()=>{const query=(id)=>{const p=new URLSearchParams(location.search); p.set('dungeon', id); p.delete('save'); return '?'+p;};
+  const picks=[...document.querySelectorAll('.pick[data-set]')];
+  return { tiles: picks.length, wrong: picks.filter(t=>{const a=t.closest('.pick-cell')?.querySelector('.pick-control');
+      return !(a && a.tagName === 'A' && a.classList.contains('pick-play') && a.getAttribute('href') === query(t.dataset.set)
+        && a.getAttribute('aria-label') === 'Play '+t.querySelector('.pick-name').textContent);}).map(t=>t.dataset.set),
+    add: !!document.querySelector('.pick.add').closest('.pick-cell') };})()`);
 const owned = await controlsOf();
+console.log('  triangles:', JSON.stringify(triangles));
+check(triangles.tiles > 2 && triangles.wrong.length === 0 && !triangles.add,
+  'every tile, a local set\'s too, has the triangle first, a link to its set without a save, labelled with its name; "+ Add my own" has none');
 const owner = await evaluate(`localStorage.getItem('csbweb_player_v1')`);
 console.log('  to its owner:', JSON.stringify(owned));
-check(owned[MINE] === 'pick-reject:Withdraw My Edited Dungeon' && owned[`local:${MINE}`] === 'pick-edit:Edit My Edited Dungeon'
-  && Object.entries(owned).every(([set, controls]) => set === MINE || set.startsWith('local:') || controls === ''),
-  'to its owner, the pending set has the cross alone, which withdraws it, and no other published set has a control');
+const manifestRows = JSON.parse(readFileSync(new URL('data-sets.json', import.meta.url), 'utf8')).dataSets;
+check(owned[MINE] === 'pick-documents:Documents of My Edited Dungeon,pick-reject:Withdraw My Edited Dungeon' && owned[`local:${MINE}`] === 'pick-edit:Edit My Edited Dungeon'
+  && Object.entries(owned).every(([set, controls]) => set === MINE || set.startsWith('local:')
+    || controls === `pick-documents:Documents of ${manifestRows.find((row) => row.id === set)?.name}`),
+  'to its owner, the pending set has the book and the cross, which withdraws it, every other published set the book alone, and a local set the pen');
 await clickOn('.pick-edit');
 await wait(1500);
 await inForm(`d.querySelector('.add-set-publish').click()`);
@@ -704,15 +779,14 @@ check(deleted.dialog === null && deleted.form === null && deleted.store.name ===
   'its DELETE removes the record and every save filed under its id, and the page shows the sets without it, the published one kept');
 // The moderation (`server/moderate.ts`), from the tiles, as the dev server's moderator
 // (`DEV_MODERATOR_PLAYER_ID`, `vite.config.mts`; the image's in `tools/check-image.sh`), the
-// page reloaded with their `playerId` kept. Every published set has the pen first; the set
-// published above, pending, then the tick
+// page reloaded with their `playerId` kept. Every published set has the book first, then the
+// pen; the set published above, pending, then the tick
 // and the cross, every other the eye, open on a set shown, shut on a hidden one. The tick approves it, its name white and its
 // tile still selected, then the eye hides it, purple, and shows it again, white. A refusal,
 // the server stood in for, is said in the box beside CONTINUE. Then its owner, who sees no
 // control on the approved set, withdraws a second set of theirs, published by hand: the
 // cross asks first, and CANCEL keeps it.
 const MODERATOR = '00000000-0000-4000-8000-000000000001';
-const manifestRows = JSON.parse(readFileSync(new URL('data-sets.json', import.meta.url), 'utf8')).dataSets;
 const asPlayer = async (player) => {
   await evaluate(`localStorage.setItem('csbweb_player_v1', ${JSON.stringify(player)}),1`);
   await send('Page.navigate', { url: `${APP}?dungeon=nowhere&keepsaves&keepsettings` });
@@ -724,10 +798,34 @@ const onMine = (control) => clickOn(`.pick-cell:has(.pick[data-set="${MINE}"]) .
 await asPlayer(MODERATOR);
 const moderating = await controlsOf();
 console.log('  to a moderator:', JSON.stringify(moderating));
-check(moderating[MINE] === 'pick-edit:Edit My Edited Dungeon,pick-approve:Approve My Edited Dungeon,pick-reject:Reject My Edited Dungeon'
+check(moderating[MINE] === 'pick-documents:Documents of My Edited Dungeon,pick-edit:Edit My Edited Dungeon,pick-approve:Approve My Edited Dungeon,pick-reject:Reject My Edited Dungeon'
   && Object.entries(moderating).every(([set, controls]) => set === MINE
-    || ((row) => controls === `pick-edit:Edit ${row?.name},${row?.hidden ? `pick-show:Show ${row.name}` : `pick-hide:Hide ${row?.name}`}`)(manifestRows.find((row) => row.id === set))),
-  'to a moderator, every set has the pen, the pending set then the tick and the cross, every other set the eye, open on a set shown, shut on a hidden one');
+    || ((row) => controls === `pick-documents:Documents of ${row?.name},pick-edit:Edit ${row?.name},${row?.hidden ? `pick-show:Show ${row.name}` : `pick-hide:Hide ${row?.name}`}`)(manifestRows.find((row) => row.id === set))),
+  'to a moderator, every set has the book and the pen, the pending set then the tick and the cross, every other set the eye, open on a set shown, shut on a hidden one');
+// The moderator's switch, at the page's top right corner, to a moderator alone: off, the
+// page is a player's, neither a hidden set nor a pending one listed, and every published
+// set the book alone; it stays off across a reload, and turned on again, the page is the
+// moderator's.
+const moderationSwitch = () => evaluate(`(b=>b&&{ checked: b.getAttribute('aria-checked'), text: b.textContent,
+  corner: (r=>Math.round(document.documentElement.clientWidth-r.right)+','+Math.round(r.top))(b.getBoundingClientRect()) })(document.querySelector('.welcome-moderation'))`);
+const switchedOn = await moderationSwitch();
+await clickOn('.welcome-moderation');
+await wait(1000);
+const switchedOff = { switch: await moderationSwitch(), controls: await controlsOf() };
+await asPlayer(MODERATOR);
+const offReloaded = { switch: await moderationSwitch(), controls: await controlsOf() };
+await clickOn('.welcome-moderation');
+await wait(1000);
+const switchedBack = { switch: await moderationSwitch(), controls: await controlsOf() };
+console.log("  the moderator's switch:", JSON.stringify({ switchedOn, off: switchedOff.switch, reloaded: offReloaded.switch, back: switchedBack.switch }));
+const asAPlayer = Object.keys(moderating).filter((set) => set !== MINE && !manifestRows.find((row) => row.id === set)?.hidden);
+const playerControls = (controls) => Object.keys(controls).join() === asAPlayer.join() && Object.entries(controls).every(([set, controls]) => set.startsWith('local:')
+  || controls === `pick-documents:Documents of ${manifestRows.find((row) => row.id === set)?.name}`);
+check(switchedOn?.checked === 'true' && switchedOn.text === 'Moderator on' && switchedOn.corner === '12,12'
+  && switchedOff.switch?.checked === 'false' && switchedOff.switch.text === 'Moderator off' && playerControls(switchedOff.controls)
+  && offReloaded.switch?.checked === 'false' && playerControls(offReloaded.controls)
+  && switchedBack.switch?.checked === 'true' && JSON.stringify(switchedBack.controls) === JSON.stringify(moderating),
+  "the moderator's switch, at the top right corner, on: off, the page is a player's, no hidden nor pending set, the book alone, kept across a reload; on again, the moderator's");
 await clickOn(`.pick[data-set="${MINE}"]`);
 await onMine('pick-approve');
 await wait(2000);
@@ -739,9 +837,10 @@ await onMine('pick-show');
 await wait(2000);
 const shown = await mineOf();
 console.log('  moderated:', JSON.stringify({ approved, hidden, shown }));
-check(approved.colour === 'rgb(252, 252, 252)' && approved.controls === 'pick-edit:Edit My Edited Dungeon,pick-hide:Hide My Edited Dungeon' && approved.selected === 'true'
-  && hidden.colour === 'rgb(216, 0, 216)' && hidden.controls === 'pick-edit:Edit My Edited Dungeon,pick-show:Show My Edited Dungeon' && hidden.selected === 'true'
-  && shown.colour === 'rgb(252, 252, 252)' && shown.controls === 'pick-edit:Edit My Edited Dungeon,pick-hide:Hide My Edited Dungeon' && shown.selected === 'true',
+const BOOK_OF_MINE = 'pick-documents:Documents of My Edited Dungeon';
+check(approved.colour === 'rgb(252, 252, 252)' && approved.controls === `${BOOK_OF_MINE},pick-edit:Edit My Edited Dungeon,pick-hide:Hide My Edited Dungeon` && approved.selected === 'true'
+  && hidden.colour === 'rgb(216, 0, 216)' && hidden.controls === `${BOOK_OF_MINE},pick-edit:Edit My Edited Dungeon,pick-show:Show My Edited Dungeon` && hidden.selected === 'true'
+  && shown.colour === 'rgb(252, 252, 252)' && shown.controls === `${BOOK_OF_MINE},pick-edit:Edit My Edited Dungeon,pick-hide:Hide My Edited Dungeon` && shown.selected === 'true',
   'the tick approves the set, the shut eye hides it and the open eye shows it, the page asking for the sets anew, the set kept selected');
 onPaused = ({ requestId }) => send('Fetch.fulfillRequest', { requestId, responseCode: 409,
   responseHeaders: [{ name: 'Content-Type', value: 'application/json; charset=utf-8' }],
@@ -767,8 +866,9 @@ const siteForm = { ...(await form()), publish: await publishState(), note: await
 console.log('  the pen, to a moderator:', JSON.stringify(siteForm));
 check(siteForm.open === true && siteForm.title === 'Edit the published dungeon' && siteForm.name === 'My Edited Dungeon' && siteForm.id === MINE
   && siteForm.fixedId && siteForm.prefix === true && !siteForm.deletable && siteForm.publish === 'hidden' && siteForm.removable === 'graphics.dat,thumbnail'
-  && !siteForm.rows.includes('x') && siteForm.rows.includes('dungeon.dat+') && siteForm.thumbnail === 'thumbnail.png' && !siteForm.confirm && siteForm.note === '',
-  'the pen opens the form on the published set, its files the folder\'s, its id fixed, no PUBLISH nor DELETE, CONFIRM held until a change');
+  && !siteForm.rows.includes('x') && siteForm.rows.includes('dungeon.dat+') && siteForm.thumbnail === 'thumbnail.png' && !siteForm.confirm && siteForm.note === ''
+  && siteForm.official === 'off',
+  'the pen opens the form on the published set, its files the folder\'s, its id fixed, no PUBLISH nor DELETE, CONFIRM held until a change, the official game\'s checkbox offered, off');
 await typeIn('description', 'Edited by a moderator.');
 await wait(1500);
 const describedConfirm = (await form())?.confirm;
@@ -787,14 +887,68 @@ check(describedConfirm === true && newDungeonNote.startsWith('Saved games keep t
 check(afterSiteEdit.form === null && siteEdited?.dir === `${MINE}@2` && siteEdited.description === 'Edited by a moderator.'
   && afterSiteEdit.picture === `gamefiles/${MINE}@2/${MINE}-thumbnail.png` && afterSiteEdit.page.pictures.every(Boolean) && afterSiteEdit.mine.selected === 'true',
   'CONFIRM edits the set on the site: the form closes, its text changed, its files in a new folder, whose thumbnail the page shows, the set still selected');
+// The book, to a moderator (`server/documents.ts`): under its title the set's description,
+// then the set's archive, which is made
+// in the page and downloaded as `<name>.zip` (`src/data/DataSetArchive.ts`); the set has no
+// document yet, which its dialog says, with ADD. A text chosen is added, a link that opens in a new tab, served from
+// the set's new folder; a name that is not a document's is refused in the dialog, nothing
+// sent; a .doc is a link that downloads. The text's cross asks first, then removes it.
+// CLOSE shows the page anew, the book on the set. Its owner, below, has the book, which
+// offers neither ADD nor a cross.
+const documentsDialog = () => evaluate(`(d=>d&&{ open: d.open, title: d.querySelector('h2').textContent, description: d.querySelector('.documents-description').textContent,
+  items: [...d.querySelectorAll('.documents-list li')].map(li=>{const a=li.querySelector('a'), pack=li.querySelector('.documents-pack');
+    return pack ? pack.textContent+'|'+li.querySelector('.documents-size').textContent : a ? [a.textContent, a.getAttribute('href'), a.target || (a.hasAttribute('download') ? 'download' : ''), li.querySelector('.documents-size').textContent,
+      li.querySelector('.documents-remove')?.getAttribute('aria-label') ?? ''].join('|') : li.textContent;}),
+  add: !!d.querySelector('#documents-add'), status: d.querySelector('.documents-status').textContent })(document.querySelector('dialog.documents'))`);
+const chooseDocument = (name, text) => evaluate(`(()=>{const input=document.querySelector('#documents-file'), t=new DataTransfer();
+  t.items.add(new File([${JSON.stringify(text)}], ${JSON.stringify(name)})); input.files=t.files; input.dispatchEvent(new Event('change')); return 1;})()`);
+await onMine('pick-documents');
+const noDocument = await documentsDialog();
+const downloadsBefore = downloads.length;
+await clickOn('dialog.documents .documents-pack');
+await wait(2500);
+const packed = { downloaded: downloads.slice(downloadsBefore), status: (await documentsDialog())?.status };
+await chooseDocument('Notes.txt', 'Read me first.');
+await wait(2500);
+const oneDocument = await documentsDialog();
+const servedDocument = await evaluate(`fetch(document.querySelector('dialog.documents .documents-list a').getAttribute('href')).then(r=>r.text())`);
+await chooseDocument('page.html', '<p>no</p>');
+await wait(500);
+const refusedDocument = await documentsDialog();
+await chooseDocument('Solution.doc', 'The answer.');
+await wait(2500);
+const twoDocuments = await documentsDialog();
+await clickOn('dialog.documents .documents-remove[aria-label="Remove Notes.txt"]');
+const askedRemoval = await evaluate(`(d=>d&&{ title: d.querySelector('h2').textContent, button: d.querySelector('#remove-document-confirm').textContent })(document.querySelector('dialog.remove-document'))`);
+await evaluate(`document.querySelector('#remove-document-confirm').click()`);
+await wait(2500);
+const afterRemoval = await documentsDialog();
+await clickOn('#documents-close');
+await wait(2000);
+const afterDocuments = { dialog: await documentsDialog(), mine: await mineOf() };
+const ARCHIVE = 'My Edited Dungeon.zip|every file';
+console.log('  the book:', JSON.stringify({ noDocument, packed, oneDocument, refusedDocument: refusedDocument?.status, twoDocuments, askedRemoval, afterRemoval }));
+check(noDocument?.open === true && noDocument.title === 'My Edited Dungeon: documents' && noDocument.description === 'Edited by a moderator.' && noDocument.items.join() === `${ARCHIVE},No document yet.` && noDocument.add,
+  'to a moderator, the book opens the set\'s description, its archive, then its documents, none yet, with ADD');
+check(packed.downloaded.join() === 'My Edited Dungeon.zip' && packed.status === '', 'the archive, clicked, is made and downloaded as <name>.zip');
+check(oneDocument?.items.join() === `${ARCHIVE},Notes.txt|gamefiles/${MINE}@3/Notes.txt|_blank|14 B|Remove Notes.txt` && oneDocument.status === '' && servedDocument === 'Read me first.',
+  'a text chosen is added: a link that opens in a new tab, from the set\'s new folder, its size, and a cross');
+check(refusedDocument?.status.startsWith('page.html cannot be a document') && refusedDocument.items.length === 2, 'a file whose name is not a document\'s is refused in the dialog, nothing sent');
+check(twoDocuments?.items.join() === `${ARCHIVE},Notes.txt|gamefiles/${MINE}@4/Notes.txt|_blank|14 B|Remove Notes.txt,Solution.doc|gamefiles/${MINE}@4/Solution.doc|download|11 B|Remove Solution.doc`,
+  'a .doc is a link that downloads, the documents listed by name');
+check(askedRemoval?.title === 'Remove Notes.txt?' && askedRemoval.button === 'Remove'
+  && afterRemoval?.items.join() === `${ARCHIVE},Solution.doc|gamefiles/${MINE}@5/Solution.doc|download|11 B|Remove Solution.doc`, 'its cross asks first, then removes it');
+check(afterDocuments.dialog === null && afterDocuments.mine.selected === 'true' && afterDocuments.mine.controls.startsWith(BOOK_OF_MINE),
+  'CLOSE shows the page anew, the set still selected, the book on its tile');
 const SECOND = `${MINE}-b`;
 const secondPublished = await evaluate(`(async()=>{const f=new FormData(), file=async(path)=>(await fetch(path)).blob();
-  for (const [name, value] of [['id','${SECOND}'],['name','My Second Dungeon'],['description',''],['dmRules','true'],['thumbnailAsTitle','false'],['baseSet','dm-atari']]) f.append(name, value);
+  for (const [name, value] of [['id','${SECOND}'],['name','My Second Dungeon'],['description',''],['dmRules','true'],['thumbnailAsTitle','false'],['official','false'],['baseSet','dm-atari']]) f.append(name, value);
   f.append('dungeon.dat', await file('gamefiles/dm-atari/dungeon.dat'), 'dungeon.dat');
   f.append('thumbnail', await file('gamefiles/dm-atari/dm-atari-thumbnail.png'), 'thumbnail.png');
   return (await fetch('api/data-sets', { method: 'POST', headers: { 'X-Player-Id': ${JSON.stringify(owner)} }, body: f })).status;})()`);
 await asPlayer(owner);
 const ownerAgain = await controlsOf();
+const ownersSwitch = await moderationSwitch();
 const rejectDialog = () => evaluate(`(d=>d&&{ open: d.open, title: d.querySelector('h2').textContent, button: d.querySelector('#reject-set-confirm').textContent })(document.querySelector('dialog.reject-set'))`);
 await clickOn(`.pick-cell:has(.pick[data-set="${SECOND}"]) .pick-reject`);
 const askedWithdraw = await rejectDialog();
@@ -806,12 +960,80 @@ await clickOn(`.pick-cell:has(.pick[data-set="${SECOND}"]) .pick-reject`);
 await evaluate(`document.querySelector('#reject-set-confirm').click()`);
 await wait(2000);
 const withdrawn = { dialog: await rejectDialog(), tiles: setsOf(await welcome()) };
+await clickOn(`.pick-cell:has(.pick[data-set="${MINE}"]) .pick-documents`);
+const ownersDocuments = await documentsDialog();
+await clickOn('#documents-close');
 console.log('  withdrawn:', JSON.stringify({ published: secondPublished, controls: ownerAgain[SECOND], asked: askedWithdraw }));
-check(secondPublished === 201 && ownerAgain[SECOND] === 'pick-reject:Withdraw My Second Dungeon' && ownerAgain[MINE] === ''
+check(ownersSwitch === null, "to a player, no moderator's switch");
+check(secondPublished === 201 && ownerAgain[SECOND] === 'pick-documents:Documents of My Second Dungeon,pick-reject:Withdraw My Second Dungeon' && ownerAgain[MINE] === BOOK_OF_MINE
   && askedWithdraw?.open === true && askedWithdraw.title === 'Withdraw My Second Dungeon?' && askedWithdraw.button === 'Withdraw'
   && keptPending.dialog === null && keptPending.tiles.includes(SECOND)
   && withdrawn.dialog === null && !withdrawn.tiles.includes(SECOND) && withdrawn.tiles.includes(MINE),
-  'its owner withdraws a pending set by its cross, which asks first, CANCEL keeping it; the approved set offers them nothing');
+  'its owner withdraws a pending set by its cross, which asks first, CANCEL keeping it; the approved set offers them the book alone');
+check(ownersDocuments?.items.join() === `${ARCHIVE},Solution.doc|gamefiles/${MINE}@5/Solution.doc|download|11 B|` && !ownersDocuments.add,
+  'to a player, the book offers the archive and lists the documents, with no cross and no ADD');
+// The statistics page (`src/stats/statsPage.ts`), which the welcome page's footer links
+// to, at `/stats`, none of the game's code loaded: its band, its column of sets and the
+// selected set's figures, wins, levels and champions, each as `api/stats` answers them,
+// whatever the store holds (the dev server's fortnight, `tools/lib/statsFortnight.ts`, or
+// the image's empty one). With no `?set=`, the column's first is selected; a click selects
+// another, in the URL, the page's other parameters kept, and back selects the first again.
+const statsLink = await evaluate(`[...document.querySelectorAll('.welcome-footer nav a')].find(a=>a.textContent==='Stats')?.getAttribute('href')`);
+await send('Page.navigate', { url: `${APP}stats?keepsaves&keepsettings` });
+await wait(2500);
+const statsPage = () => evaluate(`(async()=>{const q=(s,r=document)=>[...r.querySelectorAll(s)];const text=(e)=>e?.textContent;
+  const panel=document.querySelector('.stats-set');
+  for(let i=0;i<50&&!panel.querySelector('h2');i++) await new Promise(r=>setTimeout(r,100));
+  const summary=await (await fetch('api/stats')).json();
+  const id=q('.stats-pick[aria-current="true"]').map(p=>p.dataset.set).join();
+  const set=id?await (await fetch('api/stats/'+encodeURIComponent(id))).json():null;
+  const hours=(ms)=>{const h=ms/3600000;return h<10?h.toFixed(1):Math.round(h).toLocaleString('en-US');};
+  const sections=Object.fromEntries(q('.stats-section',panel).map(s=>[text(s.querySelector('h3')),s]));
+  const wins=q('tbody tr',sections['Fastest wins']);
+  return { search: location.search,
+    band: q('.stats-band dd').map(text).join('|'),
+    expectedBand: [summary.players, hours(summary.playTime), summary.started, summary.won].map(String).join('|'),
+    weeks: q('.stats-band .stats-week').length,
+    picks: q('.stats-pick').map(p=>p.dataset.set).join(), expectedPicks: summary.sets.map(s=>s.id).join(),
+    selected: id, name: text(panel.querySelector('h2')),
+    figures: q('.stats-figures dd',panel).map(text).join('|'),
+    expectedFigures: set&&[hours(set.playTime), set.started, set.won, set.died, set.players].map(String).join('|'),
+    expectedName: set?.name, sets: summary.sets.length,
+    wins: wins.length, solos: q('.stats-solo',panel).length, reincarnated: q('.stats-reincarnated',panel).length,
+    expectedWins: set?.fastest.length, expectedSolos: set?.fastest.filter(w=>w.champions.length===1).length,
+    expectedReincarnated: set?.fastest.flatMap(w=>w.champions).filter(c=>c.reincarnated).length,
+    levels: q('.stats-levels .stats-row',panel).map(r=>text(r.querySelector('.stats-row-label'))+'='+text(r.querySelector('.stats-row-value'))).join(),
+    expectedLevels: set&&(set.levels.length===0?'':Array.from({length:Math.max(...set.levels.map(l=>l.level))+1},(_,l)=>'Level '+(l+1)+'='+(set.levels.find(r=>r.level===l)?.count??0)).join()),
+    champions: q('.stats-champions .stats-row:not(.stats-row-head) .stats-row-label',panel).map(text).join(),
+    expectedChampions: set?.champions.map(c=>c.name).join(),
+    gameCode: performance.getEntriesByType('resource').map(e=>e.name).filter(n=>/\\/main(-[\\w-]+)?\\.(ts|js)(\\?|$)|\\.dat$/i.test(n)) };})()`);
+const statsFirst = await statsPage();
+console.log('state: statistics page');
+console.log('  ', JSON.stringify(statsFirst));
+const statsMatch = (page) => page.band === page.expectedBand && page.picks === page.expectedPicks && page.name === page.expectedName
+  && page.figures === page.expectedFigures && page.wins === page.expectedWins && page.solos === page.expectedSolos
+  && page.reincarnated === page.expectedReincarnated && page.levels === page.expectedLevels && page.champions === page.expectedChampions;
+check(statsLink === 'stats' && statsFirst.gameCode.length === 0 && statsFirst.weeks > 0,
+  'the welcome page\'s footer links to the statistics page, which loads none of the game\'s code, and charts the weeks');
+check(statsFirst.sets > 1 && statsFirst.selected === statsFirst.expectedPicks.split(',')[0] && statsMatch(statsFirst),
+  'with no ?set=, the column\'s first is selected, and the band, the column and its figures, wins, levels and champions are api/stats\'s');
+const secondSet = statsFirst.expectedPicks.split(',')[1];
+await clickOn(`.stats-pick[data-set="${secondSet}"]`);
+await wait(700);
+const statsSecond = await statsPage();
+console.log('  ', JSON.stringify(statsSecond));
+check(statsSecond.selected === secondSet && new URLSearchParams(statsSecond.search).get('set') === secondSet
+  && statsSecond.search.includes('keepsaves') && statsMatch(statsSecond),
+  'a click selects a set, in the URL, the other parameters kept, and the page is its own');
+await evaluate(`history.back(),1`);
+await wait(700);
+const statsBack = await statsPage();
+check(statsBack.selected === statsFirst.selected && statsMatch(statsBack), 'back selects the first again');
+await send('Page.navigate', { url: `${APP}stats?set=dm-atari&keepsaves&keepsettings` });
+await wait(2500);
+const statsDm = await statsPage();
+console.log('  ', JSON.stringify(statsDm));
+check(statsDm.selected === 'dm-atari' && statsMatch(statsDm), '?set=dm-atari selects it');
 // A tile's name says its set's state, to a moderator (`server/dataSets.ts`), whose answer
 // the dev server's manifest stands in for here, with `"moderator": true`, kids-dungeon
 // pending and 3d2d1d, a hidden set, pending too: every set is listed, the hidden ones
@@ -874,9 +1096,12 @@ check(onHeading !== chooserUp && onHeading !== entrance && (await canvasPixels()
 // EXPORT (x 170..220, y 161..174) on that save: the page's own download
 // (`downloadSaveFile`, `src/data/saves/downloadSaveFile.ts`), which no Node tool can run.
 // What the file holds is `tools/dump-save-menu.ts`'s to show.
+// The welcome page's archive was downloaded before it.
+const exportedFrom = downloads.length;
 await canvasClick(195, 168, 0); await wait(1000);
-console.log('  downloads:', downloads.join(', ') || 'none');
-check(downloads.length === 1 && /^csbweb-\d{8}-\d{6}\.dat$/.test(downloads[0]),
+const exported = downloads.slice(exportedFrom);
+console.log('  downloads:', exported.join(', ') || 'none');
+check(exported.length === 1 && /^csbweb-\d{8}-\d{6}\.dat$/.test(exported[0]),
   'EXPORT in the chooser starts one download, a .dat under the save\'s name');
 // A file dropped on the page while the chooser is up: the page's own listener
 // (`bindSaveDrop`, `src/ui/saveDrop.ts`), which no Node tool can run either. The file is
@@ -1428,6 +1653,8 @@ check(await crtEffect() === 'on', 'the effect is on at the entrance');
 check(await canvasPixels() === entrance, 'the entrance is frame 07');
 await realClick(270, 192); await wait(1500);
 check(await canvasPixels() === credits, 'a real click on the scroll brings up frame 08, the credits');
+
+check(!logs.some((line) => line.startsWith('error: CSP: ')), 'nothing the content security policy refuses');
 
 console.log('--- console errors ---');
 console.log(logs.length ? logs.join('\n') : '(none)');
