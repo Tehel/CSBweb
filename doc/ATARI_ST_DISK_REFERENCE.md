@@ -290,9 +290,10 @@ numbered from 0, as the files do: map 5 is the game's level 6.
 - **`0x22e` byte 3201**, `Byte4100[55]`, Crack Switch (In)'s coordinate set: 0 (eye level)
   becomes 2, low on the wall, where Crack Switch (Out) is.
 - **Graphic 396** (64x7), the floor picture of graphic class 35 (`s5604[35]`, whose
-  `objectGraphicIndex` is 36, drawn as graphic `360 + 36`), which Fury and, until 1.1,
-  the Staff of Manar use: 261 pixels differ. 8 December's is a brown shaft with a dark
-  tip; 11 December gives its right end a grey blade.
+  `objectGraphicIndex` is 36, drawn as graphic `360 + 36`), which the Torch
+  (`ObjDesc[25]`, weapon 2) and, until 1.1, the Snake Staff use: the torch is redrawn,
+  261 pixels differ. 8 December's has a small dark tip; 11 December's a larger black
+  head.
 
 `dungeon.dat`:
 
@@ -334,10 +335,11 @@ numbered from 0, as the files do: map 5 is the game's level 6.
 - **`0x22c`**, the object names: `ANTIVEN POTION` becomes `UNVEN POTION`.
 - **`0x22f`**: `MonsterDescriptor[24]` (the dragon), the high byte of `word14`, `$26`
   becomes `$36`: `word14_12_15`, the distance a monster attacks from
-  (`doc/CSBwin-src/Monster.cpp:4190`), 2 becomes 3. `ObjDesc[62]` (the Staff of Manar,
-  CSB's `OBJNI_STAFF_OF_IRRA`), byte 2, `graphicClass`, 35 becomes 11: the staff on the
-  floor and in flight was drawn as Fury, and is drawn as the plain staff (graphic 372)
-  the Stick, the Teowand and the Yew Staff share.
+  (`doc/CSBwin-src/Monster.cpp:4190`), 2 becomes 3. `ObjDesc[62]` (`ObjDesc` is indexed
+  by `DescIndex`, weapons from 23: weapon 39, the Snake Staff, CSB's Cross of Neta), byte
+  2, `graphicClass`, 35 becomes 11: the staff on the floor was drawn as the
+  Torch, and is drawn as the plain staff (graphic 372) the Staff of Claws, the Sling, the
+  Staff, the Yew Staff and the Staff of Manar share.
 - **`0x230`**: `Byte20046`, the stamina an attack costs (`doc/CSBwin-src/Attack.cpp:1721`),
   CHOP 8 → 10, THRUST 13 → 17, BERZERK 26 → 40, MELEE 17 → 25;
   `experienceForAttacking[32]`, SHOOT, 9 → 20; `Spells[4].byte5`, the skill OH EW RA
@@ -401,7 +403,7 @@ the sections above list for `graphics.dat`, and in the four `important` bits:
 | --- | --- | --- | --- | --- |
 | 5 | The credits scroll | The text as drawn | Corrupted | (the copy) |
 | `0xe8` (232) | Crack Switch (In), front view | The button pushed into the crack | The crack empty | 1.0, 11 December |
-| `0x18c` (396) | Graphic class 35's floor picture (Fury) | A blade | A shaft | 1.0, 11 December |
+| `0x18c` (396) | Graphic class 35's floor picture (the Torch) | 11 December's | 8 December's | 1.0, 11 December |
 | `0x22e` | `Byte4100[55]` (raw byte 3201) | **2** | **0** | 1.0, 11 December |
 | `0x22c` | Object names | `BRO POTION`, `MA POTION` | `ANTIVEN POTION`, `MON POTION` | 1.1, 1.2 |
 | `0x22f` | `MonsterDescriptor[24]`, byte 14 | `$36` | `$26` | 1.1 |
