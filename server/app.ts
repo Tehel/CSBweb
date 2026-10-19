@@ -27,6 +27,7 @@
  *   /api/event        POST: a game's event, checked (`events.ts`) and stored (`stats.ts`)
  *   /api/stats        the store's aggregates, as JSON
  *
+ * A POST a browser says another site's page sent is refused with 403 (`isCrossSite`).
  * Every file answers a conditional GET with 304. A path with a `.` segment, a backslash or
  * a NUL, encoded or not, is refused before it reaches the disk, so no request leaves the
  * three folders. A folder is 404, never a listing.
@@ -208,6 +209,10 @@ function route({ distDir, gamefilesDir, filesDir }: ServerOptions, api: ApiOptio
     if (segments === null) return send(res, 400, 'Bad path');
 
     if (segments[0] === 'api') {
+        if (req.method === 'POST' && isCrossSite(req)) {
+            req.resume();
+            return send(res, 403, 'Cross-site request');
+        }
         if (segments.join('/') === DATA_SETS_ROUTE) {
             if (req.method === 'POST') return receivePublish(gamefilesDir, api, req, res);
             if (req.method !== 'GET' && req.method !== 'HEAD') return refuseMethod(res, 'GET, HEAD, POST');
@@ -255,6 +260,25 @@ function route({ distDir, gamefilesDir, filesDir }: ServerOptions, api: ApiOptio
     if (segments.length === 0) return serveFile(req, res, join(distDir, 'index.html'), NO_CACHE);
     if (segments[0] === SERVER_DIR) return send(res, 404, 'Not found');
     return serveFile(req, res, join(distDir, ...segments), segments[0] === 'assets' ? IMMUTABLE : NO_CACHE);
+}
+
+/**
+ * Whether a browser says another site's page sent `req`: its `Sec-Fetch-Site` is neither
+ * `same-origin` nor `none`, or its `Origin` is not the `Host` it asks (`null`, from a
+ * sandboxed or opaque page, included). The page's own `sendBeacon` is a simple request,
+ * which any page could make a visitor's browser send. A client that sends neither header,
+ * a tool, is heard: only a browser can be made to post on another site's behalf.
+ */
+function isCrossSite(req: IncomingMessage): boolean {
+    const site = req.headers['sec-fetch-site'];
+    if (site !== undefined && site !== 'same-origin' && site !== 'none') return true;
+    const origin = req.headers.origin;
+    if (origin === undefined) return false;
+    try {
+        return new URL(origin).host !== req.headers.host;
+    } catch {
+        return true;
+    }
 }
 
 /**

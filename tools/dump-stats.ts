@@ -9,8 +9,9 @@
  *     did not send under a known name is dropped;
  *   - every field that could carry free text or nonsense is refused: a player that is not
  *     a UUID, an unknown set or type, a build that is not a token, a number out of its
- *     range, a champion's name past 7 characters, a fifth champion, masteries that are
- *     not four;
+ *     range, a champion's name past 7 characters, blank, or with a character a name
+ *     cannot hold (lower case, a control, a NUL, a bidi override, markup), a fifth
+ *     champion, masteries that are not four;
  *   - the store: the schema made in a missing file, WAL mode, and the WAL checkpointed into
  *     the file on close, which holds the events when it is opened again;
  *   - the aggregates of a scripted fortnight, exactly: players, games started and won per
@@ -51,14 +52,17 @@ function accepted(body: string): CheckedEvent {
 function checkTheChecks(): void {
     console.log('What api/event accepts:');
     const party = accepted(event('party', P1, 'dm-atari', 7, {
-        champions: [ch('HALK', 3), ch('BOB', 7, { reincarnated: true, note: 'free text' }), ch('ROSE', null), ch('', 0x7fff)],
+        champions: [ch('HALK', 3), ch('BOB', 7, { reincarnated: true, note: 'free text' }), ch('ROSE', null), ch("D'AR.-2", 0x7fff)],
         note: 'free text',
     }, { note: 'free text' }));
     console.log(`  party: ${JSON.stringify(party)}`);
     check(JSON.stringify(party) === JSON.stringify({
         type: 'party', player: P1, set: 'dm-atari', playthrough: 7, build: 'abc1234',
-        payload: { champions: [ch('HALK', 3), ch('BOB', 7, { reincarnated: true }), ch('ROSE', null), ch('', 0x7fff)] },
+        payload: { champions: [ch('HALK', 3), ch('BOB', 7, { reincarnated: true }), ch('ROSE', null), ch("D'AR.-2", 0x7fff)] },
     }), 'party: rebuilt, unknown fields dropped, every name and id as sent');
+    const typed = accepted(event('party', P1, 'csb', 1, { champions: [ch('A B.,;:'), ch('!?/'), ch('ÀÖØÝ')] }));
+    check(JSON.stringify(typed.payload) === JSON.stringify({ champions: [ch('A B.,;:'), ch('!?/'), ch('ÀÖØÝ')] }),
+        'names of the Reincarnate screen\'s punctuation, and of the rest a name may hold');
 
     const won = accepted(event('won', P1, 'dm-atari', 7, { gameTime: 123456, playTime: 7890000, champions: [ch('SYRA', 2, { masteries: [1, 2, 3, 15] })] }));
     console.log(`  won  : ${JSON.stringify(won.payload)}`);
@@ -92,6 +96,16 @@ function checkTheChecks(): void {
         [event('party', P1, 'csb', 1, { champions: [{ name: 7, id: 0 }] }), 'bad name'],
         [event('party', P1, 'csb', 1, { champions: [{ name: null, id: 0 }] }), 'bad name'],
         [event('party', P1, 'csb', 1, { champions: [ch('ABCDEFGH')] }), 'bad name'],
+        [event('party', P1, 'csb', 1, { champions: [ch('')] }), 'bad name'],
+        [event('party', P1, 'csb', 1, { champions: [ch('   ')] }), 'bad name'],
+        [event('party', P1, 'csb', 1, { champions: [ch('Halk')] }), 'bad name'],
+        [event('party', P1, 'csb', 1, { champions: [ch('HA\nLK')] }), 'bad name'],
+        [event('party', P1, 'csb', 1, { champions: [ch('HA\0LK')] }), 'bad name'],
+        [event('party', P1, 'csb', 1, { champions: [ch('\u202eKLAH')] }), 'bad name'],
+        [event('party', P1, 'csb', 1, { champions: [ch('<B>')] }), 'bad name'],
+        [event('party', P1, 'csb', 1, { champions: [ch('A&B')] }), 'bad name'],
+        [event('party', P1, 'csb', 1, { champions: [ch('"A"')] }), 'bad name'],
+        [event('party', P1, 'csb', 1, { champions: [ch('×')] }), 'bad name'],
         [event('party', P1, 'csb', 1, { champions: [{ name: 'HALK' }] }), 'bad id'],
         [event('party', P1, 'csb', 1, { champions: [ch('HALK', -1)] }), 'bad id'],
         [event('party', P1, 'csb', 1, { champions: [ch('HALK', 0x8000)] }), 'bad id'],

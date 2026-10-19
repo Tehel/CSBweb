@@ -12,7 +12,7 @@ No player's name, no address and no browser fingerprint (user agent, screen, lan
 sent or stored. A random id, drawn in the browser, is used only for counting players.
 Champions go by the names they carry, which a player can type. The server's checks hold a
 modified page to the same rule: the only text it can store is a champion's name, of 7
-characters at most.
+characters at most, each one a name's.
 
 ## The page's events
 
@@ -77,15 +77,23 @@ takes every event the engine makes as the page sent it.
 
 `api/event` takes a POST only (`server/app.ts`, `receiveEvent`):
 
-1. **A rate limit** of 30 events a minute per address, counted in memory, comes first
+1. **Not from another site** (403): a POST whose `Sec-Fetch-Site` is neither `same-origin`
+   nor `none`, or whose `Origin` is not the host it asks, is refused before anything else
+   (`isCrossSite`), as on every POST route. `sendBeacon` sends a simple request, which any
+   page could otherwise make its visitors' browsers send, each one a rate limit's bucket.
+   A client that sends neither header, which no browser is, is heard.
+2. **A rate limit** of 30 events a minute per address, counted in memory, comes next
    (429). The address is nginx's `X-Real-IP`, trusted only because the container's port
    is on loopback, and it is never stored.
-2. **A body of at most 4 KB** (413 otherwise).
-3. **`server/events.ts` checks it field by field** and rebuilds it from what passed (400
+3. **A body of at most 4 KB** (413 otherwise).
+4. **`server/events.ts` checks it field by field** and rebuilds it from what passed (400
    otherwise): the player is a UUID, the build a token, the set one of the `data_sets`
    table's (`doc/DEPLOYMENT.md`), every number an integer in its range, at most four
    champions, a champion's id `null` or an `i16`, a won game's masteries four, and a
-   champion's name 7 characters at most (`CHARDESC.name[8]`, `doc/CSBwin-src/CSB.h:2545`).
+   champion's name 7 characters at most (`CHARDESC.name[8]`, `doc/CSBwin-src/CSB.h:2545`),
+   not blank, and made of A to Z, the space and the Reincarnate screen's `. , ; :`, or for
+   a save edited elsewhere the accented capitals À to Ý, the digits and `! ? ' - /`
+   (`NAME`): no control character, bidi override, NUL or markup reaches `api/stats`.
 
 An event stored answers 204.
 

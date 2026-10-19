@@ -28,7 +28,9 @@
  *   - `/api/health`, and a 405 for a method that is not GET or HEAD;
  *   - `/api/event`: POST only, an event stored (what is stored, `dump-stats` asserts), a bad
  *     one 400, a set added to the table while it runs known at once, a body over 4 KB 413 whether it says so or not, and the rate limit per
- *     forwarded address, 429; `/api/stats`: the store's aggregates, not cached;
+ *     forwarded address, 429; a POST a browser says another site's page sent, by its
+ *     `Sec-Fetch-Site` or its `Origin`, 403, there and on every other POST route, and one
+ *     from the page's own origin heard; `/api/stats`: the store's aggregates, not cached;
  *   - the API is handed the page's own `checkLocalDataSet`, which `tsc` holds to the
  *     shape `server/publish.ts` types it by (`CheckDataSet`);
  *   - `POST /api/data-sets` (`server/publish.ts`), over DM's and CSB's real files: a set
@@ -449,6 +451,26 @@ async function checkEvents(port: number, store: StatsStore): Promise<void> {
     const get = await ask(port, '/api/event');
     check(get.status === 405 && get.headers.allow === 'POST', 'GET on /api/event: 405, with Allow: POST');
     check(store.stats().players === 1, 'and none of those was stored');
+
+    const host = `127.0.0.1:${port}`;
+    const crossSite: Record<string, string>[] = [
+        { 'Sec-Fetch-Site': 'cross-site' },
+        { 'Sec-Fetch-Site': 'same-site' },
+        { Origin: 'https://elsewhere.example' },
+        { Origin: `http://127.0.0.1:${port + 1}` },
+        { Origin: 'null' },
+        { Origin: 'not a URL' },
+        { 'Sec-Fetch-Site': 'cross-site', Origin: `http://${host}` },
+    ];
+    const refused = await Promise.all(crossSite.map((headers) => post(event(30), headers)));
+    console.log(`  cross-site posts: ${refused.map((answer) => answer.status).join(' ')}`);
+    check(refused.every((answer) => answer.status === 403 && answer.body === 'Cross-site request'), 'a POST another site\'s page sent, by Sec-Fetch-Site or Origin: 403');
+    const routes = [DATA_SETS_ROUTE, `${DATA_SETS_ROUTE}/a`, `${DATA_SETS_ROUTE}/a/${DOCUMENTS_SEGMENT}`];
+    const elsewhere = await Promise.all(routes.map((route) => ask(port, `/${route}`, 'POST', { 'Sec-Fetch-Site': 'cross-site', [PLAYER_ID_HEADER]: MODERATORS[0] }, '{}')));
+    check(elsewhere.every((answer) => answer.status === 403), `and on ${routes.join(', ')}: ${elsewhere.map((answer) => answer.status).join(' ')}`);
+    check(store.stats().players === 1, 'none of them stored');
+    const own = await post(event(31), { 'Sec-Fetch-Site': 'same-origin', Origin: `http://${host}` });
+    check(own.status === 204, `a POST from the page's own origin: ${own.status}`);
 
     const answers: number[] = [];
     for (let i = 0; i <= EVENTS_PER_WINDOW; i++) answers.push((await post(event(10 + i), { 'X-Real-IP': '10.1.1.1' })).status);

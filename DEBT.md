@@ -117,7 +117,6 @@ In payoff order: the first row is the next item.
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
 | W2 | `api/stats` is computed whole at every request | S | ⏳ |
-| W3 | `api/event` takes another site's posts, and any name | S | ⏳ |
 | R6 | A damaged file's counts size allocations and loops | M | ⏳ |
 | R7 | An index from a custom data set can throw | S | ⏳ |
 | R8 | An optional feature's failure ends the game, or the session | S | ⏳ |
@@ -571,7 +570,8 @@ The deciphered data handed on by `loadSaveGameState`.
 open internet behind the VPS's nginx. Its weak point is availability: what an anonymous
 client can make it hold, compute or keep. What holds already: paths (`..`, `%2e%2e`,
 `%00`, dotfiles all refused), the body's size limit, events rebuilt from checked fields
-only, errors that leak nothing. Each item ships with its check in `tools/dump-server.ts`
+only, a champion's name of the game's characters, a POST from another site's page
+refused, errors that leak nothing. Each item ships with its check in `tools/dump-server.ts`
 or `tools/dump-stats.ts`.
 
 ### W2 ⏳ `api/stats` is computed whole at every request
@@ -585,21 +585,6 @@ of service.
 
 Paying it: the answer cached for a minute (or computed on a timer), the lists capped (the
 latest or best N wins a set, the top N champions), `api/stats` under a rate limit.
-
-### W3 ⏳ `api/event` takes another site's posts, and any name
-
-- **Cross-origin**: the page posts with `navigator.sendBeacon('api/event', …)`
-  (`src/ui/gameEvents.ts:187`), a `text/plain` simple request, and the server checks
-  neither `Origin` nor `Sec-Fetch-Site`. Any page can make each of its visitors' browsers
-  post invented events, each visitor a rate-limit bucket of their own.
-- **Names**: `checkChampions` asks only that a name be a string of at most `MAX_NAME`
-  characters (`server/events.ts:99`), so control characters, bidi overrides, NUL (which
-  `json_extract` cuts), markup and the empty name are stored, and published by
-  `api/stats`, which E39's public statistics will draw.
-
-Paying it: a `POST` whose `Origin` or `Sec-Fetch-Site` names another site is refused; a
-name is made of the characters the game's font has (A to Z, the accented letters, space,
-punctuation) and is not empty. `dump-stats` checks the refusals.
 
 ### W4 ⏳ The events table grows without bound
 

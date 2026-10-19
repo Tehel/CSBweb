@@ -470,7 +470,9 @@ comma-separated `<playerId>[=<alias>]`, spaces around a comma or the `=` ignored
 | `/api/stats` | the statistics' aggregates | `no-store` |
 
 Every file answers a conditional GET with 304, and only GET and HEAD are allowed, except on
-`api/event`, `api/data-sets`'s POST, `api/data-sets/<id>` and `api/data-sets/<id>/documents`, POST only. A path with a segment that starts with `.`, or holds a `/`, a `\` or a NUL once
+`api/event`, `api/data-sets`'s POST, `api/data-sets/<id>` and `api/data-sets/<id>/documents`, POST only. A POST a
+browser says another site's page sent, by its `Sec-Fetch-Site` or its `Origin`, is refused
+with 403 (`isCrossSite`, `doc/STATISTICS.md`). A path with a segment that starts with `.`, or holds a `/`, a `\` or a NUL once
 decoded, is refused with 400 before it reaches the disk. A folder is 404, never a listing.
 
 **At start-up** it opens the store (making it, and its folder, when missing), checks
