@@ -10,7 +10,7 @@
 /** The largest body `api/event` reads. */
 export const MAX_EVENT_BYTES = 4096;
 
-const EVENT_TYPES = ['started', 'party', 'won', 'lost'] as const;
+const EVENT_TYPES = ['started', 'session', 'party', 'won', 'lost'] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
 /** `crypto.randomUUID()`'s form, which `playerId` draws. */
@@ -88,6 +88,11 @@ export function checkEvent(body: string, rules: EventRules): CheckedEvent | stri
 
 function checkPayload(type: EventType, payload: Record<string, unknown>): CheckedEvent['payload'] | string {
     if (type === 'started') return {};
+    if (type === 'session') {
+        const { playTime } = payload;
+        if (!isInteger(playTime, 0, Number.MAX_SAFE_INTEGER)) return 'bad playTime';
+        return { playTime };
+    }
 
     const champions = checkChampions(payload.champions, type === 'won');
     if (typeof champions === 'string') return champions;

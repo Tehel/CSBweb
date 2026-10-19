@@ -28,8 +28,8 @@
  *   - `/api/health`, and a 405 for a method that is not GET or HEAD;
  *   - `SECURITY_HEADERS` on every answer: the page, an asset, a 304, a HEAD, the API, and
  *     every error, a 404, a 400, a 405 and a 403 included;
- *   - `/api/event`: POST only, an event stored (what is stored, `dump-stats` asserts), a bad
- *     one 400, a set added to the table while it runs known at once, a body over 4 KB 413 whether it says so or not, and the rate limit per
+ *   - `/api/event`: POST only, an event stored (what is stored, `dump-stats` asserts), a
+ *     session counted and no row of the log, a bad one 400, a set added to the table while it runs known at once, a body over 4 KB 413 whether it says so or not, and the rate limit per
  *     forwarded address, 429; a POST a browser says another site's page sent, by its
  *     `Sec-Fetch-Site` or its `Origin`, 403, there and on every other POST route, and one
  *     from the page's own origin heard; `/api/stats`, `/api/stats/<set>` and
@@ -454,7 +454,7 @@ const MODERATORS = ['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-4bbb-
 /** The scratch server's rate limit: events per address and window. */
 const EVENTS_PER_WINDOW = 5;
 
-async function checkEvents(port: number, store: StatsStore): Promise<void> {
+async function checkEvents(port: number, db: DatabaseSync, store: StatsStore): Promise<void> {
     console.log('\nThe statistics:');
     let address = 0;
     /** Each from its own address, so that only the rate limit's own check meets it. */
@@ -467,6 +467,12 @@ async function checkEvents(port: number, store: StatsStore): Promise<void> {
     const started = () => store.summary([A]).started;
     const stored = await post(event(1));
     check(stored.status === 204 && stored.body === '', 'an event: 204, no body');
+    const logged = () => (db.prepare('SELECT COUNT(*) AS n FROM events').get() as { n: number }).n;
+    const before = logged();
+    const session = await post(JSON.stringify({ type: 'session', player: PLAYER, set: 'a', playthrough: 1, build: 'test', payload: { playTime: 60_000 } }));
+    const counted = store.setStats(A);
+    check(session.status === 204 && counted.sessions === 1 && counted.playTime === 60_000 && logged() === before,
+        "a session: 204, counted with its game's play time, and no row of the log");
     const stats = await ask(port, '/api/stats');
     console.log(`  /api/stats: ${stats.body.replace(/"week":"[^"]+"/g, '"week":<this week>')}`);
     check(stats.status === 200 && String(stats.headers['content-type']).startsWith('application/json') && stats.headers['cache-control'] === 'public, max-age=30',
@@ -1322,7 +1328,7 @@ async function main(): Promise<void> {
         await new Promise<void>((done) => server!.listen(0, '127.0.0.1', done));
         const port = (server.address() as AddressInfo).port;
         await checkAnswers(port, manifest, options.gamefilesDir);
-        await checkEvents(port, store);
+        await checkEvents(port, db, store);
         await checkTableRead(port, db, manifest);
         await checkPublish(scratch);
         await checkModeration(scratch);

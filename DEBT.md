@@ -1167,31 +1167,9 @@ the author before any code. What they are to hold:
 
 ### E40 ⏳ The statistics page
 
-Designed with the author; nothing of it is built. The server's answers are
-(`doc/STATISTICS.md` → "`api/stats`"); nothing in the page reads them yet.
-
-**What ranks the sets: hours played.** `started` counts the players who try a set, once a
-game, where a game lasts hours over many sessions. A set's popularity is the time played in
-it, so the page reports it, without the server learning when anyone plays:
-
-- **A `session` event**, sent each time a game is entered: a new game, the welcome page's
-  CONTINUE, a save read at the entrance (`GameEvents`, `src/ui/gameEvents.ts`). Once a page
-  and playthrough, so that loads within a page do not inflate it. Its payload is the play
-  time the game enters with (`Game.playTime`, ms): 0 for a new game, a save's own
-  (`SaveEntry.playTime`). `started` stays as it is. `server/events.ts` checks it as the
-  others: an integer in its range.
-- **Never a row of `events`**: no player and no time is kept of it, which would be the
-  player's habits (and W5's linking). The server keeps two aggregates of it alone:
-  sessions per set and week, a counter; and each game's play time, the largest reported
-  (`games.play_time` beside the won one's, a column of its own), whose sum is the set's
-  hours played. Hours lag a session (a session reports what came before it), and the
-  `won` and `lost` events' play time counts too.
-- **The answers**: `api/stats` gives each set's hours and sessions and the sessions per
-  week, all sets together, and orders the sets by hours played, decreasing; `api/stats/<id>`
-  its hours and its sessions per week. `tools/dump-stats.ts` and `tools/dump-server.ts`
-  assert it, and that no `session` reaches the `events` table; `tools/dump-game-events.ts`
-  that the engine's three ways in each send one, and a load in the same page none.
-  `doc/STATISTICS.md` says what it is and what is not kept, which E39's FAQ repeats.
+Designed with the author; the page is not built. The server answers all it shows
+(`doc/STATISTICS.md` → "`api/stats`"), the time played that ranks the sets included, as
+`playTime` in ms (the `session` event); nothing in the page reads it yet.
 
 **Where**: a second Vite entry, `stats.html` with `src/stats/statsPage.ts`, at `/stats`, so
 that none of the game's bundle loads; `server/app.ts` serves it, and the welcome page's
@@ -1217,8 +1195,7 @@ or CSS bars, no library (the content security policy, `server/app.ts`).
   (`DungeonLoader`, rooms in `MapDialog.ts`'s `ROOM_COLORS` as CSS), each square shaded by
   its deaths (`api/stats/<id>/<level>`), the count on hover.
 
-Paying it: three commits. The `session` event and its aggregates, first; then the page
-without the heat map; then the heat map. The page's are each checked in
+Paying it: two commits, the page without the heat map, then the heat map. The page's are each checked in
 `tools/probe-frames.mjs`'s welcome section (the page loads, a click selects a set, a level
 opens its map) and by a screenshot over a store seeded with `dump-stats`' fortnight. E39's
 ABOUT then links to it.

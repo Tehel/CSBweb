@@ -3,11 +3,14 @@
  * aggregates `api/stats` answers. No address and nothing the server has not checked is
  * stored (`events.ts`).
  *
- * The aggregates are kept as the events arrive, in three tables beside the log, so that an
+ * The aggregates are kept as the events arrive, in four tables beside the log, so that an
  * answer is a few indexed queries rather than a pass over every event: `games`, a row per
- * game (a set's playthrough), `deaths`, the lost games per square, and `picks`, the names
- * of each game's champions. A store without them is given them, filled once from its
- * `events`. The answers are cached (`AnswerCache`).
+ * game (a set's playthrough), `deaths`, the lost games per square, `picks`, the names
+ * of each game's champions, and `sessions`, the sessions per set and week. A store without
+ * them is given them, filled once from its `events`. The answers are cached (`AnswerCache`).
+ *
+ * A `session` is never a row of `events`: no player and no time is kept of it, which
+ * would be the player's habits. It counts in `sessions`, and raises its game's `played`.
  */
 import type { DatabaseSync, StatementSync } from 'node:sqlite';
 
@@ -56,6 +59,17 @@ CREATE TABLE picks (
 ) WITHOUT ROWID;
 `;
 
+/** What a store made before the sessions is given: `games.played`, and `sessions`. */
+const SESSIONS_SCHEMA = `
+ALTER TABLE games ADD COLUMN played INTEGER;  -- the largest play time reported, in ms
+CREATE TABLE sessions (
+    data_set TEXT    NOT NULL,
+    week     TEXT    NOT NULL,  -- its Monday, YYYY-MM-DD, UTC
+    count    INTEGER NOT NULL,
+    PRIMARY KEY (data_set, week)
+) WITHOUT ROWID;
+`;
+
 /** The Monday that starts the week of `time`, a column, as `YYYY-MM-DD`, UTC. */
 const week = (time: string) => `date(${time} / 1000, 'unixepoch', 'weekday 0', '-6 days')`;
 
@@ -93,12 +107,15 @@ export interface StatsSet {
 export interface StatsSummary {
     /** Distinct players of the sets' games, ever. */
     players: number;
+    /** The time played, in ms: the sum of each game's largest play time reported (`games.played`). */
+    playTime: number;
+    sessions: number;
     started: number;
     won: number;
-    /** Games started per week (from Monday, UTC), all sets together, the weeks with one. */
-    weeks: { week: string; started: number }[];
-    /** Each set, by games started, decreasing, then by name. */
-    sets: (StatsSet & { started: number; won: number; deaths: number })[];
+    /** Sessions and games started per week (from Monday, UTC), all sets together, the weeks with one. */
+    weeks: { week: string; sessions: number; started: number }[];
+    /** Each set, by play time, decreasing, then by games started, decreasing, then by name. */
+    sets: (StatsSet & { playTime: number; sessions: number; started: number; won: number; deaths: number })[];
 }
 
 /** A won game as a set's answer lists it. */
@@ -121,6 +138,9 @@ export interface LevelStats extends StatsSet {
 /** `api/stats/<set>`: one set's aggregates. Never an event, a player or a playthrough. */
 export interface SetStats extends StatsSet {
     players: number;
+    /** The time played, in ms, as the summary's. */
+    playTime: number;
+    sessions: number;
     started: number;
     won: number;
     /** The games a champion was ever in a party of. */
@@ -136,8 +156,8 @@ export interface SetStats extends StatsSet {
     levels: { level: number; count: number }[];
     /** The games a champion of each name was in a party of, and won, the most first. */
     champions: { name: string; games: number; won: number }[];
-    /** Games started and won per week, the weeks with one. */
-    weeks: { week: string; started: number; won: number }[];
+    /** Sessions, games started and games won per week, the weeks with one. */
+    weeks: { week: string; sessions: number; started: number; won: number }[];
 }
 
 export class StatsStore {
@@ -148,12 +168,21 @@ export class StatsStore {
     private readonly win: StatementSync;
     private readonly die: StatementSync;
     private readonly pick: StatementSync;
+    private readonly play: StatementSync;
+    private readonly session: StatementSync;
 
     constructor(db: DatabaseSync) {
         this.db = db;
         this.db.exec(EVENTS_SCHEMA);
         const kept = this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'games'").get() !== undefined;
+        const played = kept && this.db.prepare("SELECT 1 FROM pragma_table_info('games') WHERE name = 'played'").get() !== undefined;
         if (!kept) this.db.exec(AGGREGATES_SCHEMA);
+        if (!played) {
+            this.transaction(() => {
+                this.db.exec(SESSIONS_SCHEMA);
+                if (kept) this.fillPlayed();
+            });
+        }
         this.insert = this.db.prepare(
             'INSERT INTO events (time, player, type, data_set, playthrough, build, payload) VALUES (?, ?, ?, ?, ?, ?, ?)');
         this.addGame = this.db.prepare('INSERT INTO games (data_set, playthrough, player) VALUES (?, ?, ?) ON CONFLICT DO NOTHING');
@@ -163,12 +192,18 @@ export class StatsStore {
         this.die = this.db.prepare(
             'INSERT INTO deaths (data_set, level, x, y, count) VALUES (?, ?, ?, ?, 1) ON CONFLICT DO UPDATE SET count = count + 1');
         this.pick = this.db.prepare('INSERT INTO picks (data_set, playthrough, name) VALUES (?, ?, ?) ON CONFLICT DO NOTHING');
+        this.play = this.db.prepare('UPDATE games SET played = MAX(IFNULL(played, ?1), ?1) WHERE data_set = ?2 AND playthrough = ?3');
+        this.session = this.db.prepare(`
+            INSERT INTO sessions (data_set, week, count) VALUES (?1, ${week('?2')}, 1) ON CONFLICT DO UPDATE SET count = count + 1`);
         if (!kept) this.fillAggregates();
     }
 
+    /** `event`, kept: in the log and its aggregates, or a `session` in its aggregates alone. */
     record(event: CheckedEvent, time: number): void {
         this.transaction(() => {
-            this.insert.run(time, event.player, event.type, event.set, event.playthrough, event.build, JSON.stringify(event.payload));
+            if (event.type !== 'session') {
+                this.insert.run(time, event.player, event.type, event.set, event.playthrough, event.build, JSON.stringify(event.payload));
+            }
             this.keep(event, time);
         });
     }
@@ -177,29 +212,36 @@ export class StatsStore {
     summary(sets: readonly StatsSet[]): StatsSummary {
         const ids = JSON.stringify(sets.map((set) => set.id));
         const of = 'data_set IN (SELECT value FROM json_each(?))';
-        const totals = this.db.prepare(`
-            SELECT COUNT(DISTINCT player) AS players, COUNT(started) AS started, COUNT(won) AS won FROM games WHERE ${of}`)
-            .get(ids) as { players: number; started: number; won: number };
+        const { players } = this.db.prepare(`SELECT COUNT(DISTINCT player) AS players FROM games WHERE ${of}`).get(ids) as { players: number };
         const weeks = this.db.prepare(`
-            SELECT ${week('started')} AS week, COUNT(*) AS started FROM games
-            WHERE ${of} AND started IS NOT NULL GROUP BY 1 ORDER BY 1`).all(ids) as StatsSummary['weeks'];
+            SELECT week, SUM(sessions) AS sessions, SUM(started) AS started FROM (
+                SELECT week, count AS sessions, 0 AS started FROM sessions WHERE ${of}
+                UNION ALL
+                SELECT ${week('started')}, 0, 1 FROM games WHERE ${of} AND started IS NOT NULL)
+            GROUP BY 1 ORDER BY 1`).all(ids, ids) as StatsSummary['weeks'];
         const games = new Map((this.db.prepare(`
-            SELECT data_set AS id, COUNT(started) AS started, COUNT(won) AS won FROM games WHERE ${of} GROUP BY 1`)
-            .all(ids) as { id: string; started: number; won: number }[]).map((row) => [row.id, row]));
+            SELECT data_set AS id, IFNULL(SUM(played), 0) AS playTime, COUNT(started) AS started, COUNT(won) AS won FROM games
+            WHERE ${of} GROUP BY 1`).all(ids) as { id: string; playTime: number; started: number; won: number }[]).map((row) => [row.id, row]));
+        const sessions = new Map((this.db.prepare(`SELECT data_set AS id, SUM(count) AS sessions FROM sessions WHERE ${of} GROUP BY 1`)
+            .all(ids) as { id: string; sessions: number }[]).map((row) => [row.id, row.sessions]));
         const deaths = new Map((this.db.prepare(`SELECT data_set AS id, SUM(count) AS deaths FROM deaths WHERE ${of} GROUP BY 1`)
             .all(ids) as { id: string; deaths: number }[]).map((row) => [row.id, row.deaths]));
         const rows = sets.map(({ id, name }) => ({
-            id, name, started: games.get(id)?.started ?? 0, won: games.get(id)?.won ?? 0, deaths: deaths.get(id) ?? 0,
+            id, name, playTime: games.get(id)?.playTime ?? 0, sessions: sessions.get(id) ?? 0,
+            started: games.get(id)?.started ?? 0, won: games.get(id)?.won ?? 0, deaths: deaths.get(id) ?? 0,
         }));
-        rows.sort((a, b) => b.started - a.started || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
-        return { players: totals.players, started: totals.started, won: totals.won, weeks, sets: rows };
+        rows.sort((a, b) => b.playTime - a.playTime || b.started - a.started || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+        const sum = (key: 'playTime' | 'sessions' | 'started' | 'won') => rows.reduce((total, row) => total + row[key], 0);
+        return { players, playTime: sum('playTime'), sessions: sum('sessions'), started: sum('started'), won: sum('won'), weeks, sets: rows };
     }
 
     /** The answer to `api/stats/<set>`. */
     setStats({ id, name }: StatsSet): SetStats {
         const totals = this.db.prepare(`
-            SELECT COUNT(DISTINCT player) AS players, COUNT(started) AS started, COUNT(won) AS won FROM games WHERE data_set = ?`)
-            .get(id) as { players: number; started: number; won: number };
+            SELECT COUNT(DISTINCT player) AS players, IFNULL(SUM(played), 0) AS playTime,
+                   (SELECT IFNULL(SUM(count), 0) FROM sessions WHERE data_set = ?1) AS sessions,
+                   COUNT(started) AS started, COUNT(won) AS won FROM games WHERE data_set = ?1`)
+            .get(id) as { players: number; playTime: number; sessions: number; started: number; won: number };
         const { parties } = this.db.prepare('SELECT COUNT(DISTINCT playthrough) AS parties FROM picks WHERE data_set = ?').get(id) as { parties: number };
         const levels = this.db.prepare('SELECT level, SUM(count) AS count FROM deaths WHERE data_set = ? GROUP BY 1 ORDER BY 1')
             .all(id) as SetStats['levels'];
@@ -216,10 +258,12 @@ export class StatsStore {
             JOIN games g ON g.data_set = p.data_set AND g.playthrough = p.playthrough
             WHERE p.data_set = ? GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT ${TOP_CHAMPIONS}`).all(id) as SetStats['champions'];
         const weeks = this.db.prepare(`
-            SELECT week, SUM(started) AS started, SUM(won) AS won FROM (
-                SELECT ${week('started')} AS week, 1 AS started, 0 AS won FROM games WHERE data_set = ?1 AND started IS NOT NULL
+            SELECT week, SUM(sessions) AS sessions, SUM(started) AS started, SUM(won) AS won FROM (
+                SELECT week, count AS sessions, 0 AS started, 0 AS won FROM sessions WHERE data_set = ?1
                 UNION ALL
-                SELECT ${week('won')}, 0, 1 FROM games WHERE data_set = ?1 AND won IS NOT NULL)
+                SELECT ${week('started')}, 0, 1, 0 FROM games WHERE data_set = ?1 AND started IS NOT NULL
+                UNION ALL
+                SELECT ${week('won')}, 0, 0, 1 FROM games WHERE data_set = ?1 AND won IS NOT NULL)
             GROUP BY 1 ORDER BY 1`).all(id) as SetStats['weeks'];
         const died = levels.reduce((sum, level) => sum + level.count, 0);
         return { id, name, ...totals, parties, died, fastest, levels, champions, weeks };
@@ -232,9 +276,17 @@ export class StatsStore {
         return { id, name, level, deaths };
     }
 
-    /** The aggregates `event` adds to. */
+    /**
+     * The aggregates `event` adds to. A `session` counts in its week, and raises its game's
+     * play time where the game has a row: it makes none, as that would keep its player.
+     */
     private keep(event: Pick<CheckedEvent, 'type' | 'player' | 'set' | 'playthrough' | 'payload'>, time: number): void {
         const { set, playthrough, payload } = event;
+        if (event.type === 'session') {
+            this.session.run(set, time);
+            this.play.run(payload.playTime as number, set, playthrough);
+            return;
+        }
         this.addGame.run(set, playthrough, event.player);
         if (event.type === 'started') {
             this.start.run(time, set, playthrough);
@@ -244,6 +296,7 @@ export class StatsStore {
         for (const champion of champions) this.pick.run(set, playthrough, champion.name);
         if (event.type === 'won') this.win.run(time, payload.gameTime as number, payload.playTime as number, JSON.stringify(champions), set, playthrough);
         if (event.type === 'lost') this.die.run(set, payload.level as number, payload.x as number, payload.y as number);
+        if (event.type === 'won' || event.type === 'lost') this.play.run(payload.playTime as number, set, playthrough);
     }
 
     /** The new tables filled from the log, in the order its events arrived. */
@@ -256,6 +309,17 @@ export class StatsStore {
                 }, row.time as number);
             }
         });
+    }
+
+    /**
+     * A store made before the sessions: each game's play time, the largest of its `won` and
+     * `lost` events', from the log. It had no session to count.
+     */
+    private fillPlayed(): void {
+        this.db.exec(`
+            UPDATE games SET played = (
+                SELECT MAX(json_extract(payload, '$.playTime')) FROM events e
+                WHERE e.type IN ('won', 'lost') AND e.data_set = games.data_set AND e.playthrough = games.playthrough)`);
     }
 
     private transaction(change: () => void): void {

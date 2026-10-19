@@ -15,13 +15,15 @@
  *   - the store: the schema made in a missing file, WAL mode, and the WAL checkpointed into
  *     the file on close, which holds the events when it is opened again;
  *   - the aggregates of a scripted fortnight, exactly, as the events arrive: the summary of
- *     the public sets (players, games started and won, the weeks, the sets by games started)
- *     and each set's (its figures, its fastest wins by game clock, of the games whose start
+ *     the public sets (players, play time, sessions, games started and won, the weeks, the
+ *     sets by play time) and each set's (its figures, its fastest wins by game clock, of the games whose start
  *     came and whose clock their play time could run, the first win of a game only, the
  *     deaths per level, the champions, the weeks) and each level's (its deaths per square,
  *     the most first); nothing of a set not public;
- *     no player id or build in them;
- *   - the same aggregates made from the log alone, for a store of events only;
+ *     no player id or build in them; a `session` never in the log, nor a game's row made of
+ *     one, only its week's count and its game's largest play time;
+ *   - the same aggregates but the sessions' made from the log, for a store made before the
+ *     sessions and for a store of events only;
  *   - the cache: an answer kept for its lifetime, made again after;
  *   - 200,000 events: the aggregates made from them once, then every answer in milliseconds,
  *     and small.
@@ -84,6 +86,8 @@ function checkTheChecks(): void {
         'lost: its square; a name of 7 characters, counted as characters');
     const started = accepted(event('started', P1, 'csb', 0, { anything: 'free text' }));
     check(JSON.stringify(started.payload) === '{}', 'started: an empty payload, whatever was sent');
+    const session = accepted(event('session', P1, 'csb', 0, { playTime: 7200000, anything: 'free text' }));
+    check(JSON.stringify(session.payload) === '{"playTime":7200000}', 'session: its play time alone');
 
     console.log('\nWhat it refuses:');
     const champion = ch('HALK', 0, { masteries: [1, 1, 1, 1] });
@@ -127,6 +131,9 @@ function checkTheChecks(): void {
         [event('won', P1, 'csb', 1, { gameTime: 1, playTime: '1', champions: [] }), 'bad playTime'],
         [event('lost', P1, 'csb', 1, { gameTime: 1, playTime: 1, champions: [], level: 0, x: 256, y: 0 }), 'bad square'],
         [event('lost', P1, 'csb', 1, { gameTime: 1, playTime: 1, champions: [], level: 0, x: 0 }), 'bad square'],
+        [event('session', P1, 'csb', 1, {}), 'bad playTime'],
+        [event('session', P1, 'csb', 1, { playTime: -1 }), 'bad playTime'],
+        [event('session', P1, 'csb', 1, { playTime: 0.5 }), 'bad playTime'],
     ];
     for (const [body, why] of refusals) {
         const answer = checkEvent(body, RULES);
@@ -146,10 +153,15 @@ const day = (date: string, hour = 10) => Date.parse(`${date}T${String(hour).padS
 const winner = (name: string, id: number | null = 0) => ch(name, id, { masteries: [1, 2, 3, 4] });
 const won = (player: string, playthrough: number, gameTime: number, playTime: number, champions: object[]) =>
     event('won', player, 'dm-atari', playthrough, { gameTime, playTime, champions });
+const session = (player: string, set: string, playthrough: number, playTime: number) =>
+    event('session', player, set, playthrough, { playTime });
 
 /** A fortnight of four players, scripted: see the expected aggregates below. */
 const FORTNIGHT: [number, string][] = [
     [day('2026-10-05'), event('started', P1, 'dm-atari', 1, {})],
+    [day('2026-10-05'), session(P1, 'dm-atari', 1, 0)],
+    // A save continued: its play time is under its game's win, which counts.
+    [day('2026-10-06', 9), session(P1, 'dm-atari', 1, 200_000)],
     [day('2026-10-05', 11), event('party', P1, 'dm-atari', 1, { champions: [ch('HALK', 3)] })],
     [day('2026-10-05', 12), event('party', P1, 'dm-atari', 1, { champions: [ch('HALK', 3), ch('WU TSE', 9)] })],
     // 1,000 ticks in 5 minutes: 18,000 VBLs.
@@ -174,13 +186,24 @@ const FORTNIGHT: [number, string][] = [
     [day('2026-10-10', 13), won(P2, 9, 120, 1000, [winner('BOB', 1)])],
     [day('2026-10-11'), event('started', P2, 'csb', 3, {})],
     [day('2026-10-12'), event('started', P1, 'dm-atari', 4, {})],
+    [day('2026-10-12'), session(P1, 'dm-atari', 4, 0)],
+    // A game's play time is the largest a session reported, an earlier save's read after.
+    [day('2026-10-13', 9), session(P1, 'dm-atari', 4, 3_600_000)],
+    [day('2026-10-13', 20), session(P1, 'dm-atari', 4, 1_000_000)],
     // A win whose start never came, as an imported CSBWin save's: a win, not ranked.
     [day('2026-10-13'), won(P1, 5, 9, 8, [winner('SYRA', null)])],
     [day('2026-10-14'), event('lost', P3, 'csb', 3, { gameTime: 7, playTime: 6, champions: [ch('GOTHMOG', null)], level: 0, x: 5, y: 5 })],
+    // Hours rank the sets: CSB's one game outplays DM's.
+    [day('2026-10-14', 12), session(P3, 'csb', 3, 9_000_000)],
+    // A session of a game the store has no row of, an imported save's: its week counts, and
+    // neither its play time nor its player, of whom no row is made.
+    [day('2026-10-14', 13), session(P4, 'dm-atari', 11, 7_200_000)],
     // A set that is not public: in none of the answers.
     [day('2026-10-06'), event('started', P4, 'secret', 10, {})],
     [day('2026-10-06', 11), event('lost', P4, 'secret', 10, { gameTime: 7, playTime: 6, champions: [ch('GOTHMOG')], level: 0, x: 5, y: 5 })],
+    [day('2026-10-06', 12), session(P4, 'secret', 10, 50)],
 ];
+const SESSIONS = FORTNIGHT.filter(([, body]) => body.includes('"type":"session"')).length;
 
 const DM: StatsSet = { id: 'dm-atari', name: 'Dungeon Master' };
 const CSB: StatsSet = { id: 'csb', name: 'Chaos Strikes Back' };
@@ -188,18 +211,25 @@ const CONFLUX: StatsSet = { id: 'conflux', name: 'Conflux' };
 /** The public sets, in the table's order. */
 const PUBLIC = [CONFLUX, CSB, DM];
 
+/**
+ * DM's play time: its games' largest, 300,000 (game 1's win, over its sessions), 99 (game
+ * 2's last death), 60,000, 600,000, 1,000 and 1,000 (games 6 to 9's wins), 3,600,000
+ * (game 4's sessions) and 8 (game 5's win).
+ */
+const DM_PLAY_TIME = 300_000 + 99 + 60_000 + 600_000 + 1_000 + 1_000 + 3_600_000 + 8;
+
 const EXPECTED_SUMMARY: StatsSummary = {
-    players: 3, started: 8, won: 6,
-    weeks: [{ week: '2026-10-05', started: 7 }, { week: '2026-10-12', started: 1 }],
+    players: 3, playTime: DM_PLAY_TIME + 9_000_000, sessions: 7, started: 8, won: 6,
+    weeks: [{ week: '2026-10-05', sessions: 2, started: 7 }, { week: '2026-10-12', sessions: 5, started: 1 }],
     sets: [
-        { ...DM, started: 7, won: 6, deaths: 3 },
-        { ...CSB, started: 1, won: 0, deaths: 1 },
-        { ...CONFLUX, started: 0, won: 0, deaths: 0 },
+        { ...CSB, playTime: 9_000_000, sessions: 1, started: 1, won: 0, deaths: 1 },
+        { ...DM, playTime: DM_PLAY_TIME, sessions: 6, started: 7, won: 6, deaths: 3 },
+        { ...CONFLUX, playTime: 0, sessions: 0, started: 0, won: 0, deaths: 0 },
     ],
 };
 
 const EXPECTED_SETS: SetStats[] = [{
-    ...DM, players: 3, started: 7, won: 6, parties: 7, died: 3,
+    ...DM, players: 3, playTime: DM_PLAY_TIME, sessions: 6, started: 7, won: 6, parties: 7, died: 3,
     fastest: [
         { day: '2026-10-10', gameTime: 120, playTime: 1000, champions: [winner('BOB', 1)] },
         { day: '2026-10-08', gameTime: 500, playTime: 60_000, champions: [winner('ROSE')] },
@@ -211,14 +241,14 @@ const EXPECTED_SETS: SetStats[] = [{
         { name: 'BOB', games: 3, won: 2 }, { name: 'HALK', games: 3, won: 2 },
         { name: 'SYRA', games: 2, won: 2 }, { name: 'ROSE', games: 1, won: 1 }, { name: 'WU TSE', games: 1, won: 1 },
     ],
-    weeks: [{ week: '2026-10-05', started: 6, won: 5 }, { week: '2026-10-12', started: 1, won: 1 }],
+    weeks: [{ week: '2026-10-05', sessions: 2, started: 6, won: 5 }, { week: '2026-10-12', sessions: 4, started: 1, won: 1 }],
 }, {
-    ...CSB, players: 1, started: 1, won: 0, parties: 1, died: 1, fastest: [],
+    ...CSB, players: 1, playTime: 9_000_000, sessions: 1, started: 1, won: 0, parties: 1, died: 1, fastest: [],
     levels: [{ level: 0, count: 1 }],
     champions: [{ name: 'GOTHMOG', games: 1, won: 0 }],
-    weeks: [{ week: '2026-10-05', started: 1, won: 0 }],
+    weeks: [{ week: '2026-10-05', sessions: 0, started: 1, won: 0 }, { week: '2026-10-12', sessions: 1, started: 0, won: 0 }],
 }, {
-    ...CONFLUX, players: 0, started: 0, won: 0, parties: 0, died: 0, fastest: [], levels: [], champions: [], weeks: [],
+    ...CONFLUX, players: 0, playTime: 0, sessions: 0, started: 0, won: 0, parties: 0, died: 0, fastest: [], levels: [], champions: [], weeks: [],
 }];
 
 const EXPECTED_LEVELS: LevelStats[] = [
@@ -237,24 +267,11 @@ function checkStore(scratch: string): void {
     let db = openStore(path);
     let store = new StatsStore(db);
     check(existsSync(path), 'a missing file is made');
-    check(JSON.stringify(store.summary(PUBLIC).sets) === JSON.stringify([CSB, CONFLUX, DM].map((set) => ({ ...set, started: 0, won: 0, deaths: 0 })))
+    check(JSON.stringify(store.summary(PUBLIC).sets) === JSON.stringify([CSB, CONFLUX, DM].map((set) => ({ ...set, playTime: 0, sessions: 0, started: 0, won: 0, deaths: 0 })))
         && store.summary([]).players === 0, 'with the schema, and nothing in it: the sets by name');
     for (const [time, body] of FORTNIGHT) store.record(accepted(body), time);
     check(existsSync(`${path}-wal`), 'it writes ahead, in WAL mode');
-    const asRecorded = answers(store);
-    db.close();
-    check(!existsSync(`${path}-wal`), 'close checkpoints the WAL into the file');
 
-    const raw = new DatabaseSync(path);
-    const mode = raw.prepare('PRAGMA journal_mode').get() as { journal_mode: string };
-    const { rows } = raw.prepare('SELECT COUNT(*) AS rows FROM events').get() as { rows: number };
-    check(mode.journal_mode === 'wal' && rows === FORTNIGHT.length, `the file alone holds the ${rows} events, in ${mode.journal_mode} mode`);
-    // The store as the deployed one was: the log alone.
-    raw.exec('DROP TABLE games; DROP TABLE deaths; DROP TABLE picks');
-    raw.close();
-
-    db = openStore(path);
-    store = new StatsStore(db);
     const summary = store.summary(PUBLIC);
     const sets = PUBLIC.map((set) => store.setStats(set));
     console.log('\nThe aggregates of the scripted fortnight:');
@@ -272,9 +289,52 @@ function checkStore(scratch: string): void {
         console.log(`  ${expected.id}, level ${expected.level}: ${JSON.stringify(level.deaths)}`);
         check(JSON.stringify(level) === JSON.stringify(expected), `${expected.id}'s level ${expected.level}'s squares, the most died on first`);
     }
-    check(answers(store) === asRecorded, 'a store of the log alone is given the same aggregates, made from it once');
     const json = answers(store);
     check(![P1, P2, P3, P4, 'abc1234', 'secret'].some((text) => json.includes(text)), 'no player id, build or set not public in them');
+    db.close();
+    check(!existsSync(`${path}-wal`), 'close checkpoints the WAL into the file');
+
+    const raw = new DatabaseSync(path);
+    const mode = raw.prepare('PRAGMA journal_mode').get() as { journal_mode: string };
+    const { rows } = raw.prepare('SELECT COUNT(*) AS rows FROM events').get() as { rows: number };
+    const logged = (raw.prepare("SELECT COUNT(*) AS n FROM events WHERE type = 'session'").get() as { n: number }).n;
+    check(mode.journal_mode === 'wal' && rows === FORTNIGHT.length - SESSIONS,
+        `the file alone holds the ${rows} events, in ${mode.journal_mode} mode, the ${SESSIONS} sessions not among them`);
+    check(logged === 0, 'no session is a row of the log');
+    const players = (raw.prepare("SELECT COUNT(*) AS n FROM games WHERE player = ?").get(P4) as { n: number }).n;
+    check(players === 1, 'and no game is made of a session: its player is kept by its other events alone');
+
+    // The aggregates the log alone can make: the fortnight without its sessions.
+    const logPath = join(scratch, 'log.db');
+    const logDb = openStore(logPath);
+    const logStore = new StatsStore(logDb);
+    for (const [time, body] of FORTNIGHT) if (!body.includes('"type":"session"')) logStore.record(accepted(body), time);
+    const withoutSessions = answers(logStore);
+    const logSummary = logStore.summary(PUBLIC);
+    logDb.close();
+    console.log(`  without the sessions: play time ${logSummary.playTime}, sessions ${logSummary.sessions}, `
+        + `the sets ${logSummary.sets.map((set) => `${set.id} ${set.playTime}`).join(', ')}`);
+    check(logSummary.playTime === DM_PLAY_TIME - 3_600_000 + 6 && logSummary.sessions === 0,
+        "without the sessions, a game's play time is its won and lost events' alone");
+
+    // The store as the deployed one was before the sessions: the aggregates without them.
+    raw.exec('DROP TABLE sessions; ALTER TABLE games DROP COLUMN played');
+    raw.close();
+    db = openStore(path);
+    store = new StatsStore(db);
+    check(answers(store) === withoutSessions, 'a store made before the sessions is given its games\' play time from the log, once');
+    const upgraded = store.summary(PUBLIC).sessions;
+    store.record(accepted(session(P1, 'dm-atari', 4, 0)), day('2026-10-15'));
+    check(upgraded === 0 && store.summary(PUBLIC).sessions === 1, 'and counts the sessions from then on');
+    db.close();
+
+    // The store as the first deployed one was: the log alone.
+    const first = new DatabaseSync(path);
+    first.exec('DROP TABLE games; DROP TABLE deaths; DROP TABLE picks; DROP TABLE sessions');
+    first.close();
+    db = openStore(path);
+    store = new StatsStore(db);
+    check(answers(store) === withoutSessions, 'a store of the log alone is given the same aggregates, made from it once');
     db.close();
 }
 

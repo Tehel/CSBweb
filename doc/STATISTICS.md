@@ -1,9 +1,9 @@
 # The statistics: what the game reports, and what the server keeps
 
-The deployed game counts games: games started, won and lost, the parties that played them,
-and where parties die (`doc/DEPLOYMENT.md` for where it runs). They serve three questions:
-whether the game is actually played, which champions players prefer, and where parties die
-most often. The page that shows them is designed and not built (`DEBT.md` E40), and the FAQ
+The deployed game counts games: games started, won and lost, the time played in them, the
+parties that played them, and where parties die (`doc/DEPLOYMENT.md` for where it runs).
+They serve three questions: whether the game is actually played, which champions players
+prefer, and where parties die most often. The page that shows them is designed and not built (`DEBT.md` E40), and the FAQ
 that explains them to players is to be designed (E39).
 
 ## Anonymity is a rule of the code
@@ -35,6 +35,13 @@ game's events link up across loads, sessions and imports. Each event is
 - `started`, `{}`: a new game's first tick. A new game is the boot's or the end screen's
   `readNewGame`, or RISE's adventure read (the entrance's, or the prison's BEGIN THE
   ADVENTURE).
+- `session`, `{ playTime }`: the first tick after a game is entered, a new game (after its
+  `started`), the welcome page's CONTINUE or a save read at the entrance or by the disk
+  menu, with the play time it entered with (`Game.playTime`, in ms, read at the read): 0
+  for a new game, a save's own (`SaveEntry.playTime`). Once a page and playthrough
+  (`GameEvents.entered`), so that F9 and the disk menu's loads of the same game do not
+  count again. It is what ranks the sets, the time played in them, where `started` counts
+  a game once however long it lasts. The server keeps no row of it (below).
 - `party`, `{ champions }`: the party as it stands once a champion has joined. A DM party
   is empty at the first tick and fills up in the Hall.
 - `won`, `{ gameTime, playTime, champions }`: the game clock (`d.Time`, in ticks), the
@@ -118,9 +125,20 @@ arrive, in the event's own transaction, so that no answer reads the log:
   and dies again shows where the dungeon is hard.
 - `picks`, the names of the champions ever in a game's party, from its `party`, `won` and
   `lost` events.
+- `sessions`, the `session` events per set and week (from Monday, UTC): a counter.
+- `games.played`, each game's play time, the largest its `session`, `won` and `lost` events
+  reported, whose sum is a set's time played. It lags a session: a session reports what
+  came before it, and the time it starts is counted by the next one, or by the game's end.
+
+**A `session` is never a row of `events`**, nor of `games`: no player and no time is kept
+of it, which would be the player's habits. It adds one to its week's count, and raises its
+game's `played` where the game has a row, made by its other events. A session of a game
+with none, an imported save's, which sent no `started`, counts in its week alone, and its
+time played is its `won` or `lost` event's.
 
 A store without these tables is given them, filled once from its `events`, in the order
-they arrived.
+they arrived; one without `played` and `sessions` is given them, `played` from its `won`
+and `lost` events. The sessions before then are lost: the log never held them.
 
 ## `api/stats`
 
@@ -129,14 +147,15 @@ that is pending or hidden. Every answer is kept 30 s and says so (`Cache-Control
 max-age=30`, `AnswerCache`), so that a loop of requests costs a lookup; making one again is
 a few indexed queries, about 0.1 s at 200,000 events.
 
-- **`api/stats`**, the public sets: players ever, games started and won, games started per
-  week (from Monday, UTC), and each set's games started and won and deaths, by games
-  started, decreasing, then by name.
-- **`api/stats/<id>`**, a public set (404 for any other): its players, games started and
-  won, games with a party and deaths; its ten fastest wins by game clock, then the earlier,
+- **`api/stats`**, the public sets: players ever, time played (`playTime`, ms), sessions,
+  games started and won, sessions and games started per week (from Monday, UTC), and each
+  set's time played, sessions, games started and won and deaths, by time played,
+  decreasing, then by games started, decreasing, then by name.
+- **`api/stats/<id>`**, a public set (404 for any other): its players, time played,
+  sessions, games started and won, games with a party and deaths; its ten fastest wins by game clock, then the earlier,
   each its day, game clock, play time and party with their masteries; its deaths per level;
-  its twenty most picked champions, with the games they were in and won; its games started
-  and won per week.
+  its twenty most picked champions, with the games they were in and won; its sessions, games
+  started and games won per week.
 - **`api/stats/<id>/<level>`**, the level as its decimal number below 256: the deaths on
   each of its squares, the most first, at most 1,024, which is enough for a heat map on
   `peek-dungeon`'s map.
@@ -147,5 +166,6 @@ second, and a second's slack (`CLOCK_SLACK_TICKS`). A game read from an imported
 save, which sent no `started` and carries no play time, is a win and is not ranked.
 
 `tools/dump-stats.ts` asserts the checks, the store's aggregates over a scripted fortnight,
-the same made from the log alone, the cache, and every answer's time and size over 200,000
+its sessions in no row of the log or of `games`, the same but the sessions' made from the
+log alone and for a store made before the sessions, the cache, and every answer's time and size over 200,000
 events; `tools/dump-server.ts` the API over HTTP and the store's life in `server.ts`.

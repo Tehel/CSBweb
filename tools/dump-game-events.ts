@@ -1,13 +1,14 @@
 /**
  * The statistics' events (`src/ui/gameEvents.ts`, `doc/STATISTICS.md`), built from
  * the real engine: the Hall of Champions' joins on `dm-atari`'s level 0, a new game's
- * first tick, a won and a lost game, and a genuine CSBWin save whose champions this page
- * never saw join.
+ * first tick, the sessions of the three ways into a game, a won and a lost game, and a
+ * genuine CSBWin save whose champions this page never saw join.
  *
  * Asserts that an event holds the player id, the set, the playthrough, the build and its
  * payload, nothing more; that a champion goes by their name as it stands, the one typed
  * on the Reincarnate screen included, flagged, and by their portrait's `charID`, or `null`
- * for a save's; that an event can fail without failing the game; and that a game a `?dev`
+ * for a save's; that a game entered sends `session` with the play time it enters with, once
+ * a page and playthrough; that an event can fail without failing the game; and that a game a `?dev`
  * teleport touched sends nothing, in that page or a later one that reads a save of it.
  *
  * And that the server takes every event the engine made as it is (`server/events.ts`): the
@@ -25,7 +26,7 @@ import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import type { Game } from '../src/engine/Game';
 import type { JoinedChampion } from '../src/engine/GameHost';
 import { determineMastery } from '../src/engine/skills';
-import { GameEvents, keptTeleportedPlaythroughs, type GameEvent, type TeleportedPlaythroughs, type LostPayload, type PartyPayload, type WonPayload } from '../src/ui/gameEvents';
+import { GameEvents, keptTeleportedPlaythroughs, type GameEvent, type TeleportedPlaythroughs, type LostPayload, type PartyPayload, type SessionPayload, type WonPayload } from '../src/ui/gameEvents';
 import { checkEvent } from '../server/events.ts';
 import { check, finish } from './lib/check';
 import { dataSetNamed } from './lib/dataSets';
@@ -128,8 +129,9 @@ async function main(): Promise<void> {
     events.newGameRead();
     events.tick();
     events.tick();
-    console.log(`started: ${JSON.stringify(sent)}`);
-    check(sent.length === 1 && sent[0]!.type === 'started', "a new game's first tick sends `started`, and the next one nothing");
+    const startedSent = () => sent.filter((e) => e.type === 'started');
+    console.log(`started: ${JSON.stringify(startedSent())}`);
+    check(startedSent().length === 1 && sent[0]!.type === 'started', "a new game's first tick sends `started`, and the next one nothing");
     const started = sent[0]!;
     check(started.player === PLAYER && started.set === 'dm-atari' && started.build === BUILD,
       'it names the player, the set and the build');
@@ -139,7 +141,69 @@ async function main(): Promise<void> {
     events.newGameRead();
     events.savedGameRead();
     events.tick();
-    check(sent.length === 1, 'a save read before the first tick makes the game no new one');
+    check(startedSent().length === 1, 'a save read before the first tick makes the game no new one');
+  }
+
+  /* ------------------------------------------------- sessions ----- */
+  {
+    const sessions = (sent: GameEvent[]) => sent.filter((e) => e.type === 'session')
+      .map((e) => `${e.playthrough}:${(e.payload as SessionPayload).playTime}`).join(' ');
+
+    // A new game, the boot's or the end screen's, or RISE's adventure.
+    const fresh = harness();
+    fresh.events.newGameRead();
+    fresh.events.tick();
+    fresh.events.tick();
+    const playthrough = fresh.game.ctx.state.block1.randomGameID;
+    console.log(`\na new game: ${fresh.sent.map((e) => e.type).join(', ')}; sessions ${sessions(fresh.sent)}`);
+    check(fresh.sent.map((e) => e.type).join() === 'started,session' && sessions(fresh.sent) === `${playthrough}:0`,
+      "a new game's first tick sends `started`, then `session` at a play time of 0, and the next tick nothing");
+    checkShape(fresh.sent[1]!, 'session');
+    check(JSON.stringify(fresh.sent[1]!.payload) === '{"playTime":0}', 'its payload the play time alone');
+
+    // F9, or the disk menu: a load in the same page.
+    fresh.game.setPlayTime(60_000);
+    fresh.events.savedGameRead();
+    fresh.events.tick();
+    check(fresh.sent.length === 2, 'a save of the same game read in the page sends none');
+    // The disk menu, reading another game's save: entered in this page for the first time.
+    fresh.game.ctx.state.block1.randomGameID = (playthrough + 1) >>> 0;
+    fresh.game.setPlayTime(90_000);
+    fresh.events.savedGameRead();
+    fresh.events.tick();
+    fresh.game.ctx.state.block1.randomGameID = playthrough;
+    fresh.events.savedGameRead();
+    fresh.events.tick();
+    check(sessions(fresh.sent) === `${playthrough}:0 ${(playthrough + 1) >>> 0}:90000`,
+      `another game's save read in the page sends one, and the first game again none: ${sessions(fresh.sent)}`);
+
+    // The welcome page's CONTINUE: a save read straight into play.
+    const continued = harness();
+    continued.game.ctx.state.block1.randomGameID = 0xabcdef;
+    continued.game.setPlayTime(7_200_000);
+    continued.events.savedGameRead();
+    continued.events.tick();
+    continued.events.tick();
+    console.log(`CONTINUE: ${continued.sent.map((e) => e.type).join(', ')}; sessions ${sessions(continued.sent)}`);
+    check(continued.sent.length === 1 && sessions(continued.sent) === `${0xabcdef}:7200000`,
+      "CONTINUE's first tick sends `session` with the save's play time, and no `started`");
+
+    // A save read at the entrance, after the boot read a new game.
+    const entrance = harness();
+    entrance.events.newGameRead();
+    entrance.game.ctx.state.block1.randomGameID = 0x123;
+    entrance.game.setPlayTime(3_000);
+    entrance.events.savedGameRead();
+    entrance.events.tick();
+    console.log(`the entrance's save: ${entrance.sent.map((e) => e.type).join(', ')}; sessions ${sessions(entrance.sent)}`);
+    check(entrance.sent.length === 1 && sessions(entrance.sent) === `${0x123}:3000`,
+      "a save read at the entrance sends `session` with its play time, and nothing of the new game it replaced");
+
+    // The teleport and the setting hold a session back as they do any event.
+    const off = harness({ enabled: () => false });
+    off.events.newGameRead();
+    off.events.tick();
+    check(off.sent.length === 0, 'with the statistics off, no session');
   }
 
   /* ------------------------------------------------- the Hall, then the end ----- */
@@ -299,7 +363,7 @@ async function main(): Promise<void> {
     const changed = everySent.filter((event) => JSON.stringify(checkEvent(JSON.stringify(event), rules)) !== JSON.stringify(event));
     console.log(`\n=== the server's check: ${everySent.length} events (${[...types].join(', ')}), ${changed.length} refused or changed ===`);
     for (const event of changed) console.log(`  ${JSON.stringify(event)}: ${JSON.stringify(checkEvent(JSON.stringify(event), rules))}`);
-    check(types.size === 4 && changed.length === 0, "the server stores every type of the engine's events as the page sent it");
+    check(types.size === 5 && changed.length === 0, "the server stores every type of the engine's events as the page sent it");
   }
 
   finish();

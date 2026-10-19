@@ -1,6 +1,6 @@
 /**
  * The game's events for the server's statistics (`doc/STATISTICS.md`): a game
- * started, a champion joined, a game won or lost. The engine sends nothing: the page
+ * started or entered, a champion joined, a game won or lost. The engine sends nothing: the page
  * reports what its hooks see, and a failure to send is ignored, so nothing here delays or
  * breaks the game.
  *
@@ -22,7 +22,7 @@ import type { JoinedChampion } from '../engine/GameHost';
 import type { Champion } from '../engine/gameTypes';
 import { determineMastery } from '../engine/skills';
 
-export type GameEventType = 'started' | 'party' | 'won' | 'lost';
+export type GameEventType = 'started' | 'session' | 'party' | 'won' | 'lost';
 
 /** What the page sends to `api/event`, as JSON. */
 export interface GameEvent {
@@ -31,7 +31,7 @@ export interface GameEvent {
     set: string;
     playthrough: number;
     build: string;
-    payload: StartedPayload | PartyPayload | WonPayload | LostPayload;
+    payload: StartedPayload | SessionPayload | PartyPayload | WonPayload | LostPayload;
 }
 
 /** A champion as an event names them. */
@@ -55,6 +55,15 @@ export interface WonChampionReport extends ChampionReport {
 }
 
 export type StartedPayload = Record<string, never>;
+
+/**
+ * A game entered: the play time it enters with (`Game.playTime`, ms), 0 for a new game and a
+ * save's own for a save. The server keeps no row of it, only its week's count and the
+ * game's largest play time.
+ */
+export interface SessionPayload {
+    playTime: number;
+}
 
 /** The party once a champion has joined, in the order of its slots. */
 export interface PartyPayload {
@@ -99,24 +108,41 @@ export class GameEvents {
     private readonly reincarnated = new WeakSet<Champion>();
     /** A new game has been read, whose first tick sends `started`. */
     private newGame = false;
+    /** A game has been read, whose first tick sends `session` with this play time; `null` for none. */
+    private entering: number | null = null;
+    /** The playthroughs this page has sent a `session` of, or would have: one each. */
+    private readonly entered = new Set<number>();
 
     constructor(private readonly deps: GameEventsDeps) {}
 
     /** A new game has been read: the boot's, the end screen's, or RISE's adventure. */
     newGameRead(): void {
         this.newGame = true;
+        this.entering = this.deps.game.playTime();
     }
 
-    /** Any other game has been read: a save. */
+    /** Any other game has been read: a save, at the entrance or by CONTINUE. */
     savedGameRead(): void {
         this.newGame = false;
+        this.entering = this.deps.game.playTime();
     }
 
-    /** The main loop's tick: a new game's first sends `started`. */
+    /**
+     * The main loop's tick: a new game's first sends `started`, and the first after a read
+     * sends `session`, once a page and playthrough, so that loads in a page count once.
+     */
     tick(): void {
-        if (!this.newGame) return;
-        this.newGame = false;
-        this.emit('started', () => ({}));
+        if (this.newGame) {
+            this.newGame = false;
+            this.emit('started', () => ({}));
+        }
+        if (this.entering === null) return;
+        const playTime = this.entering;
+        this.entering = null;
+        const playthrough = this.deps.game.ctx.state.block1.randomGameID;
+        if (this.entered.has(playthrough)) return;
+        this.entered.add(playthrough);
+        this.emit('session', () => ({ playTime }));
     }
 
     /** `GameHost.championJoined`: the party as it now stands. */
