@@ -515,6 +515,16 @@ The bytes no table reads:
   comments.
 - Each `KeyXlate` terminator's `keyscan`.
 
+## The runes are font codes 96 to 119, a row of six per step
+
+The magic panel's runes are characters of the font, item `0x22d`: `DrawSpellMenuCharacters`
+prints code `6 * P1 + 96` and the five after it, `P1` the incantation's length
+(`doc/CSBwin-src/CSBCode.cpp:9051-9065`). So step `r`'s rune `n` (both from 0) is code
+`96 + 6r + n`, and the four steps' 24 runes are codes 96 to 119. Step 0 is power, 1 the
+element, 2 the form and 3 the class or alignment, as the DM manual names them; neither
+CSBWin nor the data names a rune. `tools/gen-font.ts` puts them in `dm-screen.ttf` at
+U+E000 plus the code.
+
 ## `ExpandGraphic`'s `0x20` opcode bit is never consulted
 
 The image codec's extended opcodes (`doc/CSBwin-src/CSBCode.cpp:11086-11097`) branch like
