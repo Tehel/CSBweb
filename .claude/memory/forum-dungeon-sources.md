@@ -24,5 +24,8 @@ The `@content.downloadUrl` a listing gives takes HTTP Range requests: a file's f
 or a zip's central directory and then an entry's first deflated bytes, read without
 downloading the archive (how `doc/RTC/README.md`'s survey of the RTC modules was read).
 
+WSL has no `7z` on the PATH (Black Crypt Level 13 Test is a `.7z`): Windows' 7-Zip is
+`/mnt/c/Program Files/7-Zip/7z.exe`, run as `7z.exe x -y -o"$(wslpath -w <dir>)" "$(wslpath -w <archive>)"`.
+
 **How to apply:** for any dungeon's files, list its OneDrive folder before chasing a
 topic's links. See [[custom-dungeon-archives]].
