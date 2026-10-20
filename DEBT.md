@@ -120,7 +120,7 @@ In payoff order: the first row is the next item.
 | E41 | `src/data/` imports the engine | M | ⏳ |
 | E35 | Comments and documents that are stale, wrong, or tell the past | M | ⏳ |
 | E36 | Type escape hatches that check nothing | M | ⏳ |
-| E25 | One helper for each rule, where copies drift | M | ⏳ after C170 |
+| E25 | One helper for each rule, where copies drift | M | ⏳ |
 | E26 | Systems named after CSBWin's files, not what they do | M | ⏳ |
 | D21 | A save has nine shapes | L | ⏳ |
 | E27 | `DsaSystem.ts` is one 5,000-line class | L | ⏳ |
@@ -132,7 +132,6 @@ In payoff order: the first row is the next item.
 | E30 | One presenter and one input router | M | ⏳ |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | C177 | An Atari-era save loads with its possessions, timers and hand unconverted | M | ⏳ |
-| C170 | A blow at the party skips a living champion who shares a dead one's corner | S | ⏳ |
 | C173 | The DSA's `&ADD` and `&DEL` on a square bypass `MoveObject` | M | ⏳ |
 | C174 | DSA copies that are not whole | S | ⏳ |
 | C175 | The DSA's integer widths | S | ⏳ |
@@ -557,14 +556,14 @@ refactor, with a tool of damaged saves.
 
 ### E25 ⏳ One helper for each rule, where copies drift
 
-C170 is a copy that drifted. The copies left:
+Copies of one rule drift apart. The copies left:
 
 - **Mastery**: `determineMastery`'s options default to "awake" and "no possessions"
-  (`src/engine/skills.ts:116-121`, `:150`), and six callers build them by hand
+  (`src/engine/skills.ts:116-121`, `:150`), and eight callers build them by hand
   (`CharacterStats`, `AttackSystem`, `src/renderer/ui/Attack.ts`, `MouseSystem`,
   `DsaSystem`, `PeriodicUpdates`, `MonsterAttack`, `MagicSystem`).
-- **`CharacterAtPosition`**: a third copy in `MonsterAttack.getCharacterToDamage` (C170),
-  beside the two `AttackSystem.ts:320-322` says had drifted. "Alive" is tested five ways:
+- **`CharacterAtPosition`**: the two copies `AttackSystem.ts:320-322` says had drifted,
+  beside `characterAtPosition` (`src/engine/AddCharacter.ts`). "Alive" is tested five ways:
   `(health | 0) === 0`, `health === 0`, `health > 0`, `attributes?.health ?? 0`, `!== 0`.
 - **A level's difficulty**, `getMap(party.z)?.descriptor.difficulty ?? 0`, six times
   (`AttackSystem.ts:307`, `MonsterAttack.ts:167`, `MagicSystem.ts:453`, `LightLevel.ts:28`,
@@ -595,8 +594,7 @@ C170 is a copy that drifted. The copies left:
 Paying it: a module of rule helpers (`masteryOf(ctx, champ, skill)`,
 `characterAtPosition`, `isAlive`, `levelDifficulty(ctx)`, `adjustSkillsOnPartyLevel`,
 `spellObjectId`, `roomTypeOf`); the save menu's press through `playMenuPress`; one `recordsOf(db)` and a generic record getter; the text
-codec beside `messageParametersKey`, with an `Esl` enum. After C170, so that this
-commit changes no output.
+codec beside `messageParametersKey`, with an `Esl` enum. The commit changes no output.
 
 ### E26 ⏳ Systems named after CSBWin's files, not what they do
 
@@ -1004,19 +1002,6 @@ champion's hand, packed `0x1403`, loads as slot `0x1403`, past the 2097 slots, a
 Paying it: for a file without `objectIndex`, `ConvertListOfObjects` over the timers that
 carry an object, each champion's thirty slots and the object in hand, in CSBWin's order
 after the chains; a fixture whose champions carry something.
-
-### C170 ⏳ A blow at the party skips a living champion who shares a dead one's corner
-
-`getCharacterToDamage` takes the first champion whose `partyPosition` is the corner, and
-gives up on the corner if that one is dead (`src/engine/MonsterAttack.ts:932-936`). CSBWin
-asks `CharacterAtPosition`, the first *living* champion there
-(`doc/CSBwin-src/CSBCode.cpp:6966`; `Code11f52.cpp:4084`). A recruit takes a corner among
-the living only (`src/engine/AddCharacter.ts:67`), so a dead champion and a living one can
-share a corner, and the port then hits the next corner's champion. The party's bump into a
-wall takes the same path (`MovementSystem.ts:436-438`).
-
-Paying it: `characterAtPosition(party.champions, pos)` (`AddCharacter.ts:84`); a check with a
-dead champion and a recruit in one corner.
 
 ### C173 ⏳ The DSA's `&ADD` and `&DEL` on a square bypass `MoveObject`
 

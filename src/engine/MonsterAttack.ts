@@ -16,6 +16,7 @@
  * amend, and only then acts on it. That indirection is the whole reason the block
  * exists as a struct in CSBWin, so it is kept as one here.
  */
+import { characterAtPosition } from './AddCharacter';
 import { applyLimits, sw } from '../core/intCast';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../core/types';
 import type { CsbRandom } from '../core/random';
@@ -848,11 +849,11 @@ export class MonsterAttack {
     const order = this.determineAttackOrder(
       party.position.x | 0, party.position.y | 0, attackerX, attackerY, attackerAbsPos,
     );
+    // `CharacterAtPosition`, the first *living* champion in the corner
+    // (`doc/CSBwin-src/CSBCode.cpp:6966`): a recruit may stand in a dead one's.
     for (const pos of order) {
-      const champ = party.champions.find((ch) => ch.partyPosition === pos);
-      if (champ && champ.attributes.health > 0) {
-        return party.champions.indexOf(champ);
-      }
+      const chIdx = characterAtPosition(party.champions, pos);
+      if (chIdx >= 0) return chIdx;
     }
     return -1;
   }

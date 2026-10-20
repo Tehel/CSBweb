@@ -171,6 +171,7 @@ const CHECKS = [
   { tool: 'dump-party-move.ts' },
   { tool: 'dump-last-monster-attack.ts' },
   { tool: 'dump-monster-blow-mastery.ts' },
+  { tool: 'dump-character-to-damage.ts' },
   { tool: 'dump-monster-missile-type.ts' },
   { tool: 'dump-cast-spell.ts' },
   { tool: 'dump-magic-footprints.ts' },

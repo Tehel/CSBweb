@@ -914,6 +914,16 @@ west towards it, a target to the north-west, the code falls through to `STRandom
 gives north then west, or west then north. Both draw one number. Covered by
 `tools/dump-monster-perception.ts`, against a transcription of the C.
 
+## A blow at the party hits the first living champion of a corner
+
+`GetCharacterToDamage` walks `DetermineAttackOrder`'s four corners and takes
+`CharacterAtPosition`'s answer for each (`doc/CSBwin-src/CSBCode.cpp:6950-6975`), the first
+champion in the corner whose `HP()` is not 0 (`Code11f52.cpp:4084-4105`). A recruit takes a
+corner among the living only (`Character.cpp:523-529`), so a dead champion and a living one
+can share a corner, and the blow hits the living one. A monster's blow at the closest
+champion and the party's bump into a wall both go through it. Covered by
+`tools/dump-character-to-damage.ts`.
+
 ## A monster's step waits half its move time, in whole ticks
 
 `D4W = sw(timePerMove/2 - w_54)` (`doc/CSBwin-src/Monster.cpp:1621`, `:2104`, `:2439`):
