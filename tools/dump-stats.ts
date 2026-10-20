@@ -24,19 +24,24 @@
  *     one, only its week's count and its game's largest play time;
  *   - the same aggregates but the sessions' made from the log, for a store made before the
  *     sessions and for a store of events only;
+ *   - a game's second `started` or `won` no row of the log, and nothing changed by it; a
+ *     store made before that rule keeps the first of each, and makes its picks again;
+ *   - a full log: past its rows, an event refused and nothing of it kept, a session counted;
+ *   - the rate limit's buckets: an address, an IPv4-mapped one as its IPv4, an IPv6 one as
+ *     its /64;
  *   - the cache: an answer kept for its lifetime, made again after;
  *   - 200,000 events: the aggregates made from them once, then every answer in milliseconds,
- *     and small.
+ *     and small, and the store's bytes an event, which `MAX_EVENTS` is sized by.
  *
  * Usage: npm test -- --only=dump-stats.ts
  */
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
-import { checkEvent, RateLimit, type CheckedEvent, type EventRules } from '../server/events.ts';
-import { AnswerCache, DEATH_SQUARES, StatsStore, type LevelStats, type SetStats, type StatsSet, type StatsSummary } from '../server/stats.ts';
+import { addressBucket, checkEvent, RateLimit, type CheckedEvent, type EventRules } from '../server/events.ts';
+import { AnswerCache, DEATH_SQUARES, MAX_EVENTS, StatsStore, type LevelStats, type SetStats, type StatsSet, type StatsSummary } from '../server/stats.ts';
 import { openStore } from '../server/store.ts';
 import { check, finish } from './lib/check';
 import { ch, day, event, FORTNIGHT, P1, P2, P3, P4, session, winner } from './lib/statsFortnight';
@@ -136,9 +141,29 @@ function checkTheChecks(): void {
     const allowed = [0, 1, 2, 3].map((i) => limit.allow('a', 1000 + i));
     check(allowed.join() === 'true,true,true,false' && limit.allow('b', 1004), 'the rate limit: three per window and address');
     check(limit.allow('a', 61_000), 'and a new window starts the count again');
+
+    const buckets: [string, string][] = [
+        ['10.1.2.3', '10.1.2.3'],
+        ['::ffff:10.1.2.3', '10.1.2.3'],
+        ['::FFFF:10.1.2.3', '10.1.2.3'],
+        ['2001:db8:1:2::a', '2001:db8:1:2::/64'],
+        ['2001:0DB8:0001:0002:ffff:ffff:ffff:ffff', '2001:db8:1:2::/64'],
+        ['2001:db8::1', '2001:db8:0:0::/64'],
+        ['2001:db8:0:0:1::', '2001:db8:0:0::/64'],
+        ['fe80::1%eth0', 'fe80:0:0:0::/64'],
+        ['::1', '0:0:0:0::/64'],
+        ['64:ff9b::10.1.2.3', '64:ff9b:0:0::/64'],
+        ['1:2:3:4:5:6:10.1.2.3', '1:2:3:4::/64'],
+        ['', ''],
+        ['not an address', 'not an address'],
+    ];
+    for (const [address, bucket] of buckets) check(addressBucket(address) === bucket, `${address || "''"} counts as ${addressBucket(address)}`);
+    console.log(`  ${buckets.length} addresses, each in its bucket: an IPv4-mapped one its IPv4, an IPv6 one its /64`);
 }
 
 const SESSIONS = FORTNIGHT.filter(([, body]) => body.includes('"type":"session"')).length;
+/** The fortnight's second `started` of game 1 and second `won` of game 7, which the log keeps no row of. */
+const TWICE = 2;
 
 const DM: StatsSet = { id: 'dm-atari', name: 'Dungeon Master' };
 const CSB: StatsSet = { id: 'csb', name: 'Chaos Strikes Back' };
@@ -174,7 +199,7 @@ const EXPECTED_SETS: SetStats[] = [{
     levels: [{ level: 1, count: 3 }],
     champions: [
         { name: 'BOB', games: 3, won: 2 }, { name: 'HALK', games: 3, won: 2 },
-        { name: 'SYRA', games: 2, won: 2 }, { name: 'ROSE', games: 1, won: 1 }, { name: 'WU TSE', games: 1, won: 1 },
+        { name: 'ROSE', games: 1, won: 1 }, { name: 'SYRA', games: 1, won: 1 }, { name: 'WU TSE', games: 1, won: 1 },
     ],
     weeks: [{ week: '2026-10-05', sessions: 2, started: 6, won: 5 }, { week: '2026-10-12', sessions: 4, started: 1, won: 1 }],
 }, {
@@ -233,11 +258,13 @@ function checkStore(scratch: string): void {
     const mode = raw.prepare('PRAGMA journal_mode').get() as { journal_mode: string };
     const { rows } = raw.prepare('SELECT COUNT(*) AS rows FROM events').get() as { rows: number };
     const logged = (raw.prepare("SELECT COUNT(*) AS n FROM events WHERE type = 'session'").get() as { n: number }).n;
-    check(mode.journal_mode === 'wal' && rows === FORTNIGHT.length - SESSIONS,
+    check(mode.journal_mode === 'wal' && rows === FORTNIGHT.length - SESSIONS - TWICE,
         `the file alone holds the ${rows} events, in ${mode.journal_mode} mode, the ${SESSIONS} sessions not among them`);
     check(logged === 0, 'no session is a row of the log');
     const players = (raw.prepare("SELECT COUNT(*) AS n FROM games WHERE player = ?").get(P4) as { n: number }).n;
     check(players === 1, 'and no game is made of a session: its player is kept by its other events alone');
+    const twice = (raw.prepare("SELECT COUNT(*) AS n FROM events WHERE type IN ('started', 'won') GROUP BY type, data_set, playthrough HAVING n > 1").all()).length;
+    check(rows === FORTNIGHT.length - SESSIONS - TWICE && twice === 0, `nor a game's second started or won, of which it has ${TWICE}`);
 
     // The aggregates the log alone can make: the fortnight without its sessions.
     const logPath = join(scratch, 'log.db');
@@ -275,6 +302,23 @@ function checkStore(scratch: string): void {
     check(answers(store) === slotted, "a store made before the picks' slots is given its picks again, from the log, once");
     db.close();
 
+    // The store as it was before a game's started and won were once each: the second ones
+    // in its log, and the second win's party among its picks.
+    const doubled = new DatabaseSync(path);
+    const secondWin = JSON.stringify({ gameTime: 1, playTime: 600_000, champions: [winner('SYRA')] });
+    doubled.exec(`DROP INDEX events_once;
+        INSERT INTO events (time, player, type, data_set, playthrough, build, payload) VALUES
+            (${day('2026-10-16')}, '${P1}', 'started', 'dm-atari', 1, 'abc1234', '{}'),
+            (${day('2026-10-16')}, '${P1}', 'won', 'dm-atari', 7, 'abc1234', '${secondWin}');
+        INSERT INTO picks VALUES ('dm-atari', 7, 'SYRA', 0)`);
+    doubled.close();
+    db = openStore(path);
+    store = new StatsStore(db);
+    const kept = (db.prepare('SELECT COUNT(*) AS n FROM events').get() as { n: number }).n;
+    check(answers(store) === slotted && kept === FORTNIGHT.length - SESSIONS - TWICE,
+        "a store made before a game's started and won were once each keeps the first of each, and its picks are made again");
+    db.close();
+
     // The store as the first deployed one was: the log alone.
     const first = new DatabaseSync(path);
     first.exec('DROP TABLE games; DROP TABLE deaths; DROP TABLE picks; DROP TABLE sessions');
@@ -283,6 +327,19 @@ function checkStore(scratch: string): void {
     store = new StatsStore(db);
     check(answers(store) === withoutSessions, 'a store of the log alone is given the same aggregates, made from it once');
     db.close();
+}
+
+function checkFull(): void {
+    console.log('\nA full store:');
+    const db = new DatabaseSync(':memory:');
+    const store = new StatsStore(db, 2);
+    const kept = FORTNIGHT.slice(0, 5).map(([time, body]) => store.record(accepted(body), time));
+    const rows = (db.prepare('SELECT COUNT(*) AS n FROM events').get() as { n: number }).n;
+    const { sessions, started } = store.setStats(DM);
+    db.close();
+    console.log(`  a log of 2 rows, given a started, two sessions and two parties: ${kept.join(' ')}`);
+    check(kept.join() === 'true,true,true,true,false' && rows === 2, 'past its rows, an event is refused, and nothing of it kept');
+    check(sessions === 2 && started === 1, 'where a session still counts');
 }
 
 function checkCache(): void {
@@ -355,6 +412,9 @@ function checkScale(scratch: string): void {
     const deaths = (JSON.parse(level) as LevelStats).deaths.length;
     check(events > 200_000 && slowest < 250, `every answer in ${slowest.toFixed(0)} ms, under 250`);
     check(largest < 40_000 && deaths === DEATH_SQUARES, `the largest ${largest} bytes, its squares capped at ${deaths}`);
+    const perEvent = statSync(path).size / events;
+    console.log(`  the store: ${perEvent.toFixed(0)} bytes an event, its aggregates and indexes included`);
+    check(perEvent < 400, `under the 400 bytes an event that MAX_EVENTS (${MAX_EVENTS}) is sized by`);
 }
 
 function main(): void {
@@ -362,6 +422,7 @@ function main(): void {
     try {
         checkTheChecks();
         checkStore(scratch);
+        checkFull();
         checkCache();
         checkScale(scratch);
     } finally {

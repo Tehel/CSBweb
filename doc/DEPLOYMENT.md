@@ -68,7 +68,8 @@ location / {
 `client_max_body_size` lets a published set through: nginx's own default is 1 MB, and the
 server refuses a request over 32 MiB itself (`MAX_PUBLISH_BYTES`, `server/publish.ts`).
 
-`X-Real-IP` is what the rate limits of `api/event` and of a publish count. Without it, every player shares
+`X-Real-IP` is what the rate limits of `api/event` and of a publish count, an IPv6
+address by its /64 (`addressBucket`, `server/events.ts`). Without it, every player shares
 the one bucket of the proxy's address. The server trusts the header only because the
 container's port is published on loopback (`server/app.ts`, `clientAddress`).
 
@@ -682,6 +683,7 @@ a restore that forgets the players' folders says so.
 
 ## Things that are true about restarts
 
-- **The rate limit's counts are in memory**, so a restart resets them, which is harmless.
+- **The rate limits' counts are in memory**, the day's budget of events included, so a
+  restart resets them, which is harmless.
 - **Nothing is lost**: every event is in `stats.db` before `api/event` answers 204, and a
   SIGTERM checkpoints the WAL. A `down` loses only the container's log.

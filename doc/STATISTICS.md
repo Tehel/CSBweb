@@ -93,7 +93,8 @@ takes every event the engine makes as the page sent it.
    A client that sends neither header, which no browser is, is heard.
 2. **A rate limit** of 30 events a minute per address, counted in memory, comes next
    (429). The address is nginx's `X-Real-IP`, trusted only because the container's port
-   is on loopback, and it is never stored.
+   is on loopback, and it is never stored. An IPv6 address counts by its /64, which a host
+   is given whole, and an IPv4-mapped one as its IPv4 (`addressBucket`).
 3. **A body of at most 4 KB** (413 otherwise).
 4. **`server/events.ts` checks it field by field** and rebuilds it from what passed (400
    otherwise): the player is a UUID, the build a token, the set one of the `data_sets`
@@ -103,8 +104,15 @@ takes every event the engine makes as the page sent it.
    not blank, and made of A to Z, the space and the Reincarnate screen's `. , ; :`, or for
    a save edited elsewhere the accented capitals À to Ý, the digits and `! ? ' - /`
    (`NAME`): no control character, bidi override, NUL or markup reaches `api/stats`.
+5. **A budget of 10,000 events a day**, every address together, counted in memory
+   (`EVENTS_PER_DAY`, `server/server.ts`; 429), so that no number of addresses grows the
+   store by more than a few MB a day.
+6. **A full log** refuses the event (507): at 500,000 rows (`MAX_EVENTS`,
+   `server/stats.ts`), about 140 MB at the 280 bytes an event `tools/dump-stats.ts`
+   measures, aggregates included, kept in every nightly backup. A `session`, which is no
+   row of it, still counts.
 
-An event stored answers 204.
+An event taken answers 204, and so does a game's second `started` or `won` (below).
 
 ## The store
 
@@ -120,9 +128,13 @@ opened stops the server before it listens. Its nightly backup is `doc/DEPLOYMENT
 The `events` table is the log. What `api/stats` answers is kept beside it as the events
 arrive, in the event's own transaction, so that no answer reads the log:
 
+**A game's `started` and `won` are kept once each**, the first: a later one, a save of the
+game read again or an earlier save won again, is no row of the log and changes nothing,
+its party no pick (a unique index, `events_once`). A `lost` is kept every time.
+
 - `games`, a row per set and playthrough: its first event's player (for counting, never
   answered), its first `started`'s time, and its first `won`'s time, game clock, play time
-  and party. A later `won` of the same game, from an earlier save, changes nothing.
+  and party.
 - `deaths`, the `lost` events per set and square: every one, as a party that dies, reloads
   and dies again shows where the dungeon is hard.
 - `picks`, the champions ever in a game's party, from its `party`, `won` and `lost`
@@ -146,6 +158,8 @@ time played is its `won` or `lost` event's.
 A store without these tables is given them, filled once from its `events`, in the order
 they arrived; one without `played` and `sessions` is given them, `played` from its `won`
 and `lost` events; one whose `picks` has no `slot` is given them again from its `events`.
+One made before `events_once` keeps the first `started` and `won` of each game, and is
+given its picks again, where it dropped a `won`.
 The events sent before `hero` count a reincarnated champion by their typed name. The sessions before then are lost: the log never held them.
 
 ## `api/stats`
@@ -174,10 +188,10 @@ one its play time could run: a tick at most each VBL, which sleep reaches, at 60
 second, and a second's slack (`CLOCK_SLACK_TICKS`). A game read from an imported CSBWin
 save, which sent no `started` and carries no play time, is a win and is not ranked.
 
-`tools/dump-stats.ts` asserts the checks, the store's aggregates over a scripted fortnight,
-its sessions in no row of the log or of `games`, the same but the sessions' made from the
-log alone and for a store made before the sessions or the picks' slots, the cache, and every answer's time and size over 200,000
-events; `tools/dump-server.ts` the API over HTTP and the store's life in `server.ts`.
+`tools/dump-stats.ts` asserts the checks, the rate limit's buckets, the store's aggregates over a scripted fortnight,
+its sessions in no row of the log or of `games`, a game's second `started` and `won` in none either, a full log, the same but the sessions' made from the
+log alone and for a store made before the sessions, the picks' slots or `events_once`, the cache, and every answer's time and size over 200,000
+events, with the bytes an event costs; `tools/dump-server.ts` the API over HTTP, the limits and the budget included, and the store's life in `server.ts`.
 
 ## The page
 

@@ -29,8 +29,9 @@
  *   - `SECURITY_HEADERS` on every answer: the page, an asset, a 304, a HEAD, the API, and
  *     every error, a 404, a 400, a 405 and a 403 included;
  *   - `/api/event`: POST only, an event stored (what is stored, `dump-stats` asserts), a
- *     session counted and no row of the log, a bad one 400, a set added to the table while it runs known at once, a body over 4 KB 413 whether it says so or not, and the rate limit per
- *     forwarded address, 429; a POST a browser says another site's page sent, by its
+ *     session counted and no row of the log, a game's second `started` no row either, a bad one 400, a set added to the table while it runs known at once, a body over 4 KB 413 whether it says so or not, and the rate limit per
+ *     forwarded address, an IPv6 one by its /64 and an IPv4-mapped one as its IPv4, 429; the budget a
+ *     day, every address together, 429, and a full log, 507, a session still counted; a POST a browser says another site's page sent, by its
  *     `Sec-Fetch-Site` or its `Origin`, 403, there and on every other POST route, and one
  *     from the page's own origin heard; `/api/stats`, `/api/stats/<set>` and
  *     `/api/stats/<set>/<level>`: the store's answers for the public sets, kept 30 s, 404
@@ -458,6 +459,8 @@ const OTHER = '11111111-1111-4111-8111-111111111111';
 const MODERATORS = ['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'] as const;
 /** The scratch server's rate limit: events per address and window. */
 const EVENTS_PER_WINDOW = 5;
+/** The scratch server's budget of events a day, which only `checkEventBudget`'s own server meets. */
+const EVENTS_A_DAY = 1000;
 
 async function checkEvents(port: number, db: DatabaseSync, store: StatsStore): Promise<void> {
     console.log('\nThe statistics:');
@@ -503,6 +506,9 @@ async function checkEvents(port: number, db: DatabaseSync, store: StatsStore): P
     const get = await ask(port, '/api/event');
     check(get.status === 405 && get.headers.allow === 'POST', 'GET on /api/event: 405, with Allow: POST');
     check(started() === 1, 'and none of those was stored');
+    const rows = logged();
+    const again = await post(event(1));
+    check(again.status === 204 && logged() === rows && started() === 1, "a game's second started: 204, and no row");
 
     const host = `127.0.0.1:${port}`;
     const crossSite: Record<string, string>[] = [
@@ -532,6 +538,54 @@ async function checkEvents(port: number, db: DatabaseSync, store: StatsStore): P
     check(answers.slice(0, -1).every((status) => status === 204) && answers[EVENTS_PER_WINDOW] === 429, `the rate limit: ${EVENTS_PER_WINDOW} an address, then 429`);
     check((await post(event(20), { 'X-Real-IP': '10.1.1.2' })).status === 204, 'another address is still heard');
     check((await ask(port, '/api/event', 'POST', {}, event(21))).status === 204, 'without X-Real-IP, the socket\'s address counts');
+
+    const sixes = ['2001:db8:1:2::a', '2001:0db8:0001:0002:ffff:ffff:ffff:ffff', '2001:db8:1:2:3:4:5:6', '2001:db8:1:2::7', '2001:DB8:1:2::8', '2001:db8:1:2::9'];
+    const six: number[] = [];
+    for (const [i, ip] of sixes.entries()) six.push((await post(event(40 + i), { 'X-Real-IP': ip })).status);
+    console.log(`  ${sixes.length} events from one IPv6 /64: ${six.join(' ')}`);
+    check(six.slice(0, -1).every((status) => status === 204) && six.at(-1) === 429, `an IPv6 address counts by its /64: ${EVENTS_PER_WINDOW}, then 429`);
+    check((await post(event(50), { 'X-Real-IP': '2001:db8:1:3::a' })).status === 204, 'and the next /64 is still heard');
+    const mapped: number[] = [];
+    for (let i = 0; i < EVENTS_PER_WINDOW; i++) mapped.push((await post(event(60 + i), { 'X-Real-IP': '10.2.2.2' })).status);
+    mapped.push((await post(event(70), { 'X-Real-IP': '::ffff:10.2.2.2' })).status);
+    check(mapped.slice(0, -1).every((status) => status === 204) && mapped.at(-1) === 429, `an IPv4-mapped address counts as its IPv4: ${mapped.join(' ')}`);
+}
+
+/**
+ * The day's budget and the full store, on a server of their own: four events a day from
+ * every address together, and a log of two rows.
+ */
+async function checkEventBudget(scratch: string): Promise<void> {
+    console.log('\nThe events a day, and a full store:');
+    const db = new DatabaseSync(':memory:');
+    const options = scratchFiles(join(scratch, 'budget'));
+    const dataSets = filledFrom(SCRATCH_MANIFEST, new DataSetStore(db));
+    const store = new StatsStore(db, 2);
+    const server = createAppServer(options, {
+        checkDataSet: checkLocalDataSet, dataSets, moderators: [], store, notify: NOBODY,
+        rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000), eventBudget: new RateLimit(4, 86_400_000),
+        publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now,
+    });
+    await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+    const port = (server.address() as AddressInfo).port;
+    try {
+        let address = 0;
+        const post = (type: string, playthrough: number, payload: object = {}) => ask(port, '/api/event', 'POST', { 'X-Real-IP': `10.4.0.${++address}` },
+            JSON.stringify({ type, player: PLAYER, set: 'a', playthrough, build: 'test', payload }));
+        const statuses = [
+            (await post('started', 1)).status, (await post('started', 2)).status,
+            (await post('session', 1, { playTime: 60_000 })).status, (await post('started', 3)).status, (await post('started', 4)).status,
+        ];
+        const full = (db.prepare('SELECT COUNT(*) AS n FROM events').get() as { n: number }).n;
+        const { sessions, started } = store.setStats({ id: 'a', name: 'A' });
+        console.log(`  five events, each from its own address: ${statuses.join(' ')}; the log ${full} rows, ${started} started, ${sessions} session`);
+        check(statuses.slice(0, 3).every((status) => status === 204) && statuses[3] === 507, 'a full log refuses an event, 507, and takes a session, which is no row of it');
+        check(full === 2 && started === 2 && sessions === 1, 'nothing of the refused event kept');
+        check(statuses[4] === 429, 'the day\'s budget, every address together, then 429');
+    } finally {
+        server.close();
+        db.close();
+    }
 }
 
 /** The scratch publish server's rate limit: publishes per address and window. */
@@ -578,7 +632,7 @@ async function checkPublish(scratch: string): Promise<void> {
     const server = createAppServer(options, {
         checkDataSet: checkLocalDataSet, dataSets, moderators: parseModerators(MODERATORS.join()), store: new StatsStore(db),
         notify: (event) => told.push(`${event.name}: ${event.activity} by ${event.by}`),
-        rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000),
+        rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000), eventBudget: new RateLimit(EVENTS_A_DAY, 86_400_000),
         publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now,
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
@@ -875,7 +929,7 @@ async function checkModeration(scratch: string): Promise<void> {
     }
     const server = createAppServer(options, {
         checkDataSet: checkLocalDataSet, dataSets, moderators: parseModerators(MODERATORS.join()), notify: NOBODY, store: new StatsStore(db),
-        rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000),
+        rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000), eventBudget: new RateLimit(EVENTS_A_DAY, 86_400_000),
         publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now,
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
@@ -992,7 +1046,7 @@ async function checkDocuments(scratch: string): Promise<void> {
     const server = createAppServer(options, {
         checkDataSet: checkLocalDataSet, dataSets, moderators: parseModerators(MODERATORS.join()), store: new StatsStore(db),
         notify: (event) => told.push(notificationText({ ...event, at: 0 }).split('\n')[0]!),
-        rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000),
+        rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000), eventBudget: new RateLimit(EVENTS_A_DAY, 86_400_000),
         publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now,
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
@@ -1326,6 +1380,7 @@ async function main(): Promise<void> {
             store,
             rules: { hasSet: (id) => dataSets.hasSet(id) },
             rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000),
+            eventBudget: new RateLimit(EVENTS_A_DAY, 86_400_000),
             publishRateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000),
             now: Date.now,
         };
@@ -1334,6 +1389,7 @@ async function main(): Promise<void> {
         const port = (server.address() as AddressInfo).port;
         await checkAnswers(port, manifest, options.gamefilesDir);
         await checkEvents(port, db, store);
+        await checkEventBudget(scratch);
         await checkTableRead(port, db, manifest);
         await checkPublish(scratch);
         await checkModeration(scratch);

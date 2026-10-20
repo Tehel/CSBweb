@@ -6,6 +6,7 @@
  * range, and the only text a modified page could store is a champion's name, of 7
  * characters at most, each one the game's (`NAME`).
  */
+import { isIPv6 } from 'node:net';
 
 /** The largest body `api/event` reads. */
 export const MAX_EVENT_BYTES = 4096;
@@ -147,8 +148,9 @@ function isInteger(value: unknown, min: number, max: number): value is number {
 }
 
 /**
- * At most `limit` events per address in each window of `windowMs`, counted in memory. The
- * map is emptied at each new window, so it holds one window's addresses at most.
+ * At most `limit` requests per key in each window of `windowMs`, counted in memory: per
+ * address (`addressBucket`), or, under one key, all of them together. The map is emptied
+ * at each new window, so it holds one window's keys at most.
  */
 export class RateLimit {
     private readonly counts = new Map<string, number>();
@@ -161,13 +163,32 @@ export class RateLimit {
         this.windowMs = windowMs;
     }
 
-    allow(address: string, now: number): boolean {
+    allow(key: string, now: number): boolean {
         if (now - this.windowStart >= this.windowMs) {
             this.counts.clear();
             this.windowStart = now;
         }
-        const count = (this.counts.get(address) ?? 0) + 1;
-        this.counts.set(address, count);
+        const count = (this.counts.get(key) ?? 0) + 1;
+        this.counts.set(key, count);
         return count <= this.limit;
     }
+}
+
+/**
+ * What a rate limit counts `address` as: an IPv4 address as itself, an IPv4-mapped IPv6
+ * one as its IPv4, and any other IPv6 address as its /64, which a host is given whole and
+ * can draw an address of at each request. Anything else, as itself.
+ */
+export function addressBucket(address: string): string {
+    const bare = address.replace(/%.*$/, '');
+    const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(bare);
+    if (mapped !== null) return mapped[1]!;
+    if (!isIPv6(bare)) return address;
+    const [head = '', tail] = bare.split('::');
+    /** A part's groups, an IPv4 tail as its two. */
+    const groups = (part: string | undefined) => (part ? part.split(':').flatMap((group) => (group.includes('.') ? ['0', '0'] : [group])) : []);
+    const front = groups(head);
+    const back = groups(tail);
+    const all = tail === undefined ? front : [...front, ...Array<string>(8 - front.length - back.length).fill('0'), ...back];
+    return `${all.slice(0, 4).map((group) => parseInt(group, 16).toString(16)).join(':')}::/64`;
 }

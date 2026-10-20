@@ -31,6 +31,21 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE INDEX IF NOT EXISTS events_by_type ON events (type, data_set, playthrough);
 `;
 
+/**
+ * A game's `started` and `won` once each, its first: a later one, as a reload of an earlier
+ * save sends, is not a row and changes nothing (`StatsStore.record`). A `lost` is every one.
+ */
+const ONCE_SCHEMA = `
+CREATE UNIQUE INDEX events_once ON events (type, data_set, playthrough) WHERE type IN ('started', 'won');
+`;
+
+/**
+ * The rows the log holds at most, past which only a `session` is kept: about 300 bytes
+ * each, the aggregates included (`tools/dump-stats.ts`), so some 150 MB, in each of the
+ * nightly backups too (`doc/DEPLOYMENT.md`), on a disk the VPS shares.
+ */
+export const MAX_EVENTS = 500_000;
+
 const AGGREGATES_SCHEMA = `
 CREATE TABLE games (
     data_set    TEXT    NOT NULL,
@@ -184,15 +199,22 @@ export class StatsStore {
     private readonly picks: PickStatements;
     private readonly play: StatementSync;
     private readonly session: StatementSync;
+    private readonly maxEvents: number;
+    /** The log's rows. */
+    private rows: number;
 
-    constructor(db: DatabaseSync) {
+    constructor(db: DatabaseSync, maxEvents = MAX_EVENTS) {
         this.db = db;
+        this.maxEvents = maxEvents;
         this.db.exec(EVENTS_SCHEMA);
         const kept = this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'games'").get() !== undefined;
         const played = kept && this.db.prepare("SELECT 1 FROM pragma_table_info('games') WHERE name = 'played'").get() !== undefined;
         const slotted = kept && this.db.prepare("SELECT 1 FROM pragma_table_info('picks') WHERE name = 'slot'").get() !== undefined;
+        const once = this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'events_once'").get() !== undefined;
+        let wonTwice = false;
+        if (!once) wonTwice = this.keepFirsts();
         if (!kept) this.db.exec(AGGREGATES_SCHEMA + PICKS_SCHEMA);
-        if (kept && !slotted) {
+        if (kept && (!slotted || wonTwice)) {
             this.transaction(() => {
                 this.db.exec(`DROP TABLE picks; ${PICKS_SCHEMA}`);
                 this.fillPicks();
@@ -205,7 +227,7 @@ export class StatsStore {
             });
         }
         this.insert = this.db.prepare(
-            'INSERT INTO events (time, player, type, data_set, playthrough, build, payload) VALUES (?, ?, ?, ?, ?, ?, ?)');
+            'INSERT INTO events (time, player, type, data_set, playthrough, build, payload) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING');
         this.addGame = this.db.prepare('INSERT INTO games (data_set, playthrough, player) VALUES (?, ?, ?) ON CONFLICT DO NOTHING');
         this.start = this.db.prepare('UPDATE games SET started = MIN(IFNULL(started, ?1), ?1) WHERE data_set = ?2 AND playthrough = ?3');
         this.win = this.db.prepare(
@@ -217,16 +239,27 @@ export class StatsStore {
         this.session = this.db.prepare(`
             INSERT INTO sessions (data_set, week, count) VALUES (?1, ${week('?2')}, 1) ON CONFLICT DO UPDATE SET count = count + 1`);
         if (!kept) this.fillAggregates();
+        this.rows = (this.db.prepare('SELECT COUNT(*) AS rows FROM events').get() as { rows: number }).rows;
     }
 
-    /** `event`, kept: in the log and its aggregates, or a `session` in its aggregates alone. */
-    record(event: CheckedEvent, time: number): void {
+    /**
+     * `event`, kept: in the log and its aggregates, or a `session` in its aggregates alone.
+     * A game's second `started` or `won` is taken and changes nothing (`ONCE_SCHEMA`). False
+     * when the log is full, at `maxEvents` rows, and `event` is not a `session`: nothing of it
+     * is kept.
+     */
+    record(event: CheckedEvent, time: number): boolean {
+        if (event.type !== 'session' && this.rows >= this.maxEvents) return false;
+        let added = 0;
         this.transaction(() => {
             if (event.type !== 'session') {
-                this.insert.run(time, event.player, event.type, event.set, event.playthrough, event.build, JSON.stringify(event.payload));
+                added = Number(this.insert.run(time, event.player, event.type, event.set, event.playthrough, event.build, JSON.stringify(event.payload)).changes);
+                if (added === 0) return;
             }
             this.keep(event, time);
         });
+        this.rows += added;
+        return true;
     }
 
     /** The answer to `api/stats` for `sets`, the public ones: nothing of any other set. */
@@ -341,6 +374,24 @@ export class StatsStore {
         champions.forEach((champion, slot) => {
             (champion.id === null ? picks.read : picks.joined).run(set, playthrough, champion.hero ?? champion.name, slot);
         });
+    }
+
+    /**
+     * A store made before `ONCE_SCHEMA` is given it: of each game's `started` and `won`
+     * events, the first alone is kept, which the aggregates kept already, but a later win's
+     * party, among the picks. Whether a `won` was dropped, so that the picks are made again.
+     */
+    private keepFirsts(): boolean {
+        let wonTwice = false;
+        this.transaction(() => {
+            const later = (type: string) => Number(this.db.prepare(`
+                DELETE FROM events WHERE type = ?1 AND id NOT IN (SELECT MIN(id) FROM events WHERE type = ?1 GROUP BY data_set, playthrough)`)
+                .run(type).changes);
+            later('started');
+            wonTwice = later('won') > 0;
+            this.db.exec(ONCE_SCHEMA);
+        });
+        return wonTwice;
     }
 
     /** `picks` filled from the log, in the order its events arrived, its own statements on a table new in this transaction. */

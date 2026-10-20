@@ -47,7 +47,7 @@ import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, PLAYER_ID_HEA
 import { manifestText, samePlayerId, wallsText, type DataSetStore, type DataSetViewer, type Moderator } from './dataSets.ts';
 import { addDocument, removeDocument } from './documents.ts';
 import { editDataSet } from './edit.ts';
-import { checkEvent, isPlayerId, MAX_EVENT_BYTES, type EventRules, type RateLimit } from './events.ts';
+import { addressBucket, checkEvent, isPlayerId, MAX_EVENT_BYTES, type EventRules, type RateLimit } from './events.ts';
 import { MAX_MODERATION_BYTES, moderateDataSet, type ModerationAnswer } from './moderate.ts';
 import type { Notify } from './notify.ts';
 import { MAX_PUBLISH_BYTES, publishDataSet, type CheckDataSet, type PublishAnswer, type ReadDungeonWalls } from './publish.ts';
@@ -119,6 +119,8 @@ export interface ApiOptions {
     rules: EventRules;
     /** Events per address. */
     rateLimit: RateLimit;
+    /** Events from every address together, counted under one key: the store's growth a day. */
+    eventBudget: RateLimit;
     /** Publishes per address, refused ones included. */
     publishRateLimit: RateLimit;
     /** The clock events are stored and notifications dated with. */
@@ -428,9 +430,9 @@ function isNotModified(req: IncomingMessage, etag: string, mtime: Date): boolean
 }
 
 /**
- * `api/event`: the rate limit first, then a body of at most `MAX_EVENT_BYTES`, checked and
- * stored. The page's `sendBeacon` reads no answer, so the status is for the tools and the
- * logs.
+ * `api/event`: the rate limit first, then a body of at most `MAX_EVENT_BYTES`, checked, the
+ * day's budget, and stored, unless the store is full. The page's `sendBeacon` reads no
+ * answer, so the status is for the tools and the logs.
  */
 async function receiveEvent(api: ApiOptions, req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (!api.rateLimit.allow(clientAddress(req), api.now())) {
@@ -441,7 +443,8 @@ async function receiveEvent(api: ApiOptions, req: IncomingMessage, res: ServerRe
     if (body === null) return send(res, 413, 'Event too large');
     const event = checkEvent(body.toString('utf8'), api.rules);
     if (typeof event === 'string') return send(res, 400, `Bad event: ${event}`);
-    api.store.record(event, api.now());
+    if (!api.eventBudget.allow('', api.now())) return send(res, 429, 'Too many events today');
+    if (!api.store.record(event, api.now())) return send(res, 507, 'The statistics are full');
     res.statusCode = 204;
     res.end();
 }
@@ -576,14 +579,14 @@ export function dataSetViewer(api: Pick<ApiOptions, 'moderators'>, req: Incoming
 }
 
 /**
- * The address the rate limit counts: the host's nginx's `X-Real-IP`, which is trusted only
- * because the container's port is published on loopback (`doc/DEPLOYMENT.md`), or the socket's
- * own. It is never stored.
+ * The address the rate limits count, an IPv6 one by its /64 (`addressBucket`): the host's
+ * nginx's `X-Real-IP`, which is trusted only because the container's port is published on
+ * loopback (`doc/DEPLOYMENT.md`), or the socket's own. It is never stored.
  */
 function clientAddress(req: IncomingMessage): string {
     const forwarded = req.headers['x-real-ip'];
-    if (typeof forwarded === 'string' && forwarded !== '') return forwarded;
-    return req.socket.remoteAddress ?? '';
+    if (typeof forwarded === 'string' && forwarded !== '') return addressBucket(forwarded);
+    return addressBucket(req.socket.remoteAddress ?? '');
 }
 
 /** The request's body, or `null` past `limit` bytes, which is drained unread. */

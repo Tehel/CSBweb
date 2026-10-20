@@ -114,7 +114,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| W4 | The events table grows without bound | S | ⏳ |
 | W5 | The statistics are pseudonymous, not anonymous | S | ⏳ |
 | R12 | Listing the saves reads every save's bytes | M | ⏳ |
 | U11 | The cursor over a dialog takes the game's shapes | S | ⏳ |
@@ -460,23 +459,12 @@ The deciphered data handed on by `loadSaveGameState`.
 open internet behind the VPS's nginx. Its weak point is availability: what an anonymous
 client can make it hold, compute or keep. What holds already: paths (`..`, `%2e%2e`,
 `%00`, dotfiles all refused), the body's size limit, events rebuilt from checked fields
-only, a champion's name of the game's characters, a POST from another site's page
+only, the rate limits counting an IPv6 client by its /64, a budget of events a day, a
+game's `started` and `won` stored once, a log of bounded rows, a champion's name of the game's characters, a POST from another site's page
 refused, a content security policy and `nosniff` on every answer, errors that leak nothing, a
 container held to a memory, process and privilege budget, read-only but for its data, and
 statistics aggregated as the events arrive, each answer capped and cached 30 s. Each item ships with its check in `tools/dump-server.ts`
 or `tools/dump-stats.ts`.
-
-### W4 ⏳ The events table grows without bound
-
-The only limit is 30 events a minute per address (`EVENTS_PER_MINUTE`,
-`server/server.ts:25`; `RateLimit`, `server/events.ts`): no global budget, nothing refusing
-a second `won` of the same playthrough, no retention, and an IPv6 client has a /64 of
-addresses. One address can add 43,200 rows a day, about 10 MB, on a disk the VPS shares,
-and SQLite never shrinks.
-
-Paying it: a global budget a day; `started` and `won` unique by type, data set and
-playthrough (`INSERT OR IGNORE`), but not `lost`, as every death counts where parties die
-(`doc/STATISTICS.md`); IPv6 counted by its /64; a size check.
 
 ### W5 ⏳ The statistics are pseudonymous, not anonymous
 

@@ -42,6 +42,7 @@ export const FORTNIGHT: [number, string][] = [
     [day('2026-10-05', 12), event('party', P1, 'dm-atari', 1, { champions: [ch('HALK', 3), ch('TSE', 9, { reincarnated: true, hero: 'WU TSE' })] })],
     // 1,000 ticks in 5 minutes: 18,000 VBLs.
     [day('2026-10-07'), won(P1, 1, 1000, 300_000, [winner('HALK', 3), winner('TSE', 9, 'WU TSE')])],
+    // A game's second start, from a save of it read again: no row, and nothing changed.
     [day('2026-10-08', 9), event('started', P1, 'dm-atari', 1, {})],
     [day('2026-10-06'), event('started', P2, 'dm-atari', 2, {})],
     [day('2026-10-06', 11), event('party', P2, 'dm-atari', 2, { champions: [ch('HALK', 3), ch('KID', 1, { reincarnated: true, hero: 'BOB' })] })],
@@ -53,7 +54,7 @@ export const FORTNIGHT: [number, string][] = [
     [day('2026-10-08', 12), won(P3, 6, 500, 60_000, [winner('ROSE')])],
     [day('2026-10-09'), event('started', P1, 'dm-atari', 7, {})],
     [day('2026-10-09', 11), won(P1, 7, 500, 600_000, [winner('HALK', 3)])],
-    // A game's second win, from an earlier save: its first is kept, its party a pick of the game.
+    // A game's second win, from an earlier save: its first is kept, and nothing of the second.
     [day('2026-10-09', 12), won(P1, 7, 1, 600_000, [winner('SYRA')])],
     // 121 ticks in a second's 60 VBLs, beyond the second's slack: a win, not ranked.
     [day('2026-10-10'), event('started', P2, 'dm-atari', 8, {})],

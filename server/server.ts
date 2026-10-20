@@ -46,6 +46,12 @@ import { openStore } from './store.ts';
 /** Events per address and minute: a game sends a few, a party's joins included. */
 const EVENTS_PER_MINUTE = 30;
 
+/**
+ * Events a day, every address together: a game sends a dozen or so, and the store's log
+ * grows by a few MB at most (`MAX_EVENTS`, `stats.ts`).
+ */
+const EVENTS_PER_DAY = 10_000;
+
 /** Publishes per address and hour, refused ones included: a player publishes a set now and then. */
 const PUBLISHES_PER_HOUR = 5;
 
@@ -95,6 +101,7 @@ const server = createAppServer(options, {
     store,
     rules: { hasSet: (id) => dataSets.hasSet(id) },
     rateLimit: new RateLimit(EVENTS_PER_MINUTE, 60_000),
+    eventBudget: new RateLimit(EVENTS_PER_DAY, 86_400_000),
     publishRateLimit: new RateLimit(PUBLISHES_PER_HOUR, 3_600_000),
     now: Date.now,
     notify,
