@@ -132,7 +132,6 @@ In payoff order: the first row is the next item.
 | E30 | One presenter and one input router | M | ⏳ |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | C177 | An Atari-era save loads with its possessions, timers and hand unconverted | M | ⏳ |
-| C169 | A monster's `timePerMove / 2` is not an integer division | S | ⏳ |
 | C170 | A blow at the party skips a living champion who shares a dead one's corner | S | ⏳ |
 | C173 | The DSA's `&ADD` and `&DEL` on a square bypass `MoveObject` | M | ⏳ |
 | C174 | DSA copies that are not whole | S | ⏳ |
@@ -1005,21 +1004,6 @@ champion's hand, packed `0x1403`, loads as slot `0x1403`, past the 2097 slots, a
 Paying it: for a file without `objectIndex`, `ConvertListOfObjects` over the timers that
 carry an object, each champion's thirty slots and the object in hand, in CSBWin's order
 after the chains; a fixture whose champions carry something.
-
-### C169 ⏳ A monster's `timePerMove / 2` is not an integer division
-
-`D4W = sw(timePerMove/2 - w_54)` divides an `i16` (`doc/CSBwin-src/Monster.cpp:1621`; used
-at `:1710`, `:2104`, `:2439`). The port writes `frame.timePerMove / 2 -
-frame.sinceLastUpdate` (`src/engine/MonsterAI.ts:1074`, and `stepOrDefer`, `:1179`), a
-float, and stores the remainder back into `frame.timePerMove` (`:1091`). For an odd move
-time, 15 of the 27 monster types (Skeleton 7, Mummy 17, Giggler 3…), a group whose wait is
-exactly half defers where CSBWin's moves, the rest of the turn runs with a time of x.5, and
-the random stream parts from CSBWin's. Every other division in the file truncates (`:932`,
-`:968`, `:990`).
-
-Paying it: `div(timePerMove, 2)` under `sw`; `Process_Invincible`'s tail (`:1074-1091`)
-calling `stepOrDefer` instead of repeating it; a check with a Skeleton deferred at
-`sinceLastUpdate` 3.
 
 ### C170 ⏳ A blow at the party skips a living champion who shares a dead one's corner
 

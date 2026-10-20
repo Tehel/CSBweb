@@ -49,6 +49,7 @@ import {
 import { setPackedBits } from './monsterTypes';
 import { ordinalOfMonsterAtPosition } from './monsterPosition';
 import { MmRecord, MonsterEvents } from './MmRecord';
+import { div, sw } from '../core/intCast';
 
 /**
  * The values CSBWin passes by reference through the `Try_*` chain.
@@ -151,6 +152,15 @@ interface InitialChecksResult {
   timer: TimerEntry;
   /** The rewritten function code — negatives become TT_29/30/31. */
   timerFunction: number;
+}
+
+/**
+ * `D4W = sw(timePerMove/2 - w_54)` (`doc/CSBwin-src/Monster.cpp:1621`, `:2104`, `:2439`):
+ * what is left of half a move, `timePerMove` an `i16` divided as C divides, truncating.
+ * At or below 0 the group moves now; above it, the group waits that long.
+ */
+function halfMoveRemaining(frame: AiFrame): number {
+  return sw(div(frame.timePerMove, 2) - frame.sinceLastUpdate);
 }
 
 export class MonsterAI {
@@ -1071,7 +1081,7 @@ export class MonsterAI {
     const newY = c.mapY + 2 * (this.ctx.tables.deltaY[dir] ?? 0);
     this.ctx.systems.monsters.playTeleportSound(newX, newY, c.level);
 
-    const remaining = frame.timePerMove / 2 - frame.sinceLastUpdate;
+    const remaining = halfMoveRemaining(frame);
     frame.bool36 = remaining <= 0;
     if (frame.bool36) {
       // Any non-zero `MoveObject` ends the turn; otherwise the timer follows the group to
@@ -1176,7 +1186,7 @@ export class MonsterAI {
    * Public so that `tools/` can take an AI step onto a square of its choosing.
    */
   stepOrDefer(frame: AiFrame, c: AiConst, newX: number, newY: number): boolean {
-    const remaining = frame.timePerMove / 2 - frame.sinceLastUpdate;
+    const remaining = halfMoveRemaining(frame);
     frame.bool36 = remaining <= 0;
     if (!frame.bool36) {
       frame.timePerMove = remaining;

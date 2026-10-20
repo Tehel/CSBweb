@@ -914,6 +914,14 @@ west towards it, a target to the north-west, the code falls through to `STRandom
 gives north then west, or west then north. Both draw one number. Covered by
 `tools/dump-monster-perception.ts`, against a transcription of the C.
 
+## A monster's step waits half its move time, in whole ticks
+
+`D4W = sw(timePerMove/2 - w_54)` (`doc/CSBwin-src/Monster.cpp:1621`, `:2104`, `:2439`):
+`timePerMove` is an `i16`, so the half truncates. At or below 0 the group moves now; above
+it, `timePerMove = D4W` and `w_54 = -1`, and the group waits. For an odd move time, a
+Skeleton's 7 or a Giggler's 3, the half is 3 or 1, never 3.5. Covered by
+`tools/dump-monster-move-code.ts`.
+
 ## Monsters step onto fake pits and false walls only if they recognise them
 
 `doc/CSBwin-src/Monster.cpp:681-707`. Bit 0 of the cell flag marks a *fake* pit or false wall,

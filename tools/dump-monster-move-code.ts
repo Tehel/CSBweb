@@ -22,6 +22,8 @@
  *  6. `CreateMonster` on the party's level returns `RNnul` and makes no sound, because
  *     the attach makes `MoveObject` return 1 (`Monster.cpp:222-231`); a generator queues
  *     its own sound when it is audible (`Timer.cpp:1797-1800`).
+ *  7. A step waits `D4W = sw(timePerMove/2 - w_54)` (`Monster.cpp:2104`), an `i16`
+ *     division: a Skeleton's 7 halves to 3, so at `w_54` 3 it moves, and at 2 it waits 1.
  *
  * The squares are real open squares of `dungeon.dat`; the teleporters are real teleporter
  * records moved onto them and re-aimed, and the pit is a real one.
@@ -264,6 +266,24 @@ async function main(): Promise<void> {
       + `sounds [${sounds.join(',')}]`);
     check(made === null && anyGroupAt(game, at), "it returns RNnul, although the group is there");
     check(sounds.length === 0, 'and queues no sound');
+  }
+
+  /* ------------------------------ 7. half an odd move time ---- */
+  {
+    const game = await makeGame();
+    const moves: string[] = [];
+    wrapMember(game.systems.monsters, 'moveMonster', () => () => { moves.push('move'); return { code: 1, position: new Position(0, 0, 0) }; });
+    const step = (sinceLastUpdate: number): AiFrame => {
+      const frame = standInOf<AiFrame>({ timer: standInOf<AiFrame['timer']>({}), timePerMove: 7, sinceLastUpdate, bool36: false });
+      game.systems.monsterAI.stepOrDefer(frame, standInOf<AiConst>({ mapX: 1, mapY: 1, level: 0 }), 1, 2);
+      return frame;
+    };
+    const atThree = step(3);
+    const atTwo = step(2);
+    console.log(`7. timePerMove 7: at w_54 3 ${atThree.bool36 ? 'moves' : `waits ${atThree.timePerMove}`}, ` +
+      `at 2 ${atTwo.bool36 ? 'moves' : `waits ${atTwo.timePerMove}`}`);
+    check(atThree.bool36 && moves.length === 1, 'half of 7 is 3: at w_54 3 the group moves');
+    check(!atTwo.bool36 && atTwo.timePerMove === 1 && atTwo.sinceLastUpdate === -1, 'at w_54 2 it waits 1, a whole tick');
   }
 
   finish();
