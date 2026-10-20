@@ -24,3 +24,7 @@ stage the copy with
 `git update-index --cacheinfo 100644,$(git hash-object -w <copy>),DEBT.md`. Then check
 that `git diff DEBT.md` is exactly their patch: their edit stays unstaged in the tree.
 Say so in the report.
+
+The reverse-apply fails when one of your edits sits next to one of theirs (an index row
+deleted beside the row they moved): chain the commit on its success with `&&`, never
+`;`, and when it fails undo their edit in the copy by hand.

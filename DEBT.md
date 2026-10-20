@@ -116,7 +116,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E40 | The statistics page's heat map | M | ⏳ |
 | R7 | An index from a custom data set can throw | S | ⏳ |
 | R8 | An optional feature's failure ends the game, or the session | S | ⏳ |
 | R10 | Pointer, touch and WebGL | S | ⏳ |
@@ -167,6 +166,7 @@ In payoff order: the first row is the next item.
 | F19 | The tools' screen is wired by hand, and has drifted | S | ⏳ with E29 |
 | F17 | The frame pipeline and the runner are untyped | M | ⏳ |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
+| E40 | The statistics page's heat map | M | ⏸️ |
 | G29 | Recording a game and playing it back | — | ⏸️ |
 | C150 | Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops | S | ⏸️ waits on the author |
 | G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
