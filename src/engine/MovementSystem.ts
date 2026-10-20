@@ -15,6 +15,7 @@ import { div, sw } from '../core/intCast';
 import type { GameContext } from './GameContext';
 import { flashButton, setClockTick } from './LoopState';
 import { TimerFunction } from './TimerQueue';
+import type { PartyMoveData } from './filterParameters';
 
 /** `PARTYMOVE_CONSTANTS` (doc/CSBwin-src/CSB.h:4316-4325): the move types, then the flags. */
 export const PM_BEGINTURN = 1;
@@ -23,54 +24,6 @@ export const PM_ATTEMPTMOVE = 3;
 export const PM_INHIBITMOVE = 0x0001;
 export const PM_SETDELAY = 0x0002;
 export const PM_ADDDELAY = 0x0004;
-
-/**
- * `PARTYMOVEDATA` (doc/CSBwin-src/CSB.h:4328-4379), the block the party move filter reads
- * and may rewrite (`CallPartyMoveFilter`, `DsaSystem.partyMoveFilter`). The locations are
- * `LOCATIONREL` integers whose position is the party's facing.
- */
-export interface PartyMoveData {
-    moveType: number;
-    flags: number;
-    delay: number;
-    /** The stamina each champion pays, -1 past the party. */
-    staminaAdjustment: number[];
-    relDirection: number;
-    absDirection: number;
-    fromLocation: number;
-    toLocation: number;
-    fromLocationType: number;
-    toLocationType: number;
-}
-
-/** `sizeof(PARTYMOVEDATA) / 4` (doc/CSBwin-src/CSBCode.cpp:7922): its 13 longwords. */
-export const PARTY_MOVE_DATA_WORDS = 13;
-
-/**
- * `memcpy(pDSAparameters + 1, pmd, sizeof(*pmd))` (doc/CSBwin-src/CSBCode.cpp:7923): the
- * block as the filter's DSA sees it, a longword per field in the struct's order.
- */
-export function partyMoveDataToWords(pmd: PartyMoveData): number[] {
-    return [
-        pmd.moveType, pmd.flags, pmd.delay, ...pmd.staminaAdjustment,
-        pmd.relDirection, pmd.absDirection, pmd.fromLocation, pmd.toLocation,
-        pmd.fromLocationType, pmd.toLocationType,
-    ].map((word) => word | 0);
-}
-
-/**
- * `memcpy(pmd, pDSAparameters + 1, sizeof(*pmd))` (doc/CSBwin-src/CSBCode.cpp:7926): the
- * block back from the filter's DSA, `word(i)` its longword `i`.
- */
-export function partyMoveDataFromWords(word: (index: number) => number): PartyMoveData {
-    const w = (index: number): number => word(index) | 0;
-    return {
-        moveType: w(0), flags: w(1), delay: w(2),
-        staminaAdjustment: [w(3), w(4), w(5), w(6)],
-        relDirection: w(7), absDirection: w(8), fromLocation: w(9), toLocation: w(10),
-        fromLocationType: w(11), toLocationType: w(12),
-    };
-}
 
 /**
  * `MoveParty`'s `button` for each of its `direction`s (doc/CSBwin-src/CSBCode.cpp:8091-8093):

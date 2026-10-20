@@ -25,9 +25,9 @@
 import { DBType, OBJECT_ID_EOF, Position, type ObjectID } from '../src/core/types';
 import { Expool } from '../src/data/CsbwinExpool';
 import type { DungeonData } from '../src/data/dungeonTypes';
-import { StkOp } from '../src/engine/DsaSystem';
+import { StkOp } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
-import { DeleteMonsterWhy } from '../src/engine/MonsterDamage';
+import { DeleteMonsterWhy } from '../src/engine/filterParameters';
 import { makeMoreRoomInDB } from '../src/engine/MakeMoreRoomInDB';
 import { MonsterType } from '../src/engine/monsterTypes';
 import { UNSET, freshGame, globalStore, int, op, varFetch, varStore, withFilterDsas } from './lib/dsa';

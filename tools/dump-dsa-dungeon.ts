@@ -25,7 +25,7 @@
  */
 import { DBType, OBJECT_ID_EOF, Position, RoomType, locationRelToInteger, type ObjectID } from '../src/core/types';
 import type { DsaDefinition } from '../src/data/dungeonTypes';
-import { StkOp } from '../src/engine/DsaSystem';
+import { StkOp } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
 import { int, op, report, run, varFetch, varStore } from './lib/dsa';
 import { check, finish } from './lib/check';

@@ -19,7 +19,7 @@ import {
   Position,
 } from '../core/types';
 import { ActuatorAction } from '../data/actuatorHelpers';
-import { CursorFilterType } from './DsaSystem';
+import { CursorFilterType } from './dsa/DsaTypes';
 import { nameIndexOf, type GameContext } from './GameContext';
 import { setClockTick, speed } from './LoopState';
 import type { Champion } from './gameTypes';

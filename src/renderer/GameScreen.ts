@@ -52,8 +52,10 @@ import {
   marchingOrderPointerMoved,
   handleMouseButton,
   handleInventoryToggle,
+  closeHintOracle,
   handleMouseUnclick,
   releaseEyeOrMouth,
+  openHintOracle,
   searchMouseButtons,
   syncInventoryButtons,
   tag02076e,
@@ -88,7 +90,7 @@ import type { SaveEntry } from '../data/saves';
 import type { ImportedFile } from '../engine/GameSaves';
 import { drawCharacterStateEyePanel, drawInventoryBackground, drawInventoryScreen, repackOpenChest, syncOpenChest } from './ui/Inventory';
 import { drawCharacterState, drawHeldObjectName, drawPartyStatus, getChampionPortrait } from './ui/Character';
-import { closeHintOracle, drawHintOracleButton, openHintOracle, type HintOracleFiles } from './ui/HintOracleButton';
+import { drawHintOracleButton, type HintOracleFiles } from './ui/HintOracleButton';
 import { displayFrozenScreen, displaySleepScreen, drawMessageLines, shadeRectIndex } from './ui/Draw';
 
 /**

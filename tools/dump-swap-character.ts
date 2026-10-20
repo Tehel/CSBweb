@@ -26,7 +26,7 @@
 import { readCsbwinCharacter, writeCsbwinCharacter } from '../src/data/CsbwinCharacters';
 import { CHARDESC_SIZE } from '../src/data/CsbwinSaveInfo';
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
-import { StkOp } from '../src/engine/DsaSystem';
+import { StkOp } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
 import type { Champion } from '../src/engine/gameTypes';
 import { buildSaveFile } from '../src/engine/SaveGameFile';

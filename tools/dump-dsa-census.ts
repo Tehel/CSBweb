@@ -24,7 +24,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { DungeonLoader } from '../src/data/DungeonLoader';
-import { StkOp } from '../src/engine/DsaSystem';
+import { StkOp } from '../src/engine/dsa/DsaTypes';
 import { dsaCensus, NOT_OPERATIONS } from '../src/engine/DungeonCensus';
 import { check, finish } from './lib/check';
 

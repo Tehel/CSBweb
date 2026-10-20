@@ -22,7 +22,7 @@ import {
 import type { DungeonState } from '../engine/DungeonState';
 import type { PartyFootprints } from '../engine/PartyFootprints';
 import type { GameState } from '../engine/gameTypes';
-import type { MonsterDesignOptions } from '../engine/MonsterSystem';
+import type { MonsterDesignOptions } from '../engine/monsterTypes';
 import type { InterpreterContext } from './bytecode/BytecodeInterpreter';
 import type { IndexedBitmap, PaletteIndexViewportBuffer } from './csbwin/CanvasBlitter';
 import { createPaletteIndexViewportBuffer, cropBitmap, mirrorBitmap, tag0088b2Index } from './csbwin/CanvasBlitter';

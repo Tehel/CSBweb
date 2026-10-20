@@ -7,7 +7,7 @@
  * so a dungeon can rewrite any field of it, and only then applies the result. That
  * indirection is the reason the struct exists, so it is kept as one here: the UI half
  * in `src/renderer/ui/Feeding.ts` derives the block, `DsaSystem.feedingFilter` hands it
- * to the DSAs as the 27 words below, and this file applies it, reaching
+ * to the DSAs as 27 words (`filterParameters.ts`), and this file applies it, reaching
  * the engine (`CurePoison`, `AdjustStamina`, `KillCharacter`, the shield timer) through
  * the context.
  *
@@ -24,6 +24,7 @@ import {
 import type { GameContext } from './GameContext';
 import { CHARFLAG_PORTRAIT_CHANGED, type Champion } from './gameTypes';
 import { drawCharacterState } from './Party';
+import type { FeedParameters } from './filterParameters';
 
 /** `MAXMANA` (`doc/CSBwin-src/Character.cpp:4413`). */
 const MAX_MANA = 900;
@@ -32,138 +33,6 @@ const FOOD_WATER_MIN = -1023;
 export const FOOD_WATER_MAX = 2048;
 /** What a gulp from a waterskin gives (`doc/CSBwin-src/Character.cpp:4127`). */
 export const WATERSKIN_GULP = 800;
-
-/**
- * `FEEDPARAMETERS` (`doc/CSBwin-src/Character.cpp:3956-3983`).
- *
- * `potionType`/`potionStrength` are marked readonly in CSBWin — the filter may look
- * at them but changing them does nothing, because the switch that reads them has
- * already run.
- */
-export interface FeedParameters {
-  performFeeding: boolean;
-  characterIndex: number;
-  objectDB: number;
-  objectType: number;
-  objectID: number;
-  foodValue: number;
-  waterValue: number;
-  /** Readonly. */
-  potionType: number;
-  /** Readonly. */
-  potionStrength: number;
-  strengthAdjust: number;
-  dexterityAdjust: number;
-  wisdomAdjust: number;
-  vitalityAdjust: number;
-  antiVenin: boolean;
-  staminaAdjust: number;
-  shieldStrengthAdjust: number;
-  shieldDuration: number;
-  manaAdjust: number;
-  hitpointAdjust: number;
-  healCount: number;
-  emptyFlask: boolean;
-  emptyHand: boolean;
-  chew: boolean;
-  /** The sound ordinal, or -1 for silence — CSBWin's `fp.gulp`. */
-  gulp: number;
-  location: number;
-  antiMagicAdjust: number;
-  antiFireAdjust: number;
-}
-
-/** `FEEDPARAMETERS::Clear` (`doc/CSBwin-src/Character.cpp:3986-4014`). */
-export function clearFeedParameters(): FeedParameters {
-  return {
-    performFeeding: false,
-    characterIndex: -1,
-    objectDB: -1,
-    objectType: -1,
-    objectID: -1,
-    foodValue: 0,
-    waterValue: 0,
-    potionType: -1,
-    potionStrength: -1,
-    strengthAdjust: 0,
-    dexterityAdjust: 0,
-    wisdomAdjust: 0,
-    vitalityAdjust: 0,
-    antiVenin: false,
-    staminaAdjust: 0,
-    shieldStrengthAdjust: 0,
-    shieldDuration: 0,
-    manaAdjust: 0,
-    hitpointAdjust: 0,
-    healCount: 0,
-    emptyFlask: false,
-    emptyHand: false,
-    chew: false,
-    gulp: -1,
-    location: -1,
-    antiMagicAdjust: 0,
-    antiFireAdjust: 0,
-  };
-}
-
-/** `sizeof(fp) / 4` (`doc/CSBwin-src/Character.cpp:4351`): the 27 longwords of `FEEDPARAMETERS`. */
-export const FEED_PARAMETER_WORDS = 27;
-
-/**
- * `memcpy(pDSAparameters + 1, &fp, sizeof(fp))` (`doc/CSBwin-src/Character.cpp:4350`): the
- * block as the feeding filter's DSA sees it, a longword per field in the struct's order
- * (`:3953-3983`), a `bool32` 1 or 0.
- */
-export function feedParametersToWords(fp: FeedParameters): number[] {
-  const flag = (value: boolean): number => (value ? 1 : 0);
-  return [
-    flag(fp.performFeeding), fp.characterIndex, fp.objectDB, fp.objectType, fp.objectID,
-    fp.foodValue, fp.waterValue, fp.potionType, fp.potionStrength,
-    fp.strengthAdjust, fp.dexterityAdjust, fp.wisdomAdjust, fp.vitalityAdjust,
-    flag(fp.antiVenin), fp.staminaAdjust, fp.shieldStrengthAdjust, fp.shieldDuration,
-    fp.manaAdjust, fp.hitpointAdjust, fp.healCount,
-    flag(fp.emptyFlask), flag(fp.emptyHand), flag(fp.chew), fp.gulp, fp.location,
-    fp.antiMagicAdjust, fp.antiFireAdjust,
-  ].map((word) => word | 0);
-}
-
-/**
- * `memcpy(&fp, pDSAparameters + 1, sizeof(fp))` (`doc/CSBwin-src/Character.cpp:4353`): the
- * block back from the feeding filter's DSA, `word(i)` its longword `i`. A `bool32` is
- * true when it is not 0, as CSBWin's tests of it read it.
- */
-export function feedParametersFromWords(word: (index: number) => number): FeedParameters {
-  const w = (index: number): number => word(index) | 0;
-  return {
-    performFeeding: w(0) !== 0,
-    characterIndex: w(1),
-    objectDB: w(2),
-    objectType: w(3),
-    objectID: w(4),
-    foodValue: w(5),
-    waterValue: w(6),
-    potionType: w(7),
-    potionStrength: w(8),
-    strengthAdjust: w(9),
-    dexterityAdjust: w(10),
-    wisdomAdjust: w(11),
-    vitalityAdjust: w(12),
-    antiVenin: w(13) !== 0,
-    staminaAdjust: w(14),
-    shieldStrengthAdjust: w(15),
-    shieldDuration: w(16),
-    manaAdjust: w(17),
-    hitpointAdjust: w(18),
-    healCount: w(19),
-    emptyFlask: w(20) !== 0,
-    emptyHand: w(21) !== 0,
-    chew: w(22) !== 0,
-    gulp: w(23),
-    location: w(24),
-    antiMagicAdjust: w(25),
-    antiFireAdjust: w(26),
-  };
-}
 
 /**
  * What a potion does before the drinker is looked at: the half of `_FeedCharacter`'s

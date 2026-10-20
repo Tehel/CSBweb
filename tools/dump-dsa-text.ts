@@ -21,7 +21,7 @@
  */
 import { DBType, OBJECT_ID_EOF, Position, locationRelToInteger, type ObjectID } from '../src/core/types';
 import { EDT_GLOBAL_TEXT } from '../src/data/DecodeText';
-import { StkOp } from '../src/engine/DsaSystem';
+import { StkOp } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
 import { printWithSubstitution } from '../src/engine/PrintWithSubstitution';
 import { int, op, run } from './lib/dsa';

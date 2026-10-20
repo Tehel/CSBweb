@@ -7,7 +7,7 @@
  * leaving it out.
  */
 import { OBJECT_ID_NULL, type LocationRel, type ObjectID } from '../core/types';
-import { DsaVars } from './DsaSystem';
+import { DsaVars } from './dsa/DsaTypes';
 import type { TimerEntry } from './TimerQueue';
 
 /** `MONSTEREVENTS` (`doc/CSBwin-src/CSB.h:2874-2927`): the turn's flags, by bit. */

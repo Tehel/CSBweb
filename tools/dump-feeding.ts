@@ -22,7 +22,8 @@ import {
   attributeCurrent,
   attributeMaximum,
 } from '../src/engine/attributes';
-import { applyFeedParameters, clearFeedParameters, derivePotionFeeding } from '../src/engine/Feeding';
+import { applyFeedParameters, derivePotionFeeding } from '../src/engine/Feeding';
+import { clearFeedParameters } from '../src/engine/filterParameters';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import type { Champion } from '../src/engine/gameTypes';
 import { processTimersAt, stockGame } from './lib/game';

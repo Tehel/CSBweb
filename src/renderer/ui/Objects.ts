@@ -12,14 +12,14 @@ import {
 } from '../../engine/AdjustStatsForItemCarried';
 import { ammunitionClassFor, illumuletLight, isIllumulet } from '../../engine/CharacterSystem';
 import { feetMaxLoadShift, feetMoveTimeBonus } from '../../engine/CharacterStats';
-import { FOOD_WATER_MAX, WATERSKIN_GULP, potionEffect } from '../../engine/Feeding';
+import { potionEffect } from '../../engine/Feeding';
+import { FOOD_WATER_MAX, WATERSKIN_GULP } from '../../engine/Feeding';
 import { DescIndex, GetBasicObjectType, NameIndex, OBJDI_EYE_OF_TIME } from '../../engine/objectIndex';
 import { DBType, ObjectID } from '../../core/types';
-import { ViewingFilterResult, ViewingFilterSite } from '../../engine/DsaSystem';
+import { ViewingFilterResult, ViewingFilterSite } from '../../engine/dsa/DsaTypes';
 import { Champion } from '../../engine/gameTypes';
 import { copyCharacter } from '../../engine/Party';
 import { determineMastery as determineMasteryEngine, possessionMasteryBonus } from '../../engine/skills';
-import { CLASS_NAMES, SUBSKILL_NAMES } from './ChampionDialog';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
 import { UIState } from './UIState';
 export type ItemDescriptionLine = { text: string; color: number };
@@ -471,6 +471,16 @@ function carriedPropertyLines(ui: UIState, objectId: ObjectID): string[] {
   lines.push(...masteryPropertyLines(resolveObjectNameIndex(ui, objectId)));
   return lines;
 }
+
+/** `d.Pointer16596` (`doc/CSBwin-src/CSBCode.cpp:373-376`), the four classes. */
+export const CLASS_NAMES = ['FIGHTER', 'NINJA', 'PRIEST', 'WIZARD'];
+/** Skills 4 to 19, four to a class (`doc/TRAINING.md`). */
+export const SUBSKILL_NAMES = [
+  'SWING', 'THRUST', 'CLUB', 'PARRY',
+  'STEAL', 'FIGHT', 'THROW', 'SHOOT',
+  'IDENTIFY', 'HEAL', 'INFLUENCE', 'DEFEND',
+  'FIRE', 'AIR', 'EARTH', 'WATER',
+];
 
 /** The 20 skills by number: the four classes (`skillNames`, `doc/CSBwin-src/CSB.h:2504-2509`), then their sub-skills, four to a class. */
 const SKILL_NAMES = [...CLASS_NAMES, ...SUBSKILL_NAMES];

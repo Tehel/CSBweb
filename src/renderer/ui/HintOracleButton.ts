@@ -22,8 +22,6 @@
  */
 import type { HcsbDat } from '../../data/HintOracleLoader';
 import type { Rect, UIButton } from '../../data/tables/UITables';
-import type { HintSquare } from '../intro/HintOracle';
-import { tag02076e, tag0207cc } from './Mouse';
 import type { UIState } from './UIState';
 
 /**
@@ -111,29 +109,4 @@ export function drawHintOracleButton(ui: UIState): void {
       screen.pixels[y * screen.width + x] = glyph ? ink : paper;
     }
   }
-}
-
-/** The square the Oracle answers for: the party's, which a save writes as `partyLevel`, `partyX` and `partyY`. */
-function hintSquareOf(ui: UIState): HintSquare {
-  const { x, y, z } = ui.partyState.position;
-  return { level: z, x, y };
-}
-
-/**
- * The flag acted on: `TAG02076e`, the clock stopped, and the screen's paint held for the
- * Oracle's (`hintOracleUp`). Returns the square to open the Oracle on.
- */
-export function openHintOracle(ui: UIState): HintSquare {
-  tag02076e(ui);
-  ui.ctx.state.paused = true;
-  ui.hintOracleUp = true;
-  return hintSquareOf(ui);
-}
-
-/** The Oracle closed: the clock runs again, and `TAG0207cc` shows the inventory again. */
-export function closeHintOracle(ui: UIState): void {
-  if (!ui.hintOracleUp) return;
-  ui.hintOracleUp = false;
-  ui.ctx.state.paused = false;
-  tag0207cc(ui);
 }

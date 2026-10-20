@@ -264,6 +264,9 @@ const CHECKS = [
   // back by the tool's own reader and by unzip, every set's files in it, byte for byte.
   { tool: 'dump-data-set-archive.ts' },
   { tool: 'dump-build.ts' },
+  // No value-import cycle in src/: which module of a cycle loads first depends on the
+  // entry point, so a value read at load time breaks some entries and not others.
+  { tool: 'dump-import-cycles.ts' },
   // The deployed server: its start-up check, caching, preconditions, refused paths, the
   // statistics' API, and server.ts itself, run as Node runs it, stopped by SIGTERM.
   { tool: 'dump-server.ts' },

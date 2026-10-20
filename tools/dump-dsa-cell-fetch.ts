@@ -12,7 +12,7 @@
  * Run: `npm test -- --only=dump-dsa-cell-fetch.ts`
  */
 import { OBJECT_ID_EOF, Position, RoomType, locationRelToInteger } from '../src/core/types';
-import { StkOp } from '../src/engine/DsaSystem';
+import { StkOp } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
 import { globalStore, int, op, run, varFetch } from './lib/dsa';
 import { check, finish } from './lib/check';

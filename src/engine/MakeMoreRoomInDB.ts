@@ -20,7 +20,7 @@
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';
 import { getActuatorType } from '../data/actuatorHelpers';
 import type { GameContext } from './GameContext';
-import { DeleteMonsterWhy, deleteMonsterParameters } from './MonsterDamage';
+import { DeleteMonsterWhy, deleteMonsterParameters } from './filterParameters';
 
 /**
  * `rnD5.pos(0)`, for a group or a missile, which `DeleteDBEntry` has thrown out with its

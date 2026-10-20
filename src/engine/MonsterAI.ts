@@ -46,7 +46,7 @@ import {
   monsterWord2Bit3,
   monsterWord2Bit4,
 } from '../data/tables/MonsterDesc';
-import { setPackedBits } from './MonsterSystem';
+import { setPackedBits } from './monsterTypes';
 import { ordinalOfMonsterAtPosition } from './monsterPosition';
 import { MmRecord, MonsterEvents } from './MmRecord';
 

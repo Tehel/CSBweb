@@ -9,6 +9,9 @@
  * really are stored as `"X"` in `graphics.dat`.
  */
 
+import type { CreatureRecord } from '../data/dungeonTypes';
+import type { RulesOptions } from './GameContext';
+
 /** `MONSTERTYPE` — index into `MonsterDescriptor[27]`. */
 export enum MonsterType {
   mon_Scorpion = 0,
@@ -111,3 +114,36 @@ export const ATTACK_TYPE_NONE = 255;
 
 /** The attack class `PrepareAttack` falls back to for an empty weapon hand. */
 export const ATTACK_CLASS_EMPTY_HAND = 2;
+
+/** The two monster design options, CSBWin's globals, which `GameContext.rules` holds. */
+export type MonsterDesignOptions = Pick<RulesOptions, 'invisibleMonsters' | 'drawAsSize4Monsters'>;
+
+/**
+ * `DB4::invisible()`, `drawAsSize4()`, `Unique()` and `Poisoned()`
+ * (`doc/CSBwin-src/CSB.h:1128-1135`): bits 11 to 14 of `word14`, each only if its design
+ * option is set, `invisibleMonsters` for the first and `drawAsSize4Monsters` for the
+ * other three. Both options come from a save's extended-features block
+ * (`SaveGame.cpp:396-402`) and default to `false` (`data.cpp:78-79`). Every reader of the
+ * four goes through these; the raw bits are only written (`&MONSTER!`, a new group).
+ */
+export function monsterInvisible(options: MonsterDesignOptions, monster: CreatureRecord): boolean {
+  return options.invisibleMonsters && monster.invisible;
+}
+export function monsterDrawAsSize4(options: MonsterDesignOptions, monster: CreatureRecord): boolean {
+  return options.drawAsSize4Monsters && monster.drawAsSize4;
+}
+export function monsterUnique(options: MonsterDesignOptions, monster: CreatureRecord): boolean {
+  return options.drawAsSize4Monsters && monster.unique;
+}
+export function monsterPoisoned(options: MonsterDesignOptions, monster: CreatureRecord): boolean {
+  return options.drawAsSize4Monsters && monster.poisoned;
+}
+
+/**
+ * `SetMonsterPositionBits` — replace the `index`th 2-bit field of a packed byte
+ * (`doc/CSBwin-src/CSBCode.cpp`, used throughout the monster code).
+ */
+export function setPackedBits(packed: number, index: number, value: number): number {
+  const shift = 2 * (index & 0x3);
+  return ((packed & ~(0x3 << shift)) | ((value & 0x3) << shift)) & 0xff;
+}

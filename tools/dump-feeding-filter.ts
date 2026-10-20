@@ -23,7 +23,7 @@
 import { DBType, OBJECT_ID_EOF, locationRelToInteger, type ObjectID } from '../src/core/types';
 import { OBJNI_APPLE, OBJNI_WATERSKIN } from '../src/core/objectNameIndex';
 import type { DungeonData } from '../src/data/dungeonTypes';
-import { StkOp } from '../src/engine/DsaSystem';
+import { StkOp } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
 import { handleMouthPress } from '../src/renderer/ui/Feeding';
 import { resolveObjectNameIndex } from '../src/renderer/ui/Objects';

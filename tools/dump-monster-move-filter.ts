@@ -43,7 +43,7 @@ import { readFileSync } from 'node:fs';
 import { DBType, Position, locationRelFromInteger, locationRelToInteger, type ObjectID } from '../src/core/types';
 import type { DungeonData } from '../src/data/dungeonTypes';
 import { DungeonLoader } from '../src/data/DungeonLoader';
-import { StkOp } from '../src/engine/DsaSystem';
+import { StkOp } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
 import { MonsterEvents } from '../src/engine/MmRecord';
 import { TimerFunction } from '../src/engine/TimerQueue';

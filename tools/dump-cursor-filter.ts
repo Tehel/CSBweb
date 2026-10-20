@@ -77,7 +77,7 @@ import { readFileSync } from 'node:fs';
 import { OBJNI_APPLE } from '../src/core/objectNameIndex';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, locationRelToInteger, type ObjectID } from '../src/core/types';
 import type { DsaDefinition, DungeonData } from '../src/data/dungeonTypes';
-import { CursorFilterType, StkOp } from '../src/engine/DsaSystem';
+import { CursorFilterType, StkOp } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
 import { GetBasicObjectType } from '../src/engine/objectIndex';
 import { applySaveBytes } from '../src/engine/SaveGameFile';

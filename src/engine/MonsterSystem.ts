@@ -19,12 +19,12 @@ import type { CsbRandom } from '../core/random';
 import type { CreatureRecord, Item16Record } from '../data/dungeonTypes';
 import { ITEM16_FREE, SMS_ATTACKING, SMS_MIRROR } from '../data/dungeonTypes';
 import type { DungeonState } from './DungeonState';
-import type { GameContext, RulesOptions } from './GameContext';
+import type { GameContext } from './GameContext';
 import { selectPaletteForLightLevel } from './LightLevel';
 import { TimerFunction, type TimerEntry, type TimerQueue } from './TimerQueue';
 import { MonsterEvents, type MmRecord } from './MmRecord';
-import { DeleteMonsterWhy, deleteMonsterParameters } from './MonsterDamage';
-import { MonsterType, StateOfFear } from './monsterTypes';
+import { DeleteMonsterWhy, deleteMonsterParameters } from './filterParameters';
+import { MonsterType, monsterUnique, setPackedBits, StateOfFear } from './monsterTypes';
 import type { MonsterDesc } from '../data/tables/MonsterDesc';
 import {
   monsterAttackingMirrorOK,
@@ -60,30 +60,6 @@ const SOUND_ORDINAL_TELEPORT = 17;
 
 /** The out-of-range `groupIndex` sentinel for a monster with no `ITEM16`. */
 const GROUP_INDEX_DETACHED = 0xd8;
-
-/** The two monster design options, CSBWin's globals, which `GameContext.rules` holds. */
-export type MonsterDesignOptions = Pick<RulesOptions, 'invisibleMonsters' | 'drawAsSize4Monsters'>;
-
-/**
- * `DB4::invisible()`, `drawAsSize4()`, `Unique()` and `Poisoned()`
- * (`doc/CSBwin-src/CSB.h:1128-1135`): bits 11 to 14 of `word14`, each only if its design
- * option is set, `invisibleMonsters` for the first and `drawAsSize4Monsters` for the
- * other three. Both options come from a save's extended-features block
- * (`SaveGame.cpp:396-402`) and default to `false` (`data.cpp:78-79`). Every reader of the
- * four goes through these; the raw bits are only written (`&MONSTER!`, a new group).
- */
-export function monsterInvisible(options: MonsterDesignOptions, monster: CreatureRecord): boolean {
-  return options.invisibleMonsters && monster.invisible;
-}
-export function monsterDrawAsSize4(options: MonsterDesignOptions, monster: CreatureRecord): boolean {
-  return options.drawAsSize4Monsters && monster.drawAsSize4;
-}
-export function monsterUnique(options: MonsterDesignOptions, monster: CreatureRecord): boolean {
-  return options.drawAsSize4Monsters && monster.unique;
-}
-export function monsterPoisoned(options: MonsterDesignOptions, monster: CreatureRecord): boolean {
-  return options.drawAsSize4Monsters && monster.poisoned;
-}
 
 export class MonsterSystem {
   /** `d.ITEM16QueLen` — how many slots are in use. */
@@ -931,13 +907,4 @@ function makeFreeItem16(): Item16Record {
     uByte11: 0,
     singleMonsterStatus: [0, 0, 0, 0],
   };
-}
-
-/**
- * `SetMonsterPositionBits` — replace the `index`th 2-bit field of a packed byte
- * (`doc/CSBwin-src/CSBCode.cpp`, used throughout the monster code).
- */
-export function setPackedBits(packed: number, index: number, value: number): number {
-  const shift = 2 * (index & 0x3);
-  return ((packed & ~(0x3 << shift)) | ((value & 0x3) << shift)) & 0xff;
 }

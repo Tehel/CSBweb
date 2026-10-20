@@ -34,6 +34,7 @@ import type { MonsterDesc } from '../data/tables/MonsterDesc';
 import { monsterWord14_12_15, monsterWord16_8_11, monsterWord2Bit4 } from '../data/tables/MonsterDesc';
 import { wakeUp } from './LoopState';
 import { TimerFunction } from './TimerQueue';
+import type { AttackParameters } from './filterParameters';
 
 /**
  * The missile "projectile" RNs a monster can throw (`doc/CSBwin-src/CSBTypes.h`, used
@@ -54,86 +55,6 @@ const THROWABLE: ReadonlySet<number> = new Set([
   RN_FIREBALL, RN_POISON, RN_LIGHTNING, RN_DISPELL_MISSILE,
   RN_ZO_SPELL, RN_POISON_CLOUD, RN_POISON_BOLT,
 ]);
-
-/**
- * `ATTACK_PARAMETERES` (`doc/CSBwin-src/Monster.cpp:921-942`), twenty longwords.
- *
- * Kept as one block because the Monster Attack Filter DSA is handed the whole thing
- * and may rewrite any field before it is acted on
- * (`doc/CSBwin-src/Monster.cpp:1129-1175`). The two flags are CSBWin's `i32`s, tested
- * against 0, and `missileType` its `ui32`, so a value the filter writes is kept as written.
- */
-export interface AttackParameters {
-  monsterID: number;
-  monsterType: number;
-  monsterIndex: number;
-  monsterLevel: number;
-  monsterX: number;
-  monsterY: number;
-  monsterPos: number;
-  missileOriginPosition: number;
-  missileRange: number;
-  missileDamage: number;
-  missileDecayRate: number;
-  directionToParty: number;
-  distanceToParty: number;
-  missileType: number;
-  monsterShouldLaunchMissile: number;
-  monsterShouldSteal: number;
-  /** 0-3 a specific champion, 4 the leader, 5 random, 6 closest, -1 none. */
-  heroToDamage: number;
-  attackSoundOrdinal: number;
-  disableTime: number;
-  /** CSBWin starts this at -1; only `== 1` suppresses poison. */
-  supressPoison: number;
-}
-
-/** `sizeof(attackParameters) / 4` (`doc/CSBwin-src/Monster.cpp:1169`): its 20 longwords. */
-export const ATTACK_PARAMETER_WORDS = 20;
-
-/**
- * `memcpy(pDSAparameters + 1, &attackParameters, sizeof(attackParameters))`
- * (`doc/CSBwin-src/Monster.cpp:1168`): the block as the monster attack filter's DSA sees
- * it, a longword per field in the struct's order (`:921-942`).
- */
-export function attackParametersToWords(p: AttackParameters): number[] {
-  return [
-    p.monsterID, p.monsterType, p.monsterIndex, p.monsterLevel, p.monsterX, p.monsterY,
-    p.monsterPos, p.missileOriginPosition, p.missileRange, p.missileDamage, p.missileDecayRate,
-    p.directionToParty, p.distanceToParty, p.missileType, p.monsterShouldLaunchMissile,
-    p.monsterShouldSteal, p.heroToDamage, p.attackSoundOrdinal, p.disableTime, p.supressPoison,
-  ].map((word) => word | 0);
-}
-
-/**
- * `memcpy(&attackParameters, pDSAparameters + 1, sizeof(attackParameters))`
- * (`doc/CSBwin-src/Monster.cpp:1171`): the block back from the DSA into `p`, `word(i)` its
- * longword `i`, a `ui32` field read unsigned.
- */
-export function attackParametersFromWords(p: AttackParameters, word: (index: number) => number): void {
-  const w = (index: number): number => word(index) | 0;
-  const u = (index: number): number => word(index) >>> 0;
-  p.monsterID = u(0);
-  p.monsterType = u(1);
-  p.monsterIndex = u(2);
-  p.monsterLevel = w(3);
-  p.monsterX = w(4);
-  p.monsterY = w(5);
-  p.monsterPos = w(6);
-  p.missileOriginPosition = w(7);
-  p.missileRange = w(8);
-  p.missileDamage = w(9);
-  p.missileDecayRate = w(10);
-  p.directionToParty = w(11);
-  p.distanceToParty = w(12);
-  p.missileType = u(13);
-  p.monsterShouldLaunchMissile = w(14);
-  p.monsterShouldSteal = w(15);
-  p.heroToDamage = w(16);
-  p.attackSoundOrdinal = w(17);
-  p.disableTime = w(18);
-  p.supressPoison = w(19);
-}
 
 export class MonsterAttack {
   private readonly dungeon: DungeonState;

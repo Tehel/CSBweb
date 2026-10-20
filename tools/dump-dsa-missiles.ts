@@ -22,7 +22,7 @@
 import { DBType, OBJECT_ID_EOF, Position, locationRelToInteger, type ObjectID } from '../src/core/types';
 import { RN_FIREBALL, RN_LIGHTNING } from '../src/core/spellRn';
 import type { DungeonData } from '../src/data/dungeonTypes';
-import { StkOp } from '../src/engine/DsaSystem';
+import { StkOp } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { decodeMissileTimerWord8 } from '../src/engine/missileHelpers';

@@ -23,7 +23,7 @@
  */
 import { messageParametersKey } from '../src/data/CsbwinExpool';
 import type { DungeonData } from '../src/data/dungeonTypes';
-import { StkOp } from '../src/engine/DsaSystem';
+import { StkOp } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
 import { AttackType } from '../src/engine/monsterTypes';
 import { TimerFunction, type TimerEntry } from '../src/engine/TimerQueue';

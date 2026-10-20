@@ -68,7 +68,7 @@ import {
 } from '../data/DataSets';
 import { GraphicsLoader } from '../data/GraphicsLoader';
 import { ITEM_KINDS, isIllegalSubcode, operationsUsed, type DungeonCensus } from '../engine/DungeonCensus';
-import { StkOp } from '../engine/DsaSystem';
+import { StkOp } from '../engine/dsa/DsaTypes';
 import { lastTitleFrame, thumbnailPng } from '../renderer/intro/TitleThumbnail';
 import {
     checkLocalDataSet, identifyLocalDataSetFile, recordFile,

@@ -33,7 +33,7 @@ import {
   monsterWord4Bit8,
 } from '../../data/tables/MonsterDesc';
 import { ordinalAtPositionBytes } from '../../engine/monsterPosition';
-import { monsterDrawAsSize4, monsterInvisible, type MonsterDesignOptions } from '../../engine/MonsterSystem';
+import { monsterDrawAsSize4, monsterInvisible, type MonsterDesignOptions } from '../../engine/monsterTypes';
 import { DBType, OBJECT_ID_EOF, type ObjectID } from '../../core/types';
 import { applyLimits } from '../../core/intCast';
 import { viewportRandom, type ViewportDraw } from './ViewportDraw';

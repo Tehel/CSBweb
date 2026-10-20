@@ -73,7 +73,7 @@ import { readFileSync } from 'node:fs';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, locationRelToInteger, type ObjectID } from '../src/core/types';
 import { DecodeText, GetText } from '../src/data/DecodeText';
 import { DungeonLoader } from '../src/data/DungeonLoader';
-import { StkOp, ViewingFilterSite, type ViewingFilterResult } from '../src/engine/DsaSystem';
+import { StkOp, ViewingFilterSite, type ViewingFilterResult } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
 import { UNSET, freshGame, globalStore, int, op, varFetch, varStore, withFilterDsas } from './lib/dsa';
 import { check, finish } from './lib/check';

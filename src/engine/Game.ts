@@ -38,7 +38,8 @@ import { createGravityState, createLoopFlags, flashButton, vblFlashButton, vblIn
 import { makeMoreRoomInDB } from './MakeMoreRoomInDB';
 import { smartDiscard } from './SmartDiscard';
 import { isNinetySecondTick, isTenSecondTick, ninetySecondUpdate, tenSecondUpdate } from './PeriodicUpdates';
-import { CursorFilterType, DsaSystem } from './DsaSystem';
+import { DsaSystem } from './DsaSystem';
+import { CursorFilterType } from './dsa/DsaTypes';
 import { OBJECT_ID_NULL, Position } from '../core/types';
 import { EDT_GLOBAL_TEXT } from '../data/DecodeText';
 import { VBL_FREQUENCY } from '../core/constants';

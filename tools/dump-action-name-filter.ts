@@ -18,7 +18,7 @@
  *
  * Run: `npm test -- --only=dump-action-name-filter.ts`
  */
-import { StkOp } from '../src/engine/DsaSystem';
+import { StkOp } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
 import { EDT_GLOBAL_TEXT } from '../src/data/DecodeText';
 import type { DungeonData } from '../src/data/dungeonTypes';

@@ -31,7 +31,7 @@ import { CloudType } from './cloudTypes';
 import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
 import { MonsterDamageResult } from './MonsterDamage';
-import { monsterDrawAsSize4 } from './MonsterSystem';
+import { monsterDrawAsSize4 } from './monsterTypes';
 import { MonsterType } from './monsterTypes';
 import { ordinalOfMonsterAtPosition } from './monsterPosition';
 import { DescIndex, IsAKey } from './objectIndex';

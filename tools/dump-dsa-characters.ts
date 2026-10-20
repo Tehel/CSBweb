@@ -34,7 +34,7 @@ import { readFileSync } from 'node:fs';
 
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../src/core/types';
 import { Expool } from '../src/data/CsbwinExpool';
-import { StkOp } from '../src/engine/DsaSystem';
+import { StkOp } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
 import type { Champion } from '../src/engine/gameTypes';
 import { attributeCurrent, attributeMaximum, attributeMinimum } from '../src/engine/attributes';

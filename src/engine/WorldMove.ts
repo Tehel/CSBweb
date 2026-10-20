@@ -16,8 +16,9 @@ import type { CreatureRecord, Item16Record, TeleporterRecord } from '../data/dun
 import { monsterHorizontalSize, monsterLevitating } from '../data/tables/MonsterDesc';
 import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
-import { DeleteMonsterWhy, MonsterDamageResult, deleteMonsterParameters } from './MonsterDamage';
-import { setPackedBits } from './MonsterSystem';
+import { MonsterDamageResult } from './MonsterDamage';
+import { DeleteMonsterWhy, deleteMonsterParameters } from './filterParameters';
+import { setPackedBits } from './monsterTypes';
 import { gatherThrownWeapons } from './ThrownWeapons';
 import { StateOfFear } from './monsterTypes';
 import { decodeMissileTimerWord8 } from './missileHelpers';

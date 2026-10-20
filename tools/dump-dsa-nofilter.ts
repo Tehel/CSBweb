@@ -13,7 +13,7 @@
  * Run: `npm test -- --only=dump-dsa-nofilter.ts`
  */
 import { DBType, OBJECT_ID_NULL } from '../src/core/types';
-import { CursorFilterType, StkOp } from '../src/engine/DsaSystem';
+import { CursorFilterType, StkOp } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
 import { freshGame, int, op, run, withFilterDsas } from './lib/dsa';
 import { check, finish } from './lib/check';

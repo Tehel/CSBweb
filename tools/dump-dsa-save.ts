@@ -46,7 +46,7 @@ import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import { buildSaveFile } from '../src/engine/SaveGameFile';
-import { StkOp } from '../src/engine/DsaSystem';
+import { StkOp } from '../src/engine/dsa/DsaTypes';
 import { identityOverlayPalette } from '../src/engine/OverlayPalette';
 import { freshGame, globalStore, int, op, run } from './lib/dsa';
 import { newGame, stockDungeon, stockGame, stockGraphics } from './lib/game';

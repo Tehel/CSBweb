@@ -37,7 +37,7 @@ import { EF_EXTENDED_FLAGS } from '../src/data/CsbwinExtendedFeatures';
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
 import { readU16LE, readU32LE } from '../src/core/bytes';
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
-import { StkOp } from '../src/engine/DsaSystem';
+import { StkOp } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
 import { Overlay, OVERLAY_HEIGHT, OVERLAY_WIDTH } from '../src/engine/Overlay';
 import { identityOverlayPalette } from '../src/engine/OverlayPalette';

@@ -31,7 +31,7 @@ import { Expool } from '../src/data/CsbwinExpool';
 import type { DungeonData } from '../src/data/dungeonTypes';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
-import { StkOp } from '../src/engine/DsaSystem';
+import { StkOp } from '../src/engine/dsa/DsaTypes';
 import { DungeonState } from '../src/engine/DungeonState';
 import { buildSaveFile } from '../src/engine/SaveGameFile';
 import { SkinCache } from '../src/engine/SkinCache';

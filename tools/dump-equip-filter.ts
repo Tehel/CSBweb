@@ -17,7 +17,7 @@
  * Run: `npm test -- --only=dump-equip-filter.ts`
  */
 import { OBJECT_ID_NULL, type ObjectID } from '../src/core/types';
-import { StkOp } from '../src/engine/DsaSystem';
+import { StkOp } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
 import { UNSET, freshGame, globalStore, int, op, varFetch, varStore, withFilterDsas } from './lib/dsa';
 import { check, finish } from './lib/check';

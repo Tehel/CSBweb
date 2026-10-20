@@ -7,8 +7,9 @@
  */
 import { OBJNI_APPLE, OBJNI_DRAGON_STEAK, OBJNI_SPECIAL_G, OBJNI_SPECIAL_H, OBJNI_WATER, OBJNI_WATERSKIN } from '../../core/objectNameIndex';
 import { PotionType } from '../../core/constants';
-import { CursorFilterType } from '../../engine/DsaSystem';
-import { WATERSKIN_GULP, applyFeedParameters, clearFeedParameters, derivePotionFeeding, type FeedParameters } from '../../engine/Feeding';
+import { CursorFilterType } from '../../engine/dsa/DsaTypes';
+import { applyFeedParameters, derivePotionFeeding, WATERSKIN_GULP } from '../../engine/Feeding';
+import { clearFeedParameters, type FeedParameters } from '../../engine/filterParameters';
 import { CHARFLAG_CHEST_OR_SCROLL } from '../../engine/gameTypes';
 import { drawCharacterState } from '../../engine/Party';
 import { DBType, OBJECT_ID_NULL, ObjectID, locationRelToInteger } from '../../core/types';

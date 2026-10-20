@@ -21,7 +21,7 @@
  */
 import { DBType, locationRelToInteger, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../src/core/types';
 import type { DsaDefinition, DungeonData } from '../src/data/dungeonTypes';
-import { StkOp } from '../src/engine/DsaSystem';
+import { StkOp } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
 import { TimerFunction, type TimerEntry } from '../src/engine/TimerQueue';
 import { stockGame } from './lib/game';

@@ -26,7 +26,7 @@
  * Run: `npm test -- --only=dump-dsa-monsters.ts`
  */
 import { DBType, OBJECT_ID_EOF, Position, locationRelToInteger, type ObjectID } from '../src/core/types';
-import { StkOp } from '../src/engine/DsaSystem';
+import { StkOp } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { globalStore, int, op, report, run, varFetch, varStore } from './lib/dsa';

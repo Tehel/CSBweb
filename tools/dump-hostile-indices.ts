@@ -19,7 +19,7 @@
  */
 import { DBType, OBJECT_ID_EOF, Position, RoomType, locationRelToInteger, type ObjectID } from '../src/core/types';
 import type { DoorRecord } from '../src/data/dungeonTypes';
-import { StkOp, ViewingFilterSite } from '../src/engine/DsaSystem';
+import { StkOp, ViewingFilterSite } from '../src/engine/dsa/DsaTypes';
 import type { DungeonState } from '../src/engine/DungeonState';
 import { DrawDoor } from '../src/renderer/bytecode/DrawDoor';
 import type { ViewportDraw } from '../src/renderer/bytecode/ViewportDraw';

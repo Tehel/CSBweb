@@ -20,7 +20,7 @@
  */
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';
 import type { ContainerRecord, CreatureRecord, DungeonData } from '../data/dungeonTypes';
-import { StkOp } from './DsaSystem';
+import { StkOp } from './dsa/DsaTypes';
 import { DungeonState } from './DungeonState';
 
 /** The `STKOP` values that are no `case` of `EX_AMPERSAND`'s switch, nor `I_Indirect`. */

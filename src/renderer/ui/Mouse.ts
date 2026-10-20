@@ -14,6 +14,7 @@ import { canPlaceInSlot, drawPositionSquare } from './Character';
 import { objectIconBitmap } from './Draw';
 import { drinkAtWaterFountain, handleMouthPress } from './Feeding';
 import { HINT_ORACLE_BUTTON, inventoryButtonList } from './HintOracleButton';
+import type { HintSquare } from '../intro/HintOracle';
 import { searchButtonList } from './HitTest';
 import { describeObject, getActiveChestView, getEyeRect, repackOpenChest, syncOpenChest, tag0189d4, tag019036 } from './Inventory';
 import { handleMagicClick } from './MagicPanel';
@@ -24,7 +25,7 @@ import { UIMode, UIState, stHideCursor, stShowCursor, tag002572 } from './UIStat
 import { getPartyChampion, selectMagicCaster, setHandOwner } from '../../engine/Party';
 import { getChampionPossession } from '../../engine/gameTypes';
 import { characterAtPosition } from '../../engine/AddCharacter';
-import { CursorFilterType } from '../../engine/DsaSystem';
+import { CursorFilterType } from '../../engine/dsa/DsaTypes';
 import { freeze, setClockTick, thaw, waitForButtonFlash, wakeUp } from '../../engine/LoopState';
 import {
   hasCursorObject,
@@ -847,4 +848,29 @@ function drawCursorBitmap(ui: UIState, bitmap: IndexedBitmap, x: number, y: numb
       dst.pixels[dstRow + dx] = pixel;
     }
   }
+}
+
+/** The square the Oracle answers for: the party's, which a save writes as `partyLevel`, `partyX` and `partyY`. */
+function hintSquareOf(ui: UIState): HintSquare {
+  const { x, y, z } = ui.partyState.position;
+  return { level: z, x, y };
+}
+
+/**
+ * The flag acted on: `TAG02076e`, the clock stopped, and the screen's paint held for the
+ * Oracle's (`hintOracleUp`). Returns the square to open the Oracle on.
+ */
+export function openHintOracle(ui: UIState): HintSquare {
+  tag02076e(ui);
+  ui.ctx.state.paused = true;
+  ui.hintOracleUp = true;
+  return hintSquareOf(ui);
+}
+
+/** The Oracle closed: the clock runs again, and `TAG0207cc` shows the inventory again. */
+export function closeHintOracle(ui: UIState): void {
+  if (!ui.hintOracleUp) return;
+  ui.hintOracleUp = false;
+  ui.ctx.state.paused = false;
+  tag0207cc(ui);
 }

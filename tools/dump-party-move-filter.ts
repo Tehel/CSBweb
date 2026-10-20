@@ -30,7 +30,7 @@
 import { readFileSync } from 'node:fs';
 
 import { Position, RoomType, locationRelToInteger } from '../src/core/types';
-import { StkOp } from '../src/engine/DsaSystem';
+import { StkOp } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
 import { MovementAction, type MovementResult } from '../src/engine/gameTypes';
 import { UNSET, globalStore, int, op, varFetch, varStore, withFilterDsas } from './lib/dsa';

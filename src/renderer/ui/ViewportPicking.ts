@@ -15,7 +15,7 @@ import { GraphicRoomType } from '../bytecode/Types';
 import { resolveObjectNameIndex } from './Objects';
 import { UIState } from './UIState';
 import { setClockTick } from '../../engine/LoopState';
-import { CursorFilterType } from '../../engine/DsaSystem';
+import { CursorFilterType } from '../../engine/dsa/DsaTypes';
 import { forgetThrownWeapon } from '../../engine/ThrownWeapons';
 
 const POTION_WATER_FLASK = 15;

@@ -48,19 +48,20 @@
  */
 import { OBJNI_ILLUMULET_A, OBJNI_STAFF, OBJNI_TORCH_A, OBJNI_TORCH_D, OBJNI_WATERSKIN } from '../src/core/objectNameIndex';
 import { PotionType } from '../src/core/constants';
-import { applyFeedParameters, clearFeedParameters, type FeedParameters } from '../src/engine/Feeding';
+import { applyFeedParameters } from '../src/engine/Feeding';
+import { clearFeedParameters, type FeedParameters } from '../src/engine/filterParameters';
 import { computeFeedParameters } from '../src/renderer/ui/Feeding';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../src/core/types';
 import { AdjustStatsForItemCarried } from '../src/engine/AdjustStatsForItemCarried';
 import { attributeCurrent, attributeMaximum, attributeMinimum } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
 import { determineMastery } from '../src/engine/skills';
-import { CLASS_NAMES, SUBSKILL_NAMES } from '../src/renderer/ui/ChampionDialog';
+import { CLASS_NAMES, SUBSKILL_NAMES } from '../src/renderer/ui/Objects';
 import { getAttackClass } from '../src/renderer/ui/Objects';
 import { getLegalAttackTypes } from '../src/renderer/ui/Attack';
 import { NO_EXTRAS, nameIndexOf, type GameContext } from '../src/engine/GameContext';
 import { OBJDI_COMPASS, OBJDI_EYE_OF_TIME } from '../src/engine/objectIndex';
-import { StkOp } from '../src/engine/DsaSystem';
+import { StkOp } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
 import { describeObject, drawItemPropertyLines, drawObjectInfoPanel } from '../src/renderer/ui/Inventory';
 import { blitBasicGraphicToViewport } from '../src/renderer/ui/Draw';

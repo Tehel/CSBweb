@@ -117,14 +117,14 @@ In payoff order: the first row is the next item.
 | E23 | One game read, whole or not at all | L | ⏳ |
 | D18 | The interface's `d.` lives in the screen, and composing the screen changes the world | L | ⏳ |
 | D19 | `RuntimeSaveState` is neither strict nor a snapshot | M | ⏳ |
-| E24 | Two import cycles, and pure helpers in the systems | S | ⏳ |
+| E41 | `src/data/` imports the engine | S | ⏳ |
 | E35 | Comments and documents that are stale, wrong, or tell the past | M | ⏳ |
 | E36 | Type escape hatches that check nothing | M | ⏳ |
 | E25 | One helper for each rule, where copies drift | M | ⏳ after C170, C171 |
 | E26 | Systems named after CSBWin's files, not what they do | M | ⏳ |
 | D20 | Three record-size tables and two image layouts | S | ⏳ |
 | D21 | A save has nine shapes | L | ⏳ |
-| E27 | `DsaSystem.ts` is one 5,000-line class | L | ⏳ after E24 |
+| E27 | `DsaSystem.ts` is one 5,000-line class | L | ⏳ |
 | E28 | The bytecode interpreter decodes through switches and maps built per call | M | ⏳ |
 | E29 | `GameScreen` is the canvas, the compose order, the palettes and a façade | L | ⏳ |
 | E31 | Late wiring with silent defaults, and long parameter lists | M | ⏳ |
@@ -170,7 +170,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C183 · D22 · E41 · F22 · G31 · P13 · R17 · U13 · W8 · X16. An ID recorded and paid in one commit has no
+Next free IDs: C183 · D22 · E42 · F22 · G31 · P13 · R17 · U13 · W8 · X16. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -577,37 +577,6 @@ state from a pure function instead of a scratch `Game`; `GameState.dungeon` gone
 validation and the swap change what a damaged file does: commits of their own after the
 refactor, with a tool of damaged saves.
 
-### E24 ⏳ Two import cycles, and pure helpers in the systems
-
-`MonsterPerception`, `MonsterAttack`, `MonsterDamage`, `MonsterSystem`, `MmRecord` and
-`DsaSystem` import values from each other in a cycle, and so do `HintOracleButton` and
-`Mouse`. Nothing reads a value at load time today, so it works, but which module loads
-first depends on the entry point (a tool entering at `MonsterAttack`), and one table built
-at a module's top level would break some entries and not others. Every edge is a pure
-helper living in a system's module:
-
-- `MmRecord` imports `DsaVars` from `DsaSystem` (`MmRecord.ts:10`, `:80`), the edge that
-  closes the cycle;
-- `setPackedBits` and the `monsterDrawAsSize4`, `Invisible`, `Unique` and `Poisoned`
-  readers live in `MonsterSystem`, which six modules import for them;
-- `DsaSystem` imports the filters' parameter-block codecs from `Feeding`, `MonsterAttack`,
-  `MonsterDamage` and `MovementSystem` (`DsaSystem.ts:59-67`): the dependency points the
-  wrong way;
-- `MonsterSystem` imports `deleteMonsterParameters` and `DeleteMonsterWhy` from
-  `MonsterDamage`;
-- `HintOracleButton` imports `tag02076e` and `tag0207cc` from `Mouse`
-  (`HintOracleButton.ts:25`) for `openHintOracle` and `closeHintOracle`, which only
-  `GameScreen` calls.
-
-`src/data/` imports the engine five times: `AltMonGraphics` from `Die`, `CsbwinCharacters`
-from `gameTypes` and `attributes`, `HeroExtractor` from `AddCharacter` and `RelativeXY`.
-
-Paying it: `DsaVars`, `DsaVarType`, `StkOp` and the cursor and viewing filters' types in a
-leaf `dsa/DsaTypes.ts`; the packed-bit readers in `monsterTypes.ts`; the filters' codecs
-beside their interfaces in a `filterParameters.ts`; the two Oracle functions in `Mouse.ts`
-or `GameScreen`; what `src/data/` takes from the engine moved down. Then a check in
-`npm test` that fails on a value-import cycle.
-
 ### E25 ⏳ One helper for each rule, where copies drift
 
 C170 and C171 are copies that drifted. The copies left:
@@ -693,7 +662,7 @@ and seven filter sites have none (`processMissileEncounterFilter`,
 parameters are marshalled field by field both ways (`:1380-1412`, and again in
 `MagicSystem.ts:140-155`), where every other block has a codec.
 
-Paying it, in steps, into `src/engine/dsa/`: `DsaTypes.ts` (E24); `DsaMachine.ts`, the
+Paying it, in steps, into `src/engine/dsa/`, beside `DsaTypes.ts`: `DsaMachine.ts`, the
 stack, the bank, `execute` over a `ProgramCursor` (`word()`, `nextState(word, shift, bits,
 maxState, signed)`) and the state look-ups; `DsaFilters.ts`, one `runFilter(esl, words,
 options)` the sites call with their codecs, the spell's included; `ops/` by domain (stack
@@ -910,6 +879,22 @@ Paying it: the casts and `??` removed where the type already says it; `hcsb.dat`
 lengths checked once in `parseHcsbDat`, not by 54 `!`; `noUncheckedIndexedAccess` turned on
 module by module where data comes from files (the intro, the renderer, the loaders), in a
 `tsconfig` that `npm test` runs; an `OBJECT_ID_EMPTY` constant; the two free flags on.
+
+### E41 ⏳ `src/data/` imports the engine
+
+The readers sit below the engine that runs what they read, yet six value imports point
+up: `AltMonGraphics` and `CSBGraphicsLoader` take `Die` (`src/engine/Die.ts`),
+`CsbwinCharacters` takes `CHARFLAG_MALE` and `getChampionPossession` from
+`engine/gameTypes`, `HeroExtractor` takes `readHeroText` from `engine/AddCharacter`, and
+`LocalDataSets` takes `dungeonCensus` (`engine/DungeonCensus`) and `buildGameTables`
+(`engine/GameTables`). The last two are a set's check, which plays the boot's readers and
+counts what the dungeon holds, and the server bundles it (`dist/server/LocalDataSets.js`).
+
+Paying it: `Die` into `src/core/`; the possession reader and the flag beside
+`CsbwinCharacters` or in `core`; `readHeroText` into `HeroExtractor`, which `AddCharacter`
+then imports; and `checkLocalDataSet` with the census out of `src/data/`, beside the code
+that runs a set (the server's bundle entry moving with it). Then
+`tools/dump-import-cycles.ts` fails on an edge from `src/data/` into `src/engine/`.
 
 ### E39 ⏳ The About and Credits pages
 

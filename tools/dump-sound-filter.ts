@@ -19,7 +19,7 @@
  *
  * Run: `npm test -- --only=dump-sound-filter.ts`
  */
-import { StkOp } from '../src/engine/DsaSystem';
+import { StkOp } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
 import { UNSET, freshGame, globalStore, int, op, varFetch, withFilterDsas } from './lib/dsa';
 import { check, finish } from './lib/check';

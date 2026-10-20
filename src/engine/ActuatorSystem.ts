@@ -36,7 +36,7 @@ import {
     OBJNI_CHEST,
     OBJNI_NOT_AN_OBJECT,
 } from '../core/objectNameIndex';
-import { CursorFilterType } from './DsaSystem';
+import { CursorFilterType } from './dsa/DsaTypes';
 
 /** CSBWin message colours (`doc/CSBWIN_MESSAGES_REFERENCE.md`). */
 export const MSG_COLOR_SPELL = 4;

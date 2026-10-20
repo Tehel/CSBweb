@@ -40,7 +40,7 @@ import {
   monsterVerticalSize,
   monsterWord16_12_15,
 } from '../data/tables/MonsterDesc';
-import { setPackedBits } from './MonsterSystem';
+import { setPackedBits } from './monsterTypes';
 import { CloudType } from './cloudTypes';
 import { RelativeXY } from './RelativeXY';
 import { sw } from '../core/intCast';

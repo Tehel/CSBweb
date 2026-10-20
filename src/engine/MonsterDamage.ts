@@ -30,7 +30,8 @@ import type { GameContext } from './GameContext';
 import { TimerFunction, type TimerEntry, type TimerQueue } from './TimerQueue';
 import type { MmRecord } from './MmRecord';
 import { MonsterType, StateOfFear } from './monsterTypes';
-import { monsterDrawAsSize4, setPackedBits } from './MonsterSystem';
+import { monsterDrawAsSize4, setPackedBits } from './monsterTypes';
+import { deleteMonsterParameters, DeleteMonsterWhy, type DeleteMonsterParameters } from './filterParameters';
 import type { MonsterDesc } from '../data/tables/MonsterDesc';
 import {
   monsterBravery,
@@ -45,73 +46,6 @@ export enum MonsterDamageResult {
   NO_MONSTER_DIED = 0,
   SOME_NOT_ALL_MONSTERS_DIED = 1,
   ALL_MONSTERS_DIED = 2,
-}
-
-/**
- * `DELETEMONSTERWHY` (`doc/CSBwin-src/CSB.h:2976-2985`): why a group, or a member of one,
- * leaves the dungeon. The kill statistics count by it.
- */
-export enum DeleteMonsterWhy {
-  DMW_Unknown = 0,
-  DMW_Fusion = 1,
-  DMW_MakeRoom = 2,
-  DMW_Damage = 3,
-  DMW_Movement1 = 4,
-  DMW_Movement2 = 5,
-}
-
-/**
- * `DELETEMONSTERPARAMETERS` (`doc/CSBwin-src/CSB.h:2996-3010`): what the delete monster
- * filter's DSA reads and may rewrite. `dropResidue` is 0 for the default, 1 to drop the
- * remains, 2 not to; `deathCloud` 0 for the default, 1 to show the cloud, 2 not to;
- * `index` is the member's in its group, -1 for the whole group.
- */
-export interface DeleteMonsterParameters {
-  monsterID: number;
-  level: number;
-  x: number;
-  y: number;
-  why: DeleteMonsterWhy;
-  dropResidue: number;
-  deathCloud: number;
-  index: number;
-}
-
-/**
- * `DELETEMONSTERPARAMETERS::DELETEMONSTERPARAMETERS` (`doc/CSBwin-src/Code11f52.cpp:953-959`).
- * The monster and its square are left unset, as CSBWin leaves them, until
- * `ProcessMonsterDeleteFilter` fills them in.
- */
-export function deleteMonsterParameters(why: DeleteMonsterWhy, index: number): DeleteMonsterParameters {
-  return { monsterID: 0, level: 0, x: 0, y: 0, why, dropResidue: 0, deathCloud: 0, index };
-}
-
-/** `sizeof(DELETEMONSTERPARAMETERS) / 4` (`doc/CSBwin-src/Code11f52.cpp:1047`): its 8 longwords. */
-export const DELETE_MONSTER_PARAMETER_WORDS = 8;
-
-/**
- * `memcpy(pDSAparameters + 1, pdmp, sizeof (*pdmp))` (`doc/CSBwin-src/Code11f52.cpp:1046`):
- * the block as the delete monster filter's DSA sees it, a longword per field in the
- * class's order (`CSB.h:2999-3006`).
- */
-export function deleteMonsterParametersToWords(p: DeleteMonsterParameters): number[] {
-  return [p.monsterID, p.level, p.x, p.y, p.why, p.dropResidue, p.deathCloud, p.index].map((word) => word | 0);
-}
-
-/**
- * `memcpy(pdmp, pDSAparameters + 1, sizeof (*pdmp))` (`doc/CSBwin-src/Code11f52.cpp:1049`):
- * the block back from the DSA into `p`, `word(i)` its longword `i`.
- */
-export function deleteMonsterParametersFromWords(p: DeleteMonsterParameters, word: (index: number) => number): void {
-  const w = (index: number): number => word(index) | 0;
-  p.monsterID = w(0);
-  p.level = w(1);
-  p.x = w(2);
-  p.y = w(3);
-  p.why = w(4);
-  p.dropResidue = w(5);
-  p.deathCloud = w(6);
-  p.index = w(7);
 }
 
 /** `EDT_Statistics`, `ESTAT_NumMonsterKilled` (`doc/CSBwin-src/CSB.h:1565-1566`). */

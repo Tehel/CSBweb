@@ -26,7 +26,7 @@
  */
 import { Position, RoomType, locationRelToInteger } from '../src/core/types';
 import { messageParametersKey } from '../src/data/CsbwinExpool';
-import { StkOp } from '../src/engine/DsaSystem';
+import { StkOp } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
 import { TimerFunction, type TimerEntry } from '../src/engine/TimerQueue';
 import { globalStore, int, op, run, varFetch, varStore } from './lib/dsa';
