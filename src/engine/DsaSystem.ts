@@ -1265,10 +1265,9 @@ export class DsaSystem {
       subroutineLevel: 0,
     }, bank);
 
+    // `PutState` whatever `Execute` returned, -1 included (`doc/CSBwin-src/DSA.cpp:5463-5464`).
     const nextState = bank.forceState >= 0 ? bank.forceState : finalState;
-    if (nextState >= 0) {
-      this.putState(masterRecord, masterDsa, nextState);
-    }
+    this.putState(masterRecord, masterDsa, nextState);
     // `ProcessDSATimer6` returns `deletedSlave` (`doc/CSBwin-src/DSA.cpp:5484-5487`),
     // and every timer walk that runs a DSA breaks out of the cell's chain on it
     // (`Timer.cpp:1433`, `:1757`, `:2230`) — the slave's link is no longer the cell's.
@@ -1526,20 +1525,30 @@ export class DsaSystem {
             const value = bank.stack.pop();
             const numCase = program[pc++] ?? 0;
             wordsRemaining--;
-            let found = false;
-            for (let i = 0; i < numCase; i++) {
-              const low = program[pc++] ?? 0;
-              const high = program[pc++] ?? 0;
-              const targetLow = program[pc++] ?? 0;
-              const targetHigh = program[pc++] ?? 0;
-              const caseValue = ((high << 16) | low) >>> 0;
-              const target = ((targetHigh << 16) | targetLow) >>> 0;
-              if (!found && caseValue === (value >>> 0)) {
+            // `EX_CASE`'s binary search over the cases, in unsigned order
+            // (`doc/CSBwin-src/DSA.cpp:1005-1031`): on an unsorted table, or a value given
+            // twice, it finds what the search finds, not the first.
+            const key = value >>> 0;
+            const word32 = (at: number): number => (((program[at + 1] ?? 0) << 16) | (program[at] ?? 0)) >>> 0;
+            let base = pc;
+            for (let n = numCase; n > 0;) {
+              const m = n >> 1;
+              const at = base + 4 * m;
+              const caseValue = word32(at);
+              if (caseValue === key) {
+                const target = word32(at + 2);
                 transferState = (target >>> 8) & 0xffff;
                 transferCol = target & 0xff;
-                found = true;
+                break;
+              }
+              if (caseValue > key) {
+                n = m;
+              } else {
+                base = at + 4;
+                n -= m + 1;
               }
             }
+            pc += 4 * numCase;
             wordsRemaining = program.length - pc;
             break;
           }
@@ -1992,7 +2001,8 @@ export class DsaSystem {
         bank.stack.push(bank.stack.pop() + bank.stack.pop());
         break;
       case StkOp.GEAR:
-        bank.stack.push(bank.stack.pop() * bank.stack.pop());
+        // An `i32` product, which wraps (`DSA.cpp:2534-2540`).
+        bank.stack.push(Math.imul(bank.stack.pop(), bank.stack.pop()));
         break;
       case StkOp.ONE_MINUS:
         bank.stack.push(bank.stack.pop() - 1);
@@ -2076,12 +2086,12 @@ export class DsaSystem {
         break;
       }
       case StkOp.RANDOM: {
-        let v = bank.stack.pop();
+        let v = bank.stack.pop() >>> 0;
         if (v === 0) v = 1;
-        // `(ui32)STRandom() % V` (doc/CSBwin-src/DSA.cpp:2730) — the full 24-bit
-        // draw modulo V, *not* `STRandom(V)`, which masks to 16 bits first.
-        const result = this.random.next() % v;
-        bank.stack.push(result);
+        // `(ui32)STRandom() % V` with `ui32 V` (doc/CSBwin-src/DSA.cpp:2721-2733) — the
+        // full 24-bit draw modulo V, unsigned, *not* `STRandom(V)`, which masks to 16 bits.
+        const result = (this.random.next() >>> 0) % v;
+        bank.stack.push(result | 0);
         break;
       }
       case StkOp.COPY: {
@@ -3615,7 +3625,8 @@ export class DsaSystem {
         setActuatorDsaState(rec, state);
         break;
       case 1:
-        dsa.state = state;
+        // `void State(i32 s){m_state = (ui16)s;}` (`doc/CSBwin-src/Data.h:2483`).
+        dsa.state = state & 0xffff;
         break;
       case 2:
         setActuatorParameterB(rec, state);

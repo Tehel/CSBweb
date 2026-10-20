@@ -4441,6 +4441,15 @@ along the way substituted ordinal 5's item for ordinal 4's (a plain object's imp
 ordinal 13's item for ordinal 20's (a small blast) — see PLAN.md for the fix and its
 evidence.
 
+## The DSA's integers are C's: `i32`, `ui32`, `ui16`
+
+`&*` multiplies two `i32`s (`doc/CSBwin-src/DSA.cpp:2534-2540`), which wraps:
+0x7fffffff squared is 1. `&RANDOM` takes a `ui32 V` and gives `(ui32)STRandom() % V`
+(`:2721-2733`), so of -1 the draw itself. A run's final state is put whatever it is
+(`PutState`, `:5463-5464`), -1 included, and a DSA's own state is `m_state = (ui16)s`
+(`Data.h:2483`). `CASE` binary-searches its table (`:1005-1031`): an unsorted table, or a
+value given twice, jumps where the search lands. Covered by `tools/dump-dsa-widths.ts`.
+
 ## The DSA's `&ADD` and `&COPY` copy whole records
 
 `&ADD` of a monster group copies its `DB4` byte by byte past the link

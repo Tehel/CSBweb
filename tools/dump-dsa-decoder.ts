@@ -121,14 +121,15 @@ function run(program: number[], state = 0): Run {
   check(r.global0 === 7, 'a STORE above 25 pops nothing');
 
   // From state 5, a NOOP of -6 makes the next state -1, which sets no final state; an
-  // illegal command after it must leave it so, and the DSA stays in state 5.
+  // illegal command after it must leave it so, and `PutState` puts the -1 `Execute`
+  // returns (`DSA.cpp:5463-5464`), `(ui16)`: 0xffff.
   const s = run([NOOP | rel(-6, 6, 10), STORE | (26 << 6) | rel(2, 11, 5)], 5);
   console.log(`3b. from 5, NOOP -6, STORE 26 +2: state ${s.dsa.state}`);
-  check(s.dsa.state === 5, 'a STORE above 25 leaves the next state');
+  check(s.dsa.state === 0xffff, 'a STORE above 25 leaves the next state');
 
   const o = run([NOOP | rel(-6, 6, 10), OVERRIDE | (2 << 6) | rel(2, 12, 4)], 5);
   console.log(`3c. from 5, NOOP -6, OVERRIDE what 2 +2: state ${o.dsa.state}`);
-  check(o.dsa.state === 5, 'an OVERRIDE whose what is not 1 leaves the next state');
+  check(o.dsa.state === 0xffff, 'an OVERRIDE whose what is not 1 leaves the next state');
 }
 
 /* ---------------------------------------------- 4. GLOBALFETCH ------------------ */

@@ -133,7 +133,6 @@ In payoff order: the first row is the next item.
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | C177 | An Atari-era save loads with its possessions, timers and hand unconverted | M | ⏳ |
 | C173 | The DSA's `&ADD` and `&DEL` on a square bypass `MoveObject` | M | ⏳ |
-| C175 | The DSA's integer widths | S | ⏳ |
 | C176 | The DSA goes on where CSBWin stops | S | ⏳ |
 | C179 | A thrown object drawn as its floor picture is offset and never mirrored | S | ⏳ |
 | C180 | `AdjustSkills`' widths, and a gain of 0 | S | ⏳ |
@@ -1027,27 +1026,6 @@ which of them meet a pit, a teleporter, the party's square or a monster is not t
 Paying it: both through the world `MoveObject` (`objectMover()`, as `findCellSource` and
 `findCellDestination` do), then `setPos`; a tool with a pit, a teleporter, the party's
 square, and a monster group added on the party's level.
-
-### C175 ⏳ The DSA's integer widths
-
-- **`&*`** multiplies in doubles and truncates (`bank.stack.pop() * bank.stack.pop()`,
-  `src/engine/DsaSystem.ts:2235-2237`), where CSBWin's `i32 * i32` wraps
-  (`doc/CSBwin-src/DSA.cpp:2534-2540`). A product past 2^53 loses its low bits:
-  `0x7fffffff * 0x7fffffff` gives 0 for 1. Conflux has about 216 `&*`.
-- **`&RANDOM`** takes its divisor signed (`this.random.next() % v`, `:2319-2326`); CSBWin's
-  is `(ui32)STRandom() % V` with `ui32 V` (`DSA.cpp:2721-2733`), so `&RANDOM` of -1 gives
-  the draw itself, not 0.
-- **A DSA's state written back**: `void State(i32 s) { m_state = (ui16)s; }`
-  (`doc/CSBwin-src/Data.h:2483`), and `PutState` runs whatever the state
-  (`DSA.cpp:5464`). The port stores it unmasked (`putState`, `DsaSystem.ts:3853-3854`) and
-  skips a final state of -1 (`processTimer6Internal`, `:1510`), so a state of 65536 or more
-  lives unwrapped until a save wraps it, and a load changes what the game then does.
-- **`CASE`** takes the first match (`:1771-1783`), where CSBWin binary-searches in
-  unsigned order (`DSA.cpp:1007-1031`). They differ on an unsorted table, or on a key given
-  twice with two targets; Conflux's 781 tables give the same result both ways.
-
-Paying it: `Math.imul`; `(next() >>> 0) % (v >>> 0)`; `& 0xffff` and an unconditional put;
-the binary search. A check of each in a `dump-dsa-*` tool.
 
 ### C176 ⏳ The DSA goes on where CSBWin stops
 
