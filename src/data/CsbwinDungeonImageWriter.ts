@@ -30,6 +30,7 @@
 import { writeU16BE, writeU32LE } from '../core/bytes';
 import { EXPOOL_RECORD_SIZE } from './CsbwinExpool';
 import { levelCellOffsets } from './DungeonLoader';
+import { dbEntrySize, type DatabaseShape } from './DungeonImageLayout';
 import { DBType, OBJECT_ID_NULL } from '../core/types';
 import type {
     ActuatorRecord, ClothingRecord, CloudRecord, ContainerRecord, CreatureRecord, DatabaseRecord,
@@ -260,23 +261,15 @@ function buildTextWords(textWords: readonly number[]): Uint8Array {
 }
 
 /** How the databases of the image being written differ from a plain `dungeon.dat`. */
-interface DatabaseWriteOptions {
-    /** ACTUATOR records are 10 bytes, not 8 (`MakeBigActuators`). */
-    bigActuators?: boolean;
-    /** SCROLL records are 6 bytes with an RN text reference, not 4 with a 10-bit index. */
-    newScrolls?: boolean;
-}
+type DatabaseWriteOptions = Pick<DatabaseShape, 'bigActuators' | 'newScrolls'>;
 
 /**
- * `dbEntrySizes` (`doc/CSBwin-src/SaveGame.cpp:2783-2787` for the ACTUATOR special case,
- * `:2401-2412` for SCROLL). Databases 12 and 13 are `//Not used` in `CSB.h` and have no
- * record size; both are empty in every file this project holds.
+ * A record's size in the image being written: `dbEntrySize`, EXPOOL's counted. Databases
+ * 12 and 13 are `//Not used` in `CSB.h` and have no record size; both are empty in every
+ * file this project holds.
  */
 export function databaseRecordSize(db: number, options: DatabaseWriteOptions = {}): number {
-    const sizes = [4, 6, 4, 8, 16, 4, 4, 4, 4, 8, 4, EXPOOL_RECORD_SIZE, 0, 0, 8, 4];
-    if (db === DBType.ACTUATOR && options.bigActuators) return 10;
-    if (db === DBType.SCROLL && options.newScrolls) return 6;
-    return sizes[db] ?? 0;
+    return dbEntrySize(db, { ...options, expool: true });
 }
 
 /**

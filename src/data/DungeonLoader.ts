@@ -37,10 +37,8 @@ import { readExtendedFeatures } from './CsbwinExtendedFeatures';
 import { CheckCelltypes, ExtendPortraits, convertOriginalDungeon } from './CsbwinDungeonConversions';
 import { databaseRecords, rnMapsOf } from './CsbwinObjectIndex';
 import type { CsbwinObjectIndex } from './CsbwinObjectIndex';
-import {
-    DUNGEON_HEADER_SIZE,
-    MAP_DESCRIPTOR_SIZE
-} from '../core/constants';
+import { DUNGEON_HEADER_SIZE } from '../core/constants';
+import { computeDungeonImageLayout, dbEntrySize } from './DungeonImageLayout';
 
 /**
  * Dungeon.dat loader class
@@ -243,7 +241,7 @@ export class DungeonLoader {
         const mapDescriptors = this.parseMapDescriptors(header.numMaps);
 
         // Calculate offsets for all sections
-        const offsets = this.calculateOffsets(header, mapDescriptors);
+        const offsets = this.calculateOffsets();
         this.compareChecksum(offsets.mapData + (this.options.cellFlagArraySize ?? header.mapDataSize));
 
         // Parse column index
@@ -454,62 +452,25 @@ export class DungeonLoader {
     }
 
     /**
-     * Calculate offsets for all data sections
+     * Where each section of the image sits (`computeDungeonImageLayout`), in the shape the
+     * options give its records. An image whose sections run past its end does not read.
      */
-    private calculateOffsets(header: DungeonHeader, maps: MapDescriptor[]) {
-        const totalColumns = maps.reduce((sum, m) => sum + m.width, 0);
-
-        const columnIndexOffset = DUNGEON_HEADER_SIZE + maps.length * MAP_DESCRIPTOR_SIZE;
-        const objectListOffset = columnIndexOffset + totalColumns * 2;
-        const textDataOffset = objectListOffset + header.objectListSize * 2;
-        // In a save the text is already indirect: `NumWordsInTextArray` counts index
-        // entries (`ConvertToIndirectText` repurposes it,
-        // `doc/CSBwin-src/SaveGame.cpp:2484`), each 4 bytes, then a 4-byte
-        // `sizeOfCompressedText` and that many words of text. Both the index and the
-        // size word are little-endian, alone in a big-endian image.
-        let doorsOffset: number;
-        if (this.options.indirectText) {
-            const sizeAt = textDataOffset + header.textDataSize * 4;
-            const compressedWords = this.file.peekU32LE(sizeAt);
-            doorsOffset = sizeAt + 4 + compressedWords * 2;
-        } else {
-            doorsOffset = textDataOffset + header.textDataSize * 2;
-        }
-
-        let offset = doorsOffset;
-        const databaseOffsets: number[] = [];
-
-        // Calculate offset for each database
-        for (let i = 0; i < 16; i++) {
-            databaseOffsets.push(offset);
-            const recordSize = this.getDatabaseRecordSize(i);
-            offset += header.objectCounts[i] * recordSize;
-        }
-
-        const mapDataOffset = offset;
-
+    private calculateOffsets() {
+        const layout = computeDungeonImageLayout(this.file.read(0, this.file.length()), 0, {
+            indirectText: this.options.indirectText ?? false,
+            bigActuators: this.options.bigActuators,
+            newScrolls: this.options.newScrolls,
+            expool: this.options.expool,
+        });
+        if (!layout) throw new Error('the dungeon image is cut short');
         return {
-            columnIndex: columnIndexOffset,
-            objectList: objectListOffset,
-            textData: textDataOffset,
-            databases: databaseOffsets,
-            mapData: mapDataOffset,
-            totalColumns
+            columnIndex: layout.columnIndex,
+            objectList: layout.objectList,
+            textData: layout.text,
+            databases: layout.databases,
+            mapData: layout.cellFlags,
+            totalColumns: layout.totalColumns,
         };
-    }
-
-    /**
-     * Get record size for database type
-     */
-    private getDatabaseRecordSize(dbType: number): number {
-        const sizes = [4, 6, 4, 8, 16, 4, 4, 4, 4, 8, 4, 0, 0, 0, 8, 4];
-        // `dbEntrySizes[dbACTUATOR]` is the *big* size in CSBWin; the small one is the
-        // special case (`doc/CSBwin-src/SaveGame.cpp:2783-2787`). SCROLL grows the same
-        // way from extended-features version 'B' (`:2401-2412`).
-        if (dbType === DBType.ACTUATOR && this.options.bigActuators) return 10;
-        if (dbType === DBType.SCROLL && this.options.newScrolls) return 6;
-        if (dbType === 11 && this.options.expool) return EXPOOL_RECORD_SIZE;
-        return sizes[dbType] || 0;
     }
 
     /**
@@ -648,7 +609,7 @@ export class DungeonLoader {
     clearedRecords(db: DBType, count: number, shape: { bigActuators?: boolean; newScrolls?: boolean }): DatabaseRecord[] {
         const objectIndex = { length: 0, typeMap: new Uint8Array(0), indexMap: new Uint16Array(0) };
         this.options = { bigActuators: shape.bigActuators, newScrolls: shape.newScrolls, objectIndex };
-        const size = this.getDatabaseRecordSize(db);
+        const size = dbEntrySize(db, this.options);
         const bytes = new Uint8Array(count * size);
         for (let i = 0; i < count; i++) bytes.fill(0xff, i * size, i * size + 2);
         this.file.loadFromArray(bytes);

@@ -6,9 +6,8 @@
  * `CsbwinExtendedFeatures.ts`'s.
  */
 
-import type { Item16Record, TimerRecord, DsaIndex, MissileRecord } from './dungeonTypes';
-import { DBType, OBJECT_ID_NULL, type ObjectID } from '../core/types';
-import { EXPOOL_RECORD_SIZE, specialLocationsFromExpool } from './CsbwinExpool';
+import type { Item16Record, TimerRecord, DsaIndex } from './dungeonTypes';
+import { computeDungeonImageLayout, type DungeonImageLayout } from './DungeonImageLayout';
 import {
   BLOCK1_SIZE,
   genChecksum,
@@ -46,7 +45,6 @@ export interface SaveGameState {
   timerQueue?: number[];
   /** `gb2.TimerSequence` — the stamp the next queued timer takes. */
   timerSequence?: number;
-  missiles?: MissileRecord[];
   maxItem16: number;
   maxTimers: number;
   sequencedTimers: boolean;
@@ -64,7 +62,6 @@ export interface SaveGameState {
   dsaLevelIndex?: number[][];
   dsaIndex?: DsaIndex;
   extendedWallDecorations?: boolean;
-  specialLocations?: Record<number, number>;
   spellFilterLocation?: number;
   /** `EXTENDEDFEATURESBLOCK.hintKey`, absent for a file without a block. */
   hintKey?: Uint8Array;
@@ -290,152 +287,6 @@ const CHARACTER_SIZE = 3328;
  * else.
  */
 
-/**
- * Where each section of the dungeon image sits, relative to `startOffset`.
- *
- * The image is blocks 7-14 of the save (`doc/CSBWIN_SAVEGAME_REFERENCE.md`), written
- * plain by `WriteAndChecksum` and read back plain by `ReadDatabases` — a save is
- * loaded with `d.gameState == GAMESTATE_ResumeSavedGame`, which skips that function's
- * compression preamble (`doc/CSBwin-src/SaveGame.cpp:2557-2586`).
- *
- * Two record sizes are not the `dungeon.dat` ones, which is what made this arithmetic
- * fail for years' worth of guesses:
- *
- * - **ACTUATOR is 2 bytes larger** unless the file predates big actuators.
- *   `ReadDatabases` spells it as a subtraction from the *big* size —
- *   `if ((D6W==dbACTUATOR) & !bigActuators) D4W -= 2;`
- *   (`doc/CSBwin-src/SaveGame.cpp:2783-2787`) — so `dbEntrySizes[dbACTUATOR]` is the
- *   big one and the small one is the special case.
- * - **SCROLL is 2 bytes larger** from extended-features version `'B'` on.
- *   `readScrollDatabase` branches to `readNewScrollDatabase` at `>= 'B'`, and its own
- *   comment says why: "The old version had a 10-bit index into the text database. The
- *   new version has an RN reference to the text."
- *   (`doc/CSBwin-src/SaveGame.cpp:2401-2412`).
- *
- * And the indirect-text block is **little-endian** — both the index and the
- * `sizeOfCompressedText` word after it — while every other word in the image is
- * big-endian. It is a PC-era addition whose swap helper is a no-op on the shipping
- * build, exactly like the Extended Features header.
- */
-interface DungeonImageLayout {
-  numMaps: number;
-  totalColumns: number;
-  objectListSize: number;
-  objectCounts: number[];
-  recordSizes: number[];
-  /** All absolute file offsets. */
-  columnIndex: number;
-  objectList: number;
-  text: number;
-  databases: number[];
-  cellFlags: number;
-}
-
-export function computeDungeonImageLayout(
-  data: Uint8Array,
-  startOffset: number,
-  options: { indirectText: boolean; bigActuators: boolean; newScrolls: boolean },
-): DungeonImageLayout | null {
-  const HEADER_SIZE = 44;
-  const MAP_DESCRIPTOR_SIZE = 16;
-
-  if (startOffset + HEADER_SIZE > data.length) return null;
-
-  const numMaps = data[startOffset + 4] ?? 0;
-  // `ReadDatabases` reads `16 * NumLevel()` bytes of descriptors, whatever the byte says
-  // (`doc/CSBwin-src/SaveGame.cpp:2623-2639`): Conflux 3.5 has 64 levels.
-  if (numMaps < 1) return null;
-  const textDataSize = readU16BE(data, startOffset + 6);
-  const objectListSize = readU16BE(data, startOffset + 10);
-
-  const objectCounts: number[] = [];
-  for (let i = 0; i < 16; i++) objectCounts.push(readU16BE(data, startOffset + 12 + i * 2));
-
-  const recordSizes = [4, 6, 4, 8, 16, 4, 4, 4, 4, 8, 4, EXPOOL_RECORD_SIZE, 0, 0, 8, 4];
-  if (options.bigActuators) recordSizes[DBType.ACTUATOR] += 2;
-  if (options.newScrolls) recordSizes[DBType.SCROLL] += 2;
-
-  let totalColumns = 0;
-  for (let i = 0; i < numMaps; i++) {
-    const offset = startOffset + HEADER_SIZE + i * MAP_DESCRIPTOR_SIZE;
-    if (offset + MAP_DESCRIPTOR_SIZE > data.length) return null;
-    totalColumns += ((readU16BE(data, offset + 8) >> 6) & 0x1f) + 1;
-  }
-
-  const columnIndex = startOffset + HEADER_SIZE + numMaps * MAP_DESCRIPTOR_SIZE;
-  const objectList = columnIndex + totalColumns * 2;
-  const text = objectList + objectListSize * 2;
-
-  let databaseStart: number;
-  if (options.indirectText) {
-    // `NumWordsInTextArray` is repurposed by `ConvertToIndirectText`, which assigns it
-    // the index length (`doc/CSBwin-src/SaveGame.cpp:2484`), so in a save it counts
-    // index entries, not text words.
-    const sizeOffset = text + textDataSize * 4;
-    if (sizeOffset + 4 > data.length) return null;
-    const compressedSize = readU32LE(data, sizeOffset);
-    databaseStart = sizeOffset + 4 + compressedSize * 2;
-  } else {
-    databaseStart = text + textDataSize * 2;
-  }
-
-  const databases: number[] = [];
-  let cursor = databaseStart;
-  for (let db = 0; db < 16; db++) {
-    databases.push(cursor);
-    cursor += objectCounts[db] * (recordSizes[db] ?? 0);
-  }
-  if (cursor > data.length) return null;
-
-  return {
-    numMaps, totalColumns, objectListSize, objectCounts, recordSizes,
-    columnIndex, objectList, text, databases, cellFlags: cursor,
-  };
-}
-
-function parseSpecialLocationsFromSaveData(
-  data: Uint8Array,
-  layout: DungeonImageLayout,
-): Record<number, number> | null {
-  const expoolCount = layout.objectCounts[11] ?? 0;
-  if (expoolCount <= 0) return null;
-  const expoolStart = layout.databases[11];
-  if (expoolStart + expoolCount * EXPOOL_RECORD_SIZE > data.length) return null;
-  return specialLocationsFromExpool(data.subarray(expoolStart, expoolStart + expoolCount * EXPOOL_RECORD_SIZE));
-}
-
-function parseMissileRecordsFromSaveData(
-  data: Uint8Array,
-  layout: DungeonImageLayout,
-): MissileRecord[] | null {
-  const missileCount = layout.objectCounts[DBType.MISSILE] ?? 0;
-  if (missileCount <= 0) return null;
-  const start = layout.databases[DBType.MISSILE];
-  const size = layout.recordSizes[DBType.MISSILE];
-  if (start + missileCount * size > data.length) return null;
-
-  const records: MissileRecord[] = [];
-  for (let i = 0; i < missileCount; i++) {
-    const base = start + i * size;
-    // Both are RNs, so both are indirect-index slot numbers in a save; a missile's
-    // flying object may also be a spell literal. A free record — link `RNnul` — keeps a
-    // stale flying object whose slot may have been freed since, so it is read as
-    // `RNnul`, exactly as in `DungeonLoader.readRNOfRecord`.
-    const nextObject = readU16BE(data, base) as ObjectID;
-    records.push({
-      nextObject,
-      projectileObject:
-        nextObject === OBJECT_ID_NULL
-          ? OBJECT_ID_NULL
-          : readU16BE(data, base + 2) as ObjectID,
-      rangeRemaining: data[base + 4] ?? 0,
-      damageRemaining: data[base + 5] ?? 0,
-      timerIndex: readU16BE(data, base + 6),
-    });
-  }
-  return records;
-}
-
 function parseBlock1Hashes(buf: Uint8Array): Block1Hashes {
   return {
     block2Hash: readU16BE(buf, 312),
@@ -656,20 +507,18 @@ export function loadSaveGameState(file: Uint8Array): SaveGameState & { data: Uin
 
   const timerQueue = parseTimerQueue(timerQueueBuf, block2.maxTimers, block2.numTimer);
 
-  const layout = computeDungeonImageLayout(saveData, afterTimerQueue, {
+  // A save's image has a level: one that reads as none is not an image.
+  const read = computeDungeonImageLayout(saveData, afterTimerQueue, {
     indirectText: extended.indirectText,
     bigActuators: extended.bigActuators ?? false,
     newScrolls: extended.version >= 0x42, // 'B'
+    expool: true,
   });
-  const specialLocations = layout ? parseSpecialLocationsFromSaveData(saveData, layout) : null;
-  const missiles = layout
-    ? parseMissileRecordsFromSaveData(saveData, layout)
-    : null;
+  const layout = read && read.numMaps >= 1 ? read : null;
 
   return {
     item16,
     timers,
-    missiles: missiles ?? undefined,
     maxItem16: block2.maxItem16,
     maxTimers: block2.maxTimers,
     sequencedTimers,
@@ -681,7 +530,6 @@ export function loadSaveGameState(file: Uint8Array): SaveGameState & { data: Uin
     dsaLevelIndex: extended.dsaLevelIndex,
     dsaIndex: extended.dsaIndex,
     extendedWallDecorations: extended.extendedWallDecorations,
-    specialLocations: specialLocations ?? undefined,
     spellFilterLocation: extended.spellFilterLocation,
     hintKey: extended.header?.hintKey,
     handChar: block2.handChar,

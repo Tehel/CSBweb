@@ -61,7 +61,7 @@
 import { loadCsbwinWorld, type CsbwinWorld } from '../data/CsbwinDungeonImage';
 import { readExpectedSignatures, readRulesOptions } from '../data/CsbwinExtendedFeatures';
 import { readFileSignatures } from './FileSignatures';
-import { readDisableSaves, readGlobalVariables, readOverlayPalette } from '../data/CsbwinExpool';
+import { readDisableSaves, readGlobalVariables, readOverlayPalette, specialLocationsFromExpool } from '../data/CsbwinExpool';
 import { readCsbwinParty, readCsbwinPartyTail } from '../data/CsbwinCharacters';
 import { CHARDESC_SIZE } from '../data/CsbwinSaveInfo';
 import { CheckMonsters } from './CheckMonsters';
@@ -73,6 +73,7 @@ import type { RuntimeSaveState } from './RuntimeSave';
 import { OBJECT_ID_NULL, Position } from '../core/types';
 import type { Direction, ObjectID } from '../core/types';
 import type { Block1State, PartyState } from './gameTypes';
+import type { MissileRecord } from '../data/dungeonTypes';
 
 /**
  * Build the party state out of `GAMEBLOCK2` and block 4.
@@ -177,6 +178,23 @@ function buildBlock1State(world: CsbwinWorld): Block1State {
 }
 
 /**
+ * The image's missile records. A free one, its link `RNnul`, keeps a stale flying object
+ * whose slot may have been freed since, so it is read as `RNnul`, as `DungeonLoader`
+ * reads it when the save has an object index (`readRNOfRecord`).
+ */
+function missilesOf(world: CsbwinWorld): MissileRecord[] {
+    return world.dungeon.databases.missiles.records.map((record) => ({
+        ...record,
+        projectileObject: record.nextObject === OBJECT_ID_NULL ? OBJECT_ID_NULL : record.projectileObject,
+    }));
+}
+
+/** `EDT_SpecialLocations`, the image's EXPOOL records of special locations. */
+function specialLocationsOf(world: CsbwinWorld): Record<number, number> | undefined {
+    return (world.dungeon.expool && specialLocationsFromExpool(world.dungeon.expool)) ?? undefined;
+}
+
+/**
  * Everything a CSBWin save says, in the shape `Game.applyRuntimeSaveState` takes.
  *
  * Pure: no `Game` is touched, so a verification tool can build one and read it without
@@ -219,13 +237,13 @@ export function buildCsbwinRuntimeState(world: CsbwinWorld): RuntimeSaveState {
             timerQueue: world.save.timerQueue,
             timerSequence: world.save.timerSequence,
             firstAvailTimer: gb2.firstAvailTimer,
-            missiles: world.save.missiles,
+            missiles: missilesOf(world),
             // The image holds none of these six: the save carries them beside it.
             snapshot: captureDungeonSnapshot({
                 ...world.dungeon,
                 dsaLevelIndex: world.save.dsaLevelIndex,
                 dsaIndex: world.save.dsaIndex,
-                specialLocations: world.save.specialLocations,
+                specialLocations: specialLocationsOf(world),
                 extendedWallDecorations: world.save.extendedWallDecorations,
                 spellFilterLocation: world.save.spellFilterLocation,
                 hintKey: world.save.hintKey,
@@ -251,7 +269,7 @@ function installCsbwinWorld(game: Game, world: CsbwinWorld): void {
     game.installWorld(Object.assign(world.dungeon, {
         dsaLevelIndex: world.save.dsaLevelIndex,
         dsaIndex: world.save.dsaIndex,
-        specialLocations: world.save.specialLocations,
+        specialLocations: specialLocationsOf(world),
         extendedWallDecorations: world.save.extendedWallDecorations,
         spellFilterLocation: world.save.spellFilterLocation,
         hintKey: world.save.hintKey,

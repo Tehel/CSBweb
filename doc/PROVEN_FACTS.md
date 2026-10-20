@@ -3591,12 +3591,10 @@ four-byte form. A genuine save therefore carries values like `0x1c02`, `0x586c` 
 `0xa030` there. This is `TIMER.unused13` again: CSBWin never reads it, and the only way to
 write the file back byte for byte is to carry it.
 
-**`EXPOOL` — database 11 — had no parser at all.** `getDatabaseRecordSize` returned 256 so
-the layout would close, and the bytes were then skipped and discarded; the one consumer,
-`parseSpecialLocationsFromSaveData`, hashes its own copy straight out of the save file.
-`DungeonData.expool` now keeps the whole section as bytes (9 records in the seven
-made-to-order saves, 13 in `csbgame7.dat`), which is what lets a save be written back carrying the EXPOOL it was
-read with. `SaveGame` deposits the DSA global variables and the 24 overlay palette
+**`EXPOOL` — database 11 — is kept as its bytes.** `DungeonData.expool` holds the whole
+section (9 records in the seven made-to-order saves, 13 in `csbgame7.dat`), which is what
+lets a save be written back carrying the EXPOOL it was read with, and the special
+locations are read from it (`specialLocationsFromExpool`). `SaveGame` deposits the DSA global variables and the 24 overlay palette
 records into EXPOOL immediately before the image (`doc/CSBwin-src/SaveGame.cpp:1205-1231`).
 The port writes both ("The DSA global variables are the `EXPOOL` records a read finds",
 and the overlay palette in "`EXPOOL` is a directory block, free lists by record length,

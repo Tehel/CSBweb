@@ -53,7 +53,7 @@ function main(): void {
   check(levels.join() === '20x16,21x16', 'its levels are 20x16 and 21x16');
   check(h.objectCounts.slice(0, 5).join() === '4,0,26,30,12' && h.objectCounts.slice(5).every(n => n === 0),
     '4 doors, 26 texts, 30 actuators, 12 groups and nothing else');
-  // The sections, in `calculateOffsets`' order, end at the checksum word: the header,
+  // The sections, in `computeDungeonImageLayout`'s order, end at the checksum word: the header,
   // the level descriptors, the column index, the object list, the raw text, the four
   // databases, and 660 bytes of cell flags.
   const columns = data.maps.reduce((n, m) => n + m.descriptor.width, 0);

@@ -28,6 +28,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
+import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
+import { specialLocationsFromExpool } from '../src/data/CsbwinExpool';
 // The CHARDESC offsets and the name decode are shared with the save/load menu, which
 // lists genuine saves the same way; `src/data/CsbwinSaveInfo.ts` carries their proof.
 import {
@@ -85,6 +87,15 @@ function main(): void {
       continue;
     }
     check(true, `${name}: every block unscrambled and checksummed clean`);
+    // The missiles and the special locations are the image's, read by `DungeonLoader`.
+    let world;
+    try {
+      world = loadCsbwinWorld(bytes);
+    } catch {
+      world = undefined;
+    }
+    const missiles = world?.dungeon.databases.missiles.records;
+    const specialLocations = world?.dungeon.expool ? specialLocationsFromExpool(world.dungeon.expool) ?? undefined : undefined;
 
     console.log(`  extended features  : sequencedTimers=${state.sequencedTimers} ` +
       `extendedTimers=${state.extendedTimers} bigActuators=${state.bigActuators ?? false} ` +
@@ -96,8 +107,8 @@ function main(): void {
     console.log(`  MaxTimers          : ${state.maxTimers}`);
     console.log(`  handChar           : ${state.handChar}`);
     console.log(`  magicCaster        : ${state.magicCaster}`);
-    console.log(`  missile records    : ${state.missiles === undefined ? 'unreadable (see below)' : state.missiles.length}`);
-    console.log(`  special locations  : ${state.specialLocations === undefined ? 'unreadable (see below)' : Object.keys(state.specialLocations).length}`);
+    console.log(`  missile records    : ${missiles === undefined ? 'unreadable (see below)' : missiles.length}`);
+    console.log(`  special locations  : ${specialLocations === undefined ? 'unreadable (see below)' : Object.keys(specialLocations).length}`);
 
     const gb2 = state.block2;
     if (gb2) {
@@ -191,14 +202,14 @@ function main(): void {
       check(false, `${name}: the dungeon image layout should have been computed`);
     }
 
-    check(state.missiles !== undefined, `${name}: the missile database should parse`);
-    if (state.missiles) {
+    check(missiles !== undefined, `${name}: the missile database should parse`);
+    if (missiles) {
       // A record is free when its link is `RNnul`, CSBWin's own test
       // (`doc/CSBwin-src/data.cpp:948`, `:962`). The pool is always allocated at full
       // size, 60 records whatever is happening on screen, and a free record's other
       // words are whatever was left in them, so they say nothing about it.
-      const live = state.missiles.filter((m) => m.nextObject !== OBJECT_ID_NULL);
-      console.log(`    missiles in flight: ${live.length} of ${state.missiles.length} pool slots`);
+      const live = missiles.filter((m) => m.nextObject !== OBJECT_ID_NULL);
+      console.log(`    missiles in flight: ${live.length} of ${missiles.length} pool slots`);
       for (const m of live) {
         console.log(`      projectile=0x${m.projectileObject.toString(16)} range=${m.rangeRemaining} ` +
           `damage=${m.damageRemaining} timer=${m.timerIndex}`);

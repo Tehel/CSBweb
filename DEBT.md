@@ -122,7 +122,6 @@ In payoff order: the first row is the next item.
 | E36 | Type escape hatches that check nothing | M | ⏳ |
 | E25 | One helper for each rule, where copies drift | M | ⏳ after C170, C171 |
 | E26 | Systems named after CSBWin's files, not what they do | M | ⏳ |
-| D20 | Three record-size tables and two image layouts | S | ⏳ |
 | D21 | A save has nine shapes | L | ⏳ |
 | E27 | `DsaSystem.ts` is one 5,000-line class | L | ⏳ |
 | E28 | The bytecode interpreter decodes through switches and maps built per call | M | ⏳ |
@@ -134,6 +133,7 @@ In payoff order: the first row is the next item.
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | C177 | An Atari-era save loads with its possessions, timers and hand unconverted | M | ⏳ |
 | C178 | No save keeps the dungeon's game information | S | ⏳ |
+| C183 | A `dungeon.dat` without an Extended Features block counts no EXPOOL record | S | ⏳ |
 | C171 | The Firestaff does not soften a monster's blow, and three mastery calls ignore sleep | S | ⏳ |
 | C168 | A monster north-west of the party never prefers west | S | ⏳ |
 | C169 | A monster's `timePerMove / 2` is not an integer division | S | ⏳ |
@@ -170,7 +170,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C183 · D22 · E42 · F22 · G31 · P13 · R17 · U13 · W8 · X16. An ID recorded and paid in one commit has no
+Next free IDs: C184 · D22 · E42 · F22 · G31 · P13 · R17 · U13 · W8 · X16. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -479,23 +479,6 @@ keeps the shape of the JSON save it once was:
 Paying it: every field required, the old-save branches and their comments gone; the party
 and `item16` deep-copied both ways; the missiles from the snapshot only; a light capture for
 the save. Before G29, whose recording would hold such states.
-
-### D20 ⏳ Three record-size tables and two image layouts
-
-A database's record size is written three times: `DungeonLoader.getDatabaseRecordSize`
-(`src/data/DungeonLoader.ts:504-512`), `SaveGameLoader.ts:348` and
-`CsbwinDungeonImageWriter.databaseRecordSize` (`:275`). They disagree already: database 11
-is 256 bytes in one and 0 in another unless `options.expool`, where CSBWin's
-`dbEntrySizes[11]` is always `sizeof(DB11)`, 256 (`doc/CSBwin-src/data.cpp:395-413`). The
-image's layout is computed twice (`DungeonLoader.calculateOffsets` and
-`computeDungeonImageLayout`, which `Chaos` uses), and a save image's missiles and special
-locations are parsed twice (`parseMissileRecordsFromSaveData`,
-`DungeonLoader.parseMissileDatabase`).
-
-Paying it: one `dbEntrySize(db, shape)` and one image layout for the reader, the writer and
-`Chaos`; the missiles and EXPOOL taken from the `DungeonData`. Settling database 11 on
-CSBWin's 256 changes the read of a block-less `dungeon.dat` with EXPOOL records, which no
-known file is: a separate commit, as for any divergence a refactor finds.
 
 ### D21 ⏳ A save has nine shapes
 
@@ -1040,6 +1023,20 @@ eight committed saves; they hold 32 and that line (`doc/PROVEN_FACTS.md:2393`).
 
 Paying it: the string and its signed size on `DungeonData`, as `hintKey` is, written back; a
 save round trip checks that Conflux's survives.
+
+### C183 ⏳ A `dungeon.dat` without an Extended Features block counts no EXPOOL record
+
+CSBWin's `dbEntrySizes[11]` is `sizeof(DB11)`, 256, whatever the file
+(`doc/CSBwin-src/data.cpp:395-413`), so `ReadDatabases` steps over a database 11 a
+`dungeon.dat` declares. The port's `dbEntrySize` (`src/data/DungeonImageLayout.ts`) gives
+it 0 unless the shape says `expool`, which only a file with an Extended Features block
+and a save do (`DungeonLoader.loadDungeonDat`, `CsbwinDungeonImage`), and
+`DungeonLoader.readExpool` keeps no records then. No known file is such a `dungeon.dat`
+with EXPOOL records, so nothing reads differently today.
+
+Fixing it: database 11 at 256 always, the `expool` flag gone from `DatabaseShape`, and
+`readExpool` keeping the records of every image; a tool that builds such a file, read
+with the section after it in place.
 
 ### C171 ⏳ The Firestaff does not soften a monster's blow, and three mastery calls ignore sleep
 

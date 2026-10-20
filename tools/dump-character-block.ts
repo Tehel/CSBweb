@@ -183,7 +183,7 @@ function main(): void {
   //    `saveSaveGameState` used to put 3328 zeros here whatever it was given.
   const champions = [champion, readCsbwinCharacter(original, 1).champion];
   const file = saveSaveGameState({
-    item16: [], timers: [], missiles: [], maxItem16: 0, maxTimers: 0,
+    item16: [], timers: [], maxItem16: 0, maxTimers: 0,
     sequencedTimers: false, extendedTimers: false,
     characterBlock: buildCsbwinCharacterBlock(champions, tail),
   });

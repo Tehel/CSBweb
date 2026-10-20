@@ -27,7 +27,7 @@ import {
     unscrambleStream,
 } from '../data/CsbwinSaveStream';
 import { buildImageChecksum } from '../data/CsbwinDungeonImageWriter';
-import { computeDungeonImageLayout } from '../data/SaveGameLoader';
+import { computeDungeonImageLayout } from '../data/DungeonImageLayout';
 import type { UtilityPortraits } from '../data/UtilityPortraits';
 import { CHARFLAG_MALE } from './gameTypes';
 
@@ -155,8 +155,9 @@ function readDungeon(
         indirectText: extended.indirectText,
         bigActuators: extended.bigActuators ?? false,
         newScrolls: extended.version >= 0x42, // 'B'
+        expool: true,
     });
-    if (!layout) throw new Error('the dungeon does not read');
+    if (!layout || layout.numMaps < 1) throw new Error('the dungeon does not read');
     // `cellArraySize = LE16(wordGear(A0+2)); if (cellflagArraySize != 0) cellArraySize = cellflagArraySize;`
     const cellArraySize = extended.cellFlagArraySize || readU16BE(bytes, start + 2);
     const end = layout.cellFlags + cellArraySize;

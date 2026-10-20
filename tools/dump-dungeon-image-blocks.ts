@@ -220,7 +220,7 @@ interface ImageLayout {
 /**
  * Where every section of `dungeon.dat` starts, computed from the raw header rather than
  * from the loader, so the tool does not take the loader's word for it. The same
- * arithmetic `DungeonLoader.calculateOffsets` does.
+ * arithmetic `computeDungeonImageLayout` does.
  */
 function dungeonDatLayout(raw: Uint8Array): ImageLayout {
   const u16 = (o: number) => (raw[o] << 8) | raw[o + 1];

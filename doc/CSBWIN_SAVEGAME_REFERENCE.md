@@ -329,8 +329,8 @@ extended-features/compression preamble (`:2557-2586`); the `ExpandData` path wit
 The full section layout, the two record sizes that differ from `dungeon.dat`
 (ACTUATOR 10 with `bigActuators`, SCROLL 6 from version `'B'`) and the little-endian
 indirect-text block are written up in `doc/PROVEN_FACTS.md` → "The dungeon image
-layout in a save file". `computeDungeonImageLayout` in `src/data/SaveGameLoader.ts`
-implements it, and `tools/dump-csbwin-save.ts` checks that the section lengths sum
+layout in a save file". `computeDungeonImageLayout` in `src/data/DungeonImageLayout.ts`
+implements it, for the reader, a save's read and `Chaos` alike, and `tools/dump-csbwin-save.ts` checks that the section lengths sum
 exactly to `EOF - 2` on every save it reads, the eight of `tools/fixtures/` and Chaos
 Strikes Back's two.
 

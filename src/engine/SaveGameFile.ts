@@ -125,14 +125,12 @@ export function buildSaveFile(game: Game, options: SaveFileOptions = {}): Uint8A
     const runtime = game.getRuntimeSaveState();
     const item16 = runtime.dungeon.item16 ?? [];
     const timers = runtime.dungeon.timers ?? [];
-    const missiles = runtime.dungeon.missiles ?? [];
     const file = buildFileBlocks(game, runtime, timers, options);
     const saveGameState: SaveGameState = {
         item16,
         timers: file.timers,
         timerQueue: runtime.dungeon.timerQueue,
         timerSequence: runtime.dungeon.timerSequence,
-        missiles,
         maxItem16: item16.length,
         maxTimers: timers.length,
         // The 16-byte `TIMER`, which is what every committed save uses and the only form
