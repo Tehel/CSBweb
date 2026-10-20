@@ -31,6 +31,7 @@ import { readHintOracle } from '../../data/HintOracleLoader';
 import type { HintOracleFiles } from '../ui/HintOracleButton';
 import { Die } from '../../engine/Die';
 import { canvasPoint } from '../../lib/crt';
+import type { MessageSink } from '../../engine/GameHost';
 import type { SavedGameRead } from '../../engine/GameSaves';
 import type { GameScreen } from '../GameScreen';
 import { decodeCursorBitmap, type UIButton } from '../../data/tables/UITables';
@@ -640,6 +641,33 @@ async function gameSetupAfterRestart(host: IntroHost, deps: Omit<BootSequenceDep
 }
 
 /* ------------------------------------------------------------ the Oracle ---- */
+
+/**
+ * What the message area says when the Oracle fails, and its colour, the save messages'.
+ * The port's words: CSBWin's error routine, `TAG0093a0_17`, draws nothing
+ * (`doc/CSBwin-src/Hint.cpp:7903-7908`).
+ */
+export const HINT_ORACLE_FAILED = 'UNABLE TO READ THE HINTS!';
+const HINT_ORACLE_FAILED_COLOR = 15;
+
+/**
+ * `runHintOracle`, as its button opens it: an Oracle that fails closes with a line in
+ * the message area, and the game goes on. `hcsb.hct` read under a key that does not
+ * decipher it fails so, as an imported save of a modified CSB gives. Resolves to the
+ * error, for the page's console, or `null`; it never rejects.
+ */
+export async function openHintOracle(
+  deps: HostDeps, files: HintOracleFiles, square: HintSquare, hintKey: Uint8Array | undefined, messages: MessageSink,
+): Promise<unknown> {
+  try {
+    await runHintOracle(deps, files, square, hintKey);
+    return null;
+  } catch (error) {
+    messages.printLinefeed();
+    messages.quePrintLines(HINT_ORACLE_FAILED_COLOR, HINT_ORACLE_FAILED);
+    return error;
+  }
+}
 
 /**
  * The Hint Oracle on `square`, opened by its button in the inventory

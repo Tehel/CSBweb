@@ -116,7 +116,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| R8 | An optional feature's failure ends the game, or the session | S | ⏳ |
 | R10 | Pointer, touch and WebGL | S | ⏳ |
 | R11 | Right-click closes the save menu while it saves or loads | S | ⏳ |
 | R16 | A save's DELETE is told done before its transaction commits | S | ⏳ |
@@ -321,8 +320,6 @@ Decisions taken with the author, for every row:
   document belongs to one set and the backup copies it with the folder. A moderator adds
   and removes them, on any published set; a local set has none, and the game reads none.
 
-A custom dungeon reaches what the shipped ones do not, so R8 matters more now.
-
 ### P11 ⏳ A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it
 
 To design with the author, and complex. A CSBWin save holds the whole dungeon (blocks
@@ -449,23 +446,10 @@ untrusted: they may stop the game with a message, as CSBWin dies, but never cras
 the tab, nor corrupt what is stored. Each item owes what a fix owes ("How to work this
 list", point 4), its check included.
 
-### R8 ⏳ An optional feature's failure ends the game, or the session
-
-- **The Hint Oracle** runs with `.catch(reportError)` (`src/main.ts:386`), so any error in
-  it ends the game with whatever was not saved. `readHintOracle` throws for a world whose
-  `hintKey` does not decipher `hcsb.hct`, such as an imported save of a modified CSB.
-- **RISE's NEW FACE**: `utilityPortraits ??=` caches a promise that rejects when
-  `arrayBuffer()` or the parse fails (`src/main.ts:151-158`), and `refreshSaveMenu`'s
-  `await ui.onHasNewFaces()` then throws into the catch that empties the list
-  (`src/renderer/ui/SaveMenu.ts:504-509`): RISE lists nothing until a reload.
-
-Paying it: the Oracle closes on its own error with a line in the message area, and
-`reportError` is kept for `Die`; the faces' promise settles to `null` on any failure.
-
 ### R10 ⏳ Pointer, touch and WebGL
 
 - **Touch screens likely stay silent.** Audio is unlocked on the canvas's first
-  `pointerdown`, once (`src/main.ts:166-178`), which is a user activation for a mouse and
+  `pointerdown`, once (`src/main.ts:168-180`), which is a user activation for a mouse and
   not for a touch: `resume()` fails, the listener is gone, and only the settings'
   SOUND brings the sound back.
 - **A lost WebGL context keeps the curve.** On `webglcontextlost` the tube is hidden but
@@ -576,7 +560,7 @@ CSBWin's interface state is `d.`: the open chest and its contents, the attack me
 (`src/renderer/ui/UIState.ts:210-253`), and the engine reads them back through `GameHost`
 queries (`pressingEye`, `pressingMouth`, `displayResurrectChestOrScroll`,
 `attackingCharacterOrdinal`, `src/engine/GameHost.ts:47-207`, answered as
-`screen?.…() ?? 0` in `src/main.ts:239-242`), beside calls into the UI named by CSBWin
+`screen?.…() ?? 0` in `src/main.ts:271-274`), beside calls into the UI named by CSBWin
 address (`tag02076e`, `tag0207cc`, `tag01b29a`, `tag011366`). So:
 
 - **Composing the screen opens and repacks chests.** `presentViewport` runs

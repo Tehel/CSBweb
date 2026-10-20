@@ -38,7 +38,9 @@
  *    title, and every other byte of the adventure is the one without them, which is
  *    `makeNewAdventure`'s as ever. `csbgame-early-2hero-renamed.dat`'s renamed champion
  *    is known by their portrait, and keeps the new name. The prison's four, CSB's own
- *    faces, keep their portraits either way.
+ *    faces, keep their portraits either way. A file that does not read, or a read that
+ *    fails, gives no portraits, and no toggle, where it would empty RISE's list
+ *    (`readUtilityPortraits`).
  *
  * Run: `npm test -- --only=dump-rise.ts`
  */
@@ -53,7 +55,7 @@ import type { OpenedSave, SaveEntry } from '../src/data/saves';
 import { readSaveFileFields } from '../src/data/saves/SaveStore';
 import { PORTRAIT_HEIGHT, PORTRAIT_WIDTH, readCsbwinCharacter } from '../src/data/CsbwinCharacters';
 import { CHARDESC_SIZE } from '../src/data/CsbwinSaveInfo';
-import { UTILITY_PORTRAITS_FILE, UtilityPortraits } from '../src/data/UtilityPortraits';
+import { UTILITY_PORTRAITS_FILE, UtilityPortraits, readUtilityPortraits } from '../src/data/UtilityPortraits';
 import { ReadSavedGame, UtilityDiskMessages, UtilityError, makeNewAdventure, type UtilityGame } from '../src/engine/Chaos';
 import type { Game } from '../src/engine/Game';
 import type { Champion } from '../src/engine/gameTypes';
@@ -644,6 +646,23 @@ async function checkPrisonFaces(portraits: UtilityPortraits): Promise<void> {
     'and keep their portraits, the faces on or off');
 }
 
+/** `readUtilityPortraits` of a file that does not read, and of a read that fails. */
+async function checkDamagedFaces(): Promise<void> {
+  const failures: string[] = [];
+  const failed = (error: unknown): void => { failures.push(String(error)); };
+  const damaged = read(resolve(CSB, UTILITY_PORTRAITS_FILE)).slice(0, 40);
+  const settled = (p: Promise<UtilityPortraits | null>) => p.then((v) => v, (error: unknown) => `rejected ${String(error)}`);
+  const truncated = await settled(readUtilityPortraits(async () => damaged, failed));
+  const unread = await settled(readUtilityPortraits(async () => { throw new Error('no network'); }, failed));
+  const missing = await settled(readUtilityPortraits(async () => null, failed));
+  const whole = await settled(readUtilityPortraits(async () => read(resolve(CSB, UTILITY_PORTRAITS_FILE)), failed));
+  console.log(`  its first 40 bytes: ${String(truncated)}; a read that fails: ${String(unread)}; none: ${String(missing)}; `
+    + `the errors: ${JSON.stringify(failures)}`);
+  check(truncated === null && unread === null && missing === null, 'a damaged file, a failed read and no file give no portraits');
+  check(failures.length === 2, 'the two failures are handed on, and no file is none');
+  check(whole instanceof UtilityPortraits, 'the whole file gives them');
+}
+
 async function main(): Promise<void> {
   checkCarving();
   checkButtons();
@@ -652,6 +671,7 @@ async function main(): Promise<void> {
   checkTitles();
   await checkPrison();
   await checkPrisonFaces(checkNewFaces());
+  await checkDamagedFaces();
   finish();
 }
 

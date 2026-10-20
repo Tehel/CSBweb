@@ -363,9 +363,10 @@ the close box replaced, and DONE on the title list closing the Oracle.
   after the disk menu (`SaveGame.cpp:1375`), and the clock runs.
 - **The key.** `hcsb.hct` is fetched with the page and read when the Oracle opens, under
   the running world's `hintKey`, the one its last read took from a block
-  (`runHintOracle`). A file that does not read under it opens no Oracle, and the page
-  reports the error. CSBWin's error routine, `TAG0093a0_17`, draws nothing
-  (`Hint.cpp:7903-7908`).
+  (`runHintOracle`). A file that does not read under it opens no Oracle: the inventory
+  comes back, the clock runs, and the message area says `UNABLE TO READ THE HINTS!`
+  (`openHintOracle`), the port's words, as CSBWin's error routine, `TAG0093a0_17`, draws
+  nothing (`Hint.cpp:7903-7908`). An error while the Oracle runs closes it the same way.
 
 `tools/dump-hint-oracle-button.ts` checks the picture, and the click on the party's square
 after a step, a teleporter and a pit. Golden frames 15 and 16 are a CSB inventory with

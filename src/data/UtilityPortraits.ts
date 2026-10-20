@@ -11,7 +11,7 @@
  */
 import type { ui8 } from '../core/types';
 import { PORTRAIT_HEIGHT, PORTRAIT_WIDTH } from './CsbwinCharacters';
-import type { GraphicsLoader } from './GraphicsLoader';
+import { GraphicsLoader } from './GraphicsLoader';
 
 /** The file, in a data set's folder beside `mini.dat`. */
 export const UTILITY_PORTRAITS_FILE = 'utility-portraits.dat';
@@ -54,5 +54,25 @@ export class UtilityPortraits {
     if (!portrait) return undefined;
     const charID = this.dmCells.indexOf(portrait.join());
     return charID < 0 ? undefined : this.newFaces[charID]!.slice();
+  }
+}
+
+/**
+ * The portraits of a set's file as `read` gives it: `null` for a set without one, and for
+ * one that does not read, whose error goes to `failed`. It never rejects, so RISE's
+ * question whether the set has them (`UIState.onHasNewFaces`) never empties its list.
+ */
+export async function readUtilityPortraits(
+  read: () => Promise<Uint8Array | null>, failed: (error: unknown) => void,
+): Promise<UtilityPortraits | null> {
+  try {
+    const bytes = await read();
+    if (!bytes) return null;
+    const file = new GraphicsLoader();
+    file.loadFromArray(bytes);
+    return new UtilityPortraits(file);
+  } catch (error) {
+    failed(error);
+    return null;
   }
 }

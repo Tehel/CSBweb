@@ -15,7 +15,7 @@ import { isLocalDataSetId, localDataSet, recordFiles } from './data/LocalDataSet
 import { emptyDungeonData } from './data/DungeonLoader';
 import { GraphicsLoader } from './data/GraphicsLoader';
 import { BrowserDataSetStore, BrowserSaveStore, downloadSaveFile, type DrawPlaythrough, type OpenedSave } from './data/saves';
-import { UTILITY_PORTRAITS_FILE, UtilityPortraits } from './data/UtilityPortraits';
+import { UTILITY_PORTRAITS_FILE, readUtilityPortraits, type UtilityPortraits } from './data/UtilityPortraits';
 import { Game } from './engine/Game';
 import { buildGameTables, type GameTables } from './engine/GameTables';
 import { extractGraphicsTables, type GraphicsTables } from './data/tables/GraphicsTables';
@@ -31,7 +31,7 @@ import { GameScreen } from './renderer/GameScreen';
 import { bindSaveDrop, bindUIEvents, showFatalMessage, showWelcomePage, welcomePageQuery } from './ui';
 import { ScrollingText } from './renderer/csbwin/ScrollingText';
 import { UIMode } from './renderer/ui/UIState';
-import { runBootSequence, runHintOracle, type BootSequenceDeps } from './renderer/intro/BootSequence';
+import { openHintOracle, runBootSequence, type BootSequenceDeps } from './renderer/intro/BootSequence';
 import { reduceTitlePicture } from './renderer/intro/TitlePicture';
 import type { TitleFrame } from './renderer/intro/TitleThumbnail';
 import { showEndOfGame } from './renderer/intro/EndOfGame';
@@ -152,17 +152,12 @@ async function readMiniDat(): Promise<Uint8Array> {
 
 /**
  * The data set's `utility-portraits.dat`, for RISE's NEW FACE (`src/data/UtilityPortraits.ts`),
- * read once; `null` for a set without it, which has no toggle.
+ * read once; `null` for a set without it, or whose file does not read, which has no toggle.
  */
 let utilityPortraits: Promise<UtilityPortraits | null> | null = null;
-function readUtilityPortraits(): Promise<UtilityPortraits | null> {
-    utilityPortraits ??= (async () => {
-        const bytes = await setFiles.read(UTILITY_PORTRAITS_FILE);
-        if (!bytes) return null;
-        const file = new GraphicsLoader();
-        file.loadFromArray(bytes);
-        return new UtilityPortraits(file);
-    })();
+function utilityPortraitsOfSet(): Promise<UtilityPortraits | null> {
+    utilityPortraits ??= readUtilityPortraits(() => setFiles.read(UTILITY_PORTRAITS_FILE),
+        (error) => console.warn(`${UTILITY_PORTRAITS_FILE} does not read:`, error));
     return utilityPortraits;
 }
 
@@ -369,8 +364,8 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         onReadSave: (entry) => saves.open(entry),
         // RISE, on the entrance: a new adventure from a save of any set.
         onMakeNewAdventure: async (source, newFaces) => (adventure = await saves.makeNewAdventure(
-            source, await readMiniDat(), newFaces ? await readUtilityPortraits() : null)),
-        onHasNewFaces: async () => (await readUtilityPortraits()) !== null,
+            source, await readMiniDat(), newFaces ? await utilityPortraitsOfSet() : null)),
+        onHasNewFaces: async () => (await utilityPortraitsOfSet()) !== null,
         onSaveGame: (over) => saves.save('stopped', over ?? 'new'),
         isPrison: () => saves.inPrison(),
         // EXPORT: the row's file as the store holds it, downloaded under the row's name.
@@ -420,7 +415,9 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
             };
             if (!screen || !files.hintOracle) return close();
             const deps = { canvas: gameCanvasEl, gameScreen: screen, playSound };
-            runHintOracle(deps, files.hintOracle, square, game.ctx.state.dungeon.hintKey).catch(reportError).finally(close);
+            void openHintOracle(deps, files.hintOracle, square, game.ctx.state.dungeon.hintKey, messages)
+                .then((error) => { if (error !== null) console.error('Hint Oracle:', error); })
+                .finally(close);
         },
     });
     return { game, screen, saves, messages, events };

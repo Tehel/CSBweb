@@ -17,6 +17,9 @@
  *    enciphered under the key, reads under the world's key as the plain file reads; with
  *    no key it fails the first header check, and a key whose first byte is 0 reads the
  *    plain file plain.
+ * 5. **An Oracle that does not read closes, and the game goes on** (`openHintOracle`): it
+ *    resolves to the error, where it would end the game, and the message area says
+ *    `HINT_ORACLE_FAILED`. The screen is never taken: the file fails before it.
  *
  * Run: `npm test -- --only=dump-hint-key.ts`
  */
@@ -26,11 +29,15 @@ import { readExtendedFeatures } from '../src/data/CsbwinExtendedFeatures';
 import { formChecksum } from '../src/data/CsbwinObjectIndex';
 import { encipherHintFile, parseHintOracle, readHintOracle } from '../src/data/HintOracleLoader';
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
+import type { MessageSink } from '../src/engine/GameHost';
 import type { Game } from '../src/engine/Game';
 import { buildSaveFile } from '../src/engine/SaveGameFile';
+import { HINT_ORACLE_FAILED, openHintOracle } from '../src/renderer/intro/BootSequence';
+import type { HcsbDat } from '../src/data/HintOracleLoader';
 import { check, finish } from './lib/check';
 import { STOCK_DIR, stockDungeon, stockGame } from './lib/game';
 import { savePath } from './lib/saves';
+import { standInOf } from './lib/standIn';
 
 const KEY = Uint8Array.of(0x5a, 0x01, 0xff, 0x80, 0x00, 0x13, 0x37, 0xc4);
 const SIGNATURES = [0x11223344, 0x55667788, 0x99aabbcc, 0xddeeff01] as const;
@@ -128,5 +135,20 @@ const zeroFirst = KEY.slice();
 zeroFirst[0] = 0;
 check(JSON.stringify(readHintOracle(hct, zeroFirst)) === JSON.stringify(plain),
   'a key whose first byte is 0 reads the plain file plain (`hintKey[0] != 0`)');
+
+console.log('5. An Oracle that does not read');
+const printed: string[] = [];
+const messages = standInOf<MessageSink>({
+  printLinefeed: () => printed.push('\n'),
+  quePrintLines: (color, text) => printed.push(`${color}:${text}`),
+});
+let rejected: unknown = null;
+const failure = await openHintOracle(standInOf<Parameters<typeof openHintOracle>[0]>({}),
+  { hct: enciphered, dat: standInOf<HcsbDat>({}) }, { level: 0, x: 0, y: 0 }, undefined, messages)
+  .catch((error: unknown) => { rejected = error; return null; });
+console.log(`  enciphered, with no key: ${failure === null ? 'no error' : String(failure)}; the message area: `
+  + `${JSON.stringify(printed)}${rejected === null ? '' : `; rejected ${String(rejected)}`}`);
+check(rejected === null && String(failure).includes('first word is not 2'), 'it resolves to the error, and never rejects');
+check(printed.join() === `\n,15:${HINT_ORACLE_FAILED}`, 'the message area says so, on a line of its own');
 
 finish();
