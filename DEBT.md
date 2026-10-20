@@ -133,7 +133,6 @@ In payoff order: the first row is the next item.
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | C177 | An Atari-era save loads with its possessions, timers and hand unconverted | M | ⏳ |
 | C173 | The DSA's `&ADD` and `&DEL` on a square bypass `MoveObject` | M | ⏳ |
-| C174 | DSA copies that are not whole | S | ⏳ |
 | C175 | The DSA's integer widths | S | ⏳ |
 | C176 | The DSA goes on where CSBWin stops | S | ⏳ |
 | C179 | A thrown object drawn as its floor picture is offset and never mirrored | S | ⏳ |
@@ -1028,23 +1027,6 @@ which of them meet a pit, a teleporter, the party's square or a monster is not t
 Paying it: both through the world `MoveObject` (`objectMover()`, as `findCellSource` and
 `findCellDestination` do), then `setPos`; a tool with a pit, a teleporter, the party's
 square, and a monster group added on the party's level.
-
-### C174 ⏳ DSA copies that are not whole
-
-- **`&ADD` of a monster group shares its hit points** with the original. The copy is
-  `{ ...rec, nextObject, possession, groupIndex }` (`src/engine/DsaSystem.ts:4919-4932`),
-  and `CreatureRecord.hp` is an array (`src/data/dungeonTypes.ts:205`) that damage writes in
-  place (`MonsterDamage.ts:569`, `:714`, `:831`, `MissileEncounter.ts:399`, `&MONSTER!`):
-  a hit on either group hurts both. CSBWin copies the record byte by byte
-  (`doc/CSBwin-src/DSA.cpp:1879`). No other record holds an array.
-- **`&COPY` of an actuator drops `word8`.** The port copies `word2`, `word4` and `word6`
-  (`DsaSystem.ts:2336-2343`); CSBWin copies the whole record past its link,
-  `memcpy(((ui8 *)pDst)+2, ((ui8 *)pSrc)+2, sizeof(*pSrc)-2)` (`DSA.cpp:4717`), and `DB3`
-  has a `word8` (`CSB.h:1025`), a big actuator's bits 16-17 of its parameters, which
-  `STORE` and `&PARAM` can set while the game runs. Conflux has `BigActuators` and about ten
-  `&COPY` sites.
-
-Paying it: `hp: [...rec.hp]`; `word8` copied when present; a `dump-dsa-*` check of each.
 
 ### C175 ⏳ The DSA's integer widths
 

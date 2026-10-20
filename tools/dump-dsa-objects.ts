@@ -17,9 +17,13 @@
  *    last champion, whose slot its search alone keeps; the port for every champion
  *    (`DEBT.md` H), so a curse laid and the weapon taken off leaves the Luck as it was.
  *
+ * 4. **Copies are whole.** `&ADD` of a monster group copies its record byte by byte
+ *    (`DSA.cpp:1879-1882`), so the copy's hit points are its own; `&COPY` of an actuator
+ *    copies the record past its link (`:4717`), a big actuator's `word8` with it.
+ *
  * Run: `npm test -- --only=dump-dsa-objects.ts`
  */
-import { type ObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_NULL, locationRelToInteger, type ObjectID } from '../src/core/types';
 import { StkOp } from '../src/engine/dsa/DsaTypes';
 import { freshGame, globalStore, int, op, run } from './lib/dsa';
 import { check, finish } from './lib/check';
@@ -118,6 +122,29 @@ check(dungeon.getWeaponRecord(weapon)?.charges === 14 && dungeon.getPotionRecord
   check(first.game.ctx.party.state.champions[0]!.attributes.stats[0]!.current === firstBefore - 3,
     'so does a curse on the first champion\'s: the port passes the slot found, not CSBWin\'s 30');
   check(luck(removed.game, 0) === luck(base, 0), 'the cursed weapon taken off gives the Luck back, and no more');
+}
+
+{
+  const records = base.ctx.dungeon.getData().databases;
+  const creature = records.creatures.records.findIndex((r) => r.nextObject !== OBJECT_ID_NULL && r.hp.length > 0);
+  const group = base.ctx.dungeon.rnMaps.rn(DBType.CREATURE, creature);
+  const added = run((_game, at) => [...int(0), ...int(locationRelToInteger({ l: at.z, x: at.x, y: at.y, p: 0 })), ...int(group), op(StkOp.ADD)]);
+  const copy = added.game.ctx.dungeon.getCreatureRecord(added.game.ctx.dungeon.findFirstMonster(added.at));
+  const original = added.game.ctx.dungeon.getCreatureRecord(group)!;
+  const hpBefore = original.hp[0];
+  if (copy) copy.hp[0] = 1;
+  console.log(`4. &ADD of group ${group}: a copy at (${added.at.x},${added.at.y}), its first hit points set to 1, the original's ${hpBefore} -> ${original.hp[0]}`);
+  check(copy !== null && copy !== original, 'the group is copied onto the square');
+  check(original.hp[0] === hpBefore, 'and a blow at the copy does not hurt the original');
+
+  const actuators = records.actuators.records;
+  const [src, dst] = [0, 1];
+  const copied = run([...int(base.ctx.dungeon.rnMaps.rn(DBType.ACTUATOR, src)), ...int(base.ctx.dungeon.rnMaps.rn(DBType.ACTUATOR, dst)), op(StkOp.COPY)],
+    (game) => { game.ctx.dungeon.getData().databases.actuators.records[src]!.word8 = 0x0003; });
+  const after = copied.game.ctx.dungeon.getData().databases.actuators.records;
+  console.log(`   &COPY of actuator ${src} onto ${dst}: word8 set to 3, copied ${after[dst]!.word8}, link ${after[dst]!.nextObject === actuators[dst]!.nextObject ? 'kept' : 'changed'}`);
+  check(after[dst]!.word8 === 3, 'a big actuator\'s word8 is copied with the rest');
+  check(after[dst]!.nextObject === actuators[dst]!.nextObject, 'and the link is not');
 }
 
 finish();

@@ -4441,6 +4441,14 @@ along the way substituted ordinal 5's item for ordinal 4's (a plain object's imp
 ordinal 13's item for ordinal 20's (a small blast) — see PLAN.md for the fix and its
 evidence.
 
+## The DSA's `&ADD` and `&COPY` copy whole records
+
+`&ADD` of a monster group copies its `DB4` byte by byte past the link
+(`doc/CSBwin-src/DSA.cpp:1879-1882`), so the copy's hit points are its own and a blow at one
+group leaves the other whole. `&COPY` of an actuator is `memcpy(((ui8 *)pDst)+2,
+((ui8 *)pSrc)+2, sizeof(*pSrc)-2)` (`:4717`): every word past the link, a big actuator's
+`word8` (`CSB.h:1025`) with them. Covered by `tools/dump-dsa-objects.ts`.
+
 ## The sound filter hands a sound to the dungeon's DSAs, a silent one included
 
 `QueueSound` calls `SoundFilter(soundNum, LOCAL_12, &soundLocr)` once it has the volume,

@@ -2096,9 +2096,12 @@ export class DsaSystem {
           const src = this.dungeon.getActuatorRecord(srcId);
           const dst = this.dungeon.getActuatorRecord(dstId);
           if (!src || !dst) break;
+          // `memcpy(((ui8 *)pDst)+2, ((ui8 *)pSrc)+2, sizeof(*pSrc)-2)` (`DSA.cpp:4717`): the
+          // whole record past its link, a big actuator's `word8` with it.
           dst.word2 = src.word2;
           dst.word4 = src.word4;
           dst.word6 = src.word6;
+          if (src.word8 !== undefined) dst.word8 = src.word8;
         }
         break;
       }
@@ -4685,6 +4688,8 @@ export class DsaSystem {
         // (doc/CSBwin-src/DSA.cpp:1885-1888).
         return placed(this.dungeon.findEmptyDBEntry('creatures', {
           ...rec,
+          // The record byte by byte (`DSA.cpp:1879-1882`): the copy's hit points its own.
+          hp: [...rec.hp],
           nextObject: OBJECT_ID_EOF,
           possession: copiedPossessions,
           groupIndex: this.detachedGroupIndex(rec),
