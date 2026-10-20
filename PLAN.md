@@ -8,7 +8,7 @@ markers; keep them honest. Marker meanings:
 - ✅ done and believed faithful to CSBWin
 - ⚠️ implemented but knowingly diverges or is incomplete — the note says how
 - ⏳ not started, or a placeholder stands in for the real logic
-- ⏸️ postponed until the default dungeon is validated (`DEBT.md` → "Priority")
+- ⏸️ postponed: taken only when the author names it (`DEBT.md` → "Priority")
 - 🚫 deliberately skipped (the note says why)
 
 **When you defer part of a job, record the deferral here.** A phase marked ✅ with silent
@@ -20,19 +20,21 @@ finished, lift anything still open into **`DEBT.md`**, which is the authority on
 any verified fact into `doc/`; then delete the phase's body and add its line to
 "Completed phases".
 
-## Current priority: a working game on the default dungeon
+## Current priority: paying the debt, then open-sourcing
 
-The goal is a complete, faithful game on `dm-atari`. The work is **`DEBT.md`'s active
-rows**: the unported CSBWin features the default dungeon and Chaos Strikes Back reach
-(`DEBT.md` → "Priority"). `DEBT.md` says how to work an item. **One item per commit, a few
+The game is complete. Every FTL dungeon loads and plays, and so do the fans' dungeons the
+welcome page lists; Dungeon Master and Theron's Quest have been played to their end. The
+site around them is deployed: the welcome page, a player's own data sets, the server.
+
+The work now is **`DEBT.md`'s active rows** (`DEBT.md` → "Priority"), and after them
+cleaning the repository up to publish it as open source. `DEBT.md` says how to work an item. **One item per commit, a few
 per session**, then `/clear`. Its index is the live status; its first row is the next item.
 At the author's request its P rows come first: a player's own data sets, added from local
 files on the welcome page, played, then published and moderated (`DEBT.md` → "P").
 
-⏸️ **Postponed until the default dungeon is validated**: a save of a dungeon the port does
-not know (`DEBT.md` G22), CSBWin's debugging features (G14, the ASCII dump), and comparing
-frames against CSBWin's own screenshots. The retail dungeon uses none of them. Features of
-**Chaos Strikes Back** are not postponed: it is the next dungeon to try.
+⏸️ **Postponed**, until the author names one: a save of a dungeon the port does not know
+(`DEBT.md` G22), CSBWin's debugging features (G14, the ASCII dump), comparing frames
+against CSBWin's own screenshots, and the extras (X). No dungeon the port plays needs them.
 
 ## Ground rules
 

@@ -12,15 +12,16 @@ and an ID is never reused. Items paid before 2026-09-26 are in `doc/PLAN_ARCHIVE
 Markers are `PLAN.md`'s: ⚠️ knowingly divergent or incomplete · ⏳ not started ·
 ⏸️ postponed · 🚫 deliberately not done.
 
-## Priority: a working game on the default dungeon
+## Priority: paying the debt, then open-sourcing
 
-**The goal now is a complete, faithful game on the default dungeon** (`dm-atari`), so the
-unported features it needs come next, and whatever it does not need waits. Two pieces
-of work follow it, the author's next challenges: a redesigned page, and a second dungeon
-(Chaos Strikes Back first). Tiers D and E hold what the
-code needs before them: a base solid enough to build them on. The page redesign has
-begun: the interface in the canvas (U) and the welcome page (`src/ui/welcomePage.ts`) are
-in, and E39 is what is left of it.
+**The game is complete.** Every FTL dungeon loads and plays, and so do the fans' dungeons
+the welcome page lists. Dungeon Master has been won, once with a single champion on
+a tablet, and Theron's Quest played to its end. The site around them is
+deployed: the welcome page (`src/ui/welcomePage.ts`), a player's own data sets, the
+server (`doc/DEPLOYMENT.md`). The work now is this list, in the index's order, and after
+it cleaning the repository up to publish it as open source. Tiers D and E hold what the
+code needs to be a base others can read and build on. Of the page's redesign, the
+interface in the canvas (U) and the welcome page are in, and E39 is what is left.
 
 **Conflux 3.5** (`static/gamefiles/conflux-3.5-b8/`) is the third dungeon, a data set
 (`conflux-3.5`) whose first ticks play (`tools/watch-conflux-start.ts`) and whose start is a
@@ -48,12 +49,11 @@ The order, then:
 2. **D and E.** New structural debt still goes into D or E and jumps the queue.
 3. **C — Known divergences from CSBWin.** A divergence found along the way goes here and is
    taken before the G items: a known bug outranks a missing feature.
-4. **G — Unported CSBWin features the default dungeon reaches**, in the index's order.
+4. **G — Unported CSBWin features a dungeon the port plays reaches**, in the index's order.
 5. **F — Verification debt** is independent of the rest. Interleave it anywhere.
 
-**Postponed (⏸️).** The default dungeon is validated: the author has won it four times,
-once with a single champion on a tablet. These still wait: they are not taken in order,
-and no session picks one up unless the author names it:
+**Postponed (⏸️).** These are not part of the work: they are not taken in order, and no
+session picks one up unless the author names it:
 
 - **A save of a dungeon the port does not know** (G22).
 - **CSBWin's debugging features** that are not part of the game: the ASCII dump, and the
@@ -66,12 +66,10 @@ and no session picks one up unless the author names it:
   canvas's colours go with it: an Atari intensity times 36, not CSBWin's RGB555 (H).
 - **Fullscreen filled by a fraction** (E22), until players ask for it: the author decides
   then, from the analysis the item records.
-- **X — Extras**: gameplay features CSBWin does not have, wanted by the author once the
-  faithful game is complete.
+- **X — Extras**: gameplay features CSBWin does not have, which the author wants in time.
 
-A **Chaos Strikes Back** feature is *not* postponed: CSB is the next dungeon to try once the
-default one is satisfying, and DM is a subset of it. A feature CSB needs stays in the
-active list, even if DM never reaches it.
+A CSBWin feature that a dungeon the port plays needs is *not* postponed, Chaos Strikes
+Back's first: it stays in the active list, even if Dungeon Master never reaches it.
 
 **H** is not debt: deliberate divergences, recorded so nobody "fixes" them.
 
@@ -1485,7 +1483,7 @@ Things CSBWin does that the port has not built. These are not defects in existin
 they are listed so nothing is lost. The active ones come in the index's order; the
 postponed ones follow, under their own heading (see "Priority").
 
-### Postponed until the default dungeon is validated
+### Postponed
 
 Not taken in order; the author names one to start it (see "Priority").
 
@@ -1575,9 +1573,9 @@ every line needs its exact tick and random state.
 
 ## X — Extras (not in CSBWin)
 
-Features from later versions of the game or from elsewhere, which the author wants once
-the default dungeon is validated. Postponed (⏸️) like the G items below "Postponed", and
-taken only when the author names one.
+Features from later versions of the game or from elsewhere, which the author wants in
+time. Postponed (⏸️) like the G items under "Postponed", and taken only when the author
+names one.
 
 Rules for all of them:
 

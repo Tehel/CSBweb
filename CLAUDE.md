@@ -305,10 +305,14 @@ Champions, death, bones, resurrection), sleep, the pre-game screens (title, dung
 entrance, doors, credits) and most of the DM UI. Genuine CSBWin save files load, and a
 save of the port's is such a file, all sixteen blocks, and nothing else; the dialog
 behind the disk icon lists them by playthrough, and exports and imports them
-(`doc/SAVES.md`). **The current priority is a complete
-game on the default dungeon**: `DEBT.md`'s active rows, one item per commit (the unported
-features the retail dungeon reaches, and the DSA's open bugs). Every DSA operation and the
-indirect `&ADD`/`&DEL` are ported. Players' own data sets come first (`DEBT.md` P). CSBWin's debugging extras, a save of an unknown dungeon, and comparing
-frames with CSBWin's are postponed until the default dungeon is validated; Chaos Strikes
-Back's own features are not. The first row of `DEBT.md`'s index is the next item, and
-`/pay-debt` starts a session on it.
+(`doc/SAVES.md`). Every DSA operation and the indirect `&ADD`/`&DEL` are ported.
+
+**The game is complete**: every FTL dungeon and the fans' dungeons the welcome page lists
+load and play, Dungeon Master and Theron's Quest have been played to their end, and the
+site around them is deployed (`doc/DEPLOYMENT.md`). **The current priority is paying the
+debt**, `DEBT.md`'s active rows, one item per commit, **then cleaning the repository up to
+publish it as open source**. Players' own data sets come first (`DEBT.md` P). CSBWin's
+debugging extras, a save of an unknown dungeon, comparing frames with CSBWin's and the
+extras (X) are postponed until the author names one; a CSBWin feature a played dungeon
+needs is not. The first row of `DEBT.md`'s index is the next item, and `/pay-debt` starts
+a session on it.
