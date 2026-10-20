@@ -293,7 +293,9 @@ and the sleep click before the engine's `sleep`. The engine's callers, `wakeUp` 
 `tag0207cc` clears it, and while it is set `GameScreen.presentViewport` shades the three
 areas. The arrow is `UIState.arrowCursorShape`, which `tag02076e` sets and `tag002572` clears
 (`tag0207cc`, `handleClothingClick` and the feeding call it); while it is set
-`drawCursorItem` draws the arrow. No inventory is drawn while the menu is up.
+`drawCursorItem` draws the arrow. Over any dialog (`UIState.dialog`), the settings, the
+map and the champions too, it draws the arrow whatever is in hand, as each takes the whole
+screen (`tools/dump-object-cursor.ts`). No inventory is drawn while the menu is up.
 Evidence: `tools/dump-save-menu.ts`, "the disk menu over an open chest";
 `tools/dump-sleep.ts` and `tools/dump-hall-of-champions.ts` for the other callers, the
 latter also for the candidate's object on the cursor.

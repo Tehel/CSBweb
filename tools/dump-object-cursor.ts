@@ -16,7 +16,8 @@
  * What to look for: the copper coin's icon is mostly colour 9. Over the viewport it is a
  * colour-4 shape, over the portraits it is itself, and over the right-hand panel and the
  * message area it is the arrow. With the extra, it is itself over the viewport too, in
- * the interface palette's colour 9 however the viewport palette changed it.
+ * the interface palette's colour 9 however the viewport palette changed it. Over a
+ * dialog, which takes the whole screen, it is the arrow, whatever is in hand.
  *
  * Run: `npm test -- --only=dump-object-cursor.ts`
  */
@@ -35,6 +36,10 @@ import { newGame, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 import * as mouse from '../src/renderer/ui/Mouse';
 import { standInOf } from './lib/standIn';
+import { closeDialog } from '../src/renderer/ui/Dialog';
+import { openSettingsDialog } from '../src/renderer/ui/SettingsDialog';
+import { openMapDialog } from '../src/renderer/ui/MapDialog';
+import { openChampionDialog } from '../src/renderer/ui/ChampionDialog';
 
 /** The copper coin's name index: an icon mostly of colour 9. */
 const COPPER_COIN = 125;
@@ -200,6 +205,40 @@ async function main(): Promise<void> {
   const background = (70 * 320 + 40) * 4; // (40, 70): viewport, clear of the cursor
   check(image.data[background] === br && image.data[background + 1] === bg && image.data[background + 2] === bb,
     'the viewport around the cursor should keep the viewport palette');
+
+  // ---- Over a dialog of the whole screen: the arrow, whatever is in hand. The champion
+  // in hand is a stand-in bitmap of colour 9, so any pixel of it would show.
+  ui.settings.update({ mapView: true, championView: true });
+  const standInChampion = { width: 21, height: 16, pixels: new Uint8Array(21 * 16).fill(9) };
+  const hands: [string, () => void][] = [
+    ['the coin', () => { party.state.objectInHand = coin as ObjectID; party.state.cursorOwner = -1; ui.word23144 = 0; }],
+    ['nothing, a champion owning the cursor', () => { party.state.objectInHand = OBJECT_ID_NULL; party.state.cursorOwner = 0; ui.word23144 = 0; }],
+    ['a champion of the marching order', () => {
+      party.state.objectInHand = OBJECT_ID_NULL;
+      party.state.cursorOwner = -1;
+      ui.pointer23178 = standInChampion;
+      ui.pointer23182 = standInChampion;
+      ui.word23144 = 1;
+    }],
+  ];
+  const dialogs: [string, () => void][] = [
+    ['settings', () => openSettingsDialog(ui)],
+    ['map', () => { openMapDialog(ui); }],
+    ['champions', () => { openChampionDialog(ui); }],
+  ];
+  for (const [dialog, open] of dialogs) {
+    open();
+    check(ui.dialog !== null, `the ${dialog} dialog should be up`);
+    for (const [hand, take] of hands) {
+      take();
+      for (const [x, y] of [[100, 100], [100, 15]] as const) {
+        row(`${dialog} dialog, ${hand}`, x, y, true);
+        check(wantArrow(x, y) === 0 && ui.objectCursorFootprint === null,
+          `over the ${dialog} dialog, holding ${hand}, the cursor at (${x},${y}) should be the arrow`);
+      }
+    }
+    closeDialog(ui);
+  }
 
   finish();
 }

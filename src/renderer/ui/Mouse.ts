@@ -658,6 +658,11 @@ function drawMarchingOrderCursor(ui: UIState, x: number, y: number, dynamicPalet
  * The cursor, drawn where the pointer is. Where it is is CSBWin's screen, which picks its
  * shape; `placeX` moves the column it is drawn at, the left-handed screen's
  * (`src/renderer/LeftHanded.ts`), whose regions are moved before the cursor goes on.
+ *
+ * Over a dialog it is the arrow, whatever is in hand. Every dialog takes the whole screen,
+ * where CSBWin's zones would show the hand or the object over a viewport and portraits it
+ * covers. `_DoMenu` sets no shape (`doc/CSBwin-src/Menu.cpp`), as its menu covers the
+ * viewport alone; a dialog of the whole screen is the port's.
  */
 export function drawCursorItem(
   ui: UIState,
@@ -666,11 +671,16 @@ export function drawCursorItem(
 ): void {
   ui.objectCursorFootprint = null;
   if (!ui.hoverPoint) return;
-  // The held eye or mouth has hidden it (`stHideCursor`).
-  if (ui.word23118 > 0) return;
   const x = Math.floor(ui.hoverPoint.x);
   const y = Math.floor(ui.hoverPoint.y);
   const drawnX = placeX(x, y);
+  if (ui.dialog) {
+    const arrow = getCursorArrowBitmap(ui);
+    if (arrow) drawCursorBitmap(ui, arrow, drawnX, y, 12);
+    return;
+  }
+  // The held eye or mouth has hidden it (`stHideCursor`).
+  if (ui.word23118 > 0) return;
   if (ui.word23144 !== 0) {
     // `CreateCursorBitmap` asks before anything else (`doc/CSBwin-src/CSBCode.cpp:2267`).
     drawMarchingOrderCursor(ui, drawnX, y, dynamicPaletteSwitching);
