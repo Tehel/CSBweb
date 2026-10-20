@@ -281,6 +281,9 @@ function checkEnciphering(): void {
   const world = outcome(() => `${loadCsbwinWorld(save).dungeon.maps.length} levels`);
   console.log(`  loadCsbwinWorld: ${world}`);
   check(world === `${plainData.maps.length} levels`, 'the enciphered save reads, its image closing at the file\'s end');
+  // Deciphered once: `loadCsbwinWorld` reads the image from the bytes the blocks were read from.
+  check(isDeepStrictEqual(loadSaveGameState(save).data, saved.data) && loadSaveGameState(plainSave).data === plainSave,
+    'the read hands on the file deciphered, and a plain file as given, for the image to be read from');
 
   const other = plainGame;
   applySaveBytes(other, save);

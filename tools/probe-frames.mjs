@@ -353,7 +353,7 @@ check(moves.left, 'the pointer gone, no cursor is left for the frames that follo
 // SAVE (x 95..143, y 161..174), a new save from that row, for the resume from the
 // entrance below.
 await canvasClick(120, 168, 0); await wait(1200);
-// A delete is done only once its transaction commits (`idbDelete`, `src/data/saves/idb.ts`):
+// A delete is done only once its transaction commits (`BrowserSaveStore.remove`):
 // one aborted after its request succeeded, as a quota or an I/O error aborts one, is a
 // delete that failed, and the save is still listed, for the resume below.
 const abortedDelete = await evaluate(`(async()=>{const {saves}=window.__probe;const own=IDBObjectStore.prototype.delete;
@@ -633,18 +633,21 @@ check(afterAdd.tiles.includes(`local:${MINE}!`) && new RegExp(`dungeon=local%3A$
 // record: its name, its id fixed, dungeon.dat replaceable but not removable, and DELETE.
 // A new name confirmed is stored over the record, which keeps when it was added, and its
 // save stays. DELETE asks first, counting the save; CANCEL keeps the set, and DELETE
-// removes the record and its save, so that the pages below see the one save.
+// removes the record and its save, its row and its file, so that the pages below see the
+// one save.
 const saveDatabase = (body) => evaluate(`(async()=>{${body.before ?? ''}
   return new Promise((resolve, reject) => { const open = indexedDB.open('csbweb-saves');
     open.onerror = () => reject(open.error);
-    open.onsuccess = () => { const db = open.result, tx = db.transaction(['saves', 'dataSets'], 'readwrite');
-      const saves = tx.objectStore('saves'), dataSets = tx.objectStore('dataSets');
+    open.onsuccess = () => { const db = open.result, tx = db.transaction(['saves', 'saveFiles', 'dataSets'], 'readwrite');
+      const saves = tx.objectStore('saves'), files = tx.objectStore('saveFiles'), dataSets = tx.objectStore('dataSets');
       ${body.write}
       tx.oncomplete = () => { db.close(); resolve(true); }; tx.onerror = () => reject(tx.error); }; });})()`);
 await saveDatabase({
   write: `const all = saves.getAll();
     all.onsuccess = () => { const row = all.result[0];
-      saves.put({ ...row, id: 'probe-local-save', dataSet: 'local:${MINE}', savedAt: row.savedAt - 1, usedAt: (row.usedAt ?? row.savedAt) - 1 }); };`,
+      saves.put({ ...row, id: 'probe-local-save', dataSet: 'local:${MINE}', savedAt: row.savedAt - 1, usedAt: (row.usedAt ?? row.savedAt) - 1 });
+      const file = files.get(row.id);
+      file.onsuccess = () => files.put({ ...file.result, id: 'probe-local-save' }); };`,
 });
 await send('Page.navigate', { url: `${APP}?dungeon=nowhere&keepsaves` });
 await wait(2500);
@@ -664,9 +667,10 @@ check((await welcome()).play === atLocal.play && (await form())?.open === true, 
 await inForm(`d.querySelector('#add-set-cancel').click()`);
 const readStore = () => evaluate(`new Promise((resolve, reject) => { const open = indexedDB.open('csbweb-saves');
   open.onerror = () => reject(open.error);
-  open.onsuccess = () => { const tx = open.result.transaction(['saves', 'dataSets']);
-    const set = tx.objectStore('dataSets').get('local:${MINE}'), saves = tx.objectStore('saves').getAllKeys();
-    tx.oncomplete = () => { open.result.close(); resolve({ name: set.result?.name ?? null, createdAt: set.result?.createdAt ?? null, saves: saves.result.sort().join() }); }; }; })`);
+  open.onsuccess = () => { const tx = open.result.transaction(['saves', 'saveFiles', 'dataSets']);
+    const set = tx.objectStore('dataSets').get('local:${MINE}'), saves = tx.objectStore('saves').getAllKeys(), files = tx.objectStore('saveFiles').getAllKeys();
+    tx.oncomplete = () => { open.result.close(); resolve({ name: set.result?.name ?? null, createdAt: set.result?.createdAt ?? null,
+      saves: saves.result.sort().join(), files: files.result.sort().join() }); }; }; })`);
 const pen = await evaluate(`(()=>{const pens=[...document.querySelectorAll('.pick-edit')], p=pens[0], a=p.getBoundingClientRect();
   const b=p.closest('.pick-cell').querySelector('.pick[data-set] .pick-picture').getBoundingClientRect();
   return { count: pens.length, of: p.closest('.pick-cell').querySelector('.pick').dataset.set, label: p.getAttribute('aria-label'),
@@ -695,7 +699,8 @@ await wait(2000);
 const edited = await readStore();
 const afterEdit = await welcome();
 check(await form() === null && edited.name === 'My Edited Dungeon' && edited.createdAt === stored.createdAt
-  && edited.saves === ['probe-local-save', decodeURIComponent(saveId)].sort().join() && afterEdit.tiles.includes(`local:${MINE}*!`),
+  && edited.saves === ['probe-local-save', decodeURIComponent(saveId)].sort().join() && edited.files === edited.saves
+  && afterEdit.tiles.includes(`local:${MINE}*!`),
   'CONFIRM stores the edited record over the old, when it was added kept, its save kept, and the page shows it selected');
 // PUBLISH, beside DELETE on the pen's form, offers the stored set to the site
 // (`server/publish.ts`), which the dev server answers as the deployed one does
@@ -795,6 +800,7 @@ await evaluate(`document.querySelector('#delete-set-confirm').click()`);
 await wait(1500);
 const deleted = { dialog: await confirmation(), form: await form(), store: await readStore(), page: await welcome() };
 check(deleted.dialog === null && deleted.form === null && deleted.store.name === null && deleted.store.saves === decodeURIComponent(saveId)
+  && deleted.store.files === deleted.store.saves
   && tilesOf(deleted.page).filter((tile) => tile !== MINE).join() === atWelcome.tiles && tilesOf(deleted.page).includes(MINE),
   'its DELETE removes the record and every save filed under its id, and the page shows the sets without it, the published one kept');
 // The moderation (`server/moderate.ts`), from the tiles, as the dev server's moderator
@@ -1506,6 +1512,58 @@ check(heldStore.opened === 'listed' && heldStore.newer === 'opened'
 check(heldStore.held === 'CLOSE THE GAME IN YOUR OTHER TABS, THEN TRY AGAIN' && heldStore.again === heldStore.held
   && heldStore.released === 'listed',
   'an earlier build holding the store refuses the game\'s open at once, asking to close it; let go, the store lists');
+
+// The store's upgrade to version 6 (`upgradeRows`, `src/data/saves/idb.ts`). A store of
+// version 5, staged on `/package.json` (the origin's, without the app), holds a row and
+// its file in one. The welcome page opens it: the row is kept without its file, which is
+// in `saveFiles` under the row's id, byte for byte. Then the game's store: a list reads
+// the row alone, a read gives the file back, and an import writes, and a DELETE deletes,
+// a row and its file together.
+const rawSaves = `new Promise((resolve, reject) => { const o = indexedDB.open('csbweb-saves');
+  o.onerror = () => reject(o.error);
+  o.onsuccess = () => { const db = o.result, tx = db.transaction(['saves', 'saveFiles']);
+    const rows = tx.objectStore('saves').getAll(), files = tx.objectStore('saveFiles').getAll();
+    const sum = (b) => new Uint8Array(b).reduce((a, x) => (a * 31 + x) >>> 0, 0);
+    tx.oncomplete = () => { db.close(); resolve({ version: db.version,
+      rows: rows.result.map((r) => r.id + ('bytes' in r ? '+bytes' : '')).sort().join(),
+      files: files.result.map((f) => f.id + ':' + f.bytes.byteLength + ':' + sum(f.bytes)).sort().join() }); }; }; })`;
+await send('Page.navigate', { url: `${APP}package.json?keepsaves` });
+await wait(800);
+const stagedV5 = await evaluate(`(async()=>{
+  const file = new Uint8Array(await (await fetch('/gamefiles/csb/csbgame2.dat')).arrayBuffer());
+  await new Promise((r) => { const d = indexedDB.deleteDatabase('csbweb-saves'); d.onsuccess = d.onerror = r; });
+  await new Promise((resolve, reject) => { const o = indexedDB.open('csbweb-saves', 5);
+    o.onupgradeneeded = () => { o.result.createObjectStore('saves', { keyPath: 'id' }); o.result.createObjectStore('dataSets', { keyPath: 'id' }); };
+    o.onerror = () => reject(o.error);
+    o.onsuccess = () => { const tx = o.result.transaction('saves', 'readwrite');
+      tx.objectStore('saves').put({ id: 'probe-v5.dat', name: 'probe-v5.dat', dataSet: 'csb', playthrough: 7, quick: false, sleep: false,
+        savedAt: 1, usedAt: 1, playTime: 0, level: 1, champions: ['PROBE'], unofficial: false, bytes: file.slice().buffer });
+      tx.oncomplete = () => { o.result.close(); resolve(); }; tx.onerror = () => reject(tx.error); }; });
+  return 'probe-v5.dat:' + file.length + ':' + file.reduce((a, x) => (a * 31 + x) >>> 0, 0); })()`);
+await send('Page.navigate', { url: `${APP}?dungeon=nowhere&keepsaves` });
+await wait(2500);
+const upgradedV5 = await evaluate(rawSaves);
+console.log('  version 5 upgraded:', JSON.stringify(upgradedV5));
+check(upgradedV5.version === 6 && upgradedV5.rows === 'probe-v5.dat' && upgradedV5.files === stagedV5,
+  "the upgrade to version 6 keeps a row without its file, and its file byte for byte in saveFiles under the row's id");
+await send('Page.navigate', { url: `${APP}?intro=0&dungeon=csb&keepsaves` });
+await wait(3500);
+const filesApart = await evaluate(`(async()=>{ const { saves } = window.__probe;
+  const listed = await saves.list(), entry = listed.find((e) => e.id === 'probe-v5.dat');
+  if (!entry) return { listed: listed.map((e) => e.id).join() };
+  const { bytes } = await saves.open(entry);
+  const read = 'probe-v5.dat:' + bytes.length + ':' + bytes.reduce((a, x) => (a * 31 + x) >>> 0, 0);
+  const imported = await saves.importSave({ name: 'probe-import.dat', bytes });
+  const afterImport = await ${rawSaves};
+  if (imported.kind === 'stored') await saves.remove(imported.entry);
+  return { listedBytes: 'bytes' in entry, read, imported: imported.kind, afterImport, afterDelete: await ${rawSaves} }; })()`);
+console.log('  files apart:', JSON.stringify(filesApart));
+check(filesApart.listedBytes === false && filesApart.read === stagedV5,
+  'a listed save carries no file, and a read gives its file back');
+check(filesApart.imported === 'stored' && filesApart.afterImport?.rows === 'probe-import.dat,probe-v5.dat'
+  && filesApart.afterImport.files.split(',').map((f) => f.split(':')[0]).join() === 'probe-import.dat,probe-v5.dat'
+  && filesApart.afterDelete?.rows === 'probe-v5.dat' && filesApart.afterDelete.files === stagedV5,
+  'an import writes a row and its file, and a DELETE deletes both');
 
 // The map dialog (`src/renderer/ui/MapDialog.ts`), over CSB's `csbgame2.dat`, its party
 // where the save left it: a press held on the message area opens it, with MAP VIEW on

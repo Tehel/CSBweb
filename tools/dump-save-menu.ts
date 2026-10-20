@@ -141,7 +141,7 @@ import {
   type SaveStore,
   type StoredSaveRecord,
 } from '../src/data/saves/SaveStore';
-import { ROWS_UPGRADED_VERSION, stampBlock1Rows, stampSaveRecords, upgradeSaveRecords, upgradeStoredRows } from '../src/data/saves/legacyRows';
+import { ROWS_UPGRADED_VERSION, splitSaveRecord, stampBlock1Rows, stampSaveRecords, upgradeSaveRecords, upgradeStoredRows } from '../src/data/saves/legacyRows';
 import { dungeonWalls, KNOWN_DUNGEONS, type KnownDungeon } from '../src/data/DungeonSignature';
 import type { DataSetFiles } from '../src/data/DataSetFiles';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
@@ -3881,6 +3881,16 @@ async function checkUpgrade(): Promise<void> {
   check(steps(3) === 'block 1, kept, kept', 'from version 3, only the stamp of GAMEBLOCK1\'s four words');
   check(steps(ROWS_UPGRADED_VERSION) === 'kept, kept, kept' && steps(ROWS_UPGRADED_VERSION + 1) === 'kept, kept, kept',
     `from version ${ROWS_UPGRADED_VERSION} on, none: a file imported since is left as it is (doc/SAVES.md)`);
+
+  // Then every row's file goes to a store of its own (`splitSaveRecord`), the IndexedDB
+  // half of which `tools/probe-frames.mjs` checks in a browser.
+  const upgraded = upgradeStoredRows(later, 2, DEFAULT_DATA_SET.id, drawFrom(SEED));
+  const split = upgraded.map(splitSaveRecord);
+  console.log(`  split: ${split.map(({ entry, file }) => `${entry.id} (${Object.keys(entry).join(' ')}), ${file.id} ${file.bytes.byteLength} bytes`).join('; ')}`);
+  check(split.every(({ entry, file }, i) => !('bytes' in entry) && file.id === entry.id && file.bytes === upgraded[i]!.bytes),
+    'each upgraded row is split into a row without its file, and the file under the row\'s id');
+  check(split.every(({ entry }, i) => JSON.stringify(saveEntryOf(entry)) === JSON.stringify(saveEntryOf(upgraded[i]!))),
+    'and the row lists as it did');
 }
 
 /* ------------------------------------------------------------------------------- */

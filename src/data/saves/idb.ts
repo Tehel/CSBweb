@@ -5,11 +5,12 @@
  * database and the cell flags, so one is comfortably past a megabyte, and `localStorage`
  * is a synchronous ~5 MB budget for the whole origin.
  */
-import { ROWS_UPGRADED_VERSION, upgradeStoredRows } from './legacyRows';
+import { FILES_APART_VERSION, ROWS_UPGRADED_VERSION, splitSaveRecord, upgradeStoredRows } from './legacyRows';
 import type { DrawPlaythrough, StoredSaveRecord } from './SaveStore';
 
 const DB_NAME = 'csbweb-saves';
 /**
+ * 6: the saves' files in a store of their own, `SAVE_FILES_STORE`, apart from their rows.
  * 5: a second store, `DATA_SETS_STORE`, the player's own data sets. 4: no row's file
  * holds 0 in all four of `GAMEBLOCK1`'s `Byte22598`, `Byte22596`, `Word22594` and
  * `Word22592`. 3: every row names a playthrough, its file's own. 2: a row is a
@@ -17,10 +18,12 @@ const DB_NAME = 'csbweb-saves';
  * a CSBWin file, which may name no playthrough. 1 had neither the three fields nor that
  * rule, and a second store for a directory handle.
  */
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 
-/** The saves, one `SaveRecord` each, keyed by `id`. */
+/** The saves' rows, one `SaveEntry` each, keyed by `id`: what a list reads. */
 export const SAVES_STORE = 'saves';
+/** The saves' files, one `SaveFileRecord` each, keyed by its row's `id`. */
+export const SAVE_FILES_STORE = 'saveFiles';
 /** The player's own data sets, one `LocalDataSetRecord` each, keyed by `id` (`BrowserDataSetStore`). */
 export const DATA_SETS_STORE = 'dataSets';
 /** The version that added `DATA_SETS_STORE`. */
@@ -57,18 +60,26 @@ const VERSION_1_DATA_SET = 'dm-atari';
  * steps of the versions after `oldVersion` run (`upgradeStoredRows`): a version-1 row
  * names no data set, and every one becomes `dm-atari`'s (`VERSION_1_DATA_SET`); a row that
  * names no playthrough is given one, `draw` giving the new ones; and a file that holds
- * none of `GAMEBLOCK1`'s four words of `_ReadEntireGame` is given them. A store at
- * `ROWS_UPGRADED_VERSION` or past it is not read.
+ * none of `GAMEBLOCK1`'s four words of `_ReadEntireGame` is given them. Then each row's
+ * file goes to `SAVE_FILES_STORE` (`splitSaveRecord`). A store at `FILES_APART_VERSION`
+ * or past it is not read.
  */
 function upgradeRows(db: IDBDatabase, tx: IDBTransaction, oldVersion: number, draw: DrawPlaythrough): void {
     if (db.objectStoreNames.contains(HANDLES_STORE)) db.deleteObjectStore(HANDLES_STORE);
-    if (oldVersion >= ROWS_UPGRADED_VERSION) return;
+    if (oldVersion >= FILES_APART_VERSION) return;
+    const files = db.createObjectStore(SAVE_FILES_STORE, { keyPath: 'id' });
     const saves = tx.objectStore(SAVES_STORE);
     const all = saves.getAll();
     all.onsuccess = () => {
-        const rows: StoredSaveRecord[] = upgradeStoredRows(all.result, oldVersion, VERSION_1_DATA_SET, draw);
+        const rows: StoredSaveRecord[] = oldVersion < ROWS_UPGRADED_VERSION
+            ? upgradeStoredRows(all.result, oldVersion, VERSION_1_DATA_SET, draw)
+            : all.result;
         saves.clear();
-        for (const record of rows) saves.put(record);
+        for (const record of rows) {
+            const { entry, file } = splitSaveRecord(record);
+            saves.put(entry);
+            files.put(file);
+        }
     };
 }
 
@@ -93,8 +104,10 @@ export function openSaveDatabase(draw: DrawPlaythrough): Promise<IDBDatabase> {
         const request = indexedDB.open(DB_NAME, DB_VERSION);
         request.onupgradeneeded = (event) => {
             const db = request.result;
-            if (event.oldVersion < 1) db.createObjectStore(SAVES_STORE, { keyPath: 'id' });
-            else if (request.transaction) upgradeRows(db, request.transaction, event.oldVersion, draw);
+            if (event.oldVersion < 1) {
+                db.createObjectStore(SAVES_STORE, { keyPath: 'id' });
+                db.createObjectStore(SAVE_FILES_STORE, { keyPath: 'id' });
+            } else if (request.transaction) upgradeRows(db, request.transaction, event.oldVersion, draw);
             if (event.oldVersion < DATA_SETS_VERSION && !db.objectStoreNames.contains(DATA_SETS_STORE)) {
                 db.createObjectStore(DATA_SETS_STORE, { keyPath: 'id' });
             }
@@ -172,10 +185,4 @@ export function idbDone(tx: IDBTransaction): Promise<void> {
         tx.onerror = () => reject(tx.error ?? new Error('IndexedDB write failed'));
         tx.onabort = () => reject(tx.error ?? new Error('IndexedDB write aborted'));
     });
-}
-
-export async function idbDelete(db: IDBDatabase, store: string, key: IDBValidKey): Promise<void> {
-    const tx = db.transaction(store, 'readwrite');
-    await promisify(tx.objectStore(store).delete(key));
-    await idbDone(tx);
 }

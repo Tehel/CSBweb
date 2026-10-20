@@ -24,14 +24,20 @@
  * left as it is.
  *
  * Each step runs on a store of a version before its own alone (`upgradeStoredRows`), so a
- * file imported since is left as it is. All three are pure, so the tools run them
- * (`tools/dump-save-menu.ts`, `tools/dump-save-stamp.ts`); `idb.ts` calls them once, in
- * the upgrade.
+ * file imported since is left as it is.
+ *
+ * **Version 5** (`splitSaveRecord`). A row held its file, and a list read every file. The
+ * upgrade puts each file in a store of its own, under its row's `id`, and keeps the row
+ * without it. It runs on the rows of every earlier version, once the steps above have
+ * made them today's.
+ *
+ * All four are pure, so the tools run them (`tools/dump-save-menu.ts`,
+ * `tools/dump-save-stamp.ts`); `idb.ts` calls them once, in the upgrade.
  */
 import { holdsNoBlock1Words, stampBlock1Words, stampRandomGameID } from '../SaveGameLoader';
 import {
     SAVE_FILE_EXTENSION, joinedPlaythrough, readSaveFileFields, saveEntryOf,
-    type DrawPlaythrough, type SaveRecord, type StoredSaveRecord,
+    type DrawPlaythrough, type SaveFileRecord, type SaveRecord, type StoredSaveEntry, type StoredSaveRecord,
 } from './SaveStore';
 
 /** The suffix of a JSON save's name. */
@@ -183,4 +189,12 @@ export function upgradeStoredRows(rows: readonly unknown[], oldVersion: number, 
     if (oldVersion < 3) upgraded = stampSaveRecords(upgraded, draw);
     if (oldVersion < 4) upgraded = stampBlock1Rows(upgraded);
     return [...upgraded];
+}
+
+/** The version that put the files in a store of their own: a store before it holds each file in its row. */
+export const FILES_APART_VERSION = 6;
+
+/** A row of a store before `FILES_APART_VERSION` as today's row and its file, under the row's `id`. */
+export function splitSaveRecord({ bytes, ...entry }: StoredSaveRecord): { entry: StoredSaveEntry; file: SaveFileRecord } {
+    return { entry, file: { id: entry.id, bytes } };
 }

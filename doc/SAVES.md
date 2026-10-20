@@ -28,8 +28,10 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   answers "CANNOT SAVE NOW". A
   `.dmweb.json`, the JSON wrapper earlier builds wrote around such a file, is not read:
   the store's upgrade kept of each the file it carried as `raw`.
-- **Every save is a row of IndexedDB** (`SaveRecord`, `src/data/saves/SaveStore.ts`): the
-  file's bytes beside what the list needs. The level, the champions' names and the
+- **Every save is a row of IndexedDB and its file** (`SaveEntry` and `SaveFileRecord`,
+  `src/data/saves/SaveStore.ts`), in two object stores, `saves` and `saveFiles`, under
+  one key, written and deleted in one transaction: a list reads the rows alone, and a
+  file is read only to be loaded or exported. The level, the champions' names and the
   playthrough (below) are read from the file's own blocks when the row is written; the
   data set, the date, when the save was last used, the play time and whether it is F5's
   or the Sleepsave are the row's own. Nothing is JSON, and no row holds anything a `.dat` could not be
@@ -49,10 +51,11 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   "ALREADY UTILIZED". The author's decision: the store's rows are stamped, once, and a
   file imported later is left as it is, refused as CSBWin's utility refuses it.
 
-  Each step runs on a store of a version before its own alone (`upgradeStoredRows`),
-  and a store at version 4 or past it is not read at all. Version 5 adds a second object
-  store to the database, `dataSets`, the player's own data sets
-  (`src/data/LocalDataSets.ts`, `BrowserDataSetStore`), and changes no row. The steps after version 2's
+  Each step runs on a store of a version before its own alone (`upgradeStoredRows`).
+  Version 5 adds an object store to the database, `dataSets`, the player's own data sets
+  (`src/data/LocalDataSets.ts`, `BrowserDataSetStore`), and changes no row. To version 6,
+  each row's file goes to `saveFiles`, under the row's id, and the row is kept without
+  it (`splitSaveRecord`); a store at version 6 is not read at all. The steps after version 2's
   keep a row they cannot read as it is: the store is a save's only copy, and a reader
   made stricter must not delete it.
   Nothing else in `src/` reads JSON. A
@@ -72,8 +75,8 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   "best effort" may lose under pressure.
 - **No store on disk.** IndexedDB (`BrowserSaveStore`) is the one store: a directory on
   disk needs `showDirectoryPicker`, which is Chromium's alone. **Export** downloads the
-  selected save's bare `.dat`, which CSBWin opens: the row's bytes as the store holds
-  them, under the row's name (`downloadSaveFile`, `src/data/saves/downloadSaveFile.ts`).
+  selected save's bare `.dat`, which CSBWin opens: its file as the store holds it, under
+  the row's name (`downloadSaveFile`, `src/data/saves/downloadSaveFile.ts`).
   What the row alone holds, its date, its play time and whether it is F5's or the
   Sleepsave, stays behind. **Import** is a `.dat` dropped on the page while the dialog is up, the disk
   menu's or RESUME's chooser, never RISE's (`bindSaveDrop`, `src/ui/saveDrop.ts`): the whole
@@ -510,7 +513,10 @@ An unknown dungeon played from its save is `DEBT.md` G22.
 sections are named below. Node has no IndexedDB, so no tool runs `BrowserSaveStore`
 itself: neither the IndexedDB half of the upgrades (`upgradeRows`) nor
 `BrowserSaveStore.markUsed`, nor `BrowserDataSetStore`. `tools/probe-frames.mjs` checks
-the store held by another tab in a browser, both ways.
+in a browser the store held by another tab, both ways; the upgrade from version 5, a
+row's file moved to `saveFiles` byte for byte; a list reading no file, an import and a
+DELETE writing and deleting a row and its file together, and a local data set deleted
+with its saves' rows and files.
 
 - **RISE**: `tools/dump-rise.ts` (the row a new adventure is stored as, again, and a
   refusal; the chooser's `rise` mode over every set's saves, its LOAD and a refusal, and

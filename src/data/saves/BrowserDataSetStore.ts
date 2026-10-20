@@ -3,8 +3,8 @@
  * database: one record each, its files as Blobs, keyed by its `local:<id>`.
  */
 import type { LocalDataSetRecord } from '../LocalDataSets';
-import { DATA_SETS_STORE, SAVES_STORE, askToPersist, idbDone, idbGet, idbGetAll, idbPut, openSaveDatabase } from './idb';
-import type { DrawPlaythrough, StoredSaveRecord } from './SaveStore';
+import { DATA_SETS_STORE, SAVES_STORE, SAVE_FILES_STORE, askToPersist, idbDone, idbGet, idbGetAll, idbPut, openSaveDatabase } from './idb';
+import type { DrawPlaythrough, StoredSaveEntry } from './SaveStore';
 
 /** A record as the store may hold it: one stored before `thumbnailAsTitle` or `official` has none, for `false`. */
 type StoredDataSetRecord = Omit<LocalDataSetRecord, 'thumbnailAsTitle' | 'official'> & { thumbnailAsTitle?: boolean; official?: boolean };
@@ -39,16 +39,24 @@ export class BrowserDataSetStore {
         askToPersist();
     }
 
-    /** The set `id` names and every save filed under it, in one transaction: all of them, or none. */
+    /**
+     * The set `id` names and every save filed under it, its row and its file, in one
+     * transaction: all of them, or none.
+     */
     async remove(id: string): Promise<void> {
-        const tx = (await this.db()).transaction([DATA_SETS_STORE, SAVES_STORE], 'readwrite');
+        const tx = (await this.db()).transaction([DATA_SETS_STORE, SAVES_STORE, SAVE_FILES_STORE], 'readwrite');
         const done = idbDone(tx);
         tx.objectStore(DATA_SETS_STORE).delete(id);
+        const files = tx.objectStore(SAVE_FILES_STORE);
         const rows = tx.objectStore(SAVES_STORE).openCursor();
         rows.onsuccess = () => {
             const row = rows.result;
             if (!row) return;
-            if ((row.value as StoredSaveRecord).dataSet === id) row.delete();
+            const entry = row.value as StoredSaveEntry;
+            if (entry.dataSet === id) {
+                row.delete();
+                files.delete(entry.id);
+            }
             row.continue();
         };
         await done;

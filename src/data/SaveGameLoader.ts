@@ -97,6 +97,12 @@ export interface SaveGameState {
    */
   simpleEncipher?: boolean;
   /**
+   * The file as `READ` gives it (`readExtendedFeatures`' `data`): deciphered when
+   * `simpleEncipher`, else the file as given. The dungeon image is read from it
+   * (`loadCsbwinWorld`), so a file is deciphered once. Only a read sets it.
+   */
+  data?: Uint8Array;
+  /**
    * `gameInfo` as the file holds it, without the terminator `ReadGameInfo` appends.
    * Carried verbatim: it is a free-text blob the game only ever shows.
    */
@@ -583,7 +589,7 @@ function parseTimerQueue(buf: Uint8Array, maxTimers: number, numTimer: number): 
   return out;
 }
 
-export function loadSaveGameState(file: Uint8Array): SaveGameState {
+export function loadSaveGameState(file: Uint8Array): SaveGameState & { data: Uint8Array } {
   const extended = readExtendedFeatures(file);
   const saveData = extended.data;
   let offset = extended.offset;
@@ -689,6 +695,7 @@ export function loadSaveGameState(file: Uint8Array): SaveGameState {
     characterBlock,
     extendedFeatures: extended.header,
     simpleEncipher: extended.simpleEncipher,
+    data: saveData,
     gameInfo: extended.gameInfo,
     extendedFeaturesSize: extended.offset,
     dungeonImageOffset: afterTimerQueue,

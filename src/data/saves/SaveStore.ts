@@ -9,7 +9,8 @@
  * **Nothing in this file touches the DOM**: the rows, their order and their formatting
  * are pure, so that `tools/dump-save-menu.ts` can assert them headlessly.
  */
-import { readCsbwinSaveInfo } from '../CsbwinSaveInfo';
+import { csbwinSaveInfoOf, readCsbwinSaveInfo, type CsbwinSaveInfo } from '../CsbwinSaveInfo';
+import type { SaveGameState } from '../SaveGameLoader';
 
 /** One row of the list: what a save is listed by, without its bytes. */
 export interface SaveEntry {
@@ -58,7 +59,7 @@ export interface SaveEntry {
     unofficial: boolean;
 }
 
-/** A row as the store holds it: the entry, and the CSBWin file. */
+/** A row and its CSBWin file, as the store's earlier versions held them in one (`legacyRows.ts`). */
 export interface SaveRecord extends SaveEntry {
     bytes: ArrayBuffer;
 }
@@ -67,17 +68,29 @@ export interface SaveRecord extends SaveEntry {
  * A row as a store may hold it: one written before rows held `usedAt`, `playTime`,
  * `unofficial` or `sleep` has none of them.
  */
-export type StoredSaveRecord = Omit<SaveRecord, 'usedAt' | 'playTime' | 'unofficial' | 'sleep'>
+export type StoredSaveEntry = Omit<SaveEntry, 'usedAt' | 'playTime' | 'unofficial' | 'sleep'>
     & { usedAt?: number; playTime?: number; unofficial?: boolean; sleep?: boolean };
 
+/** A row and its file in one, as a store before the files had their own held it. */
+export type StoredSaveRecord = StoredSaveEntry & { bytes: ArrayBuffer };
+
 /**
- * A stored row's entry, without its bytes. A row written before rows held `usedAt` has
+ * A save's CSBWin file as the store holds it, apart from its row, under the row's `id`:
+ * a list reads the rows alone, and a file is read only to be loaded or exported.
+ */
+export interface SaveFileRecord {
+    id: string;
+    bytes: ArrayBuffer;
+}
+
+/**
+ * A stored row's entry. A row written before rows held `usedAt` has
  * none, and counts as last used when it was saved; one written before they held
  * `playTime` counts no time played; one written before they held `unofficial` is of its
  * data set's own dungeon, since no file came in from outside then; one written before
  * they held `sleep` is no Sleepsave, since no build wrote one then.
  */
-export function saveEntryOf(record: StoredSaveRecord): SaveEntry {
+export function saveEntryOf(record: StoredSaveEntry): SaveEntry {
     return {
         id: record.id,
         name: record.name,
@@ -102,7 +115,15 @@ export type SaveFileFields = Pick<SaveEntry, 'playthrough' | 'level' | 'champion
  * any `.dat` is listed. `null` for a file that is not a CSBWin save, which has no row.
  */
 export function readSaveFileFields(bytes: Uint8Array): SaveFileFields | null {
-    const info = readCsbwinSaveInfo(bytes);
+    return fieldsOf(readCsbwinSaveInfo(bytes));
+}
+
+/** A file's part of its row, out of the file already read (`csbwinSaveInfoOf`). */
+export function saveFileFieldsOf(state: SaveGameState): SaveFileFields | null {
+    return fieldsOf(csbwinSaveInfoOf(state));
+}
+
+function fieldsOf(info: CsbwinSaveInfo | null): SaveFileFields | null {
     if (!info) return null;
     return { playthrough: info.randomGameID, level: info.level, champions: info.champions };
 }

@@ -10,7 +10,7 @@
  * consequence is deliberate: a file whose blocks unscramble but whose image is damaged
  * has a row and fails on LOAD, with the reason on the menu's status line.
  */
-import { loadSaveGameState } from './SaveGameLoader';
+import { loadSaveGameState, type SaveGameState } from './SaveGameLoader';
 
 /**
  * `CHARDESC` is 800 bytes (`doc/CSBwin-src/CSB.h:2542-2653`, whose last member is
@@ -112,16 +112,23 @@ export interface CsbwinSaveInfo {
  */
 export function readCsbwinSaveInfo(bytes: Uint8Array): CsbwinSaveInfo | null {
     try {
-        const state = loadSaveGameState(bytes);
-        const { block1, block2 } = state;
-        if (!block1 || !block2) return null;
-        const roster = state.characterBlock ? readCharacterNames(state.characterBlock) : [];
-        const champions = roster
-            .slice(0, Math.max(0, Math.min(4, block2.numCharacter)))
-            .map((c) => c.name)
-            .filter((n) => n.length > 0);
-        return { level: block2.partyLevel, champions, time: block2.time, randomGameID: block1.randomGameID >>> 0 };
+        return csbwinSaveInfoOf(loadSaveGameState(bytes));
     } catch {
         return null;
     }
+}
+
+/**
+ * The listing fields of a save already read (`loadSaveGameState`), so that a caller who
+ * has read the file reads none of it again; `null` without its blocks 1 and 2.
+ */
+export function csbwinSaveInfoOf(state: SaveGameState): CsbwinSaveInfo | null {
+    const { block1, block2 } = state;
+    if (!block1 || !block2) return null;
+    const roster = state.characterBlock ? readCharacterNames(state.characterBlock) : [];
+    const champions = roster
+        .slice(0, Math.max(0, Math.min(4, block2.numCharacter)))
+        .map((c) => c.name)
+        .filter((n) => n.length > 0);
+    return { level: block2.partyLevel, champions, time: block2.time, randomGameID: block1.randomGameID >>> 0 };
 }

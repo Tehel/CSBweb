@@ -36,8 +36,8 @@ import { checkDungeon, dungeonWalls, KNOWN_DUNGEONS, type DungeonCheck, type Dun
 import { readsGameBlock1, stampRandomGameID } from '../data/SaveGameLoader';
 import type { UtilityPortraits } from '../data/UtilityPortraits';
 import {
-    SAVE_FILE_EXTENSION, joinedPlaythrough, readSaveFileFields, slotOf,
-    type OpenedSave, type SaveEntry, type SaveSlot, type SaveStore,
+    SAVE_FILE_EXTENSION, joinedPlaythrough, readSaveFileFields, saveFileFieldsOf, slotOf,
+    type OpenedSave, type SaveEntry, type SaveFileFields, type SaveSlot, type SaveStore,
 } from '../data/saves';
 import { UtilityDiskMessages, UtilityError, makeNewAdventure } from './Chaos';
 import type { Game } from './Game';
@@ -395,10 +395,13 @@ export class GameSaves {
      * later blocks or dungeon image do not read has no signature, and throws one with
      * CSBWin's line for a failed read.
      *
+     * The file is read once, whole (`loadCsbwinWorld`), and only a read that fails asks
+     * whether it holds a `GAMEBLOCK1` at all (`readsGameBlock1`).
+     *
      * The row keeps the file's name, made unique in the store, and its date where the
      * page has one (`ImportedFile.modifiedAt`), today's otherwise; it counts no time
      * played, which no file holds, and is the last save used, being the last written.
-     * Its level, champions and playthrough are the file's (`readSaveFileFields`). A file
+     * Its level, champions and playthrough are the file's (`saveFileFieldsOf`). A file
      * that names no playthrough, an earlier build's, takes one as it enters the store:
      * that of the newest save of the same data set and party (`joinedPlaythrough`), or a
      * new one that no save of the data set holds (`drawPlaythrough`), stamped into the
@@ -407,18 +410,20 @@ export class GameSaves {
      * a save of another that drew the same id.
      */
     async importSave(file: ImportedFile, answer: ImportAnswer | null = null): Promise<ImportResult> {
-        if (!readsGameBlock1(file.bytes)) {
-            this.log(`${file.name} has no GAMEBLOCK1: not a saved game`);
-            throw new SaveFileError(NOT_A_SAVED_GAME);
-        }
         let walls: DungeonWalls;
+        let fields: SaveFileFields | null;
         try {
-            walls = await dungeonWalls(loadCsbwinWorld(file.bytes).dungeon);
+            const world = loadCsbwinWorld(file.bytes);
+            walls = await dungeonWalls(world.dungeon);
+            fields = saveFileFieldsOf(world.save);
         } catch (error) {
+            if (!readsGameBlock1(file.bytes)) {
+                this.log(`${file.name} has no GAMEBLOCK1: not a saved game`);
+                throw new SaveFileError(NOT_A_SAVED_GAME);
+            }
             this.log(`${file.name} does not read as a saved game`, error);
             throw new SaveFileError(SAVED_GAME_DAMAGED);
         }
-        const fields = readSaveFileFields(file.bytes);
         if (!fields) throw new SaveFileError(SAVED_GAME_DAMAGED);
         const own = await this.ownDungeons();
         const elsewhere = answer === 'elsewhere';

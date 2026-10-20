@@ -114,7 +114,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| R12 | Listing the saves reads every save's bytes | M | ⏳ |
 | U11 | The cursor over a dialog takes the game's shapes | S | ⏳ |
 | U12 | A text outside the game's font draws as other letters | S | ⏳ |
 | D17 | The screen keeps the party it last drew | S | ⏳ |
@@ -438,17 +437,6 @@ takes untrusted data. A file the player drops on the page and a custom dungeon a
 untrusted: they may stop the game with a message, as CSBWin dies, but never crash or hang
 the tab, nor corrupt what is stored. Each item owes what a fix owes ("How to work this
 list", point 4), its check included.
-
-### R12 ⏳ Listing the saves reads every save's bytes
-
-`BrowserSaveStore.list` is a `getAll` over whole rows, files included, and every F5,
-Sleepsave, menu save, F9, import and new game lists. A Conflux save is about 0.6 MB, and no
-row leaves the store unless the player deletes it (the dialog's DELETE). An import also parses its file three times,
-and an enciphered save is deciphered twice (`loadCsbwinWorld` again after
-`loadSaveGameState`).
-
-Paying it: the rows' fields and their files in two object stores, which bumps `DB_VERSION`.
-The deciphered data handed on by `loadSaveGameState`.
 
 ---
 
@@ -924,8 +912,7 @@ palette codes, so none moves.
 - **Dead members and code**: `TimerQueue.clear` (`:193`), `PartyFootprints.reset`
   (`:213`), `MovementResult.stepped`, `.blocked` and `.newFacing` (`gameTypes.ts:346-358`),
   `MonsterSystem.detachedGroupIndexFor` (`:911`), `MonsterAI.clearAttacking` (`:1696`),
-  `MonsterAttack`'s `RN_*` re-exports (`:39-49`), `BrowserSaveStore.remove` and
-  `idbDelete`, `GraphicEntry.image`, `getCacheStats`, `clearCache`, `const result = 0; …
+  `MonsterAttack`'s `RN_*` re-exports (`:39-49`), `GraphicEntry.image`, `getCacheStats`, `clearCache`, `const result = 0; …
   return result | 1` (`Game.ts:856`), `offset = offset;` (`SaveGameLoader.ts:619-621`),
   `x !== -1 ? x : -1` (`MonsterDamage.ts:368`).
 - **Tool-only code in the engine**: `DungeonState.applyDoorActionAtPosition` and

@@ -14,7 +14,6 @@
  */
 import { DungeonLoader } from './DungeonLoader';
 import { loadSaveGameState } from './SaveGameLoader';
-import { simpleEncipher } from './CsbwinExtendedFeatures';
 import type { DungeonData } from './dungeonTypes';
 
 export interface CsbwinWorld {
@@ -33,7 +32,7 @@ export interface CsbwinWorld {
 export function loadCsbwinWorld(file: Uint8Array): CsbwinWorld {
     const save = loadSaveGameState(file);
     // An enciphered save is read deciphered, the image as its blocks (`readExtendedFeatures`).
-    const bytes = save.simpleEncipher ? simpleEncipher(file) : file;
+    const bytes = save.data;
     const imageOffset = save.dungeonImageOffset;
     if (imageOffset === undefined) throw new Error('save has no dungeon image');
 

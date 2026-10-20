@@ -21,7 +21,7 @@ import { readFileSync } from 'node:fs';
 
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { formatSaveRow, saveEntryOf, slotOf, type SaveEntry, type StoredSaveRecord } from '../src/data/saves/SaveStore';
+import { formatSaveRow, saveEntryOf, slotOf, type SaveEntry, type StoredSaveEntry } from '../src/data/saves/SaveStore';
 import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import type { Game } from '../src/engine/Game';
 import type { MessageSink } from '../src/engine/GameHost';
@@ -94,9 +94,9 @@ function checkRow(): void {
   console.log(`  "${row}"`);
   check(row === '  2026-09-13 14:05 L14 SLEEPSAVE' && row.length <= 32, 'the Sleepsave\'s row reads SLEEPSAVE, as F5\'s reads QUICKSAVE, and fits');
 
-  const stored: StoredSaveRecord = {
+  const stored: StoredSaveEntry = {
     id: 'old', name: 'old', dataSet: DEFAULT_DATA_SET.id, playthrough: 7, quick: false,
-    savedAt: 1, level: 1, champions: [], bytes: new ArrayBuffer(0),
+    savedAt: 1, level: 1, champions: [],
   };
   check(saveEntryOf(stored).sleep === false, 'a stored row from before rows held the flag is no Sleepsave');
 }
