@@ -116,7 +116,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| R16 | A save's DELETE is told done before its transaction commits | S | ⏳ |
 | W4 | The events table grows without bound | S | ⏳ |
 | W5 | The statistics are pseudonymous, not anonymous | S | ⏳ |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
@@ -443,16 +442,6 @@ takes untrusted data. A file the player drops on the page and a custom dungeon a
 untrusted: they may stop the game with a message, as CSBWin dies, but never crash or hang
 the tab, nor corrupt what is stored. Each item owes what a fix owes ("How to work this
 list", point 4), its check included.
-
-### R16 ⏳ A save's DELETE is told done before its transaction commits
-
-`idbDelete` (`src/data/saves/idb.ts:177-180`) awaits the delete request's success and
-not its transaction, where `idbPut` awaits both (`idbDone`). The request succeeds before
-the transaction commits, so `BrowserSaveStore.remove` resolves, and the menu says
-"SAVE DELETED" (`SAVE_MENU_DELETED`), for a delete whose transaction can still abort
-(a quota or I/O error), the row then still there at the next list. Paying it:
-`idbDelete` awaits `idbDone(tx)` as `idbPut` does. No Node tool runs IndexedDB, so its
-check is a save's DELETE in `tools/probe-frames.mjs`, which deletes none yet.
 
 ### R12 ⏳ Listing the saves reads every save's bytes
 

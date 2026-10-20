@@ -177,4 +177,5 @@ export function idbDone(tx: IDBTransaction): Promise<void> {
 export async function idbDelete(db: IDBDatabase, store: string, key: IDBValidKey): Promise<void> {
     const tx = db.transaction(store, 'readwrite');
     await promisify(tx.objectStore(store).delete(key));
+    await idbDone(tx);
 }

@@ -353,6 +353,17 @@ check(moves.left, 'the pointer gone, no cursor is left for the frames that follo
 // SAVE (x 95..143, y 161..174), a new save from that row, for the resume from the
 // entrance below.
 await canvasClick(120, 168, 0); await wait(1200);
+// A delete is done only once its transaction commits (`idbDelete`, `src/data/saves/idb.ts`):
+// one aborted after its request succeeded, as a quota or an I/O error aborts one, is a
+// delete that failed, and the save is still listed, for the resume below.
+const abortedDelete = await evaluate(`(async()=>{const {saves}=window.__probe;const own=IDBObjectStore.prototype.delete;
+  IDBObjectStore.prototype.delete=function(key){const request=own.call(this,key);const tx=this.transaction;
+    request.addEventListener('success',()=>tx.abort());return request;};
+  try { const [entry]=await saves.list(); if (!entry) return 'no save';
+    const told=await saves.remove(entry).then(()=>'done',()=>'failed');
+    return told+', '+((await saves.list()).some(e=>e.id===entry.id)?'listed':'gone'); }
+  finally { IDBObjectStore.prototype.delete=own; }})()`);
+check(abortedDelete === 'failed, listed', `a delete whose transaction aborts fails, and the save is still listed (${abortedDelete})`);
 
 // The dungeon entrance, with the intro left on. The wait has to cover the FTL logo — 98
 // vertical blanks — and the whole title animation — about 116 — plus the entrance's own
