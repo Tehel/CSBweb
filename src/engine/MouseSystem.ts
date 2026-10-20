@@ -28,7 +28,7 @@ import { copyCharacter } from './Party';
 import { AdjustSkillsWhy, determineMastery } from './skills';
 import { TimerFunction } from './TimerQueue';
 
-export interface DropCursorOptions {
+interface DropCursorOptions {
   viAltar?: boolean;
 }
 

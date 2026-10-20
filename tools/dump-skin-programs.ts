@@ -38,7 +38,7 @@
 import { readFileSync } from 'node:fs';
 
 import { readU16LE, readU32LE } from '../src/core/bytes';
-import { Position } from '../src/core/types';
+import { OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import { BackgroundLib } from '../src/data/BackgroundLib';
 import { CSBGraphicsLoader, CSBGraphicType } from '../src/data/CSBGraphicsLoader';
 import { DungeonLoader } from '../src/data/DungeonLoader';
@@ -50,7 +50,7 @@ import {
   type InterpreterContext,
 } from '../src/renderer/bytecode/BytecodeInterpreter';
 import { Opcode } from '../src/renderer/bytecode/Opcodes';
-import { GraphicRoomType, RoomType, type SummarizeRoomData } from '../src/renderer/bytecode/Types';
+import { GraphicRoomType, type SummarizeRoomData } from '../src/renderer/bytecode/Types';
 import type { IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import { cellNames, relativeX, relativeY, skinProgramStart } from '../src/renderer/DrawViewport';
 import { RelativeXY } from '../src/engine/RelativeXY';
@@ -78,7 +78,7 @@ function csbGraphics(dir: string): CSBGraphicsLoader {
 function cell(n: number, skinNumber: number): SummarizeRoomData {
   return {
     x: 0, y: 0, relativeCellNumber: n, skinNumber, roomType: RoomType.OPEN, championPortraitOrdinal: 0,
-    graphicRoomType: GraphicRoomType.OPEN, rn2: 0xfffe, decorations: [0, 0, 0], text: [0xfffe, 0xfffe, 0xfffe],
+    graphicRoomType: GraphicRoomType.OPEN, rn2: OBJECT_ID_EOF, decorations: [0, 0, 0], text: [OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF],
   };
 }
 

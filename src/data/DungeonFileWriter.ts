@@ -26,7 +26,7 @@ import { buildExtendedFeaturesPrefix, buildLiveExtendedFeatures } from './Csbwin
 import { objectIndexOf } from './CsbwinObjectIndex';
 import type { DungeonData } from './dungeonTypes';
 
-export interface DungeonFileOptions {
+interface DungeonFileOptions {
     /**
      * The block's `DMRules`, which a new game takes as `DMRulesDesignOption`
      * (`doc/CSBwin-src/SaveGame.cpp:394-400`) in place of the data set's `dmRules`.

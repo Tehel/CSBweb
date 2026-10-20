@@ -326,14 +326,14 @@ export const TABS: ReadonlyArray<{
 
 export const TITLE = 'SETTINGS';
 export const CLOSE_LABEL = 'CLOSE';
-export const CLOSE_HELP = 'BACK TO THE GAME, SAME AS ESC AND RIGHT CLICK';
+const CLOSE_HELP = 'BACK TO THE GAME, SAME AS ESC AND RIGHT CLICK';
 export const EXIT_LABEL = 'EXIT';
 export const EXIT_HELP = 'LEAVE THE GAME FOR THE WELCOME PAGE';
 /** EXIT's question (see "EXIT"), and its two options: EXIT, then CANCEL. */
 export const EXIT_QUESTION = 'LEAVE THE GAME?';
 export const EXIT_WARNING = 'WHAT IS NOT SAVED IS LOST';
-export const EXIT_OPTIONS = [EXIT_LABEL, 'CANCEL'] as const;
-export const TOGGLE_LABELS = ['ON', 'OFF'] as const;
+const EXIT_OPTIONS = [EXIT_LABEL, 'CANCEL'] as const;
+const TOGGLE_LABELS = ['ON', 'OFF'] as const;
 
 /* --------------------------------------------------------------------- state ---- */
 
@@ -349,10 +349,6 @@ export interface SettingsDialogState {
   exiting: boolean;
   /** The question's button flashing, or `null`. */
   press: MenuPress | null;
-}
-
-export function isSettingsDialogOpen(ui: UIState): boolean {
-  return ui.settingsDialog !== null;
 }
 
 const SETTINGS_DIALOG: Dialog = {

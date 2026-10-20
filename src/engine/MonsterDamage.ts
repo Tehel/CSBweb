@@ -363,7 +363,7 @@ export class MonsterDamage {
     if (bodyPartSoundDelay >= 0 && dropResidue && desc && monsterLeavesDroppings(desc)) {
       const positions = this.monsterPositionByte(
         monster,
-        monsterAttachedToLevel !== -1 ? monsterAttachedToLevel : -1,
+        monsterAttachedToLevel,
         false,
       );
       for (let i = monster.numMonM1 & 0x3; i >= 0; i--) {

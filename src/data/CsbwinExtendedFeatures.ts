@@ -79,7 +79,7 @@ export const EF_EXTENDED_FLAGS = {
  * (`doc/CSBwin-src/data.cpp:249`); `'B'` and up store the new six-byte SCROLL
  * (`doc/CSBwin-src/SaveGame.cpp:2401-2412`), and every committed save is `'B'`.
  */
-export const EF_VERSION_B = 0x42;
+const EF_VERSION_B = 0x42;
 
 /**
  * The 512-byte header, field for field. Names are CSBWin's.
@@ -126,7 +126,7 @@ export interface ExtendedFeaturesBlock {
 }
 
 /** Read the 512-byte header. The caller has already verified its checksum. */
-export function parseExtendedFeaturesBlock(block: Uint8Array): ExtendedFeaturesBlock {
+function parseExtendedFeaturesBlock(block: Uint8Array): ExtendedFeaturesBlock {
     return {
         version: block[36] ?? 0,
         flags: block[37] ?? 0,
@@ -432,7 +432,7 @@ function writeDsa(wcs: WcsWriter, dsa: DsaDefinition): void {
 }
 
 /** `countDSAs` (`doc/CSBwin-src/SaveGame.cpp:763-773`): the DSAs the index holds. */
-export function countDSAs(index: DsaIndex | undefined): number {
+function countDSAs(index: DsaIndex | undefined): number {
     return (index?.entries ?? []).slice(0, 256).filter((dsa) => dsa).length;
 }
 
@@ -619,7 +619,7 @@ export function readExtendedFeatures(file: Uint8Array): {
 }
 
 /** What `buildExtendedFeaturesPrefix` needs beyond the header. */
-export interface ExtendedFeaturesPrefix {
+interface ExtendedFeaturesPrefix {
     header: ExtendedFeaturesBlock;
     /** `dataTypeMap`: one byte per slot, `(pos << 4) | dbNum`, 0xff when free. */
     typeMap: Uint8Array;
@@ -756,7 +756,7 @@ export interface SavedOverlay {
     overlayP4: number;
 }
 
-export interface LiveExtendedFeatures {
+interface LiveExtendedFeatures {
     /** `cellflagArraySize` — `cellFlagArraySize(dungeon.maps)`, the length of block 14. */
     cellFlagArraySize: number;
     /** `extendedWallDecorations`, as the world carries it. */

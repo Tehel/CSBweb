@@ -182,7 +182,7 @@ export function feedParametersFromWords(word: (index: number) => number): FeedPa
  * `drinkable` is the switch's `fp.performFeeding = true`: a type with no case of its own
  * leaves it as it was.
  */
-export interface PotionEffect {
+interface PotionEffect {
   drinkable: boolean;
   dexterityAdjust: number;
   strengthAdjust: number;

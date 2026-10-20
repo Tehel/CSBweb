@@ -11,7 +11,7 @@ import { OBJNI_BONES_A, OBJNI_EMPTY_FLASK, OBJNI_WATER, OBJNI_WATERSKIN } from '
 import { OBJECT_ID_EOF, OBJECT_ID_NULL, ObjectID, Position, RoomType } from '../../core/types';
 import { CreatureRecord } from '../../data/dungeonTypes';
 import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
-import { GraphicRoomType, RoomType as SummaryRoomType } from '../bytecode/Types';
+import { GraphicRoomType } from '../bytecode/Types';
 import { resolveObjectNameIndex } from './Objects';
 import { UIState } from './UIState';
 import { setClockTick } from '../../engine/LoopState';
@@ -20,12 +20,12 @@ import { forgetThrownWeapon } from '../../engine/ThrownWeapons';
 
 const POTION_WATER_FLASK = 15;
 
-export type ViewportCursorAction =
+type ViewportCursorAction =
   | { kind: 'throw'; side: 0 | 1 }
   | { kind: 'drop'; pos: number; viAltar?: boolean }
   | { kind: 'wall' };
 
-export function isDoorSwitchHit(ui: UIState, x: number, y: number): boolean {
+function isDoorSwitchHit(ui: UIState, x: number, y: number): boolean {
   const rects = ui.context.doorSwitchRects;
   if (!rects || rects.length === 0) return false;
   const vx = x - VIEWPORT_X;
@@ -37,7 +37,7 @@ export function isDoorSwitchHit(ui: UIState, x: number, y: number): boolean {
 }
 
 /** What an empty-handed click in the viewport touches (`resolveEmptyHandedViewportClick`). */
-export type EmptyHandedViewportTarget = 'doorSwitch' | 'wall' | 'object' | 'stone';
+type EmptyHandedViewportTarget = 'doorSwitch' | 'wall' | 'object' | 'stone';
 
 /**
  * What an empty-handed click in the viewport touches, in `HandleClickInViewport`'s order
@@ -64,7 +64,7 @@ export function resolveEmptyHandedViewportClick(ui: UIState, x: number, y: numbe
     return ui.context.facingAlcove ? null : 'wall';
   }
   if (ui.context.facingAlcove) return null;
-  if (ui.context.roomData?.[17]?.roomType !== SummaryRoomType.STONE) return null;
+  if (ui.context.roomData?.[17]?.roomType !== RoomType.STONE) return null;
   if (!isFrontCellStoneOrVisibleFalseWall(ui)) return null;
   if (x < 33 || x > 189 || y < 44 || y > 150) return null;
   return 'stone';
@@ -108,7 +108,7 @@ export function resolveViewportCursorAction(ui: UIState, x: number, y: number): 
   // `d.CellTypeJustAhead == 0` (`doc/CSBwin-src/Mouse.cpp:1166`), which is all this arm
   // tests: a false wall that is not open summarises as stone, imaginary or not
   // (`Codea59a.cpp:278-279`), unlike the bare-stone sound's `(cf & 5) == 0`.
-  const stoneAhead = ui.context.roomData?.[17]?.roomType === SummaryRoomType.STONE;
+  const stoneAhead = ui.context.roomData?.[17]?.roomType === RoomType.STONE;
   const doorFacingAhead = isFrontCellDoorFacing(ui);
 
   if (stoneAhead) {
@@ -169,7 +169,7 @@ export function findDropAreaHit(ui: UIState, x: number, y: number, count: number
   return null;
 }
 
-export function isViewportButtonHit(ui: UIState, index: number, x: number, y: number): boolean {
+function isViewportButtonHit(ui: UIState, index: number, x: number, y: number): boolean {
   const buttons = ui.context.viewportObjectButtons;
   if (!buttons || index < 0 || index >= buttons.length) return false;
   const rect = buttons[index];
@@ -191,7 +191,7 @@ export function testThrow(clickX: number, clickY: number, doorFacing: boolean): 
   return 1;
 }
 
-export function isFrontCellStoneOrVisibleFalseWall(ui: UIState): boolean {
+function isFrontCellStoneOrVisibleFalseWall(ui: UIState): boolean {
   const facing = ui.partyState.facing & 0x3;
   const pos = ui.partyState.position;
   const target = new Position(pos.x + ui.ctx.tables.deltaX[facing]!, pos.y + ui.ctx.tables.deltaY[facing]!, pos.z);
@@ -206,12 +206,12 @@ export function isFrontCellStoneOrVisibleFalseWall(ui: UIState): boolean {
   return false;
 }
 
-export function isFrontCellDoorFacing(ui: UIState): boolean {
+function isFrontCellDoorFacing(ui: UIState): boolean {
   const rd = ui.context.roomData?.[17];
   return rd?.graphicRoomType === GraphicRoomType.DOOR_FACING;
 }
 
-export function findViewportObjectHit(ui: UIState, x: number, y: number): { relativeLocation: number; rn: ObjectID } | null {
+function findViewportObjectHit(ui: UIState, x: number, y: number): { relativeLocation: number; rn: ObjectID } | null {
   const buttons = ui.context.viewportObjectButtons;
   const rns = ui.context.viewportObjectRNs;
   if (!buttons || !rns) return null;
@@ -234,7 +234,7 @@ export function findViewportObjectHit(ui: UIState, x: number, y: number): { rela
   return null;
 }
 
-export function getPickupCellForRelativePos(ui: UIState, relativeLocation: number): Position | null {
+function getPickupCellForRelativePos(ui: UIState, relativeLocation: number): Position | null {
   const facing = ui.partyState.facing & 0x3;
   let target = ui.partyState.position;
   if (relativeLocation >= 2) {
@@ -243,7 +243,7 @@ export function getPickupCellForRelativePos(ui: UIState, relativeLocation: numbe
   return target;
 }
 
-export function isMonsterBlockingPickup(ui: UIState, relativeLocation: number, position: Position): boolean {
+function isMonsterBlockingPickup(ui: UIState, relativeLocation: number, position: Position): boolean {
   if (relativeLocation < 2) return false;
   const rn = ui.ctx.dungeon.findFirstMonster(position);
   if (rn === OBJECT_ID_EOF) return false;
@@ -263,11 +263,11 @@ export function isMonsterLevitating(ui: UIState, creature: CreatureRecord): bool
   return (desc.word2 & 0x20) !== 0;
 }
 
-export function monsterOccupiesPosition(positions: number, curAbsPos: number, count: number): boolean {
+function monsterOccupiesPosition(positions: number, curAbsPos: number, count: number): boolean {
   return monsterIndexAtPosition(positions, curAbsPos, count) >= 0;
 }
 
-export function monsterIndexAtPosition(positions: number, curAbsPos: number, count: number): number {
+function monsterIndexAtPosition(positions: number, curAbsPos: number, count: number): number {
   if (isCenteredPositions(positions)) return 0;
   for (let i = 0; i < count; i++) {
     if (((positions >> (2 * i)) & 0x3) === curAbsPos) return i;
@@ -275,6 +275,6 @@ export function monsterIndexAtPosition(positions: number, curAbsPos: number, cou
   return -1;
 }
 
-export function isCenteredPositions(positions: number): boolean {
+function isCenteredPositions(positions: number): boolean {
   return (positions & 0xff) === 0xff;
 }

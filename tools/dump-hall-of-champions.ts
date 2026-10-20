@@ -725,9 +725,9 @@ function portraitSection(): void {
       roomType: 0,
       championPortraitOrdinal: 0,
       graphicRoomType: 0,
-      rn2: 0xfffe,
+      rn2: OBJECT_ID_EOF,
       decorations: [0, 0, 0],
-      text: [0xfffe, 0xfffe, 0xfffe],
+      text: [OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF],
     };
     summarizeRoomInfoCsbwin(rslt, probe.ctx.dungeon, party.position, partyFacing, objectTables);
     return rslt;

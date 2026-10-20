@@ -91,7 +91,7 @@ export function lineY(line: number): number {
 export const LABEL_X = TABLE_PANEL.x1 + 4;
 export const LABEL_CHARS = 10;
 /** The champions' four columns, right of the labels'. */
-export const COLUMN_X0 = LABEL_X + LABEL_CHARS * CHAR_WIDTH + 2;
+const COLUMN_X0 = LABEL_X + LABEL_CHARS * CHAR_WIDTH + 2;
 export const COLUMN_WIDTH = 57;
 /** A level's or a sub-skill's mastery is right-aligned in the column's first three characters. */
 export const VALUE_CHARS = 3;
@@ -107,7 +107,7 @@ export function columnX(chIdx: number): number {
  * Where a text starts so that its last character's ink ends on the column `right`: a
  * glyph is inked on the first five of its six columns.
  */
-export function rightAlignedX(right: number, text: string): number {
+function rightAlignedX(right: number, text: string): number {
   return right + 2 - text.length * CHAR_WIDTH;
 }
 
@@ -139,7 +139,7 @@ export const SUBSKILL_NAMES = [
 ];
 
 /** A row of the table: its label, and what a champion's cell reads. */
-export interface TableRow {
+interface TableRow {
   readonly label: string;
   /** The reading; a skill's carries its bar too. */
   readonly read: (champion: Champion) => Reading;
@@ -154,7 +154,7 @@ export interface Reading {
 /** A blank line between two groups of rows. */
 const GAP = null;
 
-export type ChampionTab = 'attributes' | 'skills';
+type ChampionTab = 'attributes' | 'skills';
 
 /**
  * Skill `skill`'s mastery and its progress: the experience `DetermineMastery` counts, a
@@ -209,10 +209,6 @@ export interface ChampionDialogState {
   pointer: DialogPoint;
 }
 
-export function isChampionDialogOpen(ui: UIState): boolean {
-  return ui.championDialog !== null;
-}
-
 const CHAMPION_DIALOG: Dialog = {
   uiPalette: true,
   draw: (ui) => drawChampionDialog(ui),
@@ -259,7 +255,7 @@ const BTN_CLOSE = 1;
 const BTN_TAB0 = 10;
 
 /** The dialog's button list, in the form of CSBWin's: CLOSE, and the tabs. */
-export function championDialogButtons(): UIButton[] {
+function championDialogButtons(): UIButton[] {
   return [
     buttonOf(CLOSE_FRAME, BTN_CLOSE, 'champions.close'),
     ...tabButtons(TAB_FRAMES, BTN_TAB0, 'champions.tab').map((b, i) => ({ ...b, name: `champions.tab.${TABS[i].tab}` })),
@@ -302,7 +298,7 @@ export function drawChampionDialog(ui: UIState): void {
 }
 
 /** A column's colour: lit where marked, dim for a dead champion, else the option colour. */
-export function columnColor(state: ChampionDialogState, champion: Champion, chIdx: number): number {
+function columnColor(state: ChampionDialogState, champion: Champion, chIdx: number): number {
   if (state.marked === chIdx) return LIT_COLOR;
   return champion.attributes.health === 0 ? DIM_COLOR : MENU_OPTION_COLOR;
 }

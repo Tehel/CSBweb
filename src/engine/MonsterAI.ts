@@ -105,7 +105,7 @@ export interface AiConst {
  *
  * Named after CSBWin's fields so the two can be read side by side.
  */
-export interface AiScratch extends MoveProbeState, TurnState {
+interface AiScratch extends MoveProbeState, TurnState {
   /** `d.monsterX` / `d.monsterY` — the group whose turn it is. */
   monsterX: number;
   monsterY: number;
@@ -118,7 +118,7 @@ export interface AiScratch extends MoveProbeState, TurnState {
   lastMonsterMoved: ObjectID;
 }
 
-export function makeAiScratch(): AiScratch {
+function makeAiScratch(): AiScratch {
   return {
     directionHasBeenTested: new Uint8Array(4),
     monsterMoveInhibit: new Uint8Array(4),
@@ -138,7 +138,7 @@ export function makeAiScratch(): AiScratch {
 }
 
 /** What `InitialChecks` decides. */
-export interface InitialChecksResult {
+interface InitialChecksResult {
   /** True when the timer has been dealt with and the AI must not run. */
   handled: boolean;
   /** `w_54` — how long since this group's last update, in ticks, modulo 256. */
@@ -1689,13 +1689,6 @@ export class MonsterAI {
         timer,
         this.ctx.systems.monsters.nextMonsterUpdateTime(slot, monIdx, false, mapX, mapY, level),
       );
-    }
-  }
-
-  /** Clear every member's attacking flag without touching the timers. */
-  clearAttacking(slot: Item16Record): void {
-    for (let i = 0; i < 4; i++) {
-      slot.singleMonsterStatus[i] = (slot.singleMonsterStatus[i] ?? 0) & ~SMS_ATTACKING;
     }
   }
 

@@ -17,7 +17,7 @@
  */
 
 /** `sizeof(palette)` in `SaveGame` and `LoadGame`: three components of 512 entries. */
-export const OVERLAY_PALETTE_SIZE = 3 * 512;
+const OVERLAY_PALETTE_SIZE = 3 * 512;
 
 /**
  * `ClearOverlayPalette` (`doc/CSBwin-src/data.cpp:118-146`): the identity palette, each

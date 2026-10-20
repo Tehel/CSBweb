@@ -16,7 +16,7 @@ import { zip } from '../core/zip';
 import { thumbnailPath, type DataSet } from './DataSets';
 
 /** A file of the archive: its name in the set's folder, and whether the set is not whole without it. */
-export interface ArchiveFile {
+interface ArchiveFile {
     file: string;
     required: boolean;
 }

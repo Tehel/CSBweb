@@ -1,7 +1,8 @@
 import { SNDexpand } from '../core/compression';
 import { div } from '../core/intCast';
 import type { GraphicsLoader } from '../data/GraphicsLoader';
-import { buildSoundCatalog, ratesDefault, type SoundInfo, type SoundTableEntry } from './soundsIndex';
+import { buildSoundCatalog, ratesDefault, type SoundInfo } from './soundsIndex';
+import type { SoundTableEntry } from '../data/tables/UITables';
 
 /** `SNDHEAD`'s `nSamplesPerSecond` in `SOUNDDATA::Decode` (`doc/CSBwin-src/Sound.cpp:343`). */
 const CUSTOM_SOUND_RATE = 11025;

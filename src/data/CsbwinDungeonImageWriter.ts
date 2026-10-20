@@ -59,7 +59,7 @@ const bit = (b: boolean | undefined): number => (b ? 1 : 0);
  * (`doc/CSBwin-src/SaveGame.cpp:2624-2627`) — but a file may fill both, so neither value
  * can be derived from the other.
  */
-export function buildDungeonImageHeader(header: DungeonHeader): Uint8Array {
+function buildDungeonImageHeader(header: DungeonHeader): Uint8Array {
     const buf = new Uint8Array(DUNGEON_IMAGE_HEADER_SIZE);
     writeU16BE(buf, 0, header.randomSeed);
     writeU16BE(buf, 2, header.mapDataSize);
@@ -77,7 +77,7 @@ export function buildDungeonImageHeader(header: DungeonHeader): Uint8Array {
 }
 
 /** Block 8 — `LEVELDESC[NumLevel]`, the inverse of `DungeonLoader.parseMapDescriptors`. */
-export function buildLevelDescriptors(descriptors: readonly MapDescriptor[]): Uint8Array {
+function buildLevelDescriptors(descriptors: readonly MapDescriptor[]): Uint8Array {
     const buf = new Uint8Array(descriptors.length * LEVEL_DESCRIPTOR_SIZE);
     descriptors.forEach((d, i) => {
         const at = i * LEVEL_DESCRIPTOR_SIZE;
@@ -126,7 +126,7 @@ export function buildLevelDescriptors(descriptors: readonly MapDescriptor[]): Ui
  * CSBWin writes the array into the save beside the object list
  * (`doc/PROVEN_FACTS.md` → "The column index is saved state, not dungeon structure").
  */
-export function buildColumnIndex(columnIndex: readonly number[]): Uint8Array {
+function buildColumnIndex(columnIndex: readonly number[]): Uint8Array {
     const buf = new Uint8Array(columnIndex.length * 2);
     for (let i = 0; i < columnIndex.length; i++) writeU16BE(buf, i * 2, columnIndex[i] & 0xffff);
     return buf;
@@ -203,7 +203,7 @@ export function buildCellFlagArray(maps: readonly MapData[], size: number): Uint
  * (`src/data/CsbwinObjectIndex.ts`), or a packed RN for a world read without its
  * conversions (`DungeonImageOptions.noConvert`).
  */
-export function buildObjectList(objectList: readonly number[]): Uint8Array {
+function buildObjectList(objectList: readonly number[]): Uint8Array {
     const buf = new Uint8Array(objectList.length * 2);
     for (let i = 0; i < objectList.length; i++) writeU16BE(buf, i * 2, objectList[i] & 0xffff);
     return buf;
@@ -222,7 +222,7 @@ export function buildObjectList(objectList: readonly number[]): Uint8Array {
  * (`doc/CSBwin-src/SaveGame.cpp:2486`). That is why a save says 125 where `dungeon.dat`
  * says 1749.
  */
-export function buildIndirectTextIndex(indirectTextIndex: readonly number[]): Uint8Array {
+function buildIndirectTextIndex(indirectTextIndex: readonly number[]): Uint8Array {
     const buf = new Uint8Array(indirectTextIndex.length * 4);
     for (let i = 0; i < indirectTextIndex.length; i++) writeU32LE(buf, i * 4, indirectTextIndex[i] >>> 0);
     return buf;
@@ -237,7 +237,7 @@ export function buildIndirectTextIndex(indirectTextIndex: readonly number[]): Ui
  * text array, which is never swapped on the way in either, so they are big-endian in
  * memory and big-endian in the file.
  */
-export function buildCompressedText(compressedText: readonly number[]): Uint8Array {
+function buildCompressedText(compressedText: readonly number[]): Uint8Array {
     const buf = new Uint8Array(4 + compressedText.length * 2);
     writeU32LE(buf, 0, compressedText.length >>> 0);
     for (let i = 0; i < compressedText.length; i++) writeU16BE(buf, 4 + i * 2, compressedText[i] & 0xffff);
@@ -253,14 +253,14 @@ export function buildCompressedText(compressedText: readonly number[]): Uint8Arr
  * carries this form. It is here so that the writer is the exact inverse of the reader on
  * both kinds of image, which is what lets `dungeon.dat` be a test case.
  */
-export function buildTextWords(textWords: readonly number[]): Uint8Array {
+function buildTextWords(textWords: readonly number[]): Uint8Array {
     const buf = new Uint8Array(textWords.length * 2);
     for (let i = 0; i < textWords.length; i++) writeU16BE(buf, i * 2, textWords[i] & 0xffff);
     return buf;
 }
 
 /** How the databases of the image being written differ from a plain `dungeon.dat`. */
-export interface DatabaseWriteOptions {
+interface DatabaseWriteOptions {
     /** ACTUATOR records are 10 bytes, not 8 (`MakeBigActuators`). */
     bigActuators?: boolean;
     /** SCROLL records are 6 bytes with an RN text reference, not 4 with a 10-bit index. */
@@ -298,7 +298,7 @@ export function databaseRecordSize(db: number, options: DatabaseWriteOptions = {
  *   the image, as `SaveGame` does (`doc/CSBwin-src/SaveGame.cpp:1206-1231`, `src/engine/SaveGameFile.ts`).
  * - **12 and 13**, which `CSB.h` marks `//Not used`. Empty in every file here.
  */
-export function buildDatabases(
+function buildDatabases(
     dungeon: DungeonData,
     options: DatabaseWriteOptions = {},
 ): Uint8Array {
@@ -312,7 +312,7 @@ export function buildDatabases(
 }
 
 /** One database's records. Exported so a tool can compare them a section at a time. */
-export function buildDatabase(
+function buildDatabase(
     dungeon: DungeonData,
     db: number,
     options: DatabaseWriteOptions = {},
@@ -537,7 +537,7 @@ function writtenSecondary(rn: number, link: number): number {
 }
 
 /** Every section of the image, in file order. Blocks 7-14. */
-export interface DungeonImageSections {
+interface DungeonImageSections {
     /** Block 7 — `DUNGEONDATINDEX`, 44 bytes. */
     header: Uint8Array;
     /** Block 8 — `LEVELDESC[NumLevel]`. */
@@ -560,7 +560,7 @@ export interface DungeonImageSections {
 }
 
 /** How the image being written differs from a plain `dungeon.dat`. */
-export interface DungeonImageWriteOptions extends DatabaseWriteOptions {
+interface DungeonImageWriteOptions extends DatabaseWriteOptions {
     /** The text section is an indirect index plus compressed text. Saves only. */
     indirectText?: boolean;
 }

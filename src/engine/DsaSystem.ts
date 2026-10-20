@@ -79,7 +79,7 @@ export enum ViewingFilterSite {
   ATTRIBUTES,
 }
 
-export interface ViewingFilterOptions {
+interface ViewingFilterOptions {
   site: ViewingFilterSite;
   phraseMask: number;
   objectId: ObjectID;
@@ -176,7 +176,7 @@ export enum CursorFilterType {
  * as `ConvertToInteger` gives it, `RNnul` 0xFFFF for none; `p1` to `p4` are the type's
  * own, 0 when it has none: for an actuator's, the level, the square and the wall side.
  */
-export interface CursorFilterPacket {
+interface CursorFilterPacket {
   object: number;
   type: number;
   p1: number;

@@ -23,7 +23,7 @@
  */
 
 /** `d.PartyFootprints` and `d.Byte13220` are both 24 entries (`Data.h:796`). */
-export const MAX_FOOTPRINT_ENTRIES = 24;
+const MAX_FOOTPRINT_ENTRIES = 24;
 
 export class PartyFootprints {
   /** `d.PartyFootprints[24]` — packed `[level:6][y:5][x:5]`. */
@@ -207,16 +207,6 @@ export class PartyFootprints {
     } else {
       this.indexOfLastMagic = 0;
     }
-  }
-
-  /** Reset the trail — used when a save game is restored. */
-  reset(): void {
-    this.prints = [];
-    this.ages = [];
-    this.count = 0;
-    this.lastPartyMoveTime = 0;
-    this.indexOfFirstMagic = 0;
-    this.indexOfLastMagic = 0;
   }
 
   /**

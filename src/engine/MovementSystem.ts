@@ -92,7 +92,7 @@ const MOVE_BUTTON = [3, 4, 5, 6, 0x1124, 0x1125] as const;
  * bit of `[3]` is set for a positive move and cleared for a negative one, and the axis
  * moves to the front of `[0..2]`, one place at a time.
  */
-export function recordMoveHistory(history: number[], absdir: number): void {
+function recordMoveHistory(history: number[], absdir: number): void {
     let axis: number;
     let delta: number;
     if (absdir <= 3) {
@@ -259,10 +259,7 @@ export class MovementSystem {
         this.party.setFacing(newFacing);
         actuators.triggerObjectMove(position, OBJECT_ID_NULL, true, true, this.party.state.facing);
 
-        return {
-            success: true,
-            newFacing,
-        };
+        return { success: true };
     }
 
     /**
@@ -408,7 +405,6 @@ export class MovementSystem {
                 });
                 return {
                     success: false,
-                    blocked: true,
                     inhibited: true,
                 };
             }
@@ -423,7 +419,6 @@ export class MovementSystem {
         return {
             success: true,
             newPosition: this.party.state.position,
-            stepped: true,
         };
     }
 
@@ -502,7 +497,6 @@ export class MovementSystem {
         }
         return {
             success: false,
-            blocked: true,
             inhibited: true,
         };
     }
@@ -538,11 +532,11 @@ export class MovementSystem {
         }
         if (roomTypeTo !== RoomType.STONE) {
             if (this.dungeon.findFirstMonster(newPosition) !== OBJECT_ID_EOF) {
-                return { success: false, blocked: true };
+                return { success: false };
             }
             return this.traverseStairway(direction - 4, false);
         }
-        if (this.party.state.champions.length === 0) return { success: false, blocked: true };
+        if (this.party.state.champions.length === 0) return { success: false };
         return this.bumpWall(newPosition, direction);
     }
 
@@ -632,7 +626,6 @@ export class MovementSystem {
         if (!next) {
             return {
                 success: false,
-                blocked: true,
             };
         }
         const newFacing = this.dungeon.getExitStairsDirection(next, facing, this.ctx.tables);
@@ -666,7 +659,6 @@ export class MovementSystem {
         return {
             success: true,
             newPosition: next,
-            newFacing: this.party.state.facing,
         };
     }
 

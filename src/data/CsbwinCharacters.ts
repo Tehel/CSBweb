@@ -58,7 +58,7 @@ const PORTRAIT_BYTES_PER_LINE = (PORTRAIT_WIDTH / 16) * 8;
 
 
 /** Everything in one `CHARDESC` that this port has somewhere to put. */
-export interface CsbwinCharacter {
+interface CsbwinCharacter {
   champion: Champion;
   /** `charFlags`, kept raw: the caller needs bit 4 for gender and 0x400 for "moved". */
   charFlags: i16;
@@ -246,7 +246,7 @@ export function isMale(charFlags: number): boolean {
  * The 128 bytes after the four `CHARDESC`s, laid out by `Data.h:781-797`. Offsets are
  * from the start of block 4, so `4 * 800 = 3200` is `Brightness`.
  */
-export interface CsbwinPartyTail {
+interface CsbwinPartyTail {
   brightness: i16;
   seeThruWalls: i8;
   magicFootprintsActive: i8;
@@ -345,7 +345,7 @@ export function writePortrait(block: Uint8Array, base: number, pixels?: ui8[]): 
 }
 
 /** What the packer needs that a `Champion` does not carry. */
-export interface CsbwinCharacterWriteOptions {
+interface CsbwinCharacterWriteOptions {
   /**
    * `CHARDESC.load`, in tenths of a kilogram. CSBWin keeps it incrementally; this port
    * re-sums it (`CharacterStats.characterLoad`), so a live game passes that function

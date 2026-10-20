@@ -9,12 +9,12 @@
  */
 
 import { BytecodeInterpreter, InterpreterContext } from './bytecode/BytecodeInterpreter';
-import { GraphicRoomType, RoomType, SummarizeRoomData } from './bytecode/Types';
+import { GraphicRoomType, SummarizeRoomData } from './bytecode/Types';
 import { BytecodePrograms } from './bytecode/BytecodePrograms';
 import type { DungeonState } from '../engine/DungeonState';
 import { RelativeXY, type DirectionTables } from '../engine/RelativeXY';
 import { summarizeRoomInfoCsbwin } from './csbwin/SummarizeRoomInfo';
-import { Position } from '../core/types';
+import { OBJECT_ID_EOF, Position, RoomType } from '../core/types';
 import { readU16LE } from '../core/bytes';
 
 /**
@@ -79,9 +79,9 @@ export function DrawViewport(
       roomType: RoomType.STONE, // Will be overwritten by summarizeRoomInfoCsbwin
       championPortraitOrdinal: 0,
       graphicRoomType: GraphicRoomType.STONE,
-      rn2: 0xfffe,
+      rn2: OBJECT_ID_EOF,
       decorations: [0, 0, 0],
-      text: [0xfffe, 0xfffe, 0xfffe],
+      text: [OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF],
     };
 
     // Gather room information for this cell

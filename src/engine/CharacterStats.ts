@@ -278,7 +278,7 @@ export function feetMoveTimeBonus(feetNameIndex: number): number {
  * Free-standing because the renderer's load display needs it too, and because it
  * needs nothing but the champion.
  */
-export function staminaAdjustedAttribute(champ: Champion, baseValue: number): number {
+function staminaAdjustedAttribute(champ: Champion, baseValue: number): number {
   const stamina = champ.attributes?.stamina ?? 0;
   const half = sw(div(champ.attributes?.maxStamina ?? 0, 2));
   if (stamina >= half) return baseValue;

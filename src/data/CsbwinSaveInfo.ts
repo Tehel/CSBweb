@@ -81,7 +81,7 @@ export function encodeCharField(text: string, size: number): Uint8Array {
 }
 
 /** The four champions of a save's block 4, names and titles, empty slots included. */
-export function readCharacterNames(characterBlock: Uint8Array): Array<{ name: string; title: string }> {
+function readCharacterNames(characterBlock: Uint8Array): Array<{ name: string; title: string }> {
     const out: Array<{ name: string; title: string }> = [];
     for (let i = 0; i < 4; i++) {
         const base = i * CHARDESC_SIZE;

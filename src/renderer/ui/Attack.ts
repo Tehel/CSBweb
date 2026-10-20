@@ -31,7 +31,7 @@
  */
 import { OBJNI_SPECIAL_C } from '../../core/objectNameIndex';
 import { DBType, OBJECT_ID_NULL, type ObjectID } from '../../core/types';
-import { AttackType, ATTACK_TYPE_NONE, ATTACK_CLASS_EMPTY_HAND } from '../../engine/monsterTypes';
+import { ATTACK_TYPE_NONE, ATTACK_CLASS_EMPTY_HAND } from '../../engine/monsterTypes';
 import { getPartyChampion } from '../../engine/Party';
 import { CHARFLAG_ATTACK_DISABLE, getChampionPossession, SLOT_WEAPON_HAND, type Champion } from '../../engine/gameTypes';
 import { determineMastery } from '../../engine/skills';
@@ -65,7 +65,7 @@ export function attackButtonRect(chIdx: number): Rect {
  * 1` — so an attack option gated on charges is never hidden by an object that has no
  * charge field at all.
  */
-export function itemHasChargesLeft(ui: UIState, chIdx: number): boolean {
+function itemHasChargesLeft(ui: UIState, chIdx: number): boolean {
   const champ = ui.partyState && getPartyChampion(ui.partyState, chIdx);
   if (!champ) return true;
   const rn = getChampionPossession(champ, SLOT_WEAPON_HAND);
@@ -513,15 +513,4 @@ function drawAttackDamageFlash(ui: UIState): void {
   const digits = String(damage);
   const x = 274 - 3 * digits.length;
   drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, x, 100, 4, 0, digits);
-}
-
-/** Which attack types the champion is currently offered — for tools and the trace. */
-export function possibleAttackTypeNames(ui: UIState): string[] {
-  const names: string[] = [];
-  for (let i = 0; i < ui.word20248; i++) {
-    const type = ui.possibleAttackTypes[i];
-    if (type < 0) continue;
-    names.push(attackTypeName(ui, type) || AttackType[type] || String(type));
-  }
-  return names;
 }

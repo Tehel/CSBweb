@@ -288,7 +288,7 @@ export function SNDexpand(compressedData: Uint8Array): Uint8Array {
  * Check if data is LZW+RLE compressed
  * (based on size mismatch in graphics.dat)
  */
-export function isCompressed(compressedSize: ui16, decompressedSize: ui16): boolean {
+function isCompressed(compressedSize: ui16, decompressedSize: ui16): boolean {
     return compressedSize !== decompressedSize;
 }
 

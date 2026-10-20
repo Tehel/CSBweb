@@ -50,10 +50,10 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { atariToRGB, OBJECT_ID_EOF, Position } from '../src/core/types';
+import { atariToRGB, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import { BytecodeInterpreter, interpreterStackPointers } from '../src/renderer/bytecode/BytecodeInterpreter';
 import { BytecodePrograms } from '../src/renderer/bytecode/BytecodePrograms';
-import { GraphicRoomType, RoomType, type SummarizeRoomData } from '../src/renderer/bytecode/Types';
+import { GraphicRoomType, ViewRoomType, type SummarizeRoomData } from '../src/renderer/bytecode/Types';
 import type { IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import {
   cellNames,
@@ -92,15 +92,15 @@ const UNDRAWN = 16;
 const GUTTER = 17;
 
 /** `graphicRoomType` → the `RoomType` `SummarizeRoomInfo` leaves beside it. */
-const ROOM_TYPE: Record<GraphicRoomType, RoomType> = {
+const ROOM_TYPE: Record<GraphicRoomType, RoomType | ViewRoomType> = {
   [GraphicRoomType.STONE]: RoomType.STONE,
   [GraphicRoomType.OPEN]: RoomType.OPEN,
   [GraphicRoomType.PIT]: RoomType.PIT,
   [GraphicRoomType.TELEPORTER]: RoomType.TELEPORTER,
-  [GraphicRoomType.DOOR_EDGE]: RoomType.DOOR_EDGE,
-  [GraphicRoomType.DOOR_FACING]: RoomType.DOOR_FACING,
-  [GraphicRoomType.STAIR_EDGE]: RoomType.STAIR_EDGE,
-  [GraphicRoomType.STAIR_FACING]: RoomType.STAIR_FACING,
+  [GraphicRoomType.DOOR_EDGE]: ViewRoomType.DOOR_EDGE,
+  [GraphicRoomType.DOOR_FACING]: ViewRoomType.DOOR_FACING,
+  [GraphicRoomType.STAIR_EDGE]: ViewRoomType.STAIR_EDGE,
+  [GraphicRoomType.STAIR_FACING]: ViewRoomType.STAIR_FACING,
 };
 
 function main(): void {

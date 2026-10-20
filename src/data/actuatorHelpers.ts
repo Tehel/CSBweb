@@ -29,10 +29,6 @@ export function getActuatorDsaSelector(rec: ActuatorRecord): number {
   return (rec.word2 >> 7) & 0x1f;
 }
 
-export function setActuatorDsaSelector(rec: ActuatorRecord, selector: number): void {
-  rec.word2 = (rec.word2 & ~(0x1f << 7)) | ((selector & 0x1f) << 7);
-}
-
 export function getActuatorDsaState(rec: ActuatorRecord): number {
   return (rec.word2 >> 12) & 0xf;
 }
@@ -109,10 +105,6 @@ export function getActuatorDrawAsSize4(rec: ActuatorRecord): boolean {
   return (rec.word6 & 0x1) !== 0;
 }
 
-export function getActuatorBlockDisables(rec: ActuatorRecord): boolean {
-  return (rec.word4 & 0x100) !== 0;
-}
-
 export function getActuatorSetResponses(rec: ActuatorRecord): number {
   return (rec.word6 >> 6) & 0x3f;
 }
@@ -134,9 +126,8 @@ export const PORTRAIT_INACTIVE = 1;
 
 /**
  * `PORTRAIT_Response*` (`doc/CSBwin-src/CSB.h:920-923`), what a portrait's two-bit
- * response fields hold, its `DisableMessage` among them.
+ * response fields hold, its `DisableMessage` among them; 0 is none.
  */
-export const PORTRAIT_RESPONSE_NONE = 0;
 export const PORTRAIT_RESPONSE_SET = 1;
 export const PORTRAIT_RESPONSE_CLEAR = 2;
 export const PORTRAIT_RESPONSE_TOGGLE = 3;

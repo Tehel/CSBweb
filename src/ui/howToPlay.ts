@@ -159,7 +159,7 @@ export function openHowToPlay(host: HowToPlayHost): void {
 }
 
 /** The sheet's sections for `bindings`, each key named by `label`. */
-export function helpSheet(bindings: KeyBindings, label: (code: string) => string): HTMLElement[] {
+function helpSheet(bindings: KeyBindings, label: (code: string) => string): HTMLElement[] {
     const keys = (action: KeyAction) => keyCaps(bindings[action].map(label).filter((name) => name !== ''));
 
     const move = section('how-move', 'Move');

@@ -72,9 +72,9 @@ function ornamentAhead(game: Game): number {
     roomType: 0,
     championPortraitOrdinal: 0,
     graphicRoomType: 0,
-    rn2: 0xfffe,
+    rn2: OBJECT_ID_EOF,
     decorations: [0, 0, 0],
-    text: [0xfffe, 0xfffe, 0xfffe],
+    text: [OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF],
   };
   summarizeRoomInfoCsbwin(rslt, game.ctx.dungeon, game.ctx.party.state.position, FACING_WEST, objectTables);
   // decorations[1] is relative position 2, the face turned toward the party.

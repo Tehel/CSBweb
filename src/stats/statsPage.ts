@@ -65,7 +65,7 @@ const PAGE = `
   </footer>
 </main>`;
 
-export async function showStatsPage(body: HTMLElement): Promise<void> {
+async function showStatsPage(body: HTMLElement): Promise<void> {
     body.innerHTML = PAGE;
     const band = body.querySelector<HTMLElement>('.stats-band')!;
     const column = body.querySelector<HTMLElement>('.stats-sets')!;

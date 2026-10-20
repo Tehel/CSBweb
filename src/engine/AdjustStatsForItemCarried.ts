@@ -51,10 +51,10 @@ export const adjustVitality = 4;
 export const adjustAntiMagic = 5;
 export const adjustAntiFire = 6;
 export const adjustMaxMana = 8;
-export const adjustIllegal = 99;
+const adjustIllegal = 99;
 
 /** What carrying an object adjusts, and by how much: `whatToAdjust` and `D4W`. */
-export interface ItemCarriedAdjustment {
+interface ItemCarriedAdjustment {
   whatToAdjust: number;
   amount: number;
 }

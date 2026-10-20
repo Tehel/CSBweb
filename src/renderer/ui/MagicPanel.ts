@@ -190,7 +190,7 @@ function* magicSelectionScript(ui: UIState, button: number): LoopScript {
  * `byte33` is the step: every CSBWin writer keeps it at `strlen(incantation) & 3`.
  * `CHARFLAG_statsChanged` has no counterpart: the panels are redrawn every frame.
  */
-export function tag01b990(ui: UIState, button: number): void {
+function tag01b990(ui: UIState, button: number): void {
   const party = ui.partyState;
   const pcA3 = party.champions[party.magicCasterIndex];
   if (!pcA3) return;
@@ -213,7 +213,7 @@ export function tag01b990(ui: UIState, button: number): void {
  * `BackspaceMagicSelection` (`doc/CSBwin-src/Magic.cpp:809-825`): the rune before
  * `byte33` goes. Its mana is not given back.
  */
-export function backspaceMagicSelection(ui: UIState): void {
+function backspaceMagicSelection(ui: UIState): void {
   const party = ui.partyState;
   const pcA3 = party.champions[party.magicCasterIndex];
   if (!pcA3 || pcA3.incantation.length === 0) return;

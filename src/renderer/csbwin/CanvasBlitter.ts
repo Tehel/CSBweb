@@ -49,24 +49,6 @@ export function fillRectIndex(buffer: PaletteIndexViewportBuffer, rect: Rect, in
   }
 }
 
-export function drawRectOutlineIndex(buffer: PaletteIndexViewportBuffer, rect: Rect, index: number): void {
-  const normalized = normalizeRectInclusive(rect, buffer.width, buffer.height);
-  if (!normalized) return;
-
-  const value = index & 0xff;
-  const stride = buffer.width;
-  const { x1, x2, y1, y2 } = normalized;
-
-  for (let x = x1; x <= x2; x++) {
-    buffer.pixels[y1 * stride + x] = value;
-    buffer.pixels[y2 * stride + x] = value;
-  }
-  for (let y = y1; y <= y2; y++) {
-    buffer.pixels[y * stride + x1] = value;
-    buffer.pixels[y * stride + x2] = value;
-  }
-}
-
 /**
  * `vblFlashButn` (doc/CSBwin-src/VBL.cpp:60-122): invert bit plane 2 over the rectangle,
  * corners included. The routine flips the word at `+4` of each 16-pixel group, which

@@ -70,7 +70,7 @@ const actuatorIndices = (game: Game): number[] =>
 function ordinalAhead(game: Game): number {
   const rslt: SummarizeRoomData = {
     x: WALL.x, y: WALL.y, relativeCellNumber: 17, skinNumber: 0, roomType: 0, championPortraitOrdinal: 0,
-    graphicRoomType: 0, rn2: 0xfffe, decorations: [0, 0, 0], text: [0xfffe, 0xfffe, 0xfffe],
+    graphicRoomType: 0, rn2: OBJECT_ID_EOF, decorations: [0, 0, 0], text: [OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF],
   };
   summarizeRoomInfoCsbwin(rslt, game.ctx.dungeon, game.ctx.party.state.position, FACING_NORTH, objectTables);
   return rslt.decorations[1] | 0;

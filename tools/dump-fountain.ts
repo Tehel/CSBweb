@@ -21,10 +21,10 @@
  */
 import { PotionType } from '../src/core/constants';
 import { OBJNI_WATERSKIN } from '../src/core/objectNameIndex';
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../src/core/types';
 import type { RectPos } from '../src/data/tables/UITables';
 import type { Game } from '../src/engine/Game';
-import { RoomType, type SummarizeRoomData } from '../src/renderer/bytecode/Types';
+import type { SummarizeRoomData } from '../src/renderer/bytecode/Types';
 import { handleMouseButton } from '../src/renderer/ui/Mouse';
 import { resolveObjectNameIndex } from '../src/renderer/ui/Objects';
 import type { UIState } from '../src/renderer/ui/UIState';

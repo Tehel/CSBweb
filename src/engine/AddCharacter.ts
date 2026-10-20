@@ -34,7 +34,7 @@ export interface AddCharacterItem {
  * `FingerprintExists` (`doc/CSBwin-src/Character.cpp:438-451`): a champion of the party
  * has it, or one in the wings (`GetFromWings`, testing only).
  */
-export function fingerprintExists(champions: Champion[], pool: WingsPool, fingerprint: number): boolean {
+function fingerprintExists(champions: Champion[], pool: WingsPool, fingerprint: number): boolean {
   if (champions.some((champ) => champ.fingerprint === (fingerprint & 0xffff))) return true;
   return getFromWings(pool, fingerprint, true) !== null;
 }
@@ -201,7 +201,7 @@ export function assignPresetHeroPossessions(
 }
 
 /** The `Champion` fields `addCharacterDefaults` initializes. */
-export type ChampionDefaults = Pick<
+type ChampionDefaults = Pick<
   Champion,
   | 'busyTimerIndex' | 'attackType' | 'attackStatModifier'
   | 'wounds' | 'poisonCount' | 'maxRecentDamage' | 'damageFromDirection' | 'shieldStrength'

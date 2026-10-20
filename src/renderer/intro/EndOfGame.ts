@@ -12,7 +12,7 @@ import { runShowCredits, type BootSequenceDeps } from './BootSequence';
 import { SOUND_DYING, type WonChampion } from './ShowCredits';
 
 /** What the end takes: the boot's deps for the credits and a restart, the game and its message area. */
-export interface EndOfGameDeps extends Omit<BootSequenceDeps, 'skip' | 'title'> {
+interface EndOfGameDeps extends Omit<BootSequenceDeps, 'skip' | 'title'> {
   game: Game;
   messages: ScrollingText;
 }

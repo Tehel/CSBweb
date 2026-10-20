@@ -12,7 +12,7 @@ import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import type { Champion } from '../../engine/gameTypes';
 import type { UIState } from './UIState';
 
-export function drawHorzBar(ui: UIState, x0: number, y0: number, width: number, color: number): void {
+function drawHorzBar(ui: UIState, x0: number, y0: number, width: number, color: number): void {
   const x1 = VIEWPORT_X + x0;
   const y1 = VIEWPORT_Y + y0;
   const rect = { x1, y1, x2: x1 + width, y2: y1 + 6 };
@@ -66,7 +66,7 @@ export function displayFrozenScreen(ui: UIState): void {
   if (ui.fontData) drawTextLineIndex(viewport, ui.fontData, 81, 69, 4, 0, 'GAME FROZEN');
 }
 
-export function offsetViewportRect(rect: Rect): Rect {
+function offsetViewportRect(rect: Rect): Rect {
   return {
     x1: rect.x1 + VIEWPORT_X,
     x2: rect.x2 + VIEWPORT_X,
@@ -261,7 +261,7 @@ export function computeBarHeight(current: number, max: number, allowOverMax: boo
 /** The plain box, the one that marks something wrong, and the attacker's cyan one. */
 export const BOX_GRAPHIC_PLAIN = 33;
 export const BOX_GRAPHIC_MARKED = 34;
-export const BOX_GRAPHIC_ATTACKING = 35;
+const BOX_GRAPHIC_ATTACKING = 35;
 
 /**
  * `DrawCharacterPossession`'s `LOCAL_20` (`doc/CSBwin-src/Character.cpp:1155-1209`): the

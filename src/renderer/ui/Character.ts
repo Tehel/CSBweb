@@ -197,7 +197,7 @@ export function drawVitalsAndLoad(ui: UIState, champion: Champion): void {
   );
 }
 
-export function drawLifeForceLine(ui: UIState, 
+function drawLifeForceLine(ui: UIState, 
   xCurrent: number,
   xSlash: number,
   xMax: number,
@@ -227,12 +227,12 @@ export function drawLifeForceLine(ui: UIState,
   );
 }
 
-export function formatLifeValue(value: number): string {
+function formatLifeValue(value: number): string {
   const clamped = Math.max(0, Math.min(9999, Math.floor(value)));
   return String(clamped).padStart(3, ' ');
 }
 
-export function computeChampionLoad(ui: UIState, champion: Champion): { load: number; maxLoad: number; color: number } | null {
+function computeChampionLoad(ui: UIState, champion: Champion): { load: number; maxLoad: number; color: number } | null {
   const load = computeLoadWeight(ui, champion);
   const maxLoad = computeMaxLoad(ui, champion);
   const color = getLoadColor(load, maxLoad);
@@ -248,24 +248,24 @@ export function computeLoadWeight(ui: UIState, champion: Champion): number {
 }
 
 /** `MaxLoad` (`doc/CSBwin-src/Code11f52.cpp:4318`), in the engine. */
-export function computeMaxLoad(ui: UIState, champion: Champion): number {
+function computeMaxLoad(ui: UIState, champion: Champion): number {
   return ui.ctx.systems.characterStats.maxLoad(champion);
 }
 
-export function getLoadColor(load: number, maxLoad: number): number {
+function getLoadColor(load: number, maxLoad: number): number {
   if (maxLoad <= 0) return 13;
   if (load > maxLoad) return 8;
   if (load * 8 > maxLoad * 5) return 11;
   return 13;
 }
 
-export function formatLoad(value: number): string {
+function formatLoad(value: number): string {
   const whole = Math.floor(value / 10);
   const frac = Math.abs(value % 10);
   return `${String(whole).padStart(3, ' ')}.${frac}`;
 }
 
-export function formatMaxLoad(value: number): string {
+function formatMaxLoad(value: number): string {
   return String(Math.floor((value + 5) / 10)).padStart(3, ' ');
 }
 
@@ -489,7 +489,7 @@ export function drawCharacterState(ui: UIState, chIdx: number, charFlags: number
   }
 }
 
-export function drawShieldDots(ui: UIState, baseX: number, champion: Champion): void {
+function drawShieldDots(ui: UIState, baseX: number, champion: Champion): void {
   const shields: number[] = [];
   const fireShield = ui.partyState.fireShield;
   const spellShield = ui.partyState.spellShield;
@@ -588,7 +588,7 @@ export function getPortraitBitmap(ui: UIState, portraitIndex: number): IndexedBi
   return bmp;
 }
 
-export function getPortraitSheet(ui: UIState): IndexedBitmap | null {
+function getPortraitSheet(ui: UIState): IndexedBitmap | null {
   if (ui.portraitSheet !== undefined) return ui.portraitSheet;
   const img1 = ui.getGraphicBitmap(26, ImageFormat.IMG1);
   if (img1 && img1.width >= PORTRAIT_WIDTH && img1.height >= PORTRAIT_HEIGHT) {
@@ -634,7 +634,7 @@ export function drawTopBarHandIcons(ui: UIState): void {
   }
 }
 
-export function drawLifeBars(ui: UIState, chIdx: number, champion: Champion): void {
+function drawLifeBars(ui: UIState, chIdx: number, champion: Champion): void {
   // `if (pcA3->HP() > 0)` (`doc/CSBwin-src/Character.cpp:921`).
   if ((champion.attributes.health | 0) <= 0) return;
   const offsets = ui.uiTables.graphic232.word1526[chIdx];

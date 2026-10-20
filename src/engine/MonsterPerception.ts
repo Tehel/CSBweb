@@ -60,7 +60,7 @@ export function distanceBetweenPoints(x1: number, y1: number, x2: number, y2: nu
  * us" counts as ahead, and the sideways tolerance is `ahead + 1`, so the cone is one
  * cell wider than a strict diagonal.
  */
-export function isItInThisDirection(dir: number, myX: number, myY: number, destX: number, destY: number): boolean {
+function isItInThisDirection(dir: number, myX: number, myY: number, destX: number, destY: number): boolean {
   let ahead = 0;
   let sideways = 0;
   switch (dir & 0x3) {
@@ -125,7 +125,7 @@ export function getPrimaryAndSecondaryDirection(
 }
 
 /** The two wall predicates `TestDirectPathOpen` is parameterised over. */
-export type BlockingTest = (mapX: number, mapY: number) => boolean;
+type BlockingTest = (mapX: number, mapY: number) => boolean;
 
 export class MonsterPerception {
   private readonly dungeon: DungeonState;
@@ -619,7 +619,7 @@ export class MonsterPerception {
 }
 
 /** What `PossibleMove` answers, gathered from CSBWin's `d.` scratch globals. */
-export interface MoveProbe {
+interface MoveProbe {
   /** The move can be made. */
   possible: boolean;
   /** `d.Word13038` — the destination itself is impassable. */

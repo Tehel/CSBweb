@@ -117,7 +117,6 @@ In payoff order: the first row is the next item.
 | E23 | One game read, whole or not at all | L | ⏳ |
 | D18 | The interface's `d.` lives in the screen, and composing the screen changes the world | L | ⏳ |
 | D19 | `RuntimeSaveState` is neither strict nor a snapshot | M | ⏳ |
-| E34 | Dead code and duplicated types | S | ⏳ |
 | E24 | Two import cycles, and pure helpers in the systems | S | ⏳ |
 | E35 | Comments and documents that are stale, wrong, or tell the past | M | ⏳ |
 | E36 | Type escape hatches that check nothing | M | ⏳ |
@@ -841,39 +840,6 @@ loader's cache keyed by format, or the parameter dropped with the dead fallback.
 Paying it: the look-up tables built once a present and shared by the three conversions;
 `DsaVars` allocated on first use; the traces behind a test or a closure. The frames record
 palette codes, so none moves.
-
-### E34 ⏳ Dead code and duplicated types
-
-- **Dead exports**, referenced nowhere but at their declaration: `RemoteBinaryFile`
-  (`src/core/BinaryFile.ts:200`), `PositionOriented` and `getCellAttributes`
-  (`src/core/types.ts:100`, `:185`), `setActuatorDsaSelector`, `getActuatorBlockDisables`
-  (which repeats `blocksDisables`) and `PORTRAIT_RESPONSE_NONE`
-  (`src/data/actuatorHelpers.ts:32`, `:112`, `:139`), `ObjectListEntry`
-  (`dungeonTypes.ts:510`), `monsterNibble0` (`MonsterDesc.ts:49`), `SLOT_SHIELD_HAND`
-  (`gameTypes.ts:18`), `AdjustSkillsFilterParams` and `AdjustSkillsFilterResult`
-  (`skills.ts:44`, `:51`), `WALL_BITMAP_WIDTH` and `WALL_BITMAP_HEIGHT`
-  (`ViewportGraphics.ts:43-44`), `drawRectOutlineIndex` (`CanvasBlitter.ts:52`),
-  `startHint` (`HintOracle.ts:748`), `possibleAttackTypeNames` (`Attack.ts:519`),
-  `clampFoodWater` (`Feeding.ts:201`), `SAVE_MENU_PRESS_MS` (`SaveMenu.ts:1045`). About 280 more exports are used only in their
-  own file, the 101 `StdDraw*` programs among them (E28).
-- **Dead members and code**: `TimerQueue.clear` (`:193`), `PartyFootprints.reset`
-  (`:213`), `MovementResult.stepped`, `.blocked` and `.newFacing` (`gameTypes.ts:346-358`),
-  `MonsterSystem.detachedGroupIndexFor` (`:911`), `MonsterAI.clearAttacking` (`:1696`),
-  `MonsterAttack`'s `RN_*` re-exports (`:39-49`), `GraphicEntry.image`, `getCacheStats`, `clearCache`, `const result = 0; …
-  return result | 1` (`Game.ts:856`), `offset = offset;` (`SaveGameLoader.ts:619-621`),
-  `x !== -1 ? x : -1` (`MonsterDamage.ts:368`).
-- **Tool-only code in the engine**: `DungeonState.applyDoorActionAtPosition` and
-  `applyDoorActionAt` (`:794`, `:937`), an instant door toggle CSBWin does not have, used
-  only by `tools/dump-savegame.ts`.
-- **Duplicated types**: `RoomType` in `src/core/types.ts:30` and
-  `src/renderer/bytecode/Types.ts:16`, the second with the view's 16 to 20
-  (`src/renderer/ui/ViewportPicking.ts` imports both, one as `SummaryRoomType`);
-  `SoundTableEntry` in `src/audio/soundsIndex.ts:8` and `src/data/tables/UITables.ts:42`;
-  `type RN = number` (`bytecode/Types.ts:10`), unbranded, for `rn2` and `text`, which forces
-  `as ObjectID` in the interpreter (`:1679`, `popRN`).
-
-Paying it: delete; one `RoomType` and a `ViewRoomType` for 16 to 20; one
-`SoundTableEntry`; `ObjectID` in `SummarizeRoomData`; the door toggle in `tools/lib`.
 
 ### E35 ⏳ Comments and documents that are stale, wrong, or tell the past
 

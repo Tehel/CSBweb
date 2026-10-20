@@ -23,7 +23,7 @@ import type { JoinedChampion } from '../engine/GameHost';
 import type { Champion } from '../engine/gameTypes';
 import { determineMastery } from '../engine/skills';
 
-export type GameEventType = 'started' | 'session' | 'party' | 'won' | 'lost';
+type GameEventType = 'started' | 'session' | 'party' | 'won' | 'lost';
 
 /** What the page sends to `api/event`, as JSON. */
 export interface GameEvent {
@@ -36,7 +36,7 @@ export interface GameEvent {
 }
 
 /** A champion as an event names them. */
-export interface ChampionReport {
+interface ChampionReport {
     /** Their name as it stands: the mirror's, or the one typed on the Reincarnate screen. */
     name: string;
     /**
@@ -52,12 +52,12 @@ export interface ChampionReport {
 }
 
 /** A champion of a won game, with the four masteries the won screen shows. */
-export interface WonChampionReport extends ChampionReport {
+interface WonChampionReport extends ChampionReport {
     /** `DetermineMastery(chIdx, skill | 0xc000)` for fighter, ninja, priest and wizard. */
     masteries: number[];
 }
 
-export type StartedPayload = Record<string, never>;
+type StartedPayload = Record<string, never>;
 
 /**
  * A game entered: the play time it enters with (`Game.playTime`, ms), 0 for a new game and a
@@ -91,7 +91,7 @@ export interface LostPayload extends Duration {
     y: number;
 }
 
-export interface GameEventsDeps {
+interface GameEventsDeps {
     game: Game;
     /** The data set's id. */
     set: string;

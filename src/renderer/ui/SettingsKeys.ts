@@ -94,12 +94,12 @@ export const PRESETS: ReadonlyArray<{ readonly preset: KeyPreset; readonly label
 
 export const LABELS_NAME = 'KEY LABELS';
 export const LABELS_HELP = 'THE KEYBOARD THE KEYS ARE NAMED FOR';
-export const LAYOUT_LABELS: Readonly<Record<KeyLabelLayout, string>> = { qwerty: 'QWERTY', azerty: 'AZERTY' };
+const LAYOUT_LABELS: Readonly<Record<KeyLabelLayout, string>> = { qwerty: 'QWERTY', azerty: 'AZERTY' };
 export const SLOT_HELP = 'CLICK A KEY TO CHANGE IT, RIGHT CLICK TO CLEAR';
 export const CAPTURE_HELP = 'PRESS THE NEW KEY, OR ESC TO CANCEL';
 export const CAPTURE_LABEL = 'PRESS A KEY';
 /** What an empty slot shows. */
-export const EMPTY_SLOT_LABEL = '-';
+const EMPTY_SLOT_LABEL = '-';
 
 /* ------------------------------------------------------------------ geometry ---- */
 

@@ -193,7 +193,7 @@ export interface Block1 {
 }
 
 /** Every field zero, for a caller that has none of them. */
-export function emptyBlock1(): Block1 {
+function emptyBlock1(): Block1 {
   return {
     byte22598: 0, byte22596: 0, saveOption: 0, randomGameID: 0, totalMoveCount: 0,
     word22594: 0, word22592: 0, byte22808: new Uint8Array(132),
@@ -258,7 +258,7 @@ export interface Block2 {
 }
 
 /** Every field zero, for a caller that has only some of them. */
-export function emptyBlock2(): Block2 {
+function emptyBlock2(): Block2 {
   return {
     time: 0, ranseed: 0, objectInHand: 0, numCharacter: 0,
     partyX: 0, partyY: 0, partyFacing: 0, partyLevel: 0,
@@ -317,7 +317,7 @@ const CHARACTER_SIZE = 3328;
  * big-endian. It is a PC-era addition whose swap helper is a no-op on the shipping
  * build, exactly like the Extended Features header.
  */
-export interface DungeonImageLayout {
+interface DungeonImageLayout {
   numMaps: number;
   totalColumns: number;
   objectListSize: number;
@@ -622,10 +622,6 @@ export function loadSaveGameState(file: Uint8Array): SaveGameState & { data: Uin
     item16 = parseItem16(buf, block2.maxItem16);
   }
 
-  if (block2.maxItem16 === 0) {
-    offset = offset;
-  }
-
   const { buf: characterBlock, next: afterCharacters } = unscrambleStream(
     saveData,
     offset,
@@ -720,7 +716,7 @@ export function loadSaveGameState(file: Uint8Array): SaveGameState & { data: Uin
  * Bytes 50-127 are `FILL180`, which `SaveGame` clears before writing (`:1055`), so they
  * are left as the zeros `new Uint8Array` supplies.
  */
-export function buildBlock2(b: Block2): Uint8Array {
+function buildBlock2(b: Block2): Uint8Array {
   const buf = new Uint8Array(BLOCK2_SIZE);
   writeU32BE(buf, 0, b.time >>> 0);
   writeU32BE(buf, 4, b.ranseed >>> 0);

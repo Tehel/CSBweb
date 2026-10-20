@@ -65,7 +65,7 @@ export const MAP_PANEL: Rect = { x1: 10, y1: TITLE_Y2 + 7, x2: 309, y2: 189 };
 export const MAP_AREA: Rect = { x1: MAP_PANEL.x1 + 2, y1: MAP_PANEL.y1 + 2, x2: MAP_PANEL.x2 - 2, y2: MAP_PANEL.y2 - 2 };
 
 /** Where a map of `width` by `height` cells is drawn: a cell's size, and its first cell's corner. */
-export interface MapLayout {
+interface MapLayout {
   readonly cell: number;
   readonly x0: number;
   readonly y0: number;
@@ -122,10 +122,6 @@ export interface MapDialogState {
   pointer: DialogPoint;
 }
 
-export function isMapDialogOpen(ui: UIState): boolean {
-  return ui.mapDialog !== null;
-}
-
 const MAP_DIALOG: Dialog = {
   uiPalette: true,
   draw: (ui) => drawMapDialog(ui),
@@ -161,7 +157,7 @@ function partyMap(ui: UIState): MapData | undefined {
 const BTN_CLOSE = 1;
 
 /** The dialog's button list, in the form of CSBWin's: CLOSE. */
-export function mapDialogButtons(): UIButton[] {
+function mapDialogButtons(): UIButton[] {
   return [buttonOf(CLOSE_FRAME, BTN_CLOSE, 'map.close')];
 }
 
@@ -171,7 +167,7 @@ function hovered(state: MapDialogState): number {
 }
 
 /** The map's cell under the screen point `(x, y)`, or `null`. */
-export function cellAt(map: MapData, x: number, y: number): { x: number; y: number } | null {
+function cellAt(map: MapData, x: number, y: number): { x: number; y: number } | null {
   const { width, height } = map.descriptor;
   const layout = mapLayout(width, height);
   const cx = Math.floor((x - layout.x0) / layout.cell);

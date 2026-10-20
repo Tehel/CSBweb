@@ -24,7 +24,7 @@ import { monsterHorizontalSize } from '../data/tables/MonsterDesc';
 import type { DungeonState } from './DungeonState';
 
 /** `UI_MessageBox(title, text, MESSAGE_OK)`'s two strings, as one line. */
-export type MessageBox = (line: string) => void;
+type MessageBox = (line: string) => void;
 
 // CSBWin's two `static bool`s: each warning is shown once per process.
 let warning4Issued = false;

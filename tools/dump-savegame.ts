@@ -128,7 +128,7 @@ async function main(): Promise<void> {
 
   // ---- Pick the things to mutate, all from the real dungeon ---------------
 
-  // A closed door. `applyDoorActionAtPosition` with action 2 (TOGGLE) opens it.
+  // A closed door, which the tool opens by hand.
   let door: { x: number; y: number } | null = null;
   for (let x = 0; x < width && !door; x++) {
     for (let y = 0; y < height && !door; y++) {
@@ -193,7 +193,8 @@ async function main(): Promise<void> {
 
   // ---- Mutate the played world -------------------------------------------
 
-  played.ctx.dungeon.applyDoorActionAtPosition(level, door.x, door.y, 2);
+  // Its state, the flag's low three bits, from 0 to 4 at once: no timer, no sound.
+  map.cellFlags[door.x]![door.y] = (map.cellFlags[door.x]![door.y]! & 0xf8) | 4;
   const doorOpened = doorStateAt(played, door.x, door.y, level);
 
   played.ctx.dungeon.removeObjectFromCell(new Position(carry.fromX, carry.fromY, level), carry.rn);

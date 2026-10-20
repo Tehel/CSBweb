@@ -39,7 +39,7 @@ import { getOrSet, OBJECT_ID_EOF, Position } from '../core/types';
 
 type IndexedBitmapSet = IndexedBitmap[]
 
-export interface WallBitmapSet {
+interface WallBitmapSet {
   wall: IndexedBitmapSet;
   wallMirrored: IndexedBitmapSet;
   doors: IndexedBitmapSet;
@@ -48,12 +48,12 @@ export interface WallBitmapSet {
 // Full-viewport (224×136) palette-index templates.
 // `ceilingMirrored` corresponds to CSBWin `(x+y+facing)&1 == 0` path (Viewport.cpp:6759-6761).
 // `floorMirrored` corresponds to CSBWin `(x+y+facing)&1 == 1` path (Viewport.cpp:6748-6751).
-export interface FloorCeiling {
+interface FloorCeiling {
   normal: Uint8Array;
   mirrored: Uint8Array;
 }
 
-export interface ViewportRendererDeps {
+interface ViewportRendererDeps {
   graphicsLoader: GraphicsLoader;
   dungeonState: DungeonState;
   /** `d.PartyFootprints`, whose magic prints `SummarizeRoomInfo` shows. */

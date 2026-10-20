@@ -30,10 +30,10 @@
  *
  * Run: `npm test -- --only=dump-footprint-decoration.ts`
  */
-import { Position } from '../src/core/types';
+import { OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import { DungeonState, extendedCellFlagsKey } from '../src/engine/DungeonState';
 import { PartyFootprints } from '../src/engine/PartyFootprints';
-import { GraphicRoomType, RoomType, type SummarizeRoomData } from '../src/renderer/bytecode/Types';
+import { GraphicRoomType, type SummarizeRoomData } from '../src/renderer/bytecode/Types';
 import type { IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import { summarizeRoomInfoCsbwin } from '../src/renderer/csbwin/SummarizeRoomInfo';
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
@@ -87,9 +87,9 @@ function main(): void {
       roomType: RoomType.STONE,
       championPortraitOrdinal: 0,
       graphicRoomType: GraphicRoomType.STONE,
-      rn2: 0xfffe,
+      rn2: OBJECT_ID_EOF,
       decorations: [0, 0, 0],
-      text: [0xfffe, 0xfffe, 0xfffe],
+      text: [OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF],
     };
     summarizeRoomInfoCsbwin(rslt, dungeon, new Position(0, 0, 0), 0, undefined, footprints);
     return rslt;
@@ -133,9 +133,9 @@ function extendedCellFlags(dungeon: DungeonState, [cell, others, short]: [Positi
       roomType: RoomType.STONE,
       championPortraitOrdinal: 0,
       graphicRoomType: GraphicRoomType.STONE,
-      rn2: 0xfffe,
+      rn2: OBJECT_ID_EOF,
       decorations: [0, 0, 0],
-      text: [0xfffe, 0xfffe, 0xfffe],
+      text: [OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF],
     };
     summarizeRoomInfoCsbwin(rslt, dungeon, new Position(0, 0, 0), 0, undefined, undefined, time);
     return (rslt.decorations[2] & 0x8000) !== 0;

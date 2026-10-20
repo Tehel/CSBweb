@@ -194,7 +194,7 @@ const TURNED_OVER: ReadonlyMap<number, number> = new Map([[10, 3], [3, 10], [15,
  * black, light at the top and left, has its light and its shade change places. The ring
  * keeps its shape, mitres and all.
  */
-export function pressBevel(ui: UIState, frame: Rect): void {
+function pressBevel(ui: UIState, frame: Rect): void {
   const buf = ui.screenIndexBuffer;
   for (let y = frame.y1 + 3; y <= frame.y2 - 3; y++) {
     for (let x = frame.x1 + 3; x <= frame.x2 - 3; x++) {

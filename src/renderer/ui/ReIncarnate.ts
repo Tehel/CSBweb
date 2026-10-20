@@ -62,7 +62,7 @@ const BACKSPACE_X1 = 107;
 const BACKSPACE_X2 = 175;
 
 /** The stage of entry: CSBWin's `D6W`, 1 for the name and 2 for the title. */
-export type ReincarnateStage = 1 | 2;
+type ReincarnateStage = 1 | 2;
 
 export interface ReincarnateState {
   /** The champion being renamed — always the potential one, the last in the party. */

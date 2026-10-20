@@ -36,25 +36,12 @@ export enum AdjustSkillsWhy {
   ThrowByCharacter = 9,
 }
 
-export interface DetermineMasteryOptions {
+interface DetermineMasteryOptions {
   partySleeping?: boolean;
   getObjectNameIndex?: (objectId: ObjectID) => number | null;
 }
 
-export interface AdjustSkillsFilterParams {
-  chIdx: number;
-  skillNumber: number;
-  experience: number;
-  why: AdjustSkillsWhy;
-}
-
-export interface AdjustSkillsFilterResult {
-  chIdx: number;
-  skillNumber: number;
-  experience: number;
-}
-
-export interface AdjustSkillsResult {
+interface AdjustSkillsResult {
   chIdx: number;
   skillNumber: number;
   experienceApplied: number;
@@ -69,7 +56,7 @@ export function createEmptySkills(): Skill[] {
   return skills;
 }
 
-export function limitSkillExperience(experience: number): number {
+function limitSkillExperience(experience: number): number {
   return experience > SKILL_EXPERIENCE_LIMIT ? SKILL_EXPERIENCE_LIMIT : experience;
 }
 
@@ -86,7 +73,7 @@ export function createSkillsFromSubskillLevels(levels: number[], allowNeophyte =
   return skills;
 }
 
-export function populateBaseSkillExperience(skills: Skill[]): void {
+function populateBaseSkillExperience(skills: Skill[]): void {
   for (let base = 0; base < 4; base++) {
     let total = 0;
     const start = SUBSKILL_START + base * SUBSKILLS_PER_BASE;

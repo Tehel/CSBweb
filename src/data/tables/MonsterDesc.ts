@@ -46,7 +46,6 @@ export const monsterInvincible = (d: MonsterDesc): boolean => (d.word2 & 0x2000)
 /*
  * `MONSTERDESC_WORD4` (doc/CSBwin-src/CSB.h:2295-2316).
  */
-export const monsterNibble0 = (d: MonsterDesc): number => d.word4 & 3;
 export const monsterNibble12 = (d: MonsterDesc): number => (d.word4 >> 12) & 3;
 export const monsterNibble14 = (d: MonsterDesc): number => (d.word4 >> 14) & 3;
 export const monsterNonAttackingMirrorOK = (d: MonsterDesc): boolean => (d.word4 & 0x0004) !== 0;

@@ -3,32 +3,17 @@
  * Port from CSBWin CSB.h
  */
 
-/**
- * RN - Record Number (reference to dungeon data)
- * In CSBWin this is typedef ui16 RN
- */
-export type RN = number;
+import type { ObjectID, RoomType } from '../../core/types';
 
 /**
- * Room type enumeration
- * From CSB.h ROOMTYPE enum
+ * The `ROOMTYPE` values (CSB.h) only a view's summary holds, beside a cell's own
+ * (`RoomType`, `src/core/types.ts`): a door or a stairway seen on its edge or its face.
  */
-export enum RoomType {
-  STONE = 0,        // Wall
-  OPEN = 1,         // Floor
-  PIT = 2,          // Pit
-  STAIRS = 3,       // Stairs
-  DOOR = 4,         // Door
-  TELEPORTER = 5,   // Teleporter
-  FALSEWALL = 6,    // False wall
-  EMPTY = 7,        // Empty (DM2)
-
-  // Extra values used by CSBWin rendering logic (CSB.h ROOMTYPE)
+export enum ViewRoomType {
   DOOR_EDGE = 16,    // Door seen on edge
   DOOR_FACING = 17,  // Door seen on flat side
   STAIR_EDGE = 18,   // Stairway at right angle to facing
   STAIR_FACING = 19, // Stairway in direction facing
-  EXTERIOR = 20,     // Exterior wall of dungeon
 }
 
 /**
@@ -54,10 +39,10 @@ export interface SummarizeRoomData {
   y: number;
   relativeCellNumber: number;
   skinNumber: number;
-  roomType: RoomType;
+  roomType: RoomType | ViewRoomType;
   championPortraitOrdinal: number;
   graphicRoomType: GraphicRoomType;
-  rn2: RN;
+  rn2: ObjectID;
   decorations: [number, number, number];  // right, front, left
-  text: [RN, RN, RN];                    // right, front, left
+  text: [ObjectID, ObjectID, ObjectID];                    // right, front, left
 }

@@ -19,13 +19,12 @@ interface GraphicEntry {
     compressedSize: ui16;
     decompressedSize: ui16;
     rawData?: Uint8Array;      // Decompressed raw data
-    image?: DecodedImage;       // Decoded image (pixels)
 }
 
 /**
  * Graphics.dat data
  */
-export interface GraphicsData {
+interface GraphicsData {
     itemCount: ui16;
     entries: GraphicEntry[];
 }
@@ -184,33 +183,4 @@ export class GraphicsLoader {
         return this.data;
     }
 
-    /**
-     * Clear image cache to free memory
-     */
-    clearCache(): void {
-        this.imageCache.clear();
-        if (this.data) {
-            for (const entry of this.data.entries) {
-                delete entry.rawData;
-                delete entry.image;
-            }
-        }
-    }
-
-    /**
-     * Get cache statistics
-     */
-    getCacheStats(): { cachedImages: number; cachedRaw: number } {
-        let cachedRaw = 0;
-        if (this.data) {
-            for (const entry of this.data.entries) {
-                if (entry.rawData) cachedRaw++;
-            }
-        }
-
-        return {
-            cachedImages: this.imageCache.size,
-            cachedRaw
-        };
-    }
 }

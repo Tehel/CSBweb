@@ -768,7 +768,7 @@ async function fileRow(file: File): Promise<LocalDataSetFile | null> {
 }
 
 /** An id made from `name`: lowercase, every run of other characters a '-', at most 40. */
-export function idFromName(name: string): string {
+function idFromName(name: string): string {
     return name.toLowerCase().replace(/[^a-z0-9._]+/g, '-').replace(/^[-._]+/, '').slice(0, 40).replace(/-+$/, '');
 }
 

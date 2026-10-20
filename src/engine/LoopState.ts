@@ -105,7 +105,7 @@ export interface LoopFlags {
  * screens before it (`VM_PRESENTS`, `VM_PRISONDOOR`, `VM_CREDITS`) and after it
  * (`VM_THEEND`, `VM_CAST`) are the intro's host, which has no overlay.
  */
-export type VideoMode =
+type VideoMode =
   | 'VM_DEFAULT' | 'VM_CENTERMENU' | 'VM_LEFTMENU' | 'VM_ADVENTURE' | 'VM_INVENTORY' | 'VM_FROZEN' | 'VM_SLEEPING';
 
 /**

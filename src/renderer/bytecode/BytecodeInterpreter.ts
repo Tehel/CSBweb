@@ -1685,7 +1685,7 @@ export class BytecodeInterpreter {
 
     const rd = this.context.roomData[relativeCell | 0];
     const textRN = rd?.text[(wallDecorationPos as 0 | 1 | 2) ?? 0] ?? OBJECT_ID_EOF;
-    drawWallText(this.draw, textRN as ObjectID, wallDecorationDrawLocation | 0, this.removeMortarJoint);
+    drawWallText(this.draw, textRN, wallDecorationDrawLocation | 0, this.removeMortarJoint);
     this.removeMortarJoint = true;
     return true;
   }

@@ -21,7 +21,7 @@ import { getChampionPossession, type Champion } from './gameTypes';
 import { DescIndex } from './objectIndex';
 
 /** Who threw an object, from which slot, and the record it was then. */
-export interface ThrownWeaponTag {
+interface ThrownWeaponTag {
   readonly chIdx: number;
   readonly slot: number;
   readonly record: DatabaseRecord;

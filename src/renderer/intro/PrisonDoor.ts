@@ -54,8 +54,8 @@ const GAMESTATE_RISE = 203;
 export const DOOR_SLOT_WIDTH = 128;
 export const DOOR_SLOT_HEIGHT = 161;
 /** `d.Pointer22920` / `d.Pointer22916`, 20608 bytes = 256x161 at one byte per pixel. */
-export const INTERIOR_WIDTH = 256;
-export const INTERIOR_HEIGHT = 161;
+const INTERIOR_WIDTH = 256;
+const INTERIOR_HEIGHT = 161;
 /** The `Word84` save starts at screen row 30, and the animation writes back to the same. */
 export const INTERIOR_SCREEN_Y = 30;
 /** Only 232 of the 256 columns ever reach the screen — the `112 + 4*2` bytes at `:9557`. */
@@ -170,7 +170,7 @@ export function withRiseButton(buttons: UIButton[]): UIButton[] {
 /* --------------------------------------------------------------------- drawing ---- */
 
 /** The eight pre-shifted door halves, plus the pristine interior behind them. */
-export interface PrisonDoorAssets {
+interface PrisonDoorAssets {
   /** `d.Pointer22952[0..7]`: 0..3 the left half at 0/4/8/12 px, 4..7 the right half. */
   slots: IndexedBitmap[];
   entrance: IndexedBitmap;
@@ -258,7 +258,7 @@ export async function drawPrisonDoor(host: IntroHost, assets: PrisonDoorAssets):
  * unreachable in practice: the exit is a click or a key. This port waits for the input and
  * does not keep the counter.
  */
-export async function showCreditsScroll(host: IntroHost, assets: PrisonDoorAssets): Promise<void> {
+async function showCreditsScroll(host: IntroHost, assets: PrisonDoorAssets): Promise<void> {
   const rects = host.uiTables.graphic232;
   host.setCursorVisible(false);         // `STHideCursor(HC34)` (`:9762`)
   await fadeToPalette(host, PALETTE_11914);

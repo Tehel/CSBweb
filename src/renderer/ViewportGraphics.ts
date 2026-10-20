@@ -40,8 +40,6 @@ export function getCachedGraphicBitmap(
  * Wall bitmap dimensions
  * Standard wall graphics are 32x136 pixels
  */
-export const WALL_BITMAP_WIDTH = 32;
-export const WALL_BITMAP_HEIGHT = 136;
 
 /**
  * Viewport dimensions (dungeon view area)

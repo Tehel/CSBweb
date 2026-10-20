@@ -53,7 +53,7 @@ export async function dungeonSignature(dungeon: DungeonData): Promise<string[]> 
 }
 
 /** Each level's `[width, height]`, in the levels' order. */
-export type DungeonShapes = readonly (readonly [number, number])[];
+type DungeonShapes = readonly (readonly [number, number])[];
 
 /** A dungeon the port can name. */
 export interface KnownDungeon {
@@ -293,7 +293,7 @@ export const KNOWN_DUNGEONS: readonly KnownDungeon[] = [
 ];
 
 /** The known dungeon a signature looks like. */
-export interface DungeonMatch {
+interface DungeonMatch {
     dungeon: KnownDungeon;
     /** How many of the signature's levels are the dungeon's, each against the level of its own number. */
     levels: number;

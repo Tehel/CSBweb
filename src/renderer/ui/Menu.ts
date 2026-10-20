@@ -41,7 +41,7 @@ export const MENU_WIDTH = 224;
 export const MENU_HEIGHT = 136;
 
 /** `BLT2Screen` puts the centred menu at screen (47,33) (`Menu.cpp:450-458`). */
-export const MENU_CENTRED_X = 47;
+const MENU_CENTRED_X = 47;
 
 /** `CenteredText`: fg 9 on bg 5 (`Menu.cpp:200-208`). */
 export const MENU_OPTION_COLOR = 9;
@@ -86,11 +86,11 @@ export interface MenuPress {
 }
 
 /** Menu coordinates -> screen coordinates. */
-export function menuOriginX(centred: boolean): number {
+function menuOriginX(centred: boolean): number {
   return centred ? MENU_CENTRED_X : VIEWPORT_X;
 }
 
-export function menuOriginY(): number {
+function menuOriginY(): number {
   return VIEWPORT_Y;
 }
 
@@ -112,7 +112,7 @@ export function splitLongLine(text: string): [string, string] | null {
 /**
  * `CenteredText` (`Menu.cpp:192`): `x -= 3*strlen`, then fg 9 on bg 5.
  */
-export function centeredText(
+function centeredText(
   ui: UIState,
   text: string,
   x: number,
@@ -138,7 +138,7 @@ export function centeredText(
  * overlapping move behaves. CSBWin allocates 8400 bytes for exactly this in the
  * one-option layout (`Menu.cpp:293-305`) and gets away without one elsewhere.
  */
-export function copyMenuRegion(
+function copyMenuRegion(
   ui: UIState,
   srcX: number,
   srcY: number,
@@ -175,7 +175,7 @@ export function copyMenuRegion(
  * (`Menu.cpp:268-280`). Split out because the save screen wants the bitmap without
  * any of the four option layouts.
  */
-export function drawMenuBitmap(ui: UIState, centred: boolean): void {
+function drawMenuBitmap(ui: UIState, centred: boolean): void {
   const graphic = ui.getGraphicBitmap(MENU_GRAPHIC);
   if (!graphic) return;
   const ox = menuOriginX(centred);
@@ -205,7 +205,7 @@ export function drawMenuBitmap(ui: UIState, centred: boolean): void {
  * Apply the layout patch for `count` options (`Menu.cpp:291-346`). The rectangles come
  * out of `graphics.dat` item 0x231; the source origins are the literals in `_DoMenu`.
  */
-export function patchMenuLayout(ui: UIState, count: number, centred: boolean): void {
+function patchMenuLayout(ui: UIState, count: number, centred: boolean): void {
   const g231 = ui.uiTables.graphic231;
   const ox = menuOriginX(centred);
   const oy = menuOriginY();
@@ -233,7 +233,7 @@ export function patchMenuLayout(ui: UIState, count: number, centred: boolean): v
 }
 
 /** The option labels for a layout (`Menu.cpp:302-346`). */
-export function drawMenuOptions(ui: UIState, options: string[], centred: boolean): void {
+function drawMenuOptions(ui: UIState, options: string[], centred: boolean): void {
   const positions = OPTION_POSITIONS[options.length - 1];
   if (!positions) return;
   for (let i = 0; i < options.length; i++) {
@@ -246,7 +246,7 @@ export function drawMenuOptions(ui: UIState, options: string[], centred: boolean
  * The title block (`Menu.cpp:348-449`). Returns the y the next line would have used,
  * which is what `D5W` carries in the C++.
  */
-export function drawMenuTitles(
+function drawMenuTitles(
   ui: UIState,
   title1: string | null,
   title2: string | null,

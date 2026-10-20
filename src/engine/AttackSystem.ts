@@ -74,7 +74,7 @@ const OBJNI_VORPAL_BLADE = 40;
 const OBJNI_EXECUTIONER = 43;
 
 /** `ATTACKDATATYPE` (`doc/CSBwin-src/Attack.cpp:264`) — which arm of `ATTDEP` is live. */
-export enum AttackDataType {
+enum AttackDataType {
   ADT_Unset = 0,
   ADT_WarCry = 1,
   ADT_Physical = 2,
@@ -106,7 +106,7 @@ const MISC_MAGICAL_BOX_B = 43;
  * is much harder to check against the C++ when written as `attdep[0]`; the marshalling
  * to and from the DSA's flat parameter array picks the live arm from `dataType`.
  */
-export interface AttDep {
+interface AttDep {
   warcryetc: { mastery: number; skillIncrement: number; effectiveMastery: number; requiredMastery: number };
   physicalAttack: { monsterDamage: number; staminaAdjust: number; skillAdjust: number; attackedMonsterOrdinal: number };
   spellAttack: { spellRange: number; spellType: number; decrementCharges: number };

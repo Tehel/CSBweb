@@ -58,9 +58,8 @@ const SOUND_ORDINAL_DETH_KNIGHT_FLIP = 16;
 /** `soundTELEPORT` (`doc/CSBwin-src/CSB.h:628`). */
 const SOUND_ORDINAL_TELEPORT = 17;
 
-/** The out-of-range `groupIndex` sentinels for a monster with no `ITEM16`. */
-export const GROUP_INDEX_DETACHED = 0xd8;
-export const GROUP_INDEX_DETACHED_SIZE4 = 0xff;
+/** The out-of-range `groupIndex` sentinel for a monster with no `ITEM16`. */
+const GROUP_INDEX_DETACHED = 0xd8;
 
 /** The two monster design options, CSBWin's globals, which `GameContext.rules` holds. */
 export type MonsterDesignOptions = Pick<RulesOptions, 'invisibleMonsters' | 'drawAsSize4Monsters'>;
@@ -903,16 +902,6 @@ export class MonsterSystem {
   }
 
   /* ----------------------------------------------------------------- misc ---- */
-
-  /**
-   * The `groupIndex` sentinel for a monster with no `ITEM16` — 0xd8, or 0xff when it
-   * fills the whole cell (`doc/CSBwin-src/MoveObject.cpp:517-518`).
-   */
-  detachedGroupIndexFor(monster: CreatureRecord): number {
-    const desc = this.getDesc(monster);
-    const fillsCell = desc ? monsterHorizontalSize(desc) === 2 : false;
-    return fillsCell ? GROUP_INDEX_DETACHED_SIZE4 : GROUP_INDEX_DETACHED;
-  }
 
   playTeleportSound(mapX: number, mapY: number, level: number): void {
     this.ctx.sounds.queueSound(SOUND_ORDINAL_TELEPORT, mapX, mapY, 1, level);

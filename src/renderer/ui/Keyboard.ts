@@ -283,7 +283,7 @@ function isTableAction(action: KeyAction): action is TableAction {
  * What one of the port's own keys asks of the page: F5's quick-save, F9's quick-load, the
  * map and the champions.
  */
-export type PortKeyAction = 'quickSave' | 'quickLoad' | 'map' | 'champions';
+type PortKeyAction = 'quickSave' | 'quickLoad' | 'map' | 'champions';
 
 function isPortAction(action: KeyAction): action is PortKeyAction {
   return action === 'quickSave' || action === 'quickLoad' || action === 'map' || action === 'champions';

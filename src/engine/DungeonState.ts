@@ -788,18 +788,6 @@ export class DungeonState {
         return this.data.databases.teleporters.records[index] ?? null;
     }
 
-    /**
-     * Apply a door action at a specific map coordinate.
-     */
-    applyDoorActionAtPosition(level: number, x: number, y: number, action: number): boolean {
-        const map = this.getMap(level);
-        if (!map) return false;
-        if (x < 0 || y < 0 || x >= map.descriptor.width || y >= map.descriptor.height) return false;
-        const cellFlag = map.cellFlags[x][y];
-        if (((cellFlag >> 5) & 0x7) !== RoomType.DOOR) return false;
-        return this.applyDoorActionAt(map, x, y, cellFlag, action);
-    }
-
 
     getWeaponRecord(rn: ObjectID): WeaponRecord | null {
         const { category, index } = this.rnMaps.decode(rn);
@@ -933,31 +921,6 @@ export class DungeonState {
         };
     }
 
-
-    private applyDoorActionAt(map: MapData, x: number, y: number, cellFlag: CellFlag, action: number): boolean {
-        const doorState = cellFlag & 0x7;
-        if (doorState === 5) return false;
-
-        let nextState = doorState;
-        if (action === 0) {
-            if (doorState === 0) return false;
-            nextState = 0;
-        } else if (action === 1) {
-            if (doorState === 4) return false;
-            nextState = 4;
-        } else if (action === 2) {
-            nextState = doorState === 0 ? 4 : 0;
-        } else {
-            return false;
-        }
-
-        if (nextState === doorState) return false;
-
-        const newAttr = (cellFlag & 0x8) | (nextState & 0x7);
-        const newCellFlag = (cellFlag & 0xf0) | newAttr;
-        map.cellFlags[x][y] = newCellFlag;
-        return true;
-    }
 
     /**
      * Check if a position has objects

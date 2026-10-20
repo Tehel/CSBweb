@@ -44,9 +44,9 @@ let dbPromise: Promise<IDBDatabase> | null = null;
 let blocked = false;
 
 /** What the store says while another tab holds it at an earlier version. */
-export const STORE_HELD_BY_ANOTHER_TAB = 'CLOSE THE GAME IN YOUR OTHER TABS, THEN TRY AGAIN';
+const STORE_HELD_BY_ANOTHER_TAB = 'CLOSE THE GAME IN YOUR OTHER TABS, THEN TRY AGAIN';
 /** What it says once another tab's newer build has upgraded it. */
-export const STORE_UPGRADED_ELSEWHERE = 'THE GAME WAS UPDATED IN ANOTHER TAB. RELOAD THIS PAGE';
+const STORE_UPGRADED_ELSEWHERE = 'THE GAME WAS UPDATED IN ANOTHER TAB. RELOAD THIS PAGE';
 
 /**
  * The set a version-1 row was saved in: version 1 played only `dm-atari`. A literal, not

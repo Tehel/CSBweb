@@ -114,7 +114,7 @@ export function drawHintOracleButton(ui: UIState): void {
 }
 
 /** The square the Oracle answers for: the party's, which a save writes as `partyLevel`, `partyX` and `partyY`. */
-export function hintSquareOf(ui: UIState): HintSquare {
+function hintSquareOf(ui: UIState): HintSquare {
   const { x, y, z } = ui.partyState.position;
   return { level: z, x, y };
 }

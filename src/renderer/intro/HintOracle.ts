@@ -743,8 +743,3 @@ export class HintOracleScreen {
     await this.tag0051c2_31();
   }
 }
-
-/** `_StartHint` on `square`, until DONE on the title list. The screen and palette are left as the Oracle's. */
-export async function startHint(host: HintOracleHost, oracle: HintOracle, dat: HcsbDat, square: HintSquare): Promise<void> {
-  await new HintOracleScreen(host, oracle, dat, square).run();
-}

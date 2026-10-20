@@ -57,7 +57,7 @@ export function prisonCellFlags(): CellFlag[][] {
 }
 
 /** The zeroed `LEVELDESC`, as a `MapData` the viewport can read. */
-export function prisonMap(): MapData {
+function prisonMap(): MapData {
   const cellFlags = prisonCellFlags();
   return {
     descriptor: {

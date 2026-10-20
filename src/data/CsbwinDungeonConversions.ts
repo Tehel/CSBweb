@@ -33,7 +33,7 @@ import { databaseRecords } from './CsbwinObjectIndex';
 import type { DungeonData } from './dungeonTypes';
 
 /** Which of the three shapes a world is in. `true` means "already converted". */
-export interface DungeonImageShape {
+interface DungeonImageShape {
     /** ACTUATOR records carry `word8` (`EF_FLAGS.BigActuators`). */
     bigActuators: boolean;
     /** The text is an indirect index plus compressed text (`EF_FLAGS.IndirectText`). */

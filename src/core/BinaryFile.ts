@@ -197,9 +197,3 @@ export class BinaryFile {
 }
 
 // Convenience aliases matching CSBWin and original JS naming
-export class RemoteBinaryFile extends BinaryFile {
-    async get(url: string): Promise<void> { return this.load(url); }
-    read8(position?: number): ui8 { return this.readU8(position); }
-    read16(position?: number): ui16 { return this.readU16(position); }
-    read32(position?: number): ui32 { return this.readU32(position); }
-}

@@ -436,7 +436,7 @@ export interface TimerRecord {
     timerWord6: number;
 }
 
-export interface DsaAction {
+interface DsaAction {
     column: ui32;
     program: Uint16Array;
 }
@@ -502,14 +502,6 @@ export interface Databases {
     misc: Database<MiscRecord>;
     missiles: Database<MissileRecord>;
     clouds: Database<CloudRecord>;
-}
-
-/**
- * Object list entry (for tile)
- */
-export interface ObjectListEntry {
-    objectID: ObjectID;
-    position: Position;
 }
 
 /**

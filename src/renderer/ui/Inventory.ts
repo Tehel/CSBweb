@@ -210,7 +210,7 @@ export function drawCharacterStateEyePanel(ui: UIState, chIdx: number, charFlags
  * Both are drawn last and over the icons, as CSBWin draws them, with transparent
  * colour 12 so the eye or mouth shows through the frame.
  */
-export function drawMouthAndEyeBoxes(ui: UIState, champion: Champion): void {
+function drawMouthAndEyeBoxes(ui: UIState, champion: Champion): void {
   const g232 = ui.uiTables.graphic232;
   // `BLT2Viewport(…, 16, 12)`: 16 *bytes* per source line, which is 32 pixels, and 12
   // is the transparent colour, not a height.
@@ -249,7 +249,7 @@ export function eyeBoxGraphic(champion: Champion): number {
  * `TAG0189a8` (`doc/CSBwin-src/Character.cpp:3854`) — graphic 40, the
  * Resurrect / Reincarnate / Cancel menu a provisionally added champion is waiting on.
  */
-export function drawResurrectMenu(ui: UIState): void {
+function drawResurrectMenu(ui: UIState): void {
   ui.displayResurrectChestOrScroll = 5;
   // CSBWin passes a *byte* width of 72 (`BLT2Viewport(…, 72, 6)`); this helper takes
   // pixels, as every other call here does.
@@ -288,7 +288,7 @@ export function getInventorySlotRect(iconSlots: { pixelX: number; pixelY: number
   };
 }
 
-export function getChestSlotRect(iconSlots: { pixelX: number; pixelY: number }[], slot: number): Rect | null {
+function getChestSlotRect(iconSlots: { pixelX: number; pixelY: number }[], slot: number): Rect | null {
   const icon = iconSlots[38 + slot];
   if (!icon) return null;
   return {
@@ -299,7 +299,7 @@ export function getChestSlotRect(iconSlots: { pixelX: number; pixelY: number }[]
   };
 }
 
-export function getOpenChestIconIndex(ui: UIState): number {
+function getOpenChestIconIndex(ui: UIState): number {
   if (ui.openChestIconIndex !== null) return ui.openChestIconIndex;
   const names = ui.objectTables.objectNames;
   for (let i = 0; i < names.length; i++) {
@@ -342,7 +342,7 @@ export function syncOpenChest(ui: UIState, chestView: ChestViewSource | null): v
   openChest(ui, chestView.id);
 }
 
-export function openChest(ui: UIState, chestId: ObjectID): void {
+function openChest(ui: UIState, chestId: ObjectID): void {
   const chest = ui.ctx.dungeon.getContainerRecord(chestId);
   if (!chest) {
     ui.openChestId = null;
@@ -399,7 +399,7 @@ export function repackOpenChest(ui: UIState): void {
   ui.openChestContents = emptyChestContents();
 }
 
-export function drawChestPanel(ui: UIState, chestView: ChestViewSource): void {
+function drawChestPanel(ui: UIState, chestView: ChestViewSource): void {
   const g232 = ui.uiTables.graphic232;
   blitBasicGraphicToViewport(ui, 25, g232.wRectPos926, 144, 8);
   drawInspectArrow(ui, chestView.source === 'cursor');
@@ -416,7 +416,7 @@ export function drawChestPanel(ui: UIState, chestView: ChestViewSource): void {
   }
 }
 
-export function drawInspectArrow(ui: UIState, fromEye: boolean): void {
+function drawInspectArrow(ui: UIState, fromEye: boolean): void {
   const g232 = ui.uiTables.graphic232;
   const graphicIndex = fromEye ? 19 : 18;
   blitBasicGraphicToViewport(ui, graphicIndex, g232.wRectPos934, 16, 8);
@@ -494,7 +494,7 @@ export function drawItemPropertyLines(ui: UIState, description: ItemDescriptionL
   }
 }
 
-export function drawEyeIcon(ui: UIState): void {
+function drawEyeIcon(ui: UIState): void {
   const word612 = ui.uiTables.graphic232.word612;
   const icon = ui.pressingEye ? OBJNI_SPECIAL_E : OBJNI_SPECIAL_D;
   const rect = getEyeRect(ui);
@@ -513,7 +513,7 @@ export function getEyeRect(ui: UIState): Rect | null {
 }
 
 /** `DisplayScroll` (`doc/CSBwin-src/Character.cpp:3321`): the scroll's text in the panel. */
-export function drawScrollPanel(ui: UIState, scrollId: ObjectID): void {
+function drawScrollPanel(ui: UIState, scrollId: ObjectID): void {
   const scroll = ui.ctx.dungeon.getScrollRecord(scrollId);
   if (!scroll) return;
   const text = ui.ctx.dungeon.decodeScrollText(scroll, ui.objectTables.textDecode) ?? '';
@@ -530,7 +530,7 @@ export function drawScrollPanel(ui: UIState, scrollId: ObjectID): void {
   drawInspectArrow(ui, ui.pressingEye);
 }
 
-export function splitScrollLines(text: string): { lines: string[]; startY: number } {
+function splitScrollLines(text: string): { lines: string[]; startY: number } {
   const bytes: number[] = [];
   for (let i = 0; i < text.length; i++) bytes.push(text.charCodeAt(i) & 0xff);
   bytes.push(0, 0);
@@ -580,7 +580,7 @@ export function splitScrollLines(text: string): { lines: string[]; startY: numbe
   return { lines, startY };
 }
 
-export function bytesToString(bytes: number[], start: number, end: number): string {
+function bytesToString(bytes: number[], start: number, end: number): string {
   let out = '';
   for (let i = start; i < end; i++) {
     out += String.fromCharCode(bytes[i] ?? 0);
@@ -588,14 +588,14 @@ export function bytesToString(bytes: number[], start: number, end: number): stri
   return out;
 }
 
-export function drawScrollLine(ui: UIState, y: number, text: string): void {
+function drawScrollLine(ui: UIState, y: number, text: string): void {
   const line = text.length > MAX_SCROLL_LINE_LENGTH ? text.slice(0, MAX_SCROLL_LINE_LENGTH) : text;
   const encoded = encodeScrollFontText(line);
   const x = VIEWPORT_X + 162 - Math.floor((line.length * 6) / 2);
   drawTextLineIndexRaw(ui.screenIndexBuffer, ui.fontData, x, VIEWPORT_Y + y, 0, 15, encoded);
 }
 
-export function encodeScrollFontText(text: string): string {
+function encodeScrollFontText(text: string): string {
   const out: number[] = [];
   for (let i = 0; i < text.length; i++) {
     let code = text.charCodeAt(i) & 0xff;

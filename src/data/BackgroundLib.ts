@@ -33,7 +33,7 @@ interface BackgroundGraphic {
  * `BACKGROUND_MASK`'s header (`CSB.h:330-337`), as `CreateVirtualMask` fills one from the
  * stack: `ui16`s but `dstX`, an `i16`.
  */
-export interface BackgroundMaskHeader {
+interface BackgroundMaskHeader {
   srcX: number;
   srcY: number;
   dstX: number;
@@ -49,12 +49,12 @@ export interface BackgroundPointer {
 }
 
 /** `GetSkinDef`'s answer: the skin's definition, and `skinDefSize`, the bytes from it to the section's end. */
-export interface SkinDef extends BackgroundPointer {
+interface SkinDef extends BackgroundPointer {
   size: number;
 }
 
 /** `GetDecorationBitmap`'s answer, where it returns 0. */
-export interface DecorationBitmap {
+interface DecorationBitmap {
   /** `*pBitmap`, a `ui16` pointer. */
   bitmap: BackgroundPointer;
   /** `*pLocation`, the location's `ui16` entry, read as bytes. */

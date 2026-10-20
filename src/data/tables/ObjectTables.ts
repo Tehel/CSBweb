@@ -3,7 +3,7 @@ import type { MonsterDesc } from './MonsterDesc';
 import type { RectPos } from './UITables';
 import { readI16BE, readI8, readU16BE } from '../../core/bytes';
 
-export interface GraphicClass {
+interface GraphicClass {
   objectGraphicIndex: number; // i8
   uByte1: number; // ui8
   widthBytes: number; // ui8 (packed pixels: 1 byte = 2 pixels)
@@ -12,9 +12,9 @@ export interface GraphicClass {
   byte5: number; // ui8 (viewportPosition set index)
 }
 
-export type ViewportPositionTable = { x: number; y: number }[][][]; // [3][10][5]
+type ViewportPositionTable = { x: number; y: number }[][][]; // [3][10][5]
 
-export type MonsterPositionTable = { x: number; y: number }[][][]; // [3][11][5]
+type MonsterPositionTable = { x: number; y: number }[][][]; // [3][11][5]
 
 /**
  * `WEAPONDESC` (doc/CSBwin-src/CSB.h:1352) — one 6-byte record per weapon type.
@@ -54,13 +54,13 @@ export interface MonsterGraphicDesc {
   uByte11: number;
 }
 
-export interface SpecialColorScheme {
+interface SpecialColorScheme {
   paletteEntries: number[]; // 6 entries (one per viewport palette)
   monsterColorMapMedium: number; // Byte6628
   monsterColorMapFar: number; // Byte6612
 }
 
-export interface MissileGraphicDesc {
+interface MissileGraphicDesc {
   uByte0: number;
   uByte1: number;
   widthBytes: number;

@@ -1,5 +1,5 @@
-import { DBType, OBJECT_ID_EOF, type ui8, Position } from '../../core/types';
-import { GraphicRoomType, RoomType, type SummarizeRoomData } from '../bytecode/Types';
+import { DBType, OBJECT_ID_EOF, type ui8, Position, RoomType } from '../../core/types';
+import { GraphicRoomType, ViewRoomType, type SummarizeRoomData } from '../bytecode/Types';
 import { ECF_FOOTPRINTS, type DungeonState } from '../../engine/DungeonState';
 import type { PartyFootprints } from '../../engine/PartyFootprints';
 import {
@@ -23,10 +23,10 @@ const graphicRoomTypes: number[] = (() => {
   map[RoomType.OPEN] = GraphicRoomType.OPEN;
   map[RoomType.PIT] = GraphicRoomType.PIT;
   map[RoomType.TELEPORTER] = GraphicRoomType.TELEPORTER;
-  map[RoomType.DOOR_EDGE] = GraphicRoomType.DOOR_EDGE;
-  map[RoomType.DOOR_FACING] = GraphicRoomType.DOOR_FACING;
-  map[RoomType.STAIR_EDGE] = GraphicRoomType.STAIR_EDGE;
-  map[RoomType.STAIR_FACING] = GraphicRoomType.STAIR_FACING;
+  map[ViewRoomType.DOOR_EDGE] = GraphicRoomType.DOOR_EDGE;
+  map[ViewRoomType.DOOR_FACING] = GraphicRoomType.DOOR_FACING;
+  map[ViewRoomType.STAIR_EDGE] = GraphicRoomType.STAIR_EDGE;
+  map[ViewRoomType.STAIR_FACING] = GraphicRoomType.STAIR_FACING;
   return map;
 })();
 
@@ -448,7 +448,7 @@ export function summarizeRoomInfoCsbwin(
       // Codea59a.cpp:359-374
       const nsTravel = (cellFlags & 8) >> 3;
       const facingIsNS = facing & 1;
-      rslt.roomType = (facingIsNS === nsTravel ? RoomType.STAIR_EDGE : RoomType.STAIR_FACING) as RoomType;
+      rslt.roomType = facingIsNS === nsTravel ? ViewRoomType.STAIR_EDGE : ViewRoomType.STAIR_FACING;
       rslt.decorations[0] = cellFlags & 4;
       cellFlags = 0;
       break;
@@ -459,9 +459,9 @@ export function summarizeRoomInfoCsbwin(
       const nsDoor = (cellFlags & 8) >> 3;
       const facingIsNS = facing & 1;
       if (nsDoor === facingIsNS) {
-        rslt.roomType = RoomType.DOOR_EDGE;
+        rslt.roomType = ViewRoomType.DOOR_EDGE;
       } else {
-        rslt.roomType = RoomType.DOOR_FACING;
+        rslt.roomType = ViewRoomType.DOOR_FACING;
         rslt.decorations[0] = cellFlags & 7; // door state
         const doorRN = dungeon.findFirstDoor(new Position(rslt.x, rslt.y, z));
         rslt.decorations[1] = doorRN === RN_EOF ? 0 : dungeon.rnMaps.idx(doorRN);

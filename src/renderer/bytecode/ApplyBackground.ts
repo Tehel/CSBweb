@@ -23,7 +23,7 @@ import type { PaletteIndexViewportBuffer } from '../csbwin/CanvasBlitter';
 const LINE_BYTES = 112;
 const LINES = 136;
 /** `d.pViewportBMP`'s size (`doc/CSBwin-src/CSBCode.cpp:10245`). */
-export const VIEWPORT_BMP_SIZE = LINE_BYTES * LINES;
+const VIEWPORT_BMP_SIZE = LINE_BYTES * LINES;
 
 /** The port's viewport as CSBWin's `d.pViewportBMP` bytes (see the module comment). */
 export class ViewportBMP {

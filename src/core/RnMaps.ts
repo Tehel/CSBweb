@@ -25,7 +25,7 @@ import { DBType, OBJECT_ID_NULL, type ObjectID, type TilePosition } from './type
  * A record's link, which `RN(DBTYPE, dbIndex)` reads to tell a free record (`RNnul`) from
  * a live one: `undefined` for a record its database does not hold.
  */
-export type RecordLink = (db: DBType, dbIndex: number) => number | undefined;
+type RecordLink = (db: DBType, dbIndex: number) => number | undefined;
 
 export class RnMaps {
     private typeMap: Uint8Array;

@@ -33,7 +33,7 @@ export interface DecorationDesc {
   height: number;
 }
 
-export interface ExtendedWallDecoration {
+interface ExtendedWallDecoration {
   id: number;
   desc: DecorationDesc[]; // 13 entries (relative positions 0..12)
   sideBitmap: IndexedBitmap;

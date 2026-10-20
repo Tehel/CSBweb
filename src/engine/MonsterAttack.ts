@@ -37,14 +37,8 @@ import { TimerFunction } from './TimerQueue';
 
 /**
  * The missile "projectile" RNs a monster can throw (`doc/CSBwin-src/CSBTypes.h`, used
- * at `doc/CSBwin-src/Monster.cpp:1045-1080`). Re-exported for the callers that used to
- * take them from here; the values live in `src/core/spellRn.ts`, which says why.
+ * at `doc/CSBwin-src/Monster.cpp:1045-1080`); `src/core/spellRn.ts` says why they live there.
  */
-export {
-  RN_FIREBALL, RN_POISON, RN_LIGHTNING, RN_DISPELL_MISSILE,
-  RN_ZO_SPELL, RN_POISON_BOLT, RN_POISON_CLOUD,
-} from '../core/spellRn';
-
 import {
   RN_DISPELL_MISSILE, RN_FIREBALL, RN_LIGHTNING, RN_POISON,
   RN_POISON_BOLT, RN_POISON_CLOUD, RN_ZO_SPELL,
@@ -1023,6 +1017,6 @@ export class MonsterAttack {
  * `ScaledMultiply(value, shift, factor)` — `value * factor >> shift`, i.e. a fixed
  * point multiply. CSBWin's comment reads `D6*D7/64` for shift 6.
  */
-export function scaledMultiply(value: number, shift: number, factor: number): number {
+function scaledMultiply(value: number, shift: number, factor: number): number {
   return (value * factor) >> shift;
 }

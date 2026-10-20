@@ -1,19 +1,11 @@
 import { SoundIndex } from '../core/constants';
+import type { SoundTableEntry } from '../data/tables/UITables';
 
 export interface SoundInfo {
   name: string;
   rates?: number[];
 }
 
-export interface SoundTableEntry {
-  word0: number;
-  byte2: number;
-  byte3: number;
-  byte4: number;
-  byte5: number;
-  byte6: number;
-  byte7: number;
-}
 
 /**
  * Playback rates for the 4-bit PCM sounds, in Hz.

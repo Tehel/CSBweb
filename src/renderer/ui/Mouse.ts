@@ -259,7 +259,7 @@ export function releaseEyeOrMouth(ui: UIState): void {
   }
 }
 
-export function isEyeClick(ui: UIState, x: number, y: number): boolean {
+function isEyeClick(ui: UIState, x: number, y: number): boolean {
   if (ui.partyState.selectedCharacterIndex < 0) return false;
   const rect = getEyeRect(ui);
   if (!rect) return false;
@@ -287,7 +287,7 @@ export function handleEyePress(ui: UIState): void {
   }
 }
 
-export function handlePartyBlockClick(ui: UIState, button: number, x: number, y: number): void {
+function handlePartyBlockClick(ui: UIState, button: number, x: number, y: number): void {
   if (ui.partyState.selectedCharacterIndex === button) {
     setHandOwner(ui.partyState, button, ui.ctx.host);
     return;
@@ -576,7 +576,7 @@ function recolourRows(buffer: IndexedBitmap, rows: number, colorMap: number[]): 
  * position to `d.CH16482[-1]` (`CSBCode.cpp:2149-2151`, `:2176`); the port writes them to
  * nobody (`DEBT.md` H).
  */
-export function tag0025a6(ui: UIState, p1: number): void {
+function tag0025a6(ui: UIState, p1: number): void {
   const party = ui.partyState;
   const g232 = ui.uiTables.graphic232;
   const d7 = p1;
@@ -773,7 +773,7 @@ function drawObjectCursor(ui: UIState, cursor: ObjectCursor, x: number, y: numbe
   }
 }
 
-export function drawEmptyCursor(ui: UIState, placeX: (x: number, y: number) => number = (x) => x): void {
+function drawEmptyCursor(ui: UIState, placeX: (x: number, y: number) => number = (x) => x): void {
   if (!ui.hoverPoint) return;
   const x = Math.floor(ui.hoverPoint.x);
   const y = Math.floor(ui.hoverPoint.y);
@@ -784,7 +784,7 @@ export function drawEmptyCursor(ui: UIState, placeX: (x: number, y: number) => n
   drawCursorBitmap(ui, bitmap, placeX(x, y), y, 12);
 }
 
-export function shouldUseHandCursor(ui: UIState, x: number, y: number): boolean {
+function shouldUseHandCursor(ui: UIState, x: number, y: number): boolean {
   const cursorOwner = ui.partyState.cursorOwner;
   if (cursorOwner < 0) return false;
   return inCursorShapeZone(ui, x, y);
@@ -821,14 +821,14 @@ export function getCursorArrowBitmap(ui: UIState): IndexedBitmap | null {
   return ui.cursorArrowBitmap;
 }
 
-export function getCursorHandBitmap(ui: UIState): IndexedBitmap | null {
+function getCursorHandBitmap(ui: UIState): IndexedBitmap | null {
   if (ui.cursorHandBitmap) return ui.cursorHandBitmap;
   ui.cursorHandBitmap = decodeCursorBitmap(ui.uiTables.graphic232.cursorHand);
   return ui.cursorHandBitmap;
 }
 
 
-export function drawCursorBitmap(ui: UIState, bitmap: IndexedBitmap, x: number, y: number, transparentColor: number): void {
+function drawCursorBitmap(ui: UIState, bitmap: IndexedBitmap, x: number, y: number, transparentColor: number): void {
   const dst = ui.screenIndexBuffer;
   const maxW = bitmap.width;
   const maxH = bitmap.height;

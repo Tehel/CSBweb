@@ -190,7 +190,7 @@ export function drinkAtWaterFountain(ui: UIState): void {
   ui.ctx.sounds.queueSound(fp.gulp, pos.x, pos.y, 0, pos.z);
 }
 
-export function getFoodValue(ui: UIState, nameIndex: number): number {
+function getFoodValue(ui: UIState, nameIndex: number): number {
   const values = ui.objectTables.foodValue;
   if (!values) return 0;
   const offset = nameIndex - OBJNI_APPLE;
@@ -198,11 +198,7 @@ export function getFoodValue(ui: UIState, nameIndex: number): number {
   return values[offset] ?? 0;
 }
 
-export function clampFoodWater(value: number): number {
-  return Math.max(-1023, Math.min(2048, Math.floor(value)));
-}
-
-export function startMouthChewAnimation(ui: UIState): void {
+function startMouthChewAnimation(ui: UIState): void {
   const now = nowMs();
   const frameMs = (1000 * 8) / 60;
   ui.mouthChewStartMs = now;
@@ -224,7 +220,7 @@ export function drawMouthChewAnimation(ui: UIState): void {
   drawObjectIconAt(ui, x, y, icon, ui.uiTables.graphic232.word612, -1);
 }
 
-export function ensureMouthChewLoop(ui: UIState): void {
+function ensureMouthChewLoop(ui: UIState): void {
   if (ui.mouthChewFrameHandle !== null) return;
   const schedule = (cb: (time: number) => void): number => {
     if (typeof requestAnimationFrame === 'function') return requestAnimationFrame(cb);

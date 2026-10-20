@@ -120,7 +120,7 @@ export type GameScreenHooks = Pick<UIState,
 >;
 
 /** What the screen reads: the graphics, and the game it shows. */
-export interface GameScreenDeps {
+interface GameScreenDeps {
   graphicsLoader: GraphicsLoader;
   /** The game's one set of `graphics.dat` tables, the one its `GameTables` was built from. */
   tables: GraphicsTables;

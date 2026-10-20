@@ -42,7 +42,7 @@ export const HINT_TEXT_BUFFER_SIZE = 2240;
 export const HINT_ANYWHERE = 0xff;
 
 /** One record of the location table (`f.Seg1Addr10550`). */
-export interface HintLocation {
+interface HintLocation {
     x: number;
     y: number;
     level: number;
@@ -51,7 +51,7 @@ export interface HintLocation {
 }
 
 /** One hint record (`f.Seg2Addr10546`), with its chunk expanded. */
-export interface OracleHint {
+interface OracleHint {
     title: string;
     /** The chunk its pages are in (`+22`). */
     chunk: number;
@@ -205,7 +205,7 @@ export interface HcsbDat {
 }
 
 /** `i16 Segment1_16872[50]` (`Hint.cpp:374`). */
-export const HCSB_SEGMENT1_WORDS = 50;
+const HCSB_SEGMENT1_WORDS = 50;
 
 /** Parse `hcsb.dat`. Throws where `ReadDatSeg` would read past an item into its buffer. */
 export function parseHcsbDat(file: Uint8Array): HcsbDat {

@@ -459,7 +459,7 @@ export function savedGameRead(ui: UIState, inventoryWasOpen: boolean): void {
 }
 
 /** What the interface reads, all of it there before the first frame. */
-export type UISources = Pick<UIState,
+type UISources = Pick<UIState,
   | 'graphicsLoader' | 'ctx' | 'context' | 'screenIndexBuffer' | 'uiTables' | 'objectTables'
   | 'fontData' | 'graphicCache'>;
 

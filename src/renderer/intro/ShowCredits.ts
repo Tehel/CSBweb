@@ -53,10 +53,10 @@ export const THE_END_VBLS = 300;
 /** `for (D7W=900; (--D7W!=0)&&(d.PartyHasDied==0);)` (`:260`): 899 VBLs at most. */
 export const RESTART_BUTTON_VBLS = 899;
 /** The button `HandleMouseEvents` answers with `d.PartyHasDied = 1` (`Mouse.cpp:1937`). */
-export const BUTTON_RESTART_THIS_GAME = 0xd7;
+const BUTTON_RESTART_THIS_GAME = 0xd7;
 
 /** `fillMemory((i16 *)&LOCAL_110, 16, 2, 2)` (`:230`): sixteen words of `0x002`. */
-export const PALETTE_LOCAL_110: readonly number[] = new Array(16).fill(0x002);
+const PALETTE_LOCAL_110: readonly number[] = new Array(16).fill(0x002);
 
 /** `LOCAL_46`: `LOCAL_110` with `color[15] = 0x777` (`:231-233`), white on dark blue. */
 export const PALETTE_LOCAL_46: readonly number[] = PALETTE_LOCAL_110.map((c, i) => (i === 15 ? 0x777 : c));
@@ -104,7 +104,7 @@ export interface ShowCreditsHooks {
  * game to be set up again, `'terminate'` where CSBWin pushes `UIM_TERMINATE`, with the
  * credits picture up.
  */
-export type ShowCreditsEnd = 'restart' | 'terminate';
+type ShowCreditsEnd = 'restart' | 'terminate';
 
 /**
  * `_ShowCredits(1)` of a lost game. `'restart'` is the "RESTART THIS GAME" button's

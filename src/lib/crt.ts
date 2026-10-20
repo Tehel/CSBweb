@@ -36,7 +36,7 @@ let curvedCanvas: HTMLCanvasElement | null = null;
  * Where on the screen a point of the tube shows, both in 0..1 from the top left: the
  * shader's `warp`, for the pointer. A point of the tube's black corners is off the screen.
  */
-export function crtWarp(u: number, v: number): [number, number] {
+function crtWarp(u: number, v: number): [number, number] {
     const cx = u * 2 - 1;
     const cy = v * 2 - 1;
     return [

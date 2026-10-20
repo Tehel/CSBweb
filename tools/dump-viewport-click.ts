@@ -29,8 +29,7 @@
  *
  * Run: `npm test -- --only=dump-viewport-click.ts`
  */
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position } from '../src/core/types';
-import { RoomType } from '../src/renderer/bytecode/Types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType } from '../src/core/types';
 import type { SummarizeRoomData } from '../src/renderer/bytecode/Types';
 import { summarizeRoomInfoCsbwin } from '../src/renderer/csbwin/SummarizeRoomInfo';
 import type { ObjectID } from '../src/core/types';
@@ -95,9 +94,9 @@ function summaryAhead(game: Game): SummarizeRoomData {
     roomType: 0,
     championPortraitOrdinal: 0,
     graphicRoomType: 0,
-    rn2: 0xfffe,
+    rn2: OBJECT_ID_EOF,
     decorations: [0, 0, 0],
-    text: [0xfffe, 0xfffe, 0xfffe],
+    text: [OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF],
   };
   summarizeRoomInfoCsbwin(rslt, game.ctx.dungeon, party.position, party.facing & 3);
   return rslt;

@@ -131,7 +131,7 @@ export function getObjectDisplayName(ui: UIState, objectId: ObjectID, objectName
  * selected champion of priest mastery above 1. The eye's item properties keep the gate
  * (`getItemPropertyLines`).
  */
-export function showsPotionPower(ui: UIState, objectNameIndex: number): boolean {
+function showsPotionPower(ui: UIState, objectNameIndex: number): boolean {
   if (objectNameIndex === OBJNI_WATER_FLASK || objectNameIndex === OBJNI_EMPTY_FLASK) return false;
   const selected = ui.partyState.selectedCharacterIndex;
   if (selected < 0) return false;
@@ -139,7 +139,7 @@ export function showsPotionPower(ui: UIState, objectNameIndex: number): boolean 
   return !!champ && determineMastery(ui, champ, 2) > 1;
 }
 
-export function formatWeightText(weight: number): string {
+function formatWeightText(weight: number): string {
   const total = Math.max(0, weight | 0);
   const kg = Math.floor(total / 10);
   const tenths = Math.abs(total % 10);
@@ -149,7 +149,7 @@ export function formatWeightText(weight: number): string {
 /**
  * `GetObjectWeight` / `TAG0091e6`, in the engine (`src/engine/CharacterStats.ts`).
  */
-export function getObjectWeightForRecord(ui: UIState, rn: ObjectID, visited: Set<number>): number {
+function getObjectWeightForRecord(ui: UIState, rn: ObjectID, visited: Set<number>): number {
   return ui.ctx.systems.characterStats.getObjectWeight(rn, visited);
 }
 
@@ -158,7 +158,7 @@ export function getObjectWeightForRecord(ui: UIState, rn: ObjectID, visited: Set
  * rewrote them: a DSA's `&DESCRIBE` changed the mask, a phrase's text or a colour. A
  * filter that ran no `&DESCRIBE` let the object through.
  */
-export type ObjectDescription = { lines: ItemDescriptionLine[]; rewritten: boolean };
+type ObjectDescription = { lines: ItemDescriptionLine[]; rewritten: boolean };
 
 export function getObjectDescriptionLines(ui: UIState, objectId: ObjectID, objectNameIndex: number): ObjectDescription {
   const lines: ItemDescriptionLine[] = [];
@@ -257,7 +257,7 @@ export function getObjectDescriptionLines(ui: UIState, objectId: ObjectID, objec
   return { lines, rewritten };
 }
 
-export function buildPhraseSummary(mask: number, phrases: string[], colors: number[]): ItemDescriptionLine | null {
+function buildPhraseSummary(mask: number, phrases: string[], colors: number[]): ItemDescriptionLine | null {
   if (mask === 0) return null;
   const chosen: string[] = [];
   let color = 13;

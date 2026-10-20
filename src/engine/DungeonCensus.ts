@@ -28,13 +28,13 @@ export const NOT_OPERATIONS: ReadonlySet<number> = new Set<number>([StkOp.NOOP, 
 
 /** The item databases, in `DBType` order: the kinds an item is counted under. */
 export const ITEM_KINDS = ['weapons', 'clothing', 'scrolls', 'potions', 'containers', 'misc'] as const;
-export type ItemKind = typeof ITEM_KINDS[number];
+type ItemKind = typeof ITEM_KINDS[number];
 const KIND_OF: Partial<Record<DBType, ItemKind>> = {
   [DBType.WEAPON]: 'weapons', [DBType.CLOTHING]: 'clothing', [DBType.SCROLL]: 'scrolls',
   [DBType.POTION]: 'potions', [DBType.CHEST]: 'containers', [DBType.MISC]: 'misc',
 };
 
-export interface DsaCensus {
+interface DsaCensus {
   /** The DSAs defined, and the programs of all their states. */
   dsas: number;
   programs: number;

@@ -95,13 +95,6 @@ export function isSamePosition(a: Position, b: Position): boolean {
 }
 
 /**
- * Party starting position
- */
-export interface PositionOriented extends Position {
-    facing: Direction;
-}
-
-/**
  * Object ID (Record Name): CSBWin's `RN`, a slot of the world's object indirect index
  * (`src/core/RnMaps.ts`), whose maps say the object's database, record and corner.
  * `dungeon.dat` stores one packed, `[pos:2][db:4][idx:10]`, until its reader numbers it.
@@ -180,22 +173,15 @@ export function cellHasObjects(cellFlag: CellFlag): boolean {
 }
 
 /**
- * Get type-specific attributes from cell flag
- */
-export function getCellAttributes(cellFlag: CellFlag): ui8 {
-    return cellFlag & 0x0F;
-}
-
-/**
  * Color in Atari ST format (12-bit RGB, 4 bits per channel)
  * Format: 0x0RGB where R,G,B are 0-7
  */
-export type AtariColor = ui16;
+type AtariColor = ui16;
 
 /**
  * RGB color (8-bit per channel)
  */
-export interface RGBColor {
+interface RGBColor {
     r: ui8;
     g: ui8;
     b: ui8;

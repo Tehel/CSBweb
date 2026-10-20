@@ -54,7 +54,7 @@ import type { Champion } from './gameTypes';
 export type SavedGameRead = 'loaded' | 'cancelled' | 'damaged' | { refused: string };
 
 /** What a new adventure's row has after its source's name (`GameSaves.makeNewAdventure`). */
-export const ADVENTURE_SUFFIX = '-csb';
+const ADVENTURE_SUFFIX = '-csb';
 
 /**
  * `d.Word22592` of a game CSB's prison began, the compressed `dungeon.dat`'s word 6; a
@@ -85,13 +85,13 @@ export interface GameSavesScreen {
  * and repacked an open chest (`TAG02076e`, `doc/CSBwin-src/Character.cpp:5141-5150`); F5
  * and the Sleepsave have done neither.
  */
-export type SaveClock = 'running' | 'stopped';
+type SaveClock = 'running' | 'stopped';
 
 /**
  * Where a save is written: a row of its own, a slot of the playthrough (F5's or the
  * Sleepsave), or over a listed save, the one selected in the disk menu.
  */
-export type SaveTarget = 'new' | SaveSlot | SaveEntry;
+type SaveTarget = 'new' | SaveSlot | SaveEntry;
 
 /** A file on its way into the store (`GameSaves.importSave`). */
 export interface ImportedFile {

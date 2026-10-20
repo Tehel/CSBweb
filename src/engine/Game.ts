@@ -50,8 +50,8 @@ import type { GameTables } from './GameTables';
 /**
  * Game event callback types
  */
-export type GameEventCallback = (game: Game) => void;
-export type MovementCallback = (success: boolean, result?: MovementResult) => void;
+type GameEventCallback = (game: Game) => void;
+type MovementCallback = (success: boolean, result?: MovementResult) => void;
 
 /**
  * What `HandleMouseEvents` asks of the screen: a click's button, and where the buttons it
@@ -907,34 +907,33 @@ export class Game implements MainLoop {
      * empty one.
      */
     private handleMouseEvents(delta: number): number {
-        const result = 0;
         const queue = this.ctx.mouseQueue;
         if (this.ctx.loop.gravityMove) {
             queue.discardAllInput();
             const step = this.systems.movement.gravityMove();
-            if (step === 0) return result;
+            if (step === 0) return 0;
             queue.enqueueKey(step);
         }
         for (;;) {
-            if (queue.count() === 0) return result;
+            if (queue.count() === 0) return 0;
             if (this.translateMouseClick(queue.head())) break;
             queue.take();
         }
         const frozen = this.ctx.loop.gameFrozen;
         if (frozen && queue.head().num !== 148) {
             queue.take();
-            return result;
+            return 0;
         }
         const time = this.ctx.state.tickCount;
         const thawCommand = frozen && queue.head().num === 148;
-        if (this.lastInputTime !== 0 && time < this.lastInputTime + delta && !thawCommand) return result;
+        if (this.lastInputTime !== 0 && time < this.lastInputTime + delta && !thawCommand) return 0;
         const entry = queue.head();
         const num = entry.num;
         const party = this.ctx.party.state;
         if (num >= 3 && num <= 6 && (
             party.partyMoveDisableTimer !== 0 ||
             (party.word11712 !== 0 && ((party.facing + num - 3) & 3) === party.word11714)
-        )) return result;
+        )) return 0;
         queue.take();
         // `RecordFile_Record(&pMouseQueue[d.MouseQStart])` (doc/CSBwin-src/Mouse.cpp:1645),
         // the entry's one count in `totalMoveCount` (`Recording.cpp:1091-1114`). A viewport
@@ -944,7 +943,7 @@ export class Game implements MainLoop {
         this.recordFileRecord(entry);
         if (num === MOUSE_UNCLICK) {
             this.mouseEventHandlers?.unclick();
-            return result | 1;
+            return 1;
         }
         const action = BUTTON_MOVEMENT[num];
         if (action !== undefined) {
@@ -961,7 +960,7 @@ export class Game implements MainLoop {
             this.mouseEventHandlers?.button(num, entry.x, entry.y);
         }
         this.lastInputTime = time;
-        return result;
+        return 0;
     }
 
     /**

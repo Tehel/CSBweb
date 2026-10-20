@@ -13,10 +13,8 @@ import type { Attribute } from './attributes';
  * numbers, and so does ported code; these name only the slots CSBWin's own comments
  * name, for the port's code that is not a transcription.
  */
-export const POSSESSION_COUNT = 30;
-/** The hand CSBWin calls the "non-weapon hand" (`doc/CSBwin-src/Character.cpp:3079`). */
-export const SLOT_SHIELD_HAND = 0;
-/** "Weapon hand = 1" (`doc/CSBwin-src/Attack.cpp:1669`). */
+const POSSESSION_COUNT = 30;
+/** "Weapon hand = 1" (`doc/CSBwin-src/Attack.cpp:1669`); slot 0 is the "non-weapon hand" (`Character.cpp:3079`). */
 export const SLOT_WEAPON_HAND = 1;
 
 /**
@@ -347,19 +345,11 @@ export enum MovementAction {
 export interface MovementResult {
     success: boolean;           // Did the movement succeed?
     newPosition?: Position;  // New position (if moved)
-    newFacing?: Direction;      // New facing (if turned)
-    blocked?: boolean;          // Was movement blocked by wall?
     /**
      * `MoveParty`'s `D5W != 0`: terrain or a monster refused the move, and
      * `DiscardAllInput(); d.clockTick = 0;` follow (doc/CSBwin-src/CSBCode.cpp:8397-8401).
      */
     inhibited?: boolean;
-    /**
-     * `MoveParty`'s `D5W == 0` arm: the party stepped into the next cell (not a stairway),
-     * so `d.partyMoveDisableTimer` is set once `MoveObject` has run
-     * (doc/CSBwin-src/CSBCode.cpp:8402-8436).
-     */
-    stepped?: boolean;
     /**
      * The party move filter refused a turn or a step (`PM_INHIBITMOVE`): `_TurnParty`
      * returns before its arrow flashes, and `MoveParty` returns `NULL`, so its caller

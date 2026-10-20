@@ -49,9 +49,9 @@ import type {
 import type { DungeonState } from './DungeonState';
 
 /** The first `d.ObjDesc` row of each database (`OBJ_DESC_INDEX`, `doc/CSBwin-src/Objects.h:247-379`). */
-export const OBJDI_SCROLL = 0;
+const OBJDI_SCROLL = 0;
 export const OBJDI_CHEST = 1;
-export const OBJDI_MON_POTION_A = 2;
+const OBJDI_MON_POTION_A = 2;
 export const OBJDI_EYE_OF_TIME = 23;
 export const OBJDI_CAPE = 69;
 export const OBJDI_COMPASS = 127;

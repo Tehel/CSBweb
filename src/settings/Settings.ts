@@ -57,7 +57,7 @@ export interface SettingsValues {
   readonly keyLabels: KeyLabelLayout;
 }
 
-export const ASPECT_RATIOS = ['16:10', '4:3'] as const;
+const ASPECT_RATIOS = ['16:10', '4:3'] as const;
 export type AspectRatio = (typeof ASPECT_RATIOS)[number];
 
 export const DEFAULT_SETTINGS: SettingsValues = {
@@ -85,7 +85,7 @@ export const OLD_SETTINGS_KEY = 'csbweb_ui_settings_v1';
 /** What the settings are kept in: `localStorage`, or a tool's map. */
 export type SettingsStorage = Pick<Storage, 'getItem' | 'setItem'>;
 
-export type SettingsListener = (values: SettingsValues) => void;
+type SettingsListener = (values: SettingsValues) => void;
 
 export class Settings {
   private current: SettingsValues;
@@ -154,7 +154,7 @@ export function applyToGame(ctx: Pick<GameContext, 'extras'>, values: SettingsVa
 }
 
 /** A stored record as settings, each field that is missing or of the wrong type its default. */
-export function parseSettings(raw: unknown): SettingsValues {
+function parseSettings(raw: unknown): SettingsValues {
   const record = asRecord(raw);
   const extras = asRecord(record.extras);
   const defaults = DEFAULT_SETTINGS;
@@ -188,7 +188,7 @@ export function parseSettings(raw: unknown): SettingsValues {
  * The page's earlier settings in this model's names. Its one Extras button turned on
  * every extra; its map was shown by default.
  */
-export function fromOldSettings(raw: unknown): Record<string, unknown> {
+function fromOldSettings(raw: unknown): Record<string, unknown> {
   const old = asRecord(raw);
   const extras = typeof old.extras === 'boolean'
     ? { gatherThrownWeapons: old.extras, drinkAtFountain: old.extras, colourNewMastery: old.extras, showItemProperties: old.extras }

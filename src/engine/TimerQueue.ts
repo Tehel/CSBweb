@@ -190,13 +190,6 @@ export class TimerQueue {
     return entry;
   }
 
-  clear(): void {
-    this.queue = [];
-    this.nextSequence = 0;
-    this.firstAvailTimer = 0;
-    this.indexMap.clear();
-  }
-
   createTimer(
     functionType: number,
     x: number,

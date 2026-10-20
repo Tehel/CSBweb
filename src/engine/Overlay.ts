@@ -28,7 +28,7 @@ const BITMAP_FILE_HEADER_SIZE = 14;
 const BITMAP_INFO_HEADER_SIZE = 40;
 
 /** `OVERLAYDATA`: the overlay in memory, `currentOverlay`. */
-export class OverlayData {
+class OverlayData {
   /** `m_overlayNumber`: the section read last, -1 for none (`Cleanup`). */
   overlayNumber = -1;
   /**

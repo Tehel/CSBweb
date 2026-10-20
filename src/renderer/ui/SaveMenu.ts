@@ -169,7 +169,6 @@ import { closeDialog, openDialog, type Dialog } from './Dialog';
 import type { Rect, UIButton } from '../../data/tables/UITables';
 import { searchButtonList } from './HitTest';
 import {
-  MENU_PRESS_PHASE_MS,
   MENU_TITLE1_COLOR,
   MENU_TITLE_MAX_CHARS,
   doMenu,
@@ -259,7 +258,7 @@ const ROW_STEP = LINE_STEP;
 export const SAVE_MENU_ROWS = FULL_LIST.rows;
 
 /** A list's panel, its scrollbar, and its rows: where the first is, and how many fit. */
-export type SaveMenuList = ListWidget;
+type SaveMenuList = ListWidget;
 
 /** The list of a mode: RISE's is under its title panel, the others' fills the column. */
 export function saveMenuList(mode: SaveMenuMode): SaveMenuList {
@@ -296,7 +295,7 @@ const ACTION_LABELS = { load: 'LOAD', save: 'SAVE', delete: 'DELETE' } as const;
 /** The dialog's own button that takes it down: it undoes nothing. */
 const CLOSE_LABEL = 'CLOSE';
 /** DELETE's question, over the save's row. */
-export const SAVE_MENU_DELETE_QUESTION = 'DELETE THIS SAVE?';
+const SAVE_MENU_DELETE_QUESTION = 'DELETE THIS SAVE?';
 /** LOAD's label in RISE's dialog: the entrance's button that opened it. */
 const RISE_LABEL = 'RISE';
 /**
@@ -324,7 +323,7 @@ const ANYWAY_LABEL = 'IMPORT ANYWAY';
 const OK_LABEL = 'OK';
 
 /** A dropped file that was not stored: what its dungeon is to the data set's. */
-export type ImportRefusal = Exclude<ImportResult, { kind: 'stored' }>;
+type ImportRefusal = Exclude<ImportResult, { kind: 'stored' }>;
 
 /**
  * The menu about a dropped file that was not stored, `_DoMenu`'s: the question for a
@@ -368,13 +367,13 @@ function fittedTitle(prefix: string, name: string): string {
 }
 
 /** What option `choice` of `refusal`'s menu answers, 1-based: `null` for CANCEL and OK. */
-export function importAnswer(refusal: ImportRefusal, choice: number): ImportAnswer | null {
+function importAnswer(refusal: ImportRefusal, choice: number): ImportAnswer | null {
   if (refusal.kind !== 'different') return null;
   return choice === 1 ? 'elsewhere' : choice === 2 ? 'anyway' : null;
 }
 
 /** The prison's question (`askBeginAdventure`), and its two options. */
-export const BEGIN_ADVENTURE_QUESTION = 'BEGIN THE ADVENTURE?';
+const BEGIN_ADVENTURE_QUESTION = 'BEGIN THE ADVENTURE?';
 const YES_LABEL = 'YES';
 const NOT_YET_LABEL = 'NOT YET';
 
@@ -435,13 +434,13 @@ export const SAVE_MENU_GEOMETRY = {
 export type SaveMenuMode = 'full' | 'loadOnly' | 'rise';
 
 /** What the bottom pair of buttons does. */
-export type SaveMenuAction = 'load' | 'save';
+type SaveMenuAction = 'load' | 'save';
 
 /** What a question in the dialog's place asks about: LOAD or SAVE across playthroughs, or DELETE. */
-export type SaveMenuQuestion = SaveMenuAction | 'delete';
+type SaveMenuQuestion = SaveMenuAction | 'delete';
 
 /** A row of the list: the full menu's "new save", a playthrough's heading, or a save under one. */
-export type SaveMenuRow =
+type SaveMenuRow =
   | { kind: 'new' }
   | { kind: 'heading'; playthrough: Playthrough }
   | { kind: 'save'; entry: SaveEntry };
@@ -576,7 +575,7 @@ export function closeSaveMenu(ui: UIState): void {
 /* ------------------------------------------------------------------ the list ---- */
 
 /** List the saves again. Never throws — the failure becomes the dialog's message. */
-export async function refreshSaveMenu(ui: UIState): Promise<void> {
+async function refreshSaveMenu(ui: UIState): Promise<void> {
   const state = ui.saveMenu;
   if (!state) return;
   state.busy = true;
@@ -1196,9 +1195,6 @@ function beginPress(ui: UIState, state: SaveMenuState, buttons: UIButton[], butt
   state.frameHandle = scheduleFrame(tick);
   ui.renderLastFrame();
 }
-
-/** How long the press takes end to end, for anything that needs to wait it out. */
-export const SAVE_MENU_PRESS_MS = MENU_PRESS_PHASE_MS * 2;
 
 /* -------------------------------------------------------------- the actions ---- */
 
