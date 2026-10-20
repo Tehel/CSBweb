@@ -248,12 +248,13 @@ export function createCrtEffect(canvas: HTMLCanvasElement): CrtEffect {
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     };
 
-    // A lost context is waited out, the game canvas showing through; a restored one is
-    // built again.
+    // A lost context is waited out, the game canvas showing through and the pointer read
+    // flat, as it shows; a restored one is built again.
     tube.addEventListener('webglcontextlost', (e) => {
         e.preventDefault();
         lost = true;
         tube.style.visibility = 'hidden';
+        curvedCanvas = null;
     });
     tube.addEventListener('webglcontextrestored', () => {
         try {
@@ -264,6 +265,7 @@ export function createCrtEffect(canvas: HTMLCanvasElement): CrtEffect {
         }
         lost = false;
         tube.style.visibility = '';
+        curvedCanvas = curve ? canvas : null;
     });
 
     return {
@@ -274,7 +276,7 @@ export function createCrtEffect(canvas: HTMLCanvasElement): CrtEffect {
             curve = nextCurve;
             const on = scanlines || curve;
             tube.style.display = on ? '' : 'none';
-            curvedCanvas = curve ? canvas : null;
+            curvedCanvas = curve && !lost ? canvas : null;
             if (on && !wasOn) draw();
             else if (!on && frame !== null) {
                 cancelAnimationFrame(frame);

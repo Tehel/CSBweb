@@ -162,6 +162,12 @@ function utilityPortraitsOfSet(): Promise<UtilityPortraits | null> {
 }
 
 /**
+ * The events that may unlock the sound: a mouse's press is a user activation, a finger's
+ * only at its lift, so the press, the lift, the click and the key all try, until one does.
+ */
+const AUDIO_UNLOCK_EVENTS = ['pointerdown', 'pointerup', 'click', 'touchend', 'keydown'] as const;
+
+/**
  * The sound manager, unlocked by the first press or key anywhere on the page, the Sound
  * button's included: browsers keep audio locked until then.
  */
@@ -169,10 +175,12 @@ function createSoundManager(graphicsLoader: GraphicsLoader, tables: GameTables):
     const sound = new SoundManager(graphicsLoader);
     if (sound.isAvailable()) {
         const unlockAudio = (): void => {
-            sound.unlock();
+            void sound.unlock().then((running) => {
+                if (!running) return;
+                for (const type of AUDIO_UNLOCK_EVENTS) window.removeEventListener(type, unlockAudio);
+            });
         };
-        window.addEventListener('pointerdown', unlockAudio, { once: true });
-        window.addEventListener('keydown', unlockAudio, { once: true });
+        for (const type of AUDIO_UNLOCK_EVENTS) window.addEventListener(type, unlockAudio);
     }
     sound.setSoundTable(tables.sound1772);
     if (sound.isAvailable()) sound.preloadAll();
@@ -688,7 +696,7 @@ async function init() {
         if (__CSBWEB_PROBE__) {
             // `presetHeroes`: the heroes behind the dungeon's mirrors, for `tools/lib/buildParty.mjs`.
             const presetHeroes = () => extractPresetHeroes(built.game.ctx.dungeon.getData(), built.game.ctx.tables.textDecode, built.game.ctx.tables);
-            (window as unknown as Record<string, unknown>).__probe = { game, screen, saves: built.saves, renderView, refreshScreen, presetHeroes, applySaveBytes };
+            (window as unknown as Record<string, unknown>).__probe = { game, screen, sound, saves: built.saves, renderView, refreshScreen, presetHeroes, applySaveBytes };
         }
         // Before the intro: the entrance's chooser takes a dropped save as the disk menu does.
         bindSaveDrop(built.screen);

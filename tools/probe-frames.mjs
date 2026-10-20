@@ -290,6 +290,15 @@ check(await hoverAt(0.5, 0.5) === '160,100', 'the curve on: the tube\'s middle i
 const curved = (await hoverAt(0.1, 0.1)).split(',').map(Number);
 check(curved[0] < 32 && curved[1] < 20, `the curve on: the pointer at (32,20)'s place shows a pixel nearer the corner (${curved})`);
 check(await hoverAt(0.002, 0.002) === '0,0', 'the curve on: a point of the tube\'s black corner is the screen\'s corner');
+// A lost WebGL context hides the tube and the game canvas shows through, flat, so the
+// pointer is read flat until the context is restored. The extension is kept from before
+// the loss, after which the context gives none.
+const loseContext = (how) => evaluate(`(()=>{window.__loseContext??=document.getElementById('crt-canvas').getContext('webgl').getExtension('WEBGL_lose_context');
+  window.__loseContext.${how}();return 1;})()`);
+await loseContext('loseContext'); await wait(300);
+check(await hoverAt(0.1, 0.1) === '32,20', 'the WebGL context lost: the pointer is the plain scaling');
+await loseContext('restoreContext'); await wait(300);
+check((await hoverAt(0.1, 0.1)).split(',').map(Number).join() === curved.join(), 'and restored: the pointer is curved again');
 await toggleCrt(SCANLINES);
 check(await crtEffect() === 'on' && (await hoverAt(0.1, 0.1)).split(',').map(Number).join() === curved.join(),
   'the curve alone: the effect stays on, the pointer curved');
@@ -1220,9 +1229,15 @@ const touch = async (type, x, y) => {
   await send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x: p.x, y: p.y }] });
 };
 const pressingEye = () => evaluate(`window.__probe.screen.ui.pressingEye`);
+// The tap is this page's first user activation, the clicks above being the page's own
+// events, and a touch gives one only at its lift: the sound is unlocked by it
+// (`createSoundManager`, `src/main.ts`), not by the press.
+const soundRunning = () => evaluate(`window.__probe.sound.isRunning()`);
+check(!(await soundRunning()), 'no user activation yet: the sound is locked');
 await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
 await touch('touchStart', 124, 10); await touch('touchEnd', 124, 10); await wait(600);
 check(await selected() === 1, 'a tap on a champion\'s bars opens the inventory, once');
+check(await soundRunning(), 'and unlocks the sound');
 await touch('touchStart', 19, 53); await wait(600);
 check(await pressingEye(), 'a finger held on the eye keeps it pressed');
 await touch('touchEnd', 19, 53); await wait(600);

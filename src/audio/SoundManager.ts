@@ -72,10 +72,19 @@ export class SoundManager {
     }
   }
 
-  async unlock(): Promise<void> {
-    if (!this.audioContext) return;
-    if (this.audioContext.state !== 'suspended') return;
-    await this.audioContext.resume();
+  /**
+   * Ask the browser to let the sound play, and say whether it does. Without a user
+   * activation the context stays suspended, and `resume` may reject or never settle.
+   */
+  async unlock(): Promise<boolean> {
+    if (!this.audioContext) return false;
+    if (this.audioContext.state === 'suspended') await this.audioContext.resume().catch(() => undefined);
+    return this.isRunning();
+  }
+
+  /** Whether the browser lets the sound play. */
+  isRunning(): boolean {
+    return this.audioContext?.state === 'running';
   }
 
   preloadAll(): void {

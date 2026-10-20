@@ -116,7 +116,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| R10 | Pointer, touch and WebGL | S | ⏳ |
 | R11 | Right-click closes the save menu while it saves or loads | S | ⏳ |
 | R16 | A save's DELETE is told done before its transaction commits | S | ⏳ |
 | W4 | The events table grows without bound | S | ⏳ |
@@ -445,19 +444,6 @@ takes untrusted data. A file the player drops on the page and a custom dungeon a
 untrusted: they may stop the game with a message, as CSBWin dies, but never crash or hang
 the tab, nor corrupt what is stored. Each item owes what a fix owes ("How to work this
 list", point 4), its check included.
-
-### R10 ⏳ Pointer, touch and WebGL
-
-- **Touch screens likely stay silent.** Audio is unlocked on the canvas's first
-  `pointerdown`, once (`src/main.ts:168-180`), which is a user activation for a mouse and
-  not for a touch: `resume()` fails, the listener is gone, and only the settings'
-  SOUND brings the sound back.
-- **A lost WebGL context keeps the curve.** On `webglcontextlost` the tube is hidden but
-  `curvedCanvas` stays set (`src/lib/crt.ts:253-267`), so `canvasPoint` warps clicks over a
-  flat picture, about 3 pixels near the edges.
-
-Paying it: the unlock on `pointerup`, `click` and `touchend`, its listeners removed once
-the context runs; the curve cleared with the context.
 
 ### R11 ⏳ Right-click closes the save menu while it saves or loads
 
