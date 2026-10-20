@@ -25,6 +25,28 @@ export function loadFontData(graphicsLoader: GraphicsLoader): FontData {
   return { bytes: raw };
 }
 
+/**
+ * A character of a text in capitals the font has no glyph for: it draws a space, `!` to
+ * `?`, A to Z and `[ \ ] ^ _`, ASCII from 0x20 to 0x5f without `@`.
+ */
+const NOT_IN_FONT = /[^\x20-\x3f\x41-\x5f]/u;
+
+/** Whether the font draws every character of `s`, a text in capitals. */
+export function fontDraws(s: string): boolean {
+  return !NOT_IN_FONT.test(s);
+}
+
+/**
+ * A text from outside the game, a player's or the browser's, as the font can draw it. The
+ * font holds ASCII alone, and a character is drawn by its code's low seven bits, so
+ * `É` (0xC9) would draw as `I`. Its accents are dropped, a compatibility form taken
+ * (`ﬁ` as `FI`, `…` as `...`), and every character with no glyph becomes `?`. The text
+ * comes out in capitals, as `drawTextLineIndex` draws it.
+ */
+export function foldToFont(text: string): string {
+  return text.normalize('NFKD').replace(/\p{M}/gu, '').toUpperCase().replace(new RegExp(NOT_IN_FONT, 'gu'), '?');
+}
+
 export function drawTextLineIndex(
   dst: PaletteIndexViewportBuffer,
   font: FontData,

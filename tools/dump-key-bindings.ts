@@ -32,7 +32,8 @@ import {
   actionsByCode, ARROWS_KEY_BINDINGS, bindKey, clearKey, DEFAULT_KEY_BINDINGS, handleUIKey, KEY_PRESETS, KEYPAD_KEY_BINDINGS,
   keyScanOf, portKeyAction, setKeyBindings, tableKeyButton, translateKey, type KeyAction, type KeyBindings,
 } from '../src/renderer/ui/Keyboard';
-import { KEY_LABEL_CHARS, LAYOUT_CHARS, fontDraws, keyLabel } from '../src/renderer/ui/KeyLabels';
+import { KEY_LABEL_CHARS, LAYOUT_CHARS, keyLabel } from '../src/renderer/ui/KeyLabels';
+import { fontDraws } from '../src/renderer/csbwin/TextRenderer';
 import { KEY_ACTION_NAMES } from '../src/renderer/ui/SettingsKeys';
 import { Settings } from '../src/settings/Settings';
 import { attackPanelTick, closeAttackMenu, handleAttackAreaClick } from '../src/renderer/ui/Attack';

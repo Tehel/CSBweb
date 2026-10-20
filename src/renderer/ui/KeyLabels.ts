@@ -15,6 +15,8 @@
  * (SPACE, TAB, F1, LEFT).
  */
 
+import { fontDraws } from '../csbwin/TextRenderer';
+
 /** The layouts a player can pick where the browser does not say. */
 export type KeyLabelLayout = 'qwerty' | 'azerty';
 
@@ -81,11 +83,6 @@ const CODE_NAMES: Readonly<Record<string, string>> = {
   Comma: 'COMMA', Period: 'PERIOD', Slash: 'SLASH', IntlBackslash: 'ISO KEY', IntlRo: 'RO',
   IntlYen: 'YEN',
 };
-
-/** Whether the game's font draws every character of `s`, as `drawText` upper-cases it. */
-export function fontDraws(s: string): boolean {
-  return /^[ -?A-Z[\\\]^_]*$/.test(s);
-}
 
 /**
  * The label of the key `code`, from the browser's layout map where there is one, else

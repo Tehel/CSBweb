@@ -3380,6 +3380,16 @@ async function checkDrop(graphics: GraphicsLoader): Promise<void> {
   check(titles[0].endsWith('...') && titles[1].endsWith('...') && titles[2] === 'THIS LOOKS LIKE A SAVE OF THE KEEP',
     'a name too long for the panel is cut and ends in "...", and a short one is whole');
 
+  // A name outside the font's ASCII is folded to what it draws: `É` would draw as `I`.
+  const accented = SaveMenu.importMenu({ kind: 'other', dungeon: { name: 'Château d\'Éole — ﬁn ß@😀', dataSets: [], signature: [] } });
+  console.log(`  an accented name: ${accented.title1}`);
+  check(accented.title1 === 'THIS LOOKS LIKE A SAVE OF CHATEAU D\'EOLE ? FIN SS??',
+    'a published set\'s accents are dropped, and what the font has no glyph for drawn as "?"');
+  const refused = await menuRig(graphics, memoryStore(() => {}, false, () => { throw new Error('Accès refusé'); }), 'DAROO');
+  const refusedState = await refused.open();
+  console.log(`  a store whose error has accents: ${refusedState.message}`);
+  check(refusedState.message === 'ACCES REFUSE', 'an error\'s message is folded to what the font draws');
+
   const realNow = Date.now;
   let now = new Date(2026, 9, 2, 10, 0, 0).getTime();
   Date.now = () => now;

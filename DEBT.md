@@ -114,7 +114,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| U12 | A text outside the game's font draws as other letters | S | ⏳ |
 | D17 | The screen keeps the party it last drew | S | ⏳ |
 | E23 | One game read, whole or not at all | L | ⏳ |
 | D18 | The interface's `d.` lives in the screen, and composing the screen changes the world | L | ⏳ |
@@ -390,19 +389,6 @@ service worker: the game is not playable offline.
 None of it changes the game: with every new setting at its default, every tool's output
 and every golden frame stay the same, the dialogs aside. Each item owes its check: a
 golden frame for what it draws, and a probe or a `tools/` assertion for what it does.
-
-### U12 ⏳ A text outside the game's font draws as other letters
-
-The canvas draws a text through the game's font, which holds ASCII alone:
-`drawTextLineIndexInternal` (`src/renderer/csbwin/TextRenderer.ts`) takes each character's
-code `& 0x7f`, so an accented capital draws as an unrelated letter (`É`, 0xC9, as `I`) and
-any other character outside ASCII as whatever its low seven bits name. The texts the port
-puts there that a player wrote are a save's name, an imported file's (`importedFileName`),
-and a published set's name in the import dialog's "THIS LOOKS LIKE A SAVE OF …"
-(`importMenu`, `src/renderer/ui/SaveMenu.ts`). CSBWin's own texts are ASCII. Paying it:
-such a text is folded to what the font holds before it is drawn (accents dropped through
-`normalize('NFD')`, and what is still outside the font replaced by a character it
-holds), in one helper the save menu calls; a `tools/dump-save-menu.ts` check of a name with accents, which fails before.
 
 ---
 

@@ -208,9 +208,12 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   the other sets (`publishedDungeons`, `src/main.ts`), and keeps the answer for the
   session; where the server cannot answer, the console says why, that import is held
   against the catalogue alone, and the next asks again. A published set's name is a
-  player's, up to 60 characters: where "THIS LOOKS LIKE A SAVE OF" and the name do not fit
-  the title panel's two lines of 33 characters, the name is cut at a word and ends in
-  `...` (`fittedTitle`, `src/renderer/ui/SaveMenu.ts`).
+  player's, up to 60 characters. It is folded first to what the game's font draws, which
+  is ASCII alone: its accents dropped, and `?` for a character with no glyph
+  (`foldToFont`, `src/renderer/csbwin/TextRenderer.ts`), as is an error's message the
+  dialog shows. Where "THIS LOOKS LIKE A SAVE OF" and the name do not fit the title
+  panel's two lines of 33 characters, the name is cut at a word and ends in `...`
+  (`fittedTitle`, `src/renderer/ui/SaveMenu.ts`).
 
   This holds for every set, the site's and a player's own alike: a local set's author
   keeps their saves while they move its walls, by IMPORT ANYWAY, and a set the catalogue

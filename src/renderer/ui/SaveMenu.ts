@@ -164,6 +164,7 @@ import type { OpenedSave, Playthrough, SaveEntry } from '../../data/saves';
 import { SAVES_ARE_DISABLED, type ImportAnswer, type ImportResult, type ImportedFile } from '../../engine/GameSaves';
 import { formatPlaythroughRow, formatSavePreview, formatSaveRow, lastUsedSave, playthroughsOf } from '../../data/saves';
 import { clearIndex } from '../csbwin/CanvasBlitter';
+import { foldToFont } from '../csbwin/TextRenderer';
 import { closeDialog, openDialog, type Dialog } from './Dialog';
 import type { Rect, UIButton } from '../../data/tables/UITables';
 import { searchButtonList } from './HitTest';
@@ -330,7 +331,8 @@ export type ImportRefusal = Exclude<ImportResult, { kind: 'stored' }>;
  * save of a slightly different dungeon, whose options send it on to the other sets or
  * store it (`importAnswer`); or the refusal of another dungeon's save, which names the
  * dungeon and says whether a data set plays it, and of an unknown one's, under one option.
- * A published set's name is a player's, and is cut to fit the title panel (`fittedTitle`).
+ * A published set's name is a player's: folded to what the font draws (`foldToFont`),
+ * and cut to fit the title panel (`fittedTitle`).
  */
 export function importMenu(refusal: ImportRefusal): { title1: string; title2: string | null; options: string[] } {
   switch (refusal.kind) {
@@ -338,7 +340,7 @@ export function importMenu(refusal: ImportRefusal): { title1: string; title2: st
       return { title1: SAVE_MENU_DIFFERENT, title2: null, options: [ELSEWHERE_LABEL, ANYWAY_LABEL, CANCEL_LABEL] };
     case 'other':
       return {
-        title1: fittedTitle('THIS LOOKS LIKE A SAVE OF ', refusal.dungeon.name.toUpperCase()),
+        title1: fittedTitle('THIS LOOKS LIKE A SAVE OF ', foldToFont(refusal.dungeon.name)),
         title2: refusal.dungeon.dataSets.length > 0 ? 'SWITCH TO IT TO IMPORT IT' : 'NOT SUPPORTED YET',
         options: [OK_LABEL],
       };
@@ -595,9 +597,9 @@ export async function refreshSaveMenu(ui: UIState): Promise<void> {
   }
 }
 
+/** An error's message, the browser's own among them, as the font draws it. */
 function shortError(error: unknown): string {
-  const text = error instanceof Error ? error.message : String(error);
-  return text.toUpperCase();
+  return foldToFont(error instanceof Error ? error.message : String(error));
 }
 
 /**
