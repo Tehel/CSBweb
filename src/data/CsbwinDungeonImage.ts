@@ -59,7 +59,6 @@ export function loadCsbwinWorld(file: Uint8Array): CsbwinWorld {
         newScrolls: (save.version ?? 0) >= 0x42, // extended features version 'B'
         indirectText: save.indirectText ?? false,
         expandedPortraits: save.expandedPortraits ?? false,
-        expool: true,
         cellFlagArraySize,
         // Every RN in a save's image is a slot number in the object indirect index, not
         // the packed RN `dungeon.dat` stores — see `src/data/CsbwinObjectIndex.ts`.

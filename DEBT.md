@@ -132,7 +132,6 @@ In payoff order: the first row is the next item.
 | E30 | One presenter and one input router | M | ⏳ |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | C177 | An Atari-era save loads with its possessions, timers and hand unconverted | M | ⏳ |
-| C183 | A `dungeon.dat` without an Extended Features block counts no EXPOOL record | S | ⏳ |
 | C171 | The Firestaff does not soften a monster's blow, and three mastery calls ignore sleep | S | ⏳ |
 | C168 | A monster north-west of the party never prefers west | S | ⏳ |
 | C169 | A monster's `timePerMove / 2` is not an integer division | S | ⏳ |
@@ -1008,20 +1007,6 @@ champion's hand, packed `0x1403`, loads as slot `0x1403`, past the 2097 slots, a
 Paying it: for a file without `objectIndex`, `ConvertListOfObjects` over the timers that
 carry an object, each champion's thirty slots and the object in hand, in CSBWin's order
 after the chains; a fixture whose champions carry something.
-
-### C183 ⏳ A `dungeon.dat` without an Extended Features block counts no EXPOOL record
-
-CSBWin's `dbEntrySizes[11]` is `sizeof(DB11)`, 256, whatever the file
-(`doc/CSBwin-src/data.cpp:395-413`), so `ReadDatabases` steps over a database 11 a
-`dungeon.dat` declares. The port's `dbEntrySize` (`src/data/DungeonImageLayout.ts`) gives
-it 0 unless the shape says `expool`, which only a file with an Extended Features block
-and a save do (`DungeonLoader.loadDungeonDat`, `CsbwinDungeonImage`), and
-`DungeonLoader.readExpool` keeps no records then. No known file is such a `dungeon.dat`
-with EXPOOL records, so nothing reads differently today.
-
-Fixing it: database 11 at 256 always, the `expool` flag gone from `DatabaseShape`, and
-`readExpool` keeping the records of every image; a tool that builds such a file, read
-with the section after it in place.
 
 ### C171 ⏳ The Firestaff does not soften a monster's blow, and three mastery calls ignore sleep
 

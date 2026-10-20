@@ -14,16 +14,11 @@ export interface DatabaseShape {
   bigActuators?: boolean;
   /** SCROLL records are 6 bytes with an RN text reference, not 4 with a 10-bit index. */
   newScrolls?: boolean;
-  /**
-   * EXPOOL's records, database 11, are counted. An image read without an Extended
-   * Features block skips none of them.
-   */
-  expool?: boolean;
 }
 
 /**
  * `dbEntrySizes` (`doc/CSBwin-src/data.cpp:395-413`): the size of a record of database
- * `db` in an image of the shape `shape`. CSBWin's table holds the *big* actuator, and
+ * `db` in an image of the shape `shape`, whatever else the file holds. CSBWin's table holds the *big* actuator, and
  * `ReadDatabases` takes 2 from it for an image without big actuators
  * (`doc/CSBwin-src/SaveGame.cpp:2783-2787`); the new scroll is 2 bytes longer from
  * extended-features version 'B' (`:2401-2412`).
@@ -31,11 +26,11 @@ export interface DatabaseShape {
 export function dbEntrySize(db: number, shape: DatabaseShape): number {
   if (db === DBType.ACTUATOR && shape.bigActuators) return 10;
   if (db === DBType.SCROLL && shape.newScrolls) return 6;
-  if (db === DBType.EXPOOL) return shape.expool ? EXPOOL_RECORD_SIZE : 0;
   return RECORD_SIZES[db] ?? 0;
 }
 
-const RECORD_SIZES = [4, 6, 4, 8, 16, 4, 4, 4, 4, 8, 4, 0, 0, 0, 8, 4];
+/** `sizeof (DB0)` to `sizeof (DB15)`; DB11, EXPOOL's, is 256 (`doc/CSBwin-src/CSB.h:1283-1291`). */
+const RECORD_SIZES = [4, 6, 4, 8, 16, 4, 4, 4, 4, 8, 4, EXPOOL_RECORD_SIZE, 0, 0, 8, 4];
 
 /**
  * Where each section of the dungeon image sits, relative to `startOffset`.

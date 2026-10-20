@@ -61,8 +61,6 @@ export interface DungeonImageOptions {
     newScrolls?: boolean;
     /** The text section is already an indirect index + compressed text, not raw words. */
     indirectText?: boolean;
-    /** EXPOOL (db 11) records exist and are 256 bytes each. Saves only. */
-    expool?: boolean;
     /**
      * Read the image exactly as it stands, without the three load-time conversions
      * `convertOriginalDungeon` runs (`src/data/CsbwinDungeonConversions.ts`).
@@ -195,7 +193,6 @@ export class DungeonLoader {
             newScrolls: ef.version >= 0x42, // 'B'
             indirectText: ef.indirectText,
             expandedPortraits: ef.expandedPortraits,
-            expool: true,
             cellFlagArraySize: ef.cellFlagArraySize || undefined,
             objectIndex: ef.objectIndex,
         } : {};
@@ -216,9 +213,9 @@ export class DungeonLoader {
             data.gameInfo = readGameInfo(ef.header.gameInfoSize, ef.gameInfo ?? new Uint8Array(0));
             if (ef.dsaLevelIndex) data.dsaLevelIndex = ef.dsaLevelIndex;
             if (ef.dsaIndex) data.dsaIndex = ef.dsaIndex;
-            const specialLocations = data.expool ? specialLocationsFromExpool(data.expool) : null;
-            if (specialLocations) data.specialLocations = specialLocations;
         }
+        const specialLocations = data.expool ? specialLocationsFromExpool(data.expool) : null;
+        if (specialLocations) data.specialLocations = specialLocations;
         return data;
     }
 
@@ -461,7 +458,6 @@ export class DungeonLoader {
             indirectText: this.options.indirectText ?? false,
             bigActuators: this.options.bigActuators,
             newScrolls: this.options.newScrolls,
-            expool: this.options.expool,
         });
         if (!layout) throw new Error('the dungeon image is cut short');
         return {
@@ -507,7 +503,7 @@ export class DungeonLoader {
      * other RN of the image.
      */
     private readExpool(offset: number, count: ui16): Uint8Array | null {
-        if (!this.options.expool || count <= 0) return null;
+        if (count <= 0) return null;
         const bytes = new Uint8Array(count * EXPOOL_RECORD_SIZE);
         this.file.seek(offset);
         for (let i = 0; i < bytes.length; i++) bytes[i] = this.file.readU8();

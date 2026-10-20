@@ -1651,6 +1651,17 @@ the directory, the eight blocks of three records, every link and chain. `csbgame
 holds them among others, and CSBWin's loop run over each of the eight leaves its bytes as
 they were.
 
+## Every image's `EXPOOL` records are 256 bytes, whatever the file
+
+`ReadDatabases` reads `dbEntrySizes[D6W] * DBSize(D6W)` bytes of each of the sixteen
+databases (`doc/CSBwin-src/SaveGame.cpp:2786-2815`), and `dbEntrySizes[11]` is
+`sizeof(DB11)` (`doc/CSBwin-src/data.cpp:395-413`): a link, a `size` word and 63
+longwords, 256 bytes (`CSB.h:1283-1291`). Nothing there asks for an Extended Features
+block, so a `dungeon.dat` without one that declares EXPOOL records has them read and
+kept, and its cell flags read after them (`dbEntrySize`, `src/data/DungeonImageLayout.ts`).
+
+Covered by `tools/dump-expool.ts`.
+
 ## CSBWin carries an `EXPOOL` record of a type it does not know through a load and a save
 
 The type of a key is its top byte, an `EXPOOL_DATA_TYPE` from 1 to 10

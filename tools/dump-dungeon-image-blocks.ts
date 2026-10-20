@@ -49,9 +49,9 @@ import {
   buildDungeonImageSections,
   buildImageChecksum,
   cellFlagArraySize,
-  databaseRecordSize,
   dungeonImageSectionList,
 } from '../src/data/CsbwinDungeonImageWriter';
+import { dbEntrySize } from '../src/data/DungeonImageLayout';
 import {
   objectIndexOf,
   formChecksum,
@@ -235,7 +235,7 @@ function dungeonDatLayout(raw: Uint8Array): ImageLayout {
   const databases: number[] = [];
   for (let db = 0; db < 16; db++) {
     databases.push(at);
-    at += u16(12 + db * 2) * databaseRecordSize(db);
+    at += u16(12 + db * 2) * dbEntrySize(db, {});
   }
   return {
     header: 0, levelDescriptors, columnIndex, objectList,
@@ -419,7 +419,7 @@ function compareDatabases(s: Subject, mine: Uint8Array): void {
     const count = s.dungeon.header.objectCounts[db] ?? 0;
     const size = db === DBType.EXPOOL
       ? EXPOOL_RECORD_SIZE
-      : databaseRecordSize(db, s.options);
+      : dbEntrySize(db, s.options);
     if (count === 0 || size === 0) continue;
     check(s.base + s.layout.databases[db] === base + at,
       `${s.label}: database ${db} starts where the file puts it`);

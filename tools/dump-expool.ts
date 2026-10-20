@@ -20,14 +20,21 @@
  * Then the champion bones records, which are the ones play writes: one longword under
  * the bones' RN, and two records under one key.
  *
+ * And a `dungeon.dat` without an Extended Features block that declares EXPOOL records:
+ * `ReadDatabases` reads `dbEntrySizes[11]`, `sizeof(DB11)`, 256 bytes, for each
+ * (`doc/CSBwin-src/SaveGame.cpp:2786-2815`, `CSB.h:1283-1291`), whatever the file, so the
+ * sections after them read in place and the records are the world's.
+ *
  * Run: `npm test -- --only=dump-expool.ts`
  */
 import { readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 
-import { readU32BE } from '../src/core/bytes';
+import { readU32BE, writeU16BE } from '../src/core/bytes';
+import { DungeonLoader } from '../src/data/DungeonLoader';
+import { computeDungeonImageLayout } from '../src/data/DungeonImageLayout';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
-import { EXPOOL_RECORD_SIZE, Expool, type ExpoolDatabase } from '../src/data/CsbwinExpool';
+import { EXPOOL_RECORD_SIZE, Expool, specialLocationsFromExpool, type ExpoolDatabase } from '../src/data/CsbwinExpool';
 import { check, finish } from './lib/check';
 import { genuineSaves } from './lib/saves';
 import { stockDungeon } from './lib/game';
@@ -176,6 +183,28 @@ function main(): void {
     check(data.header.objectCounts[11] === 3, 'the 22nd record makes a second block of them');
     check(Array.from({ length: 21 }, (_, i) => pool.copyChampionBonesRecord(0x2900 + i)).every((v, i) => v === i),
       'and all of them are found');
+  }
+
+  console.log('\nA dungeon.dat without a block, with EXPOOL records');
+  {
+    // DM's dungeon.dat, whose database 11 is empty, given a save's pool there.
+    const pool = loadCsbwinWorld(new Uint8Array(readFileSync(genuineSaves()[0]!))).dungeon.expool!;
+    const original = new Uint8Array(readFileSync('static/gamefiles/dm-atari/dungeon.dat'));
+    const at = computeDungeonImageLayout(original, 0, { indirectText: false })!.databases[11]!;
+    const file = new Uint8Array(original.length + pool.length);
+    file.set(original.subarray(0, at));
+    file.set(pool, at);
+    file.set(original.subarray(at), at + pool.length);
+    writeU16BE(file, 12 + 11 * 2, pool.length / EXPOOL_RECORD_SIZE);
+    const plain = new DungeonLoader().loadDungeonDat(original);
+    const read = new DungeonLoader().loadDungeonDat(file);
+    const flags = (data: typeof plain): string => JSON.stringify(data.maps.map((m) => m.cellFlags));
+    console.log(`  ${pool.length / EXPOOL_RECORD_SIZE} records at byte ${at}; kept ${(read.expool?.length ?? 0) / EXPOOL_RECORD_SIZE}, ` +
+      `special locations ${Object.keys(read.specialLocations ?? {}).length}`);
+    check(flags(read) === flags(plain), 'the cell flags after them read in place');
+    check(read.expool !== undefined && read.expool.every((b, i) => b === pool[i]), 'and the records are the world\'s');
+    check(JSON.stringify(read.specialLocations) === JSON.stringify(specialLocationsFromExpool(pool) ?? undefined),
+      'with its special locations');
   }
 
   finish();

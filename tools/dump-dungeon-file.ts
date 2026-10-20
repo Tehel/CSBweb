@@ -40,7 +40,8 @@ import { resolve } from 'node:path';
 
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { buildDungeonFile } from '../src/data/DungeonFileWriter';
-import { buildDungeonImageSections, databaseRecordSize } from '../src/data/CsbwinDungeonImageWriter';
+import { buildDungeonImageSections } from '../src/data/CsbwinDungeonImageWriter';
+import { dbEntrySize } from '../src/data/DungeonImageLayout';
 import { readExtendedFeatures, EF_FLAGS } from '../src/data/CsbwinExtendedFeatures';
 import { DBType } from '../src/core/types';
 import { objectIndexOf } from '../src/data/CsbwinObjectIndex';
@@ -198,8 +199,8 @@ function csbwinsOwn(): void {
   const sections = buildDungeonImageSections(world, options);
   let scroll = sections.header.length + sections.levelDescriptors.length + sections.columnIndex.length +
     sections.objectList.length + sections.indirectTextIndex.length + sections.text.length;
-  for (let db = 0; db < DBType.SCROLL; db++) scroll += databaseRecordSize(db, options) * world.header.objectCounts[db];
-  scroll += databaseRecordSize(DBType.SCROLL, options) * 33 + 2;
+  for (let db = 0; db < DBType.SCROLL; db++) scroll += dbEntrySize(db, options) * world.header.objectCounts[db];
+  scroll += dbEntrySize(DBType.SCROLL, options) * 33 + 2;
   const expected = [scroll, scroll + 1, imageA.length - 2, imageA.length - 1];
   console.log(['file', file.length, 'written', written.length, 'slots', a.objectIndex?.length, b.objectIndex?.length,
     'image', imageA.length, imageB.length, 'differing at', differing.join(' '), 'scroll 33 text word at', scroll,

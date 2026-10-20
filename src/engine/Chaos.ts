@@ -155,7 +155,6 @@ function readDungeon(
         indirectText: extended.indirectText,
         bigActuators: extended.bigActuators ?? false,
         newScrolls: extended.version >= 0x42, // 'B'
-        expool: true,
     });
     if (!layout || layout.numMaps < 1) throw new Error('the dungeon does not read');
     // `cellArraySize = LE16(wordGear(A0+2)); if (cellflagArraySize != 0) cellArraySize = cellflagArraySize;`

@@ -263,14 +263,6 @@ function buildTextWords(textWords: readonly number[]): Uint8Array {
 /** How the databases of the image being written differ from a plain `dungeon.dat`. */
 type DatabaseWriteOptions = Pick<DatabaseShape, 'bigActuators' | 'newScrolls'>;
 
-/**
- * A record's size in the image being written: `dbEntrySize`, EXPOOL's counted. Databases
- * 12 and 13 are `//Not used` in `CSB.h` and have no record size; both are empty in every
- * file this project holds.
- */
-export function databaseRecordSize(db: number, options: DatabaseWriteOptions = {}): number {
-    return dbEntrySize(db, { ...options, expool: true });
-}
 
 /**
  * Block 13 — all sixteen databases, back to back, in `DBType` order
@@ -310,7 +302,7 @@ function buildDatabase(
     db: number,
     options: DatabaseWriteOptions = {},
 ): Uint8Array {
-    const size = databaseRecordSize(db, options);
+    const size = dbEntrySize(db, options);
     const declared = dungeon.header.objectCounts[db] ?? 0;
 
     if (db === DBType.EXPOOL) {

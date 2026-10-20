@@ -512,7 +512,6 @@ export function loadSaveGameState(file: Uint8Array): SaveGameState & { data: Uin
     indirectText: extended.indirectText,
     bigActuators: extended.bigActuators ?? false,
     newScrolls: extended.version >= 0x42, // 'B'
-    expool: true,
   });
   const layout = read && read.numMaps >= 1 ? read : null;
 
