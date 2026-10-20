@@ -7,12 +7,24 @@
 import type { ui8, ui16 } from './types';
 
 /**
+ * The most bytes a reader expands one item of a file into, or allocates for it: 16 MiB, past
+ * every known data set's largest (Conflux III WIP008's `CSBgraphics.dat` holds a section
+ * of 2.9 MB). A count read from a damaged file is checked against it before it sizes an
+ * allocation, where CSBWin's `allocateMemory` would fail and end the program.
+ */
+export const MAX_EXPANDED_SIZE = 1 << 24;
+
+/**
  * LZW decompression
  *
  * Used in graphics.dat for compressed images.
  * Variable-length codes (9-12 bits) with dictionary reset.
  *
  * Reference: Graphics.cpp in CSBWin
+ *
+ * A damaged stream can close a dictionary chain on itself, which CSBWin follows for ever
+ * (`LZWExpand`, `doc/CSBwin-src/Graphics.cpp:2777-2781`): a chain longer than the 4096
+ * entries throws, and so does an output past `MAX_EXPANDED_SIZE`.
  */
 export function LZWexpand(compressedData: Uint8Array): Uint8Array {
     let dataPosition = 0;
@@ -131,6 +143,7 @@ export function LZWexpand(compressedData: Uint8Array): Uint8Array {
         while (newCode >= 256) {
             stack.push(byteArray[newCode]);
             newCode = wordArray[newCode];
+            if (stack.length > 4096) throw new Error('LZW dictionary chain closes on itself');
         }
 
         D7 = byteArray[newCode];
@@ -140,6 +153,7 @@ export function LZWexpand(compressedData: Uint8Array): Uint8Array {
         while (stack.length > 0) {
             out.push(stack.pop()!);
         }
+        if (out.length > MAX_EXPANDED_SIZE) throw new Error(`LZW expands past ${MAX_EXPANDED_SIZE} bytes`);
 
         // Add new dictionary entry
         if (LZWNextCode < 4096) {
@@ -164,8 +178,10 @@ export function LZWexpand(compressedData: Uint8Array): Uint8Array {
  * - [0x90][0x0] means "literal 0x90"
  *
  * Reference: Graphics.cpp in CSBWin
+ *
+ * An output past `maxSize` throws.
  */
-export function RLEexpand(compressedData: Uint8Array): Uint8Array {
+export function RLEexpand(compressedData: Uint8Array, maxSize = MAX_EXPANDED_SIZE): Uint8Array {
     const out: ui8[] = [];
     let RLErepeatFlag = false;
     let RLErepeatChar: ui8 = 0;
@@ -194,6 +210,7 @@ export function RLEexpand(compressedData: Uint8Array): Uint8Array {
                 // Count=0 means literal 0x90
                 out.push(0x90);
             }
+            if (out.length > maxSize) throw new Error(`RLE expands past ${maxSize} bytes`);
         }
     }
 
@@ -211,6 +228,8 @@ export function RLEexpand(compressedData: Uint8Array): Uint8Array {
  *     (N encoded in following nibbles with continuation bit)
  *
  * Reference: http://dmweb.free.fr/?q=node/220#toc133
+ *
+ * A repeat stops at the first word's count, past which nothing is kept.
  */
 export function SNDexpand(compressedData: Uint8Array): Uint8Array {
     const size = (compressedData[0] << 8) | compressedData[1];
@@ -253,7 +272,7 @@ export function SNDexpand(compressedData: Uint8Array): Uint8Array {
 
             count += 3; // Minimum repeat is 3
 
-            for (let i = 0; i < count; i++) {
+            for (let i = 0; i < count && out.length < size; i++) {
                 out.push(lastSample);
             }
         }
@@ -277,7 +296,7 @@ export function isCompressed(compressedSize: ui16, decompressedSize: ui16): bool
  * Decompress graphics data (LZW + RLE)
  *
  * If compressedSize !== decompressedSize, applies LZW then RLE.
- * Otherwise returns original data.
+ * Otherwise returns original data. An RLE output past `decompressedSize` throws.
  */
 export function decompressGraphics(
     data: Uint8Array,
@@ -287,7 +306,7 @@ export function decompressGraphics(
     if (!isCompressed(compressedSize, decompressedSize)) return data;
 
     const lzwExpanded = LZWexpand(data);
-    const rleExpanded = RLEexpand(lzwExpanded);
+    const rleExpanded = RLEexpand(lzwExpanded, decompressedSize);
 
     if (rleExpanded.length !== decompressedSize) {
         throw new Error(`Decompression size mismatch: expected ${decompressedSize}, got ${rleExpanded.length}`);
@@ -308,9 +327,10 @@ export function decompressGraphics(
  * input word in its low word; `acc` and `input` are those two halves. The count is
  * `D7W`, a word, so a `dstSize` over 65535 expands only `dstSize & 0xffff` bytes (65536
  * when that is 0), as it does in CSBWin. A word past the end of `src` reads as 0 here,
- * where CSBWin would read beyond its buffer.
+ * where CSBWin would read beyond its buffer. A `dstSize` past `MAX_EXPANDED_SIZE` throws.
  */
 export function ExpandData(src: Uint8Array, dstSize: number): Uint8Array {
+    if (dstSize > MAX_EXPANDED_SIZE) throw new Error(`dungeon.dat expands to ${dstSize} bytes, past ${MAX_EXPANDED_SIZE}`);
     const dst = new Uint8Array(dstSize);
     let a3 = 20;
     let a2 = 0;

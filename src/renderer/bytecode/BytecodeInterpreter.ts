@@ -19,6 +19,7 @@ import {
   type PaletteIndexViewportBuffer
 } from '../csbwin/CanvasBlitter';
 import type { AltMonCache } from '../../data/AltMonGraphics';
+import { Die } from '../../engine/Die';
 import type { DungeonState } from '../../engine/DungeonState';
 import type { PartyFootprints } from '../../engine/PartyFootprints';
 import type { GameState } from '../../engine/gameTypes';
@@ -365,6 +366,9 @@ export function interpreterStackTop(n: number): number[] {
  * This function executes a bytecode program by iterating through
  * the opcode array and dispatching to handler functions.
  */
+/** The most opcodes one `Interpret` runs before it takes its program for one that never returns. */
+const INTERPRET_STEP_BUDGET = 1 << 20;
+
 export class BytecodeInterpreter {
   private context: InterpreterContext;
   private pc: number = 0;  // Program counter
@@ -387,7 +391,9 @@ export class BytecodeInterpreter {
    * `Interpret` (`doc/CSBwin-src/Viewport.cpp:2425-2474`, `:3299-3308`): `code` run from
    * word `startAddr` until a `Return` pops the `0xffff` it pushes first. A word below 60000
    * calls a subroutine at that address, its return address on `rstack`. A standard
-   * program starts at 0; a skin's is the words of its section (`DrawViewport`).
+   * program starts at 0; a skin's is the words of its section (`DrawViewport`). One that
+   * has not returned after `INTERPRET_STEP_BUDGET` opcodes, as a skin's that jumps to
+   * itself never does, ends in `die`, where CSBWin's never returns.
    */
   public interpret(code: ArrayLike<number>, startAddr: number, cellNum: number): void {
     this.program = code;
@@ -397,7 +403,10 @@ export class BytecodeInterpreter {
     this.hasAlcove = 0;
     rpush(0xffff);
 
-    for (;;) {
+    for (let steps = 0; ; steps++) {
+      if (steps === INTERPRET_STEP_BUDGET) {
+        throw new Die(0, `The viewport program for cell ${cellNum} ran ${steps} opcodes without returning.`);
+      }
       // CSBWin reads on past the code's end; the port stops there.
       if (this.pc >= this.program.length) return;
       const opcode = this.program[this.pc]!;

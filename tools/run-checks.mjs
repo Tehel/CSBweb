@@ -355,6 +355,10 @@ const CHECKS = [
   // CSBWin screen capture plus a hand-built stream per opcode. Three opcodes were wrong
   // and only one image in the data used them, so nothing else could have caught it.
   { tool: 'dump-image-codec.ts' },
+  // A damaged file's counts set absurdly, one per reader that sizes or loops by one: a DSA's
+  // states, the expanded sizes, the LZW chains, a portrait's size, a viewport program's
+  // steps. Each throws at once, where it would exhaust the memory or never return.
+  { tool: 'dump-damaged-counts.ts' },
   // Every table read from graphics.dat's table items, written back over the item's own
   // bytes at the offsets Data.h's declarations give it, in every data set.
   { tool: 'dump-graphics-tables.ts' },

@@ -2962,6 +2962,8 @@ nibble the left pixel; rows are bottom-up, `(width+1)/2` bytes each, with no pad
 four (`:356-435`). `GetExternalPortraitAddress` (`:540-571`) takes only a 32 by 29 result,
 and gives `GetErrorPortrait`'s picture, the word "Error" in colour 0 on colour 2
 (`errorPortraitBitmap`, `:464-524`), for anything else, the section missing included.
+Its size test, `fileSize < minSize + size` with `size = (width+1)/2 * height`, is made
+in `ui32`s (`:251-252`, `:356-372`), so a product that wraps passes it.
 
 Every portrait section of both files here is 582 bytes, which is that layout with 16
 colours and 464 bytes of pixels: Conflux's 156 and `tools/fixtures/csbgraphics/CSBgraphics.dat`'s 197, from id 24 up.

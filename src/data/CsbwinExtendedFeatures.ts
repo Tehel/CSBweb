@@ -305,6 +305,14 @@ function readU16Array(bytes: Uint8Array, count: number): number[] {
     return out;
 }
 
+/**
+ * The most states a DSA's table holds: every one a 16-bit `m_state` names
+ * (`doc/CSBwin-src/Data.h:2460`). `m_numState` is an `i32` that sizes the table
+ * (`DSA::Read`, `doc/CSBwin-src/DSA.cpp:5654`) before the section's checksum is checked; a
+ * damaged one past this throws, where CSBWin's allocation would fail.
+ */
+const MAX_DSA_STATES = 0x10000;
+
 function readDsa(rcs: RcsReader): DsaDefinition {
     const description = decodeCString(rcs.readBytes(80));
     const state = rcs.readU16();
@@ -313,6 +321,7 @@ function readDsa(rcs: RcsReader): DsaDefinition {
     const numStates = rcs.readU32();
     const firstDisplayedState = rcs.readU32();
     const numNonEmptyStates = rcs.readU32();
+    if (numStates > MAX_DSA_STATES) throw new Error(`savegame DSA of ${numStates} states`);
     const states: Array<{ actions: Array<{ column: number; program: Uint16Array }> } | null> =
         Array.from({ length: numStates }, () => null);
 
@@ -408,8 +417,8 @@ function writeDsa(wcs: WcsWriter, dsa: DsaDefinition): void {
     wcs.writeU8(dsa.groupId);
     wcs.writeU32(dsa.numStates);
     wcs.writeU32(dsa.firstDisplayedState);
-    const states = Array.from({ length: dsa.numStates }, (_, i) => dsa.states[i] ?? null);
-    wcs.writeU32(states.filter((s) => s !== null).length);
+    const states = dsa.states.slice(0, dsa.numStates);
+    wcs.writeU32(states.filter((s) => s).length);
     states.forEach((state, stateNum) => {
         if (!state) return;
         wcs.writeU32(stateNum);

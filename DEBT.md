@@ -117,7 +117,6 @@ In payoff order: the first row is the next item.
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
 | E40 | The statistics page's heat map | M | ⏳ |
-| R6 | A damaged file's counts size allocations and loops | M | ⏳ |
 | R7 | An index from a custom data set can throw | S | ⏳ |
 | R8 | An optional feature's failure ends the game, or the session | S | ⏳ |
 | R10 | Pointer, touch and WebGL | S | ⏳ |
@@ -450,32 +449,6 @@ takes untrusted data. A file the player drops on the page and a custom dungeon a
 untrusted: they may stop the game with a message, as CSBWin dies, but never crash or hang
 the tab, nor corrupt what is stored. Each item owes what a fix owes ("How to work this
 list", point 4), its check included.
-
-### R6 ⏳ A damaged file's counts size allocations and loops
-
-A count read from a file sizes an array or bounds a loop before anything checks it:
-
-- **A dropped save can crash the tab.** `readDsa` sizes `states` from the file's
-  `numStates` (`src/data/CsbwinExtendedFeatures.ts:313-317`), and the DSA section's
-  checksum is compared only after every DSA is parsed. `readsGameBlock1`, the first thing
-  an import runs, reaches it: a `csbgame7.dat` whose header checksum holds and whose
-  `numStates` is 400 million is a V8 out-of-memory, and the tab dies. CSBWin's `DSA::Read`
-  fails its allocation and dies cleanly (`doc/CSBwin-src/DSA.cpp:5638-5671`). The writer
-  has the same `Array.from` (`:411`).
-- **The same in the game files' readers**: `ExpandData`'s `new Uint8Array(dstSize)`
-  (`src/core/compression.ts:313`), `CSBGraphicsLoader.readSection`'s `uncompressedSize`,
-  `importBitmap`'s size test through `Math.imul(...) >>> 0`, which wraps, `SNDexpand`'s
-  repeat count, and the LZW and `OvlDecode` chains, which loop for ever on a cyclic
-  dictionary.
-- **A skin program can hang the tab.** The bytecode interpreter's `for (;;)`
-  (`src/renderer/bytecode/BytecodeInterpreter.ts:400`) has no step limit, so a `Jump` to
-  itself in a `CSBgraphics.dat` program never returns, and no error reaches the fatal
-  screen.
-
-Paying it: a bound on every count that sizes something (a DSA's states at most 0xFFFF, a
-size at most the file's or a sane maximum), a cycle guard in the dictionary decoders, a
-step budget in the interpreter that ends in `die`. A tool feeds each reader a file with the
-count set absurdly and checks that it throws.
 
 ### R7 ⏳ An index from a custom data set can throw
 
@@ -907,7 +880,7 @@ Each command's body keeps CSBWin's order and names. Two tools change with it:
 
 ### E28 ⏳ The bytecode interpreter decodes through switches and maps built per call
 
-- `executeOpcode` is a 510-line switch (`src/renderer/bytecode/BytecodeInterpreter.ts:414`),
+- `executeOpcode` is a 510-line switch (`src/renderer/bytecode/BytecodeInterpreter.ts:423`),
   `resolveStdRectanglePointer` a 208-line one (`:1710`).
 - Fifteen functions build an object-literal map at every call (`opWallBitmap`,
   `getStdWallRectanglePointer`, `opFloorPitRectangle`, `opTeleporterRectangle`,
@@ -1089,7 +1062,7 @@ Paying it: delete; one `RoomType` and a `ViewRoomType` for 16 to 20; one
   `PeriodicUpdates`), `Party.ts:103`, `:218`, `:305`, `RuntimeSave.ts:199-200`,
   `CsbwinSaveGame.ts:4-9`, `:114`, `SaveGameLoader.ts:295-296`, `CsbwinSaveInfo.ts:42-44`,
   `CsbwinDungeonImageWriter.ts:287-290`, `SaveGameFile.ts:229-231`, `MonsterAttack.ts:598`,
-  `MissileEncounter.ts:513`, `DrawDecorations.ts:177-179`, `BytecodeInterpreter.ts:1590` ("Phase 5").
+  `MissileEncounter.ts:513`, `DrawDecorations.ts:177-179`, `BytecodeInterpreter.ts:1599` ("Phase 5").
 - **Wrong**: `MagicSystem.ts:397` ("Spell effects are wired in subsequent magic parity
   steps"); `MonsterAttack.ts:750-751` (`potentialChampionIndex` "still always -1 here",
   which `HallOfChampions.ts:134` sets); `MonsterDamage.ts:452` (a branch without the hook
@@ -1129,7 +1102,7 @@ nothing, and a `?? 0` on a field that cannot be missing hides the type's contrac
   `attrs?.health ?? 0` (`src/renderer/ui/Character.ts:69-70`, `:153-158`),
   `party.cursorOwner ?? -1`
   (`ActuatorSystem`), `(wallDecorationPos as 0 | 1 | 2) ?? 0`
-  (`BytecodeInterpreter.ts:1658`, `:1678`), `slot?.uByte4 ?? 0` hiding a missing ITEM16
+  (`BytecodeInterpreter.ts:1667`, `:1687`), `slot?.uByte4 ?? 0` hiding a missing ITEM16
   (`MonsterAI.ts:1429`); `CharacterStats.getObjectWeight(item: ObjectID | number | null |
   undefined)`;
 - `as ObjectID` on what already is one, which blurs the audit by which a cast marks a
@@ -1277,7 +1250,7 @@ after the chains; a fixture whose champions carry something.
 
 `readExtendedFeatures` reads the game-information string (`SaveGameState.gameInfo`),
 `DungeonData` has no field for it, and `buildLiveExtendedFeatures` writes
-`gameInfoSize: 0` (`src/data/CsbwinExtendedFeatures.ts:933`). So a save of the port's drops
+`gameInfoSize: 0` (`src/data/CsbwinExtendedFeatures.ts:950`). So a save of the port's drops
 Conflux's 541 bytes of credits, Towers of Chaos's 89, 3D2D1D's 40 and `dm-windows`'s 32,
 where CSBWin carries the string from any read into every save
 (`doc/CSBwin-src/SaveGame.cpp:1002-1003`) and supplies "No game information was provided"
@@ -2220,6 +2193,13 @@ Recorded so that nobody "fixes" them.
   port's `decodeIMG` stops at the whole lines `EXPAND_GRAPHIC_MAX_SIZE` holds
   (`src/core/imageDecoder.ts`), 121 of them there, and returns that height. No real image
   comes near the cap. `tools/dump-image-codec.ts` checks it.
+- 🚫 **A portrait's size is tested without CSBWin's wrap.** `ImportBitmap`'s
+  `size = (width+1)/2 * height` and its test `fileSize < minSize + size` are `ui32`s
+  (`doc/CSBwin-src/Bitmaps.cpp:251-252`, `:356-372`), so a width and height whose product
+  wraps, 131071 by 65536 giving 0, pass it, and the pixels are read past the section,
+  into the heap. The port tests the exact size, and refuses such a portrait
+  (`CSBGraphicsLoader.importBitmap`, `src/data/CSBGraphicsLoader.ts`); every portrait here is
+  582 bytes. `tools/dump-damaged-counts.ts` checks it.
 - **Not debt** (listed so it is not raised again):
   - Table names like `byte20090`, `word1074` and `uByte590` are CSBWin's own
     (`d.Byte20090`…), kept greppable by rule.

@@ -9,6 +9,8 @@
 
 import type { ui32 } from '../core/types';
 import { readU16LE, readU32LE } from '../core/bytes';
+import { MAX_EXPANDED_SIZE } from '../core/compression';
+import { Die } from '../engine/Die';
 import { Signature, type FileSignature } from './FileSignature';
 
 export enum CSBGraphicType {
@@ -162,43 +164,63 @@ function readDecorationDesc(data: Uint8Array, off: number): DecorationDesc {
   };
 }
 
+/** `m_maxstack`: the stack `OVLDECODE` allocates, and never enlarges. */
+const OVL_STACK_SIZE = 1024;
+
+/**
+ * `OVLDECODE` (`doc/CSBwin-src/Graphics.cpp:3119-3211`). The table is `m_maxTableLen` wide,
+ * but only stored as far as `m_tableLen` has filled it, its unwritten entries 0: an escape
+ * doubles it for a few bits, and a damaged section can ask for more than memory holds. A
+ * write past `m_maxTableLen` is dropped, where CSBWin's runs past its allocation.
+ */
 class OvlDecode {
-  private codes: Uint32Array;
-  private chars: Uint8Array;
+  private codes = new Uint32Array(512);
+  private chars = new Uint8Array(512);
   private codeSize = 9;
   private bitsRemaining = 0;
   private codeword = 0;
   private tableLen = 255;
   private maxTableLen = 512;
-  private stack: Uint8Array;
+  private readonly stack = new Uint8Array(OVL_STACK_SIZE);
   private stackLen = 0;
   private a = 0;
   private b = 0;
   private c = 0;
   private ch = 0;
 
-  constructor(private getCodeword: () => number) {
-    this.codes = new Uint32Array(512);
-    this.chars = new Uint8Array(512);
-    this.stack = new Uint8Array(1024);
-  }
+  constructor(private getCodeword: () => number) {}
 
   private enlargeTable(): void {
     this.maxTableLen *= 2;
-    const nextCodes = new Uint32Array(this.maxTableLen);
-    nextCodes.set(this.codes);
-    this.codes = nextCodes;
-    const nextChars = new Uint8Array(this.maxTableLen);
-    nextChars.set(this.chars);
-    this.chars = nextChars;
     this.codeSize++;
   }
 
-  private ensureStack(extra: number): void {
-    if (this.stackLen + extra < this.stack.length) return;
-    const next = new Uint8Array(this.stack.length * 2);
-    next.set(this.stack);
-    this.stack = next;
+  /**
+   * `m_stack[m_stklen++] = byte`, then `if (m_stklen >= m_maxstack) EnlargeStack()`, which
+   * is `NotImplemented(0xf864)` (`doc/CSBwin-src/Graphics.cpp:3143-3146`): a chain longer
+   * than the stack, as a damaged section's cyclic one is, ends the program.
+   */
+  private push(byte: number): void {
+    this.stack[this.stackLen++] = byte;
+    if (this.stackLen >= OVL_STACK_SIZE) {
+      throw new Die(0xf864, 'You have encountered code at relative address 0x00f864 that I thought was unused.');
+    }
+  }
+
+  /** `m_codes[m_tableLen] = a; m_chars[m_tableLen] = c`, the storage grown to hold it. */
+  private addEntry(a: number, c: number): void {
+    if (this.tableLen >= this.maxTableLen) return;
+    if (this.tableLen >= this.codes.length) {
+      const length = Math.min(this.codes.length * 2, this.maxTableLen);
+      const nextCodes = new Uint32Array(length);
+      nextCodes.set(this.codes);
+      this.codes = nextCodes;
+      const nextChars = new Uint8Array(length);
+      nextChars.set(this.chars);
+      this.chars = nextChars;
+    }
+    this.codes[this.tableLen] = a;
+    this.chars[this.tableLen] = c;
   }
 
   getBytes(out: Uint8Array): void {
@@ -229,26 +251,20 @@ class OvlDecode {
           this.enlargeTable();
           continue;
         }
-        this.ensureStack(1);
-        this.stack[this.stackLen++] = this.c & 0xff;
+        this.push(this.c & 0xff);
         for (this.ch = this.a; this.ch > 255; this.ch = this.codes[this.ch] ?? 0) {
-          this.ensureStack(1);
-          this.stack[this.stackLen++] = this.chars[this.ch] ?? 0;
+          this.push(this.chars[this.ch] ?? 0);
         }
-        this.ensureStack(1);
-        this.stack[this.stackLen++] = this.ch & 0xff;
+        this.push(this.ch & 0xff);
       } else {
         for (this.ch = this.b; this.ch > 255; this.ch = this.codes[this.ch] ?? 0) {
-          this.ensureStack(1);
-          this.stack[this.stackLen++] = this.chars[this.ch] ?? 0;
+          this.push(this.chars[this.ch] ?? 0);
         }
-        this.ensureStack(1);
-        this.stack[this.stackLen++] = this.ch & 0xff;
+        this.push(this.ch & 0xff);
       }
 
       this.c = this.ch;
-      this.codes[this.tableLen] = this.a >>> 0;
-      this.chars[this.tableLen] = this.c & 0xff;
+      this.addEntry(this.a >>> 0, this.c & 0xff);
       this.tableLen++;
       this.a = this.b >>> 0;
     }
@@ -456,7 +472,9 @@ export class CSBGraphicsLoader {
    * bytes each with no padding to four, the high nibble the left pixel. CSBWin writes them
    * into bitplanes rounded up to 16 pixels, the extra ones 0; here the bitmap is
    * `width` wide, the only width `GetExternalPortraitAddress` takes being 32. `null` where
-   * `ImportBitmap` returns false.
+   * `ImportBitmap` returns false. Its size test is made without CSBWin's 32-bit wrap
+   * (`size = (width+1)/2 * height`, a `ui32`, `doc/CSBwin-src/Bitmaps.cpp:356-372`), past
+   * which it would read beyond the section (DEBT.md H).
    */
   importBitmap(index: number): IndexedBitmap | null {
     const raw = this.readSection(CSBGraphicType.Portrait, index, PORTRAIT_MIN_SIZE);
@@ -473,10 +491,10 @@ export class CSBGraphicsLoader {
     const width = readU32LE(raw, infoHeader + 4);
     const height = readU32LE(raw, infoHeader + 8);
     const srcByteWidth = ((width + 1) >>> 0) >>> 1;
-    const size = Math.imul(srcByteWidth, height) >>> 0;
+    const size = srcByteWidth * height;
     if (fileSize < PORTRAIT_MIN_SIZE + size) return null;
     const out = new Uint8Array(width * height);
-    for (let i = 0; i < height; i++) {
+    for (let i = 0; i < height && width > 0; i++) {
       const srcLine = pixels + srcByteWidth * (height - 1 - i);
       for (let srcX = 0; srcX < width; srcX++) {
         const byte = raw[srcLine + (srcX >> 1)] ?? 0;
@@ -530,7 +548,8 @@ export class CSBGraphicsLoader {
    * CSBWin's are a fresh allocation, to change as it reads them. A section missing that
    * `mustExist` asked for ends `firstTime`, CSBWin's "Missing section" message; one that
    * did not ask, as `BACKGROUND_LIB` sometimes does not (`src/data/BackgroundLib.ts`),
-   * leaves it (`:3280-3289`).
+   * leaves it (`:3280-3289`). An `uncompressedSize` past `MAX_EXPANDED_SIZE` throws, where
+   * CSBWin's allocation would fail.
    */
   readSection(type: number, id: number, minimumSize: number, mustExist = true): Uint8Array | null {
     if (!this.open() || !this.data) {
@@ -547,6 +566,9 @@ export class CSBGraphicsLoader {
       return null;
     }
     if (header.uncompressedSize < minimumSize) return null;
+    if (header.uncompressedSize > MAX_EXPANDED_SIZE) {
+      throw new Error(`CSBgraphics.dat section ${type}/${id} expands to ${header.uncompressedSize} bytes, past ${MAX_EXPANDED_SIZE}`);
+    }
     const start = header.fileOffset;
     const end = start + header.compressedSize;
     if (end > this.data.length) return null;
