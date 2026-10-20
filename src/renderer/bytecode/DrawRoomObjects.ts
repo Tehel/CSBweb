@@ -264,9 +264,6 @@ function drawObjectsAtPosition(
     const vp = tables.viewportPosition[vpSet]?.[relativeCellNumber]?.[relativeLocationWithinCell];
     if (!vp || vp.y === 0) continue;
 
-    const rightSideOfCell = ((relativeLocationWithinCell + 1) & 2) !== 0;
-    const local36 = (gc.byte4 & 1) !== 0 && !local34 && (middleLeftRight === 2 || (middleLeftRight === 0 && rightSideOfCell));
-
     const r = drawSingleObject(
       draw,
       tables,
@@ -275,7 +272,7 @@ function drawObjectsAtPosition(
       relativeCellNumber,
       relativeLocationWithinCell,
       currentSmallOffset,
-      local36,
+      local34,
       drawingAlcoveObjects,
       vp.x,
       vp.y,
@@ -295,7 +292,7 @@ function drawSingleObject(
   relativeCellNumber: number,
   relativeLocationWithinCell: number,
   currentSmallOffset: number,
-  mirror: boolean,
+  local34: boolean,
   drawingAlcoveObjects: boolean,
   baseX: number,
   baseY2: number,
@@ -314,6 +311,12 @@ function drawSingleObject(
   else if (relativeCellNumber >= 6 || (relativeCellNumber >= 3 && nearSideOfCell)) distanceFromUs = 1;
   else distanceFromUs = 2;
   const touchable = distanceFromUs === 0 && middleLeftRight === 0 && !drawingMissiles;
+  // `LOCAL_36` (`doc/CSBwin-src/Code51a4.cpp:1810-1816`), a missile's too, whose `LOCAL_34`
+  // is 0 (`:2572-2578`): a class whose `byte4 & 1` is mirrored on the right of the view, and
+  // on the right side of the middle cell, but not as an alcove's second picture.
+  const rightSideOfCell = ((relativeLocationWithinCell + 1) & 2) !== 0;
+  const mirror = (gc.byte4 & 1) !== 0 && !local34 &&
+    (middleLeftRight === 2 || (middleLeftRight === 0 && rightSideOfCell));
 
   const src = getGraphic(graphicNum);
   if (!src) return { nextSmallOffset: currentSmallOffset };
@@ -337,20 +340,22 @@ function drawSingleObject(
   let xCenter = baseX;
   let y2 = baseY2;
 
-  // Apply CSBWin "small offsets" to shift items slightly based on distance and position.
-  const idxBase = ((distanceFromUs & 0xffff) << 3) & 0xff;
-  const oi = currentSmallOffset & 0xf;
-  const offXIndex = tables.smallOffsetIndices[oi * 2 + 0] ?? 0;
-  const offYIndex = tables.smallOffsetIndices[oi * 2 + 1] ?? 0;
-  xCenter += tables.smallOffsets[idxBase + offXIndex] ?? 0;
-  y2 += tables.smallOffsets[idxBase + offYIndex] ?? 0;
-
-  // Advance small-offset state (DrawSingleObject, Code51a4.cpp:1925-1940).
-  currentSmallOffset = (currentSmallOffset + 1) | 0;
-  if (drawingAlcoveObjects) {
-    if (currentSmallOffset >= 14) currentSmallOffset = 2;
-  } else {
-    currentSmallOffset &= 15;
+  // The "small offsets" that shift an object on the floor a little by distance and
+  // position, and the next object's, which an object in flight takes no part in
+  // (DrawSingleObject, Code51a4.cpp:1907-1937).
+  if (!drawingMissiles) {
+    const idxBase = ((distanceFromUs & 0xffff) << 3) & 0xff;
+    const oi = currentSmallOffset & 0xf;
+    const offXIndex = tables.smallOffsetIndices[oi * 2 + 0] ?? 0;
+    const offYIndex = tables.smallOffsetIndices[oi * 2 + 1] ?? 0;
+    xCenter += tables.smallOffsets[idxBase + offXIndex] ?? 0;
+    y2 += tables.smallOffsets[idxBase + offYIndex] ?? 0;
+    currentSmallOffset = (currentSmallOffset + 1) | 0;
+    if (drawingAlcoveObjects) {
+      if (currentSmallOffset >= 14) currentSmallOffset = 2;
+    } else {
+      currentSmallOffset &= 15;
+    }
   }
 
   let x1 = xCenter - widthBytes + 1;

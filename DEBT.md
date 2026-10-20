@@ -133,7 +133,6 @@ In payoff order: the first row is the next item.
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | C177 | An Atari-era save loads with its possessions, timers and hand unconverted | M | ⏳ |
 | C173 | The DSA's `&ADD` and `&DEL` on a square bypass `MoveObject` | M | ⏳ |
-| C179 | A thrown object drawn as its floor picture is offset and never mirrored | S | ⏳ |
 | C181 | What `d.Initialize()` zeroes survives a restart | S | ⏳ |
 | F15 | Tools that read the wall clock, and a runner with no timeout | S | ⏳ |
 | F16 | A tool can pass having checked less than it says | S | ⏳ |
@@ -1024,22 +1023,6 @@ which of them meet a pit, a teleporter, the party's square or a monster is not t
 Paying it: both through the world `MoveObject` (`objectMover()`, as `findCellSource` and
 `findCellDestination` do), then `setPos`; a tool with a pit, a teleporter, the party's
 square, and a monster group added on the party's level.
-
-### C179 ⏳ A thrown object drawn as its floor picture is offset and never mirrored
-
-`DrawSingleObject` adds the small offsets only `if (!drawingMissiles)`
-(`doc/CSBwin-src/Code51a4.cpp:1907`), and works out the mirror (`LOCAL_36`) for missiles
-too, its missile call passing `LOCAL_34 = 0` (`:1810-1816`, `:2572-2578`). The port adds the
-offsets always (`drawSingleObject`, `src/renderer/bytecode/DrawRoomObjects.ts:340-346`) and
-passes `mirror = false` for every missile (`:758-772`). So an object in flight with no
-missile graphic (a torch, food, a potion, a shield) is drawn 2 pixels right and 3 up at
-distance 0 (1 and -2 at distance 1, 1 and -1 at 2, with the stock
-`smallOffsetIndices[0]`), and the types whose graphic class has `byte4 & 1` (classes 0, 63
-and 79) are not mirrored on the right.
-
-Paying it: the offsets behind `!drawingMissiles`, the mirror computed in `drawSingleObject`
-with `local34 = false` for missiles; `tools/dump-missile-draw.ts` checks a thrown torch's
-rectangle. A golden frame moves only if one shows an object in flight.
 
 ### C181 ⏳ What `d.Initialize()` zeroes survives a restart
 

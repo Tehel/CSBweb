@@ -4441,6 +4441,17 @@ along the way substituted ordinal 5's item for ordinal 4's (a plain object's imp
 ordinal 13's item for ordinal 20's (a small blast) — see PLAN.md for the fix and its
 evidence.
 
+## An object flying as its floor picture takes no small offset, and may be mirrored
+
+`DrawSingleObject` adds the small offsets of an object on the floor, and moves on to the
+next object's, only `if (!drawingMissiles)` (`doc/CSBwin-src/Code51a4.cpp:1907-1937`), and
+works out its mirror, `LOCAL_36`, for every object it draws (`:1810-1816`): a class whose
+`byte4 & 1` is mirrored on the right of the view and on the right side of the middle
+cell, unless `LOCAL_34`, the alcove's second picture, which a missile passes as 0
+(`:2572-2578`). So a thrown object with no missile graphic flies where its viewport
+position says, and the classes with that bit (0, 63, 79) fly mirrored on the right.
+Covered by `tools/dump-missile-draw.ts`.
+
 ## `AdjustSkills` takes the low word of the filter's answer, and runs it for a gain of 0
 
 The Adjust Skills Filter's answer is `pDSAparameters[1+2] & 0xfffff`

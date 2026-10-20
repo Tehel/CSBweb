@@ -16,7 +16,12 @@
  *  3. its rectangle is CSBWin's: `y1 = 47 - h/2 + (h even)`, `y2 = 47 + h/2`
  *     (`:2536-2541`);
  *  4. in the party's own cell (`RelativeCellNumber == 9`) a missile whose size does not
- *     follow its range is drawn at full size, not through `d.Byte5752` (`:2327-2336`).
+ *     follow its range is drawn at full size, not through `d.Byte5752` (`:2327-2336`);
+ *  5. an object that flies as its floor picture is drawn where its viewport position
+ *     says, without the small offsets an object on the floor takes (`DrawSingleObject`
+ *     adds them `if (!drawingMissiles)`, `:1907`), and is mirrored on the right side of
+ *     the cell when its class's `byte4 & 1` says so, `LOCAL_34` being 0 (`:1810-1816`,
+ *     `:2572-2578`).
  *
  * Run: `npm test -- --only=dump-missile-draw.ts`
  */
@@ -139,6 +144,49 @@ async function main(): Promise<void> {
     console.log(`cell 9 pos ${location9}: drawn (${full.x1},${full.y1})-(${full.x2},${full.y2}), w_130=${w130}`);
     check(full.y2 - full.y1 + 1 === md.height,
       `a launched dagger in the party cell is full height ${md.height} (got ${full.y2 - full.y1 + 1})`);
+  }
+
+  // --- 5. an object flying as its floor picture ---------------------------------------
+  // The first object of the dungeon whose class has `byte4 & 1`, in the party's own cell.
+  let object: ObjectID | null = null;
+  for (const db of [DBType.WEAPON, DBType.CLOTHING, DBType.POTION, DBType.MISC]) {
+    const count = data.header.objectCounts[db] ?? 0;
+    for (let i = 0; i < count && object === null; i++) {
+      const rn = dungeon.rnMaps.rn(db, i);
+      const gc = GetGraphicClass(dungeon, tables, rn);
+      if (gc !== null && gc >= 0 && ((tables.graphicClasses[gc]?.byte4 ?? 0) & 1) !== 0) object = rn as ObjectID;
+    }
+  }
+  check(object !== null, 'an object whose graphic class mirrors');
+  if (object !== null) {
+    const gc = tables.graphicClasses[GetGraphicClass(dungeon, tables, object)!]!;
+    const flying = standInOf<MissileRecord>({ projectileObject: object, timerIndex: 0, rangeRemaining: 255 });
+    standIn(view, 'getMissileRecord', () => flying);
+    const location = [1, 2].find((l) => (tables.viewportPosition[gc.byte5]?.[9]?.[l]?.y ?? 0) !== 0)!;
+    // Its left half colour 5, its right half 6: mirrored, the left edge is 6.
+    const w = gc.widthBytes * 2;
+    const viewportIndexBuffer = createPaletteIndexViewportBuffer(224, 136, 0);
+    const context = standInOf<InterpreterContext>({
+      viewportIndexBuffer, objectTables: tables, dungeonState: view, graphicCache: new Map(),
+      getGraphicBitmap: () => ({ width: w, height: gc.height, pixels: Uint8Array.from({ length: w * gc.height }, (_, i) => (i % w < w / 2 ? 5 : 6)) }),
+    });
+    const vp = tables.viewportPosition[0]![9]![location]!;
+    drawMissilesAtPosition(new ViewportDraw(context), view, tables,
+      dungeon.rnMaps.setPos(dungeon.rnMaps.rn(DBType.MISSILE, 0), location), location, 0, 0, 0, 9, location, 0);
+    const { pixels, width } = viewportIndexBuffer;
+    let x1 = 999, y2 = -1, edge = 0;
+    for (let y = 0; y < 136; y++) {
+      for (let x = 0; x < 224; x++) {
+        const c = pixels[y * width + x]!;
+        if (c === 0) continue;
+        if (x < x1) { x1 = x; edge = c; }
+        y2 = Math.max(y2, y);
+      }
+    }
+    console.log(`flying ${object} (class byte4 0x${gc.byte4.toString(16)}) at cell 9 pos ${location}: ` +
+      `x1 ${x1} y2 ${y2}, viewport x ${vp.x}, left edge colour ${edge}`);
+    check(y2 === Math.min(135, 47) && x1 === Math.max(0, vp.x - gc.widthBytes + 1), 'it lies where its position says, no small offset added');
+    check(edge === 6, 'and on the right side of the cell it is mirrored');
   }
 
   weapon.weaponType = savedType;
