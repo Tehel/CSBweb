@@ -19,6 +19,10 @@
  *    `doc/CSBwin-src/DSA.cpp:2978`): on a count of 3, `&PARAM@ 5` reads variables
  *    3 and 4, and `NoValue` names them; variable 0 is not read.
  *
+ * 6. **The adjust-skills filter's answer** (`doc/CSBwin-src/Magic.cpp:255-327`): it may
+ *    give up to 0xfffff, of which the skill takes `(UI16)`, the low word; and it runs for a
+ *    gain of 0, as a failed cast's `w4 >> diff` may be.
+ *
  * Run: `npm test -- --only=dump-dsa-parameters.ts`
  */
 import { messageParametersKey } from '../src/data/CsbwinExpool';
@@ -53,6 +57,30 @@ const ADJUST_SKILLS_FILTER_KEY = (3 << 24) | 6;
     + `and the timer's DSA after it finds ${g[0]}`);
   check(before[0] === 0 && g[1] === 9, 'the adjust-skills filter ran, on its nine parameters');
   check(g[0] === 0, 'a DSA a timer runs after it finds the count it had, 0');
+}
+
+/* ------------------------------- 6. the adjust-skills filter's answer ---------- */
+{
+  const filter = (program: number[]) => ({
+    program,
+    place: (game: Game, locr: number) => {
+      const data: DungeonData = game.ctx.dungeon.getData();
+      data.specialLocations = { [ADJUST_SKILLS_FILTER_KEY]: locr };
+    },
+  });
+  const big = run([...int(0), globalStore(2)], undefined, undefined,
+    filter([...int(0), varStore(0), ...int(0), varStore(1), ...int(0x12345), varStore(2), ...int(3), ...int(0), op(StkOp.PARAM_STORE)]));
+  const skill = big.game.ctx.party.state.champions[0]!.skills[0]!;
+  const before = skill.experience;
+  adjustSkills(big.game.ctx, 0, 0, 1, AdjustSkillsWhy.Unknown, 0);
+  console.log(`6. the filter answers 0x12345: the skill gains 0x${(skill.experience - before).toString(16)}`);
+  check(skill.experience - before === 0x2345, 'the skill takes the low word of the filter\'s answer');
+
+  const zero = run([...int(0), globalStore(2)], undefined, undefined, filter([op(StkOp.NUM_PARAM), globalStore(3)]));
+  zero.game.systems.magic.applySpellSkillGain(0, 0, 0, AdjustSkillsWhy.CastSpell1);
+  const ran = zero.game.systems.dsa.getGlobalVariables()[3];
+  console.log(`   a gain of 0: the filter ${ran === 9 ? 'runs' : 'does not run'}`);
+  check(ran === 9, 'a gain of 0 runs the filter');
 }
 
 /* ------------------------------- 2. the party attack's parameters -------------- */

@@ -250,7 +250,9 @@ export function adjustSkills(
     return { chIdx, skillNumber, experienceApplied: 0, leveledUp: false };
   }
 
-  skillEntry.experience = limitSkillExperience((skillEntry.experience ?? 0) + adjustedExp);
+  // `psA3->experience += (UI16)(experience)` (`Magic.cpp:327`, `:337`): the filter may
+  // give up to 0xfffff, of which the skill takes the low word.
+  skillEntry.experience = limitSkillExperience((skillEntry.experience ?? 0) + (adjustedExp & 0xffff));
   if (skillEntry.tempAdjust < 32000) {
     const inc = applyLimits(1, Math.trunc(adjustedExp / 8), 100);
     skillEntry.tempAdjust = (skillEntry.tempAdjust + inc) | 0;
@@ -258,7 +260,7 @@ export function adjustSkills(
 
   if (skillNumber >= 4) {
     const base = skills[basicSkill];
-    base.experience = limitSkillExperience((base.experience ?? 0) + adjustedExp);
+    base.experience = limitSkillExperience((base.experience ?? 0) + (adjustedExp & 0xffff));
   }
 
   // A filter may name a champion who is not there: an empty `CHARDESC`, whose mastery

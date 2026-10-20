@@ -134,7 +134,6 @@ In payoff order: the first row is the next item.
 | C177 | An Atari-era save loads with its possessions, timers and hand unconverted | M | ⏳ |
 | C173 | The DSA's `&ADD` and `&DEL` on a square bypass `MoveObject` | M | ⏳ |
 | C179 | A thrown object drawn as its floor picture is offset and never mirrored | S | ⏳ |
-| C180 | `AdjustSkills`' widths, and a gain of 0 | S | ⏳ |
 | C181 | What `d.Initialize()` zeroes survives a restart | S | ⏳ |
 | F15 | Tools that read the wall clock, and a runner with no timeout | S | ⏳ |
 | F16 | A tool can pass having checked less than it says | S | ⏳ |
@@ -1041,18 +1040,6 @@ and 79) are not mirrored on the right.
 Paying it: the offsets behind `!drawingMissiles`, the mirror computed in `drawSingleObject`
 with `local34 = false` for missiles; `tools/dump-missile-draw.ts` checks a thrown torch's
 rectangle. A golden frame moves only if one shows an object in flight.
-
-### C180 ⏳ `AdjustSkills`' widths, and a gain of 0
-
-`AdjustSkills` adds `(UI16)(experience)` once the Adjust Skills Filter has run, and the
-filter can return up to 0xfffff (`doc/CSBwin-src/Magic.cpp:316-325`); the port adds the
-whole value (`src/engine/skills.ts:250`, `:258`). And CSBWin runs the filter for a gain of
-0, its only `return` for 0 coming after it, where `applySpellSkillGain` returns first on
-`experience <= 0` (`src/engine/MagicSystem.ts:451`), as for a failed cast whose
-`w4 >> diff` is 0. Only a dungeon with an Adjust Skills Filter DSA sees either.
-
-Paying it: `& 0xffff` on both additions, and a gain of 0 reaching `adjustSkills`; a check
-with a filter that returns more than 0xffff.
 
 ### C181 ⏳ What `d.Initialize()` zeroes survives a restart
 

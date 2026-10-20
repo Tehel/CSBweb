@@ -4441,6 +4441,14 @@ along the way substituted ordinal 5's item for ordinal 4's (a plain object's imp
 ordinal 13's item for ordinal 20's (a small blast) — see PLAN.md for the fix and its
 evidence.
 
+## `AdjustSkills` takes the low word of the filter's answer, and runs it for a gain of 0
+
+The Adjust Skills Filter's answer is `pDSAparameters[1+2] & 0xfffff`
+(`doc/CSBwin-src/Magic.cpp:316-318`), and the skill and its class take
+`(UI16)(experience)` of it (`:327`, `:337`). The only `return` for a gain of 0 comes after
+the filter (`:322`), so a gain of 0, as a failed cast's `w4 >> diff` may be, still runs it.
+Covered by `tools/dump-dsa-parameters.ts`.
+
 ## The DSA stops where CSBWin's does
 
 An unknown command code says "Unknown DSA command code" and returns the state the run is in

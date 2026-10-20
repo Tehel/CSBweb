@@ -448,8 +448,11 @@ export class MagicSystem {
     return null;
   }
 
+  /**
+   * `AdjustSkills` on the party's level, whatever the gain: a gain of 0 still runs the
+   * Adjust Skills Filter, whose answer may give some (`doc/CSBwin-src/Magic.cpp:255-322`).
+   */
   applySpellSkillGain(chIdx: number, skillNumber: number, experience: number, why: AdjustSkillsWhy): void {
-    if (experience <= 0) return;
     const map = this.dungeon.getMap(this.ctx.party.state.position.z);
     const experienceMultiplier = map?.descriptor.difficulty ?? 0;
     adjustSkills(this.ctx, chIdx, skillNumber, experience, why, experienceMultiplier);
