@@ -105,6 +105,8 @@
  *    bevels; a click on it OLD FACE, another NEW FACE again; LOAD passes what it shows
  *    to the new adventure. For a set without them, and in the other modes, there is
  *    none.
+ * 21. **The menu while it works.** A save held in the store's write: a right-click,
+ *    which closes the menu otherwise, leaves it up, and the save ends as without it.
  * 7. **The press animation.** `_WaitForMenuSelect` paints its second pass over its first
  *    and restores the screen only after both (`doc/CSBwin-src/Menu.cpp:121-179`). The
  *    save menu redraws the whole screen on every frame of the press, so the pixels of a
@@ -1849,6 +1851,48 @@ async function checkQuestion(graphics: GraphicsLoader): Promise<void> {
   } finally {
     Date.now = realNow;
   }
+}
+
+/* --------------------------------------------------- 21. the menu while it works ---- */
+
+/**
+ * A save held in the store's write: the menu is busy, and a right-click, which closes it
+ * otherwise, leaves it up until the save is written (`saveMenuClick`), so the game does
+ * not play on under a save still being made.
+ */
+async function checkBusy(graphics: GraphicsLoader): Promise<void> {
+  console.log('');
+  console.log('=== a right-click while the menu saves ===');
+  const store = memoryStore();
+  let holding = false;
+  let letWrite: (() => void) | null = null;
+  const held: SaveStore = {
+    ...store,
+    write: async (written, bytes) => {
+      if (holding) await new Promise<void>((done) => { letWrite = done; });
+      return store.write(written, bytes);
+    },
+  };
+  const rig = await menuRig(graphics, held, 'DAROO');
+  const { ui } = rig;
+  const state = await rig.open();
+  console.log(`  the list:\n${rig.list()}`);
+  holding = true;
+  const rect = menuButtonRect(SaveMenu.saveMenuButtons(state), SaveMenu.SAVE_MENU_GEOMETRY.saveButtonId)!;
+  SaveMenu.saveMenuClick(ui, rect.x1 + 1, rect.y1 + 1, LEFT);
+  for (let i = 0; i < 300 && !letWrite; i++) await new Promise((done) => setTimeout(done, 10));
+  const writing = state.busy && letWrite !== null;
+  SaveMenu.saveMenuClick(ui, VIEWPORT_X + 4, VIEWPORT_Y + 4, RIGHT);
+  const stayed = SaveMenu.isSaveMenuOpen(ui);
+  console.log(`  SAVE, its write held: ${writing ? 'busy' : 'NOT BUSY'}; a right-click: ${stayed ? 'the menu stays' : 'THE MENU CLOSED'}`);
+  check(writing && stayed && ui.saveMenu === state, 'a right-click while the save is written leaves the menu up');
+  (letWrite as (() => void) | null)?.();
+  await rig.settled();
+  console.log(`  the write let go: "${state.message}", ${store.files.size} save(s)`);
+  check(SaveMenu.isSaveMenuOpen(ui) && !state.busy && state.message === 'GAME SAVED' && store.files.size === 1,
+    'and the save ends as without it, the menu up');
+  SaveMenu.saveMenuClick(ui, VIEWPORT_X + 4, VIEWPORT_Y + 4, RIGHT);
+  check(!SaveMenu.isSaveMenuOpen(ui), 'once it is done, a right-click closes the menu');
 }
 
 /* ------------------------------------------------------ 13. the two-level list ---- */
@@ -3856,6 +3900,7 @@ async function main(): Promise<void> {
   await checkSaveCall();
   await checkSelection(graphics);
   await checkQuestion(graphics);
+  await checkBusy(graphics);
   await checkTwoLevels(graphics);
   await checkPreview(graphics);
   await checkScrolling(graphics);

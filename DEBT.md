@@ -116,7 +116,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| R11 | Right-click closes the save menu while it saves or loads | S | ⏳ |
 | R16 | A save's DELETE is told done before its transaction commits | S | ⏳ |
 | W4 | The events table grows without bound | S | ⏳ |
 | W5 | The statistics are pseudonymous, not anonymous | S | ⏳ |
@@ -444,17 +443,6 @@ takes untrusted data. A file the player drops on the page and a custom dungeon a
 untrusted: they may stop the game with a message, as CSBWin dies, but never crash or hang
 the tab, nor corrupt what is stored. Each item owes what a fix owes ("How to work this
 list", point 4), its check included.
-
-### R11 ⏳ Right-click closes the save menu while it saves or loads
-
-`saveMenuClick` closes the menu on a right button (`src/renderer/ui/SaveMenu.ts:854-858`)
-before it looks at `busy` (`:859`). The clock starts again and `TAG0207cc` runs while
-`store.write` is pending; then `saveWritten` (`GameSaves.ts:288-312`) runs its monster
-re-attach and `SmartDiscard` on a world that has moved on, against "the game played on
-after a save is the one a load of it gives back". A LOAD that answers after the menu is
-opened again restores into the new menu.
-
-Paying it: a right-click while `busy` does nothing.
 
 ### R16 ⏳ A save's DELETE is told done before its transaction commits
 

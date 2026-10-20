@@ -945,6 +945,9 @@ export function saveMenuButtons(state: SaveMenuState): UIButton[] {
 export function saveMenuClick(ui: UIState, x: number, y: number, buttons: number): void {
   const state = ui.saveMenu;
   if (!state) return;
+  // Nothing while a save, a load, a list or an import is under way: closing the menu
+  // would let the game play on under it.
+  if (state.busy) return;
   // Right-click closes the dialog, or cancels the question when one is up. CSBWin has no
   // such thing; see the divergence list.
   if ((buttons & 1) !== 0) {
@@ -952,7 +955,7 @@ export function saveMenuClick(ui: UIState, x: number, y: number, buttons: number
     else closeSaveMenu(ui);
     return;
   }
-  if (state.busy || state.press) return;
+  if (state.press) return;
 
   if (state.adventure) {
     answerAdventure(ui, state, state.adventure, menuHitTest(menuButtonList(ui, 2, true), x, y, buttons));

@@ -413,7 +413,8 @@ opens the same one, load-only.
   quick-save, and F9 loads the playthrough's newest save left. The load-only chooser
   has it; RISE's dialog, with no EXPORT, has none.
 - **CLOSE, Esc and a right-click close it.** CLOSE undoes nothing, so it is not called
-  CANCEL; the questions' CANCEL is theirs.
+  CANCEL; the questions' CANCEL is theirs. None of them does while the dialog works (a
+  save, a load, a list or an import under way): the game would play on under it.
 - **While a DSA has disabled saves** (`&DISABLESAVES`, `DsaSystem.disableSaves`), CSBWin's
   disk menu is only "SAVES ARE DISABLED" and OK (`doc/CSBwin-src/SaveGame.cpp:856-873`),
   since it did nothing but save. The dialog loads and exports too, so it opens as ever,
