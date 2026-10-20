@@ -22,7 +22,7 @@ One line per memory in this directory. Committed with the project; never shared.
 - [New golden frame needs --update](new-golden-frame-needs-update.md) — `check-frames.sh` ignores frames not in the baseline; `--update`, then only `??` PNGs in `git status`
 - [Design canvas files](design-canvas-files.md) — reading the canvas URL gives "Loading…"; list its files and read `project/<Artboard>.dc.html`; ideas, not specs, optimistic about space
 - [Headless fullscreen](headless-fullscreen.md) — only CDP input grants activation, a touch only at its lift; the fullscreen viewport is the metrics override; a CDP Esc never leaves fullscreen; no `display-mode` emulation, but element fullscreen matches `display-mode: fullscreen`
-- [Text changes, no tests](text-changes-no-tests.md) — copy-only welcome-page changes need a screenshot, not `npm test` or the frames
+- [Text changes, no tests](text-changes-no-tests.md) — Markdown docs and welcome-page copy need no `npm test` nor frames; the gate is for code
 - [Dialog layout moves probe clicks](dialog-layout-moves-probe-clicks.md) — a dialog's new geometry, or a settings tab reordered (buttons at x 85/236, y 65/86/107), breaks `probe-frames.mjs`'s hard-coded clicks, some in the CRT section; a failed probe leaves no frames, reproduce in `probe-ui`
 - [Screen regions](screen-regions.md) — five regions placed by CSBWin's code; gaps x 224-232 and 274-280 are not always black (Conflux's flame); `PROVEN_FACTS.md` and `LeftHanded.ts` hold the detail
 - [GameScreen stubs in tools](gamescreen-stubs-in-tools.md) — three dialog tools cast a stub `as unknown as GameScreen`: a new method `GameInput` calls passes `tsc` and crashes them; add it to each stub

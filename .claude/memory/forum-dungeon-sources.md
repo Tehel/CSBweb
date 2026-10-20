@@ -17,8 +17,8 @@ logging in through the token OneDrive's web app uses; `api.onedrive.com` answers
 working calls are `oneDrive()` and its neighbours in `utils/submit-forum-dungeons.ts`.
 
 Paul Stevens' `http://dianneandpaul.net/CSBwin/Games/` still serves a few archives
-directly, but older versions than the port ships: Towers of Chaos 3.0 (ours is 3.3),
-Conflux WIP006 (ours is 3.5 beta 8).
+directly: Towers of Chaos 3.0 (older than ours, 3.3) and Conflux WIP006 (newer than ours,
+3.5 beta 8: the WIP builds, 2012-2016, follow 3.5 beta 8, and WIP 008 is Conflux's last).
 
 The `@content.downloadUrl` a listing gives takes HTTP Range requests: a file's first bytes,
 or a zip's central directory and then an entry's first deflated bytes, read without

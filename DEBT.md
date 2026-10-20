@@ -116,8 +116,6 @@ In payoff order: the first row is the next item.
 | --- | --- | --- | --- |
 | W4 | The events table grows without bound | S | ⏳ |
 | W5 | The statistics are pseudonymous, not anonymous | S | ⏳ |
-| P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
-| E39 | The About and Credits pages | M | ⏳ to design with the author |
 | R12 | Listing the saves reads every save's bytes | M | ⏳ |
 | U11 | The cursor over a dialog takes the game's shapes | S | ⏳ |
 | U12 | A text outside the game's font draws as other letters | S | ⏳ |
@@ -140,6 +138,7 @@ In payoff order: the first row is the next item.
 | E32 | Four ways to read bytes, and eight graphics caches | M | ⏳ |
 | E33 | What a frame costs | S | ⏳ |
 | E30 | One presenter and one input router | M | ⏳ |
+| E39 | The About and Credits pages | M | ⏳ to design with the author |
 | C177 | An Atari-era save loads with its possessions, timers and hand unconverted | M | ⏳ |
 | C178 | No save keeps the dungeon's game information | S | ⏳ |
 | C171 | The Firestaff does not soften a monster's blow, and three mastery calls ignore sleep | S | ⏳ |
@@ -159,6 +158,7 @@ In payoff order: the first row is the next item.
 | F19 | The tools' screen is wired by hand, and has drifted | S | ⏳ with E29 |
 | F17 | The frame pipeline and the runner are untyped | M | ⏳ |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
+| P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | E40 | The statistics page's heat map | M | ⏸️ |
 | G29 | Recording a game and playing it back | — | ⏸️ |
 | C150 | Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops | S | ⏸️ waits on the author |
