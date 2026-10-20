@@ -4441,6 +4441,15 @@ along the way substituted ordinal 5's item for ordinal 4's (a plain object's imp
 ordinal 13's item for ordinal 20's (a small blast) — see PLAN.md for the fix and its
 evidence.
 
+## The DSA stops where CSBWin's does
+
+An unknown command code says "Unknown DSA command code" and returns the state the run is in
+(`doc/CSBwin-src/DSA.cpp:5263-5265`), so nothing after it runs. The stack holds 100
+values, and `die`s on an overflow (`0xdcd6`), an underflow (`0xdcd7`), a pick or a poke
+past the bottom (`0xdcdb`) and a roll past it (`0xdcda`) (`:370-424`); an underflow's
+message says where the DSA stands (`constructDebugMessage`, `:278-289`). Covered by
+`tools/dump-dsa-limits.ts`.
+
 ## The DSA's integers are C's: `i32`, `ui32`, `ui16`
 
 `&*` multiplies two `i32`s (`doc/CSBwin-src/DSA.cpp:2534-2540`), which wraps:

@@ -133,7 +133,6 @@ In payoff order: the first row is the next item.
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | C177 | An Atari-era save loads with its possessions, timers and hand unconverted | M | ⏳ |
 | C173 | The DSA's `&ADD` and `&DEL` on a square bypass `MoveObject` | M | ⏳ |
-| C176 | The DSA goes on where CSBWin stops | S | ⏳ |
 | C179 | A thrown object drawn as its floor picture is offset and never mirrored | S | ⏳ |
 | C180 | `AdjustSkills`' widths, and a gain of 0 | S | ⏳ |
 | C181 | What `d.Initialize()` zeroes survives a restart | S | ⏳ |
@@ -1026,22 +1025,6 @@ which of them meet a pit, a teleporter, the party's square or a monster is not t
 Paying it: both through the world `MoveObject` (`objectMover()`, as `findCellSource` and
 `findCellDestination` do), then `setPos`; a tool with a pit, a teleporter, the party's
 square, and a monster group added on the party's level.
-
-### C176 ⏳ The DSA goes on where CSBWin stops
-
-- **An unknown command** is traced and skipped (`default: … break;`,
-  `src/engine/DsaSystem.ts:1980-1985`), and the loop reads its operands as commands. CSBWin
-  says "Unknown DSA command code" and returns the state it started with
-  (`doc/CSBwin-src/DSA.cpp:5265`). One `warnedOps` set serves both the commands and the `&`
-  operations, so an opcode of one hides the other's warning.
-- **The stack has no limit.** CSBWin's holds 100 values and dies on an overflow
-  (`0xdcd6`), an underflow (`0xdcd7`) and a pick, poke or roll out of range (`0xdcdb`,
-  `0xdcda`) (`DSA.cpp:370-424`). The port's grows without bound and gives 0 for an empty
-  pop or a pick out of range (`DsaStack`, `DsaSystem.ts:445-497`), silently, so a DSA that
-  pushes in a loop grows until the tab dies.
-
-Paying it: `return exPkt.curState`, and two warning sets; the limit, and `die` with
-CSBWin's codes (`src/engine/Die.ts`). A tool feeding each case.
 
 ### C179 ⏳ A thrown object drawn as its floor picture is offset and never mirrored
 

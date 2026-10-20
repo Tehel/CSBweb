@@ -14,6 +14,7 @@ import {
 import { DescIndex, GetBasicObjectType } from './objectIndex';
 import { addToSkill, determineMastery } from './skills';
 import { attributeCurrent, attributeMaximum, attributeMinimum, setAttributeCurrent, setAttributeMaximum, setAttributeMinimum } from './attributes';
+import { die } from './Die';
 import { sw } from '../core/intCast';
 import {
   RN_DISPELL_MISSILE, RN_FIREBALL, RN_FLUX_CAGE, RN_MONSTER_DEATH, RN_POISON_CLOUD, RN_ZO_SPELL,
@@ -201,41 +202,52 @@ interface ViewingFilterContext {
   phraseColorOverrides: Array<number | null>;
 }
 
+/**
+ * `STACK` (`doc/CSBwin-src/DSA.cpp:370-424`): 100 values, and `die` on an overflow
+ * (`0xdcd6`), an underflow (`0xdcd7`), a pick or a poke past the bottom (`0xdcdb`) and a
+ * roll past it (`0xdcda`). `fail` is that `die`, `underflow` asking for its "DSA stack
+ * underflow" message; the overflow's has none.
+ */
 class DsaStack {
   private stack: number[] = [];
+
+  constructor(private readonly fail: (errorNum: number, underflow: boolean) => never) {}
 
   clear(): void {
     this.stack.length = 0;
   }
 
   push(value: number): void {
+    if (this.stack.length > 99) this.fail(0xdcd6, false);
     this.stack.push(value | 0);
   }
 
   pop(): number {
-    const value = this.stack.pop();
-    return value === undefined ? 0 : value;
+    if (this.stack.length < 1) this.fail(0xdcd7, true);
+    return this.stack.pop()!;
+  }
+
+  /** The `ui32` index's `i+1`, which wraps as the C's does. */
+  private reach(index: number): number {
+    return ((index >>> 0) + 1) >>> 0;
   }
 
   pick(index: number): void {
-    const idx = this.stack.length - 1 - index;
-    if (idx < 0 || idx >= this.stack.length) {
-      this.push(0);
-      return;
-    }
-    this.push(this.stack[idx] ?? 0);
+    if (this.stack.length < this.reach(index)) this.fail(0xdcdb, true);
+    this.push(this.stack[this.stack.length - 1 - (index >>> 0)] ?? 0);
   }
 
   poke(index: number): void {
     const value = this.pop();
-    const idx = this.stack.length - index;
-    if (idx < 0 || idx >= this.stack.length) return;
-    this.stack[idx] = value;
+    const i = index >>> 0;
+    if (this.stack.length < i) this.fail(0xdcdb, true);
+    // `stack[stacklen-i] = v`: 0 writes the slot above the top, which holds nothing.
+    if (i > 0) this.stack[this.stack.length - i] = value;
   }
 
   roll(index: number): void {
-    const start = this.stack.length - 1 - index;
-    if (start < 0 || start >= this.stack.length) return;
+    if (this.stack.length < this.reach(index)) this.fail(0xdcda, true);
+    const start = this.stack.length - 1 - (index >>> 0);
     const value = this.stack[start];
     for (let i = start; i < this.stack.length - 1; i++) {
       this.stack[i] = this.stack[i + 1] ?? 0;
@@ -244,9 +256,9 @@ class DsaStack {
   }
 
   minusRoll(index: number): void {
+    if (this.stack.length < this.reach(index)) this.fail(0xdcda, true);
     const end = this.stack.length - 1;
-    const start = end - index;
-    if (start < 0 || start >= this.stack.length) return;
+    const start = end - (index >>> 0);
     const value = this.stack[end];
     for (let i = end; i > start; i--) {
       this.stack[i] = this.stack[i - 1] ?? 0;
@@ -256,7 +268,7 @@ class DsaStack {
 }
 
 class DsaBank {
-  stack = new DsaStack();
+  readonly stack: DsaStack;
   forceState = -1;
   mostRecentInterestingObjectID = -1;
   filter = false;
@@ -272,8 +284,14 @@ class DsaBank {
    */
   private texts: Array<string | null> | null = null;
 
-  /** `trace` says what CSBWin's `NoValue` asks in its message box. */
-  constructor(public vars: DsaVars, private readonly trace: (line: string) => void) {}
+  /** `trace` says what CSBWin's `NoValue` asks in its message box; `fail` is the stack's `die`. */
+  constructor(
+    public vars: DsaVars,
+    private readonly trace: (line: string) => void,
+    fail: (errorNum: number, underflow: boolean) => never,
+  ) {
+    this.stack = new DsaStack(fail);
+  }
 
   /** `DSADBANK::SetText` (`doc/CSBwin-src/DSA.cpp:195-206`): an index past 9 sets nothing. */
   setText(text: string, index: number): void {
@@ -487,7 +505,14 @@ export class DsaSystem {
    * (`readDisableSaves`), and a save writes that record (`Expool.writeDisableSaves`).
    */
   disableSaves = false;
+  /** The commands and the `&` operations warned of once, apart: an opcode of one is not the other's. */
+  private warnedCommands = new Set<number>();
   private warnedOps = new Set<number>();
+  /**
+   * `pExPkt`, "only for debugging purposes" (`doc/CSBwin-src/DSA.cpp:277`): where the run
+   * stands, for a `die`'s message, as `SAVEPEXPKT` keeps it through a nested run (`:5050-5051`).
+   */
+  private where: { locr: LocationRel; state: number; column: number } | null = null;
   private overridePos = 0;
   private overrideP = false;
   private viewingFilterContext: ViewingFilterContext | null = null;
@@ -1244,7 +1269,8 @@ export class DsaSystem {
     // and a run nested in another's clears the caller's.
     this.overrideP = false;
 
-    const bank = new DsaBank(vars, (line) => this.ctx.host.trace(line));
+    const bank = new DsaBank(vars, (line) => this.ctx.host.trace(line), (errorNum, underflow) =>
+      die(this.ctx.host, errorNum, underflow ? this.debugMessage('DSA stack underflow') : 'SystemError'));
     bank.stack.clear();
     bank.filter = filter;
     const finalState = this.execute({
@@ -1300,11 +1326,27 @@ export class DsaSystem {
   }
 
   private execute(exPkt: ExecutionPacket, bank: DsaBank): number {
+    const saved = this.where;
+    try {
+      return this.executeRun(exPkt, bank);
+    } finally {
+      this.where = saved;
+    }
+  }
+
+  /** `constructDebugMessage` (`doc/CSBwin-src/DSA.cpp:278-289`). */
+  private debugMessage(msg: string): string {
+    const w = this.where;
+    return w ? `${msg}\nDSA at ${w.locr.l}(${w.locr.x},${w.locr.y})\nRow=${w.state};Col=${w.column}` : msg;
+  }
+
+  private executeRun(exPkt: ExecutionPacket, bank: DsaBank): number {
     let finalState = -1;
     let curState = exPkt.curState;
     let column = exPkt.column;
 
     do {
+      this.where = { locr: exPkt.locrMaster, state: curState, column };
       const state = this.getDsaState(exPkt.slave, curState);
       if (!state) {
         if (finalState === -1) finalState = curState;
@@ -1746,11 +1788,13 @@ export class DsaSystem {
             break;
           }
           default:
-            if (!this.warnedOps.has(opcode)) {
-              this.warnedOps.add(opcode);
-              this.ctx.host.trace(`Unimplemented DSA opcode ${opcode}`);
+            // "Unknown DSA command code", and the run returns the state it is in
+            // (`doc/CSBwin-src/DSA.cpp:5263-5265`).
+            if (!this.warnedCommands.has(opcode)) {
+              this.warnedCommands.add(opcode);
+              this.ctx.host.trace(`Unknown DSA command code ${opcode}`);
             }
-            break;
+            return curState;
         }
 
         if (transferState >= 0) break;

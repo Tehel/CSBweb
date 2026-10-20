@@ -44,7 +44,7 @@ const SEED = 0x2468;
 
 {
   // Column 0 switches on 3, a value given twice: to column 1, then to column 2.
-  const r = run([globalStore(1)]);
+  const r = run([...int(0), globalStore(1)]);
   const dsa = r.game.ctx.dungeon.getData().dsaIndex!.entries[0]!;
   const target = (column: number): number[] => [column & 0xffff, 0];
   dsa.states[0]!.actions = [

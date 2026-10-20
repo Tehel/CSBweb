@@ -4,9 +4,9 @@
  *
  * 1. **`IsMaxState`** is `nextState == -MAXSTATE` in every command
  *    (`doc/CSBwin-src/Data.h:1904-2399`). An `&` whose 3-bit field holds -4 reads no
- *    extra word, and the command after it runs. `QUESTION`'s field of -2 does read it,
- *    unsigned (`DSA.cpp:859-867`: `m_PC` is a `ui16 *`, `:251`), so a word of 0xffff
- *    takes the state to 65535.
+ *    extra word, and the command after it runs. `QUESTION`'s field of -2 does read it
+ *    (`DSA.cpp:859-867`), and the command after the word runs. Read unsigned or not, a
+ *    state is put as a `ui16` (`Data.h:2483`), where 0xffff and -1 are one.
  * 2. **`LOAD_INTEGER` (26)** pushes its word unsigned (`:1100-1107`); `LOAD` 29
  *    (`LOAD_ABS32`) pushes nothing (`:1139-1144`).
  * 3. **`STORE` above 25** pops nothing, and leaves the next state (`:1329-1333`), as does
@@ -98,9 +98,9 @@ function run(program: number[], state = 0): Run {
   console.log(`1a. LOAD 5, &1+ with field -4, GV0!: GV0 = ${r.global0}`);
   check(r.global0 === 6, 'an & whose field is -4 reads no state word, so the GLOBALSTORE after it runs');
 
-  const q = run([QUESTION | rel(-2, 6, 4), 0xffff]);
-  console.log(`1b. QUESTION with field -2, state word 0xffff: state ${q.dsa.state}`);
-  check(q.dsa.state === 65535, 'QUESTION reads its state word unsigned');
+  const q = run([...loadInteger(1), ...loadInteger(0), QUESTION | rel(-2, 6, 4), 0xffff, globalStore(0)]);
+  console.log(`1b. LOAD 1, LOAD 0, QUESTION with field -2, state word 0xffff, GV0!: GV0 = ${q.global0}`);
+  check(q.global0 === 1, 'QUESTION reads its state word, so the GLOBALSTORE after it runs');
 }
 
 /* ---------------------------------------------- 2. LOAD ------------------------- */
