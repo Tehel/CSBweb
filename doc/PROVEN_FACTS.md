@@ -896,8 +896,9 @@ return true;
 
 ## `GetPrimaryAndSecondaryDirection` treats north specially
 
-`doc/CSBwin-src/Code11f52.cpp:2268-2275`: having found a primary direction whose `dir + 1`
-neighbour is not also in cone, CSBWin only tries the `dir + 3` neighbour when `dir != 0`:
+`doc/CSBwin-src/Code11f52.cpp:2268-2276`: having found the first direction from north,
+`dir`, towards a target off both axes, and its `dir + 1` neighbour not also towards it,
+CSBWin tests the `dir + 3` neighbour only for north:
 
 ```cpp
 if (   (dirD4 != 0)
@@ -906,8 +907,12 @@ if (   (dirD4 != 0)
                  ...)==0)  )
 ```
 
-The `||` short-circuits, so for `dirD4 == 0` the second test runs but its result is discarded
-and the random-secondary branch is taken regardless. Preserved in the port.
+For any other `dirD4` the `||` is true at once, and its `dir + 3` neighbour was ruled out
+anyway, as the loop came through it first; the secondary is then `dir + 1` or `dir + 3` on
+`STRandom() & 2`. For north the west test decides: west not towards the target, the same;
+west towards it, a target to the north-west, the code falls through to `STRandomBool`, which
+gives north then west, or west then north. Both draw one number. Covered by
+`tools/dump-monster-perception.ts`, against a transcription of the C.
 
 ## Monsters step onto fake pits and false walls only if they recognise them
 

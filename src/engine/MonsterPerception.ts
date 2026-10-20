@@ -106,14 +106,10 @@ export function getPrimaryAndSecondaryDirection(
 
     let secondary = (dir + 1) & 3;
     if (!isItInThisDirection(secondary, oldX, oldY, newX, newY)) {
-      // Not a perfect diagonal towards `dir + 1`. Try `dir - 1`, but only when
-      // `dir != 0` — CSBWin's short-circuit, which makes north special.
-      let diagonal = false;
-      if (dir !== 0) {
-        secondary = (dir + 3) & 3;
-        diagonal = isItInThisDirection(secondary, oldX, oldY, newX, newY);
-      }
-      if (!diagonal) {
+      // Not a diagonal towards `dir + 1`. `(dirD4 != 0) || (IsItInThisDirection(dirD4+3)
+      // == 0)` (`Code11f52.cpp:2268-2276`): any other first direction has had `dir + 3`
+      // ruled out by the loop, and north tries west, a north-west target falling through.
+      if (dir !== 0 || !isItInThisDirection(secondary = (dir + 3) & 3, oldX, oldY, newX, newY)) {
         secondary = (dir + (random.next() & 2) + 1) & 3;
         return { primary: dir, secondary };
       }

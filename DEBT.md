@@ -132,7 +132,6 @@ In payoff order: the first row is the next item.
 | E30 | One presenter and one input router | M | ⏳ |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | C177 | An Atari-era save loads with its possessions, timers and hand unconverted | M | ⏳ |
-| C168 | A monster north-west of the party never prefers west | S | ⏳ |
 | C169 | A monster's `timePerMove / 2` is not an integer division | S | ⏳ |
 | C170 | A blow at the party skips a living champion who shares a dead one's corner | S | ⏳ |
 | C173 | The DSA's `&ADD` and `&DEL` on a square bypass `MoveObject` | M | ⏳ |
@@ -1006,25 +1005,6 @@ champion's hand, packed `0x1403`, loads as slot `0x1403`, past the 2097 slots, a
 Paying it: for a file without `objectIndex`, `ConvertListOfObjects` over the timers that
 carry an object, each champion's thirty slots and the object in hand, in CSBWin's order
 after the chains; a fixture whose champions carry something.
-
-### C168 ⏳ A monster north-west of the party never prefers west
-
-`GetPrimaryAndSecondaryDirection`, for a target off both axes, finds the first direction
-`dirD4` towards it from north and, when `dirD4 + 1` is not also towards it, tests
-`(dirD4 != 0) || (IsItInThisDirection(dirD4 + 3) == 0)`
-(`doc/CSBwin-src/Code11f52.cpp:2268-2276`): for north the `||` evaluates the west test, and
-a target to the north-west falls through to `STRandomBool`, which gives north then west or
-west then north. The port tests `dir + 3` only when `dir !== 0`
-(`getPrimaryAndSecondaryDirection`, `src/engine/MonsterPerception.ts:101-117`), where the
-loop has already ruled it out, and never for north. So a target to the north-west always
-gives north first, and half the time east second, away from the party. Every direction
-site of `MonsterAI` and the smell's path (`MonsterPerception.ts:370`) take it.
-`doc/PROVEN_FACTS.md:881-895` says the west test's result is discarded, which is the
-misreading. Both sides draw one number, so the random stream keeps its length.
-
-Paying it: the west test for north, its result deciding the branch; the fact corrected;
-`tools/dump-monster-perception.ts` checks (-1,-1), (-2,-1) and (-1,-2) against a
-transcription of the C.
 
 ### C169 ⏳ A monster's `timePerMove / 2` is not an integer division
 

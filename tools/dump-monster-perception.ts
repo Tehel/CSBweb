@@ -11,6 +11,12 @@
  * with the map: a monster three cells down an open corridor sees the party, one
  * behind a stone wall does not, and no monster claims a move into a wall.
  *
+ * And `GetPrimaryAndSecondaryDirection` for a target off both axes, against a
+ * transcription of the C (`doc/CSBwin-src/Code11f52.cpp:2253-2290`), over every offset
+ * within three squares and several seeds: the same two directions and the same stream.
+ * A target to the north-west is the case north makes special: west is tested
+ * (`:2268-2276`), and either may come first.
+ *
  * Run: `npm test -- --only=dump-monster-perception.ts [level] [partyX] [partyY]`
  */
 import { CsbRandom } from '../src/core/random';
@@ -33,6 +39,70 @@ import type { PartyState } from '../src/engine/gameTypes';
 import { standInOf } from './lib/standIn';
 
 const DIRS = ['N', 'E', 'S', 'W'];
+
+/** `IsItInThisDirection` (`doc/CSBwin-src/Code11f52.cpp:2179-2210`), transcribed. */
+function cIsItInThisDirection(dir: number, myX: number, myY: number, destX: number, destY: number): boolean {
+  let ahead = 0;
+  let sideways = 0;
+  switch (dir) {
+    case 0: ahead = myY - destY; sideways = destX - myX; break;
+    case 1: ahead = destX - myX; sideways = destY - myY; break;
+    case 2: ahead = destY - myY; sideways = destX - myX; break;
+    case 3: ahead = myX - destX; sideways = destY - myY; break;
+  }
+  if (ahead < 0) return false;
+  if (Math.abs(sideways) > ahead + 1) return false;
+  return true;
+}
+
+/** `GetPrimaryAndSecondaryDirection`'s "moved in both axes" (`:2253-2290`), transcribed. */
+function cBothAxes(random: CsbRandom, oldX: number, oldY: number, newX: number, newY: number): [number, number] {
+  let secondaryDirection = 0;
+  let dirD4 = 0;
+  for (;;) {
+    if (cIsItInThisDirection(dirD4, oldX, oldY, newX, newY)) {
+      if (!cIsItInThisDirection(secondaryDirection = (dirD4 + 1) & 3, oldX, oldY, newX, newY)) {
+        if ((dirD4 !== 0) || !cIsItInThisDirection(secondaryDirection = (dirD4 + 3) & 3, oldX, oldY, newX, newY)) {
+          secondaryDirection = (dirD4 + (random.next() & 2) + 1) & 3;
+          return [dirD4, secondaryDirection];
+        }
+      }
+      if (random.bool() !== 0) {
+        const dirD7 = secondaryDirection;
+        secondaryDirection = dirD4;
+        return [dirD7, secondaryDirection];
+      }
+      return [dirD4, secondaryDirection];
+    }
+    dirD4 = (dirD4 + 1) & 3;
+  }
+}
+
+function checkDirections(): void {
+  let compared = 0;
+  let differ = 0;
+  const northWest = new Set<string>();
+  for (let dx = -3; dx <= 3; dx++) {
+    for (let dy = -3; dy <= 3; dy++) {
+      if (dx === 0 || dy === 0) continue;
+      for (let seed = 1; seed <= 16; seed++) {
+        const port = new CsbRandom(seed);
+        const c = new CsbRandom(seed);
+        const got = getPrimaryAndSecondaryDirection(port, 5, 5, 5 + dx, 5 + dy);
+        const want = cBothAxes(c, 5, 5, 5 + dx, 5 + dy);
+        compared++;
+        if (got.primary !== want[0] || got.secondary !== want[1] || port.next() !== c.next()) {
+          if (differ++ < 4) console.log(`  !! (${dx},${dy}) seed ${seed}: ${got.primary},${got.secondary} where the C gives ${want.join(',')}`);
+        }
+        if (dx === -1 && dy === -1) northWest.add(`${DIRS[got.primary]}${DIRS[got.secondary]}`);
+      }
+    }
+  }
+  console.log(`GetPrimaryAndSecondaryDirection: ${compared} cases against the C, ${differ} differ; ` +
+    `a target at (-1,-1) gives ${[...northWest].sort().join(' ')}`);
+  check(differ === 0, 'every target off both axes gives the C\'s two directions, from the same stream');
+  check(northWest.has('NW') && northWest.has('WN'), 'a target to the north-west gives north then west, or west then north');
+}
 
 async function main(): Promise<void> {
   const data = stockDungeon();
@@ -144,6 +214,8 @@ async function main(): Promise<void> {
   check(inconsistent === 0, `no monster claimed a move into stone (${inconsistent} did)`);
   check(sightViolations === 0, `no monster saw the party from beyond its sightDistance (${sightViolations} did)`);
   check(sawParty > 0, `at least one monster saw the party (${sawParty} of ${examined})`);
+  console.log('');
+  checkDirections();
   finish();
 }
 
