@@ -114,7 +114,6 @@ async function main(): Promise<void> {
   //         the object lands in the hand, then clicking again puts it back.
   //         (`HandleClothingClick`, doc/CSBwin-src/CSBCode.cpp:6987)
   const ui: UIState = newUIState(graphics, game.ctx);
-  ui.partyState = party.state;
   party.state.selectedCharacterIndex = 0;
 
   const first = party.state.champions[0];

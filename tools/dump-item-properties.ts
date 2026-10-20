@@ -87,7 +87,6 @@ function uiFor(game: Game): UIState {
   const ui = newUIState(graphics, game.ctx, {
     getGraphicBitmap: (n, format) => getCachedGraphicBitmap(graphics, cache, n, format),
   });
-  ui.partyState = game.ctx.party.state;
   return ui;
 }
 

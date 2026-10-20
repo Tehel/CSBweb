@@ -71,11 +71,13 @@ export interface UIState {
   readonly uiTables: UITables;
   readonly objectTables: ObjectTables;
   readonly fontData: FontData;
+  /** The game's party, `ctx.party.state`. */
+  readonly partyState: PartyState;
   /**
-   * The party the screen last drew (`GameScreen.setPartyState`), `ctx.party.state` at first
-   * and after a read in play (`savedGameRead`).
+   * `ctx.party.generation` when the screen last composed (`GameScreen.syncParty`), or
+   * read a game in play (`savedGameRead`): another value is another game.
    */
-  partyState: PartyState;
+  partyGeneration: number;
   uiMode: UIMode;
   /**
    * The mode button 147 froze, which button 148 puts back with its lists and key tables:
@@ -446,14 +448,14 @@ export function initializePlayState(ui: UIState): void {
  * reads a game only after `d.Initialize()` (`doc/CSBwin-src/CSBCode.cpp:333-340`), so the
  * screen's share of `d` is a new game's, as `initializePlayState` leaves it, and the party
  * is the one read. The old world's open chest is dropped, never repacked into the world
- * read, and an open inventory is closed as `ShowHideInventory` closes one, its
- * `videoMode = VM_ADVENTURE` (`:7512`): the party read has none open. The caller sets
- * the button lists.
+ * read, and the inventory its party had open is closed as `ShowHideInventory` closes
+ * one, its `videoMode = VM_ADVENTURE` (`:7512`): the party read has none open. The
+ * caller sets the button lists.
  */
-export function savedGameRead(ui: UIState): void {
-  if (ui.partyState.selectedCharacterIndex >= 0) ui.ctx.loop.videoMode = 'VM_ADVENTURE';
+export function savedGameRead(ui: UIState, inventoryWasOpen: boolean): void {
+  if (inventoryWasOpen) ui.ctx.loop.videoMode = 'VM_ADVENTURE';
   initializePlayState(ui);
-  ui.partyState = ui.ctx.party.state;
+  ui.partyGeneration = ui.ctx.party.generation;
 }
 
 /** What the interface reads, all of it there before the first frame. */
@@ -470,7 +472,8 @@ export type UIHooks = Pick<UIState,
 export function createUIState(sources: UISources, hooks: UIHooks): UIState {
   return {
     ...sources,
-    partyState: sources.ctx.party.state,
+    get partyState() { return this.ctx.party.state; },
+    partyGeneration: sources.ctx.party.generation,
     ...initialPlayState(),
     dialog: null,
     saveMenu: null,

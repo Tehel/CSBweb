@@ -384,13 +384,14 @@ export class Game implements MainLoop {
      * (doc/CSBwin-src/SaveGame.cpp:2087). `applySaveBytes` calls it. A save read in play,
      * which only the port has, begins at once (`tag0138ec`), as one read at the entrance or
      * after a lost game begins when the loop starts (`start`); the screen is told first,
-     * and leaves the old world (`GameHost.savedGameRead`).
+     * and leaves the old world (`GameHost.savedGameRead`), whose party had an inventory
+     * open or not.
      */
-    savedGameRead(): void {
+    savedGameRead(inventoryWasOpen: boolean): void {
         this.canRestart = true;
         this.resumedSavedGame = true;
         if (!this.running) return;
-        this.ctx.host.savedGameRead();
+        this.ctx.host.savedGameRead(inventoryWasOpen);
         this.tag0138ec();
     }
 

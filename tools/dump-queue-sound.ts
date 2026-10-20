@@ -374,7 +374,6 @@ function main(): void {
     const index = potions.findIndex((r) => r.nextObject !== OBJECT_ID_NULL && r.potionType !== PotionType.EMPTY_FLASK);
     const potion = game.ctx.dungeon.rnMaps.rn(DBType.POTION, index);
     const ui = newUIState(graphics, game.ctx);
-    ui.partyState = game.ctx.party.state;
     const at = new Position(3, 3, 1);
     stand(game, at, 0);
     game.ctx.party.state.selectedCharacterIndex = 0;

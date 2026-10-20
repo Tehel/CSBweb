@@ -323,7 +323,6 @@ async function main(): Promise<void> {
   // `if (d.PressingEye!=0) {lastTime=d.Time; RETURN_int(result);};` sits after button 81
   // and before 140 (doc/CSBwin-src/Mouse.cpp:1818-1819). Through the real dispatcher.
   const ui = newUIState(graphics, game.ctx);
-  ui.partyState = party;
   game.setMouseEventHandlers({
     translate: buttonsAt.translate,
     button: (num, x, y) => handleMouseButton(ui, num, x, y),

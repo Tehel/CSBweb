@@ -54,6 +54,11 @@ export function initialPartyState(position: Position, facing: Direction): PartyS
  */
 export class Party {
     state: PartyState;
+    /**
+     * How many times `setState` has replaced the state: another party, so another game,
+     * loaded or begun. The screen reads it to draw that game afresh (`GameScreen.syncParty`).
+     */
+    generation = 0;
 
     constructor(initialPosition: Position, initialFacing: Direction) {
         this.state = initialPartyState(initialPosition, initialFacing);
@@ -123,6 +128,7 @@ export class Party {
             position: new Position(state.position.x, state.position.y, state.position.z),
             facing: state.facing,
         };
+        this.generation++;
     }
 
     /**

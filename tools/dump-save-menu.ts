@@ -843,7 +843,6 @@ async function checkEnterAndLeave(graphics: GraphicsLoader): Promise<void> {
   party.selectedCharacterIndex = 0;
 
   const ui = newUIState(graphics, game.ctx);
-  ui.partyState = party;
   // An attack has just been made: `TAG01b1c0` closed the menu, and the tick that brings
   // the buttons back has not run.
   ui.word20252 = 0;
@@ -908,7 +907,6 @@ async function checkQuickSaveOverOpenChest(graphics: GraphicsLoader): Promise<vo
   party.selectedCharacterIndex = 0;
 
   const ui = newUIState(graphics, game.ctx);
-  ui.partyState = party;
   const draw = (): void => {
     Inventory.syncOpenChest(ui, Inventory.getActiveChestView(ui, party.champions[0]!));
   };
@@ -942,7 +940,7 @@ async function checkReadInPlay(graphics: GraphicsLoader): Promise<void> {
   console.log('=== a save read in play over an open chest and an open inventory ===');
   for (const how of ['F9', 'LOAD'] as const) {
     let ui: UIState | null = null;
-    const game = await loadGame({ savedGameRead: () => { if (ui) savedGameRead(ui); } });
+    const game = await loadGame({ savedGameRead: (inventoryWasOpen) => { if (ui) savedGameRead(ui, inventoryWasOpen); } });
     game.systems.hallOfChampions.addChampion(healthyChampion('DAROO'));
     const old = game.ctx.party.state;
     const found = findChest(game);
@@ -979,10 +977,8 @@ async function checkReadInPlay(graphics: GraphicsLoader): Promise<void> {
     } finally {
       game.stop();
     }
-    // The next compose (`refreshScreen`): the party the engine has, and the chest view
-    // dropped with no inventory open.
+    // The next compose (`refreshScreen`): the chest view dropped with no inventory open.
     const party = game.ctx.party.state;
-    ui.partyState = party;
     if (party.selectedCharacterIndex < 0) Inventory.syncOpenChest(ui, null);
     const held = chestContents(game, chest);
     const videoMode: string = game.ctx.loop.videoMode;
@@ -1498,7 +1494,6 @@ async function menuRig(
     exported,
     /** Raise the menu, and wait for its list. */
     async open(mode: SaveMenu.SaveMenuMode = 'full'): Promise<SaveMenu.SaveMenuState> {
-      ui.partyState = game.ctx.party.state;
       SaveMenu.openSaveMenu(ui, mode);
       await this.settled();
       return ui.saveMenu!;

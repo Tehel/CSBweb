@@ -14,7 +14,7 @@ builds it whole, from its data sources and every hook, so none of them is ever m
 - **data sources**: `graphicsLoader`, `ctx` (the game's `GameContext`, CSBWin's `d.`:
   the dungeon, the party and the systems), `context` (the viewport's bytecode interpreter
   context), `screenIndexBuffer`, `uiTables`, `objectTables`, `fontData`, `partyState` (the
-  party the screen last drew, `ctx.party.state` until then), `uiMode`
+  game's party, `ctx.party.state`, read through), `uiMode`
 - **interaction state**: `pressingEye`, `hoverPoint`, the attack menu
   (`attackingCharacterOrdinal`, `possibleAttackTypes`, …), the open chest,
   the chew-animation clock, the two button lists, `reincarnate` (non-null while the

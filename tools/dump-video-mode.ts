@@ -49,7 +49,6 @@ party.position = new Position(6, 14, 2);
 game.systems.monsters.loadPartyLevel(2);
 
 const ui: UIState = newUIState(graphics, game.ctx);
-ui.partyState = party;
 Mouse.updateButtonLists(ui);
 game.setMouseEventHandlers({
   translate: (x, y, buttons) => Mouse.searchMouseButtons(ui, x, y, buttons),

@@ -113,14 +113,14 @@ function renderView() {
     if (!game || !screen || game.mainLoopHasReturned()) return;
 
     const party = game.ctx.party;
-    screen.setPartyState(party.state);
+    screen.syncParty();
     screen.drawViewport(party.state.position, party.state.facing, game.ctx.state.word1868);
 }
 
 /** The screen composed again over the viewport as it stands, without `DrawViewport`. */
 function refreshScreen() {
     if (!game || !screen || game.mainLoopHasReturned()) return;
-    screen.setPartyState(game.ctx.party.state);
+    screen.syncParty();
     screen.refreshOverlay();
 }
 
@@ -287,7 +287,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         tag02076e: () => screen?.tag02076e(),
         tag0207cc: () => screen?.tag0207cc(),
         // A save read in play: the screen leaves the old world for the one read.
-        savedGameRead: () => screen?.savedGameRead(),
+        savedGameRead: (inventoryWasOpen) => screen?.savedGameRead(inventoryWasOpen),
         // The prison's fourth champion asks whether the adventure begins, and every
         // champion is reported.
         championJoined: (joined) => {

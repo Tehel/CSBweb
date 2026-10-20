@@ -114,7 +114,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| D17 | The screen keeps the party it last drew | S | ⏳ |
 | E23 | One game read, whole or not at all | L | ⏳ |
 | D18 | The interface's `d.` lives in the screen, and composing the screen changes the world | L | ⏳ |
 | D19 | `RuntimeSaveState` is neither strict nor a snapshot | M | ⏳ |
@@ -421,21 +420,6 @@ or `tools/dump-stats.ts`.
 ## D — State representation
 
 New state-representation debt goes here, and jumps the queue.
-
-### D17 ⏳ The screen keeps the party it last drew
-
-`Party.setState` builds a new object (`src/engine/Party.ts:118-126`), and the screen keeps
-its own reference, `ui.partyState` (`src/renderer/ui/UIState.ts:76`, about 125 uses), set
-again by `GameScreen.setPartyState` from `renderView` and `refreshScreen`
-(`src/main.ts:111`, `:118`), and by a save read in play, which must tell the screen
-(`GameHost.savedGameRead`, `savedGameRead` in `UIState.ts`) or what runs before the next
-compose reads the old party. "Another game" is detected by the object changing
-(`setPartyState`'s `state !== this.ui.partyState`). The freeze has two owners the same way:
-`GameScreen.isFrozen()` reads `ui.uiMode`, `Game.isFrozen()` reads `ctx.loop.gameFrozen`.
-
-Paying it: `Party.state` restored in place, as `TimerQueue.restore` and the footprints'
-are, or `ui.partyState` a getter over `ctx.party.state`; another game signalled by a
-generation count; one owner for the freeze.
 
 ### D18 ⏳ The interface's `d.` lives in the screen, and composing the screen changes the world
 

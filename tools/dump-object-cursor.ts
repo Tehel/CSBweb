@@ -63,7 +63,7 @@ async function main(): Promise<void> {
       return bitmap;
     },
   });
-  ui.partyState = party.state;
+  ui.ctx.party.state = party.state;
 
   // ---- A copper coin from the dungeon, in hand.
   check(ui.objectTables.objectNames[COPPER_COIN] === 'COPPER COIN', `name index ${COPPER_COIN} should be the copper coin`);

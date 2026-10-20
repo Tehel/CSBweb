@@ -176,7 +176,6 @@ function portraitActuatorTypes(game: Game, mirror: Position, wall: number): numb
 function attackHandShaded(game: Game, chIdx: number): boolean {
   const graphics = sharedGraphics!;
   const ui = newUIState(graphics, game.ctx);
-  ui.partyState = game.ctx.party.state;
   drawAttackButton(ui, chIdx);
   const { pixels, width } = ui.screenIndexBuffer;
   const rect = attackButtonRect(chIdx);
@@ -800,7 +799,6 @@ function portraitSection(): void {
     const hero = heroByName(g, 'HALK');
     standAtMirror(g, hero);
     const ui = newUIState(sharedGraphics!, g.ctx);
-    ui.partyState = g.ctx.party.state;
     pairUi = ui;
     g.systems.mouse.handleWallClick();
     const candidate = g.ctx.party.state.champions[0]!;

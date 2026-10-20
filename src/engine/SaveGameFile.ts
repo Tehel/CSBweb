@@ -273,11 +273,12 @@ export class SaveFileError extends Error {}
  * game, and the page has its message (`src/engine/Die.ts`).
  */
 export function applySaveBytes(game: Game, bytes: Uint8Array): void {
+    const inventoryWasOpen = game.ctx.party.state.selectedCharacterIndex >= 0;
     try {
         applyCsbwinSave(game, bytes);
     } catch (error) {
         if (error instanceof Die) throw error;
         throw new SaveFileError(`CSBWIN SAVE: ${(error as Error).message}`.toUpperCase());
     }
-    game.savedGameRead();
+    game.savedGameRead(inventoryWasOpen);
 }

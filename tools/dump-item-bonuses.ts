@@ -57,7 +57,6 @@ function makeGame(host?: Partial<GameHost>): Game {
 /** The interface over `g`, whose inventory click calls the engine's pair. */
 function uiOver(g: Game): UIState {
   const ui = newUIState(graphics, g.ctx);
-  ui.partyState = g.ctx.party.state;
   return ui;
 }
 

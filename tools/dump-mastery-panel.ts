@@ -175,7 +175,6 @@ async function main(): Promise<void> {
   party.state.selectedCharacterIndex = 0;
 
   const ui: UIState = newUIState(graphics, game.ctx);
-  ui.partyState = party.state;
 
   /** Draw the panel for the champion as it stands and hand back the screen buffer. */
   function renderPanel(): Uint8Array {

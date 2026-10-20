@@ -354,7 +354,7 @@ function checkBoxedIn(inventoryOpen: boolean, withoutB = false, stripState: 'fre
   cage(game, CX, CY);
   cage(game, CX, CY + 1);
   setRoom(game, CX, CY + 2, RoomType.STONE);
-  game.savedGameRead();
+  game.savedGameRead(false);
   const types: number[] = [];
   const lordChaos = game.ctx.dungeon.getCreatureRecord(game.ctx.dungeon.findFirstMonster(new Position(CX, CY, LEVEL)))!;
   const word1868: boolean[] = [];

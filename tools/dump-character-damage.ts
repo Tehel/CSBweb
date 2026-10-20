@@ -400,7 +400,7 @@ console.log('=== drawPartyStatus ===');
   }).ctx, {
     getGraphicBitmap: (n, format) => getCachedGraphicBitmap(graphics, cache, n, format),
   });
-  ui.partyState = party.state;
+  ui.ctx.party.state = party.state;
 
   // Canary: the two graphics are the sizes `DisplayCharacterDamage`'s rectangles are
   // (`x2 = x1 + 47`, `y2 = 6`; `x2 = x1 + 31`, `y2 = 28`).

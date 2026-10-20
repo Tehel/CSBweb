@@ -126,7 +126,7 @@ function main(): void {
     // `inventoryOpen = ((chIdx+1) == d.SelectedCharacterOrdinal)` (`:1258`) — the
     // portrait goes to the status box only for the champion whose inventory is open.
     party.state.selectedCharacterIndex = chIdx;
-    ui.partyState = party.state;
+    ui.ctx.party.state = party.state;
     const buffer = createPaletteIndexViewportBuffer(SCREEN_W, SCREEN_H, 0);
     ui.screenIndexBuffer = buffer;
     drawPartyStatus(ui);

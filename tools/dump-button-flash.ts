@@ -263,7 +263,6 @@ async function main(): Promise<void> {
   // ---- the spell panel: `_MagicSelection` holds the loop through its waits ---------------
   let redraws = 0;
   const ui = newUIState(graphics, game.ctx, { getGraphicBitmap: () => null, renderLastFrame: () => { redraws++; } });
-  ui.partyState = party;
   let castAt = -1;
   let frameNo = 0;
   const magic = game.systems.magic;

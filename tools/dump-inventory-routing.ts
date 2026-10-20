@@ -90,7 +90,6 @@ async function main(): Promise<void> {
   console.log('champions: ' + party.state.champions.map((c, i) => `${i}=${c.name}`).join(' ') + '\n');
 
   const ui: UIState = newUIState(graphics, game.ctx);
-  ui.partyState = party.state;
 
   // Not every mirror hands its hero a weapon, so pick, per box, a slot that really
   // holds something. Nothing is moved or synthesised — these are the possessions the

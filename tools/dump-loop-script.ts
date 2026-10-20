@@ -184,7 +184,7 @@ function checkProcessTimersViewportAndSound(): void {
   const w = watchedGame();
   const game = w.game;
   frame(w);
-  game.savedGameRead();
+  game.savedGameRead(false);
   function* script(): LoopScript {
     for (let n = 0; n < 3; n++) {
       yield* game.processTimersViewportAndSound();

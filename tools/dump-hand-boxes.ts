@@ -50,7 +50,7 @@ async function main(): Promise<void> {
   const ui: UIState = newUIState(graphics, game.ctx, {
     getGraphicBitmap: (n, format) => getCachedGraphicBitmap(graphics, cache, n, format),
   });
-  ui.partyState = party.state;
+  ui.ctx.party.state = party.state;
   const iconSlots = ui.uiTables.graphic232.iconDisplay;
 
   /** The 18x18 frame's outer ring around a 16x16 icon at `rect`. */

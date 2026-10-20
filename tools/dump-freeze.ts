@@ -51,7 +51,6 @@ async function main(): Promise<void> {
 
   // The UI half, wired as `GameInput.install` wires it.
   const ui: UIState = newUIState(graphics, game.ctx);
-  ui.partyState = party;
   Mouse.updateButtonLists(ui);
 
   const lists = ui.uiTables.graphic231.buttons;

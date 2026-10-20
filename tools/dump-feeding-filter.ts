@@ -69,7 +69,6 @@ function misc(game: Game, ui: UIState, nameIndex: number, specialState = 0): Obj
 function feed(game: Game, nameIndex = OBJNI_APPLE, specialState = 0) {
   const ui = newUIState(graphics, game.ctx);
   const party = game.ctx.party.state;
-  ui.partyState = party;
   const rn = misc(game, ui, nameIndex, specialState);
   party.cursorOwner = CHAMPION;
   party.selectedCharacterIndex = CHAMPION;

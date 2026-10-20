@@ -141,9 +141,10 @@ export interface GameHost {
    * `d.Initialize()` has zeroed the whole of `d` (`doc/CSBwin-src/CSBCode.cpp:333-340`),
    * so the screen's share of it, the open chest, the attack menu, the Reincarnate
    * screen, the eye and the mouth, is the old world's and goes, and the screen takes
-   * the party read. Called before anything runs on the world read.
+   * the party read. Called before anything runs on the world read, with whether the old
+   * world's party had an inventory open, which the read has replaced.
    */
-  savedGameRead(): void;
+  savedGameRead(inventoryWasOpen: boolean): void;
   /**
    * `ShowCredits(1)`, the end of the game, which the engine does not draw: from
    * `_StartCSB` once `MainLoop` has returned on a lost game

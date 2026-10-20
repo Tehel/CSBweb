@@ -348,7 +348,6 @@ function clothing(programs: number[][], held: boolean, inHand: boolean) {
   const game = withFilterDsas(ESL_CURSORFILTER, programs);
   const party = game.ctx.party.state;
   const ui = newUIState(stockGraphics(), game.ctx);
-  ui.partyState = party;
   const character = game.systems.character;
   character.removeCharacterPossession(0, 0);
   const apple = misc(game);
@@ -387,7 +386,6 @@ for (const cancelled of [false, true]) {
   const game = withFilterDsas(ESL_CURSORFILTER, [[...report(0), ...cancel]]);
   const party = game.ctx.party.state;
   const ui = newUIState(stockGraphics(), game.ctx);
-  ui.partyState = party;
   let food = misc(game);
   for (let miscType = 1; resolveObjectNameIndex(ui, food) !== OBJNI_APPLE; miscType++) {
     game.ctx.dungeon.getData().databases.misc.records.pop();
@@ -566,7 +564,7 @@ for (const inHand of [true, false]) {
     game.systems.dsa.setGlobalVariables(new Array<number>(100).fill(UNSET));
     const held = misc(game);
     party.objectInHand = held;
-    game.savedGameRead();
+    game.savedGameRead(false);
     const g = game.systems.dsa.getGlobalVariables();
     console.log(`save read in play: ${packet(g)}, runs ${runs(game)}, hand ${party.objectInHand}`);
     check(runs(game) === 1 && packet(g) === dsaPacket(CursorFilterType.ResumeSavedGame, held), '18. a save read in play sends ResumeSavedGame at once');

@@ -12,7 +12,7 @@
  */
 
 import type { GraphicsLoader } from '../data/GraphicsLoader';
-import type { Champion, PartyState } from '../engine/gameTypes';
+import type { Champion } from '../engine/gameTypes';
 import type { CSBGraphicsLoader } from '../data/CSBGraphicsLoader';
 import type { ScrollingText } from './csbwin/ScrollingText';
 import type { GameContext } from '../engine/GameContext';
@@ -352,8 +352,8 @@ export class GameScreen {
   }
 
   /** A saved game read in play — the host's `savedGameRead`: the read party is awake. */
-  savedGameRead(): void {
-    savedGameRead(this.ui);
+  savedGameRead(inventoryWasOpen: boolean): void {
+    savedGameRead(this.ui, inventoryWasOpen);
     this.setUIMode(UIMode.Adventure);
   }
 
@@ -529,17 +529,19 @@ export class GameScreen {
     return bitmap ? Array.from(bitmap.pixels) : undefined;
   }
 
-  setPartyState(state: PartyState): void {
+  /** Before a compose: the game's party, which may be another game's since the last. */
+  syncParty(): void {
     // Another party is another game, loaded or begun, which CSBWin draws afresh: nothing
     // `TAG02076e` shaded survives it (a quick-load over a sleeping party, which no
     // `TAG0207cc` follows).
     // Nor does a champion in hand (`d.Word23144 = 0`, `doc/CSBwin-src/CSBCode.cpp:10609`).
-    if (state !== this.ui.partyState) {
+    const generation = this.ui.ctx.party.generation;
+    if (generation !== this.ui.partyGeneration) {
       this.ui.shadedByTag02076e = false;
       this.ui.arrowCursorShape = false;
       this.ui.word23144 = 0;
     }
-    this.ui.partyState = state;
+    this.ui.partyGeneration = generation;
     syncInventoryButtons(this.ui);
   }
 
@@ -617,11 +619,6 @@ export class GameScreen {
     drawCharacterStateEyePanel(this.ui, chIdx, charFlags);
   }
 
-  /** Buttons 147 to 148: `gameFrozen`, the screen's side of it. */
-  isFrozen(): boolean {
-    return this.ui.uiMode === UIMode.Frozen;
-  }
-
   /**
    * `TAG0196da`'s table half: the button the current key tables bind `code`, a
    * `KeyboardEvent.code`, to, or 0 — and 0 for F1-F4, the port's caster keys
@@ -689,7 +686,7 @@ export class GameScreen {
     // The inventory is drawn into the viewport bitmap (`TAG022a60(17, d.pViewportBMP)`,
     // doc/CSBwin-src/CSBCode.cpp:7552), so the freeze's flood covers it, and nothing draws
     // it again until the thaw's `TAG0207cc` shows it.
-    const frozen = this.isFrozen();
+    const frozen = this.ui.ctx.loop.gameFrozen;
     // Frozen, no tick runs (doc/CSBwin-src/CSBCode.cpp:775), so nothing draws over "GAME
     // FROZEN". Asleep, the tick draws no viewport (`:647`), and `DisplaySleepScreen` holds
     // it. Both screens stay in the viewport until the next `DrawViewport`.

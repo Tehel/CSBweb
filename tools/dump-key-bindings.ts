@@ -90,7 +90,6 @@ async function main(): Promise<void> {
   setHandOwner(party.state, 0, ctx.host);
 
   const ui: UIState = newUIState(graphics, ctx);
-  ui.partyState = party.state;
 
   let attacks: Array<{ chIdx: number; attackType: number }> = [];
   standIn(game.systems.character, 'executeAttack', (chIdx: number, attackType: number) => {

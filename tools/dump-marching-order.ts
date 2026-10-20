@@ -58,7 +58,7 @@ async function main(): Promise<void> {
       return bitmap;
     },
   });
-  ui.partyState = state;
+  ui.ctx.party.state = state;
   const g232 = ui.uiTables.graphic232;
 
   mouse.updateButtonLists(ui);
@@ -219,7 +219,7 @@ async function main(): Promise<void> {
   console.log(['empty box 3', 'lit', emptyLit].join('\t'));
   check(emptyLit === 0, `the box of a champion not in the party should be black (${emptyLit} pixels lit)`);
 
-  // ---- `GameScreen.setPartyState` empties the hand for another game (`CSBCode.cpp:10609`)
+  // ---- `GameScreen.syncParty` empties the hand for another game (`CSBCode.cpp:10609`)
   //      — covered by reading; it has no engine to drive here.
 
   finish();

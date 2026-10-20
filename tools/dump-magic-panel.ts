@@ -49,7 +49,6 @@ async function main(): Promise<void> {
   game.setRandomSeed(0x12345678);
   const party = game.ctx.party.state;
   const ui = newUIState(graphics, game.ctx);
-  ui.partyState = party;
   const base = ui.uiTables.graphic230.spellBaseMana;
   const scale = ui.uiTables.graphic230.spellFirstRuneScale;
   // The engine's `CastMagic`, the UI's call, wrapped to read its result.

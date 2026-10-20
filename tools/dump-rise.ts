@@ -282,7 +282,6 @@ async function checkChooser(): Promise<void> {
       onRestoreSave: (save: OpenedSave) => { log.push(`restore ${save.entry.name}`); },
       onRestoreFailed: (error) => { log.push(`failed ${JSON.stringify((error as Error).message)}`); },
     });
-    ui.partyState = game.ctx.party.state;
     const settled = async (): Promise<void> => {
       for (let i = 0; i < 300 && ui.saveMenu && (ui.saveMenu.busy || ui.saveMenu.press); i++) {
         await new Promise((done) => setTimeout(done, 10));
@@ -431,7 +430,6 @@ async function checkPrison(): Promise<void> {
     onMakeNewAdventure: async (source) => { log.push(`make ${source.name}`); return saves.makeNewAdventure(source, MINI); },
     onRestoreSave: (save: OpenedSave) => { log.push(`restore ${save.entry.name}`); },
   });
-  ui.partyState = game.ctx.party.state;
   const settled = async (): Promise<void> => {
     for (let i = 0; i < 300 && ui.saveMenu && (ui.saveMenu.busy || ui.saveMenu.press); i++) {
       await new Promise((done) => setTimeout(done, 10));

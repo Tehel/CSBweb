@@ -38,7 +38,7 @@ const confluxDungeon = (): DungeonData =>
 
 /** `game` started as `start(enterDungeon)` starts it, the loop stopped before any VBL runs. */
 function started(game: Game, enterDungeon: boolean, resumed = false): Game {
-  if (resumed) game.savedGameRead();
+  if (resumed) game.savedGameRead(false);
   game.start(enterDungeon);
   game.stop();
   return game;

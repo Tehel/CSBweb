@@ -50,7 +50,7 @@ async function main(): Promise<void> {
   const ui: UIState = newUIState(graphics, game.ctx, {
     getGraphicBitmap: (n, format) => getCachedGraphicBitmap(graphics, cache, n, format),
   });
-  ui.partyState = party.state;
+  ui.ctx.party.state = party.state;
   let damageToDisplay = 0;
   standIn(game.systems.attack, 'consumeAttackDamageToDisplay', () => {
     const damage = damageToDisplay;

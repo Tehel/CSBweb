@@ -270,7 +270,6 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
   const game = withFilter([[...params3(0), ...describe(-1, 0, 5)], [...params3(10)]]);
   const party = game.ctx.party.state;
   const ui = newUIState(stockGraphics(), game.ctx);
-  ui.partyState = party;
   party.selectedCharacterIndex = 1;
   party.objectInHand = OBJECT_ID_NULL;
   const unset = (): void => {
@@ -315,7 +314,6 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
   const game = withFilter([[...params(0)]]);
   const party = game.ctx.party.state;
   const ui = newUIState(stockGraphics(), game.ctx);
-  ui.partyState = party;
   party.selectedCharacterIndex = 1;
   const unset = (): void => {
     const g = game.systems.dsa.getGlobalVariables();
@@ -363,7 +361,6 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
     getGraphicBitmap: (n, format) => getCachedGraphicBitmap(graphics, cache, n, format),
   });
   ui = theUi;
-  theUi.partyState = party;
   party.selectedCharacterIndex = -1;
   party.objectInHand = OBJECT_ID_NULL;
   const character = game.systems.character;
@@ -440,7 +437,6 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
     getGraphicBitmap: (n, format) => getCachedGraphicBitmap(graphics, cache, n, format),
   });
   ui = theUi;
-  theUi.partyState = party;
   party.selectedCharacterIndex = -1;
   party.objectInHand = OBJECT_ID_NULL;
   const character = game.systems.character;
@@ -525,7 +521,6 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
     getGraphicBitmap: (n, format) => getCachedGraphicBitmap(graphics, cache, n, format),
   });
   ui = theUi;
-  theUi.partyState = party;
   party.selectedCharacterIndex = -1;
   party.objectInHand = OBJECT_ID_NULL;
   const character = game.systems.character;

@@ -144,8 +144,8 @@ behaviour with an extra case explaining why it looks like an omission.
 **Build a `UIState` through `tools/lib/ui.ts`.** `newUIState(graphics, ctx, hooks?)`
 builds it as `GameScreen` does: the tables and font, a blank 320x200 screen, and a fresh
 `ViewportRenderer`'s interpreter context, with every hook a no-op unless passed. Assign
-`partyState`, `screenIndexBuffer` or `context` afterwards to stage a party, a buffer or a
-view. Read the tables off it (`ui.uiTables`, `ui.objectTables`) rather than extracting
+`ui.ctx.party.state`, `screenIndexBuffer` or `context` afterwards to stage a party, a
+buffer or a view: `ui.partyState` reads the game's party, and cannot be assigned. Read the tables off it (`ui.uiTables`, `ui.objectTables`) rather than extracting
 them again.
 
 **Build a `Game` through `tools/lib/game.ts`.** `newGame(data, graphics, options?)`
