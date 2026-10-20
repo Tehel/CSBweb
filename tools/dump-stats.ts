@@ -27,6 +27,8 @@
  *   - a game's second `started` or `won` no row of the log, and nothing changed by it; a
  *     store made before that rule keeps the first of each, and makes its picks again;
  *   - a full log: past its rows, an event refused and nothing of it kept, a session counted;
+ *   - every time kept to 10 s, rounded down: an event's, a game's start and win; a store
+ *     made before that rule given its times rounded down, and the same answers;
  *   - the rate limit's buckets: an address, an IPv4-mapped one as its IPv4, an IPv6 one as
  *     its /64;
  *   - the cache: an answer kept for its lifetime, made again after;
@@ -41,10 +43,10 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 import { addressBucket, checkEvent, RateLimit, type CheckedEvent, type EventRules } from '../server/events.ts';
-import { AnswerCache, DEATH_SQUARES, MAX_EVENTS, StatsStore, type LevelStats, type SetStats, type StatsSet, type StatsSummary } from '../server/stats.ts';
+import { AnswerCache, DEATH_SQUARES, MAX_EVENTS, StatsStore, TIME_GRAIN, type LevelStats, type SetStats, type StatsSet, type StatsSummary } from '../server/stats.ts';
 import { openStore } from '../server/store.ts';
 import { check, finish } from './lib/check';
-import { ch, day, event, FORTNIGHT, P1, P2, P3, P4, session, winner } from './lib/statsFortnight';
+import { ch, day, event, FORTNIGHT, P1, P2, P3, P4, session, winner, won } from './lib/statsFortnight';
 
 const RULES: EventRules = { hasSet: (id) => ['dm-atari', 'csb', 'conflux', 'secret'].includes(id) };
 
@@ -342,6 +344,30 @@ function checkFull(): void {
     check(sessions === 2 && started === 1, 'where a session still counts');
 }
 
+/** Every time kept to `TIME_GRAIN`, an event's and a game's, and a store's made before it rounded down when opened. */
+function checkGrain(): void {
+    console.log('\nThe times:');
+    const db = new DatabaseSync(':memory:');
+    let store = new StatsStore(db);
+    const at = day('2026-10-05');
+    store.record(accepted(event('started', P1, 'dm-atari', 1, {})), at + 12_345);
+    store.record(accepted(won(P1, 1, 1000, 300_000, [winner('HALK', 3)])), at + 3_600_000 + 9_999);
+    const times = () => JSON.stringify([
+        db.prepare('SELECT time FROM events ORDER BY id').all().map((row) => row.time),
+        db.prepare('SELECT started, won FROM games').get()]);
+    const coarse = JSON.stringify([[at + 10_000, at + 3_600_000], { started: at + 10_000, won: at + 3_600_000 }]);
+    const kept = times();
+    const answered = answers(store);
+    console.log(`  received at +12,345 and +3,609,999 ms, kept as ${kept}`);
+    check(kept === coarse && TIME_GRAIN === 10_000, 'an event\'s time, and its game\'s start and win, rounded down to 10 s');
+
+    // The store as it was before the grain: its times to the millisecond.
+    db.exec('UPDATE events SET time = time + 1234; UPDATE games SET started = started + 1234, won = won + 5678');
+    store = new StatsStore(db);
+    check(times() === coarse && answers(store) === answered, 'a store made before the grain is given its times rounded down, and the same answers');
+    db.close();
+}
+
 function checkCache(): void {
     console.log('\nThe cache:');
     let now = 0;
@@ -423,6 +449,7 @@ function main(): void {
         checkTheChecks();
         checkStore(scratch);
         checkFull();
+        checkGrain();
         checkCache();
         checkScale(scratch);
     } finally {

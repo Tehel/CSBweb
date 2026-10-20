@@ -6,13 +6,23 @@ They serve three questions: whether the game is actually played, which champions
 prefer, and where parties die most often. The statistics page shows them ("The page", below), and the FAQ
 that explains them to players is to be designed (E39).
 
-## Anonymity is a rule of the code
+## Pseudonymous
 
 No player's name, no address and no browser fingerprint (user agent, screen, language) is
-sent or stored. A random id, drawn in the browser, is used only for counting players.
+sent with an event or stored with the statistics. A random id, drawn in the browser, is
+used only for counting players: the statistics are pseudonymous, the id linking one
+player's games, and a player who clears the site's data is given a new one (below).
 Champions go by the names they carry, which a player can type. The server's checks hold a
 modified page to the same rule: the only text it can store is a champion's name, of 7
 characters at most, each one a name's.
+
+The host's nginx keeps its access log (`doc/DEPLOYMENT.md` → "The site"), as any site's
+does: every request's address, user agent and time, to the second, each `POST /api/event`
+among them. So that a stored time does not name one request of that log, every time the
+store keeps is rounded down to 10 s (`TIME_GRAIN`, `server/stats.ts`): an event's, and a
+game's start and win. The answers count days and weeks, which it changes nothing of. Ten
+seconds blurs the link rather than cutting it: in a quiet ten seconds, one request is the
+one event.
 
 ## The page's events
 
@@ -174,7 +184,7 @@ a few indexed queries, about 0.1 s at 200,000 events.
   set's time played, sessions, games started and won and deaths, by time played,
   decreasing, then by games started, decreasing, then by name.
 - **`api/stats/<id>`**, a public set (404 for any other): its players, time played,
-  sessions, games started and won, games with a party and deaths; its ten fastest wins by game clock, then the earlier,
+  sessions, games started and won, games with a party and deaths; its ten fastest wins by game clock, then the earlier, then the game first received,
   each its day, game clock, play time and party with their masteries; its deaths per level;
   its twenty most picked champions, by their mirror's name (`picks`), with the games they
   were in and won; its sessions, games
@@ -189,8 +199,8 @@ second, and a second's slack (`CLOCK_SLACK_TICKS`). A game read from an imported
 save, which sent no `started` and carries no play time, is a win and is not ranked.
 
 `tools/dump-stats.ts` asserts the checks, the rate limit's buckets, the store's aggregates over a scripted fortnight,
-its sessions in no row of the log or of `games`, a game's second `started` and `won` in none either, a full log, the same but the sessions' made from the
-log alone and for a store made before the sessions, the picks' slots or `events_once`, the cache, and every answer's time and size over 200,000
+its sessions in no row of the log or of `games`, a game's second `started` and `won` in none either, a full log, every time to 10 s, the same but the sessions' made from the
+log alone and for a store made before the sessions, the picks' slots, `events_once` or the 10 s, the cache, and every answer's time and size over 200,000
 events, with the bytes an event costs; `tools/dump-server.ts` the API over HTTP, the limits and the budget included, and the store's life in `server.ts`.
 
 ## The page

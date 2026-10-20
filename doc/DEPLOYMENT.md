@@ -65,6 +65,10 @@ location / {
 }
 ```
 
+The block sets no `access_log`, so nginx's default keeps one: every request's address,
+user agent and time, `api/event`'s too. That is kept knowingly, and the statistics' own
+times are coarse so as not to match it (`doc/STATISTICS.md` → "Pseudonymous").
+
 `client_max_body_size` lets a published set through: nginx's own default is 1 MB, and the
 server refuses a request over 32 MiB itself (`MAX_PUBLISH_BYTES`, `server/publish.ts`).
 

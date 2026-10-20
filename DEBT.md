@@ -114,7 +114,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| W5 | The statistics are pseudonymous, not anonymous | S | ⏳ |
 | R12 | Listing the saves reads every save's bytes | M | ⏳ |
 | U11 | The cursor over a dialog takes the game's shapes | S | ⏳ |
 | U12 | A text outside the game's font draws as other letters | S | ⏳ |
@@ -465,20 +464,6 @@ refused, a content security policy and `nosniff` on every answer, errors that le
 container held to a memory, process and privilege budget, read-only but for its data, and
 statistics aggregated as the events arrive, each answer capped and cached 30 s. Each item ships with its check in `tools/dump-server.ts`
 or `tools/dump-stats.ts`.
-
-### W5 ⏳ The statistics are pseudonymous, not anonymous
-
-`doc/STATISTICS.md` says no address is stored, and E39's FAQ is to insist the statistics
-are anonymous. But the nginx block `doc/DEPLOYMENT.md` gives (`:54-60`) sets no
-`access_log`, so nginx's default logs the address and user agent of every
-`POST /api/event`; `events.time` is to the millisecond (`server/stats.ts`); and the
-player's id lives in `localStorage` for ever, with no retention. The log's times link an
-address to a player's id.
-
-Paying it: `access_log off` (or a format without the address) for `location =
-/api/event`, in `doc/DEPLOYMENT.md` and on the VPS (the author's); the time stored to the
-minute or coarser; a retention period; the FAQ saying "pseudonymous", and how to reset the
-id.
 
 ---
 
@@ -1037,9 +1022,14 @@ the author before any code. What they are to hold:
   - a leaderboard of the preferred champions;
   - where parties die most often.
 
-  It insists that the statistics are anonymous: no player's name, no IP address, no
-  browser profiling. A random id, drawn in the browser, is used only for counting
-  players. Champions go by the names they carry, which a player can type.
+  It is clear about what is anonymous and what is not (`doc/STATISTICS.md` →
+  "Pseudonymous"): no player's name, no IP address and no browser profiling in the
+  statistics, and champions going by the names they carry, which a player can type; but
+  a random id, drawn in the browser and used only for counting players, links one
+  player's games, so the statistics are pseudonymous. It says how to reset the id
+  (clearing the site's data) and how to send none (SEND STATISTICS), and that the web
+  server's access log keeps every request's address, as any site's does, against which
+  the statistics keep their times to 10 s.
 - **The public statistics** are a page of their own, `/stats` (`doc/STATISTICS.md` → "The page"); ABOUT links to it.
 - **CREDITS** is a block of the welcome page (`#credits`). It does not name the data sets'
   authors yet.

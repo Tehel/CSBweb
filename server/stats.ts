@@ -20,7 +20,7 @@ import type { CheckedChampion, CheckedEvent } from './events.ts';
 const EVENTS_SCHEMA = `
 CREATE TABLE IF NOT EXISTS events (
     id          INTEGER PRIMARY KEY,
-    time        INTEGER NOT NULL,  -- ms since the epoch, the server's clock
+    time        INTEGER NOT NULL,  -- ms since the epoch, the server's clock, to TIME_GRAIN
     player      TEXT    NOT NULL,
     type        TEXT    NOT NULL,
     data_set    TEXT    NOT NULL,
@@ -38,6 +38,14 @@ CREATE INDEX IF NOT EXISTS events_by_type ON events (type, data_set, playthrough
 const ONCE_SCHEMA = `
 CREATE UNIQUE INDEX events_once ON events (type, data_set, playthrough) WHERE type IN ('started', 'won');
 `;
+
+/**
+ * The grain of every time the store keeps, in ms: an event's, and a game's start and win,
+ * each rounded down to it. The answers count days and weeks, which it changes nothing of.
+ * A time names the ten seconds an event arrived in, not the one request of nginx's access
+ * log (`doc/DEPLOYMENT.md`), which keeps every request's address, to the second.
+ */
+export const TIME_GRAIN = 10_000;
 
 /**
  * The rows the log holds at most, past which only a `session` is kept: about 300 bytes
@@ -177,8 +185,9 @@ export interface SetStats extends StatsSet {
     /** The lost games, every one: a party may die several times in a game. */
     died: number;
     /**
-     * The fastest wins by game clock, then the earlier, of the games whose start was received
-     * and whose clock its play time could have run (`CLOCK_SLACK_TICKS`).
+     * The fastest wins by game clock, then the earlier, then the game first received, of the
+     * games whose start was received and whose clock its play time could have run
+     * (`CLOCK_SLACK_TICKS`).
      */
     fastest: Win[];
     /** The lost games on each level, by level: its squares are the level's answer. */
@@ -211,6 +220,7 @@ export class StatsStore {
         const played = kept && this.db.prepare("SELECT 1 FROM pragma_table_info('games') WHERE name = 'played'").get() !== undefined;
         const slotted = kept && this.db.prepare("SELECT 1 FROM pragma_table_info('picks') WHERE name = 'slot'").get() !== undefined;
         const once = this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'events_once'").get() !== undefined;
+        this.coarsenTimes(kept);
         let wonTwice = false;
         if (!once) wonTwice = this.keepFirsts();
         if (!kept) this.db.exec(AGGREGATES_SCHEMA + PICKS_SCHEMA);
@@ -243,13 +253,15 @@ export class StatsStore {
     }
 
     /**
-     * `event`, kept: in the log and its aggregates, or a `session` in its aggregates alone.
+     * `event`, received at `received` (ms since the epoch), kept at its `TIME_GRAIN`: in the
+     * log and its aggregates, or a `session` in its aggregates alone.
      * A game's second `started` or `won` is taken and changes nothing (`ONCE_SCHEMA`). False
      * when the log is full, at `maxEvents` rows, and `event` is not a `session`: nothing of it
      * is kept.
      */
-    record(event: CheckedEvent, time: number): boolean {
+    record(event: CheckedEvent, received: number): boolean {
         if (event.type !== 'session' && this.rows >= this.maxEvents) return false;
+        const time = received - received % TIME_GRAIN;
         let added = 0;
         this.transaction(() => {
             if (event.type !== 'session') {
@@ -303,7 +315,7 @@ export class StatsStore {
             SELECT date(won / 1000, 'unixepoch') AS day, game_time AS gameTime, play_time AS playTime, champions FROM games
             WHERE data_set = ? AND won IS NOT NULL AND started IS NOT NULL
               AND game_time * 1000 <= play_time * ${VBL_FREQUENCY} + ${CLOCK_SLACK_TICKS * 1000}
-            ORDER BY game_time, won LIMIT ${FASTEST_WINS}`).all(id).map((row) => ({
+            ORDER BY game_time, won, rowid LIMIT ${FASTEST_WINS}`).all(id).map((row) => ({
             day: row.day as string, gameTime: row.gameTime as number, playTime: row.playTime as number,
             champions: JSON.parse(row.champions as string) as CheckedChampion[],
         }));
@@ -401,6 +413,15 @@ export class StatsStore {
             const { champions } = JSON.parse(row.payload as string) as { champions: CheckedChampion[] };
             this.pickParty(picks, row.data_set as string, row.playthrough as number, champions);
         }
+    }
+
+    /** A store made before `TIME_GRAIN`: its times rounded down to it, which changes no answer. */
+    private coarsenTimes(kept: boolean): void {
+        const coarse = (time: string) => `${time} = ${time} - ${time} % ${TIME_GRAIN}`;
+        this.transaction(() => {
+            this.db.exec(`UPDATE events SET ${coarse('time')} WHERE time % ${TIME_GRAIN} <> 0`);
+            if (kept) this.db.exec(`UPDATE games SET ${coarse('started')}, ${coarse('won')} WHERE started % ${TIME_GRAIN} <> 0 OR won % ${TIME_GRAIN} <> 0`);
+        });
     }
 
     /** The new tables filled from the log, in the order its events arrived. */
