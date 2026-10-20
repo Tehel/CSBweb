@@ -120,7 +120,7 @@ In payoff order: the first row is the next item.
 | E41 | `src/data/` imports the engine | M | ⏳ |
 | E35 | Comments and documents that are stale, wrong, or tell the past | M | ⏳ |
 | E36 | Type escape hatches that check nothing | M | ⏳ |
-| E25 | One helper for each rule, where copies drift | M | ⏳ after C170, C171 |
+| E25 | One helper for each rule, where copies drift | M | ⏳ after C170 |
 | E26 | Systems named after CSBWin's files, not what they do | M | ⏳ |
 | D21 | A save has nine shapes | L | ⏳ |
 | E27 | `DsaSystem.ts` is one 5,000-line class | L | ⏳ |
@@ -132,7 +132,6 @@ In payoff order: the first row is the next item.
 | E30 | One presenter and one input router | M | ⏳ |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | C177 | An Atari-era save loads with its possessions, timers and hand unconverted | M | ⏳ |
-| C171 | The Firestaff does not soften a monster's blow, and three mastery calls ignore sleep | S | ⏳ |
 | C168 | A monster north-west of the party never prefers west | S | ⏳ |
 | C169 | A monster's `timePerMove / 2` is not an integer division | S | ⏳ |
 | C170 | A blow at the party skips a living champion who shares a dead one's corner | S | ⏳ |
@@ -560,12 +559,12 @@ refactor, with a tool of damaged saves.
 
 ### E25 ⏳ One helper for each rule, where copies drift
 
-C170 and C171 are copies that drifted. The copies left:
+C170 is a copy that drifted. The copies left:
 
 - **Mastery**: `determineMastery`'s options default to "awake" and "no possessions"
   (`src/engine/skills.ts:116-121`, `:150`), and six callers build them by hand
   (`CharacterStats`, `AttackSystem`, `src/renderer/ui/Attack.ts`, `MouseSystem`,
-  `DsaSystem`, `PeriodicUpdates`), some leaving them out (C171).
+  `DsaSystem`, `PeriodicUpdates`, `MonsterAttack`, `MagicSystem`).
 - **`CharacterAtPosition`**: a third copy in `MonsterAttack.getCharacterToDamage` (C170),
   beside the two `AttackSystem.ts:320-322` says had drifted. "Alive" is tested five ways:
   `(health | 0) === 0`, `health === 0`, `health > 0`, `attributes?.health ?? 0`, `!== 0`.
@@ -598,7 +597,7 @@ C170 and C171 are copies that drifted. The copies left:
 Paying it: a module of rule helpers (`masteryOf(ctx, champ, skill)`,
 `characterAtPosition`, `isAlive`, `levelDifficulty(ctx)`, `adjustSkillsOnPartyLevel`,
 `spellObjectId`, `roomTypeOf`); the save menu's press through `playMenuPress`; one `recordsOf(db)` and a generic record getter; the text
-codec beside `messageParametersKey`, with an `Esl` enum. After C170 and C171, so that this
+codec beside `messageParametersKey`, with an `Esl` enum. After C170, so that this
 commit changes no output.
 
 ### E26 ⏳ Systems named after CSBWin's files, not what they do
@@ -1007,21 +1006,6 @@ champion's hand, packed `0x1403`, loads as slot `0x1403`, past the 2097 slots, a
 Paying it: for a file without `objectIndex`, `ConvertListOfObjects` over the timers that
 carry an object, each champion's thirty slots and the object in hand, in CSBWin's order
 after the chains; a fixture whose champions carry something.
-
-### C171 ⏳ The Firestaff does not soften a monster's blow, and three mastery calls ignore sleep
-
-`MonsterDamagesCharacter` subtracts `2*DetermineMastery(chIdx, 7)`
-(`doc/CSBwin-src/Monster.cpp:4576`), without the 0x4000 flag, so the Firestaff in the weapon
-hand adds its levels. The port's `determineMastery(champ, 7, {})`
-(`src/engine/MonsterAttack.ts:471`) counts possessions only when its options carry
-`getObjectNameIndex` (`src/engine/skills.ts:116-121`, `:150`), so a champion holding the
-Firestaff takes 2 to 4 more before the floor test, which can then flip `damage <= 1` and
-the draws behind it. The same defaults leave out sleep: CSBWin's `DetermineMastery` returns
-1 while the party sleeps, and `MagicSystem.ts:249` (a DSA's `&CAST` can run then) and
-`CharacterStats.determineThrowingDistance(…, partySleeping = false)` do not ask.
-
-Paying it: the options at these sites (E25 then gives every site one `masteryOf`); a check of
-a Firestaff bearer hit with a fixed seed.
 
 ### C168 ⏳ A monster north-west of the party never prefers west
 

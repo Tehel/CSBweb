@@ -172,7 +172,7 @@ export class CharacterStats {
    * whichever skill its `uByte1` class selects; low stamina scales the lot; and a
    * wound on that very hand halves it.
    */
-  determineThrowingDistance(champ: Champion, hand: number, partySleeping = false): number {
+  determineThrowingDistance(champ: Champion, hand: number, partySleeping: boolean): number {
     let d7 = sw((this.ctx.random.next() & 15) + championAttribute(champ, AttributeIndex.Strength));
 
     const obj = getChampionPossession(champ, hand);

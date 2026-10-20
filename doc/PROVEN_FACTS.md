@@ -1530,6 +1530,13 @@ Being quicker than the monster is not enough on its own — it still needs a 3-i
 checks (`:4549`) it is awake (`WakeUp` clears it, `CSBCode.cpp:7110`), and it gets them
 like anyone else.
 
+The blow is then softened by `2*DetermineMastery(chIdx, 7)` (`:4575-4576`), the plain
+skill number: without the 0x4000 flag, `DetermineMastery` adds the possessions' bonuses
+(`doc/CSBwin-src/Code17818.cpp:73-147`), so the Firestaff in the weapon hand takes 2 more
+off, the complete one 4. And every `DetermineMastery` returns 1 while the party sleeps,
+whatever its flags (`:29-36`): a spell a DSA's `&CAST` casts then is cast at mastery 1.
+Covered by `tools/dump-monster-blow-mastery.ts` and `tools/dump-cast-spell.ts`.
+
 `IsCharacterLucky` (`doc/CSBwin-src/Character.cpp:2170`) then moves Luck by 2 in the
 *opposite* direction to the outcome: down when it saved you. Luck is spent by using it.
 

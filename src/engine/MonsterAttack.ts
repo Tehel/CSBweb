@@ -22,7 +22,7 @@ import type { CsbRandom } from '../core/random';
 import { MISC_BONES_OF_HERO } from '../core/constants';
 import type { CreatureRecord, Item16Record } from '../data/dungeonTypes';
 import type { DungeonState } from './DungeonState';
-import type { GameContext } from './GameContext';
+import { nameIndexOf, type GameContext } from './GameContext';
 import { CHARFLAG_CHEST_OR_SCROLL, getChampionPossession, type Champion } from './gameTypes';
 import { drawCharacterState, getPartyChampion } from './Party';
 import { MonsterType, StateOfFear } from './monsterTypes';
@@ -383,7 +383,11 @@ export class MonsterAttack {
     }
 
     let damage = experienceTerm + this.random.below(16) + desc.attack10;
-    damage -= 2 * determineMastery(champ, 7, {});
+    // `DetermineMastery(chIdx, 7)`, no flag: the Firestaff in hand counts, and asleep it is 1.
+    damage -= 2 * determineMastery(champ, 7, {
+      partySleeping: this.ctx.party.state.sleeping,
+      getObjectNameIndex: (objectId) => nameIndexOf(this.ctx, objectId),
+    });
     if (damage <= 1) {
       if (this.random.bool() !== 0) return 0;
       damage = this.random.zeroTo3() + 2;

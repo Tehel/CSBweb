@@ -13,6 +13,9 @@
  * - `action` is handled first, before `chIdx >= d.NumCharacter` and `HP() == 0`
  *   (`:1112-1155`): a filter's abort message prints for a dead caster, and an action with
  *   no message (8) casts normally.
+ * - asleep, as a DSA's `&CAST` may cast, the caster's mastery is 1, as every
+ *   `DetermineMastery` gives while the party sleeps (`doc/CSBwin-src/Code17818.cpp:29-36`):
+ *   short of the spell's difficulty, a caster of little wisdom fails it.
  * - Zokathra (missile type 7) goes into the first empty hand, and with both hands full is
  *   dropped in the party's cell with `MoveObject(obj_2, -1, 0, d.partyX, d.partyY)`
  *   (`:1362-1389`), so the pads there see it placed, with `unchangedRoom` true.
@@ -20,7 +23,7 @@
  * Run: `npm test -- --only=dump-cast-spell.ts`
  */
 import { DBType, OBJECT_ID_EOF, Position, type ObjectID } from '../src/core/types';
-import { makeAddCharacterAttributes } from '../src/engine/attributes';
+import { AttributeIndex, makeAddCharacterAttributes, setAttributeCurrent } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
 import type { SpellParameters } from '../src/engine/magicTypes';
 import { newGame, stockDungeon, stockGraphics } from './lib/game';
@@ -107,6 +110,14 @@ async function main(): Promise<void> {
   const deadAbort = cast({ action: 3 }, (c) => { c.attributes.health = 0; });
   const silentAbort = cast({ action: 1 });
   const unknownAction = cast({ action: 8 });
+  // Wisdom 0: each point short of the difficulty fails at 113 draws in 128 (`:1222-1235`).
+  const dull = (c: Champion): void => setAttributeCurrent(c.attributes.stats[AttributeIndex.Wisdom], 0);
+  const awake = cast({}, dull);
+  game.ctx.party.state.sleeping = true;
+  const asleep = cast({}, dull);
+  game.ctx.party.state.sleeping = false;
+  console.log(`wisdom 0, mastery 3 for a difficulty of 3: awake ${awake.result} ${JSON.stringify(awake.printed)}, ` +
+    `asleep ${asleep.result} ${JSON.stringify(asleep.printed)}`);
 
   // Zokathra, through a filter's missile type 7, with the hands full or not. Every pad call
   // for a misc object is recorded.
@@ -173,6 +184,8 @@ async function main(): Promise<void> {
     `a filter's abort should print for a dead caster, as CSBWin checks the action first (${JSON.stringify(deadAbort.printed)})`);
   check(silentAbort.result === 0 && silentAbort.printed === '', 'action 1 should abort silently');
   check(unknownAction.result === 1, 'an action with no message (8) should cast normally');
+  check(awake.result === 1 && asleep.result === 0 && asleep.printed !== '',
+    'asleep, the caster\'s mastery is 1: short of the difficulty, the spell fails with its message');
   check(zokEmpty.result === 1 && game.ctx.dungeon.rnMaps.dbType(zokEmpty.hand0) === DBType.MISC
     && zokEmpty.dropped === 0 && zokEmpty.pads.length === 0,
     'Zokathra with a hand empty goes into hand 0, and nothing is dropped');

@@ -247,6 +247,7 @@ export class MagicSystem {
     const required = sw(spell.skillRequired + spellPower);
     const w4 = this.computeSpellExperience(required, spellPower, skillRequired);
     const mastery = determineMastery(champion, spellByte5, {
+      partySleeping: this.ctx.party.state.sleeping,
       getObjectNameIndex: (objectId) => nameIndexOf(this.ctx, objectId),
     });
 
