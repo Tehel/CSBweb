@@ -279,6 +279,9 @@ const CHECKS = [
   // A dungeon.dat behind an Extended Features block, the DM Windows package's: read in the
   // block's shape it is DM's dungeon converted, and a new game takes the block's rules.
   { tool: 'dump-extended-dungeon.ts' },
+  // The dungeon's game information, ReadGameInfo's: kept from a block, written into every
+  // save, and "No game information was provided" for a size of 0.
+  { tool: 'dump-game-info.ts' },
   { tool: 'dump-dungeon-file.ts' },
   { tool: 'dump-dungeon-builder.ts' },
   // `ReadExtendedFeatures` without a plain sentinel: the "simple" encipherment's stream,

@@ -132,7 +132,6 @@ In payoff order: the first row is the next item.
 | E30 | One presenter and one input router | M | ⏳ |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | C177 | An Atari-era save loads with its possessions, timers and hand unconverted | M | ⏳ |
-| C178 | No save keeps the dungeon's game information | S | ⏳ |
 | C183 | A `dungeon.dat` without an Extended Features block counts no EXPOOL record | S | ⏳ |
 | C171 | The Firestaff does not soften a monster's blow, and three mastery calls ignore sleep | S | ⏳ |
 | C168 | A monster north-west of the party never prefers west | S | ⏳ |
@@ -1009,20 +1008,6 @@ champion's hand, packed `0x1403`, loads as slot `0x1403`, past the 2097 slots, a
 Paying it: for a file without `objectIndex`, `ConvertListOfObjects` over the timers that
 carry an object, each champion's thirty slots and the object in hand, in CSBWin's order
 after the chains; a fixture whose champions carry something.
-
-### C178 ⏳ No save keeps the dungeon's game information
-
-`readExtendedFeatures` reads the game-information string (`SaveGameState.gameInfo`),
-`DungeonData` has no field for it, and `buildLiveExtendedFeatures` writes
-`gameInfoSize: 0` (`src/data/CsbwinExtendedFeatures.ts:950`). So a save of the port's drops
-Conflux's 541 bytes of credits, Towers of Chaos's 89, 3D2D1D's 40 and `dm-windows`'s 32,
-where CSBWin carries the string from any read into every save
-(`doc/CSBwin-src/SaveGame.cpp:1002-1003`) and supplies "No game information was provided"
-for a size of 0 (`:249-264`). The comment there says the size was "measured zero" in the
-eight committed saves; they hold 32 and that line (`doc/PROVEN_FACTS.md:2393`).
-
-Paying it: the string and its signed size on `DungeonData`, as `hintKey` is, written back; a
-save round trip checks that Conflux's survives.
 
 ### C183 ⏳ A `dungeon.dat` without an Extended Features block counts no EXPOOL record
 

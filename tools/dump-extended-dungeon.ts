@@ -161,7 +161,7 @@ function main(): void {
   const behind = load(withBlock);
   console.log(`  a ${prefix.length}-byte prefix before CSB's ${csbFile.length}-byte file; Word22592 ${behind.word22592}`);
   check(behind.word22592 === 12 && behind.extendedFeatures !== undefined, 'the body is expanded, Word22592 12');
-  const { extendedFeatures: _e, extendedWallDecorations: _x, spellFilterLocation: _s, hintKey: _k, dsaLevelIndex, ...rest } = behind;
+  const { extendedFeatures: _e, extendedWallDecorations: _x, spellFilterLocation: _s, hintKey: _k, gameInfo: _g, dsaLevelIndex, ...rest } = behind;
   check(dsaLevelIndex?.every((row) => row.every((v) => v === 0xffff)) === true, 'the block\'s empty DSA level index');
   check(json(rest) === json(csb), "the world is CSB's own");
 

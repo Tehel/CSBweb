@@ -33,7 +33,7 @@ import type {
 import { ExpandData } from '../core/compression';
 import { readU16BE, readU32BE } from '../core/bytes';
 import { EXPOOL_RECORD_SIZE, specialLocationsFromExpool } from './CsbwinExpool';
-import { readExtendedFeatures } from './CsbwinExtendedFeatures';
+import { readExtendedFeatures, readGameInfo } from './CsbwinExtendedFeatures';
 import { CheckCelltypes, ExtendPortraits, convertOriginalDungeon } from './CsbwinDungeonConversions';
 import { databaseRecords, rnMapsOf } from './CsbwinObjectIndex';
 import type { CsbwinObjectIndex } from './CsbwinObjectIndex';
@@ -213,6 +213,7 @@ export class DungeonLoader {
             data.extendedWallDecorations = ef.extendedWallDecorations;
             data.spellFilterLocation = ef.spellFilterLocation;
             data.hintKey = ef.header.hintKey;
+            data.gameInfo = readGameInfo(ef.header.gameInfoSize, ef.gameInfo ?? new Uint8Array(0));
             if (ef.dsaLevelIndex) data.dsaLevelIndex = ef.dsaLevelIndex;
             if (ef.dsaIndex) data.dsaIndex = ef.dsaIndex;
             const specialLocations = data.expool ? specialLocationsFromExpool(data.expool) : null;

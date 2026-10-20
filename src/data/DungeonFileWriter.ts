@@ -54,10 +54,12 @@ export function buildDungeonFile(dungeon: DungeonData, options: DungeonFileOptio
             bThreeDMovements: false,
             dsaIndex: dungeon.dsaIndex,
             hintKey: dungeon.hintKey,
+            gameInfo: dungeon.gameInfo,
         }),
         typeMap: objectIndex.typeMap,
         indexMap: objectIndex.indexMap,
         dsaIndex: dungeon.dsaIndex,
+        gameInfo: dungeon.gameInfo?.text,
         dsaLevelIndex: dungeon.dsaLevelIndex,
     });
     const image = buildDungeonImage(dungeon, { indirectText: true, bigActuators: true, newScrolls: true });

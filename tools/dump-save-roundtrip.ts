@@ -344,6 +344,12 @@ const NOT_CARRIED: Array<{ pattern: string; why: string; holds: (d: Difference, 
     holds: (d) => d.was == null && d.now === 'AAAAAAAAAAA=',
   },
   {
+    pattern: '.dungeon.snapshot.gameInfo',
+    why: 'no game information, written as a size of 0, read as ReadGameInfo\'s own (SaveGame.cpp:249-255)',
+    holds: (d) => d.was == null && JSON.stringify(d.now) ===
+      JSON.stringify({ size: 32, text: Buffer.from('No game information was provided').toString('base64') }),
+  },
+  {
     pattern: '.dungeon.snapshot.databases.scrolls[].textReference',
     why: 'a free record keeps only its link (data.cpp:995-1017)',
     holds: (d, { live }) => isFree(live, 'scrolls', d),

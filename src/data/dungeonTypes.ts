@@ -505,6 +505,17 @@ export interface Databases {
 }
 
 /**
+ * A game-information string as a save writes it after its Extended Features block:
+ * `size` is the block's `gameInfoSize`, `gameInfoSize - 1` of the global
+ * (`doc/CSBwin-src/SaveGame.cpp:1002-1003`), signed, and `text` the `max(0, size)` bytes
+ * `WriteGameInfo` writes (`:266-271`).
+ */
+export interface GameInfo {
+    size: number;
+    text: Uint8Array;
+}
+
+/**
  * Complete dungeon data
  */
 export interface DungeonData {
@@ -560,6 +571,12 @@ export interface DungeonData {
      * block, for which `ReadExtendedFeatures` leaves it zeroed (`:316`).
      */
     hintKey?: Uint8Array;
+    /**
+     * `gameInfo` and `gameInfoSize`, CSBWin's globals (`doc/CSBwin-src/data.cpp:271-272`),
+     * as the next save writes them (`readGameInfo`, `src/data/CsbwinExtendedFeatures.ts`).
+     * Unset, as `gameInfo == NULL`, for a world read from a file without a block.
+     */
+    gameInfo?: GameInfo;
     /**
      * The Extended Features block a `dungeon.dat` opens with, when it has one (the DM
      * Windows package's). A new game read from it takes its rule flags

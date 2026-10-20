@@ -53,13 +53,15 @@
  *   the live entry had the one its creator set (`RuntimeSave.collapseTimerBytes`).
  * - The footprint ring is the file's twenty-four entries, the ones not yet walked zero.
  * - `dsaLevelIndex`, `extendedWallDecorations`, `spellFilterLocation` and `hintKey` are
- *   the Extended Features block's, written out where a game from `dungeon.dat` had none.
+ *   the Extended Features block's, written out where a game from `dungeon.dat` had none,
+ *   and `gameInfo` is "No game information was provided", which `ReadGameInfo` reads for
+ *   the size of 0 such a game writes.
  * - A free record keeps only its link: the object a deleted scroll named, what a
  *   deleted monster carried or a deleted chest held, is not written
  *   (`doc/CSBwin-src/data.cpp:995-1017`).
  */
 import { loadCsbwinWorld, type CsbwinWorld } from '../data/CsbwinDungeonImage';
-import { readExpectedSignatures, readRulesOptions } from '../data/CsbwinExtendedFeatures';
+import { readExpectedSignatures, readGameInfo, readRulesOptions } from '../data/CsbwinExtendedFeatures';
 import { readFileSignatures } from './FileSignatures';
 import { readDisableSaves, readGlobalVariables, readOverlayPalette, specialLocationsFromExpool } from '../data/CsbwinExpool';
 import { readCsbwinParty, readCsbwinPartyTail } from '../data/CsbwinCharacters';
@@ -73,7 +75,7 @@ import type { RuntimeSaveState } from './RuntimeSave';
 import { OBJECT_ID_NULL, Position } from '../core/types';
 import type { Direction, ObjectID } from '../core/types';
 import type { Block1State, PartyState } from './gameTypes';
-import type { MissileRecord } from '../data/dungeonTypes';
+import type { GameInfo, MissileRecord } from '../data/dungeonTypes';
 
 /**
  * Build the party state out of `GAMEBLOCK2` and block 4.
@@ -189,6 +191,12 @@ function missilesOf(world: CsbwinWorld): MissileRecord[] {
     }));
 }
 
+/** `ReadGameInfo` over the save's block (`readGameInfo`); none for a save without one. */
+function gameInfoOf(world: CsbwinWorld): GameInfo | undefined {
+    const block = world.save.extendedFeatures;
+    return block ? readGameInfo(block.gameInfoSize, world.save.gameInfo ?? new Uint8Array(0)) : undefined;
+}
+
 /** `EDT_SpecialLocations`, the image's EXPOOL records of special locations. */
 function specialLocationsOf(world: CsbwinWorld): Record<number, number> | undefined {
     return (world.dungeon.expool && specialLocationsFromExpool(world.dungeon.expool)) ?? undefined;
@@ -238,7 +246,7 @@ export function buildCsbwinRuntimeState(world: CsbwinWorld): RuntimeSaveState {
             timerSequence: world.save.timerSequence,
             firstAvailTimer: gb2.firstAvailTimer,
             missiles: missilesOf(world),
-            // The image holds none of these six: the save carries them beside it.
+            // The image holds none of these seven: the save carries them beside it.
             snapshot: captureDungeonSnapshot({
                 ...world.dungeon,
                 dsaLevelIndex: world.save.dsaLevelIndex,
@@ -247,6 +255,7 @@ export function buildCsbwinRuntimeState(world: CsbwinWorld): RuntimeSaveState {
                 extendedWallDecorations: world.save.extendedWallDecorations,
                 spellFilterLocation: world.save.spellFilterLocation,
                 hintKey: world.save.hintKey,
+                gameInfo: gameInfoOf(world),
             }),
         },
     };
@@ -254,7 +263,7 @@ export function buildCsbwinRuntimeState(world: CsbwinWorld): RuntimeSaveState {
 
 /**
  * `_ReadEntireGame`'s read of a save's world, installed as the running game's
- * (`Game.installWorld`): the image, structure and all, with the six the save carries
+ * (`Game.installWorld`): the image, structure and all, with the seven the save carries
  * beside it, its rules and signatures, and `CheckMonsters` (doc/CSBwin-src/SaveGame.cpp:2029). The save
  * restores its state over it (`applyCsbwinSave`).
  */
@@ -273,6 +282,7 @@ function installCsbwinWorld(game: Game, world: CsbwinWorld): void {
         extendedWallDecorations: world.save.extendedWallDecorations,
         spellFilterLocation: world.save.spellFilterLocation,
         hintKey: world.save.hintKey,
+        gameInfo: gameInfoOf(world),
     }));
 }
 

@@ -102,6 +102,7 @@ function buildFileBlocks(
             dsaIndex: dungeon.dsaIndex,
             signatures: game.ctx.signatures,
             hintKey: dungeon.hintKey,
+            gameInfo: dungeon.gameInfo,
             overlay: game.ctx.overlay.toExtendedFeatures(),
         }),
         dungeonImage: buildDungeonImage(dungeon, {
@@ -148,6 +149,7 @@ export function buildSaveFile(game: Game, options: SaveFileOptions = {}): Uint8A
         },
         characterBlock: file.characterBlock,
         extendedFeatures: file.extendedFeatures,
+        gameInfo: game.ctx.state.dungeon.gameInfo?.text,
         objectIndex: file.objectIndex,
         dsaLevelIndex: game.ctx.state.dungeon.dsaLevelIndex,
         // The DSAs as play left them: a DSA whose `localState` is 1 keeps its state in

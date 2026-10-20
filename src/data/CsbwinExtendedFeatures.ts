@@ -36,7 +36,7 @@
  */
 import { formChecksum, readObjectIndirectIndex } from './CsbwinObjectIndex';
 import type { CsbwinObjectIndex } from './CsbwinObjectIndex';
-import type { DsaDefinition, DsaIndex } from './dungeonTypes';
+import type { DsaDefinition, DsaIndex, GameInfo } from './dungeonTypes';
 import { readU16LE, readU32LE, writeU16LE, writeU32LE } from '../core/bytes';
 
 /** `strcpy(efb.sentinel, " Extended Features ")` — 19 characters and a terminator. */
@@ -779,6 +779,8 @@ interface LiveExtendedFeatures {
     signatures?: ExpectedSignatures;
     /** `hintKey`, as the world's file gave it; absent, eight zeros. */
     hintKey?: Uint8Array;
+    /** The world's `gameInfo`; absent, `gameInfo == NULL`, a size of 0. */
+    gameInfo?: GameInfo;
     /** `overlayActive` and `currentOverlay` (`Overlay.toExtendedFeatures`); absent, none. */
     overlay?: SavedOverlay;
     /** `SupressDSAWarningOption`, written as `SupressDSAWarning`, where CSBWin writes none. */
@@ -870,6 +872,24 @@ export function readRulesOptions(
     rules.bThreeDMovements = (header.extendedFlags & EF_EXTENDED_FLAGS.ThreeDMovements) !== 0;
 }
 
+/** What `ReadGameInfo` puts in place of a block's empty string (`doc/CSBwin-src/SaveGame.cpp:252`). */
+const NO_GAME_INFO = 'No game information was provided';
+
+/**
+ * `ReadGameInfo` (`doc/CSBwin-src/SaveGame.cpp:247-264`), which every read of a block
+ * runs (`:388`): the block's string, `size` its `gameInfoSize` and `text` the bytes after
+ * the DSAs, as the next save writes them back. A size of 0 reads as "No game
+ * information was provided", whose `gameInfoSize` is its length and the terminator, so
+ * the save writes 32.
+ */
+export function readGameInfo(size: number, text: Uint8Array): GameInfo {
+    if (size === 0) {
+        const bytes = Uint8Array.from(NO_GAME_INFO, (c) => c.charCodeAt(0));
+        return { size: bytes.length, text: bytes };
+    }
+    return { size, text: text.slice() };
+}
+
 /**
  * The 512-byte header a running game writes, field for field against `SaveGame`
  * (`doc/CSBwin-src/SaveGame.cpp:941-1005`).
@@ -917,9 +937,9 @@ export function readRulesOptions(
  * **Zero, and measured zero rather than assumed.** `editingOptions` is never assigned by
  * `SaveGame` at all.
  *
- * **`gameInfoSize` is 0**, meaning `gameInfo == NULL` (`:977-978`) — this port has no
- * game-information string. Note that 0 and -1 are different things here; -1 is an
- * allocated-but-empty one.
+ * **`gameInfoSize`** is the world's `gameInfo`'s (`:1002-1003`), 0 for none: a world read
+ * from a file with a block carries one (`readGameInfo`). Note that 0 and -1 are different
+ * things here; -1 is an allocated-but-empty one.
  *
  * **`numDSA`** is `countDSAs()` (`:935`), the DSAs `buildExtendedFeaturesPrefix` then
  * writes.
@@ -947,7 +967,7 @@ export function buildLiveExtendedFeatures(live: LiveExtendedFeatures): ExtendedF
         flags,
         numDSA: countDSAs(live.dsaIndex),
         editingOptions: 0,
-        gameInfoSize: 0,
+        gameInfoSize: live.gameInfo?.size ?? 0,
         cellFlagArraySize: live.cellFlagArraySize,
         graphicsSignature1: (live.signatures?.expectedGraphicSignature1 ?? 0) >>> 0,
         graphicsSignature2: (live.signatures?.expectedGraphicSignature2 ?? 0) >>> 0,

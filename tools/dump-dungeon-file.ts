@@ -55,6 +55,7 @@ import { newGame, runVbl, STOCK_DIR, TICK_DUE } from './lib/game';
 const read = (path: string): Uint8Array => new Uint8Array(readFileSync(resolve(path)));
 const load = (bytes: Uint8Array): DungeonData => new DungeonLoader().loadDungeonDat(bytes);
 
+const NO_GAME_INFO = 'No game information was provided';
 /** The secondary RNs a free record does not carry through a write (`writtenSecondary`). */
 const SECONDARY = ['possession', 'textObject', 'textReference', 'containedObject', 'projectileObject'];
 /** The block's fields, as a world read from a file without one lacks them. */
@@ -66,11 +67,17 @@ const EMPTY_BLOCK_FIELDS: Record<string, (v: unknown) => boolean> = {
   extendedWallDecorations: (v) => v === false,
   spellFilterLocation: (v) => v === 0,
   hintKey: (v) => v === 'AAAAAAAAAAA=' || (v instanceof Uint8Array && v.every((b) => b === 0)),
+  // A size of 0 written, which `ReadGameInfo` reads as its own string (`SaveGame.cpp:249-255`).
+  gameInfo: (v) => {
+    const info = v as { size?: number; text?: Uint8Array | string } | null;
+    const text = typeof info?.text === 'string' ? Buffer.from(info.text, 'base64') : info?.text;
+    return info?.size === 32 && text !== undefined && Buffer.from(text).toString('latin1') === NO_GAME_INFO;
+  },
 };
 
 /** JSON, a free record without its secondary RN and an empty block field as absent. */
 const json = (v: unknown): string => JSON.stringify(v, (k, x) => {
-  if (x instanceof Uint8Array && k !== 'hintKey') return Array.from(x);
+  if (x instanceof Uint8Array && k !== 'hintKey' && k !== 'text') return Array.from(x);
   if (x instanceof Uint16Array) return Array.from(x);
   if (k in EMPTY_BLOCK_FIELDS && (x === null || EMPTY_BLOCK_FIELDS[k](x))) return undefined;
   if (x && typeof x === 'object' && (x as { nextObject?: number }).nextObject === 0xffff) {
@@ -152,7 +159,10 @@ function roundTrip(name: string, dungeonPath: string, graphicsPath: string): voi
   const differ = Object.keys({ ...a, ...b }).filter((k) => json(a[k]) !== json(b[k]));
   console.log(`parts compared ${Object.keys(a).length}, differing: ${differ.join(', ') || '-'}`);
   check(differ.length === 0, 'read back, the world is the one written');
-  check(json(buildDungeonFile(after, { dmRules })) === json(written), 'and written again, the same bytes');
+  // A world with no game information writes a size of 0, which reads back as
+  // `ReadGameInfo`'s string; without it, the world writes the same bytes again.
+  check(json(buildDungeonFile({ ...after, gameInfo: before.gameInfo }, { dmRules })) === json(written),
+    'and written again, the same bytes, but for the game information a size of 0 reads as');
 
   const { game: playedBefore, hashes: hashesBefore } = play(load(original), graphics, dmRules, 200);
   const { game: playedAfter, hashes: hashesAfter } = play(load(written), graphics, dmRules, 200);

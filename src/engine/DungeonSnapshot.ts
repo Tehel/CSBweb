@@ -31,7 +31,7 @@
  *   (`src/data/CsbwinExpool.ts`). The rest of it is the file's, and this port cannot
  *   regenerate it.
  * - `dsaLevelIndex`, `dsaIndex`, `specialLocations`, `extendedWallDecorations`,
- *   `spellFilterLocation` and `hintKey` are carried for the same reason. `dungeon.dat` has none of
+ *   `spellFilterLocation`, `hintKey` and `gameInfo` are carried for the same reason. `dungeon.dat` has none of
  *   them; a CSBWin save's Extended Features block and `EXPOOL` do, and a CSBWin load
  *   writes them into the world (`buildCsbwinRuntimeState`). Only each DSA's `state`
  *   changes in play, but `dsaIndex` goes in whole, since it is the save's.
@@ -121,6 +121,7 @@ export const DUNGEON_DATA_SOURCES = {
     extendedWallDecorations: 'snapshot',
     spellFilterLocation: 'snapshot',
     hintKey: 'snapshot',
+    gameInfo: 'snapshot',
     bigActuators: 'loaded',
     indirectText: 'loaded',
     newScrolls: 'loaded',
@@ -192,6 +193,8 @@ export interface DungeonSnapshot {
     spellFilterLocation?: number | null;
     /** `data.hintKey`, base64. */
     hintKey?: string | null;
+    /** `data.gameInfo`, its text base64. */
+    gameInfo?: { size: number; text: string } | null;
 }
 
 function encodeBytes(bytes: Uint8Array): string {
@@ -333,6 +336,7 @@ export function captureDungeonSnapshot(data: DungeonData): DungeonSnapshot {
     snapshot.extendedWallDecorations = data.extendedWallDecorations ?? null;
     snapshot.spellFilterLocation = data.spellFilterLocation ?? null;
     snapshot.hintKey = data.hintKey ? encodeBytes(data.hintKey) : null;
+    snapshot.gameInfo = data.gameInfo ? { size: data.gameInfo.size, text: encodeBytes(data.gameInfo.text) } : null;
 
     return snapshot;
 }
@@ -410,4 +414,6 @@ export function applyDungeonSnapshot(data: DungeonData, snapshot: DungeonSnapsho
     else if (snapshot.spellFilterLocation !== undefined) data.spellFilterLocation = snapshot.spellFilterLocation;
     if (snapshot.hintKey === null) delete data.hintKey;
     else if (snapshot.hintKey) data.hintKey = decodeBytes(snapshot.hintKey);
+    if (snapshot.gameInfo === null) delete data.gameInfo;
+    else if (snapshot.gameInfo) data.gameInfo = { size: snapshot.gameInfo.size, text: decodeBytes(snapshot.gameInfo.text) };
 }

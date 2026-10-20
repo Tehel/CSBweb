@@ -2431,6 +2431,22 @@ committed saves all hold a `gameInfoSize` of 32.
 
 Covered by `tools/dump-csbwin-save.ts`.
 
+## Every save carries the game information the last block gave
+
+`ReadExtendedFeatures` ends every read of a block with `ReadGameInfo(handle,
+efb.gameInfoSize)` (`doc/CSBwin-src/SaveGame.cpp:388`), which keeps the string in the
+global `gameInfo` with `gameInfoSize` its length and terminator, and for a size of 0
+puts "No game information was provided" there instead (`:247-264`). `SaveGame` then writes
+`gameInfoSize - 1`, or 0 when `gameInfo` is `NULL`, and `WriteGameInfo` the string
+(`:1002-1003`, `:1020`, `:266-271`). So a game read from a `dungeon.dat` with a block
+carries its string into every save: Conflux's 541 bytes of credits, Towers of Chaos's 89,
+3D2D1D's 40, `dm-windows`'s 32. A file without a block runs no `ReadGameInfo`, and a game
+read from DM's `dungeon.dat` saves a size of 0, which its read turns into the 32 bytes of
+"No game information was provided": the eight committed saves' string. The port keeps it
+as `DungeonData.gameInfo` (`readGameInfo`, `src/data/CsbwinExtendedFeatures.ts`).
+
+Covered by `tools/dump-game-info.ts`.
+
 ## `CHARDESC.title` is 20 bytes, not 16
 
 `CHARDESC` (`doc/CSBwin-src/CSB.h:2542`) declares
@@ -4255,8 +4271,9 @@ back only when that bit is set (`:389-392`), and the index is always written —
 header without the bit leaves three bytes of terminator for GAMEBLOCK1 to eat.
 
 `gameInfoSize` is 0 for "no game information at all" and `gameInfoSize - 1` when there is
-some (`:1002-1003`), which makes **-1** an allocated-but-empty string. A port with no game
-information writes 0.
+some (`:1002-1003`), which makes **-1** an allocated-but-empty string. The port writes the
+world's, which a read of a block gave ("Every save carries the game information the last
+block gave"), and 0 for a world read from a file without one.
 
 The four signatures and `hintKey` are written from what the reads left
 (`:961-966`), not computed. `ReadExtendedFeatures` zeroes `hintKey` before it looks for a
