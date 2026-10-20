@@ -124,9 +124,11 @@ function TAG004b26(draw: ViewportDraw, door: IndexedBitmap, ornament: number, ne
   const slot = draw.context.doorOrnaments?.[ornament - 1];
   if (!tables || !getGraphic || !slot) return;
   const [graphicNum, set] = slot;
-  const rect = tables.doorOrnamentRectSets[set][nearness];
+  // A custom data set's ornament can name a set past `d.Byte4122`'s four, which CSBWin
+  // reads on past its table: the ornament is not drawn.
+  const rect = tables.doorOrnamentRectSets[set]?.[nearness];
   const graphic = getGraphic(graphicNum);
-  if (!graphic) return;
+  if (!rect || !graphic) return;
 
   let ornamentBitmap = graphic;
   if (nearness !== 2) {
@@ -136,7 +138,7 @@ function TAG004b26(draw: ViewportDraw, door: IndexedBitmap, ornament: number, ne
     if (cached) {
       ornamentBitmap = cached;
     } else {
-      const size = tables.doorOrnamentRectSets[set][2]; // `Byte5058[18*set]`
+      const size = tables.doorOrnamentRectSets[set]![2]!; // `Byte5058[18*set]`
       const colorMap = nearness === 0 ? tables.doorOrnamentColorMapF3 : tables.doorOrnamentColorMapF2;
       const cropped = cropBitmap(graphic, 2 * size.widthBytes, size.height);
       ornamentBitmap = shrinkBlt(

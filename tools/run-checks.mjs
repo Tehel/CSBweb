@@ -359,6 +359,7 @@ const CHECKS = [
   // states, the expanded sizes, the LZW chains, a portrait's size, a viewport program's
   // steps. Each throws at once, where it would exhaust the memory or never return.
   { tool: 'dump-damaged-counts.ts' },
+  { tool: 'dump-hostile-indices.ts' },
   // Every table read from graphics.dat's table items, written back over the item's own
   // bytes at the offsets Data.h's declarations give it, in every data set.
   { tool: 'dump-graphics-tables.ts' },

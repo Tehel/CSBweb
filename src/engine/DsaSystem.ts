@@ -3480,8 +3480,8 @@ export class DsaSystem {
     let possIndex = bank.stack.pop() >>> 0;
     const idx = bank.stack.pop();
     let object: ObjectID = OBJECT_ID_NULL;
-    if (this.isValidObjectId(idx) && this.dungeon.rnMaps.dbType(idx) === DBType.CREATURE) {
-      const monster = this.dungeon.getCreatureRecord(idx)!;
+    const monster = this.isValidObjectId(idx) ? this.dungeon.getCreatureRecord(idx) : null;
+    if (monster) {
       for (object = monster.possession; possIndex > 0 && object !== OBJECT_ID_EOF;
         object = this.dungeon.getDBRecordLink(object)) {
         possIndex--;
@@ -3503,8 +3503,8 @@ export class DsaSystem {
     const id = bank.stack.pop();
     const result = new Int32Array(8);
     result[1] = -1;
-    if (this.isValidObjectId(id) && this.dungeon.rnMaps.dbType(id) === DBType.CREATURE) {
-      const monster = this.dungeon.getCreatureRecord(id)!;
+    const monster = this.isValidObjectId(id) ? this.dungeon.getCreatureRecord(id) : null;
+    if (monster) {
       result[0] = (monster.numMonM1 & 0x3) + 1;
       result[1] = monster.creatureType;
       for (let i = 0; i < 4; i++) result[2 + i] = monster.hp[i] ?? 0;
@@ -3531,8 +3531,8 @@ export class DsaSystem {
     const id = bank.stack.pop();
     this.noFilter(bank);
     if (!this.isValidObjectId(id)) return;
-    if (this.dungeon.rnMaps.dbType(id) !== DBType.CREATURE) return; // "Not a Monster"
-    const monster = this.dungeon.getCreatureRecord(id)!;
+    const monster = this.dungeon.getCreatureRecord(id);
+    if (!monster) return; // "Not a Monster"
     for (let i = 0; i < 4 && i < ((num - 2) >>> 0); i++) monster.hp[i] = bank.getVar(index + i + 2) & 0xffff;
     if (num > 6) {
       const flags = bank.getVar(index + 6);
@@ -3701,12 +3701,14 @@ export class DsaSystem {
     }
     const character = this.ctx.systems.character;
     if (pCH) character.adjustStatsForItemCarried(pCH, loc, -1, obj);
+    let record: { cursed?: boolean } | null = null;
     switch (this.dungeon.rnMaps.dbType(obj)) {
-      case DBType.WEAPON: this.dungeon.getWeaponRecord(obj)!.cursed = curse; break;
-      case DBType.CLOTHING: this.dungeon.getClothingRecord(obj)!.cursed = curse; break;
-      case DBType.MISC: this.dungeon.getMiscRecord(obj)!.cursed = curse; break;
+      case DBType.WEAPON: record = this.dungeon.getWeaponRecord(obj); break;
+      case DBType.CLOTHING: record = this.dungeon.getClothingRecord(obj); break;
+      case DBType.MISC: record = this.dungeon.getMiscRecord(obj); break;
       default: break;
     }
+    if (record) record.cursed = curse;
     if (pCH) character.adjustStatsForItemCarried(pCH, loc, +1, obj);
   }
 
@@ -4075,7 +4077,8 @@ export class DsaSystem {
       const { category, position } = this.dungeon.rnMaps.decode(rn);
       if (category !== DBType.TEXT) continue;
       if (position !== locr.p) continue;
-      const record = this.dungeon.getTextRecord(rn)!;
+      const record = this.dungeon.getTextRecord(rn);
+      if (!record) continue;
       ctx.phraseTextOverrides[index] = GetText(this.dungeon.getData(), record.textOffset, this.ctx.tables.textDecode);
       ctx.phraseMask |= 1 << index;
     }

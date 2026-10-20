@@ -185,11 +185,12 @@ export function cropBitmap(src: IndexedBitmap, width: number, height: number): I
   return { width: w, height: h, pixels: out };
 }
 
+/** `rect` clipped to a `dstWidth` x `dstHeight` buffer, or `null` when none of it is on it. */
 function normalizeRectInclusive(rect: RectPos, dstWidth: number, dstHeight: number): RectPos | null {
-  const x1 = clampInt(rect.x1, 0, dstWidth - 1);
-  const y1 = clampInt(rect.y1, 0, dstHeight - 1);
-  const x2 = clampInt(rect.x2, 0, dstWidth - 1);
-  const y2 = clampInt(rect.y2, 0, dstHeight - 1);
+  const x1 = Math.max(rect.x1 | 0, 0);
+  const y1 = Math.max(rect.y1 | 0, 0);
+  const x2 = Math.min(rect.x2 | 0, dstWidth - 1);
+  const y2 = Math.min(rect.y2 | 0, dstHeight - 1);
 
   if (x2 < x1 || y2 < y1) return null;
 
@@ -211,7 +212,12 @@ function normalizeRectInclusive(rect: RectPos, dstWidth: number, dstHeight: numb
  * Here we treat all coordinates as pixels:
  * - `dstRect` uses inclusive coordinates, same as CSBWin (`x2-x1+1` width).
  * - `srcX/srcY` (carried via `RectPos`) select the top-left within `src`.
- * - `srcWidth/srcHeight` (carried via `RectPos`) are treated as optional copy limits.
+ * - `srcStride` and `srcHeight` (carried via `RectPos`) are the source's line width and
+ *   rows, the bitmap's own by default; `srcWidth` is not read.
+ * - The rectangle is clipped to `dst`, the source moving with a clipped left or top edge:
+ *   one partly off `dst` draws the part on it, one wholly off draws nothing. CSBWin's
+ *   callers clip first, and the port's with them; this guards a custom data set's
+ *   rectangles, which CSBWin would draw outside its buffer.
  * - `transparentColor` matches CSBWin behavior (`10` for shapes, `-1` for no transparency).
  *
  * This does not attempt to emulate the Atari ST planar bit shifting; it operates on already-decoded pixels.
@@ -230,8 +236,9 @@ export function tag0088b2Index(
   let dstX2 = rect.x2;
   let dstY2 = rect.y2;
 
-  let srcX0 = rect.srcX ?? 0;
-  let srcY0 = rect.srcY ?? 0;
+  // The source moves with a clipped left or top edge.
+  let srcX0 = (rect.srcX ?? 0) + rect.x1 - (dstRect.x1 | 0);
+  let srcY0 = (rect.srcY ?? 0) + rect.y1 - (dstRect.y1 | 0);
 
   // Clamp source offsets.
   if (srcX0 < 0) {

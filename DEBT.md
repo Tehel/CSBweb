@@ -116,7 +116,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| R7 | An index from a custom data set can throw | S | ⏳ |
 | R8 | An optional feature's failure ends the game, or the session | S | ⏳ |
 | R10 | Pointer, touch and WebGL | S | ⏳ |
 | R11 | Right-click closes the save menu while it saves or loads | S | ⏳ |
@@ -322,7 +321,7 @@ Decisions taken with the author, for every row:
   document belongs to one set and the backup copies it with the folder. A moderator adds
   and removes them, on any published set; a local set has none, and the game reads none.
 
-A custom dungeon reaches what the shipped ones do not, so R7 and R8 matter more now.
+A custom dungeon reaches what the shipped ones do not, so R8 matters more now.
 
 ### P11 ⏳ A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it
 
@@ -449,31 +448,6 @@ takes untrusted data. A file the player drops on the page and a custom dungeon a
 untrusted: they may stop the game with a message, as CSBWin dies, but never crash or hang
 the tab, nor corrupt what is stored. Each item owes what a fix owes ("How to work this
 list", point 4), its check included.
-
-### R7 ⏳ An index from a custom data set can throw
-
-The shipped data sets stay in range; a custom one need not (G22):
-
-- **Door ornaments**: `this.objectTables.doorOrnamentRectSetIndex[decoration]`
-  (`src/renderer/ViewportRenderer.ts:275`) reads a 12-entry table unchecked, and
-  `tables.doorOrnamentRectSets[set][nearness]` (`src/renderer/bytecode/DrawDoor.ts:127`,
-  `:139`) four sets without `?.`, where the floor decorations' path guards
-  (`rectSet?.[relativeCell]`). A door TOC entry of 12 or more, or a `Byte4122` value of 4
-  or more, throws in the draw and ends the game.
-- **The blitter clamps where it should clip.** `normalizeRectInclusive`
-  (`src/renderer/csbwin/CanvasBlitter.ts:188-203`) moves `x1`/`y1` without moving
-  `srcX`/`srcY`, and clamps a rectangle wholly off the right to `width - 1`: one partly off
-  the left draws the wrong columns, one wholly off the right a one-pixel sliver. Each
-  caller clips by hand, each its own way (`drawSingleObject` the low side only,
-  `drawMonsterAt`'s `x1 === 223`, `DrawClouds`). Its comment says `srcWidth` limits the
-  copy (`:214`); the body never reads it.
-- **`DsaSystem`'s `!` on record lookups**: `getCreatureRecord(id)!` (`:3484`, `:3507`,
-  `:3535`), `get{Weapon,Clothing,Misc}Record(obj)!` (`:3705-3707`), `getTextRecord(rn)!`
-  (`:4078`). An index map naming a record past its database throws, where the sibling
-  paths check (`findMonsterSource`).
-
-Paying it: the guards; a clipping `tag0088b2Index`, its callers' own clipping dropped,
-with `npm test -- --frames`.
 
 ### R8 ⏳ An optional feature's failure ends the game, or the session
 
@@ -802,7 +776,7 @@ C170 and C171 are copies that drifted. The copies left:
 - **A spell's RN**, `0xff80 + (x & 0x7f)`, at `TimerSystem.ts:993`, `:1637` and
   `MagicSystem.ts:479-480`, beside `missileHelpers.spellObjectId` (`:26`);
   `adjustSpellMissileRange` and `computeSpellLaunchPos` (`MagicSystem.ts:463-477`) repeat
-  `characterThrowsSpell` and `launchObject`; `DsaSystem.ts:4673-4676` repeats
+  `characterThrowsSpell` and `launchObject`; `DsaSystem.ts:4676-4679` repeats
   `MonsterSystem.detachedGroupIndexFor`.
 - **The room type**, `(cellFlag >> 5) & 0x7`, written out 28 times beside 4 calls of
   `getRoomType`; the facing byte packed at `WorldMove.ts:616` and `DungeonState.ts:928`.
@@ -811,7 +785,7 @@ C170 and C171 are copies that drifted. The copies left:
   `objectIndex.ts:86-94` and `MakeMoreRoomInDB.ts:95-98`, beside `DATABASE_KEY` (`:62`)
   and `getRecord` (`:688`).
 - **The global text's key**, `((EDT_GLOBAL_TEXT << 24) | (index & 0xffff)) >>> 0`, at
-  `Game.ts:187`, `DsaSystem.ts:4098` and `:4113`, and its decode at `DsaSystem.ts:4100-4106`
+  `Game.ts:187`, `DsaSystem.ts:4101` and `:4116`, and its decode at `DsaSystem.ts:4103-4109`
   and `DecodeText.ts:269-272`; `EDT_SPECIAL_LOCATIONS` and `ESL_MONSTER_MOVE_FILTER` both in
   `CsbwinExpool.ts:40-44` and `DsaSystem.ts:329-351`, and the fifteen `ESL_*` loose
   constants.
@@ -861,7 +835,7 @@ parts.
 
 Five doc comments sit over the wrong function (`:147` over `CursorFilterType`;
 `:3276-3279` over `examineCell`, not `noFilter`; `:3609-3615` over `getObjectField`, not
-`isCarried`; `:4084-4091` over `globalText`, not `setGlobalText` and `isValidObjectId`),
+`isCarried`; `:4087-4094` over `globalText`, not `setGlobalText` and `isValidObjectId`),
 and seven filter sites have none (`processMissileEncounterFilter`,
 `processAdjustSkillsFilter`, `processSpellFilter`, `processTimer5`, `6` and `7`). A spell's
 parameters are marshalled field by field both ways (`:1380-1412`, and again in
@@ -899,7 +873,7 @@ Each command's body keeps CSBWin's order and names. Two tools change with it:
   `if (!tables || !viewport || !getGraphic) return;` draw nothing and say nothing when a
   dependency is missing; `floorBitmap` and `ceilingBitmap` are dead.
 - The drawing's state is module-wide: the interpreter's `stack`, `rstack`, `sp` and `rsp`,
-  `viewportRandom` (`ViewportDraw.ts:32`) and `graphicRandomState` (`DrawDoor.ts:210`),
+  `viewportRandom` (`ViewportDraw.ts:32`) and `graphicRandomState` (`DrawDoor.ts:212`),
   which tools reseed by hand.
 - `selectLevel` writes the level's monster colours into the shared tables
   (`tables.monsterColorMapMedium[...]`, `src/renderer/ViewportRenderer.ts:203-208`), the
@@ -998,7 +972,7 @@ loader's cache keyed by format, or the parameter dropped with the dead fallback.
 
 - **The palette-to-RGBA conversion is most of a compose**: 0.76 ms of `refreshOverlay`'s,
   where a 16-entry `Uint32` table a palette, written through a `Uint32Array` view, takes
-  0.14 ms (`updateImageDataFromIndex*`, `src/renderer/csbwin/CanvasBlitter.ts:409-483`). It
+  0.14 ms (`updateImageDataFromIndex*`, `src/renderer/csbwin/CanvasBlitter.ts:416-490`). It
   always takes the two-palette path while adventuring: `viewportPalette !== uiPalette`
   compares two separate copies (`GameScreen.ts:754-757`). Its body is written three times
   in `CanvasBlitter`, and the cursor's footprint loop twice (`reconvertThroughPalette`,
@@ -1072,8 +1046,7 @@ Paying it: delete; one `RoomType` and a `ViewRoomType` for 16 to 20; one
   `CsbwinSaveInfo.ts:9` ("never touches the image"); `CsbwinSaveGame.ts:182`
   (`buildCsbwinRuntimeState` "pure", where `readDisableSaves` removes records from the
   world's `expool`); `DrawViewport.ts:5`, `:156`, `:163` ("the 3D first-person view", and
-  doubts on cells 3 and 10 that `relativeX`/`relativeY` settle); `CanvasBlitter.ts:214`
-  (R7); `getChampionMessageColor`'s `?? 13`, "the historical default", a guessed number
+  doubts on cells 3 and 10 that `relativeX`/`relativeY` settle); `getChampionMessageColor`'s `?? 13`, "the historical default", a guessed number
   (`ActuatorSystem`).
 - **Documents**: `doc/CSBWIN_DSA_REFERENCE.md` says `&PARTY@` and `&CHAR@` write nothing
   past 100, where `&CHAR@` zero-fills (`doc/CSBwin-src/DSA.cpp:4179-4227`; the port is
@@ -1106,8 +1079,8 @@ nothing, and a `?? 0` on a field that cannot be missing hides the type's contrac
   (`MonsterAI.ts:1429`); `CharacterStats.getObjectWeight(item: ObjectID | number | null |
   undefined)`;
 - `as ObjectID` on what already is one, which blurs the audit by which a cast marks a
-  conversion (`CLAUDE.md` → "Object IDs"): `DsaSystem.ts:1538`, `:1539`, `:2050`, `:4413`,
-  `:4616`, `:4628`, `ActuatorSystem.ts:607`, `TimerSystem.ts:1427`, `:1559`, `:1597`,
+  conversion (`CLAUDE.md` → "Object IDs"): `DsaSystem.ts:1538`, `:1539`, `:2050`, `:4416`,
+  `:4619`, `:4631`, `ActuatorSystem.ts:607`, `TimerSystem.ts:1427`, `:1559`, `:1597`,
   `objectIndex.ts` (`NameIndex`), `PeriodicUpdates.ts:67`, `MonsterSystem.ts:750`, `:757`;
 - CSBWin's `RNempty` written as `0 as ObjectID` (`ActuatorSystem.ts:350`) and `rn === 0`
   (`objectIndex.ts:82`).
@@ -1331,7 +1304,7 @@ puts its copy on one with `MoveObject(newObj, -1, 0, x, y)`
 `triggerObjectMove`; `setPos`, `triggerObjectMove`, then `addObjectToCell`. What that loses:
 
 - no pit or teleporter on the square is resolved (`WorldMove.resolveCellEffects`, which
-  `&MOVE` already uses, `:4413`, `:4606-4621`);
+  `&MOVE` already uses, `:4416`, `:4609-4624`);
 - `unchangedRoom` is always false, where `MoveObject` passes whether the party stands there
   (`Code11f52.cpp:3314-3328`, `:3458-3473`), so floor actuators of types 1 and 2 fire under
   the party where CSBWin's do not;
@@ -1351,7 +1324,7 @@ square, and a monster group added on the party's level.
 ### C174 ⏳ DSA copies that are not whole
 
 - **`&ADD` of a monster group shares its hit points** with the original. The copy is
-  `{ ...rec, nextObject, possession, groupIndex }` (`src/engine/DsaSystem.ts:4916-4929`),
+  `{ ...rec, nextObject, possession, groupIndex }` (`src/engine/DsaSystem.ts:4919-4932`),
   and `CreatureRecord.hp` is an array (`src/data/dungeonTypes.ts:205`) that damage writes in
   place (`MonsterDamage.ts:569`, `:714`, `:831`, `MissileEncounter.ts:399`, `&MONSTER!`):
   a hit on either group hurts both. CSBWin copies the record byte by byte
