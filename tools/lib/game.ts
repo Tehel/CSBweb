@@ -90,7 +90,8 @@ export function newGame(data: DungeonData, graphics: GraphicsLoader, host?: Part
  * A `GameContext` over `data` with every table from `graphics`, for a tool that stands a
  * subsystem up without a whole `Game`. `parts` replaces members, so the tool can keep its
  * own party, dungeon or seeded random. (The replaced members are not rewired: the sound
- * queue keeps following the context's own party.)
+ * queue keeps following the context's own party.) No read installs its world, so the timer
+ * queue keeps `deleteDuplicateTimers`' default, `true`, whatever the world's `EXPOOL` says.
  */
 export function newContext(data: DungeonData, graphics: GraphicsLoader, parts: Partial<GameContext> = {}): GameContext {
   return { ...createGameContext(data, gameTablesOf(graphics)), ...parts };

@@ -16,7 +16,7 @@ import { VBL_PER_TICK } from './LoopState';
 import type { Block1State, PartyState } from './gameTypes';
 import { ensureHandOwner } from './Party';
 import type { FootprintsSnapshot } from './PartyFootprints';
-import type { TimerEntry } from './TimerQueue';
+import type { TimerEntry, TimerQueue } from './TimerQueue';
 
 export interface RuntimeSaveState {
     party: PartyState;
@@ -53,6 +53,26 @@ export interface RuntimeSaveState {
     };
 }
 
+/**
+ * What a read restores (`readGame`): the runtime state, its world's snapshot left out
+ * where the world the read installs is already the state's, as a new game's is.
+ */
+export type ReadState = Omit<RuntimeSaveState, 'dungeon'> & {
+    dungeon: Omit<RuntimeSaveState['dungeon'], 'snapshot'> & { snapshot?: DungeonSnapshot };
+};
+
+/** The timer table and its queue as `RuntimeSaveState` carries them (`buildTimerRecords`). */
+export function timerQueueState(timers: TimerQueue): Pick<RuntimeSaveState['dungeon'],
+    'timers' | 'timerQueue' | 'timerSequence' | 'firstAvailTimer'> {
+    const { records, queue } = buildTimerRecords(timers);
+    return {
+        timers: records,
+        timerQueue: queue,
+        timerSequence: timers.getNextSequence(),
+        firstAvailTimer: timers.getFirstAvailTimer(),
+    };
+}
+
 /** Snapshot the runtime state. */
 export function getRuntimeSaveState(ctx: GameContext): RuntimeSaveState {
     const item16 = ctx.state.dungeon.item16
@@ -61,7 +81,6 @@ export function getRuntimeSaveState(ctx: GameContext): RuntimeSaveState {
               singleMonsterStatus: [...r.singleMonsterStatus],
           }))
         : undefined;
-    const { records: timers, queue: timerQueue } = buildTimerRecords(ctx);
     const missiles = ctx.state.dungeon.databases.missiles.records.map((rec) => ({
         nextObject: rec.nextObject,
         projectileObject: rec.projectileObject,
@@ -83,10 +102,7 @@ export function getRuntimeSaveState(ctx: GameContext): RuntimeSaveState {
         },
         dungeon: {
             item16,
-            timers,
-            timerQueue,
-            timerSequence: ctx.timers.getNextSequence(),
-            firstAvailTimer: ctx.timers.getFirstAvailTimer(),
+            ...timerQueueState(ctx.timers),
             missiles,
             snapshot: ctx.dungeon.captureSnapshot(),
         },
@@ -97,7 +113,7 @@ export function getRuntimeSaveState(ctx: GameContext): RuntimeSaveState {
  * Restore the runtime state. The caller owes the loop's own reset:
  * `HandleMouseEvents`' `lastTime = 0` (`Game.applyRuntimeSaveState`).
  */
-export function applyRuntimeSaveState(ctx: GameContext, save: RuntimeSaveState): void {
+export function applyRuntimeSaveState(ctx: GameContext, save: ReadState): void {
     // `d.PartySleeping = 0` wherever a game starts (doc/CSBwin-src/CSBCode.cpp:10603):
     // CSBWin never saves it. Loading over a sleeping party must hand the UI its
     // adventure button lists back, whatever the restored state says.
@@ -130,7 +146,7 @@ export function applyRuntimeSaveState(ctx: GameContext, save: RuntimeSaveState):
     // The world first: cell flags, object chains and every database record. This
     // has to land before the ITEM16/timer restore below, because the monster pool
     // is re-derived from the creature records it puts back.
-    ctx.dungeon.applySnapshot(save.dungeon.snapshot);
+    if (save.dungeon.snapshot) ctx.dungeon.applySnapshot(save.dungeon.snapshot);
 
     const item16 = save.dungeon.item16 ?? [];
     const timers = save.dungeon.timers ?? [];
@@ -244,9 +260,9 @@ function collapseTimerBytes(record: TimerRecord, object: number | undefined): Ti
  * function 0 — as in CSBWin's array. A save written before the table had a size is
  * as long as its highest live slot, and the table it restores fills at once.
  */
-function buildTimerRecords(ctx: GameContext): { records: TimerRecord[]; queue: number[] } {
-    const entries = ctx.timers.getTimers();
-    const records: TimerRecord[] = Array.from({ length: ctx.timers.getMaxTimers() }, () => emptyTimerRecord());
+function buildTimerRecords(timers: TimerQueue): { records: TimerRecord[]; queue: number[] } {
+    const entries = timers.getTimers();
+    const records: TimerRecord[] = Array.from({ length: timers.getMaxTimers() }, () => emptyTimerRecord());
     for (const entry of entries) {
         records[entry.index] = collapseTimerBytes({
             time: entry.time >>> 0,

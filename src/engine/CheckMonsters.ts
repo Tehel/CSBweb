@@ -5,9 +5,9 @@
  * `_ReadEntireGame` calls `CheckMonsters` once the whole file is read (`:2029`), a new
  * game's and a save's alike, with no gate, between `CheckCelltypes` and `ExtendPortraits`
  * (both in `src/data/CsbwinDungeonConversions.ts`, run by `DungeonLoader`). It needs
- * `MonsterDescriptor`'s sizes, so it runs where the tables are: `Game`'s constructor, for
- * a new game, and `applyCsbwinSave`, for a save, each before anything attaches a group to
- * an `ITEM16`.
+ * `MonsterDescriptor`'s sizes, so it runs where the tables are: `newGameState`, for a new
+ * game, and `applyCsbwinSave`, for a save, each before anything attaches a group to an
+ * `ITEM16`.
  *
  * It reads `groupIndex` as the packed positions, but in a save a group on the party's
  * level holds its `ITEM16` index there: CSBWin writes the file before it detaches them

@@ -8,7 +8,7 @@
 
 import type { DungeonData } from '../data/dungeonTypes';
 import { DungeonLoader } from '../data/DungeonLoader';
-import { readDeleteDuplicateTimers, readDisableSaves } from '../data/CsbwinExpool';
+import { readDeleteDuplicateTimers, readDisableSaves, readGlobalVariables } from '../data/CsbwinExpool';
 import { die } from './Die';
 import { readGame } from './ReadGame';
 import type { PartyState, MovementResult } from './gameTypes';
@@ -19,10 +19,10 @@ import { ActuatorSystem } from './ActuatorSystem';
 import { TimerSystem } from './TimerSystem';
 import { WorldMove } from './WorldMove';
 import { MissileEncounter } from './MissileEncounter';
-import { MonsterSystem } from './MonsterSystem';
-import { createGameContext, type GameContext, type GameSystems } from './GameContext';
+import { MonsterSystem, newItem16Pool } from './MonsterSystem';
+import { createGameContext, newGameState, type GameContext, type GameSystems } from './GameContext';
 import { createGameHost, type GameHost } from './GameHost';
-import { applyRuntimeSaveState, getRuntimeSaveState, type RuntimeSaveState } from './RuntimeSave';
+import { applyRuntimeSaveState, getRuntimeSaveState, timerQueueState, type ReadState, type RuntimeSaveState } from './RuntimeSave';
 import { MonsterPerception } from './MonsterPerception';
 import { MonsterDamage } from './MonsterDamage';
 import { MonsterAI } from './MonsterAI';
@@ -44,7 +44,8 @@ import { EDT_GLOBAL_TEXT } from '../data/DecodeText';
 import { VBL_FREQUENCY } from '../core/constants';
 
 import { CharacterStats } from './CharacterStats';
-import { CheckMonsters } from './CheckMonsters';
+import { PartyFootprints } from './PartyFootprints';
+import { CsbRandom } from '../core/random';
 import type { GameTables } from './GameTables';
 
 /**
@@ -178,9 +179,6 @@ export class Game implements MainLoop {
      */
     constructor(dungeonData: DungeonData, tables: GameTables, host: Partial<GameHost> = {}) {
         const ctx = createGameContext(dungeonData, tables, createGameHost(host));
-        // `_ReadEntireGame`'s `CheckMonsters` (doc/CSBwin-src/SaveGame.cpp:2029), which a
-        // new game's read runs and the loader cannot: it needs the monster table.
-        CheckMonsters(ctx.dungeon, tables.monsterDesc, (line) => ctx.host.trace(line));
         this.ctx = ctx;
         ctx.dungeon.makeMoreRoomInDB = (db) => makeMoreRoomInDB(ctx, db);
         ctx.sounds.soundFilter = (ordinal, highVolume, level, x, y) =>
@@ -212,6 +210,8 @@ export class Game implements MainLoop {
             mainLoop: this,
         } satisfies GameSystems);
         this.systems = ctx.systems;
+        // A game built over a world takes it as a read does, `deleteDuplicateTimers` with it.
+        this.installWorld(dungeonData);
     }
 
     /** Pin `d.RandomNumber`. For tools and, eventually, save-game restore. */
@@ -291,9 +291,9 @@ export class Game implements MainLoop {
      * `_ReadEntireGame` for a new game: `dungeon.dat` read into the running game
      * (`readGame`, doc/CSBwin-src/SaveGame.cpp:1579-1594). `data` must be a fresh parse
      * of the file, since play writes into the `DungeonData` it runs on. The running game
-     * takes it as its world, and a scratch `Game` over it gives the rest of a new game,
-     * the party at the start, the clock and the timers, which a load restores here, so
-     * every system keeps its object and the page its wiring.
+     * takes it as its world, made a new game's (`newGameState`), and the rest of a new
+     * game, the party at the start, the clock and the timers, which a load restores here,
+     * so every system keeps its object and the page its wiring.
      *
      * `_ReadEntireGame` sends the cursor filter `CURSORFILTER_ReadGame` for `RNnul` before it
      * empties the hand (doc/CSBwin-src/SaveGame.cpp:1597-1603), and a saved game's read
@@ -308,14 +308,31 @@ export class Game implements MainLoop {
             extendedFeatures: data.extendedFeatures,
             simpleEncipher: data.simpleEncipher,
             state: () => {
-                const state = new Game(data, this.ctx.tables).getRuntimeSaveState();
-                // `totalMoveCount` is a global, not `d.`'s (`doc/CSBwin-src/data.cpp:254`), so
-                // `d.Initialize()` leaves it and the new game counts on from the last one.
-                state.game.block1.totalMoveCount = this.ctx.state.block1.totalMoveCount;
-                // A new game reads `disableSaves` as a saved one does, from its world's
-                // `EXPOOL` (`doc/CSBwin-src/SaveGame.cpp:1648`, `:1962-1964`).
-                state.game.disableSaves = readDisableSaves(data);
-                return state;
+                const random = new CsbRandom();
+                const newGame = newGameState(data, this.ctx.tables, random, (line) => this.ctx.host.trace(line));
+                return {
+                    party: newGame.party.state,
+                    game: {
+                        tickCount: 0,
+                        randomSeed: random.getSeed(),
+                        gameWon: false,
+                        footprints: new PartyFootprints().capture(),
+                        dsaGlobals: readGlobalVariables(data),
+                        // A new game reads `disableSaves` as a saved one does, from its
+                        // world's `EXPOOL` (`doc/CSBwin-src/SaveGame.cpp:1648`, `:1962-1964`).
+                        disableSaves: readDisableSaves(data),
+                        overlayPalette: newGame.overlayPalette,
+                        // `totalMoveCount` is a global, not `d.`'s (`doc/CSBwin-src/data.cpp:254`),
+                        // so `d.Initialize()` leaves it and the new game counts on from the last one.
+                        block1: { ...newGame.block1, totalMoveCount: this.ctx.state.block1.totalMoveCount },
+                    },
+                    dungeon: {
+                        // `InitializeItem16`'s pool (`MonsterSystem.initializeItem16`).
+                        item16: data.item16?.length ? data.item16 : newItem16Pool(),
+                        ...timerQueueState(newGame.timers),
+                        missiles: data.databases.missiles.records,
+                    },
+                };
             },
         });
         this.canRestart = false;
@@ -1054,7 +1071,7 @@ export class Game implements MainLoop {
      * opens with a tick (`:596-611`), so one is made due: a game read in play, which only
      * the port has, ticks in the next pass, and that tick draws its first view.
      */
-    applyRuntimeSaveState(save: RuntimeSaveState): void {
+    applyRuntimeSaveState(save: ReadState): void {
         applyRuntimeSaveState(this.ctx, save);
         this.lastInputTime = 0;
         // CSBWin saves none of the gravity's globals, nor resets them: a game read starts

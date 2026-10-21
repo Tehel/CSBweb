@@ -106,7 +106,7 @@ export class MonsterSystem {
       this.item16QueLen = pool.reduce((n, r) => n + (r.word0 >= 0 ? 1 : 0), 0);
       return;
     }
-    for (let i = 0; i < INITIAL_MAX_ITEM16; i++) pool.push(makeFreeItem16());
+    pool.push(...newItem16Pool());
     this.item16QueLen = 0;
   }
 
@@ -890,6 +890,11 @@ export class MonsterSystem {
   private trace(line: string): void {
     this.ctx.host.trace(line);
   }
+}
+
+/** `InitializeItem16`'s pool: `INITIAL_MAX_ITEM16` free slots. */
+export function newItem16Pool(): Item16Record[] {
+  return Array.from({ length: INITIAL_MAX_ITEM16 }, makeFreeItem16);
 }
 
 function makeFreeItem16(): Item16Record {

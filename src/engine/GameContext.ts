@@ -9,13 +9,14 @@
  * `systems` holds the subsystems themselves, so that they call each other directly, as
  * CSBWin's functions do; `host` holds the calls that leave the engine (`GameHost`).
  */
-import { readDeleteDuplicateTimers, readOverlayPalette } from '../data/CsbwinExpool';
+import { readOverlayPalette } from '../data/CsbwinExpool';
 import { noExpectedSignatures, type ExpectedSignatures } from '../data/CsbwinExtendedFeatures';
 import { noRuntimeFileSignatures, type RuntimeFileSignatures } from '../data/FileSignature';
 import type { DungeonData } from '../data/dungeonTypes';
 import { DBType, type ObjectID } from '../core/types';
 import { sw } from '../core/intCast';
 import { CsbRandom } from '../core/random';
+import { CheckMonsters } from './CheckMonsters';
 import { DungeonState } from './DungeonState';
 import type { Block1State, GameState } from './gameTypes';
 import { createGameHost, type GameHost } from './GameHost';
@@ -217,11 +218,11 @@ export interface RulesOptions {
  * `:2768-2776`, `:2824-2828`): 100 slots, and one more per record of the monster
  * database and of each database from the missiles on, a record count being the file's
  * and `d.Byte7302`'s extra ones together (`DungeonState.addNewGameSpares`). The read
- * then takes `deleteDuplicateTimers` from the world's `EXPOOL` (`:1965-1975`).
+ * then takes `deleteDuplicateTimers` from the world's `EXPOOL` (`:1965-1975`,
+ * `Game.installWorld`).
  */
 function newGameTimerQueue(dungeonData: DungeonData): TimerQueue {
   const timers = new TimerQueue();
-  timers.deleteDuplicateTimers = readDeleteDuplicateTimers(dungeonData);
   timers.allocate(100);
   for (let db = 0; db < 16; db++) {
     if (db !== DBType.CREATURE && db < DBType.MISSILE) continue;
@@ -270,19 +271,57 @@ function newGameBlock1(random: CsbRandom, dungeonData: DungeonData): Block1State
     };
 }
 
+/** A new game before any system runs (`newGameState`). */
+export interface NewGameState {
+  /** The party at the dungeon's start, with no champion. */
+  party: Party;
+  /** `GAMEBLOCK1`, its `RandomGameID` drawn (`newGameBlock1`). */
+  block1: Block1State;
+  /** The timer table as sized, and empty (`newGameTimerQueue`). */
+  timers: TimerQueue;
+  /** The world's overlay palette, or the one `d.Initialize()` clears. */
+  overlayPalette: Uint8Array;
+}
+
 /**
- * The context for a new game over `dungeonData`: the party at the dungeon's start, the
- * clock at 0, an empty timer queue, and `host` (a null host by default).
+ * What `_ReadEntireGame` makes of `dungeon.dat` before any system runs: `dungeonData`
+ * takes `d.Byte7302`'s spare records (`DungeonState.addNewGameSpares`) and
+ * `CheckMonsters` (doc/CSBwin-src/SaveGame.cpp:2029), in place, and the party, `block1`,
+ * the timers and the overlay palette are a new game's. `RandomGameID` is drawn from
+ * `random`. `createGameContext` builds a context from it, and `Game.readNewGame` the
+ * state its read restores.
+ */
+export function newGameState(
+  dungeonData: DungeonData,
+  tables: GameTables,
+  random: CsbRandom,
+  trace: (line: string) => void,
+): NewGameState {
+  const dungeon = new DungeonState(dungeonData);
+  dungeon.addNewGameSpares(tables.byte7302);
+  CheckMonsters(dungeon, tables.monsterDesc, trace);
+  return {
+    party: new Party(dungeon.getStartPosition(), dungeon.getStartFacing()),
+    block1: newGameBlock1(random, dungeonData),
+    timers: newGameTimerQueue(dungeonData),
+    overlayPalette: readOverlayPalette(dungeonData) ?? identityOverlayPalette(),
+  };
+}
+
+/**
+ * The context for a new game over `dungeonData` (`newGameState`): the party at the
+ * dungeon's start, the clock at 0, an empty timer queue, and `host` (a null host by
+ * default).
  */
 export function createGameContext(
   dungeonData: DungeonData,
   tables: GameTables,
   host: GameHost = createGameHost(),
 ): GameContext {
-  const dungeon = new DungeonState(dungeonData);
-  dungeon.addNewGameSpares(tables.byte7302);
-  const party = new Party(dungeon.getStartPosition(), dungeon.getStartFacing());
   const random = new CsbRandom();
+  const { party, block1, timers, overlayPalette } =
+    newGameState(dungeonData, tables, random, (line) => host.trace(line));
+  const dungeon = new DungeonState(dungeonData);
   const state: GameState = {
     dungeon: dungeonData,
     paused: false,
@@ -290,10 +329,8 @@ export function createGameContext(
     gameWon: false,
     word1868: false,
     currentPalette: 0,
-    block1: newGameBlock1(random, dungeonData),
+    block1,
   };
-  const timers = newGameTimerQueue(dungeonData);
-  const overlayPalette = readOverlayPalette(dungeonData) ?? identityOverlayPalette();
   return {
     dungeon,
     party,
