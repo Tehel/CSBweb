@@ -494,7 +494,7 @@ const W_RECT_POS_23222 = { x1: 0, x2: 18, y1: 0, y2: 13 };
  */
 function recolourRows(buffer: IndexedBitmap, rows: number, colorMap: number[]): void {
   for (let i = 0; i < rows * buffer.width; i++) {
-    buffer.pixels[i] = Math.floor(colorMap[buffer.pixels[i] & 0x0f] / 10);
+    buffer.pixels[i] = Math.floor(colorMap[buffer.pixels[i]! & 0x0f]! / 10);
   }
 }
 
@@ -525,7 +525,7 @@ function tag0025a6(ui: UIState, p1: number): void {
     const chIdx = characterAtPosition(party.champions, (party.facing + d7) & 3);
     if (chIdx === -1) return;
     const square = createPaletteIndexViewportBuffer(19, 14);
-    drawPositionSquare(ui, square, W_RECT_POS_23222, chIdx, party.champions[chIdx], party.facing);
+    drawPositionSquare(ui, square, W_RECT_POS_23222, chIdx, party.champions[chIdx]!, party.facing);
 
     const a2 = createPaletteIndexViewportBuffer(32, 16, 12);
     tag0088b2Index(square, a2, W_RECT_POS_23214, 0);
@@ -546,13 +546,13 @@ function tag0025a6(ui: UIState, p1: number): void {
   const d6 = ui.word23144 - 1;
   ui.word23144 = 0;
   const d4 = characterAtPosition(party.champions, (party.facing + d6) & 3);
-  if (d4 >= 0) party.champions[d4].facing = party.facing;
+  if (d4 >= 0) party.champions[d4]!.facing = party.facing;
   // Put down where they were picked up, `CHARFLAG_positionChanged` redraws the square,
   // which the port does every frame.
   if (d6 === d7) return;
   const d5 = characterAtPosition(party.champions, (d7 + party.facing) & 3);
-  if (d5 >= 0) party.champions[d5].partyPosition = (d6 + party.facing) & 3;
-  if (d4 >= 0) party.champions[d4].partyPosition = (d7 + party.facing) & 3;
+  if (d5 >= 0) party.champions[d5]!.partyPosition = (d6 + party.facing) & 3;
+  if (d4 >= 0) party.champions[d4]!.partyPosition = (d7 + party.facing) & 3;
 }
 
 /**
@@ -588,7 +588,7 @@ function drawMarchingOrderCursor(ui: UIState, x: number, y: number, dynamicPalet
     for (let col = 0; col <= 20; col++) {
       const dx = x - 9 + col;
       if (dx < 0 || dx >= dst.width) continue;
-      const pixel = src.pixels[row * src.width + col];
+      const pixel = src.pixels[row * src.width + col]!;
       if (pixel === 12) continue;
       dst.pixels[dy * dst.width + dx] = pixel;
     }
@@ -707,7 +707,7 @@ function drawObjectCursor(ui: UIState, cursor: ObjectCursor, x: number, y: numbe
     for (let col = 0; col < 32; col++) {
       const dx = x - 8 + col;
       if (dx < 0 || dx >= dst.width) continue;
-      const pixel = src.pixels[row * src.width + col];
+      const pixel = src.pixels[row * src.width + col]!;
       if (pixel === 12) continue;
       dst.pixels[dy * dst.width + dx] = pixel;
     }
@@ -783,7 +783,7 @@ function drawCursorBitmap(ui: UIState, bitmap: IndexedBitmap, x: number, y: numb
     for (let col = 0; col < maxW; col++) {
       const dx = x + col;
       if (dx < 0 || dx >= dst.width) continue;
-      const pixel = bitmap.pixels[srcRow + col] & 0x0f;
+      const pixel = bitmap.pixels[srcRow + col]! & 0x0f;
       if (pixel === tc) continue;
       dst.pixels[dstRow + dx] = pixel;
     }

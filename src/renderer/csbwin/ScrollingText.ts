@@ -19,6 +19,7 @@
  */
 
 import { div } from '../../core/intCast';
+import type { Tuple } from '../../core/types';
 import { fillRectIndex, type PaletteIndexViewportBuffer } from './CanvasBlitter';
 import { drawTextLineIndex, type FontData } from './TextRenderer';
 
@@ -83,11 +84,11 @@ export class ScrollingText {
   /** `m_futureLines` — pieces waiting to be placed. */
   private futureLines: TextPiece[] = [];
   /** Pieces currently on each row (our stand-in for the persistent screen pixels). */
-  private rows: PlacedPiece[][] = [[], [], [], []];
+  private rows: Tuple<PlacedPiece[], typeof NUM_ROWS> = [[], [], [], []];
   /** `d.TextTimeout[4]`; -1 means the row is empty. */
-  private textTimeout: number[] = [-1, -1, -1, -1];
+  private textTimeout: Tuple<number, typeof NUM_ROWS> = [-1, -1, -1, -1];
   /** `m_printLinesCount[4]`. */
-  private rowPrintLinesCount: number[] = [-1, -1, -1, -1];
+  private rowPrintLinesCount: Tuple<number, typeof NUM_ROWS> = [-1, -1, -1, -1];
   /** `d.PrintColumn` / `d.PrintRow`. Zero-initialised, like CSBWin's `d`. */
   private printColumn = 0;
   private printRow = 0;
@@ -239,7 +240,7 @@ export class ScrollingText {
   /** CSBWin `LINEQUEUE::MaxPrintLinesCount()` (`doc/CSBwin-src/CSBCode.cpp:1388`). */
   private maxPrintLinesCount(): number {
     if (this.futureLines.length === 0) return -1;
-    return this.futureLines[this.futureLines.length - 1].printLinesCount;
+    return this.futureLines[this.futureLines.length - 1]!.printLinesCount;
   }
 
   /** CSBWin `SCROLLING_TEXT::ClockTick()` (`doc/CSBwin-src/CSBCode.cpp:1529`). */
@@ -269,13 +270,13 @@ export class ScrollingText {
         continue;
       }
 
-      this.rows[row].push({ col: piece.col, color: piece.color, text: piece.text });
+      this.rows[row]!.push({ col: piece.col, color: piece.color, text: piece.text });
       this.changed = true;
 
       this.textTimeout[row] = time + (this.partySleeping ? TEXT_TIMEOUT_TICKS_SLEEPING : TEXT_TIMEOUT_TICKS);
       // A row must never expire before the row above it.
-      if (row > 0 && this.textTimeout[row - 1] !== -1 && this.textTimeout[row] <= this.textTimeout[row - 1]) {
-        this.textTimeout[row] = this.textTimeout[row - 1];
+      if (row > 0 && this.textTimeout[row - 1] !== -1 && this.textTimeout[row]! <= this.textTimeout[row - 1]!) {
+        this.textTimeout[row] = this.textTimeout[row - 1]!;
       }
       this.futureLines.shift();
     }
@@ -285,7 +286,7 @@ export class ScrollingText {
   private removeTimedOutText(time: number): void {
     for (let row = 0; row < NUM_ROWS; row++) {
       if (this.textTimeout[row] === -1) continue;
-      if (this.textTimeout[row] > time) continue;
+      if (this.textTimeout[row]! > time) continue;
       // "We'll get it next time."
       if (this.textScanlineScrollCount >= 0 || this.pushTextUp !== 0) return;
       this.rows[row] = [];
@@ -300,9 +301,9 @@ export class ScrollingText {
     this.textScanlineScrollCount = 0; // Start the scrolling process
     this.scrollingOut = this.rows[0];
     for (let row = 0; row < NUM_ROWS - 1; row++) {
-      this.rows[row] = this.rows[row + 1];
-      this.textTimeout[row] = this.textTimeout[row + 1];
-      this.rowPrintLinesCount[row] = this.rowPrintLinesCount[row + 1];
+      this.rows[row] = this.rows[row + 1]!;
+      this.textTimeout[row] = this.textTimeout[row + 1]!;
+      this.rowPrintLinesCount[row] = this.rowPrintLinesCount[row + 1]!;
     }
     this.rows[NUM_ROWS - 1] = [];
     this.textTimeout[NUM_ROWS - 1] = -1;
@@ -358,7 +359,7 @@ export class ScrollingText {
   resetTime(newTime: number, currentTime: number): void {
     for (let row = 0; row < NUM_ROWS; row++) {
       if (this.textTimeout[row] === -1) continue;
-      this.textTimeout[row] += newTime - currentTime;
+      this.textTimeout[row]! += newTime - currentTime;
     }
   }
 
@@ -370,8 +371,8 @@ export class ScrollingText {
   setNewSpeed(oldSpeed: number, newSpeed: number, time: number): void {
     if (oldSpeed === newSpeed) return;
     for (let row = 0; row < NUM_ROWS; row++) {
-      if (this.textTimeout[row] < 0) continue;
-      const delta = div((this.textTimeout[row] - time) * (oldSpeed + 1) + newSpeed, newSpeed + 1);
+      if (this.textTimeout[row]! < 0) continue;
+      const delta = div((this.textTimeout[row]! - time) * (oldSpeed + 1) + newSpeed, newSpeed + 1);
       this.textTimeout[row] = time + delta;
     }
   }
@@ -397,7 +398,7 @@ export class ScrollingText {
     };
     const offset = this.textScanlineScrollCount >= 0 ? ROW_HEIGHT - this.textScanlineScrollCount : 0;
     for (let row = -1; row < NUM_ROWS; row++) {
-      const pieces = row < 0 ? this.scrollingOut : this.rows[row];
+      const pieces = row < 0 ? this.scrollingOut : this.rows[row]!;
       if (pieces.length === 0) continue;
       const y = row * ROW_HEIGHT + TEXT_BASE_Y - ROW_CLEAR_TOP_Y + offset;
       for (const piece of pieces) {

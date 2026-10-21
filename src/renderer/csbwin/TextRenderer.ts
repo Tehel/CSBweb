@@ -124,7 +124,7 @@ function drawTextLineIndexInternal(
     }
 
     for (let row = 0; row < FONT_ROW_COUNT; row++) {
-      const rowByte = bytes[code + row * FONT_ROW_STRIDE];
+      const rowByte = bytes[code + row * FONT_ROW_STRIDE]!;
       const py = startY + row;
       if (py < 0 || py >= height) continue;
       const rowOff = py * width;

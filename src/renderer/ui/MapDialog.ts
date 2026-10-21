@@ -196,7 +196,7 @@ export function drawMapDialog(ui: UIState): void {
   const layout = mapLayout(width, height);
   for (let x = 0; x < width; x++) {
     for (let y = 0; y < height; y++) {
-      fillRectIndex(buf, cellSquare(layout, x, y), ROOM_COLORS[getRoomType(map.cellFlags[x][y])] ?? OTHER_ROOM_COLOR);
+      fillRectIndex(buf, cellSquare(layout, x, y), ROOM_COLORS[getRoomType(map.cellFlags[x]![y]!)] ?? OTHER_ROOM_COLOR);
     }
   }
   const party = ui.ctx.party.state;
@@ -217,12 +217,12 @@ function drawPartyTriangle(ui: UIState, square: Rect, facing: number): void {
   for (let along = 0; along < size; along++) {
     for (let across = 0; across < size; across++) {
       if (Math.abs(2 * across - (size - 1)) > along + even) continue;
-      const [dx, dy] = [
+      const [dx, dy] = ([
         [across, along],
         [size - 1 - along, across],
         [size - 1 - across, size - 1 - along],
         [along, size - 1 - across],
-      ][facing & 3];
+      ] as const)[facing & 3]!;
       buf.pixels[(square.y1 + dy) * buf.width + square.x1 + dx] = PARTY_COLOR;
     }
   }

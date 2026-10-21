@@ -128,7 +128,7 @@ export function drawMagicIncantation(ui: UIState, incantation: number[]): void {
   const y = 70;
   for (let i=0; i<4; i++) {
     const x = 232 + 9 * (i + 1);
-    const ch = (i >= incantation.length) ? ' ' : String.fromCharCode(incantation[i]);
+    const ch = (i >= incantation.length) ? ' ' : String.fromCharCode(incantation[i]!);
     drawTextLineIndexRaw(ui.screenIndexBuffer, ui.fontData, x, y, 4, 0, ch);
   }
 }

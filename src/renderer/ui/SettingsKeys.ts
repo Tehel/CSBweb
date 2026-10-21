@@ -133,7 +133,7 @@ export function layoutFrames(area: KeysArea): Rect[] {
 
 /** The list, from a row of the plate under KEY LABELS, or under the presets without it, to the area's foot. */
 export function keysList(ui: UIState, area: KeysArea): ListWidget {
-  const above = hasLabelsLine(ui) ? labelsLine(area) : presetFrames(area)[0];
+  const above = hasLabelsLine(ui) ? labelsLine(area) : presetFrames(area)[0]!;
   return listIn({ x1: area.x1, y1: above.y2 + 2, x2: area.x2, y2: area.y2 });
 }
 
@@ -185,7 +185,8 @@ function hasLabelsLine(ui: UIState): boolean {
 export function keysTabButtons(ui: UIState, state: KeysTabState, area: KeysArea): UIButton[] {
   const buttons: UIButton[] = [];
   presetFrames(area).forEach((frame, i) => {
-    if (PRESETS[i].preset !== 'custom') buttons.push(buttonOf(frame, BTN_PRESET0 + i, `settings.keys.preset.${PRESETS[i].preset}`));
+    const { preset } = PRESETS[i]!;
+    if (preset !== 'custom') buttons.push(buttonOf(frame, BTN_PRESET0 + i, `settings.keys.preset.${preset}`));
   });
   if (hasLabelsLine(ui)) {
     layoutFrames(area).forEach((frame, i) => buttons.push(buttonOf(frame, BTN_LAYOUT0 + i, `settings.keys.layout.${KEY_LABEL_LAYOUTS[i]}`)));
@@ -210,7 +211,7 @@ export function keysTabHoverButtons(ui: UIState, state: KeysTabState, area: Keys
     return { word0: BTN_ROW0 + row, x1: r.x1, y1: r.y1, x2: r.x2 + 1, y2: r.y2 + 1, button: 2, name: `settings.keys.row${row}` };
   });
   const presets = presetFrames(area);
-  const custom = presets[presets.length - 1];
+  const custom = presets[presets.length - 1]!;
   const names: UIButton[] = [buttonOf(custom, BTN_PRESET0 + presets.length - 1, 'settings.keys.preset.custom')];
   if (hasLabelsLine(ui)) {
     names.push({ word0: BTN_LABELS_NAME, ...rectButton(labelsNamePanel(area)), button: 2, name: 'settings.keys.labels' });
@@ -236,7 +237,7 @@ function slotOf(state: KeysTabState, id: number): { action: KeyAction; slot: 0 |
 /** What the help line says of the control `id`, or `undefined` for none of the tab's. */
 export function keysTabHelp(state: KeysTabState, id: number): string | undefined {
   if (state.capture) return CAPTURE_HELP;
-  if (id >= BTN_PRESET0 && id < BTN_PRESET0 + PRESETS.length) return PRESETS[id - BTN_PRESET0].help;
+  if (id >= BTN_PRESET0 && id < BTN_PRESET0 + PRESETS.length) return PRESETS[id - BTN_PRESET0]!.help;
   if (id === BTN_LABELS_NAME || (id >= BTN_LAYOUT0 && id < BTN_LAYOUT0 + KEY_LABEL_LAYOUTS.length)) return LABELS_HELP;
   if (id >= BTN_SLOT0 && id < BTN_LABELS_NAME) return SLOT_HELP;
   return id >= BTN_SCROLL_UP && id <= BTN_SCROLL_DOWN ? '' : undefined;
@@ -255,7 +256,7 @@ export function drawKeysTab(ui: UIState, state: KeysTabState, area: KeysArea, ov
   const look = (id: number, pressed: boolean): ButtonLook => (pressed ? 'pressed' : over === id ? 'hover' : 'raised');
 
   presetFrames(area).forEach((frame, i) => {
-    const { preset, label } = PRESETS[i];
+    const { preset, label } = PRESETS[i]!;
     const chosen = values.keyPreset === preset;
     drawButton(ui, frame, label, preset === 'custom' && !chosen ? 'inert' : look(BTN_PRESET0 + i, chosen));
   });
@@ -265,16 +266,16 @@ export function drawKeysTab(ui: UIState, state: KeysTabState, area: KeysArea, ov
     drawPanel(ui, namePanel);
     drawText(ui, LABELS_NAME, namePanel.x1 + 4, buttonLabelAt(namePanel).y);
     layoutFrames(area).forEach((frame, i) => {
-      const layout = KEY_LABEL_LAYOUTS[i];
+      const layout = KEY_LABEL_LAYOUTS[i]!;
       drawButton(ui, frame, LAYOUT_LABELS[layout], look(BTN_LAYOUT0 + i, values.keyLabels === layout));
     });
   }
 
   const list = keysList(ui, area);
   drawPanel(ui, list.panel);
-  drawList(ui, list, KEY_ACTION_NAMES.length, state.scrollTop, -1, (index) => KEY_ACTION_NAMES[index][1]);
+  drawList(ui, list, KEY_ACTION_NAMES.length, state.scrollTop, -1, (index) => KEY_ACTION_NAMES[index]![1]);
   for (let row = 0; row < shownRows(list, state); row++) {
-    const action = KEY_ACTION_NAMES[state.scrollTop + row][0];
+    const action = KEY_ACTION_NAMES[state.scrollTop + row]![0];
     for (const slot of [0, 1] as const) {
       const r = slotRect(list, row, slot);
       const y = list.rowFirstY + row * ROW_STEP;
@@ -302,7 +303,7 @@ function scrollBy(ui: UIState, state: KeysTabState, area: KeysArea, delta: numbe
 export function keysTabClick(ui: UIState, state: KeysTabState, area: KeysArea, id: number): void {
   state.capture = null;
   if (id >= BTN_PRESET0 && id < BTN_PRESET0 + PRESETS.length) {
-    const { preset } = PRESETS[id - BTN_PRESET0];
+    const { preset } = PRESETS[id - BTN_PRESET0]!;
     if (preset !== 'custom' && ui.settings.values.keyPreset !== preset) ui.settings.update({ keyPreset: preset });
   } else if (id >= BTN_LAYOUT0 && id < BTN_LAYOUT0 + KEY_LABEL_LAYOUTS.length) {
     const layout = KEY_LABEL_LAYOUTS[id - BTN_LAYOUT0];
@@ -350,7 +351,7 @@ export function keysTabKey(ui: UIState, state: KeysTabState, area: KeysArea, cod
     Home: -KEY_ACTION_NAMES.length, End: KEY_ACTION_NAMES.length,
   };
   if (!(code in delta)) return false;
-  scrollBy(ui, state, area, delta[code]);
+  scrollBy(ui, state, area, delta[code]!);
   return true;
 }
 

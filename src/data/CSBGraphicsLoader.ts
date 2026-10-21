@@ -7,7 +7,7 @@
  * alternate monster graphics (`AltMonGraphics`).
  */
 
-import type { ui32 } from '../core/types';
+import type { Tuple, ui32 } from '../core/types';
 import { readU16LE, readU32LE } from '../core/bytes';
 import { MAX_EXPANDED_SIZE } from '../core/compression';
 import { Die } from '../core/Die';
@@ -35,14 +35,14 @@ export interface DecorationDesc {
 
 interface ExtendedWallDecoration {
   id: number;
-  desc: DecorationDesc[]; // 13 entries (relative positions 0..12)
+  desc: Tuple<DecorationDesc, 13>; // relative positions 0..12
   sideBitmap: IndexedBitmap;
   frontBitmap: IndexedBitmap;
 }
 
 export interface ExtendedFloorDecoration {
   id: number;
-  desc: DecorationDesc[]; // 9 entries (relative cells 0..8)
+  desc: Tuple<DecorationDesc, 9>; // relative cells 0..8
   mirrorFlags: number;
   bitmap: IndexedBitmap;
 }
@@ -382,10 +382,7 @@ export class CSBGraphicsLoader {
     if (!raw) return null;
 
     const descCount = 13;
-    const desc: DecorationDesc[] = new Array(descCount);
-    for (let i = 0; i < descCount; i++) {
-      desc[i] = readDecorationDesc(raw, i * 6);
-    }
+    const desc = Array.from({ length: descCount }, (_, i) => readDecorationDesc(raw, i * 6)) as Tuple<DecorationDesc, typeof descCount>;
 
     const bitmapOffset = descCount * 6 + 2; // +2 alignment padding (CSBCode.cpp:3217)
     const sideDesc = desc[11];
@@ -426,10 +423,7 @@ export class CSBGraphicsLoader {
     if (!raw) return null;
 
     const descCount = 9;
-    const desc: DecorationDesc[] = new Array(descCount);
-    for (let i = 0; i < descCount; i++) {
-      desc[i] = readDecorationDesc(raw, i * 6);
-    }
+    const desc = Array.from({ length: descCount }, (_, i) => readDecorationDesc(raw, i * 6)) as Tuple<DecorationDesc, typeof descCount>;
 
     const mirrorFlags = readU16LE(raw, descCount * 6);
     const bitmapOffset = descCount * 6 + 2;

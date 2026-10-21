@@ -178,7 +178,7 @@ function main(): void {
   console.log('');
   console.log('=== a toggle ===');
   const centre = (f: Rect): [number, number] => [(f.x1 + f.x2) >> 1, (f.y1 + f.y2) >> 1];
-  const pair = W.framesAcross({ x1: 120, y1: 60, x2: 239, y2: 60 + W.LOW_BUTTON_HEIGHT - 1 }, 2) as [Rect, Rect];
+  const pair = W.framesAcross({ x1: 120, y1: 60, x2: 239, y2: 60 + W.LOW_BUTTON_HEIGHT - 1 }, 2);
   check(pair[1].x1 - pair[0].x2 - 1 === W.BUTTON_GAP && pair[1].x2 === 239, 'its two frames span the row, graphic 0\'s nine columns apart');
   clear(ui);
   W.drawToggle(ui, pair, ['ON', 'OFF'], 1);

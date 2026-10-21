@@ -128,7 +128,7 @@ const ink = new Set(font.pixels);
 console.log(`font colours: ${[...ink].sort((a, b) => a - b).join(' ')}`);
 // `TAG004a22_26(P1, word 10, word 8)` at load (`:4778-4780`) takes word 8 as the ink the
 // font is drawn in: a word at the wrong offset would not name it.
-check(ink.size === 2 && ink.has(TRANSPARENT) && ink.has(segment1[8]!), 'the font is drawn in colour 12 and item 0\'s word 8 alone');
+check(ink.size === 2 && ink.has(TRANSPARENT) && ink.has(segment1[8]), 'the font is drawn in colour 12 and item 0\'s word 8 alone');
 check(glyph(' ').every((row) => row === '........'), 'the space is an empty cell');
 const letterA = glyph('A');
 for (const row of letterA) console.log(`  A | ${row}`);

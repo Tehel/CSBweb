@@ -64,7 +64,7 @@ export function vblFlashButn(buffer: PaletteIndexViewportBuffer, rect: Rect): vo
   for (let y = y1; y <= y2; y++) {
     const row = y * stride;
     for (let x = x1; x <= x2; x++) {
-      buffer.pixels[row + x] ^= 4;
+      buffer.pixels[row + x]! ^= 4;
     }
   }
 }
@@ -126,8 +126,8 @@ export function shrinkBlt(
     let accX = startX;
     for (let x = 0; x < dstWidth; x++) {
       const srcX = accX >>> 16;
-      const v = srcPx[srcRow + (srcX >= srcWidth ? srcWidth - 1 : srcX)] & 0x0f;
-      out[dstRow + x] = Math.floor(colorMap[v] / 10); // `switch (D5W/10)`
+      const v = srcPx[srcRow + (srcX >= srcWidth ? srcWidth - 1 : srcX)]! & 0x0f;
+      out[dstRow + x] = Math.floor(colorMap[v]! / 10); // `switch (D5W/10)`
       accX = (accX + stepX) >>> 0;
     }
     accY = (accY + stepY) >>> 0;
@@ -144,7 +144,7 @@ export function mirrorBitmap(src: IndexedBitmap): IndexedBitmap {
   const out = new Uint8Array(width * height);
   for (let y = 0; y < height; y++) {
     const row = y * width;
-    for (let x = 0; x < width; x++) out[row + (width - 1 - x)] = pixels[row + x];
+    for (let x = 0; x < width; x++) out[row + (width - 1 - x)] = pixels[row + x]!;
   }
   return { width, height, pixels: out };
 }
@@ -270,7 +270,7 @@ export function tag0088b2Index(
     const dstRow = dy * dstStride;
 
     for (let x = 0; x < copyWidth; x++) {
-      const v = srcPixels[srcRow + (srcX0 + x)];
+      const v = srcPixels[srcRow + (srcX0 + x)]!;
       if (useTransparency && v === tc) continue;
       dstPixels[dstRow + (dstX1 + x)] = v;
     }
@@ -307,7 +307,7 @@ export function tag0088b2Explicit(
       const si = srcRow + x;
       const di = dstRow + x;
       if (si >= src.length || di >= dst.length) continue;
-      const v = src[si];
+      const v = src[si]!;
       if (useTransparency && v === tc) continue;
       dst[di] = v;
     }
@@ -383,7 +383,7 @@ function groupPixel(bitmap: IndexedBitmap, group: number, i: number): number {
   const groupsPerRow = (bitmap.width + 15) >> 4;
   const y = Math.floor(group / groupsPerRow);
   const x = (group % groupsPerRow) * 16 + i;
-  return x < bitmap.width && y < bitmap.height ? bitmap.pixels[y * bitmap.width + x] : 0;
+  return x < bitmap.width && y < bitmap.height ? bitmap.pixels[y * bitmap.width + x]! : 0;
 }
 
 /**
@@ -411,7 +411,7 @@ export function updateImageDataFromIndex(
   }
 
   for (let i = 0; i < pixelCount; i++) {
-    const colorIndex = inPx[i] & 0x0f;
+    const colorIndex = inPx[i]! & 0x0f;
     const color = palette[colorIndex] ?? 0;
 
     const r = atariIntensity[(color >> 8) & 0x7]!;
@@ -453,7 +453,7 @@ export function updateImageDataFromIndexWithViewportPalette(
     const inViewportY = y >= y1 && y <= y2;
     for (let x = 0; x < src.width; x++) {
       const idx = row + x;
-      const colorIndex = inPx[idx] & 0x0f;
+      const colorIndex = inPx[idx]! & 0x0f;
       const useViewportPalette = inViewportY && x >= x1 && x <= x2;
       const palette = useViewportPalette ? viewportPalette : uiPalette;
       const color = palette[colorIndex] ?? 0;
@@ -491,9 +491,9 @@ export function reconvertThroughPalette(
     for (let col = 0; col < bitmap.width; col++) {
       const sx = x + col;
       if (sx < 0 || sx >= src.width) continue;
-      if ((bitmap.pixels[row * bitmap.width + col] & 0x0f) === transparentColor) continue;
+      if ((bitmap.pixels[row * bitmap.width + col]! & 0x0f) === transparentColor) continue;
       const idx = sy * src.width + sx;
-      const color = palette[src.pixels[idx] & 0x0f] ?? 0;
+      const color = palette[src.pixels[idx]! & 0x0f] ?? 0;
       const o = idx * 4;
       out[o + 0] = atariIntensity[(color >> 8) & 0x7]!;
       out[o + 1] = atariIntensity[(color >> 4) & 0x7]!;

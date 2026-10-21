@@ -106,14 +106,14 @@ function objectIconSource(
 ): { graphic: IndexedBitmap; srcX: number; srcY: number } | null {
   if (objectNameIndex < 0 || word612.length === 0) return null;
   let group = 0;
-  while (group < word612.length && objectNameIndex >= word612[group]) {
+  while (group < word612.length && objectNameIndex >= word612[group]!) {
     group++;
   }
   group -= 1;
   if (group < 0) return null;
   const graphic = ui.getGraphicBitmap(42 + group);
   if (!graphic) return null;
-  const offset = objectNameIndex - word612[group];
+  const offset = objectNameIndex - word612[group]!;
   return { graphic, srcX: (offset & 15) << 4, srcY: offset & 0xff0 };
 }
 
@@ -173,7 +173,7 @@ export function drawObjectIconMask(ui: UIState,
     for (let x = 0; x < maxW; x++) {
       const sx = srcX + x;
       if (sx < 0 || sx >= srcStride) continue;
-      const pixel = graphic.pixels[sy * srcStride + sx] & 0x0f;
+      const pixel = graphic.pixels[sy * srcStride + sx]! & 0x0f;
       const mapped = colorMap[pixel] ?? 0;
       if (mapped !== 0) continue; // leave cyan background for mapped pixels (ex: color 12 -> 40)
       dst.pixels[dstRow + rect.x1 + x] = 0; // black mask for non-mapped pixels
@@ -210,7 +210,7 @@ export function drawObjectIconAt(ui: UIState,
     for (let col = 0; col < maxW; col++) {
       const dx = x + col;
       if (dx < 0) continue;
-      const pixel = graphic.pixels[srcRow + (srcX + col)] & 0x0f;
+      const pixel = graphic.pixels[srcRow + (srcX + col)]! & 0x0f;
       if (pixel === tc) continue;
       dst.pixels[dstRow + dx] = overrideColor !== undefined ? (overrideColor & 0x0f) : pixel;
     }

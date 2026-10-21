@@ -88,7 +88,7 @@ export function initializeWallBitmapsIndexed(
     });
   }
 
-  wallBitmaps.push(mirrorBitmap(wallBitmaps[5]));
+  wallBitmaps.push(mirrorBitmap(wallBitmaps[5]!));
   return wallBitmaps;
 }
 
@@ -122,7 +122,7 @@ export function initializeDoorBitmapsIndexed(
   }
 
   // Mirror of slot [2] into slot [0] (used as "door facing right frame" in CSBWin)
-  doorBitmaps[0] = mirrorBitmap(doorBitmaps[2]);
+  doorBitmaps[0] = mirrorBitmap(doorBitmaps[2]!);
 
   return doorBitmaps;
 }

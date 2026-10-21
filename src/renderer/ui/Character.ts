@@ -283,7 +283,7 @@ export function drawPositionSquare(
   champion: Champion | null,
   facing: number,
 ): void {
-  fillRectIndex(dst, rect, ui.uiTables.graphic232.byte1386[chIdx]);
+  fillRectIndex(dst, rect, ui.uiTables.graphic232.byte1386[chIdx]!);
   const indicator = ui.getGraphicBitmap(28);
   if (!indicator) return;
   const champFacing = champion?.facing ?? facing;
@@ -403,14 +403,14 @@ export function drawPartyStatus(ui: UIState): void {
     // box has none, and `KillCharacter` blanks a dead champion's (`:2669-2672`).
     if (champion && champion.attributes.health !== 0) {
       const dir = (champion.partyPosition + 4 - facing) & 3;
-      drawPositionSquare(ui, ui.screenIndexBuffer, g232.wRectPos1454[dir], chIdx, champion, facing);
+      drawPositionSquare(ui, ui.screenIndexBuffer, g232.wRectPos1454[dir]!, chIdx, champion, facing);
     }
   }
 
   // `TAG0025a6` blanks the square it picks a champion up from, and `DrawCharacterState`
   // leaves that square alone until the champion is put down
   // (`doc/CSBwin-src/CSBCode.cpp:2137-2140`, `Character.cpp:1463-1466`).
-  if (ui.word23144 !== 0) fillRectIndex(ui.screenIndexBuffer, g232.wRectPos1454[ui.word23144 - 1], 0);
+  if (ui.word23144 !== 0) fillRectIndex(ui.screenIndexBuffer, g232.wRectPos1454[ui.word23144 - 1]!, 0);
 
   drawTopBarHandIcons(ui);
 }
@@ -657,7 +657,7 @@ function drawLifeBars(ui: UIState, chIdx: number, champion: Champion): void {
 
     for (let row = 0; row <= 24; row++) {
       const filled = height > (24 - row);
-      const color = filled ? CHAR_COLORS[chIdx] : 12;
+      const color = filled ? CHAR_COLORS[chIdx]! : 12;
       const y = 2 + row;
       drawMaskedBarRow(ui, startX, y, mask1, color);
       drawMaskedBarRow(ui, startX + 16, y, mask2, color);

@@ -410,7 +410,7 @@ export function drawWallText(draw: ViewportDraw, textRN: ObjectID, relativePosit
   while (idx < textBytes.length && lineIdx < tables.wallTextLineY2.length) {
     let lineStart = idx;
     let lineLen = 0;
-    while (idx < textBytes.length && textBytes[idx] < 0x80) {
+    while (idx < textBytes.length && textBytes[idx]! < 0x80) {
       lineLen++;
       idx++;
     }
@@ -474,7 +474,7 @@ export function DrawFloorDecorations(draw: ViewportDraw, graphicOrdinal: number,
     // `d.LoadedFloorDecorations[graphicIndex]` (`doc/CSBwin-src/CSBCode.cpp:3936-3957`).
     const slot = loaded[graphicIndex];
     if (!slot) return;
-    if (relativeCell < 0 || relativeCell >= tables.floorDecorationDescSets[0].length) return;
+    if (relativeCell < 0 || relativeCell >= tables.floorDecorationDescSets[0]!.length) return;
 
     const [baseGraphic, rectSetIndex] = slot;
     const rectSet = tables.floorDecorationDescSets[rectSetIndex];

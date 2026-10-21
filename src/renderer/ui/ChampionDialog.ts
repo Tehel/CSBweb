@@ -155,8 +155,8 @@ type ChampionTab = 'attributes' | 'skills';
  */
 export function skillProgress(champion: Champion, skill: number): Required<Reading> {
   const skills = ensureSkills(champion.skills);
-  const own = skills[skill].experience;
-  const counted = skill < 4 ? own : Math.floor((own + skills[(skill - 4) >> 2].experience) / 2);
+  const own = skills[skill]!.experience;
+  const counted = skill < 4 ? own : Math.floor((own + skills[(skill - 4) >> 2]!.experience) / 2);
   const mastery = determineMastery(champion, skill | 0xc000);
   const low = mastery <= 1 ? 0 : 500 * 2 ** (mastery - 2);
   const high = 500 * 2 ** (mastery - 1);
@@ -250,7 +250,7 @@ const BTN_TAB0 = 10;
 function championDialogButtons(): UIButton[] {
   return [
     buttonOf(CLOSE_FRAME, BTN_CLOSE, 'champions.close'),
-    ...tabButtons(TAB_FRAMES, BTN_TAB0, 'champions.tab').map((b, i) => ({ ...b, name: `champions.tab.${TABS[i].tab}` })),
+    ...tabButtons(TAB_FRAMES, BTN_TAB0, 'champions.tab').map((b, i) => ({ ...b, name: `champions.tab.${TABS[i]!.tab}` })),
   ];
 }
 
@@ -334,7 +334,7 @@ export function championDialogClick(ui: UIState, x: number, y: number, buttons: 
     closeChampionDialog(ui);
     return;
   }
-  if (id >= BTN_TAB0 && id < BTN_TAB0 + TABS.length) state.tab = TABS[id - BTN_TAB0].tab;
+  if (id >= BTN_TAB0 && id < BTN_TAB0 + TABS.length) state.tab = TABS[id - BTN_TAB0]!.tab;
 }
 
 /** The pointer moved. Nothing is drawn here: says whether a button's look changed. */

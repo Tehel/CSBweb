@@ -36,6 +36,7 @@
 import { fillRectIndex } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
 import type { Rect, UIButton } from '../../data/tables/UITables';
+import type { Tuple } from '../../core/types';
 import { MENU_GRAPHIC, MENU_OPTION_COLOR, MENU_PANEL_COLOR, MENU_TITLE1_COLOR } from './Menu';
 import type { UIState } from './UIState';
 
@@ -93,7 +94,7 @@ export function drawPiece(ui: UIState, piece: DialogPiece, box: Rect): void {
     const srcRow = (piece.y1 + along(y, height, pieceHeight, piece.top, piece.bottom)) * graphic.width;
     const dstRow = (box.y1 + y) * buf.width + box.x1;
     for (let x = 0; x < width; x++) {
-      buf.pixels[dstRow + x] = graphic.pixels[srcRow + piece.x1 + along(x, width, pieceWidth, piece.left, piece.right)];
+      buf.pixels[dstRow + x] = graphic.pixels[srcRow + piece.x1 + along(x, width, pieceWidth, piece.left, piece.right)]!;
     }
   }
 }
@@ -200,7 +201,7 @@ function pressBevel(ui: UIState, frame: Rect): void {
     for (let x = frame.x1 + 3; x <= frame.x2 - 3; x++) {
       if (x >= frame.x1 + 6 && x <= frame.x2 - 6 && y >= frame.y1 + 6 && y <= frame.y2 - 6) continue;
       const i = y * buf.width + x;
-      buf.pixels[i] = TURNED_OVER.get(buf.pixels[i]) ?? buf.pixels[i];
+      buf.pixels[i] = TURNED_OVER.get(buf.pixels[i]!) ?? buf.pixels[i]!;
     }
   }
 }
@@ -230,17 +231,17 @@ export const BUTTON_GAP = 9;
  * `count` button frames side by side across `row`, graphic 0's nine columns apart, as
  * wide as each other; the last takes the columns the division leaves.
  */
-export function framesAcross(row: Rect, count: number, gap = BUTTON_GAP): Rect[] {
+export function framesAcross<N extends number>(row: Rect, count: N, gap = BUTTON_GAP): Tuple<Rect, N> {
   const width = Math.floor((row.x2 - row.x1 + 1 - gap * (count - 1)) / count);
   return Array.from({ length: count }, (_, i) => {
     const x1 = row.x1 + i * (width + gap);
     return { x1, y1: row.y1, x2: i === count - 1 ? row.x2 : x1 + width - 1, y2: row.y2 };
-  });
+  }) as Tuple<Rect, N>;
 }
 
 /** A toggle: two buttons, the chosen one pressed. */
 export function drawToggle(ui: UIState, frames: readonly [Rect, Rect], labels: readonly [string, string], chosen: 0 | 1): void {
-  frames.forEach((frame, i) => drawButton(ui, frame, labels[i], i === chosen ? 'pressed' : 'raised'));
+  frames.forEach((frame, i) => drawButton(ui, frame, labels[i]!, i === chosen ? 'pressed' : 'raised'));
 }
 
 /** The toggle's button list: `firstId` for the first, and on. */
@@ -306,8 +307,8 @@ export function drawTabbedPage(
   ui: UIState, page: Rect, tabs: Rect[], labels: readonly string[], selected: number, hovered: number,
 ): void {
   const label = (i: number, y: number, color: number): void => {
-    const tab = tabs[i];
-    drawCentredText(ui, labels[i], ((tab.x1 + tab.x2) >> 1) + 1, y, color, PLATE_COLOR);
+    const tab = tabs[i]!;
+    drawCentredText(ui, labels[i]!, ((tab.x1 + tab.x2) >> 1) + 1, y, color, PLATE_COLOR);
   };
   tabs.forEach((tab, i) => {
     if (i === selected) return;

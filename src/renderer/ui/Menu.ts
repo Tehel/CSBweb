@@ -156,7 +156,7 @@ function copyMenuRegion(
     for (let x = 0; x < width; x++) {
       const sx = srcX + x;
       if (sx < 0 || sx >= stride) continue;
-      temp[y * width + x] = buf.pixels[sy * stride + sx];
+      temp[y * width + x] = buf.pixels[sy * stride + sx]!;
     }
   }
   for (let y = 0; y < height; y++) {
@@ -165,7 +165,7 @@ function copyMenuRegion(
     for (let x = 0; x < width; x++) {
       const dx = dstX + x;
       if (dx < 0 || dx >= stride) continue;
-      buf.pixels[dy * stride + dx] = temp[y * width + x];
+      buf.pixels[dy * stride + dx] = temp[y * width + x]!;
     }
   }
 }
@@ -237,8 +237,8 @@ function drawMenuOptions(ui: UIState, options: string[], centred: boolean): void
   const positions = OPTION_POSITIONS[options.length - 1];
   if (!positions) return;
   for (let i = 0; i < options.length; i++) {
-    const [x, y] = positions[i];
-    centeredText(ui, options[i], x, y, centred);
+    const [x, y] = positions[i]!;
+    centeredText(ui, options[i]!, x, y, centred);
   }
 }
 

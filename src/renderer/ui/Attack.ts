@@ -203,7 +203,7 @@ export function executeAttack(ui: UIState, option: number): number {
   if (option === -1) {
     result = -1;
   } else {
-    const attackType = ui.ctx.interface.possibleAttackTypes[option] & 0xff;
+    const attackType = ui.ctx.interface.possibleAttackTypes[option]! & 0xff;
     if (attackType === ATTACK_TYPE_NONE) return 0;
     result = ui.ctx.systems.character.executeAttack(chIdx, attackType);
     // The fusion's `Attack(_1_, …)` never returns (`Character.cpp:4997`): `_FusionSequence`

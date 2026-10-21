@@ -63,7 +63,7 @@ export function DrawViewport(
   // First pass: Calculate positions and gather room data for all cells
   for (let cellNum = 0; cellNum < 21; cellNum++) {
     // Calculate absolute position for this cell
-    const pos = RelativeXY(directions, facing, relativeY[cellNum], relativeX[cellNum], position.x, position.y);
+    const pos = RelativeXY(directions, facing, relativeY[cellNum]!, relativeX[cellNum]!, position.x, position.y);
 
     // The cell's skin, else the level's default, on `d.LoadedLevel`, the level drawn
     // (`doc/CSBwin-src/Viewport.cpp:6784-6793`).
@@ -71,7 +71,7 @@ export function DrawViewport(
     if (skinNumber === 0) skinNumber = dungeonState.skinCache.GetDefaultSkin(level);
 
     // Initialize room data structure
-    roomData[cellNum] = {
+    const room: SummarizeRoomData = {
       x: pos.x,
       y: pos.y,
       relativeCellNumber: cellNum,
@@ -83,9 +83,10 @@ export function DrawViewport(
       decorations: [0, 0, 0],
       text: [OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF],
     };
+    roomData[cellNum] = room;
 
     // Gather room information for this cell
-    summarizeRoomInfoCsbwin(roomData[cellNum], dungeonState, position, facing, context.objectTables, context.footprints,
+    summarizeRoomInfoCsbwin(room, dungeonState, position, facing, context.objectTables, context.footprints,
       context.gameState?.tickCount);
   }
 
@@ -94,14 +95,14 @@ export function DrawViewport(
 
   // Second pass: Execute bytecode programs to draw each cell
   for (let cellNum = 0; cellNum < 21; cellNum++) {
-    const skinNumber = roomData[cellNum].skinNumber;
+    const { skinNumber, graphicRoomType } = roomData[cellNum]!;
     if (skinNumber !== 0) {
       // A skin's own program, from its cell table; a skin with none draws nothing
       // (`Viewport.cpp:6796-6813`).
       const pCode = context.backgroundLib?.GetCode(skinNumber) ?? null;
       if (pCode !== null) {
         const code = skinCodeWords(pCode);
-        const startOffset = skinProgramStart(code, cellNum, roomData[cellNum].graphicRoomType);
+        const startOffset = skinProgramStart(code, cellNum, graphicRoomType);
         context.graphicTrace?.(`  Draw Cell ${cellNum} skin ${skinNumber}`);
         interpreter.interpret(code, startOffset, cellNum);
       }
@@ -109,7 +110,7 @@ export function DrawViewport(
     }
 
     // Get the bytecode program for this cell and room type
-    const program = getBytecodeProgram(cellNum, roomData[cellNum].graphicRoomType);
+    const program = getBytecodeProgram(cellNum, graphicRoomType);
 
     if (program) {
       // Execute the bytecode program to render this cell

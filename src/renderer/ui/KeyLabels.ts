@@ -91,7 +91,7 @@ const CODE_NAMES: Readonly<Record<string, string>> = {
 export function keyLabel(code: string, layout: KeyLabelLayout, layoutMap: KeyboardLayoutMap | null): string {
   if (code === '') return '';
   const digit = /^(Digit|Numpad)([0-9])$/.exec(code);
-  if (digit) return digit[1] === 'Numpad' ? `KP ${digit[2]}` : digit[2];
+  if (digit) return digit[1] === 'Numpad' ? `KP ${digit[2]}` : digit[2]!;
   if (/^F([1-9]|1[0-9]|2[0-4])$/.test(code)) return code;
   const named = NAMED_KEYS[code];
   if (named) return named;

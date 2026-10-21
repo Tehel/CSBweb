@@ -185,7 +185,7 @@ export class ViewportRenderer {
         this.viewportPalettes[i] = base.slice();
         continue;
       }
-      for (let j = 0; j < base.length; j++) target[j] = base[j];
+      for (let j = 0; j < base.length; j++) target[j] = base[j]!;
     }
   }
 
@@ -271,8 +271,9 @@ export class ViewportRenderer {
     const doorOrnaments = this.context.doorOrnaments!;
     const doorDecorationTOC = map?.doorDecorationTOC ?? [];
     for (let i = 0; i < doorDecorationTOC.length; i++) {
-      const decoration = doorDecorationTOC[i];
-      doorOrnaments[i] = [303 + decoration, this.objectTables.doorOrnamentRectSetIndex[decoration]];
+      const decoration = doorDecorationTOC[i]!;
+      // An entry past `d.Byte4122`'s twelve has no set: its ornament is not drawn (DEBT.md C184).
+      doorOrnaments[i] = [303 + decoration, this.objectTables.doorOrnamentRectSetIndex[decoration] ?? -1];
     }
 
     // `d.LoadedFloorDecorations[i] = { 247 + 6 * FloorDecorationTOC[i], Byte4110[FloorDecorationTOC[i]] }`
@@ -280,8 +281,9 @@ export class ViewportRenderer {
     const loadedFloorDecorations = this.context.loadedFloorDecorations!;
     const floorDecorationTOC = map?.floorDecorationTOC ?? [];
     for (let i = 0; i < floorDecorationTOC.length; i++) {
-      const decoration = floorDecorationTOC[i];
-      loadedFloorDecorations[i] = [247 + 6 * decoration, this.objectTables.floorDecorationRectSetIndex[decoration]];
+      const decoration = floorDecorationTOC[i]!;
+      // An entry past `d.Byte4110`'s ten has no set: its decoration is not drawn (DEBT.md C184).
+      loadedFloorDecorations[i] = [247 + 6 * decoration, this.objectTables.floorDecorationRectSetIndex[decoration] ?? -1];
     }
 
     // `d.DoorTOC[2] = d.DoorCharacteristics[doorType0Index/doorType1Index]`
@@ -349,19 +351,19 @@ export class ViewportRenderer {
     // - Other distances use mirrored copies of their own bitmaps.
     // - Corner bitmaps (index 5/6) are not swapped here.
     const out = normal.slice();
-    out[0] = mirrorBitmap(normal[1]); // F0R1 becomes mirror of original F0L1
-    out[1] = mirrorBitmap(normal[0]); // F0L1 becomes mirror of original F0R1
-    out[2] = mirrorBitmap(normal[2]); // F1
+    out[0] = mirrorBitmap(normal[1]!); // F0R1 becomes mirror of original F0L1
+    out[1] = mirrorBitmap(normal[0]!); // F0L1 becomes mirror of original F0R1
+    out[2] = mirrorBitmap(normal[2]!); // F1
 
     const wallRects = this.context.wallRectangles;
     if (wallRects && this.mirrorWallRectF2 && this.mirrorWallRectF3) {
-      const derivedF3 = this.buildMirrorWallBitmap(normal[4], wallRects[0], this.mirrorWallRectF3, 11);
-      const derivedF2 = this.buildMirrorWallBitmap(normal[3], wallRects[3], this.mirrorWallRectF2, 8);
-      out[4] = derivedF3 ?? mirrorBitmap(normal[4]);
-      out[3] = derivedF2 ?? mirrorBitmap(normal[3]);
+      const derivedF3 = this.buildMirrorWallBitmap(normal[4]!, wallRects[0]!, this.mirrorWallRectF3, 11);
+      const derivedF2 = this.buildMirrorWallBitmap(normal[3]!, wallRects[3]!, this.mirrorWallRectF2, 8);
+      out[4] = derivedF3 ?? mirrorBitmap(normal[4]!);
+      out[3] = derivedF2 ?? mirrorBitmap(normal[3]!);
     } else {
-      out[4] = mirrorBitmap(normal[4]);
-      out[3] = mirrorBitmap(normal[3]);
+      out[4] = mirrorBitmap(normal[4]!);
+      out[3] = mirrorBitmap(normal[3]!);
     }
     // out[5]/out[6] remain as-is (F3L2 + its mirror).
     return out;
@@ -437,7 +439,7 @@ export class ViewportRenderer {
       const srcRow = y * src.width;
       const dstRow = (dstY + y) * VIEWPORT_WIDTH;
       for (let x = 0; x < copyW; x++) {
-        const v = src.pixels[srcRow + x] & 0x0f;
+        const v = src.pixels[srcRow + x]! & 0x0f;
         const dx = mirrorX ? VIEWPORT_WIDTH - 1 - x : x;
         dst[dstRow + dx] = v;
       }

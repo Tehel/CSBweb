@@ -16,7 +16,7 @@ const TSC = resolve(ROOT, 'node_modules/.bin/tsc');
 /** The paths held to the flag: a folder ends in `/`. */
 const MODULES = [
   'src/lib/',
-  'src/renderer/intro/',
+  'src/renderer/',
   'src/settings/',
   'src/stats/',
 ];

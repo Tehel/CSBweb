@@ -846,7 +846,7 @@ export function drawSaveMenu(ui: UIState): void {
   // The rows, and their scrollbar.
   const list = saveMenuList(state.mode);
   clampScroll(state);
-  drawList(ui, list, state.rows.length, state.scrollTop, state.selected, (index) => rowText(state, state.rows[index]));
+  drawList(ui, list, state.rows.length, state.scrollTop, state.selected, (index) => rowText(state, state.rows[index]!));
 
   if (state.rows.length === 0 && !state.busy && !state.message) {
     // An empty list has to say so, which the load-only menu's can be; when the store

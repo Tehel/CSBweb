@@ -256,8 +256,9 @@ function buildPhraseSummary(mask: number, phrases: string[], colors: number[]): 
   let color = 13;
   for (let i = 0; i < phrases.length; i++) {
     if ((mask & (1 << i)) === 0) continue;
-    if (!phrases[i]) continue;
-    chosen.push(phrases[i]);
+    const phrase = phrases[i];
+    if (!phrase) continue;
+    chosen.push(phrase);
     color = colors[i] ?? 13;
   }
   if (chosen.length === 0) return null;

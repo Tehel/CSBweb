@@ -206,7 +206,7 @@ export class GameScreen {
       graphicCache,
       getGraphicBitmap: (graphicNum) => this.getGraphicBitmap(graphicNum),
     });
-    this.uiPalette = palette552[0].slice();
+    this.uiPalette = palette552[0]!.slice();
     this.screen = createPaletteIndexViewportBuffer(SCREEN_WIDTH, SCREEN_HEIGHT, 0);
 
     const ui = createUIState({

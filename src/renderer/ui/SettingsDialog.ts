@@ -152,7 +152,7 @@ function lineRect(line: number): Rect {
 
 /** Setting `index`'s button on a tab of buttons: two a line, the first on the left. */
 export function settingButtonFrame(index: number): Rect {
-  return framesAcross(lineRect(index >> 1), 2)[index & 1];
+  return framesAcross(lineRect(index >> 1), 2)[index & 1]!;
 }
 
 /** A toggle's two frames on line `line`: ON, then OFF. */
@@ -401,7 +401,7 @@ const BTN_LINE0 = 20;
 const BTN_NAME0 = 60;
 
 function tabOf(state: SettingsDialogState) {
-  return TABS.find((t) => t.tab === state.tab) ?? TABS[0];
+  return TABS.find((t) => t.tab === state.tab) ?? TABS[0]!;
 }
 
 function settingsOf(state: SettingsDialogState): readonly Setting[] {
@@ -439,7 +439,7 @@ function turnOver(ui: UIState, setting: Setting & { kind: 'toggle' | 'page' }): 
  */
 export function settingsDialogButtons(ui: UIState, state: SettingsDialogState): UIButton[] {
   const buttons = [buttonOf(CLOSE_FRAME, BTN_CLOSE, 'settings.close'), buttonOf(EXIT_FRAME, BTN_EXIT, 'settings.exit')];
-  buttons.push(...tabButtons(TAB_FRAMES, BTN_TAB0, 'settings.tab').map((b, i) => ({ ...b, name: `settings.tab.${TABS[i].tab}` })));
+  buttons.push(...tabButtons(TAB_FRAMES, BTN_TAB0, 'settings.tab').map((b, i) => ({ ...b, name: `settings.tab.${TABS[i]!.tab}` })));
   if (state.tab === 'keys') buttons.push(...keysTabButtons(ui, state.keys, KEYS_AREA));
   const asButtons = isButtonsTab(state);
   settingsOf(state).forEach((setting, line) => {
@@ -494,7 +494,7 @@ export function helpText(ui: UIState, state: SettingsDialogState): string {
     const keys = keysTabHelp(state.keys, id);
     if (keys !== undefined) return keys;
   }
-  if (id >= BTN_TAB0 && id < BTN_TAB0 + TABS.length) return TABS[id - BTN_TAB0].help;
+  if (id >= BTN_TAB0 && id < BTN_TAB0 + TABS.length) return TABS[id - BTN_TAB0]!.help;
   const setting = settingsOf(state)[lineOf(id)];
   if (!setting) return '';
   if (inert(ui, setting)) {
@@ -561,7 +561,7 @@ function drawSettingLines(ui: UIState, state: SettingsDialogState, look: (id: nu
     const frames = toggleFrames(line);
     const on = isOn(ui, setting);
     frames.forEach((frame, i) => {
-      drawButton(ui, frame, TOGGLE_LABELS[i], inert(ui, setting) ? 'inert' : look(id + i, on === (i === 0)));
+      drawButton(ui, frame, TOGGLE_LABELS[i]!, inert(ui, setting) ? 'inert' : look(id + i, on === (i === 0)));
     });
   });
 }
@@ -595,7 +595,7 @@ export function settingsDialogClick(ui: UIState, x: number, y: number, buttons: 
     return;
   }
   if (id >= BTN_TAB0 && id < BTN_TAB0 + TABS.length) {
-    state.tab = TABS[id - BTN_TAB0].tab;
+    state.tab = TABS[id - BTN_TAB0]!.tab;
     return;
   }
   if (state.tab === 'keys') {

@@ -1721,33 +1721,33 @@ export class BytecodeInterpreter {
     // but returning TS references instead of raw pointers.
     switch (ptr) {
       case StdRectPtr.RECT_StdWallRectangleF3L2:
-        return this.context.wallRectangles[13];
+        return this.context.wallRectangles[13] ?? null;
       case StdRectPtr.RECT_StdWallRectangleF3L1:
-        return this.context.wallRectangles[1];
+        return this.context.wallRectangles[1] ?? null;
       case StdRectPtr.RECT_StdWallRectangleF3:
-        return this.context.wallRectangles[0];
+        return this.context.wallRectangles[0] ?? null;
       case StdRectPtr.RECT_StdWallRectangleF3R1:
-        return this.context.wallRectangles[2];
+        return this.context.wallRectangles[2] ?? null;
       case StdRectPtr.RECT_StdWallRectangleF3R2:
-        return this.context.wallRectangles[12];
+        return this.context.wallRectangles[12] ?? null;
       case StdRectPtr.RECT_StdWallRectangleF2L1:
-        return this.context.wallRectangles[4];
+        return this.context.wallRectangles[4] ?? null;
       case StdRectPtr.RECT_StdWallRectangleF2:
-        return this.context.wallRectangles[3];
+        return this.context.wallRectangles[3] ?? null;
       case StdRectPtr.RECT_StdWallRectangleF2R1:
-        return this.context.wallRectangles[5];
+        return this.context.wallRectangles[5] ?? null;
       case StdRectPtr.RECT_StdWallRectangleF1L1:
-        return this.context.wallRectangles[7];
+        return this.context.wallRectangles[7] ?? null;
       case StdRectPtr.RECT_StdWallRectangleF1:
-        return this.context.wallRectangles[6];
+        return this.context.wallRectangles[6] ?? null;
       case StdRectPtr.RECT_StdWallRectangleF1R1:
-        return this.context.wallRectangles[8];
+        return this.context.wallRectangles[8] ?? null;
       case StdRectPtr.RECT_StdWallRectangleF0L1:
-        return this.context.wallRectangles[10];
+        return this.context.wallRectangles[10] ?? null;
       case StdRectPtr.RECT_StdWallRectangleF0:
-        return this.context.wallRectangles[9];
+        return this.context.wallRectangles[9] ?? null;
       case StdRectPtr.RECT_StdWallRectangleF0R1:
-        return this.context.wallRectangles[11];
+        return this.context.wallRectangles[11] ?? null;
 
       case StdRectPtr.RECT_StdFloorPitRectangleF3L1:
         return this.context.floorPitRectangles?.[11] ?? null;

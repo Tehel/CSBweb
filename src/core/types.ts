@@ -13,6 +13,14 @@ export type i32 = number;  // signed 32-bit
 export type ui32 = number; // unsigned 32-bit
 
 /**
+ * `N` values of `T`, a length the compiler knows: a constant index below `N` reads a `T`
+ * under `noUncheckedIndexedAccess`. CSBWin's fixed arrays, `RectPos wallRectangles[14]`,
+ * once their reader has checked the length. A length only known at run time is a `T[]`.
+ */
+export type Tuple<T, N extends number, A extends T[] = []> =
+    number extends N ? T[] : A['length'] extends N ? A : Tuple<T, N, [...A, T]>;
+
+/**
  * Direction enum (0=North, 1=East, 2=South, 3=West)
  * Following CSBWin convention
  */
