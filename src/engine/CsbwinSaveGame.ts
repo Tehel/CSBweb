@@ -24,7 +24,7 @@
  * | The header, every level's descriptor and tables, cell flags, object chains, column index, every database record, the text arrays | the dungeon image, installed |
  * | `dsaLevelIndex`, `dsaIndex`, `specialLocations`, the extended-feature flags | the Extended Features block and `EXPOOL`, added to the same snapshot |
  * | `ITEM16`, missiles | blocks 3 and the image, through `RuntimeSave`'s `applySaveGameState` |
- * | The timer table and the queue that orders it | blocks 5 and 6, through `Game.restoreTimerQueue` |
+ * | The timer table and the queue that orders it | blocks 5 and 6, into `TimerQueue.restore` (`installRuntimeState`) |
  * | `d.RandomGameID`, `totalMoveCount`, `d.Byte22808`, `d.Word22592`-`d.Word22598` | `GAMEBLOCK1` (`buildBlock1State`) |
  * | The DSA global variables, and their number | `EXPOOL` (`readGlobalVariables`, `doc/CSBwin-src/SaveGame.cpp:1916-1930`) |
  * | The overlay palette | `EXPOOL` (`readOverlayPalette`, `doc/CSBwin-src/SaveGame.cpp:1931-1959`), the identity without it |
@@ -203,7 +203,7 @@ function specialLocationsOf(world: CsbwinWorld): Record<number, number> | undefi
 }
 
 /**
- * Everything a CSBWin save says, in the shape `Game.applyRuntimeSaveState` takes.
+ * Everything a CSBWin save says, in the shape a read installs (`readGame`).
  *
  * Pure: no `Game` is touched, so a verification tool can build one and read it without
  * standing a game up.

@@ -10,7 +10,7 @@
 import type { DungeonData, Item16Record, MissileRecord, TimerRecord } from '../data/dungeonTypes';
 import { DBType, type ObjectID } from '../core/types';
 import { sw } from '../core/intCast';
-import type { DungeonSnapshot } from './DungeonSnapshot';
+import { applyDungeonSnapshot, type DungeonSnapshot } from './DungeonSnapshot';
 import type { GameContext } from './GameContext';
 import { VBL_PER_TICK } from './LoopState';
 import type { Block1State, PartyState } from './gameTypes';
@@ -111,10 +111,35 @@ export function getRuntimeSaveState(ctx: GameContext): RuntimeSaveState {
 }
 
 /**
- * Restore the runtime state. The caller owes the loop's own reset:
- * `HandleMouseEvents`' `lastTime = 0` (`Game.applyRuntimeSaveState`).
+ * A read's state made ready to install (`prepareRuntimeState`): the timer queue's
+ * entries built from its table, the rest as the state gives it.
  */
-export function applyRuntimeSaveState(ctx: GameContext, save: ReadState): void {
+export interface PreparedState {
+    save: ReadState;
+    timers: TimerEntry[];
+}
+
+/**
+ * The half of a restore that builds: the state's world put into `world` (its snapshot,
+ * then the `ITEM16` pool and the missile records the save carries beside it), and the
+ * timer queue's entries. It touches nothing but `world`, so a read builds it over a world
+ * not yet installed, and an error here leaves the running game as it was (`readGame`).
+ * The snapshot lands before the pool, which is re-derived from the creature records it
+ * puts back (`startRuntimeState`).
+ */
+export function prepareRuntimeState(world: DungeonData, save: ReadState): PreparedState {
+    if (save.dungeon.snapshot) applyDungeonSnapshot(world, save.dungeon.snapshot);
+    applySaveGameState(world, save.dungeon.item16 ?? [], save.dungeon.missiles ?? []);
+    return { save, timers: timerEntriesOf(save.dungeon.timers ?? [], save.dungeon.timerQueue ?? []) };
+}
+
+/**
+ * The half of a restore that installs, over the world `prepareRuntimeState` built,
+ * once it is the running one: assignments that cannot throw. `startRuntimeState`
+ * follows.
+ */
+export function installRuntimeState(ctx: GameContext, prepared: PreparedState): void {
+    const { save } = prepared;
     // `d.PartySleeping = 0` wherever a game starts (doc/CSBwin-src/CSBCode.cpp:10603):
     // CSBWin never saves it. Loading over a sleeping party must hand the UI its
     // adventure button lists back, whatever the restored state says.
@@ -144,29 +169,22 @@ export function applyRuntimeSaveState(ctx: GameContext, save: ReadState): void {
     ctx.systems.dsa.disableSaves = save.game.disableSaves;
     ctx.overlayPalette.set(save.game.overlayPalette);
 
-    // The world first: cell flags, object chains and every database record. This
-    // has to land before the ITEM16/timer restore below, because the monster pool
-    // is re-derived from the creature records it puts back.
-    if (save.dungeon.snapshot) ctx.dungeon.applySnapshot(save.dungeon.snapshot);
-
-    const item16 = save.dungeon.item16 ?? [];
-    const timers = save.dungeon.timers ?? [];
-    const missiles = save.dungeon.missiles ?? [];
-    restoreTimerQueue(
-        ctx,
-        timers,
-        save.dungeon.timerQueue ?? [],
-        save.dungeon.timerSequence ?? 0,
-        save.dungeon.firstAvailTimer,
-    );
-    applySaveGameState(ctx.dungeon.getData(), item16, missiles);
-    // The restore replaced the ITEM16 pool wholesale; re-derive which groups are
-    // active, as CSBWin's game start does after its own restore
-    // (`LoadPartyLevel(d.partyLevel)`, doc/CSBwin-src/CSBCode.cpp:10615).
+    ctx.timers.restore(prepared.timers, save.dungeon.timerSequence ?? 0,
+        (save.dungeon.timers ?? []).length, save.dungeon.firstAvailTimer);
     ctx.footprints.restore(save.game.footprints);
-    ctx.systems.monsters.reloadAfterSaveGame();
     // An extra's, never saved (`ThrownWeapons`).
     ctx.thrownWeapons.clear();
+}
+
+/**
+ * The end of a restore, over the installed state: the `ITEM16` pool was replaced
+ * wholesale, so which groups are active is re-derived, as CSBWin's game start does after
+ * its own restore (`LoadPartyLevel(d.partyLevel)`, doc/CSBwin-src/CSBCode.cpp:10615).
+ * It walks the world, so it is where a damaged one can still throw. The caller owes the
+ * loop's own reset: `HandleMouseEvents`' `lastTime = 0` (`Game.startReadState`).
+ */
+export function startRuntimeState(ctx: GameContext): void {
+    ctx.systems.monsters.reloadAfterSaveGame();
 }
 
 /**
@@ -283,19 +301,14 @@ function buildTimerRecords(timers: TimerQueue): { records: TimerRecord[]; queue:
 }
 
 /**
- * Rebuild the live queue from a saved table and the heap's array order.
+ * The live queue's entries, from a saved table and the heap's array order, for
+ * `TimerQueue.restore`.
  *
  * The records are a table *by index*; the queue names which of them are live and in
  * what order. Both readings of bytes 6-9 come back, because which one a timer means
  * depends on its function and the queue entry carries both.
  */
-function restoreTimerQueue(
-    ctx: GameContext,
-    records: TimerRecord[],
-    order: number[],
-    nextSequence: number,
-    firstAvailTimer: number | undefined,
-): void {
+function timerEntriesOf(records: TimerRecord[], order: number[]): TimerEntry[] {
     const entries: TimerEntry[] = [];
     for (const index of order) {
         const record = records[index];
@@ -325,7 +338,7 @@ function restoreTimerQueue(
             object,
         });
     }
-    ctx.timers.restore(entries, nextSequence, records.length, firstAvailTimer);
+    return entries;
 }
 
 /** A free slot in the timer table: `TT_EMPTY`, and nothing else set. */

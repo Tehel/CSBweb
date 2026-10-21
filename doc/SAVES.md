@@ -469,6 +469,14 @@ dropped, never repacked into the world read, an open inventory closed, its video
 adventure's again, and the attack menu, the Reincarnate screen, the eye and the mouth are
 gone. The disk menu's `TAG0207cc` then runs on the party read.
 
+A read is whole or nothing (`readGame`, `src/engine/ReadGame.ts`). It builds the world,
+the state and everything else it installs off the running game, then installs them in one
+step that cannot fail, then starts the game read: the overlay, the party's level loaded,
+the databases thinned. A file that fails while the read builds is the line or the
+dialog's message above, and the game played on is the one that was running, untouched. A
+failure once the read is in ends the game, `die(0xbad)` with "SAVED GAME DAMAGED!" and the
+reason, rather than play on in a game half read. `tools/dump-damaged-read.ts` holds both.
+
 ## CONTINUE
 
 The welcome page's CONTINUE (`src/ui/welcomePage.ts`) opens the game's page with the

@@ -184,7 +184,7 @@ What the engine does with it:
   (`DEBT.md` → H). No other script's wait runs the clock.
 - Sleep and `WakeUp` call `setNewSpeed` with `d.Speed` (`speed` in
   `src/engine/LoopState.ts`), and every load calls `resetTime` just before it replaces the
-  tick count (`applyRuntimeSaveState`).
+  tick count (`installRuntimeState`).
 - A restart calls `restart()` (`showEndOfGame`, `src/renderer/intro/EndOfGame.ts`).
 
 One emitter is the port's own. F5 and F9, which CSBWin does not have, say what they did

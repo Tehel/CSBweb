@@ -366,7 +366,7 @@ world keeps the file's maps as its `RnMaps` (`src/core/RnMaps.ts`,
 
 `src/engine/CsbwinSaveGame.ts` (`applyCsbwinSave`) restores a genuine save into
 a running `Game`: it builds a `RuntimeSaveState` from `GAMEBLOCK2`, block 4 and the
-image, and hands it to `Game.applyRuntimeSaveState`, the path every read takes. The
+image, and reads it with its world through `readGame`, the path every read takes. The
 port's own save is such a file and loads the same way: `applySaveBytes` in
 `src/engine/SaveGameFile.ts` is what the disk menu's LOAD and F9 call
 (`doc/SAVES.md`).

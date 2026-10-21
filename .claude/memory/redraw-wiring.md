@@ -13,7 +13,7 @@ The port has no per-animation-frame render. `DrawViewport` (`renderView` in `src
 - a script's tick, through `GameHost.drawViewport`.
 
 A game's first view (start, restart, a load) is the tick `MainLoop` opens with:
-`Game.start`, `resumeMainLoop` and `applyRuntimeSaveState` make one due, and the page
+`Game.start`, `resumeMainLoop` and `installReadState` make one due, and the page
 draws nothing itself.
 
 Everything else — clicks, keys, the message scroll, the button flash, the tick's paint

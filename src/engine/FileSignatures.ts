@@ -18,7 +18,9 @@
  */
 import { readRuntimeFileSignatures, type ExpoolDatabase } from '../data/CsbwinExpool';
 import { csbGraphicsExpected } from '../data/CsbwinExtendedFeatures';
-import { csbGraphicsSignatureRefused, graphicsSignatureRefused, type FileSignature } from '../data/FileSignature';
+import {
+    csbGraphicsSignatureRefused, graphicsSignatureRefused, type FileSignature, type RuntimeFileSignatures,
+} from '../data/FileSignature';
 import { die } from './Die';
 import type { GameContext } from './GameContext';
 
@@ -27,14 +29,15 @@ import type { GameContext } from './GameContext';
  * gives: its `EDBT_RuntimeFileSignatures` records (`readRuntimeFileSignatures`), then
  * `openGraphicsFile`'s check of `graphics.dat` against the one it names
  * (`Graphics.cpp:1830-1840`), which a world naming none (0, or `0xffffffff`) passes. A
- * read checks before it installs anything.
+ * read checks before it installs anything, and installs what this returns with the rest
+ * (`readGame`).
  */
-export function readFileSignatures(ctx: GameContext, world: ExpoolDatabase): void {
+export function readFileSignatures(ctx: GameContext, world: ExpoolDatabase): RuntimeFileSignatures {
     const runtime = readRuntimeFileSignatures(world);
     const o = graphicsSignatureRefused(runtime, ctx.tables.graphicsSignature);
     // "Actuatl" is CSBWin's spelling.
     if (o !== null) die(ctx.host, 0x3c6c, `Incorrect Graphics File signature\nActuatl Signature = ${o}`);
-    Object.assign(ctx.runtimeFileSignatures, runtime);
+    return runtime;
 }
 
 /**

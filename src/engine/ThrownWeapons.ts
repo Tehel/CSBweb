@@ -12,7 +12,7 @@
  * (`forgetThrownWeapon`).
  *
  * Tags are made whether or not the extra is on; only the gather reads them, and only
- * with it on. They are never saved: a load forgets them (`applyRuntimeSaveState`).
+ * with it on. They are never saved: a load forgets them (`installRuntimeState`).
  */
 import { OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID, type Position } from '../core/types';
 import type { DatabaseRecord } from '../data/dungeonTypes';

@@ -4339,8 +4339,8 @@ bytes 6-7 — where `ConvertTimers` says the object lives — and zeros in bytes
 the packed `[x:5][y:5][direction:2][decay:4]` word belongs, because `pos` and `action` are
 both 0 for a missile. `csbgame-flying-sword.dat` settles both: function 49, bytes 6-7
 `07 9a` (the object's indirect slot) and bytes 8-9 `a9 09` (the packed word,
-`timerWord8`). `Game.collapseTimerBytes` is the one place the three representations meet
-now, and `restoreTimerQueue` is its inverse.
+`timerWord8`). `collapseTimerBytes` (`src/engine/RuntimeSave.ts`) is the one place the three representations meet,
+and `timerEntriesOf` is its inverse.
 
 The other conflict is benign and is guarded rather than assumed: a magic shield or poison
 timer keeps a **count** in `timerWord6` while `uByte6`/`uByte7` are zero, because
@@ -5093,7 +5093,7 @@ starts there (`d.vblCount = 0`, `:627`), so the second tick is `d.Speed` VBLs on
 port's tick belongs to a pass, so `d.clockTick` is set where `MainLoop` would be entered
 (`Game.start`, `Game.resumeMainLoop`) and the first VBL's pass ticks. A game read in play,
 which only the port has (the save menu's LOAD, F9), is followed by the same tick
-(`Game.applyRuntimeSaveState`), and the page draws no first view of its own. Evidence:
+(`Game.installReadState`), and the page draws no first view of its own. Evidence:
 `tools/dump-vbl-clock.ts`.
 
 ## A refused move throws away all queued input, and postpones a due tick by one VBL
@@ -6336,7 +6336,7 @@ CSBWin saves no message state: `SCROLLING_TEXT::Serialize` is declared
 screen and rebases their timeouts onto the loaded clock with
 `scrollingText.ResetTime(b.gb2.Time)`, just before `d.Time = b.gb2.Time`
 (`SaveGame.cpp:1747-1748`, `ResetTime` at `CSBCode.cpp:1574`). The port does the same in
-`applyRuntimeSaveState`, which every load reaches. A load over a sleeping party (the port's
+`installRuntimeState`, which every load reaches. A load over a sleeping party (the port's
 in-game load; CSBWin loads only when a game starts) also shrinks the rows back, as the next
 tick's `SetNewSpeed(0, 15)` would (`CSBCode.cpp:622-626`). Evidence: `tools/dump-sleep.ts`.
 

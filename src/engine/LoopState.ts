@@ -94,7 +94,7 @@ export interface LoopFlags {
    *
    * The three are globals CSBWin never saves and never resets: a load keeps the last
    * game's, a restart of the program starts from these. The port gives every game read
-   * the program's start (`Game.applyRuntimeSaveState`, `DEBT.md` H, "A game read starts
+   * the program's start (`Game.installReadState`, `DEBT.md` H, "A game read starts
    * the gravity afresh").
    */
   moveHistory: number[];

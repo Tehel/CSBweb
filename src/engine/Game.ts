@@ -9,7 +9,7 @@
 import type { DungeonData } from '../data/dungeonTypes';
 import { DungeonLoader } from '../data/DungeonLoader';
 import { readDeleteDuplicateTimers, readDisableSaves, readGlobalVariables } from '../data/CsbwinExpool';
-import { die } from './Die';
+import { Die, die } from './Die';
 import { readGame } from './ReadGame';
 import type { PartyState, MovementResult } from './gameTypes';
 import { MovementAction } from './gameTypes';
@@ -22,7 +22,10 @@ import { MissileEncounter } from './MissileEncounter';
 import { MonsterSystem, newItem16Pool } from './MonsterSystem';
 import { createGameContext, newGameState, type GameContext, type GameSystems } from './GameContext';
 import { createGameHost, type GameHost } from './GameHost';
-import { applyRuntimeSaveState, getRuntimeSaveState, timerQueueState, type ReadState, type RuntimeSaveState } from './RuntimeSave';
+import {
+    getRuntimeSaveState, installRuntimeState, prepareRuntimeState, startRuntimeState, timerQueueState,
+    type PreparedState, type ReadState, type RuntimeSaveState,
+} from './RuntimeSave';
 import { MonsterPerception } from './MonsterPerception';
 import { MonsterDamage } from './MonsterDamage';
 import { MonsterAI } from './MonsterAI';
@@ -345,17 +348,15 @@ export class Game implements MainLoop {
      * `ReadDatabases` fails (doc/CSBwin-src/SaveGame.cpp:1910-1912) CSBWin's read ends at
      * `tag01efee`, and at the boot in `die(0xbad)`. The author's decision is that a game
      * file that does not read ends the game wherever it is read (`DEBT.md` H): `die(0xbad)`,
-     * whose message says why. The parse fails before anything is installed, so the
-     * running game is left as it was.
+     * whose message says why: the parse, or the read built over it (`readGame`).
      */
     readDungeonDat(bytes: Uint8Array): void {
-        let data: DungeonData;
         try {
-            data = new DungeonLoader().loadDungeonDat(bytes);
+            this.readNewGame(new DungeonLoader().loadDungeonDat(bytes));
         } catch (error) {
+            if (error instanceof Die) throw error;
             die(this.ctx.host, 0xbad, `SAVED GAME DAMAGED!\ndungeon.dat: ${error instanceof Error ? error.message : error}`);
         }
-        this.readNewGame(data);
     }
 
     /**
@@ -363,15 +364,16 @@ export class Game implements MainLoop {
      * the header, every level's descriptor and tables, from the file it opens
      * (`ReadDatabases`, doc/CSBwin-src/SaveGame.cpp:2536). `DungeonState` keeps its object,
      * which every system and the renderer hold, and takes the new data: the world has
-     * that one route, `ctx.dungeon`. A read (`readGame`) installs its world before it
-     * restores the state that goes with it (`applyRuntimeSaveState`), whose snapshot must
-     * then fit.
+     * that one route, `ctx.dungeon`. A read (`readGame`) builds the state that goes with
+     * it over the world first (`prepareRuntimeState`), and installs both at once.
+     *
+     * `deleteDuplicateTimers` is a global every read sets from the world's `EXPOOL` once
+     * the databases are in (doc/CSBwin-src/SaveGame.cpp:1965-1975); a read reads it while
+     * it builds.
      */
-    installWorld(data: DungeonData): void {
+    installWorld(data: DungeonData, deleteDuplicateTimers = readDeleteDuplicateTimers(data)): void {
         this.ctx.dungeon.install(data);
-        // `deleteDuplicateTimers`, a global every read sets from the world's `EXPOOL`
-        // once the databases are in (doc/CSBwin-src/SaveGame.cpp:1965-1975).
-        this.ctx.timers.deleteDuplicateTimers = readDeleteDuplicateTimers(data);
+        this.ctx.timers.deleteDuplicateTimers = deleteDuplicateTimers;
     }
 
     /**
@@ -1063,22 +1065,44 @@ export class Game implements MainLoop {
     }
 
     /**
-     * Restore a read's state (`RuntimeSave.applyRuntimeSaveState`), then the loop's own
-     * reset: `HandleMouseEvents(_16_, -999887)` — `lastTime = 0`
-     * (doc/CSBwin-src/SaveGame.cpp:1785, `Mouse.cpp:1473-1477`). Every game read comes
-     * through here, and `_GameSetup` follows each `ReadEntireGame` with
-     * `SmartDiscard(true)` (`CSBCode.cpp:10759-10760`). `MainLoop` follows every read and
-     * opens with a tick (`:596-611`), so one is made due: a game read in play, which only
-     * the port has, ticks in the next pass, and that tick draws its first view.
+     * Restore `save` over the running world, as a read restores its own over the world it
+     * installs (`readGame`): `prepareRuntimeState`, then `installReadState` and
+     * `startReadState`. For the tools, which take a game back to a state they captured.
      */
     applyRuntimeSaveState(save: ReadState): void {
-        applyRuntimeSaveState(this.ctx, save);
+        const world = this.ctx.dungeon.getData();
+        const prepared = prepareRuntimeState(world, save);
+        // A new skin cache, over the records the snapshot put back.
+        this.ctx.dungeon.install(world);
+        this.installReadState(prepared);
+        this.startReadState();
+    }
+
+    /**
+     * Install a read's state (`RuntimeSave.installRuntimeState`), then the loop's own
+     * reset: `HandleMouseEvents(_16_, -999887)` — `lastTime = 0`
+     * (doc/CSBwin-src/SaveGame.cpp:1785, `Mouse.cpp:1473-1477`). `MainLoop` follows every
+     * read and opens with a tick (`:596-611`), so one is made due: a game read in play,
+     * which only the port has, ticks in the next pass, and that tick draws its first view.
+     * Assignments alone: this is part of the read's swap, which cannot throw.
+     */
+    installReadState(prepared: PreparedState): void {
+        installRuntimeState(this.ctx, prepared);
         this.lastInputTime = 0;
         // CSBWin saves none of the gravity's globals, nor resets them: a game read starts
         // from the program's start, `{0,1,2,0}` and at rest (`DEBT.md` H, "A game read
         // starts the gravity afresh").
         Object.assign(this.ctx.loop, createGravityState());
-        smartDiscard(this.ctx, true);
         this.ctx.loop.clockTick = true;
+    }
+
+    /**
+     * The end of every game read, over the installed state: the party's level loaded
+     * (`RuntimeSave.startRuntimeState`), and `_GameSetup`'s `SmartDiscard(true)` after
+     * each `ReadEntireGame` (`CSBCode.cpp:10759-10760`).
+     */
+    startReadState(): void {
+        startRuntimeState(this.ctx);
+        smartDiscard(this.ctx, true);
     }
 }
