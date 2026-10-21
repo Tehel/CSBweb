@@ -403,15 +403,12 @@ export function initializePlayState(ui: UIState): void {
 /**
  * A saved game read in play (`GameHost.savedGameRead`), which only the port has: CSBWin
  * reads a game only after `d.Initialize()` (`doc/CSBwin-src/CSBCode.cpp:333-340`), so the
- * screen's share of `d` is a new game's, as `initializePlayState` leaves it, and the party
- * is the one read. The old world's open chest is dropped, never repacked into the world
- * read, and the inventory its party had open is closed as `ShowHideInventory` closes
- * one, its `videoMode = VM_ADVENTURE` (`:7512`): the party read has none open. The
+ * screen's share of `d` is a new game's, as `initialPlayState` leaves it, and the party
+ * is the one read. `ctx.interface` is the engine's to reset (`Game.savedGameRead`). The
  * caller sets the button lists.
  */
-export function savedGameRead(ui: UIState, inventoryWasOpen: boolean): void {
-  if (inventoryWasOpen) ui.ctx.loop.videoMode = 'VM_ADVENTURE';
-  initializePlayState(ui);
+export function savedGameRead(ui: UIState): void {
+  Object.assign(ui, initialPlayState());
   ui.partyGeneration = ui.ctx.party.generation;
 }
 

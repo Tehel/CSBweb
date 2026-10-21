@@ -273,15 +273,15 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // (`doc/CSBwin-src/CSBCode.cpp:6797` around `Code13ea4.cpp:20`); the
         // screen hands its answer to `HallOfChampions.reincarnateNamed`.
         openReincarnateScreen: (chIdx) => screen?.openReincarnateScreen(chIdx),
-        // A weapon hand changed: the attack menu and the inventory are the screen's.
+        // A weapon hand changed: the attack menu is the screen's.
         closeAttackMenuOf: (chIdx) => screen?.closeAttackMenuOf(chIdx),
-        showHideInventory: (chIdx) => screen?.showHideInventory(chIdx),
         releaseEyeOrMouth: () => screen?.releaseEyeOrMouth(),
-        // `TAG02076e` / `TAG0207cc` from the engine: the Hall of Champions and `WakeUp`.
+        // What `ShowHideInventory`, `TAG02076e` and `TAG0207cc` draw.
+        showHideInventory: () => screen?.showHideInventory(),
         tag02076e: () => screen?.tag02076e(),
         tag0207cc: () => screen?.tag0207cc(),
         // A save read in play: the screen leaves the old world for the one read.
-        savedGameRead: (inventoryWasOpen) => screen?.savedGameRead(inventoryWasOpen),
+        savedGameRead: () => screen?.savedGameRead(),
         // The prison's fourth champion asks whether the adventure begins, and every
         // champion is reported.
         championJoined: (joined) => {

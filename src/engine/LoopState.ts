@@ -1,6 +1,6 @@
 /**
- * The main loop's `d.` flags that other CSBWin files write, and `WakeUp` and the freeze,
- * which write them (`DEBT.md` E2, "how a system reaches the loop's state"). They live on
+ * The main loop's `d.` flags that other CSBWin files write, and the freeze, which writes
+ * them (`DEBT.md` E2, "how a system reaches the loop's state"). They live on
  * the context (`ctx.loop`) and not in `GameState`: none is saved, in CSBWin or here.
  */
 import type { Rect } from '../data/tables/UITables';
@@ -265,25 +265,6 @@ export function vblInterrupt(ctx: GameContext): void {
   const loop = ctx.loop;
   loop.vblCount += 1;
   if (loop.vblCount >= speed(ctx)) loop.clockTick = true;
-}
-
-/**
- * `WakeUp` (doc/CSBwin-src/CSBCode.cpp:7106) — button 146, or any blow that lands on a
- * sleeping party (`Monster.cpp:4544`, `Character.cpp:2814-2817`). `d.clockTick = 1`,
- * `d.PartySleeping = 0`, the message timeouts rescaled to the game speed
- * (`scrollingText.SetNewSpeed(d.Speed, …)`, `:7112`), the adventure button lists back (the
- * host's listeners), `DiscardAllInput()`, `TAG0207cc` (`:7120`), and `videoMode =
- * VM_ADVENTURE` last (`:7121`).
- */
-export function wakeUp(ctx: GameContext): void {
-  const oldSpeed = speed(ctx);
-  ctx.loop.clockTick = true;
-  ctx.party.state.sleeping = false;
-  ctx.host.messages.setNewSpeed(oldSpeed, VBL_PER_TICK, ctx.state.tickCount);
-  ctx.host.sleepChanged(false);
-  ctx.mouseQueue.discardAllInput();
-  ctx.host.tag0207cc();
-  ctx.loop.videoMode = 'VM_ADVENTURE';
 }
 
 /**

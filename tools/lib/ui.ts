@@ -11,6 +11,10 @@
  * The settings are the defaults, kept nowhere, the CRT effect can be shown, and there is
  * no fullscreen. The map
  * dialog moves no party, as on a page opened without `?dev`, and EXIT leaves for nothing.
+ *
+ * The game's host draws on it what `ShowHideInventory`, `TAG02076e`, `TAG0207cc` and a read
+ * in play draw, as `main.ts` wires `GameScreen`, after whatever the tool's own host does
+ * there: the engine does their `d.` work, and a click on the screen goes through it.
  */
 import type { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import type { GameContext } from '../../src/engine/GameContext';
@@ -18,7 +22,8 @@ import { NO_FULLSCREEN } from '../../src/lib/fullscreen';
 import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../../src/renderer/csbwin/CanvasBlitter';
 import { loadFontData } from '../../src/renderer/csbwin/TextRenderer';
 import { Settings } from '../../src/settings/Settings';
-import { createUIState, type UIHooks, type UIState } from '../../src/renderer/ui/UIState';
+import { showHideInventoryDrawing, tag02076eDrawing, tag0207ccDrawing } from '../../src/renderer/ui/Mouse';
+import { createUIState, savedGameRead as savedGameReadOnScreen, type UIHooks, type UIState } from '../../src/renderer/ui/UIState';
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../../src/renderer/ViewportGraphics';
 import { ViewportRenderer } from '../../src/renderer/ViewportRenderer';
 import { graphicsTablesOf } from './game';
@@ -37,7 +42,7 @@ export function newUIState(graphics: GraphicsLoader, ctx: GameContext, hooks: Pa
     graphicCache,
     getGraphicBitmap: (graphicNum) => getGraphicBitmap(graphicNum),
   });
-  return createUIState({
+  const ui = createUIState({
     graphicsLoader: graphics,
     ctx,
     context: viewport.context,
@@ -72,4 +77,11 @@ export function newUIState(graphics: GraphicsLoader, ctx: GameContext, hooks: Pa
     ...hooks,
     getGraphicBitmap,
   });
+  const host = ctx.host;
+  const { showHideInventory, tag02076e, tag0207cc, savedGameRead } = host;
+  host.showHideInventory = (chIdx) => { showHideInventory(chIdx); showHideInventoryDrawing(ui); };
+  host.tag02076e = () => { tag02076e(); tag02076eDrawing(ui); };
+  host.tag0207cc = () => { tag0207cc(); tag0207ccDrawing(ui); };
+  host.savedGameRead = () => { savedGameRead(); savedGameReadOnScreen(ui); };
+  return ui;
 }

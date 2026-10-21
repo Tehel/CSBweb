@@ -16,18 +16,20 @@ import { drinkAtWaterFountain, handleMouthPress } from './Feeding';
 import { HINT_ORACLE_BUTTON, inventoryButtonList } from './HintOracleButton';
 import type { HintSquare } from '../intro/HintOracle';
 import { searchButtonList } from './HitTest';
-import { describeObject, getActiveChestView, getEyeRect, tag0189d4, tag019036 } from './Inventory';
+import { describeObject, describeWeaponHandScroll, getActiveChestView, getEyeRect, tag0189d4, tag019036 } from './Inventory';
 import { handleMagicClick } from './MagicPanel';
 import { drawLegalAttackTypes, handleAttackAreaClick } from './Attack';
 import { isChestRecord, resolveObjectNameIndex } from './Objects';
 import { OBJECT_ID_NULL } from '../../core/types';
 import { UIMode, UIState, stHideCursor, stShowCursor, tag002572 } from './UIState';
-import { getPartyChampion, selectMagicCaster, setHandOwner } from '../../engine/Party';
+import { getPartyChampion, setHandOwner } from '../../engine/Party';
 import { getChampionPossession } from '../../engine/gameTypes';
 import { characterAtPosition } from '../../engine/AddCharacter';
 import { describeObject as describeObjectInterface, repackChest, tag019036 as tag019036Interface } from '../../engine/OpenChest';
 import { CursorFilterType } from '../../engine/dsa/DsaTypes';
-import { freeze, setClockTick, thaw, waitForButtonFlash, wakeUp } from '../../engine/LoopState';
+import { freeze, thaw } from '../../engine/LoopState';
+import { wakeUp } from '../../engine/MouseSystem';
+import { showHideInventory, tag02076e, tag0207cc } from '../../engine/ShowHideInventory';
 import {
   hasCursorObject,
   resolveEmptyHandedViewportClick,
@@ -122,13 +124,13 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
   }
   if (id === 83) {
     const owner = ui.partyState.cursorOwner;
-    if (owner >= 0) handleInventoryToggle(ui, owner);
+    if (owner >= 0) showHideInventory(ui.ctx, owner);
     return;
   }
   if (id >= 7 && id <= 11) {
     const button = id - 7;
     if ((button === 4 || button < numChampions) && !potential) {
-      handleInventoryToggle(ui, button);
+      showHideInventory(ui.ctx, button);
     }
     return;
   }
@@ -168,8 +170,8 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
     // disk, while a champion is only provisionally joined. The party lying down asks
     // for the Sleepsave, the port's own (`UIState.sleepSaveNeeded`).
     if (!potential) {
-      if (ui.partyState.selectedCharacterIndex >= 0) handleInventoryToggle(ui, 4);
-      tag02076e(ui);
+      if (ui.partyState.selectedCharacterIndex >= 0) showHideInventory(ui.ctx, 4);
+      tag02076e(ui.ctx);
       if (ui.ctx.systems.mouse.sleep()) ui.sleepSaveNeeded = true;
     }
     return;
@@ -204,7 +206,7 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
     // lists and key tables saved and replaced by `Buttons17832` and `Byte18448`, and
     // "GAME FROZEN" in the viewport (`GameScreen.presentViewport`) are the screen's.
     freeze(ui.ctx);
-    tag02076e(ui);
+    tag02076e(ui.ctx);
     ui.modeBeforeFreeze = ui.uiMode;
     ui.uiMode = UIMode.Frozen;
     updateButtonLists(ui);
@@ -215,7 +217,7 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
     // `TAG0207cc`, then the saved lists and key tables back.
     thaw(ui.ctx);
     ui.uiMode = ui.modeBeforeFreeze;
-    tag0207cc(ui);
+    tag0207cc(ui.ctx);
     updateButtonLists(ui);
     syncInventoryButtons(ui);
     return;
@@ -343,95 +345,40 @@ export function tag01a6ea(ui: UIState, clickX: number, clickY: number): void {
   }
 }
 
-export function handleInventoryToggle(ui: UIState, button: number): void {
-  if (button !== 4) {
-    if (button < 0 || button > 3) return;
-    const champ = getPartyChampion(ui.partyState, button);
-    if (!champ || (champ.attributes.health | 0) === 0) return;
-  }
-  // `if (d.PressingMouth != 0) return; if (d.PressingEye != 0) return; d.clockTick = 1;`
-  // (`doc/CSBwin-src/CSBCode.cpp:7498-7500`).
-  if (ui.ctx.interface.pressingMouth) return;
-  if (ui.ctx.interface.pressingEye) return;
-  setClockTick(ui.ctx, 1);
-  // `videoMode = VM_ADVENTURE` as an open inventory closes (`:7512`), and
-  // `VM_INVENTORY` as one opens (`:7546`).
-  if (ui.partyState.selectedCharacterIndex >= 0) ui.ctx.loop.videoMode = 'VM_ADVENTURE';
-  if (button === 4) {
-    repackChest(ui.ctx);
-    ui.partyState.selectedCharacterIndex = -1;
-    syncInventoryButtons(ui);
-    // `DiscardAllInput()` once the adventure's list is back (`:7539`), but not for a
-    // sleeping party, which returns before it (`:7527-7531`).
-    if (!ui.partyState.sleeping) ui.ctx.mouseQueue.discardAllInput();
-    return;
-  }
-  const previous = ui.partyState.selectedCharacterIndex;
-  ui.partyState.selectedCharacterIndex =
-    ui.partyState.selectedCharacterIndex === button ? -1 : button;
-  // `RepackChest` as an open inventory closes (`:7513-7518`).
-  if (previous >= 0) repackChest(ui.ctx);
-  if (ui.partyState.selectedCharacterIndex >= 0) ui.ctx.loop.videoMode = 'VM_INVENTORY';
+/**
+ * `ShowHideInventory`'s drawing (`doc/CSBwin-src/CSBCode.cpp:7478-7582`), the host's
+ * `showHideInventory`, once the engine has shown or hidden the inventory
+ * (`showHideInventory`, `src/engine/ShowHideInventory.ts`): the secondary button list,
+ * `d.Buttons17760` or `d.Buttons17304` (`:7538`, `:7577`), and for an inventory shown,
+ * `TAG0189d4`'s description of a scroll in the weapon hand (`:7563-7573`).
+ */
+export function showHideInventoryDrawing(ui: UIState): void {
   syncInventoryButtons(ui);
-  // `ShowHideInventory`'s `CHARFLAG_chestOrScroll` and `DrawCharacterState`
-  // (`doc/CSBwin-src/CSBCode.cpp:7563-7573`), which never runs with the eye held (`:7499`).
-  if (ui.partyState.selectedCharacterIndex >= 0) tag0189d4(ui);
-  // `DiscardAllInput()` once the new secondary list is set, as the inventory closes
-  // (`:7539`) or opens (`:7579`): a key or a click queued behind the portrait is lost.
-  ui.ctx.mouseQueue.discardAllInput();
+  if (ui.partyState.selectedCharacterIndex >= 0) describeWeaponHandScroll(ui);
 }
 
 /**
- * `TAG02076e` (`doc/CSBwin-src/Character.cpp:5133-5160`), before the disk menu goes up
- * (`SaveGame.cpp:877`), at the freeze (`Mouse.cpp:1875`), on the way to sleep (`:1830`),
- * and once a Hall of Champions candidate's inventory is shown (the host's `tag02076e`,
- * `Character.cpp:798`). The main loop's call, with `TAG0207cc`, is dead in CSBWin
- * (`doc/PROVEN_FACTS.md` → "`d.Word11722` is always zero"). Its state half: an open inventory showing a chest
- * (`d.DisplayResurrectChestOrScroll == 4`) has it repacked (`:5141-5150`), so the save
- * finds the chest's objects in the chest. Asleep, it does nothing (`:5136`). The drawing
- * half is `shadedByTag02076e`, which `GameScreen.presentViewport` reads for the three
- * shaded areas, and `arrowCursorShape`, which `drawCursorItem` reads for the arrow cursor of
- * `SetCursorShape(0)` (`:5158`).
+ * `TAG02076e`'s drawing (`doc/CSBwin-src/Character.cpp:5151-5158`), the host's
+ * `tag02076e`, once the engine has repacked the open chest (`tag02076e`,
+ * `src/engine/ShowHideInventory.ts`): `shadedByTag02076e`, which
+ * `GameScreen.presentViewport` reads for the three shaded areas, and `arrowCursorShape`,
+ * which `drawCursorItem` reads for the arrow cursor of `SetCursorShape(0)`.
  */
-export function tag02076e(ui: UIState): void {
-  const party = ui.partyState;
-  if (party.sleeping) return;
-  // `WaitForButtonFlash(); //If any are active` (`:5138`).
-  waitForButtonFlash(ui.ctx);
-  if (party.selectedCharacterIndex >= 0 && ui.ctx.interface.displayResurrectChestOrScroll === 4) repackChest(ui.ctx);
+export function tag02076eDrawing(ui: UIState): void {
   ui.shadedByTag02076e = true;
   ui.arrowCursorShape = true;
 }
 
 /**
- * `TAG0207cc` (`doc/CSBwin-src/CSBCode.cpp:10058-10092`), once the disk menu has gone
- * (`SaveGame.cpp:1375`), at the thaw (`Mouse.cpp:1904`), and through the host's
- * `tag0207cc` from `WakeUp` (`CSBCode.cpp:7120`) and `_ResurrectReincarnateCancel`
- * (`:6716`, `:6867`). Its state half: the magic caster is selected again, which a
- * dead one does not survive (`:10069-10071`); the attack buttons come back unless an
- * attack menu is open (`d.Word20252 = 1`, `:10072-10075`); and an open inventory is shut
- * without a repack and shown again through `ShowHideInventory` (`:10077-10082`), whose
- * `TAG0189d4` opens the chest again. The redraws, and `TAG002572`'s cursor, the
- * port does every frame once `shadedByTag02076e` is clear; `d.Word11750 = 0` is the dead
- * countdown in `DEBT.md` H. Asleep, it only redraws the sleep screen (`:10062-10066`),
- * which `GameScreen.presentViewport` draws every time it composes the screen.
+ * `TAG0207cc`'s drawing (`doc/CSBwin-src/CSBCode.cpp:10058-10092`), the host's
+ * `tag0207cc`, once the engine has selected the magic caster again (`tag0207cc`,
+ * `src/engine/ShowHideInventory.ts`): `DrawLegalAttackTypes` (`:10076`), the shading
+ * lifted, which the port's every frame redraws, and `TAG002572`'s cursor (`:10089`).
  */
-export function tag0207cc(ui: UIState): void {
-  const party = ui.partyState;
-  if (party.sleeping) return;
+export function tag0207ccDrawing(ui: UIState): void {
   ui.shadedByTag02076e = false;
-  const caster = party.magicCasterIndex;
-  party.magicCasterIndex = -1;
-  selectMagicCaster(party, caster);
-  if (ui.ctx.interface.attackingCharacterOrdinal === 0) ui.ctx.interface.word20252 = 1;
   drawLegalAttackTypes(ui);
-  const selected = party.selectedCharacterIndex;
-  if (selected >= 0) {
-    party.selectedCharacterIndex = -1;
-    ui.ctx.loop.videoMode = 'VM_ADVENTURE';
-    handleInventoryToggle(ui, selected);
-  }
-  tag002572(ui); // `:10089`
+  tag002572(ui);
 }
 
 export function syncInventoryButtons(ui: UIState): void {
@@ -862,7 +809,7 @@ function hintSquareOf(ui: UIState): HintSquare {
  * Oracle's (`hintOracleUp`). Returns the square to open the Oracle on.
  */
 export function openHintOracle(ui: UIState): HintSquare {
-  tag02076e(ui);
+  tag02076e(ui.ctx);
   ui.ctx.state.paused = true;
   ui.hintOracleUp = true;
   return hintSquareOf(ui);
@@ -873,5 +820,5 @@ export function closeHintOracle(ui: UIState): void {
   if (!ui.hintOracleUp) return;
   ui.hintOracleUp = false;
   ui.ctx.state.paused = false;
-  tag0207cc(ui);
+  tag0207cc(ui.ctx);
 }

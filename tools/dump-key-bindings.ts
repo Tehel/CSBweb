@@ -180,7 +180,7 @@ async function main(): Promise<void> {
   check(press('Tab') && ui.ctx.interface.attackingCharacterOrdinal === 0 && attacks.length === 0,
     'Tab with no menu open should be claimed and do nothing');
 
-  // ---- 3. The inventory keys, the same toggle `handleInventoryToggle` gives a click.
+  // ---- 3. The inventory keys, the same `showHideInventory` a click runs.
   press('Digit7');
   check(party.state.selectedCharacterIndex === 0, "'7' should open champion 1's inventory");
   press('Digit8');

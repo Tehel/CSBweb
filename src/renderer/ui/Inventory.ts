@@ -158,7 +158,7 @@ export function tag0189d4(ui: UIState): void {
  * what it draws, the Resurrect menu, a chest or food and water, is drawn from
  * `ctx.interface` (`drawInventoryScreen`).
  */
-function describeWeaponHandScroll(ui: UIState): void {
+export function describeWeaponHandScroll(ui: UIState): void {
   ui.weaponHandScroll = null;
   if (ui.partyState.potentialChampionIndex >= 0) return;
   const champion = ui.partyState.champions[ui.partyState.selectedCharacterIndex];

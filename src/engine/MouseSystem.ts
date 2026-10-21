@@ -3,7 +3,8 @@
  * (`DropObject`, `Mouse.cpp:849`, with its Vi-altar arm) or thrown (`ThrowObjectInHand`,
  * `:765`), and `ThrowByCharacter` (`:673`), which the THROW attack also runs; the engine
  * arms of `HandleClickInViewport` (`:1032` — the door button, the wall touched, the
- * floor pick-up's `MoveObject`); and button 145, `Sleep`. The UI half — the hit tests,
+ * floor pick-up's `MoveObject`); button 145, `Sleep`; and `WakeUp`, button 146's and a
+ * blow's. The UI half — the hit tests,
  * the inventory click — is `src/renderer/ui/Mouse.ts`.
  *
  * Moved out of `Game` by `DEBT.md` E2; the other systems reach it as `ctx.systems.mouse`.
@@ -21,7 +22,8 @@ import {
 import { ActuatorAction } from '../data/actuatorHelpers';
 import { CursorFilterType } from './dsa/DsaTypes';
 import { nameIndexOf, type GameContext } from './GameContext';
-import { setClockTick, speed } from './LoopState';
+import { setClockTick, speed, VBL_PER_TICK } from './LoopState';
+import { tag0207cc } from './ShowHideInventory';
 import type { Champion } from './gameTypes';
 import { tagThrownWeapon } from './ThrownWeapons';
 import { copyCharacter } from './Party';
@@ -377,4 +379,23 @@ export class MouseSystem {
     this.ctx.loop.videoMode = 'VM_SLEEPING';
     return true;
   }
+}
+
+/**
+ * `WakeUp` (doc/CSBwin-src/CSBCode.cpp:7106) — button 146, or any blow that lands on a
+ * sleeping party (`Monster.cpp:4544`, `Character.cpp:2814-2817`). `d.clockTick = 1`,
+ * `d.PartySleeping = 0`, the message timeouts rescaled to the game speed
+ * (`scrollingText.SetNewSpeed(d.Speed, …)`, `:7112`), the adventure button lists back (the
+ * host's listeners), `DiscardAllInput()`, `TAG0207cc` (`:7120`), and `videoMode =
+ * VM_ADVENTURE` last (`:7121`).
+ */
+export function wakeUp(ctx: GameContext): void {
+  const oldSpeed = speed(ctx);
+  ctx.loop.clockTick = true;
+  ctx.party.state.sleeping = false;
+  ctx.host.messages.setNewSpeed(oldSpeed, VBL_PER_TICK, ctx.state.tickCount);
+  ctx.host.sleepChanged(false);
+  ctx.mouseQueue.discardAllInput();
+  tag0207cc(ctx);
+  ctx.loop.videoMode = 'VM_ADVENTURE';
 }

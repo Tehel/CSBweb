@@ -94,8 +94,10 @@ export interface GameHost {
    */
   closeAttackMenuOf(chIdx: number): void;
   /**
-   * `ShowHideInventory(chIdx)` (`doc/CSBwin-src/CSBCode.cpp:7478`), 4 to hide: the
-   * inventory is the UI's. `_FusionSequence` hides an open one (`Attack.cpp:2271-2274`).
+   * `ShowHideInventory(chIdx)` (`doc/CSBwin-src/CSBCode.cpp:7478`), 4 to hide, its drawing,
+   * once the engine has shown or hidden the inventory (`showHideInventory`,
+   * `ShowHideInventory.ts`): the secondary button list, and `TAG0189d4`'s description of
+   * a scroll in the weapon hand, which runs the viewing filter.
    */
   showHideInventory(chIdx: number): void;
   /**
@@ -105,27 +107,28 @@ export interface GameHost {
    */
   releaseEyeOrMouth(): void;
   /**
-   * `TAG02076e` (`doc/CSBwin-src/Character.cpp:5133`): the open chest repacked, the
-   * interface shaded and the arrow cursor, all the UI's. `AddCharacter` calls it once the
-   * candidate's inventory is shown (`:797-798`).
+   * `TAG02076e` (`doc/CSBwin-src/Character.cpp:5133`), its drawing, once the engine has
+   * repacked the open chest (`tag02076e`, `ShowHideInventory.ts`): the interface shaded and
+   * the arrow cursor (`:5151-5158`).
    */
   tag02076e(): void;
   /**
-   * `TAG0207cc` (`doc/CSBwin-src/CSBCode.cpp:10058`), `TAG02076e`'s undoing: `WakeUp` calls it
-   * last (`:7120`), and `_ResurrectReincarnateCancel` once the inventory is hidden (`:6716`,
-   * `:6867`).
+   * `TAG0207cc` (`doc/CSBwin-src/CSBCode.cpp:10058`), `TAG02076e`'s undoing, its drawing, once
+   * the engine has selected the magic caster again (`tag0207cc`, `ShowHideInventory.ts`):
+   * `DrawLegalAttackTypes`, the shading lifted and `TAG002572`'s cursor. An open inventory
+   * is shown again after it, through `showHideInventory`.
    */
   tag0207cc(): void;
   /**
    * A saved game was read in play, which only the port has (`Game.savedGameRead`): F9,
    * the disk menu's LOAD, or the prison's new adventure. CSBWin reads a game only after
    * `d.Initialize()` has zeroed the whole of `d` (`doc/CSBwin-src/CSBCode.cpp:333-340`),
-   * so the screen's share of it, the open chest, the attack menu, the Reincarnate
-   * screen, the eye and the mouth, is the old world's and goes, and the screen takes
-   * the party read. Called before anything runs on the world read, with whether the old
-   * world's party had an inventory open, which the read has replaced.
+   * so the screen's share of it, the Reincarnate screen, the marching-order drag, what
+   * the eye and the attack panel drew, is the old world's and goes, and the screen takes
+   * the party read. Called once the engine has reset `ctx.interface`, before anything
+   * runs on the world read.
    */
-  savedGameRead(inventoryWasOpen: boolean): void;
+  savedGameRead(): void;
   /**
    * `ShowCredits(1)`, the end of the game, which the engine does not draw: from
    * `_StartCSB` once `MainLoop` has returned on a lost game

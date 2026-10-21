@@ -79,7 +79,8 @@ import { UNSET, freshGame, globalStore, int, op, varFetch, varStore, withFilterD
 import { check, finish } from './lib/check';
 import { gameTablesOf, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
-import { drawCursorItem, handleInventoryToggle, handleMouseButton, handleMouseUnclick, releaseEyeOrMouth } from '../src/renderer/ui/Mouse';
+import { drawCursorItem, handleMouseButton, handleMouseUnclick, releaseEyeOrMouth } from '../src/renderer/ui/Mouse';
+import { showHideInventory } from '../src/engine/ShowHideInventory';
 import { drawCharacterStateEyePanel, drawInventoryScreen, getInventorySlotRect } from '../src/renderer/ui/Inventory';
 import { drawObjectIcon } from '../src/renderer/ui/Draw';
 import { drawHeldObjectName } from '../src/renderer/ui/Character';
@@ -384,7 +385,7 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
   };
 
   step('the scroll into a closed inventory\'s weapon hand', () => character.addCharacterPossession(1, scroll, 1), null);
-  step('the inventory opened', () => handleInventoryToggle(theUi, 1), scroll);
+  step('the inventory opened', () => showHideInventory(theUi.ctx, 1), scroll);
   step('three composes', () => { for (let i = 0; i < 3; i++) drawInventoryScreen(theUi); }, null);
   check(theUi.ctx.interface.displayResurrectChestOrScroll === 2, 'a scroll in the weapon hand leaves d.DisplayResurrectChestOrScroll 2');
   step('the ten-second update with the scroll shown', () => tenSecondUpdate(game.ctx), null);
@@ -437,7 +438,7 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
   const character = game.systems.character;
   character.removeCharacterPossession(1, 1);
   const scroll = game.ctx.dungeon.rnMaps.rn(DBType.SCROLL, 0);
-  handleInventoryToggle(theUi, 1);
+  showHideInventory(theUi.ctx, 1);
   const g = (): number[] => game.systems.dsa.getGlobalVariables();
   const unset = (): void => {
     const v = g();
@@ -480,7 +481,7 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
   tenSecondUpdate(game.ctx);
   check(seen() === null, 'the ten-second update with the mouth held runs nothing');
   check(panel(() => drawInventoryScreen(theUi)) === foodWater, 'after the ten-second update, the panel is still food and water');
-  handleInventoryToggle(theUi, 1);
+  showHideInventory(theUi.ctx, 1);
   check(party.selectedCharacterIndex === 1, 'with the mouth held, the inventory does not close (ShowHideInventory returns on d.PressingMouth)');
   unset();
   handleMouseUnclick(theUi);
@@ -503,7 +504,6 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
   let ui: UIState | null = null;
   const game = withFilterDsas(ESL_VIEWINGFILTER, [[...params(0)]], {
     drawCharacterState: (chIdx, charFlags) => { if (ui) drawCharacterStateEyePanel(ui, chIdx, charFlags); },
-    showHideInventory: (chIdx) => { if (ui) handleInventoryToggle(ui, chIdx); },
     releaseEyeOrMouth: () => { if (ui) releaseEyeOrMouth(ui); },
   });
   const party = game.ctx.party.state;
@@ -527,7 +527,7 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
     drawCursorItem(theUi, false);
     return pixels.some((v) => v !== 0);
   };
-  handleInventoryToggle(theUi, 1);
+  showHideInventory(theUi.ctx, 1);
   drawInventoryScreen(theUi);
   const before = pointerDrawn();
   handleMouseButton(theUi, 71, 0, 0);
@@ -549,7 +549,7 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
 
   // The mouth on champion 1, whose scroll lets it be held; the eye on champion 2.
   for (const [what, button, chIdx] of [['mouth', 70, 1], ['eye', 71, 2]] as const) {
-    if (party.selectedCharacterIndex !== chIdx) handleInventoryToggle(theUi, chIdx);
+    if (party.selectedCharacterIndex !== chIdx) showHideInventory(theUi.ctx, chIdx);
     drawInventoryScreen(theUi);
     handleMouseButton(theUi, button, 0, 0);
     const held = theUi.ctx.interface.pressingEye || theUi.ctx.interface.pressingMouth;
@@ -579,7 +579,7 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
     for (let y = r.y1; y <= r.y2; y++) for (let x = r.x1; x <= r.x2; x++) out.push(pixels[y * 320 + x]!);
     return out;
   };
-  handleInventoryToggle(theUi, 0);
+  showHideInventory(theUi.ctx, 0);
   party.objectInHand = game.ctx.dungeon.rnMaps.rn(DBType.WEAPON, 0);
   const shownBefore = name().some((v) => v !== 0);
   handleMouseButton(theUi, 71, 0, 0);

@@ -25,11 +25,12 @@ import { Position } from '../src/core/types';
 import { UIMode, type UIState } from '../src/renderer/ui/UIState';
 import { newGame, runVbl, TICK_DUE, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
-import { wakeUp } from '../src/engine/LoopState';
+import { wakeUp } from '../src/engine/MouseSystem';
 import { check, finish } from './lib/check';
 import * as Mouse from '../src/renderer/ui/Mouse';
 import * as Draw from '../src/renderer/ui/Draw';
 import * as Keyboard from '../src/renderer/ui/Keyboard';
+import { showHideInventory } from '../src/engine/ShowHideInventory';
 import { testChampion } from './lib/champion';
 
 async function main(): Promise<void> {
@@ -172,7 +173,7 @@ async function main(): Promise<void> {
   console.log('');
   console.log('=== the bottom-left corner freezes, Esc thaws, over an open inventory ===');
   {
-    Mouse.handleInventoryToggle(ui, 0);
+    showHideInventory(ui.ctx, 0);
     check(party.selectedCharacterIndex === 0 && ui.secondaryButtons === lists.buttons17760, 'HERO0\'s inventory is open');
     game.lastInputTime = 0;
     check(Mouse.searchMouseButtons(ui, 0, 199, 2) === 0, 'x 0, y 199 is not: the upper bounds are excluded');
@@ -186,7 +187,7 @@ async function main(): Promise<void> {
     check(!game.isFrozen(), 'thawed by Pause');
     check(party.selectedCharacterIndex === 0 && ui.secondaryButtons === lists.buttons17760,
       'TAG0207cc shows the inventory again, and its list is back');
-    Mouse.handleInventoryToggle(ui, 0);
+    showHideInventory(ui.ctx, 0);
   }
 
   console.log('');

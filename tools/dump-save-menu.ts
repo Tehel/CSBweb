@@ -174,7 +174,7 @@ import {
   menuButtonRect,
   splitLongLine,
 } from '../src/renderer/ui/Menu';
-import { savedGameRead, type UIState } from '../src/renderer/ui/UIState';
+import type { UIState } from '../src/renderer/ui/UIState';
 import { SCREEN_HEIGHT, SCREEN_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../src/renderer/ViewportGraphics';
 import { DEFAULT_DATA_SET, dataSetNamed, diskFiles } from './lib/dataSets';
 import { graphicsTablesOf, newGame, stockGame, stockGraphics } from './lib/game';
@@ -928,7 +928,7 @@ async function checkReadInPlay(graphics: GraphicsLoader): Promise<void> {
   console.log('=== a save read in play over an open chest and an open inventory ===');
   for (const how of ['F9', 'LOAD'] as const) {
     let ui: UIState | null = null;
-    const game = await loadGame({ savedGameRead: (inventoryWasOpen) => { if (ui) savedGameRead(ui, inventoryWasOpen); } });
+    const game = await loadGame();
     game.systems.hallOfChampions.addChampion(healthyChampion('DAROO'));
     const old = game.ctx.party.state;
     const found = findChest(game);

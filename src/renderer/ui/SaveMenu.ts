@@ -180,7 +180,7 @@ import {
   splitLongLine,
   type MenuPress,
 } from './Menu';
-import { tag02076e, tag0207cc } from './Mouse';
+import { tag02076e, tag0207cc } from '../../engine/ShowHideInventory';
 import { nowMs, type UIState } from './UIState';
 import {
   BUTTON_PIECE,
@@ -522,7 +522,7 @@ const SAVE_MENU_DIALOG: Dialog = {
  */
 export function openSaveMenu(ui: UIState, mode: SaveMenuMode = 'full'): void {
   if (ui.dialog) return;
-  if (mode === 'full') tag02076e(ui);
+  if (mode === 'full') tag02076e(ui.ctx);
   ui.ctx.loop.videoMode = mode === 'full' ? 'VM_LEFTMENU' : 'VM_CENTERMENU';
   openDialog(ui, SAVE_MENU_DIALOG);
   ui.saveMenu = {
@@ -569,7 +569,7 @@ export function closeSaveMenu(ui: UIState): void {
   releaseLongPress(ui.saveMenu);
   ui.saveMenu = null;
   closeDialog(ui);
-  if (mode === 'full') tag0207cc(ui);
+  if (mode === 'full') tag0207cc(ui.ctx);
 }
 
 /* ------------------------------------------------------------------ the list ---- */

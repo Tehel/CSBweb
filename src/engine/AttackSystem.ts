@@ -36,6 +36,7 @@ import { getChampionPossession, type Champion } from './gameTypes';
 import { tagThrownWeapon } from './ThrownWeapons';
 import { selectPaletteForLightLevel } from './LightLevel';
 import { getPartyChampion, markAllPortraitsChanged } from './Party';
+import { showHideInventory } from './ShowHideInventory';
 import { MonsterDamageResult } from './MonsterDamage';
 import { DeleteMonsterWhy, deleteMonsterParameters } from './filterParameters';
 import { TimerFunction } from './TimerQueue';
@@ -975,7 +976,7 @@ export class AttackSystem {
     const party = this.ctx.party.state;
     const level = party.position.z;
     this.ctx.state.gameWon = true;
-    if (party.selectedCharacterIndex >= 0) this.ctx.host.showHideInventory(4);
+    if (party.selectedCharacterIndex >= 0) showHideInventory(this.ctx, 4);
     yield* waitForButtonFlashScript(this.ctx);
     party.brightness = 200;
     selectPaletteForLightLevel(this.ctx);

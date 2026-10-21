@@ -177,7 +177,8 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
             `ctx.loop`), PeriodicUpdates (the ninety- and ten-second updates), LightLevel
             (`SelectPaletteForLightLevel`: `d.CurrentPalette`), OpenChest (the open
             chest, opened and repacked at CSBWin's events, never by drawing),
-            SmartDiscard (thinning a filling database), MakeMoreRoomInDB (making
+            ShowHideInventory (the inventory shown and hidden, and `TAG02076e` and
+            `TAG0207cc`, the interface put aside and back: their `d.` work), SmartDiscard (thinning a filling database), MakeMoreRoomInDB (making
             room in a full one),
             RuntimeSave (the state a read restores), SaveGameFile (the CSBWin file a
             save is, written from the game and read back), GameSaves (a save built and

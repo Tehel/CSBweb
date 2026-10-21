@@ -51,15 +51,15 @@ import {
   drawCursorItem,
   marchingOrderPointerMoved,
   handleMouseButton,
-  handleInventoryToggle,
   closeHintOracle,
   handleMouseUnclick,
   releaseEyeOrMouth,
   openHintOracle,
   searchMouseButtons,
   syncInventoryButtons,
-  tag02076e,
-  tag0207cc,
+  showHideInventoryDrawing,
+  tag02076eDrawing,
+  tag0207ccDrawing,
   updateButtonLists,
 } from './ui/Mouse';
 import { drawSpellControls, drawSpellPanel } from './ui/MagicPanel';
@@ -309,9 +309,9 @@ export class GameScreen {
   }
 
 
-  /** `ShowHideInventory` (`doc/CSBwin-src/CSBCode.cpp:7478`) — the host's `showHideInventory`. */
-  showHideInventory(chIdx: number): void {
-    handleInventoryToggle(this.ui, chIdx);
+  /** `ShowHideInventory`'s drawing (`doc/CSBwin-src/CSBCode.cpp:7478`) — the host's `showHideInventory`. */
+  showHideInventory(): void {
+    showHideInventoryDrawing(this.ui);
   }
 
   /** `KillCharacter`'s release of the eye or the mouth — the host's `releaseEyeOrMouth`. */
@@ -319,19 +319,19 @@ export class GameScreen {
     releaseEyeOrMouth(this.ui);
   }
 
-  /** `TAG02076e` (`doc/CSBwin-src/Character.cpp:5133`) — the host's `tag02076e`. */
+  /** `TAG02076e`'s drawing (`doc/CSBwin-src/Character.cpp:5133`) — the host's `tag02076e`. */
   tag02076e(): void {
-    tag02076e(this.ui);
+    tag02076eDrawing(this.ui);
   }
 
-  /** `TAG0207cc` (`doc/CSBwin-src/CSBCode.cpp:10058`) — the host's `tag0207cc`. */
+  /** `TAG0207cc`'s drawing (`doc/CSBwin-src/CSBCode.cpp:10058`) — the host's `tag0207cc`. */
   tag0207cc(): void {
-    tag0207cc(this.ui);
+    tag0207ccDrawing(this.ui);
   }
 
   /** A saved game read in play — the host's `savedGameRead`: the read party is awake. */
-  savedGameRead(inventoryWasOpen: boolean): void {
-    savedGameRead(this.ui, inventoryWasOpen);
+  savedGameRead(): void {
+    savedGameRead(this.ui);
     this.setUIMode(UIMode.Adventure);
   }
 

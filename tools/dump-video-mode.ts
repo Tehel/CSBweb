@@ -19,13 +19,14 @@
  * Run: `npm test -- --only=dump-video-mode.ts`
  */
 import { Position } from '../src/core/types';
-import { wakeUp } from '../src/engine/LoopState';
+import { wakeUp } from '../src/engine/MouseSystem';
 import * as Mouse from '../src/renderer/ui/Mouse';
 import * as SaveMenu from '../src/renderer/ui/SaveMenu';
 import { UIMode, type UIState } from '../src/renderer/ui/UIState';
 import { check, finish } from './lib/check';
 import { newGame, runVbl, TICK_DUE, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
+import { showHideInventory } from '../src/engine/ShowHideInventory';
 import { testChampion } from './lib/champion';
 
 const data = stockDungeon();
@@ -37,9 +38,6 @@ const game = newGame(data, graphics, {
     Mouse.updateButtonLists(ui);
     Mouse.syncInventoryButtons(ui);
   },
-  tag0207cc: () => Mouse.tag0207cc(ui),
-  tag02076e: () => Mouse.tag02076e(ui),
-  showHideInventory: (chIdx) => Mouse.handleInventoryToggle(ui, chIdx),
 });
 game.setRandomSeed(0x12345678);
 game.systems.hallOfChampions.addChampion(testChampion(0));
@@ -85,11 +83,11 @@ console.log('=== the game start ===');
 console.log('');
 console.log('=== the inventory ===');
 {
-  const [opened, openTick] = around('ShowHideInventory(0)', () => Mouse.handleInventoryToggle(ui, 0));
+  const [opened, openTick] = around('ShowHideInventory(0)', () => showHideInventory(ui.ctx, 0));
   check(opened === 'VM_INVENTORY' && openTick === 'VM_INVENTORY', 'shown: VM_INVENTORY, which a tick keeps');
-  const [swapped] = around('ShowHideInventory(1), over 0\'s', () => Mouse.handleInventoryToggle(ui, 1));
+  const [swapped] = around('ShowHideInventory(1), over 0\'s', () => showHideInventory(ui.ctx, 1));
   check(swapped === 'VM_INVENTORY', 'another champion\'s: VM_INVENTORY still');
-  const [closed] = around('ShowHideInventory(4)', () => Mouse.handleInventoryToggle(ui, 4));
+  const [closed] = around('ShowHideInventory(4)', () => showHideInventory(ui.ctx, 4));
   check(closed === 'VM_ADVENTURE', 'hidden: VM_ADVENTURE at once (:7512)');
 }
 
@@ -102,19 +100,19 @@ console.log('=== the freeze ===');
   Mouse.handleMouseButton(ui, 148, 160, 100);
   console.log(`button 148: ${mode()}`);
   check(mode() === 'VM_ADVENTURE', 'thawed: VM_ADVENTURE at once (:1903)');
-  Mouse.handleInventoryToggle(ui, 0);
+  showHideInventory(ui.ctx, 0);
   Mouse.handleMouseButton(ui, 147, 0, 198);
   Mouse.handleMouseButton(ui, 148, 160, 100);
   console.log(`frozen and thawed over HERO0's inventory: ${mode()}`);
   check(mode() === 'VM_INVENTORY' && party.selectedCharacterIndex === 0,
     'TAG0207cc shows the inventory again: VM_INVENTORY (CSBCode.cpp:10081-10082, :7546)');
-  Mouse.handleInventoryToggle(ui, 4);
+  showHideInventory(ui.ctx, 4);
 }
 
 console.log('');
 console.log('=== sleep ===');
 {
-  Mouse.handleInventoryToggle(ui, 0);
+  showHideInventory(ui.ctx, 0);
   const [slept, sleptTick] = around('button 145, over an inventory', () => Mouse.handleMouseButton(ui, 145, 0, 0));
   check(party.sleeping && party.selectedCharacterIndex === -1, 'the party sleeps, the inventory hidden');
   check(slept === 'VM_SLEEPING' && sleptTick === 'VM_SLEEPING', 'asleep: VM_SLEEPING (Mouse.cpp:1842), which a tick keeps');
@@ -133,14 +131,14 @@ console.log('=== the disk menu ===');
   check(closed === 'VM_LEFTMENU', 'closed, the mode stays: no overlay until the next tick');
   check(closedTick === 'VM_ADVENTURE', 'and the next tick\'s top sets VM_ADVENTURE (CSBCode.cpp:617)');
 
-  Mouse.handleInventoryToggle(ui, 1);
+  showHideInventory(ui.ctx, 1);
   SaveMenu.openSaveMenu(ui);
   const opened = mode();
   SaveMenu.closeSaveMenu(ui);
   console.log(`over HERO1's inventory: open ${opened}, closed ${mode()}`);
   check(opened === 'VM_LEFTMENU' && mode() === 'VM_INVENTORY' && party.selectedCharacterIndex === 1,
     'over an inventory, TAG0207cc shows it again: VM_INVENTORY at once (SaveGame.cpp:1375)');
-  Mouse.handleInventoryToggle(ui, 4);
+  showHideInventory(ui.ctx, 4);
 
   SaveMenu.openSaveMenu(ui, 'loadOnly');
   console.log(`load-only: ${mode()}`);

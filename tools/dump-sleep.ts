@@ -35,7 +35,7 @@ import { UIMode, type UIState } from '../src/renderer/ui/UIState';
 import { ScrollingText } from '../src/renderer/csbwin/ScrollingText';
 import { gameTablesOf, newGame, presetHeroesOfGame, runVbl, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
-import { wakeUp } from '../src/engine/LoopState';
+import { wakeUp } from '../src/engine/MouseSystem';
 import { check, finish } from './lib/check';
 import * as Mouse from '../src/renderer/ui/Mouse';
 import * as Draw from '../src/renderer/ui/Draw';
@@ -55,7 +55,6 @@ async function main(): Promise<void> {
       Mouse.updateButtonLists(ui);
       Mouse.syncInventoryButtons(ui);
     },
-    tag0207cc: () => Mouse.tag0207cc(ui),
   });
   game.setRandomSeed(0x12345678);
   game.systems.hallOfChampions.addChampion(testChampion(0));

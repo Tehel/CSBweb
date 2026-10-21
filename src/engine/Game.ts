@@ -21,6 +21,7 @@ import { WorldMove } from './WorldMove';
 import { MissileEncounter } from './MissileEncounter';
 import { MonsterSystem, newItem16Pool } from './MonsterSystem';
 import { createGameContext, newGameState, type GameContext, type GameSystems } from './GameContext';
+import { createInterfaceState } from './InterfaceState';
 import { createGameHost, type GameHost } from './GameHost';
 import {
     getRuntimeSaveState, installRuntimeState, prepareRuntimeState, startRuntimeState, timerQueueState,
@@ -390,15 +391,21 @@ export class Game implements MainLoop {
      * The tail of `_ReadEntireGame` once a saved game is in: `d.CanRestartFromSavegame = 1`
      * (doc/CSBwin-src/SaveGame.cpp:2087). `applySaveBytes` calls it. A save read in play,
      * which only the port has, begins at once (`tag0138ec`), as one read at the entrance or
-     * after a lost game begins when the loop starts (`start`); the screen is told first,
-     * and leaves the old world (`GameHost.savedGameRead`), whose party had an inventory
-     * open or not.
+     * after a lost game begins when the loop starts (`start`). First the old world's
+     * interface goes: CSBWin reads a game only after `d.Initialize()` has zeroed the whole
+     * of `d` (doc/CSBwin-src/CSBCode.cpp:333-340), so `ctx.interface` is a new game's, its
+     * open chest dropped and never repacked into the world read, and an inventory the old
+     * party had open is closed as `ShowHideInventory` closes one, `videoMode =
+     * VM_ADVENTURE` (`:7512`): the party read has none open. Then the screen leaves the
+     * old world (`GameHost.savedGameRead`).
      */
     savedGameRead(inventoryWasOpen: boolean): void {
         this.canRestart = true;
         this.resumedSavedGame = true;
         if (!this.running) return;
-        this.ctx.host.savedGameRead(inventoryWasOpen);
+        if (inventoryWasOpen) this.ctx.loop.videoMode = 'VM_ADVENTURE';
+        Object.assign(this.ctx.interface, createInterfaceState());
+        this.ctx.host.savedGameRead();
         this.tag0138ec();
     }
 

@@ -45,6 +45,7 @@ import type { GameContext } from './GameContext';
 import { emptyPossessions, type Champion } from './gameTypes';
 import { setClockTick } from './LoopState';
 import { selectMagicCaster, setHandOwner } from './Party';
+import { tag02076e, tag0207cc } from './ShowHideInventory';
 
 export class HallOfChampions {
   /** `d.ObjDesc[].word4` and `d.CarryLocation[]`, the two `AddCharacter` reads. */
@@ -146,7 +147,7 @@ export class HallOfChampions {
     this.ctx.loop.videoMode = 'VM_INVENTORY';
     // Its `DiscardAllInput()` (`CSBCode.cpp:7579`).
     this.ctx.mouseQueue.discardAllInput();
-    this.ctx.host.tag02076e();
+    tag02076e(this.ctx);
     return true;
   }
 
@@ -179,7 +180,7 @@ export class HallOfChampions {
       // `d.NumCharacter--` and no more: the record stays in its slot, possessions and all.
       party.vacantCharacters[party.champions.length - 1] = champion;
       party.champions.pop();
-      this.ctx.host.tag0207cc(); // `:6716`
+      tag0207cc(this.ctx); // `:6716`
       return true;
     }
 
@@ -238,7 +239,7 @@ export class HallOfChampions {
     this.ctx.loop.videoMode = 'VM_ADVENTURE';
     setClockTick(this.ctx, 1);
     this.ctx.mouseQueue.discardAllInput();
-    this.ctx.host.tag0207cc();
+    tag0207cc(this.ctx);
     this.ctx.host.championJoined({ champion, reincarnated: button === 161, hero: this.reincarnationSource?.name ?? champion.name });
   }
 

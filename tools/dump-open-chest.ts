@@ -23,7 +23,8 @@
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../src/core/types';
 import type { Game } from '../src/engine/Game';
 import { handleMouthPress } from '../src/renderer/ui/Feeding';
-import { handleEyePress, handleInventoryToggle, handleMouseUnclick } from '../src/renderer/ui/Mouse';
+import { handleEyePress, handleMouseUnclick } from '../src/renderer/ui/Mouse';
+import { showHideInventory } from '../src/engine/ShowHideInventory';
 import { check, finish } from './lib/check';
 import { testChampion } from './lib/champion';
 import { stockGame, stockGraphics } from './lib/game';
@@ -109,7 +110,7 @@ console.log('=== the inventory, the eye and the mouth, with no screen composed =
   game.systems.character.addCharacterPossession(0, chest, 1);
   const ui = newUIState(stockGraphics(), game.ctx);
 
-  handleInventoryToggle(ui, 0);
+  showHideInventory(ui.ctx, 0);
   console.log(`  inventory shown:     ${state(game, chests)}`);
   check(party.selectedCharacterIndex === 0 && game.ctx.interface.openChestId === chest && chestContents(game, chest) === 0,
     'ShowHideInventory\'s DrawCharacterState opens the weapon hand\'s chest');
@@ -142,7 +143,7 @@ console.log('=== the inventory, the eye and the mouth, with no screen composed =
   check(game.ctx.interface.openChestId === chest && chestContents(game, chest) === 0,
     'QuitPressingMouth\'s TAG0189d4 opens it again (CSBCode.cpp:7452)');
 
-  handleInventoryToggle(ui, 0);
+  showHideInventory(ui.ctx, 0);
   console.log(`  inventory hidden:    ${state(game, chests)}`);
   check(party.selectedCharacterIndex === -1 && game.ctx.interface.openChestId === null && chestContents(game, chest) === packed,
     'ShowHideInventory hiding it repacks the chest (CSBCode.cpp:7517)');

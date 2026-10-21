@@ -114,7 +114,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| D18 | The host is asked for the interface's `d.` | L | ⏳ steps 1-3 of 4 done |
+| D18 | The host is asked for the interface's `d.` | L | ⏳ steps 1-4 of 5 done |
 | D19 | `RuntimeSaveState` is neither strict nor a snapshot | M | ⏳ |
 | E41 | `src/data/` imports the engine | M | ⏳ |
 | E35 | Comments and documents that are stale, wrong, or tell the past | M | ⏳ |
@@ -416,18 +416,28 @@ CSBWin's interface state is `d.`: the open chest and its contents, the attack me
 (`src/engine/InterfaceState.ts`), which the engine and the screen both read. The chest
 is opened and repacked at CSBWin's events (`src/engine/OpenChest.ts`), the engine's
 `DrawCharacterState` (`drawCharacterState`, `src/engine/Party.ts`) among them, and the
-compose only reads. What is left:
+compose only reads. `ShowHideInventory`, `TAG02076e` and `TAG0207cc` do their `d.` work in
+the engine (`src/engine/ShowHideInventory.ts`) and ask the host only to draw, and a read in
+play resets `ctx.interface` in the engine (`Game.savedGameRead`). What is left:
 
-- **The host is asked for the interface's work.** The calls into the UI named by CSBWin
-  address (`tag02076e`, `tag0207cc`, `tag01b29a`, `tag011366`, `src/main.ts:281-307`) do
-  `d.` work on the screen's side, and so does `showHideInventory`, whose repack and
-  `TAG0189d4` are `handleInventoryToggle`'s (`src/renderer/ui/Mouse.ts`); a read in play
-  resets `ctx.interface` only through the host (`GameHost.savedGameRead`, through
-  `initializePlayState`).
+- **The attack menu's `d.` is the screen's to change.** `TAG01b29a`
+  (`attackPanelTick`, `src/renderer/ui/Attack.ts`, the host's `tag01b29a`) turns the
+  champions to face their blows and moves `d.Word20250`, `d.Word20252` and the attack
+  damage to display; `TAG01b1c0` (`closeAttackMenu`, the host's `closeAttackMenuOf`) closes
+  the menu; and `DrawLegalAttackTypes` (`drawLegalAttackTypes`, which the host's
+  `tag0207cc` runs) runs the action name filter, which rewrites `d.PossibleAttackTypes`.
+  `TAG01b29a`'s flash holds the buttons back by the wall clock (`attackFlashUntilMs`, H),
+  which the engine's half has to ask the screen.
+- **`KillCharacter` and `RemoveCharacter` ask the host to let go of the eye or the mouth**
+  (`releaseEyeOrMouth`, `src/renderer/ui/Mouse.ts`), whose `d.PressingEye` and
+  `d.PressingMouth` are the engine's.
+
+`TAG011366` is paid: the engine clears the champion's timer (`MonsterAttack.tag011366`) and
+asks the host only to draw over the damage.
 
 Paying it: `GameHost` keeps only what leaves the engine. No pixel moves.
 
-In four steps, one commit each; steps 1 to 3 are done:
+In five steps, one commit each; steps 1 to 4 are done:
 
 1. **The fields move** (refactor, done). They are `ctx.interface`'s, made by
    `createInterfaceState`; `UIState` keeps only what the screen draws from, and the engine
@@ -439,10 +449,15 @@ In four steps, one commit each; steps 1 to 3 are done:
    `drawCharacterState` and by the inventory, the eye and the mouth; the compose draws
    what they left in `ctx.interface` (`doc/PROVEN_FACTS.md` → "A chest is opened and
    repacked at events, never by drawing", `tools/dump-open-chest.ts`).
-4. **`GameHost` keeps what leaves the engine** (refactor). A read in play resets
-   `ctx.interface` in the engine, and `savedGameRead` keeps only the screen's share;
-   `tag02076e`, `tag0207cc`, `tag01b29a`, `tag011366` and `showHideInventory` do their
-   `d.` work in the engine and ask the host only to draw, under their CSBWin names.
+4. **`ShowHideInventory`, `TAG02076e`, `TAG0207cc` and a read in play in the engine**
+   (refactor, done). `src/engine/ShowHideInventory.ts`; the host's members of the same
+   names draw (`showHideInventoryDrawing`, `tag02076eDrawing`, `tag0207ccDrawing`,
+   `src/renderer/ui/Mouse.ts`), and `savedGameRead` resets only the screen's share. A tool's
+   `newUIState` hands the game's host those drawings, as `main.ts` does.
+5. **The attack menu and the eye's release in the engine** (refactor). `TAG01b29a`,
+   `TAG01b1c0` and `DrawLegalAttackTypes`'s state in the engine under their CSBWin names,
+   the host asked for the flash and the drawing; `releaseEyeOrMouth`'s `d.` in the engine,
+   the host asked only to show the pointer again.
 
 ### D19 ⏳ `RuntimeSaveState` is neither strict nor a snapshot
 

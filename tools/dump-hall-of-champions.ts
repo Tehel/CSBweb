@@ -39,8 +39,7 @@ import { attackButtonRect, drawAttackButton } from '../src/renderer/ui/Attack';
 import { ImageFormat } from '../src/core/imageDecoder';
 import { graphicsTablesOf, newGame, presetHeroesOfGame, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
-import { drawCursorItem, handleClothingClick, tag02076e, tag0207cc } from '../src/renderer/ui/Mouse';
-import type { UIState } from '../src/renderer/ui/UIState';
+import { drawCursorItem, handleClothingClick } from '../src/renderer/ui/Mouse';
 import { check, fail, finish } from './lib/check';
 
 const DELTA_X = [0, 1, 0, -1];
@@ -61,8 +60,6 @@ let reincarnateScreen: (chIdx: number) => void = () => {};
  * inventory open at the time (`selectedCharacterIndex`) and the party's size.
  */
 const pairCalls: string[] = [];
-/** A screen the games' pair runs on as well, `tag02076e` / `tag0207cc`, when a scenario sets it. */
-let pairUi: UIState | null = null;
 
 function makeGame(): Game {
   const data = stockDungeon();
@@ -97,8 +94,8 @@ function gameOn(data: DungeonData, graphics: GraphicsLoader): Game {
       discardText: () => {},
     },
     openReincarnateScreen: (chIdx) => reincarnateScreen(chIdx),
-    tag02076e: () => { pairCalls.push(pairCall(game, 'TAG02076e')); if (pairUi) tag02076e(pairUi); },
-    tag0207cc: () => { pairCalls.push(pairCall(game, 'TAG0207cc')); if (pairUi) tag0207cc(pairUi); },
+    tag02076e: () => { pairCalls.push(pairCall(game, 'TAG02076e')); },
+    tag0207cc: () => { pairCalls.push(pairCall(game, 'TAG0207cc')); },
   });
   game.setRandomSeed(0x12345678);
   messagesOf.set(game, messages);
@@ -799,7 +796,6 @@ function portraitSection(): void {
     const hero = heroByName(g, 'HALK');
     standAtMirror(g, hero);
     const ui = newUIState(sharedGraphics!, g.ctx);
-    pairUi = ui;
     g.systems.mouse.handleWallClick();
     const candidate = g.ctx.party.state.champions[0]!;
     const slot = candidate.possessions.findIndex((rn) => rn !== OBJECT_ID_NULL);
@@ -828,7 +824,6 @@ function portraitSection(): void {
     check(shadedAfterPick, 'and the movement, magic and weapon-ready areas stay shaded');
     check(putBack && empty !== withObject, 'put back, the cursor is set from the empty hand (RemoveObjectFromHand, TAG002572)');
     g.systems.hallOfChampions.resurrectReincarnateCancel(CANCEL);
-    pairUi = null;
   }
 
   /* ------------------------------------------------ CSB's prison, every mirror ---- */

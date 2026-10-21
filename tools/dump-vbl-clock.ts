@@ -21,7 +21,8 @@
  * Run: `npm test -- --only=dump-vbl-clock.ts`
  */
 import type { Game } from '../src/engine/Game';
-import { freeze, thaw, VBL_PER_TICK, wakeUp, type LoopScript } from '../src/engine/LoopState';
+import { freeze, thaw, VBL_PER_TICK, type LoopScript } from '../src/engine/LoopState';
+import { wakeUp } from '../src/engine/MouseSystem';
 import { newGame, stockGraphics, stockDungeon } from './lib/game';
 import { check, finish } from './lib/check';
 

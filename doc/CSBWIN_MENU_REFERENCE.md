@@ -286,13 +286,16 @@ back from the hand (`:2059-2079`).
 
 `_ReadEntireGame` (`SaveGame.cpp:1536`), the load at the entrance, calls neither.
 
-The port: `tag02076e` and `tag0207cc` in `src/renderer/ui/Mouse.ts`, which `SaveMenu.ts`
-calls around its full screen and not its load-only one, the freeze around its frozen game,
-and the sleep click before the engine's `sleep`. The engine's callers, `wakeUp` and
-`HallOfChampions`, reach them through `GameHost`'s `tag02076e` and `tag0207cc`. The redraws are the frame's: `tag02076e` sets `UIState.shadedByTag02076e` and
-`tag0207cc` clears it, and while it is set `GameScreen.presentViewport` shades the three
-areas. The arrow is `UIState.arrowCursorShape`, which `tag02076e` sets and `tag002572` clears
-(`tag0207cc`, `handleClothingClick` and the feeding call it); while it is set
+The port: `tag02076e` and `tag0207cc` in `src/engine/ShowHideInventory.ts`, which
+`SaveMenu.ts` calls around its full screen and not its load-only one, the freeze around its
+frozen game, the Hint Oracle around its own, and the sleep click before the engine's
+`sleep`; `wakeUp` and `HallOfChampions` call them too. They do the `d.` work, and ask
+`GameHost`'s `tag02076e` and `tag0207cc` for the drawing, `tag02076eDrawing` and
+`tag0207ccDrawing` in `src/renderer/ui/Mouse.ts`. The redraws are the frame's:
+`tag02076eDrawing` sets `UIState.shadedByTag02076e` and `tag0207ccDrawing` clears it, and
+while it is set `GameScreen.presentViewport` shades the three areas. The arrow is
+`UIState.arrowCursorShape`, which `tag02076eDrawing` sets and `tag002572` clears
+(`tag0207ccDrawing`, `handleClothingClick` and the feeding call it); while it is set
 `drawCursorItem` draws the arrow. Over any dialog (`UIState.dialog`), the settings, the
 map and the champions too, it draws the arrow whatever is in hand, as each takes the whole
 screen (`tools/dump-object-cursor.ts`). No inventory is drawn while the menu is up.

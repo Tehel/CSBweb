@@ -53,7 +53,7 @@
 import { selectMagicCaster } from '../../engine/Party';
 import { attackMenuButton, prepareAttack } from './Attack';
 import { magicSelection } from './MagicPanel';
-import { handleInventoryToggle } from './Mouse';
+import { showHideInventory } from '../../engine/ShowHideInventory';
 import { UIState } from './UIState';
 
 /** A champion's place in the party, 0-3. */
@@ -421,7 +421,7 @@ function toggleInventory(ui: UIState, chIdx: number): void {
   const party = ui.partyState;
   if (championPending(ui)) return;
   if (chIdx >= party.champions.length) return;
-  handleInventoryToggle(ui, chIdx);
+  showHideInventory(ui.ctx, chIdx);
 }
 
 /** Button id 100 — the rune keypad, live only once a caster is selected. */
