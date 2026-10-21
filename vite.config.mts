@@ -7,14 +7,14 @@ import { dirname, join } from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { DatabaseSync } from 'node:sqlite';
 
-import { answerStats, contentType, dataSetViewer, pathSegments, receiveDocument, receiveEdit, receiveModeration, receivePublish } from './server/app';
-import { DataSetStore, manifestText, parseModerators, wallsText } from './server/dataSets';
-import { RateLimit } from './server/events';
-import { NOBODY } from './server/notify';
-import type { CheckDataSet } from './server/publish';
-import { AnswerCache, StatsStore } from './server/stats';
-import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, PLAYER_ID_HEADER, parseManifest } from './src/data/DataSets';
-import { fillFortnight } from './tools/lib/statsFortnight';
+import { answerStats, contentType, dataSetViewer, pathSegments, receiveDocument, receiveEdit, receiveModeration, receivePublish } from './server/app.ts';
+import { DataSetStore, manifestText, parseModerators, wallsText } from './server/dataSets.ts';
+import { RateLimit } from './server/events.ts';
+import { NOBODY } from './server/notify.ts';
+import type { CheckDataSet } from './server/publish.ts';
+import { AnswerCache, StatsStore } from './server/stats.ts';
+import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, PLAYER_ID_HEADER, parseManifest } from './src/data/DataSets.ts';
+import { fillFortnight } from './tools/lib/statsFortnight.ts';
 
 /**
  * The build the page's events name (`src/ui/gameEvents.ts`): `CSBWEB_BUILD` where the
