@@ -362,12 +362,12 @@ export class Game implements MainLoop {
      * Take `data` as the world, whole: `_ReadEntireGame` reads the structure with the rest,
      * the header, every level's descriptor and tables, from the file it opens
      * (`ReadDatabases`, doc/CSBwin-src/SaveGame.cpp:2536). `DungeonState` keeps its object,
-     * which every system and the renderer hold, and takes the new data; `state.dungeon`
-     * follows. A read (`readGame`) installs its world before it restores the state that
-     * goes with it (`applyRuntimeSaveState`), whose snapshot must then fit.
+     * which every system and the renderer hold, and takes the new data: the world has
+     * that one route, `ctx.dungeon`. A read (`readGame`) installs its world before it
+     * restores the state that goes with it (`applyRuntimeSaveState`), whose snapshot must
+     * then fit.
      */
     installWorld(data: DungeonData): void {
-        this.ctx.state.dungeon = data;
         this.ctx.dungeon.install(data);
         // `deleteDuplicateTimers`, a global every read sets from the world's `EXPOOL`
         // once the databases are in (doc/CSBwin-src/SaveGame.cpp:1965-1975).

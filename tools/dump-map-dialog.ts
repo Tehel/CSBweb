@@ -85,7 +85,7 @@ console.log('\n=== 2. the drawing ===');
   const game = stockGame();
   const ui = freshUI(game, true);
   const party = game.ctx.party.state;
-  const maps = game.ctx.state.dungeon.maps;
+  const maps = game.ctx.dungeon.getData().maps;
   const buf = ui.screenIndexBuffer;
   const at = (x: number, y: number) => buf.pixels[y * buf.width + x];
   const seen = new Set<number>();
@@ -179,7 +179,7 @@ console.log('\n=== 3. the dialog ===');
 
   const party = game.ctx.party.state;
   party.position.x = 2; party.position.y = 2; party.position.z = 0;
-  const layout = mapLayout(game.ctx.state.dungeon.maps[0].descriptor.width, game.ctx.state.dungeon.maps[0].descriptor.height);
+  const layout = mapLayout(game.ctx.dungeon.getData().maps[0].descriptor.width, game.ctx.dungeon.getData().maps[0].descriptor.height);
   const target = centre(cellSquare(layout, 5, 7));
   openMapDialog(ui);
   mapDialogClick(ui, target.x, target.y, 2);

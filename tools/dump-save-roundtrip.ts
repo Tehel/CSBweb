@@ -177,9 +177,9 @@ function compareChampions(label: string, before: Champion[], after: Champion[]):
  * dungeon whose text has been edited or a save from another dungeon entirely.
  */
 function compareConvertedImage(label: string, source: Game, restored: Game): void {
-  const from = source.ctx.state.dungeon;
-  const to = restored.ctx.state.dungeon;
-  const fresh = loadWorld().ctx.state.dungeon;
+  const from = source.ctx.dungeon.getData();
+  const to = restored.ctx.dungeon.getData();
+  const fresh = loadWorld().ctx.dungeon.getData();
 
   check((from.expool?.length ?? 0) > 0,
     `${label}: the save carries an EXPOOL to lose (${from.expool?.length ?? 0} bytes)`);
@@ -326,7 +326,7 @@ const NOT_CARRIED: Array<{ pattern: string; why: string; holds: (d: Difference, 
     pattern: '.dungeon.snapshot.dsaLevelIndex',
     why: 'the Extended Features block\'s DSA index, written out: no DSA on any level',
     holds: (d, { loaded }) => d.was == null
-      && (loaded.ctx.state.dungeon.dsaLevelIndex ?? [[0]]).every((level) => level.every((word) => word === 0xff || word === 0xffff)),
+      && (loaded.ctx.dungeon.getData().dsaLevelIndex ?? [[0]]).every((level) => level.every((word) => word === 0xff || word === 0xffff)),
   },
   {
     pattern: '.dungeon.snapshot.extendedWallDecorations',
@@ -373,7 +373,7 @@ const NOT_CARRIED: Array<{ pattern: string; why: string; holds: (d: Difference, 
 
 /** Whether the record a difference is in is a free one: its link is `RNnul`. */
 function isFree(live: Game, database: 'scrolls' | 'creatures' | 'containers', d: Difference): boolean {
-  return live.ctx.state.dungeon.databases[database].records[d.path[4] as number]?.nextObject === OBJECT_ID_NULL;
+  return live.ctx.dungeon.getData().databases[database].records[d.path[4] as number]?.nextObject === OBJECT_ID_NULL;
 }
 
 /**
@@ -444,7 +444,7 @@ function checkTheFileAlone(): void {
       // The staging, or the list below would be met by a game with nothing to lose.
       check(party.champions.length === 2 && party.champions.every((c) => c.portraitGraphic !== undefined && c.portrait === undefined),
         `${label}: two champions the engine created, who carry a portrait index`);
-      check(party.objectInHand !== OBJECT_ID_NULL && live.ctx.state.dungeon.databases.missiles.records.length > 0,
+      check(party.objectInHand !== OBJECT_ID_NULL && live.ctx.dungeon.getData().databases.missiles.records.length > 0,
         `${label}: an object on the cursor and a missile in flight`);
       check(party.pendingDamage.some((n) => n > 0) && party.pendingOuches.some((n) => n !== 0),
         `${label}: a blow and a wound not yet taken (${party.pendingDamage}; ${party.pendingOuches})`);
@@ -800,11 +800,11 @@ function main(): void {
     } catch (e) {
       error = (e as Error).message;
     }
-    const world = loaded.ctx.state.dungeon;
+    const world = loaded.ctx.dungeon.getData();
     console.log(`built over ${builtOver} maps, now ${loaded.ctx.dungeon.getMapCount()}${error ? `, refused: ${error}` : ''}`);
     check(!error && builtOver === 14 && loaded.ctx.dungeon.getMapCount() === 11 && world === loaded.ctx.dungeon.getData(),
       'the save\'s eleven-level world replaces DM\'s fourteen, in state and DungeonState both');
-    const from = live.ctx.state.dungeon;
+    const from = live.ctx.dungeon.getData();
     check(!error && same(world.maps.map((m) => [m.descriptor, m.monsterTypes, m.wallDecorationTOC, m.floorDecorationTOC, m.doorDecorationTOC]),
         from.maps.map((m) => [m.descriptor, m.monsterTypes, m.wallDecorationTOC, m.floorDecorationTOC, m.doorDecorationTOC]))
       && same(world.levelIndex, from.levelIndex) && same(world.header, from.header),

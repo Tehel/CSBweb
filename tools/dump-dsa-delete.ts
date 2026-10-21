@@ -18,7 +18,6 @@
 import {
   DBType, locationRelToInteger, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID,
 } from '../src/core/types';
-import type { DungeonData } from '../src/data/dungeonTypes';
 import { Game } from '../src/engine/Game';
 import type { TimerEntry } from '../src/engine/TimerQueue';
 import { newGame, stockDungeon, stockGraphics } from './lib/game';
@@ -74,7 +73,7 @@ async function main(): Promise<void> {
 
   /** A new type-47 actuator whose DSA is `selector`, in corner 0 of `at`. */
   const addDsaActuator = (game: Game, at: Position, selector: number): ObjectID => {
-    const data: DungeonData = game.ctx.dungeon.getData();
+    const data = game.ctx.dungeon.getData();
     data.databases.actuators.records.push({ nextObject: OBJECT_ID_EOF, word2: 47 | (selector << 7), word4: 0, word6: 0 });
     const rn = game.ctx.dungeon.rnMaps.rn(DBType.ACTUATOR, data.databases.actuators.records.length - 1);
     game.ctx.dungeon.addObjectToCell(at, rn);
@@ -83,7 +82,7 @@ async function main(): Promise<void> {
 
   /** A copy of weapon 0, in corner 1 of `at`. */
   const addWeapon = (game: Game, at: Position): ObjectID => {
-    const data: DungeonData = game.ctx.dungeon.getData();
+    const data = game.ctx.dungeon.getData();
     data.databases.weapons.records.push({ ...data.databases.weapons.records[0], nextObject: OBJECT_ID_EOF });
     const rn = game.ctx.dungeon.rnMaps.setPos(game.ctx.dungeon.rnMaps.rn(DBType.WEAPON, data.databases.weapons.records.length - 1), 1);
     game.ctx.dungeon.addObjectToCell(at, rn);
@@ -92,7 +91,7 @@ async function main(): Promise<void> {
 
   /** Install DSA 0 on `at`'s level, selector 0, running `programs` in turn as one state. */
   const installDsa = (game: Game, at: Position, program: Uint16Array): void => {
-    const data: DungeonData = game.ctx.dungeon.getData();
+    const data = game.ctx.dungeon.getData();
     data.dsaIndex = { entries: [{
       description: 'test', state: 0, localState: 1, groupId: 0, numStates: 1, firstDisplayedState: 0,
       states: [{ actions: [{ column: 0, program }] }],

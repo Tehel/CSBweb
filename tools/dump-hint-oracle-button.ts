@@ -124,7 +124,7 @@ async function oracleTitles(ui: UIState, square: HintSquare): Promise<string[]> 
     discardAllInput: () => { queue.length = 0; },
   };
   // As the page opens it, under the running world's key (`runHintOracle`).
-  const oracle = new HintOracleScreen(host, readHintOracle(files.hct, ui.ctx.state.dungeon.hintKey), files.dat, square);
+  const oracle = new HintOracleScreen(host, readHintOracle(files.hct, ui.ctx.dungeon.getData().hintKey), files.dat, square);
   await oracle.run();
   return titles ?? [];
 }

@@ -609,7 +609,7 @@ function main(): void {
           next.systems.monsterAttack.killCharacter(0);
           load(next);
           const bonesRecords = (): number =>
-            new Expool(next.ctx.state.dungeon).keys().filter((key) => key >>> 24 === EDT_CHAMPION_BONES).length;
+            new Expool(next.ctx.dungeon.getData()).keys().filter((key) => key >>> 24 === EDT_CHAMPION_BONES).length;
           const loaded = bonesAt(next, altar.party)[0];
           if (loaded === undefined) {
             fail(`${name}: the bones are not on the floor of the loaded game`);

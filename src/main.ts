@@ -423,7 +423,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
             };
             if (!screen || !files.hintOracle) return close();
             const deps = { canvas: gameCanvasEl, gameScreen: screen, playSound };
-            void openHintOracle(deps, files.hintOracle, square, game.ctx.state.dungeon.hintKey, messages)
+            void openHintOracle(deps, files.hintOracle, square, game.ctx.dungeon.getData().hintKey, messages)
                 .then((error) => { if (error !== null) console.error('Hint Oracle:', error); })
                 .finally(close);
         },

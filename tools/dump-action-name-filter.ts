@@ -21,7 +21,6 @@
 import { StkOp } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
 import { EDT_GLOBAL_TEXT } from '../src/data/DecodeText';
-import type { DungeonData } from '../src/data/dungeonTypes';
 import { drawAttackPanel, prepareAttack } from '../src/renderer/ui/Attack';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import type { UIState } from '../src/renderer/ui/UIState';
@@ -153,7 +152,7 @@ for (const [index, text, renames] of [[7, 'FLAME', true], [0x10007, 'FLAME', fal
   const game = withFilterDsas(ESL_ACTIONNAMEFILTER, [report(0)]);
   const ui = uiOf(game);
   prepareAttack(ui, chIdx);
-  const data: DungeonData = game.ctx.dungeon.getData();
+  const data = game.ctx.dungeon.getData();
   data.specialLocations = {};
   prepareAttack(ui, chIdx);
   const g = game.systems.dsa.getGlobalVariables();

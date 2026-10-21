@@ -76,7 +76,7 @@ import { readFileSync } from 'node:fs';
 
 import { OBJNI_APPLE } from '../src/core/objectNameIndex';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, locationRelToInteger, type ObjectID } from '../src/core/types';
-import type { DsaDefinition, DungeonData } from '../src/data/dungeonTypes';
+import type { DsaDefinition } from '../src/data/dungeonTypes';
 import { CursorFilterType, StkOp } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
 import { GetBasicObjectType } from '../src/engine/objectIndex';
@@ -129,7 +129,7 @@ function wallSquare(game: Game): Position {
 
 /** A new misc object of `miscType`, on no square. */
 function misc(game: Game, miscType = 0): ObjectID {
-  const data: DungeonData = game.ctx.dungeon.getData();
+  const data = game.ctx.dungeon.getData();
   data.databases.misc.records.push({ nextObject: OBJECT_ID_EOF, specialState: 0, important: false, miscType });
   return game.ctx.dungeon.rnMaps.rn(DBType.MISC, data.databases.misc.records.length - 1);
 }
@@ -139,7 +139,7 @@ const basicType = (game: Game, rn: ObjectID): number =>
 
 /** An actuator of `type` and `value` on side 0 of `at`, before anything else there. */
 function actuator(game: Game, at: Position, type: number, value: number): void {
-  const data: DungeonData = game.ctx.dungeon.getData();
+  const data = game.ctx.dungeon.getData();
   data.databases.actuators.records.push({ nextObject: OBJECT_ID_EOF, word2: type | (value << 7), word4: 0, word6: 0 });
   game.ctx.dungeon.addObjectToCell(at, game.ctx.dungeon.rnMaps.rn(DBType.ACTUATOR, data.databases.actuators.records.length - 1));
 }
@@ -408,7 +408,7 @@ for (const cancelled of [false, true]) {
  */
 function runDsa(game: Game, words: (at: Position) => number[]): Position {
   const dungeon = game.ctx.dungeon;
-  const data: DungeonData = dungeon.getData();
+  const data = dungeon.getData();
   const at = wallSquare(game);
   const dsa: DsaDefinition = {
     description: 'caller', state: 0, localState: 1, groupId: 0, numStates: 1, firstDisplayedState: 0,

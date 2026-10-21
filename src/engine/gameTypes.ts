@@ -62,7 +62,6 @@ export const CHARFLAG_PORTRAIT_CHANGED = 0x1000;
  * clears it.
  */
 export const CHARFLAG_CHEST_OR_SCROLL = 0x0800;
-import type { DungeonData } from '../data/dungeonTypes';
 
 /**
  * Champion attributes (stats)
@@ -362,8 +361,6 @@ export interface MovementResult {
  * Complete game state
  */
 export interface GameState {
-    dungeon: DungeonData;       // Dungeon data (maps, objects, etc.)
-
     paused: boolean;            // A dialog holds the clock (`openDialog`), and the Hint Oracle
     tickCount: ui16;            // Number of game ticks elapsed
 

@@ -114,7 +114,7 @@ for (const name of ATARI_SAVES) {
     check(false, `${name}: a game built over DM's world should take the save — ${(error as Error).message}`);
     continue;
   }
-  const installed = game.ctx.state.dungeon;
+  const installed = game.ctx.dungeon.getData();
   console.log(`  game built over ${builtOver} maps, now ${game.ctx.dungeon.getMapCount()} maps, ` +
     `start (${installed.header.startPosition?.x},${installed.header.startPosition?.y}), ` +
     `level 0 ${installed.maps[0].descriptor.width}x${installed.maps[0].descriptor.height}`);

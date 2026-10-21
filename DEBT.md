@@ -114,7 +114,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E23 | One game read, whole or not at all | L | ⏳ step 3 of 6 |
+| E23 | One game read, whole or not at all | L | ⏳ step 4 of 6 |
 | D18 | The interface's `d.` lives in the screen, and composing the screen changes the world | L | ⏳ |
 | D19 | `RuntimeSaveState` is neither strict nor a snapshot | M | ⏳ |
 | E41 | `src/data/` imports the engine | M | ⏳ |
@@ -448,18 +448,18 @@ keeps the shape of the JSON save it once was:
 - **Optional fields for an older save that cannot exist**: `item16?`, `timers?`,
   `timerQueue?`, `timerSequence?`, `firstAvailTimer?`, `missiles?`
   (`src/engine/RuntimeSave.ts:41-50`), read through `?? []` and `timerSequence ?? 0`
-  (`:151-158`); the snapshot's optional, `null` and `undefined` cases
+  (`:152-159`); the snapshot's optional, `null` and `undefined` cases
   (`src/engine/DungeonSnapshot.ts:171-194`, `:384-412`); `Party.setState`'s defaults for "a
   field an older runtime save does not carry" (`Party.ts:115-126`) and `ensureHandOwner`'s
   repair of quick-saves written before `setHandOwner` existed (`Party.ts:213-230`).
 - **Not a snapshot**: `getRuntimeSaveState` copies everything but the party, which it hands
-  over live (`party: ctx.party.state`, `RuntimeSave.ts:92`); `applySaveGameState` adopts
+  over live (`party: ctx.party.state`, `RuntimeSave.ts:93`); `applySaveGameState` adopts
   the caller's `item16` array (`:175-176`); `Party.setState` copies the champions one level
   deep, so attributes, possessions and skills stay shared. `tools/dump-save-roundtrip.ts:242`
   works round it with a JSON copy.
 - **The missiles are restored twice**: the snapshot refills them in place
   (`DungeonSnapshot.ts:105`, source `'snapshot'`), then `applySaveGameState` replaces the
-  array with a hand copy of five fields (`RuntimeSave.ts:175-186`). A field added to
+  array with a hand copy of five fields (`RuntimeSave.ts:176-187`). A field added to
   `MissileRecord` would be dropped there, and `DUNGEON_DATA_SOURCES` names the wrong source.
 - **A snapshot captured for nothing**: `buildSaveFile` calls `getRuntimeSaveState()`
   (`src/engine/SaveGameFile.ts:125`), which captures the whole world, every record cloned
@@ -516,11 +516,11 @@ against each other, and the file formats.
 Both reads go through one list of steps, `readGame` (`src/engine/ReadGame.ts`), from
 `Game.readNewGame` (`Game.ts:305-341`), which builds its state from `newGameState`
 (`GameContext.ts:294-309`), and `applyCsbwinSave` (`CsbwinSaveGame.ts:264-295`); around
-it are `SaveGameFile.ts:275-284` and `GameSaves.read`:
+it are `SaveGameFile.ts:276-285` and `GameSaves.read`:
 
 - **It is not atomic.** `readGame` sets `ctx.rules`, `ctx.signatures`, the overlay and
   the world before `applyRuntimeSaveState` restores the rest, and `applySaveBytes` turns any error into a
-  `SaveFileError` (`src/engine/SaveGameFile.ts:275-283`), after which the full menu says so
+  `SaveFileError` (`src/engine/SaveGameFile.ts:276-284`), after which the full menu says so
   and play goes on: in the new world with the old timers and footprints, when it throws late
   (an `RnMaps.check` in `reloadAfterSaveGame`). CSBWin's `tag01efee` dies.
 - **Nothing holds a save against its world**: the party's level, x and y, `numCharacter`,
@@ -530,10 +530,9 @@ it are `SaveGameFile.ts:275-284` and `GameSaves.read`:
   inside `numCharacter` and renumbers the rest (`src/data/CsbwinCharacters.ts:293-303`),
   leaving `handChar`, `MagicCaster` and the positions naming other champions; CSBWin does
   not renumber.
-- **The world has two routes**, `GameState.dungeon` and `DungeonState.getData()` (typed
-  `Readonly`, written through), which `installWorld` keeps in step (`Game.ts:370-371`).
-  `newGameState` and a save's read each build a throwaway `DungeonState` over the world
-  for `CheckMonsters` (`GameContext.ts:300`, `CsbwinSaveGame.ts:278`).
+- **A world is checked through a throwaway `DungeonState`**: `newGameState` and a save's
+  read each build one over the world for `CheckMonsters` (`GameContext.ts:300`,
+  `CsbwinSaveGame.ts:278`), and `installWorld` then hands the world to the context's own.
 - **What `d.Initialize()` zeroes is reset nowhere** (C181).
 - **A read in play** drops no running script (`Game.applyRuntimeSaveState`) and does not
   empty the mouse queue, so clicks queued before F9 are translated against the loaded
@@ -541,16 +540,13 @@ it are `SaveGameFile.ts:275-284` and `GameSaves.read`:
 
 Paying it, in six steps, a commit each. Steps 1 to 3 are refactors, every tool's output
 byte-identical; 4 to 6 change what a damaged file or a read in play does, and are fixes
-with their tool. Where it stands: steps 1 and 2 are done, one pipeline, `readGame`, and
-one new game, `newGameState`, which `readNewGame` and `createGameContext` both build from;
-step 3 is next.
+with their tool. Where it stands: steps 1 to 3 are done, one pipeline, `readGame`, one
+new game, `newGameState`, which `readNewGame` and `createGameContext` both build from, and
+one route to the world, `ctx.dungeon.getData()`; step 4 is next.
 
-3. **One route to the world.** `GameState.dungeon` gone (14 uses in `src/`, the rest in
-   `tools/`), the world read through `ctx.dungeon`; `DungeonState.getData()` read-only in
-   fact or not typed so; `installWorld` installs one thing.
-4. **Build, then swap** (a fix). Every piece made off the context (the world, the party,
-   the timer queue, `item16`, the rules, signatures and overlay) before any is installed,
-   then one swap that cannot throw. An error before it leaves the running game as it was
+4. **Build, then swap** (a fix). Every piece made off the context (the world and the
+   `DungeonState` that `CheckMonsters` reads, the party, the timer queue, `item16`, the
+   rules, signatures and overlay) before any is installed, then one swap that cannot throw. An error before it leaves the running game as it was
    and is the menu's message; one after it is `die(0xbad)`. A new tool of damaged saves,
    one failing late (`reloadAfterSaveGame`'s `RnMaps.check`), proves the old game stands.
 5. **A save held against its world** (a fix). A pure `validateCsbwinWorld` before the
@@ -587,8 +583,8 @@ Copies of one rule drift apart. The copies left:
   `characterThrowsSpell` and `launchObject`; `DsaSystem.ts:4676-4679` repeats
   `MonsterSystem.detachedGroupIndexFor`.
 - **The room type**, `(cellFlag >> 5) & 0x7`, written out 28 times beside 4 calls of
-  `getRoomType`; the facing byte packed at `WorldMove.ts:616` and `DungeonState.ts:928`.
-- **The database dispatch**, five times: two 13-case switches (`DungeonState.ts:460-572`),
+  `getRoomType`; the facing byte packed at `WorldMove.ts:616` and `DungeonState.ts:914`.
+- **The database dispatch**, five times: two 13-case switches (`DungeonState.ts:458-570`),
   ten `getXxxRecord` getters (`:775-856`), `SmartDiscard.ts:223-230`,
   `objectIndex.ts:86-94` and `MakeMoreRoomInDB.ts:95-98`, beside `DATABASE_KEY` (`:62`)
   and `getRecord` (`:688`).
@@ -740,7 +736,7 @@ controls again.
   (`= () => 1`, `SoundQueue.ts:48`); `TimerSystem`'s constructor writes into `ctx.dungeon`
   (`:94`). A bare `createGameContext` gets, silently, a full database that refuses records,
   untranslated texts and no sound filter, and `systems: {} as GameSystems`
-  (`GameContext.ts:360`) types every system as present.
+  (`GameContext.ts:359`) types every system as present.
 - `TimerQueue.createTimer` takes ten positional parameters and `createTimerWithUByte5`, its
   near copy, eleven (`TimerQueue.ts:200-259`), at 26 call sites
   (`createTimer(TT_LIGHT, 0, 0, 0, 0, time >>> 0, z, undefined, 0, deltaSteps)`,
@@ -806,9 +802,9 @@ palette codes, so none moves.
   (`dump-monster-move-code.ts:3`), C27 (`dump-champion-death.ts:123`) and D1
   (`dump-throwing.ts:338`).
 - **The past**: "Moved out of `Game` by `DEBT.md` E2" (`MagicSystem`, `MouseSystem`,
-  `PeriodicUpdates`), `Party.ts:103`, `:218`, `:305`, `RuntimeSave.ts:215-216`,
+  `PeriodicUpdates`), `Party.ts:103`, `:218`, `:305`, `RuntimeSave.ts:216-217`,
   `CsbwinSaveGame.ts:4-9`, `:114`, `SaveGameLoader.ts:295-296`, `CsbwinSaveInfo.ts:42-44`,
-  `CsbwinDungeonImageWriter.ts:287-290`, `SaveGameFile.ts:229-231`, `MonsterAttack.ts:598`,
+  `CsbwinDungeonImageWriter.ts:287-290`, `SaveGameFile.ts:230-232`, `MonsterAttack.ts:598`,
   `MissileEncounter.ts:513`, `DrawDecorations.ts:177-179`, `BytecodeInterpreter.ts:1599` ("Phase 5").
 - **Wrong**: `MagicSystem.ts:397` ("Spell effects are wired in subsequent magic parity
   steps"); `MonsterAttack.ts:750-751` (`potentialChampionIndex` "still always -1 here",
@@ -1251,7 +1247,7 @@ CSBWin can record a game and play it back:
 Conflux 3.5's Extended Features block sets `AutoRecord` (0x10), `RecordDesignOption`
 (`doc/CSBwin-src/SaveGame.cpp:403-404`): a game read from it records unless the command
 line or the menu says not to (`:2588-2603`). The port has neither, and no way to start either. It keeps only the recorder's count,
-`totalMoveCount`, which a save stores (`Game.recordFileRecord`, `src/engine/Game.ts:992`).
+`totalMoveCount`, which a save stores (`Game.recordFileRecord`, `src/engine/Game.ts:990`).
 `extraTicks` is always on (`src/engine/MovementSystem.ts:161-164`).
 
 Once ported, a recording made in CSBWin and played back in the port is an end-to-end test
@@ -1353,7 +1349,7 @@ Rules for all of them:
 ### X9 ⏸️ Thrown weapons' tags kept across a save
 
 The tags of `src/engine/ThrownWeapons.ts` live only in memory, `GameContext.thrownWeapons`,
-and a load clears them (`src/engine/RuntimeSave.ts:168`). A tag holds the record it was
+and a load clears them (`src/engine/RuntimeSave.ts:169`). A tag holds the record it was
 made for, and `tagOf` keeps it only while the object's RN still names that very
 `DatabaseRecord`. A loaded world has new records, so that check cannot survive a save.
 

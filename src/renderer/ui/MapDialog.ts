@@ -149,7 +149,7 @@ export function closeMapDialog(ui: UIState): void {
 
 /** The party's map: the level it stands on. */
 function partyMap(ui: UIState): MapData | undefined {
-  return ui.ctx.state.dungeon.maps[ui.ctx.party.state.position.z];
+  return ui.ctx.dungeon.getData().maps[ui.ctx.party.state.position.z];
 }
 
 /* ---------------------------------------------------------------- the controls ---- */

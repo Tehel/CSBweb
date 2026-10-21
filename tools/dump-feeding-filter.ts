@@ -22,7 +22,6 @@
  */
 import { DBType, OBJECT_ID_EOF, locationRelToInteger, type ObjectID } from '../src/core/types';
 import { OBJNI_APPLE, OBJNI_WATERSKIN } from '../src/core/objectNameIndex';
-import type { DungeonData } from '../src/data/dungeonTypes';
 import { StkOp } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
 import { handleMouthPress } from '../src/renderer/ui/Feeding';
@@ -54,7 +53,7 @@ const CHAMPION = 0;
 
 /** A misc object of the type whose name index is `nameIndex`, on no square. */
 function misc(game: Game, ui: UIState, nameIndex: number, specialState = 0): ObjectID {
-  const data: DungeonData = game.ctx.dungeon.getData();
+  const data = game.ctx.dungeon.getData();
   const records = data.databases.misc.records;
   for (let miscType = 0; miscType < 128; miscType++) {
     records.push({ nextObject: OBJECT_ID_EOF, specialState, important: false, miscType });

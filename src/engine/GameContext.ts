@@ -323,7 +323,6 @@ export function createGameContext(
     newGameState(dungeonData, tables, random, (line) => host.trace(line));
   const dungeon = new DungeonState(dungeonData);
   const state: GameState = {
-    dungeon: dungeonData,
     paused: false,
     tickCount: 0,
     gameWon: false,

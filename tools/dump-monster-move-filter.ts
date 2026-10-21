@@ -41,7 +41,6 @@
 import { readFileSync } from 'node:fs';
 
 import { DBType, Position, locationRelFromInteger, locationRelToInteger, type ObjectID } from '../src/core/types';
-import type { DungeonData } from '../src/data/dungeonTypes';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { StkOp } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
@@ -82,7 +81,7 @@ function group(game: Game): { rn: ObjectID; at: Position } {
 /** A game whose filter square holds `programs`, its location given by `records(locr)`. */
 function filterGame(programs: FilterDsa[], records: (locr: number) => Record<number, number>): { game: Game; locr: number } {
   const game = withFilterDsas(ESL_MONSTERMOVEFILTER, programs);
-  const data: DungeonData = game.ctx.dungeon.getData();
+  const data = game.ctx.dungeon.getData();
   const locr = data.specialLocations![(3 << 24) | ESL_MONSTERMOVEFILTER]!;
   data.specialLocations = records(locr);
   return { game, locr };
@@ -208,7 +207,7 @@ const ran = (g: number[]): boolean => g[0] === 1;
   ];
   for (const [what, records, want] of cases) {
     const game = withFilterDsas(ESL_MONSTERMOVEFILTER, [MARK]);
-    const data: DungeonData = game.ctx.dungeon.getData();
+    const data = game.ctx.dungeon.getData();
     const locr = data.specialLocations![DUNGEON_KEY]!;
     data.specialLocations = records(game, locr);
     const got = ran(turn(game));
@@ -221,7 +220,7 @@ const ran = (g: number[]): boolean => g[0] === 1;
 {
   const { game } = filterGame([MARK], (locr) => ({ [DUNGEON_KEY]: record(locr, 31) }));
   const first = ran(turn(game));
-  const data: DungeonData = game.ctx.dungeon.getData();
+  const data = game.ctx.dungeon.getData();
   data.specialLocations = {};
   game.systems.dsa.setGlobalVariables(new Array<number>(100).fill(UNSET));
   const second = ran(turn(game));

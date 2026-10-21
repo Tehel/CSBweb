@@ -184,8 +184,8 @@ function compareGames(label: string, before: Game, after: Game, monsters: boolea
     check(same(was.skills, now.skills), `${who}: the skills`);
   }
 
-  const wasWorld = before.ctx.state.dungeon;
-  const nowWorld = after.ctx.state.dungeon;
+  const wasWorld = before.ctx.dungeon.getData();
+  const nowWorld = after.ctx.dungeon.getData();
 
   let flags = 0;
   let differing = 0;
@@ -275,7 +275,7 @@ function compareChains(label: string, before: Game, after: Game): void {
   const at = before.ctx.party.state.position;
   const cells: Position[] = [new Position(at.x, at.y, at.z)];
 
-  const map = before.ctx.state.dungeon.maps[at.z];
+  const map = before.ctx.dungeon.getData().maps[at.z];
   outer: for (let x = 0; x < (map?.descriptor.width ?? 0); x++) {
     for (let y = 0; y < (map?.descriptor.height ?? 0); y++) {
       const cell = new Position(x, y, at.z);
@@ -456,7 +456,7 @@ function countRecords(world: DungeonData): number {
 function main(): void {
   console.log('=== 1. a game that started from dungeon.dat ===');
   const fresh = playFromDungeonDat();
-  const missiles = fresh.ctx.state.dungeon.databases.missiles.records.length;
+  const missiles = fresh.ctx.dungeon.getData().databases.missiles.records.length;
   const carrying = carriedObjects(fresh);
   console.log(`  ${missiles} MISSILE records, ${carrying} live timer(s) carrying an object`);
   check(carrying > 0,
@@ -478,19 +478,19 @@ function main(): void {
       `dungeon.dat: the thrown object is still in flight (${carrying} carrying timer(s))`);
     // The vacuity guard. A file that wrote `dungeon.dat` back unchanged would pass every
     // comparison above, because the fresh game it loads into *is* dungeon.dat.
-    const pristine = makeGame().ctx.state.dungeon;
-    check(countRecords(freshBack.ctx.state.dungeon) !== countRecords(pristine) ||
-      !same(freshBack.ctx.state.dungeon.objectList, pristine.objectList),
+    const pristine = makeGame().ctx.dungeon.getData();
+    check(countRecords(freshBack.ctx.dungeon.getData()) !== countRecords(pristine) ||
+      !same(freshBack.ctx.dungeon.getData().objectList, pristine.objectList),
       'dungeon.dat: the world that came back is the played one, not the file the game booted on');
   }
 
   console.log('\n=== 2. a game restored from csbgame7.dat and played on ===');
   const played = playFromCsbwinSave('csbgame7.dat');
-  const creatures = played.ctx.state.dungeon.databases.creatures.records.length;
-  check(creatures > 0 && (played.ctx.state.dungeon.item16?.length ?? 0) > 0,
+  const creatures = played.ctx.dungeon.getData().databases.creatures.records.length;
+  check(creatures > 0 && (played.ctx.dungeon.getData().item16?.length ?? 0) > 0,
     `csbgame7.dat: it really does carry monsters (${creatures} creature records, ` +
-    `${played.ctx.state.dungeon.item16?.length ?? 0} ITEM16 slots)`);
-  check((played.ctx.state.dungeon.expool?.length ?? 0) > 0,
+    `${played.ctx.dungeon.getData().item16?.length ?? 0} ITEM16 slots)`);
+  check((played.ctx.dungeon.getData().expool?.length ?? 0) > 0,
     'csbgame7.dat: and an EXPOOL that dungeon.dat does not have');
   check(played.ctx.state.block1.randomGameID === 0x261fdc50 && played.ctx.state.block1.totalMoveCount === 69897,
     `csbgame7.dat: the loaded game has the file's RandomGameID and totalMoveCount ` +

@@ -157,7 +157,7 @@ console.log('3. &GETSKIN and &SETSKIN');
     ...get(1, 5, 3, 0),
     ...set(0x1ff, 1, 5, 3), ...get(1, 5, 3, 1), ...get(1, 4, 3, 2), ...get(1, 5, 4, 3),
   ]);
-  const expool = new Expool(game.ctx.state.dungeon);
+  const expool = new Expool(game.ctx.dungeon.getData());
   const record = expool.locate(skinsKey(1, 5));
   console.log(`  before 0x${g[0]!.toString(16)}, after 0x${g[1]!.toString(16)}, its pair's 0x${g[2]!.toString(16)}, below 0x${g[3]!.toString(16)}`);
   console.log(`  record: ${record?.map((w) => w.toString(16).padStart(8, '0')).join(' ')}`);
@@ -167,7 +167,7 @@ console.log('3. &GETSKIN and &SETSKIN');
   check(record?.length === 2 && record[0] === 0 && record[1] === 0xff000000,
     "the record is byte 7's two longwords, little-endian");
 
-  const pool = (): string => Array.from(game.ctx.state.dungeon.expool ?? []).join();
+  const pool = (): string => Array.from(game.ctx.dungeon.getData().expool ?? []).join();
   const cache = game.ctx.dungeon.skinCache;
   const before = pool();
   cache.SetSkin(1, 5, 3, 0xff);
@@ -211,7 +211,7 @@ console.log('4. A save');
   // The other game reads a cell first, so a cache kept across the read would answer 0.
   other.ctx.dungeon.skinCache.GetSkin(l, x, y);
   applyCsbwinSave(other, buildSaveFile(game));
-  const after = cachedSkins(other.ctx.state.dungeon, other.ctx.dungeon.skinCache);
+  const after = cachedSkins(other.ctx.dungeon.getData(), other.ctx.dungeon.skinCache);
   console.log(`  set ${l}:${x}:${y} to ${skin} and ${bare!.join(':')} to 200; ${after.size} skinned cells loaded`);
   check(after.size === expected.size && [...expected].every(([at, s]) => after.get(at) === s),
     "a save keeps every cell's skin, the two set in play with them");

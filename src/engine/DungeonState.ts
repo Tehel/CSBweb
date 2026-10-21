@@ -114,10 +114,8 @@ export class DungeonState {
         this.skinCache = new SkinCache(data);
     }
 
-    /**
-     * Get dungeon data
-     */
-    getData(): Readonly<DungeonData> {
+    /** The world, the one route to it, which play writes through. */
+    getData(): DungeonData {
         return this.data;
     }
 

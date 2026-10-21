@@ -86,8 +86,8 @@ check(sameBytes(blockOf(keyed).hintKey, KEY), "the keyed file's block holds the 
 console.log('1. A read keeps them');
 const game = freshGame();
 applyCsbwinSave(game, keyed);
-console.log(`  world's key ${hex(game.ctx.state.dungeon.hintKey)}, signatures ${hexWords(signaturesOf(game))}`);
-check(sameBytes(game.ctx.state.dungeon.hintKey, KEY), "the world's hintKey is the file's");
+console.log(`  world's key ${hex(game.ctx.dungeon.getData().hintKey)}, signatures ${hexWords(signaturesOf(game))}`);
+check(sameBytes(game.ctx.dungeon.getData().hintKey, KEY), "the world's hintKey is the file's");
 check(sameNumbers(signaturesOf(game), SIGNATURES), "the game's signatures are the file's");
 
 console.log('2. A save writes them back');
@@ -98,14 +98,14 @@ check(sameBytes(written.hintKey, KEY), 'the save writes the key back');
 check(sameNumbers(written.signatures, SIGNATURES), 'the save writes the four signatures back');
 const other = freshGame();
 applyCsbwinSave(other, saved);
-check(sameBytes(other.ctx.state.dungeon.hintKey, KEY) && sameNumbers(signaturesOf(other), SIGNATURES),
+check(sameBytes(other.ctx.dungeon.getData().hintKey, KEY) && sameNumbers(signaturesOf(other), SIGNATURES),
   'the file the save wrote reads back with all five');
 
 console.log('3. A file without a block');
 check(readExtendedFeatures(new Uint8Array(readFileSync(`${STOCK_DIR}/dungeon.dat`))).header === undefined, '`dm-atari/dungeon.dat` has no block');
 game.readNewGame(stockDungeon());
-console.log(`  world's key ${hex(game.ctx.state.dungeon.hintKey)}, signatures ${hexWords(signaturesOf(game))}`);
-check(game.ctx.state.dungeon.hintKey === undefined, 'a new game from it has no key');
+console.log(`  world's key ${hex(game.ctx.dungeon.getData().hintKey)}, signatures ${hexWords(signaturesOf(game))}`);
+check(game.ctx.dungeon.getData().hintKey === undefined, 'a new game from it has no key');
 check(sameNumbers(signaturesOf(game), SIGNATURES), 'and keeps the signatures the last block gave');
 const newGameSaved = blockOf(buildSaveFile(game));
 check(sameBytes(newGameSaved.hintKey, new Uint8Array(8)), "its save's key is eight zeros");
@@ -121,7 +121,7 @@ const enciphered = encipherHintFile(hct, KEY);
 const differs = enciphered.reduce((n, b, i) => n + (b !== hct[i] ? 1 : 0), 0);
 console.log(`  ${hct.length} bytes, ${differs} changed by the key; first words ${hex(enciphered.subarray(0, 4))}`);
 check(differs > hct.length * 0.9, 'the key changes almost every byte');
-const read = readHintOracle(enciphered, other.ctx.state.dungeon.hintKey);
+const read = readHintOracle(enciphered, other.ctx.dungeon.getData().hintKey);
 check(JSON.stringify(read) === JSON.stringify(plain), "the enciphered file, read under the loaded world's key, is the plain file's hints");
 let refused = '';
 try {

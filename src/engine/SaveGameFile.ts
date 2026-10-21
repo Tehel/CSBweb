@@ -19,7 +19,7 @@ import { objectIndexOf } from '../data/CsbwinObjectIndex';
 import { buildDungeonImage, cellFlagArraySize } from '../data/CsbwinDungeonImageWriter';
 import { buildLiveExtendedFeatures } from '../data/CsbwinExtendedFeatures';
 import { Expool } from '../data/CsbwinExpool';
-import type { DungeonData, TimerRecord } from '../data/dungeonTypes';
+import type { TimerRecord } from '../data/dungeonTypes';
 import type { Game } from './Game';
 import type { RuntimeSaveState } from './RuntimeSave';
 import type { Champion } from './gameTypes';
@@ -56,7 +56,7 @@ function buildFileBlocks(
     objectInHand: number;
     timers: TimerRecord[];
 } {
-    const dungeon: DungeonData = game.ctx.state.dungeon;
+    const dungeon = game.ctx.dungeon.getData();
 
     // The world has to be save-shaped, which `DungeonLoader` guarantees by converting on
     // load (`src/data/CsbwinDungeonConversions.ts`). Refuse rather than write a file
@@ -127,6 +127,7 @@ export function buildSaveFile(game: Game, options: SaveFileOptions = {}): Uint8A
     const item16 = runtime.dungeon.item16 ?? [];
     const timers = runtime.dungeon.timers ?? [];
     const file = buildFileBlocks(game, runtime, timers, options);
+    const world = game.ctx.dungeon.getData();
     const saveGameState: SaveGameState = {
         item16,
         timers: file.timers,
@@ -149,12 +150,12 @@ export function buildSaveFile(game: Game, options: SaveFileOptions = {}): Uint8A
         },
         characterBlock: file.characterBlock,
         extendedFeatures: file.extendedFeatures,
-        gameInfo: game.ctx.state.dungeon.gameInfo?.text,
+        gameInfo: world.gameInfo?.text,
         objectIndex: file.objectIndex,
-        dsaLevelIndex: game.ctx.state.dungeon.dsaLevelIndex,
+        dsaLevelIndex: world.dsaLevelIndex,
         // The DSAs as play left them: a DSA whose `localState` is 1 keeps its state in
         // its own `m_state` (`DsaSystem.putState`), which `DSA::Write` writes.
-        dsaIndex: game.ctx.state.dungeon.dsaIndex,
+        dsaIndex: world.dsaIndex,
         dungeonImage: file.dungeonImage,
     };
     return saveSaveGameState(saveGameState);

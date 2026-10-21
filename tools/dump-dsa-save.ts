@@ -102,7 +102,7 @@ console.log('2. The global variables at a read');
 console.log('3 and 4. The global variables at a save, and the round trip');
 {
   const game = freshGame();
-  const data = game.ctx.state.dungeon;
+  const data = game.ctx.dungeon.getData();
   const expool = new Expool(data);
   expool.write(globalsKey(0), new Array<number>(16).fill(0));
   expool.write(globalsKey(1), new Array<number>(16).fill(0));
@@ -139,7 +139,7 @@ console.log('3 and 4. The global variables at a save, and the round trip');
 
   const other = freshGame();
   applyCsbwinSave(other, first);
-  const after = other.ctx.state.dungeon.dsaIndex;
+  const after = other.ctx.dungeon.getData().dsaIndex;
   console.log(`  loaded: ${after?.entries.filter((d) => d).length} DSAs, ${other.systems.dsa.getGlobalVariables().length} globals`);
   check(same(after, before), 'the DSAs load back as they were saved, the moved state with them');
   check(same(other.systems.dsa.getGlobalVariables(), values), 'the 32 globals load back as they were');
@@ -149,10 +149,10 @@ console.log('5. 3D2D1D');
 {
   const graphics = stockGraphics();
   const game = newGame(new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync('static/gamefiles/3D2D1D/dungeon.dat'))), graphics);
-  const before = game.ctx.state.dungeon.dsaIndex;
+  const before = game.ctx.dungeon.getData().dsaIndex;
   const other = freshGame();
   applyCsbwinSave(other, buildSaveFile(game));
-  const after = other.ctx.state.dungeon.dsaIndex;
+  const after = other.ctx.dungeon.getData().dsaIndex;
   console.log(`  ${after?.entries.filter((d) => d).length} DSAs loaded`);
   check(countOf(before) === 6 && same(after, before), "a 3D2D1D game saves, and loads back with its six DSAs");
 }
@@ -160,7 +160,7 @@ console.log('5. 3D2D1D');
 console.log('6. Conflux 3.5');
 {
   const game = newGame(new DungeonLoader().loadDungeonDat(new Uint8Array(conflux)), stockGraphics());
-  const before = game.ctx.state.dungeon.dsaIndex;
+  const before = game.ctx.dungeon.getData().dsaIndex;
   const other = freshGame();
   let error = '';
   try {
@@ -168,7 +168,7 @@ console.log('6. Conflux 3.5');
   } catch (e) {
     error = String(e);
   }
-  const after = other.ctx.state.dungeon;
+  const after = other.ctx.dungeon.getData();
   console.log(`  ${error || `${after.maps.length} levels, ${countOf(after.dsaIndex)} DSAs, ${other.systems.dsa.getGlobalVariables().length} globals`}`);
   check(error === '' && after.maps.length === 64, 'a save of a Conflux game loads, its 64 levels with it');
   check(same(after.dsaIndex, before) && same(other.systems.dsa.getGlobalVariables(), game.systems.dsa.getGlobalVariables()),
@@ -190,15 +190,15 @@ console.log('7. &DISABLESAVES');
     new Expool(data).keys().filter((key) => key === disableSavesKey).length;
   const first = buildSaveFile(game);
   const second = buildSaveFile(game);
-  const running = records(game.ctx.state.dungeon);
+  const running = records(game.ctx.dungeon.getData());
   const inFile = records(loadCsbwinWorld(first).dungeon);
   console.log(`  saved twice: ${running} records in the running pool, ${inFile} in the first file`);
   check(running === 2 && inFile === 1, 'each save writes one record more into the running pool, and the file holds them');
 
   const other = freshGame();
   applyCsbwinSave(other, second);
-  console.log(`  loaded: disableSaves ${other.systems.dsa.disableSaves}, ${records(other.ctx.state.dungeon)} records left`);
-  check(other.systems.dsa.disableSaves && records(other.ctx.state.dungeon) === 0,
+  console.log(`  loaded: disableSaves ${other.systems.dsa.disableSaves}, ${records(other.ctx.dungeon.getData())} records left`);
+  check(other.systems.dsa.disableSaves && records(other.ctx.dungeon.getData()) === 0,
     'a load sets disableSaves from the records, and reads every one out of the pool');
 
   other.systems.dsa.disableSaves = false;
@@ -236,7 +236,7 @@ console.log('8. The overlay palette');
   check(alone >= 5, `at least five pools are the palette records alone (${alone})`);
 
   const game = stockGame();
-  check(game.ctx.state.dungeon.expool === undefined && sameBytes(game.ctx.overlayPalette, identity),
+  check(game.ctx.dungeon.getData().expool === undefined && sameBytes(game.ctx.overlayPalette, identity),
     "a game on dm-atari's dungeon.dat, which has no pool, has the identity");
   const written = loadCsbwinWorld(buildSaveFile(game)).dungeon;
   console.log(`  its save: a pool of ${written.header.objectCounts[11]} blocks`);

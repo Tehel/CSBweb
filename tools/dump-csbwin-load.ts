@@ -23,7 +23,7 @@
  *   holds, and every possession names a live record **in the live dungeon**, which is
  *   what proves the world and the party were restored into the same place;
  * - the random stream continues from `gb2.ranseed` rather than the host clock;
- * - the live world is the save's own, `state.dungeon` and `DungeonState` both;
+ * - the live world is the save's own, `DungeonState`'s;
  * - the runtime state of the loaded world, restored into a game built over `dungeon.dat`,
  *   gives back every field `DUNGEON_DATA_SOURCES` marks `snapshot`. The `loaded` ones
  *   are the file's a world was read from, and the runtime state carries none of them.
@@ -172,7 +172,7 @@ function main(): void {
   for (const path of saves) {
     const name = path.split('/').pop() ?? path;
     const game = loadWorld();
-    const pristineFlags = snapshotCellFlags(game.ctx.state.dungeon);
+    const pristineFlags = snapshotCellFlags(game.ctx.dungeon.getData());
 
     let world;
     try {
@@ -188,7 +188,7 @@ function main(): void {
     const party = game.ctx.party.state;
     const cell = new Position(party.position.x, party.position.y, party.position.z);
     const chain = objectsAt(game, cell);
-    const loadedFlags = snapshotCellFlags(game.ctx.state.dungeon);
+    const loadedFlags = snapshotCellFlags(game.ctx.dungeon.getData());
     const moved = countFlagDifferences(pristineFlags, loadedFlags);
 
     console.log(`\n${name}`);
@@ -232,14 +232,14 @@ function main(): void {
       const { category, index } = game.ctx.dungeon.rnMaps.decode(rn);
       const key = DB_OF_CATEGORY[category];
       check(
-        key !== undefined && index < game.ctx.state.dungeon.databases[key].records.length,
+        key !== undefined && index < game.ctx.dungeon.getData().databases[key].records.length,
         `${name}: the object under the party is a real record (cat ${category} index ${index})`,
       );
     }
 
     // The party and the world agree: every possession names a live carryable record in
     // the dungeon the game is now running, not the one the save was parsed into.
-    const live = game.ctx.state.dungeon;
+    const live = game.ctx.dungeon.getData();
     let carried = 0;
     for (const champion of party.champions) {
       for (const rn of champion.possessions) {
@@ -315,8 +315,8 @@ function main(): void {
 
     // The world the game runs is the one the save holds, `loaded` fields and all.
     check(
-      live === world.dungeon && game.ctx.dungeon.getData() === world.dungeon,
-      `${name}: the save's world is the running one, in state and DungeonState both`,
+      live === world.dungeon,
+      `${name}: the save's world is the running one`,
     );
 
     // And the runtime state of the loaded game, restored into another. It carries only
@@ -326,14 +326,14 @@ function main(): void {
     // checks after it of the party.
     const second = loadWorld();
     second.applyRuntimeSaveState(JSON.parse(JSON.stringify(game.getRuntimeSaveState())));
-    const lost = differingFields(SOURCES, live, second.ctx.state.dungeon);
+    const lost = differingFields(SOURCES, live, second.ctx.dungeon.getData());
     check(
       lost.length === 0,
       `${name}: every snapshot field of the loaded world survives a runtime-state round trip` +
         (lost.length ? ` (lost: ${lost.slice(0, 6).join(', ')}${lost.length > 6 ? ', ...' : ''})` : ''),
     );
     check(
-      countFlagDifferences(snapshotCellFlags(second.ctx.state.dungeon), loadedFlags) === 0,
+      countFlagDifferences(snapshotCellFlags(second.ctx.dungeon.getData()), loadedFlags) === 0,
       `${name}: the loaded world survives a runtime-state round trip`,
     );
     check(

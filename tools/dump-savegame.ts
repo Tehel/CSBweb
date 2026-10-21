@@ -120,7 +120,7 @@ async function main(): Promise<void> {
   const played = await loadWorld();
   played.ctx.party.state.position = new Position(0, 0, level);
   played.systems.monsters.loadPartyLevel(level);
-  const playedData = played.ctx.dungeon.getData() as DungeonData;
+  const playedData = played.ctx.dungeon.getData();
 
   const map = played.ctx.dungeon.getMap(level);
   if (!map) throw new Error(`level ${level} does not exist`);
@@ -275,7 +275,7 @@ async function main(): Promise<void> {
   const reloaded = await loadWorld();
   reloaded.ctx.party.state.position = new Position(0, 0, level);
   reloaded.systems.monsters.loadPartyLevel(level);
-  const reloadedData = reloaded.ctx.dungeon.getData() as DungeonData;
+  const reloadedData = reloaded.ctx.dungeon.getData();
 
   // What the old code produced: a fresh dungeon with the party pasted back in.
   const freshDoor = doorStateAt(reloaded, door.x, door.y, level);

@@ -64,9 +64,9 @@ for (const [dir, size] of [['conflux-3.5-b8', 541], ['towers-of-chaos-3.3', 89],
 console.log('\n2. DM\'s dungeon.dat, no block');
 {
   const game = newGame(stockDungeon(), graphics);
-  check(game.ctx.state.dungeon.gameInfo === undefined, 'the world has no game information');
+  check(game.ctx.dungeon.getData().gameInfo === undefined, 'the world has no game information');
   const first = saved(game);
-  console.log(`  saved: ${first.size}, read back ${JSON.stringify(ascii(loaded(first.bytes).ctx.state.dungeon.gameInfo?.text))}`);
+  console.log(`  saved: ${first.size}, read back ${JSON.stringify(ascii(loaded(first.bytes).ctx.dungeon.getData().gameInfo?.text))}`);
   check(first.size === 0 && first.text === '', 'its save writes a size of 0 and no byte');
   const second = saved(loaded(first.bytes));
   console.log(`  its save's game saved: ${second.size} ${JSON.stringify(second.text)}`);

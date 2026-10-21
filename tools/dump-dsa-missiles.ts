@@ -21,7 +21,6 @@
  */
 import { DBType, OBJECT_ID_EOF, Position, locationRelToInteger, type ObjectID } from '../src/core/types';
 import { RN_FIREBALL, RN_LIGHTNING } from '../src/core/spellRn';
-import type { DungeonData } from '../src/data/dungeonTypes';
 import { StkOp } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
 import { TimerFunction } from '../src/engine/TimerQueue';
@@ -179,7 +178,7 @@ function describeMissile(game: Game, rn: ObjectID): string {
     // The spell filter's column 0: its count, and the action made 1, "abort, no message".
     program: [op(StkOp.NUM_PARAM), globalStore(0), ...int(1), varStore(0), ...int(1), ...int(0), op(StkOp.PARAM_STORE)],
     place: (game: Game, location: number) => {
-      const data: DungeonData = game.ctx.dungeon.getData();
+      const data = game.ctx.dungeon.getData();
       data.spellFilterLocation = (0x80000000 | location) >>> 0;
     },
   };

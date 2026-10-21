@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs';
 
 import { DBType, OBJECT_ID_EOF, Position, RoomType, locationRelToInteger, type ObjectID } from '../../src/core/types';
-import type { DsaDefinition, DungeonData } from '../../src/data/dungeonTypes';
+import type { DsaDefinition } from '../../src/data/dungeonTypes';
 import { DungeonLoader } from '../../src/data/DungeonLoader';
 import { applyCsbwinSave } from '../../src/engine/CsbwinSaveGame';
 import type { Game } from '../../src/engine/Game';
@@ -80,7 +80,7 @@ export function placeFilterDsas(game: Game, esl: number, programs: FilterDsa[]):
     }
   }
   if (!at) throw new Error('no empty open square');
-  const data: DungeonData = dungeon.getData();
+  const data = dungeon.getData();
   const entries: DsaDefinition[] = programs.map((program, i) => ({
     description: `test ${i}`, state: 0, localState: 1, groupId: 0, numStates: 1, firstDisplayedState: 0,
     states: [{
@@ -138,7 +138,7 @@ export function run(
   if (!at) throw new Error('no empty open square');
   prepare(game, at);
   const words = typeof program === 'function' ? program(game, at) : program;
-  const data: DungeonData = dungeon.getData();
+  const data = dungeon.getData();
   data.databases.actuators.records.push({ nextObject: OBJECT_ID_EOF, word2: 47, word4: 0, word6: 0 });
   const rn: ObjectID = dungeon.rnMaps.rn(DBType.ACTUATOR, data.databases.actuators.records.length - 1);
   dungeon.addObjectToCell(at, rn);

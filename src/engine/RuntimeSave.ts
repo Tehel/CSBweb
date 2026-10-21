@@ -75,13 +75,14 @@ export function timerQueueState(timers: TimerQueue): Pick<RuntimeSaveState['dung
 
 /** Snapshot the runtime state. */
 export function getRuntimeSaveState(ctx: GameContext): RuntimeSaveState {
-    const item16 = ctx.state.dungeon.item16
-        ? ctx.state.dungeon.item16.map((r) => ({
+    const world = ctx.dungeon.getData();
+    const item16 = world.item16
+        ? world.item16.map((r) => ({
               ...r,
               singleMonsterStatus: [...r.singleMonsterStatus],
           }))
         : undefined;
-    const missiles = ctx.state.dungeon.databases.missiles.records.map((rec) => ({
+    const missiles = world.databases.missiles.records.map((rec) => ({
         nextObject: rec.nextObject,
         projectileObject: rec.projectileObject,
         rangeRemaining: rec.rangeRemaining,
@@ -158,7 +159,7 @@ export function applyRuntimeSaveState(ctx: GameContext, save: ReadState): void {
         save.dungeon.timerSequence ?? 0,
         save.dungeon.firstAvailTimer,
     );
-    applySaveGameState(ctx.state.dungeon, item16, missiles);
+    applySaveGameState(ctx.dungeon.getData(), item16, missiles);
     // The restore replaced the ITEM16 pool wholesale; re-derive which groups are
     // active, as CSBWin's game start does after its own restore
     // (`LoadPartyLevel(d.partyLevel)`, doc/CSBwin-src/CSBCode.cpp:10615).

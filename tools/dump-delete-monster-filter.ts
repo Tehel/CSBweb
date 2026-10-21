@@ -24,7 +24,6 @@
  */
 import { DBType, OBJECT_ID_EOF, Position, type ObjectID } from '../src/core/types';
 import { Expool } from '../src/data/CsbwinExpool';
-import type { DungeonData } from '../src/data/dungeonTypes';
 import { StkOp } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
 import { DeleteMonsterWhy } from '../src/engine/filterParameters';
@@ -103,7 +102,7 @@ const hex = (v: number): string => '0x' + (v >>> 0).toString(16);
   check(a !== undefined && b !== undefined, 'two groups on the party\'s level');
   const key = statsKey(DeleteMonsterWhy.DMW_Damage, MonsterType.mon_Mummy);
   const before = dungeon.locateExpoolRecord(key);
-  const keys = (): number => new Expool(dungeon.getData() as DungeonData).keys().length;
+  const keys = (): number => new Expool(dungeon.getData()).keys().length;
   const sizes: number[] = [keys()];
   const counts: (number[] | null)[] = [];
   for (const { rn, at } of [a!, b!]) {

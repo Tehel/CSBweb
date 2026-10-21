@@ -26,7 +26,6 @@
  * Run: `npm test -- --only=dump-dsa-parameters.ts`
  */
 import { messageParametersKey } from '../src/data/CsbwinExpool';
-import type { DungeonData } from '../src/data/dungeonTypes';
 import { StkOp } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
 import { AttackType } from '../src/engine/monsterTypes';
@@ -47,7 +46,7 @@ const ADJUST_SKILLS_FILTER_KEY = (3 << 24) | 6;
       ...int(4444), varStore(0), ...int(1), ...int(0), op(StkOp.PARAM_STORE),
     ],
     place: (game, locr) => {
-      const data: DungeonData = game.ctx.dungeon.getData();
+      const data = game.ctx.dungeon.getData();
       data.specialLocations = { [ADJUST_SKILLS_FILTER_KEY]: locr };
     },
   });
@@ -64,7 +63,7 @@ const ADJUST_SKILLS_FILTER_KEY = (3 << 24) | 6;
   const filter = (program: number[]) => ({
     program,
     place: (game: Game, locr: number) => {
-      const data: DungeonData = game.ctx.dungeon.getData();
+      const data = game.ctx.dungeon.getData();
       data.specialLocations = { [ADJUST_SKILLS_FILTER_KEY]: locr };
     },
   });

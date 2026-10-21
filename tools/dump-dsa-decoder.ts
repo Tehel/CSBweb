@@ -20,7 +20,7 @@
  * Run: `npm test -- --only=dump-dsa-decoder.ts`
  */
 import { DBType, locationRelToInteger, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../src/core/types';
-import type { DsaDefinition, DungeonData } from '../src/data/dungeonTypes';
+import type { DsaDefinition } from '../src/data/dungeonTypes';
 import { StkOp } from '../src/engine/dsa/DsaTypes';
 import type { Game } from '../src/engine/Game';
 import { TimerFunction, type TimerEntry } from '../src/engine/TimerQueue';
@@ -72,7 +72,7 @@ function run(program: number[], state = 0): Run {
   }
   if (!at) throw new Error('no empty open square');
 
-  const dungeonData: DungeonData = dungeon.getData();
+  const dungeonData = dungeon.getData();
   dungeonData.databases.actuators.records.push({ nextObject: OBJECT_ID_EOF, word2: 47, word4: 0, word6: 0 });
   const rn: ObjectID = dungeon.rnMaps.rn(DBType.ACTUATOR, dungeonData.databases.actuators.records.length - 1);
   dungeon.addObjectToCell(at, rn);

@@ -526,7 +526,7 @@ export class DsaSystem {
     this.objDescWord4 = ctx.tables.objDescWord4;
     this.carryLocation = ctx.tables.carryLocation;
     this.monsterDesc = ctx.tables.monsterDesc;
-    this.globalVariables = Int32Array.from(readGlobalVariables(ctx.state.dungeon));
+    this.globalVariables = Int32Array.from(readGlobalVariables(ctx.dungeon.getData()));
   }
 
   setParameters(count: number, values: ArrayLike<number>): void {
