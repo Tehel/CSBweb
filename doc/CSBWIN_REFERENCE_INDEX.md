@@ -6,7 +6,9 @@ This index links the CSBWin-sourced reference docs under `doc/`.
 
 `doc/CSBwin-src/` is `CSBwin_SRC_20230608.7z` from dianneandpaul.net/CSBwin/, the main
 line's last source and the build the author plays ("Version 2023.06.08", `CSBwin.rc:313`),
-CRLF turned to LF and nothing else changed. `doc/CSBWIN_SYMBOL_INDEX.tsv` is built from it,
+with the CRs of its source and text files removed and nothing else changed. It is not ours,
+so it is git-ignored: `npm run fetch-csbwin-src` (`tools/fetch-csbwin-src.ts`) fetches it,
+from the site or the Wayback Machine's copy, checks the archive's SHA-256 and writes the tree. `doc/CSBWIN_SYMBOL_INDEX.tsv` is built from it,
 and every citation in `doc/`, `src/` and `tools/` names its lines (`doc/PLAN_ARCHIVE.md`'s
 are mapped by script and unreviewed).
 

@@ -20,7 +20,7 @@ const SRC = join(ROOT, 'doc/CSBwin-src');
 const OUT = join(ROOT, 'doc/CSBWIN_SYMBOL_INDEX.tsv');
 
 if (!existsSync(SRC)) {
-  console.error(`No ${SRC}. Restore the C++ reference before indexing.`);
+  console.error(`No ${SRC}. Fetch the C++ reference first: npm run fetch-csbwin-src.`);
   process.exit(1);
 }
 

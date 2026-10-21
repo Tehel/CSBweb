@@ -14,6 +14,8 @@ This port is based on the awesome CSBWin version by Paul R. Stevens, which was c
 
 - Node.js 20+ (22 for `tools/probe-ui.mjs` without a flag)
 - npm
+- `7z` (7-Zip or p7zip), and `npm run fetch-csbwin-src` once: it fetches `doc/CSBwin-src/`,
+  CSBWin's C++ source, which the docs cite and `npm test` reads
 - The original game files under `static/gamefiles/`, one directory per data set, each
   listed in `tools/data-sets.json` (parsed by `src/data/DataSets.ts`)
 
@@ -44,7 +46,7 @@ csbweb/
 │   └── main.ts            # the page's bootstrap
 ├── tools/                 # verification tools (dump-*.ts), the golden frames
 ├── static/gamefiles/      # the original game data files, one directory per data set
-├── doc/                   # CSBWin reference docs; CSBwin-src/ is the C++ (not ours)
+├── doc/                   # CSBWin reference docs; CSBwin-src/ is the C++ (not ours, fetched)
 ├── PLAN.md, DEBT.md       # project status and technical debt
 ├── index.html
 ├── vite.config.mts
