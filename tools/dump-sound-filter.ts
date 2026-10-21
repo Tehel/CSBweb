@@ -13,7 +13,7 @@
  *    `100 * max(dx, dy)`: 141 for a step of (1, 1), 500 for (3, 4), 0 on the party's square.
  * 4. **A sound out of earshot reaches the filter too**, with volume -1 (`CSBCode.cpp:1905-1907`).
  * 5. **A DSA plays the sound if it pleases**, with `&SOUND` (`PlayCustomSound`,
- *    `Sound.cpp:1048-1071`).
+ *    `Sound.cpp:1048-1069`).
  * 6. **A sound queued while the DSAs run plays on** (`filterActive`, `:677-681`): the
  *    filter does not run for it.
  *

@@ -283,7 +283,7 @@ export function drawPositionSquare(
   champion: Champion | null,
   facing: number,
 ): void {
-  fillRectIndex(dst, rect, ui.uiTables.graphic232.byte1386[chIdx] ?? 13);
+  fillRectIndex(dst, rect, ui.uiTables.graphic232.byte1386[chIdx]);
   const indicator = ui.getGraphicBitmap(28);
   if (!indicator) return;
   const champFacing = champion?.facing ?? facing;

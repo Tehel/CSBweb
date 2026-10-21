@@ -1,12 +1,11 @@
 /**
  * Load a genuine CSBWin save into the running game.
  *
- * The pieces were all in place separately: `loadCsbwinWorld` parses the dungeon image
- * into a real `DungeonData`, `readCsbwinParty` unpacks `CHARDESC[4]`, and
- * the save's object indirect index, which the world keeps as its `RnMaps`, makes every
- * object reference in either of them mean something.
- * What was missing is this — turning the three into the `RuntimeSaveState` the engine
- * already knows how to restore.
+ * `loadCsbwinWorld` parses the dungeon image into a real `DungeonData`,
+ * `readCsbwinParty` unpacks `CHARDESC[4]`, and the save's object indirect index, which
+ * the world keeps as its `RnMaps`, makes every object reference in either of them mean
+ * something. This module turns the three into the `RuntimeSaveState` the engine
+ * restores.
  *
  * The save's world becomes the running game's (`readGame`), structure and all,
  * as `_ReadEntireGame` reads it (`doc/CSBwin-src/SaveGame.cpp:2536`), so a save of any
@@ -171,7 +170,7 @@ function buildPartyState(world: CsbwinWorld): PartyState {
         selectedCharacterIndex: -1,
         // None of the three is in the file's party blocks. `LoadGame` clears
         // `d.GameIsLost` (doc/CSBwin-src/SaveGame.cpp:2095); the other two take
-        // `initialPartyState`'s values, as they did before they were required.
+        // `initialPartyState`'s values.
         potentialChampionIndex: -1,
         gameIsLost: false,
         // `d.PendingDamage` and `d.PendingOuches` are not in the file either.
@@ -262,8 +261,9 @@ function specialLocationsOf(world: CsbwinWorld): Record<number, number> | undefi
 /**
  * Everything a CSBWin save says, in the shape a read installs (`readGame`).
  *
- * Pure: no `Game` is touched, so a verification tool can build one and read it without
- * standing a game up.
+ * No `Game` is touched, so a verification tool can build one and read it without
+ * standing a game up. It is not pure: `readDisableSaves` takes its records out of the
+ * world's `expool`, as `LoadGame` does, so it is built once per world.
  */
 export function buildCsbwinRuntimeState(world: CsbwinWorld): RuntimeSaveState {
     const gb2 = world.save.block2;

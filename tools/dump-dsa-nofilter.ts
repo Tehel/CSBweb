@@ -2,7 +2,7 @@
  * `NOFILTER` (`doc/CSBwin-src/DSA.cpp:463`): an operation that changes the dungeon, run by
  * a filter's DSA, says "Filter Modifying Dungeon" (`NoFilter`, `:458-461`), and does what
  * it does all the same. Each operation below runs as the one DSA of the cursor filter
- * (`CursorFilter`, `MoveObject.cpp:797-865`), whose runs are a filter's, and as an
+ * (`CursorFilter`, `MoveObject.cpp:797-858`), whose runs are a filter's, and as an
  * ordinary DSA's program, against a genuine save (`csbgame7.dat`). Its operands make it
  * do nothing once past the check: an empty hand to `&DEL`, a full one to `&ADD`, a
  * location off the dungeon, a source type of 0, an object copied onto itself.

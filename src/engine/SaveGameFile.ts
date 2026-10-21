@@ -226,8 +226,8 @@ function buildBlock2FromGame(game: Game, runtime: RuntimeState): Block2 {
  * created, who carries `portraitGraphic` (a cell of basic graphic 26, or past 23 a
  * portrait of `CSBgraphics.dat`) because the engine holds no graphics to blit from.
  * `AddCharacter` blits that portrait into the character record once
- * (`doc/CSBwin-src/Character.cpp:485-509`); this is where the
- * port finally does the same.
+ * (`doc/CSBwin-src/Character.cpp:485-509`); the port does the same here, at the
+ * write.
  */
 function buildCharacterBlock(
     game: Game,

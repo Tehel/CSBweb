@@ -269,11 +269,11 @@ type DatabaseWriteOptions = Pick<DatabaseShape, 'bigActuators' | 'newScrolls'>;
  * (`doc/CSBwin-src/SaveGame.cpp:1297-1313`).
  *
  * This is the inverse of `DungeonLoader`'s thirteen record parsers, field for field and
- * bit for bit against the `DBn` classes in `doc/CSBwin-src/CSB.h:821-1348`. Writing it
- * is what found the bits those parsers were dropping — the door's `word2` bits 9-15, the
- * chest's whole `word4` and its two trailing bytes, the misc item's `cursed` and
- * `subType`, the new scroll's uninitialised `word4` debris, and four more; all are
- * carried on the record now and named in `src/data/dungeonTypes.ts`.
+ * bit for bit against the `DBn` classes in `doc/CSBwin-src/CSB.h:821-1348`. Every bit is
+ * carried on the record, those the game never reads too — the door's `word2` bits 9-15,
+ * the chest's whole `word4` and its two trailing bytes, the misc item's `cursed` and
+ * `subType`, the new scroll's uninitialised `word4` debris — and named in
+ * `src/data/dungeonTypes.ts`.
  *
  * Three of the sixteen have no record parser:
  *

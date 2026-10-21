@@ -13,7 +13,7 @@
  *    the pool; a count of -1 when the record is gone. The sequence is back to 0 at the
  *    next tick (`Attack.cpp:2212`).
  * 3. **Any other room timer gives a count of 0** (`Timer.cpp:1704-1707`).
- * 4. **`&SOUND`** (`DSA.cpp:4613-4625`, `PlayCustomSound`, `Sound.cpp:1048-1071`): a
+ * 4. **`&SOUND`** (`DSA.cpp:4613-4625`, `PlayCustomSound`, `Sound.cpp:1048-1069`): a
  *    negative number plays `d.sound1772`'s entry `-n - 1`, quiet for a volume of 0, none
  *    past the 22nd; a number from 0 up is `CSBgraphics.dat`'s, which, in a game with no
  *    such file, plays nothing and is reported once (the sounds themselves are

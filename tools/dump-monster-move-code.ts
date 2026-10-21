@@ -1,6 +1,6 @@
 /**
  * What `MoveObject` returns for a monster, and what its callers do with it
- * (`doc/CSBwin-src/Code11f52.cpp:2831-3459`; DEBT.md C24).
+ * (`doc/CSBwin-src/Code11f52.cpp:2831-3459`).
  *
  *  1. A teleport on the party's level returns 1 — `LOCAL_14` is `TeleportMonster`'s
  *     value (`:3023`, `:2419`) — starts the group's timers where it lands and deletes

@@ -329,14 +329,8 @@ async function main(): Promise<void> {
 
   // `atk_THROW` and `atk_SHOOT` both take an object off a champion and turn it into a
   // missile. Nothing on screen distinguishes "the hand was emptied" from "the hand was
-  // not", because the missile is drawn either way — so the bug this section pins down
-  // was invisible until the thrown club was picked up again and the party owned two.
-  //
-  // The trap was that a champion's hands were stored **twice**: in `possessions[0..1]`
-  // and in `shieldHand`/`weaponHand`/`quiver` mirrors that every reader fell back to
-  // when the array read null, so a removal that wrote only the array removed nothing.
-  // The mirrors are gone (DEBT.md D1), but the check is still made through the UI's own
-  // reader rather than through `possessions` directly.
+  // not", because the missile is drawn either way, so this section checks it, through
+  // the UI's own reader rather than through `possessions` directly.
   console.log('');
   console.log('=== 7. the thrown object leaves the champion (atk_THROW, atk_SHOOT) ===');
 

@@ -381,9 +381,8 @@ export class MonsterDamage {
    *
    * The HP array is cleared *before* the group is lifted with `MoveObject(obj, x, y,
    * -1, 0)` (`:1072-1073`) — so `CheckMoveFromMissile` finds no hit points and returns
-   * at once (`:2628-2631`) — and the lift releases the square's pads. Without the hook
-   * (a standalone `MonsterDamage`) the group is only unlinked. `mmr` is the turn's record,
-   * which the lift tells the group is gone.
+   * at once (`:2628-2631`) — and the lift releases the square's pads. `mmr` is the
+   * turn's record, which the lift tells the group is gone.
    */
   deleteMonster(level: number, mapX: number, mapY: number, mmr?: MmRecord): void {
     const position = new Position(mapX, mapY, level);
@@ -410,16 +409,6 @@ export class MonsterDamage {
 
   /* ---------------------------------------------------------------- damage ---- */
 
-  /**
-   * `DamageMonster` (`doc/CSBwin-src/Code11f52.cpp:1089`).
-   *
-   * `apply` is CSBWin's `P6`: when zero the group is *not* actually removed and
-   * droppings are queued for later instead — that is how a monster killed while
-   * being moved gets its remains placed at the destination.
-   *
-   * `noItem16` says the group has no `ITEM16` attached, which changes where the
-   * packed position and facing bytes live.
-   */
   /**
    * `DamageMonsterGroup` (`doc/CSBwin-src/Code11f52.cpp:1352`) — one blow that lands on
    * every member of a group, as a cloud or an explosion does.
@@ -478,6 +467,16 @@ export class MonsterDamage {
     return Math.trunc((8 * (damage + this.random.zeroTo3())) / (resistance + 1));
   }
 
+  /**
+   * `DamageMonster` (`doc/CSBwin-src/Code11f52.cpp:1089`).
+   *
+   * `apply` is CSBWin's `P6`: when zero the group is *not* actually removed and
+   * droppings are queued for later instead — that is how a monster killed while
+   * being moved gets its remains placed at the destination.
+   *
+   * `noItem16` says the group has no `ITEM16` attached, which changes where the
+   * packed position and facing bytes live.
+   */
   damageMonster(
     monster: CreatureRecord,
     indexInGroup: number,

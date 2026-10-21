@@ -114,7 +114,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E35 | Comments and documents that are stale, wrong, or tell the past | M | ⏳ |
 | E36 | Type escape hatches that check nothing | M | ⏳ |
 | E25 | One helper for each rule, where copies drift | M | ⏳ |
 | E26 | Systems named after CSBWin's files, not what they do | M | ⏳ |
@@ -461,14 +460,14 @@ Copies of one rule drift apart. The copies left:
   beside `characterAtPosition` (`src/engine/AddCharacter.ts`). "Alive" is tested five ways:
   `(health | 0) === 0`, `health === 0`, `health > 0`, `attributes?.health ?? 0`, `!== 0`.
 - **A level's difficulty**, `getMap(party.z)?.descriptor.difficulty ?? 0`, six times
-  (`AttackSystem.ts:307`, `MonsterAttack.ts:167`, `MagicSystem.ts:453`, `LightLevel.ts:28`,
-  `ActuatorSystem.ts:632`, `TimerSystem.ts:1215`).
-- **Skill gain on the party's level** is `MagicSystem.applySpellSkillGain` (`:450`), used
+  (`AttackSystem.ts:307`, `MonsterAttack.ts:167`, `MagicSystem.ts:456`, `LightLevel.ts:28`,
+  `ActuatorSystem.ts:635`, `TimerSystem.ts:1215`).
+- **Skill gain on the party's level** is `MagicSystem.applySpellSkillGain` (`:454`), used
   for blows, war cries and throws (`AttackSystem.ts:386`, `:704`, `:1533`,
   `MouseSystem.ts:231`).
 - **A spell's RN**, `0xff80 + (x & 0x7f)`, at `TimerSystem.ts:993`, `:1637` and
-  `MagicSystem.ts:479-480`, beside `missileHelpers.spellObjectId` (`:26`);
-  `adjustSpellMissileRange` and `computeSpellLaunchPos` (`MagicSystem.ts:463-477`) repeat
+  `MagicSystem.ts:482-484`, beside `missileHelpers.spellObjectId` (`:26`);
+  `adjustSpellMissileRange` and `computeSpellLaunchPos` (`MagicSystem.ts:466-481`) repeat
   `characterThrowsSpell` and `launchObject`; `DsaSystem.ts:4676-4679` repeats
   `MonsterSystem.detachedGroupIndexFor`.
 - **The room type**, `(cellFlag >> 5) & 0x7`, written out 28 times beside 4 calls of
@@ -531,7 +530,7 @@ Five doc comments sit over the wrong function (`:147` over `CursorFilterType`;
 and seven filter sites have none (`processMissileEncounterFilter`,
 `processAdjustSkillsFilter`, `processSpellFilter`, `processTimer5`, `6` and `7`). A spell's
 parameters are marshalled field by field both ways (`:1380-1412`, and again in
-`MagicSystem.ts:140-155`), where every other block has a codec.
+`MagicSystem.ts:141-156`), where every other block has a codec.
 
 Paying it, in steps, into `src/engine/dsa/`, beside `DsaTypes.ts`: `DsaMachine.ts`, the
 stack, the bank, `execute` over a `ProgramCursor` (`word()`, `nextState(word, shift, bits,
@@ -555,7 +554,7 @@ Each command's body keeps CSBWin's order and names. Two tools change with it:
   `DrawViewport`, 64 to 70 allocate one.
 - A program is found by building `${cellName}_${roomTypeName}`, with an `_Any` fallback, in
   a map of 101 exported `StdDraw*` constants nothing else imports
-  (`BytecodePrograms.ts:1962`, `src/renderer/DrawViewport.ts:192-211`), where CSBWin
+  (`BytecodePrograms.ts:1962`, `src/renderer/DrawViewport.ts:192-214`), where CSBWin
   indexes `pStdDrawCode[21][8]` (`doc/CSBwin-src/Viewport.cpp:1952`).
 - 38 commented-out debug lines (`// StdBltShape(bitmapPtr=${bitmapPtr}, ...)`).
 - `InterpreterContext` (`:35-155`) carries the drawing's inputs and the picking's outputs
@@ -681,46 +680,6 @@ Paying it: the look-up tables built once a present and shared by the three conve
 `DsaVars` allocated on first use; the traces behind a test or a closure. The frames record
 palette codes, so none moves.
 
-### E35 ⏳ Comments and documents that are stale, wrong, or tell the past
-
-- **Paid debt IDs in the code**, which "How to work this list", point 5, says mean the debt
-  is open: E1, E1c, E1d and E2 (`Game.ts:6`, `GameContext.ts:2`, `:54`, `GameHost.ts:2`,
-  `LoopState.ts:3`, `MouseQueue.ts:12`, `MouseSystem.ts:9`, `PeriodicUpdates.ts:7`,
-  `MagicSystem.ts:9`, `CharacterSystem.ts:10`, `HallOfChampions.ts:7`, `:10`); in the tools
-  C14 (`dump-cloud-draw.ts:27`), C23 (`dump-wiggle-monster.ts:5`), C24
-  (`dump-monster-move-code.ts:3`), C27 (`dump-champion-death.ts:123`) and D1
-  (`dump-throwing.ts:338`).
-- **The past**: "Moved out of `Game` by `DEBT.md` E2" (`MagicSystem`, `MouseSystem`,
-  `PeriodicUpdates`), `Party.ts:119`, `:300`, `RuntimeSave.ts:223-224`,
-  `CsbwinSaveGame.ts:4-9`, `:174`, `SaveGameLoader.ts:295-296`, `CsbwinSaveInfo.ts:42-44`,
-  `CsbwinDungeonImageWriter.ts:287-290`, `SaveGameFile.ts:228-230`, `MonsterAttack.ts:598`,
-  `MissileEncounter.ts:513`, `DrawDecorations.ts:177-179`, `BytecodeInterpreter.ts:1599` ("Phase 5").
-- **Wrong**: `MagicSystem.ts:397` ("Spell effects are wired in subsequent magic parity
-  steps"); `MonsterAttack.ts:750-751` (`potentialChampionIndex` "still always -1 here",
-  which `HallOfChampions.ts:134` sets); `MonsterDamage.ts:452` (a branch without the hook
-  that does not exist), and `DamageMonster`'s comment over `damageMonsterGroup`
-  (`:480-489`); `SaveGameLoader.ts:501` (ITEM16's `word0` "little-endian in the file", read
-  big-endian, as `LE16` on the little-endian build means, `doc/CSBwin-src/CSBTypes.h:151`);
-  `CsbwinSaveInfo.ts:9` ("never touches the image"); `CsbwinSaveGame.ts:265`
-  (`buildCsbwinRuntimeState` "pure", where `readDisableSaves` removes records from the
-  world's `expool`); `DrawViewport.ts:5`, `:156`, `:163` ("the 3D first-person view", and
-  doubts on cells 3 and 10 that `relativeX`/`relativeY` settle); `getChampionMessageColor`'s `?? 13`, "the historical default", a guessed number
-  (`ActuatorSystem`).
-- **Documents**: `doc/CSBWIN_DSA_REFERENCE.md` says `&PARTY@` and `&CHAR@` write nothing
-  past 100, where `&CHAR@` zero-fills (`doc/CSBwin-src/DSA.cpp:4179-4227`; the port is
-  right), and its last four sections cite `DSA.cpp` without lines;
-  `doc/CSBWIN_SAVEGAME_REFERENCE.md:286` says `SimpleEncryption` is neither written nor read
-  past the header (the whole file is), and calls block 0 byte-identical with its game
-  information (only the round-trip tool's is, C178); `doc/UI_MODULE_MAP.md:41`
-  (`pointInRect`, gone), `:79` (the wrappers "delegate and do nothing else", where
-  `handleMouseButton`, `setPartyState` and `initializePlayState` hold logic), `:106` (nine
-  screen states and a server started by hand: twenty, and the probe starts its own);
-  two CSBWin ranges past their file's end, `MoveObject.cpp:797-865` (858 lines;
-  `DsaSystem.ts:905`, `doc/PROVEN_FACTS.md` and two tools) and `Sound.cpp:1048-1071`
-  (1069; `SoundQueue.ts`, `doc/CSBWIN_DSA_REFERENCE.md` and three tools).
-
-Paying it: each rewritten as the present rule, or deleted.
-
 ### E36 ⏳ Type escape hatches that check nothing
 
 `noUncheckedIndexedAccess` is off (it would raise 1,573 errors), so an index's `!` asserts
@@ -738,9 +697,9 @@ nothing, and a `?? 0` on a field that cannot be missing hides the type's contrac
   undefined)`;
 - `as ObjectID` on what already is one, which blurs the audit by which a cast marks a
   conversion (`CLAUDE.md` → "Object IDs"): `DsaSystem.ts:1538`, `:1539`, `:2050`, `:4416`,
-  `:4619`, `:4631`, `ActuatorSystem.ts:607`, `TimerSystem.ts:1427`, `:1559`, `:1597`,
+  `:4619`, `:4631`, `ActuatorSystem.ts:610`, `TimerSystem.ts:1427`, `:1559`, `:1597`,
   `objectIndex.ts` (`NameIndex`), `PeriodicUpdates.ts:67`, `MonsterSystem.ts:750`, `:757`;
-- CSBWin's `RNempty` written as `0 as ObjectID` (`ActuatorSystem.ts:350`) and `rn === 0`
+- CSBWin's `RNempty` written as `0 as ObjectID` (`ActuatorSystem.ts:353`) and `rn === 0`
   (`objectIndex.ts:82`).
 
 Two compiler checks cost nothing: `noImplicitReturns` and `noImplicitOverride` raise no

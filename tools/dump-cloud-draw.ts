@@ -24,7 +24,7 @@
  * reads at `srcX - LOCAL_30`, which is `max(0, clip - LOCAL_30)` when mirrored: a
  * mirrored cloud at the left edge is clipped by less than its overhang, as in CSBWin.
  *
- * Then the rest of `DrawClouds` (C14), against the real tables and a synthetic graphic
+ * Then the rest of `DrawClouds`, against the real tables and a synthetic graphic
  * of each real graphic's size:
  *
  *  4. the scale: `Larger(4, Byte5758[cell/3] * Larger(48, value+1) >> 8) & 0xfffe`

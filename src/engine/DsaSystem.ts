@@ -687,7 +687,7 @@ export class DsaSystem {
   }
 
   /**
-   * `CursorFilter` (`doc/CSBwin-src/MoveObject.cpp:797-865`), which a site calls before
+   * `CursorFilter` (`doc/CSBwin-src/MoveObject.cpp:797-858`), which a site calls before
    * it does something to the object on the cursor: every DSA at `ESL_CURSORFILTER`'s
    * location in turn, each on the packet as the DSA before it left it, a count of 6 and
    * the packet's six words (`:846-847`). Back comes the whole packet, into `cfp`

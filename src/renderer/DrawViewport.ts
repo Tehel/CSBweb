@@ -1,8 +1,8 @@
 /**
  * DrawViewport - Main viewport rendering function
- * Mechanical port from CSBWin Viewport.cpp line 6694
+ * Mechanical port from CSBWin Viewport.cpp line 6701
  *
- * This function renders the 3D first-person view by:
+ * This function renders the dungeon view by:
  * 1. Calculating cell positions relative to party position/facing
  * 2. Gathering room data for each of the 21 viewport cells
  * 3. Executing bytecode programs to draw each cell
@@ -148,19 +148,22 @@ export function skinProgramStart(code: ArrayLike<number>, cellNum: number, graph
   return code[mainOffset + 8 * cellNum + graphicRoomType]!;
 }
 
-/** The 21 cells' names in the program table, by relative cell number. */
+/**
+ * The 21 cells' names in the program table, by relative cell number: F and the cell's
+ * `relativeY`, then L or R and the size of its `relativeX`.
+ */
 export const cellNames = [
   'F4L2',
   'F4R2',
   'F3L2',
-  'F3R2', // place switched with F3R2 ?
+  'F3R2',
   'F4L1',
   'F4R1',
   'F4',
   'F3L1',
   'F3R1',
   'F3',
-  'F2L2', // place switched with F2L2 ?
+  'F2L2',
   'F2R2',
   'F2L1',
   'F2R1',

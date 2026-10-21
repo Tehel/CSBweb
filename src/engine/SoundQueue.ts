@@ -106,7 +106,7 @@ export class SoundQueue {
   }
 
   /**
-   * `PlayCustomSound(soundNum, volume, flags)` (`doc/CSBwin-src/Sound.cpp:1048-1071`), a
+   * `PlayCustomSound(soundNum, volume, flags)` (`doc/CSBwin-src/Sound.cpp:1048-1069`), a
    * DSA's `&SOUND`. A negative number is `d.sound1772`'s entry `-soundNum - 1`, none past
    * the 22nd, played by `StartSound`, loud unless `volume` is 0 (`:652-672`). `flags` is
    * unused. A number from 0 up is a sound of `CSBgraphics.dat` (`readSound`), played

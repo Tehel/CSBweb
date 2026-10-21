@@ -4562,7 +4562,7 @@ sets a waterskin's two bits (`CSB.h:1277`), so an empty one emptied again holds 
 
 ## The cursor filter runs every DSA at its location on the packet, which a site may cancel
 
-`CursorFilter` (`doc/CSBwin-src/MoveObject.cpp:797-865`) runs every type-47 actuator at
+`CursorFilter` (`doc/CSBwin-src/MoveObject.cpp:797-858`) runs every type-47 actuator at
 `ESL_CURSORFILTER`'s location (9, `CSB.h:1547`), each with `continue`: the count is
 `sizeof(*cfp) / 4`, 6, and the words are `CURSORFILTER_PACKET`'s six `int`s, `object`,
 `type`, `p1` to `p4` (`CSB.h:1520-1529`), copied in before each DSA and back after it
@@ -5778,7 +5778,7 @@ count of -1, and on the outer array (see "`&PARAM@` compares the count unsigned"
 filters are the exception. `_FeedCharacter` declares no `NEWDSAPARAMETERS`
 (`Character.cpp:4021-4514`), so the feeding filter's DSAs leave its count, 27, and the
 block in the caller's array (`:4350-4353`). Nor does `CursorFilter`
-(`MoveObject.cpp:797-865`), nor any function of `Mouse.cpp` or `MoveObject.cpp`, so its
+(`MoveObject.cpp:797-858`), nor any function of `Mouse.cpp` or `MoveObject.cpp`, so its
 DSAs leave its count, 6, and the packet in the caller's array (`:846-849`). `ActionNameFilter`'s `NEWDSAPARAMETERS` is declared in the block
 that looks for its DSA (`CSBCode.cpp:8758`), which closes before the DSA runs (`:8780`,
 `:8802`), so it writes its count, 5, and its words into the caller's array, and leaves them

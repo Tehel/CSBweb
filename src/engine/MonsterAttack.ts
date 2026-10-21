@@ -670,7 +670,7 @@ export class MonsterAttack {
     // The search skips the *potential* champion — the one standing in a Hall of
     // Champions mirror who has not been confirmed yet — because they are counted in
     // `d.NumCharacter` but are not really in the party. `potentialChampionIndex` is
-    // still always -1 here; Phase 13 step 4 is what sets it.
+    // theirs, set by `HallOfChampions` while the mirror waits for an answer.
     const potential = party.potentialChampionIndex;
     let living = -1;
     for (let i = 0; i < party.champions.length; i++) {

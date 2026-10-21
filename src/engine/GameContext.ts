@@ -1,5 +1,5 @@
 /**
- * `GameContext` — what every subsystem shares, CSBWin's global `d.` (`DEBT.md` E1).
+ * `GameContext` — what every subsystem shares, CSBWin's global `d.`.
  *
  * `Game` creates it first and hands it to each subsystem as its first constructor
  * argument. Everything in it is created once and never replaced, so a subsystem may keep
@@ -52,7 +52,7 @@ import type { TimerSystem } from './TimerSystem';
 import type { WorldMove } from './WorldMove';
 
 /**
- * The subsystems, so that one calls another directly (`DEBT.md` E1c). `Game` fills it
+ * The subsystems, so that one calls another directly. `Game` fills it
  * as it constructs them. No constructor may call through it — only a method may, and
  * methods run after construction, so the construction order does not matter. A call
  * goes through the instance at call time, so a tool that replaces a method on an

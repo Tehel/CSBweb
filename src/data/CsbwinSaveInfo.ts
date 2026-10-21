@@ -6,9 +6,10 @@
  * which `loadSaveGameState` already unscrambles and checksums — this module only unpacks
  * the champion names out of the raw character block it hands back.
  *
- * It stops at those blocks and never touches the image, the best part of a megabyte. The
- * consequence is deliberate: a file whose blocks unscramble but whose image is damaged
- * has a row and fails on LOAD, with the reason on the menu's status line.
+ * Of the image, the best part of a megabyte, it reads only the layout
+ * (`computeDungeonImageLayout`) and never the world. The consequence is deliberate: a
+ * file whose blocks unscramble but whose image is damaged has a row and fails on LOAD,
+ * with the reason on the menu's status line.
  */
 import { loadSaveGameState, type SaveGameState } from './SaveGameLoader';
 
@@ -39,10 +40,9 @@ export const CHARDESC_TITLE_SIZE = 20;
  *
  * **They are C strings, and the first NUL ends them.** `AddCharacter` terminates both
  * (`doc/CSBwin-src/Character.cpp:568,588`) and the game prints them with
- * `TextToViewport(…, pcA3->title, false)` (`:1343`), which stops there. This reader used
- * to *skip* zero bytes and go on, which is why some genuine saves appeared to hold a
- * title of `\0HE DEVIL`: CSBWin shows those champions a **blank** title, and so must we.
- * The stray NUL is written by `EditCharacterName`'s insert branch
+ * `TextToViewport(…, pcA3->title, false)` (`:1343`), which stops there. Some genuine
+ * saves hold a title of `\0HE DEVIL`, which CSBWin shows as a **blank** title, and so
+ * does the port. The stray NUL is written by `EditCharacterName`'s insert branch
  * (`doc/CSBwin-src/Chaos.cpp:6539-6540`), whose shift loop starts at `max_len` (7) rather
  * than at the name's length, so its first move is `name[8] = name[7]` — and `name` is
  * `char[8]`, so `name[8]` *is* `title[0]`. See `doc/PROVEN_FACTS.md` → "A champion's

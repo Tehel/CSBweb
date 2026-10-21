@@ -1596,7 +1596,7 @@ export class BytecodeInterpreter {
   }
 
   // ============================================================
-  // ROOM OBJECTS (Phase 5)
+  // ROOM OBJECTS
   // ============================================================
 
   // CSBWin `objectDrawingLocations[21]` (Viewport.cpp:2419)

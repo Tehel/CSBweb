@@ -1,9 +1,8 @@
 /**
  * How a tool builds a `Game`: over the whole `GameTables` set, as `main.ts` does.
  *
- * Tools used to hand `Game` the subset of tables they thought they needed, so a tool could
- * pass while the code it exercised read a table the tool had left out (`DEBT.md` E1a).
- * Now every tool gets every table. The tables are extracted once per `GraphicsLoader`
+ * Every tool gets every table, never the subset it thinks it needs, so no tool passes
+ * while the code it exercises reads a table it left out. The tables are extracted once per `GraphicsLoader`
  * (`graphicsTablesOf`), and the tool's `GameTables` is built from that one extraction, as
  * `main.ts` builds the game's.
  */

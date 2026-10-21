@@ -3,7 +3,7 @@
  * `gameTick`, `tag0006a4`, `HandleMouseEvents` and the mouse queue's front door), the
  * construction of every system over one `GameContext`, and one-line facades for
  * `main.ts`, the UI and `tools/`. Everything else lives in the system that ports its
- * CSBWin file (`DEBT.md` E2).
+ * CSBWin file.
  */
 
 import type { DungeonData } from '../data/dungeonTypes';

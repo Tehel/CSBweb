@@ -353,9 +353,11 @@ function parseBlock2(buf: Uint8Array): Block2 {
 /**
  * Read the `ITEM16[]` block (CSBWin `CSB.h:2253`).
  *
- * `word0` is the one swapped field: CSBWin byte-swaps it on load with
- * `d.Item16[i].word0 = LE16(d.Item16[i].word0)` (doc/CSBwin-src/SaveGame.cpp:494),
- * so it is little-endian in the file while the rest of the record is plain bytes.
+ * `word0` is the one word: CSBWin reads it on load as
+ * `d.Item16[i].word0 = LE16(d.Item16[i].word0)` (doc/CSBwin-src/SaveGame.cpp:494), and
+ * `LE16` is a byte swap on the little-endian build (`doc/CSBwin-src/CSBTypes.h:151`),
+ * so it is big-endian in the file, like every word of a save's blocks; the rest of the
+ * record is plain bytes.
  */
 function parseItem16(buf: Uint8Array, maxItem16: number): Item16Record[] {
   const out: Item16Record[] = [];

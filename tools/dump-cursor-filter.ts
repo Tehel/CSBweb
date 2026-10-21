@@ -1,5 +1,5 @@
 /**
- * The cursor filter (`doc/CSBwin-src/MoveObject.cpp:797-865`) at its six `TouchWall` sites
+ * The cursor filter (`doc/CSBwin-src/MoveObject.cpp:797-858`) at its six `TouchWall` sites
  * (`Mouse.cpp:422-584`), run through `ActuatorSystem.touchWall` with DSAs on its square,
  * against a genuine save (`csbgame7.dat`). Each test square holds actuators on its side 0,
  * and the hand or the square the object they want.

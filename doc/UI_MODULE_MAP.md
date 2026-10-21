@@ -38,7 +38,7 @@ A function that turns out not to need the state does not take it — the pure he
 | --- | --- | --- |
 | `ui/Mouse.ts` | `Mouse.cpp` | The button search a click is queued by, the `word0` button dispatcher (including its `PotentialCharacterOrdinal` gates), clothing/party/inventory click handlers, `tag01a6ea` for the eye panel, `TAG02076e` and `TAG0207cc`, the way in and out of the disk menu, the freeze, sleep and the Hall of Champions menu, button 80's `HandleClickInViewport`, and the cursor |
 | `ui/Keyboard.ts` | `CSBUI.cpp` (`KEYXLATE`, `UIM_KEYDOWN`) | The panel key bindings — attack menus, attack options, inventories, runes, cast, caster. CSBWin has no keys of its own: `config.txt` binds a scancode to a screen point and a mouse button, and `UIM_KEYDOWN` clicks there. This binds the handlers those clicks reach. Also the port's own keys outside the panels: K , J L M . to move, F5 and F9 to quick-save and quick-load (`portKeyAction`) |
-| `ui/HitTest.ts` | `Mouse.cpp` | `searchButtonList`, `pointInRect` — the leaf both Mouse and the panels depend on |
+| `ui/HitTest.ts` | `Mouse.cpp` | `searchButtonList` — the leaf both Mouse and the panels depend on |
 | `ui/ReIncarnate.ts` | `Code13ea4.cpp` | The name-entry screen a reincarnated champion gets: the two fields, the letter grid, and the duplicate-name rule. The one **modal** screen in the UI — while `ui.reincarnate` is set, `GameInput` (`src/renderer/GameInput.ts`) hands it every click and every key |
 | `ui/Menu.ts` | `Menu.cpp` | `_DoMenu` and `_WaitForMenuSelect`: graphic 0, the four option layouts and their self-blits, `CenteredText`/`SplitLongLine`, the 210-213 button sets and the two-pass press animation. See `doc/CSBWIN_MENU_REFERENCE.md` |
 | `ui/SaveMenu.ts` | `SaveGame.cpp` (`_DisplayDiskMenu`), extended | The save/load screen behind the disk icon. A dialog over the whole screen, drawn from the widget kit (`Widgets.ts`) and keeping `_DoMenu`'s animation, which replaces the four-slot chooser with a scrolling list over `src/data/saves/`. **Modal** like `ReIncarnate.ts`: it is the dialog over the game (`Dialog.ts`), and clicks reach it straight from the DOM event, not through the mouse queue |
@@ -83,8 +83,10 @@ the engine's). `presentViewport()` composites every panel over the viewport and 
 palette indices to RGBA through the UI palette and the light level's viewport palette. It
 also hosts the save menu and the Reincarnate screen. Its public methods —
 `searchMouseButtons`, `handleMouseButton`, `translateKey`, `handleUIKey`, … — are thin
-wrappers, because the input path and `main.ts` call the screen, not the UI modules. They
-delegate and do nothing else.
+wrappers, because the input path and `main.ts` call the screen, not the UI modules. Most
+delegate and do nothing else; `handleMouseButton` also opens what the click asked for (the
+save menu, the Hint Oracle, the sleep's save), and `initializePlayState` empties the
+viewport's caches before a new game.
 
 `src/renderer/GameInput.ts` is the input path. The page's listeners (`src/ui/events.ts`)
 hand it a screen point and a mouse button, or a key and its modifiers, and nothing else of
@@ -111,8 +113,7 @@ dungeon.
 
 ## Verifying a change here
 
-`tools/check-frames.sh` compares nine live screen states, pixel by pixel, against
-`tools/frames/`.
-See the header of `tools/probe-frames.mjs` for how to start the dev server and headless
-Chrome it needs. It covers rendering plus the inventory open/select click path; throwing,
-dropping, chests, feeding and casting are **not** exercised.
+`tools/check-frames.sh` compares thirty live screen states, pixel by pixel, against
+`tools/frames/`, and starts its own dev server and headless Chrome (`CLAUDE.md` → "Tech
+stack" lists what its probe asserts besides). Throwing, dropping, chests, feeding and
+casting are not among the frames.

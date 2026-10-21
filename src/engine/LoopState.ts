@@ -1,7 +1,7 @@
 /**
  * The main loop's `d.` flags that other CSBWin files write, and the freeze, which writes
- * them (`DEBT.md` E2, "how a system reaches the loop's state"). They live on
- * the context (`ctx.loop`) and not in `GameState`: none is saved, in CSBWin or here.
+ * them. They live on the context (`ctx.loop`), where every system reaches them, and not
+ * in `GameState`: none is saved, in CSBWin or here.
  */
 import type { Rect } from '../data/tables/UITables';
 import type { GameContext } from './GameContext';

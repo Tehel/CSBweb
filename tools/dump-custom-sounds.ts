@@ -1,6 +1,6 @@
 /**
  * The sounds of `CSBgraphics.dat` a DSA's `&SOUND` plays with a number from 0 up
- * (`PlayCustomSound`, `doc/CSBwin-src/Sound.cpp:1048-1071`), through
+ * (`PlayCustomSound`, `doc/CSBwin-src/Sound.cpp:1048-1069`), through
  * `SoundQueue.playCustomSound` on a game with each file here.
  *
  * 1. **Every `CGT_Sound` section plays** (`SOUNDDATA::ReadSound`, `:998-1034`): its bytes

@@ -4,7 +4,7 @@
  * (`doc/CSBwin-src/CSBCode.cpp:690-698`) and `Game.gameTick` makes them; they are here,
  * beside the bodies, so that the tools test the same two predicates the tick does.
  * Neither update has state of its own, so they are functions over the context, as
- * `wakeUp` is. Moved out of `Game` by `DEBT.md` E2.
+ * `wakeUp` is.
  */
 import { OBJECT_ID_NULL, type ObjectID } from '../core/types';
 import { sw } from '../core/intCast';

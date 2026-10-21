@@ -119,8 +119,7 @@ function armChampion(game: Game, chIdx: number): void {
   const champ = game.ctx.party.state.champions[chIdx]!;
   const rn = dagger();
   champ.possessions![1] = rn;
-  // Slot 8 as well: the port used to mirror it in a `quiver` field, and the drop forgot
-  // the mirror, so the inventory still showed the dropped object there (DEBT.md C27).
+  // Slot 8 as well, the quiver's first, which the drop empties like any other slot.
   const spare = dagger();
   champ.possessions![8] = spare;
   // Facing away from the party, so the death's `facing = d.partyFacing` shows.

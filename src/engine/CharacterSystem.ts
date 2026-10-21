@@ -7,8 +7,7 @@
  * `refillPossessionSlot`). Also `_ExecuteAttack`'s engine half (`executeAttack`) and
  * `BringCharacterToLife`, by the same file. The open chest is `OpenChest.ts`'s.
  *
- * Moved out of `Game` by `DEBT.md` E2; the other systems reach it as
- * `ctx.systems.character`.
+ * The other systems reach it as `ctx.systems.character`.
  */
 import { sw } from '../core/intCast';
 import {

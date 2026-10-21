@@ -174,9 +174,8 @@ function drawWallDecorationGraphic(
   //   - position 7 (F2 front-left) runs off the *left* edge, so it must show its
   //     **right** end — CSBWin's "Jst ahead to the left. Truncate graphic" (`:3608`).
   //
-  // Without this, position 7 drew its left end into a slot flush against the left
-  // border: cropped on the wrong side, and with the transparent margin that should
-  // have been off-screen left as a visible gap.
+  // Drawn from its left end, position 7 would be cropped on the wrong side, and the
+  // transparent margin that belongs off-screen left would show as a gap.
   let srcOffsetX = 0;
   if (relativePosition === 7) {
     srcOffsetX = finalBitmapWidth - ((desc.x2 | 0) - (desc.x1 | 0));

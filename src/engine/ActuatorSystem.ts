@@ -67,9 +67,12 @@ export class ActuatorSystem {
     this.byte1386 = ctx.tables.byte1386;
   }
 
-  /** CSBWin per-champion message colour `d.Byte1386[chIdx]`; 13 is the historical default. */
+  /**
+   * A champion's colour, `d.Byte1386[chIdx]`, one per champion in graphic 232, which
+   * `_ResurrectReincarnateCancel` prints their name in (`doc/CSBwin-src/CSBCode.cpp:6856`).
+   */
   getChampionMessageColor(chIdx: number): number {
-    return this.byte1386[chIdx] ?? 13;
+    return this.byte1386[chIdx];
   }
 
   triggerPressurePads(position: Position, facing: number, pressed: boolean, unchangedRoom = false): boolean {

@@ -7,7 +7,7 @@
  * blow's. The UI half — the hit tests,
  * the inventory click — is `src/renderer/ui/Mouse.ts`.
  *
- * Moved out of `Game` by `DEBT.md` E2; the other systems reach it as `ctx.systems.mouse`.
+ * The other systems reach it as `ctx.systems.mouse`.
  */
 import { MISC_BONES_OF_HERO } from '../core/constants';
 import { applyLimits } from '../core/intCast';

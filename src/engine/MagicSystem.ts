@@ -6,8 +6,7 @@
  * and `AdjustSkills` bound to the context. The rune panel, `Magic.cpp`'s UI half, is
  * `src/renderer/ui/MagicPanel.ts`.
  *
- * Moved out of `Game` by `DEBT.md` E2; the other systems reach it as
- * `ctx.systems.magic`.
+ * The other systems reach it as `ctx.systems.magic`.
  */
 import type { SpellDefinition } from '../data/spellTypes';
 import { applyLimits, sb, sw } from '../core/intCast';
@@ -396,7 +395,6 @@ export class MagicSystem {
     let disableTime = (spell.word6 >> 10) & 0x3f;
     if (spellParameters.disableTime !== -1) disableTime = spellParameters.disableTime;
     this.disableCharacterAction(casterIdx, disableTime);
-    // Spell effects are wired in subsequent magic parity steps.
     return 1;
   }
 

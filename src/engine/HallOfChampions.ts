@@ -4,11 +4,10 @@
  * (`CSBCode.cpp:6674`) and the tail of `ReIncarnate` (`Code13ea4.cpp:167-172`). The hero
  * text parsing and the possession sorting are `AddCharacter.ts`'s free functions.
  *
- * One system for three CSBWin files, not one per file (`DEBT.md` E2): the three share
+ * One system for three CSBWin files, not one per file: the three share
  * `reincarnateAttributePenalty` / `reincarnateStatPenalty`, which `AddCharacter` writes
  * and `_ResurrectReincarnateCancel` reads, and two of the files have no other port.
- * Moved out of `Game` by E2; `ActuatorSystem`'s mirror click reaches it as
- * `ctx.systems.hallOfChampions`.
+ * `ActuatorSystem`'s mirror click reaches it as `ctx.systems.hallOfChampions`.
  */
 import type { ActuatorRecord, DatabaseRecord } from '../data/dungeonTypes';
 import {

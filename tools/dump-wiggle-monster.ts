@@ -2,15 +2,14 @@
  * `WiggleEverything` moves a monster group with `MoveObject(objD4, x, y, x, y)`
  * (`doc/CSBwin-src/Timer.cpp:2446-2450`), which is `MonsterSystem.moveMonster`.
  *
- * `TimerSystem.wiggleMonster` hand-rolled it and missed most of it (DEBT.md C23):
+ * So a wiggle does to a group all that `MoveObject` does:
  *
  *  1. A group teleported off a square that switched on gets its AI timers started where
  *     it lands, and loses those at the square it left (`Code11f52.cpp:3436-3456`).
  *  2. Teleported to another level, it gives its `ITEM16` back (`DetachItem16`, `:3399-3404`).
  *  3. Teleported to a level its type may not live on, it is deleted (`:3182-3211`).
  *  4. A teleporter that sends it back to its own square leaves it alone — nothing is
- *     lifted, pressed or set down (`:3218-3248`). `wiggleMonster` lifted it and set it
- *     down again through two `PlaceOrRemoveObjectInRoom` calls.
+ *     lifted, pressed or set down (`:3218-3248`).
  *
  * The teleporter is a real record from `dungeon.dat`, re-aimed onto a real open square,
  * switched off, and then switched on by the `TT_TELEPORTER` timer an actuator would queue.

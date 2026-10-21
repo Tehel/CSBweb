@@ -8,9 +8,8 @@
  * queued, and `MouseQEnd + 1 == MouseQStart` means empty.
  *
  * It lives on the context (`ctx.mouseQueue`) because, as in CSBWin, more than the main
- * loop writes it: `DiscardAllInput` is called from `WakeUp`, `MoveParty`, the level load
- * (`DEBT.md` E2, "how a system reaches the loop's state"). `HandleMouseEvents`, which
- * takes the entries, stays in `Game`.
+ * loop writes it: `DiscardAllInput` is called from `WakeUp`, `MoveParty`, the level load.
+ * `HandleMouseEvents`, which takes the entries, stays in `Game`.
  */
 
 /**

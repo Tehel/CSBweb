@@ -510,8 +510,7 @@ export class MissileEncounter {
    * poison — was decided in `determineMagicDamage`; this only applies
    * it. Going through `DamageCharacter` rather than subtracting from `health` is
    * the whole point: it is what runs armour, wounds, the shields, the wake-up, and
-   * `KillCharacter`. Until it did, a champion killed by a missile left no bones and
-   * no possessions, and a party wiped by one did not lose the game.
+   * `KillCharacter`.
    *
    * The **wound mask is 12**, a literal at the call site: bits 2 and 3, the torso
    * and the legs. A missile cannot wound a hand, a head or a foot.

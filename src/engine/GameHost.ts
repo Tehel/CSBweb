@@ -1,5 +1,5 @@
 /**
- * `GameHost` — what the engine asks of whoever runs it (`DEBT.md` E1d): the calls that
+ * `GameHost` — what the engine asks of whoever runs it: the calls that
  * leave the engine. `main.ts` hands one to `Game` with the sound manager, the message
  * area and the renderer behind it; a tool hands the parts it listens to, or nothing.
  *

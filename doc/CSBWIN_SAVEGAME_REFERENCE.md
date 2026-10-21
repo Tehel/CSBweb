@@ -250,7 +250,10 @@ Against the write order above, over `dungeon.dat` and the eight saves of
 the DSA section and the game-info string, and one field as it was read
 rather than derived: `gameInfoSize` is signed, and -1 means an empty game info that still
 exists, which is not the 0 that means none (`doc/PROVEN_FACTS.md` →
-"`EXTENDEDFEATURESBLOCK` offsets, and `gameInfoSize` is signed").
+"`EXTENDEDFEATURESBLOCK` offsets, and `gameInfoSize` is signed"). A block whose `flags`
+hold `SimpleEncryption` marks the whole file enciphered: it is read deciphered and written
+enciphered, every byte by its position, the block included (`readExtendedFeatures`,
+`doc/CSBwin-src/SaveGame.cpp:326-340`, `:939-946`, `system.cpp:301-329`).
 
 **Block 5** is the 16-byte `TIMER` in whichever of the three sizes the Extended Features
 flags select. **Block 6** is the queue array, which CSBWin keeps as a binary heap and
@@ -283,8 +286,7 @@ and the port writes as zero.
 
 - The DSA tracing flags `WriteDSAs` puts beside the DSAs, postponed with CSBWin's other
   debugging features (`DEBT.md` → "Priority").
-- `SimpleEncryption`, neither written nor read past the header, and `MakeBigActuators`'
-  read of the actuator type before the byte swap (`DEBT.md` H).
+- `MakeBigActuators`' read of the actuator type before the byte swap (`DEBT.md` H).
 
 ### Evidence
 

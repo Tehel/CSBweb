@@ -220,9 +220,8 @@ function objectBytesOf(timerFunction: number): 6 | 8 | null {
  * Three rules, each with a source:
  *
  * - The **object** goes into the pair `ConvertTimers` names for that function.
- *   Without this a thrown sword was written with its launch square in bytes 6-7 and
- *   the object nowhere, so the file lost it: `MagicSystem.launchMissile` puts the
- *   RN on `TimerEntry.object` and passes the launch x,y as the bytes.
+ *   `MagicSystem.launchMissile` puts the RN on `TimerEntry.object` and the launch
+ *   x,y in the bytes, so a missile written from its bytes alone would lose its object.
  * - For 48 and 49, **bytes 8-9 are `timerWord8`** — the packed
  *   `[x:5][y:5][direction:2][decay:4]` `processMissileTimer` reads back. Those two
  *   bytes are passed as `pos` and `action`, which a missile timer leaves at zero,

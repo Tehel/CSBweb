@@ -117,8 +117,6 @@ export class Party {
      * Both champion fields move by the same delta: `charPosition`, so the champion who
      * was on the party's left is still on its left afterwards, and `facing`, which is
      * what the champion's *own* attacks and the corner marker in their box read.
-     * Nothing was rotating either before, so a champion kept attacking in the direction
-     * the party faced when they joined.
      *
      * **Every** change of party facing must come through here, not just a turn on the
      * spot: a teleporter's rotation is the same operation, and in CSBWin both are one
@@ -298,9 +296,7 @@ export function selectMagicCaster(party: PartyState, chIdx: number): void {
  *
  * Both champion fields move by the same delta: `charPosition`, so the champion who was
  * on the party's left is still on its left afterwards, and `facing`, which is what the
- * champion's *own* attacks and the corner marker in their box read. Nothing was rotating
- * either before, so a champion kept attacking in the direction the party faced when they
- * joined.
+ * champion's *own* attacks and the corner marker in their box read.
  *
  * **Every** change of party facing must come through here, not just a turn on the spot:
  * a teleporter's rotation and a pit shuffle are the same operation, and in CSBWin all
