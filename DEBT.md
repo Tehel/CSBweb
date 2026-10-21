@@ -114,7 +114,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E23 | One game read, whole or not at all | L | ⏳ step 6 of 6 |
 | D18 | The interface's `d.` lives in the screen, and composing the screen changes the world | L | ⏳ |
 | D19 | `RuntimeSaveState` is neither strict nor a snapshot | M | ⏳ |
 | E41 | `src/data/` imports the engine | M | ⏳ |
@@ -510,35 +509,6 @@ The structure need no longer follow CSBWin's files (the author's decision): a mo
 gather or split CSBWin's functions as the code's concerns ask. What still follows CSBWin is
 the behaviour, the names of ported functions, which keep the two codebases greppable
 against each other, and the file formats.
-
-### E23 ⏳ One game read, whole or not at all
-
-Both reads go through one list of steps, `readGame` (`src/engine/ReadGame.ts`), from
-`Game.readNewGame` (`Game.ts:308-344`), which builds its state from `newGameState`
-(`GameContext.ts:294-309`), and `applyCsbwinSave` (`CsbwinSaveGame.ts:321-353`); around
-it are `SaveGameFile.ts:276-285` and `GameSaves.read`. A read is built off the running
-game, installed by assignments that cannot throw, then started (the overlay, the party's
-level, `SmartDiscard`): an error while it builds leaves the running game as it was, and
-one once it is installed is `die(0xbad)` (`tools/dump-damaged-read.ts`). What is left:
-
-- **A world is checked through a throwaway `DungeonState`**: `newGameState` and a save's
-  read each build one over the world for `CheckMonsters` (`GameContext.ts:300`,
-  `CsbwinSaveGame.ts:336`), and `installWorld` then hands the world to the context's own.
-- **What `d.Initialize()` zeroes is reset nowhere** (C181).
-- **A read in play** drops no running script (`Game.installReadState`) and does not
-  empty the mouse queue, so clicks queued before F9 are translated against the loaded
-  screen.
-
-Paying it, in six steps, a commit each. Steps 1 to 3 are refactors, every tool's output
-byte-identical; 4 to 6 change what a damaged file or a read in play does, and are fixes
-with their tool. Where it stands: steps 1 to 5 are done, one pipeline, `readGame`, one
-new game, `newGameState`, which `readNewGame` and `createGameContext` both build from, one
-route to the world, `ctx.dungeon.getData()`, a read built, then installed whole, and a
-save held against its world first (`validateCsbwinWorld`); step 6 is next.
-
-6. **A read in play starts clean** (a fix). A running script dropped and the mouse queue
-   emptied, as a read at the boot finds them. C181's reset of what `d.Initialize()` zeroes
-   is a step of the same pipeline, paid as its own item.
 
 ### E25 ⏳ One helper for each rule, where copies drift
 
@@ -1027,7 +997,7 @@ database starts from the last game's level. The other `d.` fields the context ke
 check the same way.
 
 Paying it: one reset of the context's `d.` fields, called by every new game and restart
-(E23's pipeline); a check that a restart's `levelCleared` is zero.
+(the read's pipeline, `readGame`); a check that a restart's `levelCleared` is zero.
 
 ### C150 ⏸️ Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops
 

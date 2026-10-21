@@ -20,6 +20,11 @@
  * 3. **An error once it is installed ends the game.** The party's level loaded
  *    (`reloadAfterSaveGame`) is made to throw: the read is `die(0xbad)`, "SAVED GAME
  *    DAMAGED!" and the error, not a message over a game half read.
+ * 4. **A read in play starts clean**, as CSBWin's every read, at the boot or the restart,
+ *    ends in `DiscardAllInput` (`doc/CSBwin-src/CSBCode.cpp:10808`, `Code1f9e6.cpp:321`):
+ *    a game holding a script, its first `VBLDelay` a hundred VBLs long, and a key, a
+ *    click and its button-up queued, reads `csbgame7.dat`. No script holds the loop, the
+ *    queue is empty, and the read game plays 200 VBLs, the script's step never run.
  *
  * Run: `npm test -- --only=dump-damaged-read.ts`
  */
@@ -33,6 +38,7 @@ import { CHARDESC_SIZE } from '../src/data/CsbwinSaveInfo';
 import { saveSaveGameState, type Block2, type SaveGameState } from '../src/data/SaveGameLoader';
 import { Die } from '../src/engine/Die';
 import type { Game } from '../src/engine/Game';
+import type { LoopScript } from '../src/engine/LoopState';
 import { SaveFileError, applySaveBytes } from '../src/engine/SaveGameFile';
 import { check, finish } from './lib/check';
 import { TICK_DUE, runVbl, stockGame } from './lib/game';
@@ -213,7 +219,34 @@ function checkStartError(): void {
   check(dies.length === 1 && dies[0] === error, 'the host is told once');
 }
 
+/* ------------------------------------------- 4. a read in play starts clean ---- */
+
+function checkStartsClean(): void {
+  console.log('=== a read in play starts clean: no script, no input ===');
+  const game = runningGame();
+  let scriptRanOn = false;
+  function* held(): LoopScript {
+    yield 100;
+    scriptRanOn = true;
+  }
+  game.runScript(held());
+  game.enqueueKeyButton(1);
+  game.onMouseClick(100, 100, 1);
+  game.onMouseUnClick();
+  console.log(`  before the read: a script ${game.isRunningScript() ? 'holds' : 'does not hold'} the loop, ${game.ctx.mouseQueue.count()} entries queued`);
+  check(game.isRunningScript() && game.ctx.mouseQueue.count() === 3, 'the script holds the loop, and three entries wait');
+
+  applySaveBytes(game, new Uint8Array(readFileSync(DAMAGED_FROM)));
+  console.log(`  after the read: a script ${game.isRunningScript() ? 'holds' : 'does not hold'} the loop, ${game.ctx.mouseQueue.count()} entries queued`);
+  check(!game.isRunningScript(), 'no script holds the loop');
+  check(game.ctx.mouseQueue.count() === 0, 'the queue is empty');
+
+  play(game, 200);
+  check(!game.isDead() && !scriptRanOn, 'the read game plays 200 VBLs, the dropped script never resumed');
+}
+
 checkBuildError();
 checkWorldHeld();
 checkStartError();
+checkStartsClean();
 finish();

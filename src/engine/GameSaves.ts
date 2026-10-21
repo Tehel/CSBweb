@@ -635,7 +635,8 @@ export class GameSaves {
 
     /**
      * F9: the newest save of the game's playthrough, F5's, the Sleepsave or the menu's. Not while a
-     * script holds the loop: it would run on in the loaded world. Nor while a champion is
+     * script holds the loop, whose `VBLDelay`s make no pass of the loop and take no input
+     * (`Game.runFrame`). Nor while a champion is
      * still being chosen, where the disk icon does nothing
      * (`doc/CSBwin-src/Mouse.cpp:1855-1857`), as F5 is refused (`quickSave`). Both are
      * asked again once the store has answered, since the game runs on while it is asked:

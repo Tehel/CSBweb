@@ -467,7 +467,10 @@ counterpart: CSBWin reads a game only after `d.Initialize()` has zeroed the whol
 the read is in, before anything runs on it (`GameHost.savedGameRead`): an open chest is
 dropped, never repacked into the world read, an open inventory closed, its video mode the
 adventure's again, and the attack menu, the Reincarnate screen, the eye and the mouth are
-gone. The disk menu's `TAG0207cc` then runs on the party read.
+gone. The loop's share starts clean too (`Game.installReadState`): no script holds it, and
+the clicks and keys queued before the read are gone, as both CSBWin's reads, at the boot
+and at the restart, end in `DiscardAllInput`. The disk menu's `TAG0207cc` then runs on the
+party read.
 
 A read is whole or nothing (`readGame`, `src/engine/ReadGame.ts`). It builds the world,
 the state and everything else it installs off the running game, then installs them in one

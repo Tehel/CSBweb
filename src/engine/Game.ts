@@ -1085,9 +1085,19 @@ export class Game implements MainLoop {
      * read and opens with a tick (`:596-611`), so one is made due: a game read in play,
      * which only the port has, ticks in the next pass, and that tick draws its first view.
      * Assignments alone: this is part of the read's swap, which cannot throw.
+     *
+     * The game read starts clean, as CSBWin's every read does: no script holds the loop,
+     * since a read in CSBWin comes only at the boot and at the restart, which leaves the
+     * credits for a new `MainLoop`; and the input is gone, `DiscardAllInput` ending both
+     * (doc/CSBwin-src/CSBCode.cpp:10808, `Code1f9e6.cpp:321`). A read in play drops the
+     * clicks and keys queued before it, which would be translated against the read
+     * game's screen.
      */
     installReadState(prepared: PreparedState): void {
         installRuntimeState(this.ctx, prepared);
+        this.script = null;
+        this.scriptDelay = 0;
+        this.ctx.mouseQueue.discardAllInput();
         this.lastInputTime = 0;
         // CSBWin saves none of the gravity's globals, nor resets them: a game read starts
         // from the program's start, `{0,1,2,0}` and at rest (`DEBT.md` H, "A game read

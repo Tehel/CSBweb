@@ -5116,6 +5116,13 @@ which only the port has (the save menu's LOAD, F9), is followed by the same tick
 (`Game.installReadState`), and the page draws no first view of its own. Evidence:
 `tools/dump-vbl-clock.ts`.
 
+Both of CSBWin's reads end with the input gone: `_ShowPrisonDoor`'s with
+`DiscardAllInput()` once `GameSetup` has read the game (`doc/CSBwin-src/CSBCode.cpp:10808`),
+and the restart's after `d.Initialize()` and `GameSetup` (`Code1f9e6.cpp:321`). Neither
+comes inside a script: the restart is the credits', which `MainLoop` is entered anew from.
+So a read in play drops the script holding the loop and empties the mouse queue
+(`Game.installReadState`). Evidence: `tools/dump-damaged-read.ts`.
+
 ## A refused move throws away all queued input, and postpones a due tick by one VBL
 
 When `MoveParty`'s inhibit flag `D5W` is set — terrain, or with champions a monster in the
