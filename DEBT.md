@@ -439,6 +439,43 @@ and the mouth: `doc/CSBwin-src/CSBCode.cpp:7452-7517`, `Character.cpp:1915`, `:3
 `:4532`, `:5149`); `presentViewport` only reads; `GameHost` keeps only what leaves the
 engine. No pixel moves.
 
+In four steps, one commit each; none is taken yet:
+
+1. **The fields move** (refactor). `src/engine/InterfaceState.ts`, `ctx.interface` beside
+   `ctx.loop`, made by `createInterfaceState` in `createGameContext`: the `d.` fields alone,
+   `PressingEye`, `PressingMouth`, `DisplayResurrectChestOrScroll`, `objOpenChest`,
+   `rnChestContents`, `AttackingCharacterOrdinal`, `Word20250`, `Word20252`, and the menu's
+   `PossibleAttackTypes`, `Byte20256` and `Word20248`, which `DrawLegalAttackTypes` writes
+   with them. `UIState` keeps what is the screen's (bitmaps, the chew's and the flash's
+   times, the drawn option names), and its copies go; the UI reads and writes
+   `ui.ctx.interface`. The four `GameHost` queries go: `PrintWithSubstitution`,
+   `PeriodicUpdates` and `MonsterAttack` read the context, and `tools/dump-dsa-text.ts`
+   sets the field. Proven by the whole-output diff and the frames.
+2. **`ShowChestContents`'s opening and `RepackChest` in the engine** (refactor). The
+   unlinking and relinking (`openChest`, `repackOpenChest`,
+   `src/renderer/ui/Inventory.ts:345-400`) move to the engine on `ctx.interface`, under
+   CSBWin's names (`Character.cpp:3042`, `:3113`). `GameHost.repackChest` and
+   `GameSaves`' `repackOpenChest` member go: `RemoveCharacterPossession` and the save call
+   it. The compose still calls them where it does now, so nothing moves.
+3. **The chest opened and repacked at CSBWin's events** (fix). Opened by `TAG0189d4`'s
+   `DescribeObject` (`Character.cpp:3911`) and `_ClickOnEye`'s
+   (`Viewport.cpp:7293`); repacked by `DescribeObject` under the eye or the mouth
+   (`Character.cpp:3464`), `DisplayFoodWater` (`Viewport.cpp:7248`), `TAG019036`
+   (`Character.cpp:4532`), `QuitPressingEye` (`CSBCode.cpp:7464`), `ShowHideInventory`
+   (`:7517`), `TAG02076e` (`Character.cpp:5149`) and `RemoveCharacterPossession` (`:1915`);
+   `DisplayResurrectChestOrScroll` written by `TAG0189d4` and `TAG0189a8` only
+   (`Character.cpp:3856-3894`). The compose's `syncOpenChest` calls go
+   (`presentViewport`, `drawInventoryScreen`, the chest slot's click in `Mouse.ts`), and
+   so does its skip under the disk menu; F5 and the Sleepsave, which repack for the
+   file, open it again through `TAG0189d4` after it rather than at the next draw. Its
+   check: a headless `Game` with a chest in the weapon hand of an open inventory finds
+   the chest's objects unlinked, and linked again once it closes, with no screen
+   composed, which fails before.
+4. **`GameHost` keeps what leaves the engine** (refactor). A read in play resets
+   `ctx.interface` in the engine, and `savedGameRead` keeps only the screen's share;
+   `tag02076e`, `tag0207cc`, `tag01b29a` and `tag011366` do their `d.` work in the engine
+   and ask the host only to draw, under their CSBWin names.
+
 ### D19 ⏳ `RuntimeSaveState` is neither strict nor a snapshot
 
 `RuntimeSaveState` is never a file (its header says so, as `DungeonSnapshot`'s does), yet
