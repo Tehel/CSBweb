@@ -30,7 +30,7 @@ export function printWithSubstitution(ctx: GameContext, txt: string, color: numb
       case 'p': {
         // `d.CH16482[d.AttackingCharacterOrdinal-1].name`. With no menu open CSBWin reads
         // the record before the first champion; the port reads no name.
-        const ordinal = ctx.host.attackingCharacterOrdinal();
+        const ordinal = ctx.interface.attackingCharacterOrdinal;
         p4 = ctx.party.state.champions[ordinal - 1]?.name.slice(0, 8) ?? '';
         p4At = 0;
         break;

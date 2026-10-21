@@ -276,7 +276,7 @@ function optionsHeld(ui: UIState, champion: Champion, rn: ObjectID): number {
   champion.possessions[1] = rn;
   getLegalAttackTypes(ui, 0, ui.uiTables.graphic230.legalAttacks[getAttackClass(ui, rn)] ?? []);
   champion.possessions[1] = OBJECT_ID_NULL;
-  return ui.word20248;
+  return ui.ctx.interface.word20248;
 }
 
 /** A weapon line's place in the priority order, -1 for a line of no kind. */

@@ -305,28 +305,9 @@ export class GameScreen {
 
   /** `if (d.AttackingCharacterOrdinal == chIdx+1) TAG01b1c0();` — the host's `closeAttackMenuOf`. */
   closeAttackMenuOf(chIdx: number): void {
-    if (this.ui.attackingCharacterOrdinal === chIdx + 1) closeAttackMenu(this.ui);
+    if (this.ui.ctx.interface.attackingCharacterOrdinal === chIdx + 1) closeAttackMenu(this.ui);
   }
 
-  /** `d.AttackingCharacterOrdinal` — the host's `attackingCharacterOrdinal`. */
-  attackingCharacterOrdinal(): number {
-    return this.ui.attackingCharacterOrdinal;
-  }
-
-  /** `d.PressingEye` — the host's `pressingEye`. */
-  pressingEye(): boolean {
-    return this.ui.pressingEye;
-  }
-
-  /** `d.PressingMouth` — the host's `pressingMouth`. */
-  pressingMouth(): boolean {
-    return this.ui.pressingMouth;
-  }
-
-  /** `d.DisplayResurrectChestOrScroll` — the host's `displayResurrectChestOrScroll`. */
-  displayResurrectChestOrScroll(): number {
-    return this.ui.displayResurrectChestOrScroll;
-  }
 
   /** `ShowHideInventory` (`doc/CSBwin-src/CSBCode.cpp:7478`) — the host's `showHideInventory`. */
   showHideInventory(chIdx: number): void {
@@ -696,7 +677,7 @@ export class GameScreen {
     else if (this.ui.partyState.sleeping) displaySleepScreen(this.ui);
     if (!inventoryOpen) {
       syncOpenChest(this.ui, null);
-      this.ui.displayResurrectChestOrScroll = 0;
+      this.ui.ctx.interface.displayResurrectChestOrScroll = 0;
     }
     if (inventoryOpen && !frozen) {
       drawInventoryBackground(this.ui);

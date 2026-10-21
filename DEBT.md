@@ -114,7 +114,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| D18 | The interface's `d.` lives in the screen, and composing the screen changes the world | L | ⏳ |
+| D18 | Composing the screen changes the world, and the host is asked for the interface's `d.` | L | ⏳ step 1 of 4 done |
 | D19 | `RuntimeSaveState` is neither strict nor a snapshot | M | ⏳ |
 | E41 | `src/data/` imports the engine | M | ⏳ |
 | E35 | Comments and documents that are stale, wrong, or tell the past | M | ⏳ |
@@ -408,52 +408,43 @@ or `tools/dump-stats.ts`.
 
 New state-representation debt goes here, and jumps the queue.
 
-### D18 ⏳ The interface's `d.` lives in the screen, and composing the screen changes the world
+### D18 ⏳ Composing the screen changes the world, and the host is asked for the interface's `d.`
 
 CSBWin's interface state is `d.`: the open chest and its contents, the attack menu
 (`d.AttackingCharacterOrdinal`, `Word20250`, `Word20252`), `PressingEye`, `PressingMouth`,
-`DisplayResurrectChestOrScroll`. The port keeps them in `UIState`
-(`src/renderer/ui/UIState.ts:210-253`), and the engine reads them back through `GameHost`
-queries (`pressingEye`, `pressingMouth`, `displayResurrectChestOrScroll`,
-`attackingCharacterOrdinal`, `src/engine/GameHost.ts:47-207`, answered as
-`screen?.…() ?? 0` in `src/main.ts:271-274`), beside calls into the UI named by CSBWin
-address (`tag02076e`, `tag0207cc`, `tag01b29a`, `tag011366`). So:
+`DisplayResurrectChestOrScroll`. They are the context's, `ctx.interface`
+(`src/engine/InterfaceState.ts`), which the engine and the screen both read. What is left:
 
 - **Composing the screen opens and repacks chests.** `presentViewport` runs
   `syncOpenChest(this.ui, null)` and zeroes `displayResurrectChestOrScroll`
-  (`src/renderer/GameScreen.ts:698-701`), and `drawInventoryScreen` opens the chest through
-  `syncOpenChest(ui, chestView)` (`src/renderer/ui/Inventory.ts:41`), which unlinks its
-  objects from the database (`:363-368`). A compose runs at every refresh, up to 60 a
+  (`src/renderer/GameScreen.ts:678-681`), and `drawInventoryScreen` opens the chest through
+  `syncOpenChest(ui, chestView)` (`src/renderer/ui/Inventory.ts:42`), which unlinks its
+  objects from the database (`:364-369`). A compose runs at every refresh, up to 60 a
   second while the pointer moves, so what the engine finds in a chest depends on when the
-  screen was last composed. The save repacks by hand first (`GameSaves.ts:289`), and the
-  compose skips the inventory under the disk menu so as not to open it again
-  (`GameScreen.ts:710-713`). CSBWin opens the chest while drawing too, but only at events
-  (`TAG0189d4`).
-- A headless `Game` has none of this state, and a read in play resets it only through
-  the host (`GameHost.savedGameRead`), as the screen's.
+  screen was last composed, and a headless `Game` never opens one. The save repacks by
+  hand first (`GameSaves.ts:321`), and the compose skips the inventory under the disk
+  menu so as not to open it again (`GameScreen.ts:693`). CSBWin opens the chest while
+  drawing too, but only at events (`TAG0189d4`).
+- **The host is asked for the interface's work.** `GameHost.repackChest`, and the calls
+  into the UI named by CSBWin address (`tag02076e`, `tag0207cc`, `tag01b29a`,
+  `tag011366`, `src/main.ts:283-309`), do `d.` work on the screen's side; a read in play
+  resets `ctx.interface` only through the host (`GameHost.savedGameRead`, through
+  `initializePlayState`).
 
-Paying it: the fields in an engine-owned `ctx.interface` beside `LoopState`, which both
-sides read; the chest opened and repacked at the events where CSBWin calls `TAG0189d4` and
+Paying it: the chest opened and repacked at the events where CSBWin calls `TAG0189d4` and
 `RepackChest` (an inventory toggled, the hand's object or the weapon hand changing, the eye
 and the mouth: `doc/CSBwin-src/CSBCode.cpp:7452-7517`, `Character.cpp:1915`, `:3464`,
 `:4532`, `:5149`); `presentViewport` only reads; `GameHost` keeps only what leaves the
 engine. No pixel moves.
 
-In four steps, one commit each; none is taken yet:
+In four steps, one commit each; step 1 is done:
 
-1. **The fields move** (refactor). `src/engine/InterfaceState.ts`, `ctx.interface` beside
-   `ctx.loop`, made by `createInterfaceState` in `createGameContext`: the `d.` fields alone,
-   `PressingEye`, `PressingMouth`, `DisplayResurrectChestOrScroll`, `objOpenChest`,
-   `rnChestContents`, `AttackingCharacterOrdinal`, `Word20250`, `Word20252`, and the menu's
-   `PossibleAttackTypes`, `Byte20256` and `Word20248`, which `DrawLegalAttackTypes` writes
-   with them. `UIState` keeps what is the screen's (bitmaps, the chew's and the flash's
-   times, the drawn option names), and its copies go; the UI reads and writes
-   `ui.ctx.interface`. The four `GameHost` queries go: `PrintWithSubstitution`,
-   `PeriodicUpdates` and `MonsterAttack` read the context, and `tools/dump-dsa-text.ts`
-   sets the field. Proven by the whole-output diff and the frames.
+1. **The fields move** (refactor, done). They are `ctx.interface`'s, made by
+   `createInterfaceState`; `UIState` keeps only what the screen draws from, and the engine
+   reads the fields with no host query.
 2. **`ShowChestContents`'s opening and `RepackChest` in the engine** (refactor). The
    unlinking and relinking (`openChest`, `repackOpenChest`,
-   `src/renderer/ui/Inventory.ts:345-400`) move to the engine on `ctx.interface`, under
+   `src/renderer/ui/Inventory.ts:346-401`) move to the engine on `ctx.interface`, under
    CSBWin's names (`Character.cpp:3042`, `:3113`). `GameHost.repackChest` and
    `GameSaves`' `repackOpenChest` member go: `RemoveCharacterPossession` and the save call
    it. The compose still calls them where it does now, so nothing moves.
@@ -685,7 +676,7 @@ the canvas's output (`putImageData`), the order of the compose, the palettes' ch
 façade over the UI and the boot (`getScreenBuffer`, `doMenu`, `setBootFrameRenderer`). It needs an `HTMLCanvasElement`, so no tool can
 build one, and `tools/lib/ui.ts` copies its wiring (F19). Each page hook is named four
 times: in `UIState`, `UIHooks`, `GameScreenHooks` and the constructor's copy
-(`GameScreen.ts:97-119`, `:193-226`, `UIState.ts:435-438`).
+(`GameScreen.ts:97-119`, `:193-226`, `UIState.ts:424-427`).
 
 Paying it: a `ScreenComposer` without the DOM (the screen's index buffer, the palettes,
 `PresentedFrame`, `presentViewport`'s order) and a thin canvas presenter; one factory for the
@@ -701,7 +692,7 @@ intro's VBL (`BootSequence.ts:193-203`) and the CRT (`src/lib/crt.ts:232-249`).
 
 - `renderLastFrame`, which the chew, the menus and Reincarnate draw through, skips
   `refreshScreen`'s `setPartyState` and its `mainLoopHasReturned()` test
-  (`GameScreen.ts:775-781`, `src/main.ts:114-118`), so a chew still running when the game ends
+  (`GameScreen.ts:810-816`, `src/main.ts:114-118`), so a chew still running when the game ends
   draws the adventure over the credits' wait; `initializePlayState` cancels neither loop.
 - The CRT uploads the canvas and runs its shader at device pixels at every display frame,
   changed or not: about 2.3 million pixels a frame at a device ratio of 2, up to 120 times a
@@ -723,7 +714,7 @@ controls again.
   (`= () => 1`, `SoundQueue.ts:48`); `TimerSystem`'s constructor writes into `ctx.dungeon`
   (`:94`). A bare `createGameContext` gets, silently, a full database that refuses records,
   untranslated texts and no sound filter, and `systems: {} as GameSystems`
-  (`GameContext.ts:359`) types every system as present.
+  (`GameContext.ts:363`) types every system as present.
 - `TimerQueue.createTimer` takes ten positional parameters and `createTimerWithUByte5`, its
   near copy, eleven (`TimerQueue.ts:200-259`), at 26 call sites
   (`createTimer(TT_LIGHT, 0, 0, 0, 0, time >>> 0, z, undefined, 0, deltaSteps)`,
@@ -764,7 +755,7 @@ loader's cache keyed by format, or the parameter dropped with the dead fallback.
   where a 16-entry `Uint32` table a palette, written through a `Uint32Array` view, takes
   0.14 ms (`updateImageDataFromIndex*`, `src/renderer/csbwin/CanvasBlitter.ts:416-490`). It
   always takes the two-palette path while adventuring: `viewportPalette !== uiPalette`
-  compares two separate copies (`GameScreen.ts:754-757`). Its body is written three times
+  compares two separate copies (`GameScreen.ts:735-738`). Its body is written three times
   in `CanvasBlitter`, and the cursor's footprint loop twice (`reconvertThroughPalette`,
   `PresentedFrame.capture`).
 - **Every monster turn allocates** an `MmRecord` and with it a `DsaVars` of two 100-entry
@@ -809,7 +800,7 @@ palette codes, so none moves.
   right), and its last four sections cite `DSA.cpp` without lines;
   `doc/CSBWIN_SAVEGAME_REFERENCE.md:286` says `SimpleEncryption` is neither written nor read
   past the header (the whole file is), and calls block 0 byte-identical with its game
-  information (only the round-trip tool's is, C178); `doc/UI_MODULE_MAP.md:40`
+  information (only the round-trip tool's is, C178); `doc/UI_MODULE_MAP.md:41`
   (`pointInRect`, gone), `:79` (the wrappers "delegate and do nothing else", where
   `handleMouseButton`, `setPartyState` and `initializePlayState` hold logic), `:106` (nine
   screen states and a server started by hand: twenty, and the probe starts its own);
@@ -1028,7 +1019,7 @@ square, and a monster group added on the party's level.
 (`doc/CSBwin-src/Code1f9e6.cpp:309`), and its `memset (this, 0, sizeof (*this))` zeroes
 every `d.` field it does not set again (`DBank::Initialize`, `CSBCode.cpp:333-339`). The
 port reads the new game into the same context, and nothing resets `ctx.levelCleared`
-(`d.LevelCleared`, `src/engine/GameContext.ts:132`, written only by
+(`d.LevelCleared`, `src/engine/GameContext.ts:135`, written only by
 `MakeMoreRoomInDB`): after a restart, or a new game in the same page, the sweep of a full
 database starts from the last game's level. The other `d.` fields the context keeps are to
 check the same way.

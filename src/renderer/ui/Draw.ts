@@ -277,7 +277,7 @@ const BOX_GRAPHIC_ATTACKING = 35;
 export function possessionBoxGraphic(ui: UIState, chIdx: number, champion: Champion, slot: number): number {
   let box = -1;
   if (slot <= 5) box = (champion.wounds & (1 << slot)) !== 0 ? BOX_GRAPHIC_MARKED : BOX_GRAPHIC_PLAIN;
-  if (slot === 1 && chIdx + 1 === ui.attackingCharacterOrdinal) box = BOX_GRAPHIC_ATTACKING;
+  if (slot === 1 && chIdx + 1 === ui.ctx.interface.attackingCharacterOrdinal) box = BOX_GRAPHIC_ATTACKING;
   return box;
 }
 

@@ -276,10 +276,6 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // A weapon hand changed, or a chest left the open inventory's weapon hand:
         // the attack menu, the inventory and the open chest are the screen's.
         closeAttackMenuOf: (chIdx) => screen?.closeAttackMenuOf(chIdx),
-        attackingCharacterOrdinal: () => screen?.attackingCharacterOrdinal() ?? 0,
-        pressingEye: () => screen?.pressingEye() ?? false,
-        pressingMouth: () => screen?.pressingMouth() ?? false,
-        displayResurrectChestOrScroll: () => screen?.displayResurrectChestOrScroll() ?? 0,
         showHideInventory: (chIdx) => screen?.showHideInventory(chIdx),
         releaseEyeOrMouth: () => screen?.releaseEyeOrMouth(),
         repackChest: () => screen?.repackChest(),

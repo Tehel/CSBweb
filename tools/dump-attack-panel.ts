@@ -76,8 +76,8 @@ async function main(): Promise<void> {
     let hash = 0;
     for (let i = 0; i < pixels.length; i++) hash = (hash * 31 + pixels.charCodeAt(i)) >>> 0;
     const black = pixels.split(/[,/]/).every((p) => p === '0');
-    console.log([label, `ordinal ${ui.attackingCharacterOrdinal}`, `word20252 ${ui.word20252}`,
-      `word20250 ${ui.word20250}`, black ? 'black' : hash.toString(16).padStart(8, '0')].join('\t'));
+    console.log([label, `ordinal ${ui.ctx.interface.attackingCharacterOrdinal}`, `word20252 ${ui.ctx.interface.word20252}`,
+      `word20250 ${ui.ctx.interface.word20250}`, black ? 'black' : hash.toString(16).padStart(8, '0')].join('\t'));
     return pixels;
   }
 
@@ -143,7 +143,7 @@ async function main(): Promise<void> {
   ] as const) {
     const screen = createPaletteIndexViewportBuffer(320, 200, 7);
     ui.screenIndexBuffer = screen;
-    ui.attackingCharacterOrdinal = 0;
+    ui.ctx.interface.attackingCharacterOrdinal = 0;
     ui.attackFlashValue = value;
     drawAttackPanel(ui);
     let x1 = 320, x2 = -1;
@@ -166,7 +166,7 @@ async function main(): Promise<void> {
   for (const [value, left] of [[-1, 245], [-2, 250]] as const) {
     const screen = createPaletteIndexViewportBuffer(320, 200, 7);
     ui.screenIndexBuffer = screen;
-    ui.attackingCharacterOrdinal = 0;
+    ui.ctx.interface.attackingCharacterOrdinal = 0;
     ui.attackFlashValue = value;
     drawAttackPanel(ui);
     let x1 = 320;
@@ -186,7 +186,7 @@ async function main(): Promise<void> {
   party.state.cursorOwner = -1;
   const flinch = (label: string): void => console.log([label, `facing ${champ.facing}`,
     `from ${champ.damageFromDirection}`, `maxRecentDamage ${champ.maxRecentDamage}`,
-    `ordinal ${ui.attackingCharacterOrdinal}`].join('\t'));
+    `ordinal ${ui.ctx.interface.attackingCharacterOrdinal}`].join('\t'));
   const facing = champ.facing;
   champ.damageFromDirection = (facing + 2) & 3;
   champ.maxRecentDamage = 12;
@@ -194,14 +194,14 @@ async function main(): Promise<void> {
   prepareAttack(ui, 0);
   attackPanelTick(ui);
   flinch('candidate, menu open: tick');
-  check(ui.attackingCharacterOrdinal === 0, 'the tick closes the menu (TAG01b1c0)');
+  check(ui.ctx.interface.attackingCharacterOrdinal === 0, 'the tick closes the menu (TAG01b1c0)');
   check(champ.facing === facing && champ.maxRecentDamage === 12, 'and nobody turns');
   attackPanelTick(ui);
   flinch('candidate: tick');
   check(champ.facing === facing && champ.maxRecentDamage === 12,
     'while the candidate stands, nobody turns, and the damage is kept');
   render('candidate: the panel, its buttons shaded');
-  check(ui.word20250 === 0 && ui.word20252 === 1, 'but the buttons are drawn again (CSBCode.cpp:8954-8958)');
+  check(ui.ctx.interface.word20250 === 0 && ui.ctx.interface.word20252 === 1, 'but the buttons are drawn again (CSBCode.cpp:8954-8958)');
   party.state.potentialChampionIndex = -1;
   attackPanelTick(ui);
   flinch('candidate gone: tick');

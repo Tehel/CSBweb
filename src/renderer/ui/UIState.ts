@@ -10,6 +10,7 @@ import type { GraphicsLoader } from '../../data/GraphicsLoader';
 import type { OpenedSave, SaveEntry } from '../../data/saves';
 import type { ImportAnswer, ImportResult, ImportedFile } from '../../engine/GameSaves';
 import type { GameContext } from '../../engine/GameContext';
+import { createInterfaceState } from '../../engine/InterfaceState';
 import type { PartyState } from '../../engine/gameTypes';
 import type { InterpreterContext } from '../bytecode/BytecodeInterpreter';
 import type { IndexedBitmap, createPaletteIndexViewportBuffer } from '../csbwin/CanvasBlitter';
@@ -17,7 +18,7 @@ import type { KeyXlate, UIButton, UITables } from '../../data/tables/UITables';
 import type { ObjectTables } from '../../data/tables/ObjectTables';
 import type { FontData } from '../csbwin/TextRenderer';
 import type { ImageFormat } from '../../core/imageDecoder';
-import { OBJECT_ID_NULL, type ObjectID } from '../../core/types';
+import type { ObjectID } from '../../core/types';
 import type { ItemDescriptionLine } from './Objects';
 import type { HintSquare } from '../intro/HintOracle';
 import type { HintOracleFiles } from './HintOracleButton';
@@ -30,11 +31,6 @@ import type { Settings } from '../../settings/Settings';
 import type { Fullscreen } from '../../lib/fullscreen';
 import type { Dialog } from './Dialog';
 import type { KeyboardLayoutMap } from './KeyLabels';
-
-/** Eight empty chest slots, each `RNnul`. */
-export function emptyChestContents(): ObjectID[] {
-  return new Array<ObjectID>(8).fill(OBJECT_ID_NULL);
-}
 
 export enum UIMode {
   Adventure = 'adventure',
@@ -151,13 +147,6 @@ export interface UIState {
   sleepSaveNeeded: boolean;
   /** The Oracle is up: it has the screen, and the interface draws nothing until it closes. */
   hintOracleUp: boolean;
-  pressingEye: boolean;
-  /**
-   * `d.PressingMouth`: the mouth pressed with an empty hand while the eye panel showed a
-   * chest, a scroll or the Resurrect menu (`doc/CSBwin-src/Character.cpp:4058-4075`).
-   * Food and water are drawn over it until the release (`drawInventoryScreen`).
-   */
-  pressingMouth: boolean;
   /**
    * What `_ClickOnEye`'s `DescribeObject(d.objectInHand, 1)` drew at the press
    * (`doc/CSBwin-src/Viewport.cpp:7287-7293`), kept for the composes until the release.
@@ -210,18 +199,6 @@ export interface UIState {
   objectCursorFootprint: { x: number; y: number; bitmap: IndexedBitmap } | null;
 
   /* ---- the attack menu (doc/CSBwin-src/Character.cpp) ---- */
-  /** `d.AttackingCharacterOrdinal` — 1-based champion with the menu open, 0 for none. */
-  attackingCharacterOrdinal: number;
-  /** `d.PossibleAttackTypes[4]` — the offered `ATTACKTYPE`s; -1 marks an empty slot. */
-  possibleAttackTypes: Int8Array;
-  /** `d.Byte20256[4]` — the mastery each option demanded, for the panel's dots. */
-  byte20256: Uint8Array;
-  /** `d.Word20248` — how many of `possibleAttackTypes` are real. */
-  word20248: number;
-  /** `d.Word20250` — the panel owes a redraw. */
-  word20250: number;
-  /** `d.Word20252` — 1 shows the four attack buttons, 0 the option list. */
-  word20252: number;
   /**
    * What the option list's last `DrawLegalAttackTypes` drew: its `numAttackOption`, which
    * chose the backdrop, and the three names, the action name filter's included.
@@ -244,16 +221,6 @@ export interface UIState {
    * over the name (graphic 15). `TAG011366` draws over it. See `ui/Character.ts`.
    */
   characterDamage: ({ damage: number; inventoryOpen: boolean } | null)[];
-  /**
-   * `d.DisplayResurrectChestOrScroll` (`doc/CSBwin-src/Character.cpp:3855`) — what the
-   * eye panel is currently showing, which is also what a click in it means: 5 the
-   * Resurrect/Reincarnate/Cancel menu, 4 an open chest, 0 anything else. Written by
-   * `TAG0189d4`'s port in `drawInventoryScreen`, read by `tag01a6ea`.
-   */
-  displayResurrectChestOrScroll: number;
-  openChestId: ObjectID | null;
-  /** `d.rnChestContents[8]` — the open chest's objects, `RNnul` in an empty slot. */
-  openChestContents: ObjectID[];
   openChestIconIndex: number | null;
   mouthChewStartMs: number | null;
   mouthChewEndMs: number;
@@ -385,16 +352,16 @@ export interface UIState {
 /** The fields of `UIState` that a game in play sets, and a restart clears. */
 type PlayState = Pick<UIState,
   | 'uiMode' | 'modeBeforeFreeze' | 'shadedByTag02076e' | 'arrowCursorShape' | 'reincarnate' | 'diskMenuNeeded' | 'hintOracleNeeded' | 'sleepSaveNeeded'
-  | 'pressingEye' | 'pressingMouth' | 'describedObject' | 'weaponHandScroll' | 'word23144' | 'word23118' | 'pointer23178' | 'pointer23182'
-  | 'attackingCharacterOrdinal' | 'possibleAttackTypes' | 'byte20256' | 'word20248'
-  | 'word20250' | 'word20252' | 'attackOptionCount' | 'attackOptionNames' | 'closedAttackMenuOrdinal' | 'attackFlashValue' | 'attackFlashUntilMs'
+  | 'describedObject' | 'weaponHandScroll' | 'word23144' | 'word23118' | 'pointer23178' | 'pointer23182'
+  | 'attackOptionCount' | 'attackOptionNames' | 'closedAttackMenuOrdinal' | 'attackFlashValue' | 'attackFlashUntilMs'
   | 'characterDamage'
-  | 'displayResurrectChestOrScroll' | 'openChestId' | 'openChestContents' | 'openChestIconIndex'>;
+  | 'openChestIconIndex'>;
 
 /**
  * The screen's share of `d` as a game begins: `d.Initialize()` zeroes the whole of `d`
- * (`doc/CSBwin-src/CSBCode.cpp:333-340`), and `TAG021028` sets the adventure's lists and
- * `d.Word20252` (`:10597-10614`).
+ * (`doc/CSBwin-src/CSBCode.cpp:333-340`), and `TAG021028` sets the adventure's lists
+ * (`:10597-10614`). The share the engine reads too is `ctx.interface`'s
+ * (`createInterfaceState`).
  */
 function initialPlayState(): PlayState {
   return {
@@ -406,41 +373,31 @@ function initialPlayState(): PlayState {
     diskMenuNeeded: false,
     hintOracleNeeded: false,
     sleepSaveNeeded: false,
-    pressingEye: false,
-    pressingMouth: false,
     describedObject: null,
     weaponHandScroll: null,
     word23144: 0,
     word23118: 0,
     pointer23178: null,
     pointer23182: null,
-    attackingCharacterOrdinal: 0,
-    possibleAttackTypes: Int8Array.from([-1, -1, -1, -1]),
-    byte20256: new Uint8Array(4),
-    word20248: 0,
-    word20250: 0,
-    // The panel starts showing the four attack buttons.
-    word20252: 1,
     attackOptionCount: 0,
     attackOptionNames: ['', '', ''],
     closedAttackMenuOrdinal: 0,
     attackFlashValue: 0,
     attackFlashUntilMs: 0,
     characterDamage: [null, null, null, null],
-    displayResurrectChestOrScroll: 0,
-    openChestId: null,
-    openChestContents: emptyChestContents(),
     openChestIconIndex: null,
   };
 }
 
 /**
  * A restarted game's `d.Initialize()` and `TAG021028` (`doc/CSBwin-src/Code1f9e6.cpp:309`,
- * `:318`), the screen's half: no open chest, attack menu, marching-order drag or
- * sleep left over from the lost game. The caller sets the button lists for `uiMode`.
+ * `:318`), the screen's half and `ctx.interface`: no open chest, attack menu,
+ * marching-order drag or sleep left over from the lost game. The caller sets the button
+ * lists for `uiMode`.
  */
 export function initializePlayState(ui: UIState): void {
   Object.assign(ui, initialPlayState());
+  Object.assign(ui.ctx.interface, createInterfaceState());
 }
 
 /**

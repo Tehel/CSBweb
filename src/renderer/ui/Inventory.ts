@@ -19,7 +19,8 @@ import { drawAttributePanel, drawFoodWaterPanel, drawVitalsAndLoad, getInventory
 import { BOX_GRAPHIC_MARKED, BOX_GRAPHIC_PLAIN, blitBasicGraphicToViewport, drawObjectIcon, drawPossessionBox, possessionBoxGraphic } from './Draw';
 import { drawMouthChewAnimation } from './Feeding';
 import { ITEM_DESCRIPTION_Y, applyViewingFilter, drawItemDescriptionLine, getInventoryPlaceholderIndex, getItemPropertyLines, getObjectDescriptionLines, getObjectDisplayName, isChestRecord, placeItemPropertyLines, resolveObjectNameIndex, type ItemDescriptionLine } from './Objects';
-import { DescribedObject, UIState, emptyChestContents } from './UIState';
+import { DescribedObject, UIState } from './UIState';
+import { emptyChestContents } from '../../engine/InterfaceState';
 
 const MAX_LINES_IN_SCROLL = 9;
 const MAX_SCROLL_LINE_LENGTH = 16;
@@ -114,9 +115,9 @@ export function drawInventoryScreen(ui: UIState): void {
   // a chest's contents, a scroll as its viewing filter left it (`ui.weaponHandScroll`),
   // or food and water.
   const handObject = getChampionPossession(champion, 1);
-  if (ui.pressingMouth) {
+  if (ui.ctx.interface.pressingMouth) {
     drawFoodWaterPanel(ui, champion);
-  } else if (ui.pressingEye) {
+  } else if (ui.ctx.interface.pressingEye) {
     const cursorObject = ui.partyState.objectInHand;
     if (chestView) {
       // Held, only a chest on the cursor is a chest view (`getActiveChestView`).
@@ -129,14 +130,14 @@ export function drawInventoryScreen(ui: UIState): void {
   } else if (ui.partyState.potentialChampionIndex >= 0) {
     drawResurrectMenu(ui);
   } else if (chestView) {
-    ui.displayResurrectChestOrScroll = chestView.source === 'hand' ? 4 : 0;
+    ui.ctx.interface.displayResurrectChestOrScroll = chestView.source === 'hand' ? 4 : 0;
     drawChestPanel(ui, chestView);
   } else if (handObject !== OBJECT_ID_NULL && ui.ctx.dungeon.rnMaps.dbType(handObject) === DBType.SCROLL) {
-    ui.displayResurrectChestOrScroll = 2;
+    ui.ctx.interface.displayResurrectChestOrScroll = 2;
     if (ui.weaponHandScroll?.objectId !== handObject) ui.weaponHandScroll = describeObject(ui, handObject);
     drawScrollPanel(ui, ui.weaponHandScroll.scrollId);
   } else {
-    ui.displayResurrectChestOrScroll = 0;
+    ui.ctx.interface.displayResurrectChestOrScroll = 0;
     drawFoodWaterPanel(ui, champion);
   }
   drawMouthChewAnimation(ui);
@@ -182,8 +183,8 @@ export function tag019036(ui: UIState): void {
 export function drawCharacterStateEyePanel(ui: UIState, chIdx: number, charFlags: number): void {
   if ((charFlags & CHARFLAG_CHEST_OR_SCROLL) === 0) return;
   if (ui.partyState.selectedCharacterIndex !== chIdx) return;
-  if (ui.pressingMouth) return;
-  if (ui.pressingEye) {
+  if (ui.ctx.interface.pressingMouth) return;
+  if (ui.ctx.interface.pressingEye) {
     if (ui.partyState.objectInHand === OBJECT_ID_NULL) tag019036(ui);
   } else {
     tag0189d4(ui);
@@ -250,7 +251,7 @@ export function eyeBoxGraphic(champion: Champion): number {
  * Resurrect / Reincarnate / Cancel menu a provisionally added champion is waiting on.
  */
 function drawResurrectMenu(ui: UIState): void {
-  ui.displayResurrectChestOrScroll = 5;
+  ui.ctx.interface.displayResurrectChestOrScroll = 5;
   // CSBWin passes a *byte* width of 72 (`BLT2Viewport(…, 72, 6)`); this helper takes
   // pixels, as every other call here does.
   blitBasicGraphicToViewport(ui, 40, ui.uiTables.graphic232.wRectPos926, 144, 6);
@@ -316,11 +317,11 @@ function getOpenChestIconIndex(ui: UIState): number {
 export function getActiveChestView(ui: UIState, champion: Champion): ChestViewSource | null {
 
   const cursorObject = ui.partyState.objectInHand;
-  if (ui.pressingEye && cursorObject !== OBJECT_ID_NULL && isChestRecord(ui, cursorObject)) {
+  if (ui.ctx.interface.pressingEye && cursorObject !== OBJECT_ID_NULL && isChestRecord(ui, cursorObject)) {
     return { id: cursorObject, source: 'cursor' };
   }
 
-  if (ui.pressingEye || ui.pressingMouth) return null;
+  if (ui.ctx.interface.pressingEye || ui.ctx.interface.pressingMouth) return null;
   const handSlot = 1; // CSBWin uses weapon hand for chest display.
   const handObject = getChampionPossession(champion, handSlot);
   if (handObject !== OBJECT_ID_NULL && isChestRecord(ui, handObject)) {
@@ -331,26 +332,26 @@ export function getActiveChestView(ui: UIState, champion: Champion): ChestViewSo
 
 export function syncOpenChest(ui: UIState, chestView: ChestViewSource | null): void {
   if (!chestView) {
-    if (ui.openChestId !== null) {
+    if (ui.ctx.interface.openChestId !== null) {
       repackOpenChest(ui);
     }
     return;
   }
 
-  if (ui.openChestId !== null && ui.openChestId === chestView.id) return;
-  if (ui.openChestId !== null) repackOpenChest(ui);
+  if (ui.ctx.interface.openChestId !== null && ui.ctx.interface.openChestId === chestView.id) return;
+  if (ui.ctx.interface.openChestId !== null) repackOpenChest(ui);
   openChest(ui, chestView.id);
 }
 
 function openChest(ui: UIState, chestId: ObjectID): void {
   const chest = ui.ctx.dungeon.getContainerRecord(chestId);
   if (!chest) {
-    ui.openChestId = null;
-    ui.openChestContents = emptyChestContents();
+    ui.ctx.interface.openChestId = null;
+    ui.ctx.interface.openChestContents = emptyChestContents();
     return;
   }
 
-  ui.openChestId = chestId;
+  ui.ctx.interface.openChestId = chestId;
   const contents = emptyChestContents();
   let cursor = chest.containedObject;
   let index = 0;
@@ -358,7 +359,7 @@ function openChest(ui: UIState, chestId: ObjectID): void {
     contents[index++] = cursor;
     cursor = ui.ctx.dungeon.getDBRecordLink(cursor);
   }
-  ui.openChestContents = contents;
+  ui.ctx.interface.openChestContents = contents;
 
   for (const item of contents) {
     if (item !== OBJECT_ID_NULL) {
@@ -374,17 +375,17 @@ function openChest(ui: UIState, chestId: ObjectID): void {
  * the champion whose inventory is open (`GameHost.repackChest`).
  */
 export function repackOpenChest(ui: UIState): void {
-  if (ui.openChestId === null) return;
-  const chest = ui.ctx.dungeon.getContainerRecord(ui.openChestId);
+  if (ui.ctx.interface.openChestId === null) return;
+  const chest = ui.ctx.dungeon.getContainerRecord(ui.ctx.interface.openChestId);
   if (!chest) {
-    ui.openChestId = null;
-    ui.openChestContents = emptyChestContents();
+    ui.ctx.interface.openChestId = null;
+    ui.ctx.interface.openChestContents = emptyChestContents();
     return;
   }
 
   chest.containedObject = OBJECT_ID_EOF;
   let previous: ObjectID | null = null;
-  for (const item of ui.openChestContents) {
+  for (const item of ui.ctx.interface.openChestContents) {
     if (item === OBJECT_ID_NULL) continue;
     ui.ctx.dungeon.setDBRecordLink(item, OBJECT_ID_EOF);
     if (previous === null) {
@@ -395,8 +396,8 @@ export function repackOpenChest(ui: UIState): void {
     previous = item;
   }
 
-  ui.openChestId = null;
-  ui.openChestContents = emptyChestContents();
+  ui.ctx.interface.openChestId = null;
+  ui.ctx.interface.openChestContents = emptyChestContents();
 }
 
 function drawChestPanel(ui: UIState, chestView: ChestViewSource): void {
@@ -409,7 +410,7 @@ function drawChestPanel(ui: UIState, chestView: ChestViewSource): void {
   for (let slot = 0; slot < 8; slot++) {
     const rect = getChestSlotRect(iconSlots, slot);
     if (!rect) continue;
-    const item = ui.openChestContents[slot] ?? OBJECT_ID_NULL;
+    const item = ui.ctx.interface.openChestContents[slot] ?? OBJECT_ID_NULL;
     if (item === OBJECT_ID_NULL) continue;
     const objectIndex = resolveObjectNameIndex(ui, item);
     if (objectIndex >= 0) drawObjectIcon(ui, rect, objectIndex, word612);
@@ -484,7 +485,7 @@ export function drawObjectInfoPanel(ui: UIState, objectId: ObjectID): void {
   if (ui.ctx.extras.showItemProperties && !described.rewritten) {
     drawItemPropertyLines(ui, described.lines, getItemPropertyLines(ui, objectId));
   }
-  drawInspectArrow(ui, ui.pressingEye);
+  drawInspectArrow(ui, ui.ctx.interface.pressingEye);
 }
 
 /** The extra's lines under the description's (`placeItemPropertyLines`), in colour 13 as CSBWin's. */
@@ -496,7 +497,7 @@ export function drawItemPropertyLines(ui: UIState, description: ItemDescriptionL
 
 function drawEyeIcon(ui: UIState): void {
   const word612 = ui.uiTables.graphic232.word612;
-  const icon = ui.pressingEye ? OBJNI_SPECIAL_E : OBJNI_SPECIAL_D;
+  const icon = ui.ctx.interface.pressingEye ? OBJNI_SPECIAL_E : OBJNI_SPECIAL_D;
   const rect = getEyeRect(ui);
   if (!rect) return;
   drawObjectIcon(ui, rect, icon, word612);
@@ -527,7 +528,7 @@ function drawScrollPanel(ui: UIState, scrollId: ObjectID): void {
     drawScrollLine(ui, y, line);
     y += 7;
   }
-  drawInspectArrow(ui, ui.pressingEye);
+  drawInspectArrow(ui, ui.ctx.interface.pressingEye);
 }
 
 function splitScrollLines(text: string): { lines: string[]; startY: number } {

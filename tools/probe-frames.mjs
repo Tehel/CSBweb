@@ -1245,7 +1245,7 @@ const touch = async (type, x, y) => {
     return {x:r.left+(${x}+0.5)*r.width/320, y:r.top+(${y}+0.5)*r.height/200};})()`);
   await send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x: p.x, y: p.y }] });
 };
-const pressingEye = () => evaluate(`window.__probe.screen.ui.pressingEye`);
+const pressingEye = () => evaluate(`window.__probe.screen.ui.ctx.interface.pressingEye`);
 // The tap is this page's first user activation, the clicks above being the page's own
 // events, and a touch gives one only at its lift: the sound is unlocked by it
 // (`createSoundManager`, `src/main.ts`), not by the press.

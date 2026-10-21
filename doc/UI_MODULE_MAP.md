@@ -15,10 +15,11 @@ builds it whole, from its data sources and every hook, so none of them is ever m
   the dungeon, the party and the systems), `context` (the viewport's bytecode interpreter
   context), `screenIndexBuffer`, `uiTables`, `objectTables`, `fontData`, `partyState` (the
   game's party, `ctx.party.state`, read through), `uiMode`
-- **interaction state**: `pressingEye`, `hoverPoint`, the attack menu
-  (`attackingCharacterOrdinal`, `possibleAttackTypes`, …), the open chest,
-  the chew-animation clock, the two button lists, `reincarnate` (non-null while the
-  name-entry screen is modal)
+- **interaction state**: `hoverPoint`, what the attack menu drew, the chew-animation
+  clock, the two button lists, `reincarnate` (non-null while the name-entry screen is
+  modal). The `d.` fields the engine reads too, the held eye and mouth, the open chest
+  and the attack menu (`attackingCharacterOrdinal`, `possibleAttackTypes`, …), are the
+  context's, `ctx.interface` (`src/engine/InterfaceState.ts`)
 - **bitmap caches**: `graphicCache`, cursor bitmaps, the portrait sheet
 - **hooks out to the page** (`GameScreenHooks`): the save menu's three (`onSaveGame`,
   `onRestoreSave`, `onRestoreFailed`, which the page points at `GameSaves`), and `onReincarnated`, the page's

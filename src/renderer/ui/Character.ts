@@ -676,7 +676,7 @@ function drawLifeBars(ui: UIState, chIdx: number, champion: Champion): void {
  * picked up.
  */
 export function drawHeldObjectName(ui: UIState): void {
-  if (ui.pressingEye && ui.partyState.objectInHand !== OBJECT_ID_NULL) {
+  if (ui.ctx.interface.pressingEye && ui.partyState.objectInHand !== OBJECT_ID_NULL) {
     // `_ClickOnEye`'s `ClearHeldObjectName` (`doc/CSBwin-src/Viewport.cpp:7291`), until
     // the release's `DrawNameOfHeldObject` (`doc/CSBwin-src/CSBCode.cpp:7468-7471`).
     fillRectIndex(ui.screenIndexBuffer, ui.uiTables.graphic232.wRectPos624, 0);

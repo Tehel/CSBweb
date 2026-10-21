@@ -157,8 +157,8 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
   // `if (d.PressingEye!=0) {lastTime=d.Time; RETURN_int(result);};` and the same for
   // the mouth (doc/CSBwin-src/Mouse.cpp:1818-1819): every button after 81 is swallowed
   // until the button-up lets go.
-  if (ui.pressingEye) return;
-  if (ui.pressingMouth) return;
+  if (ui.ctx.interface.pressingEye) return;
+  if (ui.ctx.interface.pressingMouth) return;
   if (id === 145) {
     // The sleep icon, `buttons17760` beside the disk (`doc/CSBWIN_MENU_REFERENCE.md`), so
     // it is only ever clicked with an inventory open. `ShowHideInventory(4)` closes it
@@ -228,13 +228,13 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
  * `TAG0189d4` draws, which describes the weapon hand's scroll again.
  */
 export function handleMouseUnclick(ui: UIState): void {
-  if (ui.pressingEye) {
-    ui.pressingEye = false;
+  if (ui.ctx.interface.pressingEye) {
+    ui.ctx.interface.pressingEye = false;
     ui.describedObject = null;
     tag0189d4(ui);
     stShowCursor(ui);
-  } else if (ui.pressingMouth) {
-    ui.pressingMouth = false;
+  } else if (ui.ctx.interface.pressingMouth) {
+    ui.ctx.interface.pressingMouth = false;
     tag0189d4(ui);
     stShowCursor(ui);
   }
@@ -248,13 +248,13 @@ export function handleMouseUnclick(ui: UIState): void {
  * back whatever the count was. No `TAG0189d4`: the inventory is closing.
  */
 export function releaseEyeOrMouth(ui: UIState): void {
-  if (ui.pressingEye) {
-    ui.pressingEye = false;
+  if (ui.ctx.interface.pressingEye) {
+    ui.ctx.interface.pressingEye = false;
     ui.describedObject = null;
     ui.word23118 = 1;
     stShowCursor(ui);
-  } else if (ui.pressingMouth) {
-    ui.pressingMouth = false;
+  } else if (ui.ctx.interface.pressingMouth) {
+    ui.ctx.interface.pressingMouth = false;
     ui.word23118 = 1;
     stShowCursor(ui);
   }
@@ -273,12 +273,12 @@ function isEyeClick(ui: UIState, x: number, y: number): boolean {
  * draws the attributes (`doc/CSBwin-src/Character.cpp:4541-4595`); with an object,
  * `DescribeObject` runs it as it describes the object (`describeObject`), and the
  * composes until the release draw what it left. The panel itself is drawn from
- * `pressingEye` (`drawInventoryScreen`).
+ * `ctx.interface.pressingEye` (`drawInventoryScreen`).
  */
 export function handleEyePress(ui: UIState): void {
   if (ui.partyState.selectedCharacterIndex < 0) return;
-  if (ui.pressingEye) return;
-  ui.pressingEye = true;
+  if (ui.ctx.interface.pressingEye) return;
+  ui.ctx.interface.pressingEye = true;
   stHideCursor(ui);
   const inHand = ui.partyState.objectInHand;
   if (inHand === OBJECT_ID_NULL) {
@@ -314,7 +314,7 @@ function handlePartyBlockClick(ui: UIState, button: number, x: number, y: number
 export function tag01a6ea(ui: UIState, clickX: number, clickY: number): void {
   const buttons = ui.uiTables.graphic231.buttons;
 
-  if (ui.displayResurrectChestOrScroll === 4) {
+  if (ui.ctx.interface.displayResurrectChestOrScroll === 4) {
     // An open chest in the weapon hand: the grid takes clothing clicks, but only from
     // someone holding the cursor (`d.HandChar != -1`).
     if (ui.partyState.cursorOwner < 0) return;
@@ -329,7 +329,7 @@ export function tag01a6ea(ui: UIState, clickX: number, clickY: number): void {
     return;
   }
 
-  if (ui.displayResurrectChestOrScroll === 5) {
+  if (ui.ctx.interface.displayResurrectChestOrScroll === 5) {
     // The Hall of Champions menu, and only with an empty cursor (`d.EmptyHanded`).
     if (ui.partyState.objectInHand !== OBJECT_ID_NULL) return;
     const button = searchButtonList(buttons.buttons18372, clickX, clickY, 2);
@@ -345,8 +345,8 @@ export function handleInventoryToggle(ui: UIState, button: number): void {
   }
   // `if (d.PressingMouth != 0) return; if (d.PressingEye != 0) return; d.clockTick = 1;`
   // (`doc/CSBwin-src/CSBCode.cpp:7498-7500`).
-  if (ui.pressingMouth) return;
-  if (ui.pressingEye) return;
+  if (ui.ctx.interface.pressingMouth) return;
+  if (ui.ctx.interface.pressingEye) return;
   setClockTick(ui.ctx, 1);
   // `videoMode = VM_ADVENTURE` as an open inventory closes (`:7512`), and
   // `VM_INVENTORY` as one opens (`:7546`).
@@ -393,7 +393,7 @@ export function tag02076e(ui: UIState): void {
   if (party.sleeping) return;
   // `WaitForButtonFlash(); //If any are active` (`:5138`).
   waitForButtonFlash(ui.ctx);
-  if (party.selectedCharacterIndex >= 0 && ui.displayResurrectChestOrScroll === 4) repackOpenChest(ui);
+  if (party.selectedCharacterIndex >= 0 && ui.ctx.interface.displayResurrectChestOrScroll === 4) repackOpenChest(ui);
   ui.shadedByTag02076e = true;
   ui.arrowCursorShape = true;
 }
@@ -418,7 +418,7 @@ export function tag0207cc(ui: UIState): void {
   const caster = party.magicCasterIndex;
   party.magicCasterIndex = -1;
   selectMagicCaster(party, caster);
-  if (ui.attackingCharacterOrdinal === 0) ui.word20252 = 1;
+  if (ui.ctx.interface.attackingCharacterOrdinal === 0) ui.ctx.interface.word20252 = 1;
   drawLegalAttackTypes(ui);
   const selected = party.selectedCharacterIndex;
   if (selected >= 0) {
@@ -468,7 +468,7 @@ export function handleClothingClick(ui: UIState, button: number): void {
 
   const objectInHand = ui.partyState.objectInHand;
   const slotObject = isChestSlot
-    ? ui.openChestContents[slot - 30] ?? OBJECT_ID_NULL
+    ? ui.ctx.interface.openChestContents[slot - 30] ?? OBJECT_ID_NULL
     : getChampionPossession(champ, slot);
   if (objectInHand === OBJECT_ID_NULL && slotObject === OBJECT_ID_NULL) return;
 
@@ -493,7 +493,7 @@ export function handleClothingClick(ui: UIState, button: number): void {
   }
   if (slotObject !== OBJECT_ID_NULL) {
     if (isChestSlot) {
-      ui.openChestContents[slot - 30] = OBJECT_ID_NULL;
+      ui.ctx.interface.openChestContents[slot - 30] = OBJECT_ID_NULL;
     } else {
       character.removeCharacterPossession(chIdx, slot);
     }
@@ -503,7 +503,7 @@ export function handleClothingClick(ui: UIState, button: number): void {
   }
   if (objectInHand !== OBJECT_ID_NULL) {
     if (isChestSlot) {
-      ui.openChestContents[slot - 30] = objectInHand;
+      ui.ctx.interface.openChestContents[slot - 30] = objectInHand;
     } else {
       character.addCharacterPossession(chIdx, objectInHand, slot);
     }

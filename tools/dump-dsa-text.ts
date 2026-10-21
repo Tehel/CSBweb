@@ -36,7 +36,7 @@ function listen(game: Game): void {
   discarded = 0;
   game.ctx.host.messages.quePrintLines = (color, text) => { queued.push({ color, text }); };
   game.ctx.host.messages.discardText = () => { discarded++; };
-  game.ctx.host.attackingCharacterOrdinal = () => 2;
+  game.ctx.interface.attackingCharacterOrdinal = 2;
 }
 
 function texts(game: Game): Array<{ rn: ObjectID; at: Position }> {
@@ -181,7 +181,7 @@ console.log('5. PrintWithSubstitution');
   ];
   for (const [txt, ordinal, want] of cases) {
     queued = [];
-    game.ctx.host.attackingCharacterOrdinal = () => ordinal;
+    game.ctx.interface.attackingCharacterOrdinal = ordinal;
     printWithSubstitution(game.ctx, txt, 0x10009);
     console.log(`  ${JSON.stringify(txt)} (menu ${ordinal}): ${show()}`);
     check(want === null ? queued.length === 0 : queued.length === 1 && queued[0]!.text === want && queued[0]!.color === 9,

@@ -115,8 +115,8 @@ export function handleMouthPress(ui: UIState): void {
 
   const objectId = ui.partyState.objectInHand;
   if (objectId === OBJECT_ID_NULL) {
-    if (ui.displayResurrectChestOrScroll === 0) return;
-    ui.pressingMouth = true;
+    if (ui.ctx.interface.displayResurrectChestOrScroll === 0) return;
+    ui.ctx.interface.pressingMouth = true;
     // `STHideCursor(HC5); d.Word23118 = 1;` (`:4071-4072`).
     stHideCursor(ui);
     ui.word23118 = 1;
@@ -165,7 +165,7 @@ export function handleMouthPress(ui: UIState): void {
   // `CHARFLAG_statsChanged` has no counterpart, the panels being drawn from live state;
   // `CHARFLAG_chestOrScroll` has, with food and water in the eye panel, and the
   // `DrawCharacterState` that ends the feeding (`doc/CSBwin-src/Character.cpp:4503-4509`).
-  if (ui.displayResurrectChestOrScroll === 0) champ.charFlags |= CHARFLAG_CHEST_OR_SCROLL;
+  if (ui.ctx.interface.displayResurrectChestOrScroll === 0) champ.charFlags |= CHARFLAG_CHEST_OR_SCROLL;
   drawCharacterState(ui.partyState, selected, 0, ui.ctx.host);
 }
 

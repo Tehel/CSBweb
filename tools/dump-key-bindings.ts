@@ -50,7 +50,7 @@ function row(ui: UIState, key: string, taken: boolean): void {
   console.log([
     key,
     taken ? 'taken' : 'passed',
-    ui.attackingCharacterOrdinal,
+    ui.ctx.interface.attackingCharacterOrdinal,
     party.selectedCharacterIndex,
     party.magicCasterIndex,
     runes(party),
@@ -126,46 +126,46 @@ async function main(): Promise<void> {
   //         not open opens it, replacing any other — never stacking.
   attacks = [];
   press('KeyQ');
-  check(ui.attackingCharacterOrdinal === 1, "'q' should open champion 1's attack menu");
-  check(ui.word20252 === 0, "'q' should put the panel into its option-list state");
-  check(ui.word20248 >= 1, 'an empty hand should still offer at least one attack');
-  const offered = ui.word20248;
+  check(ui.ctx.interface.attackingCharacterOrdinal === 1, "'q' should open champion 1's attack menu");
+  check(ui.ctx.interface.word20252 === 0, "'q' should put the panel into its option-list state");
+  check(ui.ctx.interface.word20248 >= 1, 'an empty hand should still offer at least one attack');
+  const offered = ui.ctx.interface.word20248;
 
   press('KeyX');
-  check(ui.attackingCharacterOrdinal === 2, "'x' should replace the open menu with champion 2's, not stack on it");
+  check(ui.ctx.interface.attackingCharacterOrdinal === 2, "'x' should replace the open menu with champion 2's, not stack on it");
   check(attacks.length === 0, "'x' should open champion 2's menu, not attack for champion 1");
 
   press('KeyW');
   check(attacks.length === 1 && attacks[0].chIdx === 1,
     "'w' with champion 2's menu open should perform their first attack");
-  check(ui.attackingCharacterOrdinal === 0, 'performing an attack should close the menu');
+  check(ui.ctx.interface.attackingCharacterOrdinal === 0, 'performing an attack should close the menu');
   check(clockTick() === 'due',
     "and set d.clockTick to what it returned, as the click does (Character.cpp:4733-4734)");
-  check(ui.word20250 === 1, 'closing the menu should leave the panel owing a redraw');
+  check(ui.ctx.interface.word20250 === 1, 'closing the menu should leave the panel owing a redraw');
 
   // ---- 2. Any of the column's three keys opens the menu; with it open, each is its row,
   //         and only a row that `word20248` says is real (`handleAttackAreaClick`).
   attacks = [];
   press('KeyZ');
-  check(ui.attackingCharacterOrdinal === 1 && attacks.length === 0,
+  check(ui.ctx.interface.attackingCharacterOrdinal === 1 && attacks.length === 0,
     "'z' with no menu open should open champion 1's, and attack nothing");
   press('KeyZ');
   if (offered < 3) {
     check(attacks.length === 0, `only ${offered} attack(s) offered, so 'z' must do nothing`);
-    check(ui.attackingCharacterOrdinal === 1, 'a dead option must leave the menu open');
+    check(ui.ctx.interface.attackingCharacterOrdinal === 1, 'a dead option must leave the menu open');
     press('KeyQ');
   } else {
     check(attacks.length === 1, "'z' should perform the third attack when one is offered");
   }
-  check(ui.attackingCharacterOrdinal === 0, 'the panel should be closed again');
+  check(ui.ctx.interface.attackingCharacterOrdinal === 0, 'the panel should be closed again');
 
   press('KeyA');
   press('KeyA');
   if (offered < 2) {
-    check(ui.attackingCharacterOrdinal === 1, `only ${offered} attack offered, so 'a' must do nothing`);
+    check(ui.ctx.interface.attackingCharacterOrdinal === 1, `only ${offered} attack offered, so 'a' must do nothing`);
     closeAttackMenu(ui);
   } else {
-    check(attacks.length >= 1 && attacks[attacks.length - 1].chIdx === 0 && ui.attackingCharacterOrdinal === 0,
+    check(attacks.length >= 1 && attacks[attacks.length - 1].chIdx === 0 && ui.ctx.interface.attackingCharacterOrdinal === 0,
       "'a' should perform champion 1's second attack");
   }
 
@@ -173,11 +173,11 @@ async function main(): Promise<void> {
   //          no menu open its point is above the hands, and it does nothing.
   attacks = [];
   press('KeyW');
-  check(ui.attackingCharacterOrdinal === 2, "'w' should open champion 2's menu");
+  check(ui.ctx.interface.attackingCharacterOrdinal === 2, "'w' should open champion 2's menu");
   check(press('Tab'), 'Tab should be claimed');
-  check(ui.attackingCharacterOrdinal === 0 && attacks.length === 0,
+  check(ui.ctx.interface.attackingCharacterOrdinal === 0 && attacks.length === 0,
     'Tab should close the menu without attacking');
-  check(press('Tab') && ui.attackingCharacterOrdinal === 0 && attacks.length === 0,
+  check(press('Tab') && ui.ctx.interface.attackingCharacterOrdinal === 0 && attacks.length === 0,
     'Tab with no menu open should be claimed and do nothing');
 
   // ---- 3. The inventory keys, the same toggle `handleInventoryToggle` gives a click.
@@ -191,7 +191,7 @@ async function main(): Promise<void> {
   check(party.state.selectedCharacterIndex === -1,
     "'9' should do nothing — there is no third champion");
   press('KeyE');
-  check(ui.attackingCharacterOrdinal === 0, "'e' should do nothing — there is no third champion");
+  check(ui.ctx.interface.attackingCharacterOrdinal === 0, "'e' should do nothing — there is no third champion");
 
   // ---- 4. The magic keys. No caster, no keypad (button id 100's guard in `Mouse.ts`).
   check(party.state.magicCasterIndex === -1, 'no caster should be selected yet');
@@ -246,7 +246,7 @@ async function main(): Promise<void> {
   for (const key of ['q', 'Q', '1', '&', '~', '`', '²', ' ', 'Numpad1', 'Numpad7']) {
     check(!handleUIKey(ui, key), `'${key}' is no panel binding`);
   }
-  check(ui.attackingCharacterOrdinal === 0 && party.state.selectedCharacterIndex === -1,
+  check(ui.ctx.interface.attackingCharacterOrdinal === 0 && party.state.selectedCharacterIndex === -1,
     'and opened no menu or inventory');
 
   for (const key of [...MOVE_KEYS, 'Escape', 'F5', 'F9']) {
@@ -264,7 +264,7 @@ async function main(): Promise<void> {
   //         (`doc/CSBwin-src/Mouse.cpp:1717-1789`), keys included.
   party.state.potentialChampionIndex = 0;
   press('KeyQ');
-  check(ui.attackingCharacterOrdinal === 0, 'no attack menu while a champion is only provisional');
+  check(ui.ctx.interface.attackingCharacterOrdinal === 0, 'no attack menu while a champion is only provisional');
   press('Digit7');
   check(party.state.selectedCharacterIndex === -1, 'no inventory either');
   press('Digit1');
@@ -294,12 +294,12 @@ async function main(): Promise<void> {
   check(attacks.length === 1 && (party.state.champions[0].charFlags & CHARFLAG_ATTACK_DISABLE) !== 0,
     'the attack should leave champion 1 busy');
   press('KeyQ');
-  check(ui.attackingCharacterOrdinal === 0, "'q' should open no menu for a busy champion");
+  check(ui.ctx.interface.attackingCharacterOrdinal === 0, "'q' should open no menu for a busy champion");
   clickHand();
-  check(ui.attackingCharacterOrdinal === 0, 'a click on a busy champion\'s hand should open no menu');
+  check(ui.ctx.interface.attackingCharacterOrdinal === 0, 'a click on a busy champion\'s hand should open no menu');
   party.state.champions[0].charFlags &= ~CHARFLAG_ATTACK_DISABLE;
   clickHand();
-  check(ui.attackingCharacterOrdinal === 1, 'the same click opens the menu once the champion is idle');
+  check(ui.ctx.interface.attackingCharacterOrdinal === 1, 'the same click opens the menu once the champion is idle');
   closeAttackMenu(ui);
 
   // ---- 8. An attack that starts a script (the fusion's `_FusionSequence`) never returns
@@ -326,12 +326,12 @@ async function main(): Promise<void> {
   if (option) handleAttackAreaClick(ui, (option.x1 + option.x2) >> 1, (option.y1 + option.y2) >> 1);
   row(ui, 'option', true);
   check(attacks.length === 1 && game.isRunningScript(), 'the click attacks, and the attack holds the loop');
-  check(ui.attackingCharacterOrdinal === 1, 'the attack menu stays up: TAG01b1c0 does not run');
+  check(ui.ctx.interface.attackingCharacterOrdinal === 1, 'the attack menu stays up: TAG01b1c0 does not run');
   check(clockTick() === 'not due', 'd.clockTick is not set');
   const heldKeys = ['KeyQ', 'KeyW', 'KeyA', 'KeyX', 'Digit7', 'F2', 'Digit1', 'Backquote', 'Space', 'Tab']
     .map((key) => press(key));
   check(heldKeys.every((taken) => taken), 'every panel key is still claimed');
-  check(attacks.length === 1 && ui.attackingCharacterOrdinal === 1 && party.state.selectedCharacterIndex === -1
+  check(attacks.length === 1 && ui.ctx.interface.attackingCharacterOrdinal === 1 && party.state.selectedCharacterIndex === -1
     && party.state.magicCasterIndex === 0 && runes(party.state) === '-',
   'and none acts: no attack, the same menu, no inventory, the same caster, no rune');
   check(!press('KeyK'), 'a key that is not the panel\'s is still passed on');
@@ -341,7 +341,7 @@ async function main(): Promise<void> {
   restoreRecording();
   if (option) handleAttackAreaClick(ui, (option.x1 + option.x2) >> 1, (option.y1 + option.y2) >> 1);
   row(ui, 'option', true);
-  check(ui.attackingCharacterOrdinal === 0 && clockTick() === 'due',
+  check(ui.ctx.interface.attackingCharacterOrdinal === 0 && clockTick() === 'due',
     'with no script, the same click closes the menu and makes a tick due');
 
   // ---- 9. The graphics.dat key tables `TAG0196da` searches (doc/CSBwin-src/CSBCode.cpp:

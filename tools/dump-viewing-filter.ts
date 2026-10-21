@@ -347,12 +347,10 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
 
 /* ------------------------------- 10. the scroll in the weapon hand -------------- */
 {
-  // The host's three members are the screen's, as `main.ts` wires them.
+  // The host's member is the screen's, as `main.ts` wires it.
   let ui: UIState | null = null;
   const game = withFilterDsas(ESL_VIEWINGFILTER, [[...params(0)]], {
     drawCharacterState: (chIdx, charFlags) => { if (ui) drawCharacterStateEyePanel(ui, chIdx, charFlags); },
-    pressingEye: () => ui?.pressingEye ?? false,
-    displayResurrectChestOrScroll: () => ui?.displayResurrectChestOrScroll ?? 0,
   });
   const party = game.ctx.party.state;
   const graphics = stockGraphics();
@@ -388,7 +386,7 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
   step('the scroll into a closed inventory\'s weapon hand', () => character.addCharacterPossession(1, scroll, 1), null);
   step('the inventory opened', () => handleInventoryToggle(theUi, 1), scroll);
   step('three composes', () => { for (let i = 0; i < 3; i++) drawInventoryScreen(theUi); }, null);
-  check(theUi.displayResurrectChestOrScroll === 2, 'a scroll in the weapon hand leaves d.DisplayResurrectChestOrScroll 2');
+  check(theUi.ctx.interface.displayResurrectChestOrScroll === 2, 'a scroll in the weapon hand leaves d.DisplayResurrectChestOrScroll 2');
   step('the ten-second update with the scroll shown', () => tenSecondUpdate(game.ctx), null);
   step('the eye pressed with an empty hand', () => handleMouseButton(theUi, 71, 0, 0), -1);
   step('the ten-second update with the eye held', () => tenSecondUpdate(game.ctx), -1);
@@ -396,7 +394,7 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
   step('the scroll out of the weapon hand', () => character.removeCharacterPossession(1, 1), null);
   check(theUi.weaponHandScroll === null, 'with the hand empty, nothing is kept');
   drawInventoryScreen(theUi);
-  check(theUi.displayResurrectChestOrScroll === 0, 'with the hand empty, the panel is food and water');
+  check(theUi.ctx.interface.displayResurrectChestOrScroll === 0, 'with the hand empty, the panel is food and water');
   handleMouseButton(theUi, 71, 0, 0);
   step('poison with the eye held and food and water shown', () => game.systems.monsterAttack.poisonCharacter(1, 1), -1);
   handleMouseUnclick(theUi);
@@ -426,9 +424,6 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
   let ui: UIState | null = null;
   const game = withFilterDsas(ESL_VIEWINGFILTER, [[...params(0)]], {
     drawCharacterState: (chIdx, charFlags) => { if (ui) drawCharacterStateEyePanel(ui, chIdx, charFlags); },
-    pressingEye: () => ui?.pressingEye ?? false,
-    pressingMouth: () => ui?.pressingMouth ?? false,
-    displayResurrectChestOrScroll: () => ui?.displayResurrectChestOrScroll ?? 0,
   });
   const party = game.ctx.party.state;
   const graphics = stockGraphics();
@@ -471,7 +466,7 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
   unset();
   handleMouseButton(theUi, 70, 0, 0);
   const atPress = seen();
-  const held = theUi.pressingMouth;
+  const held = theUi.ctx.interface.pressingMouth;
   const heldPanel = panel(() => drawInventoryScreen(theUi));
   console.log(`11. the mouth pressed with an empty hand: ${held ? 'held' : 'not held'}, `
     + `the panel ${heldPanel === foodWater ? 'food and water' : heldPanel === scrollShown ? 'the scroll' : 'unknown'}, `
@@ -480,7 +475,7 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
   check(held, 'the mouth pressed with an empty hand and the scroll shown is held (d.PressingMouth)');
   check(heldPanel === foodWater, 'held, the panel is food and water');
   check(atPress === null, 'the press runs no viewing filter');
-  check(theUi.displayResurrectChestOrScroll === 2, 'held, d.DisplayResurrectChestOrScroll stays 2');
+  check(theUi.ctx.interface.displayResurrectChestOrScroll === 2, 'held, d.DisplayResurrectChestOrScroll stays 2');
   unset();
   tenSecondUpdate(game.ctx);
   check(seen() === null, 'the ten-second update with the mouth held runs nothing');
@@ -492,14 +487,14 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
   const atRelease = seen();
   console.log(`    the release: ${atRelease === null ? 'runs nothing' : `runs on ${atRelease}`}, `
     + `the panel ${panel(() => drawInventoryScreen(theUi)) === scrollShown ? 'the scroll' : 'not the scroll'}`);
-  check(!theUi.pressingMouth && atRelease === scroll, "the release lets go, and TAG0189d4 runs the scroll's viewing filter");
+  check(!theUi.ctx.interface.pressingMouth && atRelease === scroll, "the release lets go, and TAG0189d4 runs the scroll's viewing filter");
   check(panel(() => drawInventoryScreen(theUi)) === scrollShown, 'released, the panel is the scroll again');
 
   character.removeCharacterPossession(1, 1);
   drawInventoryScreen(theUi);
   handleMouseButton(theUi, 70, 0, 0);
-  console.log(`    with food and water shown, the mouth is ${theUi.pressingMouth ? 'held' : 'not held'}`);
-  check(!theUi.pressingMouth, 'with food and water shown (d.DisplayResurrectChestOrScroll 0), the mouth is not held');
+  console.log(`    with food and water shown, the mouth is ${theUi.ctx.interface.pressingMouth ? 'held' : 'not held'}`);
+  check(!theUi.ctx.interface.pressingMouth, 'with food and water shown (d.DisplayResurrectChestOrScroll 0), the mouth is not held');
 }
 
 /* ------------------------------- 12, 13. the pointer, and a death while held ---- */
@@ -508,9 +503,6 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
   let ui: UIState | null = null;
   const game = withFilterDsas(ESL_VIEWINGFILTER, [[...params(0)]], {
     drawCharacterState: (chIdx, charFlags) => { if (ui) drawCharacterStateEyePanel(ui, chIdx, charFlags); },
-    pressingEye: () => ui?.pressingEye ?? false,
-    pressingMouth: () => ui?.pressingMouth ?? false,
-    displayResurrectChestOrScroll: () => ui?.displayResurrectChestOrScroll ?? 0,
     showHideInventory: (chIdx) => { if (ui) handleInventoryToggle(ui, chIdx); },
     releaseEyeOrMouth: () => { if (ui) releaseEyeOrMouth(ui); },
   });
@@ -539,11 +531,11 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
   drawInventoryScreen(theUi);
   const before = pointerDrawn();
   handleMouseButton(theUi, 71, 0, 0);
-  const eyeHeld = theUi.pressingEye && !pointerDrawn();
+  const eyeHeld = theUi.ctx.interface.pressingEye && !pointerDrawn();
   handleMouseUnclick(theUi);
   const eyeReleased = pointerDrawn() && theUi.word23118 === 0;
   handleMouseButton(theUi, 70, 0, 0);
-  const mouthHeld = theUi.pressingMouth && !pointerDrawn();
+  const mouthHeld = theUi.ctx.interface.pressingMouth && !pointerDrawn();
   handleMouseUnclick(theUi);
   const mouthReleased = pointerDrawn() && theUi.word23118 === 0;
   console.log(`12. the pointer: ${before ? 'drawn' : 'not drawn'}; the eye held ${eyeHeld ? 'hides it' : 'leaves it'}, `
@@ -560,9 +552,9 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
     if (party.selectedCharacterIndex !== chIdx) handleInventoryToggle(theUi, chIdx);
     drawInventoryScreen(theUi);
     handleMouseButton(theUi, button, 0, 0);
-    const held = theUi.pressingEye || theUi.pressingMouth;
+    const held = theUi.ctx.interface.pressingEye || theUi.ctx.interface.pressingMouth;
     game.systems.monsterAttack.killCharacter(chIdx);
-    const released = !theUi.pressingEye && !theUi.pressingMouth;
+    const released = !theUi.ctx.interface.pressingEye && !theUi.ctx.interface.pressingMouth;
     const closed = party.selectedCharacterIndex === -1;
     const shown = pointerDrawn() && theUi.word23118 === 0;
     theUi.diskMenuNeeded = false;
@@ -591,7 +583,7 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
   party.objectInHand = game.ctx.dungeon.rnMaps.rn(DBType.WEAPON, 0);
   const shownBefore = name().some((v) => v !== 0);
   handleMouseButton(theUi, 71, 0, 0);
-  const clearedHeld = theUi.pressingEye && name().every((v) => v === 0);
+  const clearedHeld = theUi.ctx.interface.pressingEye && name().every((v) => v === 0);
   handleMouseUnclick(theUi);
   const shownAfter = name().some((v) => v !== 0);
   party.objectInHand = OBJECT_ID_NULL;

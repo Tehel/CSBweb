@@ -93,8 +93,8 @@ function itemHasChargesLeft(ui: UIState, chIdx: number): boolean {
  */
 export function getLegalAttackTypes(ui: UIState, chIdx: number, row: ArrayLike<number>): void {
   const champ = ui.partyState && getPartyChampion(ui.partyState, chIdx);
-  ui.possibleAttackTypes[0] = row[0] ?? 0;
-  ui.byte20256[0] = 1;
+  ui.ctx.interface.possibleAttackTypes[0] = row[0] ?? 0;
+  ui.ctx.interface.byte20256[0] = 1;
 
   let count = 1;
   for (let i = 1; i < 3; i++) {
@@ -108,12 +108,12 @@ export function getLegalAttackTypes(ui: UIState, chIdx: number, row: ArrayLike<n
     const skill = (ui.uiTables.graphic230.skillNumber[attackType] ?? 0) & 0xff;
     const mastery = champ ? masteryOf(ui, champ, skill) : 0;
     if (mastery < required) continue;
-    ui.possibleAttackTypes[count] = attackType;
-    ui.byte20256[count] = required;
+    ui.ctx.interface.possibleAttackTypes[count] = attackType;
+    ui.ctx.interface.byte20256[count] = required;
     count++;
   }
-  ui.word20248 = count;
-  for (let i = count; i < 3; i++) ui.possibleAttackTypes[i] = -1;
+  ui.ctx.interface.word20248 = count;
+  for (let i = count; i < 3; i++) ui.ctx.interface.possibleAttackTypes[i] = -1;
 }
 
 function masteryOf(ui: UIState, champ: Champion, skill: number): number {
@@ -151,9 +151,9 @@ export function prepareAttack(ui: UIState, chIdx: number): void {
   const row = ui.uiTables.graphic230.legalAttacks[attackClass];
   if (!row) return;
 
-  ui.attackingCharacterOrdinal = chIdx + 1;
+  ui.ctx.interface.attackingCharacterOrdinal = chIdx + 1;
   getLegalAttackTypes(ui, chIdx, row);
-  ui.word20252 = 0;
+  ui.ctx.interface.word20252 = 0;
   drawLegalAttackTypes(ui);
 }
 
@@ -167,8 +167,8 @@ export function drawLegalAttackTypes(ui: UIState): void {
   ui.closedAttackMenuOrdinal = 0;
   ui.attackFlashValue = 0;
   ui.attackFlashUntilMs = 0;
-  if (ui.word20252 === 0 && ui.attackingCharacterOrdinal !== 0) nameAttackOptions(ui);
-  ui.word20250 = 0;
+  if (ui.ctx.interface.word20252 === 0 && ui.ctx.interface.attackingCharacterOrdinal !== 0) nameAttackOptions(ui);
+  ui.ctx.interface.word20250 = 0;
 }
 
 /**
@@ -179,17 +179,17 @@ export function drawLegalAttackTypes(ui: UIState): void {
  * changes the attack it is.
  */
 function nameAttackOptions(ui: UIState): void {
-  const chIdx = ui.attackingCharacterOrdinal - 1;
+  const chIdx = ui.ctx.interface.attackingCharacterOrdinal - 1;
   let numAttackOption = 3;
-  if (ui.possibleAttackTypes[2] === -1) numAttackOption = 2;
-  if (ui.possibleAttackTypes[1] === -1) numAttackOption = 1;
+  if (ui.ctx.interface.possibleAttackTypes[2] === -1) numAttackOption = 2;
+  if (ui.ctx.interface.possibleAttackTypes[1] === -1) numAttackOption = 1;
   ui.attackOptionCount = numAttackOption;
   for (let i = 0; i < 3; i++) {
-    let name = attackTypeName(ui, ui.possibleAttackTypes[i]!);
+    let name = attackTypeName(ui, ui.ctx.interface.possibleAttackTypes[i]!);
     if (i < numAttackOption) {
-      const filtered = ui.ctx.systems.dsa.actionNameFilter(chIdx, i, numAttackOption, ui.possibleAttackTypes[i]!);
+      const filtered = ui.ctx.systems.dsa.actionNameFilter(chIdx, i, numAttackOption, ui.ctx.interface.possibleAttackTypes[i]!);
       if (filtered) {
-        ui.possibleAttackTypes[i] = filtered.attackType;
+        ui.ctx.interface.possibleAttackTypes[i] = filtered.attackType;
         if (filtered.name !== null) name = filtered.name;
       }
     }
@@ -205,10 +205,10 @@ function nameAttackOptions(ui: UIState): void {
  * (`possessionBoxGraphic`).
  */
 export function closeAttackMenu(ui: UIState): void {
-  if (ui.attackingCharacterOrdinal === 0) return;
-  ui.closedAttackMenuOrdinal = ui.attackingCharacterOrdinal;
-  ui.attackingCharacterOrdinal = 0;
-  ui.word20250 = 1;
+  if (ui.ctx.interface.attackingCharacterOrdinal === 0) return;
+  ui.closedAttackMenuOrdinal = ui.ctx.interface.attackingCharacterOrdinal;
+  ui.ctx.interface.attackingCharacterOrdinal = 0;
+  ui.ctx.interface.word20250 = 1;
 }
 
 /**
@@ -218,13 +218,13 @@ export function closeAttackMenu(ui: UIState): void {
  * closes the menu without attacking and returns CSBWin's -1.
  */
 export function executeAttack(ui: UIState, option: number): number {
-  if (ui.attackingCharacterOrdinal === 0) return 0;
-  const chIdx = ui.attackingCharacterOrdinal - 1;
+  if (ui.ctx.interface.attackingCharacterOrdinal === 0) return 0;
+  const chIdx = ui.ctx.interface.attackingCharacterOrdinal - 1;
   let result: number;
   if (option === -1) {
     result = -1;
   } else {
-    const attackType = ui.possibleAttackTypes[option] & 0xff;
+    const attackType = ui.ctx.interface.possibleAttackTypes[option] & 0xff;
     if (attackType === ATTACK_TYPE_NONE) return 0;
     result = ui.ctx.systems.character.executeAttack(chIdx, attackType);
     // The fusion's `Attack(_1_, …)` never returns (`Character.cpp:4997`): `_FusionSequence`
@@ -260,7 +260,7 @@ export function attackMenuButton(ui: UIState, id: number): void {
   }
   // Only the options actually offered are live; the rows below `word20248` are dead
   // even though the button list covers them.
-  if (id - 112 > ui.word20248) return;
+  if (id - 112 > ui.ctx.interface.word20248) return;
   if (id === 113) flashButton(ui.ctx, 0xea, 0x13e, 0x56, 0x60);
   else if (id === 114) flashButton(ui.ctx, 0xea, 0x13e, 0x62, 0x6c);
   else flashButton(ui.ctx, 0xea, 0x13e, 0x6e, 0x78);
@@ -276,13 +276,13 @@ export function attackMenuButton(ui: UIState, id: number): void {
 export function handleAttackAreaClick(ui: UIState, x: number, y: number): void {
   const numCharacter = ui.partyState.champions.length;
 
-  if (ui.attackingCharacterOrdinal !== 0) {
+  if (ui.ctx.interface.attackingCharacterOrdinal !== 0) {
     const id = searchButtonList(ui.uiTables.graphic231.buttons.buttons17892, x, y, 2);
     if (id !== 0) attackMenuButton(ui, id);
     return;
   }
 
-  if (ui.word20252 !== 0) {
+  if (ui.ctx.interface.word20252 !== 0) {
     const id = searchButtonList(ui.uiTables.graphic231.buttons.buttons17952, x, y, 2);
     if (id === 0) return;
     const chIdx = id - 116;
@@ -305,7 +305,7 @@ export function attackPanelTick(ui: UIState): void {
   // the first tick after (`CSBCode.cpp:8913-8921`).
   const candidate = party.potentialChampionIndex >= 0;
   if (party.sleeping || candidate) {
-    if (ui.attackingCharacterOrdinal !== 0) {
+    if (ui.ctx.interface.attackingCharacterOrdinal !== 0) {
       closeAttackMenu(ui);
       return;
     }
@@ -316,7 +316,7 @@ export function attackPanelTick(ui: UIState): void {
       if (!champ) return;
       // Not the champion holding the cursor, and not the one with the menu open: those
       // two keep facing the way the player left them.
-      if (idx !== cursorOwner && idx + 1 !== ui.attackingCharacterOrdinal && champ.maxRecentDamage) {
+      if (idx !== cursorOwner && idx + 1 !== ui.ctx.interface.attackingCharacterOrdinal && champ.maxRecentDamage) {
         const from = champ.damageFromDirection;
         if (champ.facing !== from) champ.facing = from;
       }
@@ -324,9 +324,9 @@ export function attackPanelTick(ui: UIState): void {
     });
   }
 
-  if (ui.word20250 === 0) return;
+  if (ui.ctx.interface.word20250 === 0) return;
 
-  if (ui.attackingCharacterOrdinal === 0) {
+  if (ui.ctx.interface.attackingCharacterOrdinal === 0) {
     // The flash is a timed overlay rather than CSBWin's blocking delay; the panel stays
     // owed a redraw until it has run its course.
     if (ui.attackFlashUntilMs > nowMs()) return;
@@ -337,12 +337,12 @@ export function attackPanelTick(ui: UIState): void {
       ui.closedAttackMenuOrdinal = 0;
       return;
     }
-    ui.word20252 = 1;
+    ui.ctx.interface.word20252 = 1;
     drawLegalAttackTypes(ui);
     return;
   }
 
-  ui.word20252 = 0;
+  ui.ctx.interface.word20252 = 0;
   drawLegalAttackTypes(ui);
 }
 
@@ -408,7 +408,7 @@ export function drawAttackPanel(ui: UIState): void {
     return;
   }
 
-  if (ui.word20252 !== 0) {
+  if (ui.ctx.interface.word20252 !== 0) {
     for (let chIdx = 0; chIdx < ui.partyState.champions.length; chIdx++) {
       drawAttackButton(ui, chIdx);
     }
@@ -416,7 +416,7 @@ export function drawAttackPanel(ui: UIState): void {
   }
 
   // A closed menu is still what CSBWin's screen shows (`closeAttackMenu`).
-  const ordinal = ui.attackingCharacterOrdinal || ui.closedAttackMenuOrdinal;
+  const ordinal = ui.ctx.interface.attackingCharacterOrdinal || ui.closedAttackMenuOrdinal;
   if (ordinal === 0) return;
   const champ = getPartyChampion(ui.partyState, ordinal - 1);
   if (!champ) return;

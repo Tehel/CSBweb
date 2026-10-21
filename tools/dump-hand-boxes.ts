@@ -123,7 +123,7 @@ async function main(): Promise<void> {
   console.log('');
   console.log('=== the attack menu ===');
   prepareAttack(ui, 0);
-  check(ui.attackingCharacterOrdinal === 1, "champion 1's menu is open");
+  check(ui.ctx.interface.attackingCharacterOrdinal === 1, "champion 1's menu is open");
   check(show("champion 1's menu", bar()) === '33 35 33 33', 'the weapon hand of the attacker is boxed in cyan (:1207-1209)');
   check(show("champion 1's inventory, menu open", inventory(0)) === '33 35 33 33 33 33',
     'in the inventory too: D7W == 1 whichever screen the slot is on');
@@ -136,7 +136,7 @@ async function main(): Promise<void> {
   prepareAttack(ui, 1);
   check(show("champion 2's menu", bar()) === '33 33 33 35', "champion 2's menu boxes champion 2's hand");
   takeAttackOption(ui, 0);
-  check(ui.attackingCharacterOrdinal === 0, 'the attack closed the menu');
+  check(ui.ctx.interface.attackingCharacterOrdinal === 0, 'the attack closed the menu');
   check(show('attack, before the tick', bar()) === '33 33 33 33', 'and took the cyan box away');
   prepareAttack(ui, 0);
   closeAttackMenu(ui);

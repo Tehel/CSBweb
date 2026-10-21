@@ -341,10 +341,10 @@ async function main(): Promise<void> {
   const pass = flashOf('PASS', clickAt(attackRect(112)));
   check(pass.tick === undefined && same(pass.after[0]!, PASS) && pass.after[1] === null && pass.after[2] === null,
     'PASS should flash (0x11d, 0x13f, 0x4d, 0x53) with no tick, and the next VBL put it back (CSBCode.cpp:773)');
-  check(ui.attackingCharacterOrdinal === 0, 'PASS should close the menu');
+  check(ui.ctx.interface.attackingCharacterOrdinal === 0, 'PASS should close the menu');
 
   prepareAttack(ui, 0);
-  const offered = ui.word20248;
+  const offered = ui.ctx.interface.word20248;
   const air = flashOf('option 113 at the air', clickAt(attackRect(113)));
   check(air.tick === undefined && same(air.after[0]!, OPTIONS[0]!) && air.after[1] === null,
     'a blow at the air (0, d.clockTick = 0) should flash the option with no tick, and the next VBL put it back (:773)');
@@ -355,13 +355,13 @@ async function main(): Promise<void> {
   const first = flashOf('option 113, a blow that lands', clickAt(attackRect(113)));
   check(same(first.tick ?? null, OPTIONS[0]!) && same(first.after[0]!, OPTIONS[0]!) && first.after[1] === null,
     "the first option's tick should draw it inverted, and the next VBL put it back");
-  check(ui.attackingCharacterOrdinal === 0, 'the attack should close the menu');
+  check(ui.ctx.interface.attackingCharacterOrdinal === 0, 'the attack should close the menu');
 
   // Champion 1's key column: W opens its menu, then each key of the column is a row.
   reset();
   const keyRow = (key: string): { inverted: Rect | null; ordinal: number } => {
     handleUIKey(ui, key);
-    const result = { inverted: flashedButton(game.ctx), ordinal: ui.attackingCharacterOrdinal };
+    const result = { inverted: flashedButton(game.ctx), ordinal: ui.ctx.interface.attackingCharacterOrdinal };
     frame();
     frame();
     return result;

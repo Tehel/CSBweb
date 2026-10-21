@@ -94,20 +94,6 @@ export interface GameHost {
    */
   closeAttackMenuOf(chIdx: number): void;
   /**
-   * `d.AttackingCharacterOrdinal`: the champion whose attack menu is open, from 1, or 0.
-   * `PrintWithSubstitution`'s `@p` names them. The attack menu is the UI's.
-   */
-  attackingCharacterOrdinal(): number;
-  /**
-   * `d.PressingEye`, `d.PressingMouth` and `d.DisplayResurrectChestOrScroll`, which the
-   * ten-second update and `PoisonCharacter` read before they set `CHARFLAG_chestOrScroll`
-   * (`doc/CSBwin-src/Code17818.cpp:435-443`, `doc/CSBwin-src/CSBCode.cpp:7279-7284`):
-   * the eye or the mouth held, and what `TAG0189d4` last put in its panel, are the UI's.
-   */
-  pressingEye(): boolean;
-  pressingMouth(): boolean;
-  displayResurrectChestOrScroll(): number;
-  /**
    * `ShowHideInventory(chIdx)` (`doc/CSBwin-src/CSBCode.cpp:7478`), 4 to hide: the
    * inventory is the UI's. `_FusionSequence` hides an open one (`Attack.cpp:2271-2274`).
    */
@@ -236,10 +222,6 @@ export function createGameHost(host: Partial<GameHost> = {}): GameHost {
     openReincarnateScreen: host.openReincarnateScreen ?? (() => {}),
     championJoined: host.championJoined ?? (() => {}),
     closeAttackMenuOf: host.closeAttackMenuOf ?? (() => {}),
-    attackingCharacterOrdinal: host.attackingCharacterOrdinal ?? (() => 0),
-    pressingEye: host.pressingEye ?? (() => false),
-    pressingMouth: host.pressingMouth ?? (() => false),
-    displayResurrectChestOrScroll: host.displayResurrectChestOrScroll ?? (() => 0),
     showHideInventory: host.showHideInventory ?? (() => {}),
     releaseEyeOrMouth: host.releaseEyeOrMouth ?? (() => {}),
     repackChest: host.repackChest ?? (() => {}),

@@ -65,7 +65,7 @@ function champion(game: Game): number {
   game.ctx.party.state.champions.forEach((_, chIdx) => {
     const ui = uiOf(freshGame());
     prepareAttack(ui, chIdx);
-    if (ui.attackingCharacterOrdinal !== 0 && ui.attackOptionCount > most) [best, most] = [chIdx, ui.attackOptionCount];
+    if (ui.ctx.interface.attackingCharacterOrdinal !== 0 && ui.attackOptionCount > most) [best, most] = [chIdx, ui.attackOptionCount];
   });
   if (best < 0) throw new Error('no champion of the save can attack');
   return best;
@@ -93,7 +93,7 @@ const plain = freshGame();
 const chIdx = champion(plain);
 const ui0 = uiOf(plain);
 prepareAttack(ui0, chIdx);
-const types = Array.from(ui0.possibleAttackTypes.subarray(0, 3));
+const types = Array.from(ui0.ctx.interface.possibleAttackTypes.subarray(0, 3));
 const n = ui0.attackOptionCount;
 const names = ui0.uiTables.graphic230.attackNames;
 console.log(`1. champion ${chIdx}, no filter: ${n} options, types [${types.join(', ')}], named `
@@ -141,7 +141,7 @@ for (const [index, text, renames] of [[7, 'FLAME', true], [0x10007, 'FLAME', fal
   const game = withFilterDsas(ESL_ACTIONNAMEFILTER, [[...report(0), ...setParam(4, other)]]);
   const ui = uiOf(game);
   prepareAttack(ui, chIdx);
-  const now = Array.from(ui.possibleAttackTypes.subarray(0, 3));
+  const now = Array.from(ui.ctx.interface.possibleAttackTypes.subarray(0, 3));
   console.log(`4. parameter 4 set to ${other}: types [${now.join(', ')}], named ${JSON.stringify(ui.attackOptionNames)}`);
   check(now.join() === types.map((t, i) => (i < n ? other : t)).join(), 'each option offered is the attack the DSA chose');
   check(ui.attackOptionNames.join() === ui0.attackOptionNames.join(), 'named still by the attack it was');

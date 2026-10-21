@@ -26,6 +26,7 @@ import { Party } from './Party';
 import { PartyFootprints } from './PartyFootprints';
 import { MouseQueue } from './MouseQueue';
 import { createLoopFlags, type LoopFlags, type MainLoop } from './LoopState';
+import { createInterfaceState, type InterfaceState } from './InterfaceState';
 import { Overlay } from './Overlay';
 import { identityOverlayPalette } from './OverlayPalette';
 import { createSmartDiscardState, type SmartDiscardState } from './SmartDiscard';
@@ -120,6 +121,8 @@ export interface GameContext {
   readonly mouseQueue: MouseQueue;
   /** `d.clockTick` and `d.newPartyLevel` as other files write them (`LoopFlags`). */
   readonly loop: LoopFlags;
+  /** The interface's `d.` fields the engine reads too: the eye, the mouth, the open chest, the attack menu (`InterfaceState`). */
+  readonly interface: InterfaceState;
   /** `QueueSound`. */
   readonly sounds: SoundQueue;
   /** `SmartDiscard.cpp`'s statics: where the discard cycle stands. */
@@ -339,6 +342,7 @@ export function createGameContext(
     timers,
     mouseQueue: new MouseQueue(),
     loop: createLoopFlags(),
+    interface: createInterfaceState(),
     sounds: new SoundQueue(party, tables.sound1772, host, state, timers),
     smartDiscard: createSmartDiscardState(),
     levelCleared: new Uint8Array(16),

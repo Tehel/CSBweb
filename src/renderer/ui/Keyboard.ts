@@ -397,7 +397,7 @@ function attackKey(ui: UIState, chIdx: number, option: number): void {
   const party = ui.partyState;
   if (championPending(ui)) return;
   if (chIdx >= party.champions.length) return;
-  if (ui.attackingCharacterOrdinal === chIdx + 1) {
+  if (ui.ctx.interface.attackingCharacterOrdinal === chIdx + 1) {
     // The attack options are button ids 113-115, flashed and taken as a click's are.
     attackMenuButton(ui, 113 + option);
     return;
@@ -412,7 +412,7 @@ function attackKey(ui: UIState, chIdx: number, option: number): void {
  */
 function pass(ui: UIState): void {
   if (championPending(ui)) return;
-  if (ui.attackingCharacterOrdinal === 0) return;
+  if (ui.ctx.interface.attackingCharacterOrdinal === 0) return;
   attackMenuButton(ui, 112);
 }
 

@@ -904,7 +904,7 @@ export class MonsterAttack {
 
     this.damageCharacter(chIdx, Math.max(1, Math.trunc(strength / 64)), 0, 0);
     // `CHARFLAG_statsChanged` has no counterpart: the panels are drawn from live state.
-    if (chIdx === party.selectedCharacterIndex && this.ctx.host.displayResurrectChestOrScroll() === 0) {
+    if (chIdx === party.selectedCharacterIndex && this.ctx.interface.displayResurrectChestOrScroll === 0) {
       champ.charFlags |= CHARFLAG_CHEST_OR_SCROLL;
     }
 

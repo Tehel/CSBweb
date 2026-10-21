@@ -332,7 +332,7 @@ async function main(): Promise<void> {
     reset();
     party.champions = [champion()];
     party.selectedCharacterIndex = 0;
-    ui.pressingEye = false;
+    ui.ctx.interface.pressingEye = false;
     ui.diskMenuNeeded = false;
     buttonsAt.click(game, 71, 20, 50);
     if (withButtonUp) game.onMouseUnClick();
@@ -532,9 +532,9 @@ async function main(): Promise<void> {
     party.magicCasterIndex = 0;
     party.selectedCharacterIndex = -1;
     party.objectInHand = OBJECT_ID_NULL;
-    ui.pressingEye = false;
-    ui.attackingCharacterOrdinal = 0;
-    ui.word20252 = 1;
+    ui.ctx.interface.pressingEye = false;
+    ui.ctx.interface.attackingCharacterOrdinal = 0;
+    ui.ctx.interface.word20252 = 1;
     game.ctx.loop.clockTick = false;
   };
   /**
@@ -594,7 +594,7 @@ async function main(): Promise<void> {
   check(party.selectedCharacterIndex < 0 && closeFrames === 1, 'so does hiding it');
 
   soloParty();
-  ui.pressingEye = true;
+  ui.ctx.interface.pressingEye = true;
   const eyeFrames = framesToTick(() => handleMouseButton(ui, 7, 0, 0));
   const openedUnderEye = party.selectedCharacterIndex === 0;
   row('button 7, eye pressed', openedUnderEye ? 'opened' : 'refused', eyeFrames, '-', 'untouched');
@@ -633,14 +633,14 @@ async function main(): Promise<void> {
   const attackOnce = (measure: 'frames' | 'due', option: [number, number]): number | boolean => {
     soloParty();
     handleMouseButton(ui, 111, champX, champY);
-    if (ui.attackingCharacterOrdinal !== 1) throw new Error('the attack menu did not open');
+    if (ui.ctx.interface.attackingCharacterOrdinal !== 1) throw new Error('the attack menu did not open');
     attackResult = -99;
     const click = (): void => handleMouseButton(ui, 111, option[0], option[1]);
     return measure === 'frames' ? framesToTick(click) : dueTickRuns(click);
   };
   soloParty();
   handleMouseButton(ui, 111, champX, champY);
-  const optionCount = ui.word20248;
+  const optionCount = ui.ctx.interface.word20248;
   const offered = new Set<number>();
   for (let option = 0; option < optionCount; option++) {
     const at = centreOf(buttons.buttons17892, 113 + option);
@@ -664,7 +664,7 @@ async function main(): Promise<void> {
   const passFrames = attackOnce('frames', [passX, passY]) as number;
   const passDueRuns = attackOnce('due', [passX, passY]) as boolean;
   row('PASS', String(attackResult), passFrames, passDueRuns, 'untouched');
-  check(ui.attackingCharacterOrdinal === 0 && attackResult === -99, 'PASS closes the menu and attacks nothing');
+  check(ui.ctx.interface.attackingCharacterOrdinal === 0 && attackResult === -99, 'PASS closes the menu and attacks nothing');
   check(passFrames > 1 && passDueRuns, 'and leaves d.clockTick alone');
 
   // The cast button (108), by a champion with every skill mastered, so no cast fails on

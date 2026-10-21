@@ -302,27 +302,27 @@ async function main(): Promise<void> {
   }
   // The reference: the same champion, already in the party, eye held. The text lands on
   // graphic 20, the panel's own background, so a line drawn on zeros would not match.
-  ui.pressingEye = true;
+  ui.ctx.interface.pressingEye = true;
   const wantLine = lineStrip(renderInventory(), 0, candidateLine.length);
   check(/[^0]/.test(wantLine), 'the reference panel is drawn');
   party.state.potentialChampionIndex = 0;
-  ui.pressingEye = false;
+  ui.ctx.interface.pressingEye = false;
   const menuPixels = renderInventory();
   const menuLine = lineStrip(menuPixels, 0, candidateLine.length);
-  console.log(`eye released: menu state ${ui.displayResurrectChestOrScroll}, `
+  console.log(`eye released: menu state ${ui.ctx.interface.displayResurrectChestOrScroll}, `
     + `mastery line ${menuLine === wantLine ? 'drawn' : 'covered by the menu'}`);
-  check(ui.displayResurrectChestOrScroll === 5, 'a candidate\'s inventory shows the Resurrect menu');
+  check(ui.ctx.interface.displayResurrectChestOrScroll === 5, 'a candidate\'s inventory shows the Resurrect menu');
   check(menuLine !== wantLine, 'the menu, not the panel, is on the mastery line');
-  ui.pressingEye = true;
+  ui.ctx.interface.pressingEye = true;
   const eyePixels = renderInventory();
   const eyeLine = lineStrip(eyePixels, 0, candidateLine.length);
-  console.log(`eye held:     menu state ${ui.displayResurrectChestOrScroll}, `
+  console.log(`eye held:     menu state ${ui.ctx.interface.displayResurrectChestOrScroll}, `
     + `mastery line ${eyeLine === wantLine ? 'drawn' : 'covered by the menu'}`);
   check(eyeLine === wantLine, `the held eye shows "${candidateLine}" over the menu`);
-  check(ui.displayResurrectChestOrScroll === 5, '_ClickOnEye leaves DisplayResurrectChestOrScroll at 5');
-  ui.pressingEye = false;
+  check(ui.ctx.interface.displayResurrectChestOrScroll === 5, '_ClickOnEye leaves DisplayResurrectChestOrScroll at 5');
+  ui.ctx.interface.pressingEye = false;
   renderInventory();
-  check(ui.displayResurrectChestOrScroll === 5, 'releasing the eye brings the menu back');
+  check(ui.ctx.interface.displayResurrectChestOrScroll === 5, 'releasing the eye brings the menu back');
   party.state.potentialChampionIndex = -1;
   console.log('');
 
