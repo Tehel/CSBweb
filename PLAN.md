@@ -142,7 +142,3 @@ notes of the phases closed up to 2026-09-26; for a phase closed later, its line 
 | 15 | Verification: the test runner, the golden frames, the render probe, the table items round-tripped |
 | 16 | Title screen and dungeon entrance |
 | 17 | Deployment: the game on the author's VPS (`doc/DEPLOYMENT.md`, `doc/STATISTICS.md`) |
-
-## Next Steps (Phased)
-
-Only the phases with work left in them.
