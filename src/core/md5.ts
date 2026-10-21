@@ -5,6 +5,8 @@
  * `crypto.subtle` has no MD5, so the port has its own.
  */
 
+import type { Tuple } from './types';
+
 /** The per-round shifts, `S11` to `S44` (`md5C.cpp`), four to a round. */
 const SHIFTS = [7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21];
 
@@ -21,7 +23,7 @@ export function md5(bytes: Uint8Array): Uint8Array {
     view.setUint32(padded.length - 8, (bytes.length * 8) >>> 0, true);
     view.setUint32(padded.length - 4, Math.floor(bytes.length / 0x20000000), true);
 
-    const state = [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476];
+    const state: Tuple<number, 4> = [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476];
     const x = new Uint32Array(16);
     for (let block = 0; block < padded.length; block += 64) {
         for (let i = 0; i < 16; i++) x[i] = view.getUint32(block + 4 * i, true);
@@ -34,8 +36,8 @@ export function md5(bytes: Uint8Array): Uint8Array {
             else if (round === 1) { f = (b & d) | (c & ~d); g = (5 * i + 1) & 15; }
             else if (round === 2) { f = b ^ c ^ d; g = (3 * i + 5) & 15; }
             else { f = c ^ (b | ~d); g = (7 * i) & 15; }
-            const s = SHIFTS[(round << 2) | (i & 3)];
-            const sum = (a + f + K[i] + x[g]) >>> 0;
+            const s = SHIFTS[(round << 2) | (i & 3)]!;
+            const sum = (a + f + K[i]! + x[g]!) >>> 0;
             a = d;
             d = c;
             c = b;

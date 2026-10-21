@@ -4,6 +4,7 @@
  * IMG1 and IMG2 name the two byte orders the 4-byte header can come in, nothing more.
  */
 
+import { readU8, readU16BE, readU16LE } from './bytes';
 import type { ui8, ImageDimensions } from './types';
 
 /**
@@ -73,12 +74,9 @@ export const EXPAND_GRAPHIC_MAX_SIZE = 999999;
  * subroutine the single-pixel opcode uses (`CSBCode.cpp:11084-11091`).
  */
 export function decodeIMG(data: Uint8Array, format: ImageFormat = ImageFormat.IMG1): DecodedImage {
-    const width = format === ImageFormat.IMG1
-        ? (data[0] << 8) | data[1]
-        : data[0] | (data[1] << 8);
-    const height = format === ImageFormat.IMG1
-        ? (data[2] << 8) | data[3]
-        : data[2] | (data[3] << 8);
+    const readU16 = format === ImageFormat.IMG1 ? readU16BE : readU16LE;
+    const width = readU16(data, 0);
+    const height = readU16(data, 2);
 
     // `destBytesPerLine = (I16)(((destBytesPerLine+15)>>1)&0x7ff8)` bytes per line; two pixels to the byte.
     const stride = ((((width + 15) >> 1) & 0x7ff8)) * 2;
@@ -98,7 +96,7 @@ export function decodeIMG(data: Uint8Array, format: ImageFormat = ImageFormat.IM
     };
 
     while (off < data.length && p < total) {
-        const op = data[off++];
+        const op = data[off++]!;
         const colour = op & 0xf;
 
         // `if (D2B < 0) goto tag0214be;` — the short form, its count in the high nibble.
@@ -110,8 +108,8 @@ export function decodeIMG(data: Uint8Array, format: ImageFormat = ImageFormat.IM
         }
 
         // `D1B = *(A0++); if (D3W & 0x40) { D1W <<= 8; D1B = *(A0++); }; D1W += 1;`
-        let count = data[off++];
-        if (op & 0x40) count = ((count << 8) | data[off++]) & 0xffff;
+        let count = readU8(data, off++);
+        if (op & 0x40) count = ((count << 8) | readU8(data, off++)) & 0xffff;
         count += 1;
 
         switch (op & 0x30) {
@@ -120,7 +118,7 @@ export function decodeIMG(data: Uint8Array, format: ImageFormat = ImageFormat.IM
                 // opens with one pixel of the opcode's own colour so the rest pairs up.
                 if (count & 1) emit(colour);
                 for (let i = 0; i < (count >> 1); i++) {
-                    const pair = data[off++];
+                    const pair = readU8(data, off++);
                     emit(pair >> 4);
                     emit(pair);
                 }
@@ -130,7 +128,7 @@ export function decodeIMG(data: Uint8Array, format: ImageFormat = ImageFormat.IM
                 // `A2 = A1 - D7W` — the same column one line up, advancing in step. Then
                 // the fall-through into `tag0214f2`.
                 for (let i = 0; i < count && p < total; i++, p++) {
-                    buffer[p] = p >= stride ? buffer[p - stride] : 0;
+                    buffer[p] = p >= stride ? buffer[p - stride]! : 0;
                 }
                 emit(colour);
                 break;
@@ -142,8 +140,9 @@ export function decodeIMG(data: Uint8Array, format: ImageFormat = ImageFormat.IM
         }
     }
 
-    // A stream that stops short leaves the rest at colour 0. CSBWin has no such guard — it
-    // runs until the destination is full and reads off the end of the source if it has to —
+    // A stream that stops short leaves the rest at colour 0, and an opcode whose count or
+    // nibbles it cuts off reads 0 for them. CSBWin has no such guard — it runs until the
+    // destination is full and reads off the end of the source if it has to —
     // and graphic 5 is four pixels short of 320x200, so the real game shows four pixels of
     // whatever followed the buffer in the heap. They are the bottom-right corner of a border.
     const pixels = stride === width

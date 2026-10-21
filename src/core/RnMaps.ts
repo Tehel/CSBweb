@@ -83,19 +83,19 @@ export class RnMaps {
     dbType(rn: ObjectID): DBType {
         if (!this.checkIndirectIndex(rn)) return DBType.UNKNOWN;
         if (this.indexMap[rn] === 0xffff) return DBType.UNKNOWN;
-        return (this.typeMap[rn] & 0x0f) as DBType;
+        return (this.typeMap[rn]! & 0x0f) as DBType;
     }
 
     /** `RN::pos()` (`CSBTypes.h:337-341`): the corner of its cell. */
     pos(rn: ObjectID): TilePosition {
         this.check(rn);
-        return ((this.typeMap[rn] >> 4) & 3) as TilePosition;
+        return ((this.typeMap[rn]! >> 4) & 3) as TilePosition;
     }
 
     /** `RN::idx` (`CSBTypes.h:349-353`): the record within its database. */
     idx(rn: ObjectID): number {
         this.check(rn);
-        return this.indexMap[rn];
+        return this.indexMap[rn]!;
     }
 
     /** `dbType()`, `pos()` and `idx()` at once. */
@@ -109,7 +109,7 @@ export class RnMaps {
      */
     setPos(rn: ObjectID, p: number): ObjectID {
         this.check(rn);
-        this.typeMap[rn] = (this.typeMap[rn] & 0xcf) | ((p & 3) << 4);
+        this.typeMap[rn] = (this.typeMap[rn]! & 0xcf) | ((p & 3) << 4);
         return rn;
     }
 
@@ -125,9 +125,9 @@ export class RnMaps {
                 emptyIndexEntry = i;
                 continue;
             }
-            if ((this.typeMap[i] & 15) !== db) continue;
+            if ((this.typeMap[i]! & 15) !== db) continue;
             if (this.indexMap[i] === dbIndex) return i as ObjectID; // Already exists
-            if (this.link(db, this.indexMap[i]) === 0xffff) {
+            if (this.link(db, this.indexMap[i]!) === 0xffff) {
                 emptyIndexEntry = i;
                 continue;
             }
@@ -153,8 +153,8 @@ export class RnMaps {
                 if (emptyIndexEntry < 0) emptyIndexEntry = i;
                 continue;
             }
-            if ((this.typeMap[i] & 15) !== db) continue;
-            if (this.link(db, this.indexMap[i]) === 0xffff) {
+            if ((this.typeMap[i]! & 15) !== db) continue;
+            if (this.link(db, this.indexMap[i]!) === 0xffff) {
                 emptyIndexEntry = i;
                 break;
             }
@@ -180,9 +180,9 @@ export class RnMaps {
                 if (emptyIndexEntry < 0) emptyIndexEntry = i;
                 continue;
             }
-            if ((this.typeMap[i] & 15) !== db) continue;
-            if (this.link(db, this.indexMap[i]) === 0xffff) {
-                return { emptyIndexEntry: i, emptyDBEntry: this.indexMap[i] };
+            if ((this.typeMap[i]! & 15) !== db) continue;
+            if (this.link(db, this.indexMap[i]!) === 0xffff) {
+                return { emptyIndexEntry: i, emptyDBEntry: this.indexMap[i]! };
             }
         }
         return { emptyIndexEntry, emptyDBEntry: -1 };
@@ -213,11 +213,11 @@ export class RnMaps {
     deleteIndexEntry(db: DBType, dbIndex: number): boolean {
         let j = -1;
         for (let i = 0; i < this.dataMapLength; i++) {
-            if ((this.typeMap[i] & 0xf) !== db) continue;
+            if ((this.typeMap[i]! & 0xf) !== db) continue;
             if (this.indexMap[i] !== dbIndex) continue;
             if (j !== -1) return false; // Cloned!!!
             j = i;
-            if ((this.typeMap[i] & 0x80) !== 0) return false; // Cloned!!!
+            if ((this.typeMap[i]! & 0x80) !== 0) return false; // Cloned!!!
         }
         if (j !== -1) {
             this.typeMap[j] = 0xff;
@@ -237,7 +237,7 @@ export class RnMaps {
         const pos = (packed >> 14) & 3;
         const idx = packed & 0x3ff;
         for (let i = 1; i < this.dataMapLength; i++) {
-            if ((this.typeMap[i] & 15) !== dbNum) continue;
+            if ((this.typeMap[i]! & 15) !== dbNum) continue;
             if (this.indexMap[i] !== idx) continue;
             if (!duplicateOK) throw new Error('Duplicated Object');
             return { slot: i as ObjectID, duplicate: true };

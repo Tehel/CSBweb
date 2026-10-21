@@ -17,7 +17,7 @@ export function soundDataDecode(sound: Uint8Array, volume: number): Uint8Array {
   const volTable = new Uint8Array(256);
   for (let i = 0; i < 128; i++) volTable[i] = div(i - 128 - div(volume, 2), volume) + 128;
   for (let i = 128; i < 256; i++) volTable[i] = div(i - 128 + div(volume, 2), volume) + 128;
-  return sound.map((sample) => volTable[sample]);
+  return sound.map((sample) => volTable[sample]!);
 }
 
 interface SoundVariant {
@@ -168,7 +168,7 @@ export class SoundManager {
     const samples = soundDataDecode(sound, volume);
     const buffer = this.audioContext.createBuffer(1, samples.length, CUSTOM_SOUND_RATE);
     const channel = buffer.getChannelData(0);
-    for (let i = 0; i < samples.length; i++) channel[i] = (samples[i] - 128) / 128;
+    for (let i = 0; i < samples.length; i++) channel[i] = (samples[i]! - 128) / 128;
     const source = this.audioContext.createBufferSource();
     source.buffer = buffer;
     source.connect(this.gainNode);

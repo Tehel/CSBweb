@@ -84,10 +84,8 @@ export class BinaryFile {
         this.seek(this.pos + bytes);
     }
 
-    /**
-     * Check if we have enough bytes available
-     */
-    private checkAvailable(bytes: number): void {
+    /** The data, once it is checked to hold `bytes` more bytes from the read head. */
+    private checkAvailable(bytes: number): Uint8Array {
         if (!this.data) {
             throw new Error('No data loaded');
         }
@@ -97,6 +95,7 @@ export class BinaryFile {
                 `need ${bytes} bytes, only ${this.data.length - this.pos} available`
             );
         }
+        return this.data;
     }
 
     read(position: number, length: number): Uint8Array {
@@ -111,8 +110,7 @@ export class BinaryFile {
         if (position !== undefined) {
             this.seek(position);
         }
-        this.checkAvailable(1);
-        const value = this.data![this.pos];
+        const value = this.checkAvailable(1)[this.pos]!;
         this.pos += 1;
         return value;
     }
@@ -121,13 +119,13 @@ export class BinaryFile {
         if (position !== undefined) {
             this.seek(position);
         }
-        this.checkAvailable(2);
+        const d = this.checkAvailable(2);
 
         let value: ui16;
         if (this.endianness === Endianness.BIG_ENDIAN) {
-            value = (this.data![this.pos] << 8) | this.data![this.pos + 1];
+            value = (d[this.pos]! << 8) | d[this.pos + 1]!;
         } else {
-            value = this.data![this.pos] | (this.data![this.pos + 1] << 8);
+            value = d[this.pos]! | (d[this.pos + 1]! << 8);
         }
 
         this.pos += 2;
@@ -138,19 +136,19 @@ export class BinaryFile {
         if (position !== undefined) {
             this.seek(position);
         }
-        this.checkAvailable(4);
+        const d = this.checkAvailable(4);
 
         let value: ui32;
         if (this.endianness === Endianness.BIG_ENDIAN) {
-            value = (this.data![this.pos] << 24) |
-                    (this.data![this.pos + 1] << 16) |
-                    (this.data![this.pos + 2] << 8) |
-                    this.data![this.pos + 3];
+            value = (d[this.pos]! << 24) |
+                    (d[this.pos + 1]! << 16) |
+                    (d[this.pos + 2]! << 8) |
+                    d[this.pos + 3]!;
         } else {
-            value = this.data![this.pos] |
-                    (this.data![this.pos + 1] << 8) |
-                    (this.data![this.pos + 2] << 16) |
-                    (this.data![this.pos + 3] << 24);
+            value = d[this.pos]! |
+                    (d[this.pos + 1]! << 8) |
+                    (d[this.pos + 2]! << 16) |
+                    (d[this.pos + 3]! << 24);
         }
 
         this.pos += 4;
@@ -167,11 +165,11 @@ export class BinaryFile {
      * (`doc/PROVEN_FACTS.md` → "The dungeon image layout in a save file").
      */
     peekU32LE(position: number): ui32 {
-        if (position < 0 || position + 4 > (this.data?.length ?? 0)) {
+        const d = this.data;
+        if (!d || position < 0 || position + 4 > d.length) {
             throw new Error(`peekU32LE out of range at ${position}`);
         }
-        const d = this.data!;
-        return (d[position] | (d[position + 1] << 8) | (d[position + 2] << 16) | (d[position + 3] << 24)) >>> 0;
+        return (d[position]! | (d[position + 1]! << 8) | (d[position + 2]! << 16) | (d[position + 3]! << 24)) >>> 0;
     }
 
     readI8(position?: number): i8 {
@@ -189,7 +187,7 @@ export class BinaryFile {
     }
 
     // Peek at next byte without advancing position
-    peek(): ui8 { this.checkAvailable(1); return this.data![this.pos]; }
+    peek(): ui8 { return this.checkAvailable(1)[this.pos]!; }
     eof(): boolean { return this.data ? this.pos >= this.data.length : true; }
     remaining(): number { return this.data ? this.data.length - this.pos : 0; }
     setEndianness(endianness: Endianness): void { this.endianness = endianness; }

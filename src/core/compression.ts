@@ -4,6 +4,7 @@
  * Algorithms verified against the CSBWin implementation.
  */
 
+import { readU16BE } from './bytes';
 import type { ui8, ui16 } from './types';
 
 /**
@@ -91,24 +92,25 @@ export function LZWexpand(compressedData: Uint8Array): Uint8Array {
             LZWvar1 = (nbToRead << 3) - LZWCodeSize + 1;
         }
 
-        // Read next code from bit stream
+        // Read next code from bit stream. At the stream's tail a code can run past the
+        // bytes read, and the bits past them read 0.
         let bitPosition = LZWBitNumber;
         let offset = bitPosition >> 3;
         bitPosition &= 7;
 
-        newCode = ioBuffer[offset];
+        newCode = ioBuffer[offset] ?? 0;
         offset += 1;
         newCode >>= bitPosition;
         let bitsWeHave = 8 - bitPosition;
 
         // Read more bytes if needed for full code
         if (LZWCodeSize - bitsWeHave >= 8) {
-            newCode |= ioBuffer[offset] << bitsWeHave;
+            newCode |= (ioBuffer[offset] ?? 0) << bitsWeHave;
             offset += 1;
             bitsWeHave += 8;
         }
 
-        newCode |= (ioBuffer[offset] & rightBits[LZWCodeSize - bitsWeHave]) << bitsWeHave;
+        newCode |= ((ioBuffer[offset] ?? 0) & rightBits[LZWCodeSize - bitsWeHave]!) << bitsWeHave;
         LZWBitNumber += LZWCodeSize;
 
         if (newCode === -1) {
@@ -139,14 +141,14 @@ export function LZWexpand(compressedData: Uint8Array): Uint8Array {
             newCode = prevCodeWord;
         }
 
-        // Decode chain
+        // Decode chain. An entry a damaged stream names before it is made reads 0.
         while (newCode >= 256) {
-            stack.push(byteArray[newCode]);
-            newCode = wordArray[newCode];
+            stack.push(byteArray[newCode] ?? 0);
+            newCode = wordArray[newCode] ?? 0;
             if (stack.length > 4096) throw new Error('LZW dictionary chain closes on itself');
         }
 
-        D7 = byteArray[newCode];
+        D7 = byteArray[newCode] ?? 0;
         stack.push(D7);
 
         // Output decoded bytes
@@ -232,16 +234,17 @@ export function RLEexpand(compressedData: Uint8Array, maxSize = MAX_EXPANDED_SIZ
  * A repeat stops at the first word's count, past which nothing is kept.
  */
 export function SNDexpand(compressedData: Uint8Array): Uint8Array {
-    const size = (compressedData[0] << 8) | compressedData[1];
+    const size = readU16BE(compressedData, 0);
     const out: ui8[] = [];
 
     let offset = 2;
     let odd = false;
 
+    // A repeat's count can run past the last byte, whose nibbles read 0.
     function getNibble(): ui8 {
         const nib = odd
-            ? compressedData[offset++] & 0xF
-            : compressedData[offset] >> 4;
+            ? (compressedData[offset++] ?? 0) & 0xF
+            : (compressedData[offset] ?? 0) >> 4;
         odd = !odd;
         return nib;
     }
@@ -327,7 +330,8 @@ export function decompressGraphics(
  * input word in its low word; `acc` and `input` are those two halves. The count is
  * `D7W`, a word, so a `dstSize` over 65535 expands only `dstSize & 0xffff` bytes (65536
  * when that is 0), as it does in CSBWin. A word past the end of `src` reads as 0 here,
- * where CSBWin would read beyond its buffer. A `dstSize` past `MAX_EXPANDED_SIZE` throws.
+ * where CSBWin would read beyond its buffer, and so does an entry of a table a short
+ * `src` does not hold. A `dstSize` past `MAX_EXPANDED_SIZE` throws.
  */
 export function ExpandData(src: Uint8Array, dstSize: number): Uint8Array {
     if (dstSize > MAX_EXPANDED_SIZE) throw new Error(`dungeon.dat expands to ${dstSize} bytes, past ${MAX_EXPANDED_SIZE}`);
@@ -339,7 +343,7 @@ export function ExpandData(src: Uint8Array, dstSize: number): Uint8Array {
     let input = 0;
     let bitsLeft = 0; // D0W: the bits still in `input`
     const nextWord = (): number => {
-        const w = a3 + 1 < src.length ? (src[a3] << 8) | src[a3 + 1] : 0;
+        const w = a3 + 1 < src.length ? (src[a3]! << 8) | src[a3 + 1]! : 0;
         a3 += 2;
         return w;
     };
@@ -362,13 +366,13 @@ export function ExpandData(src: Uint8Array, dstSize: number): Uint8Array {
     for (;;) {
         if ((input & 0x8000) === 0) { // tag02073c
             getBits(3);
-            if (a2 < dstSize) dst[a2] = src[acc];
+            if (a2 < dstSize) dst[a2] = src[acc] ?? 0;
         } else {
             getBits(2);
             acc = (acc - 2) & 0xffff;
             if (acc === 0) {
                 getBits(4);
-                if (a2 < dstSize) dst[a2] = src[acc + 4];
+                if (a2 < dstSize) dst[a2] = src[acc + 4] ?? 0;
             } else { // tag020732
                 getBits(8);
                 if (a2 < dstSize) dst[a2] = acc & 0xff;

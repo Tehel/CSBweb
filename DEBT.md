@@ -683,15 +683,18 @@ palette codes, so none moves.
 
 ### E36 ⏳ Type escape hatches that check nothing
 
-`noUncheckedIndexedAccess` is off for the engine, `src/core/`, `src/data/`, `src/audio/`
-and the page's `src/ui/` (568 errors there with it on), so their 213 `x[i]!` assert
-nothing: 37 in `DsaSystem.ts` among them. Their `!` documents where an index was proved,
+`noUncheckedIndexedAccess` is off for the engine, `src/data/` and the page's `src/ui/`
+(468 errors there with it on), so their 203 `x[i]!` assert nothing: 37 in `DsaSystem.ts`
+among them. Their `!` documents where an index was proved,
 and the compiler holds none of them to it.
 
 What stands: `tools/tsc-indexed-access.mjs`, which `npm test` runs, holds the modules in
 its `MODULES` to the flag: `src/renderer/` (the intro, the bytecode, `csbwin/` and the
-interface among it), `src/lib/`, `src/settings/` and `src/stats/`, so each `!` left there
-is an index the code proves. A table of a fixed length is a `Tuple` (`src/core/types.ts`)
+interface among it), `src/core/`, `src/audio/`, `src/lib/`, `src/settings/` and
+`src/stats/`, so each `!` left there is an index the code proves. Where a damaged or
+short file can send a read past its end, the read says what it gets, 0, as `src/core/bytes.ts`'s
+do: the LZW, SND and `ExpandData` streams' tails and tables, and an IMG opcode a
+stream cuts off. A table of a fixed length is a `Tuple` (`src/core/types.ts`)
 once its reader has checked the length, and a constant index into it needs none:
 `hcsb.dat`'s fifty words, a CSB wall or floor decoration's descriptors, the message strip's
 four rows and `framesAcross`'s frames. No `??`, `?.`, `!` or `as` in `src/` is redundant by the
@@ -699,8 +702,7 @@ types, read with the flag on (`navigator.storage?.` aside, a browser's feature t
 CSBWin's `RNempty` is `OBJECT_ID_EMPTY`; `noImplicitReturns` and `noImplicitOverride` are on
 (`exactOptionalPropertyTypes` raises 37).
 
-Paying the rest: the other modules where data comes from files added to `MODULES`, a step
-each: `src/core/` (98 errors), `src/data/` (194) and `src/audio/` (2). The engine (250) and the page's
+Paying the rest: `src/data/` (194 errors) added to `MODULES`, a step. The engine (250) and the page's
 `src/ui/` (24) come last, or stay out if the author prefers; the item is paid when the
 list is decided and held.
 
