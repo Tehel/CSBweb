@@ -29,7 +29,7 @@
 import type { Swoosh } from '../../data/SwooshLoader';
 import { readHintOracle } from '../../data/HintOracleLoader';
 import type { HintOracleFiles } from '../ui/HintOracleButton';
-import { Die } from '../../engine/Die';
+import { Die } from '../../core/Die';
 import { canvasPoint } from '../../lib/crt';
 import type { MessageSink } from '../../engine/GameHost';
 import type { SavedGameRead } from '../../engine/GameSaves';

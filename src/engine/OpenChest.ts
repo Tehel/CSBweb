@@ -8,7 +8,7 @@
  */
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../core/types';
 import type { GameContext } from './GameContext';
-import { getChampionPossession } from './gameTypes';
+import { getChampionPossession } from '../core/charDesc';
 import { emptyChestContents } from './InterfaceState';
 
 /**

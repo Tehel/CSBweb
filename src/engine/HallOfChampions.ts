@@ -29,11 +29,10 @@ import {
   computeChampionFingerprint,
   createChampionFromHeroText,
   findFreeCharPosition,
-  readHeroText,
-  type HeroText,
   type AddCharacterItem,
   type AddCharacterTables,
 } from './AddCharacter';
+import { readHeroText, type HeroText } from '../data/HeroExtractor';
 import {
   attributeCurrent,
   attributeMaximum,
@@ -42,7 +41,8 @@ import {
   setAttributeMaximum,
 } from './attributes';
 import type { GameContext } from './GameContext';
-import { emptyPossessions, type Champion } from './gameTypes';
+import { emptyPossessions } from '../core/charDesc';
+import type { Champion } from './gameTypes';
 import { setClockTick } from './LoopState';
 import { selectMagicCaster, setHandOwner } from './Party';
 import { tag02076e, tag0207cc } from './ShowHideInventory';

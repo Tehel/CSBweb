@@ -10,7 +10,8 @@
  */
 import { addCharacterDefaults } from '../../src/engine/AddCharacter';
 import { makeAddCharacterAttributes } from '../../src/engine/attributes';
-import { emptyPossessions, type Champion, type ChampionAttributes } from '../../src/engine/gameTypes';
+import { emptyPossessions } from '../../src/core/charDesc';
+import type { Champion, ChampionAttributes } from '../../src/engine/gameTypes';
 
 /** The test hero's `Attributes[7]`, in `AttributeIndex` order: Luck first. */
 export const TEST_STATS: readonly number[] = [60, 60, 50, 50, 50, 20, 20];

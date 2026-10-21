@@ -17,7 +17,8 @@
 import { DBType, Direction, OBJECT_ID_NULL, Position } from '../src/core/types';
 import { initialPartyState, setHandOwner } from '../src/engine/Party';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
-import { getChampionPossession, type Champion, type PartyState } from '../src/engine/gameTypes';
+import { getChampionPossession } from '../src/core/charDesc';
+import type { Champion, PartyState } from '../src/engine/gameTypes';
 import { type UIState } from '../src/renderer/ui/UIState';
 import { gameTablesOf, newGame, presetHeroesOf, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';

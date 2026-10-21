@@ -66,7 +66,7 @@ export interface ServerOptions {
 const SERVER_DIR = 'server';
 
 /** The page's check built for Node (`CheckDataSet`, `publish.ts`), under `distDir`. */
-export const CHECK_MODULE = `${SERVER_DIR}/LocalDataSets.js`;
+export const CHECK_MODULE = `${SERVER_DIR}/LocalDataSetCheck.js`;
 
 /** What the server uses of `CHECK_MODULE`: the page's check of a set, and its reader of a dungeon's walls. */
 export interface PageReaders {

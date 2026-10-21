@@ -1,4 +1,5 @@
-import { getChampionPossession, type Champion, type Skill } from './gameTypes';
+import { getChampionPossession } from '../core/charDesc';
+import type { Champion, Skill } from './gameTypes';
 import type { CsbRandom } from '../core/random';
 import type { GameContext } from './GameContext';
 import type { ObjectID } from '../core/types';

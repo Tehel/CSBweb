@@ -11,7 +11,7 @@
  * What a file does not hold, a load does not give back: `src/engine/CsbwinSaveGame.ts` →
  * "What is not restored", which `tools/dump-save-roundtrip.ts` holds to its list.
  */
-import { Die } from './Die';
+import { Die } from '../core/Die';
 import { saveSaveGameState, type Block1, type Block2, type SaveGameState } from '../data/SaveGameLoader';
 import { applyCsbwinSave } from './CsbwinSaveGame';
 import { buildCsbwinCharacterBlock } from '../data/CsbwinCharacters';

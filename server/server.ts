@@ -6,7 +6,7 @@
  *
  *   PORT            the port to listen on (8085; 0 picks a free one)
  *   DIST_DIR        the built page (the checkout's `dist/`), and the page's check built for
- *                   Node, `server/LocalDataSets.js` under it (`npm run build`)
+ *                   Node, `server/LocalDataSetCheck.js` under it (`npm run build`)
  *   GAMEFILES_DIR   the data sets (the checkout's `static/gamefiles/`)
  *   FILES_DIR       the files shared by link, under `files/` (the checkout's `files/`, which
  *                   git ignores): a folder that is not there is not checked, and serves nothing

@@ -147,8 +147,8 @@ Reached from a wall click on actuator type **127** whose state lacks `PORTRAIT_I
    data set's graphics: 1.3-fr's SYRA is "L}ENFANT DE SAUVAGE", nineteen characters.
 
    The port reads the text at the click, as here: `HallOfChampions.heroTextInPartyCell`
-   and `readHeroText` (`src/engine/AddCharacter.ts`). `extractPresetHeroes`
-   (`src/data/HeroExtractor.ts`) does the same reading ahead of play for the tools,
+   and `readHeroText` (`src/data/HeroExtractor.ts`). `extractPresetHeroes`, beside it,
+   does the same reading ahead of play for the tools,
    checked by `tools/dump-preset-heroes.ts`.
 7. Sets `d.PotentialCharacterOrdinal = NumCharacter + 1` and increments `NumCharacter`
    (`:705-706`) — the champion is *provisionally* in the party.

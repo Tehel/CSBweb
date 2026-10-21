@@ -4,7 +4,8 @@ import { sb, sw } from '../core/intCast';
 import { readI16BE, writeU16BE } from '../core/bytes';
 import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
-import { CHARFLAG_ATTACK_DISABLE, CHARFLAG_PORTRAIT_CHANGED, getChampionPossession, type PartyState } from './gameTypes';
+import { CHARFLAG_ATTACK_DISABLE, CHARFLAG_PORTRAIT_CHANGED, getChampionPossession } from '../core/charDesc';
+import type { PartyState } from './gameTypes';
 import { selectPaletteForLightLevel } from './LightLevel';
 import {
   RN_DISPELL_MISSILE, RN_FIREBALL, RN_LIGHTNING, RN_MONSTER_DEATH, RN_POISON_CLOUD, RN_FFE4,

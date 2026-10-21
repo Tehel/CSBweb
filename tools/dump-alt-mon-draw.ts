@@ -32,7 +32,7 @@ import { getActuatorType, getActuatorValue } from '../src/data/actuatorHelpers';
 import { AltGraphicMapping, AltMonCache, readAltMonGraph, type AltMonGraph } from '../src/data/AltMonGraphics';
 import { CSBGraphicType, CSBGraphicsLoader, decodePlanar, type IndexedBitmap } from '../src/data/CSBGraphicsLoader';
 import type { CreatureRecord, DungeonData, DungeonHeader } from '../src/data/dungeonTypes';
-import { Die } from '../src/engine/Die';
+import { Die } from '../src/core/Die';
 import { DrawRoomObjects, mapColorValue } from '../src/renderer/bytecode/DrawRoomObjects';
 import { ViewportDraw } from '../src/renderer/bytecode/ViewportDraw';
 import { createPaletteIndexViewportBuffer, mirrorBitmap, shrinkBlt } from '../src/renderer/csbwin/CanvasBlitter';

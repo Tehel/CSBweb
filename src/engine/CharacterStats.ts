@@ -21,7 +21,8 @@
 import { applyLimits, div, sw } from '../core/intCast';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../core/types';
 import { nameIndexOf, type GameContext } from './GameContext';
-import { getChampionPossession, type Champion } from './gameTypes';
+import { getChampionPossession } from '../core/charDesc';
+import type { Champion } from './gameTypes';
 import { determineMastery } from './skills';
 import { OBJNI_BOOTS_OF_SPEED, OBJNI_ELVEN_BOOTS } from '../core/objectNameIndex';
 import type { WeaponDesc } from '../data/tables/ObjectTables';

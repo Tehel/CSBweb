@@ -58,7 +58,8 @@ import { DungeonLoader } from '../src/data/DungeonLoader';
 import { dungeonSignature } from '../src/data/DungeonSignature';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { bigEndianDungeonDat } from '../src/data/LittleEndianDungeon';
-import { checkLocalDataSet, identifyLocalDataSetFile, type LocalDataSetDraft, type LocalDataSetFile } from '../src/data/LocalDataSets';
+import type { LocalDataSetFile } from '../src/data/LocalDataSets';
+import { checkLocalDataSet, identifyLocalDataSetFile, type LocalDataSetDraft } from '../src/engine/LocalDataSetCheck';
 import { lastTitleFrame, thumbnailPng } from '../src/renderer/intro/TitleThumbnail';
 
 /** The forum's list of custom dungeons, kept up to date by its moderators. */

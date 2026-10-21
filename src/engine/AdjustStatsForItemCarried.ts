@@ -40,7 +40,8 @@ import {
 } from '../core/objectNameIndex';
 import { incrAttributeCurrent, incrAttributeMaximum, incrAttributeMinimum } from './attributes';
 import type { DungeonState } from './DungeonState';
-import { CHARFLAG_CHEST_OR_SCROLL, type Champion } from './gameTypes';
+import { CHARFLAG_CHEST_OR_SCROLL } from '../core/charDesc';
+import type { Champion } from './gameTypes';
 
 // `whatToAdjust` (`:1586-1597`) — the first seven are `Attributes[]` indices.
 export const adjustLuck = 0;

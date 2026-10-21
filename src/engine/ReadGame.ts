@@ -6,7 +6,8 @@
 import { readExpectedSignatures, readRulesOptions, type ExtendedFeaturesBlock } from '../data/CsbwinExtendedFeatures';
 import type { DungeonData } from '../data/dungeonTypes';
 import { readDeleteDuplicateTimers } from '../data/CsbwinExpool';
-import { Die, die } from './Die';
+import { Die } from '../core/Die';
+import { die } from './Die';
 import { readFileSignatures } from './FileSignatures';
 import type { Game } from './Game';
 import { prepareRuntimeState, type ReadState } from './RuntimeSave';

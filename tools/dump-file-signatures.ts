@@ -32,7 +32,7 @@ import { Expool, readRuntimeFileSignatures, type ExpoolDatabase } from '../src/d
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { foldedSignature, Signature, type FileSignature } from '../src/data/FileSignature';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { Die } from '../src/engine/Die';
+import { Die } from '../src/core/Die';
 import { csbGraphicsOpener } from '../src/engine/FileSignatures';
 import { buildSaveFile } from '../src/engine/SaveGameFile';
 import { applySaveBytes } from '../src/engine/SaveGameFile';

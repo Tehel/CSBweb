@@ -10,7 +10,7 @@
 import type { ui32 } from '../core/types';
 import { readU16LE, readU32LE } from '../core/bytes';
 import { MAX_EXPANDED_SIZE } from '../core/compression';
-import { Die } from '../engine/Die';
+import { Die } from '../core/Die';
 import { Signature, type FileSignature } from './FileSignature';
 
 export enum CSBGraphicType {

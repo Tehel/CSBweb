@@ -22,7 +22,8 @@ import {
   adjustCurrentAttribute,
 } from './attributes';
 import type { GameContext } from './GameContext';
-import { CHARFLAG_PORTRAIT_CHANGED, type Champion } from './gameTypes';
+import { CHARFLAG_PORTRAIT_CHANGED } from '../core/charDesc';
+import type { Champion } from './gameTypes';
 import { drawCharacterState } from './Party';
 import type { FeedParameters } from './filterParameters';
 

@@ -114,7 +114,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E41 | `src/data/` imports the engine | M | ⏳ |
 | E35 | Comments and documents that are stale, wrong, or tell the past | M | ⏳ |
 | E36 | Type escape hatches that check nothing | M | ⏳ |
 | E25 | One helper for each rule, where copies drift | M | ⏳ |
@@ -196,8 +195,8 @@ from data", which draws the site's sets' thumbnail, the title's last frame
 the boot reads to show it, reduced to sixteen Atari colours, in the title animation's place
 (`src/renderer/intro/TitlePicture.ts`); under it, what the dungeon holds once its
 `dungeon.dat` reads (`dungeonCensus`, `src/engine/DungeonCensus.ts`, whose DSA half
-`tools/dump-dsa-census.ts` checks); and CANCEL and CONFIRM. `checkLocalDataSet` runs at
-every change with the boot's own readers, each file read, parsed and hashed once and `src/engine/FileSignatures.ts`'s rules, and
+`tools/dump-dsa-census.ts` checks); and CANCEL and CONFIRM. `checkLocalDataSet`
+(`src/engine/LocalDataSetCheck.ts`) runs at every change with the boot's own readers, each file read, parsed and hashed once and `src/engine/FileSignatures.ts`'s rules, and
 makes the record CONFIRM stores; the page then shows the set selected. A pen on a local
 set's picture reopens the form on its record: its id fixed, since its saves are filed
 under it, and its `dungeon.dat` replaceable but not removable; the record CONFIRM writes
@@ -220,7 +219,7 @@ local, red pending, purple hidden (the one colour of the page outside the UI pal
 white otherwise. Its `gamefiles/` is mounted read-write, and `server/backup.ts` copies the folders
 of the sets beside the store's snapshots. It reads a set with the page's own
 check: `npm run build` bundles `checkLocalDataSet` and its readers for Node into
-`dist/server/LocalDataSets.js` (`vite.config.mts`, `doc/DEPLOYMENT.md` → "The build"),
+`dist/server/LocalDataSetCheck.js` (`vite.config.mts`, `doc/DEPLOYMENT.md` → "The build"),
 which `server.ts` loads at start-up and hands the API (`CheckDataSet`, `loadCheckDataSet`,
 `server/app.ts`), a tool the source's function instead, and the publish route reads a set
 with it (`server/publish.ts`).
@@ -751,22 +750,6 @@ Paying it: the casts and `??` removed where the type already says it; `hcsb.dat`
 lengths checked once in `parseHcsbDat`, not by 54 `!`; `noUncheckedIndexedAccess` turned on
 module by module where data comes from files (the intro, the renderer, the loaders), in a
 `tsconfig` that `npm test` runs; an `OBJECT_ID_EMPTY` constant; the two free flags on.
-
-### E41 ⏳ `src/data/` imports the engine
-
-The readers sit below the engine that runs what they read, yet six value imports point
-up: `AltMonGraphics` and `CSBGraphicsLoader` take `Die` (`src/engine/Die.ts`),
-`CsbwinCharacters` takes `CHARFLAG_MALE` and `getChampionPossession` from
-`engine/gameTypes`, `HeroExtractor` takes `readHeroText` from `engine/AddCharacter`, and
-`LocalDataSets` takes `dungeonCensus` (`engine/DungeonCensus`) and `buildGameTables`
-(`engine/GameTables`). The last two are a set's check, which plays the boot's readers and
-counts what the dungeon holds, and the server bundles it (`dist/server/LocalDataSets.js`).
-
-Paying it: `Die` into `src/core/`; the possession reader and the flag beside
-`CsbwinCharacters` or in `core`; `readHeroText` into `HeroExtractor`, which `AddCharacter`
-then imports; and `checkLocalDataSet` with the census out of `src/data/`, beside the code
-that runs a set (the server's bundle entry moving with it). Then
-`tools/dump-import-cycles.ts` fails on an edge from `src/data/` into `src/engine/`.
 
 ### E39 ⏳ The About and Credits pages
 

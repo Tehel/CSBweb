@@ -1,5 +1,5 @@
 /**
- * No value-import cycle in `src/`.
+ * No value-import cycle in `src/`, and no value import up from its two bottom layers.
  *
  * A module that imports a value from a module that imports one back works only while
  * neither reads the other's value at load time: which of the two loads first depends on
@@ -10,6 +10,11 @@
  *
  * The tool reads every `.ts` file under `src/`, draws each value edge between two of
  * them, and fails on every strongly connected set of more than one module, printing it.
+ *
+ * And on every value edge up from the layers the rest stands on: `src/core/` imports a
+ * value only from itself, and `src/data/`, the readers, only from itself and `core`, never
+ * from the engine that runs what they read. A type may still name the engine's shapes
+ * (`Champion`), since it vanishes from the JavaScript.
  *
  * Run: `npm test -- --only=dump-import-cycles.ts`
  */
@@ -129,6 +134,20 @@ function main(): void {
   const cycles = components(graph).filter((scc) => scc.length > 1);
   for (const scc of cycles) console.log(`  cycle: ${scc.map(name).sort().join(', ')}`);
   check(cycles.length === 0, `no value-import cycle in src/ (${cycles.length} found)`);
+
+  // The layers: what each bottom directory may import a value from.
+  const layers: [string, string[]][] = [['core/', ['core/']], ['data/', ['data/', 'core/']]];
+  for (const [layer, below] of layers) {
+    const up: string[] = [];
+    let count = 0;
+    for (const [from, to] of graph) {
+      if (!name(from).startsWith(layer)) continue;
+      count++;
+      for (const t of to) if (!below.some((dir) => name(t).startsWith(dir))) up.push(`${name(from)} -> ${name(t)}`);
+    }
+    for (const edge of up) console.log(`  up from ${layer}: ${edge}`);
+    check(count > 10 && up.length === 0, `src/${layer} (${count} modules) imports a value only from ${below.map((dir) => `src/${dir}`).join(' and ')} (${up.length} edges up)`);
+  }
 
   finish();
 }

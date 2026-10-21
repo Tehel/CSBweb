@@ -116,7 +116,8 @@ import { MAX_PUBLISH_BYTES, MAX_PUBLISHED_FILE_BYTES } from '../server/publish.t
 import { StatsStore } from '../server/stats.ts';
 import { openStore } from '../server/store.ts';
 import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, documentPath, LOCAL_DATA_SET_TEXT_LIMITS, parseManifest, PLAYER_ID_HEADER } from '../src/data/DataSets.ts';
-import { checkLocalDataSet, localDataSet, readDungeonWalls } from '../src/data/LocalDataSets.ts';
+import { localDataSet } from '../src/data/LocalDataSets.ts';
+import { checkLocalDataSet, readDungeonWalls } from '../src/engine/LocalDataSetCheck.ts';
 import { parsePublishedDungeons } from '../src/data/DungeonSignature.ts';
 import { indexedPng, indexedPngRows } from '../src/core/png.ts';
 import { dataSetNamed, GAMEFILES_DIR, MANIFEST_FILE } from './lib/dataSets.ts';

@@ -29,7 +29,7 @@ import {
 import { buildImageChecksum } from '../data/CsbwinDungeonImageWriter';
 import { computeDungeonImageLayout } from '../data/DungeonImageLayout';
 import type { UtilityPortraits } from '../data/UtilityPortraits';
-import { CHARFLAG_MALE } from './gameTypes';
+import { CHARFLAG_MALE } from '../core/charDesc';
 
 /** `UtilityDiskMessages` (`doc/CSBwin-src/Chaos.cpp:518-561`), the ones this file shows. */
 export const UtilityDiskMessages = {

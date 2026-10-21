@@ -18,7 +18,7 @@
 import { OBJNI_TORCH_A, OBJNI_TORCH_D } from '../core/objectNameIndex';
 import { sw } from '../core/intCast';
 import type { GameContext } from './GameContext';
-import { getChampionPossession } from './gameTypes';
+import { getChampionPossession } from '../core/charDesc';
 import { GetBasicObjectType } from './objectIndex';
 
 export function selectPaletteForLightLevel(ctx: GameContext): void {

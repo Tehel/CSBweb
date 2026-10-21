@@ -27,7 +27,7 @@ import {
   buildExtendedFeaturesPrefix, EF_FLAGS, readExtendedFeatures, type ExtendedFeaturesBlock,
 } from '../src/data/CsbwinExtendedFeatures';
 import { DungeonLoader } from '../src/data/DungeonLoader';
-import { Die } from '../src/engine/Die';
+import { Die } from '../src/core/Die';
 import { BytecodeInterpreter, type InterpreterContext } from '../src/renderer/bytecode/BytecodeInterpreter';
 import { Opcode } from '../src/renderer/bytecode/Opcodes';
 import { check, finish } from './lib/check';

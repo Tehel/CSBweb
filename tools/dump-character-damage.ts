@@ -31,7 +31,7 @@ import { Party, setHandOwner } from '../src/engine/Party';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { AttributeIndex, attributeCurrent, makeAddCharacterAttributes } from '../src/engine/attributes';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
-import { CHARFLAG_CURSOR, CHARFLAG_PORTRAIT_CHANGED } from '../src/engine/gameTypes';
+import { CHARFLAG_CURSOR, CHARFLAG_PORTRAIT_CHANGED } from '../src/core/charDesc';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
 import { drawCharacterState, drawPartyStatus } from '../src/renderer/ui/Character';

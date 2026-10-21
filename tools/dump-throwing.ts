@@ -33,7 +33,7 @@ import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { AttackType } from '../src/engine/monsterTypes';
 import { graphicsTablesOf, newContext, newGame, stockDungeon, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
-import { CHARFLAG_ATTACK_DISABLE, getChampionPossession } from '../src/engine/gameTypes';
+import { CHARFLAG_ATTACK_DISABLE, getChampionPossession } from '../src/core/charDesc';
 import { testChampion } from './lib/champion';
 
 /** Enough samples that the `random()&15` in the distance formula averages out. */

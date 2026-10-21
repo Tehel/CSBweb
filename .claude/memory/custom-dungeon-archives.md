@@ -10,7 +10,7 @@ CSBWin directories:
 
 - The dungeon is rarely named `dungeon.dat`: `ST-TQ1-aktuba-dungeon.dat`,
   `Imprisoned Again V15a-csbwin.dat`, `The Prison Of Dragoth.dat`. Tell every file by what
-  it holds, `identifyLocalDataSetFile` (`src/data/LocalDataSets.ts`), after
+  it holds, `identifyLocalDataSetFile` (`src/engine/LocalDataSetCheck.ts`), after
   `bigEndianDungeonDat`.
 - Many pair a PC (little-endian) twin with the Atari file, and hold several versions in
   sibling folders (Imprisoned Again: v1.1 to v1.5a). Theron's Quest Conversion holds seven

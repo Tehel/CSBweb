@@ -37,7 +37,8 @@ import {
 } from '../data/actuatorHelpers';
 import { extendedCellFlagsKey, type DungeonState } from './DungeonState';
 import { nameIndexOf, type GameContext } from './GameContext';
-import { getChampionPossession, type PartyState, type Champion } from './gameTypes';
+import { getChampionPossession } from '../core/charDesc';
+import type { PartyState, Champion } from './gameTypes';
 import { vacantPossession } from '../data/CsbwinCharacters';
 import { TimerFunction } from './TimerQueue';
 import type { TimerEntry, TimerQueue } from './TimerQueue';

@@ -17,7 +17,8 @@
 import { OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID, type Position } from '../core/types';
 import type { DatabaseRecord } from '../data/dungeonTypes';
 import type { GameContext } from './GameContext';
-import { getChampionPossession, type Champion } from './gameTypes';
+import { getChampionPossession } from '../core/charDesc';
+import type { Champion } from './gameTypes';
 import { DescIndex } from './objectIndex';
 
 /** Who threw an object, from which slot, and the record it was then. */

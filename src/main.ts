@@ -35,7 +35,7 @@ import { openHintOracle, runBootSequence, type BootSequenceDeps } from './render
 import { reduceTitlePicture } from './renderer/intro/TitlePicture';
 import type { TitleFrame } from './renderer/intro/TitleThumbnail';
 import { showEndOfGame } from './renderer/intro/EndOfGame';
-import { Die } from './engine/Die';
+import { Die } from './core/Die';
 import { csbGraphicsOpener } from './engine/FileSignatures';
 import type { PrisonDoorChoice } from './renderer/intro/PrisonDoor';
 import { applySaveBytes } from './engine/SaveGameFile';

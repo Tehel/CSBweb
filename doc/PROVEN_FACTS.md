@@ -2580,7 +2580,7 @@ game puts the party on the header's square of level 0 (`:2613-2622`), and nothin
 that the level is there, or that the square is within its columns and rows: past them,
 the column pointers built for the cell flags (`:2881-2916`) hold no cell for it. The
 form that adds a player's own set refuses both (`unstartableDungeon`,
-`src/data/LocalDataSets.ts`; `tools/dump-local-data-set.ts`).
+`src/engine/LocalDataSetCheck.ts`; `tools/dump-local-data-set.ts`).
 
 **Two record sizes are not the `dungeon.dat` ones.** This is what defeats the obvious
 arithmetic:

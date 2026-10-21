@@ -9,7 +9,8 @@
 import type { DungeonData } from '../data/dungeonTypes';
 import { DungeonLoader } from '../data/DungeonLoader';
 import { readDeleteDuplicateTimers, readDisableSaves, readGlobalVariables } from '../data/CsbwinExpool';
-import { Die, die } from './Die';
+import { Die } from '../core/Die';
+import { die } from './Die';
 import { readGame } from './ReadGame';
 import type { PartyState, MovementResult } from './gameTypes';
 import { MovementAction } from './gameTypes';

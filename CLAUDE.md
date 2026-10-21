@@ -150,7 +150,8 @@ audio/      SoundManager (the samples, played through Web Audio) and soundsIndex
 core/       BinaryFile (big-endian cursor), bytes (free byte reads), compression
             (LZW/RLE/SND), imageDecoder (IMG1/IMG2), md5, png (a paletted PNG, written),
             types, RnMaps (what an RN names: RN::dbType, pos, idx), intCast (sw, div,
-            ApplyLimits), objectNameIndex (OBJNI_* constants)
+            ApplyLimits), objectNameIndex (OBJNI_* constants), charDesc (CHARDESC's flags
+            and possessions), Die (what CSBWin's `die` throws)
 data/       DataSets (the manifest's sets), LocalDataSets (a player's own, a record of the
             store's), DataSetFiles (a set's files read by name, from its folder or its record),
             DungeonLoader, DungeonFileWriter (a `dungeon.dat` written, with its Extended
@@ -188,7 +189,8 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
             Chaos (the UTILITY's "MAKE NEW ADVENTURE": a saved game's party into
             `mini.dat`), FileSignatures (the graphics files checked against what a
             read names), DungeonCensus (what a dungeon holds: its items, monsters and
-            DSAs, counted), Die (CSBWin's `die`), RelativeXY (a square counted in steps
+            DSAs, counted), LocalDataSetCheck (a player's own set checked as the boot
+            reads it: the form's and the server's), Die (CSBWin's `die`), RelativeXY (a square counted in steps
             through `d.DeltaX`), skills, AddCharacter, objectIndex
             (the one DescIndex / GetBasicObjectType / NameIndex)
 renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens),

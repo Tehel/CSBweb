@@ -10,7 +10,7 @@
  *
  * Run: `npm test -- --only=dump-dsa-limits.ts`
  */
-import { Die } from '../src/engine/Die';
+import { Die } from '../src/core/Die';
 import { StkOp } from '../src/engine/dsa/DsaTypes';
 import { check, finish } from './lib/check';
 import { globalStore, int, op, run, UNSET } from './lib/dsa';

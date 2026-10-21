@@ -9,7 +9,7 @@
  * type `mt` is section `3 * mt + n - 1`, and 0 is the type's own pictures.
  */
 import { readU16LE, readU32LE } from '../core/bytes';
-import { Die } from '../engine/Die';
+import { Die } from '../core/Die';
 import { CSBGraphicType, decodePlanar, type CSBGraphicsLoader, type IndexedBitmap } from './CSBGraphicsLoader';
 import { altMonGraphicsKey, Expool, type ExpoolDatabase } from './CsbwinExpool';
 import type { CreatureRecord } from './dungeonTypes';

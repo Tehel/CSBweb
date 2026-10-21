@@ -30,7 +30,7 @@ import { join, relative, resolve } from 'node:path';
 
 import { CHECK_MODULE, loadPageReaders } from '../server/app.ts';
 import type { DataSetDraft, DataSetFolder } from '../server/publish.ts';
-import { checkLocalDataSet, readDungeonWalls } from '../src/data/LocalDataSets.ts';
+import { checkLocalDataSet, readDungeonWalls } from '../src/engine/LocalDataSetCheck.ts';
 import { dataSetNamed } from './lib/dataSets.ts';
 
 const ROOT = resolve(import.meta.dirname, '..');

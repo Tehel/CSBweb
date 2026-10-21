@@ -59,7 +59,7 @@ export interface DataSetFolder {
     where(name: string): string;
 }
 
-/** A player's set as the page's form gives it (`LocalDataSetDraft`, `src/data/LocalDataSets.ts`). */
+/** A player's set as the page's form gives it (`LocalDataSetDraft`, `src/engine/LocalDataSetCheck.ts`). */
 export interface DataSetDraft {
     /** The `<id>` of `local:<id>`. */
     id: string;
@@ -76,7 +76,7 @@ export interface DataSetDraft {
 }
 
 /**
- * The page's check of a player's own set, `checkLocalDataSet` (`src/data/LocalDataSets.ts`),
+ * The page's check of a player's own set, `checkLocalDataSet` (`src/engine/LocalDataSetCheck.ts`),
  * which `npm run build` makes a Node module (`vite.config.mts`) and the server loads at
  * start-up (`loadCheckDataSet`, `app.ts`), so that the server reads a set with the page's
  * own readers. It is typed here by its shape, since the page's sources are not erasable

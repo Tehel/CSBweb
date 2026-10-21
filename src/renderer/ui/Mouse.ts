@@ -23,7 +23,7 @@ import { isChestRecord, resolveObjectNameIndex } from './Objects';
 import { OBJECT_ID_NULL } from '../../core/types';
 import { UIMode, UIState, stHideCursor, stShowCursor, tag002572 } from './UIState';
 import { getPartyChampion, setHandOwner } from '../../engine/Party';
-import { getChampionPossession } from '../../engine/gameTypes';
+import { getChampionPossession } from '../../core/charDesc';
 import { characterAtPosition } from '../../engine/AddCharacter';
 import { describeObject as describeObjectInterface, repackChest, tag019036 as tag019036Interface } from '../../engine/OpenChest';
 import { CursorFilterType } from '../../engine/dsa/DsaTypes';

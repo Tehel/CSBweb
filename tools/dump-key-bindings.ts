@@ -22,7 +22,7 @@ import { setHandOwner } from '../src/engine/Party';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
 import type { Champion, PartyState } from '../src/engine/gameTypes';
 import { UIMode, type UIState } from '../src/renderer/ui/UIState';
-import { CHARFLAG_ATTACK_DISABLE } from '../src/engine/gameTypes';
+import { CHARFLAG_ATTACK_DISABLE } from '../src/core/charDesc';
 import type { LoopScript } from '../src/engine/LoopState';
 import { gameTablesOf, newGame, presetHeroesOf, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';

@@ -34,9 +34,9 @@ import { DungeonLoader, emptyDungeonData } from '../src/data/DungeonLoader';
 import { foldedSignature, Signature } from '../src/data/FileSignature';
 import { isLittleEndianDungeonDat, littleEndianDungeonDat } from '../src/data/LittleEndianDungeon';
 import {
-  checkLocalDataSet, identifyLocalDataSetFile, isLocalDataSetId, localDataSet, recordFile, recordFiles,
-  type LocalDataSetDraft, type LocalDataSetFile, type LocalDataSetRecord,
+  isLocalDataSetId, localDataSet, recordFile, recordFiles, type LocalDataSetFile, type LocalDataSetRecord,
 } from '../src/data/LocalDataSets';
+import { checkLocalDataSet, identifyLocalDataSetFile, type LocalDataSetDraft } from '../src/engine/LocalDataSetCheck';
 import type { DungeonData } from '../src/data/dungeonTypes';
 import { dungeonCensus, ITEM_KINDS, operationsUsed, type DungeonCensus } from '../src/engine/DungeonCensus';
 import type { Game } from '../src/engine/Game';

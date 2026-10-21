@@ -70,10 +70,11 @@ import { GraphicsLoader } from '../data/GraphicsLoader';
 import { ITEM_KINDS, isIllegalSubcode, operationsUsed, type DungeonCensus } from '../engine/DungeonCensus';
 import { StkOp } from '../engine/dsa/DsaTypes';
 import { lastTitleFrame, thumbnailPng } from '../renderer/intro/TitleThumbnail';
+import { recordFile, type LocalDataSetFile, type LocalDataSetRecord } from '../data/LocalDataSets';
 import {
-    checkLocalDataSet, identifyLocalDataSetFile, recordFile,
-    type LocalDataSetDraft, type LocalDataSetField, type LocalDataSetFile, type LocalDataSetProblem, type LocalDataSetRecord,
-} from '../data/LocalDataSets';
+    checkLocalDataSet, identifyLocalDataSetFile,
+    type LocalDataSetDraft, type LocalDataSetField, type LocalDataSetProblem,
+} from '../engine/LocalDataSetCheck';
 import { playerId } from './gameEvents';
 
 /** The sets a record without a `graphics.dat` may play the graphics of. */

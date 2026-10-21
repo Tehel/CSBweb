@@ -34,7 +34,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { emptyDungeonData } from '../src/data/DungeonLoader';
-import { Die } from '../src/engine/Die';
+import { Die } from '../src/core/Die';
 import type { Game } from '../src/engine/Game';
 import { applySaveBytes } from '../src/engine/SaveGameFile';
 import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';

@@ -29,7 +29,7 @@ import type { SpellParameters } from '../src/engine/magicTypes';
 import { newGame, stockDungeon, stockGraphics } from './lib/game';
 import { wrapMember, standInOf } from './lib/standIn';
 import { check, finish } from './lib/check';
-import { CHARFLAG_PORTRAIT_CHANGED, emptyPossessions } from '../src/engine/gameTypes';
+import { CHARFLAG_PORTRAIT_CHANGED, emptyPossessions } from '../src/core/charDesc';
 
 /** Rune 0x69 alone: class 3, missile type 5, skill 1, `byte5` 16 in the Atari table. */
 const SPELL_RUNE = 0x69;

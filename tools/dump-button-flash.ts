@@ -34,7 +34,8 @@
  * Run: `npm test -- --only=dump-button-flash.ts [level]`
  */
 import { OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
-import { emptyPossessions, MovementAction, type Champion } from '../src/engine/gameTypes';
+import { emptyPossessions } from '../src/core/charDesc';
+import { MovementAction, type Champion } from '../src/engine/gameTypes';
 import { flashButton, flashedButton, setClockTick, waitForButtonFlash } from '../src/engine/LoopState';
 import { createPaletteIndexViewportBuffer, vblFlashButn } from '../src/renderer/csbwin/CanvasBlitter';
 import { handleAttackAreaClick, prepareAttack } from '../src/renderer/ui/Attack';

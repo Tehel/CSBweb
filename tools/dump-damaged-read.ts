@@ -36,7 +36,7 @@ import { buildDungeonImage } from '../src/data/CsbwinDungeonImageWriter';
 import { objectIndexOf } from '../src/data/CsbwinObjectIndex';
 import { CHARDESC_SIZE } from '../src/data/CsbwinSaveInfo';
 import { saveSaveGameState, type Block2, type SaveGameState } from '../src/data/SaveGameLoader';
-import { Die } from '../src/engine/Die';
+import { Die } from '../src/core/Die';
 import type { Game } from '../src/engine/Game';
 import type { LoopScript } from '../src/engine/LoopState';
 import { SaveFileError, applySaveBytes } from '../src/engine/SaveGameFile';

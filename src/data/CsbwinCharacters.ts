@@ -25,9 +25,8 @@
  * - `portrait[1]` at 336 is really 464 bytes — `FILL337[800-337]` is the rest of it —
  *   and holds the champion's portrait **bitmap**. See `readPortrait` below.
  */
-import {
-  CHARFLAG_MALE, getChampionPossession, type Champion, type PartyState, type Skill, type VacantCharacter,
-} from '../engine/gameTypes';
+import { CHARFLAG_MALE, getChampionPossession } from '../core/charDesc';
+import type { Champion, PartyState, Skill, VacantCharacter } from '../engine/gameTypes';
 import type { Attribute } from '../engine/attributes';
 import { OBJECT_ID_NULL, type i8, type i16, type ui8, type ui16, type ObjectID } from '../core/types';
 import { CHARDESC_SIZE, decodeCharField, encodeCharField } from './CsbwinSaveInfo';

@@ -10,7 +10,8 @@
 import { OBJNI_OPEN_CHEST, OBJNI_OPEN_SCROLL, OBJNI_SPECIAL_D, OBJNI_SPECIAL_E } from '../../core/objectNameIndex';
 import { DBType, OBJECT_ID_NULL, ObjectID } from '../../core/types';
 import { ViewingFilterSite } from '../../engine/dsa/DsaTypes';
-import { CHARFLAG_CHEST_OR_SCROLL, Champion, getChampionPossession } from '../../engine/gameTypes';
+import { CHARFLAG_CHEST_OR_SCROLL, getChampionPossession } from '../../core/charDesc';
+import { Champion } from '../../engine/gameTypes';
 import { AttributeIndex, attributeCurrent, attributeMaximum } from '../../engine/attributes';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { tag0088b2Index } from '../csbwin/CanvasBlitter';

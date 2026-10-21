@@ -424,8 +424,8 @@ game's modules and links no manifest. A build is `index.html`, `stats.html`,
 `manifest.webmanifest` and `assets/`, about 1.4 MB, and the server's module.
 
 **The server's module** is the second build, `--ssr`: the page's check of a player's own
-set, `checkLocalDataSet` (`src/data/LocalDataSets.ts`) and every reader under it, bundled
-into one module that imports nothing, `dist/server/LocalDataSets.js` (`vite.config.mts`).
+set, `checkLocalDataSet` (`src/engine/LocalDataSetCheck.ts`) and every reader under it, bundled
+into one module that imports nothing, `dist/server/LocalDataSetCheck.js` (`vite.config.mts`).
 The server cannot import the page's sources as it imports `DataSets.ts`, since they are not
 erasable syntax and the image has no `node_modules`, so it loads this module instead and
 reads a set with the page's own readers. It is never served.

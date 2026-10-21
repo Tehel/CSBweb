@@ -10,7 +10,7 @@ import { PotionType } from '../../core/constants';
 import { CursorFilterType } from '../../engine/dsa/DsaTypes';
 import { applyFeedParameters, derivePotionFeeding, WATERSKIN_GULP } from '../../engine/Feeding';
 import { clearFeedParameters, type FeedParameters } from '../../engine/filterParameters';
-import { CHARFLAG_CHEST_OR_SCROLL } from '../../engine/gameTypes';
+import { CHARFLAG_CHEST_OR_SCROLL } from '../../core/charDesc';
 import { drawCharacterState } from '../../engine/Party';
 import { displayFoodWater } from '../../engine/OpenChest';
 import { DBType, OBJECT_ID_NULL, ObjectID, locationRelToInteger } from '../../core/types';

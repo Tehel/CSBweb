@@ -17,7 +17,7 @@ import {
     incrAttributeCurrent,
 } from './attributes';
 import { nameIndexOf, type GameContext } from './GameContext';
-import { CHARFLAG_CHEST_OR_SCROLL, getChampionPossession } from './gameTypes';
+import { CHARFLAG_CHEST_OR_SCROLL, getChampionPossession } from '../core/charDesc';
 import { selectPaletteForLightLevel } from './LightLevel';
 import { drawAllCharacterState } from './Party';
 import { GetBasicObjectType } from './objectIndex';

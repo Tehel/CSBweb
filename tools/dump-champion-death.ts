@@ -45,7 +45,7 @@ import { OBJNI_ILLUMULET_A, OBJNI_JEWEL_SYMAL_A, OBJNI_TORCH_A } from '../src/co
 import { graphicsTablesOf, newGame, stockDungeon, stockGraphics } from './lib/game';
 import { standIn, standInOf } from './lib/standIn';
 import { check, fail, finish } from './lib/check';
-import { getChampionPossession } from '../src/engine/gameTypes';
+import { getChampionPossession } from '../src/core/charDesc';
 import { RN_FIREBALL, RN_POISON, RN_LIGHTNING, RN_DISPELL_MISSILE, RN_POISON_BOLT } from '../src/core/spellRn';
 import { testChampion } from './lib/champion';
 

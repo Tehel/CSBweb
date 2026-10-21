@@ -19,7 +19,7 @@ import {
   type PaletteIndexViewportBuffer
 } from '../csbwin/CanvasBlitter';
 import type { AltMonCache } from '../../data/AltMonGraphics';
-import { Die } from '../../engine/Die';
+import { Die } from '../../core/Die';
 import type { DungeonState } from '../../engine/DungeonState';
 import type { PartyFootprints } from '../../engine/PartyFootprints';
 import type { GameState } from '../../engine/gameTypes';

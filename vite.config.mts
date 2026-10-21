@@ -77,7 +77,7 @@ function dataSetsRoute(): Plugin {
       const moderators = parseModerators(`${DEV_MODERATOR_PLAYER_ID}=the dev moderator`);
       const publishRateLimit = new RateLimit(1000, 60_000);
       const checkDataSet: CheckDataSet = async (...args) =>
-        ((await server.ssrLoadModule('/src/data/LocalDataSets.ts')) as { checkLocalDataSet: CheckDataSet }).checkLocalDataSet(...args);
+        ((await server.ssrLoadModule('/src/engine/LocalDataSetCheck.ts')) as { checkLocalDataSet: CheckDataSet }).checkLocalDataSet(...args);
 
       /** The store as it stands: the manifest's sets, then every change made since, a new one kept. */
       const openStore = (db: DatabaseSync): DataSetStore => {
@@ -272,7 +272,7 @@ function webAppManifest(): Plugin {
  * build --ssr`, after the page's, one self-contained module that the server, which has no
  * `node_modules`, loads from `dist/server/` (`server/app.ts`, `CHECK_MODULE`).
  */
-const SERVER_ENTRY = resolve(import.meta.dirname, 'src', 'data', 'LocalDataSets.ts');
+const SERVER_ENTRY = resolve(import.meta.dirname, 'src', 'engine', 'LocalDataSetCheck.ts');
 
 export default defineConfig(({ command, isSsrBuild }) => ({
   // The server's module is no page, and has no manifest.

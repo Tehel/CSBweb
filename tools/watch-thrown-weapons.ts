@@ -31,7 +31,8 @@
  */
 import { OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../src/core/types';
 import type { Game } from '../src/engine/Game';
-import { getChampionPossession, type Champion } from '../src/engine/gameTypes';
+import { getChampionPossession } from '../src/core/charDesc';
+import type { Champion } from '../src/engine/gameTypes';
 import { AttackType } from '../src/engine/monsterTypes';
 import { DescIndex } from '../src/engine/objectIndex';
 import { tagThrownWeapon } from '../src/engine/ThrownWeapons';

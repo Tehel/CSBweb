@@ -7,7 +7,8 @@
 
 import { OBJECT_ID_NULL, ui8, Direction, Position } from '../core/types';
 import type { PartyState, Champion } from './gameTypes';
-import { CHARFLAG_CHEST_OR_SCROLL, CHARFLAG_CURSOR, CHARFLAG_PORTRAIT_CHANGED, MovementAction } from './gameTypes';
+import { CHARFLAG_CHEST_OR_SCROLL, CHARFLAG_CURSOR, CHARFLAG_PORTRAIT_CHANGED } from '../core/charDesc';
+import { MovementAction } from './gameTypes';
 import type { GameContext } from './GameContext';
 import { drawCharacterStateEyePanel } from './OpenChest';
 import { CHARDESC_SIZE } from '../data/CsbwinSaveInfo';

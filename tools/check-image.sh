@@ -51,7 +51,7 @@ done
 docker logs "$name"
 docker exec "$name" node --input-type=module -e '
   import { readFileSync } from "node:fs";
-  const { checkLocalDataSet } = await import("/app/dist/server/LocalDataSets.js");
+  const { checkLocalDataSet } = await import("/app/dist/server/LocalDataSetCheck.js");
   const dir = "/data/gamefiles/dm-atari";
   const blob = (name) => new Blob([readFileSync(`${dir}/${name}`)]);
   const draft = { id: "dm", name: "DM", description: "", authors: [], dmRules: true, baseSet: "dm-atari",

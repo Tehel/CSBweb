@@ -23,7 +23,7 @@ import { Position, type Direction } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { PresetHero } from '../src/data/HeroExtractor';
-import { readHeroText } from '../src/engine/AddCharacter';
+import { readHeroText } from '../src/data/HeroExtractor';
 import { check, finish } from './lib/check';
 import { newGame, presetHeroesOf } from './lib/game';
 
