@@ -182,8 +182,8 @@ import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 import { SAVE_DIR, genuineSaves, memoryStore, savePath } from './lib/saves';
 import * as SaveMenu from '../src/renderer/ui/SaveMenu';
+import { tag0189d4 } from '../src/engine/OpenChest';
 import * as Widgets from '../src/renderer/ui/Widgets';
-import * as Inventory from '../src/renderer/ui/Inventory';
 import { testChampion } from './lib/champion';
 
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
@@ -847,14 +847,9 @@ async function checkEnterAndLeave(graphics: GraphicsLoader): Promise<void> {
   // the buttons back has not run.
   ui.ctx.interface.word20252 = 0;
   ui.ctx.interface.word20250 = 1;
-  const draw = (): void => {
-    // `drawInventoryScreen`'s state half: open the chest in the weapon hand, and leave
-    // `d.DisplayResurrectChestOrScroll` at 4 behind it.
-    const view = Inventory.getActiveChestView(ui, party.champions[0]!);
-    Inventory.syncOpenChest(ui, view);
-    ui.ctx.interface.displayResurrectChestOrScroll = view?.source === 'hand' ? 4 : 0;
-  };
-  draw();
+  // The inventory shown: `TAG0189d4` opens the chest in the weapon hand, and leaves
+  // `d.DisplayResurrectChestOrScroll` at 4 behind it.
+  tag0189d4(game.ctx);
   console.log(`  chest ${chest} from (${cell.x},${cell.y}) level ${cell.z}: ${packed} objects; open, it holds ${chestContents(game, chest)}`);
   check(ui.ctx.interface.openChestId === chest && chestContents(game, chest) === 0, 'the open chest\'s objects are out of its chain');
 
@@ -876,8 +871,8 @@ async function checkEnterAndLeave(graphics: GraphicsLoader): Promise<void> {
   check(ui.ctx.interface.word20252 === 1, 'and, with no attack menu open, brings the attack buttons back (d.Word20252 = 1)');
   check(ui.ctx.interface.word20250 === 0,
     'its DrawLegalAttackTypes owes the panel nothing more, so no damage is flashed at the next tick (CSBCode.cpp:8898)');
-  draw();
-  check(ui.ctx.interface.openChestId === chest && chestContents(game, chest) === 0, 'the next draw opens the chest again');
+  check(ui.ctx.interface.openChestId === chest && chestContents(game, chest) === 0,
+    'and its ShowHideInventory\'s TAG0189d4 opens the chest again (CSBCode.cpp:7573, Character.cpp:3911)');
 
   // The load-only screen is `_ReadEntireGame`, which calls neither.
   ui.ctx.interface.word20252 = 0;
@@ -907,10 +902,7 @@ async function checkQuickSaveOverOpenChest(graphics: GraphicsLoader): Promise<vo
   party.selectedCharacterIndex = 0;
 
   const ui = newUIState(graphics, game.ctx);
-  const draw = (): void => {
-    Inventory.syncOpenChest(ui, Inventory.getActiveChestView(ui, party.champions[0]!));
-  };
-  draw();
+  tag0189d4(ui.ctx);
   check(ui.ctx.interface.openChestId === chest && chestContents(game, chest) === 0, 'the open chest\'s objects are out of its chain');
 
   // F5's save, to a store in memory instead of the page's.
@@ -922,8 +914,7 @@ async function checkQuickSaveOverOpenChest(graphics: GraphicsLoader): Promise<vo
   const saved = chestContents(fresh, chest);
   console.log(`  quick-saved with the chest open, restored into a fresh game: the chest holds ${saved} of ${packed}`);
   check(saved === packed, 'the quick-save repacks the chest: the restored chest holds its objects');
-  draw();
-  check(ui.ctx.interface.openChestId === chest && chestContents(game, chest) === 0, 'and the next draw opens the chest again');
+  check(ui.ctx.interface.openChestId === chest && chestContents(game, chest) === 0, 'and opens it again once the file is made');
 }
 
 /**
@@ -951,9 +942,8 @@ async function checkReadInPlay(graphics: GraphicsLoader): Promise<void> {
     ui = newUIState(graphics, game.ctx, { onRestoreSave: (save) => applySaveBytes(game, save.bytes) });
     old.selectedCharacterIndex = 0;
     game.ctx.loop.videoMode = 'VM_INVENTORY';
-    // `drawInventoryScreen`'s state half, as in `checkEnterAndLeave`.
-    Inventory.syncOpenChest(ui, Inventory.getActiveChestView(ui, old.champions[0]!));
-    ui.ctx.interface.displayResurrectChestOrScroll = 4;
+    // The inventory shown, as in `checkEnterAndLeave`.
+    tag0189d4(game.ctx);
     const taken = ui.ctx.interface.openChestContents[0]!;
     ui.ctx.interface.openChestContents[0] = OBJECT_ID_NULL;
     old.objectInHand = taken;
@@ -974,9 +964,7 @@ async function checkReadInPlay(graphics: GraphicsLoader): Promise<void> {
     } finally {
       game.stop();
     }
-    // The next compose (`refreshScreen`): the chest view dropped with no inventory open.
     const party = game.ctx.party.state;
-    if (party.selectedCharacterIndex < 0) Inventory.syncOpenChest(ui, null);
     const held = chestContents(game, chest);
     const videoMode: string = game.ctx.loop.videoMode;
     console.log(`  ${how}: the chest holds ${held} of ${packed}, inventory ${party.selectedCharacterIndex}, videoMode ${videoMode}, attack menu ${ui.ctx.interface.attackingCharacterOrdinal}, reincarnate ${ui.reincarnate !== null}, eye ${ui.ctx.interface.pressingEye}`);

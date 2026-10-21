@@ -195,31 +195,30 @@ console.log('=== DrawCharacterState: the name and the box drawn again ===');
   const draws: string[] = [];
   const g = makeGame(3, [], draws);
   const party = g.ctx.party.state;
-  const host = g.ctx.host;
   console.log(`the first champion joining: [${draws.join('; ')}]`);
   check(draws.join(';') === '0 cursor', "AddCharacter's SetHandOwner(0) draws the new owner's name (CSBCode.cpp:8509-8510)");
 
   draws.length = 0;
-  setHandOwner(party, 1, host);
+  setHandOwner(g.ctx, 1);
   console.log(`SetHandOwner(1) from 0: [${draws.join('; ')}]`);
   check(draws.join(';') === '0 cursor;1 cursor',
     'SetHandOwner draws the old owner\'s name, then the new one\'s (CSBCode.cpp:8488-8494, :8509-8510)');
 
   draws.length = 0;
-  setHandOwner(party, 1, host);
+  setHandOwner(g.ctx, 1);
   check(draws.length === 0, 'and nothing when the owner does not change (:8482)');
 
   party.potentialChampionIndex = 2;
-  setHandOwner(party, 2, host);
+  setHandOwner(g.ctx, 2);
   console.log(`SetHandOwner(2), the recruit in a mirror: [${draws.join('; ')}], owner ${party.cursorOwner}`);
   check(draws.join(';') === '1 cursor' && party.cursorOwner === 2,
     'the recruit takes the cursor and is not drawn (:8508)');
   party.potentialChampionIndex = -1;
 
   draws.length = 0;
-  setHandOwner(party, -1, host);
+  setHandOwner(g.ctx, -1);
   check(draws.join(';') === '2 cursor' && party.cursorOwner === -1, 'SetHandOwner(-1) draws the old owner only (:8496-8500)');
-  setHandOwner(party, 0, host);
+  setHandOwner(g.ctx, 0);
 
   // The spell and fire shields: `MagicShield` starts one, its `TT_77` / `TT_78` ends it.
   const all = '0 portraitChanged;1 portraitChanged;2 portraitChanged';
@@ -482,21 +481,21 @@ console.log('=== drawPartyStatus ===');
   };
 
   // The hand changing owner, through the host: both names are drawn again.
-  setHandOwner(party.state, 0, ui.ctx.host);
+  setHandOwner(ui.ctx, 0);
   figures(false);
-  setHandOwner(party.state, 1, ui.ctx.host);
+  setHandOwner(ui.ctx, 1);
   console.log(`figures on 0 and 1, the hand passing from 0 to 1: shown [${shown()}]`);
   check(shown() === '- - - -', "SetHandOwner's two redraws take the figure off the old owner's name and the new one's");
   const noFigure = render();
   figures(false);
-  setHandOwner(party.state, 1, ui.ctx.host);
+  setHandOwner(ui.ctx, 1);
   check(shown() === '5 6 - -' && diff(noFigure, render()).fifteen > 0, 'a click on the owner already holding it redraws nothing');
 
   // With champion 1's inventory open their name goes into the viewport: the figure over
   // the portrait stays, and the other champion's goes.
   party.state.selectedCharacterIndex = 1;
   figures(true);
-  setHandOwner(party.state, 0, ui.ctx.host);
+  setHandOwner(ui.ctx, 0);
   console.log(`champion 1's inventory open, the hand passing from 1 to 0: shown [${shown()}]`);
   check(shown() === '- 6 - -', "CHARFLAG_cursor leaves the figure over an open inventory's portrait (Character.cpp:1327-1344)");
 

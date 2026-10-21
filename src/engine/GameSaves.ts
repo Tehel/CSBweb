@@ -39,7 +39,7 @@ import {
     SAVE_FILE_EXTENSION, joinedPlaythrough, readSaveFileFields, saveFileFieldsOf, slotOf,
     type OpenedSave, type SaveEntry, type SaveFileFields, type SaveSlot, type SaveStore,
 } from '../data/saves';
-import { repackChest } from './CharacterSystem';
+import { repackChest, showChestContents } from './OpenChest';
 import { UtilityDiskMessages, UtilityError, makeNewAdventure } from './Chaos';
 import type { Game } from './Game';
 import { drawRandomGameID } from './GameContext';
@@ -297,9 +297,9 @@ export class GameSaves {
      *
      * With the clock running, an open chest's objects are out of its chain
      * (`doc/PROVEN_FACTS.md` → "The disk menu saves an open chest packed"), so it is
-     * repacked first, as the disk menu's `TAG02076e` repacks it, and the inventory's next
-     * draw opens it again, as after the menu's `TAG0207cc`. The rest of the pair, the
-     * shading and the cursor, would last no frame here. And the tail runs before the
+     * repacked first, as the disk menu's `TAG02076e` repacks it, and opened again once the
+     * file is made, as `TAG0207cc`'s `TAG0189d4` opens it after the menu. The rest of the
+     * pair, the shading and the cursor, would last no frame here. And the tail runs before the
      * write, on the world the file holds, not once the write comes back: a failed
      * write keeps the re-attached monsters.
      *
@@ -317,10 +317,12 @@ export class GameSaves {
      */
     async save(clock: SaveClock, target: SaveTarget): Promise<SaveEntry> {
         if (this.game.isDead()) throw new Error('an error has ended the game');
-        if (clock === 'running') repackChest(this.game.ctx);
+        const openChest = clock === 'running' ? this.game.ctx.interface.openChestId : null;
+        if (openChest !== null) repackChest(this.game.ctx);
         const bytes = buildSaveFile(this.game, {
             portraitOf: (champion) => this.screen.portraitOf(champion),
         });
+        if (openChest !== null) showChestContents(this.game.ctx, openChest);
         const savedAt = Date.now();
         const playTime = this.game.playTime();
         const fields = readSaveFileFields(bytes);

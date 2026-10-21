@@ -79,7 +79,7 @@ This document lists UI rendering facts that are directly visible in the CSBWin C
 - Chest contents are copied into `d.rnChestContents[0..7]` and rendered using `DrawItem(D7W+38, ...)`, with empty slots filled by `objNI_NotAnObject` (`doc/CSBwin-src/Character.cpp:3060-3074`).
 - While the chest is displayed, CSBWin clears each item's link and sets the chest's `contents` link to `RNeof` to avoid stale/looped lists (`doc/CSBwin-src/Character.cpp:3093-3106`).
 - `RepackChest` rebuilds the chest linked list from `d.rnChestContents`, setting the first item as `contents` and chaining the rest via `AddObjectToRoom` (`doc/CSBwin-src/Character.cpp:3133-3154`).
-- Chest display is triggered through `DescribeObject` when the DB type is `dbCHEST` (`doc/CSBwin-src/Character.cpp:3548-3550`), which is called both from eye-click (`doc/CSBwin-src/Viewport.cpp:7291-7293`) and when the selected character's weapon hand holds a chest (`doc/CSBwin-src/Character.cpp:3881-3911`, `doc/CSBwin-src/Data.h:757-761`).
+- Chest display is triggered through `DescribeObject` when the DB type is `dbCHEST` (`doc/CSBwin-src/Character.cpp:3548-3550`), which is called both from eye-click (`doc/CSBwin-src/Viewport.cpp:7291-7293`) and when the selected character's weapon hand holds a chest (`doc/CSBwin-src/Character.cpp:3881-3911`, `doc/CSBwin-src/Data.h:757-761`). Every caller of `ShowChestContents` and `RepackChest` is in `doc/PROVEN_FACTS.md` → "A chest is opened and repacked at events, never by drawing".
 - `HandleClothingClick` reserves chest slot indices 30..37 (after subtracting 20), mapping them to `d.rnChestContents[D6W-30]` for click handling (`doc/CSBwin-src/CSBCode.cpp:6977-7012`).
 
 ## Eye click and inspection flow

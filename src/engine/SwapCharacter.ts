@@ -164,7 +164,7 @@ function removeCharacter(ctx: GameContext, chIdx: number): void {
     // Find a living party member.
     if (chIdx !== livingChar && party.champions[livingChar]!.attributes.health !== 0) break;
   }
-  if (chIdx === party.cursorOwner) setHandOwner(party, livingChar, ctx.host);
+  if (chIdx === party.cursorOwner) setHandOwner(ctx, livingChar);
   if (chIdx === party.magicCasterIndex) selectMagicCaster(party, livingChar);
 }
 
@@ -199,7 +199,7 @@ function slotCharPosition(ctx: GameContext, i: number): number {
  * `MarkAllPortraitsChanged`.
  */
 function redrawEverything(ctx: GameContext): void {
-  markAllPortraitsChanged(ctx.party.state, ctx.host);
+  markAllPortraitsChanged(ctx);
 }
 
 /** `champion` as the `CHARDESC` the save writer packs, in the file's form. */

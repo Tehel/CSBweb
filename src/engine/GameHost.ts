@@ -171,8 +171,9 @@ export interface GameHost {
    * inventory is closed (`:1315-1361`). CSBWin draws at once wherever it sets either, so
    * the engine calls this there and keeps no flag. The third, `CHARFLAG_CHEST_OR_SCROLL`,
    * fills the open inventory's eye panel again (`:1483-1502`), which runs the viewing
-   * filter; the engine keeps it in the champion's `charFlags` until a `DrawCharacterState`
-   * (`drawCharacterState`, `Party.ts`).
+   * filter, once the engine has opened or repacked the chest (`drawCharacterStateEyePanel`,
+   * `OpenChest.ts`); the engine keeps it in the champion's `charFlags` until a
+   * `DrawCharacterState` (`drawCharacterState`, `Party.ts`).
    */
   drawCharacterState(chIdx: number, charFlags: number): void;
   /**

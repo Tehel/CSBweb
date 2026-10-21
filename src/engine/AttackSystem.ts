@@ -818,7 +818,7 @@ export class AttackSystem {
       party.fireShield = sw(party.fireShield + add);
       this.ctx.systems.magic.queueUtilityTimer(TimerFunction.TT_78, fullStrength, add);
     }
-    markAllPortraitsChanged(party, this.ctx.host);
+    markAllPortraitsChanged(this.ctx);
     return raised;
   }
 
@@ -982,7 +982,7 @@ export class AttackSystem {
     party.partyShield = 100;
     party.spellShield = 100;
     party.fireShield = 100;
-    markAllPortraitsChanged(party, this.ctx.host);
+    markAllPortraitsChanged(this.ctx);
     yield* mainLoop.processTimersViewportAndSound();
     const w4 = sw(party.position.x + this.ctx.tables.deltaX[party.facing & 3]!);
     const w6 = sw(party.position.y + this.ctx.tables.deltaY[party.facing & 3]!);

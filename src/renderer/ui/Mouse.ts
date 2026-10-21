@@ -16,7 +16,7 @@ import { drinkAtWaterFountain, handleMouthPress } from './Feeding';
 import { HINT_ORACLE_BUTTON, inventoryButtonList } from './HintOracleButton';
 import type { HintSquare } from '../intro/HintOracle';
 import { searchButtonList } from './HitTest';
-import { describeObject, getActiveChestView, getEyeRect, syncOpenChest, tag0189d4, tag019036 } from './Inventory';
+import { describeObject, getActiveChestView, getEyeRect, tag0189d4, tag019036 } from './Inventory';
 import { handleMagicClick } from './MagicPanel';
 import { drawLegalAttackTypes, handleAttackAreaClick } from './Attack';
 import { isChestRecord, resolveObjectNameIndex } from './Objects';
@@ -25,7 +25,7 @@ import { UIMode, UIState, stHideCursor, stShowCursor, tag002572 } from './UIStat
 import { getPartyChampion, selectMagicCaster, setHandOwner } from '../../engine/Party';
 import { getChampionPossession } from '../../engine/gameTypes';
 import { characterAtPosition } from '../../engine/AddCharacter';
-import { repackChest } from '../../engine/CharacterSystem';
+import { describeObject as describeObjectInterface, repackChest, tag019036 as tag019036Interface } from '../../engine/OpenChest';
 import { CursorFilterType } from '../../engine/dsa/DsaTypes';
 import { freeze, setClockTick, thaw, waitForButtonFlash, wakeUp } from '../../engine/LoopState';
 import {
@@ -224,14 +224,16 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
 
 /**
  * The button let go (`doc/CSBwin-src/Mouse.cpp:1669-1683`). With the eye held,
- * `QuitPressingEye` (`doc/CSBwin-src/CSBCode.cpp:7458-7473`); otherwise, with the mouth
- * held, `QuitPressingMouth` (`:7449-7454`). Either way the panel goes back to what
- * `TAG0189d4` draws, which describes the weapon hand's scroll again.
+ * `QuitPressingEye` (`doc/CSBwin-src/CSBCode.cpp:7458-7473`), which first repacks a chest
+ * in hand the eye opened (`:7464`); otherwise, with the mouth held, `QuitPressingMouth`
+ * (`:7449-7454`). Either way the panel goes back to what `TAG0189d4` draws, which opens
+ * the weapon hand's chest again or describes its scroll.
  */
 export function handleMouseUnclick(ui: UIState): void {
   if (ui.ctx.interface.pressingEye) {
     ui.ctx.interface.pressingEye = false;
     ui.describedObject = null;
+    if (ui.partyState.objectInHand === ui.ctx.interface.openChestId) repackChest(ui.ctx);
     tag0189d4(ui);
     stShowCursor(ui);
   } else if (ui.ctx.interface.pressingMouth) {
@@ -273,8 +275,9 @@ function isEyeClick(ui: UIState, x: number, y: number): boolean {
  * held does nothing. With an empty hand, `TAG019036` runs the viewing filter before it
  * draws the attributes (`doc/CSBwin-src/Character.cpp:4541-4595`); with an object,
  * `DescribeObject` runs it as it describes the object (`describeObject`), and the
- * composes until the release draw what it left. The panel itself is drawn from
- * `ctx.interface.pressingEye` (`drawInventoryScreen`).
+ * composes until the release draw what it left. Either repacks the open chest, and
+ * `DescribeObject` opens a chest in hand (the engine's `tag019036` and `describeObject`).
+ * The panel itself is drawn from `ctx.interface.pressingEye` (`drawInventoryScreen`).
  */
 export function handleEyePress(ui: UIState): void {
   if (ui.partyState.selectedCharacterIndex < 0) return;
@@ -283,20 +286,22 @@ export function handleEyePress(ui: UIState): void {
   stHideCursor(ui);
   const inHand = ui.partyState.objectInHand;
   if (inHand === OBJECT_ID_NULL) {
+    tag019036Interface(ui.ctx);
     tag019036(ui);
-  } else if (!isChestRecord(ui, inHand)) {
-    ui.describedObject = describeObject(ui, inHand);
+  } else {
+    describeObjectInterface(ui.ctx, inHand);
+    if (!isChestRecord(ui, inHand)) ui.describedObject = describeObject(ui, inHand);
   }
 }
 
 function handlePartyBlockClick(ui: UIState, button: number, x: number, y: number): void {
   if (ui.partyState.selectedCharacterIndex === button) {
-    setHandOwner(ui.partyState, button, ui.ctx.host);
+    setHandOwner(ui.ctx, button);
     return;
   }
   const sub = searchButtonList(ui.uiTables.graphic231.buttons.buttons18216, x, y, 2);
   if (sub >= 16 && sub <= 19) {
-    setHandOwner(ui.partyState, sub - 16, ui.ctx.host);
+    setHandOwner(ui.ctx, sub - 16);
     return;
   }
   if (sub >= 20 && sub <= 27) {
@@ -353,7 +358,7 @@ export function handleInventoryToggle(ui: UIState, button: number): void {
   // `VM_INVENTORY` as one opens (`:7546`).
   if (ui.partyState.selectedCharacterIndex >= 0) ui.ctx.loop.videoMode = 'VM_ADVENTURE';
   if (button === 4) {
-    syncOpenChest(ui, null);
+    repackChest(ui.ctx);
     ui.partyState.selectedCharacterIndex = -1;
     syncInventoryButtons(ui);
     // `DiscardAllInput()` once the adventure's list is back (`:7539`), but not for a
@@ -364,9 +369,8 @@ export function handleInventoryToggle(ui: UIState, button: number): void {
   const previous = ui.partyState.selectedCharacterIndex;
   ui.partyState.selectedCharacterIndex =
     ui.partyState.selectedCharacterIndex === button ? -1 : button;
-  if (ui.partyState.selectedCharacterIndex !== previous) {
-    syncOpenChest(ui, null);
-  }
+  // `RepackChest` as an open inventory closes (`:7513-7518`).
+  if (previous >= 0) repackChest(ui.ctx);
   if (ui.partyState.selectedCharacterIndex >= 0) ui.ctx.loop.videoMode = 'VM_INVENTORY';
   syncInventoryButtons(ui);
   // `ShowHideInventory`'s `CHARFLAG_chestOrScroll` and `DrawCharacterState`
@@ -406,8 +410,8 @@ export function tag02076e(ui: UIState): void {
  * (`:6716`, `:6867`). Its state half: the magic caster is selected again, which a
  * dead one does not survive (`:10069-10071`); the attack buttons come back unless an
  * attack menu is open (`d.Word20252 = 1`, `:10072-10075`); and an open inventory is shut
- * without a repack and shown again through `ShowHideInventory` (`:10077-10082`), which
- * opens the chest again on the next draw. The redraws, and `TAG002572`'s cursor, the
+ * without a repack and shown again through `ShowHideInventory` (`:10077-10082`), whose
+ * `TAG0189d4` opens the chest again. The redraws, and `TAG002572`'s cursor, the
  * port does every frame once `shadedByTag02076e` is clear; `d.Word11750 = 0` is the dead
  * countdown in `DEBT.md` H. Asleep, it only redraws the sleep screen (`:10062-10066`),
  * which `GameScreen.presentViewport` draws every time it composes the screen.
@@ -460,12 +464,8 @@ export function handleClothingClick(ui: UIState, button: number): void {
   const champ = getPartyChampion(ui.partyState, chIdx);
   if (!champ || (champ.attributes.health | 0) === 0) return;
 
-  const chestView = getActiveChestView(ui, champ);
   const isChestSlot = slot >= 30;
-  if (isChestSlot) {
-    if (!chestView) return;
-    syncOpenChest(ui, chestView);
-  }
+  if (isChestSlot && !getActiveChestView(ui, champ)) return;
 
   const objectInHand = ui.partyState.objectInHand;
   const slotObject = isChestSlot

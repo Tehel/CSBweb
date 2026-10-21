@@ -62,7 +62,7 @@ import type { FontData } from '../src/renderer/csbwin/TextRenderer';
 import { VIEWPORT_X, VIEWPORT_Y } from '../src/renderer/ViewportGraphics';
 import { type UIState } from '../src/renderer/ui/UIState';
 import { MASTERY_LABELS, drawAttributePanel } from '../src/renderer/ui/Character';
-import { drawInventoryScreen, drawObjectInfoPanel } from '../src/renderer/ui/Inventory';
+import { drawInventoryScreen, drawObjectInfoPanel, tag0189d4 } from '../src/renderer/ui/Inventory';
 import { getObjectDisplayName, getObjectName, resolveObjectNameIndex } from '../src/renderer/ui/Objects';
 import { OBJNI_EMPTY_FLASK, OBJNI_WATER_FLASK } from '../src/core/objectNameIndex';
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
@@ -307,6 +307,7 @@ async function main(): Promise<void> {
   check(/[^0]/.test(wantLine), 'the reference panel is drawn');
   party.state.potentialChampionIndex = 0;
   ui.ctx.interface.pressingEye = false;
+  tag0189d4(ui); // the candidate's inventory shown: `TAG0189d4`'s `TAG0189a8`
   const menuPixels = renderInventory();
   const menuLine = lineStrip(menuPixels, 0, candidateLine.length);
   console.log(`eye released: menu state ${ui.ctx.interface.displayResurrectChestOrScroll}, `
@@ -321,6 +322,7 @@ async function main(): Promise<void> {
   check(eyeLine === wantLine, `the held eye shows "${candidateLine}" over the menu`);
   check(ui.ctx.interface.displayResurrectChestOrScroll === 5, '_ClickOnEye leaves DisplayResurrectChestOrScroll at 5');
   ui.ctx.interface.pressingEye = false;
+  tag0189d4(ui); // `QuitPressingEye`'s
   renderInventory();
   check(ui.ctx.interface.displayResurrectChestOrScroll === 5, 'releasing the eye brings the menu back');
   party.state.potentialChampionIndex = -1;

@@ -236,5 +236,5 @@ export function tenSecondUpdate(ctx: GameContext): void {
             champ.charFlags |= CHARFLAG_CHEST_OR_SCROLL;
         }
     }
-    drawAllCharacterState(party, ctx.host);
+    drawAllCharacterState(ctx);
 }

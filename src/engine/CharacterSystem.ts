@@ -5,8 +5,7 @@
  * a recruit, a death), `DropAllPossessions`, `AdjustStatsForItemCarried` bound to the
  * context, and the two hand refills the busy timer runs (`matchingAmmunition`,
  * `refillPossessionSlot`). Also `_ExecuteAttack`'s engine half (`executeAttack`) and
- * `BringCharacterToLife`, by the same file, and the open chest's `ShowChestContents` and
- * `RepackChest` (`showChestContents`, `repackChest`) on `ctx.interface`.
+ * `BringCharacterToLife`, by the same file. The open chest is `OpenChest.ts`'s.
  *
  * Moved out of `Game` by `DEBT.md` E2; the other systems reach it as
  * `ctx.systems.character`.
@@ -23,13 +22,13 @@ import {
   OBJNI_TORCH_A,
   OBJNI_TORCH_D,
 } from '../core/objectNameIndex';
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../core/types';
+import { DBType, OBJECT_ID_NULL, type ObjectID } from '../core/types';
 import { characterAtPosition } from './AddCharacter';
 import { AdjustStatsForItemCarried } from './AdjustStatsForItemCarried';
 import { nameIndexOf, type GameContext } from './GameContext';
 import { CHARFLAG_CHEST_OR_SCROLL, getChampionPossession, type Champion } from './gameTypes';
-import { emptyChestContents } from './InterfaceState';
 import { selectPaletteForLightLevel } from './LightLevel';
+import { repackChest } from './OpenChest';
 import { drawCharacterState } from './Party';
 
 export class CharacterSystem {
@@ -44,8 +43,8 @@ export class CharacterSystem {
    * menu closes if it is this champion's and a scroll closes; out of either hand a torch
    * goes out; and a chest out of the weapon hand of the champion whose inventory is open
    * is repacked. All of these test `RN::NameIndex`, the modified name, so a lit torch is
-   * any of `Torch_a`-`Torch_d` and a worn Illumulet `_b`. The attack menu and the open
-   * chest are the UI's, so those two go out as `GameHost` notices.
+   * any of `Torch_a`-`Torch_d` and a worn Illumulet `_b`. The attack menu is the UI's,
+   * so its closing goes out as a `GameHost` notice.
    *
    * The light changes are followed by `SelectPaletteForLightLevel`. A chest or a scroll
    * out of the selected champion's weapon hand sets `CHARFLAG_chestOrScroll`
@@ -97,7 +96,7 @@ export class CharacterSystem {
         }
       }
     }
-    drawCharacterState(this.ctx.party.state, chIdx, 0, this.ctx.host);
+    drawCharacterState(this.ctx, chIdx, 0);
     return objRemoved;
   }
 
@@ -150,7 +149,7 @@ export class CharacterSystem {
         this.ctx.dungeon.getMiscRecord(object)!.specialState = 1;
       }
     }
-    drawCharacterState(this.ctx.party.state, chIdx, 0, this.ctx.host);
+    drawCharacterState(this.ctx, chIdx, 0);
   }
 
   /**
@@ -318,72 +317,4 @@ export function isIllumulet(nameIndex: number): boolean {
 /** What an Illumulet round the neck adds to `d.Brightness`, `d.Word1074[2]` (`Character.cpp:1871`, `:2021`). */
 export function illumuletLight(word1074: readonly number[]): number {
   return word1074[2]!;
-}
-
-/**
- * `ShowChestContents` (`doc/CSBwin-src/Character.cpp:3042`) — the state half: the chest
- * becomes `d.objOpenChest`, its objects `d.rnChestContents`, and every link is cleared,
- * each object's and the chest's own, so the objects belong to the chest's slots alone
- * until `repackChest` (`:3069-3103`). The drawing is the screen's (`drawChestPanel`).
- * A chest already open is left as it is (`:3051`); a record that is no chest opens none.
- */
-export function showChestContents(ctx: GameContext, objChest: ObjectID): void {
-  const ui = ctx.interface;
-  if (ui.openChestId === objChest) return;
-  const chest = ctx.dungeon.getContainerRecord(objChest);
-  if (!chest) {
-    ui.openChestId = null;
-    ui.openChestContents = emptyChestContents();
-    return;
-  }
-
-  ui.openChestId = objChest;
-  const contents = emptyChestContents();
-  let cursor = chest.containedObject;
-  let index = 0;
-  while (cursor !== OBJECT_ID_EOF && cursor !== OBJECT_ID_NULL && index < contents.length) {
-    contents[index++] = cursor;
-    cursor = ctx.dungeon.getDBRecordLink(cursor);
-  }
-  ui.openChestContents = contents;
-
-  for (const item of contents) {
-    if (item !== OBJECT_ID_NULL) {
-      ctx.dungeon.setDBRecordLink(item, OBJECT_ID_EOF);
-    }
-  }
-  chest.containedObject = OBJECT_ID_EOF;
-}
-
-/**
- * `RepackChest` (`doc/CSBwin-src/Character.cpp:3113`) — link the open chest's objects back
- * into it, in slot order, and close it. `RemoveCharacterPossession` calls it when the
- * chest leaves the weapon hand of the champion whose inventory is open (`:1911-1919`),
- * and a save before it writes the file (`GameSaves.save`).
- */
-export function repackChest(ctx: GameContext): void {
-  const ui = ctx.interface;
-  if (ui.openChestId === null) return;
-  const chest = ctx.dungeon.getContainerRecord(ui.openChestId);
-  if (!chest) {
-    ui.openChestId = null;
-    ui.openChestContents = emptyChestContents();
-    return;
-  }
-
-  chest.containedObject = OBJECT_ID_EOF;
-  let previous: ObjectID | null = null;
-  for (const item of ui.openChestContents) {
-    if (item === OBJECT_ID_NULL) continue;
-    ctx.dungeon.setDBRecordLink(item, OBJECT_ID_EOF);
-    if (previous === null) {
-      chest.containedObject = item;
-    } else {
-      ctx.dungeon.setDBRecordLink(previous, item);
-    }
-    previous = item;
-  }
-
-  ui.openChestId = null;
-  ui.openChestContents = emptyChestContents();
 }

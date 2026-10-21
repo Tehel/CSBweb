@@ -74,7 +74,7 @@ export class HallOfChampions {
     champion.fingerprint = computeChampionFingerprint(party.state.champions, this.ctx.dungeon, pos.z, pos.x, pos.y);
     if (!party.addChampion(champion)) return false;
     if (party.state.champions.length === 1) {
-      setHandOwner(party.state, 0, this.ctx.host);
+      setHandOwner(this.ctx, 0);
     }
     return true;
   }
@@ -133,7 +133,7 @@ export class HallOfChampions {
     // `d.PotentialCharacterOrdinal = LOCAL_2 + 1; d.NumCharacter++;` (`:705-706`).
     party.potentialChampionIndex = index;
     if (party.champions.length === 1) {
-      setHandOwner(party, 0, this.ctx.host);
+      setHandOwner(this.ctx, 0);
     }
 
     this.collectMirrorPossessions(index, possessions);
@@ -174,7 +174,7 @@ export class HallOfChampions {
       setClockTick(this.ctx, 1);
       this.ctx.mouseQueue.discardAllInput();
       if (party.champions.length === 1) {
-        setHandOwner(party, -1, this.ctx.host);
+        setHandOwner(this.ctx, -1);
       }
       // `d.NumCharacter--` and no more: the record stays in its slot, possessions and all.
       party.vacantCharacters[party.champions.length - 1] = champion;
@@ -221,7 +221,7 @@ export class HallOfChampions {
 
     // `:6845-6852`
     if (party.champions.length === 1) {
-      setHandOwner(party, 0, this.ctx.host);
+      setHandOwner(this.ctx, 0);
       selectMagicCaster(party, 0);
     }
 

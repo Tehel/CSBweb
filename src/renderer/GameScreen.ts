@@ -88,7 +88,7 @@ import { championBarsAt, openChampionDialog } from './ui/ChampionDialog';
 import { doMenu, drawMenuPress, menuButtonList, type MenuPress } from './ui/Menu';
 import type { SaveEntry } from '../data/saves';
 import type { ImportedFile } from '../engine/GameSaves';
-import { drawCharacterStateEyePanel, drawInventoryBackground, drawInventoryScreen, syncOpenChest } from './ui/Inventory';
+import { drawCharacterStateEyePanel, drawInventoryBackground, drawInventoryScreen } from './ui/Inventory';
 import { drawCharacterState, drawHeldObjectName, drawPartyStatus, getChampionPortrait } from './ui/Character';
 import { drawHintOracleButton, type HintOracleFiles } from './ui/HintOracleButton';
 import { displayFrozenScreen, displaySleepScreen, drawMessageLines, shadeRectIndex } from './ui/Draw';
@@ -670,10 +670,6 @@ export class GameScreen {
     // it. Both screens stay in the viewport until the next `DrawViewport`.
     if (frozen) displayFrozenScreen(this.ui);
     else if (this.ui.partyState.sleeping) displaySleepScreen(this.ui);
-    if (!inventoryOpen) {
-      syncOpenChest(this.ui, null);
-      this.ui.ctx.interface.displayResurrectChestOrScroll = 0;
-    }
     if (inventoryOpen && !frozen) {
       drawInventoryBackground(this.ui);
       drawHintOracleButton(this.ui);
@@ -682,10 +678,7 @@ export class GameScreen {
     }
     drawPartyStatus(this.ui);
     if (inventoryOpen) {
-      // Nothing draws the inventory under the disk menu, which covers the viewport,
-      // until `TAG0207cc` shows it again. Drawing it would open the chest again that
-      // `TAG02076e` repacked for the save.
-      if (!isSaveMenuOpen(this.ui) && !frozen) drawInventoryScreen(this.ui);
+      if (!frozen) drawInventoryScreen(this.ui);
       shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word28, 0);
       // `_ReIncarnate` draws over the open inventory rather than replacing it: it
       // blanks the name strip and puts its keyboard where the eye panel was

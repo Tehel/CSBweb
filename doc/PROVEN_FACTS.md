@@ -6292,6 +6292,23 @@ its chain: `ShowChestContents` clears their links and the chest's `contents`
 pair is in `doc/CSBWIN_MENU_REFERENCE.md` → "Entering and leaving". Evidence:
 `tools/dump-save-menu.ts`, "the disk menu over an open chest".
 
+## A chest is opened and repacked at events, never by drawing
+
+`ShowChestContents` has one caller, `DescribeObject` on a chest
+(`doc/CSBwin-src/Character.cpp:3548-3550`), which `TAG0189d4` calls for a chest in the
+weapon hand of the champion whose inventory is open (`:3911`) and `_ClickOnEye` for a
+chest on the cursor (`doc/CSBwin-src/Viewport.cpp:7293`). `TAG0189d4` runs when the
+inventory is shown and whenever `DrawCharacterState` finds `CHARFLAG_chestOrScroll` with
+neither the eye nor the mouth held (`Character.cpp:1483-1502`), and at the eye's and the
+mouth's release (`doc/CSBwin-src/CSBCode.cpp:7452`, `:7465`). `RepackChest` is called by
+`RemoveCharacterPossession` (`Character.cpp:1915`), `DescribeObject` with the eye or the
+mouth held (`:3464`), `TAG019036` (`:4532`), `TAG02076e` (`:5149`), `DisplayFoodWater`
+(`Viewport.cpp:7248`), `QuitPressingEye` for a chest on the cursor (`CSBCode.cpp:7464`)
+and `ShowHideInventory` closing an inventory (`:7517`), and by nothing else. So the
+world holds the same objects in a chest however often the screen is drawn. In the port
+they are `src/engine/OpenChest.ts`'s, which nothing that composes the screen calls.
+Evidence: `tools/dump-open-chest.ts`.
+
 ## `d.Word11722` is always zero
 
 The main loop calls `TAG02076e(); TAG0207cc();` about every ten seconds while

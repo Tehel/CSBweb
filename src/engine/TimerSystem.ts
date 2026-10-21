@@ -366,7 +366,7 @@ export class TimerSystem {
   private processPartyShieldTimer(timer: TimerEntry): void {
     const party = this.ctx.party.state;
     party.partyShield = sw(party.partyShield - sw(timer.timerWord6));
-    markAllPortraitsChanged(party, this.ctx.host);
+    markAllPortraitsChanged(this.ctx);
   }
 
   /**
@@ -380,7 +380,7 @@ export class TimerSystem {
     if (!champ) return;
     // CSBWin stores the result through `uw()`, so it wraps rather than clamping.
     champ.shieldStrength = (champ.shieldStrength - sw(timer.timerWord6)) & 0xffff;
-    drawCharacterState(this.ctx.party.state, chIdx, CHARFLAG_PORTRAIT_CHANGED, this.ctx.host);
+    drawCharacterState(this.ctx, chIdx, CHARFLAG_PORTRAIT_CHANGED);
   }
 
   /**
@@ -458,13 +458,13 @@ export class TimerSystem {
   private processSpellShieldTimer(timer: TimerEntry): void {
     const party = this.ctx.party.state;
     party.spellShield = sw(party.spellShield - sw(timer.timerWord6));
-    markAllPortraitsChanged(party, this.ctx.host);
+    markAllPortraitsChanged(this.ctx);
   }
 
   private processFireShieldTimer(timer: TimerEntry): void {
     const party = this.ctx.party.state;
     party.fireShield = sw(party.fireShield - sw(timer.timerWord6));
-    markAllPortraitsChanged(party, this.ctx.host);
+    markAllPortraitsChanged(this.ctx);
   }
 
   private processMagicFootprintsTimer(): void {

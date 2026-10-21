@@ -175,7 +175,8 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
             MouseSystem (Mouse.cpp's engine half), HallOfChampions, the Monster* systems,
             MouseQueue and LoopState (the loop's `d.` state, at `ctx.mouseQueue` /
             `ctx.loop`), PeriodicUpdates (the ninety- and ten-second updates), LightLevel
-            (`SelectPaletteForLightLevel`: `d.CurrentPalette`),
+            (`SelectPaletteForLightLevel`: `d.CurrentPalette`), OpenChest (the open
+            chest, opened and repacked at CSBWin's events, never by drawing),
             SmartDiscard (thinning a filling database), MakeMoreRoomInDB (making
             room in a full one),
             RuntimeSave (the state a read restores), SaveGameFile (the CSBWin file a

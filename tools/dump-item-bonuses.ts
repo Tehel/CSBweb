@@ -30,7 +30,7 @@ import type { ObjectID } from '../src/core/types';
 import type { GameHost } from '../src/engine/GameHost';
 import type { ClothingRecord, MiscRecord, WeaponRecord } from '../src/data/dungeonTypes';
 import { AdjustStatsForItemCarried } from '../src/engine/AdjustStatsForItemCarried';
-import { repackChest, showChestContents } from '../src/engine/CharacterSystem';
+import { repackChest, showChestContents } from '../src/engine/OpenChest';
 import { Game } from '../src/engine/Game';
 import {
   AttributeIndex, attributeMinimum, makeAddCharacterAttributes, type Attribute,

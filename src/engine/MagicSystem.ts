@@ -349,7 +349,7 @@ export class MagicSystem {
               shieldAdd = Math.trunc(shieldAdd / 4);
             }
             this.ctx.party.state.partyShield = sw(this.ctx.party.state.partyShield + shieldAdd);
-            markAllPortraitsChanged(this.ctx.party.state, this.ctx.host);
+            markAllPortraitsChanged(this.ctx);
             const duration = d6 * d6;
             this.queueUtilityTimer(TimerFunction.TT_74, duration, shieldAdd);
             break;

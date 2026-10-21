@@ -129,6 +129,7 @@ const CHECKS = [
   { tool: 'dump-dsa-parameters.ts' },
   { tool: 'dump-dsa-cell-fetch.ts' },
   { tool: 'dump-viewing-filter.ts' },
+  { tool: 'dump-open-chest.ts' },
   { tool: 'dump-sound-filter.ts' },
   { tool: 'dump-action-name-filter.ts' },
   { tool: 'dump-feeding-filter.ts' },

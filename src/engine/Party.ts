@@ -8,7 +8,8 @@
 import { OBJECT_ID_NULL, ui8, Direction, Position } from '../core/types';
 import type { PartyState, Champion } from './gameTypes';
 import { CHARFLAG_CHEST_OR_SCROLL, CHARFLAG_CURSOR, CHARFLAG_PORTRAIT_CHANGED, MovementAction } from './gameTypes';
-import type { GameHost } from './GameHost';
+import type { GameContext } from './GameContext';
+import { drawCharacterStateEyePanel } from './OpenChest';
 import { addCharacterDefaults } from './AddCharacter';
 import { CHARDESC_SIZE } from '../data/CsbwinSaveInfo';
 import { getFromWings, wingsChampion, type WingsPool } from './Wings';
@@ -161,7 +162,8 @@ export class Party {
  * `DrawCharacterState` (`doc/CSBwin-src/CSBCode.cpp:8488-8494`, `:8509-8510`), which is
  * the host's: the recruit in a mirror, who is given the cursor, is not redrawn (`:8508`).
  */
-export function setHandOwner(party: PartyState, chIdx: number, host: Pick<GameHost, 'drawCharacterState'>): void {
+export function setHandOwner(ctx: GameContext, chIdx: number): void {
+    const party = ctx.party.state;
     const current = party.cursorOwner ?? -1;
     if (chIdx === current) return;
     if (chIdx !== -1) {
@@ -171,38 +173,43 @@ export function setHandOwner(party: PartyState, chIdx: number, host: Pick<GameHo
         if ((champion.attributes?.health ?? 0) === 0) return;
     }
     party.cursorOwner = -1;
-    if (current !== -1) drawCharacterState(party, current, CHARFLAG_CURSOR, host);
+    if (current !== -1) drawCharacterState(ctx, current, CHARFLAG_CURSOR);
     if (chIdx === -1) return;
     party.cursorOwner = chIdx;
     // `pcA3->facing = (ui8)d.partyFacing` (doc/CSBwin-src/CSBCode.cpp:8504).
     const champion = getPartyChampion(party, chIdx);
     if (champion) champion.facing = party.facing;
     if (chIdx === party.potentialChampionIndex) return;
-    drawCharacterState(party, chIdx, CHARFLAG_CURSOR, host);
+    drawCharacterState(ctx, chIdx, CHARFLAG_CURSOR);
 }
 
 /**
  * `DrawCharacterState(chIdx)` (`doc/CSBwin-src/Character.cpp:1234`): the host draws
  * `charFlags`, the flags just set, with the champion's `CHARFLAG_CHEST_OR_SCROLL`, which
  * is cleared as `:1519` clears every graphic flag. Nothing set, nothing is drawn (`:1256`).
+ * The flag on the champion whose inventory is open fills the eye panel again, whose
+ * opening and repacking of the chest are the engine's (`drawCharacterStateEyePanel`,
+ * `CharacterSystem.ts`), before the host draws it.
  */
-export function drawCharacterState(
-    party: PartyState, chIdx: number, charFlags: number, host: Pick<GameHost, 'drawCharacterState'>,
-): void {
+export function drawCharacterState(ctx: GameContext, chIdx: number, charFlags: number): void {
+    const party = ctx.party.state;
     const champion = party.champions[chIdx];
     if (champion) {
         charFlags |= champion.charFlags & CHARFLAG_CHEST_OR_SCROLL;
         champion.charFlags &= ~CHARFLAG_CHEST_OR_SCROLL;
     }
-    if (charFlags !== 0) host.drawCharacterState(chIdx, charFlags);
+    if ((charFlags & CHARFLAG_CHEST_OR_SCROLL) !== 0 && party.selectedCharacterIndex === chIdx) {
+        drawCharacterStateEyePanel(ctx);
+    }
+    if (charFlags !== 0) ctx.host.drawCharacterState(chIdx, charFlags);
 }
 
 /**
  * `DrawAllCharacterState` (`doc/CSBwin-src/CSBCode.cpp:6885-6895`), for the flags the
  * champions hold.
  */
-export function drawAllCharacterState(party: PartyState, host: Pick<GameHost, 'drawCharacterState'>): void {
-    for (let i = 0; i < party.champions.length; i++) drawCharacterState(party, i, 0, host);
+export function drawAllCharacterState(ctx: GameContext): void {
+    for (let i = 0; i < ctx.party.state.champions.length; i++) drawCharacterState(ctx, i, 0);
 }
 
 /**
@@ -210,9 +217,9 @@ export function drawAllCharacterState(party: PartyState, host: Pick<GameHost, 'd
  * on every champion and `DrawAllCharacterState`, which a party shield, a spell shield or
  * a fire shield changing calls for, the dots around each box being theirs.
  */
-export function markAllPortraitsChanged(party: PartyState, host: Pick<GameHost, 'drawCharacterState'>): void {
-    for (let i = 0; i < party.champions.length; i++) {
-        drawCharacterState(party, i, CHARFLAG_PORTRAIT_CHANGED, host);
+export function markAllPortraitsChanged(ctx: GameContext): void {
+    for (let i = 0; i < ctx.party.state.champions.length; i++) {
+        drawCharacterState(ctx, i, CHARFLAG_PORTRAIT_CHANGED);
     }
 }
 
@@ -224,13 +231,14 @@ export function markAllPortraitsChanged(party: PartyState, host: Pick<GameHost, 
  * from CSBWin. Quick-saves written before `setHandOwner` existed are exactly that, and
  * without this they load into a party whose inventory cannot be touched.
  */
-export function ensureHandOwner(party: PartyState, host: Pick<GameHost, 'drawCharacterState'>): void {
+export function ensureHandOwner(ctx: GameContext): void {
+    const party = ctx.party.state;
     if ((party.cursorOwner ?? -1) >= 0) return;
     if (party.champions.length === 0) return;
     for (let chIdx = 0; chIdx < 4; chIdx++) {
         const champion = getPartyChampion(party, chIdx);
         if (!champion || (champion.attributes?.health ?? 0) === 0) continue;
-        setHandOwner(party, chIdx, host);
+        setHandOwner(ctx, chIdx);
         if ((party.cursorOwner ?? -1) >= 0) return;
     }
 }

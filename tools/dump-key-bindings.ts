@@ -87,7 +87,7 @@ async function main(): Promise<void> {
   const party = ctx.party;
   party.addChampion(makeChampion(casters[0].index, 0));
   party.addChampion(makeChampion(casters[1].index, 1));
-  setHandOwner(party.state, 0, ctx.host);
+  setHandOwner(ctx, 0);
 
   const ui: UIState = newUIState(graphics, ctx);
 

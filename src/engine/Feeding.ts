@@ -256,7 +256,7 @@ export function applyFeedParameters(
     );
     // `CHARFLAG_portraitChanged` (`:4410`), which the `DrawCharacterState` that ends the
     // feeding draws (`:4509`); nothing in between shows on the champion's box.
-    drawCharacterState(party, chIdx, CHARFLAG_PORTRAIT_CHANGED, ctx.host);
+    drawCharacterState(ctx, chIdx, CHARFLAG_PORTRAIT_CHANGED);
   }
 
   // The unconfirmed champion in a Hall of Champions mirror takes no mana, no healing

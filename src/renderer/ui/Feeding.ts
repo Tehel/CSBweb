@@ -12,6 +12,7 @@ import { applyFeedParameters, derivePotionFeeding, WATERSKIN_GULP } from '../../
 import { clearFeedParameters, type FeedParameters } from '../../engine/filterParameters';
 import { CHARFLAG_CHEST_OR_SCROLL } from '../../engine/gameTypes';
 import { drawCharacterState } from '../../engine/Party';
+import { displayFoodWater } from '../../engine/OpenChest';
 import { DBType, OBJECT_ID_NULL, ObjectID, locationRelToInteger } from '../../core/types';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { drawObjectIconAt } from './Draw';
@@ -102,8 +103,8 @@ export function computeFeedParameters(
 /**
  * `_FeedCharacter` (`doc/CSBwin-src/Character.cpp:4021`), the mouth pressed. With an empty
  * hand, the mouth is held (`:4058-4075`) unless the eye panel already shows food and
- * water: `drawInventoryScreen` draws them over the chest, the scroll or the Resurrect
- * menu until the release (`handleMouseUnclick`). As with the eye (`handleEyePress`), the
+ * water: the open chest is repacked, and `drawInventoryScreen` draws them over the
+ * chest, the scroll or the Resurrect menu until the release (`handleMouseUnclick`). As with the eye (`handleEyePress`), the
  * button is taken to be down at the press, and the release comes through the queue.
  */
 export function handleMouthPress(ui: UIState): void {
@@ -117,9 +118,11 @@ export function handleMouthPress(ui: UIState): void {
   if (objectId === OBJECT_ID_NULL) {
     if (ui.ctx.interface.displayResurrectChestOrScroll === 0) return;
     ui.ctx.interface.pressingMouth = true;
-    // `STHideCursor(HC5); d.Word23118 = 1;` (`:4071-4072`).
+    // `STHideCursor(HC5); d.Word23118 = 1;` (`:4071-4072`), and `DisplayFoodWater`'s
+    // `RepackChest` (`:4073`); the compose draws food and water.
     stHideCursor(ui);
     ui.word23118 = 1;
+    displayFoodWater(ui.ctx);
     return;
   }
   // `if (d.PotentialCharacterOrdinal != 0) RETURN;` — with an object in hand, the mouth
@@ -166,7 +169,7 @@ export function handleMouthPress(ui: UIState): void {
   // `CHARFLAG_chestOrScroll` has, with food and water in the eye panel, and the
   // `DrawCharacterState` that ends the feeding (`doc/CSBwin-src/Character.cpp:4503-4509`).
   if (ui.ctx.interface.displayResurrectChestOrScroll === 0) champ.charFlags |= CHARFLAG_CHEST_OR_SCROLL;
-  drawCharacterState(ui.partyState, selected, 0, ui.ctx.host);
+  drawCharacterState(ui.ctx, selected, 0);
 }
 
 /**
