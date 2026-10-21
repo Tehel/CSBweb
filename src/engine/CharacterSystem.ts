@@ -25,6 +25,7 @@ import {
 import { DBType, OBJECT_ID_NULL, type ObjectID } from '../core/types';
 import { characterAtPosition } from './AddCharacter';
 import { AdjustStatsForItemCarried } from './AdjustStatsForItemCarried';
+import { tag01b1c0 } from './AttackMenu';
 import { nameIndexOf, type GameContext } from './GameContext';
 import { CHARFLAG_CHEST_OR_SCROLL, getChampionPossession, type Champion } from './gameTypes';
 import { selectPaletteForLightLevel } from './LightLevel';
@@ -77,7 +78,7 @@ export class CharacterSystem {
     if (slot < 2) {
       if (slot === 1) {
         // `if (d.AttackingCharacterOrdinal == chIdx+1) TAG01b1c0();` (`:1893-1896`)
-        this.ctx.host.closeAttackMenuOf(chIdx);
+        if (this.ctx.interface.attackingCharacterOrdinal === chIdx + 1) tag01b1c0(this.ctx);
         if (objNID5 >= OBJNI_OPEN_SCROLL && objNID5 <= OBJNI_SCROLL) {
           this.ctx.dungeon.getScrollRecord(objRemoved)!.open = false;
         }
@@ -124,7 +125,7 @@ export class CharacterSystem {
     if (place < 2) {
       if (place === 1) {
         // `if (d.AttackingCharacterOrdinal == chIdx+1) TAG01b1c0();` (`:1982-1985`)
-        this.ctx.host.closeAttackMenuOf(chIdx);
+        if (this.ctx.interface.attackingCharacterOrdinal === chIdx + 1) tag01b1c0(this.ctx);
         if (objNID4 >= OBJNI_OPEN_SCROLL && objNID4 <= OBJNI_SCROLL) {
           this.ctx.dungeon.getScrollRecord(object)!.open = true;
         }

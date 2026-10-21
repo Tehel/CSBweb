@@ -15,7 +15,7 @@ import { CHARDESC_SIZE } from '../data/CsbwinSaveInfo';
 import type { GameContext } from './GameContext';
 import type { Champion } from './gameTypes';
 import { markAllPortraitsChanged, selectMagicCaster, setHandOwner } from './Party';
-import { showHideInventory } from './ShowHideInventory';
+import { releaseEyeOrMouth, showHideInventory } from './ShowHideInventory';
 import { getFromWings, saveToWings, wingsChampion } from './Wings';
 
 /** `hp`'s offset in a `CHARDESC`, big-endian in the file's form. */
@@ -152,7 +152,7 @@ function removeCharacter(ctx: GameContext, chIdx: number): void {
   const party = ctx.party.state;
   const champion = party.champions[chIdx]!;
   if (party.selectedCharacterIndex === chIdx) {
-    ctx.host.releaseEyeOrMouth();
+    releaseEyeOrMouth(ctx);
     showHideInventory(ctx, 4); //Hide the inventory screen
   }
   // `byte33 = 0`, `incantation[0] = 0`.

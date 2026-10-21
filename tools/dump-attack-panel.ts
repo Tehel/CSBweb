@@ -22,10 +22,8 @@ import { Party } from '../src/engine/Party';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
-import {
-  attackPanelTick, closeAttackMenu, drawAttackPanel, executeAttack, FLASH_MS, prepareAttack,
-  takeAttackOption,
-} from '../src/renderer/ui/Attack';
+import { tag01b1c0, tag01b29a } from '../src/engine/AttackMenu';
+import { drawAttackPanel, executeAttack, FLASH_MS, prepareAttack, takeAttackOption } from '../src/renderer/ui/Attack';
 import { VBL_PER_TICK } from '../src/engine/LoopState';
 import { type UIState } from '../src/renderer/ui/UIState';
 import { check, finish } from './lib/check';
@@ -90,19 +88,19 @@ async function main(): Promise<void> {
   executeAttack(ui, -1);
   check(render('PASS, before the tick') === menu,
     'a PASS draws nothing: the menu stays on the panel (TAG01b1c0, Character.cpp:4904-4922)');
-  attackPanelTick(ui);
+  tag01b29a(ui.ctx);
   check(render('the tick') === buttons, "the tick's TAG01b29a draws the buttons over it (CSBCode.cpp:8954-8958)");
 
   prepareAttack(ui, 1);
   const menu2 = render("champion 2's menu");
-  closeAttackMenu(ui);
+  tag01b1c0(ui.ctx);
   check(render('closed by TAG01b1c0') === menu2, "a close from elsewhere leaves champion 2's menu up too");
   prepareAttack(ui, 0);
   check(render("champion 1's menu again") === menu, "a new menu is champion 1's, not the closed one's");
 
   takeAttackOption(ui, 0);
   check(render('attack, before the tick') === menu, 'an attack leaves the menu up until the tick');
-  attackPanelTick(ui);
+  tag01b29a(ui.ctx);
   const damage = render('the tick: the damage');
   check(damage !== menu && damage !== buttons, "the tick's FlashAttackDamage draws the damage over it");
   // The author's flash (DEBT.md H): over one tick and under two, where CSBWin's
@@ -110,23 +108,23 @@ async function main(): Promise<void> {
   const tickMs = (VBL_PER_TICK * 1000) / 60;
   check(FLASH_MS > tickMs && FLASH_MS < 2 * tickMs, `the flash, ${FLASH_MS} ms, is over one tick and under two`);
   ui.attackFlashUntilMs -= tickMs;
-  attackPanelTick(ui);
+  tag01b29a(ui.ctx);
   check(render('a tick on') === damage, 'the first tick after the flash leaves the damage up');
   ui.attackFlashUntilMs = 0;
   check(render('the flash over, before the tick') === damage,
     'the damage stays up after its VBLDelay(15) (Attack.cpp:1039)');
-  attackPanelTick(ui);
+  tag01b29a(ui.ctx);
   check(render('the next tick') === buttons, 'and the next tick draws the buttons');
 
   prepareAttack(ui, 0);
   takeAttackOption(ui, 0);
-  attackPanelTick(ui);
+  tag01b29a(ui.ctx);
   check(render('the damage again') === damage, 'another attack flashes the damage');
   prepareAttack(ui, 0);
   check(render("a key opens champion 1's menu") === menu,
     'a menu opened over the damage is drawn without it (DrawLegalAttackTypes)');
   executeAttack(ui, -1);
-  attackPanelTick(ui);
+  tag01b29a(ui.ctx);
   check(render('PASS, and the tick') === buttons, 'and its PASS brings the buttons back at the tick');
 
   console.log('');
@@ -192,18 +190,18 @@ async function main(): Promise<void> {
   champ.maxRecentDamage = 12;
   party.state.potentialChampionIndex = 1;
   prepareAttack(ui, 0);
-  attackPanelTick(ui);
+  tag01b29a(ui.ctx);
   flinch('candidate, menu open: tick');
   check(ui.ctx.interface.attackingCharacterOrdinal === 0, 'the tick closes the menu (TAG01b1c0)');
   check(champ.facing === facing && champ.maxRecentDamage === 12, 'and nobody turns');
-  attackPanelTick(ui);
+  tag01b29a(ui.ctx);
   flinch('candidate: tick');
   check(champ.facing === facing && champ.maxRecentDamage === 12,
     'while the candidate stands, nobody turns, and the damage is kept');
   render('candidate: the panel, its buttons shaded');
   check(ui.ctx.interface.word20250 === 0 && ui.ctx.interface.word20252 === 1, 'but the buttons are drawn again (CSBCode.cpp:8954-8958)');
   party.state.potentialChampionIndex = -1;
-  attackPanelTick(ui);
+  tag01b29a(ui.ctx);
   flinch('candidate gone: tick');
   check(champ.facing === champ.damageFromDirection && champ.maxRecentDamage === 0,
     'the first tick after it, the champion turns to the blow');

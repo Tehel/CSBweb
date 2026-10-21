@@ -21,7 +21,8 @@ import { Party } from '../src/engine/Party';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
-import { closeAttackMenu, executeAttack, prepareAttack, takeAttackOption } from '../src/renderer/ui/Attack';
+import { executeAttack, prepareAttack, takeAttackOption } from '../src/renderer/ui/Attack';
+import { tag01b1c0 } from '../src/engine/AttackMenu';
 import { drawTopBarHandIcons } from '../src/renderer/ui/Character';
 import { drawPossessionBox } from '../src/renderer/ui/Draw';
 import { drawInventoryScreen, getInventorySlotRect } from '../src/renderer/ui/Inventory';
@@ -139,7 +140,7 @@ async function main(): Promise<void> {
   check(ui.ctx.interface.attackingCharacterOrdinal === 0, 'the attack closed the menu');
   check(show('attack, before the tick', bar()) === '33 33 33 33', 'and took the cyan box away');
   prepareAttack(ui, 0);
-  closeAttackMenu(ui);
+  tag01b1c0(ui.ctx);
   check(show('closed by TAG01b1c0 from elsewhere', bar()) === '33 33 33 33', 'any close does');
 
   finish();

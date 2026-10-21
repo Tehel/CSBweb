@@ -2,7 +2,9 @@
 
 Source: `doc/CSBwin-src/Attack.cpp` (the engine) and `doc/CSBwin-src/Character.cpp` plus
 `doc/CSBwin-src/CSBCode.cpp:8823-8967` (the menu). Ported to
-`src/engine/AttackSystem.ts` and `src/renderer/ui/Attack.ts`.
+`src/engine/AttackSystem.ts`, `src/engine/AttackMenu.ts` (the menu's `d.` work: `TAG01b1c0`,
+`DrawLegalAttackTypes`'s names, `TAG01b29a`) and `src/renderer/ui/Attack.ts` (the clicks
+and the drawing).
 
 Monsters hitting the party is the other half and lives in `doc/CSBWIN_MONSTERS_REFERENCE.md`.
 
@@ -145,7 +147,8 @@ Each option offered goes through `ActionNameFilter` (`CSBCode.cpp:8739-8818`) as
 drawn: a DSA at `ESL_ACTIONNAMEFILTER`'s location may name it with a global text, and may
 change the attack it is (`doc/PROVEN_FACTS.md` → "The action name filter runs its
 location's first DSA, found once, for each option offered"). The port decides the names in
-`drawLegalAttackTypes`, once per CSBWin drawing, and `drawAttackPanel` draws what it chose.
+the engine's `drawLegalAttackTypes`, once per CSBWin drawing, and `drawAttackPanel` draws
+what it chose.
 
 `_FlashAttackDamage` (`Attack.cpp:949`) draws one of three starburst sizes — over 40, over
 15, the rest — with the number written right-to-left from x=274 in 3-pixel steps, so it

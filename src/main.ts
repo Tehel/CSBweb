@@ -273,9 +273,13 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // (`doc/CSBwin-src/CSBCode.cpp:6797` around `Code13ea4.cpp:20`); the
         // screen hands its answer to `HallOfChampions.reincarnateNamed`.
         openReincarnateScreen: (chIdx) => screen?.openReincarnateScreen(chIdx),
-        // A weapon hand changed: the attack menu is the screen's.
-        closeAttackMenuOf: (chIdx) => screen?.closeAttackMenuOf(chIdx),
-        releaseEyeOrMouth: () => screen?.releaseEyeOrMouth(),
+        // What the attack menu's `TAG01b1c0`, `DrawLegalAttackTypes` and `TAG01b29a`'s
+        // flash draw, and the flash timed by the wall clock.
+        tag01b1c0: (chIdx) => screen?.tag01b1c0(chIdx),
+        drawLegalAttackTypes: (options) => screen?.drawLegalAttackTypes(options),
+        flashAttackDamage: (damage) => screen?.flashAttackDamage(damage),
+        attackFlashHeld: () => screen?.attackFlashHeld() ?? false,
+        releaseEyeOrMouth: (eye) => screen?.releaseEyeOrMouth(eye),
         // What `ShowHideInventory`, `TAG02076e` and `TAG0207cc` draw.
         showHideInventory: () => screen?.showHideInventory(),
         tag02076e: () => screen?.tag02076e(),
@@ -300,8 +304,6 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         drawViewport: () => renderView(),
         // The main loop's tick paints what `TAG01b29a` drew after its `DrawViewport`.
         paint: () => refreshScreen(),
-        // `TAG01b29a`, after the tick's `d.Time++`: the flinch and the attack panel.
-        tag01b29a: () => screen?.attackPanelTick(),
         // `DisplayCharacterDamage`'s splat and figure, and `TAG011366` drawing over them.
         displayCharacterDamage: (chIdx, damage) => screen?.displayCharacterDamage(chIdx, damage),
         tag011366: (chIdx) => screen?.tag011366(chIdx),

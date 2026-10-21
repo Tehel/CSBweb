@@ -16,6 +16,7 @@ import type { Champion } from '../engine/gameTypes';
 import type { CSBGraphicsLoader } from '../data/CSBGraphicsLoader';
 import type { ScrollingText } from './csbwin/ScrollingText';
 import type { GameContext } from '../engine/GameContext';
+import type { AttackOptions } from '../engine/GameHost';
 import type { IndexedBitmap } from './csbwin/CanvasBlitter';
 import {
   clearIndex,
@@ -53,7 +54,7 @@ import {
   handleMouseButton,
   closeHintOracle,
   handleMouseUnclick,
-  releaseEyeOrMouth,
+  releaseEyeOrMouthDrawing,
   openHintOracle,
   searchMouseButtons,
   syncInventoryButtons,
@@ -63,7 +64,9 @@ import {
   updateButtonLists,
 } from './ui/Mouse';
 import { drawSpellControls, drawSpellPanel } from './ui/MagicPanel';
-import { attackPanelTick, closeAttackMenu, drawAttackPanel } from './ui/Attack';
+import {
+  attackFlashHeld, drawAttackPanel, drawLegalAttackTypesDrawing, flashAttackDamageDrawing, tag01b1c0Drawing,
+} from './ui/Attack';
 import { handleUIKey, tableKeyButton } from './ui/Keyboard';
 import {
   drawReincarnateScreen,
@@ -303,9 +306,24 @@ export class GameScreen {
     openReincarnateScreen(this.ui, chIdx);
   }
 
-  /** `if (d.AttackingCharacterOrdinal == chIdx+1) TAG01b1c0();` — the host's `closeAttackMenuOf`. */
-  closeAttackMenuOf(chIdx: number): void {
-    if (this.ui.ctx.interface.attackingCharacterOrdinal === chIdx + 1) closeAttackMenu(this.ui);
+  /** `TAG01b1c0`'s drawing (`doc/CSBwin-src/Character.cpp:4904`) — the host's `tag01b1c0`. */
+  tag01b1c0(chIdx: number): void {
+    tag01b1c0Drawing(this.ui, chIdx);
+  }
+
+  /** `DrawLegalAttackTypes`'s drawing (`doc/CSBwin-src/CSBCode.cpp:8823`) — the host's `drawLegalAttackTypes`. */
+  drawLegalAttackTypes(options: AttackOptions | null): void {
+    drawLegalAttackTypesDrawing(this.ui, options);
+  }
+
+  /** `FlashAttackDamage`'s drawing (`doc/CSBwin-src/Attack.cpp:949`) — the host's `flashAttackDamage`. */
+  flashAttackDamage(damage: number): void {
+    flashAttackDamageDrawing(this.ui, damage);
+  }
+
+  /** Whether the damage's flash holds the buttons back — the host's `attackFlashHeld`. */
+  attackFlashHeld(): boolean {
+    return attackFlashHeld(this.ui);
   }
 
 
@@ -314,9 +332,9 @@ export class GameScreen {
     showHideInventoryDrawing(this.ui);
   }
 
-  /** `KillCharacter`'s release of the eye or the mouth — the host's `releaseEyeOrMouth`. */
-  releaseEyeOrMouth(): void {
-    releaseEyeOrMouth(this.ui);
+  /** `KillCharacter`'s release of the eye or the mouth, its drawing — the host's `releaseEyeOrMouth`. */
+  releaseEyeOrMouth(eye: boolean): void {
+    releaseEyeOrMouthDrawing(this.ui, eye);
   }
 
   /** `TAG02076e`'s drawing (`doc/CSBwin-src/Character.cpp:5133`) — the host's `tag02076e`. */
@@ -565,16 +583,6 @@ export class GameScreen {
   refreshOverlay(): void {
     if (this.ui.hintOracleUp) return;
     this.presentViewport();
-  }
-
-  /**
-   * `TAG01b29a` (`doc/CSBwin-src/CSBCode.cpp:8904`), which CSBWin's main loop calls
-   * once per game tick (`:695`), after the tick's `DrawViewport` (`:648`). The port runs
-   * it just before its one redraw of the whole screen, so what it changes on the
-   * panels shows in the same frame.
-   */
-  attackPanelTick(): void {
-    attackPanelTick(this.ui);
   }
 
   /** `DisplayCharacterDamage`'s blit — the host's `displayCharacterDamage`. */

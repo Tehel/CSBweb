@@ -21,6 +21,16 @@ export interface JoinedChampion {
 }
 
 /**
+ * The open attack menu's options as `DrawLegalAttackTypes` draws them
+ * (`doc/CSBwin-src/CSBCode.cpp:8848-8894`): how many are offered, which sizes the
+ * backdrop, and the three rows' names, the action name filter's where it gave one.
+ */
+export interface AttackOptions {
+  count: number;
+  names: string[];
+}
+
+/**
  * Fragment-based message emitter, mirroring CSBWin's global `PrintLinefeed()` /
  * `QuePrintLines(color, text)` pair (`doc/CSBwin-src/CSBCode.cpp:1664`, `:1761`).
  *
@@ -87,12 +97,31 @@ export interface GameHost {
    */
   championJoined(joined: JoinedChampion): void;
   /**
-   * A champion's weapon hand changed (`AddCharacterPossession` /
-   * `RemoveCharacterPossession`): `if (d.AttackingCharacterOrdinal == chIdx+1)
-   * TAG01b1c0();` (`doc/CSBwin-src/Character.cpp:1893-1896`, `:1982-1985`). The attack
-   * menu is the UI's.
+   * `TAG01b1c0` (`doc/CSBwin-src/Character.cpp:4904`), its drawing, before the engine
+   * closes the menu of champion `chIdx` (`tag01b1c0`, `AttackMenu.ts`): the attacker's
+   * hands redrawn by `DrawCharacterState` (`:4917-4920`), and the menu left on the panel.
    */
-  closeAttackMenuOf(chIdx: number): void;
+  tag01b1c0(chIdx: number): void;
+  /**
+   * `DrawLegalAttackTypes` (`doc/CSBwin-src/CSBCode.cpp:8823`), its drawing, once the
+   * engine has named the options (`drawLegalAttackTypes`, `AttackMenu.ts`): the four attack
+   * buttons as `d.Word20252` says, or the open menu's `options`, null when there is none
+   * to show.
+   */
+  drawLegalAttackTypes(options: AttackOptions | null): void;
+  /**
+   * `FlashAttackDamage(damage)` (`doc/CSBwin-src/Attack.cpp:949`), from `TAG01b29a`
+   * (`CSBCode.cpp:8950-8953`): the damage figure, or CAN'T REACH (-1) and NEED AMMO (-2),
+   * over the panel.
+   */
+  flashAttackDamage(damage: number): void;
+  /**
+   * Whether the screen's flash of the damage still holds the buttons back, which
+   * `TAG01b29a` asks before it services `d.Word20250`: the port times the flash by the
+   * wall clock where CSBWin's `VBLDelay(15)` stops the game (`DEBT.md` H). Left out, it
+   * holds nothing.
+   */
+  attackFlashHeld(): boolean;
   /**
    * `ShowHideInventory(chIdx)` (`doc/CSBwin-src/CSBCode.cpp:7478`), 4 to hide, its drawing,
    * once the engine has shown or hidden the inventory (`showHideInventory`,
@@ -101,11 +130,12 @@ export interface GameHost {
    */
   showHideInventory(chIdx: number): void;
   /**
-   * `KillCharacter`'s release of a held eye or mouth, on the champion whose inventory is
-   * open, before its `ShowHideInventory(4)` (`doc/CSBwin-src/Character.cpp:2603-2625`):
-   * the eye and the mouth are the UI's.
+   * `KillCharacter`'s release of a held eye (`eye`) or mouth, its drawing, once the engine
+   * has let it go (`releaseEyeOrMouth`, `ShowHideInventory.ts`): `d.Word23118 = 1` and the
+   * pointer shown again (`doc/CSBwin-src/Character.cpp:2603-2625`), and for the eye, what
+   * it described put away.
    */
-  releaseEyeOrMouth(): void;
+  releaseEyeOrMouth(eye: boolean): void;
   /**
    * `TAG02076e` (`doc/CSBwin-src/Character.cpp:5133`), its drawing, once the engine has
    * repacked the open chest (`tag02076e`, `ShowHideInventory.ts`): the interface shaded and
@@ -145,16 +175,11 @@ export interface GameHost {
    */
   drawViewport(): void;
   /**
-   * The main loop's tick, once `tag01b29a` has drawn: the screen shown again with what it
-   * drew, over the viewport the tick's `DrawViewport` left (`Game.gameTick`). Not a
-   * `DrawViewport`.
+   * The main loop's tick, once `TAG01b29a` has run (`tag01b29a`, `AttackMenu.ts`): the
+   * screen shown again with what it drew, over the viewport the tick's `DrawViewport` left
+   * (`Game.gameTick`). Not a `DrawViewport`.
    */
   paint(): void;
-  /**
-   * `TAG01b29a` (`doc/CSBwin-src/CSBCode.cpp:8904`), from the main loop's tick after
-   * `d.Time++` (`:695`): the champions' flinch and the attack panel, both the UI's.
-   */
-  tag01b29a(): void;
   /**
    * `DisplayCharacterDamage`'s blit (`doc/CSBwin-src/CSBCode.cpp:7180-7230`): the
    * champion lost `damage` HP this tick, shown in red over their name — or over their
@@ -220,7 +245,10 @@ export function createGameHost(host: Partial<GameHost> = {}): GameHost {
     sleepChanged: host.sleepChanged ?? (() => {}),
     openReincarnateScreen: host.openReincarnateScreen ?? (() => {}),
     championJoined: host.championJoined ?? (() => {}),
-    closeAttackMenuOf: host.closeAttackMenuOf ?? (() => {}),
+    tag01b1c0: host.tag01b1c0 ?? (() => {}),
+    drawLegalAttackTypes: host.drawLegalAttackTypes ?? (() => {}),
+    flashAttackDamage: host.flashAttackDamage ?? (() => {}),
+    attackFlashHeld: host.attackFlashHeld ?? (() => false),
     showHideInventory: host.showHideInventory ?? (() => {}),
     releaseEyeOrMouth: host.releaseEyeOrMouth ?? (() => {}),
     tag02076e: host.tag02076e ?? (() => {}),
@@ -229,7 +257,6 @@ export function createGameHost(host: Partial<GameHost> = {}): GameHost {
     showCredits: host.showCredits ?? (() => {}),
     drawViewport: host.drawViewport ?? (() => {}),
     paint: host.paint ?? (() => {}),
-    tag01b29a: host.tag01b29a ?? (() => {}),
     displayCharacterDamage: host.displayCharacterDamage ?? (() => {}),
     tag011366: host.tag011366 ?? (() => {}),
     drawCharacterState: host.drawCharacterState ?? (() => {}),

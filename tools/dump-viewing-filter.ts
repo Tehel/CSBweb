@@ -79,7 +79,7 @@ import { UNSET, freshGame, globalStore, int, op, varFetch, varStore, withFilterD
 import { check, finish } from './lib/check';
 import { gameTablesOf, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
-import { drawCursorItem, handleMouseButton, handleMouseUnclick, releaseEyeOrMouth } from '../src/renderer/ui/Mouse';
+import { drawCursorItem, handleMouseButton, handleMouseUnclick } from '../src/renderer/ui/Mouse';
 import { showHideInventory } from '../src/engine/ShowHideInventory';
 import { drawCharacterStateEyePanel, drawInventoryScreen, getInventorySlotRect } from '../src/renderer/ui/Inventory';
 import { drawObjectIcon } from '../src/renderer/ui/Draw';
@@ -504,7 +504,6 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
   let ui: UIState | null = null;
   const game = withFilterDsas(ESL_VIEWINGFILTER, [[...params(0)]], {
     drawCharacterState: (chIdx, charFlags) => { if (ui) drawCharacterStateEyePanel(ui, chIdx, charFlags); },
-    releaseEyeOrMouth: () => { if (ui) releaseEyeOrMouth(ui); },
   });
   const party = game.ctx.party.state;
   const graphics = stockGraphics();

@@ -114,7 +114,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| D18 | The host is asked for the interface's `d.` | L | ⏳ steps 1-4 of 5 done |
 | D19 | `RuntimeSaveState` is neither strict nor a snapshot | M | ⏳ |
 | E41 | `src/data/` imports the engine | M | ⏳ |
 | E35 | Comments and documents that are stale, wrong, or tell the past | M | ⏳ |
@@ -408,57 +407,6 @@ or `tools/dump-stats.ts`.
 
 New state-representation debt goes here, and jumps the queue.
 
-### D18 ⏳ The host is asked for the interface's `d.`
-
-CSBWin's interface state is `d.`: the open chest and its contents, the attack menu
-(`d.AttackingCharacterOrdinal`, `Word20250`, `Word20252`), `PressingEye`, `PressingMouth`,
-`DisplayResurrectChestOrScroll`. They are the context's, `ctx.interface`
-(`src/engine/InterfaceState.ts`), which the engine and the screen both read. The chest
-is opened and repacked at CSBWin's events (`src/engine/OpenChest.ts`), the engine's
-`DrawCharacterState` (`drawCharacterState`, `src/engine/Party.ts`) among them, and the
-compose only reads. `ShowHideInventory`, `TAG02076e` and `TAG0207cc` do their `d.` work in
-the engine (`src/engine/ShowHideInventory.ts`) and ask the host only to draw, and a read in
-play resets `ctx.interface` in the engine (`Game.savedGameRead`). What is left:
-
-- **The attack menu's `d.` is the screen's to change.** `TAG01b29a`
-  (`attackPanelTick`, `src/renderer/ui/Attack.ts`, the host's `tag01b29a`) turns the
-  champions to face their blows and moves `d.Word20250`, `d.Word20252` and the attack
-  damage to display; `TAG01b1c0` (`closeAttackMenu`, the host's `closeAttackMenuOf`) closes
-  the menu; and `DrawLegalAttackTypes` (`drawLegalAttackTypes`, which the host's
-  `tag0207cc` runs) runs the action name filter, which rewrites `d.PossibleAttackTypes`.
-  `TAG01b29a`'s flash holds the buttons back by the wall clock (`attackFlashUntilMs`, H),
-  which the engine's half has to ask the screen.
-- **`KillCharacter` and `RemoveCharacter` ask the host to let go of the eye or the mouth**
-  (`releaseEyeOrMouth`, `src/renderer/ui/Mouse.ts`), whose `d.PressingEye` and
-  `d.PressingMouth` are the engine's.
-
-`TAG011366` is paid: the engine clears the champion's timer (`MonsterAttack.tag011366`) and
-asks the host only to draw over the damage.
-
-Paying it: `GameHost` keeps only what leaves the engine. No pixel moves.
-
-In five steps, one commit each; steps 1 to 4 are done:
-
-1. **The fields move** (refactor, done). They are `ctx.interface`'s, made by
-   `createInterfaceState`; `UIState` keeps only what the screen draws from, and the engine
-   reads the fields with no host query.
-2. **`ShowChestContents`'s opening and `RepackChest` in the engine** (refactor, done).
-   `showChestContents` and `repackChest` (`src/engine/OpenChest.ts`).
-3. **The chest opened and repacked at CSBWin's events** (fix, done). `OpenChest.ts`'s
-   `tag0189d4`, `describeObject`, `displayFoodWater` and `tag019036`, run by the engine's
-   `drawCharacterState` and by the inventory, the eye and the mouth; the compose draws
-   what they left in `ctx.interface` (`doc/PROVEN_FACTS.md` → "A chest is opened and
-   repacked at events, never by drawing", `tools/dump-open-chest.ts`).
-4. **`ShowHideInventory`, `TAG02076e`, `TAG0207cc` and a read in play in the engine**
-   (refactor, done). `src/engine/ShowHideInventory.ts`; the host's members of the same
-   names draw (`showHideInventoryDrawing`, `tag02076eDrawing`, `tag0207ccDrawing`,
-   `src/renderer/ui/Mouse.ts`), and `savedGameRead` resets only the screen's share. A tool's
-   `newUIState` hands the game's host those drawings, as `main.ts` does.
-5. **The attack menu and the eye's release in the engine** (refactor). `TAG01b29a`,
-   `TAG01b1c0` and `DrawLegalAttackTypes`'s state in the engine under their CSBWin names,
-   the host asked for the flash and the drawing; `releaseEyeOrMouth`'s `d.` in the engine,
-   the host asked only to show the pointer again.
-
 ### D19 ⏳ `RuntimeSaveState` is neither strict nor a snapshot
 
 `RuntimeSaveState` is never a file (its header says so, as `DungeonSnapshot`'s does), yet
@@ -559,7 +507,7 @@ Copies of one rule drift apart. The copies left:
   `objectIndex.ts:86-94` and `MakeMoreRoomInDB.ts:95-98`, beside `DATABASE_KEY` (`:62`)
   and `getRecord` (`:688`).
 - **The global text's key**, `((EDT_GLOBAL_TEXT << 24) | (index & 0xffff)) >>> 0`, at
-  `Game.ts:192`, `DsaSystem.ts:4101` and `:4116`, and its decode at `DsaSystem.ts:4103-4109`
+  `Game.ts:193`, `DsaSystem.ts:4101` and `:4116`, and its decode at `DsaSystem.ts:4103-4109`
   and `DecodeText.ts:269-272`; `EDT_SPECIAL_LOCATIONS` and `ESL_MONSTER_MOVE_FILTER` both in
   `CsbwinExpool.ts:40-44` and `DsaSystem.ts:329-351`, and the fifteen `ESL_*` loose
   constants.
@@ -668,7 +616,7 @@ the canvas's output (`putImageData`), the order of the compose, the palettes' ch
 façade over the UI and the boot (`getScreenBuffer`, `doMenu`, `setBootFrameRenderer`). It needs an `HTMLCanvasElement`, so no tool can
 build one, and `tools/lib/ui.ts` copies its wiring (F19). Each page hook is named four
 times: in `UIState`, `UIHooks`, `GameScreenHooks` and the constructor's copy
-(`GameScreen.ts:97-119`, `:193-226`, `UIState.ts:424-427`).
+(`GameScreen.ts:100-122`, `:196-229`, `UIState.ts:424-427`).
 
 Paying it: a `ScreenComposer` without the DOM (the screen's index buffer, the palettes,
 `PresentedFrame`, `presentViewport`'s order) and a thin canvas presenter; one factory for the
@@ -684,7 +632,7 @@ intro's VBL (`BootSequence.ts:193-203`) and the CRT (`src/lib/crt.ts:232-249`).
 
 - `renderLastFrame`, which the chew, the menus and Reincarnate draw through, skips
   `refreshScreen`'s `setPartyState` and its `mainLoopHasReturned()` test
-  (`GameScreen.ts:810-816`, `src/main.ts:114-118`), so a chew still running when the game ends
+  (`GameScreen.ts:818-824`, `src/main.ts:114-118`), so a chew still running when the game ends
   draws the adventure over the credits' wait; `initializePlayState` cancels neither loop.
 - The CRT uploads the canvas and runs its shader at device pixels at every display frame,
   changed or not: about 2.3 million pixels a frame at a device ratio of 2, up to 120 times a
@@ -702,7 +650,7 @@ controls again.
 
 - `Game`'s constructor wires callbacks into objects built before it:
   `DungeonState.makeMoreRoomInDB`, `textSubstitution` and `timerWord8Lookup`
-  (`DungeonState.ts:90`, `:95`, `:140`; `Game.ts:186-194`), and `SoundQueue.soundFilter`
+  (`DungeonState.ts:90`, `:95`, `:140`; `Game.ts:187-195`), and `SoundQueue.soundFilter`
   (`= () => 1`, `SoundQueue.ts:48`); `TimerSystem`'s constructor writes into `ctx.dungeon`
   (`:94`). A bare `createGameContext` gets, silently, a full database that refuses records,
   untranslated texts and no sound filter, and `systems: {} as GameSystems`
@@ -747,7 +695,7 @@ loader's cache keyed by format, or the parameter dropped with the dead fallback.
   where a 16-entry `Uint32` table a palette, written through a `Uint32Array` view, takes
   0.14 ms (`updateImageDataFromIndex*`, `src/renderer/csbwin/CanvasBlitter.ts:416-490`). It
   always takes the two-palette path while adventuring: `viewportPalette !== uiPalette`
-  compares two separate copies (`GameScreen.ts:735-738`). Its body is written three times
+  compares two separate copies (`GameScreen.ts:743-746`). Its body is written three times
   in `CanvasBlitter`, and the cursor's footprint loop twice (`reconvertThroughPalette`,
   `PresentedFrame.capture`).
 - **Every monster turn allocates** an `MmRecord` and with it a `DsaVars` of two 100-entry
@@ -1049,7 +997,7 @@ New verification debt goes here; it can be taken anywhere ("Priority", point 5).
 - `tools/dump-vbl-clock.ts`'s "MainLoop opens with a tick" check can fail under load and
   pass alone (it failed once in a full `npm test`, sixteen tools at a time). `Game.start`
   sets `vblClockStart = Date.now()` and calls `gameLoop()` at once, which reads
-  `Date.now()` again (`src/engine/Game.ts:248`, `:493`), so a stall of 17 ms between
+  `Date.now()` again (`src/engine/Game.ts:249`, `:494`), so a stall of 17 ms between
   the two runs a VBL inside `start` and spends the opening tick. The tool pins `Date.now`
   for its pacing section (`:129-173`) and not for this one.
 - `tools/dump-loop-die.ts` waits `1000 / 60 * failOn + 150` real milliseconds, then checks
@@ -1110,7 +1058,7 @@ folder laid out as the image is.
 ### F19 ⏳ The tools' screen is wired by hand, and has drifted
 
 `tools/lib/ui.ts:23-36` builds the `ViewportRenderer` as `GameScreen`'s constructor does
-(`src/renderer/GameScreen.ts:179-194`), without `gameState`, `rules` and
+(`src/renderer/GameScreen.ts:182-197`), without `gameState`, `rules` and
 `csbGraphicsLoader`. So a view a tool draws has `invisibleMonsters` and
 `drawAsSize4Monsters` off whatever the dungeon says, no `d.Time` for the magic footprints,
 and no CSB graphics.
@@ -1217,7 +1165,7 @@ CSBWin can record a game and play it back:
 Conflux 3.5's Extended Features block sets `AutoRecord` (0x10), `RecordDesignOption`
 (`doc/CSBwin-src/SaveGame.cpp:403-404`): a game read from it records unless the command
 line or the menu says not to (`:2588-2603`). The port has neither, and no way to start either. It keeps only the recorder's count,
-`totalMoveCount`, which a save stores (`Game.recordFileRecord`, `src/engine/Game.ts:990`).
+`totalMoveCount`, which a save stores (`Game.recordFileRecord`, `src/engine/Game.ts:991`).
 `extraTicks` is always on (`src/engine/MovementSystem.ts:161-164`).
 
 Once ported, a recording made in CSBWin and played back in the port is an end-to-end test

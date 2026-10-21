@@ -36,7 +36,8 @@ import { KEY_LABEL_CHARS, LAYOUT_CHARS, keyLabel } from '../src/renderer/ui/KeyL
 import { fontDraws } from '../src/renderer/csbwin/TextRenderer';
 import { KEY_ACTION_NAMES } from '../src/renderer/ui/SettingsKeys';
 import { Settings } from '../src/settings/Settings';
-import { attackPanelTick, closeAttackMenu, handleAttackAreaClick } from '../src/renderer/ui/Attack';
+import { handleAttackAreaClick } from '../src/renderer/ui/Attack';
+import { tag01b1c0, tag01b29a } from '../src/engine/AttackMenu';
 import { updateButtonLists } from '../src/renderer/ui/Mouse';
 
 function runes(party: PartyState): string {
@@ -163,7 +164,7 @@ async function main(): Promise<void> {
   press('KeyA');
   if (offered < 2) {
     check(ui.ctx.interface.attackingCharacterOrdinal === 1, `only ${offered} attack offered, so 'a' must do nothing`);
-    closeAttackMenu(ui);
+    tag01b1c0(ui.ctx);
   } else {
     check(attacks.length >= 1 && attacks[attacks.length - 1].chIdx === 0 && ui.ctx.interface.attackingCharacterOrdinal === 0,
       "'a' should perform champion 1's second attack");
@@ -290,7 +291,7 @@ async function main(): Promise<void> {
   attacks = [];
   press('KeyQ');
   press('KeyQ');
-  attackPanelTick(ui); // the tick brings the hands back: word20252 = 1
+  tag01b29a(ui.ctx); // the tick brings the hands back: word20252 = 1
   check(attacks.length === 1 && (party.state.champions[0].charFlags & CHARFLAG_ATTACK_DISABLE) !== 0,
     'the attack should leave champion 1 busy');
   press('KeyQ');
@@ -300,7 +301,7 @@ async function main(): Promise<void> {
   party.state.champions[0].charFlags &= ~CHARFLAG_ATTACK_DISABLE;
   clickHand();
   check(ui.ctx.interface.attackingCharacterOrdinal === 1, 'the same click opens the menu once the champion is idle');
-  closeAttackMenu(ui);
+  tag01b1c0(ui.ctx);
 
   // ---- 8. An attack that starts a script (the fusion's `_FusionSequence`) never returns
   //         to its caller (`doc/CSBwin-src/Character.cpp:4997`): `TAG01b1c0` leaves the

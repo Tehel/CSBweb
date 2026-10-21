@@ -31,6 +31,7 @@ import { MonsterPerception } from './MonsterPerception';
 import { MonsterDamage } from './MonsterDamage';
 import { MonsterAI } from './MonsterAI';
 import { MonsterAttack } from './MonsterAttack';
+import { tag01b29a } from './AttackMenu';
 import { AttackSystem } from './AttackSystem';
 import { MagicSystem } from './MagicSystem';
 import { CharacterSystem } from './CharacterSystem';
@@ -658,7 +659,7 @@ export class Game implements MainLoop {
         // this tick, unless a put-back was asked above: CSBWin draws it only after that
         // VBL, so the port paints it at the put-back's redraw, and the frame shows the
         // tick's `DrawViewport` until then (`paintHeld`).
-        this.ctx.host.tag01b29a();
+        tag01b29a(this.ctx);
         if (putBackAsked) this.paintIsHeld = true;
         else this.ctx.host.paint();
         // `if ((d.Time & (d.PartySleeping ? 15 : 63)) == 0) TenSecondUpdate();` (`:696-698`).

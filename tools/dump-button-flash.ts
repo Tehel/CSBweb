@@ -63,12 +63,16 @@ async function main(): Promise<void> {
   const graphics = stockGraphics();
 
   const level = Number(process.argv[2] ?? 1);
-  // The tick's `TAG01b29a` and the paint after it, as the host sees them. The host's
-  // `drawViewport` is a script's tick's: the main loop's tick draws its viewport once,
-  // through `onTick`, and its paint is no second `DrawViewport`.
+  // The tick's `TAG01b29a` and the paint after it, as the host sees them: `TAG01b29a`
+  // asks whether the damage's flash holds once it has a champion and a redraw owed. The
+  // host's `drawViewport` is a script's tick's: the main loop's tick draws its viewport
+  // once, through `onTick`, and its paint is no second `DrawViewport`.
   const hostLog: string[] = [];
   const game = newGame(data, graphics, {
-    tag01b29a: () => hostLog.push(`TAG01b29a d.Time ${game.ctx.state.tickCount} freezeLifeTimer ${game.ctx.party.state.freezeLifeTimer}`),
+    attackFlashHeld: () => {
+      hostLog.push(`TAG01b29a d.Time ${game.ctx.state.tickCount} freezeLifeTimer ${game.ctx.party.state.freezeLifeTimer}`);
+      return false;
+    },
     drawViewport: () => hostLog.push('a script tick\'s DrawViewport'),
     paint: () => hostLog.push('paint'),
   });
@@ -211,6 +215,8 @@ async function main(): Promise<void> {
   const tickOrder = (flash: boolean): { time: number; log: string[]; held: boolean; next: { inverted: Rect | null; changed: boolean; held: boolean } } => {
     reset();
     party.freezeLifeTimer = 5;
+    party.champions = [testChampion(0, { name: 'HERO' })];
+    game.ctx.interface.word20250 = 1;
     hostLog.length = 0;
     const time = game.ctx.state.tickCount;
     if (flash) {
@@ -222,6 +228,7 @@ async function main(): Promise<void> {
     const held = game.paintHeld();
     game.takeFlashChanged();
     frame();
+    party.champions = [];
     return { time, log, held, next: { inverted: flashedButton(game.ctx), changed: game.takeFlashChanged(), held: game.paintHeld() } };
   };
   const plain = tickOrder(false);

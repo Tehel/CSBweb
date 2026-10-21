@@ -34,7 +34,7 @@ import { adjustSkills, AdjustSkillsWhy, determineMastery } from './skills';
 import type { MonsterDesc } from '../data/tables/MonsterDesc';
 import { monsterWord14_12_15, monsterWord16_8_11, monsterWord2Bit4 } from '../data/tables/MonsterDesc';
 import { wakeUp } from './MouseSystem';
-import { showHideInventory } from './ShowHideInventory';
+import { releaseEyeOrMouth, showHideInventory } from './ShowHideInventory';
 import { TimerFunction } from './TimerQueue';
 import type { AttackParameters } from './filterParameters';
 
@@ -638,7 +638,7 @@ export class MonsterAttack {
     // A held eye or mouth let go, then `ShowHideInventory(4)`: the inventory closes on a
     // dead champion before its possessions drop (`doc/CSBwin-src/Character.cpp:2602-2627`).
     if (party.selectedCharacterIndex === chIdx) {
-      this.ctx.host.releaseEyeOrMouth();
+      releaseEyeOrMouth(this.ctx);
       showHideInventory(this.ctx, 4);
     }
 

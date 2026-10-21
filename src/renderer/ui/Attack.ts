@@ -3,11 +3,11 @@
  *
  * The UI half of the champion's attack, from `doc/CSBwin-src/Character.cpp`:
  * `ItemHasChargesLeft` (`:4762`), `GetLegalAttackTypes` (`:4789`), `DrawAttackButton`
- * (`:4832`), `TAG01b1c0` (`:4904`), `PrepareAttack` (`:4929`), `_ExecuteAttack`
- * (`:4969`), plus `DrawLegalAttackTypes` (`doc/CSBwin-src/CSBCode.cpp:8823`),
- * `_TAG019fac` (`doc/CSBwin-src/Character.cpp:4678`), `_TAG01b29a`
- * (`doc/CSBwin-src/CSBCode.cpp:8904`) and `_FlashAttackDamage`
- * (`doc/CSBwin-src/Attack.cpp:949`).
+ * (`:4832`), `PrepareAttack` (`:4929`), `_ExecuteAttack` (`:4969`) and `_TAG019fac`
+ * (`:4678`), plus the drawing of `TAG01b1c0` (`:4904`), `DrawLegalAttackTypes`
+ * (`doc/CSBwin-src/CSBCode.cpp:8823`) and `_FlashAttackDamage`
+ * (`doc/CSBwin-src/Attack.cpp:949`), whose `d.` work, with `_TAG01b29a`'s, is the
+ * engine's (`src/engine/AttackMenu.ts`).
  *
  * The area under the viewport is a two-state panel and `word20252` is the state:
  *
@@ -16,21 +16,24 @@
  *  - **0** — that champion's legal attack options, up to three of them, named. Clicking
  *    one calls `executeAttack`, which is where the engine's `Attack` is entered.
  *
- * `word20250` is "the panel owes a redraw", and `tag01b29a` — called once per game tick
- * — is what acts on it. It is also where the damage figure is flashed over the panel
- * before the buttons come back.
+ * `word20250` is "the panel owes a redraw", and the engine's `tag01b29a` — called once per
+ * game tick — is what acts on it. It is also where the damage figure is flashed over the
+ * panel before the buttons come back.
  *
  * ⚠️ One deliberate divergence: CSBWin's `_FlashAttackDamage` ends in `VBLDelay(15)`, a
  * quarter-second in which the whole game is stopped, and the next tick, due by then,
  * draws the buttons over it. A browser cannot block the frame loop, so the flash is timed
- * instead — `attackFlashUntilMs` — and `tag01b29a` brings the buttons back no sooner than
- * it runs out; the game keeps running underneath, as it already does for the feeding
+ * instead — `attackFlashUntilMs`, which `attackFlashHeld` reads for the host — and
+ * `tag01b29a` brings the buttons back no sooner than it runs out; the game keeps running
+ * underneath, as it already does for the feeding
  * animation. The author's decision is a longer flash, `FLASH_MS`, for the text to be
  * read (`DEBT.md` H). The figure stays up after the flash, as CSBWin's does, until
  * `DrawLegalAttackTypes` draws over it.
  */
 import { OBJNI_SPECIAL_C } from '../../core/objectNameIndex';
 import { DBType, OBJECT_ID_NULL, type ObjectID } from '../../core/types';
+import { drawLegalAttackTypes, tag01b1c0 } from '../../engine/AttackMenu';
+import type { AttackOptions } from '../../engine/GameHost';
 import { ATTACK_TYPE_NONE, ATTACK_CLASS_EMPTY_HAND } from '../../engine/monsterTypes';
 import { getPartyChampion } from '../../engine/Party';
 import { CHARFLAG_ATTACK_DISABLE, getChampionPossession, SLOT_WEAPON_HAND, type Champion } from '../../engine/gameTypes';
@@ -154,61 +157,36 @@ export function prepareAttack(ui: UIState, chIdx: number): void {
   ui.ctx.interface.attackingCharacterOrdinal = chIdx + 1;
   getLegalAttackTypes(ui, chIdx, row);
   ui.ctx.interface.word20252 = 0;
-  drawLegalAttackTypes(ui);
+  drawLegalAttackTypes(ui.ctx);
 }
 
 /**
- * `DrawLegalAttackTypes` (`doc/CSBwin-src/CSBCode.cpp:8823`), the state it leaves: the
- * panel shows what `word20252` and the ordinal say, which `drawAttackPanel` composes each
- * frame, so a menu `TAG01b1c0` closed and the damage figure are off the screen. The
- * option list's names are decided here, once, as CSBWin draws them (`:8848-8894`).
+ * `DrawLegalAttackTypes`'s drawing (`doc/CSBwin-src/CSBCode.cpp:8823`), the host's
+ * `drawLegalAttackTypes`, once the engine has named the options (`drawLegalAttackTypes`,
+ * `src/engine/AttackMenu.ts`): the panel shows what `word20252` and the ordinal say,
+ * which `drawAttackPanel` composes each frame, so a menu `TAG01b1c0` closed and the
+ * damage figure are off the screen. The option list's names are kept as CSBWin draws
+ * them, once (`:8848-8894`).
  */
-export function drawLegalAttackTypes(ui: UIState): void {
+export function drawLegalAttackTypesDrawing(ui: UIState, options: AttackOptions | null): void {
   ui.closedAttackMenuOrdinal = 0;
   ui.attackFlashValue = 0;
   ui.attackFlashUntilMs = 0;
-  if (ui.ctx.interface.word20252 === 0 && ui.ctx.interface.attackingCharacterOrdinal !== 0) nameAttackOptions(ui);
-  ui.ctx.interface.word20250 = 0;
+  if (!options) return;
+  ui.attackOptionCount = options.count;
+  for (let i = 0; i < 3; i++) ui.attackOptionNames[i] = options.names[i]!;
 }
 
 /**
- * `DrawLegalAttackTypes`'s option list (`doc/CSBwin-src/CSBCode.cpp:8850-8894`): one option
- * unless `PossibleAttackTypes[1]` is set, two unless `[2]` is too, and three rows named by
- * `GetAttackTypeName`. Each row offered goes through the action name filter after its
- * default name is read (`ActionNameFilter`, `:8879-8882`), which may name it otherwise and
- * changes the attack it is.
- */
-function nameAttackOptions(ui: UIState): void {
-  const chIdx = ui.ctx.interface.attackingCharacterOrdinal - 1;
-  let numAttackOption = 3;
-  if (ui.ctx.interface.possibleAttackTypes[2] === -1) numAttackOption = 2;
-  if (ui.ctx.interface.possibleAttackTypes[1] === -1) numAttackOption = 1;
-  ui.attackOptionCount = numAttackOption;
-  for (let i = 0; i < 3; i++) {
-    let name = attackTypeName(ui, ui.ctx.interface.possibleAttackTypes[i]!);
-    if (i < numAttackOption) {
-      const filtered = ui.ctx.systems.dsa.actionNameFilter(chIdx, i, numAttackOption, ui.ctx.interface.possibleAttackTypes[i]!);
-      if (filtered) {
-        ui.ctx.interface.possibleAttackTypes[i] = filtered.attackType;
-        if (filtered.name !== null) name = filtered.name;
-      }
-    }
-    ui.attackOptionNames[i] = name;
-  }
-}
-
-/**
- * `TAG01b1c0` (`doc/CSBwin-src/Character.cpp:4904`) — close the menu again, and ask for
- * the panel to be redrawn on the next tick. It draws nothing there, so the menu stays on
- * the screen until `TAG01b29a` draws the damage or the buttons over it. Its redraw of the
+ * `TAG01b1c0`'s drawing (`doc/CSBwin-src/Character.cpp:4904`), the host's `tag01b1c0`,
+ * before the engine closes champion `chIdx`'s menu (`tag01b1c0`,
+ * `src/engine/AttackMenu.ts`). It draws nothing on the panel, so the menu stays on the
+ * screen until `TAG01b29a` draws the damage or the buttons over it. Its redraw of the
  * attacker's hands is the frame's, which no longer boxes the weapon hand in cyan
  * (`possessionBoxGraphic`).
  */
-export function closeAttackMenu(ui: UIState): void {
-  if (ui.ctx.interface.attackingCharacterOrdinal === 0) return;
-  ui.closedAttackMenuOrdinal = ui.ctx.interface.attackingCharacterOrdinal;
-  ui.ctx.interface.attackingCharacterOrdinal = 0;
-  ui.ctx.interface.word20250 = 1;
+export function tag01b1c0Drawing(ui: UIState, chIdx: number): void {
+  ui.closedAttackMenuOrdinal = chIdx + 1;
 }
 
 /**
@@ -232,7 +210,7 @@ export function executeAttack(ui: UIState, option: number): number {
     // stays on the panel to the end of the game.
     if (ui.ctx.systems.mainLoop.isRunningScript()) return result;
   }
-  closeAttackMenu(ui);
+  tag01b1c0(ui.ctx);
   return result;
 }
 
@@ -291,59 +269,19 @@ export function handleAttackAreaClick(ui: UIState, x: number, y: number): void {
 }
 
 /**
- * `_TAG01b29a` (`doc/CSBwin-src/CSBCode.cpp:8904`) — once per game tick.
- *
- * Two jobs. It turns each champion to face whatever hit them hardest since the last
- * tick, which is the flinch you see in play; and it services `word20250` by flashing
- * the damage figure and then bringing the attack buttons back.
+ * `FlashAttackDamage`'s drawing (`doc/CSBwin-src/Attack.cpp:949`), the host's
+ * `flashAttackDamage`, from the engine's `tag01b29a`: the figure up, and the buttons held
+ * back for `FLASH_MS` (`attackFlashHeld`).
  */
-export function attackPanelTick(ui: UIState): void {
-  const party = ui.partyState;
-  if (party.champions.length === 0) return;
+export function flashAttackDamageDrawing(ui: UIState, damage: number): void {
+  ui.attackFlashValue = damage;
+  ui.attackFlashUntilMs = nowMs() + FLASH_MS;
+  ui.closedAttackMenuOrdinal = 0;
+}
 
-  // Asleep, or with a candidate at the mirror, nobody turns and the damage is kept for
-  // the first tick after (`CSBCode.cpp:8913-8921`).
-  const candidate = party.potentialChampionIndex >= 0;
-  if (party.sleeping || candidate) {
-    if (ui.ctx.interface.attackingCharacterOrdinal !== 0) {
-      closeAttackMenu(ui);
-      return;
-    }
-    if (!candidate) return;
-  } else {
-    const cursorOwner = party.cursorOwner ?? -1;
-    party.champions.forEach((champ, idx) => {
-      if (!champ) return;
-      // Not the champion holding the cursor, and not the one with the menu open: those
-      // two keep facing the way the player left them.
-      if (idx !== cursorOwner && idx + 1 !== ui.ctx.interface.attackingCharacterOrdinal && champ.maxRecentDamage) {
-        const from = champ.damageFromDirection;
-        if (champ.facing !== from) champ.facing = from;
-      }
-      champ.maxRecentDamage = 0;
-    });
-  }
-
-  if (ui.ctx.interface.word20250 === 0) return;
-
-  if (ui.ctx.interface.attackingCharacterOrdinal === 0) {
-    // The flash is a timed overlay rather than CSBWin's blocking delay; the panel stays
-    // owed a redraw until it has run its course.
-    if (ui.attackFlashUntilMs > nowMs()) return;
-    const damage = ui.ctx.systems.attack.consumeAttackDamageToDisplay();
-    if (damage !== 0) {
-      ui.attackFlashValue = damage;
-      ui.attackFlashUntilMs = nowMs() + FLASH_MS;
-      ui.closedAttackMenuOrdinal = 0;
-      return;
-    }
-    ui.ctx.interface.word20252 = 1;
-    drawLegalAttackTypes(ui);
-    return;
-  }
-
-  ui.ctx.interface.word20252 = 0;
-  drawLegalAttackTypes(ui);
+/** Whether the flash still holds the buttons back: the host's `attackFlashHeld`. */
+export function attackFlashHeld(ui: UIState): boolean {
+  return ui.attackFlashUntilMs > nowMs();
 }
 
 /**
@@ -415,7 +353,7 @@ export function drawAttackPanel(ui: UIState): void {
     return;
   }
 
-  // A closed menu is still what CSBWin's screen shows (`closeAttackMenu`).
+  // A closed menu is still what CSBWin's screen shows (`tag01b1c0Drawing`).
   const ordinal = ui.ctx.interface.attackingCharacterOrdinal || ui.closedAttackMenuOrdinal;
   if (ordinal === 0) return;
   const champ = getPartyChampion(ui.partyState, ordinal - 1);
@@ -451,16 +389,6 @@ export function drawAttackPanel(ui: UIState): void {
   for (let i = 0; i < 3; i++) {
     drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, 241, 12 * i + 93, 4, 0, ui.attackOptionNames[i]!);
   }
-}
-
-/**
- * `GetAttackTypeName` (`doc/CSBwin-src/CSBCode.cpp:8714-8732`): the low byte names the
- * attack, and 255 (-1) nothing.
- */
-function attackTypeName(ui: UIState, attackType: number): string {
-  const index = attackType & 0xff;
-  if (index === ATTACK_TYPE_NONE) return '';
-  return ui.uiTables.graphic230.attackNames[index] ?? '';
 }
 
 /**

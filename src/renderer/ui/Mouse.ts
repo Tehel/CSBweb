@@ -18,7 +18,7 @@ import type { HintSquare } from '../intro/HintOracle';
 import { searchButtonList } from './HitTest';
 import { describeObject, describeWeaponHandScroll, getActiveChestView, getEyeRect, tag0189d4, tag019036 } from './Inventory';
 import { handleMagicClick } from './MagicPanel';
-import { drawLegalAttackTypes, handleAttackAreaClick } from './Attack';
+import { handleAttackAreaClick } from './Attack';
 import { isChestRecord, resolveObjectNameIndex } from './Objects';
 import { OBJECT_ID_NULL } from '../../core/types';
 import { UIMode, UIState, stHideCursor, stShowCursor, tag002572 } from './UIState';
@@ -246,23 +246,16 @@ export function handleMouseUnclick(ui: UIState): void {
 }
 
 /**
- * `KillCharacter`'s release of a held eye, or else a held mouth, before it hides the
- * dead champion's inventory (`doc/CSBwin-src/Character.cpp:2603-2625`), so that
- * `ShowHideInventory(4)` does not return on it; `RemoveCharacter` has the same
- * (`:5292-5314`). Each sets the hide count to 1 before it shows the pointer, so it is
- * back whatever the count was. No `TAG0189d4`: the inventory is closing.
+ * `KillCharacter`'s release of a held eye (`eye`) or mouth, its drawing
+ * (`doc/CSBwin-src/Character.cpp:2603-2625`, `RemoveCharacter`'s `:5292-5314`), the host's
+ * `releaseEyeOrMouth`, once the engine has let it go (`releaseEyeOrMouth`,
+ * `src/engine/ShowHideInventory.ts`). Each sets the hide count to 1 before it shows the
+ * pointer, so it is back whatever the count was; the eye's description goes with it.
  */
-export function releaseEyeOrMouth(ui: UIState): void {
-  if (ui.ctx.interface.pressingEye) {
-    ui.ctx.interface.pressingEye = false;
-    ui.describedObject = null;
-    ui.word23118 = 1;
-    stShowCursor(ui);
-  } else if (ui.ctx.interface.pressingMouth) {
-    ui.ctx.interface.pressingMouth = false;
-    ui.word23118 = 1;
-    stShowCursor(ui);
-  }
+export function releaseEyeOrMouthDrawing(ui: UIState, eye: boolean): void {
+  if (eye) ui.describedObject = null;
+  ui.word23118 = 1;
+  stShowCursor(ui);
 }
 
 function isEyeClick(ui: UIState, x: number, y: number): boolean {
@@ -371,13 +364,12 @@ export function tag02076eDrawing(ui: UIState): void {
 
 /**
  * `TAG0207cc`'s drawing (`doc/CSBwin-src/CSBCode.cpp:10058-10092`), the host's
- * `tag0207cc`, once the engine has selected the magic caster again (`tag0207cc`,
- * `src/engine/ShowHideInventory.ts`): `DrawLegalAttackTypes` (`:10076`), the shading
+ * `tag0207cc`, once the engine has selected the magic caster again and run
+ * `DrawLegalAttackTypes` (`tag0207cc`, `src/engine/ShowHideInventory.ts`): the shading
  * lifted, which the port's every frame redraws, and `TAG002572`'s cursor (`:10089`).
  */
 export function tag0207ccDrawing(ui: UIState): void {
   ui.shadedByTag02076e = false;
-  drawLegalAttackTypes(ui);
   tag002572(ui);
 }
 

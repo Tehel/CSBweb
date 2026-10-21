@@ -2221,8 +2221,8 @@ The main loop's tick (`doc/CSBwin-src/CSBCode.cpp:646-698`) runs `DrawViewport` 
 `d.freezeLifeTimer--` (`:686-694`), `TAG01b29a` (`:695`) and `TenSecondUpdate`
 (`:696-698`). `WaitForButtonFlash` waits for the VBL that puts a flashed rectangle back
 (`:8666-8706`), so what `TAG01b29a` draws in a tick that flashed a button comes after the
-put-back. The port's pass does not wait (`DEBT.md` H): `Game.gameTick` calls the host's
-`tag01b29a` in its place and paints it at once, unless that tick asked for a put-back, in
+put-back. The port's pass does not wait (`DEBT.md` H): `Game.gameTick` calls
+`tag01b29a` (`src/engine/AttackMenu.ts`) in its place and paints it at once, unless that tick asked for a put-back, in
 which case the rest of the VBL paints nothing (`Game.paintHeld`) and the put-back's redraw
 paints it. `tools/dump-button-flash.ts` checks the order and the held paint.
 

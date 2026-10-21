@@ -101,13 +101,14 @@ const [SONJA, GOTHMOG] = [0x1cc, 0x211];
   // Their own inventory open, with the eye held: let go, and closed.
   const own = run(swap(3, -1, 0), (game) => {
     game.ctx.party.state.selectedCharacterIndex = 3;
-    game.ctx.host.releaseEyeOrMouth = () => hidden.push(-1);
+    game.ctx.interface.pressingEye = true;
+    game.ctx.host.releaseEyeOrMouth = (eye) => hidden.push(eye ? -1 : -2);
     game.ctx.host.showHideInventory = (chIdx) => {
       hidden.push(chIdx);
       if (chIdx === 4) game.ctx.party.state.selectedCharacterIndex = -1;
     };
   });
-  check(hidden.join() === '-1,4' && own.game.ctx.party.state.selectedCharacterIndex === -1,
+  check(hidden.join() === '-1,4' && !own.game.ctx.interface.pressingEye && own.game.ctx.party.state.selectedCharacterIndex === -1,
     'a champion whose inventory is open lets the eye go and closes it');
   check(names(own.game) === 'HISSSSA SONJA GOTHMOG', 'the last champion leaves, nobody moves');
 }

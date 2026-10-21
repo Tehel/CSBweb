@@ -172,13 +172,15 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
             MissileEncounter (a missile meeting something, and the clouds and door
             blows it sets off),
             ActuatorSystem, DsaSystem, MagicSystem, CharacterSystem, AttackSystem,
+            AttackMenu (the attack menu's `d.`: closed, named, and its panel's tick),
             MouseSystem (Mouse.cpp's engine half), HallOfChampions, the Monster* systems,
             MouseQueue and LoopState (the loop's `d.` state, at `ctx.mouseQueue` /
             `ctx.loop`), PeriodicUpdates (the ninety- and ten-second updates), LightLevel
             (`SelectPaletteForLightLevel`: `d.CurrentPalette`), OpenChest (the open
             chest, opened and repacked at CSBWin's events, never by drawing),
             ShowHideInventory (the inventory shown and hidden, and `TAG02076e` and
-            `TAG0207cc`, the interface put aside and back: their `d.` work), SmartDiscard (thinning a filling database), MakeMoreRoomInDB (making
+            `TAG0207cc`, the interface put aside and back: their `d.` work, and the eye
+            let go at a death), SmartDiscard (thinning a filling database), MakeMoreRoomInDB (making
             room in a full one),
             RuntimeSave (the state a read restores), SaveGameFile (the CSBWin file a
             save is, written from the game and read back), GameSaves (a save built and
