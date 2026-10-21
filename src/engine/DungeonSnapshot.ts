@@ -127,7 +127,7 @@ export const DUNGEON_DATA_SOURCES = {
     newScrolls: 'loaded',
     // Read into `block1` when a new game is made (`newGameBlock1`), which a save carries.
     word22592: 'loaded',
-    // Read into `ctx.rules` when a new game is made (`Game.readNewGameRules`); a save
+    // Read into `ctx.rules` when a new game is made (`readGame`); a save
     // carries the rules itself.
     extendedFeatures: 'loaded',
     // Read into `ctx.rules` with them; a save of the game is enciphered in its turn.

@@ -8,7 +8,7 @@
  * What was missing is this — turning the three into the `RuntimeSaveState` the engine
  * already knows how to restore.
  *
- * The save's world becomes the running game's (`Game.installWorld`), structure and all,
+ * The save's world becomes the running game's (`readGame`), structure and all,
  * as `_ReadEntireGame` reads it (`doc/CSBwin-src/SaveGame.cpp:2536`), so a save of any
  * dungeon loads into any running game. The rest goes through `RuntimeSaveState`, the
  * shape every read restores, whose snapshot then puts back what the world already
@@ -61,8 +61,7 @@
  *   (`doc/CSBwin-src/data.cpp:995-1017`).
  */
 import { loadCsbwinWorld, type CsbwinWorld } from '../data/CsbwinDungeonImage';
-import { readExpectedSignatures, readGameInfo, readRulesOptions } from '../data/CsbwinExtendedFeatures';
-import { readFileSignatures } from './FileSignatures';
+import { readGameInfo } from '../data/CsbwinExtendedFeatures';
 import { readDisableSaves, readGlobalVariables, readOverlayPalette, specialLocationsFromExpool } from '../data/CsbwinExpool';
 import { readCsbwinParty, readCsbwinPartyTail } from '../data/CsbwinCharacters';
 import { CHARDESC_SIZE } from '../data/CsbwinSaveInfo';
@@ -71,6 +70,7 @@ import { captureDungeonSnapshot } from './DungeonSnapshot';
 import { DungeonState } from './DungeonState';
 import type { Game } from './Game';
 import { identityOverlayPalette } from './OverlayPalette';
+import { readGame } from './ReadGame';
 import type { RuntimeSaveState } from './RuntimeSave';
 import { OBJECT_ID_NULL, Position } from '../core/types';
 import type { Direction, ObjectID } from '../core/types';
@@ -262,37 +262,34 @@ export function buildCsbwinRuntimeState(world: CsbwinWorld): RuntimeSaveState {
 }
 
 /**
- * `_ReadEntireGame`'s read of a save's world, installed as the running game's
- * (`Game.installWorld`): the image, structure and all, with the seven the save carries
- * beside it, its rules and signatures, and `CheckMonsters` (doc/CSBwin-src/SaveGame.cpp:2029). The save
- * restores its state over it (`applyCsbwinSave`).
+ * Parse a CSBWin save and read it into the running game (`readGame`): its world, the
+ * image, structure and all, with the seven the save carries beside it, and its state.
+ * Throws on a bad file.
  */
-function installCsbwinWorld(game: Game, world: CsbwinWorld): void {
-    // `LoadGame`'s end (doc/CSBwin-src/SaveGame.cpp:1966-2025), before anything is installed.
-    readFileSignatures(game.ctx, world.dungeon);
-    // Before `reloadAfterSaveGame` detaches the save's `ITEM16`s (`src/engine/CheckMonsters.ts`).
-    CheckMonsters(new DungeonState(world.dungeon), game.ctx.tables.monsterDesc, (line) => game.ctx.host.trace(line));
-    readRulesOptions(game.ctx.rules, world.save.extendedFeatures, world.save.simpleEncipher);
-    readExpectedSignatures(game.ctx.signatures, world.save.extendedFeatures);
-    game.ctx.overlay.readExtendedFeatures(world.save.extendedFeatures);
-    game.installWorld(Object.assign(world.dungeon, {
-        dsaLevelIndex: world.save.dsaLevelIndex,
-        dsaIndex: world.save.dsaIndex,
-        specialLocations: specialLocationsOf(world),
-        extendedWallDecorations: world.save.extendedWallDecorations,
-        spellFilterLocation: world.save.spellFilterLocation,
-        hintKey: world.save.hintKey,
-        gameInfo: gameInfoOf(world),
-    }));
-}
-
-/** Parse a CSBWin save and restore it into the running game. Throws on a bad file. */
 export function applyCsbwinSave(game: Game, bytes: Uint8Array): CsbwinWorld {
     const world = loadCsbwinWorld(bytes);
-    installCsbwinWorld(game, world);
-    // The snapshot puts back what the installed world already holds.
-    game.applyRuntimeSaveState(buildCsbwinRuntimeState(world));
-    // The image's records are already big-actuator records.
-    if (world.save.bigActuators) game.ctx.state.dungeon.bigActuators = true;
+    readGame(game, {
+        world: world.dungeon,
+        extendedFeatures: world.save.extendedFeatures,
+        simpleEncipher: world.save.simpleEncipher,
+        state: () => {
+            // `_ReadEntireGame`'s `CheckMonsters` (doc/CSBwin-src/SaveGame.cpp:2029), before
+            // `reloadAfterSaveGame` detaches the save's `ITEM16`s (`src/engine/CheckMonsters.ts`).
+            CheckMonsters(new DungeonState(world.dungeon), game.ctx.tables.monsterDesc, (line) => game.ctx.host.trace(line));
+            Object.assign(world.dungeon, {
+                dsaLevelIndex: world.save.dsaLevelIndex,
+                dsaIndex: world.save.dsaIndex,
+                specialLocations: specialLocationsOf(world),
+                extendedWallDecorations: world.save.extendedWallDecorations,
+                spellFilterLocation: world.save.spellFilterLocation,
+                hintKey: world.save.hintKey,
+                gameInfo: gameInfoOf(world),
+            });
+            // The image's records are already big-actuator records.
+            if (world.save.bigActuators) world.dungeon.bigActuators = true;
+            // The snapshot puts back what the installed world already holds.
+            return buildCsbwinRuntimeState(world);
+        },
+    });
     return world;
 }

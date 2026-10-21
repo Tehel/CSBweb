@@ -8,10 +8,9 @@
 
 import type { DungeonData } from '../data/dungeonTypes';
 import { DungeonLoader } from '../data/DungeonLoader';
-import { readExpectedSignatures, readRulesOptions } from '../data/CsbwinExtendedFeatures';
 import { readDeleteDuplicateTimers, readDisableSaves } from '../data/CsbwinExpool';
 import { die } from './Die';
-import { readFileSignatures } from './FileSignatures';
+import { readGame } from './ReadGame';
 import type { PartyState, MovementResult } from './gameTypes';
 import { MovementAction } from './gameTypes';
 import { ensureHandOwner } from './Party';
@@ -289,13 +288,12 @@ export class Game implements MainLoop {
     }
 
     /**
-     * `_ReadEntireGame` for a new game: `dungeon.dat` read into the running game, through
-     * the path a save takes (doc/CSBwin-src/SaveGame.cpp:1579-1594). `data` must be a
-     * fresh parse of the file, since play writes into the `DungeonData` it runs on. The
-     * running game takes it as its world (`installWorld`), and a scratch `Game` over it
-     * gives the rest of a new game, the party at the start, the clock and the timers,
-     * which a load restores here, so every system keeps its object and the page its
-     * wiring.
+     * `_ReadEntireGame` for a new game: `dungeon.dat` read into the running game
+     * (`readGame`, doc/CSBwin-src/SaveGame.cpp:1579-1594). `data` must be a fresh parse
+     * of the file, since play writes into the `DungeonData` it runs on. The running game
+     * takes it as its world, and a scratch `Game` over it gives the rest of a new game,
+     * the party at the start, the clock and the timers, which a load restores here, so
+     * every system keeps its object and the page its wiring.
      *
      * `_ReadEntireGame` sends the cursor filter `CURSORFILTER_ReadGame` for `RNnul` before it
      * empties the hand (doc/CSBwin-src/SaveGame.cpp:1597-1603), and a saved game's read
@@ -305,20 +303,21 @@ export class Game implements MainLoop {
      * DSA"). So the port sends neither.
      */
     readNewGame(data: DungeonData): void {
-        // `LoadGame`'s end (doc/CSBwin-src/SaveGame.cpp:1966-2025): the world must name no
-        // other graphics.dat than this one, which is checked before anything is installed.
-        readFileSignatures(this.ctx, data);
-        const fresh = new Game(data, this.ctx.tables);
-        // `totalMoveCount` is a global, not `d.`'s (`doc/CSBwin-src/data.cpp:254`), so
-        // `d.Initialize()` leaves it and the new game counts on from the last one.
-        const { totalMoveCount } = this.ctx.state.block1;
-        this.installWorld(data);
-        this.applyRuntimeSaveState(fresh.getRuntimeSaveState());
-        this.ctx.state.block1.totalMoveCount = totalMoveCount;
-        // A new game reads `disableSaves` as a saved one does, from its world's `EXPOOL`
-        // (`doc/CSBwin-src/SaveGame.cpp:1648`, `:1962-1964`).
-        this.ctx.systems.dsa.disableSaves = readDisableSaves(data);
-        this.readNewGameRules(data);
+        readGame(this, {
+            world: data,
+            extendedFeatures: data.extendedFeatures,
+            simpleEncipher: data.simpleEncipher,
+            state: () => {
+                const state = new Game(data, this.ctx.tables).getRuntimeSaveState();
+                // `totalMoveCount` is a global, not `d.`'s (`doc/CSBwin-src/data.cpp:254`), so
+                // `d.Initialize()` leaves it and the new game counts on from the last one.
+                state.game.block1.totalMoveCount = this.ctx.state.block1.totalMoveCount;
+                // A new game reads `disableSaves` as a saved one does, from its world's
+                // `EXPOOL` (`doc/CSBwin-src/SaveGame.cpp:1648`, `:1962-1964`).
+                state.game.disableSaves = readDisableSaves(data);
+                return state;
+            },
+        });
         this.canRestart = false;
         this.resumedSavedGame = false;
         this.playedVbls = 0;
@@ -347,8 +346,8 @@ export class Game implements MainLoop {
      * the header, every level's descriptor and tables, from the file it opens
      * (`ReadDatabases`, doc/CSBwin-src/SaveGame.cpp:2536). `DungeonState` keeps its object,
      * which every system and the renderer hold, and takes the new data; `state.dungeon`
-     * follows. A read installs its world before it restores the state that goes with it
-     * (`applyRuntimeSaveState`), whose snapshot must then fit.
+     * follows. A read (`readGame`) installs its world before it restores the state that
+     * goes with it (`applyRuntimeSaveState`), whose snapshot must then fit.
      */
     installWorld(data: DungeonData): void {
         this.ctx.state.dungeon = data;
@@ -356,18 +355,6 @@ export class Game implements MainLoop {
         // `deleteDuplicateTimers`, a global every read sets from the world's `EXPOOL`
         // once the databases are in (doc/CSBwin-src/SaveGame.cpp:1965-1975).
         this.ctx.timers.deleteDuplicateTimers = readDeleteDuplicateTimers(data);
-    }
-
-    /**
-     * `ReadExtendedFeatures`' rule flags and graphics signatures for a new game, from the
-     * block its `dungeon.dat` opens with (doc/CSBwin-src/SaveGame.cpp:380-383, `:394-400`,
-     * read at `ReadDatabases`' start, `:2559`), and its overlay (`Overlay.readExtendedFeatures`).
-     * A file with no block leaves them as they were.
-     */
-    private readNewGameRules(data: DungeonData): void {
-        readRulesOptions(this.ctx.rules, data.extendedFeatures, data.simpleEncipher);
-        readExpectedSignatures(this.ctx.signatures, data.extendedFeatures);
-        this.ctx.overlay.readExtendedFeatures(data.extendedFeatures);
     }
 
     /**

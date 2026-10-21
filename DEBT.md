@@ -114,7 +114,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E23 | One game read, whole or not at all | L | ⏳ step 1 of 6 |
+| E23 | One game read, whole or not at all | L | ⏳ step 2 of 6 |
 | D18 | The interface's `d.` lives in the screen, and composing the screen changes the world | L | ⏳ |
 | D19 | `RuntimeSaveState` is neither strict nor a snapshot | M | ⏳ |
 | E41 | `src/data/` imports the engine | M | ⏳ |
@@ -512,12 +512,13 @@ against each other, and the file formats.
 
 ### E23 ⏳ One game read, whole or not at all
 
-What a read does is spread over `Game.ts:290-371`, `GameContext.ts:215-229`, `:274-323`,
-`CsbwinSaveGame.ts:264-298`, `SaveGameFile.ts:275-284` and `GameSaves.read`:
+Both reads go through one list of steps, `readGame` (`src/engine/ReadGame.ts`), from
+`Game.readNewGame` (`Game.ts:290-325`) and `applyCsbwinSave` (`CsbwinSaveGame.ts:264-295`);
+around it are `GameContext.ts:215-229`, `:274-323`, `SaveGameFile.ts:275-284` and
+`GameSaves.read`:
 
-- **It is not atomic.** `installCsbwinWorld` sets `ctx.rules`, `ctx.signatures`, the
-  overlay and the world before `applyRuntimeSaveState` restores the rest
-  (`src/engine/CsbwinSaveGame.ts:270-298`), and `applySaveBytes` turns any error into a
+- **It is not atomic.** `readGame` sets `ctx.rules`, `ctx.signatures`, the overlay and
+  the world before `applyRuntimeSaveState` restores the rest, and `applySaveBytes` turns any error into a
   `SaveFileError` (`src/engine/SaveGameFile.ts:275-283`), after which the full menu says so
   and play goes on: in the new world with the old timers and footprints, when it throws late
   (an `RnMaps.check` in `reloadAfterSaveGame`). CSBWin's `tag01efee` dies.
@@ -531,12 +532,11 @@ What a read does is spread over `Game.ts:290-371`, `GameContext.ts:215-229`, `:2
 - **A new game builds a scratch `Game`**, all seventeen systems, for its effects on the data
   (`CheckMonsters`, `addNewGameSpares`), then takes its state through
   `getRuntimeSaveState` and gives it back, the world encoded in base64 and decoded onto the
-  same object. A save builds a throwaway `DungeonState` for `CheckMonsters` alone. The
-  rules are read in two places, in two orders (`Game.readNewGameRules`,
-  `installCsbwinWorld`); `deleteDuplicateTimers` is set twice (`GameContext.ts:224`,
-  `Game.ts:358`); the world has two routes, `GameState.dungeon` and
-  `DungeonState.getData()` (typed `Readonly`, written through), which `installWorld` keeps
-  in step (`Game.ts:354-355`).
+  same object. A save builds a throwaway `DungeonState` for `CheckMonsters` alone.
+  `deleteDuplicateTimers` is set twice, by the context's constructor
+  (`GameContext.ts:224`) and by every read (`Game.ts:357`); the world has two routes,
+  `GameState.dungeon` and `DungeonState.getData()` (typed `Readonly`, written through),
+  which `installWorld` keeps in step (`Game.ts:353-354`).
 - **What `d.Initialize()` zeroes is reset nowhere** (C181).
 - **A read in play** drops no running script (`Game.applyRuntimeSaveState`) and does not
   empty the mouse queue, so clicks queued before F9 are translated against the loaded
@@ -544,22 +544,14 @@ What a read does is spread over `Game.ts:290-371`, `GameContext.ts:215-229`, `:2
 
 Paying it, in six steps, a commit each. Steps 1 to 3 are refactors, every tool's output
 byte-identical; 4 to 6 change what a damaged file or a read in play does, and are fixes
-with their tool. Where it stands: no step taken, step 1 is next.
+with their tool. Where it stands: step 1, one pipeline, is `readGame`; step 2 is next.
 
-1. **One pipeline.** `readGame` (`src/engine/ReadGame.ts`), one ordered list of steps for
-   `dungeon.dat` and a save alike, in `_ReadEntireGame`'s order
-   (`doc/CSBwin-src/SaveGame.cpp:1536`): the file signatures, `CheckMonsters`, the rules,
-   signatures and overlay from the Extended Features block, the world,
-   `deleteDuplicateTimers` once, the state, the loop's reset. `Game.readNewGame` and
-   `applyCsbwinSave` become its two entries; `installCsbwinWorld` and `readNewGameRules`
-   go. A new game reads its rules after its state, a save before it: if a tool sees the
-   move, it is a C item, and the step keeps the order it found.
 2. **A new game without a scratch `Game`.** A pure `newGameState(data, tables)`: what
    `createGameContext` and the constructor's `CheckMonsters` give a new game (the party at
    the start, the spares, the timer queue as sized, `block1` and its `RandomGameID`), and
    whatever the seventeen systems' constructors add to the state, checked one by one.
    `readNewGame` builds no `Game` and no base64 world; `createGameContext` builds from the
-   same function.
+   same function, and `deleteDuplicateTimers` is set by the read alone.
 3. **One route to the world.** `GameState.dungeon` gone (14 uses in `src/`, the rest in
    `tools/`), the world read through `ctx.dungeon`; `DungeonState.getData()` read-only in
    fact or not typed so; `installWorld` installs one thing.
@@ -1240,7 +1232,7 @@ port's import refuses a save of a dungeon it does not know, and of a known one n
 set plays (`doc/SAVES.md` → "An import is checked against the dungeon"). Playing one
 would be a further answer on that refusal, of use to someone working on a dungeon of
 their own. A save is its dungeon's whole world and already loads into any running game
-(`installCsbwinWorld`), so what is missing is what the file does not hold: the graphics
+(`readGame`), so what is missing is what the file does not hold: the graphics
 and the tables read from `graphics.dat`, which the player would pick from the known
 dungeons' (the signatures an Extended Features block may carry,
 `doc/CSBwin-src/SaveGame.cpp:380-381`, could suggest one); a `dungeon.dat` for "RESTART

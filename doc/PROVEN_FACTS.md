@@ -4197,8 +4197,8 @@ They are assigned in four places:
   with no block never reaches it, so both keep what they held: a new game on
   `dm-atari/dungeon.dat`, and CSB's Atari-era saves. A new game on
   `dm-windows/dungeon.dat` gets `DMRulesDesignOption` and not `DM_rules`
-  (`tools/dump-extended-dungeon.ts`). The port reads a new game's in
-  `Game.readNewGameRules`, a save's in `applyCsbwinSave`. What a file without a block
+  (`tools/dump-extended-dungeon.ts`). The port reads both in
+  `readGame` (`src/engine/ReadGame.ts`). What a file without a block
   leaves is the data set's `dmRules`, the design option's value at the start
   (`DataSet.dmRules`; `DEBT.md` H).
 - `_ShowPrisonDoor`, once `GameSetup(_1_, 1)` has read the game, new or resumed:
