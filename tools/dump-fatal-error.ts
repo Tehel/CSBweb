@@ -55,7 +55,7 @@ function stage() {
   applyCsbwinSave(game, new Uint8Array(readFileSync(savePath('csbgame7.dat'))));
   const store = memoryStore();
   const saves = new GameSaves(game, DEFAULT_DATA_SET, diskFiles(DEFAULT_DATA_SET), store,
-    { portraitOf: () => undefined, repackOpenChest: () => {} }, () => {});
+    { portraitOf: () => undefined }, () => {});
   return { game, store, saves, died };
 }
 

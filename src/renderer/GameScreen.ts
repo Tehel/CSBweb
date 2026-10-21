@@ -88,7 +88,7 @@ import { championBarsAt, openChampionDialog } from './ui/ChampionDialog';
 import { doMenu, drawMenuPress, menuButtonList, type MenuPress } from './ui/Menu';
 import type { SaveEntry } from '../data/saves';
 import type { ImportedFile } from '../engine/GameSaves';
-import { drawCharacterStateEyePanel, drawInventoryBackground, drawInventoryScreen, repackOpenChest, syncOpenChest } from './ui/Inventory';
+import { drawCharacterStateEyePanel, drawInventoryBackground, drawInventoryScreen, syncOpenChest } from './ui/Inventory';
 import { drawCharacterState, drawHeldObjectName, drawPartyStatus, getChampionPortrait } from './ui/Character';
 import { drawHintOracleButton, type HintOracleFiles } from './ui/HintOracleButton';
 import { displayFrozenScreen, displaySleepScreen, drawMessageLines, shadeRectIndex } from './ui/Draw';
@@ -317,11 +317,6 @@ export class GameScreen {
   /** `KillCharacter`'s release of the eye or the mouth — the host's `releaseEyeOrMouth`. */
   releaseEyeOrMouth(): void {
     releaseEyeOrMouth(this.ui);
-  }
-
-  /** `RepackChest` (`doc/CSBwin-src/Character.cpp:3113`) — the host's `repackChest`. */
-  repackChest(): void {
-    repackOpenChest(this.ui);
   }
 
   /** `TAG02076e` (`doc/CSBwin-src/Character.cpp:5133`) — the host's `tag02076e`. */

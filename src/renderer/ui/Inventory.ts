@@ -3,11 +3,11 @@
  * scroll reading.
  *
  * Mirrors CSBWin `doc/CSBwin-src/CSBUI.cpp`. The chest is not a separate screen in DM —
- * an opened chest borrows the inventory's item grid, which is why `openChest` /
- * `repackOpenChest` live next to the slot rectangles.
+ * an opened chest borrows the inventory's item grid. Its opening and repacking are the
+ * engine's (`showChestContents`, `repackChest`, `src/engine/CharacterSystem.ts`).
  */
 import { OBJNI_OPEN_CHEST, OBJNI_OPEN_SCROLL, OBJNI_SPECIAL_D, OBJNI_SPECIAL_E } from '../../core/objectNameIndex';
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, ObjectID } from '../../core/types';
+import { DBType, OBJECT_ID_NULL, ObjectID } from '../../core/types';
 import { ViewingFilterSite } from '../../engine/dsa/DsaTypes';
 import { CHARFLAG_CHEST_OR_SCROLL, Champion, getChampionPossession } from '../../engine/gameTypes';
 import { AttributeIndex, attributeCurrent, attributeMaximum } from '../../engine/attributes';
@@ -20,7 +20,7 @@ import { BOX_GRAPHIC_MARKED, BOX_GRAPHIC_PLAIN, blitBasicGraphicToViewport, draw
 import { drawMouthChewAnimation } from './Feeding';
 import { ITEM_DESCRIPTION_Y, applyViewingFilter, drawItemDescriptionLine, getInventoryPlaceholderIndex, getItemPropertyLines, getObjectDescriptionLines, getObjectDisplayName, isChestRecord, placeItemPropertyLines, resolveObjectNameIndex, type ItemDescriptionLine } from './Objects';
 import { DescribedObject, UIState } from './UIState';
-import { emptyChestContents } from '../../engine/InterfaceState';
+import { repackChest, showChestContents } from '../../engine/CharacterSystem';
 
 const MAX_LINES_IN_SCROLL = 9;
 const MAX_SCROLL_LINE_LENGTH = 16;
@@ -333,71 +333,14 @@ export function getActiveChestView(ui: UIState, champion: Champion): ChestViewSo
 export function syncOpenChest(ui: UIState, chestView: ChestViewSource | null): void {
   if (!chestView) {
     if (ui.ctx.interface.openChestId !== null) {
-      repackOpenChest(ui);
+      repackChest(ui.ctx);
     }
     return;
   }
 
   if (ui.ctx.interface.openChestId !== null && ui.ctx.interface.openChestId === chestView.id) return;
-  if (ui.ctx.interface.openChestId !== null) repackOpenChest(ui);
-  openChest(ui, chestView.id);
-}
-
-function openChest(ui: UIState, chestId: ObjectID): void {
-  const chest = ui.ctx.dungeon.getContainerRecord(chestId);
-  if (!chest) {
-    ui.ctx.interface.openChestId = null;
-    ui.ctx.interface.openChestContents = emptyChestContents();
-    return;
-  }
-
-  ui.ctx.interface.openChestId = chestId;
-  const contents = emptyChestContents();
-  let cursor = chest.containedObject;
-  let index = 0;
-  while (cursor !== OBJECT_ID_EOF && cursor !== OBJECT_ID_NULL && index < contents.length) {
-    contents[index++] = cursor;
-    cursor = ui.ctx.dungeon.getDBRecordLink(cursor);
-  }
-  ui.ctx.interface.openChestContents = contents;
-
-  for (const item of contents) {
-    if (item !== OBJECT_ID_NULL) {
-      ui.ctx.dungeon.setDBRecordLink(item, OBJECT_ID_EOF);
-    }
-  }
-  chest.containedObject = OBJECT_ID_EOF;
-}
-
-/**
- * `RepackChest` (`doc/CSBwin-src/Character.cpp:3113`) — link the open chest's objects back
- * into it, in slot order. The engine asks for it when the chest leaves the weapon hand of
- * the champion whose inventory is open (`GameHost.repackChest`).
- */
-export function repackOpenChest(ui: UIState): void {
-  if (ui.ctx.interface.openChestId === null) return;
-  const chest = ui.ctx.dungeon.getContainerRecord(ui.ctx.interface.openChestId);
-  if (!chest) {
-    ui.ctx.interface.openChestId = null;
-    ui.ctx.interface.openChestContents = emptyChestContents();
-    return;
-  }
-
-  chest.containedObject = OBJECT_ID_EOF;
-  let previous: ObjectID | null = null;
-  for (const item of ui.ctx.interface.openChestContents) {
-    if (item === OBJECT_ID_NULL) continue;
-    ui.ctx.dungeon.setDBRecordLink(item, OBJECT_ID_EOF);
-    if (previous === null) {
-      chest.containedObject = item;
-    } else {
-      ui.ctx.dungeon.setDBRecordLink(previous, item);
-    }
-    previous = item;
-  }
-
-  ui.ctx.interface.openChestId = null;
-  ui.ctx.interface.openChestContents = emptyChestContents();
+  if (ui.ctx.interface.openChestId !== null) repackChest(ui.ctx);
+  showChestContents(ui.ctx, chestView.id);
 }
 
 function drawChestPanel(ui: UIState, chestView: ChestViewSource): void {

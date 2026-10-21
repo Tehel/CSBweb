@@ -30,6 +30,7 @@ import type { ObjectID } from '../src/core/types';
 import type { GameHost } from '../src/engine/GameHost';
 import type { ClothingRecord, MiscRecord, WeaponRecord } from '../src/data/dungeonTypes';
 import { AdjustStatsForItemCarried } from '../src/engine/AdjustStatsForItemCarried';
+import { repackChest, showChestContents } from '../src/engine/CharacterSystem';
 import { Game } from '../src/engine/Game';
 import {
   AttributeIndex, attributeMinimum, makeAddCharacterAttributes, type Attribute,
@@ -343,7 +344,6 @@ async function main(): Promise<void> {
     const notices: string[] = [];
     const g = makeGame({
       closeAttackMenuOf: (chIdx) => notices.push(`closeAttackMenuOf(${chIdx})`),
-      repackChest: () => notices.push('repackChest'),
     });
     g.systems.hallOfChampions.addChampion(champion(0));
     g.systems.hallOfChampions.addChampion(champion(1));
@@ -412,24 +412,30 @@ async function main(): Promise<void> {
 
     // The notices. Any change to a weapon hand asks the UI to close that champion's attack
     // menu (`:1893-1896`, `:1982-1985`); a chest out of the weapon hand of the champion
-    // whose inventory is open asks it to repack the chest (`:1911-1919`).
+    // whose inventory is open is repacked (`:1911-1919`). Each move runs with the chest
+    // open, as the inventory's draw leaves it, and a repack is noted as the chest found
+    // closed after it.
     const chest = firstRecord(g, DBType.CHEST);
-    notices.length = 0;
+    const noticed = (move: () => void): string => {
+      notices.length = 0;
+      showChestContents(g.ctx, chest);
+      move();
+      if (g.ctx.interface.openChestId === null) notices.push('repackChest');
+      else repackChest(g.ctx);
+      return notices.join(' ');
+    };
     party.objectInHand = chest;
-    handleClothingClick(ui, 8 + 1);
-    const chestIn = notices.join(' ');
-    notices.length = 0;
-    handleClothingClick(ui, 8 + 1);
-    const chestOut = notices.join(' ');
+    const chestIn = noticed(() => handleClothingClick(ui, 8 + 1));
+    const chestOut = noticed(() => handleClothingClick(ui, 8 + 1));
     party.objectInHand = OBJECT_ID_NULL;
-    notices.length = 0;
-    g.systems.character.addCharacterPossession(0, chest, 1);
-    g.systems.character.removeCharacterPossession(0, 1);
-    const otherChest = notices.join(' ');
-    notices.length = 0;
-    g.systems.character.addCharacterPossession(1, chest, 0);
-    g.systems.character.removeCharacterPossession(1, 0);
-    const shieldHand = notices.join(' ') || 'none';
+    const otherChest = noticed(() => {
+      g.systems.character.addCharacterPossession(0, chest, 1);
+      g.systems.character.removeCharacterPossession(0, 1);
+    });
+    const shieldHand = noticed(() => {
+      g.systems.character.addCharacterPossession(1, chest, 0);
+      g.systems.character.removeCharacterPossession(1, 0);
+    }) || 'none';
     console.log(`a chest into champion 1's weapon hand: ${chestIn}; out: ${chestOut}`);
     console.log(`into and out of champion 0's (inventory closed): ${otherChest}; champion 1's shield hand: ${shieldHand}`);
     check(chestIn === 'closeAttackMenuOf(1)' && chestOut === 'closeAttackMenuOf(1) repackChest',

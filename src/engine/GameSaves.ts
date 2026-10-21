@@ -39,6 +39,7 @@ import {
     SAVE_FILE_EXTENSION, joinedPlaythrough, readSaveFileFields, saveFileFieldsOf, slotOf,
     type OpenedSave, type SaveEntry, type SaveFileFields, type SaveSlot, type SaveStore,
 } from '../data/saves';
+import { repackChest } from './CharacterSystem';
 import { UtilityDiskMessages, UtilityError, makeNewAdventure } from './Chaos';
 import type { Game } from './Game';
 import { drawRandomGameID } from './GameContext';
@@ -70,8 +71,6 @@ export interface GameSavesScreen {
      * writer: the screen's, since only it holds graphic 26 (`SaveFileOptions`).
      */
     portraitOf(champion: Champion): number[] | undefined;
-    /** `RepackChest` (`doc/CSBwin-src/Character.cpp:3113`), the screen's open chest. */
-    repackOpenChest(): void;
     /**
      * Ask "BEGIN THE ADVENTURE?" in the prison (`GameSaves.inPrison`), YES making the new
      * adventure from `source`, or from a quick-save made first when it is `null`
@@ -318,7 +317,7 @@ export class GameSaves {
      */
     async save(clock: SaveClock, target: SaveTarget): Promise<SaveEntry> {
         if (this.game.isDead()) throw new Error('an error has ended the game');
-        if (clock === 'running') this.screen.repackOpenChest();
+        if (clock === 'running') repackChest(this.game.ctx);
         const bytes = buildSaveFile(this.game, {
             portraitOf: (champion) => this.screen.portraitOf(champion),
         });

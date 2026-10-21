@@ -209,7 +209,7 @@ function row(id: string, dataSet: string, bytes: Uint8Array, usedAt: number): Sa
 
 function newSaves(store: ReturnType<typeof memoryStore>, seed = SEED): GameSaves {
   return new GameSaves(newGame(emptyDungeonData(), graphics), dataSetNamed('csb'), diskFiles(dataSetNamed('csb')), store,
-    { portraitOf: () => undefined, repackOpenChest: () => {} }, () => {}, new CsbRandom(seed));
+    { portraitOf: () => undefined }, () => {}, new CsbRandom(seed));
 }
 
 async function seeded(): Promise<ReturnType<typeof memoryStore>> {
@@ -363,7 +363,6 @@ function prisonGame(
   game.setRandomSeed(SEED);
   saves = new GameSaves(game, dataSetNamed(dataSet), diskFiles(dataSetNamed(dataSet)), store, {
     portraitOf,
-    repackOpenChest: () => {},
     askBeginAdventure: (source) => { asked.push(source?.name ?? null); },
   }, () => {}, new CsbRandom(SEED));
   return { game, saves, asked };

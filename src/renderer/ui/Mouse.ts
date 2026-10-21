@@ -16,7 +16,7 @@ import { drinkAtWaterFountain, handleMouthPress } from './Feeding';
 import { HINT_ORACLE_BUTTON, inventoryButtonList } from './HintOracleButton';
 import type { HintSquare } from '../intro/HintOracle';
 import { searchButtonList } from './HitTest';
-import { describeObject, getActiveChestView, getEyeRect, repackOpenChest, syncOpenChest, tag0189d4, tag019036 } from './Inventory';
+import { describeObject, getActiveChestView, getEyeRect, syncOpenChest, tag0189d4, tag019036 } from './Inventory';
 import { handleMagicClick } from './MagicPanel';
 import { drawLegalAttackTypes, handleAttackAreaClick } from './Attack';
 import { isChestRecord, resolveObjectNameIndex } from './Objects';
@@ -25,6 +25,7 @@ import { UIMode, UIState, stHideCursor, stShowCursor, tag002572 } from './UIStat
 import { getPartyChampion, selectMagicCaster, setHandOwner } from '../../engine/Party';
 import { getChampionPossession } from '../../engine/gameTypes';
 import { characterAtPosition } from '../../engine/AddCharacter';
+import { repackChest } from '../../engine/CharacterSystem';
 import { CursorFilterType } from '../../engine/dsa/DsaTypes';
 import { freeze, setClockTick, thaw, waitForButtonFlash, wakeUp } from '../../engine/LoopState';
 import {
@@ -393,7 +394,7 @@ export function tag02076e(ui: UIState): void {
   if (party.sleeping) return;
   // `WaitForButtonFlash(); //If any are active` (`:5138`).
   waitForButtonFlash(ui.ctx);
-  if (party.selectedCharacterIndex >= 0 && ui.ctx.interface.displayResurrectChestOrScroll === 4) repackOpenChest(ui);
+  if (party.selectedCharacterIndex >= 0 && ui.ctx.interface.displayResurrectChestOrScroll === 4) repackChest(ui.ctx);
   ui.shadedByTag02076e = true;
   ui.arrowCursorShape = true;
 }

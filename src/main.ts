@@ -273,12 +273,10 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // (`doc/CSBwin-src/CSBCode.cpp:6797` around `Code13ea4.cpp:20`); the
         // screen hands its answer to `HallOfChampions.reincarnateNamed`.
         openReincarnateScreen: (chIdx) => screen?.openReincarnateScreen(chIdx),
-        // A weapon hand changed, or a chest left the open inventory's weapon hand:
-        // the attack menu, the inventory and the open chest are the screen's.
+        // A weapon hand changed: the attack menu and the inventory are the screen's.
         closeAttackMenuOf: (chIdx) => screen?.closeAttackMenuOf(chIdx),
         showHideInventory: (chIdx) => screen?.showHideInventory(chIdx),
         releaseEyeOrMouth: () => screen?.releaseEyeOrMouth(),
-        repackChest: () => screen?.repackChest(),
         // `TAG02076e` / `TAG0207cc` from the engine: the Hall of Champions and `WakeUp`.
         tag02076e: () => screen?.tag02076e(),
         tag0207cc: () => screen?.tag0207cc(),
@@ -331,7 +329,6 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // A save packs a `CHARDESC`, and that needs graphic 26 for the champions who
         // carry only a portrait index.
         portraitOf: (champion) => screen?.portraitPixelsFor(champion),
-        repackOpenChest: () => screen?.repackChest(),
         askBeginAdventure: (source) => screen?.askBeginAdventure(source),
     }, logSave, storeRandom, publishedDungeons);
 

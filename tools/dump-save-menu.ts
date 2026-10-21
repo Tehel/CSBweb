@@ -915,10 +915,7 @@ async function checkQuickSaveOverOpenChest(graphics: GraphicsLoader): Promise<vo
 
   // F5's save, to a store in memory instead of the page's.
   const store = memoryStore();
-  const saves = new GameSaves(game, DEFAULT_DATA_SET, diskFiles(DEFAULT_DATA_SET), store, {
-    portraitOf: () => undefined,
-    repackOpenChest: () => Inventory.repackOpenChest(ui),
-  }, () => {});
+  const saves = new GameSaves(game, DEFAULT_DATA_SET, diskFiles(DEFAULT_DATA_SET), store, { portraitOf: () => undefined }, () => {});
   const row = await saves.save('running', 'quick');
   const fresh = await loadGame();
   applySaveBytes(fresh, await store.read(row.id));
@@ -1100,7 +1097,7 @@ async function checkSaveCall(): Promise<void> {
     game.systems.hallOfChampions.addChampion(healthyChampion(name));
     let tailAtWrite: boolean | null = null;
     const store = shared ?? memoryStore(() => { tailAtWrite = game.canRestartFromSavegame(); }, fail);
-    const saves = new GameSaves(game, dataSet, diskFiles(dataSet), store, { portraitOf: () => undefined, repackOpenChest: () => {} },
+    const saves = new GameSaves(game, dataSet, diskFiles(dataSet), store, { portraitOf: () => undefined },
       (message: string) => { reports.push(message); });
     return { game, store, saves, tailAtWrite: (): boolean | null => tailAtWrite };
   };
@@ -1205,7 +1202,7 @@ async function checkSaveCall(): Promise<void> {
     const champion = slowGame.ctx.party.state.champions[0]!;
     const atTheKey = champion.attributes.health;
     const slow = memoryStore(() => {}, false, () => { champion.attributes.health = 1; });
-    const slowSaves = new GameSaves(slowGame, DEFAULT_DATA_SET, diskFiles(DEFAULT_DATA_SET), slow, { portraitOf: () => undefined, repackOpenChest: () => {} }, () => {});
+    const slowSaves = new GameSaves(slowGame, DEFAULT_DATA_SET, diskFiles(DEFAULT_DATA_SET), slow, { portraitOf: () => undefined }, () => {});
     const late = await slowSaves.save('running', 'quick');
     const held = readCsbwinCharacter(loadSaveGameState(await slow.read(late.id)).characterBlock!, 0).champion.attributes.health;
     console.log(`  clock running, a champion hurt while the store is listed: health ${atTheKey} at the key, ${held} in the file`);
@@ -1381,7 +1378,7 @@ async function checkSaveCall(): Promise<void> {
       racing.game.ctx.party.state.champions[0]!.name = 'CHANGED';
       const slow = { ...racing.store, read: async (id: string) => { during(racing.game); return racing.store.read(id); } };
       const racingSaves = new GameSaves(racing.game, DEFAULT_DATA_SET, diskFiles(DEFAULT_DATA_SET), slow,
-        { portraitOf: () => undefined, repackOpenChest: () => {} }, (message: string) => { reports.push(message); });
+        { portraitOf: () => undefined }, (message: string) => { reports.push(message); });
       const beforeRace = told.length;
       now += 60_000;
       await racingSaves.quickLoad();
@@ -1410,7 +1407,7 @@ async function checkSaveCall(): Promise<void> {
     const fresh = async (store: SaveStore, dataSet = DEFAULT_DATA_SET) => {
       const game = await loadGame({ messages });
       const before = game.ctx.state.block1.randomGameID;
-      const saves = new GameSaves(game, dataSet, diskFiles(dataSet), store, { portraitOf: () => undefined, repackOpenChest: () => {} },
+      const saves = new GameSaves(game, dataSet, diskFiles(dataSet), store, { portraitOf: () => undefined },
         (message: string) => { reports.push(message); });
       await saves.newGameRead();
       return { game, saves, before };
@@ -1468,7 +1465,7 @@ async function menuRig(
 ) {
   const game = await loadGame();
   game.systems.hallOfChampions.addChampion(healthyChampion(champion));
-  const saves = new GameSaves(game, dataSet, files, store, { portraitOf: () => undefined, repackOpenChest: () => {} }, () => {});
+  const saves = new GameSaves(game, dataSet, files, store, { portraitOf: () => undefined }, () => {});
   let drawsWithNoMenu = 0;
   const exported: { name: string; bytes: Uint8Array }[] = [];
   const ui: UIState = newUIState(graphics, game.ctx, {
@@ -3075,7 +3072,7 @@ async function checkImport(graphics: GraphicsLoader): Promise<void> {
   game.systems.hallOfChampions.addChampion(healthyChampion('DAROO'));
   // The games' playthroughs are given, so that every line printed is the same at each run.
   game.ctx.state.block1.randomGameID = 0x0da200;
-  const screen = { portraitOf: () => undefined, repackOpenChest: () => {} };
+  const screen = { portraitOf: () => undefined };
   const saves = new GameSaves(game, DEFAULT_DATA_SET, diskFiles(DEFAULT_DATA_SET), store, screen, log, new CsbRandom(SEED));
   const csbSaves = new GameSaves(game, dataSetNamed('csb'), diskFiles(dataSetNamed('csb')), store, screen, log, new CsbRandom(SEED));
   const read = (path: string): Uint8Array => new Uint8Array(readFileSync(resolve(path)));

@@ -105,11 +105,6 @@ export interface GameHost {
    */
   releaseEyeOrMouth(): void;
   /**
-   * `RepackChest` (`doc/CSBwin-src/Character.cpp:3113`): a chest left the weapon hand of
-   * the champion whose inventory is open (`:1911-1919`). The open chest is the UI's.
-   */
-  repackChest(): void;
-  /**
    * `TAG02076e` (`doc/CSBwin-src/Character.cpp:5133`): the open chest repacked, the
    * interface shaded and the arrow cursor, all the UI's. `AddCharacter` calls it once the
    * candidate's inventory is shown (`:797-798`).
@@ -224,7 +219,6 @@ export function createGameHost(host: Partial<GameHost> = {}): GameHost {
     closeAttackMenuOf: host.closeAttackMenuOf ?? (() => {}),
     showHideInventory: host.showHideInventory ?? (() => {}),
     releaseEyeOrMouth: host.releaseEyeOrMouth ?? (() => {}),
-    repackChest: host.repackChest ?? (() => {}),
     tag02076e: host.tag02076e ?? (() => {}),
     tag0207cc: host.tag0207cc ?? (() => {}),
     savedGameRead: host.savedGameRead ?? (() => {}),

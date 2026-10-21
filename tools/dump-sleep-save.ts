@@ -58,7 +58,7 @@ function stage(store = memoryStore(), dataSet = DEFAULT_DATA_SET) {
   const game: Game = newGame(dungeon, graphics, { messages });
   applyCsbwinSave(game, new Uint8Array(readFileSync(savePath('csbgame7.dat'))));
   const reports: string[] = [];
-  const saves = new GameSaves(game, dataSet, diskFiles(dataSet), store, { portraitOf: () => undefined, repackOpenChest: () => {} },
+  const saves = new GameSaves(game, dataSet, diskFiles(dataSet), store, { portraitOf: () => undefined },
     (message) => { reports.push(message); });
   return { game, store, saves, reports };
 }

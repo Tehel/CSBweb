@@ -114,7 +114,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| D18 | Composing the screen changes the world, and the host is asked for the interface's `d.` | L | ⏳ step 1 of 4 done |
+| D18 | Composing the screen changes the world, and the host is asked for the interface's `d.` | L | ⏳ steps 1-2 of 4 done |
 | D19 | `RuntimeSaveState` is neither strict nor a snapshot | M | ⏳ |
 | E41 | `src/data/` imports the engine | M | ⏳ |
 | E35 | Comments and documents that are stale, wrong, or tell the past | M | ⏳ |
@@ -415,21 +415,21 @@ CSBWin's interface state is `d.`: the open chest and its contents, the attack me
 `DisplayResurrectChestOrScroll`. They are the context's, `ctx.interface`
 (`src/engine/InterfaceState.ts`), which the engine and the screen both read. What is left:
 
-- **Composing the screen opens and repacks chests.** `presentViewport` runs
-  `syncOpenChest(this.ui, null)` and zeroes `displayResurrectChestOrScroll`
-  (`src/renderer/GameScreen.ts:678-681`), and `drawInventoryScreen` opens the chest through
-  `syncOpenChest(ui, chestView)` (`src/renderer/ui/Inventory.ts:42`), which unlinks its
-  objects from the database (`:364-369`). A compose runs at every refresh, up to 60 a
+- **Composing the screen opens and repacks chests.** The opening and the repacking are
+  the engine's, `showChestContents` and `repackChest` (`src/engine/CharacterSystem.ts`),
+  but the compose calls them: `presentViewport` runs `syncOpenChest(this.ui, null)` and
+  zeroes `displayResurrectChestOrScroll` (`src/renderer/GameScreen.ts:673-676`), and
+  `drawInventoryScreen` opens the chest through `syncOpenChest(ui, chestView)`
+  (`src/renderer/ui/Inventory.ts:42`). A compose runs at every refresh, up to 60 a
   second while the pointer moves, so what the engine finds in a chest depends on when the
-  screen was last composed, and a headless `Game` never opens one. The save repacks by
-  hand first (`GameSaves.ts:321`), and the compose skips the inventory under the disk
-  menu so as not to open it again (`GameScreen.ts:693`). CSBWin opens the chest while
+  screen was last composed, and a headless `Game` never opens one. The save repacks
+  first (`GameSaves.ts:320`), and the compose skips the inventory under the disk
+  menu so as not to open it again (`GameScreen.ts:688`). CSBWin opens the chest while
   drawing too, but only at events (`TAG0189d4`).
-- **The host is asked for the interface's work.** `GameHost.repackChest`, and the calls
-  into the UI named by CSBWin address (`tag02076e`, `tag0207cc`, `tag01b29a`,
-  `tag011366`, `src/main.ts:283-309`), do `d.` work on the screen's side; a read in play
-  resets `ctx.interface` only through the host (`GameHost.savedGameRead`, through
-  `initializePlayState`).
+- **The host is asked for the interface's work.** The calls into the UI named by CSBWin
+  address (`tag02076e`, `tag0207cc`, `tag01b29a`, `tag011366`, `src/main.ts:281-307`) do
+  `d.` work on the screen's side; a read in play resets `ctx.interface` only through the
+  host (`GameHost.savedGameRead`, through `initializePlayState`).
 
 Paying it: the chest opened and repacked at the events where CSBWin calls `TAG0189d4` and
 `RepackChest` (an inventory toggled, the hand's object or the weapon hand changing, the eye
@@ -437,17 +437,15 @@ and the mouth: `doc/CSBwin-src/CSBCode.cpp:7452-7517`, `Character.cpp:1915`, `:3
 `:4532`, `:5149`); `presentViewport` only reads; `GameHost` keeps only what leaves the
 engine. No pixel moves.
 
-In four steps, one commit each; step 1 is done:
+In four steps, one commit each; steps 1 and 2 are done:
 
 1. **The fields move** (refactor, done). They are `ctx.interface`'s, made by
    `createInterfaceState`; `UIState` keeps only what the screen draws from, and the engine
    reads the fields with no host query.
-2. **`ShowChestContents`'s opening and `RepackChest` in the engine** (refactor). The
-   unlinking and relinking (`openChest`, `repackOpenChest`,
-   `src/renderer/ui/Inventory.ts:346-401`) move to the engine on `ctx.interface`, under
-   CSBWin's names (`Character.cpp:3042`, `:3113`). `GameHost.repackChest` and
-   `GameSaves`' `repackOpenChest` member go: `RemoveCharacterPossession` and the save call
-   it. The compose still calls them where it does now, so nothing moves.
+2. **`ShowChestContents`'s opening and `RepackChest` in the engine** (refactor, done).
+   They are `showChestContents` and `repackChest` on `ctx.interface`
+   (`src/engine/CharacterSystem.ts`), which `RemoveCharacterPossession`, the save and
+   `TAG02076e` call; the compose calls them where it did, through `syncOpenChest`.
 3. **The chest opened and repacked at CSBWin's events** (fix). Opened by `TAG0189d4`'s
    `DescribeObject` (`Character.cpp:3911`) and `_ClickOnEye`'s
    (`Viewport.cpp:7293`); repacked by `DescribeObject` under the eye or the mouth
