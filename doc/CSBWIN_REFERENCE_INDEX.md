@@ -8,13 +8,15 @@ This index links the CSBWin-sourced reference docs under `doc/`.
 line's last source and the build the author plays ("Version 2023.06.08", `CSBwin.rc:313`),
 with the CRs of its source and text files removed and nothing else changed. It is not ours,
 so it is git-ignored: `npm run fetch-csbwin-src` (`tools/fetch-csbwin-src.ts`) fetches it,
-from the site or the Wayback Machine's copy, checks the archive's SHA-256 and writes the tree. `doc/CSBWIN_SYMBOL_INDEX.tsv` is built from it,
-and every citation in `doc/`, `src/` and `tools/` names its lines (`doc/PLAN_ARCHIVE.md`'s
+from the site or the Wayback Machine's copy, checks the archive's SHA-256 and writes the tree. No commit holds the tree.
+`doc/CSBWIN_SYMBOL_INDEX.tsv` is built from it, and every citation in `doc/`, `src/` and `tools/` names its lines (`doc/PLAN_ARCHIVE.md`'s
 are mapped by script and unreviewed).
 
-The port followed `CSBwin_SRC_20160923.zip` before it, which is in git history
-(`git show 5efad3b^:doc/CSBwin-src/<File>`): "Version 15.9", with the author's cosmetic
-edits in `CSBCode.cpp`, `RC4.cpp`, `SaveGame.cpp` and `Data.h`, a side branch of
+The port followed `CSBwin_SRC_20160923.zip` before it, from its first commit to Debt C157's:
+those commits fetch it with their own `npm run fetch-csbwin-src` (`tools/fetch-csbwin-src.mjs`,
+pinned to that archive). Their citations of `SaveGame.cpp`, `RC4.cpp` and `CSBCode.cpp` name
+the lines of a reformatted copy no commit keeps, up to 193 lines off the archive's. It is
+"Version 15.9", a side branch of
 `CSBwin_SRC_20160325` (15.8) whose only change is accessors for a monster's `word20`, so it
 behaves as 15.8. Every change between the two that alters what the port has is ported, but
 for the utility's stop on a word-10 saved game (`DEBT.md` H). The rest changes nothing the
