@@ -10,7 +10,14 @@
  *    file: the menu's `SaveFileError`, and the same state, the same world object, rules,
  *    signatures, graphics signatures named, overlay and `deleteDuplicateTimers`, then the
  *    same state after 200 VBLs of play.
- * 2. **An error once it is installed ends the game.** The party's level loaded
+ * 2. **A save is held against its world** (`validateCsbwinWorld`) before the read builds:
+ *    `csbgame7.dat` rewritten with the party on level 40, or at x 32, five champions, the
+ *    hand or the magic caster on a fifth, the object in hand past the object index, more
+ *    timers than the table, the first free timer or a queued one past it. CSBWin checks
+ *    none of them; each is refused, and the running game is still its twin's. A slot inside
+ *    `numCharacter` that holds no champion is read as one, as CSBWin plays it: with slot 1
+ *    cleared, the party is still four, the hand's champion, 2, the file's third, and it plays.
+ * 3. **An error once it is installed ends the game.** The party's level loaded
  *    (`reloadAfterSaveGame`) is made to throw: the read is `die(0xbad)`, "SAVED GAME
  *    DAMAGED!" and the error, not a message over a game half read.
  *
@@ -18,10 +25,12 @@
  */
 import { readFileSync } from 'node:fs';
 
-import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
+import { readCsbwinCharacter } from '../src/data/CsbwinCharacters';
+import { loadCsbwinWorld, type CsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { buildDungeonImage } from '../src/data/CsbwinDungeonImageWriter';
 import { objectIndexOf } from '../src/data/CsbwinObjectIndex';
-import { saveSaveGameState } from '../src/data/SaveGameLoader';
+import { CHARDESC_SIZE } from '../src/data/CsbwinSaveInfo';
+import { saveSaveGameState, type Block2, type SaveGameState } from '../src/data/SaveGameLoader';
 import { Die } from '../src/engine/Die';
 import type { Game } from '../src/engine/Game';
 import { SaveFileError, applySaveBytes } from '../src/engine/SaveGameFile';
@@ -31,21 +40,33 @@ import { savePath } from './lib/saves';
 
 const DAMAGED_FROM = savePath('csbgame7.dat');
 
-/** `csbgame7.dat` written again with its object index cut to a quarter of its slots. */
-function cutObjectIndex(): Uint8Array {
+/** `csbgame7.dat` written again, its state as `edit` makes it. */
+function rewritten(edit: (save: SaveGameState, world: CsbwinWorld) => SaveGameState): Uint8Array {
   const world = loadCsbwinWorld(new Uint8Array(readFileSync(DAMAGED_FROM)));
   const save = world.save;
-  const index = objectIndexOf(world.dungeon.rnMaps);
-  const length = index.length >> 2;
-  return saveSaveGameState({
+  return saveSaveGameState(edit({
     ...save,
-    objectIndex: { length, typeMap: index.typeMap.slice(0, length), indexMap: index.indexMap.slice(0, length) },
+    objectIndex: objectIndexOf(world.dungeon.rnMaps),
     dungeonImage: buildDungeonImage(world.dungeon, {
       indirectText: save.indirectText ?? false,
       bigActuators: save.bigActuators ?? false,
       newScrolls: (save.version ?? 0) >= 0x42,
     }),
+  }, world));
+}
+
+/** `csbgame7.dat` written again with its object index cut to a quarter of its slots. */
+function cutObjectIndex(): Uint8Array {
+  return rewritten((save) => {
+    const index = save.objectIndex!;
+    const length = index.length >> 2;
+    return { ...save, objectIndex: { length, typeMap: index.typeMap.slice(0, length), indexMap: index.indexMap.slice(0, length) } };
   });
+}
+
+/** `csbgame7.dat` written again with these fields of `GAMEBLOCK2`. */
+function withBlock2(fields: Partial<Block2>): Uint8Array {
+  return rewritten((save) => ({ ...save, ...fields, block2: { ...save.block2!, ...fields } }));
 }
 
 /** DM's stock dungeon, its random stream and its game id pinned, 100 VBLs into play. */
@@ -105,7 +126,70 @@ function checkBuildError(): void {
   check(installed(game) === installed(twin), 'after 200 VBLs the game is still the twin\'s');
 }
 
-/* --------------------------------------------- 2. an error once installed ---- */
+/* ------------------------------------- 2. a save held against its world ---- */
+
+function checkWorldHeld(): void {
+  console.log('=== a save is held against its world before the read builds ===');
+  const world = loadCsbwinWorld(new Uint8Array(readFileSync(DAMAGED_FROM)));
+  const { maxTimers } = world.save.block2!;
+  const queue = world.save.timerQueue!;
+  const cases: Array<{ what: string; bytes: Uint8Array; refused: RegExp }> = [
+    { what: 'the party on level 40', bytes: withBlock2({ partyLevel: 40 }), refused: /ON LEVEL 40, OF LEVELS 0 TO 13/ },
+    { what: 'the party at x 32', bytes: withBlock2({ partyX: 32 }), refused: /AT 32,23, ON A LEVEL OF/ },
+    { what: 'five champions', bytes: withBlock2({ numCharacter: 5 }), refused: /THE PARTY IS 5 CHAMPIONS/ },
+    { what: 'the hand on champion 4', bytes: withBlock2({ handChar: 4 }), refused: /THE HAND IS CHAMPION 4, OF 4/ },
+    { what: 'the magic caster on champion 4', bytes: withBlock2({ magicCaster: 4 }), refused: /THE MAGIC CASTER IS CHAMPION 4, OF 4/ },
+    {
+      what: 'the object in hand past the object index',
+      bytes: withBlock2({ objectInHand: world.dungeon.rnMaps.length }),
+      refused: new RegExp(`THE OBJECT IN HAND, ${world.dungeon.rnMaps.length}, NAMES NO RECORD`),
+    },
+    {
+      what: 'more timers than the table',
+      bytes: rewritten((save) => ({ ...save, timerQueue: [...queue, ...Array.from({ length: maxTimers + 1 - queue.length }, () => 0)] })),
+      refused: new RegExp(`THE TIMER QUEUE IS ${maxTimers + 1} TIMERS, OF ${maxTimers}`),
+    },
+    { what: 'the first free timer past the table', bytes: withBlock2({ firstAvailTimer: maxTimers + 1 }), refused: /THE FIRST FREE TIMER IS/ },
+    {
+      what: 'a queued timer past the table',
+      bytes: rewritten((save) => ({ ...save, timerQueue: [maxTimers, ...queue.slice(1)] })),
+      refused: new RegExp(`THE TIMER QUEUE NAMES TIMER ${maxTimers}, OF ${maxTimers}`),
+    },
+  ];
+
+  const game = runningGame();
+  const twin = installed(runningGame());
+  for (const { what, bytes, refused } of cases) {
+    let error: unknown = null;
+    try {
+      applySaveBytes(game, bytes);
+    } catch (caught) {
+      error = caught;
+    }
+    console.log(`  ${what}: ${error instanceof Error ? error.message : error}`);
+    check(error instanceof SaveFileError && refused.test(error.message), `${what} is refused, and says so`);
+    check(installed(game) === twin && !game.isDead(), `${what} leaves the running game as it was`);
+  }
+
+  // Slot 1 cleared, as `AddCharacter` leaves a slot it has not filled (`Character.cpp:479`).
+  const block = world.save.characterBlock!;
+  const names = [0, 1, 2, 3].map((i) => readCsbwinCharacter(block, i).champion.name);
+  const cleared = rewritten((save) => {
+    const characters = save.characterBlock!.slice();
+    characters.fill(0, CHARDESC_SIZE, 2 * CHARDESC_SIZE);
+    return { ...save, characterBlock: characters, handChar: 2, block2: { ...save.block2!, handChar: 2 } };
+  });
+  const read = stockGame();
+  applySaveBytes(read, cleared);
+  const party = read.ctx.party.state;
+  console.log(`  slot 1 cleared: ${party.champions.map((c) => JSON.stringify(c.name)).join(', ')}, the hand ${party.cursorOwner}`);
+  check(party.champions.length === 4 && party.champions[1].name === '', 'the cleared slot is still a champion of the party');
+  check(party.cursorOwner === 2 && party.champions[2].name === names[2], `the hand is still ${names[2]}, the file's third`);
+  play(read, 200);
+  check(!read.isDead() && read.ctx.party.state.champions.length === 4, 'and it plays 200 VBLs, four champions still');
+}
+
+/* --------------------------------------------- 3. an error once installed ---- */
 
 function checkStartError(): void {
   console.log('=== an error once the read is installed is die(0xbad) ===');
@@ -130,5 +214,6 @@ function checkStartError(): void {
 }
 
 checkBuildError();
+checkWorldHeld();
 checkStartError();
 finish();

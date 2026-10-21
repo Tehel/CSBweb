@@ -81,9 +81,10 @@ function main(): void {
     const party = readCsbwinParty(block, gb2.numCharacter);
     const tail = readCsbwinPartyTail(block);
     console.log(`\n${name} — ${party.length} champions, level ${gb2.partyLevel}`);
+    const occupied = party.filter((c) => c.occupied).length;
     check(
-      party.length === gb2.numCharacter,
-      `${name}: ${party.length} occupied slots, GAMEBLOCK2 says ${gb2.numCharacter}`,
+      occupied === gb2.numCharacter,
+      `${name}: ${occupied} occupied slots, GAMEBLOCK2 says ${gb2.numCharacter}`,
     );
 
     for (const { champion: c, charFlags } of party) {

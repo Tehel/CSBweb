@@ -4027,6 +4027,26 @@ file that does not read ends the game, the author's decision (`DEBT.md` H). The 
 status line. Evidence: `tools/dump-bad-saved-game.ts`, and `tools/dump-new-game.ts` for the
 empty world's random stream.
 
+## A save's party, hand and timers are read without a check against its world
+
+`LoadGame` assigns `d.NumCharacter`, `d.partyX`, `d.partyY`, `d.partyFacing`,
+`d.partyLevel`, `d.HandChar` and `d.MagicCaster` straight from `GAMEBLOCK2`
+(`doc/CSBwin-src/SaveGame.cpp:1755-1761`), then the timer table's `NumTimer` and
+`FirstAvailTimer` (`:1763-1764`) and the object in hand (`:1773`), and reads `MaxTimers`
+queue entries (`:1819-1823`). No step of the read after them, to its `return` at
+`:2096`, holds any of them against the dungeon, the four `CHARDESC`s, the object index or
+the timer table, and a slot inside `d.NumCharacter` is a champion whatever it holds:
+`ConvertCharacters` walks `d.CH16482[0 .. d.NumCharacter-1]` (`:2268`). A champion's
+`charPosition` needs no check: its uses mask it, `& 3` or `/2 & 1`
+(`doc/CSBwin-src/Character.cpp:408`, `:5322-5323`, `Attack.cpp:1097`), and
+`CharacterSwap` itself stores 5 there, "an impossible" position, before it looks for a
+free corner (`Character.cpp:5478-5487`).
+
+The port holds the first eight against the world before a read builds anything
+(`validateCsbwinWorld`, `src/engine/CsbwinSaveGame.ts`), and refuses a save outside them
+(`DEBT.md` H); a slot inside `numCharacter` is read as CSBWin reads it
+(`readCsbwinParty`). `tools/dump-damaged-read.ts` checks each case.
+
 ## A one-button menu takes no key
 
 `_WaitForMenuSelect` has an arm for a one-button menu that reads the keyboard

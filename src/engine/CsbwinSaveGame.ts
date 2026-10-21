@@ -64,7 +64,9 @@ import { loadCsbwinWorld, type CsbwinWorld } from '../data/CsbwinDungeonImage';
 import { readGameInfo } from '../data/CsbwinExtendedFeatures';
 import { readDisableSaves, readGlobalVariables, readOverlayPalette, specialLocationsFromExpool } from '../data/CsbwinExpool';
 import { readCsbwinParty, readCsbwinPartyTail } from '../data/CsbwinCharacters';
+import { databaseRecords } from '../data/CsbwinObjectIndex';
 import { CHARDESC_SIZE } from '../data/CsbwinSaveInfo';
+import type { Block2 } from '../data/SaveGameLoader';
 import { CheckMonsters } from './CheckMonsters';
 import { captureDungeonSnapshot } from './DungeonSnapshot';
 import { DungeonState } from './DungeonState';
@@ -72,10 +74,71 @@ import type { Game } from './Game';
 import { identityOverlayPalette } from './OverlayPalette';
 import { readGame } from './ReadGame';
 import type { RuntimeSaveState } from './RuntimeSave';
-import { OBJECT_ID_NULL, Position } from '../core/types';
+import { DBType, OBJECT_ID_NULL, Position } from '../core/types';
 import type { Direction, ObjectID } from '../core/types';
 import type { Block1State, PartyState } from './gameTypes';
 import type { GameInfo, MissileRecord } from '../data/dungeonTypes';
+
+/**
+ * `d.objectInHand.NonExtendedInteger(b.gb2.ObjectInHand)` (`doc/CSBwin-src/SaveGame.cpp:1773`):
+ * the cursor's object is an indirect slot number like every other RN in the file.
+ * `RNempty` is 0; the port keeps `RNnul` as its one empty value.
+ */
+function objectInHandOf(gb2: Block2): ObjectID {
+    const raw = gb2.objectInHand & 0xffff;
+    return raw === 0 || raw === 0xffff || raw === 0xfffe ? OBJECT_ID_NULL : raw as ObjectID;
+}
+
+/**
+ * A save held against its world, before the read builds anything. `LoadGame` assigns
+ * the party's level, x and y, `d.NumCharacter`, `d.HandChar`, `d.MagicCaster` and the
+ * object in hand straight from `GAMEBLOCK2` (`doc/CSBwin-src/SaveGame.cpp:1755-1773`),
+ * and reads the timer queue's `NumTimer` entries (`:1763-1764`, `:1819-1823`), checking
+ * none of them: a value outside what it names is read past the level's cells, the
+ * four `CHARDESC`s, the object index or the timer table. The port refuses such a save
+ * (`DEBT.md` H). A slot inside `numCharacter` that holds no champion is CSBWin's to
+ * play, and is read (`readCsbwinParty`). The champions' positions are not held: CSBWin
+ * masks them where it uses them, and stores an impossible 5 there itself
+ * (`doc/PROVEN_FACTS.md` -> "A save's party, hand and timers are read without a check
+ * against its world").
+ */
+export function validateCsbwinWorld(world: CsbwinWorld): void {
+    const gb2 = world.save.block2;
+    if (!gb2) throw new Error('save has no GAMEBLOCK2');
+    const { maps } = world.dungeon;
+    const map = maps[gb2.partyLevel];
+    if (!map) throw new Error(`the party is on level ${gb2.partyLevel}, of levels 0 to ${maps.length - 1}`);
+    const { width, height } = map.descriptor;
+    if (gb2.partyX < 0 || gb2.partyX >= width || gb2.partyY < 0 || gb2.partyY >= height) {
+        throw new Error(`the party is at ${gb2.partyX},${gb2.partyY}, on a level of ${width} by ${height}`);
+    }
+
+    const { numCharacter } = gb2;
+    if (numCharacter < 0 || numCharacter > 4) throw new Error(`the party is ${numCharacter} champions`);
+    const champion = (index: number, what: string): void => {
+        if (index < -1 || index >= numCharacter) throw new Error(`${what} is champion ${index}, of ${numCharacter}`);
+    };
+    champion(gb2.handChar, 'the hand');
+    champion(gb2.magicCaster, 'the magic caster');
+
+    const objectInHand = objectInHandOf(gb2);
+    if (objectInHand !== OBJECT_ID_NULL) {
+        const { rnMaps, databases } = world.dungeon;
+        const db = rnMaps.dbType(objectInHand);
+        if (db === DBType.UNKNOWN || rnMaps.idx(objectInHand) >= databaseRecords(databases, db).length) {
+            throw new Error(`the object in hand, ${objectInHand}, names no record`);
+        }
+    }
+
+    const { numTimer, maxTimers, firstAvailTimer } = gb2;
+    if (numTimer < 0 || numTimer > maxTimers) throw new Error(`the timer queue is ${numTimer} timers, of ${maxTimers}`);
+    if (firstAvailTimer < 0 || firstAvailTimer > maxTimers) {
+        throw new Error(`the first free timer is ${firstAvailTimer}, of ${maxTimers}`);
+    }
+    for (const index of world.save.timerQueue ?? []) {
+        if (index >= maxTimers) throw new Error(`the timer queue names timer ${index}, of ${maxTimers}`);
+    }
+}
 
 /**
  * Build the party state out of `GAMEBLOCK2` and block 4.
@@ -93,15 +156,9 @@ function buildPartyState(world: CsbwinWorld): PartyState {
     const party = readCsbwinParty(block, gb2.numCharacter);
     const tail = readCsbwinPartyTail(block);
 
-    // `d.objectInHand.NonExtendedInteger(b.gb2.ObjectInHand)` (`SaveGame.cpp:1773`) — the cursor's
-    // object is an indirect slot number like every other RN in the file. `RNempty` is 0;
-    // the port keeps `RNnul` as its one empty value. The `CURSORFILTER_ReadGame` that follows
-    // (`:1774-1779`) runs no DSA (`Game.readNewGame`).
-    const rawInHand = gb2.objectInHand & 0xffff;
-    const objectInHand =
-        rawInHand === 0 || rawInHand === 0xffff || rawInHand === 0xfffe
-            ? OBJECT_ID_NULL
-            : rawInHand as ObjectID;
+    // The `CURSORFILTER_ReadGame` that follows the object in hand (`:1774-1779`) runs no
+    // DSA (`Game.readNewGame`).
+    const objectInHand = objectInHandOf(gb2);
 
     const position = new Position(gb2.partyX, gb2.partyY, gb2.partyLevel);
 
@@ -268,6 +325,7 @@ export function buildCsbwinRuntimeState(world: CsbwinWorld): RuntimeSaveState {
  */
 export function applyCsbwinSave(game: Game, bytes: Uint8Array): CsbwinWorld {
     const world = loadCsbwinWorld(bytes);
+    validateCsbwinWorld(world);
     readGame(game, {
         world: world.dungeon,
         extendedFeatures: world.save.extendedFeatures,

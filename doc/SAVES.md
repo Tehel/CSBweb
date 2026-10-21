@@ -475,7 +475,12 @@ step that cannot fail, then starts the game read: the overlay, the party's level
 the databases thinned. A file that fails while the read builds is the line or the
 dialog's message above, and the game played on is the one that was running, untouched. A
 failure once the read is in ends the game, `die(0xbad)` with "SAVED GAME DAMAGED!" and the
-reason, rather than play on in a game half read. `tools/dump-damaged-read.ts` holds both.
+reason, rather than play on in a game half read. Before it builds, a save is held against
+its world (`validateCsbwinWorld`, `src/engine/CsbwinSaveGame.ts`): the party's level and
+square inside the dungeon, at most four champions, the hand and the caster among them,
+the object in hand a record, the timers inside their table; one outside is refused as a
+file that fails while the read builds, where CSBWin plays on into memory past its arrays
+(`DEBT.md` H). `tools/dump-damaged-read.ts` holds all three.
 
 ## CONTINUE
 

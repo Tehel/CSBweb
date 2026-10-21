@@ -54,7 +54,7 @@ function rewrite(bytes: Uint8Array): {
   const { dungeon, save } = loadCsbwinWorld(bytes);
 
   const block = save.characterBlock!;
-  const champions = readCsbwinParty(block, 4).map((c) => c.champion);
+  const champions = readCsbwinParty(block, save.block2!.numCharacter).map((c) => c.champion);
   const tail = readCsbwinPartyTail(block);
 
   const image = buildDungeonImage(dungeon, {
@@ -181,8 +181,8 @@ function main(): void {
 
     /* ---- the party, which is where the possession slots are ---- */
 
-    const theirs = readCsbwinParty(save.characterBlock!, 4);
-    const ours = readCsbwinParty(round.save.characterBlock!, 4);
+    const theirs = readCsbwinParty(save.characterBlock!, save.block2!.numCharacter);
+    const ours = readCsbwinParty(round.save.characterBlock!, round.save.block2!.numCharacter);
     check(theirs.length === ours.length, `${name}: the party is still ${theirs.length} champions`);
     let slotsWrong = 0;
     theirs.forEach((c, i) => {

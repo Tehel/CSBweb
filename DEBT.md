@@ -114,7 +114,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E23 | One game read, whole or not at all | L | ⏳ step 5 of 6 |
+| E23 | One game read, whole or not at all | L | ⏳ step 6 of 6 |
 | D18 | The interface's `d.` lives in the screen, and composing the screen changes the world | L | ⏳ |
 | D19 | `RuntimeSaveState` is neither strict nor a snapshot | M | ⏳ |
 | E41 | `src/data/` imports the engine | M | ⏳ |
@@ -489,7 +489,7 @@ What a save is passes through `ExtendedFeaturesBlock`, `readExtendedFeatures`'s 
   `record as XRecord` casts writes them (`:388-528`); `DatabaseRecord` is a union with no
   discriminant.
 - A load installs the world, then applies a snapshot of that same world over it
-  (`src/engine/CsbwinSaveGame.ts:265`), where a new game's read applies none (`ReadState`'s
+  (`src/engine/CsbwinSaveGame.ts:348`), where a new game's read applies none (`ReadState`'s
   optional `snapshot`).
 
 Paying it, in steps: a codec per database type, `{ size, read, write }` in a `DBType`-keyed
@@ -515,22 +515,15 @@ against each other, and the file formats.
 
 Both reads go through one list of steps, `readGame` (`src/engine/ReadGame.ts`), from
 `Game.readNewGame` (`Game.ts:308-344`), which builds its state from `newGameState`
-(`GameContext.ts:294-309`), and `applyCsbwinSave` (`CsbwinSaveGame.ts:264-295`); around
+(`GameContext.ts:294-309`), and `applyCsbwinSave` (`CsbwinSaveGame.ts:321-353`); around
 it are `SaveGameFile.ts:276-285` and `GameSaves.read`. A read is built off the running
 game, installed by assignments that cannot throw, then started (the overlay, the party's
 level, `SmartDiscard`): an error while it builds leaves the running game as it was, and
 one once it is installed is `die(0xbad)` (`tools/dump-damaged-read.ts`). What is left:
 
-- **Nothing holds a save against its world**: the party's level, x and y, `numCharacter`,
-  `handChar`, `MagicCaster`, the object in hand, the timers' indices. A `csbgame7.dat`
-  rewritten with the party on level 40, its checksums made right by the port's own writer,
-  installs with the party on level 40 of 14. `readCsbwinParty` drops an unoccupied slot
-  inside `numCharacter` and renumbers the rest (`src/data/CsbwinCharacters.ts:293-303`),
-  leaving `handChar`, `MagicCaster` and the positions naming other champions; CSBWin does
-  not renumber.
 - **A world is checked through a throwaway `DungeonState`**: `newGameState` and a save's
   read each build one over the world for `CheckMonsters` (`GameContext.ts:300`,
-  `CsbwinSaveGame.ts:278`), and `installWorld` then hands the world to the context's own.
+  `CsbwinSaveGame.ts:336`), and `installWorld` then hands the world to the context's own.
 - **What `d.Initialize()` zeroes is reset nowhere** (C181).
 - **A read in play** drops no running script (`Game.installReadState`) and does not
   empty the mouse queue, so clicks queued before F9 are translated against the loaded
@@ -538,18 +531,11 @@ one once it is installed is `die(0xbad)` (`tools/dump-damaged-read.ts`). What is
 
 Paying it, in six steps, a commit each. Steps 1 to 3 are refactors, every tool's output
 byte-identical; 4 to 6 change what a damaged file or a read in play does, and are fixes
-with their tool. Where it stands: steps 1 to 4 are done, one pipeline, `readGame`, one
+with their tool. Where it stands: steps 1 to 5 are done, one pipeline, `readGame`, one
 new game, `newGameState`, which `readNewGame` and `createGameContext` both build from, one
-route to the world, `ctx.dungeon.getData()`, and a read built, then installed whole;
-step 5 is next.
+route to the world, `ctx.dungeon.getData()`, a read built, then installed whole, and a
+save held against its world first (`validateCsbwinWorld`); step 6 is next.
 
-5. **A save held against its world** (a fix). A pure `validateCsbwinWorld` before the
-   build: the party's level, x and y inside the dungeon, `numCharacter` 0 to 4,
-   `handChar`, `MagicCaster` and the champions' positions inside it, the object in hand and
-   the timers' indices inside their databases; `readCsbwinParty` stops renumbering. Read
-   first what CSBWin does with each: what it refuses, the port refuses; what it plays on
-   into undefined memory, the port refuses as obviously wrong, recorded in H. Its cases go
-   in `tools/dump-damaged-read.ts`, as errors while the read builds.
 6. **A read in play starts clean** (a fix). A running script dropped and the mouse queue
    emptied, as a read at the boot finds them. C181's reset of what `d.Initialize()` zeroes
    is a step of the same pipeline, paid as its own item.
@@ -797,7 +783,7 @@ palette codes, so none moves.
   (`dump-throwing.ts:338`).
 - **The past**: "Moved out of `Game` by `DEBT.md` E2" (`MagicSystem`, `MouseSystem`,
   `PeriodicUpdates`), `Party.ts:103`, `:218`, `:305`, `RuntimeSave.ts:234-235`,
-  `CsbwinSaveGame.ts:4-9`, `:114`, `SaveGameLoader.ts:295-296`, `CsbwinSaveInfo.ts:42-44`,
+  `CsbwinSaveGame.ts:4-9`, `:174`, `SaveGameLoader.ts:295-296`, `CsbwinSaveInfo.ts:42-44`,
   `CsbwinDungeonImageWriter.ts:287-290`, `SaveGameFile.ts:230-232`, `MonsterAttack.ts:598`,
   `MissileEncounter.ts:513`, `DrawDecorations.ts:177-179`, `BytecodeInterpreter.ts:1599` ("Phase 5").
 - **Wrong**: `MagicSystem.ts:397` ("Spell effects are wired in subsequent magic parity
@@ -806,7 +792,7 @@ palette codes, so none moves.
   that does not exist), and `DamageMonster`'s comment over `damageMonsterGroup`
   (`:480-489`); `SaveGameLoader.ts:501` (ITEM16's `word0` "little-endian in the file", read
   big-endian, as `LE16` on the little-endian build means, `doc/CSBwin-src/CSBTypes.h:151`);
-  `CsbwinSaveInfo.ts:9` ("never touches the image"); `CsbwinSaveGame.ts:182`
+  `CsbwinSaveInfo.ts:9` ("never touches the image"); `CsbwinSaveGame.ts:265`
   (`buildCsbwinRuntimeState` "pure", where `readDisableSaves` removes records from the
   world's `expool`); `DrawViewport.ts:5`, `:156`, `:163` ("the 3D first-person view", and
   doubts on cells 3 and 10 that `relativeX`/`relativeY` settle); `getChampionMessageColor`'s `?? 13`, "the historical default", a guessed number
@@ -1799,6 +1785,17 @@ Recorded so that nobody "fixes" them.
   into the heap. The port tests the exact size, and refuses such a portrait
   (`CSBGraphicsLoader.importBitmap`, `src/data/CSBGraphicsLoader.ts`); every portrait here is
   582 bytes. `tools/dump-damaged-counts.ts` checks it.
+- 🚫 **A save that names what its world does not hold is refused.** `LoadGame` takes the
+  party's level, x and y, `d.NumCharacter`, `d.HandChar`, `d.MagicCaster`, the object in
+  hand and the timer queue from the file unchecked, and plays a value past what it names
+  on into memory past the level's cells, the four `CHARDESC`s, the object index or the
+  timer table (`doc/PROVEN_FACTS.md` → "A save's party, hand and timers are read without a
+  check against its world"). The port refuses such a save before its read builds
+  anything, a party on a level the dungeon has not, at a square past the level, of more
+  than four champions, a hand or a caster outside the party, an object in hand that names
+  no record, or a timer past the table (`validateCsbwinWorld`,
+  `src/engine/CsbwinSaveGame.ts`), and the running game plays on. No save CSBWin or the
+  port writes holds such a value. `tools/dump-damaged-read.ts` checks each case.
 - **Not debt** (listed so it is not raised again):
   - Table names like `byte20090`, `word1074` and `uByte590` are CSBWin's own
     (`d.Byte20090`…), kept greppable by rule.

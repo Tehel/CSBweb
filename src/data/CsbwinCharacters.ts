@@ -289,16 +289,17 @@ export function readCsbwinPartyTail(block: Uint8Array): CsbwinPartyTail {
   };
 }
 
-/** Every occupied champion slot, in party order. */
+/**
+ * The party's `numCharacter` slots, in party order. A slot inside it is a champion
+ * whatever it holds, as `d.NumCharacter` makes it in CSBWin: an unoccupied one is not
+ * dropped, so that `handChar` and `MagicCaster` name the same champions.
+ */
 export function readCsbwinParty(
   block: Uint8Array,
   numCharacter: number,
 ): CsbwinCharacter[] {
   const out: CsbwinCharacter[] = [];
-  for (let i = 0; i < Math.min(4, Math.max(0, numCharacter)); i++) {
-    const character = readCsbwinCharacter(block, i);
-    if (character.occupied) out.push(character);
-  }
+  for (let i = 0; i < Math.min(4, Math.max(0, numCharacter)); i++) out.push(readCsbwinCharacter(block, i));
   return out;
 }
 
