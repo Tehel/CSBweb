@@ -549,7 +549,9 @@ Moving it on moves all four at once. The digest is the index's, which
   belong to uid 1000 on the host, as the login user's do. `tools/check-image.sh` mounts each
   of the checkout's game folders read-only in a throwaway one, where the probe's publish writes.
 - **Limits**, on a VPS other projects share: `mem_limit: 512m` and `pids_limit: 100`, what
-  it may take; `read_only: true`, the server writing only to the two mounted folders;
+  it may take; `read_only: true`, the server writing only to the two mounted folders, and
+  SQLite keeping its temporary files in memory (`server/store.ts`), having no folder to
+  make them in;
   `cap_drop: [ALL]`, as it needs no capability (its port is above 1024, its folders its
   uid's); and `no-new-privileges`. Compose v1 takes them under `version: '3.8'`.
   `tools/check-image.sh` runs the image with the same, the probe's publish included.

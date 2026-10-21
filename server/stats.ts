@@ -453,7 +453,9 @@ export class StatsStore {
             change();
             this.db.exec('COMMIT');
         } catch (error) {
-            this.db.exec('ROLLBACK');
+            // An I/O error, a full disk or memory has rolled it back already, and a
+            // `ROLLBACK` would throw over `error`.
+            if (this.db.isTransaction) this.db.exec('ROLLBACK');
             throw error;
         }
     }

@@ -10,7 +10,11 @@
 # there and leaves the checkout as it was.
 # Before the frames, it runs the server's check of a player's set (`dist/server/`,
 # `server/app.ts` → `CHECK_MODULE`) in the container, on DM's own files: the server loads
-# it at start-up, and the image's Node must also run it.
+# it at start-up, and the image's Node must also run it. And it has the store
+# (`server/store.ts`) update many rows in a transaction, in a scratch file beside the stats,
+# as a migration of a deployed store does: on the read-only file system, the statement's
+# temporary journal has nowhere to go but memory. The throwaway store, which holds no event,
+# never needs one.
 #
 #   bash tools/check-image.sh
 #
@@ -59,5 +63,24 @@ docker exec "$name" node --input-type=module -e '
   const { problems, record } = await checkLocalDataSet(draft, new Set(), () => null, 0);
   if (!record) { console.error("the server'"'"'s check refused DM:", JSON.stringify(problems)); process.exit(1); }
   console.log(`the server'"'"'s check: DM makes a record, signature ${record.dungeonSignature[0].slice(0, 12)}…`);
+' || exit 1
+docker exec "$name" node --input-type=module -e '
+  import { rmSync } from "node:fs";
+  const { openStore } = await import("/app/server/store.ts");
+  const path = "/data/stats/check-temp.db";
+  const db = openStore(path);
+  try {
+    db.exec("CREATE TABLE t (x INTEGER NOT NULL, payload TEXT NOT NULL)");
+    const insert = db.prepare("INSERT INTO t VALUES (?, ?)");
+    for (let i = 0; i < 2000; i++) insert.run(i * 7, "x".repeat(100));
+    db.exec("BEGIN; UPDATE t SET x = x - x % 10 WHERE x % 10 <> 0; COMMIT");
+    console.log("the store: a transaction'"'"'s update of many rows runs on the read-only file system");
+  } catch (error) {
+    console.error(`the store cannot update many rows in a transaction: ${error.message}`);
+    process.exitCode = 1;
+  } finally {
+    db.close();
+    for (const file of [path, `${path}-wal`, `${path}-shm`]) rmSync(file, { force: true });
+  }
 ' || exit 1
 bash "$root/tools/check-frames.sh" --url "http://localhost:$port/"
