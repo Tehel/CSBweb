@@ -88,7 +88,7 @@ export async function displayChaosStrikesBack(host: IntroHost): Promise<void> {
 
   // Two video buffers, alternated (`:9433-9437`). Both are cleared here and never again,
   // which is safe only because each zoom frame strictly covers the one two steps back.
-  const buffers = [
+  const buffers: [IndexedBitmap, IndexedBitmap] = [
     createIndexedBitmap(SCREEN_WIDTH, SCREEN_HEIGHT),
     createIndexedBitmap(SCREEN_WIDTH, SCREEN_HEIGHT),
   ];
@@ -109,8 +109,9 @@ export async function displayChaosStrikesBack(host: IntroHost): Promise<void> {
 
   for (let i = 0; i < ZOOM_FRAMES; i++) {
     await host.vbl(2);
-    const buffer = buffers[i & 1];
-    tag0088b2Index(frames[i], buffer, { ...frameRects[i], srcX: 0, srcY: 0, srcStride: frames[i].width }, -1);
+    const buffer = buffers[i & 1]!;
+    const frame = frames[i]!;
+    tag0088b2Index(frame, buffer, { ...frameRects[i]!, srcX: 0, srcY: 0, srcStride: frame.width }, -1);
     host.screen.pixels.set(buffer.pixels);         // `setscreen(…)` — swap video buffers
     host.present();
   }

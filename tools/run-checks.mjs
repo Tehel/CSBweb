@@ -4,6 +4,8 @@
 // project's evidence. It runs the three gates CLAUDE.md calls non-negotiable:
 //
 //   1. `tsc --noEmit`            — the real build gate; `vite build` proves nothing.
+//                                  With it, the server's and the modules held to
+//                                  noUncheckedIndexedAccess (tsc-indexed-access.mjs).
 //   2. every asserting tools/*.ts — the regression suite for what the frames cannot see.
 //   3. `tools/check-frames.sh`   — the golden frames, only with `--frames` (it needs a
 //                                  dev server and a headless Chrome, which the script
@@ -461,6 +463,8 @@ const sections = [
     { name: 'tsc --noEmit', cmd: TSC, args: ['--noEmit'], show: 'failure' },
     // The server as Node strips it: erasable syntax only (server/tsconfig.json).
     { name: 'tsc --noEmit -p server', cmd: TSC, args: ['--noEmit', '-p', 'server'], show: 'failure' },
+    // The modules held to noUncheckedIndexedAccess so far (DEBT.md E36).
+    { name: 'tsc-indexed-access.mjs', cmd: process.execPath, args: [resolve(ROOT, 'tools/tsc-indexed-access.mjs')], show: 'failure' },
   ]],
   ['checks', checks.map(tool)],
   ['smoke (crash only)', smoke.map(tool)],

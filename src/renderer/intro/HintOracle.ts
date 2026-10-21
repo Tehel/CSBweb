@@ -168,7 +168,7 @@ const CLICK_MAP_B0 = 0x0a;
 /** The Oracle's state, CSBWin's `f` (`Hint.cpp:309-511`), for one run. */
 export class HintOracleScreen {
   /** `f.Segment1_16872`, item 0's fifty words. */
-  private readonly seg: readonly number[];
+  private readonly seg: Readonly<HcsbDat['segment1']>;
   /** `f.Palette16608`, item 3 to start with. */
   private readonly palette16608: number[];
   /** `f.Pointer16900`, the backdrop. */
@@ -181,7 +181,7 @@ export class HintOracleScreen {
   /** `f.Pointer16506`: the two screens. */
   private readonly pointer16506: [Uint8Array, Uint8Array];
   /** `f.Word16498`: `pointer16506[word16498]` is drawn, the other shown. */
-  private word16498 = 0;
+  private word16498: 0 | 1 = 0;
   /** `f.Pointer12798`: where the drawing goes. */
   private pointer12798: Uint8Array;
   private readonly s20: S20[] = S20_16208.map((b) => ({ ...b }));
@@ -357,7 +357,7 @@ export class HintOracleScreen {
    * screens, and a fade to item 3. The two fades take 2 and 7 as constants.
    */
   private async tag0051c2_1(): Promise<void> {
-    this.tag004a22_26(this.seg[10]!, this.seg[8]!);
+    this.tag004a22_26(this.seg[10], this.seg[8]);
     await this.fadePalette(new Array(16).fill(0), 2, 7);
     this.word16498 = 1;
     this.pointer12798 = this.pointer16506[1];
@@ -374,34 +374,34 @@ export class HintOracleScreen {
    */
   private async tag0051c2_31(): Promise<void> {
     const seg = this.seg;
-    this.tag004a22_26(seg[2]!);
+    this.tag004a22_26(seg[2]);
     await this.tag008c40_6();
     // `TAG005ae8_9`: the screen's palette into `f.Palette16608`.
     for (let i = 0; i < 16; i++) this.palette16608[i] = this.host.globalPalette[i]!;
-    this.palette16608[seg[0]!] = seg[1]!;
-    await this.fadePalette(this.palette16608, seg[12]!, seg[13]!);
-    await this.fadePalette(this.palette16608, seg[10]!, seg[11]!);
+    this.palette16608[seg[0]] = seg[1];
+    await this.fadePalette(this.palette16608, seg[12], seg[13]);
+    await this.fadePalette(this.palette16608, seg[10], seg[11]);
     this.clearKeyboard();
     this.tag0051c2_35();
     this.long16876 = this.vblCount;
-    this.tag004a22_26(seg[2]!);
+    this.tag004a22_26(seg[2]);
     await this.wvbl();
     await this.tag008c40_6(); // "Text appears on buttons"
-    this.tag004a22_26(seg[0]!);
+    this.tag004a22_26(seg[0]);
     for (let w48 = this.book9.length; w48 > 0; w48--) {
       const page = this.book9[w48 - 1]!;
       await this.displayText(page.pText8);
-      if (page.i12 === 8) this.tag005f9a_1(page.pText8.rectPos6, seg[6]!);
+      if (page.i12 === 8) this.tag005f9a_1(page.pText8.rectPos6, seg[6]);
       this.book9.splice(w48 - 1, 1);
     }
-    this.palette16608[seg[0]!] = seg[3]!;
+    this.palette16608[seg[0]] = seg[3];
     do {
       await this.wvbl();
-    } while (this.long16876 + seg[9]! > this.vblCount);
+    } while (this.long16876 + seg[9] > this.vblCount);
     this.tag0051c2_35();
-    await this.fadePalette(this.palette16608, seg[10]!, seg[11]!); // "Yellow rectangles appear"
-    await this.fadePalette(this.palette16608, seg[12]!, seg[13]!);
-    this.tag004a22_26(seg[4]!);
+    await this.fadePalette(this.palette16608, seg[10], seg[11]); // "Yellow rectangles appear"
+    await this.fadePalette(this.palette16608, seg[12], seg[13]);
+    this.tag004a22_26(seg[4]);
   }
 
   /**
@@ -626,15 +626,15 @@ export class HintOracleScreen {
         const d6 = (await this.tag001dde()) & 0xff;
         if (d6 !== 0) {
           if (nP2 === 2) {
-            this.palette16608[seg[8]!] = seg[36]!;
+            this.palette16608[seg[8]] = seg[36];
             this.setpalette(this.palette16608);
           }
           return d6;
         }
         if (nP2 === 2 && this.long14110 + 20 < this.vblCount) {
           this.long14110 = this.vblCount;
-          this.palette16608[seg[8]!] = seg[this.word14112 + 36]!;
-          this.word14112 = (this.word14112 + 1) % seg[32]!;
+          this.palette16608[seg[8]] = seg[this.word14112 + 36]!;
+          this.word14112 = (this.word14112 + 1) % seg[32];
           this.setpalette(this.palette16608);
         }
       }
@@ -660,14 +660,14 @@ export class HintOracleScreen {
     if (b.pnt14 === null) throw new Error(`Hint Oracle: button ${nP2} has no label`);
     const text: Text = { pnt2: b.pnt14, rectPos6: { ...b.rectPos4 }, w14: 1 };
     this.tag0051c2_36();
-    this.tag004a22_26(this.seg[7]!);
+    this.tag004a22_26(this.seg[7]);
     await this.displayText(text);
     await this.wvbl(21); // `TAG005a1e_5(20)`: `do { wvbl } while (w_2-- != 0)`
     const i8 = b.w18;
     this.tag004a22_26(i8);
     await this.displayText(text);
     this.tag0051c2_37();
-    const long16864 = this.seg[5]!;
+    const long16864 = this.seg[5];
     if (long16864 !== i8) this.tag004a22_26(long16864);
     this.t12 = []; // `TAG008c40_2`
     return nP2;
@@ -697,7 +697,7 @@ export class HintOracleScreen {
       const row = this.rowOf(id);
       if (row < 0) throw new Error(`Hint Oracle: title ${w14 + 1} has no line`);
       const rect = { ...this.s20[row]!.rectPos4 };
-      this.palette16608[seg[8]!] = seg[36]!;
+      this.palette16608[seg[8]] = seg[36];
       this.setpalette(this.palette16608);
       this.book19.push(rect);
       this.book9.push({ i4: 20, pText8: { pnt2: title, rectPos6: { ...rect }, w14: 1 }, i12: 8 });

@@ -259,7 +259,7 @@ async function offerRestart(host: IntroHost): Promise<boolean> {
   // entry keeps its mouse-button mask, and the second stays the terminator.
   const buttons16956 = host.uiTables.graphic231.buttons.buttons16956;
   const list: UIButton[] = [
-    { ...buttons16956[0], word0: BUTTON_RESTART_THIS_GAME, x1: 0x67, x2: 0xd9, y1: 0x91, y2: 0x9f },
+    { ...buttons16956[0]!, word0: BUTTON_RESTART_THIS_GAME, x1: 0x67, x2: 0xd9, y1: 0x91, y2: 0x9f },
     ...buttons16956.slice(1),
   ];
   host.discardAllInput();

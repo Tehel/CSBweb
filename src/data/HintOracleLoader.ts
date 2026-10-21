@@ -195,7 +195,7 @@ export function hintsAtPosition(oracle: HintOracle, level: number, x: number, y:
  */
 export interface HcsbDat {
     /** Item 0, `f.Segment1_16872`: fifty words, `segment1[n]` being `LE16(f.Segment1_16872[n])`. */
-    segment1: number[];
+    segment1: Words<typeof HCSB_SEGMENT1_WORDS>;
     /** Item 1, the backdrop, 320x200 (`f.Pointer16900`). */
     backdrop: DecodedImage;
     /** Item 2, the font, 256x27 (`f.Pointer16908`). */
@@ -206,6 +206,9 @@ export interface HcsbDat {
 
 /** `i16 Segment1_16872[50]` (`Hint.cpp:374`). */
 const HCSB_SEGMENT1_WORDS = 50;
+
+/** `N` words, a length the compiler knows: a word read at a constant index is there. */
+type Words<N extends number, W extends number[] = []> = W['length'] extends N ? W : Words<N, [...W, number]>;
 
 /** Parse `hcsb.dat`. Throws where `ReadDatSeg` would read past an item into its buffer. */
 export function parseHcsbDat(file: Uint8Array): HcsbDat {
@@ -218,7 +221,7 @@ export function parseHcsbDat(file: Uint8Array): HcsbDat {
         return Array.from({ length: count }, (_, i) => readU16BE(raw, 2 * i));
     };
     return {
-        segment1: words(0, HCSB_SEGMENT1_WORDS),
+        segment1: words(0, HCSB_SEGMENT1_WORDS) as Words<typeof HCSB_SEGMENT1_WORDS>,
         backdrop: loader.getImage(1),
         font: loader.getImage(2),
         palette: words(3, 16),

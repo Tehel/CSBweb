@@ -51,8 +51,8 @@ const CELL_OPEN = 32;
 export function prisonCellFlags(): CellFlag[][] {
   const flags: CellFlag[][] = [];
   for (let x = 0; x < PRISON_LEVEL_SIZE; x++) flags.push(new Array<CellFlag>(PRISON_LEVEL_SIZE).fill(0));
-  for (let y = 0; y < PRISON_LEVEL_SIZE; y++) flags[2][y] = CELL_OPEN;
-  flags[1][2] = CELL_OPEN;
+  for (let y = 0; y < PRISON_LEVEL_SIZE; y++) flags[2]![y] = CELL_OPEN;
+  flags[1]![2] = CELL_OPEN;
   return flags;
 }
 

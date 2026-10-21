@@ -226,7 +226,7 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
       }),
     takeClick: () => {
       const at = queue.findIndex((event) => event.kind === 'click');
-      return at < 0 ? null : queue.splice(at, 1)[0];
+      return at < 0 ? null : queue.splice(at, 1)[0]!;
     },
     discardAllInput: () => {
       queue = [];

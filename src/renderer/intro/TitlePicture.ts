@@ -41,8 +41,8 @@ export function reduceTitlePicture(rgba: ArrayLike<number>, width: number, heigh
     const counts: number[] = [];
     const colourOfPixel = new Uint32Array(width * height);
     for (let p = 0; p < width * height; p++) {
-        const alpha = rgba[p * 4 + 3];
-        const over = (component: number): number => Math.round((rgba[p * 4 + component] * alpha) / 255);
+        const alpha = rgba[p * 4 + 3]!;
+        const over = (component: number): number => Math.round((rgba[p * 4 + component]! * alpha) / 255);
         const colour = (over(0) << 16) | (over(1) << 8) | over(2);
         let index = indexOf.get(colour);
         if (index === undefined) {
@@ -51,7 +51,7 @@ export function reduceTitlePicture(rgba: ArrayLike<number>, width: number, heigh
             colours.push(colour);
             counts.push(0);
         }
-        counts[index]++;
+        counts[index]!++;
         colourOfPixel[p] = index;
     }
     const component = (colour: number, channel: number): number => (colour >> (16 - channel * 8)) & 0xff;
@@ -62,7 +62,7 @@ export function reduceTitlePicture(rgba: ArrayLike<number>, width: number, heigh
         for (let channel = 0; channel < 3; channel++) {
             let min = 255, max = 0;
             for (const i of box) {
-                const value = component(colours[i], channel);
+                const value = component(colours[i]!, channel);
                 if (value < min) min = value;
                 if (value > max) max = value;
             }
@@ -86,19 +86,19 @@ export function reduceTitlePicture(rgba: ArrayLike<number>, width: number, heigh
         });
         if (chosen < 0) break;
         // Cut it at its pixels' median along that channel, each half keeping a colour.
-        const box = boxes[chosen].sort((a, b) => component(colours[a], channel) - component(colours[b], channel) || colours[a] - colours[b]);
-        const total = box.reduce((sum, i) => sum + counts[i], 0);
+        const box = boxes[chosen]!.sort((a, b) => component(colours[a]!, channel) - component(colours[b]!, channel) || colours[a]! - colours[b]!);
+        const total = box.reduce((sum, i) => sum + counts[i]!, 0);
         let cut = 1;
-        for (let below = counts[box[0]]; cut < box.length - 1 && below * 2 < total; cut++) below += counts[box[cut]];
+        for (let below = counts[box[0]!]!; cut < box.length - 1 && below * 2 < total; cut++) below += counts[box[cut]!]!;
         boxes.splice(chosen, 1, box.slice(0, cut), box.slice(cut));
     }
 
     // Each box's register: its pixels' mean colour, each component the nearest level.
     const registers = boxes.map((box) => {
-        const total = box.reduce((sum, i) => sum + counts[i], 0);
+        const total = box.reduce((sum, i) => sum + counts[i]!, 0);
         let register = 0;
         for (let channel = 0; channel < 3; channel++) {
-            const sum = box.reduce((s, i) => s + component(colours[i], channel) * counts[i], 0);
+            const sum = box.reduce((s, i) => s + component(colours[i]!, channel) * counts[i]!, 0);
             register |= Math.min(7, Math.round(sum / total / LEVEL_STEP)) << (8 - channel * 4);
         }
         return register;
@@ -122,7 +122,7 @@ export function reduceTitlePicture(rgba: ArrayLike<number>, width: number, heigh
     });
 
     const pixels = new Uint8Array(width * height);
-    for (let p = 0; p < pixels.length; p++) pixels[p] = registerOf[colourOfPixel[p]];
+    for (let p = 0; p < pixels.length; p++) pixels[p] = registerOf[colourOfPixel[p]!]!;
     while (registers.length < TITLE_PICTURE_COLOURS) registers.push(0);
     return { pixels, registers };
 }

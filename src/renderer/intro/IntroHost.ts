@@ -125,10 +125,10 @@ export function withCursor(
     for (let col = 0; col < cursor.width; col++) {
       const dx = x + col;
       if (dx < 0 || dx >= screen.width) continue;
-      const value = cursor.pixels[row * cursor.width + col] & 0x0f;
+      const value = cursor.pixels[row * cursor.width + col]! & 0x0f;
       if (value === CURSOR_TRANSPARENT) continue;
       const index = dy * screen.width + dx;
-      saved.push({ index, value: screen.pixels[index] });
+      saved.push({ index, value: screen.pixels[index]! });
       screen.pixels[index] = value;
     }
   }

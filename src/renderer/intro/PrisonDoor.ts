@@ -196,13 +196,13 @@ export function loadAssets(host: IntroHost, rise = false): PrisonDoorAssets {
 
   const dstPos = { x1: 0, x2: 100, y1: 0, y2: 160 };
   for (let i = 1; i < 4; i++) {
-    tag0088b2Index(doorLeft, slots[i], { ...dstPos, srcX: i * 4, srcY: 0, srcStride: DOOR_SLOT_WIDTH }, -1);
+    tag0088b2Index(doorLeft, slots[i]!, { ...dstPos, srcX: i * 4, srcY: 0, srcStride: DOOR_SLOT_WIDTH }, -1);
     dstPos.x2 -= 4;
   }
   dstPos.x2 = 127;
   for (let i = 5; i < 8; i++) {
     dstPos.x1 += 4;
-    tag0088b2Index(doorRight, slots[i], { ...dstPos, srcX: 0, srcY: 0, srcStride: DOOR_SLOT_WIDTH }, -1);
+    tag0088b2Index(doorRight, slots[i]!, { ...dstPos, srcX: 0, srcY: 0, srcStride: DOOR_SLOT_WIDTH }, -1);
   }
 
   return {
@@ -241,8 +241,8 @@ export async function drawPrisonDoor(host: IntroHost, assets: PrisonDoorAssets):
   tag0088b2Index(host.screen, assets.interior, { ...rects.word84, srcX: 0, srcY: INTERIOR_SCREEN_Y, srcStride: host.screen.width }, -1);
 
   // The two halves, shut. (`:9721`, `:9725`)
-  tag0088b2Index(assets.slots[0], host.screen, { ...rects.word92, srcX: 0, srcY: 0, srcStride: DOOR_SLOT_WIDTH }, -1);
-  tag0088b2Index(assets.slots[4], host.screen, { ...rects.word100, srcX: 0, srcY: 0, srcStride: DOOR_SLOT_WIDTH }, -1);
+  tag0088b2Index(assets.slots[0]!, host.screen, { ...rects.word92, srcX: 0, srcY: 0, srcStride: DOOR_SLOT_WIDTH }, -1);
+  tag0088b2Index(assets.slots[4]!, host.screen, { ...rects.word100, srcX: 0, srcY: 0, srcStride: DOOR_SLOT_WIDTH }, -1);
 
   await fadeToPalette(host, rects.palette360);
 }
@@ -297,13 +297,13 @@ export async function openPrisonDoors(host: IntroHost, assets: PrisonDoorAssets)
     }
 
     if (leftRect.x2 >= 0) {
-      tag0088b2Index(assets.slots[step & 3], work, { ...leftRect, srcX: (step & 0xfc) * 4, srcY: 0, srcStride: DOOR_SLOT_WIDTH }, -1);
+      tag0088b2Index(assets.slots[step & 3]!, work, { ...leftRect, srcX: (step & 0xfc) * 4, srcY: 0, srcStride: DOOR_SLOT_WIDTH }, -1);
       leftRect.x2 -= 4;
     }
     // The right half's slot and source offset cancel each other out — slot `n+4` holds the
     // door shifted right by `4n` and the read starts `4n` in — so all of its motion comes
     // from `x1` walking right. Transcribed rather than simplified, to stay greppable.
-    tag0088b2Index(assets.slots[(step & 3) + 4], work, { ...rightRect, srcX: (step & 3) * 4, srcY: 0, srcStride: DOOR_SLOT_WIDTH }, -1);
+    tag0088b2Index(assets.slots[(step & 3) + 4]!, work, { ...rightRect, srcX: (step & 3) * 4, srcY: 0, srcStride: DOOR_SLOT_WIDTH }, -1);
     rightRect.x1 += 4;
 
     await host.vbl(DOOR_STEP_VBLS);

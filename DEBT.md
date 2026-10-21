@@ -682,21 +682,25 @@ palette codes, so none moves.
 
 ### E36 ⏳ Type escape hatches that check nothing
 
-`noUncheckedIndexedAccess` is off (it raises 2,129 errors, 775 of them in `src/`), so the
-356 `x[i]!` in `src/` assert nothing: 41 in `src/renderer/intro/HintOracle.ts`, 29 in
-`DsaSystem.ts`, 25 in `BytecodeInterpreter.ts` (`stack[sp]!` among them), and others. Their
-`!` documents where an index was proved, and the compiler holds none of them to it.
+`noUncheckedIndexedAccess` is off for most of `src/` (741 errors there with it on), so most
+of its 362 `x[i]!` assert nothing: 29 in `DsaSystem.ts`, 25 in `BytecodeInterpreter.ts`
+(`stack[sp]!` among them), and others. Their `!` documents where an index was proved, and
+the compiler holds none of them to it.
 
-What stands: no `??`, `?.`, `!` or `as` in `src/` that the types make redundant, read
-with the flag on (`navigator.storage?.` aside, a browser's feature test); CSBWin's
-`RNempty` is `OBJECT_ID_EMPTY`; `noImplicitReturns` and `noImplicitOverride` are on
-(`exactOptionalPropertyTypes` raises 37). `hcsb.dat`'s fifty words are checked once in
-`parseHcsbDat`, so `HintOracle`'s `seg[n]!` hold only once its type says the length.
+What stands: `tools/tsc-indexed-access.mjs`, which `npm test` runs, holds the modules in
+its `MODULES` to the flag: `src/renderer/intro/`, `src/lib/`, `src/settings/` and
+`src/stats/`, so each `!` left there is an index the code proves. `hcsb.dat`'s fifty words
+are checked once in `parseHcsbDat` and typed by their length, so `HintOracle` reads a
+constant index without one. No `??`, `?.`, `!` or `as` in `src/` is redundant by the
+types, read with the flag on (`navigator.storage?.` aside, a browser's feature test);
+CSBWin's `RNempty` is `OBJECT_ID_EMPTY`; `noImplicitReturns` and `noImplicitOverride` are on
+(`exactOptionalPropertyTypes` raises 37).
 
-Paying the rest: `noUncheckedIndexedAccess` turned on module by module where data comes
-from files, the intro first (34 errors, and `seg` typed by its length), then the renderer
-and the loaders, checked by a `tsc` pass that `npm test` runs over those modules; each
-`!` it then keeps is a proof the compiler sees.
+Paying the rest: the other modules where data comes from files added to `MODULES`, a step
+each: the renderer (`ui/` 62 errors, `csbwin/` 37, `bytecode/` 33, its own files 23),
+`src/core/` (98) and `src/data/` (212). The engine (250) and the page's `src/ui/` (24)
+come last, or stay out if the author prefers; the item is paid when the list is decided
+and held.
 
 ### E39 ⏳ The About and Credits pages
 
