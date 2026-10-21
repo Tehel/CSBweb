@@ -213,8 +213,7 @@ type ChampionDefaults = Pick<
  * What `AddCharacter` gives every `CHARDESC` before it reads the hero: the whole record
  * cleared, `ClearMemory((ui8 *)pcA3, 800)` (`doc/CSBwin-src/Character.cpp:482`), then its
  * constant stores (`:513-522`). The one initializer of these fields:
- * `createChampionFromPreset` and the tools' champion builders spread it, and
- * `Party.setState` fills an older save's gaps from it.
+ * `createChampionFromPreset` and the tools' champion builders spread it.
  */
 export function addCharacterDefaults(): ChampionDefaults {
   return {

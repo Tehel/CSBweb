@@ -114,7 +114,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| D19 | `RuntimeSaveState` is neither strict nor a snapshot | M | ⏳ |
 | E41 | `src/data/` imports the engine | M | ⏳ |
 | E35 | Comments and documents that are stale, wrong, or tell the past | M | ⏳ |
 | E36 | Type escape hatches that check nothing | M | ⏳ |
@@ -407,35 +406,6 @@ or `tools/dump-stats.ts`.
 
 New state-representation debt goes here, and jumps the queue.
 
-### D19 ⏳ `RuntimeSaveState` is neither strict nor a snapshot
-
-`RuntimeSaveState` is never a file (its header says so, as `DungeonSnapshot`'s does), yet
-keeps the shape of the JSON save it once was:
-
-- **Optional fields for an older save that cannot exist**: `item16?`, `timers?`,
-  `timerQueue?`, `timerSequence?`, `firstAvailTimer?`, `missiles?`
-  (`src/engine/RuntimeSave.ts:41-50`), read through `?? []` and `timerSequence ?? 0`
-  (`:152-159`); the snapshot's optional, `null` and `undefined` cases
-  (`src/engine/DungeonSnapshot.ts:171-194`, `:384-412`); `Party.setState`'s defaults for "a
-  field an older runtime save does not carry" (`Party.ts:115-126`) and `ensureHandOwner`'s
-  repair of quick-saves written before `setHandOwner` existed (`Party.ts:213-230`).
-- **Not a snapshot**: `getRuntimeSaveState` copies everything but the party, which it hands
-  over live (`party: ctx.party.state`, `RuntimeSave.ts:93`); `applySaveGameState` adopts
-  the caller's `item16` array (`:175-176`); `Party.setState` copies the champions one level
-  deep, so attributes, possessions and skills stay shared. `tools/dump-save-roundtrip.ts:242`
-  works round it with a JSON copy.
-- **The missiles are restored twice**: the snapshot refills them in place
-  (`DungeonSnapshot.ts:105`, source `'snapshot'`), then `applySaveGameState` replaces the
-  array with a hand copy of five fields (`RuntimeSave.ts:194-205`). A field added to
-  `MissileRecord` would be dropped there, and `DUNGEON_DATA_SOURCES` names the wrong source.
-- **A snapshot captured for nothing**: `buildSaveFile` calls `getRuntimeSaveState()`
-  (`src/engine/SaveGameFile.ts:125`), which captures the whole world, every record cloned
-  and every map in base64, and never reads it, at every F5, Sleepsave and menu save.
-
-Paying it: every field required, the old-save branches and their comments gone; the party
-and `item16` deep-copied both ways; the missiles from the snapshot only; a light capture for
-the save. Before G29, whose recording would hold such states.
-
 ### D21 ⏳ A save has nine shapes
 
 What a save is passes through `ExtendedFeaturesBlock`, `readExtendedFeatures`'s result,
@@ -447,7 +417,9 @@ What a save is passes through `ExtendedFeaturesBlock`, `readExtendedFeatures`'s 
   (`timerQueue.length ?? block2.numTimer`, `handChar ?? block2.handChar`,
   `sequencedTimers`/`extendedTimers` beside the header's `extendedFlags`). `objectInHand` is
   set twice in `buildSaveFile`, and `block1?` defaults to `emptyBlock1()`, the four zero
-  words the utility refuses as "ALREADY UTILIZED".
+  words the utility refuses as "ALREADY UTILIZED". Its reader always gives `timers`,
+  `timerQueue` and `timerSequence`, which `buildCsbwinRuntimeState` still reads through
+  `?? []` and `?? 0` (`src/engine/CsbwinSaveGame.ts:301-303`).
 - **`Chaos` reads and writes the file again**: `Chaos.readGame` (`src/engine/Chaos.ts:102`)
   walks blocks 1 to 6 with its own hash and checksum offsets, and `TAG000fc4` (`:327`)
   writes the scramble and the checksum again.
@@ -456,7 +428,7 @@ What a save is passes through `ExtendedFeaturesBlock`, `readExtendedFeatures`'s 
   `record as XRecord` casts writes them (`:388-528`); `DatabaseRecord` is a union with no
   discriminant.
 - A load installs the world, then applies a snapshot of that same world over it
-  (`src/engine/CsbwinSaveGame.ts:348`), where a new game's read applies none (`ReadState`'s
+  (`src/engine/CsbwinSaveGame.ts:351`), where a new game's read applies none (`ReadState`'s
   optional `snapshot`).
 
 Paying it, in steps: a codec per database type, `{ size, read, write }` in a `DBType`-keyed
@@ -650,7 +622,7 @@ controls again.
 
 - `Game`'s constructor wires callbacks into objects built before it:
   `DungeonState.makeMoreRoomInDB`, `textSubstitution` and `timerWord8Lookup`
-  (`DungeonState.ts:90`, `:95`, `:140`; `Game.ts:187-195`), and `SoundQueue.soundFilter`
+  (`DungeonState.ts:90`, `:95`, `:140`; `Game.ts:186-194`), and `SoundQueue.soundFilter`
   (`= () => 1`, `SoundQueue.ts:48`); `TimerSystem`'s constructor writes into `ctx.dungeon`
   (`:94`). A bare `createGameContext` gets, silently, a full database that refuses records,
   untranslated texts and no sound filter, and `systems: {} as GameSystems`
@@ -720,9 +692,9 @@ palette codes, so none moves.
   (`dump-monster-move-code.ts:3`), C27 (`dump-champion-death.ts:123`) and D1
   (`dump-throwing.ts:338`).
 - **The past**: "Moved out of `Game` by `DEBT.md` E2" (`MagicSystem`, `MouseSystem`,
-  `PeriodicUpdates`), `Party.ts:103`, `:218`, `:305`, `RuntimeSave.ts:234-235`,
+  `PeriodicUpdates`), `Party.ts:119`, `:300`, `RuntimeSave.ts:223-224`,
   `CsbwinSaveGame.ts:4-9`, `:174`, `SaveGameLoader.ts:295-296`, `CsbwinSaveInfo.ts:42-44`,
-  `CsbwinDungeonImageWriter.ts:287-290`, `SaveGameFile.ts:230-232`, `MonsterAttack.ts:598`,
+  `CsbwinDungeonImageWriter.ts:287-290`, `SaveGameFile.ts:228-230`, `MonsterAttack.ts:598`,
   `MissileEncounter.ts:513`, `DrawDecorations.ts:177-179`, `BytecodeInterpreter.ts:1599` ("Phase 5").
 - **Wrong**: `MagicSystem.ts:397` ("Spell effects are wired in subsequent magic parity
   steps"); `MonsterAttack.ts:750-751` (`potentialChampionIndex` "still always -1 here",
@@ -997,7 +969,7 @@ New verification debt goes here; it can be taken anywhere ("Priority", point 5).
 - `tools/dump-vbl-clock.ts`'s "MainLoop opens with a tick" check can fail under load and
   pass alone (it failed once in a full `npm test`, sixteen tools at a time). `Game.start`
   sets `vblClockStart = Date.now()` and calls `gameLoop()` at once, which reads
-  `Date.now()` again (`src/engine/Game.ts:249`, `:494`), so a stall of 17 ms between
+  `Date.now()` again (`src/engine/Game.ts:249`, `:500`), so a stall of 17 ms between
   the two runs a VBL inside `start` and spends the opening tick. The tool pins `Date.now`
   for its pacing section (`:129-173`) and not for this one.
 - `tools/dump-loop-die.ts` waits `1000 / 60 * failOn + 150` real milliseconds, then checks
@@ -1165,7 +1137,7 @@ CSBWin can record a game and play it back:
 Conflux 3.5's Extended Features block sets `AutoRecord` (0x10), `RecordDesignOption`
 (`doc/CSBwin-src/SaveGame.cpp:403-404`): a game read from it records unless the command
 line or the menu says not to (`:2588-2603`). The port has neither, and no way to start either. It keeps only the recorder's count,
-`totalMoveCount`, which a save stores (`Game.recordFileRecord`, `src/engine/Game.ts:991`).
+`totalMoveCount`, which a save stores (`Game.recordFileRecord`, `src/engine/Game.ts:1001`).
 `extraTicks` is always on (`src/engine/MovementSystem.ts:161-164`).
 
 Once ported, a recording made in CSBWin and played back in the port is an end-to-end test
@@ -1267,7 +1239,7 @@ Rules for all of them:
 ### X9 ⏸️ Thrown weapons' tags kept across a save
 
 The tags of `src/engine/ThrownWeapons.ts` live only in memory, `GameContext.thrownWeapons`,
-and a load clears them (`src/engine/RuntimeSave.ts:176`). A tag holds the record it was
+and a load clears them (`src/engine/RuntimeSave.ts:182`). A tag holds the record it was
 made for, and `tagOf` keeps it only while the object's RN still names that very
 `DatabaseRecord`. A loaded world has new records, so that check cannot survive a save.
 

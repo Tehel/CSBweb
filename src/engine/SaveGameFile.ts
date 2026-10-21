@@ -21,7 +21,7 @@ import { buildLiveExtendedFeatures } from '../data/CsbwinExtendedFeatures';
 import { Expool } from '../data/CsbwinExpool';
 import type { TimerRecord } from '../data/dungeonTypes';
 import type { Game } from './Game';
-import type { RuntimeSaveState } from './RuntimeSave';
+import { getRuntimeState, type RuntimeState } from './RuntimeSave';
 import type { Champion } from './gameTypes';
 
 export interface SaveFileOptions {
@@ -45,7 +45,7 @@ export interface SaveFileOptions {
  */
 function buildFileBlocks(
     game: Game,
-    runtime: RuntimeSaveState,
+    runtime: RuntimeState,
     timers: TimerRecord[],
     options: SaveFileOptions,
 ): {
@@ -123,9 +123,8 @@ function buildFileBlocks(
  * (`doc/CSBwin-src/SaveGame.cpp:1760-1761`).
  */
 export function buildSaveFile(game: Game, options: SaveFileOptions = {}): Uint8Array {
-    const runtime = game.getRuntimeSaveState();
-    const item16 = runtime.dungeon.item16 ?? [];
-    const timers = runtime.dungeon.timers ?? [];
+    const runtime = getRuntimeState(game.ctx);
+    const { item16, timers } = runtime.dungeon;
     const file = buildFileBlocks(game, runtime, timers, options);
     const world = game.ctx.dungeon.getData();
     const saveGameState: SaveGameState = {
@@ -141,8 +140,8 @@ export function buildSaveFile(game: Game, options: SaveFileOptions = {}): Uint8A
         // read at the wrong stride.
         sequencedTimers: true,
         extendedTimers: true,
-        handChar: runtime.party.cursorOwner ?? -1,
-        magicCaster: runtime.party.magicCasterIndex ?? -1,
+        handChar: runtime.party.cursorOwner,
+        magicCaster: runtime.party.magicCasterIndex,
         block1: buildBlock1FromGame(runtime),
         block2: {
             ...buildBlock2FromGame(game, runtime),
@@ -166,7 +165,7 @@ export function buildSaveFile(game: Game, options: SaveFileOptions = {}): Uint8A
  * (`doc/CSBwin-src/SaveGame.cpp:1083-1097`). `SaveOption` is 1, "SAVE AND PLAY" (`:917`):
  * the port saves and plays on, and has no "SAVE AND QUIT".
  */
-function buildBlock1FromGame(runtime: RuntimeSaveState): Block1 {
+function buildBlock1FromGame(runtime: RuntimeState): Block1 {
     const b = runtime.game.block1;
     return {
         byte22598: b.word22598 & 0xff,
@@ -190,31 +189,30 @@ function buildBlock1FromGame(runtime: RuntimeSaveState): Block1 {
  * `ObjectInHand` (8) is an RN, a slot of the object indirect index block 0 carries
  * (`src/data/CsbwinObjectIndex.ts`).
  */
-function buildBlock2FromGame(game: Game, runtime: RuntimeSaveState): Block2 {
+function buildBlock2FromGame(game: Game, runtime: RuntimeState): Block2 {
     const party = runtime.party;
-    const champions = party.champions ?? [];
     return {
         time: runtime.game.tickCount >>> 0,
         ranseed: runtime.game.randomSeed >>> 0,
         objectInHand: party.objectInHand & 0xffff,
-        numCharacter: champions.length,
-        partyX: party.position?.x ?? 0,
-        partyY: party.position?.y ?? 0,
-        partyFacing: party.facing ?? 0,
-        partyLevel: party.position?.z ?? 0,
-        handChar: party.cursorOwner ?? -1,
-        magicCaster: party.magicCasterIndex ?? -1,
-        numTimer: runtime.dungeon.timerQueue?.length ?? 0,
-        firstAvailTimer: game.ctx.timers.getFirstAvailTimer(),
-        maxTimers: runtime.dungeon.timers?.length ?? 0,
+        numCharacter: party.champions.length,
+        partyX: party.position.x,
+        partyY: party.position.y,
+        partyFacing: party.facing,
+        partyLevel: party.position.z,
+        handChar: party.cursorOwner,
+        magicCaster: party.magicCasterIndex,
+        numTimer: runtime.dungeon.timerQueue.length,
+        firstAvailTimer: runtime.dungeon.firstAvailTimer,
+        maxTimers: runtime.dungeon.timers.length,
         item16QueLen: game.systems.monsters.getItem16QueLen(),
         lastMonsterAttackTime: party.lastMonsterAttackTime >>> 0,
         lastPartyMoveTime: runtime.game.footprints.lastPartyMoveTime >>> 0,
-        partyMoveDisableTimer: (party.partyMoveDisableTimer ?? 0) & 0xffff,
-        word11712: (party.word11712 ?? 0) & 0xffff,
-        word11714: (party.word11714 ?? 0) & 0xffff,
-        maxItem16: runtime.dungeon.item16?.length ?? 0,
-        timerSequence: runtime.dungeon.timerSequence ?? 0,
+        partyMoveDisableTimer: party.partyMoveDisableTimer & 0xffff,
+        word11712: party.word11712 & 0xffff,
+        word11714: party.word11714 & 0xffff,
+        maxItem16: runtime.dungeon.item16.length,
+        timerSequence: runtime.dungeon.timerSequence,
     };
 }
 
@@ -233,22 +231,22 @@ function buildBlock2FromGame(game: Game, runtime: RuntimeSaveState): Block2 {
  */
 function buildCharacterBlock(
     game: Game,
-    runtime: RuntimeSaveState,
+    runtime: RuntimeState,
     options: SaveFileOptions,
 ): Uint8Array {
     const party = runtime.party;
     const footprints = runtime.game.footprints;
     return buildCsbwinCharacterBlock(
-        party.champions ?? [],
+        party.champions,
         {
-            brightness: party.brightness ?? 0,
+            brightness: party.brightness,
             seeThruWalls: party.seeThruWalls,
             magicFootprintsActive: party.magicFootprintsActive,
             partyShield: party.partyShield,
             fireShield: party.fireShield,
             spellShield: party.spellShield,
             numFootprintEnt: footprints.count,
-            freezeLifeTimer: party.freezeLifeTimer ?? 0,
+            freezeLifeTimer: party.freezeLifeTimer,
             indexOfFirstMagicFootprint: footprints.indexOfFirstMagic,
             indexOfLastMagicFootprint: footprints.indexOfLastMagic,
             footprints: footprints.prints,

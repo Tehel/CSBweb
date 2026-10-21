@@ -429,9 +429,9 @@ function playFromDungeonDat(): Game {
 function playFromCsbwinSave(file: string): Game {
   const game = makeGame();
   applyCsbwinSave(game, new Uint8Array(readFileSync(savePath(file))));
-  const before = game.getRuntimeSaveState().dungeon.timerQueue?.length ?? 0;
+  const before = game.getRuntimeSaveState().dungeon.timerQueue.length;
   advance(game, 40);
-  const after = game.getRuntimeSaveState().dungeon.timerQueue?.length ?? 0;
+  const after = game.getRuntimeSaveState().dungeon.timerQueue.length;
   console.log(`  ${file}: ${before} live timers before 40 ticks, ${after} after`);
   check(before > 0, `${file} carries live timers to play with`);
   return game;
@@ -439,7 +439,7 @@ function playFromCsbwinSave(file: string): Game {
 
 /** How many of a world's live timers carry an object reference. */
 function carriedObjects(game: Game): number {
-  const { timers = [], timerQueue = [] } = game.getRuntimeSaveState().dungeon;
+  const { timers, timerQueue } = game.getRuntimeSaveState().dungeon;
   const live = new Set(timerQueue);
   return timers.filter((t, slot) =>
     live.has(slot) && (t.function === 48 || t.function === 49 ||

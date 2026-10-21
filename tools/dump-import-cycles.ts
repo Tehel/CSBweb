@@ -120,10 +120,10 @@ function main(): void {
   console.log(`${files.length} modules, ${edges} value imports between them`);
   check(files.length > 100 && edges > 500, 'the tool should find the source and its imports');
 
-  // The canary: an edge the tool must see (`ensureHandOwner`), and a type-only one it
+  // The canary: an edge the tool must see (`getRuntimeSaveState`), and a type-only one it
   // must not (`GameTables`).
   const game = graph.get(resolve(SRC, 'engine/Game.ts'))!;
-  check(game.includes(resolve(SRC, 'engine/Party.ts')), 'Game imports a value from Party');
+  check(game.includes(resolve(SRC, 'engine/RuntimeSave.ts')), 'Game imports a value from RuntimeSave');
   check(!game.includes(resolve(SRC, 'engine/GameTables.ts')), 'Game imports only types from GameTables');
 
   const cycles = components(graph).filter((scc) => scc.length > 1);

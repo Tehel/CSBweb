@@ -208,7 +208,8 @@ The other half is the saves: for every file of `genuineSaves()`, a seeded
 and again after 600 VBLs of `runVbl(game, TICK_DUE)`, a tick each, on both trees. Zero `savedAt` in the hash
 (a `JSON.stringify` replacer): it is wall-clock, and with it two runs of the same tree
 never agree. A change that drops a field from the runtime save's shape drops it from the
-old tree's hash too, with the same replacer.
+old tree's hash too, with the same replacer, and the replacer sorts every object's keys:
+a copy that rebuilds an object reorders them, and the plain JSON then differs.
 
 **An RN means something only in its own world.** It is a slot of that world's
 `RnMaps`, not a packed `[pos][db][idx]`. Make one with `game.ctx.dungeon.rnMaps.rn(db,

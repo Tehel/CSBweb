@@ -13,7 +13,6 @@ import { Die, die } from './Die';
 import { readGame } from './ReadGame';
 import type { PartyState, MovementResult } from './gameTypes';
 import { MovementAction } from './gameTypes';
-import { ensureHandOwner } from './Party';
 import { MovementSystem } from './MovementSystem';
 import { ActuatorSystem } from './ActuatorSystem';
 import { TimerSystem } from './TimerSystem';
@@ -1009,7 +1008,6 @@ export class Game implements MainLoop {
      */
     setPartyState(state: PartyState): void {
         this.ctx.party.setState(state);
-        ensureHandOwner(this.ctx);
     }
 
     /**

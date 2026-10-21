@@ -10,14 +10,24 @@ import type { PartyState, Champion } from './gameTypes';
 import { CHARFLAG_CHEST_OR_SCROLL, CHARFLAG_CURSOR, CHARFLAG_PORTRAIT_CHANGED, MovementAction } from './gameTypes';
 import type { GameContext } from './GameContext';
 import { drawCharacterStateEyePanel } from './OpenChest';
-import { addCharacterDefaults } from './AddCharacter';
 import { CHARDESC_SIZE } from '../data/CsbwinSaveInfo';
 import { getFromWings, wingsChampion, type WingsPool } from './Wings';
 
 /**
- * The one initializer of `PartyState`. `Party.setState` fills from it any field an older
- * runtime save does not carry.
+ * A copy of `party` that shares nothing with it: the champions down to their
+ * possessions, skills and attributes, the vacant records, the position. Every part is
+ * plain data, but for `position`, which is made a `Position` again, so a state that has
+ * been through JSON comes back whole.
  */
+export function clonePartyState(party: PartyState): PartyState {
+    const { position, ...rest } = party;
+    return {
+        ...structuredClone(rest),
+        position: new Position(position.x, position.y, position.z),
+    };
+}
+
+/** The one initializer of `PartyState`. */
 export function initialPartyState(position: Position, facing: Direction): PartyState {
     return {
         champions: [],
@@ -117,18 +127,9 @@ export class Party {
         setPartyFacing(this.state, newFacing);
     }
 
-    /**
-     * Replace full party state (used for save/load). A field an older runtime save does
-     * not carry takes `initialPartyState`'s value, so no reader needs a fallback.
-     */
+    /** Replace the whole party state with a copy of `state`, which it shares nothing with. */
     setState(state: PartyState): void {
-        this.state = {
-            ...initialPartyState(state.position, state.facing),
-            ...state,
-            champions: state.champions.map((c) => ({ ...addCharacterDefaults(), ...c })),
-            position: new Position(state.position.x, state.position.y, state.position.z),
-            facing: state.facing,
-        };
+        this.state = clonePartyState(state);
         this.generation++;
     }
 
@@ -220,26 +221,6 @@ export function drawAllCharacterState(ctx: GameContext): void {
 export function markAllPortraitsChanged(ctx: GameContext): void {
     for (let i = 0; i < ctx.party.state.champions.length; i++) {
         drawCharacterState(ctx, i, CHARFLAG_PORTRAIT_CHANGED);
-    }
-}
-
-/**
- * Restore CSBWin's invariant that a party with champions always has a cursor owner.
- *
- * `d.HandChar` is set the moment the first champion joins and is only ever -1 while the
- * party is empty, so a restored state that has champions but no owner cannot have come
- * from CSBWin. Quick-saves written before `setHandOwner` existed are exactly that, and
- * without this they load into a party whose inventory cannot be touched.
- */
-export function ensureHandOwner(ctx: GameContext): void {
-    const party = ctx.party.state;
-    if ((party.cursorOwner ?? -1) >= 0) return;
-    if (party.champions.length === 0) return;
-    for (let chIdx = 0; chIdx < 4; chIdx++) {
-        const champion = getPartyChampion(party, chIdx);
-        if (!champion || (champion.attributes?.health ?? 0) === 0) continue;
-        setHandOwner(ctx, chIdx);
-        if ((party.cursorOwner ?? -1) >= 0) return;
     }
 }
 

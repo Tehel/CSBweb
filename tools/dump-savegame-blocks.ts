@@ -8,9 +8,8 @@
  *
  * **The fields.** `GAMEBLOCK2` (`doc/CSBwin-src/SaveGame.cpp:108-134`) carries
  * `handChar` at offset 20 and `MagicCaster` at 22, which `LoadGame` assigns straight to
- * `d.HandChar` and `d.MagicCaster` (`:1760-1761`). `parseBlock2` used to read only
- * `maxTimers` and `maxItem16`, so a cursor owner restored from a binary save was
- * whatever `ensureHandOwner` guessed.
+ * `d.HandChar` and `d.MagicCaster` (`:1760-1761`): the cursor owner a load restores is
+ * the file's, and nothing guesses it.
  *
  * **The byte order.** This is the part a round trip cannot see. The blocks are
  * big-endian (`doc/CSBwin-src/CSBCode.cpp:9162` reads every word through `LE16`, which

@@ -7,18 +7,24 @@
  * rather than a system. Which fields of the dungeon it carries, and which it leaves to
  * the file the world was built from, is `DUNGEON_DATA_SOURCES` (`DungeonSnapshot.ts`).
  */
-import type { DungeonData, Item16Record, MissileRecord, TimerRecord } from '../data/dungeonTypes';
-import { DBType, type ObjectID } from '../core/types';
+import type { DungeonData, Item16Record, TimerRecord } from '../data/dungeonTypes';
+import type { ObjectID } from '../core/types';
 import { sw } from '../core/intCast';
 import { applyDungeonSnapshot, type DungeonSnapshot } from './DungeonSnapshot';
 import type { GameContext } from './GameContext';
 import { VBL_PER_TICK } from './LoopState';
 import type { Block1State, PartyState } from './gameTypes';
-import { ensureHandOwner } from './Party';
+import { clonePartyState } from './Party';
 import type { FootprintsSnapshot } from './PartyFootprints';
 import type { TimerEntry, TimerQueue } from './TimerQueue';
 
-export interface RuntimeSaveState {
+/**
+ * The runtime state but the world: what a save file writes beside the world it reads for
+ * itself (`buildSaveFile`). Every part is a copy, both ways: a captured state shares
+ * nothing with the game it came from, and a restored one nothing with the state it was
+ * restored from.
+ */
+export interface RuntimeState {
     party: PartyState;
     game: {
         tickCount: number;
@@ -37,17 +43,25 @@ export interface RuntimeSaveState {
         /** What `GAMEBLOCK1` carries (`GameState.block1`). */
         block1: Block1State;
     };
-    dungeon: {
-        item16?: Item16Record[];
-        /** The timer table, by timer index — holes included, as CSBWin's array has them. */
-        timers?: TimerRecord[];
-        /** Which of those timers are live, in the heap's array order (`GameTimers::TimerQueue`). */
-        timerQueue?: number[];
-        /** `gameTimers.TimerSequence()` — the stamp the next queued timer will take. */
-        timerSequence?: number;
-        /** `gameTimers.FirstAvailTimer()`, the free cursor; absent, the lowest free slot. */
-        firstAvailTimer?: number;
-        missiles?: MissileRecord[];
+    dungeon: RuntimeDungeonState;
+}
+
+/** What the state carries of the dungeon beside its world. */
+interface RuntimeDungeonState {
+    item16: Item16Record[];
+    /** The timer table, by timer index — holes included, as CSBWin's array has them. */
+    timers: TimerRecord[];
+    /** Which of those timers are live, in the heap's array order (`GameTimers::TimerQueue`). */
+    timerQueue: number[];
+    /** `gameTimers.TimerSequence()` — the stamp the next queued timer will take. */
+    timerSequence: number;
+    /** `gameTimers.FirstAvailTimer()`, the free cursor. */
+    firstAvailTimer: number;
+}
+
+/** The whole runtime state, its world with it (`getRuntimeSaveState`). */
+export interface RuntimeSaveState extends RuntimeState {
+    dungeon: RuntimeDungeonState & {
         /** Everything play can change: cell flags, object chains, all DB records. */
         snapshot: DungeonSnapshot;
     };
@@ -57,12 +71,12 @@ export interface RuntimeSaveState {
  * What a read restores (`readGame`): the runtime state, its world's snapshot left out
  * where the world the read installs is already the state's, as a new game's is.
  */
-export type ReadState = Omit<RuntimeSaveState, 'dungeon'> & {
-    dungeon: Omit<RuntimeSaveState['dungeon'], 'snapshot'> & { snapshot?: DungeonSnapshot };
-};
+export interface ReadState extends RuntimeState {
+    dungeon: RuntimeDungeonState & { snapshot?: DungeonSnapshot };
+}
 
-/** The timer table and its queue as `RuntimeSaveState` carries them (`buildTimerRecords`). */
-export function timerQueueState(timers: TimerQueue): Pick<RuntimeSaveState['dungeon'],
+/** The timer table and its queue as `RuntimeState` carries them (`buildTimerRecords`). */
+export function timerQueueState(timers: TimerQueue): Pick<RuntimeDungeonState,
     'timers' | 'timerQueue' | 'timerSequence' | 'firstAvailTimer'> {
     const { records, queue } = buildTimerRecords(timers);
     return {
@@ -73,24 +87,16 @@ export function timerQueueState(timers: TimerQueue): Pick<RuntimeSaveState['dung
     };
 }
 
-/** Snapshot the runtime state. */
+/** The runtime state, its world with it. */
 export function getRuntimeSaveState(ctx: GameContext): RuntimeSaveState {
-    const world = ctx.dungeon.getData();
-    const item16 = world.item16
-        ? world.item16.map((r) => ({
-              ...r,
-              singleMonsterStatus: [...r.singleMonsterStatus],
-          }))
-        : undefined;
-    const missiles = world.databases.missiles.records.map((rec) => ({
-        nextObject: rec.nextObject,
-        projectileObject: rec.projectileObject,
-        rangeRemaining: rec.rangeRemaining,
-        damageRemaining: rec.damageRemaining,
-        timerIndex: rec.timerIndex,
-    }));
+    const state = getRuntimeState(ctx);
+    return { ...state, dungeon: { ...state.dungeon, snapshot: ctx.dungeon.captureSnapshot() } };
+}
+
+/** The runtime state but the world, which a save file reads from the game itself. */
+export function getRuntimeState(ctx: GameContext): RuntimeState {
     return {
-        party: ctx.party.state,
+        party: clonePartyState(ctx.party.state),
         game: {
             tickCount: ctx.state.tickCount,
             randomSeed: ctx.random.getSeed(),
@@ -102,12 +108,14 @@ export function getRuntimeSaveState(ctx: GameContext): RuntimeSaveState {
             block1: { ...ctx.state.block1, byte22808: [...ctx.state.block1.byte22808] },
         },
         dungeon: {
-            item16,
+            item16: cloneItem16(ctx.dungeon.getData().item16 ?? []),
             ...timerQueueState(ctx.timers),
-            missiles,
-            snapshot: ctx.dungeon.captureSnapshot(),
         },
     };
+}
+
+function cloneItem16(item16: Item16Record[]): Item16Record[] {
+    return item16.map((r) => ({ ...r, singleMonsterStatus: [...r.singleMonsterStatus] }));
 }
 
 /**
@@ -121,16 +129,16 @@ export interface PreparedState {
 
 /**
  * The half of a restore that builds: the state's world put into `world` (its snapshot,
- * then the `ITEM16` pool and the missile records the save carries beside it), and the
- * timer queue's entries. It touches nothing but `world`, so a read builds it over a world
+ * then the `ITEM16` pool the state carries beside it), and the timer queue's entries. It touches nothing but `world`, so a read builds it over a world
  * not yet installed, and an error here leaves the running game as it was (`readGame`).
  * The snapshot lands before the pool, which is re-derived from the creature records it
  * puts back (`startRuntimeState`).
  */
 export function prepareRuntimeState(world: DungeonData, save: ReadState): PreparedState {
     if (save.dungeon.snapshot) applyDungeonSnapshot(world, save.dungeon.snapshot);
-    applySaveGameState(world, save.dungeon.item16 ?? [], save.dungeon.missiles ?? []);
-    return { save, timers: timerEntriesOf(save.dungeon.timers ?? [], save.dungeon.timerQueue ?? []) };
+    // `DUNGEON_DATA_SOURCES`' one `runtimeSave` field.
+    world.item16 = cloneItem16(save.dungeon.item16);
+    return { save, timers: timerEntriesOf(save.dungeon.timers, save.dungeon.timerQueue) };
 }
 
 /**
@@ -144,13 +152,11 @@ export function installRuntimeState(ctx: GameContext, prepared: PreparedState): 
     // CSBWin never saves it. Loading over a sleeping party must hand the UI its
     // adventure button lists back, whatever the restored state says.
     const wasSleeping = ctx.party.state.sleeping;
+    // `d.HandChar = b.gb2.handChar` (doc/CSBwin-src/SaveGame.cpp:1760): the cursor
+    // owner is part of the state, as the party's.
     ctx.party.setState(save.party);
     ctx.party.state.sleeping = false;
     if (wasSleeping) ctx.host.sleepChanged(false);
-    // `d.HandChar = b.gb2.handChar` (doc/CSBwin-src/SaveGame.cpp:1760): the cursor
-    // owner is part of the saved state. `setState` carries it, and this repairs the
-    // states written before it was ever set.
-    ensureHandOwner(ctx);
 
     // `scrollingText.ResetTime(b.gb2.Time); d.Time = b.gb2.Time;`
     // (doc/CSBwin-src/SaveGame.cpp:1747-1748): CSBWin saves no message state, and the
@@ -169,8 +175,8 @@ export function installRuntimeState(ctx: GameContext, prepared: PreparedState): 
     ctx.systems.dsa.disableSaves = save.game.disableSaves;
     ctx.overlayPalette.set(save.game.overlayPalette);
 
-    ctx.timers.restore(prepared.timers, save.dungeon.timerSequence ?? 0,
-        (save.dungeon.timers ?? []).length, save.dungeon.firstAvailTimer);
+    ctx.timers.restore(prepared.timers, save.dungeon.timerSequence,
+        save.dungeon.timers.length, save.dungeon.firstAvailTimer);
     ctx.footprints.restore(save.game.footprints);
     // An extra's, never saved (`ThrownWeapons`).
     ctx.thrownWeapons.clear();
@@ -185,23 +191,6 @@ export function installRuntimeState(ctx: GameContext, prepared: PreparedState): 
  */
 export function startRuntimeState(ctx: GameContext): void {
     ctx.systems.monsters.reloadAfterSaveGame();
-}
-
-/**
- * The two tables the save carries beside the snapshot, put back into the world: the
- * `ITEM16` pool and the missile records (`DUNGEON_DATA_SOURCES`' `runtimeSave` fields).
- */
-function applySaveGameState(dungeon: DungeonData, item16: Item16Record[], missiles: MissileRecord[]): void {
-    dungeon.item16 = item16;
-    dungeon.databases.missiles.records = missiles.map((rec) => ({
-        nextObject: rec.nextObject,
-        projectileObject: rec.projectileObject,
-        rangeRemaining: rec.rangeRemaining,
-        damageRemaining: rec.damageRemaining,
-        timerIndex: rec.timerIndex,
-    }));
-    dungeon.databases.missiles.count = missiles.length & 0xffff;
-    dungeon.header.objectCounts[DBType.MISSILE] = missiles.length & 0xffff;
 }
 
 /**
@@ -276,8 +265,7 @@ function collapseTimerBytes(record: TimerRecord, object: number | undefined): Ti
  *
  * The table is `m_maxTimers` records long, so its length is the `gb2.MaxTimers` a save
  * writes, and every slot with no live timer is an empty record — `TT_EMPTY` is
- * function 0 — as in CSBWin's array. A save written before the table had a size is
- * as long as its highest live slot, and the table it restores fills at once.
+ * function 0 — as in CSBWin's array.
  */
 function buildTimerRecords(timers: TimerQueue): { records: TimerRecord[]; queue: number[] } {
     const entries = timers.getTimers();

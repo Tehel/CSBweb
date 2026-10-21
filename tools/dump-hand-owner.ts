@@ -15,7 +15,7 @@
  * Run: `npm test -- --only=dump-hand-owner.ts`
  */
 import { DBType, Direction, OBJECT_ID_NULL, Position } from '../src/core/types';
-import { ensureHandOwner, initialPartyState, setHandOwner } from '../src/engine/Party';
+import { initialPartyState, setHandOwner } from '../src/engine/Party';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
 import { getChampionPossession, type Champion, type PartyState } from '../src/engine/gameTypes';
 import { type UIState } from '../src/renderer/ui/UIState';
@@ -57,7 +57,7 @@ async function main(): Promise<void> {
 
   // ---- 1. `SetHandOwner(0)` when the party gets its first champion.
   //         (doc/CSBwin-src/Character.cpp:707-711)
-  // The game's own party, so that the inventory click in 5. reaches its systems.
+  // The game's own party, so that the inventory click in 4. reaches its systems.
   const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);
   const party = game.ctx.party;
@@ -86,19 +86,7 @@ async function main(): Promise<void> {
   row('setHandOwner(-1)', party.state);
   check(owner(party.state) === -1, 'setHandOwner(-1) should clear the owner');
 
-  // ---- 3. `ensureHandOwner` repairs a state that has champions but no owner.
-  ensureHandOwner(game.ctx);
-  row('restore repair', party.state);
-  check(owner(party.state) === 0, 'a restored party with champions must end up with an owner');
-  check(party.state.champions[1].attributes.health === 0, 'the repair must skip the dead champion');
-
-  const emptyGame = newGame(data, graphics);
-  const empty = emptyGame.ctx.party;
-  empty.setState(initialPartyState(new Position(1, 1, 0), Direction.NORTH));
-  ensureHandOwner(emptyGame.ctx);
-  check(owner(empty.state) === -1, 'the repair must leave an empty party alone');
-
-  // ---- 4. The cursor leaves a dying owner for a living champion.
+  // ---- 3. The cursor leaves a dying owner for a living champion.
   //         (doc/CSBwin-src/Character.cpp:2675-2691)
   second.attributes.health = 40;
   setHandOwner(game.ctx, 1);
@@ -112,7 +100,7 @@ async function main(): Promise<void> {
   row('owner died', party.state);
   check(owner(party.state) === 0, 'the cursor should pass to a living champion');
 
-  // ---- 5. The thing a player actually does: click a filled inventory slot and check
+  // ---- 4. The thing a player actually does: click a filled inventory slot and check
   //         the object lands in the hand, then clicking again puts it back.
   //         (`HandleClothingClick`, doc/CSBwin-src/CSBCode.cpp:6987)
   const ui: UIState = newUIState(graphics, game.ctx);

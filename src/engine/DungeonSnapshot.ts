@@ -44,7 +44,7 @@ import type { DungeonData, DatabaseRecord, Databases, DsaDefinition, DsaIndex } 
  *
  * - `snapshot`: this snapshot, captured and applied below;
  * - `runtimeSave`: `RuntimeSave`, which carries it beside the snapshot and puts it back
- *   through `applySaveGameState`;
+ *   after it (`prepareRuntimeState`);
  * - `loaded`: the file the world was built from. Play never writes it.
  */
 export type FieldSource = 'snapshot' | 'runtimeSave' | 'loaded';
@@ -162,39 +162,37 @@ export interface DungeonSnapshot {
     objectListSize: ui16;
     /** `data.header.objectCounts`. */
     objectCounts: ui16[];
-    /** Every database's records, by key. A database absent from the map is left alone. */
-    databases: Partial<Record<DatabaseKey, DatabaseRecord[]>>;
+    /** Every database's records, by key. */
+    databases: Record<DatabaseKey, DatabaseRecord[]>;
+    // From here on, each field is `null` where the world has none, which a restore then
+    // removes from the world it restores.
     /**
      * `data.textWords`, base64 of big-endian words. After the load-time conversion this
      * is the compressed text, which is why it and `compressedText` normally hold the
      * same bytes; they are stored separately because nothing guarantees it.
      */
-    textWords?: string;
+    textWords: string | null;
     /** `data.indirectTextIndex` — word offsets into `compressedText`. */
-    indirectTextIndex?: ui32[];
+    indirectTextIndex: ui32[] | null;
     /** `data.compressedText`, base64 of big-endian words. */
-    compressedText?: string;
-    /**
-     * `data.expool` — database 11, base64, or `null` for a world with no block, which a
-     * restore then removes: the champion bones records are in it.
-     */
-    expool?: string | null;
+    compressedText: string | null;
+    /** `data.expool` — database 11, base64: the champion bones records are in it. */
+    expool: string | null;
     /**
      * `data.dsaLevelIndex`, one base64 string of big-endian words per level. This and the
-     * next five are what a CSBWin load writes. Each is `null` where the world has none,
-     * which a restore then removes.
+     * next five are what a CSBWin load writes.
      */
-    dsaLevelIndex?: string[] | null;
+    dsaLevelIndex: string[] | null;
     /** `data.dsaIndex.entries`. */
-    dsaIndex?: DsaIndexSnapshot | null;
+    dsaIndex: DsaIndexSnapshot | null;
     /** `data.specialLocations`, as `[location, value]` pairs. */
-    specialLocations?: Array<[number, number]> | null;
-    extendedWallDecorations?: boolean | null;
-    spellFilterLocation?: number | null;
+    specialLocations: Array<[number, number]> | null;
+    extendedWallDecorations: boolean | null;
+    spellFilterLocation: number | null;
     /** `data.hintKey`, base64. */
-    hintKey?: string | null;
+    hintKey: string | null;
     /** `data.gameInfo`, its text base64. */
-    gameInfo?: { size: number; text: string } | null;
+    gameInfo: { size: number; text: string } | null;
 }
 
 function encodeBytes(bytes: Uint8Array): string {
@@ -306,14 +304,12 @@ function decodeCellFlags(encoded: string, width: number, height: number): ui8[][
 }
 
 export function captureDungeonSnapshot(data: DungeonData): DungeonSnapshot {
-    const databases: Partial<Record<DatabaseKey, DatabaseRecord[]>> = {};
+    const databases = {} as Record<DatabaseKey, DatabaseRecord[]>;
     for (const key of DATABASE_KEYS) {
-        const database = data.databases[key];
-        if (!database) continue;
-        databases[key] = database.records.map((record) => cloneRecord(record));
+        databases[key] = data.databases[key].records.map((record) => cloneRecord(record));
     }
 
-    const snapshot: DungeonSnapshot = {
+    return {
         cellFlags: data.maps.map((map) => encodeCellFlags(map.cellFlags)),
         objectList: [...data.objectList],
         rnMaps: { typeMap: encodeBytes(data.rnMaps.typeMapBytes()), indexMap: encodeWords(data.rnMaps.indexMapWords()) },
@@ -321,24 +317,20 @@ export function captureDungeonSnapshot(data: DungeonData): DungeonSnapshot {
         objectListSize: data.header.objectListSize,
         objectCounts: [...data.header.objectCounts],
         databases,
+        textWords: data.textWords ? encodeWords(data.textWords) : null,
+        indirectTextIndex: data.indirectTextIndex ? [...data.indirectTextIndex] : null,
+        compressedText: data.compressedText ? encodeWords(data.compressedText) : null,
+        expool: data.expool ? encodeBytes(data.expool) : null,
+        dsaLevelIndex: data.dsaLevelIndex ? data.dsaLevelIndex.map(encodeWords) : null,
+        dsaIndex: data.dsaIndex ? encodeDsaIndex(data.dsaIndex) : null,
+        specialLocations: data.specialLocations
+            ? Object.entries(data.specialLocations).map(([location, value]) => [Number(location), value])
+            : null,
+        extendedWallDecorations: data.extendedWallDecorations ?? null,
+        spellFilterLocation: data.spellFilterLocation ?? null,
+        hintKey: data.hintKey ? encodeBytes(data.hintKey) : null,
+        gameInfo: data.gameInfo ? { size: data.gameInfo.size, text: encodeBytes(data.gameInfo.text) } : null,
     };
-
-    if (data.textWords) snapshot.textWords = encodeWords(data.textWords);
-    if (data.indirectTextIndex) snapshot.indirectTextIndex = [...data.indirectTextIndex];
-    if (data.compressedText) snapshot.compressedText = encodeWords(data.compressedText);
-    snapshot.expool = data.expool ? encodeBytes(data.expool) : null;
-
-    snapshot.dsaLevelIndex = data.dsaLevelIndex ? data.dsaLevelIndex.map(encodeWords) : null;
-    snapshot.dsaIndex = data.dsaIndex ? encodeDsaIndex(data.dsaIndex) : null;
-    snapshot.specialLocations = data.specialLocations
-        ? Object.entries(data.specialLocations).map(([location, value]) => [Number(location), value])
-        : null;
-    snapshot.extendedWallDecorations = data.extendedWallDecorations ?? null;
-    snapshot.spellFilterLocation = data.spellFilterLocation ?? null;
-    snapshot.hintKey = data.hintKey ? encodeBytes(data.hintKey) : null;
-    snapshot.gameInfo = data.gameInfo ? { size: data.gameInfo.size, text: encodeBytes(data.gameInfo.text) } : null;
-
-    return snapshot;
 }
 
 export function applyDungeonSnapshot(data: DungeonData, snapshot: DungeonSnapshot): void {
@@ -373,9 +365,7 @@ export function applyDungeonSnapshot(data: DungeonData, snapshot: DungeonSnapsho
 
     for (const key of DATABASE_KEYS) {
         const records = snapshot.databases[key];
-        if (!records) continue;
         const database = data.databases[key];
-        if (!database) continue;
         // Replace in place: the databases object is shared by reference all over the
         // engine, and the arrays grow during play, so length must follow the snapshot.
         database.records.length = 0;
@@ -385,35 +375,27 @@ export function applyDungeonSnapshot(data: DungeonData, snapshot: DungeonSnapsho
         database.count = database.records.length;
     }
 
-    // The converted image. A snapshot written before these were captured has none of
-    // them, and leaving what the world already holds is the right answer for such a file
-    // — it is `dungeon.dat`'s, which is what the save was taken against.
-    if (snapshot.textWords !== undefined) data.textWords = decodeWords(snapshot.textWords);
-    if (snapshot.indirectTextIndex !== undefined) {
-        data.indirectTextIndex = [...snapshot.indirectTextIndex];
-    }
-    if (snapshot.compressedText !== undefined) {
-        data.compressedText = decodeWords(snapshot.compressedText);
-    }
+    // The rest, `null` a world that had none.
+    if (snapshot.textWords === null) delete data.textWords;
+    else data.textWords = decodeWords(snapshot.textWords);
+    if (snapshot.indirectTextIndex === null) delete data.indirectTextIndex;
+    else data.indirectTextIndex = [...snapshot.indirectTextIndex];
+    if (snapshot.compressedText === null) delete data.compressedText;
+    else data.compressedText = decodeWords(snapshot.compressedText);
     if (snapshot.expool === null) delete data.expool;
-    else if (snapshot.expool !== undefined) data.expool = decodeBytes(snapshot.expool);
-
-    // The same holds for the five a CSBWin load writes, and `null` is a world that had
-    // none.
+    else data.expool = decodeBytes(snapshot.expool);
     if (snapshot.dsaLevelIndex === null) delete data.dsaLevelIndex;
-    else if (snapshot.dsaLevelIndex) data.dsaLevelIndex = snapshot.dsaLevelIndex.map(decodeWords);
+    else data.dsaLevelIndex = snapshot.dsaLevelIndex.map(decodeWords);
     if (snapshot.dsaIndex === null) delete data.dsaIndex;
-    else if (snapshot.dsaIndex) data.dsaIndex = decodeDsaIndex(snapshot.dsaIndex);
+    else data.dsaIndex = decodeDsaIndex(snapshot.dsaIndex);
     if (snapshot.specialLocations === null) delete data.specialLocations;
-    else if (snapshot.specialLocations) data.specialLocations = Object.fromEntries(snapshot.specialLocations);
+    else data.specialLocations = Object.fromEntries(snapshot.specialLocations);
     if (snapshot.extendedWallDecorations === null) delete data.extendedWallDecorations;
-    else if (snapshot.extendedWallDecorations !== undefined) {
-        data.extendedWallDecorations = snapshot.extendedWallDecorations;
-    }
+    else data.extendedWallDecorations = snapshot.extendedWallDecorations;
     if (snapshot.spellFilterLocation === null) delete data.spellFilterLocation;
-    else if (snapshot.spellFilterLocation !== undefined) data.spellFilterLocation = snapshot.spellFilterLocation;
+    else data.spellFilterLocation = snapshot.spellFilterLocation;
     if (snapshot.hintKey === null) delete data.hintKey;
-    else if (snapshot.hintKey) data.hintKey = decodeBytes(snapshot.hintKey);
+    else data.hintKey = decodeBytes(snapshot.hintKey);
     if (snapshot.gameInfo === null) delete data.gameInfo;
-    else if (snapshot.gameInfo) data.gameInfo = { size: snapshot.gameInfo.size, text: decodeBytes(snapshot.gameInfo.text) };
+    else data.gameInfo = { size: snapshot.gameInfo.size, text: decodeBytes(snapshot.gameInfo.text) };
 }

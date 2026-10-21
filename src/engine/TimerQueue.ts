@@ -372,8 +372,7 @@ export class TimerQueue {
    *
    * The table's size and the free cursor come back as `LoadGame` reads them,
    * `gb2.MaxTimers` and `gb2.FirstAvailTimer` (`doc/CSBwin-src/SaveGame.cpp:1762-1764`),
-   * into a table that is not first allocated as a new game's. A save that carries no
-   * cursor gets the lowest free slot, which is the cursor unless the table has filled.
+   * into a table that is not first allocated as a new game's.
    *
    * New timers are not minted above the highest restored index: `LoadGame` is followed
    * by `reloadAfterSaveGame`, whose `processMonstersOnLevel` deletes and re-creates the
@@ -381,17 +380,12 @@ export class TimerQueue {
    * abandon one slot per re-created timer, and a save/load cycle on a level with
    * monsters would grow the table for ever.
    */
-  restore(entries: readonly TimerEntry[], nextSequence: number, maxTimers: number, firstAvailTimer?: number): void {
+  restore(entries: readonly TimerEntry[], nextSequence: number, maxTimers: number, firstAvailTimer: number): void {
     this.queue = entries.map((entry) => ({ ...entry }));
     this.indexMap.clear();
     for (const entry of this.queue) this.indexMap.set(entry.index, entry);
     this.maxTimers = maxTimers & 0xffff;
-    if (firstAvailTimer === undefined) {
-      this.firstAvailTimer = 0;
-      while (this.indexMap.has(this.firstAvailTimer)) this.firstAvailTimer++;
-    } else {
-      this.firstAvailTimer = firstAvailTimer;
-    }
+    this.firstAvailTimer = firstAvailTimer;
     this.nextSequence = nextSequence & 0xffff;
   }
 

@@ -117,7 +117,6 @@ const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.str
 function compareStates(label: string, before: RuntimeSaveState, after: RuntimeSaveState): void {
   check(same(before.party, after.party), `${label}: the party state round-trips`);
   check(same(before.dungeon.snapshot, after.dungeon.snapshot), `${label}: the world snapshot round-trips`);
-  check(same(before.dungeon.missiles, after.dungeon.missiles), `${label}: the missile records round-trip`);
   check(same(before.dungeon.timerQueue, after.dungeon.timerQueue), `${label}: the timer queue order round-trips`);
   check(same(before.game.footprints, after.game.footprints), `${label}: the footprint trail round-trips`);
   check(same(before.game.dsaGlobals, after.game.dsaGlobals), `${label}: the DSA globals round-trip`);
@@ -125,7 +124,7 @@ function compareStates(label: string, before: RuntimeSaveState, after: RuntimeSa
   check(before.game.gameWon === after.game.gameWon, `${label}: gameWon round-trips`);
 
   const strip = (records: RuntimeSaveState['dungeon']['timers']) =>
-    (records ?? []).map((r) => ({ ...r, sequence: 0 }));
+    records.map((r) => ({ ...r, sequence: 0 }));
   check(same(strip(before.dungeon.timers), strip(after.dungeon.timers)),
     `${label}: the timer table round-trips, field for field`);
 }
@@ -452,7 +451,7 @@ function checkTheFileAlone(): void {
     }
     // Before the save, on the live records: a word says nothing its bytes do not, so the
     // file, which has the bytes alone, loses nothing of a timer.
-    const loud = (live.getRuntimeSaveState().dungeon.timers ?? []).filter((r) =>
+    const loud = live.getRuntimeSaveState().dungeon.timers.filter((r) =>
       (r.timerWord6 !== 0 && (r.timerWord6 & 0xffff) !== ((r.uByte6 << 8) | r.uByte7))
       || (r.timerWord8 !== 0 && r.timerWord8 !== ((r.uByte8 << 8) | r.uByte9)));
     check(loud.length === 0, `${label}: no timer's word says more than its bytes (${loud.length} do)`);
@@ -507,8 +506,8 @@ function main(): void {
     const { next, bytes } = roundTrip(direct);
     const after = next.getRuntimeSaveState();
 
-    console.log(`${file}: ${bytes.length} bytes, ${before.dungeon.timers?.length ?? 0} timer slots, ` +
-      `${before.dungeon.timerQueue?.length ?? 0} live, ${championsBefore.length} champions`);
+    console.log(`${file}: ${bytes.length} bytes, ${before.dungeon.timers.length} timer slots, ` +
+      `${before.dungeon.timerQueue.length} live, ${championsBefore.length} champions`);
     compareStates(file, before, after);
     compareChampions(file, championsBefore, next.ctx.party.state.champions);
     compareConvertedImage(file, direct, next);
@@ -542,8 +541,8 @@ function main(): void {
 
   console.log('\n=== five save/load cycles on a level with live monsters ===');
   let game = fromCsbwinSave('csbgame7.dat');
-  const slotsAtStart = game.getRuntimeSaveState().dungeon.timers?.length ?? 0;
-  const liveAtStart = game.getRuntimeSaveState().dungeon.timerQueue?.length ?? 0;
+  const slotsAtStart = game.getRuntimeSaveState().dungeon.timers.length;
+  const liveAtStart = game.getRuntimeSaveState().dungeon.timerQueue.length;
   check(liveAtStart > 0, 'csbgame7.dat carries live timers to begin with');
   console.log(['cycle', 'slots', 'live', 'bytes'].join('\t'));
   console.log(['load', slotsAtStart, liveAtStart, '-'].join('\t'));
@@ -551,15 +550,15 @@ function main(): void {
     const { next, bytes } = roundTrip(game);
     game = next;
     const state = game.getRuntimeSaveState();
-    const slots = state.dungeon.timers?.length ?? 0;
-    const live = state.dungeon.timerQueue?.length ?? 0;
+    const slots = state.dungeon.timers.length;
+    const live = state.dungeon.timerQueue.length;
     console.log([cycle, slots, live, bytes.length].join('\t'));
     check(slots === slotsAtStart,
       `cycle ${cycle}: the timer table is still ${slotsAtStart} slots, not ${slots}`);
     check(live === liveAtStart,
       `cycle ${cycle}: ${liveAtStart} timers are still live, not ${live}`);
     // No abandoned slots: the live timers still fill the table from slot 0 up.
-    const highest = Math.max(-1, ...(state.dungeon.timerQueue ?? []));
+    const highest = Math.max(-1, ...state.dungeon.timerQueue);
     check(highest + 1 === live, `cycle ${cycle}: the table has no abandoned slots (highest ${highest})`);
   }
 
@@ -628,11 +627,11 @@ function main(): void {
     check(block2.partyY === party.position.y, `${file}: gb2.partyy is the party's y`);
     check(block2.partyLevel === party.position.z, `${file}: gb2.partyLevel is the party's level`);
     check(block2.partyFacing === party.facing, `${file}: gb2.partyfacing is the party's facing`);
-    check(block2.maxItem16 === (state.dungeon.item16?.length ?? 0), `${file}: gb2.MaxITEM16 is the pool size`);
-    check(block2.maxTimers === (state.dungeon.timers?.length ?? 0), `${file}: gb2.MaxTimers is the table size`);
+    check(block2.maxItem16 === state.dungeon.item16.length, `${file}: gb2.MaxITEM16 is the pool size`);
+    check(block2.maxTimers === state.dungeon.timers.length, `${file}: gb2.MaxTimers is the table size`);
     check(block2.maxTimers === live.ctx.timers.getMaxTimers(),
       `${file}: gb2.MaxTimers is m_maxTimers, ${block2.maxTimers}`);
-    check(block2.numTimer === (state.dungeon.timerQueue?.length ?? 0), `${file}: gb2.NumTimer is the queue length`);
+    check(block2.numTimer === state.dungeon.timerQueue.length, `${file}: gb2.NumTimer is the queue length`);
     check(block2.firstAvailTimer === live.ctx.timers.getFirstAvailTimer(),
       `${file}: gb2.FirstAvailTimer is the free cursor`);
     check(block2.item16QueLen === live.systems.monsters.getItem16QueLen(),
@@ -743,13 +742,13 @@ function main(): void {
   console.log('\n=== playing on after a save, beside a load of it ===');
   console.log(['tail', 'tick', 'groups', 'AI timers here', 'seed', 'same'].join('\t'));
   /** The monster AI timers (29-41) of the party's level, the ones the tail re-creates. */
-  const monsterTimers = (g: Game): number => (g.getRuntimeSaveState().dungeon.timerQueue ?? [])
+  const monsterTimers = (g: Game): number => g.getRuntimeSaveState().dungeon.timerQueue
     .map((i) => g.ctx.timers.getTimer(i))
     .filter((t) => t && t.function >= 29 && t.function <= 41 && t.level === g.ctx.party.state.position.z).length;
   const monstersOf = (g: Game): string => {
     const { dungeon, game } = g.getRuntimeSaveState();
     return JSON.stringify([dungeon.item16, fileForm(dungeon.timers), dungeon.timerQueue, dungeon.timerSequence,
-      dungeon.missiles, dungeon.snapshot, game.randomSeed, game.tickCount]);
+      dungeon.snapshot, game.randomSeed, game.tickCount]);
   };
   for (const withTail of [true, false]) {
     const live = fromCsbwinSave('csbgame7.dat');
