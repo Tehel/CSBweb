@@ -309,7 +309,7 @@ export class TimerSystem {
     if (idx >= word1074.length) idx = word1074.length - 1;
     const delta = (word1074[idx] ?? 0) * (sign >= 0 ? 1 : -1);
     const party = this.ctx.party.state;
-    party.brightness = sw((party.brightness ?? 0) + delta);
+    party.brightness = sw(party.brightness + delta);
   }
 
   private processLightLevelTimer(timer: TimerEntry): void {
@@ -328,7 +328,7 @@ export class TimerSystem {
     }
 
     const party = this.ctx.party.state;
-    const current = party.brightness ?? 0;
+    const current = party.brightness;
     party.brightness = sw(current + change);
 
     if (newSteps !== 0) {
@@ -1056,7 +1056,7 @@ export class TimerSystem {
         // (`doc/CSBwin-src/CSB.h:1275`) — *is* the champion index.
         const record = this.dungeon.getMiscRecord(target);
         if (!record) return;
-        chIdx = (record.specialState ?? 0) & 0x3;
+        chIdx = record.specialState & 0x3;
         const champ = this.ctx.party.state.champions[chIdx];
         // `if (chIndex < d.NumCharacter)`, then `if (HP() != 0) break`.
         if (!champ) return;
@@ -1138,7 +1138,7 @@ export class TimerSystem {
   }
 
   private isChampionDead(champ: PartyState['champions'][number]): boolean {
-    return (champ.attributes?.health ?? 0) <= 0;
+    return champ.attributes.health <= 0;
   }
 
   private setCellFlag(map: MapData, x: number, y: number, cellFlag: number): void {
@@ -1595,7 +1595,7 @@ export class TimerSystem {
     if (rn === OBJECT_ID_EOF || rn === OBJECT_ID_NULL) return;
     const position = new Position(timer.uByte6 & 0xff, timer.uByte7 & 0xff, timer.level & 0xff);
     this.dungeon.removeObjectFromCell(position, rn);
-    this.dungeon.deleteDBEntry(rn as ObjectID);
+    this.dungeon.deleteDBEntry(rn);
   }
 
   /**
@@ -1784,7 +1784,7 @@ export class TimerSystem {
       if (type <= DBType.CREATURE) continue;
       // `MoveObject(objD4, mapX, mapY, mapX, mapY)`: `placed` / `position` are
       // `d.NewPos` / `d.NewX`, `d.NewY`, `d.NewLevel`, or null when the object stayed.
-      const moved = this.ctx.systems.worldMove.moveObject(rn as ObjectID, mapX, mapY, mapX, mapY, level);
+      const moved = this.ctx.systems.worldMove.moveObject(rn, mapX, mapY, mapX, mapY, level);
       if (moved.placed === null || moved.position === null) continue;
       const to = moved.position;
       if (type === DBType.MISSILE) {

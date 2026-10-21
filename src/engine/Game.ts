@@ -189,7 +189,7 @@ export class Game implements MainLoop {
         ctx.sounds.soundFilter = (ordinal, highVolume, level, x, y) =>
             ctx.systems.dsa.soundFilter(ordinal, highVolume, level, x, y);
         ctx.dungeon.textSubstitution = {
-            handChar: () => ctx.party.state.cursorOwner ?? -1,
+            handChar: () => ctx.party.state.cursorOwner,
             characterName: (index) => ctx.party.state.champions[index]?.name ?? null,
             globalText: (index) => ctx.dungeon.locateExpoolRecord(((EDT_GLOBAL_TEXT << 24) | (index & 0xffff)) >>> 0),
             globalVariable: (index) => ctx.systems.dsa.getGlobalVariable(index),

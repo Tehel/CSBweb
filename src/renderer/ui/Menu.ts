@@ -257,8 +257,8 @@ function drawMenuTitles(
   const line = (text: string, y: number, color: number): void => {
     const x = TITLE_CENTRE_X - 3 * text.length;
     drawTextLineIndex(
-      ui.screenIndexBuffer!,
-      ui.fontData!,
+      ui.screenIndexBuffer,
+      ui.fontData,
       x + ox,
       y + oy,
       color,

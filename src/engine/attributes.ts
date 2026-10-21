@@ -163,6 +163,6 @@ export function adjustCurrentAttribute(attr: Attribute, adjustment: number): voi
  * gameplay formula wants (`MaxLoad`, `Quickness`, spell success, `IsCharacterLucky`).
  */
 export function championAttribute(champ: Champion, index: AttributeIndex): number {
-  const attr = champ.attributes?.stats?.[index];
+  const attr = champ.attributes.stats[index];
   return attr ? attributeCurrent(attr) : 0;
 }

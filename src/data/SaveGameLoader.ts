@@ -512,7 +512,7 @@ export function loadSaveGameState(file: Uint8Array): SaveGameState & { data: Uin
   // A save's image has a level: one that reads as none is not an image.
   const read = computeDungeonImageLayout(saveData, afterTimerQueue, {
     indirectText: extended.indirectText,
-    bigActuators: extended.bigActuators ?? false,
+    bigActuators: extended.bigActuators,
     newScrolls: extended.version >= 0x42, // 'B'
   });
   const layout = read && read.numMaps >= 1 ? read : null;

@@ -49,10 +49,8 @@ export class CharacterStats {
    * `visited` is ours, not CSBWin's: the C++ walks the contents chain with no cycle
    * guard, and a corrupt save would hang it.
    */
-  getObjectWeight(item: ObjectID | number | null | undefined, visited = new Set<number>()): number {
-    if (item === null || item === undefined) return 0;
-    if (item === OBJECT_ID_NULL || item === OBJECT_ID_EOF) return 0;
-    const rn = item as ObjectID;
+  getObjectWeight(rn: ObjectID, visited = new Set<ObjectID>()): number {
+    if (rn === OBJECT_ID_NULL || rn === OBJECT_ID_EOF) return 0;
     if (visited.has(rn)) return 0;
     visited.add(rn);
 
@@ -73,7 +71,7 @@ export class CharacterStats {
         if (!rec) return 0;
         let weight = this.ctx.tables.byte8946[rec.miscType] ?? 0;
         // A waterskin weighs its contents.
-        if (rec.miscType === MISC_WATERSKIN) weight += 2 * (rec.specialState ?? 0);
+        if (rec.miscType === MISC_WATERSKIN) weight += 2 * rec.specialState;
         return weight;
       }
       case DBType.CHEST: {
@@ -103,7 +101,7 @@ export class CharacterStats {
    * Re-summed rather than cached; see the module comment.
    */
   characterLoad(champ: Champion): number {
-    const visited = new Set<number>();
+    const visited = new Set<ObjectID>();
     let total = 0;
     for (const item of champ.possessions) {
       if (item === OBJECT_ID_NULL) continue;
@@ -191,8 +189,8 @@ export class CharacterStats {
       }
     }
 
-    if (typeof obj === 'number' && this.ctx.dungeon.rnMaps.dbType(obj as ObjectID) === DBType.WEAPON) {
-      const desc = this.weaponDescFor(obj as ObjectID);
+    if (typeof obj === 'number' && this.ctx.dungeon.rnMaps.dbType(obj) === DBType.WEAPON) {
+      const desc = this.weaponDescFor(obj);
       if (desc) {
         d7 = sw(d7 + desc.uByte2);
         const weaponClass = desc.uByte1;
@@ -280,8 +278,8 @@ export function feetMoveTimeBonus(feetNameIndex: number): number {
  * needs nothing but the champion.
  */
 function staminaAdjustedAttribute(champ: Champion, baseValue: number): number {
-  const stamina = champ.attributes?.stamina ?? 0;
-  const half = sw(div(champ.attributes?.maxStamina ?? 0, 2));
+  const stamina = champ.attributes.stamina;
+  const half = sw(div(champ.attributes.maxStamina, 2));
   if (stamina >= half) return baseValue;
 
   const halved = sw(div(baseValue, 2));

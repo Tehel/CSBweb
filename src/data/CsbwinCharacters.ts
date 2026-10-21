@@ -28,7 +28,7 @@
 import { CHARFLAG_MALE, getChampionPossession } from '../core/charDesc';
 import type { Champion, PartyState, Skill, VacantCharacter } from '../engine/gameTypes';
 import type { Attribute } from '../engine/attributes';
-import { OBJECT_ID_NULL, type i8, type i16, type ui8, type ui16, type ObjectID } from '../core/types';
+import { OBJECT_ID_NULL, type i8, type i16, type ui8, type ObjectID } from '../core/types';
 import { CHARDESC_SIZE, decodeCharField, encodeCharField } from './CsbwinSaveInfo';
 import {
   readI16BE, readI32BE, readI8, readU16BE, readU16LE, readU32LE, readU8, writeU16LE, writeU32LE,
@@ -144,7 +144,7 @@ function readPortrait(block: Uint8Array, base: number): ui8[] | undefined {
           colour |= ((planes[plane] >> (15 - bit)) & 1) << plane;
         }
         if (colour !== 0) any = true;
-        pixels[y * PORTRAIT_WIDTH + group * 16 + bit] = colour as ui8;
+        pixels[y * PORTRAIT_WIDTH + group * 16 + bit] = colour;
       }
     }
   }
@@ -165,8 +165,8 @@ export function readCsbwinCharacter(
   const base = index * CHARDESC_SIZE;
   const name = decodeCharField(block.subarray(base, base + 8));
   const title = decodeCharField(block.subarray(base + 8, base + 28));
-  const titleBytes = Array.from(block.subarray(base + 8, base + 28)) as ui8[];
-  const incantationBytes = Array.from(block.subarray(base + 34, base + 38)) as ui8[];
+  const titleBytes = Array.from(block.subarray(base + 8, base + 28));
+  const incantationBytes = Array.from(block.subarray(base + 34, base + 38));
   const slots = readPossessions(block, base);
   const charFlags = readI16BE(block, base + 48);
   const maxHealth = readI16BE(block, base + 54);
@@ -188,7 +188,7 @@ export function readCsbwinCharacter(
       stats: readAttributes(block, base),
     },
     facing: readU8(block, base + 28) as 0 | 1 | 2 | 3,
-    partyPosition: readU8(block, base + 29) as ui8,
+    partyPosition: readU8(block, base + 29),
     attackType: readI8(block, base + 32),
     // `StrLen(pcA3->incantation)` (`doc/CSBwin-src/Magic.cpp:815`) — a C string, so the
     // first zero ends it. Dropping the zeros instead would bring back the symbols a cast
@@ -213,7 +213,7 @@ export function readCsbwinCharacter(
     skills: readSkills(block, base),
     possessions: slots,
     shieldStrength: readU16BE(block, base + 274),
-    fingerprint: readU16LE(block, base + 280) as ui16,
+    fingerprint: readU16LE(block, base + 280),
     // `charFlags` holds the champion's gender and their busy bit. The rest below are
     // carried, not used: the save writer needs every field back, and these have no
     // reader in the engine yet.
@@ -381,7 +381,7 @@ export function writeCsbwinCharacter(
 ): void {
   const base = index * CHARDESC_SIZE;
 
-  block.set(encodeCharField(champion.name ?? '', 8), base);
+  block.set(encodeCharField(champion.name, 8), base);
   // The raw bytes when the title carries more than its decoded string does — but only
   // while the two still agree. A champion renamed since the save was read (the
   // reincarnate screen does exactly that) must be written from the *string*, or the
@@ -404,12 +404,12 @@ export function writeCsbwinCharacter(
   // (`Character.cpp:2653-2654`, `:5318-5319`) — so it is derived, never carried.
   block[base + 33] = champion.incantation.length & 3;
   const incantation = champion.incantationField;
-  const live = champion.incantation ?? [];
+  const live = champion.incantation;
   const keepRaw = incantation?.length === 4
     && incantationPrefix(incantation).length === live.length
     && incantationPrefix(incantation).every((b, i) => b === live[i]);
   for (let i = 0; i < 4; i++) {
-    block[base + 34 + i] = ((keepRaw ? incantation![i] : live[i] ?? 0) ?? 0) & 0xff;
+    block[base + 34 + i] = ((keepRaw ? incantation[i] : live[i] ?? 0) ?? 0) & 0xff;
   }
   block[base + 40] = champion.damageFromDirection & 0xff;
   block[base + 41] = champion.maxRecentDamage & 0xff;
@@ -438,8 +438,8 @@ export function writeCsbwinCharacter(
 
   for (let i = 0; i < 20; i++) {
     const at = base + SKILLS_OFFSET + i * SKILL_SIZE;
-    setU16BE(block, at, champion.skills?.[i]?.tempAdjust ?? 0);
-    setU32BE(block, at + 2, champion.skills?.[i]?.experience ?? 0);
+    setU16BE(block, at, champion.skills[i]?.tempAdjust ?? 0);
+    setU32BE(block, at + 2, champion.skills[i]?.experience ?? 0);
   }
 
   for (let i = 0; i < 30; i++) {

@@ -86,7 +86,7 @@ export function characterAtPosition(champions: Champion[], position: number): nu
     const champ = champions[i];
     if (!champ) continue;
     if ((champ.partyPosition | 0) !== position) continue;
-    if ((champ.attributes?.health | 0) !== 0) return i;
+    if ((champ.attributes.health | 0) !== 0) return i;
   }
   return -1;
 }

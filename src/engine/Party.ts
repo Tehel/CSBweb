@@ -164,13 +164,13 @@ export class Party {
  */
 export function setHandOwner(ctx: GameContext, chIdx: number): void {
     const party = ctx.party.state;
-    const current = party.cursorOwner ?? -1;
+    const current = party.cursorOwner;
     if (chIdx === current) return;
     if (chIdx !== -1) {
         const champion = getPartyChampion(party, chIdx);
         if (!champion) return;
         // `if ( (chIdx != -1) && (d.CH16482[chIdx].HP()==0) ) return;` (`doc/CSBwin-src/CSBCode.cpp:8484`).
-        if ((champion.attributes?.health ?? 0) === 0) return;
+        if (champion.attributes.health === 0) return;
     }
     party.cursorOwner = -1;
     if (current !== -1) drawCharacterState(ctx, current, CHARFLAG_CURSOR);
@@ -281,11 +281,11 @@ export function copyCharacter(party: PartyState, pool: WingsPool, fingerprint: n
  * never take it (`chIdx == -1`, which clears it, is always allowed).
  */
 export function selectMagicCaster(party: PartyState, chIdx: number): void {
-    if (chIdx === (party.magicCasterIndex ?? -1)) return;
+    if (chIdx === party.magicCasterIndex) return;
     if (chIdx !== -1) {
         const champion = getPartyChampion(party, chIdx);
         if (!champion) return;
-        if ((champion.attributes?.health ?? 0) === 0) return;
+        if (champion.attributes.health === 0) return;
     }
     party.magicCasterIndex = chIdx;
 }

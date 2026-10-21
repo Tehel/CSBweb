@@ -147,13 +147,6 @@ function formatWeightText(weight: number): string {
 }
 
 /**
- * `GetObjectWeight` / `TAG0091e6`, in the engine (`src/engine/CharacterStats.ts`).
- */
-function getObjectWeightForRecord(ui: UIState, rn: ObjectID, visited: Set<number>): number {
-  return ui.ctx.systems.characterStats.getObjectWeight(rn, visited);
-}
-
-/**
  * The lines `DescribeObject` draws under an object's name, and whether a viewing filter
  * rewrote them: a DSA's `&DESCRIBE` changed the mask, a phrase's text or a colour. A
  * filter that ran no `&DESCRIBE` let the object through.
@@ -227,7 +220,7 @@ export function getObjectDescriptionLines(ui: UIState, objectId: ObjectID, objec
   let phraseMask = descriptionMask & flags & 0x0f;
   phraseMask |= 0x40;
 
-  const weight = getObjectWeightForRecord(ui, objectId, new Set<number>());
+  const weight = ui.ctx.systems.characterStats.getObjectWeight(objectId);
   phrases[6] = formatWeightText(weight);
 
   const filter = applyViewingFilter(ui, ViewingFilterSite.DESCRIPTION, objectId, phraseMask);

@@ -294,7 +294,7 @@ export function parseManifest(text: string, base: string): DataSetManifest {
         const files = documents.map((document) => (document as Record<string, unknown>).file as string);
         if (new Set(files).size !== files.length) throw manifestError(`data set '${id}' names a document twice`);
         return {
-            id, name, description, authors: authors as string[], dir: under(base, dir), csbGraphics, miniDat, hintOracle, dmRules, thumbnailAsTitle, hidden, official,
+            id, name, description, authors, dir: under(base, dir), csbGraphics, miniDat, hintOracle, dmRules, thumbnailAsTitle, hidden, official,
             pending: status === 'pending', documents: documents.map((document) => ({ file: document.file as string, size: document.size as number })),
         };
     });

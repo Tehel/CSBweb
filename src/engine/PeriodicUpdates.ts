@@ -65,7 +65,7 @@ export function ninetySecondUpdate(ctx: GameContext): void {
             if (obj === OBJECT_ID_NULL) continue;
             const nameIndex = nameIndexOf(ctx, obj);
             if (nameIndex < OBJNI_TORCH_A || nameIndex > OBJNI_TORCH_D) continue;
-            const weapon = ctx.dungeon.getWeaponRecord(obj as ObjectID);
+            const weapon = ctx.dungeon.getWeaponRecord(obj);
             if (!weapon) continue;
             const charges = weapon.charges & 0x0f;
             if (charges === 0) continue;
@@ -143,7 +143,7 @@ export function tenSecondUpdate(ctx: GameContext): void {
             attrs.mana = Math.max(maxMana, mana - 1);
         }
 
-        const skills = ensureSkills(champ.skills ?? []);
+        const skills = ensureSkills(champ.skills);
         for (const entry of skills) {
             if (entry.tempAdjust > 0) entry.tempAdjust -= 1;
         }

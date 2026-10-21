@@ -258,7 +258,7 @@ export class CharacterSystem {
       champ.partyPosition = free & 0xff;
     }
 
-    const maxHealth = champ.attributes?.maxHealth ?? 0;
+    const maxHealth = champ.attributes.maxHealth;
     const reducedMax = Math.max(25, (maxHealth - Math.floor(maxHealth / 64) - 1) | 0);
     champ.attributes.maxHealth = reducedMax;
     champ.attributes.health = Math.floor(reducedMax / 2);

@@ -1435,6 +1435,8 @@ export class MonsterAI {
       this.scratch.fluxCages.fill(0);
     }
 
+    // Past `d.MaxITEM16`, CSBWin reads a static ITEM16 instead, zeroed
+    // (`doc/CSBwin-src/Monster.cpp:2985-2989`).
     const slot = this.dungeon.getAttachedItem16(monster);
     let sinceLastUpdate = (this.ctx.state.tickCount & 255) - (slot?.uByte4 ?? 0);
     if (sinceLastUpdate < 0) sinceLastUpdate += 256;

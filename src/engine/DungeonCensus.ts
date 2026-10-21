@@ -71,7 +71,7 @@ export function dungeonCensus(data: DungeonData): DungeonCensus {
   const walk = (first: ObjectID): void => {
     for (let rn = first; rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL && !seen.has(rn); rn = dungeon.getDBRecordLink(rn)) {
       seen.add(rn);
-      const category = data.rnMaps.decode(rn).category as DBType;
+      const category = data.rnMaps.decode(rn).category;
       const kind = KIND_OF[category];
       if (kind) items[kind]++;
       if (category === DBType.CREATURE) {

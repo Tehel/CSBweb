@@ -159,7 +159,7 @@ function summarizeStoneRoom(
 ): void {
   const { x, y, z } = position;
   const map = dungeon.getMap(z);
-  const sentinel = dungeon.getData().header.randomSeed ?? 0;
+  const sentinel = dungeon.getData().header.randomSeed;
   const mapWidth = map?.descriptor.width ?? 0;
   const mapHeight = map?.descriptor.height ?? 0;
   const numWallDecoration = map?.descriptor.wallGraphicsCount ?? 0;
@@ -345,7 +345,7 @@ export function summarizeRoomInfoCsbwin(
   rslt.championPortraitOrdinal = 0;
 
   const map = dungeon.getMap(z);
-  const sentinel = dungeon.getData().header.randomSeed ?? 0;
+  const sentinel = dungeon.getData().header.randomSeed;
   const mapWidth = map?.descriptor.width ?? 0;
   const mapHeight = map?.descriptor.height ?? 0;
   const numFloorDecorations = map?.descriptor.floorGraphicsCount ?? 0;

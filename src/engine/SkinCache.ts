@@ -55,8 +55,8 @@ export class SkinCache {
             if (recSize <= 0) recSize = 0;
             this.m_size[column] = recSize;
             if (this.m_size[column] === 0) return column;
-            if (this.m_size[column]! > 64) this.m_size[column] = 64;
-            copyBytes(this.m_columns[column]!, record!, this.m_size[column]!);
+            if (this.m_size[column] > 64) this.m_size[column] = 64;
+            copyBytes(this.m_columns[column]!, record!, this.m_size[column]);
         }
         return column;
     }

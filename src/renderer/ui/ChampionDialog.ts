@@ -154,7 +154,7 @@ type ChampionTab = 'attributes' | 'skills';
  * to where the next does (`doc/TRAINING.md`).
  */
 export function skillProgress(champion: Champion, skill: number): Required<Reading> {
-  const skills = ensureSkills(champion.skills ?? []);
+  const skills = ensureSkills(champion.skills);
   const own = skills[skill].experience;
   const counted = skill < 4 ? own : Math.floor((own + skills[(skill - 4) >> 2].experience) / 2);
   const mastery = determineMastery(champion, skill | 0xc000);

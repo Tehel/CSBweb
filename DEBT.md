@@ -682,33 +682,21 @@ palette codes, so none moves.
 
 ### E36 ⏳ Type escape hatches that check nothing
 
-`noUncheckedIndexedAccess` is off (it would raise 1,573 errors), so an index's `!` asserts
-nothing, and a `?? 0` on a field that cannot be missing hides the type's contract:
+`noUncheckedIndexedAccess` is off (it raises 2,129 errors, 775 of them in `src/`), so the
+356 `x[i]!` in `src/` assert nothing: 41 in `src/renderer/intro/HintOracle.ts`, 29 in
+`DsaSystem.ts`, 25 in `BytecodeInterpreter.ts` (`stack[sp]!` among them), and others. Their
+`!` documents where an index was proved, and the compiler holds none of them to it.
 
-- about 76 `x[i]!` in the UI and the intro, 54 of them in
-  `src/renderer/intro/HintOracle.ts` (`seg[36]!`, `:629`), and 25 `stack[sp]!` in the
-  bytecode interpreter;
-- `??` and `?.` on fields that are not optional: `champion.food ?? 0` and
-  `attrs?.health ?? 0` (`src/renderer/ui/Character.ts:69-70`, `:153-158`),
-  `party.cursorOwner ?? -1`
-  (`ActuatorSystem`), `(wallDecorationPos as 0 | 1 | 2) ?? 0`
-  (`BytecodeInterpreter.ts:1667`, `:1687`), `slot?.uByte4 ?? 0` hiding a missing ITEM16
-  (`MonsterAI.ts:1429`); `CharacterStats.getObjectWeight(item: ObjectID | number | null |
-  undefined)`;
-- `as ObjectID` on what already is one, which blurs the audit by which a cast marks a
-  conversion (`CLAUDE.md` → "Object IDs"): `DsaSystem.ts:1538`, `:1539`, `:2050`, `:4416`,
-  `:4619`, `:4631`, `ActuatorSystem.ts:610`, `TimerSystem.ts:1427`, `:1559`, `:1597`,
-  `objectIndex.ts` (`NameIndex`), `PeriodicUpdates.ts:67`, `MonsterSystem.ts:750`, `:757`;
-- CSBWin's `RNempty` written as `0 as ObjectID` (`ActuatorSystem.ts:353`) and `rn === 0`
-  (`objectIndex.ts:82`).
+What stands: no `??`, `?.`, `!` or `as` in `src/` that the types make redundant, read
+with the flag on (`navigator.storage?.` aside, a browser's feature test); CSBWin's
+`RNempty` is `OBJECT_ID_EMPTY`; `noImplicitReturns` and `noImplicitOverride` are on
+(`exactOptionalPropertyTypes` raises 37). `hcsb.dat`'s fifty words are checked once in
+`parseHcsbDat`, so `HintOracle`'s `seg[n]!` hold only once its type says the length.
 
-Two compiler checks cost nothing: `noImplicitReturns` and `noImplicitOverride` raise no
-error today (`exactOptionalPropertyTypes` raises 34).
-
-Paying it: the casts and `??` removed where the type already says it; `hcsb.dat`'s segment
-lengths checked once in `parseHcsbDat`, not by 54 `!`; `noUncheckedIndexedAccess` turned on
-module by module where data comes from files (the intro, the renderer, the loaders), in a
-`tsconfig` that `npm test` runs; an `OBJECT_ID_EMPTY` constant; the two free flags on.
+Paying the rest: `noUncheckedIndexedAccess` turned on module by module where data comes
+from files, the intro first (34 errors, and `seg` typed by its length), then the renderer
+and the loaders, checked by a `tsc` pass that `npm test` runs over those modules; each
+`!` it then keeps is a proof the compiler sees.
 
 ### E39 ⏳ The About and Credits pages
 

@@ -98,7 +98,7 @@ export function tag01b29a(ctx: GameContext): void {
     }
     if (!candidate) return;
   } else {
-    const cursorOwner = party.cursorOwner ?? -1;
+    const cursorOwner = party.cursorOwner;
     party.champions.forEach((champ, idx) => {
       if (!champ) return;
       // Not the champion holding the cursor, and not the one with the menu open: those

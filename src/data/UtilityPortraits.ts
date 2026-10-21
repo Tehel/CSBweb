@@ -28,7 +28,7 @@ function cellOf(sheet: { width: number; pixels: Uint8Array }, charID: number): u
   const oy = (charID >> 3) * PORTRAIT_HEIGHT;
   const cell: ui8[] = [];
   for (let y = 0; y < PORTRAIT_HEIGHT; y++) {
-    for (let x = 0; x < PORTRAIT_WIDTH; x++) cell.push(sheet.pixels[(oy + y) * sheet.width + ox + x]! as ui8);
+    for (let x = 0; x < PORTRAIT_WIDTH; x++) cell.push(sheet.pixels[(oy + y) * sheet.width + ox + x]!);
   }
   return cell;
 }

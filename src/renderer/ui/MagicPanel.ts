@@ -159,7 +159,7 @@ export function magicSelection(ui: UIState, button: number): void {
  * pressed rune inverted, not the next step's.
  */
 function* magicSelectionScript(ui: UIState, button: number): LoopScript {
-  const party = ui.partyState!;
+  const party = ui.partyState;
   if (button === 108) {
     yield* flashButtonScript(ui.ctx, 0xea, 0x12f, 0x3f, 0x49);
     // `CastMagic`'s first act is `WaitForButtonFlash()` (`Magic.cpp:942`), which is waited
@@ -168,7 +168,7 @@ function* magicSelectionScript(ui: UIState, button: number): LoopScript {
     ui.ctx.systems.magic.castSpellFromUi(party.magicCasterIndex);
   } else {
     const D7 = button - 101;
-    const pwA3 = ui.uiTables!.graphic231.word18552[D7]!;
+    const pwA3 = ui.uiTables.graphic231.word18552[D7]!;
     yield* flashButtonScript(ui.ctx, pwA3.x1, pwA3.x2, pwA3.y1, pwA3.y2);
     // `wvbl(_3_);`
     yield 1;

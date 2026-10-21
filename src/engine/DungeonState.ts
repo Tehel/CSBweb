@@ -241,7 +241,7 @@ export class DungeonState {
 
             if (absX < minX || absX > maxX || absY < minY || absY > maxY) continue;
 
-            return new Position(absX - desc.offsetX, absY - desc.offsetY, idx as ui8);
+            return new Position(absX - desc.offsetX, absY - desc.offsetY, idx);
         }
 
         return null;

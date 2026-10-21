@@ -64,7 +64,7 @@ export function resolveEmptyHandedViewportClick(ui: UIState, x: number, y: numbe
     return ui.context.facingAlcove ? null : 'wall';
   }
   if (ui.context.facingAlcove) return null;
-  if (ui.context.roomData?.[17]?.roomType !== RoomType.STONE) return null;
+  if (ui.context.roomData[17]?.roomType !== RoomType.STONE) return null;
   if (!isFrontCellStoneOrVisibleFalseWall(ui)) return null;
   if (x < 33 || x > 189 || y < 44 || y > 150) return null;
   return 'stone';
@@ -108,7 +108,7 @@ export function resolveViewportCursorAction(ui: UIState, x: number, y: number): 
   // `d.CellTypeJustAhead == 0` (`doc/CSBwin-src/Mouse.cpp:1166`), which is all this arm
   // tests: a false wall that is not open summarises as stone, imaginary or not
   // (`Codea59a.cpp:278-279`), unlike the bare-stone sound's `(cf & 5) == 0`.
-  const stoneAhead = ui.context.roomData?.[17]?.roomType === RoomType.STONE;
+  const stoneAhead = ui.context.roomData[17]?.roomType === RoomType.STONE;
   const doorFacingAhead = isFrontCellDoorFacing(ui);
 
   if (stoneAhead) {
@@ -149,10 +149,10 @@ export function fillAtWaterFountain(ui: UIState): void {
   const objectNameIndex = resolveObjectNameIndex(ui, objectId);
 
   if (objectNameIndex >= OBJNI_WATERSKIN && objectNameIndex <= OBJNI_WATER) {
-    const misc = ui.ctx.dungeon.getMiscRecord(objectId as ObjectID);
+    const misc = ui.ctx.dungeon.getMiscRecord(objectId);
     if (misc) misc.specialState = 3;
   } else if (objectNameIndex === OBJNI_EMPTY_FLASK) {
-    const potion = ui.ctx.dungeon.getPotionRecord(objectId as ObjectID);
+    const potion = ui.ctx.dungeon.getPotionRecord(objectId);
     if (potion) potion.potionType = POTION_WATER_FLASK;
   }
 }
@@ -207,7 +207,7 @@ function isFrontCellStoneOrVisibleFalseWall(ui: UIState): boolean {
 }
 
 function isFrontCellDoorFacing(ui: UIState): boolean {
-  const rd = ui.context.roomData?.[17];
+  const rd = ui.context.roomData[17];
   return rd?.graphicRoomType === GraphicRoomType.DOOR_FACING;
 }
 

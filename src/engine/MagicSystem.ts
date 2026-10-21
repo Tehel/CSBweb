@@ -586,7 +586,7 @@ export class MagicSystem {
   ): number {
     const champion = this.ctx.party.state.champions[chIdx];
     if (!champion) return 0;
-    const facing = (champion.facing ?? this.ctx.party.state.facing) & 3;
+    const facing = champion.facing & 3;
     const posInCell = ((((champion.partyPosition - facing + 1) & 2) >> 1) + facing) & 3;
     const launched = this.launchThrownMissile(
       object,

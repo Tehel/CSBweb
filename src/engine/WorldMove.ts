@@ -11,7 +11,7 @@
  * `DsaSystem.moveObjectDsa`. A monster lifted on the party's level first meets the
  * missiles in its way through `CheckMoveFromMissile`, which is `MissileEncounter`'s.
  */
-import { DBType, Direction, isSamePosition, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
+import { DBType, isSamePosition, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
 import type { CreatureRecord, Item16Record, TeleporterRecord } from '../data/dungeonTypes';
 import { monsterHorizontalSize, monsterLevitating } from '../data/tables/MonsterDesc';
 import type { DungeonState } from './DungeonState';
@@ -391,7 +391,7 @@ export class WorldMove {
           if (!below) break;
           position = below;
         }
-        const exit = this.dungeon.getExitStairsDirection(position, this.ctx.party.state.facing as Direction, this.ctx.tables);
+        const exit = this.dungeon.getExitStairsDirection(position, this.ctx.party.state.facing, this.ctx.tables);
         position = new Position(position.x + this.ctx.tables.deltaX[exit]!, position.y + this.ctx.tables.deltaY[exit]!, position.z);
         const back = (exit + 2) & 0x3;
         curPos = ((((curPos - back + 1) & 2) >> 1) + back) & 0x3;
@@ -482,7 +482,7 @@ export class WorldMove {
       for (let chIdx = 0; chIdx < party.champions.length; chIdx++) {
         const champ = party.champions[chIdx];
         if (!champ) continue;
-        if ((champ.attributes?.health ?? 0) === 0) continue;
+        if (champ.attributes.health === 0) continue;
         const maxLoad = this.ctx.systems.characterStats.maxLoad(champ);
         if (maxLoad <= 0) continue;
         const load = this.ctx.systems.characterStats.characterLoad(champ);
@@ -552,8 +552,8 @@ export class WorldMove {
     const rotation = teleporter.rotation & 0x3;
     const absolute = teleporter.absoluteRotation;
 
-    let facings = useItem16 ? (item16!.facings & 0xff) : this.encodeFacingByte(monster.facing);
-    let positions = useItem16 ? (item16!.positions & 0xff) : (monster.groupIndex & 0xff);
+    let facings = useItem16 ? (item16.facings & 0xff) : this.encodeFacingByte(monster.facing);
+    let positions = useItem16 ? (item16.positions & 0xff) : (monster.groupIndex & 0xff);
 
     let newFacings = absolute ? rotation : (facings + rotation) & 0x3;
     let newPositions = positions;
@@ -586,8 +586,8 @@ export class WorldMove {
     }
 
     if (useItem16) {
-      item16!.facings = newFacings & 0xff;
-      if (positions !== 0xff) item16!.positions = newPositions & 0xff;
+      item16.facings = newFacings & 0xff;
+      if (positions !== 0xff) item16.positions = newPositions & 0xff;
     } else {
       monster.facing = newFacings & 0x3;
       // With no ITEM16 attached, `groupIndex` is the packed positions byte.

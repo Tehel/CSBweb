@@ -37,7 +37,7 @@ import {
   OBJNI_TORCH_A,
   OBJNI_WATERSKIN,
 } from '../core/objectNameIndex';
-import { DBType, OBJECT_ID_NULL, type ObjectID } from '../core/types';
+import { DBType, OBJECT_ID_EMPTY, OBJECT_ID_NULL, type ObjectID } from '../core/types';
 import type {
   ClothingRecord,
   ContainerRecord,
@@ -79,7 +79,7 @@ const OBJECT_DATABASES: ReadonlySet<DBType> = new Set([
  * runs past its database also answers -1 here, since there is nothing to read.
  */
 export function DescIndex(dungeon: DungeonState, rn: ObjectID): number {
-  if (rn === 0) return -1; // RNempty
+  if (rn === OBJECT_ID_EMPTY) return -1;
   const category = dungeon.rnMaps.dbType(rn);
   if (!OBJECT_DATABASES.has(category)) return -1;
   const index = dungeon.rnMaps.idx(rn);
@@ -151,19 +151,18 @@ export function NameIndex(
       if (objNID7 !== OBJNI_EMPTY_FLASK) return objNID7;
     }
   }
-  const object = rn as ObjectID;
   if (objNID7 === OBJNI_COMPASS_N) {
     return objNID7 + partyFacing;
   }
   if (objNID7 === OBJNI_TORCH_A) {
-    const weapon = dungeon.getWeaponRecord(object);
+    const weapon = dungeon.getWeaponRecord(rn);
     if (weapon?.litTorch) {
       objNID7 += (tables.byte640[weapon.charges] ?? 0) & 0xff;
     }
     return objNID7;
   }
   if (objNID7 === OBJNI_OPEN_SCROLL) {
-    if (!dungeon.getScrollRecord(object)?.open) objNID7 = OBJNI_SCROLL;
+    if (!dungeon.getScrollRecord(rn)?.open) objNID7 = OBJNI_SCROLL;
     return objNID7;
   }
   if (
@@ -172,7 +171,7 @@ export function NameIndex(
     objNID7 === OBJNI_JEWEL_SYMAL_A
   ) {
     // `value()`, `BITS14_15(word2)` (`doc/CSBwin-src/CSB.h:1276`).
-    if (dungeon.getMiscRecord(object)?.specialState) objNID7++;
+    if (dungeon.getMiscRecord(rn)?.specialState) objNID7++;
     return objNID7;
   }
   if (
@@ -183,7 +182,7 @@ export function NameIndex(
     objNID7 === OBJNI_EYE_OF_TIME_A ||
     objNID7 === OBJNI_STAFF_OF_CLAWS_A
   ) {
-    if (dungeon.getWeaponRecord(object)?.charges) objNID7++;
+    if (dungeon.getWeaponRecord(rn)?.charges) objNID7++;
   }
   return objNID7;
 }

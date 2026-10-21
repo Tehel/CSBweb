@@ -277,7 +277,7 @@ export class AttackSystem {
    * so a filter that rewrites `pParam->monsterUnderAttack` does *not* change which
    * monster those two look at — only which one `PhysicalAttackFilter` damages.
    */
-  private monsterUnderAttack: ObjectID = OBJECT_ID_EOF as ObjectID;
+  private monsterUnderAttack: ObjectID = OBJECT_ID_EOF;
 
   /** `d.attackDamageToDisplay` — what `FlashAttackDamage` shows next. */
   attackDamageToDisplay = 0;
@@ -602,7 +602,7 @@ export class AttackSystem {
     // that need checking are the champion whose corner is 2 or 3 steps clockwise of
     // the direction being attacked; the intervening corner is 1 or 2 steps along.
     if (champ) {
-      const relative = sw((champ.partyPosition + 4 - (champ.facing ?? party.facing)) & 3);
+      const relative = sw((champ.partyPosition + 4 - champ.facing) & 3);
       let step = 0;
       if (relative === 2) step = 2;
       if (relative === 2 || relative === 3) {
@@ -774,7 +774,7 @@ export class AttackSystem {
       }
       case DBType.MISC: {
         const rec = dungeon.getMiscRecord(obj);
-        if (rec && (rec.specialState ?? 0) !== 0) rec.specialState = (rec.specialState ?? 0) - 1;
+        if (rec && rec.specialState !== 0) rec.specialState = rec.specialState - 1;
         break;
       }
       default:
@@ -1164,7 +1164,7 @@ export class AttackSystem {
     return determineMastery(champ, skill, {
       partySleeping: this.ctx.party.state.sleeping,
       getObjectNameIndex: (objectId: ObjectID) => {
-        const value = this.nameIndexOf(objectId as ObjectID);
+        const value = this.nameIndexOf(objectId);
         return value >= 0 ? value : null;
       },
     });
@@ -1197,7 +1197,7 @@ export class AttackSystem {
     params.charIdx = initialChIdx;
     params.attackType = initialAttackType;
 
-    const facing = (pChar.facing ?? party.facing) & 3;
+    const facing = pChar.facing & 3;
     params.attackX = party.position.x + this.ctx.tables.deltaX[facing];
     params.attackY = party.position.y + this.ctx.tables.deltaY[facing];
 

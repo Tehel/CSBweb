@@ -454,7 +454,7 @@ export class ViewportRenderer {
    * one.
    */
   renderPrisonInterior(seeThroughWalls: boolean): IndexedBitmap {
-    const seed = this.dungeonState.getData().header.randomSeed ?? 0;
+    const seed = this.dungeonState.getData().header.randomSeed;
     const dungeonState = createPrisonDungeonState(seed);
     this.context.word1868 = false;
     this.drawViewportFrame(

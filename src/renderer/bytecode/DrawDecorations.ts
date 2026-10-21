@@ -141,14 +141,14 @@ function drawWallDecorationGraphic(
 
   const colorMap = distanceBand === 0 ? tables.floorColorMapFar : tables.floorColorMapMedium;
   let pWidthDescriptor = desc;
-  let pSrcSizeDescriptor = rectSet?.[12];
+  let pSrcSizeDescriptor = rectSet[12];
   if (relativePosition === 6 || relativePosition === 1) {
-    pSrcSizeDescriptor = rectSet?.[11];
+    pSrcSizeDescriptor = rectSet[11];
   } else if (relativePosition === 5 || relativePosition === 0) {
-    pSrcSizeDescriptor = rectSet?.[10];
+    pSrcSizeDescriptor = rectSet[10];
   }
   if (relativePosition === 7 || relativePosition === 9) {
-    pWidthDescriptor = rectSet?.[8] ?? desc;
+    pWidthDescriptor = rectSet[8] ?? desc;
   }
   const finalBitmapWidth = (pWidthDescriptor.x2 | 0) - (pWidthDescriptor.x1 | 0);
   let widthPixels = src.width | 0;
@@ -386,8 +386,8 @@ export function drawWallText(draw: ViewportDraw, textRN: ObjectID, relativePosit
   if (!font) return;
 
   if (removeMortarJoint) {
-    const wall = draw.context.wallBitmaps?.[2];
-    const wallRect = draw.context.wallRectangles?.[6];
+    const wall = draw.context.wallBitmaps[2];
+    const wallRect = draw.context.wallRectangles[6];
     const wallTextRect = tables.wallTextRect;
     if (wall && wallRect && wallTextRect) {
       const rect: RectPos = {

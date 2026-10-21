@@ -233,8 +233,8 @@ function drawMouthAndEyeBoxes(ui: UIState, champion: Champion): void {
  * Note `< 0`, not `<= 0`: a champion at exactly zero food is not yet starving.
  */
 export function mouthBoxGraphic(champion: Champion): number {
-  const hungry = (champion.food ?? 0) < 0;
-  const thirsty = (champion.water ?? 0) < 0;
+  const hungry = champion.food < 0;
+  const thirsty = champion.water < 0;
   const poisoned = champion.poisonCount !== 0;
   return hungry || thirsty || poisoned ? BOX_GRAPHIC_MARKED : BOX_GRAPHIC_PLAIN;
 }
@@ -247,7 +247,7 @@ export function mouthBoxGraphic(champion: Champion): number {
  */
 export function eyeBoxGraphic(champion: Champion): number {
   for (let i = AttributeIndex.Strength; i <= AttributeIndex.AntiFire; i++) {
-    const attr = champion.attributes?.stats?.[i];
+    const attr = champion.attributes.stats[i];
     if (!attr) continue;
     if (attributeCurrent(attr) < attributeMaximum(attr)) return BOX_GRAPHIC_MARKED;
   }

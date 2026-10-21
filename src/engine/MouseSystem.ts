@@ -69,7 +69,7 @@ export class MouseSystem {
    */
   dropObjectFromCursor(relativePos: number, options?: DropCursorOptions): boolean {
     const party = this.ctx.party.state;
-    const owner = party.cursorOwner ?? -1;
+    const owner = party.cursorOwner;
     if (owner < 0) return false;
 
     const obj = party.objectInHand;
@@ -146,7 +146,7 @@ export class MouseSystem {
       champion = party.champions[chIdx];
     }
     if (!champion) return;
-    if ((champion.attributes?.health ?? 0) !== 0) return;
+    if (champion.attributes.health !== 0) return;
 
     this.ctx.systems.timer.scheduleViAltar(obj, location, posInCell, this.ctx.state.tickCount);
   }
@@ -157,7 +157,7 @@ export class MouseSystem {
    */
   throwObjectFromCursor(leftOrRight: number): boolean {
     const party = this.ctx.party.state;
-    const owner = party.cursorOwner ?? -1;
+    const owner = party.cursorOwner;
     if (owner < 0) return false;
 
     const obj = party.objectInHand;

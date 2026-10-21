@@ -722,14 +722,14 @@ export class MonsterSystem {
         if (timer.function === TimerFunction.TT_61) {
           this.ctx.sounds.queueSound(SOUND_ORDINAL_TELEPORT, mapX, mapY, 1, level);
         }
-        this.moveMonster(monsterRn as ObjectID, -1, 0, mapX, mapY, level);
+        this.moveMonster(monsterRn, -1, 0, mapX, mapY, level);
         return;
       }
 
       if (triedWander) break;
       triedWander = true;
 
-      const monster = this.dungeon.getCreatureRecord(monsterRn as ObjectID);
+      const monster = this.dungeon.getCreatureRecord(monsterRn);
       if (!monster || monster.creatureType !== MonsterType.mon_LordChaos) break;
       if (this.random.zeroTo3() !== 0) break; // 25 percent chance of movement
 

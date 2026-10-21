@@ -153,7 +153,7 @@ function readDungeon(
 ): Uint8Array {
     const layout = computeDungeonImageLayout(bytes, start, {
         indirectText: extended.indirectText,
-        bigActuators: extended.bigActuators ?? false,
+        bigActuators: extended.bigActuators,
         newScrolls: extended.version >= 0x42, // 'B'
     });
     if (!layout || layout.numMaps < 1) throw new Error('the dungeon does not read');

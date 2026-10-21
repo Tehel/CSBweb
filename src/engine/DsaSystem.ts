@@ -1320,8 +1320,8 @@ export class DsaSystem {
     while (bank.objectDeleteList !== OBJECT_ID_EOF) {
       const obj = bank.objectDeleteList;
       if (rnEquals(obj, rnSlave)) result = true;
-      bank.objectDeleteList = this.dungeon.getDBRecordLink(obj as ObjectID);
-      this.dungeon.deleteDBEntry(obj as ObjectID);
+      bank.objectDeleteList = this.dungeon.getDBRecordLink(obj);
+      this.dungeon.deleteDBEntry(obj);
     }
     return result;
   }
@@ -1860,7 +1860,7 @@ export class DsaSystem {
           const { category } = this.dungeon.rnMaps.decode(rn);
           if (!this.canDeleteFromCell(category)) break;
           this.dungeon.removeObjectFromCell(pos, rn);
-          this.ctx.systems.actuators.triggerObjectMove(pos, rn as ObjectID, false, false, this.ctx.party.state.facing);
+          this.ctx.systems.actuators.triggerObjectMove(pos, rn, false, false, this.ctx.party.state.facing);
           this.deleteLinkedScrollText(rn, bank);
           this.deleteObject(bank, rn);
           break;
@@ -4231,7 +4231,7 @@ export class DsaSystem {
         && dstType === 1
         && locationRelFromInteger(dstLoc).l === partyLevel
         && locr.l === partyLevel;
-      if (!sameLevelMonsterMove) this.objectMover().moveObject(object as ObjectID, locr.x, locr.y, -1, 0, locr.l);
+      if (!sameLevelMonsterMove) this.objectMover().moveObject(object, locr.x, locr.y, -1, 0, locr.l);
     } else if (this.dungeon.rnMaps.dbType(object) === DBType.CLOUD) {
       // The first match in `TIMER_SEARCH` order (`MoveObject.cpp:233-241`).
       for (const entry of this.timers.searchOrder()) {
@@ -4434,7 +4434,7 @@ export class DsaSystem {
         } else {
           // `MoveObject(object, -1, 0, x, y)` and then `object.pos(p)` (`:531-538`): the
           // pads see the corner the object came with, and it lies in corner `p`.
-          const result = mover.moveObject(object as ObjectID, -1, 0, locr.x, locr.y, locr.l);
+          const result = mover.moveObject(object, -1, 0, locr.x, locr.y, locr.l);
           if (result.placed !== null && result.position && result.placed !== placed) {
             this.dungeon.removeObjectFromCell(result.position, result.placed);
             this.dungeon.addObjectToCell(result.position, placed);
@@ -4446,7 +4446,7 @@ export class DsaSystem {
         // the level that named the source square is pointed at the destination
         // (`:539-571`). `MoveObject` itself leaves them behind, as the AI's own
         // steps do.
-        const moved = mover.moveMonster(object as ObjectID, srcLocr.x, srcLocr.y, locr.x, locr.y, locr.l);
+        const moved = mover.moveMonster(object, srcLocr.x, srcLocr.y, locr.x, locr.y, locr.l);
         if (moved.code === 0) {
           for (const timer of this.timers.getTimers()) {
             if (timer.level !== (locr.l & 0xff)) continue;

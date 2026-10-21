@@ -40,7 +40,7 @@ export function computeFeedParameters(
 
   const nameIndex = resolveObjectNameIndex(ui, objectId);
   if (nameIndex < 0) return null;
-  const category = ui.ctx.dungeon.rnMaps.dbType(objectId as ObjectID);
+  const category = ui.ctx.dungeon.rnMaps.dbType(objectId);
 
   // `doc/CSBwin-src/Character.cpp:4049-4055`, `:4103-4113`: a scroll has no `objectType`,
   // and the party's square and facing are the block's `location`.
@@ -55,7 +55,7 @@ export function computeFeedParameters(
   // `d.ObjDesc[objDI].word4 & 1` — the mouth bit of the carry-location mask. Anything
   // without it is inedible, and a chest or a scroll is refused outright; other objects
   // fall through so a waterskin or a bones can still reach the branches below.
-  const descIndex = descIndexForObject(ui, objectId as ObjectID);
+  const descIndex = descIndexForObject(ui, objectId);
   const carryMask = descIndex !== null ? ui.objectTables.objDescWord4[descIndex] ?? 0 : 0;
   if ((carryMask & 1) === 0) {
     if (category === DBType.CHEST || category === DBType.SCROLL) return null;
@@ -65,7 +65,7 @@ export function computeFeedParameters(
 
   if (nameIndex >= OBJNI_WATERSKIN && nameIndex <= OBJNI_WATER) {
     // A waterskin holds gulps in the misc record's `value`, and each drink spends one.
-    const rec = ui.ctx.dungeon.getMiscRecord(objectId as ObjectID);
+    const rec = ui.ctx.dungeon.getMiscRecord(objectId);
     if ((rec?.specialState ?? 0) === 0) {
       fp.waterValue = 0;
       fp.emptyFlask = false;
@@ -80,7 +80,7 @@ export function computeFeedParameters(
   }
 
   if (category === DBType.POTION) {
-    const rec = ui.ctx.dungeon.getPotionRecord(objectId as ObjectID);
+    const rec = ui.ctx.dungeon.getPotionRecord(objectId);
     if (!rec) return null;
     fp.emptyHand = false;
     fp.gulp = SOUND_GULP;
@@ -140,15 +140,15 @@ export function handleMouthPress(ui: UIState): void {
     startMouthChewAnimation(ui);
   } else if (fp.emptyFlask) {
     // A drained potion becomes an empty flask; a waterskin just loses one gulp.
-    if (ui.ctx.dungeon.rnMaps.dbType(objectId as ObjectID) === DBType.POTION) {
-      const rec = ui.ctx.dungeon.getPotionRecord(objectId as ObjectID);
+    if (ui.ctx.dungeon.rnMaps.dbType(objectId) === DBType.POTION) {
+      const rec = ui.ctx.dungeon.getPotionRecord(objectId);
       if (rec) rec.potionType = PotionType.EMPTY_FLASK;
     }
     // `value(value() - 1)` sets the record's two bits (`doc/CSBwin-src/CSB.h:1277`), so an
     // empty waterskin, which only the filter empties again, holds 3.
     if (objNID6 >= OBJNI_WATERSKIN && objNID6 <= OBJNI_WATER) {
-      const rec = ui.ctx.dungeon.getMiscRecord(objectId as ObjectID);
-      if (rec) rec.specialState = ((rec.specialState ?? 0) - 1) & 3;
+      const rec = ui.ctx.dungeon.getMiscRecord(objectId);
+      if (rec) rec.specialState = (rec.specialState - 1) & 3;
     }
   }
 
@@ -161,7 +161,7 @@ export function handleMouthPress(ui: UIState): void {
     // `RemoveObjectFromHand()` (`:4497`), and its `TAG002572`.
     ui.partyState.objectInHand = OBJECT_ID_NULL;
     tag002572(ui);
-    ui.ctx.dungeon.deleteDBEntry(objectId as ObjectID);
+    ui.ctx.dungeon.deleteDBEntry(objectId);
   }
 
   if (fp.gulp >= 0) ui.ctx.sounds.queueSound(fp.gulp, ui.partyState.position.x, ui.partyState.position.y, 0, ui.ctx.party.state.position.z);

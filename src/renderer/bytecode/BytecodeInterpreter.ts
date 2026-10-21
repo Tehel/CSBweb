@@ -1508,7 +1508,7 @@ export class BytecodeInterpreter {
     const aboveMap = dungeon.getMap(posAbove.z);
     if (!aboveMap) return true;
 
-    const cellFlag = aboveMap.cellFlags?.[posAbove.x]?.[posAbove.y] ?? 0;
+    const cellFlag = aboveMap.cellFlags[posAbove.x]?.[posAbove.y] ?? 0;
     const roomType = (cellFlag >> 5) & 0x7;
     if (roomType !== RoomType.PIT) return true;
     if ((cellFlag & 0x08) === 0) return true;
@@ -1664,7 +1664,7 @@ export class BytecodeInterpreter {
     const relativeCell = pop();
 
     const rd = this.context.roomData[relativeCell | 0];
-    const graphicOrdinal = rd?.decorations[(wallDecorationPos as 0 | 1 | 2) ?? 0] ?? 0;
+    const graphicOrdinal = rd?.decorations[wallDecorationPos as 0 | 1 | 2] ?? 0;
     // CSBWin passes the cell's `championPortraitOrdinal` as the fourth argument
     // (`doc/CSBwin-src/Viewport.cpp:2953-2957`); `SummarizeRoomInfo` set it from the
     // type-127 actuator on the wall the party is facing.
@@ -1684,7 +1684,7 @@ export class BytecodeInterpreter {
     const relativeCell = pop();
 
     const rd = this.context.roomData[relativeCell | 0];
-    const textRN = rd?.text[(wallDecorationPos as 0 | 1 | 2) ?? 0] ?? OBJECT_ID_EOF;
+    const textRN = rd?.text[wallDecorationPos as 0 | 1 | 2] ?? OBJECT_ID_EOF;
     drawWallText(this.draw, textRN, wallDecorationDrawLocation | 0, this.removeMortarJoint);
     this.removeMortarJoint = true;
     return true;

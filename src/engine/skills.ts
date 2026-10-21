@@ -112,7 +112,7 @@ export function determineMastery(
   const ignorePossessions = (skill & 0x4000) !== 0;
   const skillIndex = skill & 0x3fff;
 
-  const skills = ensureSkills(champion.skills ?? []);
+  const skills = ensureSkills(champion.skills);
   let experience = 0;
   if (skillIndex >= 0 && skillIndex < skills.length) {
     const entry = skills[skillIndex];
@@ -231,7 +231,7 @@ export function adjustSkills(
   // `chIdx` and `skillNumber` (`:335`, `:344`, `:357`).
   const basicSkill = skillNumber >= 4 ? Math.floor((skillNumber - 4) / 4) : skillNumber;
   const oldMastery = determineMastery(champ, basicSkill | 0xc000, { partySleeping });
-  const skills = ensureSkills(champ.skills ?? []);
+  const skills = ensureSkills(champ.skills);
   champ.skills = skills;
   const skillEntry = skills[skillNumber];
 
@@ -253,7 +253,7 @@ export function adjustSkills(
 
   // `psA3->experience += (UI16)(experience)` (`Magic.cpp:327`, `:337`): the filter may
   // give up to 0xfffff, of which the skill takes the low word.
-  skillEntry.experience = limitSkillExperience((skillEntry.experience ?? 0) + (adjustedExp & 0xffff));
+  skillEntry.experience = limitSkillExperience(skillEntry.experience + (adjustedExp & 0xffff));
   if (skillEntry.tempAdjust < 32000) {
     const inc = applyLimits(1, Math.trunc(adjustedExp / 8), 100);
     skillEntry.tempAdjust = (skillEntry.tempAdjust + inc) | 0;
@@ -261,7 +261,7 @@ export function adjustSkills(
 
   if (skillNumber >= 4) {
     const base = skills[basicSkill];
-    base.experience = limitSkillExperience((base.experience ?? 0) + (adjustedExp & 0xffff));
+    base.experience = limitSkillExperience(base.experience + (adjustedExp & 0xffff));
   }
 
   // A filter may name a champion who is not there: an empty `CHARDESC`, whose mastery
@@ -300,12 +300,12 @@ export function addToSkill(
   const basicSkill = skillNumber >= 4 ? Math.floor((skillNumber - 4) / 4) : skillNumber;
   const oldMastery = determineMastery(champ, basicSkill | 0xc000, { partySleeping });
 
-  const skills = ensureSkills(champ.skills ?? []);
+  const skills = ensureSkills(champ.skills);
   const skillEntry = skills[skillNumber];
-  skillEntry.experience = limitSkillExperience((skillEntry.experience ?? 0) + (experience & 0xffff));
+  skillEntry.experience = limitSkillExperience(skillEntry.experience + (experience & 0xffff));
   if (skillNumber >= 4) {
     const base = skills[basicSkill];
-    base.experience = limitSkillExperience((base.experience ?? 0) + (experience & 0xffff));
+    base.experience = limitSkillExperience(base.experience + (experience & 0xffff));
   }
   champ.skills = skills;
 

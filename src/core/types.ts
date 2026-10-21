@@ -112,6 +112,8 @@ export type ObjectID = ui16 & { readonly [rnBrand]: true };
 
 export const OBJECT_ID_EOF = 0xFFFE as ObjectID;
 export const OBJECT_ID_NULL = 0xFFFF as ObjectID;
+/** CSBWin's `RNempty` (`doc/CSBwin-src/CSBTypes.h:255`): the word 0, which some packets carry. */
+export const OBJECT_ID_EMPTY = 0x0000 as ObjectID;
 
 /**
  * `RN ==` (doc/CSBwin-src/CSBTypes.h:355-362), and `IsSameObjectAs` (`:368`): the same

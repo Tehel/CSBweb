@@ -254,7 +254,7 @@ function buildCharacterBlock(
             invisible: party.invisible,
         },
         {
-            load: (champion) => game.systems.characterStats?.characterLoad(champion) ?? champion.load,
+            load: (champion) => game.systems.characterStats.characterLoad(champion),
             portraitOf: (champion) => options.portraitOf?.(champion),
         },
         party.vacantCharacters,

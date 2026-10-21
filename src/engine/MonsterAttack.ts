@@ -149,7 +149,7 @@ export class MonsterAttack {
         case 0: case 1: case 2: case 3:
           break;
         case 4: // party leader, `d.HandChar` (`doc/CSBwin-src/Monster.cpp:1219-1221`)
-          chIdx = party.cursorOwner ?? -1;
+          chIdx = party.cursorOwner;
           break;
         case 5: // random live member
           chIdx = this.randomLiveChampion();
@@ -677,7 +677,7 @@ export class MonsterAttack {
       const other = party.champions[i];
       if (!other) continue;
       if (potential === i) continue;
-      if ((other.attributes?.health ?? 0) === 0) continue;
+      if (other.attributes.health === 0) continue;
       living = i;
       break;
     }
@@ -689,8 +689,8 @@ export class MonsterAttack {
     } else {
       // Both indices are list slots, as `d.HandChar` and `d.MagicCaster` are in CSBWin,
       // and both get the *same* champion.
-      if (chIdx === (party.cursorOwner ?? -1)) setHandOwner(this.ctx, living);
-      if (chIdx === (party.magicCasterIndex ?? -1)) selectMagicCaster(party, living);
+      if (chIdx === party.cursorOwner) setHandOwner(this.ctx, living);
+      if (chIdx === party.magicCasterIndex) selectMagicCaster(party, living);
     }
   }
 

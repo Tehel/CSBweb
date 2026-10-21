@@ -67,8 +67,8 @@ export function drawFoodWaterPanel(ui: UIState, champion: Champion): void {
     blitWord(32, g232.wRectPos966);
   }
 
-  drawFoodWaterBar(ui, champion.food ?? 0, 69, 5);
-  drawFoodWaterBar(ui, champion.water ?? 0, 92, 14);
+  drawFoodWaterBar(ui, champion.food, 69, 5);
+  drawFoodWaterBar(ui, champion.water, 92, 14);
 }
 
 export function drawAttributePanel(ui: UIState, champion: Champion): void {
@@ -101,7 +101,7 @@ export function drawAttributePanel(ui: UIState, champion: Champion): void {
   // `for (D7W=1; D7W<=6; D7W++)` — the panel lists attributes 1..6 and never Luck
   // (`doc/CSBwin-src/Character.cpp:4626`). Red when Current has fallen below Maximum,
   // green when a potion has pushed it above.
-  const stats = champion.attributes?.stats ?? [];
+  const stats = champion.attributes.stats;
   const attrValues: number[] = [];
   const attrMax: number[] = [];
   for (let i = AttributeIndex.Strength; i <= AttributeIndex.AntiFire; i++) {
@@ -151,12 +151,12 @@ export function drawAttributePanel(ui: UIState, champion: Champion): void {
 export function drawVitalsAndLoad(ui: UIState, champion: Champion): void {
 
   const attrs = champion.attributes;
-  const health = attrs?.health ?? 0;
-  const maxHealth = attrs?.maxHealth ?? 0;
-  const stamina = Math.floor((attrs?.stamina ?? 0) / 10);
-  const maxStamina = Math.floor((attrs?.maxStamina ?? 0) / 10);
-  const mana = attrs?.mana ?? 0;
-  const maxMana = attrs?.maxMana ?? 0;
+  const health = attrs.health;
+  const maxHealth = attrs.maxHealth;
+  const stamina = Math.floor(attrs.stamina / 10);
+  const maxStamina = Math.floor(attrs.maxStamina / 10);
+  const mana = attrs.mana;
+  const maxMana = attrs.maxMana;
 
   const baseX = VIEWPORT_X + 55;
   const slashX = VIEWPORT_X + 73;
@@ -643,9 +643,9 @@ function drawLifeBars(ui: UIState, chIdx: number, champion: Champion): void {
   if (!offsets || !masks) return;
 
   const heights = [
-    computeBarHeight(champion.attributes?.health ?? 0, champion.attributes?.maxHealth ?? 0, false),
-    computeBarHeight(champion.attributes?.stamina ?? 0, champion.attributes?.maxStamina ?? 0, false),
-    computeBarHeight(champion.attributes?.mana ?? 0, champion.attributes?.maxMana ?? 0, true),
+    computeBarHeight(champion.attributes.health, champion.attributes.maxHealth, false),
+    computeBarHeight(champion.attributes.stamina, champion.attributes.maxStamina, false),
+    computeBarHeight(champion.attributes.mana, champion.attributes.maxMana, true),
   ];
 
   for (let bar = 0; bar < 3; bar++) {
@@ -687,7 +687,7 @@ export function drawHeldObjectName(ui: UIState): void {
   if (!objectNames || objectNames.length === 0) return;
 
   const objectId = ui.partyState.objectInHand;
-  const label = objectId !== OBJECT_ID_NULL ? heldObjectName(ui, objectId as ObjectID) : '';
+  const label = objectId !== OBJECT_ID_NULL ? heldObjectName(ui, objectId) : '';
 
   const padded = (label || '').padEnd(14, ' ').slice(0, 14);
   drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, 0xe9, 0x25, 4, 0, padded);

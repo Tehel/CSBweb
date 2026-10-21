@@ -113,7 +113,7 @@ export class MissileEncounter {
       if (oldPos.z !== party.position.z) return;
       const monster = this.dungeon.getCreatureRecord(movedObject);
       if (!monster) return;
-      const hasHp = (monster.hp ?? []).some((hp) => (hp ?? 0) > 0);
+      const hasHp = monster.hp.some((hp) => hp > 0);
       if (!hasHp) return;
       for (let pos = 0; pos < 4; pos++) {
         if (ordinalOfMonsterAtPosition(this.dungeon, this.ctx.tables.monsterDesc, monster, pos) !== 0) {
@@ -637,7 +637,7 @@ export class MissileEncounter {
     const rn = this.createCloudRecord(CloudType.CT_FLUXCAGE, 0, 255);
     if (rn === null) return null;
     if (!this.dungeon.addObjectToCell(position, rn)) {
-      this.dungeon.deleteDBEntry(rn as ObjectID);
+      this.dungeon.deleteDBEntry(rn);
       return null;
     }
     this.timers.createTimer(
@@ -650,7 +650,7 @@ export class MissileEncounter {
       position.z,
       rn,
     );
-    return rn as ObjectID;
+    return rn;
   }
 
   /**
@@ -809,7 +809,7 @@ export class MissileEncounter {
     // `if (object.IsMagicSpell()) dbType = dbCLOUD; else dbType = object.dbType();`
     const dbType = isMagicSpellRn(projectile)
       ? DBType.CLOUD
-      : this.dungeon.rnMaps.dbType(projectile as ObjectID);
+      : this.dungeon.rnMaps.dbType(projectile);
 
     let d6: number;
     if (dbType !== DBType.CLOUD) {

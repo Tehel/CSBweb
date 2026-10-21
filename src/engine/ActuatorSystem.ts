@@ -2,6 +2,7 @@ import { GetBasicObjectType } from './objectIndex';
 import {
   rnEquals,
   DBType,
+  OBJECT_ID_EMPTY,
   OBJECT_ID_EOF,
   OBJECT_ID_NULL,
   Position,
@@ -173,7 +174,7 @@ export class ActuatorSystem {
         }
         // With nobody owning the cursor, `d.HandChar == -1`, only a portrait answers
         // (`Mouse.cpp:358-361`). Read at each actuator, as a recruit gives it an owner.
-        if ((party.cursorOwner ?? -1) === -1 && actuatorType !== 127) {
+        if (party.cursorOwner === -1 && actuatorType !== 127) {
           continue;
         }
         if (actuatorPos !== (touchedPosition & 0x3)) {
@@ -349,8 +350,8 @@ export class ActuatorSystem {
               if (allow) {
                 const deleted = objectInHand;
                 party.objectInHand = OBJECT_ID_NULL;
-                // `RNempty`, which a gift's packet carries after it (`Mouse.cpp:568`).
-                objectInHand = 0 as ObjectID;
+                // A gift's packet carries `RNempty` after it (`Mouse.cpp:568`).
+                objectInHand = OBJECT_ID_EMPTY;
                 emptyHanded = true;
                 if (deleted !== OBJECT_ID_NULL) {
                   this.dungeon.deleteDBEntry(deleted);
@@ -607,7 +608,7 @@ export class ActuatorSystem {
       const objNI = this.getBasicObjectType(obj);
       if (objNI === actuatorValue) return true;
       if (objNI !== OBJNI_CHEST) return false;
-      const chest = this.dungeon.getContainerRecord(obj as ObjectID);
+      const chest = this.dungeon.getContainerRecord(obj);
       for (let rn = chest?.containedObject ?? OBJECT_ID_EOF; rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
         if (this.getBasicObjectType(rn) === actuatorValue) return true;
       }
@@ -636,7 +637,7 @@ export class ActuatorSystem {
 
       if (mapPos !== -1) {
         // The champion who owns the cursor, d.HandChar — not whoever stands in cell mapPos.
-        const handChar = party.cursorOwner ?? -1;
+        const handChar = party.cursorOwner;
         if (handChar !== -1) {
           this.applySkillIncrease(party.champions[handChar], handChar, 8, adjustment, experienceMultiplier, AdjustSkillsWhy.SkillIncreaser1);
         }
