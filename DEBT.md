@@ -114,7 +114,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E23 | One game read, whole or not at all | L | ⏳ |
+| E23 | One game read, whole or not at all | L | ⏳ step 1 of 6 |
 | D18 | The interface's `d.` lives in the screen, and composing the screen changes the world | L | ⏳ |
 | D19 | `RuntimeSaveState` is neither strict nor a snapshot | M | ⏳ |
 | E41 | `src/data/` imports the engine | M | ⏳ |
@@ -512,12 +512,12 @@ against each other, and the file formats.
 
 ### E23 ⏳ One game read, whole or not at all
 
-What a read does is spread over `Game.ts:295-359`, `GameContext.ts:205-214`, `:260-308`,
-`CsbwinSaveGame.ts:243-271`, `SaveGameFile.ts:275` and `GameSaves.read`:
+What a read does is spread over `Game.ts:290-371`, `GameContext.ts:215-229`, `:274-323`,
+`CsbwinSaveGame.ts:264-298`, `SaveGameFile.ts:275-284` and `GameSaves.read`:
 
 - **It is not atomic.** `installCsbwinWorld` sets `ctx.rules`, `ctx.signatures`, the
   overlay and the world before `applyRuntimeSaveState` restores the rest
-  (`src/engine/CsbwinSaveGame.ts:243-271`), and `applySaveBytes` turns any error into a
+  (`src/engine/CsbwinSaveGame.ts:270-298`), and `applySaveBytes` turns any error into a
   `SaveFileError` (`src/engine/SaveGameFile.ts:275-283`), after which the full menu says so
   and play goes on: in the new world with the old timers and footprints, when it throws late
   (an `RnMaps.check` in `reloadAfterSaveGame`). CSBWin's `tag01efee` dies.
@@ -533,21 +533,51 @@ What a read does is spread over `Game.ts:295-359`, `GameContext.ts:205-214`, `:2
   `getRuntimeSaveState` and gives it back, the world encoded in base64 and decoded onto the
   same object. A save builds a throwaway `DungeonState` for `CheckMonsters` alone. The
   rules are read in two places, in two orders (`Game.readNewGameRules`,
-  `installCsbwinWorld`); `deleteDuplicateTimers` is set twice (`GameContext.ts:208`,
-  `Game.ts:342`); the world has two routes, `GameState.dungeon` and
+  `installCsbwinWorld`); `deleteDuplicateTimers` is set twice (`GameContext.ts:224`,
+  `Game.ts:358`); the world has two routes, `GameState.dungeon` and
   `DungeonState.getData()` (typed `Readonly`, written through), which `installWorld` keeps
-  in step (`Game.ts:338-339`).
+  in step (`Game.ts:354-355`).
 - **What `d.Initialize()` zeroes is reset nowhere** (C181).
 - **A read in play** drops no running script (`Game.applyRuntimeSaveState`) and does not
   empty the mouse queue, so clicks queued before F9 are translated against the loaded
   screen.
 
-Paying it: one `readGame(world, runtimeState)` for `dungeon.dat` and saves alike, an
-ordered list of steps: validate (a pure `validateCsbwinWorld`), build every piece, then
-swap them in at once; an error after the swap is `die(0xbad)`, not a message. A new game's
-state from a pure function instead of a scratch `Game`; `GameState.dungeon` gone. The
-validation and the swap change what a damaged file does: commits of their own after the
-refactor, with a tool of damaged saves.
+Paying it, in six steps, a commit each. Steps 1 to 3 are refactors, every tool's output
+byte-identical; 4 to 6 change what a damaged file or a read in play does, and are fixes
+with their tool. Where it stands: no step taken, step 1 is next.
+
+1. **One pipeline.** `readGame` (`src/engine/ReadGame.ts`), one ordered list of steps for
+   `dungeon.dat` and a save alike, in `_ReadEntireGame`'s order
+   (`doc/CSBwin-src/SaveGame.cpp:1536`): the file signatures, `CheckMonsters`, the rules,
+   signatures and overlay from the Extended Features block, the world,
+   `deleteDuplicateTimers` once, the state, the loop's reset. `Game.readNewGame` and
+   `applyCsbwinSave` become its two entries; `installCsbwinWorld` and `readNewGameRules`
+   go. A new game reads its rules after its state, a save before it: if a tool sees the
+   move, it is a C item, and the step keeps the order it found.
+2. **A new game without a scratch `Game`.** A pure `newGameState(data, tables)`: what
+   `createGameContext` and the constructor's `CheckMonsters` give a new game (the party at
+   the start, the spares, the timer queue as sized, `block1` and its `RandomGameID`), and
+   whatever the seventeen systems' constructors add to the state, checked one by one.
+   `readNewGame` builds no `Game` and no base64 world; `createGameContext` builds from the
+   same function.
+3. **One route to the world.** `GameState.dungeon` gone (14 uses in `src/`, the rest in
+   `tools/`), the world read through `ctx.dungeon`; `DungeonState.getData()` read-only in
+   fact or not typed so; `installWorld` installs one thing.
+4. **Build, then swap** (a fix). Every piece made off the context (the world, the party,
+   the timer queue, `item16`, the rules, signatures and overlay) before any is installed,
+   then one swap that cannot throw. An error before it leaves the running game as it was
+   and is the menu's message; one after it is `die(0xbad)`. A new tool of damaged saves,
+   one failing late (`reloadAfterSaveGame`'s `RnMaps.check`), proves the old game stands.
+5. **A save held against its world** (a fix). A pure `validateCsbwinWorld` before the
+   build: the party's level, x and y inside the dungeon, `numCharacter` 0 to 4,
+   `handChar`, `MagicCaster` and the champions' positions inside it, the object in hand and
+   the timers' indices inside their databases; `readCsbwinParty` stops renumbering. Read
+   first what CSBWin does with each: what it refuses, the port refuses; what it plays on
+   into undefined memory, the port refuses as obviously wrong, recorded in H. Its cases go
+   in step 4's tool.
+6. **A read in play starts clean** (a fix). A running script dropped and the mouse queue
+   emptied, as a read at the boot finds them. C181's reset of what `d.Initialize()` zeroes
+   is a step of the same pipeline, paid as its own item.
 
 ### E25 ⏳ One helper for each rule, where copies drift
 
