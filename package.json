@@ -7,6 +7,7 @@
     "build": "tsc && vite build && vite build --ssr",
     "test": "node tools/run-checks.mjs",
     "fetch-csbwin-src": "tsx tools/fetch-csbwin-src.ts",
+    "fetch-gamefiles": "tsx tools/fetch-gamefiles.ts",
     "preview": "vite preview",
     "start": "node server/server.ts",
     "deploy": "utils/deploy.sh"

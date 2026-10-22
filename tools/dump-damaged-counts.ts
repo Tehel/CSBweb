@@ -117,7 +117,7 @@ function main(): void {
   check(huge !== null, 'a DSA of 400,000,000 states throws before its table is allocated');
 
   console.log('== ExpandData ==');
-  const dungeon = new Uint8Array(readFileSync('static/gamefiles/csb/dungeon.dat'));
+  const dungeon = new Uint8Array(readFileSync('tools/fixtures/gamefiles/csb/dungeon.dat'));
   check(dungeon[0] === 0x81 && dungeon[1] === 0x04, "CSB's dungeon.dat is compressed");
   const expandHuge = thrown(() => ExpandData(dungeon.subarray(8), 0x40000000));
   console.log(`  an expanded size of 1 GiB: ${expandHuge?.message}`);

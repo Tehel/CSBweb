@@ -23,7 +23,7 @@ it cleaning the repository up to publish it as open source. Tiers D and E hold w
 code needs to be a base others can read and build on. Of the page's redesign, the
 interface in the canvas (U) and the welcome page are in, and E39 is what is left.
 
-**Conflux 3.5** (`static/gamefiles/conflux-3.5-b8/`) is the third dungeon, a data set
+**Conflux 3.5** (`tools/fixtures/gamefiles/conflux-3.5-b8/`) is the third dungeon, a data set
 (`conflux-3.5`) whose first ticks play (`tools/watch-conflux-start.ts`) and whose start is a
 golden frame. What waits on the author for it is C150. Its `dungeon.dat` is enciphered, and reads whole
 (`doc/PROVEN_FACTS.md` → "The "simple" encipherment is `RC4.cpp`'s own cipher"). Its
@@ -993,7 +993,7 @@ what the page draws.
 
 ### F21 ⏳ 3D2D1D's walkthrough is not replayed through `Game`
 
-`static/gamefiles/3D2D1D/WALKTHROUGH.md` is a full route through 3D2D1D, computed by
+`doc/3D2D1D_WALKTHROUGH.md` is a full route through 3D2D1D, computed by
 `tools/solve-3d2d1d.ts` from a model of CSBWin's moves, gravity, teleporters and four DSA
 commands, outside the engine. `tools/watch-3d2d1d-gravity.ts` replays its first two legs
 through `Game`, moves alone, and each comes to rest where the walkthrough says. The rest

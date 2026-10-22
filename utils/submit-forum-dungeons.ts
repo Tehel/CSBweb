@@ -14,7 +14,7 @@
  *
  * The candidates are the Dungeon Master forum's list of custom dungeons (`FORUM_LIST`),
  * the entries whose engines name CSBWin, less those the instance already lists (by name)
- * and those the forum's shared OneDrive (`ONEDRIVE_SHARE`) holds no files for: it keeps
+ * and those the forum's shared OneDrive (`tools/lib/oneDrive.ts`) holds no files for: it keeps
  * every dungeon of the list in `Custom Dungeons/<name> [<engines>] [<authors>]`. For each,
  * the script shows its name, its authors (the list's) and a description (its forum
  * topic's Story, Notes or Aim, cut to whole sentences) and asks:
@@ -61,14 +61,10 @@ import { bigEndianDungeonDat } from '../src/data/LittleEndianDungeon';
 import type { LocalDataSetFile } from '../src/data/LocalDataSets';
 import { checkLocalDataSet, identifyLocalDataSetFile, type LocalDataSetDraft } from '../src/engine/LocalDataSetCheck';
 import { lastTitleFrame, thumbnailPng } from '../src/renderer/intro/TitleThumbnail';
+import { fetchOk, oneDriveCustomDungeons, oneDriveFiles, type OneDriveItem } from '../tools/lib/oneDrive';
 
 /** The forum's list of custom dungeons, kept up to date by its moderators. */
 const FORUM_LIST = 'https://www.dungeon-master.com/forum/viewtopic.php?t=31516';
-/** The forum's shared folder, which the list names as the archive of every dungeon in it. */
-const ONEDRIVE_SHARE = 'https://1drv.ms/f/s!AsBu7boYHQokbYK3rjKY0b5_ra8';
-/** OneDrive's web app, whose anonymous token reads a shared folder (`oneDriveToken`). */
-const ONEDRIVE_APP_ID = '5cbed6ac-a083-4e14-b191-b4ba07653de2';
-const ONEDRIVE_API = 'https://my.microsoftpersonalcontent.com/_api/v2.0';
 /** The largest file the server takes (`MAX_PUBLISHED_FILE_BYTES`, `server/publish.ts`). */
 const MAX_FILE_BYTES = 16 * 1024 * 1024;
 /** The sets a `graphics.dat`-less dungeon may play the graphics of, as the form offers them. */
@@ -80,7 +76,6 @@ const NOT_GAME_FILES = new Set(['.exe', '.dll', '.com', '.bat', '.cmd', '.sh', '
 /** The forum topic's sections a description is taken from, in order of preference. */
 const DESCRIPTION_SECTIONS = ['story', 'notes', 'aim'];
 const SECTION = /^(version|platform|author|email address|date published|date last updated|story|aim|notes|instructions|history|download|screenshots|help)\s*:\s*(.*)$/i;
-const USER_AGENT = 'Mozilla/5.0 (CSBweb submit-forum-dungeons)';
 
 /** A dungeon of the forum's list. */
 interface Candidate {
@@ -91,15 +86,6 @@ interface Candidate {
     authors: string[];
     /** Its folder in the shared OneDrive, `null` where there is none. */
     folder: OneDriveItem | null;
-}
-
-interface OneDriveItem {
-    id: string;
-    name: string;
-    size: number;
-    folder?: unknown;
-    parentReference: { driveId: string };
-    '@content.downloadUrl'?: string;
 }
 
 /** A dungeon found in an archive, with the files that go with it. */
@@ -163,12 +149,6 @@ async function ask(question: string, prefill = ''): Promise<string> {
     }
     if (!stdin.isTTY) stdout.write(`${line}\n`);
     return line.trim();
-}
-
-async function fetchOk(url: string, init: RequestInit = {}): Promise<Response> {
-    const response = await fetch(url, { ...init, headers: { 'User-Agent': USER_AGENT, ...init.headers } });
-    if (!response.ok) throw new Error(`${url} answered HTTP ${response.status}`);
-    return response;
 }
 
 // ---------------------------------------------------------------- the forum
@@ -259,47 +239,9 @@ async function topicDescription(topic: string | null): Promise<string> {
 
 // ---------------------------------------------------------------- the shared OneDrive
 
-let oneDriveAuth: string | null = null;
-
-/** OneDrive's anonymous token, which its web app reads a shared folder with. */
-async function oneDrive(url: string): Promise<{ value?: OneDriveItem[]; '@odata.nextLink'?: string } & OneDriveItem> {
-    if (oneDriveAuth === null) {
-        const answer = await fetchOk('https://api-badgerp.svc.ms/v1.0/token', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ appId: ONEDRIVE_APP_ID }),
-        });
-        oneDriveAuth = `Badger ${(await answer.json() as { token: string }).token}`;
-    }
-    return (await fetchOk(url, { headers: { Authorization: oneDriveAuth, Prefer: 'autoredeem' } })).json();
-}
-
-async function oneDriveChildren(item: OneDriveItem): Promise<OneDriveItem[]> {
-    const children: OneDriveItem[] = [];
-    let url: string | undefined = `${ONEDRIVE_API}/drives/${item.parentReference.driveId}/items/${item.id}/children?$top=500`;
-    while (url) {
-        const page = await oneDrive(url);
-        children.push(...page.value ?? []);
-        url = page['@odata.nextLink'];
-    }
-    return children;
-}
-
-/** Every file under `item`, with its path below it. */
-async function oneDriveFiles(item: OneDriveItem, path = ''): Promise<{ path: string; item: OneDriveItem }[]> {
-    const files: { path: string; item: OneDriveItem }[] = [];
-    for (const child of await oneDriveChildren(item)) {
-        const below = `${path}/${child.name}`;
-        if (child.folder) files.push(...await oneDriveFiles(child, below));
-        else files.push({ path: below, item: child });
-    }
-    return files;
-}
-
 /** The shared folder's `Custom Dungeons`, its subfolders by the name before their first '['. */
 async function oneDriveDungeons(): Promise<Map<string, OneDriveItem>> {
-    const share = Buffer.from(ONEDRIVE_SHARE).toString('base64url');
-    const root = await oneDrive(`${ONEDRIVE_API}/shares/u!${share}/driveitem`);
-    const dungeons = (await oneDriveChildren(root)).find((child) => child.name === 'Custom Dungeons') ?? fail(`${ONEDRIVE_SHARE} has no 'Custom Dungeons' folder`);
-    return new Map((await oneDriveChildren(dungeons)).map((child) => [comparable(child.name.split(' [')[0]), child]));
+    return new Map((await oneDriveCustomDungeons()).map((child) => [comparable(child.name.split(' [')[0]), child]));
 }
 
 // ---------------------------------------------------------------- the instance

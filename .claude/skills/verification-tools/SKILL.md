@@ -84,7 +84,7 @@ import { check, finish } from './lib/check';
 async function main(): Promise<void> {
   // 1. Load the real files. Never synthesise a dungeon.
   const loader = new DungeonLoader();
-  await loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
+  await loader.loadFromArray(new Uint8Array(readFileSync(resolve('tools/fixtures/gamefiles/dm-atari/dungeon.dat'))));
   const data = loader.getData();
   if (!data) throw new Error('dungeon.dat did not load');
 
@@ -201,7 +201,7 @@ Before a behaviour-neutral change, capture `npx tsx tools/<t>.ts` for every tool
 `run-checks.mjs` into a scratch directory; after it, capture again and `cmp` file by file.
 A passing check can hide a changed number the check does not look at. Run a differing
 tool twice on the old tree (a `git worktree` of `HEAD` in the scratchpad, with
-`node_modules` and `static/gamefiles` symlinked in) to tell a real change from a tool that
+`node_modules` and `tools/fixtures/gamefiles` symlinked in) to tell a real change from a tool that
 varies on its own.
 The other half is the saves: for every file of `genuineSaves()`, a seeded
 `newGame` with `applyCsbwinSave`, then `getRuntimeSaveState()` hashed as JSON after the load

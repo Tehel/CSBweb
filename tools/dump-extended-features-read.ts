@@ -63,9 +63,9 @@ import { readU16BE, readU32LE, writeU32LE } from '../src/core/bytes';
 import { check, finish } from './lib/check';
 import { savePath } from './lib/saves';
 
-const CONFLUX = 'static/gamefiles/conflux-3.5-b8/dungeon.dat';
+const CONFLUX = 'tools/fixtures/gamefiles/conflux-3.5-b8/dungeon.dat';
 const SAVE = 'csbgame7.dat';
-const DM_WINDOWS = 'static/gamefiles/dm-windows/dungeon.dat';
+const DM_WINDOWS = 'tools/fixtures/gamefiles/dm-windows/dungeon.dat';
 
 const read = (path: string): Uint8Array => new Uint8Array(readFileSync(resolve(path)));
 const hex = (bytes: Uint8Array): string => Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join(' ');

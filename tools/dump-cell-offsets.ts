@@ -52,7 +52,7 @@ function objectListAgainstFlags(data: DungeonData): { columns: string[]; empty: 
 
 function main(): void {
   for (const set of SETS) {
-    const file = new Uint8Array(readFileSync(`static/gamefiles/${set}/dungeon.dat`));
+    const file = new Uint8Array(readFileSync(`tools/fixtures/gamefiles/${set}/dungeon.dat`));
     const data = new DungeonLoader().loadDungeonDat(file);
     const stored = data.maps.map((map) => map.descriptor.dataOffset);
     const offsets = levelCellOffsets(data.maps.map((map) => map.descriptor));
@@ -78,7 +78,7 @@ function main(): void {
     check(built.every((b, i) => b === own[i]), 'block 14 built from the levels is the file\'s own array');
   }
   // Conflux is the one data set past 64K: without the unwrapping its map 63 is read at 619.
-  const conflux = new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync('static/gamefiles/conflux-3.5-b8/dungeon.dat')));
+  const conflux = new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync('tools/fixtures/gamefiles/conflux-3.5-b8/dungeon.dat')));
   const offsets = levelCellOffsets(conflux.maps.map((map) => map.descriptor));
   check(conflux.maps[63].descriptor.dataOffset === 619 && offsets[63] === 66155,
     'Conflux\'s map 63 is stored at 619 and read at 66155');

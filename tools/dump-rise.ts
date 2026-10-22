@@ -86,7 +86,7 @@ import { graphicsTablesOf, newGame, presetHeroesOf, stockDungeon, stockGraphics 
 import { memoryStore, savePath } from './lib/saves';
 import { newUIState } from './lib/ui';
 
-const CSB = 'static/gamefiles/csb';
+const CSB = 'tools/fixtures/gamefiles/csb';
 const STONE = 10;
 const LEFT = 2;
 const SEED = 0x13579bdf;

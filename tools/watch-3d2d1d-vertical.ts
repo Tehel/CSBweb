@@ -35,7 +35,7 @@ import { createMonsterAt } from './lib/createMonster';
 import { newGame, runVbl, TICK_DUE } from './lib/game';
 import { wrapMember } from './lib/standIn';
 
-const DIR = 'static/gamefiles/3D2D1D';
+const DIR = 'tools/fixtures/gamefiles/3D2D1D';
 const read = (name: string): Uint8Array => new Uint8Array(readFileSync(`${DIR}/${name}`));
 const graphics = new GraphicsLoader();
 graphics.loadFromArray(read('graphics.dat'));

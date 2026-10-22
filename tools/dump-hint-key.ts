@@ -115,7 +115,7 @@ check(sameBytes(blockOf(buildSaveFile(freshGame())).hintKey, new Uint8Array(8))
   "a game that never read a block saves zeros for all five, as every committed save holds");
 
 console.log('4. The Oracle reads hcsb.hct under the key');
-const hct = new Uint8Array(readFileSync('static/gamefiles/csb/hcsb.hct'));
+const hct = new Uint8Array(readFileSync('tools/fixtures/gamefiles/csb/hcsb.hct'));
 const plain = parseHintOracle(hct);
 const enciphered = encipherHintFile(hct, KEY);
 const differs = enciphered.reduce((n, b, i) => n + (b !== hct[i] ? 1 : 0), 0);

@@ -1,6 +1,6 @@
 /**
  * A `dungeon.dat` that opens with an Extended Features block: the DM Windows package's
- * (`static/gamefiles/dm-windows/`), read by `DungeonLoader.loadDungeonDat` as
+ * (`tools/fixtures/gamefiles/dm-windows/`), read by `DungeonLoader.loadDungeonDat` as
  * `ReadDatabases` reads it (doc/CSBwin-src/SaveGame.cpp:2558-2586): `ReadExtendedFeatures`
  * first, then the image behind the block, in the shape the block declares.
  *
@@ -59,7 +59,7 @@ function differing(a: Databases, b: Databases, key: keyof Databases): number[] {
 
 function main(): void {
   const atari = stockDungeon();
-  const windows = load(read('static/gamefiles/dm-windows/dungeon.dat'));
+  const windows = load(read('tools/fixtures/gamefiles/dm-windows/dungeon.dat'));
   const ef = windows.extendedFeatures;
 
   console.log('== the block ==');
@@ -126,7 +126,7 @@ function main(): void {
   const graphics = stockGraphics();
   // The page's boot: a `Game` over the empty world, and `dungeon.dat` read after ENTER.
   const boot = newGame(emptyDungeonData(), graphics);
-  boot.readDungeonDat(read('static/gamefiles/dm-windows/dungeon.dat'));
+  boot.readDungeonDat(read('tools/fixtures/gamefiles/dm-windows/dungeon.dat'));
   check(boot.ctx.dungeon.getData().maps.length > 0, 'the boot reads dm-windows');
   console.log(`  a new game on dm-windows: dmRulesDesignOption ${boot.ctx.rules.dmRulesDesignOption}, dmRules ${boot.ctx.rules.dmRules}`);
   check(boot.ctx.rules.dmRulesDesignOption && !boot.ctx.rules.dmRules,
@@ -140,7 +140,7 @@ function main(): void {
   restart.readNewGame(stockDungeon());
   check(restart.ctx.rules.dmRules && restart.ctx.rules.dmRulesDesignOption,
     'readNewGame on a file with no block leaves the rules as they were');
-  restart.readNewGame(load(read('static/gamefiles/dm-windows/dungeon.dat')));
+  restart.readNewGame(load(read('tools/fixtures/gamefiles/dm-windows/dungeon.dat')));
   check(restart.ctx.rules.dmRulesDesignOption && !restart.ctx.rules.dmRules,
     'readNewGame on dm-windows takes both flags from its block');
 
@@ -153,7 +153,7 @@ function main(): void {
     csbGraphicsSignature1: 0, csbGraphicsSignature2: 0, hintKey: new Uint8Array(8),
   };
   const prefix = buildExtendedFeaturesPrefix({ header, typeMap: new Uint8Array(0), indexMap: new Uint16Array(0) });
-  const csbFile = read('static/gamefiles/csb/dungeon.dat');
+  const csbFile = read('tools/fixtures/gamefiles/csb/dungeon.dat');
   const withBlock = new Uint8Array(prefix.length + csbFile.length);
   withBlock.set(prefix);
   withBlock.set(csbFile, prefix.length);
@@ -172,7 +172,7 @@ function main(): void {
   };
   const savedFlags = (game: Game): number => readExtendedFeatures(buildSaveFile(game)).header?.extendedFlags ?? 0;
   const maze = newGame(emptyDungeonData(), graphics);
-  maze.readDungeonDat(read('static/gamefiles/3D2D1D/dungeon.dat'));
+  maze.readDungeonDat(read('tools/fixtures/gamefiles/3D2D1D/dungeon.dat'));
   console.log(`  a new game on 3D2D1D, extendedFlags 0x${maze.ctx.dungeon.getData().extendedFeatures?.extendedFlags.toString(16)}: ${flagsOf(maze)}`);
   check(maze.ctx.rules.bGravityGame && maze.ctx.rules.bThreeDMovements && !maze.ctx.rules.supressDSAWarningOption,
     'GravityGame and ThreeDMovements set bGravityGame and bThreeDMovements (SaveGame.cpp:427-430 in 20230608)');

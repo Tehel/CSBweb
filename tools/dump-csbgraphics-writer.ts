@@ -122,8 +122,8 @@ const roundTrip = (data: Uint8Array): Uint8Array | null =>
   loaderOf(buildCSBGraphicsFile([{ type: CSBGraphicType.Sound, id: 1, name: 'test', data }]))
     .readSection(CSBGraphicType.Sound, 1, 0);
 
-const conflux = shipped('static/gamefiles/conflux-3.5-b8/CSBgraphics.dat');
-const towers = shipped('static/gamefiles/towers-of-chaos-3.3/CSBgraphics.dat');
+const conflux = shipped('tools/fixtures/gamefiles/conflux-3.5-b8/CSBgraphics.dat');
+const towers = shipped('tools/fixtures/gamefiles/towers-of-chaos-3.3/CSBgraphics.dat');
 
 console.log('1. encodeOvl, on the shipped files');
 /** Section `i`'s code words in `file`. */

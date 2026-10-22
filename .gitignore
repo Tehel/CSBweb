@@ -7,6 +7,9 @@ archive
 doc/CSBwin-src/
 doc/CSBwin-src-*/
 
+# The data sets the tests and the dev server read, fetched by npm run fetch-gamefiles
+tools/fixtures/gamefiles/
+
 # tool output
 tools/output
 static/extracted

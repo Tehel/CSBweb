@@ -47,7 +47,7 @@ import { newGame, runVbl, stockGraphics, TICK_DUE, stockDungeon } from './lib/ga
 import { check, finish } from './lib/check';
 
 const conflux = new CSBGraphicsLoader();
-conflux.loadFromArray(new Uint8Array(readFileSync('static/gamefiles/conflux-3.5-b8/CSBgraphics.dat')));
+conflux.loadFromArray(new Uint8Array(readFileSync('tools/fixtures/gamefiles/conflux-3.5-b8/CSBgraphics.dat')));
 const section1 = conflux.readSection(CSBGraphicType.ViewportOverlay, 1, 0)!;
 const PIXELS = 14 + 40 + 4 * 256;
 const filePixels = section1.subarray(PIXELS, PIXELS + OVERLAY_WIDTH * OVERLAY_HEIGHT);
@@ -239,7 +239,7 @@ console.log('7. ReadCSBgraphic\'s first failure');
   check(down && overlay.active, 'puts the overlay down at its first failure only');
 
   const b = closed();
-  b.loader.loadFromArray(new Uint8Array(readFileSync('static/gamefiles/conflux-3.5-b8/CSBgraphics.dat')));
+  b.loader.loadFromArray(new Uint8Array(readFileSync('tools/fixtures/gamefiles/conflux-3.5-b8/CSBgraphics.dat')));
   b.loader.opener = () => true;
   b.loader.readSection(CSBGraphicType.OverlayPalette, 999, 0);
   b.loader.opener = () => false;

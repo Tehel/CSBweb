@@ -5,7 +5,7 @@
 # Builds the image with CSBWEB_PROBE=1 (the probes' handle, which a deployed image never
 # has) as csbweb:probe, runs it over the checkout's game files and a throwaway stats folder,
 # its store filled from their manifest (`tools/data-sets.json`, by `tools/fill-data-sets.ts`), runs `check-frames.sh --url` against it, and removes the container.
-# The game files' folder is throwaway too, each entry of `static/gamefiles/` mounted in it
+# The game files' folder is throwaway too, each entry of `tools/fixtures/gamefiles/` mounted in it
 # read-only, so that the probe's publish (`server/publish.ts`) writes its set's folder
 # there and leaves the checkout as it was.
 # Before the frames, it runs the server's check of a player's set (`dist/server/`,
@@ -27,7 +27,7 @@ name="csbweb-check-$$"
 stats="$(mktemp -d)"
 gamefiles="$(mktemp -d)"
 mounts=()
-for entry in "$root"/static/gamefiles/*; do mounts+=(-v "$entry:/data/gamefiles/$(basename "$entry"):ro"); done
+for entry in "$root"/tools/fixtures/gamefiles/*; do mounts+=(-v "$entry:/data/gamefiles/$(basename "$entry"):ro"); done
 
 cleanup() {
   docker rm -f "$name" >/dev/null 2>&1

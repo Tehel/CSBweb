@@ -82,11 +82,11 @@ function linesOf(bytes: Uint8Array): number[][] {
 for (const set of ['dm-atari', 'dm-atari-1.3-fr']) {
   console.log(`=== ${set} ===`);
   const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve(`static/gamefiles/${set}/dungeon.dat`))));
+  loader.loadFromArray(new Uint8Array(readFileSync(resolve(`tools/fixtures/gamefiles/${set}/dungeon.dat`))));
   const data = loader.getData();
   if (!data) throw new Error(`${set}/dungeon.dat did not load`);
   const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve(`static/gamefiles/${set}/graphics.dat`))));
+  graphics.loadFromArray(new Uint8Array(readFileSync(resolve(`tools/fixtures/gamefiles/${set}/graphics.dat`))));
   const dungeon = newGame(data, graphics).ctx.dungeon;
   const tables = graphicsTablesOf(graphics).objects;
   const cache = new Map<string, IndexedBitmap>();

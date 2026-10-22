@@ -9,7 +9,7 @@
  * of the game changed, and neither shows until the save is loaded.
  *
  * So the stamp is run over real files: the eight genuine CSBWin saves, and the two of
- * `static/gamefiles/csb`, which have no Extended Features block before `GAMEBLOCK1`.
+ * `tools/fixtures/gamefiles/csb`, which have no Extended Features block before `GAMEBLOCK1`.
  * One of those, `mini.dat`, has 127 words that are not zero in the block's first half,
  * where CSBWin writes zeroes (`doc/CSBwin-src/SaveGame.cpp:733-746`, the `STRandom()` it
  * comments out). For each:
@@ -45,7 +45,7 @@ import { check, finish } from './lib/check';
 import { genuineSaves } from './lib/saves';
 
 /** The saves with no Extended Features block: `GAMEBLOCK1` opens the file. */
-const BARE_SAVES = ['static/gamefiles/csb/mini.dat', 'static/gamefiles/csb/csbgame2.dat'];
+const BARE_SAVES = ['tools/fixtures/gamefiles/csb/mini.dat', 'tools/fixtures/gamefiles/csb/csbgame2.dat'];
 
 /** `RandomGameID` in `GAMEBLOCK1` (`doc/CSBwin-src/SaveGame.cpp:1085`), and the fold's last word. */
 const ID_OFFSET = 308;

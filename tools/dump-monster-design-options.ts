@@ -40,7 +40,7 @@ import { standIn, wrapMember } from './lib/standIn';
 import { createMonsterAt } from './lib/createMonster';
 import { graphicsTablesOf, stockGame, stockGraphics } from './lib/game';
 
-const CONFLUX = 'static/gamefiles/conflux-3.5-b8/dungeon.dat';
+const CONFLUX = 'tools/fixtures/gamefiles/conflux-3.5-b8/dungeon.dat';
 const graphics = stockGraphics();
 const EAST = 1;
 

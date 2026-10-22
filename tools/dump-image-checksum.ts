@@ -48,7 +48,7 @@ const MISMATCH = 'dungeon image checksum mismatch';
 
 function main(): void {
   console.log('== csb/dungeon.dat, expanded ==');
-  const csb = new Uint8Array(readFileSync(resolve('static/gamefiles/csb/dungeon.dat')));
+  const csb = new Uint8Array(readFileSync(resolve('tools/fixtures/gamefiles/csb/dungeon.dat')));
   const image = ExpandData(csb.subarray(8), readU32BE(csb, 2));
   const lastFlag = image.length - 3;
   const plain = failure(() => new DungeonLoader().loadFromArray(image));
@@ -64,7 +64,7 @@ function main(): void {
   check(failure(() => new DungeonLoader().loadDungeonDat(csb)) === null, 'the compressed file reads through its entry');
 
   console.log('== dm-atari/dungeon.dat ==');
-  const dm = new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat')));
+  const dm = new Uint8Array(readFileSync(resolve('tools/fixtures/gamefiles/dm-atari/dungeon.dat')));
   const reference = new DungeonLoader().loadDungeonDat(dm);
   const end = dm.length;
   check(failure(() => new DungeonLoader().loadDungeonDat(flipped(dm, end - 1))) === null,

@@ -25,7 +25,7 @@ const built = new WeakMap<GraphicsLoader, GameTables>();
 let stock: GraphicsLoader | null = null;
 
 /** The folder of the stock data set, the default dungeon. */
-export const STOCK_DIR = 'static/gamefiles/dm-atari';
+export const STOCK_DIR = 'tools/fixtures/gamefiles/dm-atari';
 
 /** The stock DM `graphics.dat`, loaded once. */
 export function stockGraphics(): GraphicsLoader {

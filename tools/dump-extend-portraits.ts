@@ -29,8 +29,8 @@ import type { ActuatorRecord, Database, DungeonData } from '../src/data/dungeonT
 import { check, finish } from './lib/check';
 import { genuineSaves } from './lib/saves';
 
-const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
-const ATARI_SAVES = ['static/gamefiles/csb/mini.dat', 'static/gamefiles/csb/csbgame2.dat'];
+const DUNGEON = 'tools/fixtures/gamefiles/dm-atari/dungeon.dat';
+const ATARI_SAVES = ['tools/fixtures/gamefiles/csb/mini.dat', 'tools/fixtures/gamefiles/csb/csbgame2.dat'];
 /** Champion 20's mirror, level 0 at (17,10): the one whose leftover bits hide its frame. */
 const MIRROR_286 = 286;
 const PORTRAIT_HIDE_GRAPHIC = 4;

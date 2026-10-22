@@ -287,7 +287,7 @@ class CheckedLib extends BackgroundLib {
 function views(): void {
   console.log('3. Views, the starting level');
   for (const set of SETS) {
-    const base = `static/gamefiles/${set.dir}`;
+    const base = `tools/fixtures/gamefiles/${set.dir}`;
     const data = new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync(`${base}/dungeon.dat`)));
     const graphics = new GraphicsLoader();
     graphics.loadFromArray(new Uint8Array(readFileSync(`${base}/graphics.dat`)));

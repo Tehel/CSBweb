@@ -90,7 +90,7 @@ each flag (`csbGraphics`, `miniDat`, `hintOracle`, `dmRules`, `thumbnailAsTitle`
 asks the server for it first, at `api/data-sets` (`loadManifest`, `src/main.ts`), and one
 that is missing or malformed ends the boot on `fatalMessage`, saying why.
 
-The repository's manifest is `tools/data-sets.json`, its folders under `static/gamefiles/`.
+The repository's manifest is `tools/data-sets.json`, its folders under `tools/fixtures/gamefiles/`.
 It keeps every set, because the tools need them all: they read it through
 `tools/lib/dataSets.ts`, and `tools/dump-data-sets.ts` asserts the parser's refusals and
 that every folder holds the files its flags promise. The dev server answers
@@ -453,7 +453,7 @@ runs `tsc` on it beside the root project. The package is an ES module
 routes and limits the server imports from `../src/data/`. `npm start` runs it locally, on the project's Node (below).
 
 It reads `PORT` (8085), `DIST_DIR` and `GAMEFILES_DIR` (the checkout's `dist/` and
-`static/gamefiles/`), `FILES_DIR` (the checkout's `files/`, which git ignores), and `STATS_DB` (the
+`tools/fixtures/gamefiles/`), `FILES_DIR` (the checkout's `files/`, which git ignores), and `STATS_DB` (the
 checkout's `stats/stats.db`, which git ignores), `MODERATOR_PLAYER_IDS`, the moderators,
 comma-separated `<playerId>[=<alias>]`, spaces around a comma or the `=` ignored, to whom
 `api/data-sets` offers every set (unset or empty, no one; an entry that is not a

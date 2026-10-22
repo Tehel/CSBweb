@@ -88,7 +88,7 @@ function main(): void {
   const raw = readWallDecorationRectSetIndex(graphics.getRawGraphic(0x22e), graphicsTablesOf(graphics).viewport.wallRectanglesOffset);
   const port = objectTables.wallDecorationRectSetIndex;
   const csbwin = new GraphicsLoader();
-  csbwin.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-windows/graphics.dat'))));
+  csbwin.loadFromArray(new Uint8Array(readFileSync(resolve('tools/fixtures/gamefiles/dm-windows/graphics.dat'))));
   const csbwinRaw = readWallDecorationRectSetIndex(csbwin.getRawGraphic(0x22e), graphicsTablesOf(csbwin).viewport.wallRectanglesOffset);
 
   // --- the data -------------------------------------------------------------------

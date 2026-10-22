@@ -43,7 +43,7 @@ interface DefinedItemsDump {
 
 function parseArgs(argv: string[]): ToolOptions {
   const options: ToolOptions = {
-    file: 'static/gamefiles/dm-atari/dungeon.dat',
+    file: 'tools/fixtures/gamefiles/dm-atari/dungeon.dat',
     out: 'tools/output/defined-items.json',
   };
 

@@ -47,7 +47,7 @@ import { graphicsTablesOf, newGame } from './lib/game';
 
 const FILES = [
   { name: 'tools fixture', path: 'tools/fixtures/csbgraphics/CSBgraphics.dat' },
-  { name: 'Conflux 3.5', path: 'static/gamefiles/conflux-3.5-b8/CSBgraphics.dat' },
+  { name: 'Conflux 3.5', path: 'tools/fixtures/gamefiles/conflux-3.5-b8/CSBgraphics.dat' },
 ];
 /** Two pictures to print: a bookshelf and a breaking wave. */
 const SHOWN = new Set(['wall 5', 'floor 61']);
@@ -157,7 +157,7 @@ for (const file of FILES) {
 
 // 3. The right side views, in Conflux 3.5.
 {
-  const BASE = 'static/gamefiles/conflux-3.5-b8';
+  const BASE = 'tools/fixtures/gamefiles/conflux-3.5-b8';
   const read = (name: string): Uint8Array => new Uint8Array(readFileSync(`${BASE}/${name}`));
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(read('graphics.dat'));

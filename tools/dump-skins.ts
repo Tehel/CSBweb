@@ -39,8 +39,8 @@ import { freshGame, int, op, run } from './lib/dsa';
 import { newGame, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
 
-const CONFLUX = 'static/gamefiles/conflux-3.5-b8/dungeon.dat';
-const TOWERS = 'static/gamefiles/towers-of-chaos-3.3/dungeon.dat';
+const CONFLUX = 'tools/fixtures/gamefiles/conflux-3.5-b8/dungeon.dat';
+const TOWERS = 'tools/fixtures/gamefiles/towers-of-chaos-3.3/dungeon.dat';
 const EDT_SKINS = 4;
 const skinsKey = (level: number, x: number): number => ((EDT_SKINS << 24) + (level << 4) + (x >> 1)) >>> 0;
 const DEFAULT_SKINS_KEY = ((EDT_SKINS << 24) + 0x800000) >>> 0;

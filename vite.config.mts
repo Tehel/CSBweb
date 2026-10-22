@@ -49,11 +49,13 @@ const DEV_MODERATOR_PLAYER_ID = '00000000-0000-4000-8000-000000000001';
  * `api/data-set-walls` answers `wallsText` over the same store: the published sets'.
  *
  * A published set is written into a scratch folder, made at start and removed at the end,
- * which holds a link to each entry of `static/gamefiles/`, so that a base set's
+ * which holds a link to each entry of `tools/fixtures/gamefiles/`, so that a base set's
  * `graphics.dat` and every folder name are where `publishDataSet` looks; its files are
  * served from there under `gamefiles/<id>/`, and an edited set's under its new folder's
- * name. An edit, and a document added or removed, copies a site's folder through its link,
- * and deletes the link, never `static/gamefiles/`. The store is `node:sqlite`'s, in memory:
+ * name. The site's sets are served from `tools/fixtures/gamefiles/` itself (`npm run
+ * fetch-gamefiles`), under `gamefiles/<dir>/`, as the deployed server serves its own. An
+ * edit, and a document added or removed, copies a site's folder through its link, and
+ * deletes the link, never `tools/fixtures/gamefiles/`. The store is `node:sqlite`'s, in memory:
  * on a Node without it, a GET answers the manifest and a POST 501.
  *
  * `api/stats` is `answerStats` over the same store's public sets, and over statistics made
@@ -64,7 +66,7 @@ const DEV_MODERATOR_PLAYER_ID = '00000000-0000-4000-8000-000000000001';
  */
 function dataSetsRoute(): Plugin {
   const file = resolve(import.meta.dirname, 'tools', 'data-sets.json');
-  const gamefiles = resolve(import.meta.dirname, 'static', 'gamefiles');
+  const gamefiles = resolve(import.meta.dirname, 'tools', 'fixtures', 'gamefiles');
   return {
     name: 'csbweb-data-sets',
     async configureServer(server) {
@@ -211,11 +213,11 @@ function dataSetsRoute(): Plugin {
         }
       });
 
-      // A published set's files, from the scratch folder.
+      // A set's files: a published one's from the scratch folder, a site's from the fixtures.
       server.middlewares.use('/gamefiles', (req, res, next) => {
         const segments = pathSegments(req.url ?? '');
-        if (!segments || !published.has(segments[0]!) || (req.method !== 'GET' && req.method !== 'HEAD')) return next();
-        const path = join(scratch, ...segments);
+        if (!segments || segments.length === 0 || (req.method !== 'GET' && req.method !== 'HEAD')) return next();
+        const path = join(published.has(segments[0]!) ? scratch : gamefiles, ...segments);
         if (!statSync(path, { throwIfNoEntry: false })?.isFile()) return next();
         res.setHeader('Content-Type', contentType(path));
         res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -280,9 +282,10 @@ export default defineConfig(({ command, isSsrBuild }) => ({
   root: '.',
   // Every URL relative to the page, so the game also runs under a sub-path.
   base: './',
-  // The dev server serves `static/` as it stands: the game files and the manuals. A build
-  // ships none of it. The page's own files are modules under `src/assets/`, which the
-  // build hashes, and the game files are served beside the page (`doc/DEPLOYMENT.md`).
+  // The dev server serves `static/` as it stands, the manuals, and its game files from the
+  // fixtures (`dataSetsRoute`). A build ships none of them. The page's own files are modules
+  // under `src/assets/`, which the build hashes, and the game files are served beside the
+  // page (`doc/DEPLOYMENT.md`).
   publicDir: command === 'serve' ? 'static' : false,
   define: {
     __CSBWEB_BUILD__: JSON.stringify(buildId()),

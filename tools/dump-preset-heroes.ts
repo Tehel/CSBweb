@@ -35,7 +35,7 @@ const outIndex = process.argv.indexOf('--out');
 const out = outIndex >= 0 ? process.argv[outIndex + 1] : undefined;
 
 const read = (set: string, file: string): Uint8Array =>
-  new Uint8Array(readFileSync(resolve('static/gamefiles', set, file)));
+  new Uint8Array(readFileSync(resolve('tools/fixtures/gamefiles', set, file)));
 
 function load(set: string) {
   const data = new DungeonLoader().loadDungeonDat(read(set, 'dungeon.dat'));

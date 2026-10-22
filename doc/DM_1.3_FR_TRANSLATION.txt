@@ -1,0 +1,202 @@
+"QUIT"                                      "QUITTER" // good
+"DUNGEON"                                   "DONJON" // good
+"UTILITY"                                   "OUTIL" // good
+
+"HINT"                                      "CONSEIL" // good
+"I AM READY, MASTER"                        "A VOS ORDRES, MAITRE" // good
+"WHAT IS YOUR WISH?"                        "QUE DESIREZ-VOUS ?" // good
+"CONSUMABLE"                                "COMESTIBLE" // good
+"CURSED"                                    "MAUDIT" // not see
+"BROKEN"                                    "CASSE" // not see
+"POISONED"                                  "EMPOISONNE" // no see
+"NORTH"                                     " NORD" // good
+"EAST"                                      " EST" // good
+"SOUTH"                                     " SUD" // good
+"WEST"                                      " OUEST" // Good
+"WEIGHS "                                   "PESE " // Good
+"PARTY FACING"                              "DIRECTION :" // Good
+"xyz"  "zyx" // BELOW: EVERYTHING THAT WORKS.
+"% NEEDS MORE PRACTICE WITH THIS SPELL."    "% DOIT PRATIQUER PLUS SOUVENT CE SORT." //  Not see
+"THE SPELL FIZZLES."                        "LE SORT FAIBLIT." //  No see
+"THIS SPELL REQUIRES A COMPONENT."          "CE SORT EXIGE UN ELEMENT." // not see
+"SELECT GAME FILE"                          "QUEL FICHIER ?" // good
+"CANCEL"                                    "ANNULER" // good
+"SAVE AND QUIT"                             "SVG ET QUITTER" // good
+"SAVE AND PLAY"                             "SAUVEGARDER ET JOUER" // good
+"READY TO SAVE GAME"                        "PRET A SAUVEGARDER ?" // good
+"NEOPHYTE"                                  "NEOPHYTE"  // good
+"NOVICE"                                    "NOVICE" // good
+"APPRENTICE"                                "APPRENTI" // good 
+"JOURNEYMAN"                                "COMPAGNON" // good 
+"CRAFTSMAN"                                 "ARTISAN" // good 
+"ARTISAN"                                   "PATRON" // good 
+"ADEPT"                                     "ADEPTE" // good 
+"EXPERT"                                    "EXPERT" // good 
+"` MASTER"                                  "` MAITRE" // good 
+"a MASTER"                                  "a MAITRE" // good 
+"b MASTER"                                  "b MAITRE" // (WORKS !!!) not see
+"c MASTER"                                  "c MAITRE"
+"d MASTER"                                  "d MAITRE"
+"e MASTER"                                  "e MAITRE"
+"ARCHMASTER"                                "GRD MAITRE" 
+" RESURRECTED"                              " RESSUSCITE(E)" // good
+" REINCARNATED"                             " REINCARNE(E)" // good
+"LOAD"                                      "CHARGE" // Good
+"HEALTH"                                    "SANTE" // good
+"STAMINA"                                   "VIGUEUR" // good
+"MANA"                                      "MANA" //  good
+"FIGHTER"                                   "GUERRIER" // good 
+"NINJA"                                     "NINJA"// good 
+"PRIEST"                                    "MAGE" // good 
+"WIZARD"                                    "DRUIDE" // good 
+"NEED AMMO"                                 "PAS MUNITION" // good
+"IT COMES UP HEADS"                         "CA VIENT DE DEVANT" // not see
+"IT COMES UP TAILS"                         "CA VIENT DE DERRIERE" // not see
+"STRENGTH"                                  "FORCE" // good
+"DEXTERITY"                                 "DEXTERITE" // good 
+"VITALITY"                                  "VITALITE" // good
+"WISDOM"                                    "SAGESSE" // good
+"ANTI-FIRE"                                 "ANTI-FEU" // good 
+"ANTI-MAGIC"                                "ANTI-MAGIE" // Good
+" MUMBLES A MEANINGLESS SPELL."             " MARMONNE UN SORT INCOHERENT." // good
+" NEEDS MORE PRACTICE WITH THIS "           " DOIT S'ENTRAINER AVEC CE SORT DE " // good
+" NEEDS AN EMPTY FLASK IN HAND FOR POTION." " DOIT AVOIR UN FLACON VIDE EN MAIN." // good
+" SPELL."                                   "." // good
+"THAT IS A DIFFICULT SPELL.  STUDY IT."     "C'EST UN SORT DIFFICILE. EXCERCE-TOI." // not see
+"THE SPELL FIZZLES AND DIES."               "LE SORT FAIBLIT ET CESSE." // not see
+"THIS SPELL IS TOO DIFFICULT."              "CE SORT EST TROP DIFFICILE." // good
+"DRIVE A:"                                  "LECTEUR." // not "hint oracle" not see
+"DRIVE B:"                                  "LECTEUR." // It is utility
+"GOR COIN"                                  "PIECE D'OR" // good
+"DAGGER"                                    "POIGNARD" //   good
+"\nPLEASE CHOOSE A\nSAVE GAME SLOT"         "CHOISIS UNE SAUVEGARDE..." //   good
+"YES"                                       "OUI"
+"NO"                                        "NON"
+"LOAD CHAMPIONS"                            "CHGT CHAMPIONS" //   good
+"SAVE CHAMPIONS"                            "SVG. CHAMPIONS" //   good
+"MAKE NEW ADVENTURE"                        "NOUVELLE AVENTURE" //   good
+"REVERT"                                    "RETOUR" //  good
+"UNDO"                                      "ANNULER" // good
+"FATAL ERROR: OUT OF MEMORY/REBOOT"         "ERREUR FATALE :/PAS ASSEZ DE MEMOIRE/REDEMARRER"
+"PLEASE PUT A\nSAVE GAME DISK IN @"         "METTRE UN DISQUE DE/SAUVEGARDE DANS LE @"
+"PUT PORTRAIT DISK/IN @"                    "PAS DE DISQUE DES PORTRAITS/DANS LE @"
+
+
+// *********************************************************************************
+"PUT A BLANK DISK/IN @"                     "METTRE UN DISQUE VIDE\nDANS LE @" // no good
+// Should be:
+"\nPUT A BLANK DISK\nIN @"                     "\nMETTRE UN DISQUE VIDE\nDANS LE @" // no good
+
+// *********************************************************************************
+"REPLACE EXISTING SAVED GAME?"              "REMPLACER LA SAUVEGARDE ?" // no good
+// Should be:
+"\n\nREPLACE EXISTING SAVED GAME?"              "\nREMPLACER LA SAUVEGARDE ?" // no good
+
+
+"REPLACE $'s PORTRAIT?"                     "REMPLACER LE PORTRAIT $'s ?"
+"PLEASE WAIT . . ./LOADING SAVED GAME"      "CHARGEMENT DE LA SAUVEGARDE..."
+"PLEASE WAIT . . ./SAVING GAME"             "SAUVEGARDE DU JEU..."
+
+
+// **********************************************************************************
+"CAN'T FIND SAVED GAME"                     "SAUVEGARDE INTROUVABLE" // no good
+// Should be:
+"\n\nCAN'T FIND SAVED GAME"                     "\n\nSAUVEGARDE INTROUVABLE" // no good
+
+
+
+"SAVED GAME ERROR"                          "ERREUR DE SAUVEGARDE"
+"ERROR WHILE/SAVING GAME"                   "ERREUR EN SAUVEGARDANT"
+"EACH CHAMPION MUST/HAVE A UNIQUE FIRST NAME!" "CHAQUE CHAMPION/DOIT AVOIR UN NOM !"
+"PLEASE WAIT . ./LOADING SAVED ADVENTURE"   "CHARGEMENT DE LA/NOUVELLE AVENTURE"
+"PLEASE WAIT . ./SAVING NEW ADVENTURE"      "SAUVEGARDE DE LA/NOUVELLE AVENTURE"
+"CAN'T FIND\nNEW ADVENTURE\nMINI.DAT"       "NE TROUVE PAS\nNOUVELLE AVENTURE\nMINI.DAT MANQUANT" // good
+"THE NEW ADVENTURE/IS DAMAGED"              "LA NOUVELLE AVENTURE/EST ENDOMMAGEE"
+"\nERROR WHILE\nSAVING"                     "ERREUR PENDANT LA SAUVEGARDE"
+"THE NEW ADVENTURE\nCAN ONLY BE MADE AFTER\nA SAVED GAME IS LOADED."  "LA NOUVELLE AVENTURE/SERA CHARGEE D'APRES/UNE SAUVEGARDE."
+"CAN'T MAKE NEW ADVENTURE\nFROM THIS SAVED GAME.\nALREADY UTILIZED."  "IMPOSSIBLE DE FAIRE/UNE NOUVELLE AVENTURE./SAUVEGARDE UTILISEE."
+"LOAD WHICH SAVED GAME?"                    "CHARGER QUEL JEU ?"
+"OK\nCANCEL"                                "OK\nANNULER"
+"SAVE\nFORMAT\nCANCEL"                      "SAUVER\nFORMATER\nANNULER"
+"MAKE NEW ADVENTURE\nFORMAT\nCANCEL"        "NOUVELLE AVENTURE\nFORMATER\nANNULER" // good
+
+
+// ***********************************************************************************
+// Should be:
+"YES\nNO"                                   "OUI\nNON" // no good
+
+
+
+"DUNGEON MASTER\nCHAOS STRIKES BACK\nCANCEL"  "DUNGEON MASTER/CHAOS STRIKES BACK/ANNULER"
+"\nPLEASE CHOOSE A\nSAVE GAME SLOT"         "CHOISIS UNE SAUVEGARDE"
+"END"                                       "FIN"
+"SAVES ARE DISABLED"                        "LES SAUVEGARDES SONT DESACTIVEES"
+"GAME FROZEN"                               "PAUSE" // good
+"SAVE FILE ERROR"                           "ERREUR DE SAUVEGARDE"
+"SELECT SAVE GAME"                          "CHARGER UNE SAUVEGARDE"
+"Chaos Strikes Back/Hint Oracle//Please insert a Chaos Strikes Back saved game disk in drive A://Then press LOAD"        "Chaos Strikes Back/Conseil de l'Oracle.//Mettre le disque des/sauvegardes de/CSB dans le lecteur.//Et appuyer sur CHARGE." //   good
+"Chaos Strikes Back/Hint Oracle//Please insert a Chaos Strikes Back saved game disk in drive B://Then press LOAD"        "Chaos Strikes Back/Conseil de l'Oracle.//Mettre le disque des/sauvegardes de/CSB dans le lecteur.//Et appuyer sur CHARGE." //   good
+"Please insert a saved game disk in drive A:"   "Mettre le disque des sauvegardes dans le lecteur."
+"Please insert a saved game disk in drive B:"   "Mettre le disque des sauvegardes dans le lecteur."
+"There are no clues for this location."     "Il n'y a pas de conseil pour ce lieu."
+"Chaos Strikes Back/Hint Oracle Version A//Safe to turn system off."   "Chaos Strikes Back/Conseil de l'Oracle Version A.//Pas de risque pour fermer."
+"Please Insert The Chaos Strikes Back Utility Disk in Drive A: "   "Mettre l'utilitaire de Chaos Strikes Back dans le lecteur. "
+"Disk Error/Please Try Again"               "Erreur de disque/REESSAYER."
+"Incorrect/or damaged saved game./Retry with a new saved game."  "Incorrecte/Ou sauvegarde corrompue./Recommencer avec une autre sauvegarde."
+"Don't Do This #0x%x\nThe UTILITY functions are designed to create a\n Chaos Strikes Back game from a Prison SAVEGAME\n and a 'mini.dat' file.  It will not import nor\n edit characters nor anything else.  You load a\n prison savegame, press 'Make New Adventure' twice\n choose a name for the new adventure, and quit.\n You can then RESTART at the prison door and\n select your new game to play.  You will\n start naked in a dark room filled with worms.\n If you try to use this program in any other \n way you will probably be unhappy with the\n results.  But you need not complain.  I won't listen."    "Ne faites pas ça : #0x%x/OUTIL est conçu pour créer le jeu CSB à partir d'une/sauvegarde de la prison et un fichier mini.dat./Chargez une sauvegarde. Vous pouvez seulement renommer/les noms. Vous ne pourrez rien faire d'autre./Puis cliquez deux fois sur NOUVELLE AVENTURE,/sauvegardez et fermez l'outil. RETOURNEZ à la porte/de la prison et cliquez sur MENU, puis sur votre/sauvegarde. Vous commencez sans rien dans une salle/sombre et remplie de vers. Si vous essayez quand même/d'utiliser ce programme, vous serez probablement/déçu du résultat./Pas la peine de vous plaindre, car je n'écouterai pas." // no good
+"TOGGLE"                                    "ACTIVER"
+"UNKNOWN"                                   "INCONNU"
+"THROW "                                    "LANCER "
+"SOUND "                                    "CRI"
+"KEY"                                       "CLE"
+"DIRECTORY"                                 "REPERTOIRE"
+"NONE"                                      "RIEN"
+"ALL"                                       "TOUT"
+"TIMER"                                     "CHRONO"
+"REPEAT"                                    "REPETER"
+"PLAY"                                      "JOUER"
+"PLAY GAME"                                 "JOUER" // good
+"ASCII DUMP"                                "EDITER EN ASCII" // good
+"WAKE UP"                                   "REVEILLEZ-VOUS !" // good
+"WARNING"                                   "DANGER"
+"RETURN"                                    "RETOUR"
+"A:\\F"                                     "A :\\F"
+"FORMAT FLOPPY"                             "FORMATER"
+"GAME LOADED, READY TO PLAY."               "JEU CHARGE... PRET A JOUER ?" // good
+"CAN'T MODIFY CHAOS STRIKES BACK DISK!"     "NE PEUT PAS MODIFIER LE DISQUE CSB !"
+"THAT'S NOT THE MASTER DISK!"               "CE N'EST PAS LE BON DISQUE !"
+
+// **********************************************************************************
+// Occurs after "Resume" and click on empty game button
+"CAN'T FIND SAVED GAME!"                    "SAUVEGARDE NON TROUVEE !"
+
+
+"UNABLE TO SAVE GAME!"                      "IMPOSSIBLE DE SAUVEGARDER !"
+"UNABLE TO FORMAT DISK!"                    "IMPOSSIBLE DE FORMATER !"
+"THAT'S THE CHAOS STRIKES BACK DISK!"       "C'EST LE DISQUE DU JEU CSB !"
+"THAT'S A GAME SAVE DISK!"                  "C'EST UN DISQUE DE SAUVEGARDE !"
+"THAT DISK IS WRITE-PROTECTED!"             "LE DISQUE EST PROTEGE !"
+"THAT DISK IS UNREADABLE"                   "LE DISQUE EST ILLISIBLE"
+"THAT'S NOT THE SAME GAME"                  "CE N'EST PAS LE MEME JEU"
+"SAVED GAME DAMAGED!"                       "SAUVEGARDE ENDOMMAGEE !"
+"PUT THE GAME SAVE DISK IN ~"               "PAS DE SAUVEGARDE DANS LE ~"
+"PUT THE CHAOS STRIKES BACK DISK IN ~"      "INSERER LE DISQUE CSB DANS LE ~"
+"PUT A BLANK DISK IN ~"                     "METTRE UN DISQUE VIERGE DANS LE ~"
+"SAVING GAME . . ."                         "ENREGISTREMENT..."
+"LOADING GAME . . ."                        "CHARGEMENT..." // good
+"FORMATTING DISK . . ."                     "FORMATAGE EN COURS..."
+"FORMAT DISK ANYWAY?"                       "FORMATER ?"
+"THERE IS NO DISK IN ~!"                    "AUCUN DISQUE DANS LE ~ !"
+"LOAD SAVED GAME"                           "CHARGEMENT"
+"RESTART THIS GAME"                         "RECOMMENCER"
+"THE END."                                  "FIN"
+"(EMPTY)"                                   "(VIDE)" // good
+"(ALMOST EMPTY)"                            "(PRESQUE VIDE)" // good
+"(ALMOST FULL)"                             "(PRESQUE PLEINE)" // good
+"(FULL)"                                    "(PLEINE)" // good
+"(BURNT OUT)"                               "(CONSUMEE)" // good
+"."                                         "," // no good It is for kg
+"/"                                         " /" // no good It is for kg
+" AND "                                     " ET "
+" JUST GAINED A "                           " GAGNE UN NIVEAU DE " // good
+" LEVEL"                                    " !" // good

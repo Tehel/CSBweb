@@ -57,10 +57,10 @@ import { newGame, stockDungeon, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
 
 const DEFAULT_SAVE = 'tools/fixtures/csbgame7.dat';
-const CSB_GRAPHICS = 'static/gamefiles/csb/graphics.dat';
+const CSB_GRAPHICS = 'tools/fixtures/gamefiles/csb/graphics.dat';
 /** The two `CSBgraphics.dat` here, with how many portrait sections each holds. */
 const CSB_GRAPHICS_FILES: [string, number][] = [
-  ['static/gamefiles/conflux-3.5-b8/CSBgraphics.dat', 156],
+  ['tools/fixtures/gamefiles/conflux-3.5-b8/CSBgraphics.dat', 156],
   ['tools/fixtures/csbgraphics/CSBgraphics.dat', 197],
 ];
 /** Portrait section → the cell of CSB's graphic 26 it is a copy of, in both files. */

@@ -234,7 +234,7 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
 {
   const tables = gameTablesOf(stockGraphics()).textDecode;
   for (const name of ['dm-atari', 'conflux-3.5-b8']) {
-    const data = new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync(`static/gamefiles/${name}/dungeon.dat`)));
+    const data = new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync(`tools/fixtures/gamefiles/${name}/dungeon.dat`)));
     // A free record, linked to `RNnul`, keeps the index `ConvertToIndirectText` skipped.
     const records = data.databases.texts.records.filter((r) => r.nextObject !== OBJECT_ID_NULL);
     let same = 0;

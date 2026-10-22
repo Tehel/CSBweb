@@ -10,15 +10,15 @@
  * `tools/run-checks.mjs`; `tools/dump-hint-oracle.ts` checks the same decoding.
  *
  * Run: `npx tsx tools/extract-oracle.ts [hcsb.hct] [out.json]`
- * (default: `static/gamefiles/csb/hcsb.hct` into `static/gamefiles/csb-oracle-hints.json`)
+ * (default: `tools/fixtures/gamefiles/csb/hcsb.hct` into `tools/fixtures/gamefiles/csb-oracle-hints.json`)
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { HINT_ANYWHERE, parseHintOracle } from '../src/data/HintOracleLoader';
 
-const input = process.argv[2] ?? 'static/gamefiles/csb/hcsb.hct';
-const output = process.argv[3] ?? 'static/gamefiles/csb-oracle-hints.json';
+const input = process.argv[2] ?? 'tools/fixtures/gamefiles/csb/hcsb.hct';
+const output = process.argv[3] ?? 'tools/fixtures/gamefiles/csb-oracle-hints.json';
 
 const oracle = parseHintOracle(new Uint8Array(readFileSync(resolve(input))));
 const used = oracle.locations.filter((l) => !(l.x === 0 && l.y === 0 && l.level === 0 && l.hint === 0));

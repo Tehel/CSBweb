@@ -69,7 +69,7 @@ import { newGame, presetHeroesOfGame, stockDungeon, stockGame } from './lib/game
 import { check, finish } from './lib/check';
 import { savePath } from './lib/saves';
 
-const CSB = 'static/gamefiles/csb';
+const CSB = 'tools/fixtures/gamefiles/csb';
 
 /** `CHARDESC.portrait` unpacked: 32x29 palette indices, one byte each. */
 const PORTRAIT_PIXELS = 32 * 29;

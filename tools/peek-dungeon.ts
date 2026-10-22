@@ -497,8 +497,8 @@ function main(): void {
   // `| head` closes the pipe early; that is not an error.
   process.stdout.on('error', (e: NodeJS.ErrnoException) => { if (e.code === 'EPIPE') process.exit(0); throw e; });
   const args = process.argv.slice(2);
-  let file = 'static/gamefiles/dm-atari/dungeon.dat';
-  let graphicsPath = 'static/gamefiles/dm-atari/graphics.dat';
+  let file = 'tools/fixtures/gamefiles/dm-atari/dungeon.dat';
+  let graphicsPath = 'tools/fixtures/gamefiles/dm-atari/graphics.dat';
   const rest: string[] = [];
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--file') file = args[++i] ?? file;

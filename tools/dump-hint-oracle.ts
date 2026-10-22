@@ -24,7 +24,7 @@ import {
 } from '../src/data/HintOracleLoader';
 import { check, finish } from './lib/check';
 
-const file = new Uint8Array(readFileSync(resolve('static/gamefiles/csb/hcsb.hct')));
+const file = new Uint8Array(readFileSync(resolve('tools/fixtures/gamefiles/csb/hcsb.hct')));
 const oracle = parseHintOracle(file);
 const { locations, hints, chunkLengths } = oracle;
 
@@ -85,7 +85,7 @@ console.log(`level 0 (3,23): ${menu.map((i) => hints[i]!.title).join(' / ')}`);
 check(menu.join() === '197,178,0', 'level 0 (3,23) offers CREATURES, THE MAZE, FULYA PIT, in that order');
 
 console.log('=== hcsb.dat ===');
-const datFile = new Uint8Array(readFileSync(resolve('static/gamefiles/csb/hcsb.dat')));
+const datFile = new Uint8Array(readFileSync(resolve('tools/fixtures/gamefiles/csb/hcsb.dat')));
 const index = new GraphicsLoader().loadFromArray(datFile);
 console.log(`items: ${index.entries.map((e) => `${e.compressedSize}/${e.decompressedSize}`).join(' ')}`);
 check(index.itemCount === 4, 'four items');

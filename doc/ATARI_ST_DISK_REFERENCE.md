@@ -41,7 +41,11 @@ filesystem is plain FAT12 (2 sectors a cluster, 16 root entries), and every root
 directory holds the same six files. `SWOOSH.IMG` and `START.PRG` are byte-identical on all
 six; `BOOTER` and `START.PAK`, the packed program, differ on each. Each disk's six files,
 read through the image's sector records and the FAT, are in the collection's
-`extracted/<version>/`.
+`extracted/<version>/`. The collection is dmweb.free.fr's
+`Game,Dungeon_Master,Atari_ST,Software.7z`. `tools/lib/stx.ts` reads an image's files in the
+same way, but for `BOOTER`, whose cluster holds track 0's sector 8, which the protection
+replaces by 247; `npm run fetch-gamefiles` takes 1.1's `DUNGEON.DAT` (`dm-atari`'s) and the
+1.2 English and 1.3 French disks' two data files from it.
 
 The collection's cracked copies agree with the originals where they can be read. The
 `GRAPHICS.DAT` and `DUNGEON.DAT` of `Floppy Disks MSA/…v1.1 (English) Cracked.msa` are
@@ -61,7 +65,7 @@ The English 1.2 disk's six files:
 | `DUNGEON.DAT` | 33442 | 1988-03-01 | `050fb2cf…` | The 1.2 dungeon. |
 
 Three of them are in the repository under lower-case names: `graphics.dat` and
-`dungeon.dat` in `static/gamefiles/dm-atari-1.2/`, and `swoosh.img` in `src/assets/`, the
+`dungeon.dat` in `tools/fixtures/gamefiles/dm-atari-1.2/`, and `swoosh.img` in `src/assets/`, the
 page's own, which every version shares, with the swoosh's sound as PCM (below). The data files load: the graphics through
 `GraphicsLoader` and `extractGraphicsTables`, the dungeon through `tools/peek-dungeon.ts
 --file`.
@@ -386,7 +390,7 @@ entry). Skill numbers are `CHARDESC.skills92`'s, four subskills a class from 4.
 
 ## CSBWin's files
 
-`static/gamefiles/dm-windows/graphics.dat` (md5 `0b5e042f…`), the file CSBWin's DM
+`tools/fixtures/gamefiles/dm-windows/graphics.dat` (md5 `0b5e042f…`), the file CSBWin's DM
 distribution (`DM_Windows_x86-32_20171117.zip`) ships, is **the 8 December 1987 disk's
 `GRAPHICS.DAT` with its credits scroll corrupted**. The two differ in item 5 alone, four
 bytes that draw four lines of the text wrong from "Dennis Walker" down ("Jaros" reads
@@ -448,7 +452,7 @@ The 1.3 (French) image (md5 `933955a6a596081b4bc62655efeafde5`) has the 1.2 disk
 geometry, copy protection, boot sector and six files. `SWOOSH.IMG` and `START.PRG` are
 byte-identical to 1.2's; `BOOTER` (`e9db80a6…`), `START.PAK` (95208 bytes, `6131be44…`),
 `GRAPHICS.DAT` and `DUNGEON.DAT` are not. The two data files are
-in `static/gamefiles/dm-atari-1.3-fr/`, and both load:
+in `tools/fixtures/gamefiles/dm-atari-1.3-fr/`, and both load:
 
 | File | Size | Date | md5 |
 | --- | --- | --- | --- |
@@ -522,12 +526,12 @@ and a folder:
 | `SWITCH.DAT` | 7405 | `b1fc60f2…` | Not examined. |
 | `CHAOS.FTL` | 42090 | `2de4a565…` | The utility, `doc/CSBwin-src/Chaos.cpp`'s original (below). |
 | `HINT.FTL` | 49436 | `8dfea415…` | The hint oracle, `doc/CSBwin-src/Hint.cpp`'s original (below). |
-| `HCSB.DAT` | 30793 | `708e113c…` | The hint oracle's, byte-identical to `static/gamefiles/csb/hcsb.dat`. |
-| `HCSB.HTC` | 66172 | `8ce69b54…` | Byte-identical to `static/gamefiles/csb/hcsb.hct`. |
+| `HCSB.DAT` | 30793 | `708e113c…` | The hint oracle's, byte-identical to `tools/fixtures/gamefiles/csb/hcsb.dat`. |
+| `HCSB.HTC` | 66172 | `8ce69b54…` | Byte-identical to `tools/fixtures/gamefiles/csb/hcsb.hct`. |
 | `ANIMATE.FTL` | 21128 | `e882f1a6…` | An FTL module. Not examined. |
 | `ANIMATE.DAT` | 58683 | `9f8feb26…` | Not examined. |
 | `ANIMATE.SCR` | 1802 | `4174d6de…` | Not examined. |
-| `MINI.DAT` | 42815 | `531ea104…` | The new adventure, byte-identical to `static/gamefiles/csb/mini.dat`. |
+| `MINI.DAT` | 42815 | `531ea104…` | The new adventure, byte-identical to `tools/fixtures/gamefiles/csb/mini.dat`. |
 | `PORTRAIT\` | — | — | 24 champion portraits (below). |
 
 ### The portraits
@@ -548,7 +552,7 @@ that champion: none is any cell of graphic 26, and the nearest cell differs in 1
 745 of 928 pixels. Many are armed or armoured: Halk, for one, wears a horned helmet and
 carries a shield.
 
-`static/gamefiles/csb/utility-portraits.dat` holds them for the port, RISE's NEW FACE
+`tools/fixtures/gamefiles/csb/utility-portraits.dat` holds them for the port, RISE's NEW FACE
 (`doc/SAVES.md`). It is a `graphics.dat` of two items, which `GraphicsLoader` reads.
 Item 0, stored uncompressed, is a 256x87 IMG1 picture laid out like graphic 26, so cell
 `charID` is the drawing of the champion whose DM portrait is cell `charID`. Item 1 is

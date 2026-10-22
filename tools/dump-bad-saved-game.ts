@@ -52,8 +52,8 @@ import * as Boot from '../src/renderer/intro/BootSequence';
 import { standInOf } from './lib/standIn';
 
 const SAVE = savePath('csbgame7.dat');
-const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
-const PRISON = 'static/gamefiles/csb/dungeon.dat';
+const DUNGEON = 'tools/fixtures/gamefiles/dm-atari/dungeon.dat';
+const PRISON = 'tools/fixtures/gamefiles/csb/dungeon.dat';
 
 
 const graphics = stockGraphics();

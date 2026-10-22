@@ -516,7 +516,7 @@ function startAndStop(game: Game): void {
   game.start();
   game.stop();
 }
-const stock = new Uint8Array(readFileSync('static/gamefiles/dm-atari/dungeon.dat'));
+const stock = new Uint8Array(readFileSync('tools/fixtures/gamefiles/dm-atari/dungeon.dat'));
 
 {
   const game = freshGame();

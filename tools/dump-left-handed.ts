@@ -4,7 +4,7 @@
  * moved back.
  *
  * What it asserts:
- * - every `graphics.dat` under `static/gamefiles` fits it: no button the game reads in
+ * - every `graphics.dat` under `tools/fixtures/gamefiles` fits it: no button the game reads in
  *   play, nor panel it draws outside the viewport, is cut by a region's edge or a gap's,
  *   and each has the top's gap at x 274-280 and the column's at 224-232;
  * - the canaries: the same tables with the turn-left arrow moved across the viewport's

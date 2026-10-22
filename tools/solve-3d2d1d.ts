@@ -1,8 +1,8 @@
 /**
- * Solve 3D2D1D (`static/gamefiles/3D2D1D/`). This is a model of CSBWin's vertical moves and
+ * Solve 3D2D1D (`tools/fixtures/gamefiles/3D2D1D/`). This is a model of CSBWin's vertical moves and
  * of its gravity, and a shortest-route search
- * over it. It computes the routes in `static/gamefiles/3D2D1D/WALKTHROUGH.md`, and it
- * checks that document against the model. `ANALYSIS.md` beside it explains the puzzles.
+ * over it. It computes the routes in `doc/3D2D1D_WALKTHROUGH.md`, and it
+ * checks that document against the model. `doc/3D2D1D_ANALYSIS.md` explains the puzzles.
  *
  * Like `peek-dungeon.ts`, this is **not evidence** about the port. It models CSBWin itself,
  * outside the engine, where a route is searched far faster than `Game` could play it. It
@@ -28,7 +28,7 @@
  * Run: `npx tsx tools/solve-3d2d1d.ts <command>`
  *
  *   solve          every leg of the playthrough, as the walkthrough's key blocks
- *   replay [file]  replay WALKTHROUGH.md (or `file`) in the model; exit 1 on a mismatch
+ *   replay [file]  replay doc/3D2D1D_WALKTHROUGH.md (or `file`) in the model; exit 1 on a mismatch
  *   table          the 1D corridor: where each step leads, and the shortest ways through
  *   reach          the 3D maze's resting squares, and which Screamer squares open map 5 (9,3)
  */
@@ -46,7 +46,7 @@ import { DungeonLoader } from '../src/data/DungeonLoader';
 import type { ActuatorRecord, DungeonData, TeleporterRecord } from '../src/data/dungeonTypes';
 import { DungeonState } from '../src/engine/DungeonState';
 
-const DIR = 'static/gamefiles/3D2D1D';
+const DIR = 'tools/fixtures/gamefiles/3D2D1D';
 const data: DungeonData = new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync(resolve(DIR, 'dungeon.dat'))));
 const NLEV = data.maps.length;
 const width = (l: number): number => data.maps[l]!.descriptor.width;
@@ -609,7 +609,7 @@ function cmdReach(): void {
 const [command, arg] = process.argv.slice(2);
 switch (command) {
   case 'solve': cmdSolve(); break;
-  case 'replay': process.exitCode = cmdReplay(arg ?? `${DIR}/WALKTHROUGH.md`) ? 1 : 0; break;
+  case 'replay': process.exitCode = cmdReplay(arg ?? 'doc/3D2D1D_WALKTHROUGH.md') ? 1 : 0; break;
   case 'table': cmdTable(); break;
   case 'reach': cmdReach(); break;
   default:

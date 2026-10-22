@@ -3,7 +3,7 @@
  * Back's dungeon, as CSBWin's UTILITY does it (`src/engine/Chaos.ts`,
  * `doc/CSBwin-src/Chaos.cpp`).
  *
- * 1. The canary. `static/gamefiles/csb/csbgame2.dat` is a file CSBWin's utility wrote:
+ * 1. The canary. `tools/fixtures/gamefiles/csb/csbgame2.dat` is a file CSBWin's utility wrote:
  *    `Byte22598` 2, which only `_TAG000fc4` writes, and `mini.dat`'s world. Made again
  *    from itself and `mini.dat`, with its own food, water and `RandomGameID` in place
  *    of the three draws and the sum, it is the file byte for byte. That holds every
@@ -45,7 +45,7 @@ import { check, finish } from './lib/check';
 import { newGame, stockDungeon } from './lib/game';
 import { savePath } from './lib/saves';
 
-const CSB = 'static/gamefiles/csb';
+const CSB = 'tools/fixtures/gamefiles/csb';
 const read = (path: string): Uint8Array => new Uint8Array(readFileSync(path));
 const MINI = read(resolve(CSB, 'mini.dat'));
 const CSBGAME2 = read(resolve(CSB, 'csbgame2.dat'));

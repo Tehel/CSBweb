@@ -33,7 +33,7 @@ import { check, finish } from './lib/check';
 import { gameTablesOf, newGame, stockDungeon, stockGame, stockGraphics } from './lib/game';
 import { genuineSaves } from './lib/saves';
 
-const CSB = 'static/gamefiles/csb';
+const CSB = 'tools/fixtures/gamefiles/csb';
 const ATARI_SAVES = ['mini.dat', 'csbgame2.dat'];
 
 const dmTables = gameTablesOf(stockGraphics());
@@ -100,7 +100,7 @@ const withChanges: { file: string; changed: Map<number, [Fields, Fields]> }[] = 
 for (const file of saveFiles) {
   const world = loadCsbwinWorld(new Uint8Array(readFileSync(file)));
   const attached = new Set(world.save.item16.filter((s) => s.word0 >= 0).map((s) => s.word0));
-  const changed = measure(file.replace('static/gamefiles/', ''), world.dungeon, attached);
+  const changed = measure(file.replace('tools/fixtures/gamefiles/', ''), world.dungeon, attached);
   if (changed.size > 0) withChanges.push({ file, changed });
 }
 
@@ -124,7 +124,7 @@ for (const { file, changed } of withChanges) {
     const savedSlot = savedSlots.get(i);
     const slot = pool.find((s) => s.word0 === i);
     const slotIndex = slot ? pool.indexOf(slot) : -1;
-    console.log(`  ${file.replace('static/gamefiles/', '')} creature ${String(i).padStart(3)}: n-1 ${r.numMonM1}, ` +
+    console.log(`  ${file.replace('tools/fixtures/gamefiles/', '')} creature ${String(i).padStart(3)}: n-1 ${r.numMonM1}, ` +
       `gi ${r.groupIndex} (slot ${slotIndex}), facing ${r.facing} (check wrote ${after.facing}, saved slot ${savedSlot ? savedSlot.facings & 3 : '-'})` +
       (slot ? `, positions ${slot.positions} (saved ${savedSlot?.positions})` : ''));
     check(r.numMonM1 === after.numMonM1, `${file}: creature ${i} keeps the cut numMonM1 ${after.numMonM1}`);

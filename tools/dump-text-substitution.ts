@@ -79,7 +79,7 @@ check(wall('.R.AAHL WALL').join() === Array.from(codes('.R.AAHL WALL')).join(), 
 check(wall('.Q.B .R.AAHL').join() === Array.from(codes('HALK RAAHL')).join(), 'a wall text with a .Q. is substituted in codes');
 
 console.log('2. Conflux, through a Game');
-const conflux = new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync('static/gamefiles/conflux-3.5-b8/dungeon.dat')));
+const conflux = new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync('tools/fixtures/gamefiles/conflux-3.5-b8/dungeon.dat')));
 const game = newGame(conflux, stockGraphics());
 const dungeon = game.ctx.dungeon;
 const tables = game.ctx.tables.textDecode;

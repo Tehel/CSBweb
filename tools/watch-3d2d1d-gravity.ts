@@ -4,7 +4,7 @@
  * and while `gravityMove` is set `HandleMouseEvents` throws the queue away and takes
  * `GravityMove`'s step (`Mouse.cpp:1259-1370`, `:1482-1491`), until no axis is left.
  *
- * 1. **The walkthrough's first two legs** (`static/gamefiles/3D2D1D/WALKTHROUGH.md`, "1.
+ * 1. **The walkthrough's first two legs** (`doc/3D2D1D_WALKTHROUGH.md`, "1.
  *    The champion" and "2. Open the 3D maze"), facing north: each press is one move and
  *    its slide, and comes to rest where the walkthrough says. The second leg has a
  *    champion, as the walkthrough's has AIRWING, and its `S!` bumps the wall and is a
@@ -29,7 +29,7 @@ import { check, finish } from './lib/check';
 import { testChampion } from './lib/champion';
 import { newGame, runVbl, TICK_DUE } from './lib/game';
 
-const DIR = 'static/gamefiles/3D2D1D';
+const DIR = 'tools/fixtures/gamefiles/3D2D1D';
 const read = (name: string): Uint8Array => new Uint8Array(readFileSync(`${DIR}/${name}`));
 const graphics = new GraphicsLoader();
 graphics.loadFromArray(read('graphics.dat'));

@@ -59,7 +59,7 @@ const random = (): number => {
 
 function csbGraphics(dir: string): CSBGraphicsLoader {
   const csb = new CSBGraphicsLoader();
-  csb.loadFromArray(new Uint8Array(readFileSync(`static/gamefiles/${dir}/CSBgraphics.dat`)));
+  csb.loadFromArray(new Uint8Array(readFileSync(`tools/fixtures/gamefiles/${dir}/CSBgraphics.dat`)));
   return csb;
 }
 

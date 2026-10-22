@@ -34,7 +34,7 @@ const SETS = [
   'kids-dungeon-24', 'towers-of-chaos-3.3',
 ];
 
-const dungeonDat = (set: string): Uint8Array => new Uint8Array(readFileSync(`static/gamefiles/${set}/dungeon.dat`));
+const dungeonDat = (set: string): Uint8Array => new Uint8Array(readFileSync(`tools/fixtures/gamefiles/${set}/dungeon.dat`));
 
 console.log('== The census ==');
 const records = new Map<string, number | null>();

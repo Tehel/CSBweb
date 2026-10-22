@@ -101,7 +101,7 @@ const ran = (g: number[]): boolean => g[0] === 1;
 
 /* ------------------------------- 0. Conflux ------------------------------------ */
 {
-  const conflux = new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync('static/gamefiles/conflux-3.5-b8/dungeon.dat')));
+  const conflux = new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync('tools/fixtures/gamefiles/conflux-3.5-b8/dungeon.dat')));
   const locations = conflux.specialLocations ?? {};
   const describe = (value: number | undefined): string => {
     if (value === undefined) return 'none';

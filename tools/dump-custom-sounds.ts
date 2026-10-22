@@ -31,7 +31,7 @@ import { newGame, stockGraphics, stockDungeon } from './lib/game';
 
 /** The two `CSBgraphics.dat` here, with how many sound sections each holds. */
 const FILES: [string, number][] = [
-  ['static/gamefiles/conflux-3.5-b8/CSBgraphics.dat', 611],
+  ['tools/fixtures/gamefiles/conflux-3.5-b8/CSBgraphics.dat', 611],
   ['tools/fixtures/csbgraphics/CSBgraphics.dat', 618],
 ];
 

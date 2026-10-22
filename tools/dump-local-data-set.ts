@@ -218,7 +218,7 @@ async function checkForm(): Promise<void> {
   check((await problemsOf('a dungeon.dat of 44 zeros', { ...good, files: { 'dungeon.dat': blobOf(new Uint8Array(44)) } })).join()
     === 'dungeon.dat: It has no level.', 'a dungeon.dat of zeros reads as no level, and is refused');
   const startingAt = (x: number, y: number): Blob => {
-    const file = new Uint8Array(readFileSync('static/gamefiles/dm-windows/dungeon.dat'));
+    const file = new Uint8Array(readFileSync('tools/fixtures/gamefiles/dm-windows/dungeon.dat'));
     const ef = readExtendedFeatures(file);
     const data = new DungeonLoader().loadDungeonDat(file);
     data.header.startPosition.x = x;
@@ -255,7 +255,7 @@ async function checkForm(): Promise<void> {
   const fixture = blobOf(fixtureBytes);
   const csbFold = foldedSignature(Signature(fixtureBytes)) || 1;
   const naming = (records: [number, number][]): Blob => {
-    const file = new Uint8Array(readFileSync('static/gamefiles/dm-windows/dungeon.dat'));
+    const file = new Uint8Array(readFileSync('tools/fixtures/gamefiles/dm-windows/dungeon.dat'));
     const ef = readExtendedFeatures(file);
     const data = new DungeonLoader().loadDungeonDat(file);
     for (const [key, value] of records) new Expool(data).write(key, [value]);
@@ -283,7 +283,7 @@ async function checkForm(): Promise<void> {
     csbGraphicsSignature1: 1, csbGraphicsSignature2: 0, hintKey: new Uint8Array(8),
   };
   const expecting = new Blob([new Uint8Array(buildExtendedFeaturesPrefix({ header, typeMap: new Uint8Array(0), indexMap: new Uint16Array(0) })),
-    readFileSync('static/gamefiles/csb/dungeon.dat')]);
+    readFileSync('tools/fixtures/gamefiles/csb/dungeon.dat')]);
   check((await problemsOf('a block expecting a CSBgraphics.dat, without', { ...good, files: { 'dungeon.dat': expecting } })).join()
     === 'CSBgraphics.dat: The dungeon needs its CSBgraphics.dat.', 'a dungeon whose block expects a CSBgraphics.dat needs one: the boot\'s die(0xbad)');
   check((await problemsOf('…with one', { ...good, files: { 'dungeon.dat': expecting, 'CSBgraphics.dat': fixture } })).length === 0, 'and plays with one');
@@ -298,7 +298,7 @@ async function checkForm(): Promise<void> {
   const notOracle = await problemsOf('a dungeon.dat as hcsb.dat', { ...csbFull, files: { ...csbFull.files, 'hcsb.dat': csbFull.files['dungeon.dat']! } });
   check(notOracle.length === 1 && notOracle[0].startsWith("hcsb.dat: It is not the Hint Oracle's hcsb.dat: "), 'an hcsb.dat that does not parse is refused');
 
-  const png = new Blob([readFileSync('static/gamefiles/csb/csb-thumbnail.png')], { type: 'image/png' });
+  const png = new Blob([readFileSync('tools/fixtures/gamefiles/csb/csb-thumbnail.png')], { type: 'image/png' });
   check((await problemsOf('a PNG thumbnail', { ...good, files: { ...good.files, thumbnail: png } })).length === 0, 'an image is a thumbnail');
   const asTitle = async (draft: LocalDataSetDraft) => (await checkLocalDataSet(draft, new Set(), base, 0)).record?.thumbnailAsTitle;
   const titled = { ...good, thumbnailAsTitle: true };

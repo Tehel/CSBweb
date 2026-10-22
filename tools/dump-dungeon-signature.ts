@@ -52,8 +52,8 @@ const DM = 'Dungeon Master';
 const CSB = 'Chaos Strikes Back';
 
 /** CSB's game is not its `dungeon.dat`, the prison, but this save (`doc/PROVEN_FACTS.md` → "A compressed `dungeon.dat`: CSB's prison"). */
-const MINI = 'static/gamefiles/csb/mini.dat';
-const CSB_SAVE = 'static/gamefiles/csb/csbgame2.dat';
+const MINI = 'tools/fixtures/gamefiles/csb/mini.dat';
+const CSB_SAVE = 'tools/fixtures/gamefiles/csb/csbgame2.dat';
 
 const read = (path: string): Uint8Array => new Uint8Array(readFileSync(resolve(path)));
 const hex = (bytes: Uint8Array): string => Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join(' ');
@@ -280,9 +280,9 @@ async function checkCoarseness(): Promise<void> {
 async function checkAgainstDataSet(): Promise<void> {
   console.log('\n=== 6. what a save\'s walls are to a data set (`checkDungeon`) ===');
   const save = await dungeonWalls(loadCsbwinWorld(read(savePath('csbgame7.dat'))).dungeon);
-  const dm = await dungeonWalls(dungeonDat('static/gamefiles/dm-atari/dungeon.dat'));
+  const dm = await dungeonWalls(dungeonDat('tools/fixtures/gamefiles/dm-atari/dungeon.dat'));
   const mini = await dungeonWalls(loadCsbwinWorld(read(MINI)).dungeon);
-  const prison = await dungeonWalls(dungeonDat('static/gamefiles/csb/dungeon.dat'));
+  const prison = await dungeonWalls(dungeonDat('tools/fixtures/gamefiles/csb/dungeon.dat'));
   const csbOwn = [prison, mini];
   const { shapes, signature } = save;
   // Thirteen levels the same and one not: a wall moved on level 13, its shape kept.

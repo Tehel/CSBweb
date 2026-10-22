@@ -43,7 +43,7 @@ import { newGame, stockDungeon } from './lib/game';
 import { check, finish } from './lib/check';
 import { savePath } from './lib/saves';
 
-const CSB = 'static/gamefiles/csb';
+const CSB = 'tools/fixtures/gamefiles/csb';
 const ATARI_SAVES = ['mini.dat', 'csbgame2.dat'];
 /** A save CSBWin wrote of DM, with an Extended Features block. */
 const CONTROL = 'csbgame7.dat';

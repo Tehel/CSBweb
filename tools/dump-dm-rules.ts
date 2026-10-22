@@ -93,8 +93,8 @@ check(withBoth === 8, `all eight committed saves carry both DMRules and DMRulesO
 console.log('');
 console.log('=== mini.dat, an Atari-era save with no block, leaves both as they were ===');
 const csbGraphics = new GraphicsLoader();
-quiet(() => csbGraphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/csb/graphics.dat')))));
-const mini = new Uint8Array(readFileSync(resolve('static/gamefiles/csb/mini.dat')));
+quiet(() => csbGraphics.loadFromArray(new Uint8Array(readFileSync(resolve('tools/fixtures/gamefiles/csb/graphics.dat')))));
+const mini = new Uint8Array(readFileSync(resolve('tools/fixtures/gamefiles/csb/mini.dat')));
 for (const value of [false, true]) {
   const game = quiet(() => newGame(loadCsbwinWorld(mini).dungeon, csbGraphics));
   game.ctx.rules.dmRules = value;

@@ -35,7 +35,7 @@ import { newGame } from './lib/game';
 import { memoryStore, savePath } from './lib/saves';
 import { newUIState } from './lib/ui';
 
-const ATARI = 'static/gamefiles/dm-atari';
+const ATARI = 'tools/fixtures/gamefiles/dm-atari';
 const graphics = new GraphicsLoader();
 graphics.loadFromArray(new Uint8Array(readFileSync(`${ATARI}/graphics.dat`)));
 const dungeon = new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync(`${ATARI}/dungeon.dat`)));

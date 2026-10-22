@@ -54,7 +54,8 @@ they are read, each through `LE16`, so every word of both is big-endian. The fon
 glyphs are all colour 9 on the transparent 12, and that 9 is item 0's word 8.
 
 Both come in CSBWin's Chaos Strikes Back package
-(`static/gamefiles/CSB_Windows_x86-32_20151213.zip`) and sit in `static/gamefiles/csb/`.
+(`CSB_Windows_x86-32_20151213.zip`) and sit in `tools/fixtures/gamefiles/csb/`, fetched from it by
+`npm run fetch-gamefiles`.
 CSBWin opens them by the names `"0hcsb.hct"` and `"0hcsb.dat"` (`Hint.cpp:702-703`).
 
 ### Item 0
@@ -145,7 +146,7 @@ x and y both 0xff mean "anywhere on this level". `_TAG00799a_9` reads the bytes 
 
 Fifteen retail records are all zero: records 4647-4655 and 4657-4662 (4656 is a real
 record of level 1). Nothing skips them, so they would match (0,0) of level 0, a stone
-square in the CSB dungeon (`static/gamefiles/csb/csbgame2.dat`).
+square in the CSB dungeon (`tools/fixtures/gamefiles/csb/csbgame2.dat`).
 
 ### A hint record (26 bytes)
 

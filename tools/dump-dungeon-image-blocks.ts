@@ -63,7 +63,7 @@ import type { DungeonData } from '../src/data/dungeonTypes';
 import { check, finish } from './lib/check';
 import { genuineSaves } from './lib/saves';
 
-const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
+const DUNGEON = 'tools/fixtures/gamefiles/dm-atari/dungeon.dat';
 
 /** Everything from here up is an `RNVAL` literal, not a slot (`CSBTypes.h:242-256`). */
 const RN_LITERAL_FLOOR = 0xff00;

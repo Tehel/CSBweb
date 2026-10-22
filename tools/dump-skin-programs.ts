@@ -71,7 +71,7 @@ const L = (v: number): number[] => [O.Literal, v & 0xffff];
 
 function csbGraphics(dir: string): CSBGraphicsLoader {
   const csb = new CSBGraphicsLoader();
-  csb.loadFromArray(new Uint8Array(readFileSync(`static/gamefiles/${dir}/CSBgraphics.dat`)));
+  csb.loadFromArray(new Uint8Array(readFileSync(`tools/fixtures/gamefiles/${dir}/CSBgraphics.dat`)));
   return csb;
 }
 
@@ -258,7 +258,7 @@ function cellTables(): void {
 function views(): void {
   console.log(`4. Views${all ? ', every level' : ', the starting level'}`);
   for (const set of SETS) {
-    const base = `static/gamefiles/${set.dir}`;
+    const base = `tools/fixtures/gamefiles/${set.dir}`;
     const data = new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync(`${base}/dungeon.dat`)));
     const graphics = new GraphicsLoader();
     graphics.loadFromArray(new Uint8Array(readFileSync(`${base}/graphics.dat`)));

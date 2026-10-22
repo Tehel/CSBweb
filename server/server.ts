@@ -7,7 +7,7 @@
  *   PORT            the port to listen on (8085; 0 picks a free one)
  *   DIST_DIR        the built page (the checkout's `dist/`), and the page's check built for
  *                   Node, `server/LocalDataSetCheck.js` under it (`npm run build`)
- *   GAMEFILES_DIR   the data sets (the checkout's `static/gamefiles/`)
+ *   GAMEFILES_DIR   the data sets (the checkout's `tools/fixtures/gamefiles/`)
  *   FILES_DIR       the files shared by link, under `files/` (the checkout's `files/`, which
  *                   git ignores): a folder that is not there is not checked, and serves nothing
  *   STATS_DB        the store's SQLite file (the checkout's `stats/stats.db`), created
@@ -61,7 +61,7 @@ const SHUTDOWN_GRACE_MS = 5000;
 const ROOT = join(import.meta.dirname, '..');
 const options: ServerOptions = {
     distDir: process.env.DIST_DIR ?? join(ROOT, 'dist'),
-    gamefilesDir: process.env.GAMEFILES_DIR ?? join(ROOT, 'static', 'gamefiles'),
+    gamefilesDir: process.env.GAMEFILES_DIR ?? join(ROOT, 'tools', 'fixtures', 'gamefiles'),
     filesDir: process.env.FILES_DIR ?? join(ROOT, 'files'),
 };
 const port = Number(process.env.PORT ?? 8085);

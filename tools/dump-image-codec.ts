@@ -44,7 +44,7 @@ import { check, finish } from './lib/check';
 import { graphicsTablesOf } from './lib/game';
 
 /** CSBWin's own DM `graphics.dat` first: the reference screen is of it. */
-const DATA_SETS = ['static/gamefiles/dm-windows', 'static/gamefiles/dm-atari', 'static/gamefiles/conflux-3.5-b8'];
+const DATA_SETS = ['tools/fixtures/gamefiles/dm-windows', 'tools/fixtures/gamefiles/dm-atari', 'tools/fixtures/gamefiles/conflux-3.5-b8'];
 const REFERENCE = 'tools/reference/csbwin-credits.png';
 const CREDITS_GRAPHIC = 5;
 

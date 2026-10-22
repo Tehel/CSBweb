@@ -1,5 +1,5 @@
 /**
- * `static/gamefiles/dm-atari/graphics.dat` is CSBWin's `graphics.dat` with two items taken
+ * `tools/fixtures/gamefiles/dm-atari/graphics.dat` is CSBWin's `graphics.dat` with two items taken
  * from the Atari ST 1.2 disk's, and nothing else changed.
  *
  * CSBWin's DM package ships the first 1.0 disk's file (8 December 1987), with its credits
@@ -34,9 +34,9 @@ import { decompressGraphics } from '../src/core/compression';
 import { ImageFormat, decodeIMG } from '../src/core/imageDecoder';
 import { check, finish } from './lib/check';
 
-const CSBWIN = 'static/gamefiles/dm-windows/graphics.dat';
-const ST_1_2 = 'static/gamefiles/dm-atari-1.2/graphics.dat';
-const OUTPUT = 'static/gamefiles/dm-atari/graphics.dat';
+const CSBWIN = 'tools/fixtures/gamefiles/dm-windows/graphics.dat';
+const ST_1_2 = 'tools/fixtures/gamefiles/dm-atari-1.2/graphics.dat';
+const OUTPUT = 'tools/fixtures/gamefiles/dm-atari/graphics.dat';
 const CSBWIN_MD5 = '0b5e042f2c7f2752bac78292cc6bb07e';
 const ST_1_2_MD5 = '9ce2eaf7a9e78620e3f17594437caffa';
 

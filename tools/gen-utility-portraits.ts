@@ -1,5 +1,5 @@
 /**
- * Build `static/gamefiles/csb/utility-portraits.dat` from the Chaos Strikes Back utility
+ * Build `tools/fixtures/gamefiles/csb/utility-portraits.dat` from the Chaos Strikes Back utility
  * disk's champion portraits, `A:\PORTRAIT\*.CMP`.
  *
  * The utility disk carries a redrawn portrait of each of DM's 24 champions
@@ -19,9 +19,10 @@
  * and each DM mirror's hero text gives a name and a portrait (`extractPresetHeroes` over
  * `dm-atari/dungeon.dat`).
  *
- * The disk image is not in the repository, so this tool is not in `npm test`. Run:
+ * The disk image is not in the repository, so this tool is not in `npm test`;
+ * `npm run fetch-gamefiles` runs it on the 2.1 utility disk's Pasti image. Run:
  *
- *   npx tsx tools/gen-utility-portraits.ts <CSB_UTIL.ST> [--png <preview.png>]
+ *   npx tsx tools/gen-utility-portraits.ts <utility disk .stx or .ST> [--png <preview.png>]
  *   npx tsx tools/gen-utility-portraits.ts --sheet <utility-portraits.dat> [--png <preview.png>]
  *
  * The second form takes item 0's pixels from a file this tool wrote, for a rebuild
@@ -41,8 +42,9 @@ import { PORTRAIT_HEIGHT, PORTRAIT_WIDTH, writePortrait } from '../src/data/Csbw
 import { check, finish } from './lib/check';
 import { STOCK_DIR, graphicsTablesOf, presetHeroesOf, stockDungeon, stockGraphics } from './lib/game';
 import { writeIndexedPng } from './lib/png';
+import { fat12Files, stxFiles } from './lib/stx';
 
-const OUTPUT = 'static/gamefiles/csb/utility-portraits.dat';
+const OUTPUT = 'tools/fixtures/gamefiles/csb/utility-portraits.dat';
 const COLUMNS = 8;
 const ROWS = 3;
 const SHEET_WIDTH = COLUMNS * PORTRAIT_WIDTH;
@@ -56,58 +58,6 @@ const CMP_SIZE = CMP_PORTRAIT + PORTRAIT_BYTES;
 const CHARDESC_PORTRAIT = 336;
 /** DM's champion portraits. */
 const GRAPHIC_PORTRAITS = 26;
-
-interface DiskFile {
-  name: string;
-  isDirectory: boolean;
-  bytes: Uint8Array;
-}
-
-/** A raw `.ST` image's FAT12 filesystem, as its boot sector describes it. */
-function fat12(image: Uint8Array): { root: () => DiskFile[]; list: (dir: DiskFile) => DiskFile[] } {
-  const u16 = (at: number): number => image[at]! | (image[at + 1]! << 8);
-  const bytesPerSector = u16(11);
-  const sectorsPerCluster = image[13]!;
-  const reserved = u16(14);
-  const fats = image[16]!;
-  const rootEntries = u16(17);
-  const sectorsPerFat = u16(22);
-  const fatAt = reserved * bytesPerSector;
-  const rootAt = (reserved + fats * sectorsPerFat) * bytesPerSector;
-  const dataAt = rootAt + rootEntries * 32;
-  const clusterSize = sectorsPerCluster * bytesPerSector;
-  const next = (cluster: number): number => {
-    const v = u16(fatAt + Math.floor((cluster * 3) / 2));
-    return cluster & 1 ? v >> 4 : v & 0xfff;
-  };
-  const chain = (first: number, size: number | null): Uint8Array => {
-    const parts: Uint8Array[] = [];
-    for (let c = first; c >= 2 && c < 0xff0 && parts.length < 4096; c = next(c)) {
-      parts.push(image.subarray(dataAt + (c - 2) * clusterSize, dataAt + (c - 1) * clusterSize));
-    }
-    const all = Buffer.concat(parts);
-    return new Uint8Array(size === null ? all : all.subarray(0, size));
-  };
-  const entries = (table: Uint8Array): DiskFile[] => {
-    const out: DiskFile[] = [];
-    for (let at = 0; at + 32 <= table.length && table[at] !== 0; at += 32) {
-      const attributes = table[at + 11]!;
-      if (table[at] === 0xe5 || attributes & 0x08) continue;
-      const base = Buffer.from(table.subarray(at, at + 8)).toString('latin1').trimEnd();
-      const ext = Buffer.from(table.subarray(at + 8, at + 11)).toString('latin1').trimEnd();
-      if (base === '.' || base === '..') continue;
-      const isDirectory = (attributes & 0x10) !== 0;
-      const cluster = table[at + 26]! | (table[at + 27]! << 8);
-      const size = (table[at + 28]! | (table[at + 29]! << 8) | (table[at + 30]! << 16) | (table[at + 31]! << 24)) >>> 0;
-      out.push({ name: ext ? `${base}.${ext}` : base, isDirectory, bytes: chain(cluster, isDirectory ? null : size) });
-    }
-    return out;
-  };
-  return {
-    root: () => entries(image.subarray(rootAt, dataAt)),
-    list: (dir) => entries(dir.bytes),
-  };
-}
 
 /** Atari planar, four big-endian plane words per 16 pixels, plane 0 the low bit. */
 function planarToPixels(bytes: Uint8Array): number[] {
@@ -186,7 +136,7 @@ const sheetAt = args.indexOf('--sheet');
 const sheetPath = sheetAt >= 0 ? args.splice(sheetAt, 2)[1] : undefined;
 const imagePath = args[0];
 if (!imagePath === !sheetPath) {
-  console.log('usage: npx tsx tools/gen-utility-portraits.ts <CSB_UTIL.ST> | --sheet <utility-portraits.dat> [--png <preview.png>]');
+  console.log('usage: npx tsx tools/gen-utility-portraits.ts <utility disk .stx or .ST> | --sheet <utility-portraits.dat> [--png <preview.png>]');
   process.exit(2);
 }
 
@@ -195,14 +145,13 @@ const cmpByCell = new Map<number, Uint8Array>();
 if (imagePath) readDisk(imagePath);
 else readSheet(sheetPath!);
 
-/** The 24 `.CMP`s of the disk's `PORTRAIT` folder, each in its cell. */
+/** The 24 `.CMP`s of the disk's `PORTRAIT` folder, each in its cell: a Pasti image (`tools/lib/stx.ts`), or a raw one. */
 function readDisk(path: string): void {
   const image = new Uint8Array(readFileSync(resolve(path)));
   console.log(`${path}: ${image.length} bytes, md5 ${createHash('md5').update(image).digest('hex')}`);
-  const disk = fat12(image);
-  const folder = disk.root().find((f) => f.name === 'PORTRAIT' && f.isDirectory);
-  if (!folder) throw new Error('no PORTRAIT folder on the disk');
-  const files = disk.list(folder).filter((f) => !f.isDirectory && f.name.endsWith('.CMP'));
+  const files = [...(/\.stx$/i.test(path) ? stxFiles(image) : fat12Files(image))]
+    .filter(([name]) => name.startsWith('PORTRAIT/') && name.endsWith('.CMP'))
+    .map(([name, bytes]) => ({ name: name.slice('PORTRAIT/'.length), bytes }));
   check(files.length === 24, `PORTRAIT holds 24 .CMP files (${files.length})`);
 
   const heroes = presetHeroesOf(stockDungeon(), stockGraphics());

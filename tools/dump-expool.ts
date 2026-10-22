@@ -189,7 +189,7 @@ function main(): void {
   {
     // DM's dungeon.dat, whose database 11 is empty, given a save's pool there.
     const pool = loadCsbwinWorld(new Uint8Array(readFileSync(genuineSaves()[0]!))).dungeon.expool!;
-    const original = new Uint8Array(readFileSync('static/gamefiles/dm-atari/dungeon.dat'));
+    const original = new Uint8Array(readFileSync('tools/fixtures/gamefiles/dm-atari/dungeon.dat'));
     const at = computeDungeonImageLayout(original, 0, { indirectText: false })!.databases[11]!;
     const file = new Uint8Array(original.length + pool.length);
     file.set(original.subarray(0, at));

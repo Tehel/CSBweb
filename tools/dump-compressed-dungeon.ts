@@ -25,8 +25,8 @@ import { DungeonLoader } from '../src/data/DungeonLoader';
 import { check, finish } from './lib/check';
 import { newContext, stockGraphics } from './lib/game';
 
-const CSB = new Uint8Array(readFileSync(resolve('static/gamefiles/csb/dungeon.dat')));
-const DM = new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat')));
+const CSB = new Uint8Array(readFileSync(resolve('tools/fixtures/gamefiles/csb/dungeon.dat')));
+const DM = new Uint8Array(readFileSync(resolve('tools/fixtures/gamefiles/dm-atari/dungeon.dat')));
 
 function main(): void {
   console.log('== csb/dungeon.dat ==');

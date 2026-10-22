@@ -72,9 +72,9 @@ function makeGame(): Game {
 /** CSB's prison, the compressed `dungeon.dat` whose level 0 is its 24 mirrors. */
 function makePrisonGame(): Game {
   const data = new DungeonLoader().loadDungeonDat(
-    new Uint8Array(readFileSync(resolve('static/gamefiles/csb/dungeon.dat'))));
+    new Uint8Array(readFileSync(resolve('tools/fixtures/gamefiles/csb/dungeon.dat'))));
   const graphics = new GraphicsLoader();
-  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/csb/graphics.dat'))));
+  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('tools/fixtures/gamefiles/csb/graphics.dat'))));
   return gameOn(data, graphics);
 }
 

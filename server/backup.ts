@@ -6,7 +6,7 @@
  *   docker-compose exec -T csbweb node --disable-warning=ExperimentalWarning server/backup.ts
  *
  *   STATS_DB        the store (the checkout's `stats/stats.db`), as `server.ts` reads it
- *   GAMEFILES_DIR   the data sets (the checkout's `static/gamefiles/`), as `server.ts` reads it
+ *   GAMEFILES_DIR   the data sets (the checkout's `tools/fixtures/gamefiles/`), as `server.ts` reads it
  *   BACKUP_DIR      where the snapshot goes (`backups/` beside the store), made when missing
  *
  * A `cp` of the live file is unsafe: its WAL holds committed events the file does not yet,
@@ -28,7 +28,7 @@ import { backup, DatabaseSync } from 'node:sqlite';
 
 const ROOT = join(import.meta.dirname, '..');
 const statsDb = process.env.STATS_DB ?? join(ROOT, 'stats', 'stats.db');
-const gamefilesDir = process.env.GAMEFILES_DIR ?? join(ROOT, 'static', 'gamefiles');
+const gamefilesDir = process.env.GAMEFILES_DIR ?? join(ROOT, 'tools', 'fixtures', 'gamefiles');
 const dir = process.env.BACKUP_DIR ?? join(dirname(statsDb), 'backups');
 
 const stamp = new Date().toISOString().replace(/[:.]/g, '-');

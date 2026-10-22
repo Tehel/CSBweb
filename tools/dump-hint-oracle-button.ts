@@ -43,7 +43,7 @@ import { newGame, runVbl, TICK_DUE } from './lib/game';
 import { rigTeleporter } from './lib/teleporter';
 import { newUIState } from './lib/ui';
 
-const CSB = 'static/gamefiles/csb';
+const CSB = 'tools/fixtures/gamefiles/csb';
 const files: HintOracleFiles = {
   hct: new Uint8Array(readFileSync(`${CSB}/hcsb.hct`)),
   dat: parseHcsbDat(new Uint8Array(readFileSync(`${CSB}/hcsb.dat`))),

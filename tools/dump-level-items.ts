@@ -44,8 +44,8 @@ const OBJDESC_STRIDE = 6;
 
 function parseArgs(argv: string[]): ToolOptions {
   const options: ToolOptions = {
-    file: 'static/gamefiles/dm-atari/dungeon.dat',
-    graphics: 'static/gamefiles/dm-atari/graphics.dat',
+    file: 'tools/fixtures/gamefiles/dm-atari/dungeon.dat',
+    graphics: 'tools/fixtures/gamefiles/dm-atari/graphics.dat',
     out: 'tools/output/level0-items.json',  // tools/output is gitignored
     map: 0,
     all: false,

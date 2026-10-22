@@ -36,7 +36,7 @@ export const report = (from: number, n: number): number[] =>
   Array.from({ length: n }, (_, i) => [varFetch(from + i), globalStore(i)]).flat();
 
 const graphics = stockGraphics();
-const stock = readFileSync('static/gamefiles/dm-atari/dungeon.dat');
+const stock = readFileSync('tools/fixtures/gamefiles/dm-atari/dungeon.dat');
 export const save = new Uint8Array(readFileSync(savePath('csbgame7.dat')));
 
 /** What the global variables start at in a test game: no DSA stored into one. */

@@ -52,7 +52,7 @@ const DB_NAMES = ['door', 'telep', 'text', 'actuator', 'creature', 'weapon', 'cl
  * Chaos Strikes Back's own files, read beside DM's by default: Atari-era saves with no
  * Extended Features block (`tools/dump-atari-saves.ts`).
  */
-const CSB_SAVES = ['mini.dat', 'csbgame2.dat'].map((n) => `static/gamefiles/csb/${n}`);
+const CSB_SAVES = ['mini.dat', 'csbgame2.dat'].map((n) => `tools/fixtures/gamefiles/csb/${n}`);
 
 function main(): void {
   const saves = process.argv[2]

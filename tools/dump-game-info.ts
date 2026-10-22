@@ -49,7 +49,7 @@ function loaded(bytes: Uint8Array): Game {
 
 console.log('1. The sets whose dungeon.dat has a block');
 for (const [dir, size] of [['conflux-3.5-b8', 541], ['towers-of-chaos-3.3', 89], ['3D2D1D', 40], ['dm-windows', 32]] as const) {
-  const data = new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync(`static/gamefiles/${dir}/dungeon.dat`)));
+  const data = new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync(`tools/fixtures/gamefiles/${dir}/dungeon.dat`)));
   const declared = data.extendedFeatures?.gameInfoSize;
   const text = ascii(data.gameInfo?.text);
   console.log(`  ${dir}: gameInfoSize ${declared}, read ${data.gameInfo?.size} ${JSON.stringify(text.slice(0, 40))}…`);

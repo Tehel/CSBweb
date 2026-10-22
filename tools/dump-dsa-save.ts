@@ -53,7 +53,7 @@ import { newGame, stockDungeon, stockGame, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
 import { genuineSaves } from './lib/saves';
 
-const CONFLUX = 'static/gamefiles/conflux-3.5-b8/dungeon.dat';
+const CONFLUX = 'tools/fixtures/gamefiles/conflux-3.5-b8/dungeon.dat';
 const conflux = new Uint8Array(readFileSync(CONFLUX));
 const same = (a: unknown, b: unknown): boolean =>
   JSON.stringify(a, (_k, v) => (v instanceof Uint16Array ? Array.from(v) : v)) ===
@@ -148,7 +148,7 @@ console.log('3 and 4. The global variables at a save, and the round trip');
 console.log('5. 3D2D1D');
 {
   const graphics = stockGraphics();
-  const game = newGame(new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync('static/gamefiles/3D2D1D/dungeon.dat'))), graphics);
+  const game = newGame(new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync('tools/fixtures/gamefiles/3D2D1D/dungeon.dat'))), graphics);
   const before = game.ctx.dungeon.getData().dsaIndex;
   const other = freshGame();
   applyCsbwinSave(other, buildSaveFile(game));

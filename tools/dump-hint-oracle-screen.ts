@@ -30,8 +30,8 @@ import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../src/renderer/ViewportGraphics';
 import { check, finish } from './lib/check';
 import { standInOf } from './lib/standIn';
 
-const oracle = parseHintOracle(new Uint8Array(readFileSync(resolve('static/gamefiles/csb/hcsb.hct'))));
-const dat = parseHcsbDat(new Uint8Array(readFileSync(resolve('static/gamefiles/csb/hcsb.dat'))));
+const oracle = parseHintOracle(new Uint8Array(readFileSync(resolve('tools/fixtures/gamefiles/csb/hcsb.hct'))));
+const dat = parseHcsbDat(new Uint8Array(readFileSync(resolve('tools/fixtures/gamefiles/csb/hcsb.dat'))));
 const seg = dat.segment1;
 const { LAST, NEXT, DONE, FIRST_TITLE } = HINT_BUTTON;
 

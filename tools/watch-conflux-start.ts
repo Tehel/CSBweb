@@ -26,7 +26,7 @@ import { csbGraphicsOpener } from '../src/engine/FileSignatures';
 import { check, finish } from './lib/check';
 import { graphicsTablesOf, newGame, runVbl, TICK_DUE } from './lib/game';
 
-const BASE = 'static/gamefiles/conflux-3.5-b8';
+const BASE = 'tools/fixtures/gamefiles/conflux-3.5-b8';
 const TICKS = Number(process.argv[2] ?? 600);
 const SEED = 0x2545f491;
 

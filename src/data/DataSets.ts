@@ -250,7 +250,7 @@ const FLAGS = ['csbGraphics', 'miniDat', 'hintOracle', 'dmRules', 'thumbnailAsTi
 
 /**
  * `text`, a manifest whose folders are relative to `base` (`gamefiles` for the page,
- * `static/gamefiles` for the tools, `''` for the server), every one resolved under it. A
+ * `tools/fixtures/gamefiles` for the tools, `''` for the server), every one resolved under it. A
  * manifest that is not JSON, or does not say what the page needs, throws an error whose
  * message says why: the page cannot choose a game without it.
  */

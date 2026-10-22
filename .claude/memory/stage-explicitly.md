@@ -13,7 +13,7 @@ path is not enough, because the hazard is whatever the author happens to be edit
 
 **How to apply:** stage the files the change touched. If the set is large, read
 `git status --short` and pick from it, skipping anything not yours — `NOTES.md` above
-all, and untracked game data under `static/gamefiles/` (e.g. `csbgame*.dat` saves).
+all, and untracked files that are not yours (the author's `csbgame*.dat` saves).
 
 **A file the commit needs that already holds the author's uncommitted edits** (DEBT.md,
 which every `/pay-debt` commit touches and the author edits between sessions): `git add`

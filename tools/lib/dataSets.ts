@@ -1,7 +1,7 @@
 /**
  * The page's data sets, as the tools see them: the repository's manifest,
  * `tools/data-sets.json`, read from disk and parsed by the page's own parser
- * (`src/data/DataSets.ts`), every folder under `static/gamefiles`. The dev server offers
+ * (`src/data/DataSets.ts`), every folder under `tools/fixtures/gamefiles`. The dev server offers
  * the page the same file (`vite.config.mts`); the deployed server, its own.
  *
  * Usage:
@@ -15,7 +15,7 @@ import type { DataSetFiles } from '../../src/data/DataSetFiles';
 import { parseManifest, type DataSet, type DataSetManifest } from '../../src/data/DataSets';
 
 /** The folder the page's `gamefiles/` is served from. */
-export const GAMEFILES_DIR = 'static/gamefiles';
+export const GAMEFILES_DIR = 'tools/fixtures/gamefiles';
 /** The repository's manifest, its folders relative to `GAMEFILES_DIR`. */
 export const MANIFEST_FILE = 'tools/data-sets.json';
 

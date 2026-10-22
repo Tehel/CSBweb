@@ -28,14 +28,14 @@ before answering.
 
 ## Sources
 
-- **`dungeon.dat`** (the default is `static/gamefiles/dm-atari/`): the world as a new game
+- **`dungeon.dat`** (the default is `tools/fixtures/gamefiles/dm-atari/`): the world as a new game
   starts it. It has no timers, and monsters sit where the designer put them.
 - **A CSBWin save** (`tools/fixtures/*.dat`, or any other by path): the world as it was saved. It shows
   the party (`@`), the monsters where they really are, and, in `cell`, the square's live
   timers.
 - **A `.dmweb.json`**: a save an earlier build wrote, a CSBWin file wrapped in JSON. Its
   world is read from its `raw` CSBWin file. The author's saves are untracked but readable. Pass `--graphics` with the matching
-  `graphics.dat` for another game (e.g. `static/gamefiles/csb/`).
+  `graphics.dat` for another game (e.g. `tools/fixtures/gamefiles/csb/`).
 
 ## Reading the output honestly
 

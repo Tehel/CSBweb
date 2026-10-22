@@ -45,7 +45,7 @@ import { graphicsTablesOf, stockGraphics, stockDungeon } from './lib/game';
 const graphics = stockGraphics();
 const tables = graphicsTablesOf(graphics).objects;
 const csbGraphics = new CSBGraphicsLoader();
-csbGraphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/conflux-3.5-b8/CSBgraphics.dat'))));
+csbGraphics.loadFromArray(new Uint8Array(readFileSync(resolve('tools/fixtures/gamefiles/conflux-3.5-b8/CSBgraphics.dat'))));
 /** A pool without records: every graphic is the section `3 * mt + n - 1`. */
 const NO_POOL = standInOf<DungeonData>({ header: standInOf<DungeonHeader>({ objectCounts: new Array(16).fill(0) }) });
 

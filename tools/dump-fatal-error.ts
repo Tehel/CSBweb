@@ -29,7 +29,7 @@ import { check, finish } from './lib/check';
 import { newGame } from './lib/game';
 import { memoryStore, savePath } from './lib/saves';
 
-const ATARI = 'static/gamefiles/dm-atari';
+const ATARI = 'tools/fixtures/gamefiles/dm-atari';
 const graphics = new GraphicsLoader();
 graphics.loadFromArray(new Uint8Array(readFileSync(`${ATARI}/graphics.dat`)));
 const dungeon = new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync(`${ATARI}/dungeon.dat`)));

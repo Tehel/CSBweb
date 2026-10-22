@@ -16,8 +16,10 @@ This port is based on the awesome CSBWin version by Paul R. Stevens, which was c
 - npm
 - `7z` (7-Zip or p7zip), and `npm run fetch-csbwin-src` once: it fetches `doc/CSBwin-src/`,
   CSBWin's C++ source, which the docs cite and `npm test` reads
-- The original game files under `static/gamefiles/`, one directory per data set, each
-  listed in `tools/data-sets.json` (parsed by `src/data/DataSets.ts`)
+- `npm run fetch-gamefiles` once: it fetches the original game files and the fans' dungeons
+  into `tools/fixtures/gamefiles/`, one directory per data set listed in
+  `tools/data-sets.json`, from dmweb.free.fr, Paul R. Stevens' site and the Dungeon Master
+  forum's shared OneDrive. The tests and the dev server read them
 
 ### Commands
 
@@ -45,7 +47,7 @@ csbweb/
 │   ├── ui/                # the page's DOM side: the listeners, a dropped save, the fatal screen
 │   └── main.ts            # the page's bootstrap
 ├── tools/                 # verification tools (dump-*.ts), the golden frames
-├── static/gamefiles/      # the original game data files, one directory per data set
+├── tools/fixtures/        # CSBWin saves the tools read; gamefiles/, the data sets (not ours, fetched)
 ├── doc/                   # CSBWin reference docs; CSBwin-src/ is the C++ (not ours, fetched)
 ├── PLAN.md, DEBT.md       # project status and technical debt
 ├── index.html

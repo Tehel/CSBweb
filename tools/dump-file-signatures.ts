@@ -79,7 +79,7 @@ const ramp = Uint8Array.from({ length: 200 }, (_, i) => (i * 37) & 0xff);
 check(Array.from({ length: 200 }, (_, n) => n).every((n) => digestHex(ramp.subarray(0, n)) === createHash('md5').update(ramp.subarray(0, n)).digest('hex')),
   'Node\'s digest for every length from 0 to 199');
 const gameFiles = DATA_SETS.flatMap((set) => [`${set.dir}/graphics.dat`, `${set.dir}/dungeon.dat`, ...(set.csbGraphics ? [`${set.dir}/CSBgraphics.dat`] : [])]);
-gameFiles.push('static/gamefiles/conflux-3.5-b8/CSBgraphics.dat', 'static/gamefiles/conflux-3.5-b8/graphics.dat');
+gameFiles.push('tools/fixtures/gamefiles/conflux-3.5-b8/CSBgraphics.dat', 'tools/fixtures/gamefiles/conflux-3.5-b8/graphics.dat');
 check(gameFiles.every((path) => digestHex(read(path)) === createHash('md5').update(read(path)).digest('hex')),
   `Node's digest for all ${gameFiles.length} game files`);
 
@@ -104,9 +104,9 @@ for (const set of DATA_SETS) {
   }
 }
 const confluxCsb = new CSBGraphicsLoader();
-confluxCsb.loadFromArray(read('static/gamefiles/conflux-3.5-b8/CSBgraphics.dat'));
+confluxCsb.loadFromArray(read('tools/fixtures/gamefiles/conflux-3.5-b8/CSBgraphics.dat'));
 const confluxGraphics = new GraphicsLoader();
-confluxGraphics.loadFromArray(read('static/gamefiles/conflux-3.5-b8/graphics.dat'));
+confluxGraphics.loadFromArray(read('tools/fixtures/gamefiles/conflux-3.5-b8/graphics.dat'));
 console.log(`  ${'conflux-3.5-b8'.padEnd(16)} graphics.dat    ${sig(confluxGraphics.getSignature())}`);
 console.log(`  ${'conflux-3.5-b8'.padEnd(16)} CSBgraphics.dat ${sig(confluxCsb.getSignature()!)}`);
 
@@ -125,11 +125,11 @@ for (const set of DATA_SETS) {
   const result = outcome(() => game.readDungeonDat(read(`${set.dir}/dungeon.dat`)));
   check(result === 'ok', `${set.id}: its dungeon.dat reads under its own graphics.dat (${describe(result)})`);
 }
-console.log(`  ${'conflux-3.5-b8'.padEnd(16)} ${named(new DungeonLoader().loadDungeonDat(read('static/gamefiles/conflux-3.5-b8/dungeon.dat')))}`);
+console.log(`  ${'conflux-3.5-b8'.padEnd(16)} ${named(new DungeonLoader().loadDungeonDat(read('tools/fixtures/gamefiles/conflux-3.5-b8/dungeon.dat')))}`);
 for (const path of genuineSaves()) {
   const world = loadCsbwinWorld(read(path));
   console.log(`  ${path.split('/').pop()!.padEnd(30)} ${named(Object.assign(world.dungeon, { extendedFeatures: world.save.extendedFeatures }))}`);
-  const game = newGame(new DungeonLoader().loadDungeonDat(read('static/gamefiles/csb/dungeon.dat')), graphicsOf.get('csb')!);
+  const game = newGame(new DungeonLoader().loadDungeonDat(read('tools/fixtures/gamefiles/csb/dungeon.dat')), graphicsOf.get('csb')!);
   const result = outcome(() => applySaveBytes(game, read(path)));
   check(result === 'ok', `${path}: reads under CSB's graphics.dat (${describe(result)})`);
 }
@@ -140,7 +140,7 @@ console.log('');
 console.log('=== openGraphicsFile at a read ===');
 const graphics = stockGraphics();
 const fold = foldedSignature(graphics.getSignature());
-const dungeonBytes = read('static/gamefiles/dm-atari/dungeon.dat');
+const dungeonBytes = read('tools/fixtures/gamefiles/dm-atari/dungeon.dat');
 
 /** dm-atari's dungeon.dat with `records` written into its `EXPOOL`. */
 function worldNaming(records: [number, number][]): ReturnType<DungeonLoader['loadDungeonDat']> {
@@ -153,7 +153,7 @@ function worldNaming(records: [number, number][]): ReturnType<DungeonLoader['loa
 /** A new game read of `records`' world into a game over CSB's prison. */
 function readNaming(records: [number, number][]): { result: unknown; told: unknown[]; levels: number } {
   const told: unknown[] = [];
-  const game = newGame(new DungeonLoader().loadDungeonDat(read('static/gamefiles/csb/dungeon.dat')), graphics, { die: (error) => { told.push(error); } });
+  const game = newGame(new DungeonLoader().loadDungeonDat(read('tools/fixtures/gamefiles/csb/dungeon.dat')), graphics, { die: (error) => { told.push(error); } });
   const result = outcome(() => game.readNewGame(worldNaming(records)));
   return { result, told, levels: game.ctx.dungeon.getData().maps.length };
 }
@@ -182,7 +182,7 @@ check(csbOnly.result === 'ok', 'a world naming only a CSBgraphics.dat reads: gra
   new Expool(source.ctx.dungeon.getData()).write(edbtKey(EDBT_RUNTIME_FILE_SIGNATURES, 1), [fold ^ 1]);
   const badSave = buildSaveFile(source);
   const told: unknown[] = [];
-  const target = newGame(new DungeonLoader().loadDungeonDat(read('static/gamefiles/csb/dungeon.dat')), graphics, { die: (error) => { told.push(error); } });
+  const target = newGame(new DungeonLoader().loadDungeonDat(read('tools/fixtures/gamefiles/csb/dungeon.dat')), graphics, { die: (error) => { told.push(error); } });
   const bad = outcome(() => applySaveBytes(target, badSave));
   const levelsAfterBad = target.ctx.dungeon.getData().maps.length;
   const good = outcome(() => applySaveBytes(target, goodSave));

@@ -557,7 +557,7 @@ with its saves' rows and files.
   RISE, then stamped into the file the game writes with CSBWin's, taken by RISE, and
   loading with them; a file that holds one of them left as it is).
 - **The stamp**: `tools/dump-save-stamp.ts`, over the eight genuine saves and the two of
-  `static/gamefiles/csb`. The stamped file differs in six bytes of `GAMEBLOCK1`, the id
+  `tools/fixtures/gamefiles/csb`. The stamped file differs in six bytes of `GAMEBLOCK1`, the id
   and the word the block's fold ends on; it reads back with the id, the level and the
   party; its own id stamped back gives the file byte for byte; a CSBWin block stamped is
   what `ScrambleAndWrite` writes, and `mini.dat`'s 127 fold words that are not zero are
@@ -633,7 +633,7 @@ with its saves' rows and files.
   digest's input on a level made by hand, and the digest against `node:crypto`'s; every
   data set's `dungeon.dat` and CSB's `mini.dat` a catalogue dungeon that lists the set,
   whole, no entry without its file and no digest listed twice; the eight genuine saves,
-  from `d.Time` 70 to 127290, and the two of `static/gamefiles/csb`, each its own
+  from `d.Time` 70 to 127290, and the two of `tools/fixtures/gamefiles/csb`, each its own
   dungeon's and matching no level of another; the port's own save; on the late save's
   world, a cell's attributes, objects and type among those not stone changing nothing, a
   wall opened or a cell walled changing its level's digest alone, the size in the

@@ -85,6 +85,7 @@ npm test               # the gate: tsc + every asserting tool  (~75s, a worker p
 npm test -- --only=dsa,save  # tsc + the tools whose name holds any of these
 npm test -- --frames   # …and the golden frames               (~40s more)
 npm run fetch-csbwin-src  # doc/CSBwin-src/, the C++ reference (needs 7z)
+npm run fetch-gamefiles   # tools/fixtures/gamefiles/, the data sets the tests and the dev server read (needs 7z)
 npm start              # the deployed server, server/, over dist/
 bash tools/check-image.sh  # the golden frames against the Docker image (Docker, ~4 min)
 ```

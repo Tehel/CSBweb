@@ -186,8 +186,8 @@ import { tag0189d4 } from '../src/engine/OpenChest';
 import * as Widgets from '../src/renderer/ui/Widgets';
 import { testChampion } from './lib/champion';
 
-const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
-const GRAPHICS_DAT = 'static/gamefiles/dm-atari/graphics.dat';
+const DUNGEON = 'tools/fixtures/gamefiles/dm-atari/dungeon.dat';
+const GRAPHICS_DAT = 'tools/fixtures/gamefiles/dm-atari/graphics.dat';
 
 
 /* ------------------------------------------------------------------------------- */
@@ -3019,8 +3019,8 @@ async function checkRiseFaces(graphics: GraphicsLoader): Promise<void> {
 /* ---------------------------------------------------------------- 18. the import ---- */
 
 /** A save of Chaos Strikes Back, and the save its game starts from (`doc/SAVES.md` → "RISE makes a save of its own"). */
-const CSB_SAVE = 'static/gamefiles/csb/csbgame2.dat';
-const CSB_MINI = 'static/gamefiles/csb/mini.dat';
+const CSB_SAVE = 'tools/fixtures/gamefiles/csb/csbgame2.dat';
+const CSB_MINI = 'tools/fixtures/gamefiles/csb/mini.dat';
 
 /**
  * The port's save of a new game of `champion`, playthrough `id`, in a dungeon whose cell

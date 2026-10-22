@@ -28,7 +28,7 @@ import { StkOp } from '../src/engine/dsa/DsaTypes';
 import { dsaCensus, NOT_OPERATIONS } from '../src/engine/DungeonCensus';
 import { check, finish } from './lib/check';
 
-const CONFLUX = 'static/gamefiles/conflux-3.5-b8/dungeon.dat';
+const CONFLUX = 'tools/fixtures/gamefiles/conflux-3.5-b8/dungeon.dat';
 
 /** What the port lacks, in `STKOP` order: nothing. */
 const LEFT: readonly string[] = [];

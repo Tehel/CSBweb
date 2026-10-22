@@ -77,7 +77,7 @@ const FOOD_VALUE_COUNT = 8;
 
 function parseArgs(argv: string[]): ToolOptions {
   const options: ToolOptions = {
-    graphics: 'static/gamefiles/dm-atari/graphics.dat',
+    graphics: 'tools/fixtures/gamefiles/dm-atari/graphics.dat',
     out: 'tools/output/object-definitions.json',
   };
 

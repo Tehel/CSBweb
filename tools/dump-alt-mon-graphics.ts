@@ -33,7 +33,7 @@ import { monsterHasAttackGraphic, monsterHasBackGraphic, monsterHasSideGraphic }
 import { DungeonState } from '../src/engine/DungeonState';
 import { check, finish } from './lib/check';
 
-const CONFLUX = 'static/gamefiles/conflux-3.5-b8';
+const CONFLUX = 'tools/fixtures/gamefiles/conflux-3.5-b8';
 /** The two `CSBgraphics.dat` here, with how many alternate monster graphics each holds. */
 const FILES: [string, number][] = [
   [`${CONFLUX}/CSBgraphics.dat`, 123],

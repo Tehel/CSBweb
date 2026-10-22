@@ -181,8 +181,8 @@ function roundTrip(name: string, dungeonPath: string, graphicsPath: string): voi
 
 /** `dm-windows/dungeon.dat`, CSBWin's, read and written again. */
 function csbwinsOwn(): void {
-  console.log('=== CSBWin\'s own: static/gamefiles/dm-windows/dungeon.dat ===');
-  const file = read('static/gamefiles/dm-windows/dungeon.dat');
+  console.log('=== CSBWin\'s own: tools/fixtures/gamefiles/dm-windows/dungeon.dat ===');
+  const file = read('tools/fixtures/gamefiles/dm-windows/dungeon.dat');
   const world = load(file);
   const written = buildDungeonFile(world, { dmRules: true });
   const a = readExtendedFeatures(file);

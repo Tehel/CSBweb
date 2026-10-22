@@ -329,7 +329,7 @@ older entry saying doors sound wrong — that entry is stale.)
 
 ## `dm-atari/graphics.dat` is CSBWin's with three items from the 1.2 disk (deliberate divergence from CSBWin)
 
-`static/gamefiles/dm-atari/graphics.dat` (md5 `6e1396f7abcfb1899e79d671390b41ce`) is the
+`tools/fixtures/gamefiles/dm-atari/graphics.dat` (md5 `6e1396f7abcfb1899e79d671390b41ce`) is the
 `graphics.dat` CSBWin's DM package ships (`dm-windows/`, md5
 `0b5e042f2c7f2752bac78292cc6bb07e`) with the compressed bytes of three items, 5, 232 and
 `0x22e`, taken from the English Atari ST 1.2 disk's (`dm-atari-1.2/`, md5
@@ -2619,7 +2619,7 @@ Two traps in three lines:
 then takes the image header's `LegacyCellFlagArraySize`, its word 2
 (`doc/CSBwin-src/SaveGame.cpp:2624-2627`, `CSB.h:2135`), and does so too when the block
 declares 0. Chaos Strikes Back ships its saves in that Atari-era form: `mini.dat` and
-`csbgame2.dat` (`static/gamefiles/csb/`) carry no block, their word 2 is 8763, and with it the layout closes on the
+`csbgame2.dat` (`tools/fixtures/gamefiles/csb/`) carry no block, their word 2 is 8763, and with it the layout closes on the
 final word. 8763 is also the extent of the eleven levels' cell flags and tables as their
 descriptors place them. Covered by `tools/dump-atari-saves.ts`.
 
@@ -3752,7 +3752,7 @@ names the same texts, rebuilt from a field it never overwrites, in a new slot ea
 converted.** All eight were started from the DM Windows package's
 `dungeon.dat`, which is the same dungeon that CSBWin had already converted (see "DM's two
 `dungeon.dat` files"). So the converted form is in the files: converting
-`static/gamefiles/dm-atari/dungeon.dat` here and comparing gives 0 differences in the
+`tools/fixtures/gamefiles/dm-atari/dungeon.dat` here and comparing gives 0 differences in the
 125-entry indirect text index, 0 in all 1749 words of compressed text, 0 in every TEXT
 record's rewritten index word, 0 in the text record every scroll's new RN names and in its
 `open` bit, and 0 in every actuator's `word8`.
@@ -3771,9 +3771,9 @@ where those files have 1946. The texts the slots name are the same
 
 ## DM's two `dungeon.dat` files
 
-`static/gamefiles/dm-atari/dungeon.dat` (33442 bytes) is the original Atari file: no
+`tools/fixtures/gamefiles/dm-atari/dungeon.dat` (33442 bytes) is the original Atari file: no
 Extended Features block, 8-byte actuators, 4-byte scrolls, raw text. The DM Windows
-package's (`static/gamefiles/dm-windows/dungeon.dat`, 42025 bytes, the `dm-windows` data
+package's (`tools/fixtures/gamefiles/dm-windows/dungeon.dat`, 42025 bytes, the `dm-windows` data
 set) is **the same dungeon re-saved by CSBWin** in the shape a save is written in.
 `dm-atari/dungeon.dat` is the 1.1 disk's `DUNGEON.DAT`, byte for byte
 (`doc/ATARI_ST_DISK_REFERENCE.md` → "CSBWin's files"). The set's `graphics.dat` is
@@ -3859,7 +3859,7 @@ at `:9970`) reads two tables of 4 and 16 bytes, then big-endian words bit by bit
 top: `0xx` is the first table's entry, `10yyyy` the second's, `11zzzzzzzz` a literal
 byte. Its count is the word `D7W`.
 
-CSB's `dungeon.dat` (`static/gamefiles/csb/`) is compressed: 2098 bytes, 2622 expanded,
+CSB's `dungeon.dat` (`tools/fixtures/gamefiles/csb/`) is compressed: 2098 bytes, 2622 expanded,
 `Word22592` 12. The image is two levels (20x16 and 21x16), sentinel 8, start (9,0) facing
 2, with 4 doors, 26 texts, 30 actuators and 12 groups. Level 0 is where the champions are
 chosen: 24 type-127 actuators, the mirrors, values 0 to 23, each facing a square whose
@@ -3985,7 +3985,7 @@ blocks as the file holds them, unscrambled but not byte-swapped.
   by its byte sum. An Extended Features block is written only when `mini.dat` opened with
   one; CSB's has none.
 
-`static/gamefiles/csb/csbgame2.dat` is such a file, made from this `mini.dat`: its
+`tools/fixtures/gamefiles/csb/csbgame2.dat` is such a file, made from this `mini.dat`: its
 `Byte22598` is 2, and made again from itself and `mini.dat` with its own food, water and
 `RandomGameID` in place of the draws it is the file byte for byte
 (`tools/dump-new-adventure.ts`, which holds the port's `src/engine/Chaos.ts` to every
@@ -4141,7 +4141,7 @@ hands back an enciphered file deciphered whole, which every reader reads on from
 `ctx.rules.simpleEncipher` is the global, and `saveSaveGameState` enciphers a save whose
 block declares `SimpleEncryption`. `tools/dump-extended-features-read.ts` checks the
 stream against `RC4.cpp` compiled as it stands, and against Conflux 3.5's `dungeon.dat`
-(`static/gamefiles/conflux-3.5-b8/`), which is such a file: deciphered, it opens with the
+(`tools/fixtures/gamefiles/conflux-3.5-b8/`), which is such a file: deciphered, it opens with the
 sentinel, its `flags` are 0xff, the block's checksum matches, and so do the two object
 maps' behind it, 59775 bytes read by their position. Its image reads to the file's last
 word, the sum of every byte before it. The tool also enciphers DM's CSBWin
@@ -6937,7 +6937,7 @@ scrambles the second half with word 29, which is 0, as its hash (`:714-758`). Th
 fold over all 128 words therefore ends at `D5` (`ReadUnscrambleBlock`,
 `doc/CSBwin-src/CSBCode.cpp:9272-9301`). The reader takes any words 0-126 that fold so:
 each zero is written in place of a commented-out `STRandom()` (`SaveGame.cpp:733-746`),
-and `static/gamefiles/csb/mini.dat` holds 127 words that are not zero there. No other
+and `tools/fixtures/gamefiles/csb/mini.dat` holds 127 words that are not zero there. No other
 block's hash or checksum covers a field of `GAMEBLOCK1`, so a field of its second half
 is rewritten by changing that field and word 127 alone: `stampRandomGameID`
 (`src/data/SaveGameLoader.ts`) writes `RandomGameID` so, six bytes of the file
@@ -6991,7 +6991,7 @@ the 35 tables `buildGameTables` holds, CSB's differ from DM's in six: `monsterDe
 ## The French 1.3 `graphics.dat`: longer words
 
 CSBWin was written for the English files, and two of its constants are the English words'
-sizes. The French 1.3 file (`static/gamefiles/dm-atari-1.3-fr/`) breaks both, so the port
+sizes. The French 1.3 file (`tools/fixtures/gamefiles/dm-atari-1.3-fr/`) breaks both, so the port
 reads each size from the file (`DEBT.md` H, "Word sizes from the file").
 
 - **Item `0x230` is 1356 bytes.** `ReadTablesFromGraphicsFile` asserts 0x4e8 (1256)
@@ -7176,6 +7176,6 @@ first column: the movement arrows' graphic 13, blitted into `d.Word28` (`Charact
 black there in DM and CSB, and a flame in Conflux (golden frame 18).
 
 No button the game reads in play crosses from one region into another, nor across a gap's
-edge but from its region's first column, in any data set under `static/gamefiles`; a
+edge but from its region's first column, in any data set under `tools/fixtures/gamefiles`; a
 list's click anywhere covers whole regions (`tools/dump-left-handed.ts`). The left-handed
 screen moves the regions and their gaps on that ground (`src/renderer/LeftHanded.ts`).
