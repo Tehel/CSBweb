@@ -19,3 +19,12 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+This licence covers the work of CSBweb's own authors. CSBweb is a TypeScript port written
+from CSBWin, Paul R. Stevens' C++ reconstruction of Dungeon Master: it follows CSBWin's
+behaviour and structure but contains none of its code. The licence grants no rights in
+CSBWin, which belongs to its author, nor in Dungeon Master and Chaos Strikes Back, their
+data files and artwork, which belong to FTL Games / Software Heaven, Inc. The files in this
+repository that are not under this licence are listed in README.md.

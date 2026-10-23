@@ -96,7 +96,10 @@ I'm afraid.
 
 ## License
 
-The code is [MIT](LICENSE).
+The code is [MIT](LICENSE). It is a TypeScript port written from CSBWin, Paul R. Stevens'
+C++ reconstruction of Dungeon Master: it follows CSBWin's behaviour and structure but
+contains none of its code. The MIT licence covers this project's own work, not the rights of
+CSBWin's author or of Dungeon Master's.
 
 Dungeon Master and Chaos Strikes Back, their data files, manuals and artwork belong to their
 original authors at FTL Games / Software Heaven, Inc., and the fans' dungeons to their
