@@ -90,11 +90,14 @@ export interface Extras {
   readonly colourNewMastery: boolean;
   /** An item's figures under the eye's description (`getItemPropertyLines`). */
   readonly showItemProperties: boolean;
+  /** A hundred keys waiting in the mouse queue, not seven (`LONG_MOUSEQLEN`). */
+  readonly unlimitedKeyQueue: boolean;
 }
 
 /** Every extra off: the game is CSBWin's. */
 export const NO_EXTRAS: Extras = {
   gatherThrownWeapons: false, drinkAtFountain: false, colourNewMastery: false, showItemProperties: false,
+  unlimitedKeyQueue: false,
 };
 
 export interface GameContext {

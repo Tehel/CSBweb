@@ -1113,8 +1113,7 @@ Rules for all of them:
   (`src/settings/Settings.ts`), which the game reads as `GameContext.extras` (`Extras`),
   set at every change (`applyToGame`). With every extra off, the game is CSBWin's: every
   tool's output and every golden frame stay the same. The settings dialog's GAME tab
-  shows each (`src/renderer/ui/SettingsDialog.ts`), and the page's one Extras button
-  turns them all on or off together:
+  shows each, a button of its own (`src/renderer/ui/SettingsDialog.ts`):
   - `drinkAtFountain`: an empty hand drinking at a water fountain (`drinkAtWaterFountain`,
     `src/renderer/ui/Feeding.ts`, checked by `tools/dump-fountain.ts`);
   - `colourNewMastery`: a mastery just gained drawn in colour 7 on the attribute panel until every attribute
@@ -1169,6 +1168,14 @@ Rules for all of them:
     (`showsPotionPower`: to a selected champion of priest mastery above 1); to anyone
     else a potion has no line. A water flask has no rune, and gives its
     `WATER 1600 OF 2048` to all.
+  - `unlimitedKeyQueue`, UNLIMITED KEY QUEUE, for time attacks: the mouse queue a ring of
+    `LONG_MOUSEQLEN`, 101, not `MOUSEQLEN`'s 8, so a hundred keys wait, not seven, and a
+    click is refused only while 99 wait. Every rule of CSBWin's queue is kept, its
+    lengths alone changed, as CSBWin's own `NoKeyQue` changes them
+    (`doc/CSBwin-src/Data.h:1528-1533`); a bump still throws the whole queue away. The
+    setting reaches the queue through `applyToGame` (`MouseQueue.setLength`), which
+    empties it where the length changes (`src/engine/MouseQueue.ts`, checked by
+    `tools/dump-mouse-queue.ts`, case 1b).
 
   The coloured object cursor, RISE's NEW FACE and the FTL logo are the exceptions: the
   author wants them on by default, so they are recorded under H.

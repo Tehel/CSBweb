@@ -11,6 +11,7 @@
  * still gives a whole set.
  */
 import type { Extras, GameContext } from '../engine/GameContext';
+import { LONG_MOUSEQLEN, MOUSEQLEN } from '../engine/MouseQueue';
 import { KEY_LABEL_LAYOUTS, type KeyLabelLayout } from '../renderer/ui/KeyLabels';
 import { KEY_PRESETS, setKeyBindings, type KeyAction, type KeyBindings, type KeyPreset, type KeySlots } from '../renderer/ui/Keyboard';
 
@@ -71,7 +72,10 @@ export const DEFAULT_SETTINGS: SettingsValues = {
   statistics: true,
   mapView: false,
   championView: false,
-  extras: { gatherThrownWeapons: false, drinkAtFountain: false, colourNewMastery: false, showItemProperties: false },
+  extras: {
+    gatherThrownWeapons: false, drinkAtFountain: false, colourNewMastery: false, showItemProperties: false,
+    unlimitedKeyQueue: false,
+  },
   keyPreset: 'csbwin',
   keyBindings: KEY_PRESETS.csbwin,
   keyLabels: 'qwerty',
@@ -147,9 +151,13 @@ export class Settings {
   }
 }
 
-/** What the game reads of the settings: the extras, into `ctx`, and the keys it answers. */
-export function applyToGame(ctx: Pick<GameContext, 'extras'>, values: SettingsValues): void {
+/**
+ * What the game reads of the settings: the extras, into `ctx`, the mouse queue's length
+ * they choose, and the keys it answers.
+ */
+export function applyToGame(ctx: Pick<GameContext, 'extras' | 'mouseQueue'>, values: SettingsValues): void {
   ctx.extras = values.extras;
+  ctx.mouseQueue.setLength(values.extras.unlimitedKeyQueue ? LONG_MOUSEQLEN : MOUSEQLEN);
   setKeyBindings(values.keyBindings);
 }
 
@@ -176,6 +184,7 @@ function parseSettings(raw: unknown): SettingsValues {
       drinkAtFountain: bool(extras.drinkAtFountain, defaults.extras.drinkAtFountain),
       colourNewMastery: bool(extras.colourNewMastery, defaults.extras.colourNewMastery),
       showItemProperties: bool(extras.showItemProperties, defaults.extras.showItemProperties),
+      unlimitedKeyQueue: bool(extras.unlimitedKeyQueue, defaults.extras.unlimitedKeyQueue),
     },
     keyPreset: typeof preset === 'string' && (preset === 'custom' || preset in KEY_PRESETS)
       ? preset as KeyPreset : defaults.keyPreset,
@@ -186,7 +195,7 @@ function parseSettings(raw: unknown): SettingsValues {
 
 /**
  * The page's earlier settings in this model's names. Its one Extras button turned on
- * every extra; its map was shown by default.
+ * every extra there was then, before UNLIMITED KEY QUEUE; its map was shown by default.
  */
 function fromOldSettings(raw: unknown): Record<string, unknown> {
   const old = asRecord(raw);

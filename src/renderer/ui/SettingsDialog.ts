@@ -218,13 +218,7 @@ export const TABS: ReadonlyArray<{
       { name: 'HIGHLIGHT NEW MASTERY', help: 'A MASTERY JUST GAINED SHOWN IN COLOUR', ...extra('colourNewMastery') },
       { name: 'GATHER THROWN WEAPONS', help: 'WALK OVER A THROWN WEAPON TAKES IT BACK', ...extra('gatherThrownWeapons') },
       { name: 'SHOW ITEM PROPERTIES', help: 'THE EYE ADDS DAMAGE, ARMOUR, FOOD AND MORE', ...extra('showItemProperties') },
-      {
-        name: 'MAP VIEW',
-        help: 'THE MAP: A LONG PRESS ON THE MESSAGES, OR ITS KEY',
-        kind: 'toggle',
-        get: (values) => values.mapView,
-        set: (_values, on) => ({ mapView: on }),
-      },
+      { name: 'UNLIMITED KEY QUEUE', help: 'A HUNDRED MOVES WAIT THEIR TURN, NOT SEVEN', ...extra('unlimitedKeyQueue') },
       {
         name: 'CHAMPION VIEW',
         help: 'THE CHAMPIONS: A LONG PRESS ON A BAR, OR ITS KEY',
@@ -238,6 +232,13 @@ export const TABS: ReadonlyArray<{
         kind: 'toggle',
         get: (values) => values.statistics,
         set: (_values, on) => ({ statistics: on }),
+      },
+      {
+        name: 'MAP VIEW',
+        help: 'THE MAP: A LONG PRESS ON THE MESSAGES, OR ITS KEY',
+        kind: 'toggle',
+        get: (values) => values.mapView,
+        set: (_values, on) => ({ mapView: on }),
       },
     ],
   },

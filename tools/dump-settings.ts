@@ -11,6 +11,7 @@
  * Run: `npm test -- --only=dump-settings.ts`
  */
 import { NO_EXTRAS, type Extras } from '../src/engine/GameContext';
+import { MouseQueue } from '../src/engine/MouseQueue';
 import { DEFAULT_KEY_BINDINGS, keyAction, type KeyBindings } from '../src/renderer/ui/Keyboard';
 import {
   DEFAULT_SETTINGS, OLD_SETTINGS_KEY, SETTINGS_KEY, Settings, applyToGame, type SettingsStorage, type SettingsValues,
@@ -60,7 +61,9 @@ console.log('\n=== the earlier record, read once ===');
     'the sound, its volume and the CRT effect carried over, as the scanlines and the curve');
   check(values.mapView && values.championView && !values.statistics && !('debug' in values),
     'the map, the champions and the statistics carried over, and its debug chrome dropped');
-  check(Object.values(values.extras).every(Boolean), 'the one Extras flag turned every extra on');
+  const { unlimitedKeyQueue, ...oldExtras } = values.extras;
+  check(Object.values(oldExtras).every(Boolean) && !unlimitedKeyQueue,
+    'the one Extras flag turned on every extra it knew, and not UNLIMITED KEY QUEUE, which came after it');
   check(values.startupAnimations, 'the startup animations, which it did not have, are the default');
   check(stored(storage)?.scanlines === true && stored(storage)?.curve === true, 'it is written under the new key at once');
   storage.reads.length = 0;
@@ -140,7 +143,7 @@ console.log('\n=== a table of keys, saved and read back ===');
   check(new Settings(storage).values.keyBindings === DEFAULT_KEY_BINDINGS, 'and is read back as the preset');
 
   // The keys the game answers are the table in force.
-  const ctx = { extras: NO_EXTRAS };
+  const ctx = { extras: NO_EXTRAS, mouseQueue: new MouseQueue() };
   applyToGame(ctx, { ...DEFAULT_SETTINGS, keyPreset: 'custom', keyBindings: table });
   console.log(`KeyW: ${keyAction('KeyW')}, ArrowUp: ${keyAction('ArrowUp')}, KeyK: ${keyAction('KeyK')}, Comma: ${keyAction('Comma')}`);
   check(keyAction('KeyW') === 'move.forward' && keyAction('ArrowUp') === 'move.forward', "the custom table's keys move");
@@ -152,7 +155,7 @@ console.log('\n=== a table of keys, saved and read back ===');
 console.log('\n=== each extra reaches the game alone ===');
 {
   const settings = new Settings(new MapStorage());
-  const ctx: { extras: Extras } = { extras: NO_EXTRAS };
+  const ctx: { extras: Extras; mouseQueue: MouseQueue } = { extras: NO_EXTRAS, mouseQueue: new MouseQueue() };
   settings.subscribe((values) => applyToGame(ctx, values));
   for (const extra of Object.keys(NO_EXTRAS) as Array<keyof Extras>) {
     settings.update({ extras: { ...NO_EXTRAS, [extra]: true } });

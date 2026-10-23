@@ -18,6 +18,14 @@
  */
 export const MOUSEQLEN = 8;
 
+/**
+ * The ring's length with UNLIMITED KEY QUEUE on (`Extras.unlimitedKeyQueue`), which only the
+ * port has (`DEBT.md` X): a hundred keys wait, not seven, and a click is refused only while
+ * 99 entries wait. CSBWin itself made the queue's length a build's choice, `NoKeyQue`'s
+ * 3 or 8, every rule below kept.
+ */
+export const LONG_MOUSEQLEN = 101;
+
 /** The button-up `OnMouseUnClick` queues (doc/CSBwin-src/CSBCode.cpp:7653). */
 export const MOUSE_UNCLICK = 0x0add;
 
@@ -35,10 +43,22 @@ export const UNTRANSLATED_CLICK = 0xfffe;
 export interface MouseQueueEntry { num: number; x: number; y: number; buttons: number }
 
 export class MouseQueue {
-  private readonly entries: MouseQueueEntry[] =
-    Array.from({ length: MOUSEQLEN }, () => ({ num: 0, x: 0, y: 0, buttons: 0 }));
+  /** `MOUSEQLEN`, or `LONG_MOUSEQLEN` with the extra on (`setLength`). */
+  private length = MOUSEQLEN;
+  private entries = newEntries(MOUSEQLEN);
   private start = 0;
   private end = MOUSEQLEN - 1;
+
+  /**
+   * The ring made `length` long, `MOUSEQLEN` or `LONG_MOUSEQLEN` (`applyToGame`), and left
+   * empty, as `DiscardAllInput` leaves it, where that changes it.
+   */
+  setLength(length: number): void {
+    if (length === this.length) return;
+    this.length = length;
+    this.entries = newEntries(length);
+    this.discardAllInput();
+  }
 
   /**
    * A key, `TAG0196da` (doc/CSBwin-src/CSBCode.cpp:8516): queued unless the queue is
@@ -47,9 +67,9 @@ export class MouseQueue {
    */
   enqueueKey(num: number): boolean {
     let end = this.end + 2;
-    if (end > MOUSEQLEN - 1) end -= MOUSEQLEN;
+    if (end > this.length - 1) end -= this.length;
     if (end === this.start) return false;
-    this.end = (this.end + 1) % MOUSEQLEN;
+    this.end = (this.end + 1) % this.length;
     this.entries[this.end] = { num, x: 0, y: 0, buttons: 0 };
     return true;
   }
@@ -62,8 +82,8 @@ export class MouseQueue {
    * translated (`Game.handleMouseEvents`). Says whether it was queued.
    */
   enqueueClick(x: number, y: number, buttons: number): boolean {
-    if (this.count() >= MOUSEQLEN - 2) return false;
-    this.end = (this.end + 1) % MOUSEQLEN;
+    if (this.count() >= this.length - 2) return false;
+    this.end = (this.end + 1) % this.length;
     this.entries[this.end] = { num: UNTRANSLATED_CLICK, x, y, buttons };
     return true;
   }
@@ -73,14 +93,14 @@ export class MouseQueue {
    * while fewer than `MOUSEQLEN-1` entries wait — whether or not its click was.
    */
   enqueueUnClick(): void {
-    if (this.count() >= MOUSEQLEN - 1) return;
-    this.end = (this.end + 1) % MOUSEQLEN;
+    if (this.count() >= this.length - 1) return;
+    this.end = (this.end + 1) % this.length;
     this.entries[this.end] = { num: MOUSE_UNCLICK, x: 0, y: 0, buttons: 0 };
   }
 
   /** `numEnt`: how many entries wait (doc/CSBwin-src/CSBCode.cpp:7648-7649). */
   count(): number {
-    return (this.end - this.start + 1 + MOUSEQLEN) % MOUSEQLEN;
+    return (this.end - this.start + 1 + this.length) % this.length;
   }
 
   /** The entry `HandleMouseEvents` would take next, left in place. */
@@ -90,7 +110,7 @@ export class MouseQueue {
 
   /** `MouseQStart++`, wrapped: the head is taken. */
   take(): void {
-    this.start = (this.start + 1) % MOUSEQLEN;
+    this.start = (this.start + 1) % this.length;
   }
 
   /**
@@ -100,6 +120,10 @@ export class MouseQueue {
    */
   discardAllInput(): void {
     this.start = 0;
-    this.end = MOUSEQLEN - 1;
+    this.end = this.length - 1;
   }
+}
+
+function newEntries(length: number): MouseQueueEntry[] {
+  return Array.from({ length }, () => ({ num: 0, x: 0, y: 0, buttons: 0 }));
 }

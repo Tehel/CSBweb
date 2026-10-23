@@ -56,6 +56,8 @@ import { standIn, wrapMember, standInOf } from './lib/standIn';
 import { freeze, thaw } from '../src/engine/LoopState';
 import { handleMouseButton, handleMouseUnclick } from '../src/renderer/ui/Mouse';
 import { testChampion } from './lib/champion';
+import { applyToGame, DEFAULT_SETTINGS } from '../src/settings/Settings';
+import { NO_EXTRAS } from '../src/engine/GameContext';
 
 /** The button each queued click is taken as (`ButtonsAt`). */
 const buttonsAt = new ButtonsAt();
@@ -137,6 +139,46 @@ async function main(): Promise<void> {
   console.log(`keys: ${keys.map((k) => (k ? 'in' : 'refused')).join(', ')}`);
   check(keys.slice(0, 7).every(Boolean) && !keys[7],
     `seven keys should queue and the eighth be refused (MOUSEQLEN 8) (${keys.join('/')})`);
+
+  // ---- 1b: UNLIMITED KEY QUEUE, the port's extra: a hundred keys wait ---------------
+  // `applyToGame` makes the ring `LONG_MOUSEQLEN` long, every rule of CSBWin's kept, and
+  // empties it at the change; turned off, it is CSBWin's again.
+  reset();
+  const longQueue = (on: boolean) =>
+    applyToGame(game.ctx, { ...DEFAULT_SETTINGS, extras: { ...NO_EXTRAS, unlimitedKeyQueue: on } });
+  game.enqueueMovement(MovementAction.TURN_LEFT);
+  longQueue(true);
+  const emptiedOn = game.ctx.mouseQueue.count();
+  const longKeys = Array.from({ length: 101 }, () => game.enqueueMovement(MovementAction.TURN_LEFT));
+  const longCount = game.ctx.mouseQueue.count();
+  game.discardAllInput();
+  for (let i = 0; i < 98; i++) game.enqueueMovement(MovementAction.TURN_LEFT);
+  const longClickWith98 = buttonsAt.click(game, NUM_INVENTORY, 10, 50);
+  const longClickWith99 = buttonsAt.click(game, NUM_INVENTORY, 10, 50);
+  game.discardAllInput();
+  const longFacingBefore = party.facing;
+  for (let i = 0; i < 100; i++) game.enqueueMovement(MovementAction.TURN_LEFT);
+  let longTurns = 0;
+  for (let i = 0; i < 400 && game.ctx.mouseQueue.count() > 0; i++) {
+    const was = party.facing;
+    frame(true);
+    if (party.facing !== was) longTurns++;
+  }
+  const longFacingAfter = party.facing;
+  game.enqueueMovement(MovementAction.TURN_LEFT);
+  longQueue(false);
+  const emptiedOff = game.ctx.mouseQueue.count();
+  const shortKeys = Array.from({ length: 8 }, () => game.enqueueMovement(MovementAction.TURN_LEFT));
+  game.discardAllInput();
+  console.log(`unlimited key queue: ${longKeys.filter(Boolean).length} of 101 keys in (${longCount} waiting), ` +
+    `a click with 98 waiting ${longClickWith98}, with 99 ${longClickWith99}; ${longTurns} turns taken; ` +
+    `off again, ${shortKeys.filter(Boolean).length} of 8 in`);
+  check(emptiedOn === 0 && emptiedOff === 0, 'turning the extra on or off empties the queue, as DiscardAllInput does');
+  check(longKeys.slice(0, 100).every(Boolean) && !longKeys[100] && longCount === 100,
+    'with UNLIMITED KEY QUEUE on, a hundred keys queue and the hundred-and-first is refused (LONG_MOUSEQLEN 101)');
+  check(longClickWith98 && !longClickWith99, 'a click still needs room for its button-up: refused while 99 wait');
+  check(longTurns === 100 && longFacingAfter === longFacingBefore, 'all hundred turns are taken, one per tick, in order');
+  check(shortKeys.slice(0, 7).every(Boolean) && !shortKeys[7], 'turned off, seven keys wait again, as in CSBWin');
 
   // ---- 2: a click needs room for its button-up -----------------------------------
   reset();

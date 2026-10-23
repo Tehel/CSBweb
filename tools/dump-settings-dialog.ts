@@ -202,18 +202,21 @@ console.log('\n=== 3. the controls ===');
   check(values().extras.showItemProperties && !values().extras.gatherThrownWeapons,
     'SHOW ITEM PROPERTIES\', below HIGHLIGHT NEW MASTERY\'s, turns that extra on, alone');
   click(ui, settingButtonFrame(4));
-  check(values().mapView, 'MAP VIEW\'s, on the third line, turns the map on');
+  check(values().extras.unlimitedKeyQueue && !values().mapView,
+    'UNLIMITED KEY QUEUE\'s, on the third line, where MAP VIEW is not, turns that extra on');
   click(ui, settingButtonFrame(5));
   check(values().championView, 'CHAMPION VIEW\'s, beside it, turns the champions on');
   click(ui, settingButtonFrame(6));
-  check(!values().statistics, 'SEND STATISTICS\', pressed, alone on the fourth line, turns them off');
+  check(!values().statistics, 'SEND STATISTICS\', pressed, on the fourth line, turns them off');
+  click(ui, settingButtonFrame(7));
+  check(values().mapView, 'MAP VIEW\'s, beside it, turns the map on');
   const gaps = [
     { x: settingButtonFrame(0).x2 + 4, y: centre(settingButtonFrame(0)).y },
-    { x: centre(settingButtonFrame(7)).x, y: centre(settingButtonFrame(7)).y },
+    { x: centre(settingButtonFrame(8)).x, y: centre(settingButtonFrame(8)).y },
   ];
   updates = 0;
   for (const at of gaps) settingsDialogClick(ui, at.x, at.y, 2);
-  check(updates === 0, 'a click between two buttons, or where no eighth setting is, changes nothing');
+  check(updates === 0, 'a click between two buttons, or where no ninth setting is, changes nothing');
 
   click(ui, TAB_FRAMES[2]);
   check(state.tab === 'sound', 'SOUND\'s tab selects it');
