@@ -3420,7 +3420,8 @@ with one open the panel area is the option list (`handleAttackAreaClick`). And t
 game's.
 
 The `config.txt` CSBWin's Windows build ships (`CSB_Windows_x86-32_20151213.zip`, the
-same file as `DM_Windows_x86-32_20171117.zip`'s, in the author's archive, `../DMweb-extra/archive/`)
+same file as `DM_Windows_x86-32_20171117.zip`'s, both on Paul R. Stevens' site, which
+`npm run fetch-gamefiles` downloads)
 binds the panels with these `MSCAN` lines, all left button, points in hex:
 
 | Virtual key | Point | Its comment |
@@ -5940,9 +5941,8 @@ every text on the square the party steps onto, from another square, and queues i
 so a visible text is read out at each step onto it. And `ProcessTT_OPENROOM` reads out a
 text that a timer turns from hidden to shown with the party on its square
 (`doc/CSBwin-src/Timer.cpp:1720-1743`), once per showing. So a text that should speak
-only under a condition is shown or hidden from the square before it, as the merged
-Theron's Quest's corridors do (`tools/build-theron-quest.ts`); shown from its own square,
-it speaks twice when the step finds it already visible.
+only under a condition is shown or hidden from the square before it; shown from its own
+square, it speaks twice when the step finds it already visible.
 
 ## A teleporter names its target map by number, not by depth
 

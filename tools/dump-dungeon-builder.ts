@@ -1,7 +1,7 @@
 /**
  * `tools/lib/dungeonBuilder.ts`, the dungeon taken apart and put back together, against
- * DM's own: the builder a merged dungeon is made with (`tools/build-theron-quest.ts`),
- * proven on a dungeon this repository holds.
+ * DM's own: the builder a dungeon made from others is made with, proven on a dungeon
+ * this repository holds.
  *
  * 1. DM's `dungeon.dat`, decomposed, composed, written (`buildDungeonFile`) and read back,
  *    is the same dungeon: every level, square, chain, record and text, the links and

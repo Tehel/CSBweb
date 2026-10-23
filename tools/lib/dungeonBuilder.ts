@@ -1,6 +1,6 @@
 /**
- * A dungeon taken apart and put back together: for a tool that builds a dungeon from
- * others (`tools/build-theron-quest.ts`) rather than for the game.
+ * A dungeon taken apart and put back together: for a tool that builds a dungeon, from
+ * others or from nothing, rather than for the game.
  *
  * `decompose` turns a world read by `DungeonLoader` into levels whose squares hold their
  * objects as nested values: each object its database, its corner, a copy of its record

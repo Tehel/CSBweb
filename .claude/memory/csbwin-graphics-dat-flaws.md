@@ -17,11 +17,9 @@ disk"):
 - item 232, Crack Switch (In)'s front view: an empty crack, no pushed button;
 - item `0x22e`, byte 3201 = `Byte4100[55]` 0: the pressed crack switch jumps to eye level.
 
-**Why:** the author sees the crack jump in every such set; Theron's Quest had all three.
+**Why:** the author sees the crack jump in every such set; Sphenx's Theron's Quest conversion had all three.
 **How to apply:** for each of the three, replace the item with `dm-atari`'s only when the
 set's is still CSBWin's: compare `0x22e` decompressed (`getRawGraphic`) and 232 by pixels
 (`getImage`), since editors re-compress every item; an item the author changed is theirs.
-Leave every other item alone (portraits, entrance, object names). The Theron script,
-`../DMweb-extra/archive/CustomDungeon-TheronsQuestConversion-csbweb/scripts/dm_items.py`, copies the three
-unconditionally after that check was made by hand. See [[theron-quest-conversion]],
+Leave every other item alone (portraits, entrance, object names). See
 [[custom-dungeon-archives]].

@@ -10,14 +10,13 @@
 # as soon as a session leaves the tree dirty, which it prints with the line to resume it,
 # or commits nothing (the quota spent before its first edit). It refuses to start on a
 # dirty tree. OPEN_SOURCE_PLAN.md is the author's and never counts.
-# Each decision is printed and kept in the author's archive (CSBWEB_ARCHIVE, or
-# ../DMweb-extra/archive), in night-debt/driver.log, beside each
-# session's own output.
+# Each decision is printed and kept in driver.log, beside each session's own output, in
+# ${XDG_STATE_HOME:-~/.local/state}/csbweb/night-debt, outside the repository.
 set -u
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 RESET=$(date -d "${1:-07:00}" +%s)
 HARD_STOP=$(date -d "${2:-10:00}" +%s)
-LOG=${CSBWEB_ARCHIVE:-$REPO/../DMweb-extra/archive}/night-debt
+LOG=${XDG_STATE_HOME:-$HOME/.local/state}/csbweb/night-debt
 mkdir -p "$LOG"
 cd "$REPO" || exit 1
 

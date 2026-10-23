@@ -3,7 +3,7 @@
  * LoadLevel(curLevel)` (`doc/CSBwin-src/Code11f52.cpp:2989-2990`), not the first map
  * whose depth is that number. Every dungeon the repository ships numbers its maps by
  * depth, so the two readings agree on all of them; a dungeon whose maps share a depth, as
- * a merged one's do (`tools/build-theron-quest.ts`), tells them apart.
+ * one merged from others may, tells them apart.
  *
  * DM's dungeon with one more map, built with `tools/lib/dungeonBuilder.ts`: map 14, one
  * square at depth 0, far from level 0. A teleporter put two squares in front of the
