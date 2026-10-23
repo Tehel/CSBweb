@@ -9,19 +9,20 @@
 # stop: a session still running then (one waiting on the quota) is killed. The loop stops
 # as soon as a session leaves the tree dirty, which it prints with the line to resume it,
 # or commits nothing (the quota spent before its first edit). It refuses to start on a
-# dirty tree. NOTES.md and doc/OPEN_SOURCE_PLAN.md are the author's and never count.
-# Each decision is printed and kept in archive/night-debt/driver.log, beside each
+# dirty tree. OPEN_SOURCE_PLAN.md is the author's and never counts.
+# Each decision is printed and kept in the author's archive (CSBWEB_ARCHIVE, or
+# ../DMweb-extra/archive), in night-debt/driver.log, beside each
 # session's own output.
 set -u
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 RESET=$(date -d "${1:-07:00}" +%s)
 HARD_STOP=$(date -d "${2:-10:00}" +%s)
-LOG=$REPO/archive/night-debt
+LOG=${CSBWEB_ARCHIVE:-$REPO/../DMweb-extra/archive}/night-debt
 mkdir -p "$LOG"
 cd "$REPO" || exit 1
 
 say() { echo "[$(date '+%H:%M:%S')] $*" | tee -a "$LOG/driver.log"; }
-status() { git status --porcelain -- . ':!NOTES.md' ':!doc/OPEN_SOURCE_PLAN.md'; }
+status() { git status --porcelain -- . ':!OPEN_SOURCE_PLAN.md'; }
 
 say "start; no session after $(date -d @"$RESET" +%H:%M), kill at $(date -d @"$HARD_STOP" +%H:%M)"
 if [ -n "$(status)" ]; then

@@ -46,7 +46,6 @@ Corollaries:
 | `doc/SAVES.md` | The port's own save design: the store, the playthrough, the dialog, F5 and F9. |
 | `doc/DEPLOYMENT.md` | The deployed game: the server, the image, the VPS, deploying and backups. `doc/STATISTICS.md`: what it counts. |
 | `doc/CSBWIN_SYMBOL_INDEX.tsv` | Every CSBWin symbol → `File.cpp:line`. Grep this before grepping the tree. |
-| `NOTES.md` | The author's personal scratchpad. **Do not edit.** Flag problems instead. |
 | `doc/CSBwin-src/` | The C++ reference (not ours, git-ignored, fetched by `npm run fetch-csbwin-src`): `CSBwin_SRC_20230608`, CSBWin's last source and the build the author plays. |
 
 **Documentation contract:** before working on a topic, read its doc. When you verify a new

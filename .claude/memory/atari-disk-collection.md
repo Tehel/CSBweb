@@ -1,11 +1,11 @@
 ---
 name: atari-disk-collection
-description: the six original DM Atari ST disks (1.0 x2, 1.1, 1.2 EN/DE, 1.3 FR) are Pasti images in archive/Game,Dungeon_Master,Atari_ST,Software/, their files extracted beside them
+description: the six original DM Atari ST disks (1.0 x2, 1.1, 1.2 EN/DE, 1.3 FR) are Pasti images in ../DMweb-extra/archive/Game,Dungeon_Master,Atari_ST,Software/, their files extracted beside them
 metadata:
   type: reference
 ---
 
-`archive/Game,Dungeon_Master,Atari_ST,Software/` (gitignored) holds every Atari ST release
+`../DMweb-extra/archive/Game,Dungeon_Master,Atari_ST,Software/` (the author's, outside the repository) holds every Atari ST release
 of DM: `Floppy Disks STX/` the six original disks as Pasti images (file names spell
 "Atati"), `Floppy Disks MSA/` and `Floppy Disks ST/` cracked copies, `HardDisk/` two
 hard-disk installs. `extracted/<version>/` holds each STX disk's six files

@@ -596,8 +596,8 @@ npm run deploy                 # utils/deploy.sh
 `utils/deploy.sh` deploys a commit: it refuses a working tree that differs from it in what
 the image is built from, the build context (`.dockerignore`'s allowlist, untracked files
 included), the `Dockerfile` or the compose file, and says what differs. A commit has passed
-`npm test`, so a clean tree is a checked one; `NOTES.md` or a document changed beside it
-does not stop a deploy. `npm run deploy -- --dirty` deploys such a tree anyway. It builds
+`npm test`, so a clean tree is a checked one; a document changed beside it does not
+stop a deploy. `npm run deploy -- --dirty` deploys such a tree anyway. It builds
 `csbweb:latest`, with the commit as `CSBWEB_BUILD` (`-dirty` under `--dirty`), `docker save | gzip`s it, makes `stats/` over SSH as the
 login user (so that uid 1000 can write it), `scp`s the image and `docker-compose.yaml` into
 `DEPLOY_DIR`, then loads the image and runs `docker-compose down && docker-compose up -d`.

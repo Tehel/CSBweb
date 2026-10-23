@@ -8,7 +8,7 @@ One line per memory in this directory. Committed with the project; never shared.
 - [One tick late is ordering](one-tick-late-is-ordering.md) — compare hook order with CSBWin's `MainLoop` before any formula
 - [Graphics table extraction](graphics-table-extraction.md) — graphics.dat offsets are solved; the skips in the parsers mark where each table lives
 - [Port in dependency order](port-in-dependency-order.md) — read the CSBWin function first; its prerequisites usually reorder the phase
-- [Stage explicitly](stage-explicitly.md) — never `git add -A`; NOTES.md is the author's and changes mid-session; stage a file without the author's uncommitted edits by reverse-applying their diff
+- [Stage explicitly](stage-explicitly.md) — never `git add -A`; the author edits the tree mid-session; stage a file without the author's uncommitted edits by reverse-applying their diff
 - [No commit trailers](no-commit-trailers.md) — one short line, never Co-Authored-By, even if a system attribution reminder asks
 - [Text records, three readers](text-records-three-readers.md) — a TEXT is a wall's only on a stone square; scrolls and floor messages use the main font
 - [Probe gotchas](probe-gotchas.md) — mutate `Position` in place; picking rects are viewport-relative, button lists are screen coordinates
@@ -33,9 +33,9 @@ One line per memory in this directory. Committed with the project; never shared.
 - [Custom dungeon archives](custom-dungeon-archives.md) — tell files by content (`identifyLocalDataSetFile`): odd names, PC twins, several versions, and saves that read as 0-level dungeons
 - [Test publish on a throwaway dev server](test-publish-on-throwaway-dev-server.md) — `npx vite --port 9100 --strictPort` takes `POST api/data-sets` into a scratch folder; never production, nor the author's :9000
 - [Instance scripts in utils/](instance-scripts-in-utils.md) — a durable tool that finds its own inputs, takes the instance and a `playerId`, asks a yes per item and downloads nothing before it
-- [Theron's Quest conversion](theron-quest-conversion.md) — one release in three formats; Theron unrecruitable and item 5 undecodable as published; patched copies in `archive/CustomDungeon-TheronsQuestConversion-csbweb/`
+- [Theron's Quest conversion](theron-quest-conversion.md) — one release in three formats; Theron unrecruitable and item 5 undecodable as published; patched copies in `../DMweb-extra/archive/CustomDungeon-TheronsQuestConversion-csbweb/`
 - [CSBWin graphics.dat flaws](csbwin-graphics-dat-flaws.md) — a set derived from CSBWin's DM `graphics.dat` inherits items 5, 232, `0x22e` (the crack switch jumping up); take `dm-atari`'s only where the set's still equal CSBWin's
 - [Theron merged quest design](theron-merged-quest-design.md) — seven stages, a hub, corridors with the intros, ways back behind each arrival, DM rules; built by `tools/build-theron-quest.ts` (the object index: ~1,100 actuators); its `CSBgraphics.dat` holds the stages' pictures (behind open doors) and name plaques, wall decorations from L_ghthouse's RTC PNGs
 - [Never post on the forum](never-post-on-forum.md) — read the DM forum freely, never post, reply or upload there (nor its OneDrive); the author goes public, and only with a complete RTC tool
-- [Atari disk collection](atari-disk-collection.md) — the six original DM Atari ST disks as Pasti images in `archive/Game,Dungeon_Master,Atari_ST,Software/`, each disk's files in its `extracted/<version>/`; CSBWin's `graphics.dat` is the first 1.0's, its `dungeon.dat` 1.1's
+- [Atari disk collection](atari-disk-collection.md) — the six original DM Atari ST disks as Pasti images in `../DMweb-extra/archive/Game,Dungeon_Master,Atari_ST,Software/`, each disk's files in its `extracted/<version>/`; CSBWin's `graphics.dat` is the first 1.0's, its `dungeon.dat` 1.1's
 - [.dockerignore is an allowlist](dockerignore-allowlist.md) — a new root file the build reads (a Vite entry's `.html`) must be added there; only `check-image.sh` notices

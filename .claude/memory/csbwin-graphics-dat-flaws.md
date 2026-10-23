@@ -22,6 +22,6 @@ disk"):
 set's is still CSBWin's: compare `0x22e` decompressed (`getRawGraphic`) and 232 by pixels
 (`getImage`), since editors re-compress every item; an item the author changed is theirs.
 Leave every other item alone (portraits, entrance, object names). The Theron script,
-`archive/CustomDungeon-TheronsQuestConversion-csbweb/scripts/dm_items.py`, copies the three
+`../DMweb-extra/archive/CustomDungeon-TheronsQuestConversion-csbweb/scripts/dm_items.py`, copies the three
 unconditionally after that check was made by hand. See [[theron-quest-conversion]],
 [[custom-dungeon-archives]].

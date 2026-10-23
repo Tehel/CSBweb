@@ -14,8 +14,6 @@ tools/fixtures/gamefiles/
 tools/output
 static/extracted
 
-# temporary
-static/backstory
 
 # WSL/NTFS alternate data stream droppings
 *:Zone.Identifier

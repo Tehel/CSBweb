@@ -282,11 +282,10 @@ export default defineConfig(({ command, isSsrBuild }) => ({
   root: '.',
   // Every URL relative to the page, so the game also runs under a sub-path.
   base: './',
-  // The dev server serves `static/` as it stands, the manuals, and its game files from the
-  // fixtures (`dataSetsRoute`). A build ships none of them. The page's own files are modules
-  // under `src/assets/`, which the build hashes, and the game files are served beside the
-  // page (`doc/DEPLOYMENT.md`).
-  publicDir: command === 'serve' ? 'static' : false,
+  // No public folder: the page's own files are modules under `src/assets/`, which the build
+  // hashes, and the game files are served beside the page, by the dev server from the
+  // fixtures (`dataSetsRoute`), by the deployed one from its own (`doc/DEPLOYMENT.md`).
+  publicDir: false,
   define: {
     __CSBWEB_BUILD__: JSON.stringify(buildId()),
     // The CDP probes' handle (`src/main.ts`): the dev server's, and a build's only when

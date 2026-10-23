@@ -1,19 +1,19 @@
 ---
 name: stage-explicitly
-description: Never `git add -A` — NOTES.md is the author's and changes mid-session; a file holding the author's uncommitted edits is staged without them
+description: Never `git add -A` — the author edits the tree mid-session; a file holding the author's uncommitted edits is staged without them
 metadata:
   type: feedback
 ---
 
 Stage commits by explicit path, never with `git add -A` or `git add .`.
 
-**Why:** `NOTES.md` is the author's scratchpad and they edit it *while a session is
-running*; a blanket add once swept their in-progress edits into a commit. Excluding one
-path is not enough, because the hazard is whatever the author happens to be editing.
+**Why:** the author edits files *while a session is running*; a blanket add once swept
+their in-progress edits into a commit. Excluding one path is not enough, because the
+hazard is whatever the author happens to be editing.
 
 **How to apply:** stage the files the change touched. If the set is large, read
-`git status --short` and pick from it, skipping anything not yours — `NOTES.md` above
-all, and untracked files that are not yours (the author's `csbgame*.dat` saves).
+`git status --short` and pick from it, skipping anything not yours, untracked files above
+all.
 
 **A file the commit needs that already holds the author's uncommitted edits** (DEBT.md,
 which every `/pay-debt` commit touches and the author edits between sessions): `git add`

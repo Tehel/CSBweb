@@ -324,8 +324,7 @@ CSBWin. Do not "fix" `ratesDefault` / the door rates in `src/audio/soundsIndex.t
 match the C++ source.
 
 The door sound specifically was verified correct in CSBweb: the divergence toward the JS
-pitch has already been applied and matches the real game. (`NOTES.md` still carries an
-older entry saying doors sound wrong — that entry is stale.)
+pitch has already been applied and matches the real game.
 
 ## `dm-atari/graphics.dat` is CSBWin's with three items from the 1.2 disk (deliberate divergence from CSBWin)
 
@@ -3414,7 +3413,7 @@ with one open the panel area is the option list (`handleAttackAreaClick`). And t
 game's.
 
 The `config.txt` CSBWin's Windows build ships (`CSB_Windows_x86-32_20151213.zip`, the
-same file as `DM_Windows_x86-32_20171117.zip`'s, in the author's git-ignored `archive/`)
+same file as `DM_Windows_x86-32_20171117.zip`'s, in the author's archive, `../DMweb-extra/archive/`)
 binds the panels with these `MSCAN` lines, all left button, points in hex:
 
 | Virtual key | Point | Its comment |

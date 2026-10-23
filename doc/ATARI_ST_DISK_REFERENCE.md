@@ -20,7 +20,8 @@ is marked as such. A citation `map 5 (6,18)` is a square of a disk's `DUNGEON.DA
 
 ## The disks
 
-`archive/Game,Dungeon_Master,Atari_ST,Software/` (gitignored) is a collection of the
+`../DMweb-extra/archive/Game,Dungeon_Master,Atari_ST,Software/`, in the author's archive
+outside the repository, is a collection of the
 Atari ST releases. Its `Floppy Disks STX/` holds six Pasti images of the original disks,
 `Dungeon Master for Atati ST <version>.stx` (sic):
 
@@ -510,7 +511,7 @@ over 18 glyphs or more than four lines (`tools/dump-wall-text.ts`).
 
 ## The Chaos Strikes Back utility disk
 
-`archive/CSB4S/CSB_UTIL.ST` (md5 `15ca0047d178997133837818576063da`, gitignored) is a raw
+`../DMweb-extra/archive/CSB4S/CSB_UTIL.ST` (md5 `15ca0047d178997133837818576063da`) is a raw
 sector image from a 2021 repack, `CSB4S.ZIP`, whose README says the utility disk is
 unchanged but for its copy protection. The filesystem is FAT12: single-sided, 10 sectors
 of 512 bytes a track, 2 sectors a cluster, 16 root entries. Every file is dated
