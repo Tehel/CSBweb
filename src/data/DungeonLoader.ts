@@ -313,7 +313,7 @@ export class DungeonLoader {
 
     /**
      * Parse header (44 bytes at offset 0x00)
-     * Reference: DUNGEON_DAT_FORMAT.md section "Header Format"
+     * Reference: DUNGEON_DAT_FORMAT.md section "Header"
      */
     private parseHeader(): DungeonHeader {
         this.file.seek(0x00);
@@ -358,7 +358,7 @@ export class DungeonLoader {
 
     /**
      * Parse map descriptors (16 bytes each)
-     * Reference: DUNGEON_DAT_FORMAT.md section "Map Descriptors"
+     * Reference: DUNGEON_DAT_FORMAT.md section "Level descriptors"
      */
     private parseMapDescriptors(numMaps: ui8): MapDescriptor[] {
         const descriptors: MapDescriptor[] = [];
@@ -536,7 +536,7 @@ export class DungeonLoader {
 
     /**
      * Parse text data (5-bit encoded)
-     * Reference: DUNGEON_DAT_FORMAT.md section "Text Encoding"
+     * Reference: DUNGEON_DAT_FORMAT.md section "Text"
      */
     private parseTextWords(offset: number, sizeInWords: ui16): ui16[] {
         this.file.seek(offset);

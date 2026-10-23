@@ -141,7 +141,8 @@ The wall ornaments come from the level's table, entry `ordinal - 1`
 (`AsciiDump.cpp:822-830`). Map 0's table is: mirror (43), small switch (7), slime outlet
 (12), gold keyhole (26), lever down (45), lever up (44), ruby keyhole (29), water fountain
 (35). The names are `AsciiDump.cpp`'s. For 4 (hook), 33 (slime) and 34 (grate), which it
-does not name, they are from `doc/external/dungeon format.html`.
+does not name, they are the Dungeon Master Encyclopaedia's (`doc/DUNGEON_DAT_FORMAT.md` →
+"Not checked against CSBWin").
 
 ### The champion
 

@@ -130,8 +130,8 @@ export interface TeleporterRecord {
     scope: ui8;                 // bits 14-13: 0=items, 1=creatures, 2=items+party, 3=all
     absoluteRotation: boolean;  // bit 12: 0=relative, 1=absolute
     rotation: ui8;              // bits 11-10: 0-3 (0°, 90°, 180°, 270°)
-    destX: ui8;                 // bits 9-5
-    destY: ui8;                 // bits 4-0
+    destX: ui8;                 // bits 4-0
+    destY: ui8;                 // bits 9-5
     destMap: ui8;               // +0x04 bits 15-8
     /**
      * The low byte of `word4`. `DB1` names only `destLevel()` = `BITS8_15(word4)`

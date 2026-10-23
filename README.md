@@ -116,4 +116,3 @@ What the repository does hold that is not under the MIT licence:
   golden frames, which are screenshots of the game.
 - `src/assets/spectral-*.woff2`, the Spectral font, under the SIL Open Font License
   (`src/assets/spectral-OFL.txt`).
-- `doc/external/`, documentation from the community.

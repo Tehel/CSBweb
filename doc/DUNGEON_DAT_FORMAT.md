@@ -1,809 +1,642 @@
-# Dungeon.dat File Format Specification
+# `dungeon.dat`
 
-Complete technical specification for Dungeon Master / Chaos Strikes Back dungeon.dat files.
+The file that holds a dungeon: its levels, every object in them, and the texts. CSBWin
+reads it in `ReadDatabases` (`doc/CSBwin-src/SaveGame.cpp:2536-2910`), and the port in
+`DungeonLoader` (`src/data/DungeonLoader.ts`), with the section arithmetic in
+`src/data/DungeonImageLayout.ts`. A CSBWin save carries the same image, in a shape of its
+own (`doc/CSBWIN_SAVEGAME_REFERENCE.md` → "The dungeon image in a save").
 
-**Source**: dmweb.free.fr documentation (archived in `doc/external/dungeon format.html`)
-**Applies to**: Dungeon Master, Chaos Strikes Back, Dungeon Master II
-**Platforms**: All (Atari ST, Amiga, PC, Mac, etc.)
-**Date**: 2026-01-04
+The community's description of the format is the Dungeon Master Encyclopaedia's
+["Dungeon Files"](http://dmweb.free.fr/community/documentation/file-formats/dungeon-files/)
+page (version 1.8, 2011), which credits Zyx, Meynaf, Sphenx, Beowuuf, kentaro.k-21 and
+Paul R. Stevens. This document follows its outline. Every field below is checked against
+CSBWin and cited. What only that page says is gathered at the end under "Not checked
+against CSBWin" and says so.
 
----
-
-## Table of Contents
-
-1. [File Overview](#file-overview)
-2. [File Structure](#file-structure)
-3. [Header Format](#header-format)
-4. [Map Descriptors](#map-descriptors)
-5. [Object System](#object-system)
-6. [Database Records](#database-records)
-7. [Map Data](#map-data)
-8. [Text Encoding](#text-encoding)
-9. [Compression](#compression)
+Every word is **big-endian**: that is the Atari ST and Amiga form, the one CSBWin and the
+port read. A bit range `bits 4-0` counts from bit 0, the least significant.
 
 ---
 
-## File Overview
+## The file
 
-### File Names
-- **Dungeon Master**: `DUNGEON.DAT`
-- **Chaos Strikes Back**: `DUNGEON.DAT`
-- **Apple IIGS**: Stores dungeon in fork resource
+A `dungeon.dat` is up to three things, in this order:
 
-### Endianness
-- **Little-endian**: PC, Apple IIGS, Super NES, FM-Towns, PC-98, IBM PS-V
-- **Big-endian**: Atari ST, Amiga, X68000, Macintosh, Sega CD
+1. **An Extended Features block**, only in a dungeon made for CSBWin. `ReadExtendedFeatures`
+   reads it and returns its size (`SaveGame.cpp:299`, `:2560`). It declares the shape of
+   the image after it (big actuators, indirect text, six-byte scrolls, the cell array's
+   length) and carries the object index, the DSAs and the rule flags
+   (`doc/CSBWIN_SAVEGAME_REFERENCE.md` → "Extended features block"). The DM Windows
+   package's `dungeon.dat`, 3D2D1D's, Conflux's and Towers of Chaos' have one. A file
+   can also be enciphered, which `readExtendedFeatures` undoes
+   (`src/data/CsbwinExtendedFeatures.ts`).
+2. **The image**, plain or compressed. When its first word is 33028 (`0x8104`), the image
+   is compressed (see "Compression").
+3. **A checksum word**, optional (see "Checksum").
 
-Must detect and convert accordingly.
+### The image's sections
 
-### Compression
-Optional compression with signature `0x8104` (33028) at file start. See [Compression](#compression).
+`ReadDatabases` fetches these one after the other, with no padding:
 
-### Checksum
-Optional 16-bit checksum at end of file (sum of all previous data).
+| # | Section | Size in bytes |
+|---|---------|---------------|
+| 1 | Header | 44 |
+| 2 | Level descriptors | 16 × levels |
+| 3 | Column index | 2 × the sum of the levels' widths |
+| 4 | Object list | 2 × header word 10 |
+| 5 | Text | 2 × header word 6 |
+| 6 | Databases 0 to 15 | count × record size, for each |
+| 7 | Cell array | header word 2 |
+| 8 | Checksum | 2, when present |
 
----
+(`SaveGame.cpp:2610-2873`.) The record sizes are `dbEntrySizes`, `sizeof (DB0)` to
+`sizeof (DB15)` (`doc/CSBwin-src/data.cpp:395-413`):
 
-## File Structure
+| DB | Records | Bytes |
+|----|---------|-------|
+| 0 | Doors | 4 |
+| 1 | Teleporters | 6 |
+| 2 | Texts | 4 |
+| 3 | Actuators (sensors) | 8, or 10 when the Extended Features block says big actuators |
+| 4 | Monster groups | 16 |
+| 5 | Weapons | 4 |
+| 6 | Clothing | 4 |
+| 7 | Scrolls | 4, or 6 from Extended Features version `'B'` |
+| 8 | Potions | 4 |
+| 9 | Chests | 8 |
+| 10 | Miscellaneous items | 4 |
+| 11 | `EXPOOL`, CSBWin's extension pool | 256 |
+| 12, 13 | Unused | 0 |
+| 14 | Missiles | 8 |
+| 15 | Clouds | 4 |
 
-Sequential sections (no padding between):
-
-```
-1. File Header                 (44 bytes)
-2. Map Definitions             (16 bytes × num_maps)
-3. Column Index                (2 bytes × total_columns)
-4. Object ID List              (2 bytes × object_list_size)
-5. Text Data                   (variable, in words)
-6. Door Database               (4 bytes × door_count)
-7. Teleporter Database         (6 bytes × teleporter_count)
-8. Text Database               (4 bytes × text_count)
-9. Sensor Database             (8 bytes × sensor_count)
-10. Creature Database          (16 bytes × creature_count)
-11. Weapon Database            (4 bytes × weapon_count)
-12. Clothe Database            (4 bytes × clothe_count)
-13. Scroll Database            (4 bytes × scroll_count)
-14. Potion Database            (4 bytes × potion_count)
-15. Container Database         (8 bytes × container_count)
-16. Miscellaneous Database     (4 bytes × misc_count)
-17. (Unused Database)          (0 bytes)
-18. (Unused Database)          (0 bytes)
-19. (Unused Database)          (0 bytes)
-20. Projectile Database        (8 bytes × projectile_count, save games only)
-21. Cloud Database             (4 bytes × cloud_count, save games only)
-22. Map Data                   (global_map_data_size bytes)
-23. Checksum                   (2 bytes, optional)
-```
-
----
-
-## Header Format
-
-**Offset**: 0x0000
-**Size**: 44 bytes
-
-### Field Layout
-
-| Offset | Type  | Name | Description |
-|--------|-------|------|-------------|
-| +0x00  | word  | Random Seed | Dungeon ID: 99=DM, 8=CSB Prison, 13=CSB, 0=DM2 |
-| +0x02  | word  | Map Data Size | Total size of map data section in bytes |
-| +0x04  | byte  | Num Maps | Number of maps/levels in dungeon |
-| +0x05  | byte  | (Padding) | Unused |
-| +0x06  | word  | Text Size | Size of text data in words (2-byte units) |
-| +0x08  | word  | Starting Position | Packed party start location |
-| +0x0A  | word  | Object List Size | Size of object ID list in words |
-| +0x0C  | word[16] | Object Counts | Number of objects per category |
-
-### Starting Position Encoding (word at +0x08)
-
-```
-Bits 15-12: Unused
-Bits 11-10: Initial facing direction
-            00 = North
-            01 = East
-            10 = South
-            11 = West
-Bits 9-5:   Starting Y coordinate (0-31)
-Bits 4-0:   Starting X coordinate (0-31)
-```
-
-**Decoding example**:
-```typescript
-const startPos = 0x1234;  // Example value
-const x = startPos & 0x1F;              // Bits 0-4
-const y = (startPos >> 5) & 0x1F;       // Bits 5-9
-const facing = (startPos >> 10) & 0x03; // Bits 10-11
-```
-
-### Object Counts Array (16 words at +0x0C)
-
-| Index | Category | Record Size |
-|-------|----------|-------------|
-| 0 | Doors | 4 bytes |
-| 1 | Teleporters | 6 bytes |
-| 2 | Texts | 4 bytes |
-| 3 | Sensors (Actuators) | 8 bytes |
-| 4 | Creatures | 16 bytes |
-| 5 | Weapons | 4 bytes |
-| 6 | Clothes | 4 bytes |
-| 7 | Scrolls | 4 bytes |
-| 8 | Potions | 4 bytes |
-| 9 | Containers | 8 bytes |
-| 10 | Miscellaneous | 4 bytes |
-| 11 | (Unused) | 0 bytes |
-| 12 | (Unused) | 0 bytes |
-| 13 | (Unused) | 0 bytes |
-| 14 | Projectiles | 8 bytes (save games only) |
-| 15 | Clouds | 4 bytes (save games only) |
+`ReadDatabases` takes 2 from the actuator size for an image without big actuators
+(`SaveGame.cpp:2783-2787`), and reads scrolls through `readScrollDatabase`, which picks
+the four- or six-byte form by the Extended Features version (`:2401-2412`). A FTL dungeon
+has no `EXPOOL` record, no missile and no cloud: a missile or a cloud lives only while a
+timer moves it, and a `dungeon.dat` has no timers.
 
 ---
 
-## Map Descriptors
+## Header (44 bytes)
 
-**Offset**: 0x002C (after header)
-**Size**: 16 bytes per map
+`DUNGEONDATINDEX` (`doc/CSBwin-src/CSB.h:2120-2145`):
 
-### Map Descriptor Layout
+| Offset | Size | Field | CSBWin |
+|--------|------|-------|--------|
+| 0 | word | Random seed, the dungeon's identity | `Sentinel()` |
+| 2 | word | Length of the cell array in bytes | `LegacyCellFlagArraySize()` |
+| 4 | byte | Number of levels | `NumLevel()`, `BITS8_15(word4)` |
+| 5 | byte | Unread | — |
+| 6 | word | Length of the text in words | `NumWordsInTextArray()` |
+| 8 | word | The party's start | `StartingPartyX/Y/Facing()` |
+| 10 | word | Length of the object list in words | `ObjectListLength()` |
+| 12 | 16 words | The number of records in each database | `DBSize(n)` |
 
-| Offset | Type | Name | Description |
-|--------|------|------|-------------|
-| +0x00 | word | Map Data Offset | Offset into map data section, wrapped at 64K (`PROVEN_FACTS.md` → "`LEVELDESC.cellOffset` wraps at 64K") |
-| +0x02 | word | Component Flags | Graphics usage flags (DM2 only) |
-| +0x04 | word | (Unused) | Always 0 |
-| +0x06 | byte | Offset X | Map offset X in dungeon |
-| +0x07 | byte | Offset Y | Map offset Y in dungeon |
-| +0x08 | word | Map Size | Packed: level, width, height |
-| +0x0A | word | Graphics Counts | Wall/floor decoration counts |
-| +0x0C | word | Difficulty | Map depth and creature types |
-| +0x0E | word | Door Graphics | Door types and graphics style |
+The **seed** is added into the hash that places random wall and floor decorations
+(`Hash`, `doc/CSBwin-src/CSBCode.cpp:5740-5757`). It is 99 in every DM `dungeon.dat` here
+(`dm-atari`, `dm-atari-1.2`, `dm-atari-1.3-fr`, `dm-windows`), and in Kid's Dungeon,
+Conflux and Towers of Chaos; 8 in Chaos Strikes Back's; 0 in 3D2D1D's.
 
-### Component Flags (word at +0x02, DM2 only)
+The **start** is bits 4-0 x, 9-5 y and 11-10 the facing (0 north, 1 east, 2 south,
+3 west), always on level 0 (`SaveGame.cpp:2612-2622`). DM's is (1, 3) facing south.
 
-```
-Bit 8:  Door type 1 present
-Bit 7:  Door type 0 present
-Bit 6:  Portraits present
-Bit 5:  Teleporter blue haze present
-Bit 4:  Stairs down present
-Bit 3:  Stairs up present
-Bit 2:  Nearly invisible pit present
-Bit 1:  Ceiling pit present
-Bit 0:  Normal pit present
-```
+The **cell array's length** is the Extended Features block's when it declares one; the
+header's then reads as 0 (`SaveGame.cpp:2624-2631`).
 
-Always 0 in Dungeon Master and Chaos Strikes Back.
-
-### Map Size (word at +0x08)
-
-```
-Bits 15-11: Map height - 1 (0-31, so max height = 32)
-Bits 10-6:  Map width - 1 (0-31, so max width = 32)
-Bits 5-0:   Level number (0-63)
-```
-
-**Decoding**:
-```typescript
-const mapSize = 0x1234;  // Example
-const level = mapSize & 0x3F;                 // Bits 0-5
-const width = ((mapSize >> 6) & 0x1F) + 1;    // Bits 6-10, +1
-const height = ((mapSize >> 11) & 0x1F) + 1;  // Bits 11-15, +1
-```
-
-### Graphics Counts (word at +0x0A)
-
-```
-Bits 15-12: Floor random decoration count
-Bits 11-8:  Total floor graphics count
-Bits 7-4:   Wall random decoration count
-Bits 3-0:   Total wall graphics count
-```
-
-### Difficulty (word at +0x0C)
-
-```
-Bits 15-12: Map difficulty/depth (0-15)
-Bits 11-8:  (Unused in DM/CSB, varies in some dungeons)
-Bits 7-4:   Creature types allowed on this map
-Bits 3-0:   Door decoration graphics count
-```
-
-### Door Graphics (word at +0x0E)
-
-```
-Bits 15-12: Door type 1 graphic index
-Bits 11-8:  Door type 0 graphic index
-Bits 7-4:   Map graphics style (wall/floor theme)
-Bits 3-0:   Floor/ceiling style
-```
+A new game grows two counts as it reads them: the object list by 300 empty slots
+(`:2661`, `:2707-2713`), and each database by `d.Byte7302[n]` spare records
+(`:2766-2777`).
 
 ---
 
-## Object System
+## Level descriptors (16 bytes each)
 
-### Object ID Format
+`LEVELDESC` (`CSB.h:2147-2190`). The Encyclopaedia calls a level a "map": in DM and CSB
+there is one per level, and in Dungeon Master II several maps share a level.
 
-**Size**: 2 bytes (word)
+| Offset | Size | Field |
+|--------|------|-------|
+| 0 | word | `cellOffset`: where the level's cells start in the cell array |
+| 2 | 4 bytes | `FILL2`, unread by CSBWin (Dungeon Master II's, see the end) |
+| 6 | byte | `offsetX` |
+| 7 | byte | `offsetY` |
+| 8 | word | Size and level |
+| 10 | word | Decoration counts |
+| 12 | word | Counts and experience multiplier |
+| 14 | word | Graphic sets and door types |
 
-```
-Bits 15-14: Position on tile
-            00 = North / Top-Left
-            01 = East / Top-Right
-            10 = South / Bottom-Left
-            11 = West / Bottom-Right
+`cellOffset` is 16 bits, so a dungeon whose cell array passes 64K stores it wrapped, and
+CSBWin unwraps it level by level (`SaveGame.cpp:2889-2898`, `doc/PROVEN_FACTS.md` →
+"`LEVELDESC.cellOffset` wraps at 64K, and CSBWin unwraps it").
 
-Bits 13-10: Category (0-15)
-            0000 = Door
-            0001 = Teleporter
-            0010 = Text
-            0011 = Sensor
-            0100 = Creature
-            0101 = Weapon
-            0110 = Clothe
-            0111 = Scroll
-            1000 = Potion
-            1001 = Container
-            1010 = Miscellaneous
-            1011 = (Unused)
-            1100 = (Unused)
-            1101 = (Unused)
-            1110 = Projectile
-            1111 = Cloud
+`offsetX` and `offsetY` place the level in the dungeon's frame. Stairs and pits lead to
+the same absolute square on the level one depth up or down whose rectangle holds it
+(`IncrementLevel`, `doc/CSBwin-src/CSBCode.cpp:4774-4830`); a teleporter names its
+destination's descriptor instead.
 
-Bits 9-0:   Index within category (0-1023)
-```
+Word 8:
 
-**Special Values**:
-- `0xFFFE`: End of linked list marker
-- `0xFFFF`: Null/empty slot
+| Bits | CSBWin | Meaning |
+|------|--------|---------|
+| 5-0 | `Level()` | The level's depth; several descriptors may share one |
+| 10-6 | `LastColumn()` | Width − 1 |
+| 15-11 | `LastRow()` | Height − 1 |
 
-**Encoding example**:
-```typescript
-function encodeObjectID(position: number, category: number, index: number): number {
-    return ((position & 0x03) << 14) |
-           ((category & 0x0F) << 10) |
-           (index & 0x3FF);
-}
+Word 10:
 
-function decodeObjectID(id: number) {
-    return {
-        position: (id >> 14) & 0x03,
-        category: (id >> 10) & 0x0F,
-        index: id & 0x3FF
-    };
-}
-```
+| Bits | CSBWin | Meaning |
+|------|--------|---------|
+| 3-0 | `NumWallDecoration()` | Wall decorations on the level |
+| 7-4 | `NumRandomWallDecoration()` | How many of them, the first ones, may be placed at random |
+| 11-8 | `NumFloorDecorations()` | Floor decorations on the level |
+| 15-12 | `NumRandomFloorDecorations()` | How many of them may be placed at random |
 
-### Column Index
+A square that allows a random decoration gets one when `Hash` modulo 30 falls below the
+random count (`RandomWallDecoration`, `doc/CSBWIN_DECORATIONS_REFERENCE.md`).
 
-**Purpose**: Optimize finding objects in tiles.
+Word 12:
 
-**Size**: 2 bytes per column across all maps
+| Bits | CSBWin | Meaning |
+|------|--------|---------|
+| 3-0 | `NumDoorDecorations()` | Door decorations on the level |
+| 7-4 | `numMonsterType()` | Monster types allowed on the level |
+| 11-8 | — | Unread, but not zero: DM's levels hold 0, 1, 3 and 4 there |
+| 15-12 | `experienceMultiplier()` | The level's experience multiplier, which also sets a generated monster's hit points |
 
-**Value**: Cumulative count of tiles with objects up to (but not including) this column.
+Word 14:
 
-**Usage**:
-```typescript
-function getObjectListIndex(mapIndex: number, x: number, y: number): number {
-    const columnIndex = mapColumnOffset[mapIndex] + x;
-    const baseIndex = columnIndex[columnIndex];
+| Bits | CSBWin | Meaning |
+|------|--------|---------|
+| 3-0 | `backgroundGraphicSet()` | Floor and ceiling set |
+| 7-4 | `wallGraphicSet()` | Wall set |
+| 11-8 | `Door1Type()` | The graphic of the level's door type 0 |
+| 15-12 | `Door2Type()` | The graphic of the level's door type 1 |
 
-    // Count tiles with objects in this column up to row y
-    let offset = 0;
-    for (let row = 0; row < y; row++) {
-        if (tileHasObjects(mapIndex, x, row)) {
-            offset++;
-        }
-    }
-
-    return baseIndex + offset;
-}
-```
-
-### Object ID List
-
-**Size**: 2 bytes per entry, total size in header
-
-**Structure**: Array of Object IDs, one per tile that contains objects.
-
-**Linked Lists**: Objects on same tile are chained via "Next Object ID" field in each database record.
-
-**Example**:
-```
-Tile (5, 10) contains 3 objects:
-
-objectList[45] = 0x1234  // First object
-    ↓ (record.nextObjectID)
-objectList[46] = 0x5678  // Second object
-    ↓
-objectList[47] = 0x9ABC  // Third object
-    ↓
-0xFFFE (end marker)
-```
+DM and CSB have one floor, ceiling and wall set, 0.
 
 ---
 
-## Database Records
+## Column index and object list
 
-All records start with a 2-byte "Next Object ID" field for linking.
+The **column index** has one word per column of every level, level 0's first. Each holds
+the number of squares with objects in all the columns before it, counted in the order
+the cells are stored; `d.objectLevelIndex[level]` is where a level's columns start
+(`SaveGame.cpp:2648-2655`).
 
-### Door (4 bytes)
+The **object list** holds, for each square with objects, the reference of its first
+object, in the same order. A square's entry is its column's word plus the number of
+squares with objects above it in the column (`GetObjectListIndex`,
+`doc/CSBwin-src/CSBCode.cpp:5168-5190`). The rest of the list, past the last square, is
+`0xFFFF`.
 
-| Offset | Type | Name | Description |
-|--------|------|------|-------------|
-| +0x00 | word | Next Object | Next object in tile (0xFFFE = end) |
-| +0x02 | word | Attributes | Door properties |
+### Object references
 
-**Attributes** (word):
-```
-Bit 8:   Destructible by chopping
-Bit 7:   Destructible by fireball
-Bit 6:   Has button
-Bit 5:   Opening direction (0=horizontal, 1=vertical)
-Bits 4-1: Ornate decoration number (0-15)
-Bit 0:   Door type (0 or 1)
-```
+A reference (CSBWin's `RN`) in `dungeon.dat` is packed (`SaveGame.cpp:2142-2144`):
 
-### Teleporter (6 bytes)
+| Bits | Meaning |
+|------|---------|
+| 9-0 | Record number in its database |
+| 13-10 | Database, 0 to 15 |
+| 15-14 | The object's place on the square, 0 to 3: its corner, or the side of a wall it is on |
 
-| Offset | Type | Name | Description |
-|--------|------|------|-------------|
-| +0x00 | word | Next Object | Next object in tile |
-| +0x02 | word | Attributes | Teleporter properties |
-| +0x04 | word | Destination | Target map/level |
+`0xFFFE` (`RNeof`) ends a chain, and `0xFFFF` (`RNnul`) is no object. CSBWin turns every
+packed reference into a slot of its object index as it reads the file
+(`ConvertListOfObjects`, `doc/PROVEN_FACTS.md` → "An RN in a save file is an indirect
+index, not a packed `[pos][db][idx]`").
 
-**Attributes** (word at +0x02):
-```
-Bit 15:      Sound effect (0=silent, 1=sound)
-Bits 14-13:  Scope
-             00 = Items only
-             01 = Creatures only
-             10 = Items and party
-             11 = Everything
-Bit 12:      Rotation type (0=relative, 1=absolute)
-Bits 11-10:  Rotation amount (0-3 = 0°, 90°, 180°, 270°)
-Bits 9-5:    Destination Y coordinate (0-31)
-Bits 4-0:    Destination X coordinate (0-31)
-```
+The objects of a square form a chain: each record's first word is the next object's
+reference. A click on a wall reads its actuators only up to the first monster or item in
+the chain (`TouchWall`, `doc/CSBwin-src/Mouse.cpp:322-340`, `:600`). A monster group's
+possessions and a chest's contents are chains of their own, rooted in the record.
 
-**Destination** (word at +0x04):
-```
-Bits 15-8:   Destination map/level number
-Bits 7-0:    (Unused in DM/CSB)
-```
+---
 
-### Text (4 bytes)
+## Text
 
-| Offset | Type | Name | Description |
-|--------|------|------|-------------|
-| +0x00 | word | Next Object | Next object in tile |
-| +0x02 | word | Text Reference | Pointer to text data |
+The text section is words of three 5-bit codes: bits 14-10 the first, 9-5 the second,
+4-0 the third, and bit 15 unread (`DecodeText`, `CSBCode.cpp:5597-5615`). A TEXT record
+names where its text starts, in words; `ConvertToIndirectText`
+then copies each one into a compacted array and renumbers the record
+(`SaveGame.cpp:2433-2490`, `doc/PROVEN_FACTS.md`).
 
-**Text Reference** (word at +0x02):
-```
-When bits 2-1 = 00:
-  Bits 15-3:  Offset in text data (in words)
-  Bit 2:      Translation required (DM2 only)
-  Bit 1:      Simplified sensor (DM2 only)
-  Bit 0:      Visible (1=visible wall inscription)
+`DecodeText(dest, text, typeOfText, max)` (`CSBCode.cpp:5552-5735`) reads three kinds:
 
-When bits 2-1 ≠ 00:
-  Champion definition (DM/CSB only)
-```
+| `typeOfText` | Used for | Letters | Code 28 | Ends with |
+|--------------|----------|---------|---------|-----------|
+| 0 | A wall's text | The code itself, an index in the wall font | `0x80`, a line break | `0x81` |
+| 1 | A message | ASCII | A space | 0 |
+| 2 | A scroll, a champion | ASCII | A line feed | 0 |
 
-### Sensor (Actuator) (8 bytes)
+The codes:
 
-| Offset | Type | Name | Description |
-|--------|------|------|-------------|
-| +0x00 | word | Next Object | Next object in tile |
-| +0x02 | word | Type & Data | Sensor type and parameters |
-| +0x04 | word | Behavior | Timing and action flags |
-| +0x06 | word | Target | Target location or action |
+| Code | Meaning |
+|------|---------|
+| 0-25 | `A` to `Z` |
+| 26 | Space |
+| 27 | `.` |
+| 28 | Separator, as the table above |
+| 29 | Escape 1: the next code picks a two-byte string of `d.Byte10080` |
+| 30 | Escape 2: the next code picks an eight-byte string, of `d.Byte10336` for a wall, `d.Byte10016` otherwise |
+| 31 | End |
 
-**Type & Data** (word at +0x02):
-```
-Bits 15-7:  Type-specific data
-Bits 6-0:   Sensor type (0-127)
-```
+The escape tables are read from `graphics.dat` item `0x22f`, not from the dungeon
+(`doc/CSBwin-src/Data.h:1085-1087`, `doc/PROVEN_FACTS.md`). A message starts with a line
+feed, and two separators in a row in it make a line feed (`CSBCode.cpp:5574-5580`,
+`:5689-5694`). A text is decoded only when its record's show bit is set, or when
+`typeOfText` has bit 15, as a champion's has. Every decoding ends in
+`SubstituteCharacterNames`, CSBWin's `.Q.`, `.R.` and `.N.` escapes (`doc/PROVEN_FACTS.md`).
 
-**Sensor Types**:
-- 0: Floor pad (party or creature)
-- 1: Floor pad (party only)
-- 2: Floor pad (creature only)
-- 3: Pit (party or creature falls)
-- 4: Wall switch
-- 5: Wall ornate switch
-- 6: Object detector
-- ... many more types
+### Champion text
 
-**Behavior** (word at +0x04):
-```
-Bits 15-12: Decoration graphic ordinal
-Bit 11:     Target type (0=remote, 1=local)
-Bits 10-7:  Delay (0-15 ticks)
-Bit 6:      Sound effect (0=silent, 1=sound)
-Bit 5:      Revert effect (reset after delay)
-Bits 4-3:   Action type
-            00 = Set
-            01 = Clear
-            10 = Toggle
-            11 = Hold
-Bit 2:      Once only (sensor destroyed after trigger)
-Bits 1-0:   (Varies by sensor type)
-```
+A champion's name, title and statistics are a text on the square in front of their
+mirror, where the party stands to recruit them. `AddCharacter` takes the first TEXT
+record of the party's square and decodes it with `typeOfText` `0x8002`, hidden or not
+(`doc/CSBwin-src/Character.cpp:536-548`). Numbers are written in letters, `A` = 0 to
+`P` = 15, most significant first (`DecodeCharacterValue`, `:415-432`). In order
+(`:554-701`):
 
-**Target** (word at +0x06):
-- **Remote target**: Encoded map/X/Y/position
-- **Local target**: Encoded action parameters
+| Field | Characters | Rule |
+|-------|------------|------|
+| Name | Up to 7, then a line feed | |
+| Title | Up to 19, in two lines | The two lines are joined |
+| Sex | `M` or `F`, then one character | |
+| Health | 4 | At most 999 |
+| Stamina | 4 | At most 9999; shown divided by 10 (`:1092`) |
+| Mana | 4, then one character | At most 900 |
+| Luck, Strength, Dexterity, Wisdom, Vitality, Anti-magic, Anti-fire | 2 each, then one character | At most 224 (`doc/CSBwin-src/CSB.h:631-637`) |
+| Hidden skills 4 to 19 | 1 each, four per class: fighter, ninja, priest, wizard | Level `n` gives `125 << n` experience; `A` gives none (unless CSBWin's `neophyteSkills`), at most `R` |
 
-### Creature (16 bytes)
+CSBWin reads more after the skills, all optional: three letters, the reincarnation
+attribute penalty (default 2), the reincarnation statistic penalty (default 8) and the
+random points (default 3), then eight digits of talents (`:683-689`). A text that breaks
+a rule is replaced by CSBWin's own `legalHero` (`:475`, `:554`). A class's base skill is
+the sum of its four hidden skills' experience (`:690-701`).
 
-| Offset | Type | Name | Description |
-|--------|------|------|-------------|
-| +0x00 | word | Next Object | Next object in tile |
-| +0x02 | word | Possession | Object carried by creature |
-| +0x04 | byte | Type | Creature type (0-26) |
-| +0x05 | byte | Positions | Sub-tile positions (2 bits × 4) |
-| +0x06 | word | HP 1 | Hit points for creature 1 |
-| +0x08 | word | HP 2 | Hit points for creature 2 |
-| +0x0A | word | HP 3 | Hit points for creature 3 |
-| +0x0C | word | HP 4 | Hit points for creature 4 |
-| +0x0E | word | Attributes | Creature flags |
+---
 
-**Creature Types** (byte at +0x04): CSBWin's `MONSTERTYPE`
-(`doc/CSBwin-src/Objects.h:153-183`), with the names its dump prints
+## Records
+
+Every record starts with the word that links it into its chain. A free record has
+`RNnul` there (`DeleteDBEntry`, `doc/CSBwin-src/data.cpp:995-1017`).
+
+### Door (DB0, 4 bytes)
+
+`DB0` (`CSB.h:821-848`). Word 2:
+
+| Bits | CSBWin | Meaning |
+|------|--------|---------|
+| 0 | `doorType()` | Which of the level's two door types |
+| 4-1 | `ornateness()` | The door decoration, 1-based in the level's list; 0 none |
+| 5 | `mode()` | 0 opens sideways, 1 opens up |
+| 6 | `doorSwitch()` | Has a button |
+| 7 | `canOpenWithFireball()` | Destroyed by a fireball |
+| 8 | `canOpenWithAxe()` | Destroyed by blows |
+| 15-9 | — | Unread. CSBWin's comment calls `0x0400` a random mirroring of the image |
+
+A door record belongs on a door square, whose cell flags hold its state.
+
+### Teleporter (DB1, 6 bytes)
+
+`DB1` (`CSB.h:852-888`). Word 2:
+
+| Bits | CSBWin | Meaning |
+|------|--------|---------|
+| 4-0 | `destX()` | Destination x, in the destination level |
+| 9-5 | `destY()` | Destination y |
+| 11-10 | `rotation()` | The facing, or the turn |
+| 12 | `facingMode()` | 1: set the facing to bits 11-10; 0: turn by them |
+| 14-13 | `what()` | 0 objects, 1 monsters, 2 the party and objects, 3 everything |
+| 15 | `audible()` | Buzzes |
+
+Word 4, bits 15-8: the destination level (`destLevel()`); bits 7-0 unread.
+
+### Text (DB2, 4 bytes)
+
+`DB2` (`CSB.h:890-902`). Word 2: bit 0 `show()`, whether the text is visible; bits 15-3
+`index()`, where it starts in the text section, in words. Bits 2-1 are unread.
+
+Where a text is read depends on its square: on a wall, it is drawn on the side it is on
+(`SummarizeStoneRoom`, `doc/CSBWIN_DECORATIONS_REFERENCE.md`); elsewhere, it is a message
+printed when the party enters the square (`doc/PROVEN_FACTS.md`, `Code11f52.cpp:3995-4001`).
+
+### Actuator (DB3, 8 bytes)
+
+`DB3` (`CSB.h:930-1074`). The Encyclopaedia calls actuators sensors.
+
+Word 2:
+
+| Bits | CSBWin | Meaning |
+|------|--------|---------|
+| 6-0 | `actuatorType()` | The type, see "Actuator types" |
+| 15-7 | `value()` | The type's value |
+
+Word 4:
+
+| Bits | CSBWin | Meaning |
+|------|--------|---------|
+| 1-0 | — | Unread by the FTL types; a portrait and a DSA read word 4 their own way |
+| 2 | `onceOnly()` | The type becomes 0 once it acts |
+| 4-3 | `action()` | 0 set, 1 clear, 2 toggle, 3 hold (`ACTUATORACTION`) |
+| 5 | `normallyClosed()` | Inverts the actuator's pressed state |
+| 6 | `audible()` | Clicks |
+| 10-7 | `delay()` | Ticks before the action |
+| 11 | `localActionOnly()` | Acts on itself, not on a target |
+| 15-12 | `wallGraphicOrdinal()` | Its decoration, 1-based in the level's wall or floor list; 0 none |
+
+Word 6, for a target (bit 11 clear): bits 5-4 `targetPos()`, the target wall's side;
+10-6 `targetX()`; 15-11 `targetY()`, on the actuator's own level. For a local action
+(bit 11 set): bits 15-4 `localActionType()`. Some types read word 6 their own way, below.
+
+An event acts when it leaves the actuator closed: pressed, or released with bit 5 set.
+Hold acts on every event, a set when it leaves it closed and a clear otherwise
+(`PressurePadOrAlcove`, `doc/CSBwin-src/Code11f52.cpp:3880-3910`). The action becomes a
+timer of the target square's type, which then does what that square does
+(`QueueSwitchAction`, `doc/ACTUATORS.md`).
+
+**Local actions** (`PerformLocalAction`, `doc/CSBwin-src/Mouse.cpp:239-254`): 10 gives 300
+experience in hidden skill 8, the first ninja one, shared among the living champions
+from a floor actuator, or to the champion holding the cursor from a wall
+(`SkillIncreaser`, `:210-235`). 1 and 2 rotate the actuators on that side of the square:
+the first one moves behind the last (`RotateActuatorList`, `Code11f52.cpp:3500-3560`).
+
+CSBWin's extensions read more of these words: DSAs (type 47), portraits' states, the
+and/or gate's condition; `doc/ACTUATORS.md` and `doc/CSBWIN_DSA_REFERENCE.md` have them.
+`MakeBigActuators` appends word 8 to every actuator when it reads an image without big
+actuators (`SaveGame.cpp:2816-2819`).
+
+### Monster group (DB4, 16 bytes)
+
+`DB4` (`CSB.h:1078-1142`):
+
+| Offset | Size | Field |
+|--------|------|-------|
+| 0 | word | Link |
+| 2 | word | `possession()`: the first object the group carries, dropped when it dies |
+| 4 | byte | Bits 4-0 `monsterType()`; bits 7-5 `alternateGraphics()`, CSBWin's |
+| 5 | byte | `groupIndex()`: the corners of the four monsters, two bits each, monster 1 in bits 1-0 |
+| 6 | 4 words | `hitPoints6[4]`, each monster's |
+| 14 | word | Flags |
+
+Byte 5 holds the corners only while the group is off the party's level; on it, it is the
+group's `ITEM16` slot (`AttachItem16ToMonster`, `doc/CSBwin-src/CSBCode.cpp:6146`).
+
+Word 14:
+
+| Bits | CSBWin | Meaning |
+|------|--------|---------|
+| 3-0 | `fear()` | Play's state, 0 in a dungeon |
+| 6-5 | `numMonM1()` | Monsters in the group − 1 |
+| 9-8 | `facing()` | The facing, off the party's level |
+| 10 | `important()` | Never discarded to make room |
+| 11 | `invisible()` | CSBWin's, read only with its `invisibleMonsters` option |
+| 12 | `drawAsSize4()` | CSBWin's, read only with its `drawAsSize4Monsters` option |
+| 13 | `Unique()` | CSBWin's, likewise |
+| 14 | `Poisoned()` | CSBWin's, for DSAs, likewise |
+| 4, 7, 15 | — | Unread, but DM's creature 38 has bits 4 and 7 set |
+
+`MONSTERTYPE` (`doc/CSBwin-src/Objects.h:153-183`), with the names CSBWin's dump prints
 (`MonsterName`, `doc/CSBwin-src/AsciiDump.cpp:306-339`). CSBWin names neither 5 nor 25.
+
 ```
-0  = mon_Scorpion        14 = mon_Vexirk
-1  = mon_SlimeDevil      15 = mon_Worm
-2  = mon_Giggler         16 = mon_AntMan
-3  = mon_FlyingEye       17 = mon_Muncher
-4  = mon_Hellhound       18 = mon_DethKnight
-5  = mon_5               19 = mon_Zytaz
-6  = mon_Screamer        20 = mon_WaterElemental
-7  = mon_RockPile        21 = mon_Oitu
-8  = mon_Rive            22 = mon_Demon
-9  = mon_StoneGolem      23 = mon_LordChaos
-10 = mon_Mummy           24 = mon_Dragon
-11 = mon_BlackFlame      25 = mon_25
-12 = mon_Skeleton        26 = mon_GreyLord
-13 = mon_Couatl
+0  Scorpion        7  Rock Pile      14 Vexirk          21 Oitu
+1  Slime Devil     8  Rive           15 Worm            22 Demon
+2  Giggler         9  Stone Golem    16 Ant Man         23 Lord Chaos
+3  Flying Eye     10  Mummy          17 Muncher         24 Dragon
+4  Hellhound      11  Black Flame    18 Deth Knight     25 —
+5  —              12  Skeleton       19 Zytaz           26 Grey Lord
+6  Screamer       13  Couatl         20 Water Elemental
 ```
 
-**Positions** (byte at +0x05):
-```
-Bits 7-6:  Creature 4 sub-position (00-11)
-Bits 5-4:  Creature 3 sub-position
-Bits 3-2:  Creature 2 sub-position
-Bits 1-0:  Creature 1 sub-position
-Special: 0xFF = creature centered in tile
-```
+The types a level allows are listed after its cells (see "Cell array").
 
-**Attributes** (word at +0x0E):
-```
-Bit 10:    Important/non-flushable creature
-Bits 9-8:  Facing direction (00=N, 01=E, 10=S, 11=W)
-Bits 6-5:  Count - 1 (0-3 = 1-4 creatures)
-Bits 3-0:  Runtime data (health status, state)
-```
+### Weapon (DB5, 4 bytes)
 
-### Weapon (4 bytes)
+`DB5` (`CSB.h:1144-1173`). Word 2:
 
-| Offset | Type | Name | Description |
-|--------|------|------|-------------|
-| +0x00 | word | Next Object | Next object in tile |
-| +0x02 | word | Attributes | Weapon properties |
+| Bits | CSBWin | Meaning |
+|------|--------|---------|
+| 6-0 | `weaponType()` | `WEAPONTYPE` (`Objects.h:39`) |
+| 7 | `important()` | Never discarded to make room |
+| 8 | `cursed()` | |
+| 9 | `poisoned()` | |
+| 13-10 | `charges()` | Charges; a torch's fuel |
+| 14 | `broken()` | |
+| 15 | `litTorch()` | A lit torch |
 
-**Attributes** (word at +0x02):
-```
-Bit 15:      Runtime flag
-Bit 14:      Broken (cannot use)
-Bits 13-10:  Charges or luminous power (torches)
-Bit 9:       Poisoned
-Bit 8:       Cursed
-Bit 7:       Important (plot item)
-Bits 6-0:    Weapon type (0-127)
-```
+### Clothing (DB6, 4 bytes)
 
-**Weapon Types**:
-```
-0  = Torch
-1  = Flamitt
-2  = Staff of Claws
-3  = Storm Ring
-4  = Ra Key
-... (46 types in DM, more in CSB)
-```
+`DB6` (`CSB.h:1175-1196`). Word 2: bits 6-0 `clothingType()` (`CLOTHINGTYPE`,
+`Objects.h:90`), 7 `important()`, 8 `cursed()`, 12-9 `charges()`, 13 `broken()`;
+bits 15-14 unread.
 
-### Clothe (4 bytes)
+### Scroll (DB7, 4 or 6 bytes)
 
-| Offset | Type | Name | Description |
-|--------|------|------|-------------|
-| +0x00 | word | Next Object | Next object in tile |
-| +0x02 | word | Attributes | Clothing properties |
+The four-byte form, a `dungeon.dat`'s: word 2 bits 9-0 the TEXT **record** that holds
+the scroll's text, and bits 15-10 zero for an open scroll. CSBWin converts it as it
+reads: the text becomes a reference to that record, and the scroll is open when bits
+15-10 were 0 (`convertScrolls`, `SaveGame.cpp:2356-2378`). The six-byte form, a save's
+and a dungeon's from Extended Features version `'B'`, is that converted record: word 2
+the text's reference, word 4 bit 0 `open()` (`CSB.h:1198-1219`, `doc/PROVEN_FACTS.md` →
+"The new scroll record, and where big actuators put their extra bytes").
 
-**Attributes** (word at +0x02):
-```
-Bit 13:      Broken
-Bits 12-9:   Charges (unused in DM/CSB)
-Bit 8:       Cursed
-Bit 7:       Important
-Bits 6-0:    Clothe type (0-127)
-```
+A scroll's text is decoded as type 2 whatever its show bit says.
 
-### Scroll (4 bytes)
+### Potion (DB8, 4 bytes)
 
-| Offset | Type | Name | Description |
-|--------|------|------|-------------|
-| +0x00 | word | Next Object | Next object in tile |
-| +0x02 | word | Attributes | Scroll properties |
+`DB8` (`CSB.h:1221-1236`). Word 2: bits 7-0 `strength()`, the power; 14-8
+`potionType()` (`POTIONTYPE`, `Objects.h:14`); 15 `important()`.
 
-**Attributes** (word at +0x02):
-```
-Bits 15-10:  State (0=open, 1=closed)
-Bits 9-0:    Text reference (offset in words)
-```
+### Chest (DB9, 8 bytes)
 
-### Potion (4 bytes)
+`DB9` (`CSB.h:1238-1251`): word 2 `contents()`, the first object inside; word 4, whose
+bits 2-1 plus one are the container's object index, 0 for the chest, the other bits
+unnamed and not zero in DM; two bytes `m_uByte6`.
 
-| Offset | Type | Name | Description |
-|--------|------|------|-------------|
-| +0x00 | word | Next Object | Next object in tile |
-| +0x02 | word | Attributes | Potion properties |
+### Miscellaneous item (DB10, 4 bytes)
 
-**Attributes** (word at +0x02):
-```
-Bit 15:      Important
-Bits 14-8:   Potion type (0-127)
-Bits 7-0:    Power/dosage (0-255)
-```
+`DB10` (`CSB.h:1253-1281`). Word 2:
 
-**Potion Types**:
-```
-0  = Mon Potion
-1  = Mana Potion
-2  = Magic Potion (strength)
-3  = Dexterity Potion
-4  = Shield Potion
-... (20+ types)
-```
+| Bits | CSBWin | Meaning |
+|------|--------|---------|
+| 6-0 | `miscType()` | `MISCTYPE` (`Objects.h:185`) |
+| 7 | `important()` | |
+| 8 | `cursed()` | |
+| 13-9 | `subType()` | CSBWin's |
+| 15-14 | `value()` | A waterskin's fill (0 empty, 3 full), a compass's facing, the charges, or the kind of bones |
 
-### Container (8 bytes)
+### `EXPOOL` (DB11, 256 bytes)
 
-| Offset | Type | Name | Description |
-|--------|------|------|-------------|
-| +0x00 | word | Next Object | Next object in tile |
-| +0x02 | word | Contained Object | First object inside |
-| +0x04 | word | Type | Container type |
-| +0x06 | word | (Unused) | Always 0 |
+CSBWin's extension pool: champions' bones, special locations, global texts and
+variables (`doc/CSBWIN_SAVEGAME_REFERENCE.md` → "EXPOOL", `src/data/CsbwinExpool.ts`).
+None in a FTL dungeon.
 
-**Type** (word at +0x04):
-```
-Bits 2-1:  Container type
-           00 = Chest (only valid type in DM/CSB)
-Bits 0, 3-15: Unused
-```
+### Missile (DB14, 8 bytes)
 
-**Contained objects**: Linked list starting at +0x02, using nextObjectID fields.
+`DB14` (`CSB.h:1301-1321`): word 2 `flyingObject()`, the object or spell in flight;
+byte 4 `rangeRemaining()`; byte 5 `damageRemaining()`; word 6 `timerIndex()`, the timer
+that moves it.
 
-### Miscellaneous (4 bytes)
+### Cloud (DB15, 4 bytes)
 
-| Offset | Type | Name | Description |
-|--------|------|------|-------------|
-| +0x00 | word | Next Object | Next object in tile |
-| +0x02 | word | Attributes | Item properties |
-
-**Attributes** (word at +0x02):
-```
-Bits 15-14:  Special state (waterskin/compass/bones)
-Bit 7:       Important
-Bits 6-0:    Item type (0-127)
-```
-
-**Item Types**:
-```
-0  = Compass
-1  = Waterskin (bits 15-14 = water level)
-2  = Jewel Symal
-3  = Illumulet
-4  = Rope
-5  = Lock picks
-... (50+ types: food, keys, gems, etc.)
-```
-
-### Projectile (8 bytes, save games only)
-
-| Offset | Type | Name | Description |
-|--------|------|------|-------------|
-| +0x00 | word | Next Object | Next object in tile |
-| +0x02 | word | Projectile Object | What was thrown |
-| +0x04 | byte | Range Energy | Distance remaining |
-| +0x05 | byte | Damage Energy | Attack power |
-| +0x06 | word | Event Index | Timer/event reference |
-
-### Cloud (4 bytes, save games only)
-
-| Offset | Type | Name | Description |
-|--------|------|------|-------------|
-| +0x00 | word | Next Object | Next object in tile |
-| +0x02 | word | Attributes | Cloud properties |
-
-**Attributes** (word at +0x02):
-```
-Bits 15-8:   Value/power
-Bits 6-0:    Cloud type
-```
+`DB15` (`CSB.h:1333-1348`). Word 2: bits 6-0 `cloudType()` (`CLOUDTYPE`: 0 fireball,
+3 dispell, 4 open door, 7 poison, 40 death, 50 flux cage), bit 7 `b7()`, bits 15-8
+`value()`.
 
 ---
 
-## Map Data
+## Actuator types
 
-### Structure
+What an actuator does depends on its type and on its square: on a stone wall (or a
+closed trick wall) it is a wall actuator, anywhere else a floor actuator.
 
-For each map, the map data contains:
-1. **Tile definitions** (1 byte per tile)
-2. **Graphic indices** (variable)
+### Floor actuators
 
-### Tile Definition (1 byte)
+Pressed by what enters or leaves the square (`PressurePadOrAlcove`,
+`doc/CSBwin-src/Code11f52.cpp:3767-3850`):
 
-```
-Bits 7-5:  Tile type (room type)
-           000 = Wall
-           001 = Floor
-           010 = Pit
-           011 = Stairs
-           100 = Door
-           101 = Teleporter
-           110 = Trick Wall
-           111 = Empty (DM2 only)
+| Type | Pressed by |
+|------|------------|
+| 0 | Nothing: a floor decoration |
+| 1 | Anything: the party, a monster, an item. Not again while something already holds it |
+| 2 | The party or a monster, not an item |
+| 3 | The party. With a value `v`, only arriving facing `v − 1`; leaving releases it |
+| 4 | An item whose object index is the value, not again while one already holds it |
+| 5 | Nothing |
+| 6 | Nothing: a monster generator, which a timer drives (below) |
+| 7 | A monster |
+| 8 | The party, while a champion carries an object whose index is the value (`DoesPartyHave`) |
+| 9 | The party arriving, when the value is at most 20 |
+| 47 | A DSA (`doc/CSBWIN_DSA_REFERENCE.md`) |
 
-Bit 4:     Has objects (1 = yes, 0 = no)
+A **monster generator** (type 6) acts when a set, clear or toggle timer reaches its
+square (`ProcessTT_OPENROOM`, `doc/CSBwin-src/Timer.cpp:1771-1830`): it makes a group of the
+type in its value. Word 4 bits 10-7 give the size: with bit 10 set, 1 to the number in
+bits 9-7 at random; otherwise the number itself. Word 6 bits 7-4 multiply the hit points,
+0 meaning the level's multiplier; bits 15-8 disable it for a while after it acts, 1-127
+ticks or `64 × (n − 126)` from 128, by turning it into type 0 until a
+`TT_ReactivateGenerator` timer turns it back (`:1835-1875`). Its sound is the teleport's.
+CSBWin passes word 4 bit 5 and word 6 bit 0 on as the group's invisible and
+draw-as-size-4 flags.
 
-Bits 3-0:  Tile attributes (type-specific)
-```
+Type 48 on a floor is CSBWin's counter, as type 6 on a wall.
 
-### Tile-Specific Attributes
+### Wall actuators
 
-#### Wall (type 000)
-```
-Bit 3:  Allow random decoration on North wall
-Bit 2:  Allow random decoration on East wall
-Bit 1:  Allow random decoration on South wall
-Bit 0:  Allow random decoration on West wall
-```
+A wall actuator answers to a click on its side, to an item put into it (an alcove), or
+to a timer.
 
-#### Floor (type 001)
-```
-Bit 3:  Allow random floor decoration
-Bits 2-0: (Unused)
-```
+**A click** (`TouchWall`, `doc/CSBwin-src/Mouse.cpp:291-606`). Only the actuators on the
+clicked side answer, and with nobody holding the cursor only a portrait:
 
-#### Pit (type 010)
-```
-Bit 3:  Pit is open (will fall through)
-Bit 2:  Pit is invisible
-Bit 1:  (Unused)
-Bit 0:  Imaginary pit (visual only, won't fall)
-```
+| Type | Pressed by |
+|------|------------|
+| 1 | Any click. Never with the hold action |
+| 2 | A click with an object in hand; with bit 5, an empty hand |
+| 3 | A click with an object whose index is the value (with bit 5, any other); it stays in hand |
+| 4 | As 3, and the object leaves the hand and is deleted |
+| 11 | As 4, only when it is the last actuator on that side; then the side's actuators rotate |
+| 12 | An empty hand, when it is the last on that side: the object of the value is made and put in the hand, as a launcher's (below); then the actuators rotate |
+| 13 | A holder: an empty hand takes the object of the value from that side, a hand holding one puts it there; then the actuators rotate. With hold, putting sets and taking clears |
+| 16 | An object of the value in hand, when it is the last on that side: it changes places with the square's first item |
+| 17 | As 11, and it deletes itself from the chain when pressed |
+| 127 | A champion's mirror: a click recruits the champion whose portrait the value names, once, while the portrait is active |
 
-#### Stairs (type 011)
-```
-Bit 3:  Orientation (0=West-East, 1=North-South)
-Bit 2:  Direction (0=Down, 1=Up)
-Bits 1-0: (Unused)
-```
+**An item put into it** (`PressurePadOrAlcove`, `Code11f52.cpp:3851-3878`), only the
+actuators on that side:
 
-#### Door (type 100)
-```
-Bit 3:     Orientation (0=EW, 1=NS)
-Bits 2-0:  Door state
-           000 = Open
-           001 = Almost open
-           010 = Half open
-           011 = Almost closed
-           100 = Closed
-           101 = Bashed open
-```
+| Type | Pressed by |
+|------|------------|
+| 1 | Any item, when none is already there |
+| 2 | An item whose index is the value, when none of that kind is already there |
+| 3 | Any item but the value, when no other kind is already there |
 
-#### Teleporter (type 101)
-```
-Bit 3:  Teleporter is open/active
-Bit 2:  Teleporter is visible
-Bits 1-0: (Unused)
-```
+**A timer** (`ProcessTT_STONEROOM`, `doc/CSBwin-src/Timer.cpp:2165-2386`). A timer on a
+wall also shows, hides or toggles the TEXT on the side it names.
 
-#### Trick Wall (type 110)
-```
-Bit 3:  Allow random decoration
-Bit 2:  Wall is open (passable)
-Bit 1:  (Unused)
-Bit 0:  Imaginary (visual only)
-```
+| Type | Does |
+|------|------|
+| 5 | An and/or gate. Value bits 3-0 (word 2 bits 10-7) are the state, bits 7-4 (word 2 bits 14-11) the reference. The timer's side picks a state bit, which the action sets, clears or toggles; the gate is pressed when state equals reference. CSBWin adds a condition in word 6 bits 2-0 (`andOrEdge()`) |
+| 6 | A counter. A set adds one, up to 511, anything else takes one; a counter at 0 no longer changes, and it is pressed when it reaches 0 (`OperateCounterActuator`, `:1603-1686`) |
+| 7 | Launches the object of the value |
+| 8 | Launches the spell of the value |
+| 9 | Launches two objects of the value |
+| 10 | Launches two spells of the value |
+| 14 | Launches the first item on its side of its square |
+| 15 | Launches the first two items on its side of its square |
+| 18 | Ends the game |
+| 47 | A DSA |
+| 127 | A portrait's states, CSBWin's (`ProcessPortraitTimer6`) |
 
-### Graphic Indices
-
-Following tile definitions, graphic indices specify which textures to use. Format varies by map descriptor settings.
+**Launchers** (`TriggerMissileLauncher`, `Timer.cpp:1883-2010`) throw into the square
+in front of their side, with the range in word 6 bits 11-4, a damage of 100 and no
+decay. A single missile starts at random on the left or the right. The objects a value
+makes (`ConstructPredefinedMissile`, `Mouse.cpp:106-175`): 4 to 7 a torch, 32 a dagger,
+51 an arrow, 52 a slayer, 54 a rock, 55 a poison dart, 56 a throwing star, 128 a
+boulder. The spells (`RN::CreateSpell`, `doc/CSBwin-src/CSBTypes.h:244-251`): 0 fireball,
+1 poison blob, 2 lightning bolt, 3 dispell, 4 the door-opening spell, 6 poison bolt,
+7 poison cloud. Types 14 and 15 take items at the timer's position or the next one,
+`(pos + 1) & 3`, and launch nothing when none is left. With once only, a launcher becomes type 0.
 
 ---
 
-## Text Encoding
+## Cell array
 
-### 5-Bit Character Encoding
+The cells of every level, level 0's first, each level at its `cellOffset`. A level's
+cells go column by column: x = 0, y = 0 to the height − 1, then x = 1
+(`SaveGame.cpp:2900-2915`). One byte each, CSBWin's `CELLFLAG`
+(`doc/CSBwin-src/CSBTypes.h:181-211`):
 
-Text compressed as 5-bit codes, packed 3 per word (15 bits used, bit 15 ignored).
+| Bits | Meaning |
+|------|---------|
+| 3-0 | Attributes of the square's type |
+| 4 | The square has objects |
+| 7-5 | The type (`ROOMTYPE`, `CSB.h:561-575`) |
 
-**Word format**:
-```
-Bits 14-10:  First character (5 bits)
-Bits 9-5:    Second character (5 bits)
-Bits 4-0:    Third character (5 bits)
-```
+| Type | Square | Bit 0 | Bit 1 | Bit 2 | Bit 3 |
+|------|--------|-------|-------|-------|-------|
+| 0 | Stone wall | Random decoration on the west side | … south | … east | … north |
+| 1 | Open | | | | Random floor decoration |
+| 2 | Pit | Imaginary: nobody falls | | Obscured | Open: things fall |
+| 3 | Stairs | | | Going up | Runs north–south |
+| 4 | Door | State, bits 2-0 | | | Runs north–south |
+| 5 | Teleporter | | | Visible | Active |
+| 6 | Trick wall | Passable though shown | | Open: not shown, passable | Random decoration |
 
-**Character Codes** (0-31):
-```
-0-25:  Letters A-Z
-26:    Space
-27:    Period '.'
-28:    Separator (context-dependent)
-       - Wall text: 0x80 (special marker)
-       - Message: Space
-       - Scroll/Champion: Line feed
-29:    Escape code 1 (character table)
-30:    Escape code 2 (string table)
-31:    End of text
-```
+A door's state is 0 open, 1 almost open, 2 half open, 3 almost closed, 4 closed,
+5 bashed; the party passes at 0, 1 and 5 (`doc/CSBwin-src/CSBCode.cpp:8319-8324`). A pit
+is drawn only while open, bit 2 drawing it obscured (`SummarizeRoomInfo`,
+`doc/CSBwin-src/Codea59a.cpp:263-276`); a teleporter's haze shows only while it is
+active and visible (`:354-357`). The trick wall's bits are read in
+`Codea59a.cpp:278-297` and `CSBCode.cpp:8339-8345`, the imaginary pit's in
+`Monster.cpp:682-692`. A type 7 is not a DM or CSB square: CSBWin turns it into an open
+one after the read (`CheckCelltypes`, `SaveGame.cpp:1468-1501`).
 
-### Escape Codes
+### After each level's cells
 
-**Escape 1** (code 29): Next 5-bit code indexes character table.
-**Escape 2** (code 30): Next 5-bit code indexes string table.
+Four lists of bytes follow a level's last cell, in this order
+(`SetPartyLevel`, `doc/CSBwin-src/CSBCode.cpp:5855-5875`; `Code390e.cpp:325-330`):
 
-**Common String Table** (Escape 2):
-```
-Code 0-1:   (Empty)
-Code 2:     "THE "
-Code 3:     "YOU "
-Code 4-31:  (Varies by version, mostly empty)
-```
+| Bytes | List |
+|-------|------|
+| `numMonsterType()` | The monster types allowed on the level |
+| `NumWallDecoration()` | The wall decorations: a graphic number each |
+| `NumFloorDecorations()` | The floor decorations |
+| `NumDoorDecorations()` | The door decorations |
 
-### Text Output Format
+An actuator's or a door's decoration ordinal is 1-based in these lists. CSBWin adds a
+last wall entry, 0, for a far wall text (`CSBCode.cpp:5866`). How the numbers become
+graphics is in `doc/CSBWIN_DECORATIONS_REFERENCE.md`.
 
-**Wall inscriptions**: Direct font indices (0-35).
-**Messages/Scrolls**: ASCII codes (0x41-0x5A for A-Z).
+---
 
-### Champion Text Format
+## Checksum
 
-Champions defined in text data section using special format:
-
-```
-Name (7 chars max) + CR
-Title part 1 (17 chars) + CR
-Title part 2 (2 chars) + CR
-Gender (M/F) + CR
-Health (4 hex digits)
-Stamina (4 hex digits, value × 10)
-Mana (4 hex digits) + CR
-Luck (2 hex)
-Strength (2 hex)
-Dexterity (2 hex)
-Wisdom (2 hex)
-Vitality (2 hex)
-Anti-magic (2 hex)
-Anti-fire (2 hex) + CR
-Fighter skills (4 hex, one per hidden skill)
-Ninja skills (4 hex)
-Priest skills (4 hex)
-Wizard skills (4 hex) + END
-```
-
-Example:
-```
-HALK\r
-BARBARIAN WARRIO\r
-R \r
-M\r
-12CE0FA0008C\r
-0A64460505055A5000
-```
+`FetchDataBytes` adds every byte it reads, from the header to the end of the cell array,
+into a 16-bit sum (`doc/CSBwin-src/CSBCode.cpp:9186-9211`). `ReadDatabases` then reads the
+word after the cell array without adding it, and fails the read when the word is there
+and differs from the sum (`SaveGame.cpp:2866-2870`). When the file ends at the cell array,
+nothing is compared: DM's `dungeon.dat` has no checksum, CSB's prison has one.
 
 ---
 
@@ -811,9 +644,9 @@ M\r
 
 A new game's `dungeon.dat` may be compressed. `ReadDatabases` reads the first 8 bytes and
 takes the file as compressed when their first word is 33028; otherwise it rewinds and
-reads it plain (`doc/CSBwin-src/SaveGame.cpp:2558-2586`). A saved game is never read this
-way. The port: `DungeonLoader.loadDungeonDat` and `ExpandData`
-(`src/core/compression.ts`), checked by `tools/dump-compressed-dungeon.ts`.
+reads it plain (`SaveGame.cpp:2558-2586`). A saved game is never read this way. The port:
+`DungeonLoader.loadDungeonDat` and `ExpandData` (`src/core/compression.ts`), checked by
+`tools/dump-compressed-dungeon.ts`.
 
 ### The 8-byte header
 
@@ -825,6 +658,8 @@ way. The port: `DungeonLoader.loadDungeonDat` and `ExpandData`
 
 All three big-endian. The rest of the file is the compressed body, expanded by
 `ExpandData` into a buffer that `FetchDataBytes` then reads as it would the plain file.
+Behind an Extended Features block, the body starts 8 bytes after the block, or 8 bytes
+into the file for a block of version `'@'` (`:2574-2581`).
 
 ### The body (`ExpandData`, `CSBCode.cpp:9970-10053`)
 
@@ -844,56 +679,87 @@ word's worth.
 ### Chaos Strikes Back's prison
 
 CSB's `dungeon.dat` is the one compressed file known: 2098 bytes, expanding to 2622, with
-`Word22592` 12. The expanded image ends with the checksum word `ReadDatabases` compares
-with the byte sum of everything it fetched (`SaveGame.cpp:2866-2870`), 0x939f, and the
-port's expansion matches it. DM's `dungeon.dat` is plain, and has no checksum word.
+`Word22592` 12. The expanded image ends with its checksum, 0x939f, and the port's
+expansion matches it.
 
 ---
 
-## Summary
+## What CSBWin changes as it reads
 
-### Key Points
-
-1. **Binary format**: All multi-byte values must handle endianness
-2. **Packed data**: Extensive bit-packing for space efficiency
-3. **Linked lists**: Objects chained via nextObjectID fields
-4. **Indexed access**: Column index optimizes object lookup
-5. **Optional features**: Compression and checksum are optional
-6. **Version differences**: DM, CSB, and DM2 have slight variations
-
-### Implementation Checklist
-
-- [ ] Detect endianness and convert if needed
-- [ ] Handle optional compression (signature 0x8104)
-- [ ] Parse header (44 bytes)
-- [ ] Parse map descriptors (16 bytes × count)
-- [ ] Parse column index (2 bytes × columns)
-- [ ] Parse object list (2 bytes × list size)
-- [ ] Parse text data (5-bit encoding)
-- [ ] Parse all 16 databases
-- [ ] Parse map data (tile definitions)
-- [ ] Verify checksum if present
-- [ ] Build 3D array for tile access
-- [ ] Build object lookup structures
-
-### Testing
-
-Test with these dungeons:
-- **Dungeon Master** (dungeon ID 99)
-- **Chaos Strikes Back** (dungeon ID 13)
-- **CSB Prison** (dungeon ID 8)
-
-Verify:
-- Party starts at correct position
-- Map dimensions match
-- Object counts match header
-- Checksum validates (if present)
+`ReadDatabases` and `_ReadEntireGame` turn a `dungeon.dat` into the shape a save is
+written in, and the port does the same (`convertOriginalDungeon`,
+`src/data/CsbwinDungeonConversions.ts`): references become object-index slots, texts go
+indirect, actuators get word 8, scrolls get six bytes, unknown cell types become open
+squares (`CheckCelltypes`) and mirrors get CSBWin's portrait state cleared
+(`ExtendPortraits`, `SaveGame.cpp:1503-1527`). `tools/dump-dungeon-image-blocks.ts` reads
+`dungeon.dat` without them and writes its sections back byte for byte.
 
 ---
 
-## References
+## Not checked against CSBWin
 
-- Original documentation: dmweb.free.fr
-- CSBWin source code: `doc/CSBwin-src/SaveGame.cpp` (ReadDatabases function)
-- Original JavaScript parser: `static/js/dungeon.js` (the pre-TypeScript
-  proof-of-concept, retired in Phase 14 — recoverable from git history)
+The Encyclopaedia's page says the following, which CSBWin's source neither confirms nor
+contradicts, or which concerns versions CSBWin does not read.
+
+**Versions.** The file is `DUNGEON.DAT` in most versions, `DUNGEON.GAME` on the Apple IIGS
+(with `DUNGEON.BONUS` for Kid's Dungeon), and `DUNGEONF.DAT` and `DUNGEONG.DAT` for French
+and German in multilingual versions. The PC, Apple IIGS, Super NES, FM-Towns, PC-98 and
+IBM PS-V files are little-endian, converted by swapping the two bytes of every word. DM's
+Atari ST 1.x files have no checksum; from 2.x the English files have one and the others
+not; CSB's and Dungeon Master II's always do. Atari ST 1.2 English does not read a
+compressed file. A bad checksum makes the PC 3.4 game say "The game is damaged!". The
+word at 6 of a compressed header is 12 or 8 in the files the page lists.
+
+**Seeds.** 13 is CSB's main dungeon (its `mini.dat`) and 0 Dungeon Master II's; the Hint
+Oracle's files name the dungeon by its seed.
+
+**Dungeon Master II.** A level descriptor's word 2 marks which graphics a map uses (bit 0
+pit, 1 ceiling pit, 2 faint pit, 3 stairs up, 4 stairs down, 5 teleporter haze, 6
+portraits, 7 door type 0, 8 door type 1), and word 14 bits 7-4 its style (0 blue zone,
+1 outside, 2 cave, 3 interior, 4 Skullkeep roof, 5 mist). A TEXT's bit 2 marks a text to
+translate and bit 1 a simplified sensor. Type 7 is an empty square. Its champions and its
+texts are in `graphics.dat`, its experience levels need twice the experience, and its
+sensors go far past type 18.
+
+**Older engines.** Before 2.1, floor type 5 fired when the party arrived by the stairs it
+stands on, and a launcher's word 6 bits 15-12 were a decay rate; floor type 9 checks the
+engine's version; type 18 waits word 4 bits 10-7 seconds from CSB 2.1. Types 14 and 15
+crash an older engine when no item is left to launch. Monster types 25 and 26 crash the
+original game, and a monster teleported onto a level that does not allow it dies there,
+crashing when it carries something.
+
+**Door types**, a level's word 14 bits 11-8 and 15-12: 0 grate, 1 wood, 2 iron, 3 Ra.
+Their resistances are in `graphics.dat` item 559.
+
+**DM's decorations**, by the number a level's list holds:
+
+- Walls: 0 unreadable inscription, 1 square alcove, 2 Vi altar, 3 arched alcove, 4 hook,
+  5 iron lock, 6 wood ring, 7 small switch, 8 dent 1, 9 dent 2, 10 iron ring, 11 crack,
+  12 slime outlet, 13 dent 3, 14 tiny switch, 15 green switch out, 16 blue switch out,
+  17 coin slot, 18 double iron lock, 19 square lock, 20 winged lock, 21 onyx lock,
+  22 stone lock, 23 cross lock, 24 topaz lock, 25 skeleton lock, 26 gold lock,
+  27 turquoise lock, 28 emerald lock, 29 ruby lock, 30 Ra lock, 31 master lock, 32 gem
+  hole, 33 slime, 34 grate, 35 fountain, 36 manacles, 37 ghoul's head, 38 empty torch
+  holder, 39 scratches, 40 poison holes, 41 fireball holes, 42 dagger holes, 43 champion
+  mirror, 44 lever up, 45 lever down, 46 full torch holder, 47 red switch out, 48 eye
+  switch, 49 big switch out, 50 crack switch out, 51 green switch in, 52 blue switch in,
+  53 red switch in, 54 big switch in, 55 crack switch in, 56 amalgam (encased gem),
+  57 amalgam (free gem), 58 amalgam (without gem), 59 Lord Order (outside).
+- Floors: 0 square grate, 1 square pressure pad, 2 moss, 3 round grate, 4 round pressure
+  plate, 5 black flame pit, 6 crack, 7 tiny pressure pad, 8 puddle.
+- Doors: 0 square grid, 1 iron bars, 2 jewels, 3 wooden bars, 4 arched grid, 5 block
+  lock, 6 corner lock, 7 black door (the entrance), 8 red triangle lock, 9 triangle lock,
+  10 Ra door energy, 11 iron door damage.
+
+**DM's and CSB's portraits**, a mirror's value: 0 Elija / Airwing, 1 Halk / Aroc,
+2 Syra / Talon, 3 Hissssa / Leta, 4 Zed / Dema, 5 Chani / Algor, 6 Hawk / Toadrot,
+7 Boris / Ven, 8 Mophus / Mantia, 9 Leif / Gnatu, 10 Wu Tse / Slogar, 11 Alex / Sting,
+12 Linflas / Skelar, 13 Azizi / Deth, 14 Iaido / Necro, 15 Gando / Plague, 16 Stamm /
+Tunda, 17 Leyla / Lana, 18 Tiggy / Buzzzz, 19 Sonja / Petal, 20 Nabi / Itza, 21 Gothmog /
+Tula, 22 Wuuf / Kazai, 23 Daroou / Lor.
+
+**Design rules.** An object must not be in two chains. Actuators go before a monster
+group in a square's chain. A portrait shares its wall with no decorated actuator. A
+scroll's line holds at most 14 characters. DM's four texts on level 12 at (0, 0), each
+starting with a letter A to D, are the endgame's, printed in that letter's order without
+it.
