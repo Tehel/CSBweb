@@ -6502,6 +6502,11 @@ themselves, and that the next VBL's frame has the cursor where the pointer last 
   (`0x13`) is 140, the disk menu; Esc (`0x1b`) is 147, the freeze. `Byte18428`: Insert
   (`0x5200`) is 1 and Clr/Home (`0x4700`) 2, the turns; up (`0x4800`) is 3, right
   (`0x4d00`) 4, down (`0x5000`) 5, left (`0x4b00`) 6 — so the left and right arrows strafe.
+- **An inventory shown takes the moves away.** `ShowHideInventory` empties `d.pKeyXlate1`
+  as it installs `d.Buttons17760` (`CSBCode.cpp:7577-7578`), and puts `Byte18428` back with
+  `d.Buttons17304` when it hides the inventory (`:7537-7538`): with an inventory open, no
+  key moves or turns the party, as no movement arrow does, while `Byte18400`'s keys still
+  answer. The port: `syncInventoryButtons` (`src/renderer/ui/Mouse.ts`).
 - **Every match is written.** `TAG0196da` stops at the first `pKeyXlate2` match, but goes
   on through `pKeyXlate1`, writing each match one queue slot further back and moving
   `d.MouseQEnd` with it (`CSBCode.cpp:8533-8574`): a key bound twice would leave only the

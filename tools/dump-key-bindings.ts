@@ -38,7 +38,7 @@ import { KEY_ACTION_NAMES } from '../src/renderer/ui/SettingsKeys';
 import { Settings } from '../src/settings/Settings';
 import { handleAttackAreaClick } from '../src/renderer/ui/Attack';
 import { tag01b1c0, tag01b29a } from '../src/engine/AttackMenu';
-import { updateButtonLists } from '../src/renderer/ui/Mouse';
+import { syncInventoryButtons, updateButtonLists } from '../src/renderer/ui/Mouse';
 
 function runes(party: PartyState): string {
   const caster = party.magicCasterIndex >= 0 ? party.champions[party.magicCasterIndex] : null;
@@ -406,6 +406,19 @@ async function main(): Promise<void> {
     'NumpadEnter', 'F1', 'F5', 'KeyS', 'Numpad2', 'Numpad0']) {
     check(buttonOf('Adventure', code) === 0, `awake, ${code} sends the tables nothing`);
   }
+  // An inventory shown empties `d.pKeyXlate1`, the moves' `Byte18428`, and hidden puts it
+  // back (doc/CSBwin-src/CSBCode.cpp:7577-7578, :7537-7538): the moves are nothing, the
+  // freeze is still `Byte18400`'s.
+  ui.uiMode = UIMode.Adventure;
+  updateButtonLists(ui);
+  party.state.selectedCharacterIndex = 0;
+  syncInventoryButtons(ui);
+  check(Object.keys(awake).every((code) => tableKeyButton(ui, code) === (code === 'Pause' ? 147 : 0)),
+    'an inventory open, no move key queues anything, and Pause is still 147');
+  party.state.selectedCharacterIndex = -1;
+  syncInventoryButtons(ui);
+  check(Object.entries(awake).every(([code, button]) => tableKeyButton(ui, code) === button),
+    'the inventory closed, the move keys queue their buttons again');
   check(buttonOf('Sleeping', 'Pause') === 147 && buttonOf('Sleeping', 'Enter') === 0
     && buttonOf('Sleeping', 'KeyK') === 0, 'asleep, Pause, the tables\' Esc, is 147, and Return and K nothing');
   check(buttonOf('Frozen', 'Pause') === 148 && buttonOf('Frozen', 'KeyK') === 0, 'frozen, Pause is 148, and K nothing');

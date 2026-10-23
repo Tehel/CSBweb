@@ -373,11 +373,17 @@ export function tag0207ccDrawing(ui: UIState): void {
   tag002572(ui);
 }
 
+/**
+ * `ShowHideInventory`'s lists, awake: an inventory shown installs `d.Buttons17760` and
+ * empties `d.pKeyXlate1`, so the move keys are nothing (`doc/CSBwin-src/CSBCode.cpp:7577-7578`);
+ * hidden, `d.Buttons17304` and `d.Byte18428` again (`:7537-7538`).
+ */
 export function syncInventoryButtons(ui: UIState): void {
   if (ui.uiMode !== UIMode.Adventure) return;
   const buttons = ui.uiTables.graphic231.buttons;
   const inventoryOpen = ui.partyState.selectedCharacterIndex >= 0;
   ui.secondaryButtons = inventoryOpen ? inventoryButtonList(ui) : buttons.buttons17304;
+  ui.keyXlate1 = inventoryOpen ? null : ui.uiTables.graphic231.keys.byte18428;
 }
 
 export function handleClothingClick(ui: UIState, button: number): void {
