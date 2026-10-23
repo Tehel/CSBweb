@@ -189,6 +189,24 @@ const GAME = `(async()=>{const g=window.__probe?.game; if(!g?.running) return fa
   return g.ctx.state.tickCount!==t;})()`;
 // Nothing yet says the entrance is up, its fades done: a page of it is still given time.
 const LOADED = 'true';
+// `n` of the game's VBLs (`Game.runFrame`) run from now, counted on the page. CSBWin takes
+// a click or a key in a VBL, and draws the view only in a tick (`VBL_PER_TICK` VBLs): a step
+// in play waits for a tick after the VBL taking it, one under a dialog, where the clock is
+// held, for the VBL taking it and the one drawing it. Counted in VBLs, not milliseconds, a
+// step waits as long as the game takes, however busy the machine. The entrance and the
+// Hint Oracle run no VBL of the game's, and a long press, fullscreen and the CRT effect's
+// context are the page's and the browser's timers: those still wait a time.
+const VBL_PER_TICK = 15;
+const TICK = VBL_PER_TICK + 1;
+const SHOWN = 2;
+const vbls = (n) => evaluate(`(async()=>{const g=window.__probe.game;
+  if (g.__vbls === undefined) { g.__vbls = 0; const own = g.runFrame; g.runFrame = function () { this.__vbls++; return own.call(this); }; }
+  const end = g.__vbls + ${n}, give = Date.now() + 10000;
+  while (g.__vbls < end) {
+    if (Date.now() > give) throw new Error('no VBL of the game\\'s for 10s');
+    await new Promise((r) => setTimeout(r, 4));
+  }
+  return 1;})()`);
 
 await send('Runtime.enable');
 await send('Page.enable');
@@ -278,10 +296,10 @@ await navigate(`${APP}?intro=0&dungeon=dm-atari`, GAME);
 console.log('state: booted');            await shot('01-boot');
 // The four champions, from the Hall of Champions mirrors (`tools/lib/buildParty.mjs`).
 await evaluate(BUILD_PARTY).then(names => console.log('  party:', names));
-await wait(600);
+await vbls(TICK);
 console.log('state: party built');       await shot('02-party');
 // Right-click a party block (DM mask 1, button id 7) opens that champion's inventory.
-await canvasClick(15, 15, 2);  await wait(700);
+await canvasClick(15, 15, 2);  await vbls(TICK);
 console.log('state: inventory');
 const inventory = await shot('03-inventory');
 // The effect is shown the game canvas and paints nothing on it: its curve and scanlines are
@@ -297,12 +315,12 @@ const hoverAt = (u, v) => evaluate(`(()=>{const c=document.getElementById('game-
 const SCANLINES = [236, 86];
 const CURVE = [236, 107];
 const toggleCrt = async ([x, y]) => {
-  await key('Escape'); await wait(300);
-  await canvasClick(120, 45, 0); await wait(300);
-  await canvasClick(x, y, 0); await wait(300);
-  await key('Escape'); await wait(300);
+  await key('Escape'); await vbls(SHOWN);
+  await canvasClick(120, 45, 0); await vbls(SHOWN);
+  await canvasClick(x, y, 0); await vbls(SHOWN);
+  await key('Escape'); await vbls(SHOWN);
   await evaluate(`document.getElementById('game-canvas').dispatchEvent(new PointerEvent('pointerleave',{isPrimary:true,pointerType:'mouse'})),1`);
-  await wait(200);
+  await vbls(SHOWN);
 };
 await toggleCrt(SCANLINES);
 const crtInPlay = await crtEffect();
@@ -342,15 +360,15 @@ await evaluate(`document.getElementById('game-canvas').dispatchEvent(new Pointer
 // moved on screen and 04 came out identical to 03, so the frame proved nothing beyond
 // what 03 already proved. `compare-frames.mjs` now refuses a baseline with two identical
 // frames, which is what makes that mistake visible instead of silent.
-await canvasClick(41, 66, 0);  await wait(400);
+await canvasClick(41, 66, 0);  await vbls(TICK);
 console.log('state: inventory+select');  await shot('04-inventory-sel');
 // Put it back, so the frames below are unaffected by the detour.
-await canvasClick(41, 66, 0);  await wait(400);
-await canvasClick(15, 15, 2);  await wait(500);   // back out
+await canvasClick(41, 66, 0);  await vbls(TICK);
+await canvasClick(15, 15, 2);  await vbls(TICK);   // back out
 // Champion 0's attack button (233-252 x 86-120) opens the real attack menu, listing
 // that champion's legal attacks. This used to be a dev-only F7 preview of a
 // placeholder panel; the panel is now `ui/Attack.ts` driven by `word20252`.
-await canvasClick(240, 100, 0); await wait(600);
+await canvasClick(240, 100, 0); await vbls(TICK);
 console.log('state: attack panel');      await shot('05-attack');
 // The disk icon (`buttons17760[1]`, id 140) raises the save/load dialog over the whole
 // screen, cleared. Reopen an inventory first — the attack-panel step backed out of it.
@@ -358,8 +376,8 @@ console.log('state: attack panel');      await shot('05-attack');
 // and this frame pins the dialog itself: the frame, the two panels and the four buttons,
 // all pieces of graphic 0, with LOAD and EXPORT unlabelled because that row holds no save
 // to load or to export.
-await canvasClick(15, 15, 2);  await wait(600);
-await canvasClick(177, 40, 0); await wait(900);
+await canvasClick(15, 15, 2);  await vbls(TICK);
+await canvasClick(177, 40, 0); await vbls(TICK);
 console.log('state: save menu');         await shot('06-savemenu');
 check(await wheelTaken(), 'the disk menu takes the wheel, for its list');
 // A move of the pointer paints nothing: the VBL's frame draws the cursor where the mouse
@@ -379,7 +397,8 @@ check(moves.after >= 1 && moves.after < 50 && moves.at.x === 149 && moves.at.y =
 check(moves.left, 'the pointer gone, no cursor is left for the frames that follow');
 // SAVE (x 95..143, y 161..174), a new save from that row, for the resume from the
 // entrance below.
-await canvasClick(120, 168, 0); await wait(1200);
+await canvasClick(120, 168, 0);
+await until(`window.__probe.saves.list().then((rows) => rows.length > 0)`, 'the save');
 // A delete is done only once its transaction commits (`BrowserSaveStore.remove`):
 // one aborted after its request succeeded, as a quota or an I/O error aborts one, is a
 // delete that failed, and the save is still listed, for the resume below.
@@ -1171,7 +1190,7 @@ await canvasClick(159, 147, 0); await wait(600);
 await leaveCanvas(); await wait(200);
 check((await canvasPixels()) === chooserUp, 'its OK brings the chooser back, with nothing more listed');
 await canvasClick(100, 27, 0);  await wait(300);
-await canvasClick(48, 168, 0);  await wait(1500);
+await canvasClick(48, 168, 0);  await until(GAME, 'the loaded game');
 console.log('state: game loaded');       const loaded = await shot('12-game-loaded');
 
 // The welcome page's CONTINUE, as its link reads (`?dungeon=dm-atari&save=<row id>`): the
@@ -1182,7 +1201,7 @@ console.log('state: game loaded');       const loaded = await shot('12-game-load
 const continued = async (search, ready) => {
   await navigate(`${APP}${search}`, ready);
   if (ready === LOADED) await wait(3500);
-  await leaveCanvas(); await wait(200);
+  await leaveCanvas(); await (ready === LOADED ? wait(200) : vbls(SHOWN));
   return evaluate(`(()=>{const p=window.__probe; return p ? p.game.ctx.party.state.champions.map(c=>c.name.trim()).join(' · ') : null;})()`);
 };
 const continuedParty = await continued(`?dungeon=dm-atari&save=${saveId}&keepsaves`, GAME);
@@ -1209,7 +1228,7 @@ await evaluate(`(()=>{
   renderView();
   return touched;
 })()`).then(t => console.log('  touched:', t));
-await wait(3000);
+await vbls(12 * VBL_PER_TICK);
 console.log('state: crack switch');      await shot('09-crack-switch');
 
 // Door ornaments (`TAG004b26`, `doc/CSBwin-src/CSBCode.cpp:4058`), drawn onto the door's
@@ -1225,9 +1244,9 @@ const FACE = (x, y, z, facing) => `(()=>{
   party.brightness = 1000;
   renderView();
 })()`;
-await evaluate(FACE(1, 3, 0, 0)); await wait(500);
+await evaluate(FACE(1, 3, 0, 0)); await vbls(TICK);
 console.log('state: entrance door');     await shot('10-entrance-door');
-await evaluate(FACE(2, 25, 4, 1)); await wait(500);
+await evaluate(FACE(2, 25, 4, 1)); await vbls(TICK);
 console.log('state: door lock, F2');     await shot('11-door-lock-f2');
 // A wall decoration on an F2 edge wall, positions 7 and 9 of `DrawWallDecoration`
 // (`doc/CSBwin-src/CSBCode.cpp:3599-3623`). One mirror frame in the Hall of Champions,
@@ -1236,24 +1255,24 @@ console.log('state: door lock, F2');     await shot('11-door-lock-f2');
 // F2 centre width and cut by the screen border, so on the left it must show the bitmap's
 // right end, and on the right its left end. `tools/dump-hall-of-champions.ts` pins the
 // rectangles; these two frames pin the pixels.
-await evaluate(FACE(17, 9, 0, 0)); await wait(500);
+await evaluate(FACE(17, 9, 0, 0)); await vbls(TICK);
 console.log('state: F2 front-left wall'); await shot('13-edge-decoration-left');
-await evaluate(FACE(15, 9, 0, 0)); await wait(500);
+await evaluate(FACE(15, 9, 0, 0)); await vbls(TICK);
 console.log('state: F2 front-right wall'); await shot('14-edge-decoration-right');
 // A wall text seen from afar is its plaque, cut short for a text of one to three lines
 // (`doc/CSBwin-src/CSBCode.cpp:3625-3660`). "HALL OF / CHAMPIONS", on the north
 // face of level 0 (8,5), seen from (8,3) facing south: two lines at F2 centre, so the
 // plaque stops at `d.Byte4212[10]`, row 53 of its 37-73. `tools/dump-wall-text.ts` pins
 // the cut at every position; this frame pins it in a real view.
-await evaluate(FACE(8, 3, 0, 2)); await wait(500);
+await evaluate(FACE(8, 3, 0, 2)); await vbls(TICK);
 console.log('state: wall text at F2');   await shot('19-wall-text-f2');
 // A left click on a portrait box's bars, where CSBWin has no left button, is the box's
 // right click (`searchMouseButtons`, `src/renderer/ui/Mouse.ts`): champion 1's inventory
 // opens, and a second click closes it. Nothing is drawn, so this is no frame.
 const selected = () => evaluate(`window.__probe.screen.ui.partyState.selectedCharacterIndex`);
-await canvasClick(124, 10, 0); await wait(600);
+await canvasClick(124, 10, 0); await vbls(TICK);
 check(await selected() === 1, 'a left click on a champion\'s bars opens the inventory');
-await canvasClick(124, 10, 0); await wait(600);
+await canvasClick(124, 10, 0); await vbls(TICK);
 check(await selected() === -1, 'and a second one closes it');
 // A finger, through CDP's touch events, which Chrome delivers to the page as a touch
 // screen's: pointer events as it presses and lifts, and its mouse events only after the
@@ -1271,14 +1290,14 @@ const pressingEye = () => evaluate(`window.__probe.screen.ui.ctx.interface.press
 const soundRunning = () => evaluate(`window.__probe.sound.isRunning()`);
 check(!(await soundRunning()), 'no user activation yet: the sound is locked');
 await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
-await touch('touchStart', 124, 10); await touch('touchEnd', 124, 10); await wait(600);
+await touch('touchStart', 124, 10); await touch('touchEnd', 124, 10); await vbls(TICK);
 check(await selected() === 1, 'a tap on a champion\'s bars opens the inventory, once');
 check(await soundRunning(), 'and unlocks the sound');
-await touch('touchStart', 19, 53); await wait(600);
+await touch('touchStart', 19, 53); await vbls(TICK);
 check(await pressingEye(), 'a finger held on the eye keeps it pressed');
-await touch('touchEnd', 19, 53); await wait(600);
+await touch('touchEnd', 19, 53); await vbls(TICK);
 check(!(await pressingEye()), 'and lifting it lets go');
-await touch('touchStart', 124, 10); await touch('touchEnd', 124, 10); await wait(600);
+await touch('touchStart', 124, 10); await touch('touchEnd', 124, 10); await vbls(TICK);
 check(await selected() === -1, 'a second tap closes the inventory');
 await send('Emulation.setTouchEmulationEnabled', { enabled: false });
 // A mouse pressed on the eye, moved off the canvas and released there: the canvas has the
@@ -1291,12 +1310,12 @@ const realMouse = async (type, x, y) => {
   await send('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: 'left',
     buttons: type === 'mouseReleased' ? 0 : 1, clickCount: type === 'mouseMoved' ? 0 : 1 });
 };
-await canvasClick(124, 10, 0); await wait(600);
-await realMouse('mousePressed', 19, 53); await wait(300);
+await canvasClick(124, 10, 0); await vbls(TICK);
+await realMouse('mousePressed', 19, 53); await vbls(TICK);
 check(await pressingEye(), 'a mouse held on the eye keeps it pressed');
-await realMouse('mouseMoved', 19, 215); await realMouse('mouseReleased', 19, 215); await wait(600);
+await realMouse('mouseMoved', 19, 215); await realMouse('mouseReleased', 19, 215); await vbls(TICK);
 check(!(await pressingEye()), 'and released off the canvas, lets go');
-await canvasClick(124, 10, 0); await wait(600);
+await canvasClick(124, 10, 0); await vbls(TICK);
 check(await selected() === -1, 'the inventory closed again');
 
 // The Hint Oracle's button (`src/renderer/ui/HintOracleButton.ts`), CSB's set only: the
@@ -1315,9 +1334,9 @@ await evaluate(`(async()=>{
   renderView();
   return party.champions.map((c) => c.name).join(', ');
 })()`).then(names => console.log('  csb party:', names));
-await wait(600);
-await canvasClick(15, 15, 2);  await wait(700);
-await leaveCanvas(); await wait(200);
+await vbls(TICK);
+await canvasClick(15, 15, 2);  await vbls(TICK);
+await leaveCanvas(); await vbls(SHOWN);
 console.log('state: CSB inventory');
 const csbInventory = await shot('15-csb-inventory');
 await realClick(214, 40); await wait(2500);
@@ -1338,7 +1357,7 @@ check(!(await evaluate(`window.__probe.screen.isHintOracleUp()`)) && (await canv
 // tick (`tools/watch-conflux-start.ts`). The square in front is a wall, which its skin
 // paints with a picture, and nothing in view moves.
 await navigate(`${APP}?intro=0&dungeon=conflux-3.5`, GAME);
-await leaveCanvas(); await wait(200);
+await leaveCanvas(); await vbls(SHOWN);
 console.log('state: Conflux start');     const confluxStart = await shot('18-conflux-start');
 // A viewport overlay (`src/renderer/csbwin/OverlayScreen.ts`), put up on the engine as a
 // DSA's `&OVERLAY` and `&JITTER` would: overlay 1 of Conflux's `CSBgraphics.dat` over this
@@ -1347,17 +1366,17 @@ console.log('state: Conflux start');     const confluxStart = await shot('18-con
 const OVERLAY = `window.__probe.game.ctx.overlay`;
 await evaluate(`(()=>{const o = ${OVERLAY}; o.SelectOverlay(1, 1, 50, 0, 0, window.__probe.game.ctx.state.tickCount);
   o.Jitter(4, 0, 0, 0); window.__probe.refreshScreen(); return o.active;})()`);
-await wait(500);
+await vbls(TICK);
 console.log('state: overlay');           await shot('17-overlay');
 await evaluate(`(()=>{const o = ${OVERLAY}; o.active = false; o.Jitter(0, 0, 0, 0); window.__probe.refreshScreen(); return 1;})()`);
-await wait(500);
+await vbls(TICK);
 check((await canvasPixels()) === confluxStart, 'the overlay hidden and the view shifted back, it is frame 18 again');
 // Wall decorations of Conflux's `CSBgraphics.dat`, their bitmaps read as bitplanes
 // (`tools/dump-extended-decorations.ts`), from level 0 (14,14) facing south: on the west
 // faces of the squares to the left, decoration 5, a bookshelf, drawn as it stands at F1
 // (15,15), and decoration 11, a ladder, its side view scaled by `ShrinkBLT` to F2 (15,16).
-await evaluate(FACE(14, 14, 0, 2)); await wait(500);
-await leaveCanvas(); await wait(200);
+await evaluate(FACE(14, 14, 0, 2)); await vbls(TICK);
+await leaveCanvas(); await vbls(SHOWN);
 console.log('state: Conflux bookshelf'); await shot('20-conflux-bookshelf');
 
 // The settings dialog (`src/renderer/ui/SettingsDialog.ts`), over the default dungeon's
@@ -1371,26 +1390,26 @@ const settingsValues = () => evaluate(`window.__probe.screen.ui.settings.values`
 const ticks = () => evaluate(`window.__probe.game.ctx.state.tickCount`);
 const pointerAt = (x, y) => evaluate(`(()=>{const c=document.getElementById('game-canvas');const r=c.getBoundingClientRect();
   c.dispatchEvent(new PointerEvent('pointermove',{isPrimary:true,pointerType:'mouse',clientX:r.left+(${x}+0.5)*r.width/320,clientY:r.top+(${y}+0.5)*r.height/200,bubbles:true}));return 1;})()`);
-await key('Escape'); await wait(300);
+await key('Escape'); await vbls(SHOWN);
 check(await settingsUp(), 'Esc opens the settings in play');
-const heldAt = await ticks(); await wait(1000);
+const heldAt = await ticks(); await vbls(2 * TICK);
 check(await ticks() === heldAt, 'the clock is held while they are up');
-await pointerAt(85, 65); await wait(200);
+await pointerAt(85, 65); await vbls(SHOWN);
 console.log('state: settings, GAME');    await shot('21-settings-game');
-await leaveCanvas(); await wait(200);
-await canvasClick(120, 45, 0); await wait(300);
+await leaveCanvas(); await vbls(SHOWN);
+await canvasClick(120, 45, 0); await vbls(SHOWN);
 console.log('state: settings, DISPLAY'); await shot('22-settings-display');
 // DISPLAY's ASPECT RATIO (236,65): 4:3 shows the 320x200 canvas 960x720, a click still
 // landing on what it shows, and 16:10 again 960x600.
 const canvasSize = () => evaluate(`(()=>{const c=document.getElementById('game-canvas');const r=c.getBoundingClientRect();
   return [c.width,c.height,r.width,r.height].join('x');})()`);
-await canvasClick(236, 65, 0); await wait(300);
+await canvasClick(236, 65, 0); await vbls(SHOWN);
 check((await settingsValues()).aspectRatio === '4:3' && await canvasSize() === '320x200x960x720',
   'ASPECT RATIO at 4:3 shows the 320x200 canvas 960x720');
-await canvasClick(236, 65, 0); await wait(300);
+await canvasClick(236, 65, 0); await vbls(SHOWN);
 check((await settingsValues()).aspectRatio === '16:10' && await canvasSize() === '320x200x960x600',
   'a click on it there, where it is shown, makes it 16:10, 960x600');
-await canvasClick(197, 45, 0); await wait(300);
+await canvasClick(197, 45, 0); await vbls(SHOWN);
 console.log('state: settings, SOUND');   await shot('23-settings-sound');
 // The VOLUME slider, dragged with CDP's own mouse from its left end, and released off the
 // canvas, right of it: the canvas has the pointer captured, so the moves off it come at
@@ -1402,26 +1421,26 @@ const cdpMouse = async (type, x, y) => {
   await send('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: 'left',
     buttons: type === 'mouseReleased' ? 0 : 1, clickCount: type === 'mouseMoved' ? 0 : 1 });
 };
-await cdpMouse('mousePressed', 200, 86); await wait(200);
+await cdpMouse('mousePressed', 200, 86); await vbls(SHOWN);
 check((await settingsValues()).volume === 0, 'a press at the VOLUME slider\'s left end sets it to 0');
-await cdpMouse('mouseMoved', 254, 86); await wait(200);
+await cdpMouse('mouseMoved', 254, 86); await vbls(SHOWN);
 const halfway = (await settingsValues()).volume;
 check(halfway > 0.4 && halfway < 0.6, `dragged to the track's middle, about a half (${halfway})`);
-await cdpMouse('mouseMoved', 400, 86); await cdpMouse('mouseReleased', 400, 86); await wait(200);
+await cdpMouse('mouseMoved', 400, 86); await cdpMouse('mouseReleased', 400, 86); await vbls(SHOWN);
 check((await settingsValues()).volume === 1, 'dragged off the canvas, to its right, the volume is 1');
-await pointerAt(200, 86); await wait(200);
+await pointerAt(200, 86); await vbls(SHOWN);
 check((await settingsValues()).volume === 1, 'released there, a move drags nothing');
 // SOUND's OFF, read back after a reload: the setting is kept. Then a double click on the message area opens the dialog, and a right click
 // closes it, off KEYS' slots.
-await canvasClick(284, 65, 0); await wait(300);
+await canvasClick(284, 65, 0); await vbls(SHOWN);
 check((await settingsValues()).sound === false, 'SOUND\'s OFF turns the sound off');
 // KEYS (`src/renderer/ui/SettingsKeys.ts`), KEY LABELS shown, as the browser here gives
 // no layout: a click on MOVE FORWARD's first slot waits for its key, and a key pressed
 // fills it by its code, AZERTY's Z being KeyW.
-await canvasClick(240, 45, 0); await wait(300);
-await canvasClick(190, 105, 0); await wait(300);
+await canvasClick(240, 45, 0); await vbls(SHOWN);
+await canvasClick(190, 105, 0); await vbls(SHOWN);
 console.log('state: settings, KEYS');    await shot('24-settings-keys');
-await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown',{key:'z',code:'KeyW',bubbles:true})),1`); await wait(300);
+await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown',{key:'z',code:'KeyW',bubbles:true})),1`); await vbls(SHOWN);
 const rebound = await settingsValues();
 check(rebound.keyBindings['move.forward'][0] === 'KeyW' && rebound.keyBindings['attack.1.0'][0] === '' && rebound.keyPreset === 'custom',
   'a key pressed fills the slot by its code, leaves the slot it was in, and the table is CUSTOM');
@@ -1429,10 +1448,10 @@ check(rebound.keyBindings['move.forward'][0] === 'KeyW' && rebound.keyBindings['
 // pointer still (`GameScreen.takeWheelTurned`).
 const screenSum = () => evaluate(`window.__probe.screen.ui.screenIndexBuffer.pixels.reduce((s,p,i)=>(s+p*(i%997+1))%1000000007,0)`);
 const unscrolled = await screenSum();
-await evaluate(`document.getElementById('game-canvas').dispatchEvent(new WheelEvent('wheel',{deltaY:100,cancelable:true,bubbles:true})),1`); await wait(300);
+await evaluate(`document.getElementById('game-canvas').dispatchEvent(new WheelEvent('wheel',{deltaY:100,cancelable:true,bubbles:true})),1`); await vbls(SHOWN);
 check(await evaluate(`window.__probe.screen.ui.settingsDialog.keys.scrollTop`) === 3 && await screenSum() !== unscrolled,
   'a notch of the wheel scrolls the keys three rows, drawn with the pointer still');
-await canvasClick(160, 100, 2); await wait(300);
+await canvasClick(160, 100, 2); await vbls(SHOWN);
 check(!(await settingsUp()), 'a right click closes the settings');
 // DISPLAY's LEFT HANDED (85,107), checked last, as the party it builds would change
 // the cursor of the dialogs above: the dialog closed and the party built, the panels are
@@ -1442,46 +1461,46 @@ check(!(await settingsUp()), 'a right click closes the settings');
 // turn-right arrow is shown, (80,135), turns the party. Under the dialog the screen is
 // CSBWin's again, so the clicks that turn it off land where they always do.
 const facing = () => evaluate(`window.__probe.screen.ui.partyState.facing`);
-await key('Escape'); await wait(300);
-await canvasClick(120, 45, 0); await wait(300);
-await canvasClick(85, 107, 0); await wait(300);
+await key('Escape'); await vbls(SHOWN);
+await canvasClick(120, 45, 0); await vbls(SHOWN);
+await canvasClick(85, 107, 0); await vbls(SHOWN);
 check((await settingsValues()).leftHanded === true, 'LEFT HANDED turns the left-handed screen on');
-await key('Escape'); await wait(300);
-await evaluate(BUILD_PARTY); await wait(600);
-await pointerAt(84, 100); await wait(300);
+await key('Escape'); await vbls(SHOWN);
+await evaluate(BUILD_PARTY); await vbls(TICK);
+await pointerAt(84, 100); await vbls(SHOWN);
 const leftHover = await evaluate(`(()=>{const p=window.__probe.screen.ui.hoverPoint;return Math.floor(p.x)+','+Math.floor(p.y);})()`);
 check(leftHover === '317,100',
   `left-handed, the pointer at (84,100) is the column's (317,100) (${leftHover})`);
 console.log('state: left-handed');       await shot('29-left-handed');
-await leaveCanvas(); await wait(300);
+await leaveCanvas(); await vbls(SHOWN);
 const facingBefore = await facing();
-await canvasClick(80, 135, 0); await wait(800);
+await canvasClick(80, 135, 0); await vbls(TICK);
 check(await facing() === ((facingBefore + 1) & 3), 'left-handed, a click where the turn-right arrow is shown turns the party right');
-await key('Escape'); await wait(300);
+await key('Escape'); await vbls(SHOWN);
 check(await settingsUp(), 'left-handed, Esc opens the settings, the screen CSBWin\'s under them');
-await canvasClick(120, 45, 0); await wait(300);
-await canvasClick(85, 107, 0); await wait(300);
+await canvasClick(120, 45, 0); await vbls(SHOWN);
+await canvasClick(85, 107, 0); await vbls(SHOWN);
 check((await settingsValues()).leftHanded === false, 'LEFT HANDED again turns it off');
-await key('Escape'); await wait(300);
+await key('Escape'); await vbls(SHOWN);
 await navigate(`${APP}?intro=0&keepsaves&keepsettings&dungeon=dm-atari`, GAME);
 const kept = await settingsValues();
 check(kept.sound === false && kept.volume === 1, 'after a reload, the sound is still off, at full volume');
-await canvasClick(100, 185, 0); await canvasClick(150, 190, 0); await wait(300);
+await canvasClick(100, 185, 0); await canvasClick(150, 190, 0); await vbls(SHOWN);
 check(await settingsUp(), 'a double click on the message area opens the settings');
 // EXIT asks first, in `_DoMenu`'s centred menu (a frame of it, the pointer off the
 // canvas); Esc puts the dialog back, and the question's EXIT, once it has flashed, opens
 // the welcome page, the page's other parameters kept.
 const exiting = () => evaluate(`window.__probe.screen.ui.settingsDialog?.exiting === true`);
-await canvasClick(279, 19, 0); await wait(300);
+await canvasClick(279, 19, 0); await vbls(SHOWN);
 check(await exiting(), 'EXIT asks first');
-await leaveCanvas(); await wait(200);
+await leaveCanvas(); await vbls(SHOWN);
 console.log('state: settings, EXIT');    await shot('28-settings-exit');
-await key('Escape'); await wait(300);
+await key('Escape'); await vbls(SHOWN);
 check(await settingsUp() && !(await exiting()), 'Esc on the question puts the settings back');
-await canvasClick(279, 19, 0); await wait(300);
+await canvasClick(279, 19, 0); await vbls(SHOWN);
 const exitButton = await evaluate(`(()=>{const b=window.__probe.screen.ui.uiTables.graphic231.buttons.buttons18828.find((e)=>e.word0===210);
   return {x:(b.x1+b.x2-1)>>1, y:(b.y1+b.y2-1)>>1};})()`);
-await canvasClick(exitButton.x, exitButton.y, 0); await wait(2000);
+await canvasClick(exitButton.x, exitButton.y, 0); await until(WELCOME, 'the welcome page');
 const left = await evaluate(`(()=>{const p=new URLSearchParams(location.search);
   return {search: location.search, welcome: document.querySelector('.welcome-page') !== null,
     query: !p.has('dungeon') && p.get('intro') === '0' && p.has('keepsaves') && p.has('keepsettings')};})()`);
@@ -1585,18 +1604,18 @@ await evaluate(`(async()=>{
   applySaveBytes(game, new Uint8Array(await (await fetch('/gamefiles/csb/csbgame2.dat')).arrayBuffer()));
   return 1;
 })()`);
-await wait(600);
+await vbls(TICK);
 const mapUp = () => evaluate(`window.__probe.screen.ui.mapDialog !== null`);
-await cdpMouse('mousePressed', 100, 185); await wait(900); await cdpMouse('mouseReleased', 100, 185); await wait(300);
+await cdpMouse('mousePressed', 100, 185); await wait(900); await cdpMouse('mouseReleased', 100, 185); await vbls(SHOWN);
 check(!(await mapUp()), 'with MAP VIEW off, a long press on the message area opens no map');
 await evaluate(`window.__probe.screen.ui.settings.update({ mapView: true }), 1`);
 await cdpMouse('mousePressed', 100, 185); await wait(900);
 check(await mapUp(), 'with MAP VIEW on, it opens the map while the press is held');
-await cdpMouse('mouseReleased', 100, 185); await wait(300);
+await cdpMouse('mouseReleased', 100, 185); await vbls(SHOWN);
 check(await mapUp(), 'and the release leaves it up');
-await leaveCanvas(); await wait(200);
+await leaveCanvas(); await vbls(SHOWN);
 console.log('state: map');               await shot('25-map');
-await canvasClick(160, 100, 2); await wait(300);
+await canvasClick(160, 100, 2); await vbls(SHOWN);
 check(!(await mapUp()), 'a right click closes the map');
 
 // The champion dialog (`src/renderer/ui/ChampionDialog.ts`), over the same party: a press
@@ -1608,17 +1627,17 @@ await evaluate(`window.__probe.screen.ui.settings.update({ championView: true })
 await cdpMouse('mousePressed', 55, 14); await wait(900);
 check((await championsUp()) === 0 && (await selected()) === -1,
   'with CHAMPION VIEW on, a press held on a champion\'s bars opens the champions, that champion marked, and no inventory');
-await cdpMouse('mouseReleased', 55, 14); await wait(300);
+await cdpMouse('mouseReleased', 55, 14); await vbls(SHOWN);
 check((await championsUp()) === 0 && (await selected()) === -1, 'and the release leaves it up, with no inventory');
-await leaveCanvas(); await wait(200);
+await leaveCanvas(); await vbls(SHOWN);
 console.log('state: champions, ATTRIBUTES'); await shot('26-champions-attributes');
-await canvasClick(133, 27, 0); await leaveCanvas(); await wait(300);
+await canvasClick(133, 27, 0); await leaveCanvas(); await vbls(SHOWN);
 console.log('state: champions, SKILLS');  await shot('27-champions-skills');
-await canvasClick(160, 100, 2); await wait(300);
+await canvasClick(160, 100, 2); await vbls(SHOWN);
 check((await championsUp()) === null, 'a right click closes the champions');
 await cdpMouse('mousePressed', 55, 14); await wait(100);
 check((await selected()) === -1, 'a tap on the bars: nothing while it is down');
-await cdpMouse('mouseReleased', 55, 14); await wait(700);
+await cdpMouse('mouseReleased', 55, 14); await vbls(TICK);
 check((await selected()) === 0 && (await championsUp()) === null, 'and at its release, the champion\'s inventory, and no champions');
 
 // Fullscreen (`src/lib/fullscreen.ts`), DISPLAY's FULLSCREEN. A finger's press is no
@@ -1639,16 +1658,16 @@ const screenLayout = () => evaluate(`(()=>{const g=document.getElementById('game
 const realKey = async (code) => {
   for (const type of ['rawKeyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: code, code, windowsVirtualKeyCode: 27 });
 };
-await key('Escape'); await wait(300);
-await canvasClick(120, 45, 0); await wait(300);
+await key('Escape'); await vbls(SHOWN);
+await canvasClick(120, 45, 0); await vbls(SHOWN);
 await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
 await touch('touchStart', 85, 65); await touch('touchEnd', 85, 65); await wait(800);
 check((await screenLayout()).element === 'game', 'a tap on FULLSCREEN puts #game in fullscreen, at the lift');
 await touch('touchStart', 85, 65); await touch('touchEnd', 85, 65); await wait(800);
 check((await screenLayout()).element === null, 'and a second tap leaves it');
 await send('Emulation.setTouchEmulationEnabled', { enabled: false });
-await canvasClick(236, 86, 0); await wait(300);
-await canvasClick(236, 107, 0); await wait(300);
+await canvasClick(236, 86, 0); await vbls(SHOWN);
+await canvasClick(236, 107, 0); await vbls(SHOWN);
 const screenSize = (width, height) => send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
 await screenSize(1920, 1080); await wait(300);
 await cdpMouse('mousePressed', 85, 65); await cdpMouse('mouseReleased', 85, 65); await wait(800);
@@ -1681,13 +1700,13 @@ await canvasClick(236, 65, 0); await wait(500);
 check((await screenLayout()).game[3] === 600, 'and at 16:10 again, 3 times 320x200');
 check(await hoverAt(0.5, 0.5) === '160,100', 'in fullscreen, the tube\'s middle is the screen\'s');
 check(await hoverAt(0.002, 0.002) === '0,0', 'and a point of its black corner is the screen\'s corner');
-await realClick(197, 45); await wait(300);
+await realClick(197, 45); await vbls(SHOWN);
 check((await screenLayout()).tab === 'sound', 'a real click through the effect\'s canvas selects SOUND');
-await realKey('Escape'); await wait(300);
+await realKey('Escape'); await vbls(SHOWN);
 check(!(await settingsUp()) && (await screenLayout()).element === 'game', 'a real Esc closes the settings, in fullscreen still');
-await realKey('Escape'); await wait(300);
+await realKey('Escape'); await vbls(SHOWN);
 check(await settingsUp(), 'and a second opens them');
-await canvasClick(120, 45, 0); await wait(300);
+await canvasClick(120, 45, 0); await vbls(SHOWN);
 await cdpMouse('mousePressed', 85, 65); await cdpMouse('mouseReleased', 85, 65); await wait(800);
 const windowed = await screenLayout();
 check(windowed.element === null && windowed.game[2] === 960 && windowed.game[3] === 600 && windowed.tube.every((v, i) => v === windowed.game[i]),
@@ -1721,13 +1740,13 @@ await screenSize(1600, 1000);
 // (12-27 x 46-61) held on it. Under CSBWin's description, the extra's lines, from the
 // panel's foot up.
 await navigate(`${APP}?intro=0&dungeon=dm-atari`, GAME);
-await evaluate(BUILD_PARTY); await wait(600);
-await canvasClick(15, 15, 2); await wait(700);
+await evaluate(BUILD_PARTY); await vbls(TICK);
+await canvasClick(15, 15, 2); await vbls(TICK);
 await evaluate(`(()=>{const s=window.__probe.screen.ui.settings;s.update({ extras: { ...s.values.extras, showItemProperties: true } });return 1;})()`);
-await canvasClick(69, 93, 0); await wait(400);
-await realMouse('mousePressed', 19, 53); await wait(400);
+await canvasClick(69, 93, 0); await vbls(TICK);
+await realMouse('mousePressed', 19, 53); await vbls(TICK);
 console.log('state: eye on a weapon');   await shot('30-eye-weapon');
-await realMouse('mouseReleased', 19, 53); await wait(300);
+await realMouse('mouseReleased', 19, 53); await vbls(SHOWN);
 
 // The CRT effect's input surface. The effect's canvas is shown over the game canvas, and
 // the pre-game and end-of-game screens listen on the game canvas alone (`createIntroHost`,
