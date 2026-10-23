@@ -2264,6 +2264,13 @@ endgame.
 
 ## The eye draws over a Hall of Champions candidate's Resurrect menu
 
+- The menu first goes up at the end of `AddCharacter`, through its
+  `ShowHideInventory(LOCAL_2)` (`doc/CSBwin-src/Character.cpp:797`): the
+  `CHARFLAG_chestOrScroll` it sets has `DrawCharacterState` run `TAG0189d4`
+  (`doc/CSBwin-src/CSBCode.cpp:7563-7573`). The panel and the clicks on it read
+  `d.DisplayResurrectChestOrScroll`, so a candidate's inventory opened any other way shows
+  food and water, and its three buttons do nothing. Evidence:
+  `tools/dump-hall-of-champions.ts`, first section.
 - While a candidate is on trial, `TAG0189d4` puts graphic 40, the Resurrect / Reincarnate
   / Cancel menu, where the panel goes and sets `d.DisplayResurrectChestOrScroll = 5`
   (`doc/CSBwin-src/Character.cpp:3853-3875`).

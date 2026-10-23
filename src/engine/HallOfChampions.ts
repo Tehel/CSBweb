@@ -44,7 +44,7 @@ import { emptyPossessions } from '../core/charDesc';
 import type { Champion } from './gameTypes';
 import { setClockTick } from './LoopState';
 import { selectMagicCaster, setHandOwner } from './Party';
-import { tag02076e, tag0207cc } from './ShowHideInventory';
+import { showHideInventory, tag02076e, tag0207cc } from './ShowHideInventory';
 
 export class HallOfChampions {
   /** `d.ObjDesc[].word4` and `d.CarryLocation[]`, the two `AddCharacter` reads. */
@@ -139,13 +139,10 @@ export class HallOfChampions {
     this.collectMirrorPossessions(index, possessions);
 
     // `ShowHideInventory(LOCAL_2)` (`:797`) — the inventory opens on the new
-    // champion, and `potentialChampionIndex` turns its eye panel into the
-    // Resurrect/Reincarnate/Cancel menu, and sets `videoMode = VM_INVENTORY`
-    // (`CSBCode.cpp:7546`). Then `TAG02076e()` (`:807`).
-    party.selectedCharacterIndex = index;
-    this.ctx.loop.videoMode = 'VM_INVENTORY';
-    // Its `DiscardAllInput()` (`CSBCode.cpp:7579`).
-    this.ctx.mouseQueue.discardAllInput();
+    // champion, and its `TAG0189d4` turns the eye panel into the
+    // Resurrect/Reincarnate/Cancel menu (`d.DisplayResurrectChestOrScroll = 5`). Then
+    // `TAG02076e()` (`:798`).
+    showHideInventory(this.ctx, index);
     tag02076e(this.ctx);
     return true;
   }

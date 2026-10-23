@@ -94,6 +94,7 @@ function gameOn(data: DungeonData, graphics: GraphicsLoader): Game {
       discardText: () => {},
     },
     openReincarnateScreen: (chIdx) => reincarnateScreen(chIdx),
+    showHideInventory: (chIdx) => { pairCalls.push(`ShowHideInventory(${chIdx})`); },
     tag02076e: () => { pairCalls.push(pairCall(game, 'TAG02076e')); },
     tag0207cc: () => { pairCalls.push(pairCall(game, 'TAG0207cc')); },
   });
@@ -208,8 +209,8 @@ function main(): void {
   const clicked = game.systems.mouse.handleWallClick();
   check(clicked === false, 'the portrait actuator reports no switch action (it only adds a champion)');
   console.log(`pair: ${JSON.stringify(pairCalls)}`);
-  check(pairCalls.join() === 'TAG02076e inventory 0 champions 1',
-    "TAG02076e once the candidate's inventory is shown (Character.cpp:797-798)");
+  check(pairCalls.join() === 'ShowHideInventory(0),TAG02076e inventory 0 champions 1',
+    "ShowHideInventory(LOCAL_2), then TAG02076e once the candidate's inventory is shown (Character.cpp:797-798)");
   check(party.champions.length === 1, 'HALK is in the party after the wall click');
 
   const champ = party.champions[0];
@@ -251,6 +252,9 @@ function main(): void {
   check(champ.food !== champ.water, 'food and water draw two separate randoms');
   check(party.potentialChampionIndex === 0, 'the champion is only provisional');
   check(party.selectedCharacterIndex === 0, 'the inventory opened on them (ShowHideInventory)');
+  console.log(`displayResurrectChestOrScroll ${game.ctx.interface.displayResurrectChestOrScroll}`);
+  check(game.ctx.interface.displayResurrectChestOrScroll === 5,
+    "its TAG0189d4 shows the Resurrect menu, d.DisplayResurrectChestOrScroll = 5 (Character.cpp:3856), which the panel draws and tag01a6ea's clicks read");
   check(party.cursorOwner === 0, 'the first champion in the party gets the cursor');
   console.log(`attack hand shaded: ${attackHandShaded(game, 0)}`);
   check(attackHandShaded(game, 0),
