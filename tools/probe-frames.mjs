@@ -75,8 +75,11 @@ const logs = [];
 const downloads = [];
 // What answers a request `Fetch.enable` paused, while a block stands in for the server.
 let onPaused = null;
+// What the next `Page.loadEventFired` resolves (`navigate`).
+let onLoaded = null;
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
+  if (m.method === 'Page.loadEventFired') onLoaded?.();
   if (m.method === 'Browser.downloadWillBegin') downloads.push(m.params.suggestedFilename);
   if (m.method === 'Fetch.requestPaused') onPaused?.(m.params);
   if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); }
@@ -159,6 +162,33 @@ const realClick = async (x, y) => {
     await send('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: 1 });
 };
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
+// `expr` true on the page, polled; a run that never sees it fails rather than hangs.
+const until = async (expr, what, ms = 30000) => {
+  for (const end = Date.now() + ms; ; await wait(50)) {
+    if (await evaluate(expr).catch(() => false)) return;
+    if (Date.now() > end) throw new Error(`timed out waiting for ${what}`);
+  }
+};
+// `url` loaded, then `ready` true on it. A change of the fragment alone loads nothing,
+// and Chrome then names no loader.
+const navigate = async (url, ready) => {
+  const loaded = new Promise(r => onLoaded = r);
+  const { result } = await send('Page.navigate', { url });
+  if (result?.loaderId) await loaded;
+  onLoaded = null;
+  await until(ready, url);
+};
+// What each page is ready at. The welcome page: drawn, from the store's answers, its fonts
+// and thumbnails in. The statistics page: its band filled from `api/stats` (its set's half
+// is waited for by `statsPage`). A game: started, and a tick past it, its first view drawn.
+const WELCOME = `document.body.classList.contains('welcome') && !!document.getElementById('welcome-play')
+  && document.fonts.status === 'loaded' && [...document.images].every(i => i.complete)`;
+const STATS = `document.querySelector('.stats-band')?.childElementCount > 0 && document.fonts.status === 'loaded'`;
+const GAME = `(async()=>{const g=window.__probe?.game; if(!g?.running) return false;
+  const t=g.ctx.state.tickCount; for(let i=0;i<40&&g.ctx.state.tickCount===t;i++) await new Promise(r=>setTimeout(r,25));
+  return g.ctx.state.tickCount!==t;})()`;
+// Nothing yet says the entrance is up, its fades done: a page of it is still given time.
+const LOADED = 'true';
 
 await send('Runtime.enable');
 await send('Page.enable');
@@ -204,8 +234,7 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
 // The welcome page (`src/ui/welcomePage.ts`) of a store with no save: the manifest's
 // default set, dm-atari, is selected, so PLAY opens it, and every tile is dimmed, by name.
 // The page with a save is checked further down.
-await send('Page.navigate', { url: `${APP}?dungeon=nowhere` });
-await wait(2500);
+await navigate(`${APP}?dungeon=nowhere`, WELCOME);
 const firstVisit = await evaluate(`({tiles: [...document.querySelectorAll('.pick[data-set]')].map(t=>t.dataset.set+(t.classList.contains('dim')?'':'*')+(t.getAttribute('aria-pressed')==='true'?'!':'')).join(','),
   play: document.getElementById('welcome-play').getAttribute('href'),
   resume: document.getElementById('welcome-continue').getAttribute('href'),
@@ -225,8 +254,7 @@ onPaused = ({ requestId }) => send('Fetch.fulfillRequest', { requestId, response
   responseHeaders: [{ name: 'Content-Type', value: 'application/json; charset=utf-8' }],
   body: Buffer.from(JSON.stringify({ default: null, dataSets: [] })).toString('base64') });
 await send('Fetch.enable', { patterns: [{ urlPattern: '*/api/data-sets*' }] });
-await send('Page.navigate', { url: `${APP}?dungeon=nowhere` });
-await wait(2500);
+await navigate(`${APP}?dungeon=nowhere`, WELCOME);
 await send('Fetch.disable');
 onPaused = null;
 const noSet = await evaluate(`(() => {
@@ -246,8 +274,7 @@ check(noSet.tiles === 'add' && noSet.play === 'disabled' && noSet.resume === 'di
 // `?intro=0` skips the title animation and the dungeon entrance
 // (`src/renderer/intro/BootSequence.ts`), so the six frames below still open on the
 // adventure screen. The entrance gets frames of its own at the end.
-await send('Page.navigate', { url: `${APP}?intro=0&dungeon=dm-atari` });
-await wait(3500);
+await navigate(`${APP}?intro=0&dungeon=dm-atari`, GAME);
 console.log('state: booted');            await shot('01-boot');
 // The four champions, from the Hall of Champions mirrors (`tools/lib/buildParty.mjs`).
 await evaluate(BUILD_PARTY).then(names => console.log('  party:', names));
@@ -381,8 +408,7 @@ check(abortedDelete === 'failed, listed', `a delete whose transaction aborts fai
 // selects a tile, and PLAY opens its set; a click on another set, with no save, leaves
 // CONTINUE disabled; a click on the selected tile selects none. Then PLAY's own click,
 // as a player makes it, is the way into the entrance below.
-await send('Page.navigate', { url: `${APP}?dungeon=nowhere&keepsaves` });
-await wait(2500);
+await navigate(`${APP}?dungeon=nowhere&keepsaves`, WELCOME);
 const welcome = () => evaluate(`(()=>{const q=(s)=>[...document.querySelectorAll(s)];
   return { canvas: !!document.getElementById('game-canvas'),
     tiles: q('.pick[data-set]').map(t=>t.dataset.set+(t.classList.contains('dim')?'':'*')+(t.getAttribute('aria-pressed')==='true'?'!':'')).join(','),
@@ -475,8 +501,7 @@ const howToPlay = () => evaluate(`(async()=>{const d=document.querySelector('dia
     printed: await Promise.all(['.how-pdf', '.how-png'].map(async (s)=>{const a=d.querySelector(s);
       const r=a.href ? await fetch(a.href).catch(()=>null) : null; return a.download+(r?.ok ? ' '+r.headers.get('content-type') : ' missing');})) };})()`);
 const printedSheets = JSON.parse(readFileSync(new URL('../src/assets/how-to-play/sheets.json', import.meta.url), 'utf8'));
-await send('Page.navigate', { url: `${APP}?dungeon=nowhere&keepsaves#how-to-play` });
-await wait(2500);
+await navigate(`${APP}?dungeon=nowhere&keepsaves#how-to-play`, WELCOME);
 const help = await howToPlay();
 console.log('  ', JSON.stringify(help));
 check(help?.open === true && help.hash === '#how-to-play', 'the page at #how-to-play opens HOW TO PLAY');
@@ -649,8 +674,7 @@ await saveDatabase({
       const file = files.get(row.id);
       file.onsuccess = () => files.put({ ...file.result, id: 'probe-local-save' }); };`,
 });
-await send('Page.navigate', { url: `${APP}?dungeon=nowhere&keepsaves` });
-await wait(2500);
+await navigate(`${APP}?dungeon=nowhere&keepsaves`, WELCOME);
 const withLocal = await welcome();
 console.log('  local set:', JSON.stringify(withLocal));
 check(withLocal.tiles === `dm-atari*,kids-dungeon,csb,local:${MINE}*,conflux-3.5,towers-of-chaos`
@@ -815,8 +839,7 @@ check(deleted.dialog === null && deleted.form === null && deleted.store.name ===
 const MODERATOR = '00000000-0000-4000-8000-000000000001';
 const asPlayer = async (player) => {
   await evaluate(`localStorage.setItem('csbweb_player_v1', ${JSON.stringify(player)}),1`);
-  await send('Page.navigate', { url: `${APP}?dungeon=nowhere&keepsaves&keepsettings` });
-  await wait(2500);
+  await navigate(`${APP}?dungeon=nowhere&keepsaves&keepsettings`, WELCOME);
 };
 const mineOf = async () => ({ ...(await evaluate(`(t=>({ colour: getComputedStyle(t.querySelector('.pick-name')).color, selected: t.getAttribute('aria-pressed') }))(document.querySelector('.pick[data-set="${MINE}"]'))`)),
   controls: (await controlsOf())[MINE] });
@@ -1005,8 +1028,7 @@ check(ownersDocuments?.items.join() === `${ARCHIVE},Solution.doc|gamefiles/${MIN
 // the image's empty one). With no `?set=`, the column's first is selected; a click selects
 // another, in the URL, the page's other parameters kept, and back selects the first again.
 const statsLink = await evaluate(`[...document.querySelectorAll('.welcome-footer nav a')].find(a=>a.textContent==='Stats')?.getAttribute('href')`);
-await send('Page.navigate', { url: `${APP}stats?keepsaves&keepsettings` });
-await wait(2500);
+await navigate(`${APP}stats?keepsaves&keepsettings`, STATS);
 const statsPage = () => evaluate(`(async()=>{const q=(s,r=document)=>[...r.querySelectorAll(s)];const text=(e)=>e?.textContent;
   const panel=document.querySelector('.stats-set');
   for(let i=0;i<50&&!panel.querySelector('h2');i++) await new Promise(r=>setTimeout(r,100));
@@ -1055,8 +1077,7 @@ await evaluate(`history.back(),1`);
 await wait(700);
 const statsBack = await statsPage();
 check(statsBack.selected === statsFirst.selected && statsMatch(statsBack), 'back selects the first again');
-await send('Page.navigate', { url: `${APP}stats?set=dm-atari&keepsaves&keepsettings` });
-await wait(2500);
+await navigate(`${APP}stats?set=dm-atari&keepsaves&keepsettings`, STATS);
 const statsDm = await statsPage();
 console.log('  ', JSON.stringify(statsDm));
 check(statsDm.selected === 'dm-atari' && statsMatch(statsDm), '?set=dm-atari selects it');
@@ -1072,8 +1093,7 @@ onPaused = ({ requestId }) => send('Fetch.fulfillRequest', { requestId, response
   responseHeaders: [{ name: 'Content-Type', value: 'application/json; charset=utf-8' }],
   body: Buffer.from(JSON.stringify(moderated)).toString('base64') });
 await send('Fetch.enable', { patterns: [{ urlPattern: '*/api/data-sets*' }] });
-await send('Page.navigate', { url: `${APP}?dungeon=nowhere&keepsaves` });
-await wait(2500);
+await navigate(`${APP}?dungeon=nowhere&keepsaves`, WELCOME);
 await send('Fetch.disable');
 onPaused = null;
 const states = await evaluate(`Object.fromEntries([...document.querySelectorAll('.pick[data-set]')]
@@ -1159,17 +1179,17 @@ console.log('state: game loaded');       const loaded = await shot('12-game-load
 // title and no entrance, so the screen is the one the entrance's LOAD showed of it, its
 // party the four the welcome page's box named. A row the store does not hold leaves the
 // entrance instead, without the title.
-const continued = async (search) => {
-  await send('Page.navigate', { url: `${APP}${search}` });
-  await wait(3500);
+const continued = async (search, ready) => {
+  await navigate(`${APP}${search}`, ready);
+  if (ready === LOADED) await wait(3500);
   await leaveCanvas(); await wait(200);
   return evaluate(`(()=>{const p=window.__probe; return p ? p.game.ctx.party.state.champions.map(c=>c.name.trim()).join(' · ') : null;})()`);
 };
-const continuedParty = await continued(`?dungeon=dm-atari&save=${saveId}&keepsaves`);
+const continuedParty = await continued(`?dungeon=dm-atari&save=${saveId}&keepsaves`, GAME);
 console.log('  continued party:', continuedParty);
 check(continuedParty === atWelcome.preview[1] && (await canvasPixels()) === loaded,
   'CONTINUE reads its save straight into play: the screen the entrance\'s LOAD showed, the party the box named');
-await continued('?dungeon=dm-atari&save=nowhere&keepsaves');
+await continued('?dungeon=dm-atari&save=nowhere&keepsaves', LOADED);
 check((await canvasPixels()) === entrance, 'a save the store does not hold leaves the entrance, without the title');
 
 // A pressed crack switch (`doc/PROVEN_FACTS.md`, "Crack Switch (In) placement"): level 4,
@@ -1177,8 +1197,7 @@ check((await canvasPixels()) === entrance, 'a save the store does not hold leave
 // the Out crack was, not at eye level where `graphics.dat`'s coordinate set would put it.
 // Built from a fresh `?intro=0` boot with the same party, since TouchWall needs a leader.
 // The click also opens the grid at (13,28), off to the right; the wait covers its opening.
-await send('Page.navigate', { url: `${APP}?intro=0&dungeon=dm-atari` });
-await wait(3500);
+await navigate(`${APP}?intro=0&dungeon=dm-atari`, GAME);
 await evaluate(BUILD_PARTY);
 await evaluate(`(()=>{
   const { game, renderView } = window.__probe;
@@ -1287,8 +1306,7 @@ check(await selected() === -1, 'the inventory closed again');
 // frames are taken; there the Oracle lists CREATURES and CIRCLE OF POISON. Its title list
 // cycles a palette slot every 21 VBLs, so it is no frame: `tools/dump-hint-oracle-screen.ts`
 // checks its pixels. A hint's page, the first title's, does not cycle, and is one.
-await send('Page.navigate', { url: `${APP}?intro=0&dungeon=csb` });
-await wait(3500);
+await navigate(`${APP}?intro=0&dungeon=csb`, GAME);
 await evaluate(`(async()=>{
   const { game, renderView, applySaveBytes } = window.__probe;
   applySaveBytes(game, new Uint8Array(await (await fetch('/gamefiles/csb/csbgame2.dat')).arrayBuffer()));
@@ -1319,8 +1337,7 @@ check(!(await evaluate(`window.__probe.screen.isHintOracleUp()`)) && (await canv
 // of it runs a skin's program from its `CSBgraphics.dat`, and its DSAs run from the first
 // tick (`tools/watch-conflux-start.ts`). The square in front is a wall, which its skin
 // paints with a picture, and nothing in view moves.
-await send('Page.navigate', { url: `${APP}?intro=0&dungeon=conflux-3.5` });
-await wait(3500);
+await navigate(`${APP}?intro=0&dungeon=conflux-3.5`, GAME);
 await leaveCanvas(); await wait(200);
 console.log('state: Conflux start');     const confluxStart = await shot('18-conflux-start');
 // A viewport overlay (`src/renderer/csbwin/OverlayScreen.ts`), put up on the engine as a
@@ -1348,8 +1365,7 @@ console.log('state: Conflux bookshelf'); await shot('20-conflux-bookshelf');
 // is up. A frame a tab: GAME's with the pointer on DRINK AT FOUNTAINS' button, so it is
 // lit, the help line names it and the cursor is drawn, DISPLAY's and SOUND's with it off the canvas,
 // and KEYS' with MOVE FORWARD's first slot waiting for its key.
-await send('Page.navigate', { url: `${APP}?intro=0&keepsaves&dungeon=dm-atari` });
-await wait(3500);
+await navigate(`${APP}?intro=0&keepsaves&dungeon=dm-atari`, GAME);
 const settingsUp = () => evaluate(`window.__probe.screen.ui.settingsDialog !== null`);
 const settingsValues = () => evaluate(`window.__probe.screen.ui.settings.values`);
 const ticks = () => evaluate(`window.__probe.game.ctx.state.tickCount`);
@@ -1447,8 +1463,7 @@ await canvasClick(120, 45, 0); await wait(300);
 await canvasClick(85, 107, 0); await wait(300);
 check((await settingsValues()).leftHanded === false, 'LEFT HANDED again turns it off');
 await key('Escape'); await wait(300);
-await send('Page.navigate', { url: `${APP}?intro=0&keepsaves&keepsettings&dungeon=dm-atari` });
-await wait(3500);
+await navigate(`${APP}?intro=0&keepsaves&keepsettings&dungeon=dm-atari`, GAME);
 const kept = await settingsValues();
 check(kept.sound === false && kept.volume === 1, 'after a reload, the sound is still off, at full volume');
 await canvasClick(100, 185, 0); await canvasClick(150, 190, 0); await wait(300);
@@ -1479,8 +1494,7 @@ check(left.welcome && left.query, `the question's EXIT opens the welcome page, t
 // once, asking for the other tabs to be closed, where it used to hang ENTER, F5, F9 and the
 // disk menu for ever; and so is the next, which would only queue behind it. Let go, the
 // open goes on, and the store lists.
-await send('Page.navigate', { url: `${APP}?intro=0&dungeon=dm-atari` });
-await wait(3500);
+await navigate(`${APP}?intro=0&dungeon=dm-atari`, GAME);
 const heldStore = await evaluate(`(async()=>{
   // Every step bounded, so a store that hangs fails the checks instead of the run.
   const within = (promise) => Promise.race([promise, new Promise((r) => setTimeout(() => r('hung'), 2000))]);
@@ -1527,8 +1541,7 @@ const rawSaves = `new Promise((resolve, reject) => { const o = indexedDB.open('c
     tx.oncomplete = () => { db.close(); resolve({ version: db.version,
       rows: rows.result.map((r) => r.id + ('bytes' in r ? '+bytes' : '')).sort().join(),
       files: files.result.map((f) => f.id + ':' + f.bytes.byteLength + ':' + sum(f.bytes)).sort().join() }); }; }; })`;
-await send('Page.navigate', { url: `${APP}package.json?keepsaves` });
-await wait(800);
+await navigate(`${APP}package.json?keepsaves`, LOADED);
 const stagedV5 = await evaluate(`(async()=>{
   const file = new Uint8Array(await (await fetch('/gamefiles/csb/csbgame2.dat')).arrayBuffer());
   await new Promise((r) => { const d = indexedDB.deleteDatabase('csbweb-saves'); d.onsuccess = d.onerror = r; });
@@ -1540,14 +1553,12 @@ const stagedV5 = await evaluate(`(async()=>{
         savedAt: 1, usedAt: 1, playTime: 0, level: 1, champions: ['PROBE'], unofficial: false, bytes: file.slice().buffer });
       tx.oncomplete = () => { o.result.close(); resolve(); }; tx.onerror = () => reject(tx.error); }; });
   return 'probe-v5.dat:' + file.length + ':' + file.reduce((a, x) => (a * 31 + x) >>> 0, 0); })()`);
-await send('Page.navigate', { url: `${APP}?dungeon=nowhere&keepsaves` });
-await wait(2500);
+await navigate(`${APP}?dungeon=nowhere&keepsaves`, WELCOME);
 const upgradedV5 = await evaluate(rawSaves);
 console.log('  version 5 upgraded:', JSON.stringify(upgradedV5));
 check(upgradedV5.version === 6 && upgradedV5.rows === 'probe-v5.dat' && upgradedV5.files === stagedV5,
   "the upgrade to version 6 keeps a row without its file, and its file byte for byte in saveFiles under the row's id");
-await send('Page.navigate', { url: `${APP}?intro=0&dungeon=csb&keepsaves` });
-await wait(3500);
+await navigate(`${APP}?intro=0&dungeon=csb&keepsaves`, GAME);
 const filesApart = await evaluate(`(async()=>{ const { saves } = window.__probe;
   const listed = await saves.list(), entry = listed.find((e) => e.id === 'probe-v5.dat');
   if (!entry) return { listed: listed.map((e) => e.id).join() };
@@ -1568,8 +1579,7 @@ check(filesApart.imported === 'stored' && filesApart.afterImport?.rows === 'prob
 // The map dialog (`src/renderer/ui/MapDialog.ts`), over CSB's `csbgame2.dat`, its party
 // where the save left it: a press held on the message area opens it, with MAP VIEW on
 // alone. A frame of it with the pointer off the canvas; a right click closes it.
-await send('Page.navigate', { url: `${APP}?intro=0&dungeon=csb` });
-await wait(3500);
+await navigate(`${APP}?intro=0&dungeon=csb`, GAME);
 await evaluate(`(async()=>{
   const { game, applySaveBytes } = window.__probe;
   applySaveBytes(game, new Uint8Array(await (await fetch('/gamefiles/csb/csbgame2.dat')).arrayBuffer()));
@@ -1620,8 +1630,7 @@ check((await selected()) === 0 && (await championsUp()) === null, 'and at its re
 // 1366x768. The pointer is read through the curve, a real click through the effect's
 // canvas reaches the dialog, and a real Esc, which the page locks in fullscreen, closes
 // and opens the settings and leaves fullscreen be.
-await send('Page.navigate', { url: `${APP}?intro=0&keepsaves&dungeon=dm-atari` });
-await wait(3500);
+await navigate(`${APP}?intro=0&keepsaves&dungeon=dm-atari`, GAME);
 const screenLayout = () => evaluate(`(()=>{const g=document.getElementById('game-canvas').getBoundingClientRect();
   const t=document.getElementById('crt-canvas');const r=t.getBoundingClientRect();
   return {element:document.fullscreenElement?.id??null,w:innerWidth,h:innerHeight,ratio:devicePixelRatio,
@@ -1711,8 +1720,7 @@ await screenSize(1600, 1000);
 // his weapon taken from his weapon hand (62-77 x 86-101) into the cursor, and the eye
 // (12-27 x 46-61) held on it. Under CSBWin's description, the extra's lines, from the
 // panel's foot up.
-await send('Page.navigate', { url: `${APP}?intro=0&dungeon=dm-atari` });
-await wait(3500);
+await navigate(`${APP}?intro=0&dungeon=dm-atari`, GAME);
 await evaluate(BUILD_PARTY); await wait(600);
 await canvasClick(15, 15, 2); await wait(700);
 await evaluate(`(()=>{const s=window.__probe.screen.ui.settings;s.update({ extras: { ...s.values.extras, showItemProperties: true } });return 1;})()`);
