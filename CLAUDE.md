@@ -47,6 +47,8 @@ Corollaries:
 | `doc/DEPLOYMENT.md` | The deployed game: the server, the image, the VPS, deploying and backups. `doc/STATISTICS.md`: what it counts. |
 | `doc/CSBWIN_SYMBOL_INDEX.tsv` | Every CSBWin symbol → `File.cpp:line`. Grep this before grepping the tree. |
 | `doc/CSBwin-src/` | The C++ reference (not ours, git-ignored, fetched by `npm run fetch-csbwin-src`): `CSBwin_SRC_20230608`, CSBWin's last source and the build the author plays. |
+| `.claude/memory/` | Anything worth remembering across sessions: one fact per file, indexed one line each in `MEMORY.md`, imported above. Committed with the project, not Claude Code's own memory directory under `~/.claude/projects/`, which depends on where the checkout lives. |
+| `.claude/skills/` | The project's skills. |
 
 **Documentation contract:** before working on a topic, read its doc. When you verify a new
 fact in the C++ source, write it down with a `doc/CSBwin-src/<File>.cpp:<line>` reference.
@@ -289,8 +291,7 @@ were three lines each is not.
 
 ## Conventions
 
-- Commits: **single short line, no JIRA prefix, no trailers** (e.g. `Pits on ceiling`).
-  This overrides the global `JIRA-XXX` convention.
+- Commits: **single short line, no trailers** (e.g. `Pits on ceiling`).
 - Imports name the module by relative path (`'../core/types'`). The only barrels are
   `src/ui/index.ts` and `src/data/saves/index.ts`, the public faces of the debug chrome
   and the save store.
