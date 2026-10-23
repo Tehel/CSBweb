@@ -1073,31 +1073,29 @@ which its signature can stand for.
 
 ### G29 ⏸️ Recording a game and playing it back
 
-CSBWin can record a game and play it back:
+CSBWin records a game as the mouse-queue entries it takes, each with its tick and
+`d.RandomNumber`, and plays them back in place of the queue (`RECORDFILE` and `PLAYFILE`,
+`doc/CSBwin-src/Recording.cpp`). `doc/RECORDING.md` holds how both work, what a replay
+needs, where the port stands against it, and what sharing recordings would take.
 
-- **The recorder** (`RECORDFILE`, `doc/CSBwin-src/Recording.cpp:864-1300`) is the
-  "Record" menu item (`CSBUI.cpp:966-979`). It writes `logs/RecordNNNNN.log`: a version
-  line, `#` option lines (`#DMRules`, `#ExtraTicks`, …), then one line per input event,
-  `time x y num random` in hex (`Recording.cpp:1265`). The `d.RandomNumber` on each line
-  is what shows that a playback has drifted. A click in the viewport is recorded by
-  `HandleClickInViewport` (`Mouse.cpp:1032`) with fewer coordinates, and every other entry
-  of the mouse queue by `_HandleMouseEvents` (`:1634-1645`).
-- **The player** (`PLAYFILE`, `Recording.cpp:152-849`) is the "Playback" menu item
-  (`CSBUI.cpp:980-987`), which turns `extraTicks` off. It reads `Playfile.log` and feeds
-  its events into the mouse queue at their ticks. It does so from the top of
-  `_HandleMouseEvents` (`Mouse.cpp:1494`), except while gravity runs.
+The port has neither. It keeps only the recorder's count, `totalMoveCount`, which a save
+stores (`Game.recordFileRecord`, `src/engine/Game.ts:1002`), and `extraTicks` is always on
+(`src/engine/MovementSystem.ts:115-116`). Conflux 3.5's `AutoRecord` (`doc/RECORDING.md`)
+asks for a recorder the port does not have.
 
-Conflux 3.5's Extended Features block sets `AutoRecord` (0x10), `RecordDesignOption`
-(`doc/CSBwin-src/SaveGame.cpp:403-404`): a game read from it records unless the command
-line or the menu says not to (`:2588-2603`). The port has neither, and no way to start either. It keeps only the recorder's count,
-`totalMoveCount`, which a save stores (`Game.recordFileRecord`, `src/engine/Game.ts:1001`).
-`extraTicks` is always on (`src/engine/MovementSystem.ts:161-164`).
+**It waits for the engine to settle.** Every change to what the engine does at a tick makes
+the recordings made before it drift, so the debt that changes behaviour is paid first. What
+comes before the recorder, in order:
 
-Once ported, a recording made in CSBWin and played back in the port is an end-to-end test
-of everything at once, and the first line whose `random` differs points at the first
-divergence. That needs the port's random numbers to follow CSBWin's draw for draw. A
-recording cannot be written by hand, nor by a solver such as `tools/solve-3d2d1d.ts`:
-every line needs its exact tick and random state.
+1. The determinism breaks `doc/RECORDING.md` names: the attack menu's damage flash, timed
+   on the wall clock.
+2. Its unverified points: VBL-counted state within a tick, input outside the mouse queue,
+   the port's saves.
+3. `tools/dump-replay.ts`: a scripted game recorded, replayed at another frame pacing, and
+   `d.RandomNumber` asserted equal at every entry, the two final saves byte-identical.
+
+Playing CSBWin's own recordings back needs, beyond that, the port's draws to follow
+CSBWin's draw for draw; a port-only recorder does not.
 
 ---
 
