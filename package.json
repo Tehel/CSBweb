@@ -14,12 +14,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Tehel/dmjs.git"
+    "url": "git+https://github.com/Tehel/csbweb.git"
   },
   "author": "Thomas Looten <github@looten.net>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/Tehel/dmjs/issues"
+    "url": "https://github.com/Tehel/csbweb/issues"
   },
   "directories": {
     "doc": "doc"
@@ -35,5 +35,5 @@
   "engines": {
     "node": "^24"
   },
-  "homepage": "https://github.com/Tehel/dmjs#readme"
+  "homepage": "https://github.com/Tehel/csbweb#readme"
 }
