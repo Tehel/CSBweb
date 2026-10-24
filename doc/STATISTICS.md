@@ -88,7 +88,7 @@ that reads a save of it.
 
 Events are sent with `navigator.sendBeacon` to `api/event`, and a failure is ignored:
 nothing an event does delays or breaks the game. Only a production build sends them; dev
-shows them on the console, and the tools never send. `tools/dump-game-events.ts` asserts all
+shows them on the console, and the tools never send. `tools/checks/game-events.ts` asserts all
 of it, the setting and the teleport included, on the real engine, the Hall's joins and a genuine save included, and that the server
 takes every event the engine makes as the page sent it.
 
@@ -118,7 +118,7 @@ takes every event the engine makes as the page sent it.
    (`EVENTS_PER_DAY`, `server/server.ts`; 429), so that no number of addresses grows the
    store by more than a few MB a day.
 6. **A full log** refuses the event (507): at 500,000 rows (`MAX_EVENTS`,
-   `server/stats.ts`), about 140 MB at the 280 bytes an event `tools/dump-stats.ts`
+   `server/stats.ts`), about 140 MB at the 280 bytes an event `tools/checks/stats.ts`
    measures, aggregates included, kept in every nightly backup. A `session`, which is no
    row of it, still counts.
 
@@ -198,16 +198,16 @@ one its play time could run: a tick at most each VBL, which sleep reaches, at 60
 second, and a second's slack (`CLOCK_SLACK_TICKS`). A game read from an imported CSBWin
 save, which sent no `started` and carries no play time, is a win and is not ranked.
 
-`tools/dump-stats.ts` asserts the checks, the rate limit's buckets, the store's aggregates over a scripted fortnight,
+`tools/checks/stats.ts` asserts the checks, the rate limit's buckets, the store's aggregates over a scripted fortnight,
 its sessions in no row of the log or of `games`, a game's second `started` and `won` in none either, a full log, every time to 10 s, the same but the sessions' made from the
 log alone and for a store made before the sessions, the picks' slots, `events_once` or the 10 s, the cache, and every answer's time and size over 200,000
-events, with the bytes an event costs; `tools/dump-server.ts` the API over HTTP, the limits and the budget included, and the store's life in `server.ts`.
+events, with the bytes an event costs; `tools/checks/server.ts` the API over HTTP, the limits and the budget included, and the store's life in `server.ts`.
 
 ## The page
 
 `/stats` (`stats.html`, Vite's second entry, `src/stats/statsPage.ts`), linked from the
 welcome page's footer (STATS): HTML in the welcome page's look, and none of the game's
-code (`tools/dump-build.ts` holds it to a few KB of script). Its charts are CSS bars, the
+code (`tools/checks/build.ts` holds it to a few KB of script). Its charts are CSS bars, the
 count of each on hover. Everything it shows is `api/stats`'s:
 
 - **A band across the top**, every set together: players, hours played, games started and
@@ -227,6 +227,6 @@ A chart of weeks runs from the first week answered to the current one, the weeks
 one at zero, the latest 52 at most.
 
 What is left of it is the heat map (`DEBT.md` E40). The dev server answers `api/stats`
-over the scripted fortnight of `tools/dump-stats.ts` (`tools/lib/statsFortnight.ts`), so
+over the scripted fortnight of `tools/checks/stats.ts` (`tools/lib/statsFortnight.ts`), so
 that the page has something to show; `tools/probe-frames.mjs` checks the page against what
 `api/stats` answers, whatever the store holds.

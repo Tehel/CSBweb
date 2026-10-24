@@ -73,7 +73,7 @@ const LATCH_TO_DOORS_VBLS = 20;
  * `ReadTablesFromGraphicsFile` asserts item 0x231 is 0x804 or 0x7d4 bytes and, when it is
  * the short one, overwrites the list with these four entries
  * (`doc/CSBwin-src/CSBCode.cpp:10259-10281`). DM's is the short one, and CSB's the long one,
- * whose four are these, word for word (`tools/dump-data-sets.ts`).
+ * whose four are these, word for word (`tools/checks/data-sets.ts`).
  */
 export const MISSING_PRISON_DOOR_BUTTONS: UIButton[] = [
   { word0: 0x00c8, x1: 0x00f4, x2: 0x012a, y1: 0x002d, y2: 0x003a, button: 0x0002, name: 'enter' },
@@ -96,7 +96,7 @@ export type PrisonDoorChoice = 'enter' | 'resume' | 'rise';
  * of RESUME, each copied without the panel's bare stone around it (`PANEL_STONE`), onto
  * the bare rock below the two labels. Its letters stand to its gem as RESUME's do, and so
  * does its rectangle, so it is clicked as the other two are. Positions in graphic 4 of
- * CSB's `graphics.dat` (`tools/dump-rise.ts`).
+ * CSB's `graphics.dat` (`tools/checks/rise.ts`).
  */
 export const RISE_BUTTON_ID = 0x00cb;
 /** Colour index 10, the stone the labels are carved in. */

@@ -196,4 +196,4 @@ The port redraws the strip every frame from its row model: `draw` offsets the ro
 scroll count and keeps the row scrolling out until it has gone, and `main.ts` redraws the
 screen after any frame in which the strip changed. CSBWin's loop also makes a pass for a
 mouse button going down, and the port's deliberately does not (`DEBT.md` → H). Evidence:
-`tools/dump-messages.ts`.
+`tools/checks/messages.ts`.

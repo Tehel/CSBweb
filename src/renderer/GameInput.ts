@@ -171,7 +171,7 @@ export class GameInput {
    * lists in force (`searchMouseButtons`): what the settings' double click and the map's
    * long press count. Such a click is nothing to the game, and is queued as any click is,
    * so neither gesture holds a click back. Only two things take a left click there
-   * (`tools/dump-settings-dialog.ts`): the freeze, on the pixel x 0, y 198 of
+   * (`tools/checks/settings-dialog.ts`): the freeze, on the pixel x 0, y 198 of
    * `Buttons17196`, and frozen, the thaw, `Buttons17832`'s whole screen. So a frozen
    * game's first click thaws it, as CSBWin's does, and opens nothing.
    */

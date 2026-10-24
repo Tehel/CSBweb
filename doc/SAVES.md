@@ -22,7 +22,7 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   (`doc/PROVEN_FACTS.md` -> "An `RNVAL` read as a slot is `dbUNKNOWN`"). What a file does
   not hold, a load does not give back, as in CSBWin: `src/engine/CsbwinSaveGame.ts` →
   "What is not restored" is the whole list (a blow not yet taken off the HP, the open
-  inventory, and the like), and `tools/dump-save-roundtrip.ts` saves and loads three
+  inventory, and the like), and `tools/checks/save-roundtrip.ts` saves and loads three
   played games and holds everything that differs to it. F5 saves nothing where the disk
   icon does nothing: a champion still being chosen has no place in a file, and the key
   answers "CANNOT SAVE NOW". A
@@ -226,7 +226,7 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   lists seven: Dungeon Master; Chaos Strikes Back, which is `mini.dat`'s, and its prison,
   the set's `dungeon.dat`, both the `csb` set's; Kids dungeon 24; 3D2D1D; Conflux 3.5;
   and The Towers of Chaos 3.3. A dungeon is added from what
-  `tools/dump-dungeon-signature.ts` prints when given its file: the digests as the
+  `tools/checks/dungeon-signature.ts` prints when given its file: the digests as the
   catalogue lists them. It names none of the players' dungeons: the published ones are
   the server's, and a player's own is not named in another set.
 - **A save is its own world.** A save, once stored, holds its dungeon and loads it,
@@ -459,7 +459,7 @@ A game an error has ended (`Game.die`, the page's "The game has stopped.") saves
 by either key, the dialog or the Sleepsave (`GameSaves.save`): the error may have left
 the world half-updated, and F5 would write it over the quick save that F9 reads after the
 reload the message asks for. The page takes no key of it either (`GameInput`), so F5 and
-F9 are the browser's again: a reload. `tools/dump-fatal-error.ts` holds both.
+F9 are the browser's again: a reload. `tools/checks/fatal-error.ts` holds both.
 
 A save read in play, F9's, LOAD's or the prison's new adventure, has no CSBWin
 counterpart: CSBWin reads a game only after `d.Initialize()` has zeroed the whole of `d`
@@ -483,7 +483,7 @@ its world (`validateCsbwinWorld`, `src/engine/CsbwinSaveGame.ts`): the party's l
 square inside the dungeon, at most four champions, the hand and the caster among them,
 the object in hand a record, the timers inside their table; one outside is refused as a
 file that fails while the read builds, where CSBWin plays on into memory past its arrays
-(`DEBT.md` H). `tools/dump-damaged-read.ts` holds all three.
+(`DEBT.md` H). `tools/checks/damaged-read.ts` holds all three.
 
 ## CONTINUE
 
@@ -528,7 +528,7 @@ An unknown dungeon played from its save is `DEBT.md` G22.
 
 ## Evidence
 
-`tools/dump-save-menu.ts` drives `GameSaves` and the dialog over a store in memory; its
+`tools/checks/save-menu.ts` drives `GameSaves` and the dialog over a store in memory; its
 sections are named below. Node has no IndexedDB, so no tool runs `BrowserSaveStore`
 itself: neither the IndexedDB half of the upgrades (`upgradeRows`) nor
 `BrowserSaveStore.markUsed`, nor `BrowserDataSetStore`. `tools/probe-frames.mjs` checks
@@ -537,9 +537,9 @@ row's file moved to `saveFiles` byte for byte; a list reading no file, an import
 DELETE writing and deleting a row and its file together, and a local data set deleted
 with its saves' rows and files.
 
-- **RISE**: `tools/dump-rise.ts` (the row a new adventure is stored as, again, and a
+- **RISE**: `tools/checks/rise.ts` (the row a new adventure is stored as, again, and a
   refusal; the chooser's `rise` mode over every set's saves, its LOAD and a refusal, and
-  `tools/dump-save-menu.ts` its title, its eleven rows, RISE, no EXPORT, no drop taken
+  `tools/checks/save-menu.ts` its title, its eleven rows, RISE, no EXPORT, no drop taken
   and no hint, and NEW FACE: what it reads, a click, what LOAD passes on; the
   portraits a DM party is raised with, a renamed champion's, and the prison's kept; the
   prison's question: which game is the prison, four champions recruited at its mirrors
@@ -556,7 +556,7 @@ with its saves' rows and files.
   counting no play time; a file holding the four `GAMEBLOCK1` words at 0 refused by
   RISE, then stamped into the file the game writes with CSBWin's, taken by RISE, and
   loading with them; a file that holds one of them left as it is).
-- **The stamp**: `tools/dump-save-stamp.ts`, over the eight genuine saves and the two of
+- **The stamp**: `tools/checks/save-stamp.ts`, over the eight genuine saves and the two of
   `tools/fixtures/gamefiles/csb`. The stamped file differs in six bytes of `GAMEBLOCK1`, the id
   and the word the block's fold ends on; it reads back with the id, the level and the
   party; its own id stamped back gives the file byte for byte; a CSBWin block stamped is
@@ -611,7 +611,7 @@ with its saves' rows and files.
   scrolling back; the track and the slider taking no click; a key bringing the list
   back; a list that fits having the whole track for a slider).
 - **The double click**: "the double click".
-- **The Sleepsave**: `tools/dump-sleep-save.ts` (the slot found apart from F5's, per
+- **The Sleepsave**: `tools/checks/sleep-save.ts` (the slot found apart from F5's, per
   playthrough and data set; the "SLEEPSAVE" row; a stored row from before the flag; two
   Sleepsaves one row; F5 and the Sleepsave never writing over each other; F9 loading it
   when newest; SAVE over it making it the dialog's; nothing in the message area; each
@@ -629,7 +629,7 @@ with its saves' rows and files.
   file gone, the menu up under "SAVE DELETED", the save after it selected, then the one
   before, and the row in a heading's place, the game left alone; the load-only chooser
   deleting, and RISE's dialog having no DELETE).
-- **A dungeon's signature, and the catalogue**: `tools/dump-dungeon-signature.ts` (the
+- **A dungeon's signature, and the catalogue**: `tools/checks/dungeon-signature.ts` (the
   digest's input on a level made by hand, and the digest against `node:crypto`'s; every
   data set's `dungeon.dat` and CSB's `mini.dat` a catalogue dungeon that lists the set,
   whole, no entry without its file and no digest listed twice; the eight genuine saves,
@@ -666,7 +666,7 @@ with its saves' rows and files.
   MATCH naming Dungeon Master; a Chaos Strikes Back save and one of an unknown dungeon
   refused under OK; a text file as the dialog's message; no drop taken during a press;
   the load-only chooser importing a genuine save, which LOAD then plays).
-- **No "GAME LOADED, READY TO PLAY."**: `tools/dump-bad-saved-game.ts`, "a save read"
+- **No "GAME LOADED, READY TO PLAY."**: `tools/checks/bad-saved-game.ts`, "a save read"
   (the hand-off after a load is one fade and four VBLs on a cleared screen, and waits
   for no click).
 
@@ -681,4 +681,4 @@ Two golden frames: `tools/frames/06-savemenu.png`, the dialog in play, and
 `tools/frames/12-game-loaded.png`, the loaded game's first view, straight from the
 chooser's LOAD. The first shows the "NEW SAVE" row alone, its preview empty and its list
 with the whole track for a slider, since the frame script clears IndexedDB;
-`dump-save-menu.ts` proves the rows.
+`checks/save-menu.ts` proves the rows.

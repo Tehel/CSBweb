@@ -6,7 +6,8 @@
 //   1. `tsc --noEmit`            — the real build gate; `vite build` proves nothing.
 //                                  With it, the server's and the modules held to
 //                                  noUncheckedIndexedAccess (tsc-indexed-access.mjs).
-//   2. every asserting tools/*.ts — the regression suite for what the frames cannot see.
+//   2. every asserting tools/checks/*.ts — the regression suite for what the frames
+//                                  cannot see.
 //   3. `tools/check-frames.sh`   — the golden frames, only with `--frames` (it needs a
 //                                  dev server and a headless Chrome, which the script
 //                                  starts for itself).
@@ -18,13 +19,14 @@
 //   npm test                     # gates 1 and 2   (~75s on four cores)
 //   npm test -- --frames         # all three       (adds ~40s and needs google-chrome)
 //   npm test -- --only=ai        # just the tools whose name contains "ai" (and tsc)
+//   npm test -- --only=room-text.ts  # a whole name picks that tool alone, not open-room-text.ts
 //   npm test -- --only=dsa,save  # …or any of several
 //   npm test -- --jobs=1         # one at a time; a tool's own time is then its own
 //
-// One tool on its own, its types checked: `npm test -- --only=dump-savegame.ts 3`. When
+// One tool on its own, its types checked: `npm test -- --only=savegame.ts 3`. When
 // `--only` picks out a single tool, its whole output prints, pass or fail, and every
 // argument the runner does not know is the tool's, in place of the args pinned below.
-// `npx tsx tools/<name>.ts` strips the types without checking them, as `vite build` does.
+// `npx tsx tools/checks/<name>.ts` strips the types without checking them, as `vite build` does.
 import { spawn, spawnSync } from 'node:child_process';
 import { availableParallelism } from 'node:os';
 import { existsSync } from 'node:fs';
@@ -35,363 +37,364 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const TSX = resolve(ROOT, 'node_modules/.bin/tsx');
 const TSC = resolve(ROOT, 'node_modules/.bin/tsc');
 
-// Tools that assert. `args` pins the scenario the assertions were written for — several
-// tools take a level, and the wrong level activates no monsters and checks nothing.
+// Tools that assert, in tools/checks/ unless `dir` says otherwise. `args` pins the scenario
+// the assertions were written for — several tools take a level, and the wrong level
+// activates no monsters and checks nothing.
 const CHECKS = [
-  { tool: 'dump-object-name-index.ts' },
-  { tool: 'dump-object-index.ts' },
-  { tool: 'dump-monster-tables.ts' },
-  { tool: 'dump-monster-activation.ts', args: ['3'] },
-  { tool: 'dump-monster-perception.ts' },
-  { tool: 'dump-monster-damage.ts' },
-  { tool: 'dump-monster-design-options.ts' },
-  { tool: 'dump-monster-move.ts' },
-  { tool: 'dump-monster-pad.ts' },
-  { tool: 'dump-monster-move-code.ts' },
-  { tool: 'dump-monster-generator.ts' },
-  { tool: 'dump-monster-ai.ts' },
-  { tool: 'dump-giggler-steal.ts' },
-  { tool: 'dump-add-object-to-room.ts' },
-  { tool: 'dump-attributes.ts' },
-  { tool: 'dump-adjust-skills.ts' },
-  { tool: 'dump-hand-owner.ts' },
-  { tool: 'dump-marching-order.ts' },
-  { tool: 'dump-object-cursor.ts' },
-  { tool: 'dump-inventory-routing.ts' },
-  { tool: 'dump-key-bindings.ts' },
-  { tool: 'dump-settings.ts' },
-  { tool: 'dump-settings-dialog.ts' },
-  { tool: 'dump-left-handed.ts' },
-  { tool: 'dump-map-dialog.ts' },
-  { tool: 'dump-champion-dialog.ts' },
-  { tool: 'dump-attack-panel.ts' },
-  { tool: 'dump-magic-panel.ts' },
-  { tool: 'dump-champion-state.ts' },
-  { tool: 'dump-champion-death.ts' },
-  { tool: 'dump-character-damage.ts' },
-  { tool: 'dump-show-credits.ts' },
-  { tool: 'dump-loop-script.ts' },
-  { tool: 'dump-new-game.ts' },
-  { tool: 'dump-enter-dungeon.ts' },
-  { tool: 'dump-loop-die.ts' },
-  { tool: 'dump-item-bonuses.ts' },
-  { tool: 'dump-feeding.ts' },
-  { tool: 'dump-ten-second-update.ts' },
-  { tool: 'dump-sleep.ts' },
-  { tool: 'dump-freeze.ts' },
-  { tool: 'dump-messages.ts' },
-  { tool: 'dump-vbl-clock.ts' },
-  { tool: 'dump-room-text.ts' },
-  { tool: 'dump-text-substitution.ts' },
-  { tool: 'dump-open-room-text.ts' },
-  { tool: 'dump-ninety-second-update.ts' },
-  { tool: 'dump-light-level.ts' },
-  { tool: 'dump-hall-of-champions.ts' },
-  { tool: 'dump-dm-rules.ts' },
-  { tool: 'dump-vi-altar.ts' },
-  { tool: 'dump-wings.ts' },
-  { tool: 'dump-swap-character.ts' },
+  { tool: 'object-name-index.ts' },
+  { tool: 'object-index.ts' },
+  { tool: 'monster-tables.ts' },
+  { tool: 'monster-activation.ts', args: ['3'] },
+  { tool: 'monster-perception.ts' },
+  { tool: 'monster-damage.ts' },
+  { tool: 'monster-design-options.ts' },
+  { tool: 'monster-move.ts' },
+  { tool: 'monster-pad.ts' },
+  { tool: 'monster-move-code.ts' },
+  { tool: 'monster-generator.ts' },
+  { tool: 'monster-ai.ts' },
+  { tool: 'giggler-steal.ts' },
+  { tool: 'add-object-to-room.ts' },
+  { tool: 'attributes.ts' },
+  { tool: 'adjust-skills.ts' },
+  { tool: 'hand-owner.ts' },
+  { tool: 'marching-order.ts' },
+  { tool: 'object-cursor.ts' },
+  { tool: 'inventory-routing.ts' },
+  { tool: 'key-bindings.ts' },
+  { tool: 'settings.ts' },
+  { tool: 'settings-dialog.ts' },
+  { tool: 'left-handed.ts' },
+  { tool: 'map-dialog.ts' },
+  { tool: 'champion-dialog.ts' },
+  { tool: 'attack-panel.ts' },
+  { tool: 'magic-panel.ts' },
+  { tool: 'champion-state.ts' },
+  { tool: 'champion-death.ts' },
+  { tool: 'character-damage.ts' },
+  { tool: 'show-credits.ts' },
+  { tool: 'loop-script.ts' },
+  { tool: 'new-game.ts' },
+  { tool: 'enter-dungeon.ts' },
+  { tool: 'loop-die.ts' },
+  { tool: 'item-bonuses.ts' },
+  { tool: 'feeding.ts' },
+  { tool: 'ten-second-update.ts' },
+  { tool: 'sleep.ts' },
+  { tool: 'freeze.ts' },
+  { tool: 'messages.ts' },
+  { tool: 'vbl-clock.ts' },
+  { tool: 'room-text.ts' },
+  { tool: 'text-substitution.ts' },
+  { tool: 'open-room-text.ts' },
+  { tool: 'ninety-second-update.ts' },
+  { tool: 'light-level.ts' },
+  { tool: 'hall-of-champions.ts' },
+  { tool: 'dm-rules.ts' },
+  { tool: 'vi-altar.ts' },
+  { tool: 'wings.ts' },
+  { tool: 'swap-character.ts' },
   // EXPOOL, where a death's bones record is kept: the pools of the genuine saves rebuilt
   // byte for byte, and put through CSBWin's own save loop unchanged.
-  { tool: 'dump-expool.ts' },
-  { tool: 'dump-viewport-click.ts' },
-  { tool: 'dump-fountain.ts' },
-  { tool: 'dump-item-properties.ts' },
-  { tool: 'dump-queue-sound.ts' },
-  { tool: 'dump-crack-switch.ts' },
-  { tool: 'dump-dm-atari-graphics.ts' },
-  { tool: 'dump-zokathra-wall.ts' },
-  { tool: 'dump-hidden-alcove.ts' },
-  { tool: 'dump-door-ornaments.ts' },
-  { tool: 'dump-status-boxes.ts' },
-  { tool: 'dump-hand-boxes.ts' },
-  { tool: 'dump-mastery-panel.ts' },
+  { tool: 'expool.ts' },
+  { tool: 'viewport-click.ts' },
+  { tool: 'fountain.ts' },
+  { tool: 'item-properties.ts' },
+  { tool: 'queue-sound.ts' },
+  { tool: 'crack-switch.ts' },
+  { tool: 'dm-atari-graphics.ts' },
+  { tool: 'zokathra-wall.ts' },
+  { tool: 'hidden-alcove.ts' },
+  { tool: 'door-ornaments.ts' },
+  { tool: 'status-boxes.ts' },
+  { tool: 'hand-boxes.ts' },
+  { tool: 'mastery-panel.ts' },
   { tool: 'watch-thrown-weapons.ts' },
-  { tool: 'dump-reincarnate-entry.ts' },
-  { tool: 'dump-pit-fall.ts' },
-  { tool: 'dump-teleporter-drop.ts' },
-  { tool: 'dump-teleporter-target.ts' },
-  { tool: 'dump-dev-level.ts' },
-  { tool: 'dump-wiggle-cloud.ts' },
-  { tool: 'dump-wiggle-objects.ts' },
-  { tool: 'dump-wiggle-monster.ts' },
-  { tool: 'dump-missile-drop.ts' },
-  { tool: 'dump-drop-move-object.ts' },
-  { tool: 'dump-stairs-move.ts' },
-  { tool: 'dump-local-action.ts' },
-  { tool: 'dump-does-party-have.ts' },
-  { tool: 'dump-dsa-move.ts' },
-  { tool: 'dump-dsa-delete.ts' },
-  { tool: 'dump-dsa-census.ts' },
-  { tool: 'dump-dsa-decoder.ts' },
-  { tool: 'dump-dsa-characters.ts' },
-  { tool: 'dump-dsa-objects.ts' },
-  { tool: 'dump-dsa-widths.ts' },
-  { tool: 'dump-dsa-limits.ts' },
-  { tool: 'dump-dsa-parameters.ts' },
-  { tool: 'dump-dsa-cell-fetch.ts' },
-  { tool: 'dump-viewing-filter.ts' },
-  { tool: 'dump-open-chest.ts' },
-  { tool: 'dump-sound-filter.ts' },
-  { tool: 'dump-action-name-filter.ts' },
-  { tool: 'dump-feeding-filter.ts' },
-  { tool: 'dump-char-damage-filter.ts' },
-  { tool: 'dump-equip-filter.ts' },
-  { tool: 'dump-party-move-filter.ts' },
-  { tool: 'dump-monster-attack-filter.ts' },
-  { tool: 'dump-delete-monster-filter.ts' },
-  { tool: 'dump-monster-move-filter.ts' },
-  { tool: 'dump-cursor-filter.ts' },
-  { tool: 'dump-dsa-missiles.ts' },
-  { tool: 'dump-dsa-monsters.ts' },
-  { tool: 'dump-dsa-text.ts' },
-  { tool: 'dump-dsa-message.ts' },
-  { tool: 'dump-dsa-nofilter.ts' },
-  { tool: 'dump-dsa-indirect.ts' },
-  { tool: 'dump-dsa-dungeon.ts' },
-  { tool: 'dump-dsa-save.ts' },
-  { tool: 'dump-skins.ts' },
-  { tool: 'dump-background-lib.ts' },
-  { tool: 'dump-skin-programs.ts' },
-  { tool: 'dump-custom-graphics.ts' },
-  { tool: 'dump-extended-decorations.ts' },
-  { tool: 'dump-csbgraphics-writer.ts' },
-  { tool: 'dump-wall-decoration-art.ts' },
-  { tool: 'dump-virtual-graphics.ts' },
+  { tool: 'reincarnate-entry.ts' },
+  { tool: 'pit-fall.ts' },
+  { tool: 'teleporter-drop.ts' },
+  { tool: 'teleporter-target.ts' },
+  { tool: 'dev-level.ts' },
+  { tool: 'wiggle-cloud.ts' },
+  { tool: 'wiggle-objects.ts' },
+  { tool: 'wiggle-monster.ts' },
+  { tool: 'missile-drop.ts' },
+  { tool: 'drop-move-object.ts' },
+  { tool: 'stairs-move.ts' },
+  { tool: 'local-action.ts' },
+  { tool: 'does-party-have.ts' },
+  { tool: 'dsa-move.ts' },
+  { tool: 'dsa-delete.ts' },
+  { tool: 'dsa-census.ts' },
+  { tool: 'dsa-decoder.ts' },
+  { tool: 'dsa-characters.ts' },
+  { tool: 'dsa-objects.ts' },
+  { tool: 'dsa-widths.ts' },
+  { tool: 'dsa-limits.ts' },
+  { tool: 'dsa-parameters.ts' },
+  { tool: 'dsa-cell-fetch.ts' },
+  { tool: 'viewing-filter.ts' },
+  { tool: 'open-chest.ts' },
+  { tool: 'sound-filter.ts' },
+  { tool: 'action-name-filter.ts' },
+  { tool: 'feeding-filter.ts' },
+  { tool: 'char-damage-filter.ts' },
+  { tool: 'equip-filter.ts' },
+  { tool: 'party-move-filter.ts' },
+  { tool: 'monster-attack-filter.ts' },
+  { tool: 'delete-monster-filter.ts' },
+  { tool: 'monster-move-filter.ts' },
+  { tool: 'cursor-filter.ts' },
+  { tool: 'dsa-missiles.ts' },
+  { tool: 'dsa-monsters.ts' },
+  { tool: 'dsa-text.ts' },
+  { tool: 'dsa-message.ts' },
+  { tool: 'dsa-nofilter.ts' },
+  { tool: 'dsa-indirect.ts' },
+  { tool: 'dsa-dungeon.ts' },
+  { tool: 'dsa-save.ts' },
+  { tool: 'skins.ts' },
+  { tool: 'background-lib.ts' },
+  { tool: 'skin-programs.ts' },
+  { tool: 'custom-graphics.ts' },
+  { tool: 'extended-decorations.ts' },
+  { tool: 'csbgraphics-writer.ts' },
+  { tool: 'wall-decoration-art.ts' },
+  { tool: 'virtual-graphics.ts' },
   { tool: 'watch-conflux-start.ts' },
   { tool: 'watch-3d2d1d-vertical.ts' },
   { tool: 'watch-3d2d1d-gravity.ts' },
-  { tool: 'dump-dsa-overlay.ts' },
-  { tool: 'dump-overlay-screen.ts' },
-  { tool: 'dump-video-mode.ts' },
-  { tool: 'dump-timer-modifier.ts' },
-  { tool: 'dump-flip.ts' },
-  { tool: 'dump-db-reuse.ts' },
+  { tool: 'dsa-overlay.ts' },
+  { tool: 'overlay-screen.ts' },
+  { tool: 'video-mode.ts' },
+  { tool: 'timer-modifier.ts' },
+  { tool: 'flip.ts' },
+  { tool: 'db-reuse.ts' },
   { tool: 'watch-smart-discard.ts' },
-  { tool: 'dump-make-more-room.ts' },
-  { tool: 'dump-missile-monster.ts' },
-  { tool: 'dump-missile-door.ts' },
-  { tool: 'dump-move-from-missile.ts' },
-  { tool: 'dump-missile-teleport.ts' },
-  { tool: 'dump-missile-exterior.ts' },
-  { tool: 'dump-party-move.ts' },
-  { tool: 'dump-last-monster-attack.ts' },
-  { tool: 'dump-monster-blow-mastery.ts' },
-  { tool: 'dump-character-to-damage.ts' },
-  { tool: 'dump-monster-missile-type.ts' },
-  { tool: 'dump-cast-spell.ts' },
-  { tool: 'dump-magic-footprints.ts' },
-  { tool: 'dump-footprint-decoration.ts' },
-  { tool: 'dump-timer-dedupe.ts' },
-  { tool: 'dump-delete-duplicate-timers.ts' },
-  { tool: 'dump-timer-sequence.ts' },
-  { tool: 'dump-timer-heap.ts' },
-  { tool: 'dump-throwing.ts' },
-  { tool: 'dump-clouds.ts' },
-  { tool: 'dump-player-attacks.ts' },
-  { tool: 'dump-fusion.ts' },
+  { tool: 'make-more-room.ts' },
+  { tool: 'missile-monster.ts' },
+  { tool: 'missile-door.ts' },
+  { tool: 'move-from-missile.ts' },
+  { tool: 'missile-teleport.ts' },
+  { tool: 'missile-exterior.ts' },
+  { tool: 'party-move.ts' },
+  { tool: 'last-monster-attack.ts' },
+  { tool: 'monster-blow-mastery.ts' },
+  { tool: 'character-to-damage.ts' },
+  { tool: 'monster-missile-type.ts' },
+  { tool: 'cast-spell.ts' },
+  { tool: 'magic-footprints.ts' },
+  { tool: 'footprint-decoration.ts' },
+  { tool: 'timer-dedupe.ts' },
+  { tool: 'delete-duplicate-timers.ts' },
+  { tool: 'timer-sequence.ts' },
+  { tool: 'timer-heap.ts' },
+  { tool: 'throwing.ts' },
+  { tool: 'clouds.ts' },
+  { tool: 'player-attacks.ts' },
+  { tool: 'fusion.ts' },
   // Level 1 is the argument the assertions were written for: it has a closed door,
   // a movable object with an open neighbour, and creatures.
-  { tool: 'dump-savegame.ts', args: ['1'] },
+  { tool: 'savegame.ts', args: ['1'] },
   // The save file's side of that: the CSBWin-shaped binary blocks. Needs no
   // dungeon and no arguments — it builds its own records.
-  { tool: 'dump-savegame-blocks.ts' },
+  { tool: 'savegame-blocks.ts' },
   // Genuine CSBWin save files from tools/fixtures. The only check in the
   // suite that reads bytes this project did not write, so the only one a bug
   // symmetrical between our reader and our writer cannot satisfy.
-  { tool: 'dump-csbwin-save.ts' },
+  { tool: 'csbwin-save.ts' },
   // The world inside those saves: the dungeon image parsed into a real DungeonData and
   // held up against dungeon.dat. The early saves must still *be* dungeon.dat's world.
-  { tool: 'dump-csbwin-world.ts' },
+  { tool: 'csbwin-world.ts' },
   // The champions inside those saves: the whole CHARDESC, not just the name.
-  { tool: 'dump-csbwin-party.ts' },
-  { tool: 'dump-csbwin-load.ts' },
+  { tool: 'csbwin-party.ts' },
+  { tool: 'csbwin-load.ts' },
   // Chaos Strikes Back's Atari-era saves, with no Extended Features block: loaded,
   // walked and run in a Game on CSB's graphics.dat.
-  { tool: 'dump-atari-saves.ts' },
+  { tool: 'atari-saves.ts' },
   // "MAKE NEW ADVENTURE": a saved game's party carried into mini.dat, field by field,
   // and csbgame2.dat, which CSBWin's utility wrote, made again byte for byte.
-  { tool: 'dump-new-adventure.ts' },
+  { tool: 'new-adventure.ts' },
   // RISE on CSB's entrance: the button carved from the entrance, the adventure stored
   // as a csb save, and the chooser over every set's saves that makes it.
-  { tool: 'dump-rise.ts' },
+  { tool: 'rise.ts' },
   // Chaos Strikes Back's Hint Oracle data, hcsb.hct, decoded and its limits checked.
-  { tool: 'dump-hint-oracle.ts' },
+  { tool: 'hint-oracle.ts' },
   // Its screen, run headlessly: the title list, a hint's pages, the cycle, no clues.
-  { tool: 'dump-hint-oracle-screen.ts' },
+  { tool: 'hint-oracle-screen.ts' },
   // Its button, the inventory's close box: the picture, the click on the party's square
   // after a step, a teleporter and a pit, the clock held, and the close box without it.
-  { tool: 'dump-hint-oracle-button.ts' },
+  { tool: 'hint-oracle-button.ts' },
   // The hint key and the graphics signatures kept from a read and written back at a
   // save, and hcsb.hct read under the key.
-  { tool: 'dump-hint-key.ts' },
+  { tool: 'hint-key.ts' },
   // Block 4 packed and held up against the real thing: every committed save's
   // character block, written again from the champions it yields, byte for byte.
-  { tool: 'dump-character-block.ts' },
+  { tool: 'character-block.ts' },
   // Every block the writer emits, held up against the bytes CSBWin wrote — the same
   // argument as above, widened from block 4 to blocks 2, 3, 5 and 6, which were marked
   // complete and had never been compared with a real file.
-  { tool: 'dump-save-blocks-vs-file.ts' },
+  { tool: 'save-blocks-vs-file.ts' },
   // The same for the whole dungeon image — blocks 7 to 15 — against both dungeon.dat and
   // every committed save. Six of the eight sections are byte-identical; blocks 10 and 13
   // are full of RNs, whose slot numbering is ours, so their non-RN bytes are compared and
   // their RNs resolved. It found thirteen fields the loader was dropping and the whole of
   // EXPOOL, which had no parser at all.
-  { tool: 'dump-dungeon-image-blocks.ts' },
+  { tool: 'dungeon-image-blocks.ts' },
   // Each level's cells where CSBWin reads them, `cellOffset` unwrapped past 64K: the object
   // list's column index against the flags in every data set, and Conflux's block 14.
-  { tool: 'dump-cell-offsets.ts' },
+  { tool: 'cell-offsets.ts' },
   // The three conversions `ReadDatabases` runs over an original dungeon, measured
   // against a dungeon CSBWin converted itself: every committed save was made from this
   // same dungeon.dat, so its converted form is sitting in eight files. Without them a
   // game started from dungeon.dat holds a world no save file can express.
-  { tool: 'dump-dungeon-conversions.ts' },
+  { tool: 'dungeon-conversions.ts' },
   // `ExtendPortraits`, run after the read: dungeon.dat's 24 mirrors cleaned and nothing
   // else moved, and every save that carries `ExpandedPortraits` left as written.
-  { tool: 'dump-extend-portraits.ts' },
+  { tool: 'extend-portraits.ts' },
   // `CheckCelltypes` and `CheckMonsters`, the read's other two clean-ups: no change to
   // dungeon.dat, a save's attached size-4 groups given their slot's positions and facing
   // back by the restore, and every arm tripped on built records, through `new Game` too.
-  { tool: 'dump-check-monsters.ts' },
+  { tool: 'check-monsters.ts' },
   // A compressed dungeon.dat, CSB's prison: `ExpandData` proven byte for byte by the
   // image's own checksum word, and `Word22592` taken from the file for the new game.
-  { tool: 'dump-compressed-dungeon.ts' },
+  { tool: 'compressed-dungeon.ts' },
   // `ReadDatabases`' checksum word, compared with the image's byte sum: a flipped byte
   // fails the prison, DM's dungeon.dat once a word follows it, and every committed save.
-  { tool: 'dump-image-checksum.ts' },
+  { tool: 'image-checksum.ts' },
   // And where such a failed read goes: the boot's chooser hands it to `tag01efee`, whose
   // menu after a lost game, and acknowledged line at the boot, only a left click on OK ends.
-  { tool: 'dump-bad-saved-game.ts' },
-  { tool: 'dump-damaged-read.ts' },
+  { tool: 'bad-saved-game.ts' },
+  { tool: 'damaged-read.ts' },
   // The page's data sets: each loads, builds its own tables, and stands a Game up, and
   // CSB's long 0x231 carries CSBWin's four prison-door buttons (the canary).
-  { tool: 'dump-data-sets.ts' },
+  { tool: 'data-sets.ts' },
   // A player's own set, built from a manifest set's files and read through its record:
   // the same files, the same game, tick for tick; its flags from its files; its prefix.
-  { tool: 'dump-local-data-set.ts' },
+  { tool: 'local-data-set.ts' },
   // A published set's archive, which the welcome page's book makes: the page's zip read
   // back by the tool's own reader and by unzip, every set's files in it, byte for byte.
-  { tool: 'dump-data-set-archive.ts' },
-  { tool: 'dump-build.ts' },
+  { tool: 'data-set-archive.ts' },
+  { tool: 'build.ts' },
   // No value-import cycle in src/: which module of a cycle loads first depends on the
   // entry point, so a value read at load time breaks some entries and not others.
-  { tool: 'dump-import-cycles.ts' },
+  { tool: 'import-cycles.ts' },
   // The deployed server: its start-up check, caching, preconditions, refused paths, the
   // statistics' API, and server.ts itself, run as Node runs it, stopped by SIGTERM.
-  { tool: 'dump-server.ts' },
+  { tool: 'server.ts' },
   // The statistics: what api/event accepts and rebuilds, the SQLite store, its aggregates.
-  { tool: 'dump-stats.ts' },
+  { tool: 'stats.ts' },
   // The statistics' events the page sends: a new game's first tick, the Hall's joins by
   // name and charID, a won game's masteries, a lost game's square, all as the server takes
   // them; none for a player's own set.
-  { tool: 'dump-game-events.ts' },
+  { tool: 'game-events.ts' },
   // A dungeon.dat behind an Extended Features block, the DM Windows package's: read in the
   // block's shape it is DM's dungeon converted, and a new game takes the block's rules.
-  { tool: 'dump-extended-dungeon.ts' },
+  { tool: 'extended-dungeon.ts' },
   // The dungeon's game information, ReadGameInfo's: kept from a block, written into every
   // save, and "No game information was provided" for a size of 0.
-  { tool: 'dump-game-info.ts' },
-  { tool: 'dump-dungeon-file.ts' },
-  { tool: 'dump-dungeon-builder.ts' },
+  { tool: 'game-info.ts' },
+  { tool: 'dungeon-file.ts' },
+  { tool: 'dungeon-builder.ts' },
   // `ReadExtendedFeatures` without a plain sentinel: the "simple" encipherment's stream,
   // RC4.cpp's own, against the compiled C++ and Conflux's enciphered dungeon.dat. And a
   // block it gives up on (checksum, terminator, flag) is no block: the file is read from 0.
-  { tool: 'dump-extended-features-read.ts' },
+  { tool: 'extended-features-read.ts' },
   // The other half of that argument: a genuine save re-serialised in full — all sixteen
   // blocks, image and closing checksum — and read back by this port's own reader. It is
   // what covers the words the block-by-block comparisons have to hold out, by showing
   // they still name the right objects after a whole trip through the file format.
-  { tool: 'dump-save-file-roundtrip.ts' },
+  { tool: 'save-file-roundtrip.ts' },
   // And the live half of that: a running game — played from dungeon.dat, and played on
   // from a genuine save — writes all sixteen blocks through `buildSaveFile`, and the
   // file loads back into a fresh game with the world, the party, the thrown object in
   // flight and the object on the cursor intact.
-  { tool: 'dump-live-save-file.ts' },
+  { tool: 'live-save-file.ts' },
   // The portraits of a party read out of a CSBWin save, drawn into a real screen
   // buffer: CHARDESC carries the picture rather than a graphic-26 index, so the frames
   // (which only ever see an injected party) cover the other path entirely.
-  { tool: 'dump-portraits.ts' },
+  { tool: 'portraits.ts' },
   // The sounds of CSBgraphics.dat a DSA's &SOUND plays: every section of both files read
   // as `ReadSound` does, each a WAV file once summed, and `Decode`'s volume table.
-  { tool: 'dump-custom-sounds.ts' },
+  { tool: 'custom-sounds.ts' },
   // CSBgraphics.dat's alternate monster graphics: every section of both files read as an
   // ALTMONGRAPH, the dungeon's mapping of them by level and type, and the cache's slots.
-  { tool: 'dump-alt-mon-graphics.ts' },
+  { tool: 'alt-mon-graphics.ts' },
   // A group drawn from its alternate graphic: the section's bitplanes, its places and
   // views, the derived graphics kept for the rows further away, and CSBWin's die for a
   // mirrored front beside the party; and the default dungeon names none.
-  { tool: 'dump-alt-mon-draw.ts' },
+  { tool: 'alt-mon-draw.ts' },
   // The graphics files' signatures, and CSBWin's checks of them at a read and at
   // CSBgraphics.dat's first section read: a file the game does not name ends the game.
-  { tool: 'dump-file-signatures.ts' },
-  { tool: 'dump-csbwin-timers.ts' },
+  { tool: 'file-signatures.ts' },
+  { tool: 'csbwin-timers.ts' },
   // Our *own* save, the CSBWin file F5, F9 and the disk menu write and read: saved and
   // loaded over genuine saves and over played games, with the whole of what a load
-  // changes held to a named list. `dump-savegame.ts` drives the runtime snapshot directly
-  // and the `dump-csbwin-*` tools the reader; this is the trip through both.
-  { tool: 'dump-save-roundtrip.ts' },
+  // changes held to a named list. `checks/savegame.ts` drives the runtime snapshot directly
+  // and the `checks/csbwin-*` tools the reader; this is the trip through both.
+  { tool: 'save-roundtrip.ts' },
   // The save/load screen: the button-table offsets it hangs off, the dialog built out
   // of graphic 0's pieces, the row formatting, and the two metadata paths. Nothing here is
   // visible to the golden frames until there are saves to list.
-  { tool: 'dump-save-menu.ts' },
-  { tool: 'dump-widgets.ts' },
+  { tool: 'save-menu.ts' },
+  { tool: 'widgets.ts' },
   // The Sleepsave: a playthrough's slot apart from F5's, written when the party lies down
   // and when the player wakes it, never when a blow does; silent, and refused where F5 is.
-  { tool: 'dump-sleep-save.ts' },
+  { tool: 'sleep-save.ts' },
   // A game an error has ended: the loop stops for good, and no key, click or save path
   // touches the world it left half-updated.
-  { tool: 'dump-fatal-error.ts' },
+  { tool: 'fatal-error.ts' },
   // A playthrough stamped into a save file that names none: six bytes of GAMEBLOCK1, in a
   // block that is scrambled and folded, over every genuine save.
-  { tool: 'dump-save-stamp.ts' },
+  { tool: 'save-stamp.ts' },
   // A dungeon's signature, the walls of each level, and the catalogue of the known
   // dungeons' digests, which is committed: held here to every `dungeon.dat` and save.
-  { tool: 'dump-dungeon-signature.ts' },
+  { tool: 'dungeon-signature.ts' },
   // The title animation and the dungeon entrance. The golden frames can see the entrance
   // once it is up; the nine 0x232 rectangles it hangs off, the hardcoded button list DM's
   // graphics.dat forces, the synthetic 5x5 level behind the doors, the 31-frame slide and
   // ShrinkBLT's fixed point are all invisible to them.
-  { tool: 'dump-intro.ts' },
+  { tool: 'intro.ts' },
   // The welcome page's thumbnails, each set's `<id>-thumbnail.png`: the title's last frame,
   // played from the set's graphics.dat, pixel for pixel and colour for colour.
-  { tool: 'gen-thumbnails.ts', args: ['--check'] },
+  { tool: 'gen-thumbnails.ts', dir: 'tools', args: ['--check'] },
   // A thumbnail in the title's place: reduced to sixteen Atari shades by median cut, the
   // Theron cover pinned, a picture already of sixteen shades given back exactly.
-  { tool: 'dump-title-picture.ts' },
+  { tool: 'title-picture.ts' },
   // The welcome page's font, `src/assets/dm-screen.ttf`: dm-atari's graphics.dat font as a
   // TrueType font, byte for byte what the tool writes. That the browser draws it as the
   // game does is the frames' check.
-  { tool: 'gen-font.ts', args: ['--check'] },
+  { tool: 'gen-font.ts', dir: 'tools', args: ['--check'] },
   // The FTL logo before the title, not CSBWin's: `swoosh.img`'s picture decoded (2306 bytes
   // for 64000 pixels, and a reference picture pixel for pixel) and its palette script run
   // on a headless host, each colour at its VBL.
-  { tool: 'dump-swoosh.ts' },
+  { tool: 'swoosh.ts' },
   // `ExpandGraphic`, the codec every picture in the game goes through, against a real
   // CSBWin screen capture plus a hand-built stream per opcode. Three opcodes were wrong
   // and only one image in the data used them, so nothing else could have caught it.
-  { tool: 'dump-image-codec.ts' },
+  { tool: 'image-codec.ts' },
   // A damaged file's counts set absurdly, one per reader that sizes or loops by one: a DSA's
   // states, the expanded sizes, the LZW chains, a portrait's size, a viewport program's
   // steps. Each throws at once, where it would exhaust the memory or never return.
-  { tool: 'dump-damaged-counts.ts' },
-  { tool: 'dump-hostile-indices.ts' },
+  { tool: 'damaged-counts.ts' },
+  { tool: 'hostile-indices.ts' },
   // Every table read from graphics.dat's table items, written back over the item's own
   // bytes at the offsets Data.h's declarations give it, in every data set.
-  { tool: 'dump-graphics-tables.ts' },
-  { tool: 'dump-graphic-random.ts' },
-  { tool: 'dump-teleporter-shimmer.ts' },
-  { tool: 'dump-door-lightning.ts' },
-  { tool: 'dump-cloud-draw.ts' },
-  { tool: 'dump-wall-text.ts' },
-  { tool: 'dump-missile-draw.ts' },
-  { tool: 'dump-monster-draw.ts' },
-  { tool: 'dump-render-probe.ts' },
+  { tool: 'graphics-tables.ts' },
+  { tool: 'graphic-random.ts' },
+  { tool: 'teleporter-shimmer.ts' },
+  { tool: 'door-lightning.ts' },
+  { tool: 'cloud-draw.ts' },
+  { tool: 'wall-text.ts' },
+  { tool: 'missile-draw.ts' },
+  { tool: 'monster-draw.ts' },
+  { tool: 'render-probe.ts' },
   // Level 2 has an Ant Man with a free open neighbour to be bumped into.
-  { tool: 'dump-button-flash.ts' },
-  { tool: 'dump-mouse-queue.ts' },
-  { tool: 'dump-party-collision.ts', args: ['2'] },
+  { tool: 'button-flash.ts' },
+  { tool: 'mouse-queue.ts' },
+  { tool: 'party-collision.ts', args: ['2'] },
   // Level 2's door at (0,25) is up-down, which is the mode that exercises VerticalSize.
-  { tool: 'dump-door-crush.ts', args: ['2'] },
+  { tool: 'door-crush.ts', args: ['2'] },
   { tool: 'watch-monsters.ts' },
   { tool: 'watch-monster-attacks.ts' },
 ];
@@ -400,10 +403,10 @@ const CHECKS = [
 // because a loader or table change that throws should not wait to be noticed by hand.
 // Only a crash fails them.
 const SMOKE = [
-  { tool: 'dump-defined-items.ts' },
-  { tool: 'dump-level-items.ts' },
-  { tool: 'dump-object-definitions.ts' },
-  { tool: 'dump-preset-heroes.ts' },
+  { tool: 'defined-items.ts' },
+  { tool: 'level-items.ts' },
+  { tool: 'object-definitions.ts' },
+  { tool: 'preset-heroes.ts' },
 ];
 
 const argv = process.argv.slice(2);
@@ -445,7 +448,10 @@ if (!existsSync(TSX)) {
   process.exit(1);
 }
 
-const wanted = ({ tool }) => !only || only.some((o) => tool.includes(o));
+// An `--only` that is a tool's whole name picks that tool alone: `room-text.ts` is also the
+// end of `open-room-text.ts`.
+const names = new Set([...CHECKS, ...SMOKE].map(({ tool }) => tool));
+const wanted = ({ tool }) => !only || only.some((o) => (names.has(o) ? tool === o : tool.includes(o)));
 const checks = CHECKS.filter(wanted);
 const smoke = SMOKE.filter(wanted);
 const single = only && checks.length + smoke.length === 1;
@@ -453,10 +459,10 @@ if (toolArgs.length && !single) {
   console.error(`${toolArgs.join(' ')}: a tool's arguments need --only to pick out one tool.`);
   process.exit(1);
 }
-const tool = ({ tool, args = [] }) => ({
+const tool = ({ tool, dir = 'tools/checks', args = [] }) => ({
   name: tool,
   cmd: TSX,
-  args: [resolve(ROOT, 'tools', tool), ...(toolArgs.length ? toolArgs : args)],
+  args: [resolve(ROOT, dir, tool), ...(toolArgs.length ? toolArgs : args)],
   show: single ? 'always' : undefined,
 });
 const sections = [

@@ -1,6 +1,6 @@
 /**
  * A scripted fortnight of the statistics' events (`doc/STATISTICS.md`): four players, the
- * sets `dm-atari` and `csb`, and `secret`, which no answer may name. `tools/dump-stats.ts`
+ * sets `dm-atari` and `csb`, and `secret`, which no answer may name. `tools/checks/stats.ts`
  * asserts the aggregates the store makes of it, and the dev server answers `api/stats` over
  * a store of it (`vite.config.mts`), so that the statistics page has something to show.
  */

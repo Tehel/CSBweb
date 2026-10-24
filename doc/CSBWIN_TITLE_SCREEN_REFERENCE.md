@@ -4,7 +4,7 @@ Everything before the party is in the dungeon: the title animation, the entrance
 its three buttons, the door-opening animation, the credits scroll and the "Resume" path. And
 the end of the game, `_ShowCredits`, which draws through the same hardware.
 Every line number is `doc/CSBwin-src/<File>.cpp:<line>`. Rectangle and button values marked
-**(from data)** were printed by `tools/dump-intro.ts`, which asserts them on every run.
+**(from data)** were printed by `tools/checks/intro.ts`, which asserts them on every run.
 
 The port is `src/renderer/intro/`: `IntroHost.ts` (the hardware these screens talk to),
 `TitleSequence.ts`, `PrisonDoor.ts`, `PrisonLevel.ts`, `ShowCredits.ts` and `BootSequence.ts`
@@ -88,11 +88,11 @@ right are **painted into graphic 4**. Nothing is drawn as text at runtime.
 | `Word108` | 120 | 199 | 95 | 108 | 80×14 | "THE END", graphic 6 |
 
 They are the last 136 bytes of a 1826-byte item and they are read by a parser that walks the
-whole thing field by field, so `tools/dump-intro.ts` checks each one against something
+whole thing field by field, so `tools/checks/intro.ts` checks each one against something
 CSBWin states independently: `Word84` against `allocateMemory(20608,0)` at `:9603`, `Word60`
 against the `SrcByteWidth` of 112 at `:9521`, `Word44` against `pGraphic += 9120; // =57*160`
 at `:9376`, and `Word92`/`Word100` against each other tiling 0..231 with no seam.
-`tools/dump-show-credits.ts` checks `Word108` against graphic 6, 80×14: the 40-byte source
+`tools/checks/show-credits.ts` checks `Word108` against graphic 6, 80×14: the 40-byte source
 width of `BLT2Screen(…, d.Word108, 40, -1)` and the 560 bytes `A3` skips past it
 (`Code1f9e6.cpp:136`, `:229`).
 
@@ -180,12 +180,12 @@ plays the animation above, from graphic 1, through registers its code sets. Noth
   nearest of the Atari's eight levels shown x36 (`atariToRGB`); each pixel takes the register
   nearest its colour as the canvas shows it. No dithering. The page reads the image without
   colour management (`createImageBitmap`, `colorSpaceConversion: 'none'`), so a PNG gives
-  every player the same screen, the tool's (`tools/dump-title-picture.ts`, the Theron cover
+  every player the same screen, the tool's (`tools/checks/title-picture.ts`, the Theron cover
   pinned).
 - **The showing** (`showTitlePicture`): a fade to black, as the animation's first; the picture
   put up under black registers; `_FadeToPalette` to its registers (eight VBLs, which from black
   reach any shade); `TITLE_PICTURE_HOLD_VBLS`, 90, the author's choice; a fade to black, and the
-  screen cleared. 114 VBLs in all (`tools/dump-intro.ts`).
+  screen cleared. 114 VBLs in all (`tools/checks/intro.ts`).
 - The FTL logo before it is untouched, and the startup animations setting turns both off. A
   set without a thumbnail, or with one of another size than 320x200 (an older record's), plays
   the animation. The welcome page goes on showing the thumbnail in full colour.
@@ -294,7 +294,7 @@ DM's `graphics.dat` takes that branch: `extractUITables` returns an empty `butto
 under exactly the same condition and `MISSING_PRISON_DOOR_BUTTONS`
 (`src/renderer/intro/PrisonDoor.ts`) stands in. Chaos Strikes Back's item 0x231 is the
 0x804-byte form, and its last 48 bytes are those four buttons word for word, which
-`extractUITables` reads (`tools/dump-data-sets.ts`, `doc/PROVEN_FACTS.md`).
+`extractUITables` reads (`tools/checks/data-sets.ts`, `doc/PROVEN_FACTS.md`).
 
 **(from data)** — `struct btn` is `{ i16 word0; i16 xMin, xMax, yMin, yMax; i16 button; }`
 (`CSB.h:1662`), and the mask is `2 = left, 1 = right`:
@@ -323,7 +323,7 @@ as RESUME does, the doors shut. Its picture is carved into a copy of graphic 4: 
 gem (14x14 at (243,78)) and the 7x8 cells of PRISON's R, I, S and RESUME's first E, each
 without the panels' bare stone (colour 10), with the gem at (246,165) and the letters as
 RESUME's stand to its gem. Its rectangle stands to its gem as RESUME's does
-(`tools/dump-rise.ts`).
+(`tools/checks/rise.ts`).
 
 ### The loop, `:9641-9664`
 
@@ -472,7 +472,7 @@ the bottom. `0xE` and `0xD` were wrong in the same way and are used only by the 
 0x22e..0x232, which are never decoded as images.
 
 `src/core/imageDecoder.ts` is now a transcription of `CSBCode.cpp:10961` and carries the
-opcode table; `tools/dump-image-codec.ts` holds graphic 5 up against
+opcode table; `tools/checks/image-codec.ts` holds graphic 5 up against
 `tools/reference/csbwin-credits.png`, a capture of CSBWin's own screen.
 
 
@@ -546,7 +546,7 @@ a cleared screen, the menu centred at (47, 33), and a fade up to `d.Palette11978
 is unported (`DEBT.md` G14). `tag021028` in `src/renderer/intro/BootSequence.ts`, after
 `showPrisonDoor` and after the restart's chooser, on the intro host, keeps the rest: the
 fade to black and the cleared screen that `DoMenu` gave the chooser's picture, then
-`wvbl(_4_)` and the cleared screen. Evidence: `tools/dump-bad-saved-game.ts`, "a save
+`wvbl(_4_)` and the cleared screen. Evidence: `tools/checks/bad-saved-game.ts`, "a save
 read" (one fade, four VBLs, no wait for a click), and the golden frame
 `tools/frames/12-game-loaded.png`, the loaded game's first view, a click on LOAD after
 the entrance.
@@ -684,7 +684,7 @@ before `GameHost.showCredits(true)`. `d.Word11694` is `GameState.gameWon`.
 
 The port gives `IntroHost` a `palette11946`, drawn over the viewport by `present` while it is
 set, for step 3; the page's is the viewport palette the adventure showed, or `null` with an
-inventory open (`GameScreen.palette11946`). `tools/dump-show-credits.ts` checks both branches.
+inventory open (`GameScreen.palette11946`). `tools/checks/show-credits.ts` checks both branches.
 
 
 ## Skipping it

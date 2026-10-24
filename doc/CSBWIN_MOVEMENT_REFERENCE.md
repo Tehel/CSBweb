@@ -115,4 +115,4 @@ Verified facts:
 Observed on level 2's up-down door at (0,25) with an Ant Man
 (`verticalSize == 1`) under it: the door steps `1 → 0 → 1` — it closes to 1, crushes
 and rebounds to 0, and the `TT_M3` poke gives the group a turn, which it uses to walk
-out from under the door (`tools/dump-door-crush.ts`).
+out from under the door (`tools/checks/door-crush.ts`).

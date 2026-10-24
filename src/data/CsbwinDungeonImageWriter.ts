@@ -19,7 +19,7 @@
  * byte-identical to the file they came from. Blocks 10 and 13 are full of RNs, and an RN
  * in a save is a slot number in an index whose numbering is ours rather than CSBWin's
  * (`src/data/CsbwinObjectIndex.ts`), so those two cannot be byte-identical and are held
- * up against the file a different way — see `tools/dump-dungeon-image-blocks.ts`.
+ * up against the file a different way — see `tools/checks/dungeon-image-blocks.ts`.
  *
  * Every word is **big-endian**. `SaveGame` runs `DUNGEONDATINDEX::Swap`,
  * `swapLevelDescriptors` and `swapPointer10454` over each section immediately before
@@ -368,7 +368,7 @@ function databaseRecords(dungeon: DungeonData, db: number): DatabaseRecord[] {
  * routinely still points at a slot that has since been freed. `readRNOfRecord` reads
  * those and drops them, which is the only reading that does not make a perfectly good
  * save unreadable, and this writes `RNnul` back where the file holds the stale slot.
- * `tools/dump-dungeon-image-blocks.ts` exempts exactly those words, by name.
+ * `tools/checks/dungeon-image-blocks.ts` exempts exactly those words, by name.
  */
 function writeRecord(
     buf: Uint8Array,

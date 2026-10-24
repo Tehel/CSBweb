@@ -137,7 +137,7 @@ export function ConvertToIndirectText(data: DungeonData): void {
  * bits 8-14 of the true `word2` rather than bits 0-6. This port's records are already
  * decoded, so it reads the type CSBWin meant. The two agree for any dungeon with no
  * type-47 actuator under *either* reading, and DM's `dungeon.dat` has none under either;
- * `tools/dump-dungeon-conversions.ts` asserts that rather than assuming it.
+ * `tools/checks/dungeon-conversions.ts` asserts that rather than assuming it.
  * <sub>`doc/PROVEN_FACTS.md` → "`MakeBigActuators` runs before the byte swap".</sub>
  */
 export function MakeBigActuators(data: DungeonData): void {

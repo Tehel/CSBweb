@@ -13,7 +13,7 @@ FULLSCREEN taps).
 The GAME and DISPLAY tabs are a grid of two buttons a line: x 85 (left) or 236
 (right), y 65, 86 or 107 for the three lines; setting `n` of `TABS` is
 `settingButtonFrame(n)`, line `n >> 1`, side `n & 1`. **Reordering a tab's settings** is
-a geometry change too: the indices in `tools/dump-settings-dialog.ts`, the probe's
+a geometry change too: the indices in `tools/checks/settings-dialog.ts`, the probe's
 clicks (its DISPLAY clicks in three places: `toggleCrt`'s `SCANLINES`/`CURVE`, ASPECT
 RATIO's after frame 22, and the fullscreen section's FULLSCREEN and effect clicks), and
 frames 21 and 22.

@@ -6,7 +6,7 @@
  *
  * `DUNGEON_DATA_SOURCES` is the list of what it holds: every field of `DungeonData`, and
  * where a restore takes it from. It is typed over every key, so a field added to
- * `DungeonData` does not compile until it is placed there, and `tools/dump-savegame.ts`
+ * `DungeonData` does not compile until it is placed there, and `tools/checks/savegame.ts`
  * walks it to check that play wrote no `loaded` field and that every `snapshot` field
  * comes back.
  *

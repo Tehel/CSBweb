@@ -13,7 +13,7 @@
  * The file's statics are CSBWin's module state, not `d.`, and no save carries them: they
  * are `ctx.smartDiscard` here.
  *
- * `tools/watch-smart-discard.ts` pads a database past the limit.
+ * `tools/checks/watch-smart-discard.ts` pads a database past the limit.
  */
 import { getActuatorType } from '../data/actuatorHelpers';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';

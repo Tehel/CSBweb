@@ -71,7 +71,7 @@ export interface KnownDungeon {
 /**
  * The catalogue. It is not read from the game's files as a table of CSBWin's is: it may
  * list a dungeon whose files the page does not have, and the page loads one data set's.
- * `tools/dump-dungeon-signature.ts` holds every entry to the files here, and prints the
+ * `tools/checks/dungeon-signature.ts` holds every entry to the files here, and prints the
  * digests of a dungeon that is to be added.
  *
  * The four Dungeon Master sets are one dungeon. Chaos Strikes Back is two: its

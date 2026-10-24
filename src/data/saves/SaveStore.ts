@@ -7,7 +7,7 @@
  * (`BrowserSaveStore`), for every data set, so a row names its own.
  *
  * **Nothing in this file touches the DOM**: the rows, their order and their formatting
- * are pure, so that `tools/dump-save-menu.ts` can assert them headlessly.
+ * are pure, so that `tools/checks/save-menu.ts` can assert them headlessly.
  */
 import { csbwinSaveInfoOf, readCsbwinSaveInfo, type CsbwinSaveInfo } from '../CsbwinSaveInfo';
 import type { SaveGameState } from '../SaveGameLoader';

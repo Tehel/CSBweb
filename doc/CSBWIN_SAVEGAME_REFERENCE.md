@@ -201,7 +201,7 @@ a four-bitplane 32x29 picture, unswapped, in Atari order. The champion carries t
 picture itself; there is no portrait index in the struct, and for a portrait supplied
 from `CSBgraphics.dat` there never was one. `doc/PROVEN_FACTS.md`, "`CHARDESC` carries
 the champion's portrait as pixels, not an index", has the citations and the plane
-layout; `src/data/CsbwinCharacters.ts` reads it and `tools/dump-portraits.ts` proves it
+layout; `src/data/CsbwinCharacters.ts` reads it and `tools/checks/portraits.ts` proves it
 reaches the status box.
 
 ## What the port writes and reads
@@ -294,28 +294,28 @@ and the port writes as zero.
 one of real play (`tools/lib/saves.ts`). They are files this project did not write, so a
 bug the port's reader and writer share cannot satisfy them.
 
-- `tools/dump-csbwin-save.ts`: those eight and Chaos Strikes Back's two read. Blocks 0-6
+- `tools/checks/csbwin-save.ts`: those eight and Chaos Strikes Back's two read. Blocks 0-6
   unscramble with every checksum clean, the party position, clock, seed, timer counters
   and every champion's name and title come out of blocks 2 and 4, and saves of the same
   party read back as the same roster.
-- `tools/dump-save-file-roundtrip.ts`: each of the eight parsed, all sixteen blocks
+- `tools/checks/save-file-roundtrip.ts`: each of the eight parsed, all sixteen blocks
   written again and read back by the port's own reader, field for field.
-- `tools/dump-save-blocks-vs-file.ts` (blocks 0-6), `tools/dump-character-block.ts`
-  (block 4) and `tools/dump-dungeon-image-blocks.ts` (blocks 7-15): written again from
+- `tools/checks/save-blocks-vs-file.ts` (blocks 0-6), `tools/checks/character-block.ts`
+  (block 4) and `tools/checks/dungeon-image-blocks.ts` (blocks 7-15): written again from
   what was read, and compared with the file's own bytes.
-- `tools/dump-live-save-file.ts`: a game played out of `dungeon.dat` and one played on
+- `tools/checks/live-save-file.ts`: a game played out of `dungeon.dat` and one played on
   from `csbgame7.dat`, each written and loaded into a fresh engine, with the world, the
   party, a thrown object in flight and the object on the cursor intact. Its scenario 2
   holds the monster state to a fixed point rather than to the played game, because a load
   re-creates every group's movement timers and re-rolls their walk offsets, as CSBWin's
   does.
-- `tools/dump-csbwin-world.ts` (every object chain of every save),
-  `tools/dump-csbwin-party.ts` (every possession slot names a live record),
-  `tools/dump-csbwin-load.ts` (each save restored into a real `Game` and asked where the
-  party is, what it carries and what every cell holds), `tools/dump-csbwin-timers.ts`
+- `tools/checks/csbwin-world.ts` (every object chain of every save),
+  `tools/checks/csbwin-party.ts` (every possession slot names a live record),
+  `tools/checks/csbwin-load.ts` (each save restored into a real `Game` and asked where the
+  party is, what it carries and what every cell holds), `tools/checks/csbwin-timers.ts`
   (two saves whose door timers differ in one byte: one door opens, the other shuts),
-  `tools/dump-dungeon-conversions.ts` (the conversions against the saves' converted
-  form) and `tools/dump-save-roundtrip.ts` (the file a save is, saved and loaded:
+  `tools/checks/dungeon-conversions.ts` (the conversions against the saves' converted
+  form) and `tools/checks/save-roundtrip.ts` (the file a save is, saved and loaded:
   five cycles that leave the timer table the same size, and three played games whose
   every difference after a load is on the list of what a file does not hold).
 
@@ -332,7 +332,7 @@ The full section layout, the two record sizes that differ from `dungeon.dat`
 (ACTUATOR 10 with `bigActuators`, SCROLL 6 from version `'B'`) and the little-endian
 indirect-text block are written up in `doc/PROVEN_FACTS.md` → "The dungeon image
 layout in a save file". `computeDungeonImageLayout` in `src/data/DungeonImageLayout.ts`
-implements it, for the reader, a save's read and `Chaos` alike, and `tools/dump-csbwin-save.ts` checks that the section lengths sum
+implements it, for the reader, a save's read and `Chaos` alike, and `tools/checks/csbwin-save.ts` checks that the section lengths sum
 exactly to `EOF - 2` on every save it reads, the eight of `tools/fixtures/` and Chaos
 Strikes Back's two.
 
@@ -344,7 +344,7 @@ hands the byte range to `DungeonLoader` with a `DungeonImageOptions` describing 
 three differences (big actuators, new scrolls, indirect text) that the Extended
 Features block declares.
 
-`tools/dump-csbwin-world.ts` is the evidence. The saves taken at the first moment the
+`tools/checks/csbwin-world.ts` is the evidence. The saves taken at the first moment the
 game allows one still hold `dungeon.dat`'s world, and they read back with **zero**
 differing cell flags across all 12087 cells of all 14 levels; the played saves differ
 by 82 to 733 cells, rising with how far into the game they were taken.
@@ -373,7 +373,7 @@ port's own save is such a file and loads the same way: `applySaveBytes` in
 `src/engine/SaveGameFile.ts` is what the disk menu's LOAD and F9 call
 (`doc/SAVES.md`).
 
-`tools/dump-csbwin-load.ts` is the evidence: all eight saves of `tools/fixtures/` are
+`tools/checks/csbwin-load.ts` is the evidence: all eight saves of `tools/fixtures/` are
 restored into a real `Game` and the *live engine* is then asked where the party is, who
 it is, what its cell holds, and whether every cell flag in all fourteen maps is the
 save's.

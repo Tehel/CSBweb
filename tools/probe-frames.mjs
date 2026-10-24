@@ -144,7 +144,7 @@ const crtEffect = () => evaluate(`(()=>{const gl=document.getElementById('crt-ca
 const key = (k) => evaluate(`document.dispatchEvent(new KeyboardEvent('keydown',{key:${JSON.stringify(k)},code:${JSON.stringify(k)},bubbles:true})),1`);
 // Whether the game takes a notch of the wheel over the canvas, rather than leave it to the
 // page: a save menu's list does, the disk menu's and the entrance's chooser's, and nothing
-// else. That it scrolls the list is `tools/dump-save-menu.ts`'s to show.
+// else. That it scrolls the list is `tools/checks/save-menu.ts`'s to show.
 const wheelTaken = () => evaluate(`(()=>{const e=new WheelEvent('wheel',{deltaY:100,cancelable:true,bubbles:true});
   document.getElementById('game-canvas').dispatchEvent(e); return e.defaultPrevented;})()`);
 // button: 0 = left (DM mask 2), 2 = right (DM mask 1)
@@ -464,7 +464,7 @@ check(abortedDelete === 'failed, listed', `a delete whose transaction aborts fai
 //
 // This is the only evidence that the corridor behind the doors actually renders. It is
 // drawn by the real viewport renderer over a synthetic 5x5 level
-// (`src/renderer/intro/PrisonLevel.ts`), and `tools/dump-intro.ts` can check the level and
+// (`src/renderer/intro/PrisonLevel.ts`), and `tools/checks/intro.ts` can check the level and
 // the compositing but not the pixels the bytecode programs produce.
 // The welcome page (`src/ui/welcomePage.ts`): the page with no known `?dungeon=`, HTML and
 // no game. The store holds the one save made above, of dm-atari, so its tile is bright and
@@ -607,7 +607,7 @@ await clickOn('.pick[data-set="dm-atari"]');
 // again by "Generate from data" from DM's graphics; the checkbox beside a thumbnail, off
 // at first, gone without one, checked to show it as the title. What the dropped dungeon holds
 // shows under the checklist, the form still on one screen. The record is stored, its
-// thumbnail the site's DM thumbnail pixel for pixel, and the page shows its tile selected. What the check refuses is `tools/dump-local-data-set.ts`'s.
+// thumbnail the site's DM thumbnail pixel for pixel, and the page shows its tile selected. What the check refuses is `tools/checks/local-data-set.ts`'s.
 // The set's id is the run's own: a dev server or an image another run used still holds the
 // set that run published, and refuses its id.
 const MINE = `mine-${Date.now().toString(36)}`;
@@ -1192,7 +1192,7 @@ check(onHeading !== chooserUp && onHeading !== entrance && (await canvasPixels()
   'the entrance\'s chooser takes the arrow keys, and stays up');
 // EXPORT (x 170..220, y 161..174) on that save: the page's own download
 // (`downloadSaveFile`, `src/data/saves/downloadSaveFile.ts`), which no Node tool can run.
-// What the file holds is `tools/dump-save-menu.ts`'s to show.
+// What the file holds is `tools/checks/save-menu.ts`'s to show.
 // The welcome page's archive was downloaded before it.
 const exportedFrom = downloads.length;
 await canvasClick(195, 168, 0); await until(ENTRANCE, 'the entrance at rest');
@@ -1206,7 +1206,7 @@ check(exported.length === 1 && /^csbweb-\d{8}-\d{6}\.dat$/.test(exported[0]),
 // the csb set's save, another dungeon's here, so it is refused in a one-option menu and
 // nothing is stored; OK (the centred menu's one button, around (159,147)) brings the
 // chooser back, its message gone. What is stored and what is asked is
-// `tools/dump-save-menu.ts`'s to show.
+// `tools/checks/save-menu.ts`'s to show.
 const dropTaken = await evaluate(`(async()=>{
   const bytes = await (await fetch('/gamefiles/csb/csbgame2.dat')).arrayBuffer();
   const data = new DataTransfer();
@@ -1285,7 +1285,7 @@ console.log('state: door lock, F2');     await shot('11-door-lock-f2');
 // the south face of level 0 (16,7), seen from two squares south and one to either side,
 // facing north: from (17,9) it is front-left, from (15,9) front-right. It is scaled to the
 // F2 centre width and cut by the screen border, so on the left it must show the bitmap's
-// right end, and on the right its left end. `tools/dump-hall-of-champions.ts` pins the
+// right end, and on the right its left end. `tools/checks/hall-of-champions.ts` pins the
 // rectangles; these two frames pin the pixels.
 await evaluate(FACE(17, 9, 0, 0)); await vbls(TICK);
 console.log('state: F2 front-left wall'); await shot('13-edge-decoration-left');
@@ -1294,7 +1294,7 @@ console.log('state: F2 front-right wall'); await shot('14-edge-decoration-right'
 // A wall text seen from afar is its plaque, cut short for a text of one to three lines
 // (`doc/CSBwin-src/CSBCode.cpp:3625-3660`). "HALL OF / CHAMPIONS", on the north
 // face of level 0 (8,5), seen from (8,3) facing south: two lines at F2 centre, so the
-// plaque stops at `d.Byte4212[10]`, row 53 of its 37-73. `tools/dump-wall-text.ts` pins
+// plaque stops at `d.Byte4212[10]`, row 53 of its 37-73. `tools/checks/wall-text.ts` pins
 // the cut at every position; this frame pins it in a real view.
 await evaluate(FACE(8, 3, 0, 2)); await vbls(TICK);
 console.log('state: wall text at F2');   await shot('19-wall-text-f2');
@@ -1355,7 +1355,7 @@ check(await selected() === -1, 'the inventory closed again');
 // party's square. CSB's `csbgame2.dat` is read into a `?intro=0` game, and its party set on
 // level 4 (1,7), thirteen squares from the nearest creature, so nothing moves while the
 // frames are taken; there the Oracle lists CREATURES and CIRCLE OF POISON. Its title list
-// cycles a palette slot every 21 VBLs, so it is no frame: `tools/dump-hint-oracle-screen.ts`
+// cycles a palette slot every 21 VBLs, so it is no frame: `tools/checks/hint-oracle-screen.ts`
 // checks its pixels. A hint's page, the first title's, does not cycle, and is one.
 await navigate(`${APP}?intro=0&dungeon=csb`, GAME);
 await evaluate(`(async()=>{
@@ -1393,7 +1393,7 @@ check(!(await evaluate(`window.__probe.screen.isHintOracleUp()`)) && (await canv
 
 // Conflux 3.5 at its start: level 0, (13,24) facing north, no champion. Nearly every view
 // of it runs a skin's program from its `CSBgraphics.dat`, and its DSAs run from the first
-// tick (`tools/watch-conflux-start.ts`). The square in front is a wall, which its skin
+// tick (`tools/checks/watch-conflux-start.ts`). The square in front is a wall, which its skin
 // paints with a picture, and nothing in view moves.
 await navigate(`${APP}?intro=0&dungeon=conflux-3.5`, GAME);
 await leaveCanvas(); await vbls(SHOWN);
@@ -1411,7 +1411,7 @@ await evaluate(`(()=>{const o = ${OVERLAY}; o.active = false; o.Jitter(0, 0, 0, 
 await vbls(TICK);
 check((await canvasPixels()) === confluxStart, 'the overlay hidden and the view shifted back, it is frame 18 again');
 // Wall decorations of Conflux's `CSBgraphics.dat`, their bitmaps read as bitplanes
-// (`tools/dump-extended-decorations.ts`), from level 0 (14,14) facing south: on the west
+// (`tools/checks/extended-decorations.ts`), from level 0 (14,14) facing south: on the west
 // faces of the squares to the left, decoration 5, a bookshelf, drawn as it stands at F1
 // (15,15), and decoration 11, a ladder, its side view scaled by `ShrinkBLT` to F2 (15,16).
 await evaluate(FACE(14, 14, 0, 2)); await vbls(TICK);

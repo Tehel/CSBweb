@@ -77,8 +77,8 @@ The bug is not understood until a `tools/` script reproduces it with an assertio
 have not found it yet — you have found something else that is also true.
 
 The `verification-tools` skill has how to write one: the real engine against the real game
-files, printing a table *and* asserting. Extend an existing `dump-*.ts` when one already
-covers the area (`dump-vi-altar.ts` grew from 342 to 518 lines for the bones fix) rather
+files, printing a table *and* asserting. Extend an existing `tools/checks/` tool when one already
+covers the area (`checks/vi-altar.ts` grew from 342 to 518 lines for the bones fix) rather
 than starting a new one.
 
 ## 6. What every fix owes
@@ -86,8 +86,8 @@ than starting a new one.
 The last several bug-fix commits shipped exactly these five things. Treat it as a checklist:
 
 1. **`src/`** — the fix.
-2. **`tools/dump-*.ts`** — new or extended, asserting the thing that was broken.
-3. **`tools/run-checks.mjs`** — one line, `{ tool: 'dump-<name>.ts' },`, if the tool is new.
+2. **`tools/checks/*.ts`** — new or extended, asserting the thing that was broken.
+3. **`tools/run-checks.mjs`** — one line, `{ tool: '<name>.ts' },`, if the tool is new.
    A tool nobody runs is not a regression test.
 4. **`doc/PROVEN_FACTS.md`** — the CSBWin fact you had to establish, with its
    `doc/CSBwin-src/<File>.cpp:<line>` citation. Only what you are certain of.

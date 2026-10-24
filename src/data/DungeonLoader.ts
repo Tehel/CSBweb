@@ -66,7 +66,7 @@ export interface DungeonImageOptions {
      * `convertOriginalDungeon` runs (`src/data/CsbwinDungeonConversions.ts`).
      *
      * CSBWin has no such switch — it always converts — and neither does the game. This
-     * exists for `tools/dump-dungeon-image-blocks.ts`, which writes `dungeon.dat`'s own
+     * exists for `tools/checks/dungeon-image-blocks.ts`, which writes `dungeon.dat`'s own
      * sections back out and byte-compares them with the file, and so needs the world in
      * the file's shape rather than in the shape a save is written in.
      */

@@ -342,7 +342,7 @@ export function bltShapeToViewportIndex(
  *
  * A group is 16 pixels of a row, rows padded to whole groups as CSBWin's bitmaps are; the
  * padding reads as colour 0. No caller's graphic has any: the teleporter's are 32 wide and
- * its masks multiples of 16 (`tools/dump-teleporter-shimmer.ts`).
+ * its masks multiples of 16 (`tools/checks/teleporter-shimmer.ts`).
  */
 export function tag008c98(
   src: IndexedBitmap,

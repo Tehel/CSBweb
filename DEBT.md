@@ -24,11 +24,11 @@ code needs to be a base others can read and build on. Of the page's redesign, th
 interface in the canvas (U) and the welcome page are in, and E39 is what is left.
 
 **Conflux 3.5** (`tools/fixtures/gamefiles/conflux-3.5-b8/`) is the third dungeon, a data set
-(`conflux-3.5`) whose first ticks play (`tools/watch-conflux-start.ts`) and whose start is a
+(`conflux-3.5`) whose first ticks play (`tools/checks/watch-conflux-start.ts`) and whose start is a
 golden frame. What waits on the author for it is C150. Its `dungeon.dat` is enciphered, and reads whole
 (`doc/PROVEN_FACTS.md` → "The "simple" encipherment is `RC4.cpp`'s own cipher"). Its
 skins are drawn (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Skins in the data sets"). Every DSA operation CSBWin has is ported, not only Conflux's share
-(`tools/dump-dsa-census.ts`), and a dungeon with DSAs saves (`tools/dump-dsa-save.ts`).
+(`tools/checks/dsa-census.ts`), and a dungeon with DSAs saves (`tools/checks/dsa-save.ts`).
 
 **First, at the author's request: P — players' own data sets.** A player adds a dungeon
 from their own files to the welcome page, plays it, edits it, deletes it and publishes it,
@@ -88,17 +88,17 @@ by default, so with them off the game is CSBWin's and the golden frames do not m
 3. **Refactors change no behaviour.** Tiers D and E are refactors: `npm test` before and
    after, and `npm test -- --frames` whenever anything under `src/renderer/` or `src/ui/`
    moves. Better still, and expected for any split of a module: every tool's full output is
-   byte-identical before and after (only `dump-save-menu`, by one byte, and
-   `dump-savegame`, by its payload's size, vary on their own: both carry the save's
-   wall-clock date; `dump-new-game` and `dump-game-events`, by the random game ids
-   they print; and `dump-monster-design-options`, whose unseeded games draw their seed
+   byte-identical before and after (only `checks/save-menu`, by one byte, and
+   `checks/savegame`, by its payload's size, vary on their own: both carry the save's
+   wall-clock date; `checks/new-game` and `checks/game-events`, by the random game ids
+   they print; and `checks/monster-design-options`, whose unseeded games draw their seed
    from `Math.random`, so it compares only with `Math.random` pinned, through
    `npx tsx --import`), and the author's runtime saves hash the same after load and
    after 600 ticks. A refactor that uncovers a divergence records it in tier C. If it is
    fixed at all, the fix goes in a **separate** commit, so every commit is either
    behaviour-neutral or a fix, never both.
 4. **A fix owes the usual five things** (`.claude/skills/playtest-bug/`): the CSBWin
-   citation, the fix, a `tools/` check that fails before it, a `doc/PROVEN_FACTS.md` entry
+   citation, the fix, a `tools/checks/` tool that fails before it, a `doc/PROVEN_FACTS.md` entry
    if a new fact was verified, and the bookkeeping here.
 5. **When an item is paid,** delete its entry and its index row, and rewrite or remove
    every code comment that cites its ID: an ID in the code means the debt is still open.
@@ -177,7 +177,7 @@ not have, as a manifest set's are read through `folderFiles` (`src/data/DataSetF
 It sends no statistics. An imported save is held against its `dungeon.dat` as any set's
 is, and one whose walls moved is stored on IMPORT ANYWAY (`checkDungeon`, `doc/SAVES.md`
 → "An import is checked against the dungeon"), so that a set being built keeps its saves
-as its walls move. `tools/dump-local-data-set.ts` plays such
+as its walls move. `tools/checks/local-data-set.ts` plays such
 records against their manifest sets. The welcome page (`src/ui/welcomePage.ts`) shows the local sets beside the
 manifest's, under the same order, a record's thumbnail as its tile's picture, and counts
 their saves; its last tile, "+ Add my own", opens the form that adds a set
@@ -195,7 +195,7 @@ from data", which draws the site's sets' thumbnail, the title's last frame
 the boot reads to show it, reduced to sixteen Atari colours, in the title animation's place
 (`src/renderer/intro/TitlePicture.ts`); under it, what the dungeon holds once its
 `dungeon.dat` reads (`dungeonCensus`, `src/engine/DungeonCensus.ts`, whose DSA half
-`tools/dump-dsa-census.ts` checks); and CANCEL and CONFIRM. `checkLocalDataSet`
+`tools/checks/dsa-census.ts` checks); and CANCEL and CONFIRM. `checkLocalDataSet`
 (`src/engine/LocalDataSetCheck.ts`) runs at every change with the boot's own readers, each file read, parsed and hashed once and `src/engine/FileSignatures.ts`'s rules, and
 makes the record CONFIRM stores; the page then shows the set selected. A pen on a local
 set's picture reopens the form on its record: its id fixed, since its saves are filed
@@ -206,7 +206,7 @@ go with the set and pointing to the save menu's EXPORT, then removes the record 
 those saves in one transaction (`BrowserDataSetStore.remove`). Its PUBLISH, enabled while
 the form shows the record as stored, sends it to the server (below), and the page then
 asks `api/data-sets` again.
-`tools/dump-local-data-set.ts` proves the check, the record and the census,
+`tools/checks/local-data-set.ts` proves the check, the record and the census,
 `tools/probe-frames.mjs` drives the form, adding, editing, publishing and deleting a set.
 
 The server lists the site's sets from its store (`server/dataSets.ts`, `doc/DEPLOYMENT.md`
@@ -223,7 +223,7 @@ check: `npm run build` bundles `checkLocalDataSet` and its readers for Node into
 which `server.ts` loads at start-up and hands the API (`CheckDataSet`, `loadCheckDataSet`,
 `server/app.ts`), a tool the source's function instead, and the publish route reads a set
 with it (`server/publish.ts`).
-`tools/dump-build.ts` proves the bundle says what the source says, `tools/dump-server.ts`
+`tools/checks/build.ts` proves the bundle says what the source says, `tools/checks/server.ts`
 that the server does not start without it, and `tools/check-image.sh` that the image's
 Node runs it. A published set's row keeps its dungeon's walls, read by the same module
 (`fillWalls` at start-up for a row that keeps none), which `api/data-set-walls` answers,
@@ -240,7 +240,7 @@ edit as a form (`server/edit.ts`), and a change of files writes the set a new fo
 → "Moderating the sets"), the page then asking for the sets anew. The dev server answers
 it too, replaying the changes made since it started over the store it makes at each
 request, and has one moderator, `DEV_MODERATOR_PLAYER_ID` (`vite.config.mts`), whom
-`tools/check-image.sh` makes the image's too. `tools/dump-server.ts` asserts every action,
+`tools/check-image.sh` makes the image's too. `tools/checks/server.ts` asserts every action,
 edit and refusal, and `tools/probe-frames.mjs` moderates and edits the set it publishes,
 from the tiles, as that moderator and as its owner.
 
@@ -251,7 +251,7 @@ folder holds for its players, a link each; to a moderator, it adds a file chosen
 drive and removes one
 (`server/documents.ts`, `doc/DEPLOYMENT.md` → "A set's documents"). The store lists them in
 `data_set_documents`, and each change writes the set a new folder, as an edit of its files
-does. `tools/dump-server.ts` asserts each change and refusal, `tools/dump-data-set-archive.ts`
+does. `tools/checks/server.ts` asserts each change and refusal, `tools/checks/data-set-archive.ts`
 the archive of every set, and `tools/probe-frames.mjs` downloads the archive, adds and
 removes documents from the book, as the moderator, and reads them as the owner.
 
@@ -396,8 +396,8 @@ only, the rate limits counting an IPv6 client by its /64, a budget of events a d
 game's `started` and `won` stored once, a log of bounded rows, a champion's name of the game's characters, a POST from another site's page
 refused, a content security policy and `nosniff` on every answer, errors that leak nothing, a
 container held to a memory, process and privilege budget, read-only but for its data, and
-statistics aggregated as the events arrive, each answer capped and cached 30 s. Each item ships with its check in `tools/dump-server.ts`
-or `tools/dump-stats.ts`.
+statistics aggregated as the events arrive, each answer capped and cached 30 s. Each item ships with its check in `tools/checks/server.ts`
+or `tools/checks/stats.ts`.
 
 ---
 
@@ -517,7 +517,7 @@ parts.
 (`:2003`). In `execute` (`:1544-2000`, 457 lines):
 
 - seventeen `isMaxState(...)` tests, sixteen of which can never fire, since only QUESTION's
-  MAXSTATE of 2 fits its field (`doc/CSBWIN_DSA_REFERENCE.md`, `tools/dump-dsa-census.ts`),
+  MAXSTATE of 2 fits its field (`doc/CSBWIN_DSA_REFERENCE.md`, `tools/checks/dsa-census.ts`),
   and with them all six `readSignedWord` calls;
 - `program[pc++] ?? 0` forty times and `wordsRemaining--` thirty-eight, though
   `wordsRemaining` is always `program.length - pc`;
@@ -540,8 +540,8 @@ options)` the sites call with their codecs, the spell's included; `ops/` by doma
 and arithmetic, objects, `&MOVE`, characters, monsters, the dungeon, text, messages), with
 `executeAmpersand` a dispatch over them; `DsaSystem.ts` the façade on `ctx.systems.dsa`.
 Each command's body keeps CSBWin's order and names. Two tools change with it:
-`tools/dump-dsa-census.ts:37-48` reads the ported operations from the text of
-`executeAmpersand` (an exported table instead), and `tools/dump-dsa-delete.ts:121` replaces
+`tools/checks/dsa-census.ts:37-48` reads the ported operations from the text of
+`executeAmpersand` (an exported table instead), and `tools/checks/dsa-delete.ts:121` replaces
 `executeAmpersand` on the instance.
 
 ### E28 ⏳ The bytecode interpreter decodes through switches and maps built per call
@@ -578,7 +578,7 @@ Paying it: one decode table built once (opcode to handler and operand), `pStdDra
 21-by-8 array, the rectangle pointers as a table; `draw()` returning the picking for the UI,
 the inputs required and a tool helper filling defaults; the drawing's state an object the
 `ViewportRenderer` owns; per-level copies of the two colour maps; a `trace` hook. Pixel for
-pixel: `tools/dump-render-probe.ts`, `tools/dump-skin-programs.ts` and the golden frames.
+pixel: `tools/checks/render-probe.ts`, `tools/checks/skin-programs.ts` and the golden frames.
 
 ### E29 ⏳ `GameScreen` is the canvas, the compose order, the palettes and a façade
 
@@ -738,7 +738,7 @@ map, as designed with the author:
   the set's `dungeon.dat` (`DungeonLoader`, rooms in `MapDialog.ts`'s `ROOM_COLORS` as CSS),
   each square shaded by its deaths (`api/stats/<id>/<level>`), the count on hover. The rows
   are not clickable yet (`deathsPerLevel`, `src/stats/statsPage.ts`), and the page loads
-  none of the game's code (`tools/dump-build.ts`): the reader of a `dungeon.dat` it needs
+  none of the game's code (`tools/checks/build.ts`): the reader of a `dungeon.dat` it needs
   must stay out of the game's chunk, or the bound there be raised knowingly.
 
 Paying it: the heat map, checked in `tools/probe-frames.mjs`'s statistics block (a level
@@ -831,7 +831,7 @@ the same path and holds all three, and `readPossessions` reads the slots as slot
 already (`src/data/CsbwinCharacters.ts:86-100`). The port imports a DM save from the Atari
 (`buildBlock1State`'s `Byte22596 == 1` branch; its signature matches DM's): a weapon in a
 champion's hand, packed `0x1403`, loads as slot `0x1403`, past the 2097 slots, and is gone.
-`tools/dump-atari-saves.ts`'s two files have champions who carry nothing.
+`tools/checks/atari-saves.ts`'s two files have champions who carry nothing.
 
 Paying it: for a file without `objectIndex`, `ConvertListOfObjects` over the timers that
 carry an object, each champion's thirty slots and the object in hand, in CSBWin's order
@@ -919,13 +919,13 @@ New verification debt goes here; it can be taken anywhere ("Priority", point 5).
 
 ### F15 ⏳ Tools that read the wall clock, and a runner with no timeout
 
-- `tools/dump-vbl-clock.ts`'s "MainLoop opens with a tick" check can fail under load and
+- `tools/checks/vbl-clock.ts`'s "MainLoop opens with a tick" check can fail under load and
   pass alone (it failed once in a full `npm test`, sixteen tools at a time). `Game.start`
   sets `vblClockStart = Date.now()` and calls `gameLoop()` at once, which reads
   `Date.now()` again (`src/engine/Game.ts:249`, `:500`), so a stall of 17 ms between
   the two runs a VBL inside `start` and spends the opening tick. The tool pins `Date.now`
   for its pacing section (`:129-173`) and not for this one.
-- `tools/dump-loop-die.ts` waits `1000 / 60 * failOn + 150` real milliseconds, then checks
+- `tools/checks/loop-die.ts` waits `1000 / 60 * failOn + 150` real milliseconds, then checks
   the frames counted (`:23`, `:36`): the same kind, not yet seen to fail.
 - `runAsync` waits for each tool's `close` with no limit (`tools/run-checks.mjs:365-375`), so
   a tool left with a handle open hangs the whole suite.
@@ -936,16 +936,16 @@ output so far.
 
 ### F16 ⏳ A tool can pass having checked less than it says
 
-- A scenario that is not found is logged and skipped: `dump-missile-drop.ts:220`, `:227`,
-  `:255`, `:261`, `:295`, `:301`; `dump-player-attacks.ts:124`, `:171`, `:272`, `:305`;
-  `dump-monster-damage.ts:152`; one in `dump-ten-second-update.ts`. `finish()` fails only a
+- A scenario that is not found is logged and skipped: `checks/missile-drop.ts:220`, `:227`,
+  `:255`, `:261`, `:295`, `:301`; `checks/player-attacks.ts:124`, `:171`, `:272`, `:305`;
+  `checks/monster-damage.ts:152`; one in `checks/ten-second-update.ts`. `finish()` fails only a
   run with no check at all.
 - `collectSaves` returns `[]` for a folder that is not there (`tools/lib/saves.ts:31-33`),
   its path resolved from the working directory, and eight tools loop over it without
-  asking for a single save (`dump-dsa-save`, `dump-file-signatures`, `dump-expool`,
-  `dump-dm-rules`, `dump-extend-portraits`, `dump-timer-heap`, `dump-save-menu`,
-  `dump-check-monsters`).
-- `dump-server.ts:43`, `dump-build.ts:24` and `dump-loop-die.ts:17` write their own
+  asking for a single save (`checks/dsa-save`, `checks/file-signatures`, `checks/expool`,
+  `checks/dm-rules`, `checks/extend-portraits`, `checks/timer-heap`, `checks/save-menu`,
+  `checks/check-monsters`).
+- `checks/server.ts:43`, `checks/build.ts:24` and `checks/loop-die.ts:17` write their own
   `check()` and skip `finish()`'s guard, which `tools/lib/check.ts` exists to give.
 
 Paying it: the skips become failures; the saves' folder resolved from `import.meta.dirname`,
@@ -972,12 +972,12 @@ serialises.
 without its extension, or reads `document`, passes `tsc` and fails in Node with
 `ERR_MODULE_NOT_FOUND`. The other way, `src/` is checked with Node's types
 (`"types": ["node"]`), so a Node global in browser code passes. The image copies only
-`src/data/DataSets.ts` of `src/` (`Dockerfile:29`), while `dump-server` runs the server
+`src/data/DataSets.ts` of `src/` (`Dockerfile:29`), while `checks/server` runs the server
 from the whole checkout, so an import added to `DataSets.ts` passes `npm test` and
 crash-loops the container; only the optional `tools/check-image.sh` would see it.
 
 Paying it: the server on `module` and `moduleResolution` `"nodenext"`, an ES `lib` and
-Node's types; `src/` without Node's; `dump-server` running the server from a scratch
+Node's types; `src/` without Node's; `checks/server` running the server from a scratch
 folder laid out as the image is.
 
 ### F19 ⏳ The tools' screen is wired by hand, and has drifted
@@ -995,12 +995,12 @@ what the page draws.
 
 `doc/3D2D1D_WALKTHROUGH.md` is a full route through 3D2D1D, computed by
 `tools/solve-3d2d1d.ts` from a model of CSBWin's moves, gravity, teleporters and four DSA
-commands, outside the engine. `tools/watch-3d2d1d-gravity.ts` replays its first two legs
+commands, outside the engine. `tools/checks/watch-3d2d1d-gravity.ts` replays its first two legs
 through `Game`, moves alone, and each comes to rest where the walkthrough says. The rest
 needs what those legs do not: the clicks on the mirror, the switches, the levers and the
 keyholes; the waits for a door, a false wall or a teleporter; the 1D corridor's DSA chain,
 which a hand probe ran correctly but no tool proves; and map 6's Screamers, which the model
-pins to one square where the engine moves them. Paying it: a `watch-*.ts` that reads the
+pins to one square where the engine moves them. Paying it: a `tools/checks/watch-*.ts` that reads the
 walkthrough's key blocks and its clicks, plays them through `Game` on the real files, and
 checks each resting square and the three gold keys, then the end. Size M; where the route
 and the engine part, CSBWin decides which is wrong.
@@ -1091,7 +1091,7 @@ comes before the recorder, in order:
    on the wall clock.
 2. Its unverified points: VBL-counted state within a tick, input outside the mouse queue,
    the port's saves.
-3. `tools/dump-replay.ts`: a scripted game recorded, replayed at another frame pacing, and
+3. `tools/checks/replay.ts`: a scripted game recorded, replayed at another frame pacing, and
    `d.RandomNumber` asserted equal at every entry, the two final saves byte-identical.
 
 Playing CSBWin's own recordings back needs, beyond that, the port's draws to follow
@@ -1113,19 +1113,19 @@ Rules for all of them:
   tool's output and every golden frame stay the same. The settings dialog's GAME tab
   shows each, a button of its own (`src/renderer/ui/SettingsDialog.ts`):
   - `drinkAtFountain`: an empty hand drinking at a water fountain (`drinkAtWaterFountain`,
-    `src/renderer/ui/Feeding.ts`, checked by `tools/dump-fountain.ts`);
+    `src/renderer/ui/Feeding.ts`, checked by `tools/checks/fountain.ts`);
   - `colourNewMastery`: a mastery just gained drawn in colour 7 on the attribute panel until every attribute
     its level gain raised is back at the maximum that gain gave it, whatever another
     role's level raised since (`src/engine/MasteryGains.ts`,
-    checked by `tools/dump-mastery-panel.ts`);
+    checked by `tools/checks/mastery-panel.ts`);
   - `gatherThrownWeapons`: what a champion's THROW or SHOOT sent off gathered back into their possessions when
     the party arrives on the square it lies on, never what the cursor threw: into the
     slot it left, else the quiver, its small-weapon slots first and the object fewest
     slots take first, so a club gathered with daggers keeps slot 12, then the pack
-    (`src/engine/ThrownWeapons.ts`, checked by `tools/watch-thrown-weapons.ts`);
+    (`src/engine/ThrownWeapons.ts`, checked by `tools/checks/watch-thrown-weapons.ts`);
   - `showItemProperties`: an item's figures in the eye panel, under CSBWin's description
     (`getItemPropertyLines` and `placeItemPropertyLines`, `src/renderer/ui/Objects.ts`,
-    checked by `tools/dump-item-properties.ts`). Its lines come in a fixed priority order,
+    checked by `tools/checks/item-properties.ts`). Its lines come in a fixed priority order,
     anchored at the bottom: the first at viewport y 122, the next 7 rows up, a line whose
     row would be at or above CSBWin's last dropped with every line after it, so each line
     of an item type keeps its row. CSBWin's lines never move. A line is one labelled
@@ -1173,7 +1173,7 @@ Rules for all of them:
     (`doc/CSBwin-src/Data.h:1528-1533`); a bump still throws the whole queue away. The
     setting reaches the queue through `applyToGame` (`MouseQueue.setLength`), which
     empties it where the length changes (`src/engine/MouseQueue.ts`, checked by
-    `tools/dump-mouse-queue.ts`, case 1b).
+    `tools/checks/mouse-queue.ts`, case 1b).
 
   The coloured object cursor, RISE's NEW FACE and the FTL logo are the exceptions: the
   author wants them on by default, so they are recorded under H.
@@ -1191,7 +1191,7 @@ Rules for all of them:
   checks every value against the world and drops what does not hold. The types in use
   are listed in the entries below. The shipped extras above save nothing: a save and a
   load forget what they keep.
-- **Each ships with its `tools/` check**, run with the setting on, and its entry here is
+- **Each ships with its `tools/checks/` tool**, run with the setting on, and its entry here is
   deleted as for any paid item.
 
 ### X9 ⏸️ Thrown weapons' tags kept across a save
@@ -1212,7 +1212,7 @@ made for, and `tagOf` keeps it only while the object's RN still names that very
   champion, or whose slot it freed and handed to another object, as
   `findEmptyDBEntry` does in the port. A tag kept takes the object's new record as its
   `record`.
-- **The check**: `tools/watch-thrown-weapons.ts` goes on through a save and a load: a
+- **The check**: `tools/checks/watch-thrown-weapons.ts` goes on through a save and a load: a
   weapon thrown, then the file saved and read back, then the party on its square gathers
   it. The same file with the weapon moved to another square by hand loads with no tag,
   and with the records deleted, it loads as if nothing had been thrown.
@@ -1239,7 +1239,7 @@ drawing a map from them is a separate item, entered when the author names it.
   the map's own order, eight to a longword, 29 longwords (232 cells) to a record. A chunk
   that is all unknown is not written. The default dungeon's 12087 cells make about 6 KB
   of data, about 55 records.
-- **The check**: a new `tools/dump-automap.ts` walks a route on the default dungeon and
+- **The check**: a new `tools/checks/automap.ts` walks a route on the default dungeon and
   prints each level's codes as a map. It asserts a fake wall seen as stone and a hidden
   pit seen as floor, saves, loads, and compares every code. The same file with the
   records deleted loads with every cell unknown.
@@ -1263,7 +1263,7 @@ Recorded so that nobody "fixes" them.
   position, where the file's `key` lines bind characters. Return wakes no one, as under
   the file. The settings' KEYS tab offers two other presets, KEYPAD and ARROWS
   (`KEY_PRESETS`), and a table of the player's own, kept with the settings.
-  `tools/dump-key-bindings.ts` checks every default key.
+  `tools/checks/key-bindings.ts` checks every default key.
 - 🚫 **Esc opens the settings, and Pause freezes.** CSBWin's tables bind the Atari
   keyscan of Esc, 0x1b: awake and asleep to the freeze, 147, and frozen to the thaw,
   148 (`Byte18400`, `Byte18440`, `Byte18448`, `doc/CSBwin-src/Mouse.cpp:1870-1912`), and
@@ -1271,8 +1271,8 @@ Recorded so that nobody "fixes" them.
   action sends that keyscan from Pause (`DEFAULT_KEY_BINDINGS`), and Esc opens the
   settings dialog, awake, asleep and frozen alike (`GameInput.keyDown`,
   `src/renderer/ui/SettingsDialog.ts`). A left click on the pixel x 0, y 198 still
-  freezes, and a click anywhere still thaws. `tools/dump-settings-dialog.ts` and
-  `tools/dump-freeze.ts` check both keys.
+  freezes, and a click anywhere still thaws. `tools/checks/settings-dialog.ts` and
+  `tools/checks/freeze.ts` check both keys.
 - 🚫 **A save keeps the dungeon's three 2023 flags.** CSBWin 20230608 reads
   `SupressDSAWarning` 0x100, `GravityGame` 0x200 and `ThreeDMovements` 0x400 from a file's
   `extendedFlags` into `SupressDSAWarningOption`, `bGravityGame` and `bThreeDMovements`
@@ -1285,7 +1285,7 @@ Recorded so that nobody "fixes" them.
   (`DMRules`, `InvisibleMonsters`, `ExtendedWallDecorations`). The port writes all three as
   the last file read gave them (`buildLiveExtendedFeatures`,
   `src/data/CsbwinExtendedFeatures.ts`), and a CSBWin 20230608 reads them back.
-  `tools/dump-extended-dungeon.ts` checks that a 3D2D1D save keeps both of its own. 3D2D1D
+  `tools/checks/extended-dungeon.ts` checks that a 3D2D1D save keeps both of its own. 3D2D1D
   is the only dungeon here that sets any of them.
 - 🚫 **A game read starts the gravity afresh.** CSBWin's gravity keeps three globals,
   `nextGravityMoveTime`, `moveHistory` and `gravityMove` (`doc/CSBwin-src/data.cpp:245-247`),
@@ -1297,7 +1297,7 @@ Recorded so that nobody "fixes" them.
   slides the same way whatever came before. Three moves of the player's, one along each
   axis, give either the same history. F5 is refused during a slide ("CANNOT SAVE NOW"),
   where CSBWin's queue throws the disk icon's click away (`:1482-1491`), so no save
-  holds a slide. `tools/watch-3d2d1d-gravity.ts` checks the read.
+  holds a slide. `tools/checks/watch-3d2d1d-gravity.ts` checks the read.
 - 🚫 **The data set chooses DM's rules, not the player.** CSBWin's "DM Rules" menu item
   toggles `DM_rules` at any time (`doc/CSBwin-src/CSBUI.cpp:933-935`), and its Linux build
   takes `--dmrules` at the launch (`LinCSBUI.cpp:677`). The port has no toggle: a file's
@@ -1306,8 +1306,8 @@ Recorded so that nobody "fixes" them.
   (`DataSet.dmRules`, `src/data/DataSets.ts`), which the boot turns into `DM_rules`. The
   three DM sets on the Atari files carry it, as CSBWin's own DM package carries `DMRules`
   in its block (`doc/PROVEN_FACTS.md` → "`DM_rules` and `DMRulesDesignOption`…").
-  `tools/dump-dm-rules.ts` checks that `dm-atari` boots with `DM_rules` on, and
-  `tools/dump-data-sets.ts` that no set with a block is given the flag.
+  `tools/checks/dm-rules.ts` checks that `dm-atari` boots with `DM_rules` on, and
+  `tools/checks/data-sets.ts` that no set with a block is given the flag.
 - 🚫 **The canvas shows an Atari intensity times 36, not RGB555.** CSBWin hands Windows
   RGB555 pixels, its straight palette each intensity `i` as five bits `(i << 2) | (i >> 1)`
   (`CreateOverlayTable`, `doc/CSBwin-src/Graphics.cpp:3096-3117`), which Windows widens to
@@ -1317,7 +1317,7 @@ Recorded so that nobody "fixes" them.
   `src/core/types.ts`), up to 6 a channel apart. Only
   the viewport through an overlay, a tint or a jitter is CSBWin's RGB555 widened
   (`src/renderer/csbwin/OverlayScreen.ts`), so while one is up the viewport and the panels
-  show the same Atari colour up to 6 a channel apart. `tools/dump-overlay-screen.ts` prints
+  show the same Atari colour up to 6 a channel apart. `tools/checks/overlay-screen.ts` prints
   both. To revisit when frames are compared with CSBWin's ("Priority", postponed):
   the golden frames hold palette slots, not colours (`tools/lib/frames.mjs`), so RGB555
   on every screen would move none of them.
@@ -1329,7 +1329,7 @@ Recorded so that nobody "fixes" them.
   (`drawCursorItem`, `src/renderer/ui/Mouse.ts`, and `GameScreen.presentViewport`). The
   arrow over the right-hand panel and the message area is kept. It is
   `UIState.colouredObjectCursor`, on by default. It becomes one of the player's settings
-  (`src/settings/Settings.ts`) once a tab of the settings dialog carries it; `tools/dump-object-cursor.ts` checks it both ways.
+  (`src/settings/Settings.ts`) once a tab of the settings dialog carries it; `tools/checks/object-cursor.ts` checks it both ways.
 - 🚫 **The right-hand panel is shown through the interface palette.** With
   `d.DynamicPaletteSwitching`, CSBWin converts the spell, weapon and movement panel,
   x 224-319 by rows 33-168, through the viewport's `d.Palette11946`, as it does the
@@ -1346,13 +1346,13 @@ Recorded so that nobody "fixes" them.
   `CSBgraphics.dat` one applies it (`DrawWallDecoration` and
   `drawExtendedWallDecoration`, `src/renderer/bytecode/DrawDecorations.ts`), and each of
   Conflux's draws at 1, 6 and 11 the mirror image of itself at 0, 5 and 10, as CSBWin's
-  does (`tools/dump-extended-decorations.ts`, section 3).
+  does (`tools/checks/extended-decorations.ts`, section 3).
 - 🚫 **`MakeBigActuators` reads the actuator's type, not CSBWin's byte-order slip.** CSBWin
   converts the actuators of a file without the `BigActuators` flag before their byte swap
   (`doc/CSBwin-src/SaveGame.cpp:2813-2820`), so it takes bits 8-14 of `word2` for the
   type where the port takes the type itself (`doc/PROVEN_FACTS.md` → "`MakeBigActuators`
   runs before the byte swap"). The two differ only for a type-47 actuator under either
-  reading: DM has none, Conflux's file has the flag, and `tools/dump-dungeon-conversions.ts`
+  reading: DM has none, Conflux's file has the flag, and `tools/checks/dungeon-conversions.ts`
   fails for a dungeon that has one.
 - 🚫 **A kill of `alternateGraphics` 4 to 7 is counted nowhere.** `ProcessMonsterDeleteFilter`
   indexes the kill statistics' four longwords with the three-bit subtype unchecked
@@ -1370,7 +1370,7 @@ Recorded so that nobody "fixes" them.
   keeps running, as it already does for the feeding animation. The author's decision is
   400 ms (`FLASH_MS`, `src/renderer/ui/Attack.ts`), over one tick and under two, so the
   text can be read: the damage is up for two ticks, half a second, where CSBWin's is up
-  for one. The keys still open an attack menu over it. `tools/dump-attack-panel.ts`
+  for one. The keys still open an attack menu over it. `tools/checks/attack-panel.ts`
   checks that the first tick after the flash leaves it up.
 - 🚫 **Three inputs bypass the mouse queue:** the save menu and the Reincarnate screen,
   which are modal, and the panel keys in `src/renderer/ui/Keyboard.ts`, whose module
@@ -1400,7 +1400,7 @@ Recorded so that nobody "fixes" them.
   was over (`doc/CSBwin-src/CSBCode.cpp:1508-1512`, `:1699-1702`). That the Atari
   original, with those waits, showed every text is an inference, not a verified fact. No
   other script's wait runs the clock, and no other message is placed sooner than
-  CSBWin's. `tools/dump-fusion.ts` checks it from a strip that has printed nothing and
+  CSBWin's. `tools/checks/fusion.ts` checks it from a strip that has printed nothing and
   from one that has scrolled.
 - 🚫 **A script's caller finishes at once.** `Game.runScript` returns as soon as the script
   reaches its first `VBLDelay`, so what CSBWin's suspended caller would do after the script
@@ -1417,7 +1417,7 @@ Recorded so that nobody "fixes" them.
   (`doc/CSBwin-src/Chaos.cpp:3392`). Nothing in CSBWin reads the flag, so it shows
   nowhere; the author's decision is to keep it all the same. The port keeps
   `CHARFLAG_male` and clears the rest, as the mask reads (`TAG002724`,
-  `src/engine/Chaos.ts`; `tools/dump-new-adventure.ts`).
+  `src/engine/Chaos.ts`; `tools/checks/new-adventure.ts`).
 - 🚫 **RISE raises DM's champions with the utility disk's portraits** (X8). CSBWin's
   utility copies a champion's portrait as the saved game holds it (`TAG002724`,
   `doc/CSBwin-src/Chaos.cpp:3264-3451`), and only its unported champion editor gave one
@@ -1425,7 +1425,7 @@ Recorded so that nobody "fixes" them.
   champion whose portrait is a cell of DM's graphic 26 is raised with the utility's
   redrawn face of them (`swapInNewFaces`, `src/engine/Chaos.ts`; `doc/SAVES.md` → "RISE
   makes a save of its own"). OLD FACE makes CSBWin's adventure, byte for byte
-  (`tools/dump-rise.ts`).
+  (`tools/checks/rise.ts`).
 - 🚫 **A saved game the utility cannot read is damaged, not the program's end.** On a
   `GAMEBLOCK1` that opens only with word 10, CSBWin stops in `NotImplemented(0x1868)`
   (`doc/CSBwin-src/Chaos.cpp:2966-2999`); the port refuses it with message 14. No known
@@ -1433,7 +1433,7 @@ Recorded so that nobody "fixes" them.
 - 🚫 **A `mini.dat` with an Extended Features block makes no adventure.** CSBWin's
   `_TAG000fc4` writes the new adventure a fresh block when `mini.dat` opened with one
   (`doc/CSBwin-src/Chaos.cpp:2141-2200`). The port refuses such a file (`TAG000fc4`,
-  `src/engine/Chaos.ts`; `tools/dump-new-adventure.ts`). `mini.dat` is CSB's own, as on
+  `src/engine/Chaos.ts`; `tools/checks/new-adventure.ts`). `mini.dat` is CSB's own, as on
   its disk, and no file with a block is known: only a dungeon editor could make one.
 - 🚫 **A champion who dies in hand is put down on nobody.** `KillCharacter` does not end a
   change of the marching order, and `TAG0025a6` then writes the dead champion's facing and
@@ -1462,7 +1462,7 @@ Recorded so that nobody "fixes" them.
   port passes the slot found, whoever the bearer (`setCursed`,
   `src/engine/DsaSystem.ts`), so a curse costs 3 Luck at once on every champion and the
   object taken off gives them back. No save format changes: the Luck a save carries is
-  the attribute as it stands. `tools/dump-dsa-objects.ts` checks it.
+  the attribute as it stands. `tools/checks/dsa-objects.ts` checks it.
 - 🚫 **Word sizes from the file.** Two of CSBWin's constants are the English words'
   sizes: `AttackNames[300]` in graphic `0x230` and the source widths `DisplayFoodWater`
   blits the food, water and poisoned labels with. The French 1.3 `graphics.dat` has
@@ -1535,11 +1535,11 @@ Recorded so that nobody "fixes" them.
   which in that case leaves the stream two draws further on than CSBWin's. 0 is what a
   file of an earlier build holds, which names no playthrough, and the store stamps an
   id into such a file as it takes it (`doc/SAVES.md` → "A playthrough"): a game
-  that drew 0 would write files the store takes for those. `tools/dump-new-game.ts`
+  that drew 0 would write files the store takes for those. `tools/checks/new-game.ts`
   checks it on a stream whose first pair gives 0. The same goes for an id a save of the
   data set already holds, about one pair of games in 16 million: the page draws the next
   pair once the new game is read (`GameSaves.newGameRead`, `src/engine/GameSaves.ts`),
-  checked by `tools/dump-save-menu.ts` on a store that holds a pinned stream's first ids.
+  checked by `tools/checks/save-menu.ts` on a store that holds a pinned stream's first ids.
 - 🚫 **A `CSBgraphics.dat` sound plays its WAV file's `data` chunk.** `ReadSound` takes the
   sample count from byte 40 and the samples from byte 44
   (`doc/CSBwin-src/Sound.cpp:1024-1033`), which are the `data` chunk's only after a
@@ -1549,7 +1549,7 @@ Recorded so that nobody "fixes" them.
   the `fact` chunk itself gives. Every other sound starts its `data` chunk at byte 36, and
   plays as in CSBWin, as does a section that is not a RIFF file (`doc/PROVEN_FACTS.md` →
   "`CSBgraphics.dat`'s sounds are WAV files"; `SoundQueue.readSound`,
-  `tools/dump-custom-sounds.ts`).
+  `tools/checks/custom-sounds.ts`).
 - 🚫 **Audio sample rates**, a documented exception to faithfulness:
   `doc/PROVEN_FACTS.md` → "Audio sample rates".
 - 🚫 **`dm-atari/graphics.dat` is not CSBWin's file.** It is CSBWin's with two items from
@@ -1557,7 +1557,7 @@ Recorded so that nobody "fixes" them.
   crack switch, whose front view shows its button pushed in and whose `Byte4100[55]`
   keeps it low on the wall, as in the original. `dm-windows/` keeps
   CSBWin's file as it ships. `doc/PROVEN_FACTS.md` → "`dm-atari/graphics.dat` is CSBWin's
-  with three items from the 1.2 disk"; `tools/dump-dm-atari-graphics.ts` builds and checks it.
+  with three items from the 1.2 disk"; `tools/checks/dm-atari-graphics.ts` builds and checks it.
 - 🚫 **The see-through door edge's last row.** `StdDrawSeeThruDoorEdge` reads graphic 41
   from pixel 128, so its last row runs 32 pixels past the graphic's end, into whatever
   CSBWin's memory holds there. `tag0088b2Explicit` (`src/renderer/csbwin/CanvasBlitter.ts`)
@@ -1578,7 +1578,7 @@ Recorded so that nobody "fixes" them.
   missile whose own wall filter moved the party into it is deleted by that hit, and its
   encounter's tail calls `ProcessObjectFromMissile` on it again; the port's
   `processObjectFromMissile` finds no record and does nothing
-  (`tools/dump-move-from-missile.ts`, section 3).
+  (`tools/checks/move-from-missile.ts`, section 3).
 - 🚫 **An index CSBWin does not bound reads nobody.** `&CHAR@`, `&TALENTS@` and
   `&TALENTS!` take an index of 0x20000 or more with bit 16 clear as `d.CH16482 + charIdx`
   (`doc/CSBwin-src/DSA.cpp:4197`, `:4275`, `:4326`), a record over 100 MB past `d`;
@@ -1619,7 +1619,7 @@ Recorded so that nobody "fixes" them.
   (`src/renderer/ui/HintOracleButton.ts`). The inventory still closes the way it opens,
   with a right click (entry 0, button 11) or the champion's name. Without the files the
   close box is CSBWin's (`doc/CSBWIN_HINT_ORACLE_REFERENCE.md` → "In the port: the
-  inventory's button"; `tools/dump-hint-oracle-button.ts`).
+  inventory's button"; `tools/checks/hint-oracle-button.ts`).
 - 🚫 **A left click on a champion's bars opens the inventory.** DM opens one with the
   right button only: a portrait box's, `buttons17196`'s buttons 7-10, or anywhere below
   the portraits for the leader, `buttons17304`'s 83. A finger or a stylus has none. The
@@ -1645,14 +1645,14 @@ Recorded so that nobody "fixes" them.
   read as 16385x51200), and CSBWin shows its entrance scroll as an error and quits. The
   port's `decodeIMG` stops at the whole lines `EXPAND_GRAPHIC_MAX_SIZE` holds
   (`src/core/imageDecoder.ts`), 121 of them there, and returns that height. No real image
-  comes near the cap. `tools/dump-image-codec.ts` checks it.
+  comes near the cap. `tools/checks/image-codec.ts` checks it.
 - 🚫 **A portrait's size is tested without CSBWin's wrap.** `ImportBitmap`'s
   `size = (width+1)/2 * height` and its test `fileSize < minSize + size` are `ui32`s
   (`doc/CSBwin-src/Bitmaps.cpp:251-252`, `:356-372`), so a width and height whose product
   wraps, 131071 by 65536 giving 0, pass it, and the pixels are read past the section,
   into the heap. The port tests the exact size, and refuses such a portrait
   (`CSBGraphicsLoader.importBitmap`, `src/data/CSBGraphicsLoader.ts`); every portrait here is
-  582 bytes. `tools/dump-damaged-counts.ts` checks it.
+  582 bytes. `tools/checks/damaged-counts.ts` checks it.
 - 🚫 **A save that names what its world does not hold is refused.** `LoadGame` takes the
   party's level, x and y, `d.NumCharacter`, `d.HandChar`, `d.MagicCaster`, the object in
   hand and the timer queue from the file unchecked, and plays a value past what it names
@@ -1663,7 +1663,7 @@ Recorded so that nobody "fixes" them.
   than four champions, a hand or a caster outside the party, an object in hand that names
   no record, or a timer past the table (`validateCsbwinWorld`,
   `src/engine/CsbwinSaveGame.ts`), and the running game plays on. No save CSBWin or the
-  port writes holds such a value. `tools/dump-damaged-read.ts` checks each case.
+  port writes holds such a value. `tools/checks/damaged-read.ts` checks each case.
 - **Not debt** (listed so it is not raised again):
   - Table names like `byte20090`, `word1074` and `uByte590` are CSBWin's own
     (`d.Byte20090`…), kept greppable by rule.

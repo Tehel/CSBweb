@@ -220,7 +220,7 @@ export const graphicRandomState = { r: 12345 };
  * plain multiply silently rounds away exactly the low bits `>>> 7 % n` reads: every
  * state reached is a multiple of 4096 after the previous rounding, canceling the
  * `% 32` and `% 2` of the shimmer's jitter. `Math.imul` truncates to 32 bits *before*
- * rounding, matching the C `ui32` multiply exactly (`tools/dump-graphic-random.ts`).
+ * rounding, matching the C `ui32` multiply exactly (`tools/checks/graphic-random.ts`).
  * `DrawTeleporter` is its only caller in CSBWin; clouds use `viewportRandom`.
  */
 export function GraphicRandom(maxExclusive: number): number {

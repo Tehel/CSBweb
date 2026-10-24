@@ -118,7 +118,7 @@ function readPossessions(block: Uint8Array, base: number): ObjectID[] {
  * reads — `LE16(*puwA0)` over four consecutive words per group
  * (`doc/CSBwin-src/Graphics.cpp:785-800`).
  *
- * Proven, not inferred: `tools/dump-csbwin-load.ts` decodes the four champions of every
+ * Proven, not inferred: `tools/checks/csbwin-load.ts` decodes the four champions of every
  * committed save this way and every one of them matches a cell of basic graphic 26
  * pixel for pixel.
  *

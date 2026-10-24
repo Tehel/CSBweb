@@ -92,7 +92,7 @@ that is missing or malformed ends the boot on `fatalMessage`, saying why.
 
 The repository's manifest is `tools/data-sets.json`, its folders under `tools/fixtures/gamefiles/`.
 It keeps every set, because the tools need them all: they read it through
-`tools/lib/dataSets.ts`, and `tools/dump-data-sets.ts` asserts the parser's refusals and
+`tools/lib/dataSets.ts`, and `tools/checks/data-sets.ts` asserts the parser's refusals and
 that every folder holds the files its flags promise. The dev server answers
 `api/data-sets` as the server does (`vite.config.mts`), from it, read at each request, and
 from the sets published and moderated since it started, the published ones written in a
@@ -248,7 +248,7 @@ dated by its `Last-Modified`: a folder CSBWin plays as its `directory=`, so that
 published here can be played elsewhere. A file of the folder the set does not name is left
 out: a readme that is no document, and the port's own files (CSB's `utility-portraits.dat`).
 A file the set is not whole without that does not load leaves no archive, which the dialog
-says. `tools/dump-data-set-archive.ts` checks the zip with a reader of its own and with
+says. `tools/checks/data-set-archive.ts` checks the zip with a reader of its own and with
 `unzip`, over every set of the repository's manifest. Each is a `POST` to
 `api/data-sets/<id>/documents` (`server/documents.ts`), named in `X-Player-Id`: a
 `multipart/form-data` body of one file, `file`, added under its own name, or a JSON body
@@ -430,7 +430,7 @@ The server cannot import the page's sources as it imports `DataSets.ts`, since t
 erasable syntax and the image has no `node_modules`, so it loads this module instead and
 reads a set with the page's own readers. It is never served.
 
-`tools/dump-build.ts` builds both into a scratch folder and asserts them: only the page's own file
+`tools/checks/build.ts` builds both into a scratch folder and asserts them: only the page's own file
 types, nothing of `static/`, every file `index.html` and `stats.html` name present, the manifest's icons too, the
 statistics page loading a few KB of script and none of the game's, no probe handle, and a
 server's module that imports nothing and says of DM's and CSB's files, and of a file that
@@ -509,7 +509,7 @@ that `index.html` is built, and that the game files' folder and each folder the 
 sets name exist, which may be none; then it loads the server's module (`loadCheckDataSet`, `server/app.ts`). Any failure prints `Not starting: <why>` and exits with 1, so a bad mount fails
 the container rather than the player's boot. On SIGTERM it stops listening, lets the
 requests in flight finish (5 s at most), closes the store, which checkpoints the WAL into
-the file, and exits with 0. It logs to stdout. `tools/dump-server.ts` asserts all of it,
+the file, and exits with 0. It logs to stdout. `tools/checks/server.ts` asserts all of it,
 `server.ts` run as its own process included.
 
 ## The image and the stack
@@ -531,7 +531,7 @@ of its multi-platform index, so that a rebuild takes the same bytes:
 build.
 
 **One Node, 24** (the current LTS), everywhere: the image's, `.nvmrc`'s, `package.json`'s
-`engines` (`^24`) and `@types/node`'s (`^24`). `npm test` runs on it: `dump-server` runs
+`engines` (`^24`) and `@types/node`'s (`^24`). `npm test` runs on it: `checks/server` runs
 `server.ts` as Node does, types stripped, and `backup.ts` uses `node:sqlite`'s `backup`.
 Moving it on moves all four at once. The digest is the index's, which
 `docker buildx imagetools inspect node:<version>-alpine<release>` prints as `Digest:`;
@@ -664,7 +664,7 @@ them:
 harmless, but in a script fed over `ssh` it swallows the rest of the script.
 
 `ls ~/csbweb/stats/backups/` is the check that the job runs: an empty or missing folder
-means it does not. `tools/dump-server.ts` asserts the script against a running server: the
+means it does not. `tools/checks/server.ts` asserts the script against a running server: the
 snapshot holds the events still in the WAL, the server keeps serving, and a missing store
 exits 1; a player's folder is copied whole, the site's not, the next run keeps the copy,
 and a player's folder that is not there exits 1.

@@ -30,7 +30,7 @@
  * | `disableSaves` | `EXPOOL` (`readDisableSaves`, `doc/CSBwin-src/SaveGame.cpp:1962-1964`) |
  *
  * **What is not restored.** A save is the file alone (`SaveGameFile.ts`), so this is
- * everything a save and a load lose. `tools/dump-save-roundtrip.ts` plays a game, saves
+ * everything a save and a load lose. `tools/checks/save-roundtrip.ts` plays a game, saves
  * it, loads it, and holds the whole of what differs to this list.
  *
  * - **What CSBWin's file does not hold either**, and a game it reads starts without:

@@ -50,7 +50,7 @@ const MAX_STRING = 1000;
  * must come after a widening. The tool that wrote Conflux's and Towers of Chaos's files
  * widens when the table reaches `maxTableLen - 4`, in every one of their 1,283 sections,
  * and so does this one: they are written again byte for byte
- * (`tools/dump-csbgraphics-writer.ts`). A code
+ * (`tools/checks/csbgraphics-writer.ts`). A code
  * is taken from the low bits of the current word up; one that runs past the word's end
  * takes its high bits from what is left of it and its low bits from the low end of the
  * next.

@@ -63,4 +63,4 @@ before answering.
 
 This is **not evidence**. It shows what the data holds. It does not show what the engine
 does with it. Once the data explains a behaviour, prove the behaviour in a
-`tools/dump-*.ts`, as usual.
+`tools/checks/*.ts`, as usual.

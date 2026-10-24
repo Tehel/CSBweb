@@ -796,7 +796,7 @@ export class MissileEncounter {
    * and floors the result at half itself — so a nearly spent missile still stings.
    *
    * Public because CSBWin's is a free function used by both the party and the monster
-   * arm, and because `tools/dump-champion-death.ts` reads its three outputs directly —
+   * arm, and because `tools/checks/champion-death.ts` reads its three outputs directly —
    * none of them is observable from outside once the damage has been applied.
    */
   determineMagicDamage(

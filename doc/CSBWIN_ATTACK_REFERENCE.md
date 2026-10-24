@@ -83,7 +83,7 @@ preserved.
 | CONFUSE | spends a charge, then *falls through* to the shouts |
 | WARCRY / CALM / BRANDISH / BLOWHORN | `WarCryEtc` |
 | SHOOT | fires the shield hand's contents, if it is the matching ammunition class |
-| FLIP | `STRandomBool()`, which the attack filter may change, → "IT COMES UP HEADS" / "TAILS" through `PrintWithSubstitution(…, 4, true)`: one print-queue entry, its linefeed first (`Attack.cpp:1915-1925`; `tools/dump-flip.ts`) |
+| FLIP | `STRandomBool()`, which the attack filter may change, → "IT COMES UP HEADS" / "TAILS" through `PrintWithSubstitution(…, 4, true)`: one print-queue entry, its linefeed first (`Attack.cpp:1915-1925`; `tools/checks/flip.ts`) |
 | SPELLSHIELD / FIRESHIELD | `MagicShield` at strength 0x118. A return of 0 — the champion had under four mana and got half a shield — quarters the experience and halves the busy time instead of spending a charge |
 | FLUXCAGE | `FluxCage` |
 | FUSE | Lord Chaos's endgame. **Not ported** |
@@ -117,7 +117,7 @@ there he tries to escape, in shuffled directions: a square next to him first, th
 away, which lets him jump over the party or a monster but never through a Fluxcage or a
 wall. Boxed in, `_FusionSequence` starts. The rules are in `doc/PROVEN_FACTS.md` → "The
 fusion: a dispell cloud, then Lord Chaos's escape"; the port is `AttackSystem.fusion`, the
-evidence `tools/dump-fusion.ts`. `_FusionSequence` (`:2222`), the ending itself, holds the
+evidence `tools/checks/fusion.ts`. `_FusionSequence` (`:2222`), the ending itself, holds the
 main loop to the credits: `doc/PROVEN_FACTS.md` → "`_FusionSequence`: the end of the
 game", ported as `AttackSystem.fusionSequence`.
 
@@ -161,7 +161,7 @@ centre on x=274, under the digits. Two negative values are messages instead: -1
 x 272 (`doc/CSBwin-src/Attack.cpp:972-980`). That helper takes five pixels a character,
 `x - (5 * strlen) / 2` (`doc/CSBwin-src/CSBCode.cpp:1785-1794`), where the font advances
 six, so the texts start at x 245 and 250, right of their centre (the original's started at
-242 and 248). `tools/dump-attack-panel.ts` checks both.
+242 and 248). `tools/checks/attack-panel.ts` checks both.
 
 ## Deliberately not ported
 

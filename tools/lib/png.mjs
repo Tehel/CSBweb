@@ -15,7 +15,7 @@
  * says what the slots stood for (`probe-frames.mjs`); its `PLTE` is only there to view it.
  *
  * This is deliberately separate from `lib/png.ts`, which reads *paletted* PNGs for
- * `dump-image-codec.ts`. This one is plain ESM because the CDP drivers are plain node
+ * `checks/image-codec.ts`. This one is plain ESM because the CDP drivers are plain node
  * scripts.
  *
  * Deliberately minimal: 8-bit RGB, RGBA and paletted, no interlace. Anything else throws

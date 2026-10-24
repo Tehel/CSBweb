@@ -58,7 +58,7 @@ csbweb/
 │   ├── assets/            # the page's fonts, icons and the FTL logo
 │   └── main.ts            # the page's bootstrap
 ├── server/                # the deployed server: the page, the data sets, the statistics
-├── tools/                 # verification tools (dump-*.ts), the golden frames, the fetch commands
+├── tools/                 # verification tools (checks/), the golden frames, the fetch commands
 ├── tools/fixtures/        # CSBWin saves the tools read; gamefiles/, the data sets (not ours, fetched)
 ├── utils/                 # the maintainer's scripts: deploying, backups, the forum's dungeons submitted
 ├── doc/                   # CSBWin reference docs; CSBwin-src/ is the C++ (not ours, fetched)

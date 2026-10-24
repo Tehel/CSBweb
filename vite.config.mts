@@ -59,7 +59,7 @@ const DEV_MODERATOR_PLAYER_ID = '00000000-0000-4000-8000-000000000001';
  * on a Node without it, a GET answers the manifest and a POST 501.
  *
  * `api/stats` is `answerStats` over the same store's public sets, and over statistics made
- * once, at start, of `dump-stats`' fortnight (`tools/lib/statsFortnight.ts`), which names
+ * once, at start, of `checks/stats`' fortnight (`tools/lib/statsFortnight.ts`), which names
  * `dm-atari` and `csb`: the dev page sends no event, and the statistics page then has
  * something to show. Nothing is cached, so that a set published shows at once. Without
  * `node:sqlite`, it is 501.

@@ -5,8 +5,8 @@ metadata:
   type: project
 ---
 
-`tools/dump-settings-dialog.ts`, `tools/dump-map-dialog.ts` and
-`tools/dump-champion-dialog.ts` drive the real `GameInput` over a hand-built `screen`
+`tools/checks/settings-dialog.ts`, `tools/checks/map-dialog.ts` and
+`tools/checks/champion-dialog.ts` drive the real `GameInput` over a hand-built `screen`
 object cast `as unknown as GameScreen`. The cast hides a missing method from `tsc`, so
 a new `GameScreen` method that `GameInput` calls (as `screenPoint` was) makes all three
 throw `this.host.screen.<name> is not a function` in `npm test`, not at type-check.

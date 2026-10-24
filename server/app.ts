@@ -1,7 +1,7 @@
 /**
  * What the deployed server answers (`doc/DEPLOYMENT.md`): the built page, the game
  * files beside it, and the API. `server.ts` reads the environment and listens; this module
- * is the part a tool can stand up on a free port (`tools/dump-server.ts`).
+ * is the part a tool can stand up on a free port (`tools/checks/server.ts`).
  *
  * Node runs it as it is, stripping the types, so it uses only erasable syntax and names its
  * imports with their `.ts` extension (`server/tsconfig.json` holds it to that).

@@ -41,7 +41,7 @@
  *   right) or the front one (12's) shrunk to their rectangle, the width of 7 and 9 that
  *   of 8, which the screen's edge cuts (`:3408-3519`, `:3604-3621`).
  *
- * `tools/dump-wall-decoration-art.ts` makes both from a picture and reads them back.
+ * `tools/checks/wall-decoration-art.ts` makes both from a picture and reads them back.
  */
 import { readFileSync } from 'node:fs';
 

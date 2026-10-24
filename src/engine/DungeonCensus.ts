@@ -2,7 +2,7 @@
  * What a dungeon holds, counted from its data: its levels, the items on its squares by
  * kind, its monsters and their groups, and its DSAs with the operations their programs
  * call. The form that adds a set shows it (`src/ui/addDataSetForm.ts`), and
- * `tools/dump-dsa-census.ts` checks the DSA half against the port's operations.
+ * `tools/checks/dsa-census.ts` checks the DSA half against the port's operations.
  *
  * The objects counted are those a square's chain reaches, with what a monster carries
  * (`possession`) and what a container holds (`containedObject`): a record no chain links

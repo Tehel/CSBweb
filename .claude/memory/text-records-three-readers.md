@@ -16,4 +16,4 @@ so no data reached it, and a doc repeated the claim.
 
 **How to apply:** before reasoning about how a text is drawn, find its square:
 `npx tsx tools/peek-dungeon.ts [--file …] find "<words>"` gives the object that holds it,
-and `cell <m> <x> <y>` the room type. `tools/dump-wall-text.ts` walks the wall texts only.
+and `cell <m> <x> <y>` the room type. `tools/checks/wall-text.ts` walks the wall texts only.

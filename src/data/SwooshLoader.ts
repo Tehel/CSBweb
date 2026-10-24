@@ -61,7 +61,7 @@ export function loadSwoosh(file: Uint8Array): Swoosh {
  * leftmost), `d1` the pixels left in the run, `a4` and `a5` the two mask tables.
  *
  * The code compares counts as signed words (`cmp.w d1,d0`, `$0128`); no count of the
- * picture reaches 32768 (`tools/dump-swoosh.ts`), so plain numbers do here.
+ * picture reaches 32768 (`tools/checks/swoosh.ts`), so plain numbers do here.
  */
 function decodePicture(file: Uint8Array): { screen: Uint16Array; end: number } {
     // `clr.l (a1)` on entering a group (`$0092`, `$0174`): the screen is zeroed as it goes.

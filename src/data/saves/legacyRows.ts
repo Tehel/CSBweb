@@ -31,8 +31,8 @@
  * without it. It runs on the rows of every earlier version, once the steps above have
  * made them today's.
  *
- * All four are pure, so the tools run them (`tools/dump-save-menu.ts`,
- * `tools/dump-save-stamp.ts`); `idb.ts` calls them once, in the upgrade.
+ * All four are pure, so the tools run them (`tools/checks/save-menu.ts`,
+ * `tools/checks/save-stamp.ts`); `idb.ts` calls them once, in the upgrade.
  */
 import { holdsNoBlock1Words, stampBlock1Words, stampRandomGameID } from '../SaveGameLoader';
 import {

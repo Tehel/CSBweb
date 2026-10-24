@@ -379,11 +379,11 @@ Verified from the shipped `graphics.dat`, as a check on all of the above: class 
 class 39 is `CLIMB DOWN` (a rope) and class 1 is `INVOKE / FUSE / FLUXCAGE` (the Ra
 key). `Byte20002` and `Byte19958` are non-zero exactly for the physical attacks,
 matching CSBWin's comment at `doc/CSBwin-src/Attack.cpp:1131`.
-`tools/dump-monster-tables.ts` prints all of it.
+`tools/checks/monster-tables.ts` prints all of it.
 
 ## Monster stats in the shipped data
 
-From `tools/dump-monster-tables.ts` against Dungeon Master's `graphics.dat`, as a
+From `tools/checks/monster-tables.ts` against Dungeon Master's `graphics.dat`, as a
 sanity check on the `MONSTERDESC` layout: type 15 (Worm) has `horizontalSize` 1 (two
 corners); type 24 (Dragon) has `horizontalSize` 2 (the whole cell) with `baseHealth`
 and `attack` both 255; types 23 (Lord Chaos), 25 and 26 (Grey Lord) share one

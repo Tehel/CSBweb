@@ -646,7 +646,7 @@ A new game's `dungeon.dat` may be compressed. `ReadDatabases` reads the first 8 
 takes the file as compressed when their first word is 33028; otherwise it rewinds and
 reads it plain (`SaveGame.cpp:2558-2586`). A saved game is never read this way. The port:
 `DungeonLoader.loadDungeonDat` and `ExpandData` (`src/core/compression.ts`), checked by
-`tools/dump-compressed-dungeon.ts`.
+`tools/checks/compressed-dungeon.ts`.
 
 ### The 8-byte header
 
@@ -691,7 +691,7 @@ written in, and the port does the same (`convertOriginalDungeon`,
 `src/data/CsbwinDungeonConversions.ts`): references become object-index slots, texts go
 indirect, actuators get word 8, scrolls get six bytes, unknown cell types become open
 squares (`CheckCelltypes`) and mirrors get CSBWin's portrait state cleared
-(`ExtendPortraits`, `SaveGame.cpp:1503-1527`). `tools/dump-dungeon-image-blocks.ts` reads
+(`ExtendPortraits`, `SaveGame.cpp:1503-1527`). `tools/checks/dungeon-image-blocks.ts` reads
 `dungeon.dat` without them and writes its sections back byte for byte.
 
 ---

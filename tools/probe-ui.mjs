@@ -1,7 +1,7 @@
 // Drive the running app and read its live state.
 //
 // Some bugs only exist on screen: the panel prints the wrong word, the click lands on the
-// wrong champion, the object is in the chain but not drawn. `tools/dump-*.ts` cannot see
+// wrong champion, the object is in the chain but not drawn. `tools/checks/*.ts` cannot see
 // those — they stand the engine up headlessly, without the UI. This drives the real page
 // over the Chrome DevTools Protocol instead, through the `window.__probe` handle that
 // `src/main.ts` exposes under the dev server's `__CSBWEB_PROBE__`.
@@ -17,7 +17,7 @@
 // Actions run in the order given; the bare argument is the expression, evaluated last with
 // `game`, `screen` and `renderView` in scope and printed as JSON.
 //
-// Deliberately NOT a test: nothing here asserts. Reproduce the bug in a `tools/dump-*.ts`
+// Deliberately NOT a test: nothing here asserts. Reproduce the bug in a `tools/checks/*.ts`
 // once you know what it is — see the `playtest-bug` and `verification-tools` skills.
 import { writeFileSync } from 'node:fs';
 import { spawn, execSync } from 'node:child_process';

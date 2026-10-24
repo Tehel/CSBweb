@@ -271,7 +271,7 @@ intro. There is no setting to turn it off yet.
 - The sound is `SoundManager.playRecording`. A browser that still holds the page's audio
   until a first click gives a silent logo: the recording is not kept for later.
 
-`tools/dump-swoosh.ts` checks the decode (2306 bytes read, 64000 pixels, the code counts
+`tools/checks/swoosh.ts` checks the decode (2306 bytes read, 64000 pixels, the code counts
 above, and `tools/fixtures/swoosh-index.png` pixel for pixel) and the script's timing on a
 headless host.
 
@@ -506,7 +506,7 @@ Neither is drawn in the wall font: `TEXT #44` is a scroll's (`SCROLL #31`, map 1
 (23,4)), and `TEXT #118` is on the teleporter square at map 0 (9,1), where the party is
 sent when the Firestaff comes back unfused, and is printed in the message area. Both
 show the `2`. No text on a wall, in either file, has a code past the wall font, a line
-over 18 glyphs or more than four lines (`tools/dump-wall-text.ts`).
+over 18 glyphs or more than four lines (`tools/checks/wall-text.ts`).
 
 ## The Chaos Strikes Back utility disk
 

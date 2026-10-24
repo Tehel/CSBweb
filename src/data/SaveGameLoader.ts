@@ -642,7 +642,7 @@ export function saveSaveGameState(save: SaveGameState): Uint8Array {
   const character = new Uint8Array(CHARACTER_SIZE);
   if (save.characterBlock) character.set(save.characterBlock.subarray(0, CHARACTER_SIZE));
 
-  // The whole `TIMER`, in the form the header's flags declare. `parseTimers` is the exact inverse; `tools/dump-savegame-blocks.ts` round-trips it.
+  // The whole `TIMER`, in the form the header's flags declare. `parseTimers` is the exact inverse; `tools/checks/savegame-blocks.ts` round-trips it.
   const timers = new Uint8Array(maxTimers * timerSize);
   const timerRecords = save.timers ?? [];
   // Which slots hold a live timer: `TIMER_SEARCH::FindNextTimer` walks the queue, so a

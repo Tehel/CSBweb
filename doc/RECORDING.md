@@ -151,7 +151,7 @@ What is not verified:
 - **The port's saves**: whether a save changes the game's state where CSBWin's does, so
   that a recording with saves in it replays.
 
-**The proof is a tool**: a headless `tools/dump-replay.ts` that plays a scripted game,
+**The proof is a tool**: a headless `tools/checks/replay.ts` that plays a scripted game,
 records it, replays it at another frame pacing, and asserts `d.RandomNumber` equal at every
 entry and the two final saves byte-identical. It is the first step of G29, and a
 regression test of everything at once.

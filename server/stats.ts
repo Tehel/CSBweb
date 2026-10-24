@@ -49,7 +49,7 @@ export const TIME_GRAIN = 10_000;
 
 /**
  * The rows the log holds at most, past which only a `session` is kept: about 300 bytes
- * each, the aggregates included (`tools/dump-stats.ts`), so some 150 MB, in each of the
+ * each, the aggregates included (`tools/checks/stats.ts`), so some 150 MB, in each of the
  * nightly backups too (`doc/DEPLOYMENT.md`), on a disk the VPS shares.
  */
 export const MAX_EVENTS = 500_000;

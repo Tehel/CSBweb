@@ -318,12 +318,12 @@ export function keyScanOf(code: string): number {
  * no key is anything. CSBWin goes on past a match: every `pKeyXlate1` match is written
  * too, one queue slot further back each time, so a key bound twice would leave only the
  * last match queued, over the entry queued before it (`:8533-8574`). No keyscan is bound
- * twice in either pair of tables (`tools/dump-key-bindings.ts`), so the first match is
+ * twice in either pair of tables (`tools/checks/key-bindings.ts`), so the first match is
  * what CSBWin queues.
  *
  * Then, `if (bThreeDMovements)`, the keyscan `0x4900` is button `0x1124`, a level down,
  * and `0x4a00` is `0x1125`, up (`:8575-8595`), in every mode the tables answer, asleep
- * too. Neither keyscan is in a table (`tools/dump-key-bindings.ts`), so neither is two
+ * too. Neither keyscan is in a table (`tools/checks/key-bindings.ts`), so neither is two
  * matches.
  */
 export function translateKey(ui: UIState, keyscan: number): number {

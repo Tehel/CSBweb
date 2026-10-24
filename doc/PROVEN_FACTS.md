@@ -246,7 +246,7 @@ A hero text goes through the same tables: `AddCharacter` decodes it with
 `DecodeText(…, 0x8002, 990)` (`doc/CSBwin-src/Character.cpp:545-548`). In `dm-atari-1.3-fr`
 SYRA's title is "L}ENFANT DE SAUVAGE": its `%H` is that set's `Byte10016` entry H, "}",
 and the title is nineteen characters, the most `AddCharacter` accepts (`:581`). Shown by
-`tools/dump-preset-heroes.ts`, which also recruits SYRA from the mirror in that game.
+`tools/checks/preset-heroes.ts`, which also recruits SYRA from the mirror in that game.
 
 Every text goes through the escape tables, whatever its type (`CSBCode.cpp:5624-5639`),
 the text the party finds on a square it enters included: `PlaceOrRemoveObjectInRoom`
@@ -255,7 +255,7 @@ false)`, through `TranslateLanguage` first, which with no translation changes no
 (`Code11f52.cpp:3995-4001`). In `dm-atari/dungeon.dat` the one visible such text is on
 level 0 at (9, 1), and three of its pieces are escapes: "IT IS TOO BAD YOU DID NOT DISCOVER
 THE TRUE SECRET OF THE FIRESTAFF. NOW THAT I HAVE IT I HAVE NO FURTHER NEED FOR YOU!"
-(`tools/dump-room-text.ts`).
+(`tools/checks/room-text.ts`).
 
 A timer shows a text too. `ProcessTT_OPENROOM` sets, clears or toggles a text's `show`
 bit, and when that shows a hidden text on the party's own square it decodes it with
@@ -264,7 +264,7 @@ bit, and when that shows a hidden text on the party's own square it decodes it w
 leaves the square's texts alone (`:1715-1716`), and of its actuators reaches only the
 DSAs (`:1760-1761`). In `dm-atari/dungeon.dat` the floor actuator on level 0 at (1, 4)
 shows the text under it that way, "WELCOME BACK BRAVE ADVENTURERS."
-(`tools/dump-open-room-text.ts`).
+(`tools/checks/open-room-text.ts`).
 
 Every `DecodeText` ends in `SubstituteCharacterNames` (`CSBCode.cpp:5729-5732`,
 `:5432-5547`), which replaces three escapes written in the text's own letters: `.Q.A` is
@@ -281,7 +281,7 @@ past `d.NumCharacter`, nobody holding the cursor, a missing record or a variable
 `DecodeText` returns -1. Only the text the party finds on a square checks for -1, and
 then queues nothing (`Code11f52.cpp:3995`). Conflux 3.5 names a companion `.R.AAHL`,
 global text 123, in 224 decodings of its texts; `dm-atari` has none of the three
-(`tools/dump-text-substitution.ts`).
+(`tools/checks/text-substitution.ts`).
 
 ### Bytecode Example (Viewport.cpp line 979)
 ```cpp
@@ -337,7 +337,7 @@ first 1.0 disk's (8 December 1987) with its credits corrupted, and the second 1.
 (11 December) already has 1.2's items 232 and `0x22e`
 (`doc/ATARI_ST_DISK_REFERENCE.md` → "What each version changes", "CSBWin's files"). Each donated item
 differs from CSBWin's only where said below, and every other item is CSBWin's byte for
-byte. `tools/dump-dm-atari-graphics.ts` proves all of it and rebuilds the file
+byte. `tools/checks/dm-atari-graphics.ts` proves all of it and rebuilds the file
 (`--write`). `graphics.dat` carries no checksum, and CSBWin's graphics signature, an MD5 of
 the file (`doc/CSBwin-src/data.cpp:1946-1979`), is checked only against an expected value
 a save or a dungeon states (`doc/CSBwin-src/Graphics.cpp:1808-1829`); DM's state none, and
@@ -347,7 +347,7 @@ the port writes none (`src/data/CsbwinExtendedFeatures.ts`).
 (1398, 2283, 3096, 3983: 169 against 1.2's 185). They are the high nibbles of four
 opcodes, `0xA` in CSBWin's and `0xB` in 1.2's, and CSBWin's stream draws four lines of the
 text wrong from "Dennis Walker" down, then stops four pixels short of the picture; 1.2's
-fills it exactly (`tools/dump-image-codec.ts`). Golden frame `08-credits` shows 1.2's.
+fills it exactly (`tools/checks/image-codec.ts`). Golden frame `08-credits` shows 1.2's.
 Every original disk's item 5 is 1.2's, the 8 December one included: the corruption came
 with a copy.
 
@@ -376,7 +376,7 @@ CSBWin's file the pressed crack jumps to eye level, as on the first 1.0 disk; wi
 as on every disk from the second 1.0 on and the Atari ST the author played, it stays where
 the Out crack was. The port reads the table as it stands,
 as CSBWin does, so the `dm-windows` set shows CSBWin's behaviour and `dm-atari` the
-original's. `tools/dump-crack-switch.ts` asserts both, and golden frame `09-crack-switch`
+original's. `tools/checks/crack-switch.ts` asserts both, and golden frame `09-crack-switch`
 shows the pressed switch. Do not put CSBWin's items back into `dm-atari/`.
 
 **Graphic 232, Crack Switch (In)'s front view** (`121 + 2*55 + 1`, 32x28). 1.2 encodes it
@@ -420,7 +420,7 @@ proof-of-concept and were validated against real hardware. Two independent deriv
 on the same pair is as close to a proof as this project gets that the divergence from CSBWin's
 6000 Hz is the right one, and it also fixes which variant is which: **index 0 is timer 112,
 index 1 is timer 145**. `timerDataToRateIndex` (`src/renderer/intro/IntroHost.ts`) is that
-mapping, asserted in `tools/dump-intro.ts`.
+mapping, asserted in `tools/checks/intro.ts`.
 
 ## Item `0x22e` is laid out exactly as `Data.h` declares its span
 
@@ -434,7 +434,7 @@ its comment, sits at `7246 - address`. So a field's offset in the item is `7246`
 `Data.h` address: `wallRectangles` (`Byte3074`) at 4172, `Word2530` the last four bytes.
 
 Every data set's `0x22e` is 4720 bytes, and every table the port reads from it writes
-back over its bytes at that offset (`tools/dump-graphics-tables.ts`). Six of those reads
+back over its bytes at that offset (`tools/checks/graphics-tables.ts`). Six of those reads
 run past their own field, each as CSBWin's does: `Word7246` (`Code51a4.cpp:143`),
 `Byte5070` (`CSBCode.cpp:4073`), `Byte5094` and `Byte5076` (`:4142`, `:4164`), and
 `uByte2542` and `SeeThruWallsRect + 4` as whole `RectPos`es (`Viewport.cpp:2587`,
@@ -454,7 +454,7 @@ its address, in its name or as a bare number in its comment (`//9760`), sits at
 `CLOTHINGDESC`, 4, and `MONSTERDESC`, 26 (`CSB.h:1352-1360`, `:1672-1715`, `:2295-2422`).
 
 Every data set's `0x22f` is 3086 bytes, and every table the port reads from it writes
-back over its bytes at that offset (`tools/dump-graphics-tables.ts`). `DeltaX` and
+back over its bytes at that offset (`tools/checks/graphics-tables.ts`). `DeltaX` and
 `DeltaY`, which every step in a direction reads (`RelativeXY`, `CSBCode.cpp:4636-4659`), are
 `0 1 0 -1` and `-1 0 1 0` for north, east, south and west in every data set; so are
 graphic `0x231`'s `Word18568` and `Word18560`, the steps right and forward that `MoveParty`
@@ -483,7 +483,7 @@ long, two bytes and a word, `SOUND`, a word and six bytes, `PALETTE`, sixteen wo
 lays them out: `Long1828` two bytes into `0x232`, `Spells` 1026 into `0x230`.
 
 Every data set's items are those sizes, but for two cases, and every table the port reads
-from them writes back over their bytes at those offsets (`tools/dump-graphics-tables.ts`):
+from them writes back over their bytes at those offsets (`tools/checks/graphics-tables.ts`):
 
 - `0x231` is the short `0x7d4`, 2004 bytes, everything but `Buttons16932`, in `dm-atari`,
   `dm-windows`, 1.2, the French 1.3, the Kids dungeon and Conflux; CSBWin then fills the
@@ -568,7 +568,7 @@ tag0214f2:                       // <- no jump here; the loop above falls in
 ```
 
 Dropping it costs one pixel per opcode, which on a 320-wide image with hundreds of them puts
-the whole picture out of register. Asserted in `tools/dump-image-codec.ts`.
+the whole picture out of register. Asserted in `tools/checks/image-codec.ts`.
 
 ## `d.Palette11914` is black
 
@@ -640,7 +640,7 @@ original skill. The answer decides only whether that champion's basic skill is c
 too (`skillNumber >= 4`, `:335`), whose mastery is compared with the old one (`:344`), and
 who gets `LevelUp` (`:357`).
 
-Evidence: `tools/dump-adjust-skills.ts`.
+Evidence: `tools/checks/adjust-skills.ts`.
 
 ## Throwing awards skill 10 with a literal experience base
 
@@ -703,7 +703,7 @@ filter's `skillRequired` replaces the spell's only in the experience,
 `(STRandom() & 7) + 16 * D4W + 8 * (spellPower - 1) * skillRequired + D4W * D4W`
 (`:1199-1213`). A filter's `missileType` replaces `BITS4_9(pSpell->word6)` (`:1203-1207`),
 which is what classes 2 and 3 act on; the class-1 potion type is `pSpell->word6` whatever
-the filter says (`:1252`). Evidence: `tools/dump-cast-spell.ts`.
+the filter says (`:1252`). Evidence: `tools/checks/cast-spell.ts`.
 
 ## Zokathra goes into a hand, or is dropped like any drop
 
@@ -714,7 +714,7 @@ dropped in the party's cell on the party's level, `MoveObject(obj_2, -1, 0, d.pa
 d.partyY, NULL, NULL)` between a `LoadLevel(d.partyLevel)` and a `LoadLevel(oldLevel)`
 (`:1382-1389`), so it lies at corner 0 and the pads there see it placed, with
 `unchangedRoom` true because the party stands there. When no misc record is free, nothing
-is made (`:1359`). Evidence: `tools/dump-cast-spell.ts`.
+is made (`:1359`). Evidence: `tools/checks/cast-spell.ts`.
 
 ## A fountain fills, then the wall is touched
 
@@ -723,7 +723,7 @@ fountain (`d.FacingWaterFountain`) fills a waterskin (`value(3)`) or turns an em
 into a water flask, and leaves anything else as it is
 (`doc/CSBwin-src/Mouse.cpp:1195-1227`). Every one of those paths then reaches
 `tag01a69a: TouchWallF1()` (`:1228-1229`), so the wall is touched whether or not
-something was filled, as by a click on any other wall. Evidence: `tools/dump-fountain.ts`.
+something was filled, as by a click on any other wall. Evidence: `tools/checks/fountain.ts`.
 
 ## Blocked movement has no message
 
@@ -844,7 +844,7 @@ on or off the neck (`Character.cpp:1872`, `:1908`, `:1997`, `:2022`), a `TT_LIGH
   (`:7368-7376`); the Atari DM table is `99 75 50 25 1 0`, so the search stops by 5. A
   total of 0 or less is palette 5 (`:7377-7380`).
 
-Evidence: `tools/dump-light-level.ts`.
+Evidence: `tools/checks/light-level.ts`.
 
 ## A level's monster colours are the last claimant's
 
@@ -911,7 +911,7 @@ anyway, as the loop came through it first; the secondary is then `dir + 1` or `d
 `STRandom() & 2`. For north the west test decides: west not towards the target, the same;
 west towards it, a target to the north-west, the code falls through to `STRandomBool`, which
 gives north then west, or west then north. Both draw one number. Covered by
-`tools/dump-monster-perception.ts`, against a transcription of the C.
+`tools/checks/monster-perception.ts`, against a transcription of the C.
 
 ## A blow at the party hits the first living champion of a corner
 
@@ -921,7 +921,7 @@ champion in the corner whose `HP()` is not 0 (`Code11f52.cpp:4084-4105`). A recr
 corner among the living only (`Character.cpp:523-529`), so a dead champion and a living one
 can share a corner, and the blow hits the living one. A monster's blow at the closest
 champion and the party's bump into a wall both go through it. Covered by
-`tools/dump-character-to-damage.ts`.
+`tools/checks/character-to-damage.ts`.
 
 ## A monster's step waits half its move time, in whole ticks
 
@@ -929,7 +929,7 @@ champion and the party's bump into a wall both go through it. Covered by
 `timePerMove` is an `i16`, so the half truncates. At or below 0 the group moves now; above
 it, `timePerMove = D4W` and `w_54 = -1`, and the group waits. For an odd move time, a
 Skeleton's 7 or a Giggler's 3, the half is 3 or 1, never 3.5. Covered by
-`tools/dump-monster-move-code.ts`.
+`tools/checks/monster-move-code.ts`.
 
 ## Monsters step onto fake pits and false walls only if they recognise them
 
@@ -971,7 +971,7 @@ class `-n` is `d.struct5688[n-1]`, drawn from graphic `316 + uByte0` plus 0, 1 o
 the view (`:2318-2320`, `:2463`). In DM's `graphics.dat` nineteen weapon types have one:
 the swords, the axes, the clubs, the dagger, the arrow (`n = 1`, so class `-1` is a real
 missile graphic), the Slayer, the poison dart and the throwing star. The torch, the bow,
-the staffs and the rest fly as their floor picture. `tools/dump-missile-draw.ts` checks it.
+the staffs and the rest fly as their floor picture. `tools/checks/missile-draw.ts` checks it.
 
 ## `movementTicks06 == 255` means the monster never moves
 
@@ -1038,7 +1038,7 @@ first shrunk (`ShrinkBLT`) from its F1 size to the rectangle's, through the colo
 `d.Byte4172` at F3 or `d.Byte4188` at F2, into derived graphic `68 + 2*slot + nearness`. It
 is drawn with colour 9 transparent. In `graphics.dat`, every ornament's F1 rectangle is its
 graphic's size, and set 1's three rectangles are the whole door at each nearness
-(`tools/dump-door-ornaments.ts`).
+(`tools/checks/door-ornaments.ts`).
 
 ## `AddFootprintEntry` is acknowledged broken, and still load-bearing
 
@@ -1072,8 +1072,8 @@ and ages alike: an ordinary removal. `MoveObject` deletes entry 0 while the coun
 more, then appends (`:3263-3281`), so the trail is always the last 24 squares the party
 walked, oldest first, and the magic range slides down with them (`:4369-4375`). The
 ten-second update's drop of the oldest print (`doc/CSBwin-src/Code17818.cpp:181-195`)
-leaves the rest in order. Evidence: `tools/dump-magic-footprints.ts`, and
-`tools/dump-footprint-decoration.ts` for a print drawn from a trail that has been round.
+leaves the rest in order. Evidence: `tools/checks/magic-footprints.ts`, and
+`tools/checks/footprint-decoration.ts` for a print drawn from a trail that has been round.
 
 ## The party's trail grows from empty
 
@@ -1117,7 +1117,7 @@ cells, once `d.Time > 0`, the cell's extended cell flag `ECF_FOOTPRINTS` sets th
 record, and finds nothing in a record shorter than eight longwords
 (`doc/CSBwin-src/data.cpp:1682-1692`). Only a DSA's `&ECF!` or a custom dungeon writes one.
 The port: `summarizeRoomInfoCsbwin` with the `PartyFootprints` and the game's `d.Time`
-`DrawViewport` hands it. Evidence: `tools/dump-footprint-decoration.ts`.
+`DrawViewport` hands it. Evidence: `tools/checks/footprint-decoration.ts`.
 
 ## The footprint graphic is slot 15 of `d.LoadedFloorDecorations`, which no level fills
 
@@ -1139,7 +1139,7 @@ Bit 15 of the ordinal draws it, as ordinal 16, after the cell's own decoration
 both numbers: graphics 241-246 are the sizes of set 1's nine rectangles, each at
 `241 + d.RelativeCellGraphicIncrement[cell]`, and of neither other set's. The port:
 `InterpreterContext.loadedFloorDecorations`, which `ViewportRenderer` fills.
-Evidence: `tools/dump-footprint-decoration.ts`.
+Evidence: `tools/checks/footprint-decoration.ts`.
 
 ## A monster follows staler footprints the keener its nose
 
@@ -1296,7 +1296,7 @@ type 1 pads that print its opening text. Only the boot does it: the restart afte
 game calls `GameSetup(_25_, 0)` and `TAG021028` alone (`Code1f9e6.cpp:310-318`), and a
 resumed game skips it. The port's is `Game.start(true)`, which `main.ts` calls once, after
 forcing DM rules as `_ShowPrisonDoor` does first (`:10796-10800`);
-`tools/dump-enter-dungeon.ts` asserts it.
+`tools/checks/enter-dungeon.ts` asserts it.
 
 ## The party landing on a monster group kills it, champions or not
 
@@ -1344,7 +1344,7 @@ pTimerA->timerUByte6(ub(locr.x));
 pTimerA->timerUByte7(ub(locr.y));
 ```
 
-Evidence: `tools/dump-monster-pad.ts` section 5, `tools/dump-dsa-move.ts` section 6.
+Evidence: `tools/checks/monster-pad.ts` section 5, `tools/checks/dsa-move.ts` section 6.
 
 ## `CheckMoveFromMissile` reports only a total wipe-out
 
@@ -1378,7 +1378,7 @@ So the filter's parameter 6 is the direction of the last missile `MissileTimer` 
 for an encounter no missile timer caused: a party or a monster walking away from a missile,
 or `CheckMonsterVersusMissiles`. It is 0, the zeroed global's, before any missile has
 flown. A move made from inside a missile timer, by a filter's DSA, still checks the
-missiles it leaves. `tools/dump-move-from-missile.ts` checks both.
+missiles it leaves. `tools/checks/move-from-missile.ts` checks both.
 
 ## While `MissileTimer` runs, its missile names timer 0xffff, which is the copy
 
@@ -1395,8 +1395,8 @@ So everything that looks the missile's timer up from inside `MissileTimer` reads
 first tick in a corner someone leaves. A hit there calls `DeleteTimer(0xffff)` (`:2777`),
 which writes `m_timers[0xffff]`, outside the array (`Timer.cpp:965`): undefined. The port
 answers the index with the copy the same way (`TimerQueue.getTimer`) and its
-`deleteTimer(0xffff)` deletes nothing. `tools/dump-move-from-missile.ts` case 3 checks the
-encounter, and `tools/dump-missile-teleport.ts` the direction a teleporter turns, which is
+`deleteTimer(0xffff)` deletes nothing. `tools/checks/move-from-missile.ts` case 3 checks the
+encounter, and `tools/checks/missile-teleport.ts` the direction a teleporter turns, which is
 the copy's.
 
 ## `item16Attached` is a conjunction, not a lookup
@@ -1495,7 +1495,7 @@ no missile, no blow, and the range is never drawn.
 The block is filled in one order, which is the order of the random draws
 (`:990-1126`): the side of a group in a heap (`positions` 255), whether to launch, which
 missile, the random champion, then the range's two draws. So a Vexirk next to the party
-tosses for the launch before it tosses for a fireball. `tools/dump-monster-missile-type.ts`.
+tosses for the launch before it tosses for a fireball. `tools/checks/monster-missile-type.ts`.
 
 ## Only some monsters throw, and each type throws its own thing
 
@@ -1507,7 +1507,7 @@ lightning seven times in eight, Zytaz alternate poison cloud and fireball, Demon
 Dragons breathe fire. Everything else has no missile at all: `missile` starts as `RNnul`
 (`:1045`), so the block's `missileType` is 0xffff, not 0 (`:1080`), and the launch switch,
 which lets only the seven spell RNs through, skips it (`:1183-1195`). Checked by
-`tools/dump-monster-missile-type.ts` over every monster type in the shipped dungeon.
+`tools/checks/monster-missile-type.ts` over every monster type in the shipped dungeon.
 
 ## A giggler's blow steals only from the ready hand
 
@@ -1530,7 +1530,7 @@ into `d` reaches it (`CSBCode.cpp:10249-10286`; the nearest, `0x231` and `0x22f`
 addresses 18936-16885 and 10340-7255), and
 it lies below the 3328 bytes of the save's character block (`Data.h:780-800`). So every
 try names slot 0: a giggler takes what is in the ready hand, or nothing, and the backpack
-arm never runs. Checked by `tools/dump-giggler-steal.ts`.
+arm never runs. Checked by `tools/checks/giggler-steal.ts`.
 
 ## Two independent chances to avoid a blow entirely
 
@@ -1557,7 +1557,7 @@ skill number: without the 0x4000 flag, `DetermineMastery` adds the possessions' 
 (`doc/CSBwin-src/Code17818.cpp:73-147`), so the Firestaff in the weapon hand takes 2 more
 off, the complete one 4. And every `DetermineMastery` returns 1 while the party sleeps,
 whatever its flags (`:29-36`): a spell a DSA's `&CAST` casts then is cast at mastery 1.
-Covered by `tools/dump-monster-blow-mastery.ts` and `tools/dump-cast-spell.ts`.
+Covered by `tools/checks/monster-blow-mastery.ts` and `tools/checks/cast-spell.ts`.
 
 `IsCharacterLucky` (`doc/CSBwin-src/Character.cpp:2170`) then moves Luck by 2 in the
 *opposite* direction to the outcome: down when it saved you. Luck is spent by using it.
@@ -1618,14 +1618,14 @@ set from `pcA3->charPosition`, so the bones appear where that champion stood, an
 The bones are set down with `MoveObject(objD4, -1, 0, d.partyX, d.partyY)`, exactly as
 the possessions are, so over an open pit they fall to the level below; the expool record
 is added afterwards, unconditionally, with the same `objD4`, so it pairs the bones wherever
-they came to rest. Evidence: `tools/dump-champion-death.ts` section 7 (2 of 49 checks fail
+they came to rest. Evidence: `tools/checks/champion-death.ts` section 7 (2 of 49 checks fail
 before C31's fix).
 
 After the bones, `KillCharacter` clears `byte33`, `incantation[0]` and `maxRecentDamage`
 and turns the dead champion to the party's facing, `pcA3->facing = (ui8)d.partyFacing`
 (`doc/CSBwin-src/Character.cpp:2653-2656`). The screen never shows it, since
 `BringCharacterToLife` sets the facing again (`:824`), but `&CHAR@` reads it
-(`DSA.cpp:4199`) and a save carries it. Evidence: `tools/dump-champion-death.ts`, the
+(`DSA.cpp:4199`) and a save carries it. Evidence: `tools/checks/champion-death.ts`, the
 `facesParty` column of the death table (3 checks fail without the assignment).
 
 
@@ -1633,7 +1633,7 @@ Unconditionally also means whatever the fingerprint: `AddChampionBonesRecord` st
 `fingerprint & 0xffff` with no test (`doc/CSBwin-src/data.cpp:1639-1646`), so a fingerprint
 of 0 — `AddCharacter`'s for a champion recruited at level 0, (0, 0)
 (`Character.cpp:514-517`) — pairs the bones like any other. Evidence:
-`tools/dump-vi-altar.ts` section 1b (2 checks fail before the fix).
+`tools/checks/vi-altar.ts` section 1b (2 checks fail before the fix).
 
 ## `EXPOOL` is a directory block, free lists by record length, and 32 hash chains
 
@@ -1658,7 +1658,7 @@ link, always `RNeof`, over its `size`.
   one found. `size` is 29 at most. Conflux 3.5's `dungeon.dat` holds such records: 57
   keys have from 2 to 9 records each, and the copies differ in 43 of them. All 57 are
   `EDT_Database` keys: 27 `EDBT_MonsterNames`, 28 `EDBT_AltMonGraphics` and both
-  `EDBT_GlobalVariables` keys, whose 9 and 4 records `tools/dump-dsa-save.ts` counts. Its
+  `EDBT_GlobalVariables` keys, whose 9 and 4 records `tools/checks/dsa-save.ts` counts. Its
   pool has no second table.
 - **`Read`** returns the key's first record and hands its longwords back to the head of
   their free list (`:1552-1578`); **`Locate`** leaves the record where it is
@@ -1673,8 +1673,8 @@ taken little-endian. A read takes them back only when all 24 are there, and othe
 keeps the palette it has (`SaveGame.cpp:1931-1959`), which is the identity
 `ClearOverlayPalette` makes (`data.cpp:118-146`), since `d.Initialize()` clears it
 (`CSBCode.cpp:492`) before every read (`CSBCode.cpp:11591`, `Code1f9e6.cpp:309`). Every
-committed save holds that identity. Evidence: `tools/dump-dsa-save.ts` section 8. `src/data/CsbwinExpool.ts` is the port, over the file's bytes.
-Evidence: `tools/dump-expool.ts`. Seven of the eight committed saves hold those 24
+committed save holds that identity. Evidence: `tools/checks/dsa-save.ts` section 8. `src/data/CsbwinExpool.ts` is the port, over the file's bytes.
+Evidence: `tools/checks/expool.ts`. Seven of the eight committed saves hold those 24
 records and nothing else, and 24 writes into an empty pool give their 2304 bytes exactly:
 the directory, the eight blocks of three records, every link and chain. `csbgame7.dat`
 holds them among others, and CSBWin's loop run over each of the eight leaves its bytes as
@@ -1689,7 +1689,7 @@ longwords, 256 bytes (`CSB.h:1283-1291`). Nothing there asks for an Extended Fea
 block, so a `dungeon.dat` without one that declares EXPOOL records has them read and
 kept, and its cell flags read after them (`dbEntrySize`, `src/data/DungeonImageLayout.ts`).
 
-Covered by `tools/dump-expool.ts`.
+Covered by `tools/checks/expool.ts`.
 
 ## CSBWin carries an `EXPOOL` record of a type it does not know through a load and a save
 
@@ -1735,7 +1735,7 @@ The DSAs go in the Extended Features block, behind the object maps, when `numDSA
 `0xffff`, and closes with that sum (`:775-788`, `doc/CSBwin-src/DSA.cpp:5673-5696`,
 `:5765-5806`, `doc/CSBwin-src/data.cpp:1799-1872`). `m_description` is written whole, 80
 bytes. Conflux's 131 DSAs written so are its file's section, byte for byte, the string's
-tail zero in every description. Evidence: `tools/dump-dsa-save.ts`.
+tail zero in every description. Evidence: `tools/checks/dsa-save.ts`.
 
 ## Every read sets `deleteDuplicateTimers` from an `EXPOOL` record
 
@@ -1747,7 +1747,7 @@ record, else the longword `Locate`'s pointer gives, the record's first
 (`doc/CSBwin-src/Timer.cpp:1014`). Nothing in CSBWin's source writes the record; a dungeon
 editor does, and a save keeps it, the pool being written as it is. 3D2D1D's `dungeon.dat`
 holds one of 0, so a new map timer there never merges into a matching one; Conflux 3.5's
-holds one of 1; no other data set here has one (`tools/dump-delete-duplicate-timers.ts`).
+holds one of 1; no other data set here has one (`tools/checks/delete-duplicate-timers.ts`).
 
 ## A champion bones record is keyed by the bones' slot in the object indirect index
 
@@ -1763,13 +1763,13 @@ keeps its number when the object moves within its cell, since the position is in
 (`doc/CSBwin-src/Timer.cpp:2750`), and does so before it looks at the champion: bones it
 then refuses, their champion alive (`:2759`) or in no wings (`:2775`), stay on the
 floor with no record, and a later offering reads their `value` as the champion's index
-(`:2788`). `tools/dump-vi-altar.ts` section 3b stages it. `DropObject`, `DescribeObject` and
+(`:2788`). `tools/checks/vi-altar.ts` section 3b stages it. `DropObject`, `DescribeObject` and
 `DrawNameOfHeldObject` copy it with `CopyChampionBonesRecord`, a `Locate`
 (`Mouse.cpp:904`, `Character.cpp:3577`, `Code11f52.cpp:84`). Each wants a record of
 exactly one longword.
 
 The port keys the record by the bones' RN, its slot, and reads and writes `EXPOOL` as
-the file has it. Evidence: `tools/dump-vi-altar.ts` section 7 saves a game with bones on
+the file has it. Evidence: `tools/checks/vi-altar.ts` section 7 saves a game with bones on
 the floor, finds the record in the file's own pool under the bones' slot (1947), which
 the file's index names as the bones' record, and resurrects from it in a game that loads
 the file. Four of the committed saves (`csbgame3`, `4`, `6` and `7`) have a block of
@@ -1798,8 +1798,8 @@ only.
 `ProcessTT_ViAltar` fetches bones' champion from the wings with a read
 (`Timer.cpp:2771-2782`): one found dead is healed to `MaxHP()/2` and saved back, the
 bones deleted, and no timer follows; one found alive is not saved back, so it leaves the
-wings for good, and its bones stay. Evidence: `tools/dump-wings.ts`, and
-`tools/dump-vi-altar.ts` section 8.
+wings for good, and its bones stay. Evidence: `tools/checks/wings.ts`, and
+`tools/checks/vi-altar.ts` section 8.
 
 ## `KillCharacter` is the only way a champion's hit points reach zero
 
@@ -1864,7 +1864,7 @@ objNI_Moonstone,      //7a 122
 
 So `objNI_Bones_a` is 0x93 = **147**, not 93. Nine of `src/core/objectNameIndex.ts`'s
 constants had been read as decimal or taken off the neighbouring line. The name table in
-`graphics.dat` is the arbiter — `tools/dump-object-name-index.ts` asserts the string each
+`graphics.dat` is the arbiter — `tools/checks/object-name-index.ts` asserts the string each
 constant lands on, which is the only thing that tells a right index from a plausible one.
 
 Two of the enumerators are named for the item's *powered* form while the table holds the
@@ -1888,7 +1888,7 @@ reads the way the party faces and a lit torch reads its burn state.
 
 ## `DescIndex`, `GetBasicObjectType` and `NameIndex` — three steps, three sentinels
 
-Ported once, in `src/engine/objectIndex.ts`; `tools/dump-object-index.ts` asserts them over
+Ported once, in `src/engine/objectIndex.ts`; `tools/checks/object-index.ts` asserts them over
 every record of `dungeon.dat`.
 
 - **`RN::DescIndex`** (`doc/CSBwin-src/data.cpp:569-601`) returns -1 for `RNempty`, which is
@@ -1923,7 +1923,7 @@ button]`, and for any rune after the first multiplies it by `Byte19016[first - 9
 16, 20, 24 or 28) and shifts right by 3. An odd base after UM, EE or MON therefore drops
 half a point: VI after UM costs `(3 * 12) >> 3 = 4`, not 4.5. A cost above `Mana()` refuses
 the rune whole; `BackspaceMagicSelection` gives nothing back (`Magic.cpp:809-825`).
-`tools/dump-magic-panel.ts` checks all 36 second-rune costs.
+`tools/checks/magic-panel.ts` checks all 36 second-rune costs.
 
 ## The caster tabs are hit-tested by fixed x ranges
 
@@ -1978,7 +1978,7 @@ recomputes a champion's load from its possessions instead of tracking it increme
 DAROOU's `HeroInventoryItem[]` in `dungeon.dat` is empty; HALK's holds four records and
 WU TSE's six. A test that takes "the first preset hero" and expects something in a slot
 is testing the wrong hero, not a broken `assignPresetHeroPossessions`. HALK's weapon hand
-is rn 37976, `WEAPON#88` — the same record `tools/dump-level-items.ts` finds lying in
+is rn 37976, `WEAPON#88` — the same record `tools/checks/level-items.ts` finds lying in
 HALK's mirror cell (7,8) on level 0.
 
 ## `WEAPONDESC` is six bytes, and only the first was being read
@@ -2019,7 +2019,7 @@ damage contribution and also the `+ uByte3 / 4` term in the throw's skill gain
 | `S < w <= (S-12)/2 + S` | `+ (w - S)/2` — still helps, at half rate |
 | beyond that | `- 2 * (w - midpoint)` — collapses, at double rate |
 
-Measured with `tools/dump-throwing.ts` on a strength-10 champion (`MaxLoad` 180, so
+Measured with `tools/checks/throwing.ts` on a strength-10 champion (`MaxLoad` 180, so
 `S = 11`): compass (0.1 kg) 2.9, waterskin (0.3) 3.9, cheese (0.8) 6.4, worm round (1.1)
 8.0 — then bones (1.5) drops to 4.5 and a boulder (8.1) to 0.
 
@@ -2071,7 +2071,7 @@ lifespan are the same rule:
 The renderer scales the puff by `value` (`DrawClouds` in `DrawRoomObjects.ts`, the
 `max(4, (cloudScale * max(48, value+1)) >> 8)` term), so the shrink *is* the animation:
 a death cloud made at 255 steps 255 → 215 → 175 → 135 → 95 → 55 and is gone, visibly
-dispersing. Measured with `tools/dump-clouds.ts`; a real monster killed on level 2 leaves
+dispersing. Measured with `tools/checks/clouds.ts`; a real monster killed on level 2 leaves
 a cloud of value 110, which clears in exactly 3 ticks.
 
 The poison cut-off is tested **before** the subtraction (`:597`), so the last value a
@@ -2100,7 +2100,7 @@ connects at all with `Quickness` — dexterity, stamina and load — against the
 `DetermineThrowingDistance`'s `2 * mastery` term (`doc/CSBwin-src/Character.cpp:2421`) and
 a flat `+10` when `random(64) < mastery` (`Attack.cpp:867-872`).
 
-Measured with `tools/dump-player-attacks.ts`, 300 SWINGs each at the same Worm group on
+Measured with `tools/checks/player-attacks.ts`, 300 SWINGs each at the same Worm group on
 level 3: a champion at skill-4 mastery 4 landed 213 blows for 798 damage; one at mastery 8
 landed 212 for 915. Same frequency, a fifth more damage.
 
@@ -2167,7 +2167,7 @@ Both ways a box empties fill it with colour 0 — cancelling a Hall of Champions
 (`doc/CSBwin-src/CSBCode.cpp:6700-6708`) and removing a champion
 (`doc/CSBwin-src/Character.cpp:5412-5423`). A dead champion's box is not empty: it gets
 graphic 8, the bones, and the name (`doc/CSBwin-src/Character.cpp:1301-1307`).
-`tools/dump-marching-order.ts` checks the empty fourth box.
+`tools/checks/marching-order.ts` checks the empty fourth box.
 
 **Every click that names a champion names the box, never the corner.**
 `HandleClothingClick` resolves the champion it acts on as `d.CH16482[D7W]`
@@ -2176,7 +2176,7 @@ hands and `d.SelectedCharacterOrdinal-1` for the paper doll and the backpack
 (`:6992-7005`); `_HandleMagicClick` hands `SelectMagicCaster` the same kind of index
 (`doc/CSBwin-src/Magic.cpp:692-699`), and so does `SetHandOwner`. Matching a click
 against `charPosition` instead is invisible until the party turns and then silently
-routes it to a different champion — `tools/dump-inventory-routing.ts` is the standing
+routes it to a different champion — `tools/checks/inventory-routing.ts` is the standing
 check, since the inventory *drawn* is the right one either way.
 
 ## The attack menu's options are gated on mastery, the first one never
@@ -2204,7 +2204,7 @@ it sets `d.AttackingCharacterOrdinal = 0` and `d.Word20250 = 1` (`:4904-4922`). 
 closed menu stays on the screen until the next tick's `TAG01b29a`
 (`doc/CSBwin-src/CSBCode.cpp:8948-8959`) flashes the damage over it, or draws the
 buttons. After the flash, `d.Word20250` is still 1, so the damage stays up until the tick
-after, whose `TAG01b29a` draws the buttons. `tools/dump-attack-panel.ts` checks the port.
+after, whose `TAG01b29a` draws the buttons. `tools/checks/attack-panel.ts` checks the port.
 
 `TAG01b29a` turns no champion to face their attacker while the party sleeps or a candidate
 stands at a mirror (`d.PotentialCharacterOrdinal`, `doc/CSBwin-src/CSBCode.cpp:8913-8921`),
@@ -2223,7 +2223,7 @@ The main loop's tick (`doc/CSBwin-src/CSBCode.cpp:646-698`) runs `DrawViewport` 
 put-back. The port's pass does not wait (`DEBT.md` H): `Game.gameTick` calls
 `tag01b29a` (`src/engine/AttackMenu.ts`) in its place and paints it at once, unless that tick asked for a put-back, in
 which case the rest of the VBL paints nothing (`Game.paintHeld`) and the put-back's redraw
-paints it. `tools/dump-button-flash.ts` checks the order and the held paint.
+paints it. `tools/checks/button-flash.ts` checks the order and the held paint.
 
 ## `atk_SHOOT` throws away the damage it computes
 
@@ -2270,7 +2270,7 @@ endgame.
   (`doc/CSBwin-src/CSBCode.cpp:7563-7573`). The panel and the clicks on it read
   `d.DisplayResurrectChestOrScroll`, so a candidate's inventory opened any other way shows
   food and water, and its three buttons do nothing. Evidence:
-  `tools/dump-hall-of-champions.ts`, first section.
+  `tools/checks/hall-of-champions.ts`, first section.
 - While a candidate is on trial, `TAG0189d4` puts graphic 40, the Resurrect / Reincarnate
   / Cancel menu, where the panel goes and sets `d.DisplayResurrectChestOrScroll = 5`
   (`doc/CSBwin-src/Character.cpp:3853-3875`).
@@ -2284,7 +2284,7 @@ endgame.
   draws the menu again.
 
 The port redraws the panel every frame, so `drawInventoryScreen` tests the held eye before
-the candidate. Evidence: `tools/dump-mastery-panel.ts`, last section.
+the candidate. Evidence: `tools/checks/mastery-panel.ts`, last section.
 
 ## The mouth held with an empty hand
 
@@ -2305,7 +2305,7 @@ the candidate. Evidence: `tools/dump-mastery-panel.ts`, last section.
   (`Mouse.cpp:1669-1683`). `QuitPressingMouth` is `TAG0189d4`, so the panel is drawn again
   from the weapon hand (`CSBCode.cpp:7449-7454`).
 
-Evidence: `tools/dump-viewing-filter.ts`, section 11.
+Evidence: `tools/checks/viewing-filter.ts`, section 11.
 
 ## The held eye and mouth hide the pointer until the release
 
@@ -2327,7 +2327,7 @@ Evidence: `tools/dump-viewing-filter.ts`, section 11.
   `DrawNameOfHeldObject` (`doc/CSBwin-src/Code11f52.cpp:101-109`). `QuitPressingEye` draws the
   name again (`CSBCode.cpp:7468-7471`), as does `KillCharacter`'s release.
 
-Evidence: `tools/dump-viewing-filter.ts`, sections 12 (2 of 5 fail before the hide count)
+Evidence: `tools/checks/viewing-filter.ts`, sections 12 (2 of 5 fail before the hide count)
 and 14 (1 of 4 fails before the name is cleared; the rectangle's x 0xe9 is its canary).
 
 ## A champion's death lets go of a held eye or mouth
@@ -2340,7 +2340,7 @@ either held (`doc/CSBwin-src/CSBCode.cpp:7498-7499`). So the pointer is back wha
 hide count was, and the buttons after 81 answer again. `RemoveCharacter` does the same
 (`Character.cpp:5292-5316`).
 
-Evidence: `tools/dump-viewing-filter.ts`, section 13 (6 of 10 fail before the release).
+Evidence: `tools/checks/viewing-filter.ts`, section 13 (6 of 10 fail before the release).
 
 ## The mastery names are a code table, and six of them start with a rune
 
@@ -2377,14 +2377,14 @@ The object panel uses the same six glyphs for a potion's power
 the name of any potion but the water flask and the empty flask is prefixed with the
 character `95 + strength()/40` and a space. Without the `0x8000` flag, a temporary
 adjustment counts. The line is printed with `TextToViewport(134, 68, COLOR_13, …, false)`,
-so it too goes through `drawTextLineIndexRaw`. `tools/dump-mastery-panel.ts` renders the
+so it too goes through `drawTextLineIndexRaw`. `tools/checks/mastery-panel.ts` renders the
 panel at every power step.
 
 The rank is read with the `0x8000` flag — `DetermineMastery(chIdx, role|0x8000)`
 (`doc/CSBwin-src/Character.cpp:4610`) — so the panel shows the **earned** rank and a
 temporary adjustment from a spell or potion does not move it.
 
-Covered by `tools/dump-mastery-panel.ts`, which renders the real panel and compares the
+Covered by `tools/checks/mastery-panel.ts`, which renders the real panel and compares the
 pixels against the strings spelled out independently in the tool.
 
 ## The column index is saved state, not dungeon structure
@@ -2438,7 +2438,7 @@ allocation and nulls the vacated last entry, while `DungeonState` splices the ar
 tracks the length in `header.objectListSize`. Both are self-consistent; only the second
 needs the length saved.
 
-Covered by `tools/dump-savegame.ts`.
+Covered by `tools/checks/savegame.ts`.
 
 ## `EXTENDEDFEATURESBLOCK` offsets, and `gameInfoSize` is signed
 
@@ -2476,7 +2476,7 @@ occupies **no bytes in the file** and the read head must not advance. Read unsig
 4294967295 walks past the end of the file and GAMEBLOCK1 never parses. The eight
 committed saves all hold a `gameInfoSize` of 32.
 
-Covered by `tools/dump-csbwin-save.ts`.
+Covered by `tools/checks/csbwin-save.ts`.
 
 ## Every save carries the game information the last block gave
 
@@ -2492,7 +2492,7 @@ read from DM's `dungeon.dat` saves a size of 0, which its read turns into the 32
 "No game information was provided": the eight committed saves' string. The port keeps it
 as `DungeonData.gameInfo` (`readGameInfo`, `src/data/CsbwinExtendedFeatures.ts`).
 
-Covered by `tools/dump-game-info.ts`.
+Covered by `tools/checks/game-info.ts`.
 
 ## `CHARDESC.title` is 20 bytes, not 16
 
@@ -2526,7 +2526,7 @@ characters plus terminator — starting at offset 8 with nothing lost.
 ⚠️ **Open question, not a fact.** In the three oldest committed saves several
 champions' titles read back with their first character replaced by 0: `SHE DEVIL` → `\0HE DEVIL`,
 `SHADOWSEEK` → `\0HADOWSEEK`, `THE BARBARIAN` → `\0HE BARBARIAN`, against the preset
-names `tools/dump-preset-heroes.ts` reads from `dungeon.dat`. It is a property of the
+names `tools/checks/preset-heroes.ts` reads from `dungeon.dat`. It is a property of the
 files, not of the reader: within one save, `HALK` loses its `T` while `LEYLA` and
 `ALEX` keep `SHADOWSEEK` and `ANDER` intact, so no fixed offset explains it. The
 suspicion was a champion-naming path writing its NUL at `name[8]`, which is `title[0]`.
@@ -2552,7 +2552,7 @@ bytes `44 01` (IAIDO), `45 01`, `27 01`, `0e 02`, … at 280. Read little-endian
 `AddCharacter`'s `(partyLevel << 10) | (partyX << 5) | partyY`
 (`doc/CSBwin-src/Character.cpp:515-519`) of a square of level 0, the Hall of Champions:
 0x0144 is (10,4). Read big-endian, 0x4401 is a square of level 17, which the dungeon
-does not have (`tools/dump-csbwin-load.ts`). The bones record `AddChampionBonesRecord`
+does not have (`tools/checks/csbwin-load.ts`). The bones record `AddChampionBonesRecord`
 writes is a longword of the pool, swapped as one (`DB11::swap`), so it holds the same
 0x0144, and only the little-endian reading pairs it with the champion.
 
@@ -2578,7 +2578,7 @@ cellFlagArraySize            cell flags        (EXTENDEDFEATURESBLOCK+48, else h
 
 `numMaps` is the header's byte, and nothing bounds it: `ReadDatabases` reads
 `16 * NumLevel()` bytes of descriptors whatever it says (`doc/CSBwin-src/SaveGame.cpp:2623-2639`).
-Conflux 3.5 has 64 levels, and a save of it reads back (`tools/dump-dsa-save.ts`).
+Conflux 3.5 has 64 levels, and a save of it reads back (`tools/checks/dsa-save.ts`).
 
 Nor is 0 refused: a header of 44 zero bytes reads as a dungeon of no level, every count
 0, and a file of no level and no checksum word goes through `ReadDatabases` whole. A new
@@ -2586,7 +2586,7 @@ game puts the party on the header's square of level 0 (`:2613-2622`), and nothin
 that the level is there, or that the square is within its columns and rows: past them,
 the column pointers built for the cell flags (`:2881-2916`) hold no cell for it. The
 form that adds a player's own set refuses both (`unstartableDungeon`,
-`src/engine/LocalDataSetCheck.ts`; `tools/dump-local-data-set.ts`).
+`src/engine/LocalDataSetCheck.ts`; `tools/checks/local-data-set.ts`).
 
 **Two record sizes are not the `dungeon.dat` ones.** This is what defeats the obvious
 arithmetic:
@@ -2627,13 +2627,13 @@ then takes the image header's `LegacyCellFlagArraySize`, its word 2
 declares 0. Chaos Strikes Back ships its saves in that Atari-era form: `mini.dat` and
 `csbgame2.dat` (`tools/fixtures/gamefiles/csb/`) carry no block, their word 2 is 8763, and with it the layout closes on the
 final word. 8763 is also the extent of the eleven levels' cell flags and tables as their
-descriptors place them. Covered by `tools/dump-atari-saves.ts`.
+descriptors place them. Covered by `tools/checks/atari-saves.ts`.
 
 Two independent confirmations beyond the closure sum: a 48-byte window lifted from
 `dungeon.dat`'s map-data section is found in an early save exactly at the computed cell
 flag offset, and its door database appears exactly at the computed database offset.
 
-Covered by `tools/dump-csbwin-save.ts`.
+Covered by `tools/checks/csbwin-save.ts`.
 
 ## A thrown object keeps its id: `ObjectInHand` and `MISSILE.projectileObject`
 
@@ -2694,7 +2694,7 @@ held, so the reader keeps that as `textReference` and every reader of it keeps w
 record (`doc/CSBwin-src/SaveGame.cpp:2380-2399`); the old-format branch beside it is
 what converts a pre-'B' file.
 
-Covered by `tools/dump-csbwin-world.ts`, which parses the image of every committed save
+Covered by `tools/checks/csbwin-world.ts`, which parses the image of every committed save
 into a real `DungeonData` and checks that the early ones' cell flags are **identical**
 to `dungeon.dat`'s. That is the sharpest available check on all of this: the cell flags
 are the last section in the image, so their position depends on every length before
@@ -2754,7 +2754,7 @@ write `dataTypeMap` / `dataIndexMap` past their end (`:337-353`). `RN::DescIndex
 `dbType()` alone, unless the RN is `RNempty` (`data.cpp:569-601`), so for `RNnul` and
 `RNeof` it is -1 without a corner or a record being read. The port's `RnMaps` answers
 `dbUNKNOWN` the same way and throws where CSBWin would read outside the maps
-(`tools/dump-object-index.ts`).
+(`tools/checks/object-index.ts`).
 
 **A freed slot is `dataTypeMap[i] == 0xff`, `dataIndexMap[i] == 0xffff`.**
 `DeleteDBEntry` writes both, together with `RNnul` over the record's own link
@@ -2772,11 +2772,11 @@ every scroll's text a slot of its own (`AllocateIndirectIndex`, `:2371`) beside 
 chains gave it. In DM's `dungeon.dat` the free scroll 33 names text 123, which is a wall's
 text in a chain, so the port's conversion of it holds one such pair, slots 1779 and 1945.
 
-Evidence: `tools/dump-csbwin-world.ts` walks every object chain in all eight saves —
+Evidence: `tools/checks/csbwin-world.ts` walks every object chain in all eight saves —
 1893 to 1908 objects each, chains up to 31 deep, through chests and monster possessions
 — and finds no reference to a free record, no index past a database, no category without
 a database and no cycle. The early saves hold `dungeon.dat`'s 1911 objects less exactly
-what the chosen heroes carried out of their mirrors. `tools/dump-csbwin-party.ts` asserts
+what the chosen heroes carried out of their mirrors. `tools/checks/csbwin-party.ts` asserts
 that all 30 possession slots of every champion in every save name a **live** record in
 one of the six carryable databases; read as packed RNs they had been decoding to doors
 and teleporters with indices in the hundreds.
@@ -2836,7 +2836,7 @@ closing  00 00 00 fd  01 00 01 0e 00 01  00 19 00 cd cd cd
 `fn` is 1 (`TT_DOOR_STEP`), `x`,`y` are the cell the party faces, and `u9` is the action.
 The `0xcd` tail is `TIMER`'s constructor fill (`doc/CSBwin-src/CSB.h:1868-1879`), which
 is itself a check that byte 12 really is the level and 13-15 really are unused.
-`tools/dump-csbwin-timers.ts` restores each save into a real `Game`, turns the clock, and
+`tools/checks/csbwin-timers.ts` restores each save into a real `Game`, turns the clock, and
 watches the door: one opens and the other shuts, from the same starting state, driven by
 nothing but that byte.
 
@@ -2978,7 +2978,7 @@ is the format `TAG0088b2` reads, four consecutive `LE16(*puwA0++)` per group
 
 Verified, not inferred: decoded that way, the portrait of **every champion in every
 committed save** in `tools/fixtures/` reproduces a cell of basic graphic 26
-pixel for pixel, 928 of 928 (`tools/dump-csbwin-load.ts`). A wrong offset, a reversed
+pixel for pixel, 928 of 928 (`tools/checks/csbwin-load.ts`). A wrong offset, a reversed
 plane order or a byte swap each still yield a plausible 32x29 block, and none of them
 match.
 
@@ -3008,7 +3008,7 @@ is added. Its stack is 1,024 bytes, and `EnlargeStack` is `NotImplemented(0xf864
 The tool that made Conflux 3.5's and Towers of Chaos 3.3's files widens when the table
 has `maxTableLen - 4` entries, and ends a section whose last code fills a word with a
 word of nothing. `src/data/CSBGraphicsWriter.ts` does both: of their 1,283 sections it
-writes 1,282 in the code words shipped (`tools/dump-csbgraphics-writer.ts`). The other,
+writes 1,282 in the code words shipped (`tools/checks/csbgraphics-writer.ts`). The other,
 Conflux's sound 365, is the tool's own slip: from code 14,334 its codes leave the table
 the decoder keeps, literal bytes for strings it holds since entry 2134, then codes past
 its end (15360 with entry 14587 next), read as the code one past it. The writer gives the
@@ -3032,7 +3032,7 @@ Every portrait section of both files here is 582 bytes, which is that layout wit
 colours and 464 bytes of pixels: Conflux's 156 and `tools/fixtures/csbgraphics/CSBgraphics.dat`'s 197, from id 24 up.
 Verified, not inferred: seven of them, ids 44, 46, 47, 49, 50, 146 and 148 in both files,
 decode this way to cells 14, 12, 8, 4, 7, 23 and 22 of CSB's basic graphic 26, pixel for
-pixel (`tools/dump-portraits.ts`). Top-down rows or swapped nibbles would match none.
+pixel (`tools/checks/portraits.ts`). Top-down rows or swapped nibbles would match none.
 
 ## A `CSBgraphics.dat` wall or floor decoration's bitmaps are Atari bitplanes
 
@@ -3052,7 +3052,7 @@ In both files here, the tools fixture and Conflux 3.5's, every source descriptor
 to a group, and read as bitplanes every bitmap is a picture: wall decoration 5 ("biblio")
 a bookshelf, floor decoration 61 ("flood11") a breaking wave. Read as packed nibbles, each
 is noise in vertical bands, with fewer pixels like their right neighbour in every one of
-the 144 bitmaps of each file (`tools/dump-extended-decorations.ts`; golden frame
+the 144 bitmaps of each file (`tools/checks/extended-decorations.ts`; golden frame
 `20-conflux-bookshelf`).
 
 ## A viewport overlay is a 224x136 bitmap of bytes, and its end is a `d.Time`
@@ -3110,7 +3110,7 @@ the next tick's top does, any mode but `VM_INVENTORY` and while the party is awa
 open inventory goes to `VM_INVENTORY` at once, through `TAG0207cc`'s `ShowHideInventory`
 (`SaveGame.cpp:1375`, `CSBCode.cpp:10077-10082`). A game starts outside `VM_ADVENTURE` (the
 prison door, `CSBCode.cpp:9701`, or a menu), and its first tick sets it
-(`tools/dump-video-mode.ts`).
+(`tools/checks/video-mode.ts`).
 
 `UpdateScreenArea` allocates the overlay's memory and builds `m_table` afresh
 (`WinScreen.cpp:1064-1065`), 8192 bytes, 256 overlay bytes by 16 Atari colours
@@ -3162,7 +3162,7 @@ port takes the first path, as its `StartSound` does (`SoundManager.playCustomSou
 Once summed, every sound section of both files here is a whole WAV file, its 44-byte
 header included: `RIFF`, `WAVEfmt `, PCM, mono, 11025 Hz, 8-bit, and the `data` chunk's
 size at byte 40, which is why `ReadSound` reads the count there. Conflux's 611 and
-`tools/fixtures/csbgraphics/CSBgraphics.dat`'s 618, ids 220 up, all decode so (`tools/dump-custom-sounds.ts`): unsummed
+`tools/fixtures/csbgraphics/CSBgraphics.dat`'s 618, ids 220 up, all decode so (`tools/checks/custom-sounds.ts`): unsummed
 bytes would spell no header. One section in each, 705 (`coat`), has a 4-byte `fact` chunk
 at byte 36, holding 4574, before its `data` chunk of 4574 samples at byte 48, so
 `ReadSound` reads a count of 4 and `PlayCustomSound` plays four bytes, the `fact` chunk's
@@ -3189,7 +3189,7 @@ a mapping reaches graphic 0.
 Both files here hold the same 123 sections, ids 0 to 123 without 65, and in each the
 graphics `word4` names lie end to end from offset 0 at the size their `ITEM12` gives
 them, 120 sections ending with the last; 32, 52 and 64 hold one or two more pictures
-past them, which `word4` does not name (`tools/dump-alt-mon-graphics.ts`). Read
+past them, which `word4` does not name (`tools/checks/alt-mon-graphics.ts`). Read
 big-endian, `word4` would name no view but the front. Conflux's `dungeon.dat` carries 81
 `EDBT_AltMonGraphics` records under 37 keys, of which `Locate` reads the first, and every
 one of the 586 groups that has an alternate graphic on its level finds its section.
@@ -3207,7 +3207,7 @@ read from the section, and the group's size still read from its type's `MONSTERD
   bit first (`TAG0088b2`'s 16-pixel masks, `Graphics.cpp:588-592`), `GetAlternateBasicGraphicAddress`
   pointing at `graphic + graphicOffsets[n]` (`:1113-1116`). Fifteen of Conflux's sections
   are their type's front view at `graphics.dat`'s size, transparent exactly where it is;
-  with each word's bytes swapped, none is (`tools/dump-alt-mon-draw.ts`).
+  with each word's bytes swapped, none is (`tools/checks/alt-mon-draw.ts`).
 - **Derived graphics are numbered from 0 in the group's cache slot** (`graphicNumFBSAE`):
   front 0 and 1 at three and two rows, then 2 and 3 for the side view, the back's and the
   attack's after it as `word4` has them, then the mirrored front: `2 + 2 * (side + back +
@@ -3264,7 +3264,7 @@ No `dungeon.dat` here, Conflux's included, and no genuine save in `tools/fixture
 any of the three records, and every Extended Features block among them expects zeros.
 The port: `src/data/FileSignature.ts`, `readRuntimeFileSignatures`
 (`src/data/CsbwinExpool.ts`), `src/engine/FileSignatures.ts`; evidence
-`tools/dump-file-signatures.ts`.
+`tools/checks/file-signatures.ts`.
 
 ## A `CHARDESC` slot past the party holds zeros, or the champion who left it
 
@@ -3303,9 +3303,9 @@ with no corner left the champion stands in corner 5. And `RemoveCharacter`, with
 other champion living, hands the cursor and the magic tab to slot `d.NumCharacter`,
 which `SetHandOwner` and `SelectMagicCaster` refuse only if its HP is 0
 (`Character.cpp:5343-5360`). The port keeps the slots as
-`PartyState.vacantCharacters`; `tools/dump-dsa-characters.ts` (3b, 3c),
-`tools/dump-hall-of-champions.ts` (Cancel), `tools/dump-character-block.ts` (5) and
-`tools/dump-swap-character.ts` (2, 4) check the four ways in and the corner search.
+`PartyState.vacantCharacters`; `tools/checks/dsa-characters.ts` (3b, 3c),
+`tools/checks/hall-of-champions.ts` (Cancel), `tools/checks/character-block.ts` (5) and
+`tools/checks/swap-character.ts` (2, 4) check the four ways in and the corner search.
 
 ## `CHARDESC.incantation` is a C string, and a cast leaves the rest of it behind
 
@@ -3340,7 +3340,7 @@ five writers, and each keeps it there: the add stores `(D7W + 1) & 3` after writ
 stores `(byte33 + 3) & 3` and zeroes that byte (`Magic.cpp:817-820`); the cast
 (`:954-955`, above) and the two champion resets (`Character.cpp:2653-2654`, `:5318-5319`)
 store 0 with `incantation[0] = 0`. After four runes it wraps to 0 while `StrLen` is 4.
-`tools/dump-character-block.ts` packs all eight committed saves with the derived value
+`tools/checks/character-block.ts` packs all eight committed saves with the derived value
 byte for byte. This port used to carry the file's `byte33` instead, which went stale as
 soon as a rune was typed after the load.
 
@@ -3351,7 +3351,7 @@ this port writes zero there.</sub>
 ## Packing `CHARDESC` back: the six fields with no reader
 
 Writing block 4 needs the whole 800-byte record, including what the game never reads
-back. Everything below is verified by `tools/dump-character-block.ts`, which packs the
+back. Everything below is verified by `tools/checks/character-block.ts`, which packs the
 block again for each of the eight committed saves and compares with the file's own
 bytes — all eight are byte-identical, empty slots, dead incantation tails and all.
 
@@ -3377,14 +3377,14 @@ whose bit 4 is the champion's **gender** — the only place it is recorded.
 `d.partyFacing` (`doc/CSBwin-src/Character.cpp:523`, `:532`), so a recruit that has never
 been hit saves the party's facing there. It is the way the portrait turns on the next hit
 (`Monster.cpp:1246` sets it, `CSBCode.cpp:8931-8937` applies it). The port's recruit wrote
-0 until D3's `facing3` fix (`tools/dump-hall-of-champions.ts`, a mirror faced west).
+0 until D3's `facing3` fix (`tools/checks/hall-of-champions.ts`, a mirror faced west).
 
 ### `CHARDESC.load` agrees with this port's own sum
 
 CSBWin keeps `load` (offset 272) incrementally, adjusting it at each of its eight
 possession writers; this port re-sums it from the object weights instead
 (`src/engine/CharacterStats.ts`). For all **18 champions of the eight committed
-saves** the two agree exactly (`tools/dump-csbwin-load.ts`). That is the only outside
+saves** the two agree exactly (`tools/checks/csbwin-load.ts`). That is the only outside
 check the weight system has: `WEAPONDESC`, the clothing and misc weight arrays, the
 water-flask rule and the recursion into chests all have to be right for it to hold.
 
@@ -3462,7 +3462,7 @@ line for each of A-Z, a-z, backspace, `.` `,` `;` `:`, return and space, each to
 and `UIM_CHAR` queues no character a line does not translate (`CSBUI.cpp:1099-1135`).
 
 The port binds the same physical keys, as `KeyboardEvent.code`s, to the same buttons
-(`DEFAULT_KEY_BINDINGS`, `src/renderer/ui/Keyboard.ts`, `tools/dump-key-bindings.ts`):
+(`DEFAULT_KEY_BINDINGS`, `src/renderer/ui/Keyboard.ts`, `tools/checks/key-bindings.ts`):
 the keys sit where CSBWin's sit on a US keyboard, as a virtual key or a scancode does on
 any layout. A move, Esc and the waking send their keyscan to the tables, as the file's
 `key` and `scan` lines do. It adds 7-0 for the inventories, which the file leaves
@@ -3500,8 +3500,8 @@ monster database and every database from the missiles on, one more per record
 (`:2768-2776`). `Byte7302[16]` (`Data.h:1114`) sits in graphics.dat item 0x22f right after
 `ObjDesc[180]`, and reads `0,0,0,0,75,100,120,0,5,0,140,0,0,0,60,50` in the stock file, so
 the stock dungeon's table is 100 + (182 + 75) + (0 + 60) + (0 + 50) = 467, the
-`gb2.MaxTimers` of every committed save. `tools/dump-timer-heap.ts` section 5, and
-`tools/dump-save-roundtrip.ts` 3b for a filled table through a save.
+`gb2.MaxTimers` of every committed save. `tools/checks/timer-heap.ts` section 5, and
+`tools/checks/save-roundtrip.ts` 3b for a filled table through a save.
 
 Why it is not merely tidy numbering: a restore is followed by `ProcessMonstersOnLevel`,
 which deletes and re-creates the movement timers of every monster group on the party's
@@ -3510,11 +3510,11 @@ level. The game start calls `LoadPartyLevel(d.partyLevel)`
 `ProcessMonstersOnLevel` (`:805`, `:828`). A save does the same once the file is closed
 (`doc/CSBwin-src/SaveGame.cpp:1335-1343`), so that the game played on after a save is the
 one a restore of it gives back; a save that fails jumps past it, to `tag01e4f0` (`:1361`).
-`tools/dump-save-roundtrip.ts` steps the two side by side and asserts they agree on every
+`tools/checks/save-roundtrip.ts` steps the two side by side and asserts they agree on every
 tick (`Game.saveWritten`, which the disk menu calls once its write succeeds). Without slot reuse every load
 abandons one slot per re-created timer — two per save/load cycle on `csbgame7.dat`,
 without bound, in an array CSBWin lets reach 5000 entries before `die(45, "No empty Timer
-entries")` (`doc/CSBwin-src/Timer.cpp:1003-1009`). `tools/dump-save-roundtrip.ts` runs
+entries")` (`doc/CSBwin-src/Timer.cpp:1003-1009`). `tools/checks/save-roundtrip.ts` runs
 five cycles and asserts the table neither grows nor gains a hole.
 
 What load legitimately *does* change, for the same reason, and so is excluded from that
@@ -3554,7 +3554,7 @@ sits at or above `FirstAvailTimer` in every one:
 
 This port keeps no such mark, so `saveSaveGameState` writes 0xcd for a slot that is live
 *now* and 0 otherwise — right for a slot CSBWin has never freed, and invisible either
-way. `tools/dump-save-blocks-vs-file.ts` asserts every other byte of block 5 against the
+way. `tools/checks/save-blocks-vs-file.ts` asserts every other byte of block 5 against the
 file and exempts these three in freed slots by name.
 
 **The timer queue past `NumTimer` is the same kind of debris.** CSBWin writes all
@@ -3586,7 +3586,7 @@ this port writes differ from the one it read.
 
 All three now live on `DungeonHeader.word4Low` and `MapDescriptor.fill2` /
 `MapDescriptor.word12Bits8_11`, named as CSBWin names them where it names them at all, and
-documented as unread. `tools/dump-dungeon-image-blocks.ts` is the check: blocks 7, 8, 9 and
+documented as unread. `tools/checks/dungeon-image-blocks.ts` is the check: blocks 7, 8, 9 and
 14 written again from a parsed world and compared with the file's own bytes, for
 `dungeon.dat` and for every save. Blanking `word12Bits8_11` in the writer fails it on
 levels 3, 5 and 12 of every one of the nine files.
@@ -3601,7 +3601,7 @@ long as no level starts more than 64K after the one before. Conflux 3.5's array 
 bytes, and its map 63 starts at 66155, stored as 619. Read as stored, map 63 is map 0's
 bytes: its flagged cells disagree with the object list's column index and take other
 columns' objects, among them `RNnul`. `levelCellOffsets` (`src/data/DungeonLoader.ts`) is
-the reader's and the writer's; `tools/dump-cell-offsets.ts` checks the column index
+the reader's and the writer's; `tools/checks/cell-offsets.ts` checks the column index
 against the flags in every data set, and block 14 written back against Conflux's own.
 
 ### The cell flag array's length is derivable, and lands on the declared value
@@ -3642,7 +3642,7 @@ original bytes to preserve.
 
 "Set in the data?" is measured over `dungeon.dat` and the eight committed saves, and it
 is the difference between a field a canary can prove and one it cannot: blanking any of
-the six that are set fails `tools/dump-dungeon-image-blocks.ts`, and blanking the rest
+the six that are set fails `tools/checks/dungeon-image-blocks.ts`, and blanking the rest
 cannot, because they are already zero. They are carried anyway, for the reason `FILL2` is:
 nothing derives them, and a third-party dungeon is free to use them.
 
@@ -3674,7 +3674,7 @@ to 0 immediately before the image header goes out (`:1234`), so nothing from blo
 in it, and it is written through `LE16` (`:1318-1320`) — a byte swap on the little-endian
 build CSBWin ships as — so it lands **big-endian** like the rest of the image.
 
-Verified the strongest way available: `tools/dump-dungeon-image-blocks.ts` computes the
+Verified the strongest way available: `tools/checks/dungeon-image-blocks.ts` computes the
 sum over each committed save's **own** image bytes and compares it with the word that save
 ends with. All fourteen agree, so the formula is measured against CSBWin's arithmetic
 rather than against ours.
@@ -3684,8 +3684,8 @@ rather than against ours.
 Every word of the object list, and every RN of a database record, is a slot of the object
 indirect index. The port keeps a save's slots and its maps as they were read, and writes
 them back so: blocks 10 and 13 are the file's own bytes, RNs included
-(`tools/dump-dungeon-image-blocks.ts`), and block 0 carries the file's maps slot for slot
-(`tools/dump-save-blocks-vs-file.ts`).
+(`tools/checks/dungeon-image-blocks.ts`), and block 0 carries the file's maps slot for slot
+(`tools/checks/save-blocks-vs-file.ts`).
 
 One class of word is the exception: **the second RN of a free record**.
 `DeleteDBEntry` writes `RNnul` over a record's link and frees the indirect slot that named
@@ -3694,9 +3694,9 @@ deleted record routinely still points its possession or contents chain at a slot
 since been freed. The reader
 reads those as `RNnul` (`readRNOfRecord`), and the writer puts `RNnul` back. There are 135
 to 256 of them per committed save; the tool counts and reports them, exactly as
-`tools/dump-save-blocks-vs-file.ts` exempts `TIMER.unused13`. In `csbgame-early-1hero.dat`
+`tools/checks/save-blocks-vs-file.ts` exempts `TIMER.unused13`. In `csbgame-early-1hero.dat`
 they are 136 words, and they and the closing checksum are the 274 bytes by which the file
-written back differs from the file (`tools/dump-save-file-roundtrip.ts`).
+written back differs from the file (`tools/checks/save-file-roundtrip.ts`).
 
 ## Everything CSBWin converts to slot numbers, and in what order
 
@@ -3750,7 +3750,7 @@ Running one twice does not raise an error, it produces a corrupt world — a sec
 `ConvertToIndirectText` decodes the index it built last time as if it were text, and DM's
 1749 words of text come back as 1436. So the gates are the whole safety argument, and
 this port uses the same ones (`src/data/CsbwinDungeonConversions.ts`;
-`tools/dump-dungeon-conversions.ts` measures the corruption rather than describing it).
+`tools/checks/dungeon-conversions.ts` measures the corruption rather than describing it).
 `MakeBigActuators` is likewise destructive twice over — the second pass zeroes the
 `word8` the first one lifted out of a DSA actuator's parameters. `convertScrolls` twice
 names the same texts, rebuilt from a field it never overwrites, in a new slot each.
@@ -3774,7 +3774,7 @@ them gave the free record no slot. `convertScrolls` in `doc/CSBwin-src/` convert
 record, free or not (`SaveGame.cpp:2363-2375`), and the port follows it: scroll 33's text
 gets slot 1945 and scroll 34's 1946, and a converted DM `dungeon.dat` has 1947 slots
 where those files have 1946. The texts the slots name are the same
-(`tools/dump-extended-dungeon.ts`, `tools/dump-dungeon-conversions.ts`).
+(`tools/checks/extended-dungeon.ts`, `tools/checks/dungeon-conversions.ts`).
 
 ## DM's two `dungeon.dat` files
 
@@ -3790,7 +3790,7 @@ CSBWin's, which `dm-atari`'s is with three items of the 1.2 disk's (see
 Read through its block by `DungeonLoader.loadDungeonDat` (the image with `bigActuators`,
 `newScrolls`, `indirectText`, `expool` and the file's object map as its `RnMaps`), and
 compared with `dm-atari` after `convertOriginalDungeon`, the following are identical
-(`tools/dump-extended-dungeon.ts`): the header (seed 99, start (1,3) facing 2, 14 levels), every level
+(`tools/checks/extended-dungeon.ts`): the header (seed 99, start (1,3) facing 2, 14 levels), every level
 descriptor, every cell flag and per-level table, the object list, all the text, and
 every record of 10 of the 13 databases. The rest differ only as follows:
 
@@ -3849,7 +3849,7 @@ free scroll 33's text word (0x047B in the file, which the reader drops, "A free 
 text in a CSBWin file") and the checksum. The block differs only in its game
 information, `editingOptions` 12 and the unnamed flag bit 0x02. A packed `dungeon.dat`
 and DM's and Theron's Quest's first dungeon written in this form read back as the same
-world and play the same new game, tick for tick (`tools/dump-dungeon-file.ts`).
+world and play the same new game, tick for tick (`tools/checks/dungeon-file.ts`).
 
 Nothing in this form caps a database at 1,024 records: an RN is a slot of the index, a
 word of its own, where the packed form's index is 10 bits. Conflux 3.5's file holds
@@ -3875,7 +3875,7 @@ chosen: 24 type-127 actuators, the mirrors, values 0 to 23, each facing a square
 RESTART WITH THE UTILITY DISK." (`tools/peek-dungeon.ts`). Its sections end two bytes short of
 2622, and those two bytes are the checksum `ReadDatabases` compares with the byte sum of
 everything `FetchDataBytes` fetched (`SaveGame.cpp:2866-2870`, `CSBCode.cpp:9186-9211`):
-0x939f, which the port's expansion reproduces (`tools/dump-compressed-dungeon.ts`). A
+0x939f, which the port's expansion reproduces (`tools/checks/compressed-dungeon.ts`). A
 file without the word, as DM's `dungeon.dat` is, skips the comparison, since
 `StreamInput` fails to read it.
 
@@ -3885,7 +3885,7 @@ block is read from byte 8 plus the block's size, and its length is the file's le
 unless the block's `ExtendedFeaturesVersion` is `'@'`: then the body is read from byte 8
 of the file and its length is the file's less 8 (`:2574-2581`). No shipped file has a
 compressed body behind a block; the port reads one built in front of CSB's as CSB's own
-(`tools/dump-extended-dungeon.ts`). The block then declares the image's shape and maps its
+(`tools/checks/extended-dungeon.ts`). The block then declares the image's shape and maps its
 object references as a save's does, and sets the rules (see "`DM_rules` and
 `DMRulesDesignOption`…").
 
@@ -3900,7 +3900,7 @@ it (`:1320`). `StreamInput` fails when fewer bytes remain than it is asked for
 (`CSBCode.cpp:9132-9148`), so one stray byte after the cell flags is no word either. A
 mismatch returns 0, and `_ReadEntireGame` goes to `tag01efee` (`SaveGame.cpp:1911-1912`). The port
 throws "dungeon image checksum mismatch" from `DungeonLoader`
-(`tools/dump-image-checksum.ts`).
+(`tools/checks/image-checksum.ts`).
 
 ## A PC `dungeon.dat` is the Atari image, little-endian
 
@@ -3940,7 +3940,7 @@ level descriptors describe, read little-endian, ends where the file does, or two
 before a correct little-endian checksum, and read big-endian it does not. The three PC
 files convert to images `DungeonLoader` reads, as it stands, into the world the
 little-endian reading gives; no shipped file and no save is told one
-(`tools/dump-local-data-set.ts`).
+(`tools/checks/local-data-set.ts`).
 
 ## "MAKE NEW ADVENTURE" copies a saved game's party into `mini.dat`, block by block
 
@@ -3995,7 +3995,7 @@ blocks as the file holds them, unscrambled but not byte-swapped.
 `tools/fixtures/gamefiles/csb/csbgame2.dat` is such a file, made from this `mini.dat`: its
 `Byte22598` is 2, and made again from itself and `mini.dat` with its own food, water and
 `RandomGameID` in place of the draws it is the file byte for byte
-(`tools/dump-new-adventure.ts`, which holds the port's `src/engine/Chaos.ts` to every
+(`tools/checks/new-adventure.ts`, which holds the port's `src/engine/Chaos.ts` to every
 field above).
 
 ## A failed read ends at `tag01efee`
@@ -4031,7 +4031,7 @@ page builds its `Game` over the empty world (`emptyDungeonData`) and reads `dung
 into it after ENTER (`Game.readDungeonDat`). A `dungeon.dat` that will not open throws
 `Die`, and one that does not read is `die(0xbad)` with the reason, not `tag01efee`: a game
 file that does not read ends the game, the author's decision (`DEBT.md` H). The full save menu, which CSBWin does not have, keeps its
-status line. Evidence: `tools/dump-bad-saved-game.ts`, and `tools/dump-new-game.ts` for the
+status line. Evidence: `tools/checks/bad-saved-game.ts`, and `tools/checks/new-game.ts` for the
 empty world's random stream.
 
 ## A save's party, hand and timers are read without a check against its world
@@ -4052,7 +4052,7 @@ free corner (`Character.cpp:5478-5487`).
 The port holds the first eight against the world before a read builds anything
 (`validateCsbwinWorld`, `src/engine/CsbwinSaveGame.ts`), and refuses a save outside them
 (`DEBT.md` H); a slot inside `numCharacter` is read as CSBWin reads it
-(`readCsbwinParty`). `tools/dump-damaged-read.ts` checks each case.
+(`readCsbwinParty`). `tools/checks/damaged-read.ts` checks each case.
 
 ## A one-button menu takes no key
 
@@ -4088,7 +4088,7 @@ In `dm-atari/dungeon.dat` all 24 mirrors carry leftover bits there (`word4` 0xa0
 0xa880, which reads `State` = 4, `PORTRAIT_HideGraphic`: uncleaned, its frame would not
 be drawn (`Codea59a.cpp:134-137`). The port runs it at the end of `DungeonLoader`'s parse,
 gated on `DungeonImageOptions.expandedPortraits`, which `loadCsbwinWorld` takes from the
-save's block (`tools/dump-extend-portraits.ts`).
+save's block (`tools/checks/extend-portraits.ts`).
 
 ## A disabled portrait sends its `DisableMessage` to its own cell
 
@@ -4104,7 +4104,7 @@ does, `QueueDSASwitchAction(0, action, d.LoadedLevel, x, y, pPortrait->Position(
 (`word6` bits 12-13, `CSB.h:1068`) names, as the timer that cell's room type takes, due
 at once. Cancel disables nothing and sends nothing. `ExtendPortraits` clears both fields in
 every file read without `ExpandedPortraits`, so the shipped dungeons' mirrors send nothing
-(`tools/dump-hall-of-champions.ts`).
+(`tools/checks/hall-of-champions.ts`).
 
 ## The "simple" encipherment is `RC4.cpp`'s own cipher, with a key of one byte
 
@@ -4146,7 +4146,7 @@ whatever file is read after it.
 functions, and `simpleEncipher` puts a whole file through them. `readExtendedFeatures`
 hands back an enciphered file deciphered whole, which every reader reads on from;
 `ctx.rules.simpleEncipher` is the global, and `saveSaveGameState` enciphers a save whose
-block declares `SimpleEncryption`. `tools/dump-extended-features-read.ts` checks the
+block declares `SimpleEncryption`. `tools/checks/extended-features-read.ts` checks the
 stream against `RC4.cpp` compiled as it stands, and against Conflux 3.5's `dungeon.dat`
 (`tools/fixtures/gamefiles/conflux-3.5-b8/`), which is such a file: deciphered, it opens with the
 sentinel, its `flags` are 0xff, the block's checksum matches, and so do the two object
@@ -4180,7 +4180,7 @@ function does raise come later, once the block is believed: the object maps' che
 and lengths, "Extended features damaged" and `die(0xe3ee17)` (`:369-378`).
 
 `readExtendedFeatures` (`src/data/CsbwinExtendedFeatures.ts`) returns its no-block
-result in the four cases, checked by `tools/dump-extended-features-read.ts`.
+result in the four cases, checked by `tools/checks/extended-features-read.ts`.
 
 ## `CheckMonsters` overwrites a save's attached groups, and the game's start puts them back
 
@@ -4203,7 +4203,7 @@ not 255 gets 255 and `facing` 0. The game's start undoes it: `LoadPartyLevel` be
 `TAG00bd40` (`CSBCode.cpp:805`), and `DetachItem16` writes `groupIndex` and `facing` back
 from the slot (`CSBCode.cpp:6186-6190`), not from the record. Only a cut `numMonM1` stays.
 
-Measured (`tools/dump-check-monsters.ts`): `dm-atari/dungeon.dat` has no room type above 6
+Measured (`tools/checks/check-monsters.ts`): `dm-atari/dungeon.dat` has no room type above 6
 and no group `CheckMonsters` changes. The committed saves and CSB's `mini.dat` and
 `csbgame2.dat` need no cut either; what it touches in them is 12 attached size-2 groups
 (two in `csbgame7.dat` and five in each of CSB's, of monster types 9 and 0), and in
@@ -4224,7 +4224,7 @@ They are assigned in four places:
   with no block never reaches it, so both keep what they held: a new game on
   `dm-atari/dungeon.dat`, and CSB's Atari-era saves. A new game on
   `dm-windows/dungeon.dat` gets `DMRulesDesignOption` and not `DM_rules`
-  (`tools/dump-extended-dungeon.ts`). The port reads both in
+  (`tools/checks/extended-dungeon.ts`). The port reads both in
   `readGame` (`src/engine/ReadGame.ts`). What a file without a block
   leaves is the data set's `dmRules`, the design option's value at the start
   (`DataSet.dmRules`; `DEBT.md` H).
@@ -4253,7 +4253,7 @@ of the three (`:955-993`), and the utility's `mini.dat` only `SupressDSAWarning`
 dungeon's three 2023 flags"). `SupressDSAWarningOption` stops one message box, "Excessive
 DSA operations", when the DSAs ran more than 50,000 operations too fast (`DSA.cpp:5466-5477`),
 which the port does not give. Of the dungeons here only 3D2D1D sets any of them, its
-`extendedFlags` 0x6b0 (`tools/dump-extended-dungeon.ts`).
+`extendedFlags` 0x6b0 (`tools/checks/extended-dungeon.ts`).
 
 ## `NumWordsInTextArray` means two different things either side of the conversion
 
@@ -4288,7 +4288,7 @@ the actuator's value rather than its type (`LE16` is a real byte swap under
 This port's records are decoded by the time the conversion sees them, so it reads the
 type CSBWin meant. The two agree for any dungeon with no type-47 actuator under *either*
 reading, and DM's `dungeon.dat` has none under either — 0 of 683 decoded, 0 of 683 read
-the way CSBWin reads them. `tools/dump-dungeon-conversions.ts` asserts that rather than
+the way CSBWin reads them. `tools/checks/dungeon-conversions.ts` asserts that rather than
 assuming it, so a third-party dungeon that would expose the difference fails loudly.
 
 `MakeBig` itself carries a second quirk, transcribed rather than repaired:
@@ -4306,7 +4306,7 @@ initialises them (`doc/CSBwin-src/SaveGame.cpp:2356-2378`;
 every committed save, records 0-5 carry 3585, 530, 5132, 532, 3587 and 536 in bits 1-15, and 28
 of the 35 scrolls are non-zero. The port carries them verbatim when it reads a save
 (`ScrollRecord.word4Bits1_15`) and writes 0 for a scroll it converts itself, which is the
-only honest value; `tools/dump-dungeon-conversions.ts` reports the count rather than
+only honest value; `tools/checks/dungeon-conversions.ts` reports the count rather than
 comparing it, the same treatment `TIMER.unused13` gets.
 
 A **free** scroll — link `RNnul`, which DM has exactly one of, record 33 — is converted by
@@ -4350,7 +4350,7 @@ signatures, process-wide globals that start at 0 (`doc/CSBwin-src/data.cpp:47-49
 file without a block keeps the last block's signatures and has a zero key. The port keeps
 the key on the world (`DungeonData.hintKey`), the signatures on the game
 (`ctx.signatures`), and writes all five back (`buildLiveExtendedFeatures`);
-`tools/dump-hint-key.ts` checks it.
+`tools/checks/hint-key.ts` checks it.
 
 ## A live timer keeps its object in three places, and a file has one
 
@@ -4391,7 +4391,7 @@ origMapX, origMapY, curPos, …)` (`:349-364`), whose exterior arm runs filter 6
 its answer (`Code11f52.cpp:1876-1878`), where the stone arm lets filter 4 keep the missile
 flying (`:1870-1875`). The shared tail follows (`:2079-2170`), which always returns 1: a
 spell becomes its cloud in the square it was flying from (`CreateCloud`, `:2134`), anything
-else sounds and drops there. Evidence: `tools/dump-missile-exterior.ts`.
+else sounds and drops there. Evidence: `tools/checks/missile-exterior.ts`.
 
 ## A door-blocked missile drops at its own `.pos()`, not at the `objectPos` it filters with
 
@@ -4418,7 +4418,7 @@ where the same call's `objectPos` points — proven by contrast: a shattered pot
 behind sit at two different corners of the same door cell for the identical encounter.
 `TimerSystem.processObjectFromMissile` used to take a caller-supplied `posInCell` and drop
 there, collapsing the two into one value; it now derives the drop corner from the missile
-RN it already holds. `tools/dump-missile-drop.ts`'s door scenario is the evidence: it
+RN it already holds. `tools/checks/missile-drop.ts`'s door scenario is the evidence: it
 records the missile's resting corner the tick before a real closed door blocks it, then
 checks the landed item sits there and not at the corner `objectPos` would have used.
 
@@ -4448,7 +4448,7 @@ it (see "The sound filter hands a sound to the dungeon's DSAs"). `StartSound` re
 `highVolume` (`:1923-1925`) and attenuates a 0 eighteen times
 (`doc/CSBwin-src/Sound.cpp:667-668`). So ordinal 5 (`byte6` 3, `byte7` 7) is loud up to
 three squares and quiet up to six, and ordinal 20 (0 and 4) is loud only on the square
-and quiet up to three, although both play item 537. `tools/dump-queue-sound.ts` case 9.
+and quiet up to three, although both play item 537. `tools/checks/queue-sound.ts` case 9.
 
 A sound queued with `deltaTime > 1` is not played: `QueueSound` sets a `TT_20` (20) due at
 `d.Time + (deltaTime & 0xffff) - 1`, on `d.LoadedLevel`, with the entry's `byte4` in
@@ -4458,7 +4458,7 @@ with a non-zero `deltaTime` (`:1856-1859`). When it fires, `ProcessTimers` calls
 `QueueSound(timerWord8, timerUByte6, timerUByte7, 1)` (`:6544-6551`) with the timer's level
 loaded. The callers with a delay are a champion's wound, `deltaTime` 2
 (`Monster.cpp:4597`), the door bash (`Attack.cpp:1808`) and a group's death.
-`tools/dump-queue-sound.ts` case 10.
+`tools/checks/queue-sound.ts` case 10.
 
 `ProcessMissileEncounter`'s shared ending (`Code11f52.cpp:2136-2156`) and `CreateCloud`'s
 own sound (`Code11f52.cpp:1467-1482`) are the two call sites `TimerSystem` used to read
@@ -4477,7 +4477,7 @@ works out its mirror, `LOCAL_36`, for every object it draws (`:1810-1816`): a cl
 cell, unless `LOCAL_34`, the alcove's second picture, which a missile passes as 0
 (`:2572-2578`). So a thrown object with no missile graphic flies where its viewport
 position says, and the classes with that bit (0, 63, 79) fly mirrored on the right.
-Covered by `tools/dump-missile-draw.ts`.
+Covered by `tools/checks/missile-draw.ts`.
 
 ## `AdjustSkills` takes the low word of the filter's answer, and runs it for a gain of 0
 
@@ -4485,7 +4485,7 @@ The Adjust Skills Filter's answer is `pDSAparameters[1+2] & 0xfffff`
 (`doc/CSBwin-src/Magic.cpp:316-318`), and the skill and its class take
 `(UI16)(experience)` of it (`:327`, `:337`). The only `return` for a gain of 0 comes after
 the filter (`:322`), so a gain of 0, as a failed cast's `w4 >> diff` may be, still runs it.
-Covered by `tools/dump-dsa-parameters.ts`.
+Covered by `tools/checks/dsa-parameters.ts`.
 
 ## The DSA stops where CSBWin's does
 
@@ -4494,7 +4494,7 @@ An unknown command code says "Unknown DSA command code" and returns the state th
 values, and `die`s on an overflow (`0xdcd6`), an underflow (`0xdcd7`), a pick or a poke
 past the bottom (`0xdcdb`) and a roll past it (`0xdcda`) (`:370-424`); an underflow's
 message says where the DSA stands (`constructDebugMessage`, `:278-289`). Covered by
-`tools/dump-dsa-limits.ts`.
+`tools/checks/dsa-limits.ts`.
 
 ## The DSA's integers are C's: `i32`, `ui32`, `ui16`
 
@@ -4503,7 +4503,7 @@ message says where the DSA stands (`constructDebugMessage`, `:278-289`). Covered
 (`:2721-2733`), so of -1 the draw itself. A run's final state is put whatever it is
 (`PutState`, `:5463-5464`), -1 included, and a DSA's own state is `m_state = (ui16)s`
 (`Data.h:2483`). `CASE` binary-searches its table (`:1005-1031`): an unsorted table, or a
-value given twice, jumps where the search lands. Covered by `tools/dump-dsa-widths.ts`.
+value given twice, jumps where the search lands. Covered by `tools/checks/dsa-widths.ts`.
 
 ## The DSA's `&ADD` and `&COPY` copy whole records
 
@@ -4511,7 +4511,7 @@ value given twice, jumps where the search lands. Covered by `tools/dump-dsa-widt
 (`doc/CSBwin-src/DSA.cpp:1879-1882`), so the copy's hit points are its own and a blow at one
 group leaves the other whole. `&COPY` of an actuator is `memcpy(((ui8 *)pDst)+2,
 ((ui8 *)pSrc)+2, sizeof(*pSrc)-2)` (`:4717`): every word past the link, a big actuator's
-`word8` (`CSB.h:1025`) with them. Covered by `tools/dump-dsa-objects.ts`.
+`word8` (`CSB.h:1025`) with them. Covered by `tools/checks/dsa-objects.ts`.
 
 ## The sound filter hands a sound to the dungeon's DSAs, a silent one included
 
@@ -4530,7 +4530,7 @@ DSA ran, 1 when none did, and 2 at once while its DSAs run (`filterActive`, `:67
 `&SOUND` (`PlayCustomSound`, `:1048-1071`). `gameVolume` is the volume menu's
 (`VOLUME_FULL`, 0, by default) and `NoSound` a recording's `#NoSound` line (false by
 default, `doc/CSBwin-src/data.cpp:250`, `:278`, `Recording.cpp:327-334`).
-`tools/dump-sound-filter.ts`.
+`tools/checks/sound-filter.ts`.
 
 ## The action name filter runs its location's first DSA, found once, for each option offered
 
@@ -4547,7 +4547,7 @@ After the run, parameter 4 becomes the option's attack type, cut to an `i8` (`:8
 is what `ExecuteAttack` then performs; parameter 2, a `ui32`, names the row with the global
 text `(EDT_GlobalText << 24) | p` read as a `char *` when it is below 0x10000 and the record's
 size is above 0 (`:8805-8816`), so the -1 it starts at leaves the default. The name drawn
-for a retyped row is the type it had. `tools/dump-action-name-filter.ts`.
+for a retyped row is the type it had. `tools/checks/action-name-filter.ts`.
 
 ## The feeding filter runs every DSA at its location on the whole feeding block
 
@@ -4565,7 +4565,7 @@ gets no `objectType` (`:4104-4108`). What the block cannot change: the champion 
 `ui32` (`:3970`), so `shieldStrength + shieldStrengthAdjust < 0` is never true and a
 negative adjustment leaves the sum's low 16 bits (`:4383-4391`); and `value(value() - 1)`
 sets a waterskin's two bits (`CSB.h:1277`), so an empty one emptied again holds 3
-(`:4474-4477`). `tools/dump-feeding-filter.ts`.
+(`:4474-4477`). `tools/checks/feeding-filter.ts`.
 
 ## The cursor filter runs every DSA at its location on the packet, which a site may cancel
 
@@ -4608,7 +4608,7 @@ finds the packet in its parameters, and loses an `OVERRIDE` it had set (`:5417`)
 `ResumeSavedGame` for the object in a saved game's hand, and nothing for an empty one
 (`:6356-6381`); `EnteringPrison` for `RNnul` in a new game, whose hand it then empties
 (`:6423-6430`). Each sets `p1` four times and leaves `p2` to `p4` the constructor's 0.
-`tools/dump-cursor-filter.ts`.
+`tools/checks/cursor-filter.ts`.
 
 ## The cursor filter's `ReadGame` runs no DSA
 
@@ -4640,7 +4640,7 @@ the wound mask, the kind (`P4`) and 0 (`:2881-2888`). Its word 3 comes back into
 (`:2891`), and the low word is what is added and returned (`:2905-2906`), so a DSA may deal
 0, or a negative amount, which takes damage off what is pending. The `if (D7W <= 0) D7W = 0`
 before it (`:2819-2822`) never fires: every path to it has returned on a damage of 0 or
-less. `tools/dump-char-damage-filter.ts`.
+less. `tools/checks/char-damage-filter.ts`.
 
 ## The equip filter runs its location's first DSA twice, on one set of variables
 
@@ -4658,7 +4658,7 @@ call it with `true` (`Character.cpp:1855`, `:1967`), so a removal runs the leavi
 alone and an addition, to a slot its caller found empty, the arriving half. A chest slot
 (30 and up) is written without it (`:1845`, `:1953`), and so is the throw's temporary
 swap of the weapon hand, with `false` (`doc/CSBwin-src/Mouse.cpp:700`, `:707`). Nothing is
-read back. `tools/dump-equip-filter.ts`.
+read back. `tools/checks/equip-filter.ts`.
 
 ## The party move filter runs its location's first DSA before a turn, a step and a stairway
 
@@ -4702,7 +4702,7 @@ each returns at once on `PM_INHIBITMOVE` (1):
   stairs has run it for `PM_BEGINTURN`.
 
 `_TurnParty` and `TraverseStairway` leave `delay` and the stamina adjustments unset; the
-port gives them 0. `tools/dump-party-move-filter.ts`.
+port gives them 0. `tools/checks/party-move-filter.ts`.
 
 ## The monster attack filter runs every DSA at its location, each on parameters of its own
 
@@ -4726,7 +4726,7 @@ a launch of anything else strikes no blow either, and the attack still returns t
 champion and 6 the nearest, and anything outside 0-6 returns false (`:1212-1233`).
 The block is a file-scope global, and `MonsterAttacks` writes every field of it again but
 `disableTime`, which no C++ reads (`:990-1126`), so a filter sees the `disableTime` the last
-one left. `tools/dump-monster-attack-filter.ts`.
+one left. `tools/checks/monster-attack-filter.ts`.
 
 ## The delete monster filter counts the kill, then runs every DSA at its location
 
@@ -4756,7 +4756,7 @@ Two fields are read back. `deathCloud` 2 shows no death cloud (`:1149`, `:1159`,
 `dropResidue` is read two ways: `DropMonsterRemains` gets `dropResidue < 2`, so 0 and 1
 drop and 2 and 3 do not (`:1150`, `:3200`, `:3341`, `Character.cpp:283`), while a member other than the
 last drops its remains for anything but 2 (`Code11f52.cpp:1166`), so 3 drops them there. The fusion reads
-neither. `tools/dump-delete-monster-filter.ts`.
+neither. `tools/checks/delete-monster-filter.ts`.
 
 ## The monster move filter has a location per level, and runs its first DSA before a turn
 
@@ -4788,7 +4788,7 @@ Its timer, `mmr.timer`, has function and position 0, `Time` 0 and the group's le
 the group's square with x in `uByte7` and y in `uByte6` (`:3332-3337`), the other way round
 from the other filters' (`CSBCode.cpp:8790-8791`). `ProcessDSATimer6` takes `uByte6` as x
 (`DSA.cpp:5386-5387`), so the DSA's master stands at `(y, x)` of the group's level.
-`tools/dump-monster-move-filter.ts`.
+`tools/checks/monster-move-filter.ts`.
 
 ## The monster move filter runs again after the turn, on where the group ended
 
@@ -4819,7 +4819,7 @@ moves off the level ends at `(-1, 0, 0)`; one that steps ends on its new square.
 other caller of those functions passes `NULL`, so a DSA that moves the group, the
 pre-move filter's own included, leaves `finalLocr` alone. `RN ==` compares the slot
 (`CSBTypes.h:355-358`), so the stairs' turn of the group's corner does not break the
-match. `tools/dump-monster-move-filter.ts`.
+match. `tools/checks/monster-move-filter.ts`.
 
 ## The turn's flags, and three that are never set
 
@@ -4845,7 +4845,7 @@ tests after its loop over the dead members (`:2839`), which set
 `...moveSucceeded` / `...moveFailed` pairs (`:1719-1722`, `:2448-2451`, `:2922-2933`)
 follow `MoveObject`'s answer, so "failed" is an answer of 0, the group on its new square,
 and "succeeded" any other, the group gone, teleported or off the level.
-`tools/dump-monster-move-filter.ts`.
+`tools/checks/monster-move-filter.ts`.
 
 ## The `QueueSound` calls, and the level each is on
 
@@ -4877,7 +4877,7 @@ destination's (`:2995-2996`), so it is at distance 0, and the group's before
 `TeleportMonster` (`:3023`). A door's step queues its sound on every step, unconditionally.
 The items and thresholds are `dm-atari/graphics.dat`'s sound table: ordinal 1 is heard up
 to 2 squares away (`byte6` 0, `byte7` 3), ordinal 2 up to 5 (3, 6), ordinal 17 up to 3
-(1, 4). `tools/dump-queue-sound.ts` and `tools/dump-party-collision.ts` check each call.
+(1, 4). `tools/checks/queue-sound.ts` and `tools/checks/party-collision.ts` check each call.
 
 ## A melee blow shatters a door two ticks late, and cancels the door's own timers
 
@@ -4893,7 +4893,7 @@ the door at once.
 `SetTimer` gives `TT_BASH_DOOR` a rule of its own (`doc/CSBwin-src/Timer.cpp:1102-1123`):
 every `TT_1` or `TT_DOOR` timer with the same `timerWord6` (the cell) and level is deleted,
 whatever its time — so a door that was opening or closing stops being animated before it
-shatters. Evidence: `tools/dump-player-attacks.ts` case 8.
+shatters. Evidence: `tools/checks/player-attacks.ts` case 8.
 
 ## A missile hits the monster in its corner, for `64 × magic / defense`
 
@@ -4929,7 +4929,7 @@ potion's own RN through the whole switch (`:1806-1845`); only the tail swaps in 
 (`if (w_56 != 0) RNprojectile = obj_26`, `:2095-2098`). So the blow a bomb lands on a
 monster, a champion or a door is `DetermineMagicDamage` of the potion — a random 0-3 plus
 half its weight — and the explosion comes after it, and `nonPoison_Spell` is false for a
-potion. Evidence: `tools/dump-missile-monster.ts`.
+potion. Evidence: `tools/checks/missile-monster.ts`.
 
 **A monster walks into a missile only when its positions byte is that missile's corner.**
 Both calls of `CheckMonsterVersusMissiles` pass the group's whole positions byte,
@@ -4937,7 +4937,7 @@ Both calls of `CheckMonsterVersusMissiles` pass the group's whole positions byte
 `objD6.pos() != position` (`:4491`). `RN::pos()` is `(dataTypeMap[…] >> 4) & 3`
 (`CSBTypes.h:337-341`), 0 to 3, so a byte with any of bits 2-7 set meets no missile: a lone
 monster spread over its cell (`positions() = 0xff`, `:3870`) never does, nor one whose byte
-still holds a second member's corner. Evidence: `tools/dump-missile-monster.ts` scenario 6.
+still holds a second member's corner. Evidence: `tools/checks/missile-monster.ts` scenario 6.
 
 ## Torches burn down every 512 ticks, and a recruit's does not
 
@@ -4950,7 +4950,7 @@ champion, so their torch does not burn. For hand 1 then hand 0, an object whose 
 lies in `objNI_Torch_a..objNI_Torch_d` with non-zero `charges()` gets `(charges - 1) & 15`,
 and loses `important` when that reaches 0 (`:7415-7432`). `SelectPaletteForLightLevel` and
 `DrawEightHands` follow unconditionally — the `if (D5W != 0)` around them is commented out
-(`:7441-7445`). Evidence: `tools/dump-ninety-second-update.ts`.
+(`:7441-7445`). Evidence: `tools/checks/ninety-second-update.ts`.
 
 ## `DamageCharacter` spares a mirror recruit and everyone once the game is won
 
@@ -4962,7 +4962,7 @@ game is won" (`doc/CSBwin-src/Data.h:942`) and only ever set to 1 (`Attack.cpp:2
 `Timer.cpp:2371`). So the recruit standing in a Hall of Champions mirror, and every champion
 after the win, cannot be hurt — yet the call reports non-zero, and a caller such as a
 missile's poison coin toss (`Code11f52.cpp:2081-2089`) proceeds as if damage was dealt.
-Evidence: `tools/dump-champion-death.ts` → "DamageCharacter's early guards".
+Evidence: `tools/checks/champion-death.ts` → "DamageCharacter's early guards".
 
 ## `DamageCharacter` only adds to `d.PendingDamage`; the tick takes it off and shows it
 
@@ -5018,7 +5018,7 @@ Two of `DrawCharacterState`'s redraws go over the figure before then
   over the portrait stays. Set by `SetHandOwner` on the old owner and on the new one,
   the recruit in a mirror excepted (`CSBCode.cpp:8488-8494`, `:8508-8510`).
 
-Evidence: `tools/dump-character-damage.ts`.
+Evidence: `tools/checks/character-damage.ts`.
 
 ## A wall bump hurts the two champions on the wall side, and is silent if nobody is hurt
 
@@ -5032,7 +5032,7 @@ through `DetermineAttackOrder` / `Byte586` — the two nearest the wall. Each ge
 `DamageCharacter(ch, 1, 24, 2)`: one point on the legs and feet, with armour halved, which
 an unarmoured champion takes as `1 × 130 >> 6 = 2` (`Character.cpp:2785-2794`). Sound 18 is
 queued **only if** either call returned non-zero (`:8374-8377`), so an empty party, or a
-blow the armour absorbs, bumps silently. Evidence: `tools/dump-party-collision.ts`.
+blow the armour absorbs, bumps silently. Evidence: `tools/checks/party-collision.ts`.
 
 ## Every attempted step costs stamina, bump or not; a turn costs nothing
 
@@ -5045,7 +5045,7 @@ wall and the monster checks, so a step refused by any of them costs as much as a
 taken. `MaxLoad` is stamina-adjusted (`Code11f52.cpp:4325`), so a tired champion pays
 more for the same load. `AdjustStamina` (`Code11f52.cpp:4451`) floors stamina at 0 and
 turns the overshoot into `DamageCharacter(chIdx, over / 2, 0, 0)`. A turn is
-`TurnParty` (`:7941`), which charges nothing. Evidence: `tools/dump-party-collision.ts`
+`TurnParty` (`:7941`), which charges nothing. Evidence: `tools/checks/party-collision.ts`
 case 7.
 
 ## A turn lifts the party off its square and places it back
@@ -5057,7 +5057,7 @@ the same with `1` after (`doc/CSBwin-src/CSBCode.cpp:7999-8021`). The fourth arg
 square gets `PressurePadOrAlcove` twice, the room unchanged: once as the party leaves,
 facing the old way, once as it comes back, facing the new one (`d.partyFacing`, which
 `PressurePadOrAlcove` reads, `:3811`). On stairs a turn is `TraverseStairway(D7W & 4,
-true)` instead (`CSBCode.cpp:7993-7996`). Evidence: `tools/dump-party-move.ts` case 7.
+true)` instead (`CSBCode.cpp:7993-7996`). Evidence: `tools/checks/party-move.ts` case 7.
 
 ## The move delay is `d.partyMoveDisableTimer`, in ticks, from the slowest living champion
 
@@ -5083,7 +5083,7 @@ stamps `lastTime = d.Time`, so turns and steps run at most one per tick, and a t
 party cannot step in the direction it threw. `lastTime` is reset by the initialise call
 (`delta == -999887`, `:1473-1477`) a game load makes (`SaveGame.cpp:1785`); the three
 words are saved in `GAMEBLOCK2` (`SaveGame.cpp:1054-1056`, `:1769-1771`). Evidence:
-`tools/dump-party-collision.ts` case 8, `tools/dump-live-save-file.ts`.
+`tools/checks/party-collision.ts` case 8, `tools/checks/live-save-file.ts`.
 
 ## Only stone, a shut door and a solid false wall stop a step
 
@@ -5093,7 +5093,7 @@ set (`doc/CSBwin-src/CSBCode.cpp:8311-8348`); `roomSTAIRS` is handled before it
 (`:8293-8308`). Every other room type — open, pit, teleporter, and type 7, which
 `ROOMTYPE` does not even name (`CSB.h:563-569`) — is entered. Neither the Atari
 `dungeon.dat` nor any committed save has a type-7 cell. Evidence:
-`tools/dump-party-collision.ts` case 11.
+`tools/checks/party-collision.ts` case 11.
 
 ## A tick falls due every `d.Speed` VBLs, counted on every VBL
 
@@ -5108,7 +5108,7 @@ VBLs. `d.clockTick` is cleared only by the end of a tick (`:714`) or by a handle
 that falls due while the loop cannot run it (frozen, `:775`, or held in a sequence) stays
 due and runs in the first pass that can. The port counts VBLs the same way
 (`vblInterrupt`, `src/engine/LoopState.ts`), and the page runs as many VBLs as the wall
-clock holds (`Game.gameLoop`). Evidence: `tools/dump-vbl-clock.ts`.
+clock holds (`Game.gameLoop`). Evidence: `tools/checks/vbl-clock.ts`.
 
 ## `MainLoop` opens with a tick
 
@@ -5121,14 +5121,14 @@ port's tick belongs to a pass, so `d.clockTick` is set where `MainLoop` would be
 (`Game.start`, `Game.resumeMainLoop`) and the first VBL's pass ticks. A game read in play,
 which only the port has (the save menu's LOAD, F9), is followed by the same tick
 (`Game.installReadState`), and the page draws no first view of its own. Evidence:
-`tools/dump-vbl-clock.ts`.
+`tools/checks/vbl-clock.ts`.
 
 Both of CSBWin's reads end with the input gone: `_ShowPrisonDoor`'s with
 `DiscardAllInput()` once `GameSetup` has read the game (`doc/CSBwin-src/CSBCode.cpp:10808`),
 and the restart's after `d.Initialize()` and `GameSetup` (`Code1f9e6.cpp:321`). Neither
 comes inside a script: the restart is the credits', which `MainLoop` is entered anew from.
 So a read in play drops the script holding the loop and empties the mouse queue
-(`Game.installReadState`). Evidence: `tools/dump-damaged-read.ts`.
+(`Game.installReadState`). Evidence: `tools/checks/damaged-read.ts`.
 
 ## A refused move throws away all queued input, and postpones a due tick by one VBL
 
@@ -5142,7 +5142,7 @@ tick only when it is non-zero (`:773-774`) and clears it after each (`:714`); th
 handler sets it on **every** VBL once `d.vblCount >= d.Speed` (`:1076-1087`), and
 `vblCount` is reset only at the top of a tick (`:627`). So zeroing it cancels nothing: a
 tick already due runs one VBL later. How much input that can be is the next entry.
-Evidence: `tools/dump-party-collision.ts` case 6.
+Evidence: `tools/checks/party-collision.ts` case 6.
 
 ## Clicks and keys share one mouse queue of 8, handled one entry per tick
 
@@ -5189,9 +5189,9 @@ is empty, and `numEnt = (MouseQEnd - MouseQStart + 1 + MOUSEQLEN) % MOUSEQLEN`.
   is lost. A sleeping party's close returns before it (`:7527-7531`). The Hall of
   Champions' calls (`Character.cpp:797`, `CSBCode.cpp:6693`, `:6866`) discard too.
 
-Evidence: `tools/dump-mouse-queue.ts` (it crashes before the port had the queue; case 8
+Evidence: `tools/checks/mouse-queue.ts` (it crashes before the port had the queue; case 8
 fails before the eye gate),
-`tools/dump-party-collision.ts` case 9.
+`tools/checks/party-collision.ts` case 9.
 
 ## A door button or a wall switch makes a tick due; a touch that fires nothing postpones one
 
@@ -5206,11 +5206,11 @@ fails before the eye gate),
   due by the saved `d.Time`, and whatever a click sets before that tick is set from it.
   `ProcessTimers` has no time of its own: it is `bool ProcessTimers(void)`
   (`CSBCode.cpp:6442`) and runs what is due by `d.Time`, the one clock, which the port
-  keeps in `ctx.state.tickCount` (evidence: `tools/dump-csbwin-timers.ts`, its last case).
+  keeps in `ctx.state.tickCount` (evidence: `tools/checks/csbwin-timers.ts`, its last case).
   It is called from the main loop's tick (`CSBCode.cpp:637`) and from `_FusionSequence`
   (`Attack.cpp:2201`), nowhere else: not from `DropObject`, the pick-up or `MoveParty`, so
   a timer a drop or a step queues for `d.Time` waits for the tick like any other
-  (evidence: `tools/dump-drop-move-object.ts` case 5, `tools/dump-party-collision.ts`
+  (evidence: `tools/checks/drop-move-object.ts` case 5, `tools/checks/party-collision.ts`
   case 1).
 - `TouchWallF1` returns, touching nothing, when the cell ahead is off the map
   (`Mouse.cpp:785-788`), and otherwise sets `d.clockTick = TouchWall(...)` (`:789`).
@@ -5226,7 +5226,7 @@ fails before the eye gate),
   last actuator of its side (`remainingActuators`, `:474-475`), and every actuator after
   it is on another side.
 
-Evidence: `tools/dump-mouse-queue.ts`, case 9; `tools/dump-cursor-filter.ts`, case 8.
+Evidence: `tools/checks/mouse-queue.ts`, case 9; `tools/checks/cursor-filter.ts`, case 8.
 
 ## The other handlers that write `d.clockTick`
 
@@ -5262,8 +5262,8 @@ Evidence: `tools/dump-mouse-queue.ts`, case 9; `tools/dump-cursor-filter.ts`, ca
 So a click that did something makes a tick due in its own VBL, and an attack or a cast
 that came to nothing puts off a tick that was due, as a refused move does.
 
-Evidence: `tools/dump-mouse-queue.ts`, case 10; `tools/dump-hall-of-champions.ts`;
-`tools/dump-party-collision.ts`, cases 8 and 10.
+Evidence: `tools/checks/mouse-queue.ts`, case 10; `tools/checks/hall-of-champions.ts`;
+`tools/checks/party-collision.ts`, cases 8 and 10.
 
 ## The party moves through one `MoveObject`, in one order
 
@@ -5295,7 +5295,7 @@ off the stairs (`CSBCode.cpp:8299`, `:7861`). A turn off the stairs is not a `Mo
 6. On its level, the new square's pads (`:3344-3352`); on another, `d.newPartyLevel`
    (`:3354-3359`), and the next section.
 
-Evidence: `tools/dump-party-move.ts`, and `tools/dump-party-collision.ts` case 1.
+Evidence: `tools/checks/party-move.ts`, and `tools/checks/party-collision.ts` case 1.
 
 ## A level change discards all input, at the top of the next tick
 
@@ -5308,7 +5308,7 @@ if `ProcessTimers` changed level, loops back there in the same tick
 `HandleMouseEvents` comes later in the loop (`:758`). So every key or click queued
 between the arrival and that tick is lost. A move queued before a timer — an opening
 pit, a teleporter switched on — carries the party to another level is lost too, and never
-runs on the new level. Evidence: `tools/dump-party-collision.ts` cases 10 and 12.
+runs on the new level. Evidence: `tools/checks/party-collision.ts` cases 10 and 12.
 
 Until that tick the party is half moved. The move sets `d.partyX` and `d.partyY` to the new
 level's square (`Code11f52.cpp:2903-2904`, `:2995-2996`, `:3090-3091`; `TraverseStairway`,
@@ -5319,7 +5319,7 @@ the game's start and load (`:9685`, `SaveGame.cpp:1759`, `:2621`). `ProcessTimer
 the old `d.partyLevel` and the old level's groups attached. `d.newPartyLevel = -1` comes
 after the arrival's `MoveObject` (`:632-633`), so a level change that `MoveObject` makes
 is dropped. The viewport is drawn only after the check (`:645-649`). Evidence:
-`tools/dump-party-collision.ts` cases 10 and 12, `tools/dump-party-move.ts` case 6.
+`tools/checks/party-collision.ts` cases 10 and 12, `tools/checks/party-move.ts` case 6.
 
 ## At most 31 groups wait on one square; the next is deleted unless it is unique or carries something
 
@@ -5334,7 +5334,7 @@ with a design option — `invisibleMonsters` for the first, `drawAsSize4Monsters
 other three (`CSB.h:1128-1135`) — read from a save's extended-features block
 (`SaveGame.cpp:396-402`) and `false` by default (`data.cpp:78-79`). None of the 182
 creature records in `dm-atari/dungeon.dat` sets any of bits 11-14. Evidence:
-`tools/dump-monster-move.ts` case 4.
+`tools/checks/monster-move.ts` case 4.
 
 ## A wall text's glyph is read from graphic 120 with no check of its code
 
@@ -5354,7 +5354,7 @@ have four lines at most, 14 and 15 glyphs a line at most, and no code past 35. T
 set's two texts that decode to a 50 are a scroll's and a teleporter square's message
 (`doc/ATARI_ST_DISK_REFERENCE.md` → "The French 1.3 disk").
 
-Evidence: `tools/dump-wall-text.ts`.
+Evidence: `tools/checks/wall-text.ts`.
 
 ## A wall text seen from afar is its plaque, cut short for one to three lines
 
@@ -5376,7 +5376,7 @@ positions 0 to 11 as CSBWin's comment gives them (`:3654`), and `Byte4212` =
 inside the text rectangles of its positions (set 1: 41-60 for the F3 sides, 37-63 F3
 front, 38-67 F2 sides, 37-73 F2 front, 36-83 F1 sides).
 
-Evidence: `tools/dump-wall-text.ts` case 4, and golden frame `19-wall-text-f2`.
+Evidence: `tools/checks/wall-text.ts` case 4, and golden frame `19-wall-text-f2`.
 
 ## A cloud's flip and mirror are two viewport coin flips; a missile's are not random at all
 
@@ -5397,7 +5397,7 @@ mirrored cloud is clipped by less than its overhang. The rectangle is
 
 Missiles (`Code51a4.cpp:2356-2465`) derive their mirror (`LOCAL_36`) and flip (`w_142`)
 from the graphic's `word4`, the timer's direction bits, the relative position and
-`(mapX + mapY) & 1`; nothing in them is random. Evidence: `tools/dump-cloud-draw.ts`.
+`(mapX + mapY) & 1`; nothing in them is random. Evidence: `tools/checks/cloud-draw.ts`.
 
 ## A cloud's size, graphic and colour map, and the cloud under the party
 
@@ -5460,7 +5460,7 @@ All in `DrawClouds` (`doc/CSBwin-src/Code51a4.cpp:76-321`) and `TAG005088` (`:21
   needs cell 4 or more (`:166-171`), so it is drawn beside the party, from
   `d.teleporterRectangles[10]` and `[11]`, and not four rows ahead.
 
-Evidence: `tools/dump-cloud-draw.ts` sections 4-7, 9 and 10.
+Evidence: `tools/checks/cloud-draw.ts` sections 4-7, 9 and 10.
 
 ## The teleporter's shimmer is `TAG008c98` over a stream of 16-pixel groups
 
@@ -5489,7 +5489,7 @@ as the destination, `P6 = x2 + GraphicRandom(2)`, `P7 = GraphicRandom(32)`, `P8 
   right to left (`P7` first), as for the cloud under the party. That order is an
   assumption, not a verified fact.
 
-`tools/dump-teleporter-shimmer.ts` checks the data and compares the port's drawing with the
+`tools/checks/teleporter-shimmer.ts` checks the data and compares the port's drawing with the
 C++ loop run over bitplane words.
 
 ## A two-corner monster is drawn in the cell's halves and middles, not at its corners
@@ -5531,7 +5531,7 @@ the comment above it tests the bit the other way round. Three rows ahead,
 front view two rows ahead is always mirrored. The sprite's rectangle is
 `y2 = Smaller(y, 135)`, `y1 = Larger(0, y - height + 1)`, read from source row 0
 (`TAG0088b2(..., srcOffsetX, 0, ...)`), so a sprite cut at the top loses its bottom rows.
-Evidence: `tools/dump-monster-draw.ts`.
+Evidence: `tools/checks/monster-draw.ts`.
 
 ## A skill-increaser actuator credits the cursor's owner, and an alcove passes it no position
 
@@ -5543,7 +5543,7 @@ nobody if it is `-1`; there is no cell lookup. Without one it gives `sw(300 / d.
 to each champion whose `HP() != 0`, so the dead count in the divisor. Wall actuators touched
 by hand pass their wall position (`Mouse.cpp:403`, `:412`, `:463`, `:594-596`), but
 `PressurePadOrAlcove` always passes `-1` (`Code11f52.cpp:3910`), for an alcove as much as for
-a floor pad. Evidence: `tools/dump-local-action.ts`.
+a floor pad. Evidence: `tools/checks/local-action.ts`.
 
 ## A wall face shows its last actuator's ornament, none included, and a type 5 rotates its own square
 
@@ -5564,7 +5564,7 @@ target (`:1610-1612`, `:1657`, `:1672`). `ProcessTT_STONEROOM` ends with
 `RotateActuatorList()` (`:2382`). Its other two callers are `PlaceOrRemoveObjectInRoom`
 (`doc/CSBwin-src/Code11f52.cpp:4077`) and `TouchWall` (`doc/CSBwin-src/Mouse.cpp:604`).
 When the fourth of the room's objects brings counter #616 to zero, #549 fires and
-#550 moves behind it, and the alcove shows. Evidence: `tools/dump-hidden-alcove.ts`.
+#550 moves behind it, and the alcove shows. Evidence: `tools/checks/hidden-alcove.ts`.
 
 ## A DSA can move a cloud out of a cell, and the cloud's timer goes with it
 
@@ -5587,7 +5587,7 @@ search ignores the corner too.
 
 A missile moved by a DSA has its timer's `timerWord8` low ten bits set to the new square —
 direction and decay kept — and its level to the new level (`MoveObject.cpp:574-596`).
-Evidence: `tools/dump-dsa-move.ts`.
+Evidence: `tools/checks/dsa-move.ts`.
 
 ## A DSA cell move is two low-level `MoveObject`s, except for a monster that stays on the party's level
 
@@ -5620,7 +5620,7 @@ Evidence: `tools/dump-dsa-move.ts`.
   *off* the party's level is not detached — `MoveObject` with `newX < 0` returns before
   its monster branch (`:3332`).
 
-Evidence: `tools/dump-dsa-move.ts` sections 4-8.
+Evidence: `tools/checks/dsa-move.ts` sections 4-8.
 
 ## A new object takes a slot naming a free record, else the lowest free record from index 1
 
@@ -5655,7 +5655,7 @@ one for it, so record 0, once freed with its slot, is not taken again.
 
 `dungeon.dat` ships free records: weapon 105 (of 107), scroll 33, potion 37, misc 8 and
 116 (of 280). The first arrow `ConstructPredefinedMissile` (`Mouse.cpp:106`) makes is weapon 105.
-Evidence: `tools/dump-db-reuse.ts`; `Enlarge`, `tools/dump-make-more-room.ts` section 0.
+Evidence: `tools/checks/db-reuse.ts`; `Enlarge`, `tools/checks/make-more-room.ts` section 0.
 
 ## `SmartDiscard` thins a database only at 6000 records in use, and never an important object
 
@@ -5684,7 +5684,7 @@ the object is still listed at a priority no lower (`:712-714`, `:345-356`). The 
 `dungeon.dat` sets `important()` (bit 7 of `word2` for `DB5`, `DB6` and `DB10`,
 `CSB.h:1168`, `:1188`, `:1272`) on every weapon, garment and misc object it places, on floors,
 in chests and in monsters' hands, except three floor weapons. So what `SmartDiscard` can take
-is what play creates. Evidence: `tools/watch-smart-discard.ts`.
+is what play creates. Evidence: `tools/checks/watch-smart-discard.ts`.
 
 ## A full database throws one object out of the dungeon: `MakeMoreRoomInDB`
 
@@ -5724,7 +5724,7 @@ so `FindEmptyDB4Entry`'s `GetRecordAddressDB4` reads `m_Address[16]`, past the s
 databases (`CSBCode.cpp:4910-4914`, `data.cpp:736-744`, `CSB.h:1613`); its `ASSERT` is
 compiled only under `_DEBUG` (`CSBTypes.h:104-108`). The port names the freed record anew
 (`DEBT.md` H).
-Evidence: `tools/dump-make-more-room.ts`.
+Evidence: `tools/checks/make-more-room.ts`.
 
 ## A DSA's `&DEL` frees nothing until the run is over, and tells the caller if it deleted itself
 
@@ -5738,7 +5738,7 @@ and that is `ProcessDSATimer6`'s return value (`:5487`). All three timer walks t
 DSA — `TT_5` (`Timer.cpp:1757`), `TT_6` (`:2230`) and `TT_7` (`:1433`) — `break` out of
 the cell's object chain when it is true, since the slave's link now belongs to the delete
 list. Filters (`ProcessDSAFilter`, `DSA.cpp:5316-5326`) ignore it. Evidence:
-`tools/dump-dsa-delete.ts`.
+`tools/checks/dsa-delete.ts`.
 
 ## A DSA's `OVERRIDE` lasts until an operation uses it or the next DSA run starts
 
@@ -5748,7 +5748,7 @@ command's target (`:631-632`), `&MESSAGE` (`:3072-3076`) and `&DESCRIBE` (`:4651
 Nothing else clears it but `ProcessDSATimer6`, before every DSA it runs, once the master is
 found (`:5417`). So an `OVERRIDE` no operation used does not reach the next run, and a DSA
 run nested inside another, a filter's, clears the caller's: an `OVERRIDE` set before an
-operation that runs one is gone after it. Evidence: `tools/dump-dsa-message.ts`, section 5.
+operation that runs one is gone after it. Evidence: `tools/checks/dsa-message.ts`, section 5.
 
 ## A filter's DSA that changes the dungeon says so, and goes on
 
@@ -5761,7 +5761,7 @@ then does what it does. Sixteen operations have it, each after popping its opera
 `&CHAR!`, `&THROW`, `&TELEPORT` (`:4595`), `&MOVE` (`:4686`) and `&COPY`, once the two
 objects are found of one type (`:4709`). `message` stops putting it up once
 `warningCount` runs out (`:450-451`); the port's trace says it every time. Evidence:
-`tools/dump-dsa-nofilter.ts`, for the six with a line number here.
+`tools/checks/dsa-nofilter.ts`, for the six with a line number here.
 
 ## A DSA filter runs on a parameter array of its own; the party attack's, the action name's and the feeding's write the current one
 
@@ -5793,7 +5793,7 @@ there. The party attack filter:
 `SetupDSAParam` lays `ATTACKPARAMETERS` over the current array, writes its count as
 `sizeof(ATTACKPARAMETERS)`, 124, and zeroes its 31 words, at every `_Attack` that gets past
 its first two returns, filter or none (`Attack.cpp:1346-1360`, `:1673`). Evidence:
-`tools/dump-dsa-parameters.ts`.
+`tools/checks/dsa-parameters.ts`.
 
 ## The viewing filter runs every DSA at its location, and the scroll's loop follows the object a DSA leaves
 
@@ -5809,7 +5809,7 @@ reads parameter 1 back into the loop's own `obj` whenever `checkIndirectIndex` t
 and draws it if it is a scroll (`:3523-3530`); `continue` then steps along that object's
 chain, not the actuators'. Parameter 1 starts as the scroll being read, a valid object, so
 a DSA after the first runs only if the first stores an invalid object there. Evidence:
-`tools/dump-viewing-filter.ts`.
+`tools/checks/viewing-filter.ts`.
 
 The filter runs where the eye panel is drawn, and CSBWin draws that panel only at events,
 leaving it in the viewport as drawn between them: `_ClickOnEye`, once a press, runs
@@ -5819,7 +5819,7 @@ leaving it in the viewport as drawn between them: `_ClickOnEye`, once a press, r
 and an empty hand, nothing with the eye held and an object, and `TAG0189d4` otherwise
 (`Character.cpp:1483-1502`); `QuitPressingEye` and `QuitPressingMouth` run `TAG0189d4`
 (`doc/CSBwin-src/CSBCode.cpp:7449-7473`). So a DSA at the location runs once an event,
-however often the screen is shown. Evidence: `tools/dump-viewing-filter.ts`, section 9.
+however often the screen is shown. Evidence: `tools/checks/viewing-filter.ts`, section 9.
 
 `&DESCRIBE` with a location, `ModifyDescription` (`Character.cpp:3833-3847`), sets the phrase
 from every text at the location whose corner matches, with no `IsValid`, so the last such
@@ -5829,7 +5829,7 @@ codes and escape tables as `DecodeText` for a text that is not a wall's, but wha
 `show` bit, with no line feed in front, `/` for code 28, no length limit and no
 `SubstituteCharacterNames`. On every text in use in `dm-atari` and Conflux, `GetText`
 reads what `DecodeText` at `0x8001` reads before its substitution, but for that line feed
-and code 28. Evidence: `tools/dump-viewing-filter.ts`.
+and code 28. Evidence: `tools/checks/viewing-filter.ts`.
 
 ## `CHARFLAG_chestOrScroll` fills the open inventory's eye panel again, and a scroll in the weapon hand is read there
 
@@ -5866,7 +5866,7 @@ empty hand, the ten-second update and poison run `TAG019036`'s site again.
 hand of the open inventory (`Character.cpp:1188-1194`; `D5W`, "the selected champion",
 `:1122`): the open chest is drawn there, and the scroll, opened by entering the weapon hand
 (`:1986-1991`), rolled (`objNI_OpenScroll + 1` is `objNI_Scroll`, `doc/CSBwin-src/Objects.h:470-471`), while the party panel's
-hand shows it open. Evidence: `tools/dump-viewing-filter.ts`, section 10.
+hand shows it open. Evidence: `tools/checks/viewing-filter.ts`, section 10.
 
 ## A DSA's `I_` operation acts only when its record reaches the `ESL_INDIRECTACTIONS` DSA
 
@@ -5879,7 +5879,7 @@ parameters the sender had. With no such location the operation does nothing, and
 nothing (`:2110-2121`). `STKOP_I_FilteredCast` has no case in `EX_AMPERSAND`: no operation
 writes such a record, and `&%INDIRECT` alone knows it (`:2359`). The record format and the
 counts are in `doc/CSBWIN_DSA_REFERENCE.md` → "STKOP message and sound operations".
-Evidence: `tools/dump-dsa-indirect.ts`.
+Evidence: `tools/checks/dsa-indirect.ts`.
 
 ## `&THROW` throws a spell only for the eight words `ThrowMissile` lists
 
@@ -5892,7 +5892,7 @@ location's, `RemoveObjectFromRoom`d first (`:2041-2061`). Any other word leaves 
 `RNeof`, and nothing is thrown (`:2063`), however close to a spell it is: `0xff85` and
 `0xff90` throw nothing. Beside it, `&MISSILEINFO!` pops its direction, damage and range
 only when `checkIndirectIndex` takes the slot it popped first (`DSA.cpp:2832-2838`), so an
-invalid slot leaves them on the stack. Evidence: `tools/dump-dsa-missiles.ts`.
+invalid slot leaves them on the stack. Evidence: `tools/checks/dsa-missiles.ts`.
 
 ## `&INSMON` rebuilds the facing byte from the record, and copies no status
 
@@ -5908,7 +5908,7 @@ group pushes 0xffff, because its `object` is a default `RN`, `RNnul`, which is n
 (`DSA.cpp:3365`, `:3386`, `CSBTypes.h:306`, `:377`); `&MONSTER!`'s `num` is a `ui32`, so
 `i < num - 2` lets a `num` of 0 or 1 write all four hit points (`DSA.cpp:4102`); and
 `&MONL&D` returns before its pop outside the monster move filter (`:4776`), leaving its
-index on the stack. Evidence: `tools/dump-dsa-monsters.ts`.
+index on the stack. Evidence: `tools/checks/dsa-monsters.ts`.
 
 ## A missile at a door: Zo works the button, grates let small things through, the rest hit it
 
@@ -5931,7 +5931,7 @@ The door arm of `ProcessMissileEncounter` (`doc/CSBwin-src/Code11f52.cpp:1879-19
    `HitDoor(x, y, D5W + (STRandom() & 0xffff) % D5W, false, 0)` (`:1957-1969`) — not an
    explosion, so it needs `canOpenWithAxe`, and the force must reach `DoorTOC & 0xff`.
 
-Evidence: `tools/dump-missile-door.ts`.
+Evidence: `tools/checks/missile-door.ts`.
 
 ## A floor text is read out on every step onto its square, a shown one once
 
@@ -5952,7 +5952,7 @@ destY(); curLevel = destLevel(); LoadLevel(curLevel)` (`doc/CSBwin-src/Code11f52
 the map's depth (`LEVELDESC` bits 0-5 of `word8`) plays no part, and neither do the
 other maps at that depth. Every dungeon the repository ships has each map at the depth
 of its number, so the two readings never differ there; a dungeon whose maps share a
-depth tells them apart (`tools/dump-teleporter-target.ts`).
+depth tells them apart (`tools/checks/teleporter-target.ts`).
 
 ## A teleporter that switches on under a cloud takes the cloud's timer along too
 
@@ -5965,7 +5965,7 @@ placed `RN` at `d.NewPos` and `d.NewLevel` (`:2476-2489`); for a cloud, a `TIMER
 `d.NewY`, the cloud at `d.NewPos` and `d.NewLevel` (`:2491-2510`). The compare is `RN`'s
 `!=`, which ignores the corner (`CSBTypes.h:355-362`); nothing checks the level. A cloud
 cannot fall, so in practice this is a teleporter's doing. Evidence:
-`tools/dump-wiggle-cloud.ts`.
+`tools/checks/wiggle-cloud.ts`.
 
 ## A Fluxcage lasts 100 ticks, and its `TT_24` names the cage in bytes 8-9
 
@@ -5974,7 +5974,7 @@ square at `RNempty` (centred), sets `CT_FLUXCAGE`, and queues a `TT_24` at `d.Ti
 `d.LoadedLevel` with `timerObj8()` = the cage and `uByte6/7` = the square. `TT_24`
 (`CSBCode.cpp:6553-6569`) does nothing once `d.Word11694` (game won) is set; otherwise it
 `RemoveObjectFromRoom(timerObj8(), uByte6, uByte7)` and frees the record by writing -1 to its
-link. Evidence: `tools/dump-clouds.ts` section 6.
+link. Evidence: `tools/checks/clouds.ts` section 6.
 
 ## Only `MonsterAttacks` sets `d.LastMonsterAttackTime`
 
@@ -5988,7 +5988,7 @@ and the per-champion facing reset in the tick (`Code17818.cpp:420-428`: a champi
 from the party's facing turns back once 60 ticks pass without one). A save carries it as
 an `i32` (`GAMEBLOCK2`, `SaveGame.cpp:126`), so a game no monster has attacked writes -200 as
 `ff ff ff 38`: the seven made-to-order saves and CSB's two hold it. Evidence:
-`tools/dump-last-monster-attack.ts`.
+`tools/checks/last-monster-attack.ts`.
 
 ## `TIMER_SEARCH` walks the queue backwards, and `SetTimer` mostly keeps the old timer
 
@@ -6024,7 +6024,7 @@ stamps of the queued timers (`:1136-1188`): the stamps are cut into pages of 32
 and each stamp keeps its offset in its page, so the queue's order is unchanged. The counter is
 not reset: that timer takes 0xffff and the next one 0, which sorts before every repacked stamp
 due on the same tick. A dropped duplicate returns before the repack.
-Evidence: `tools/dump-timer-dedupe.ts`, and for the repack `tools/dump-timer-sequence.ts`.
+Evidence: `tools/checks/timer-dedupe.ts`, and for the repack `tools/checks/timer-sequence.ts`.
 
 ## Actuator type 8 counts what is in a carried chest, and what is on the cursor
 
@@ -6034,7 +6034,7 @@ walks the 30 possessions of every champion whose `HP() != 0`, comparing each one
 `Objects.h:585`) has its `contents()` chain compared as well. After the last champion it sets
 `w_4 = 1`, loads `d.objectInHand` and jumps back into the loop body (`goto tag012e14`,
 `:3707-3713`), so the object on the cursor — and, if it is a chest, its contents — counts too,
-whoever holds the cursor. Evidence: `tools/dump-does-party-have.ts`.
+whoever holds the cursor. Evidence: `tools/checks/does-party-have.ts`.
 
 ## A walking monster presses and releases floor pads; a flying one does not
 
@@ -6053,7 +6053,7 @@ hit points (`doc/CSBwin-src/Code11f52.cpp:1072`) and then lifts it with `MoveObj
 `CheckMoveFromMissile` returns 0 at once (`:2593-2596`); with `newX < 0`, `MoveObject` skips the
 loop, lifts the group as above (`:3292-3331`) and returns 0 before the monster branch (`:3332`).
 
-Evidence: `tools/dump-monster-pad.ts` sections 1-4 and 6 (6: 1 of 4 checks fails before), on a
+Evidence: `tools/checks/monster-pad.ts` sections 1-4 and 6 (6: 1 of 4 checks fails before), on a
 type-1 pad from `dungeon.dat`.
 
 ## A dropped and a thrown object are set down by `MoveObject`, with `oldX` -1 and -2
@@ -6069,7 +6069,7 @@ press a type-1 pad the party is already on. The two differ at a relative telepor
 the object's corner only when `oldX != -1` (`:3035-3041`), so a dropped object keeps the
 corner it was dropped at and a thrown one (`-2`) is turned.
 
-Evidence: `tools/dump-drop-move-object.ts` (3 of 8 checks fail before).
+Evidence: `tools/checks/drop-move-object.ts` (3 of 8 checks fail before).
 
 ## `MoveObject` takes a monster or an object down stairs and out, turning its corner
 
@@ -6097,7 +6097,7 @@ A DSA's cell move sets the corner *after* its `MoveObject` (`MoveObject(object, 
 then `object.pos(p)`, `MoveObject.cpp:537-538`), so a group a DSA sends down the stairs ends in
 the DSA's corner. The same-level monster branch (`:546`) sets none, and the stairs' turn stands.
 
-Evidence: `tools/dump-stairs-move.ts`: the corner of an item and of a group, a lift with the
+Evidence: `tools/checks/stairs-move.ts`: the corner of an item and of a group, a lift with the
 ID the group came with, and the DSA's corner.
 
 ## `WiggleEverything` moves each object with `MoveObject`, and walks a counted stretch of the chain
@@ -6122,8 +6122,8 @@ on the square it started on — a teleporter not open to monsters, or one aimed 
 anything is lifted, so no pad sees it leave or arrive. Only the stairs turn a monster's corner
 (`:3159-3165`), and they always move it to another square.
 
-Evidence: `tools/dump-wiggle-objects.ts` (the moves; the count's monster case has no scenario),
-`tools/dump-wiggle-monster.ts` (the monster; 5 of 9 checks fail before).
+Evidence: `tools/checks/wiggle-objects.ts` (the moves; the count's monster case has no scenario),
+`tools/checks/wiggle-monster.ts` (the monster; 5 of 9 checks fail before).
 
 ## What `MoveObject` returns for a monster, and the AI stops on anything but 0
 
@@ -6168,10 +6168,10 @@ actuator's, or that level's `experienceMultiplier()` when the actuator's is 0
 generator's x and y. Every member's hit points are then
 `baseHealth * multiplier + STRandom() % (baseHealth / 4 + 1)` (`Monster.cpp:207`). In
 `dm-atari/dungeon.dat` most generators have a multiplier of 0 and take the level's.
-Evidence: `tools/dump-monster-generator.ts`.
+Evidence: `tools/checks/monster-generator.ts`.
 
-Evidence: `tools/dump-monster-move-code.ts` (13 of 17 checks fail before the fix),
-`tools/dump-monster-move.ts` case 1.
+Evidence: `tools/checks/monster-move-code.ts` (13 of 17 checks fail before the fix),
+`tools/checks/monster-move.ts` case 1.
 
 ## A dying champion's possessions drop in `d.DropOrder` order, through `MoveObject`
 
@@ -6195,7 +6195,7 @@ When the dying champion's inventory is the one open, `KillCharacter` hides it
 (`ShowHideInventory(4)`, `Character.cpp:2627`) before it calls `DropAllPossessions`
 (`:2629`).
 
-Evidence: `tools/dump-champion-death.ts` section 7 (2 of 45 checks fail before the fix;
+Evidence: `tools/checks/champion-death.ts` section 7 (2 of 45 checks fail before the fix;
 the `DropOrder` permutation check is its canary).
 
 ## `RemoveCharacterPossession` undoes the Illumulet, the Jewel Symal, the scroll and the torch
@@ -6216,7 +6216,7 @@ first, returns `RNnul` for an empty one, and then tests `objRemoved.NameIndex()`
 `AdjustStatsForItemCarried(pcA3, slot, -1, obj)` runs before all of these (`:1863`), and
 the object's weight comes off `load` last. In the Atari DM data `d.Word1074[2]` is 12, the
 torch is weapon type 2, the Jewel Symal misc type 2 and the Illumulet misc type 3.
-Evidence: `tools/dump-champion-death.ts` section 8 (5 of 56 checks fail before C30's fix).
+Evidence: `tools/checks/champion-death.ts` section 8 (5 of 56 checks fail before C30's fix).
 
 ## `AddCharacterPossession` lights only an unlit torch, and repacks nothing
 
@@ -6239,7 +6239,7 @@ each mirror object inside the slot-choice loop, as the slot is chosen (`:790`), 
 Hall of Champions' Cancel takes the champion back out without `RemoveCharacterPossession`
 (`CSBCode.cpp:6688-6717`): a cancelled recruit's Illumulet leaves the party lit, and their
 torch stays lit in the mirror's cell. ZED's mirror hands out a torch, which lands in his
-weapon hand. Evidence: `tools/dump-item-bonuses.ts` section 5 (7 of 109 checks fail before
+weapon hand. Evidence: `tools/checks/item-bonuses.ts` section 5 (7 of 109 checks fail before
 C34's fix).
 
 ## `AdjustStatsForItemCarried`: what a carried object does to its bearer
@@ -6272,7 +6272,7 @@ adjusted attributes. In the Atari DM object names five of these objects carry DM
 not the CSB identifiers': Staff of Irra is STAFF OF MANAR, Cross of Neta SNAKE STAFF,
 Serpent Staff THE CONDUIT, Side Splitter DELTA, Dragon Fang THE INQUISITOR. In the Hall
 of Champions TIGGY carries a Wand, CHANI a Moonstone, BORIS a Rabbit's Foot, GOTHMOG a
-Cloak of Night and NABI a Staff. Evidence: `tools/dump-item-bonuses.ts`.
+Cloak of Night and NABI a Staff. Evidence: `tools/checks/item-bonuses.ts`.
 
 `SetCursed` (`doc/CSBwin-src/Character.cpp:1787-1821`), the DSA's `&CURSE!`, finds the
 bearer with two nested loops, `ch` over `d.NumCharacter` and `loc` over 30 slots, and its
@@ -6284,7 +6284,7 @@ Luck at once and lifting it gives them back. On another champion's the Luck does
 move, but `RemoveCharacterPossession` takes the curse off at the real slot (`:1863`), so
 the object taken off gives 3 Luck that were never taken: a permanent gain. The port
 passes the slot found for every champion (`DEBT.md` H). Evidence:
-`tools/dump-dsa-objects.ts`.
+`tools/checks/dsa-objects.ts`.
 
 ## The disk menu saves an open chest packed
 
@@ -6296,7 +6296,7 @@ its chain: `ShowChestContents` clears their links and the chest's `contents`
 `TAG0207cc` (`SaveGame.cpp:1375`) shows the inventory again, which opens the chest again
 (`CSBCode.cpp:10076-10082`). `_ReadEntireGame` (`SaveGame.cpp:1536`) calls neither. The whole
 pair is in `doc/CSBWIN_MENU_REFERENCE.md` → "Entering and leaving". Evidence:
-`tools/dump-save-menu.ts`, "the disk menu over an open chest".
+`tools/checks/save-menu.ts`, "the disk menu over an open chest".
 
 ## A chest is opened and repacked at events, never by drawing
 
@@ -6313,7 +6313,7 @@ mouth held (`:3464`), `TAG019036` (`:4532`), `TAG02076e` (`:5149`), `DisplayFood
 and `ShowHideInventory` closing an inventory (`:7517`), and by nothing else. So the
 world holds the same objects in a chest however often the screen is drawn. In the port
 they are `src/engine/OpenChest.ts`'s, which nothing that composes the screen calls.
-Evidence: `tools/dump-open-chest.ts`.
+Evidence: `tools/checks/open-chest.ts`.
 
 ## `d.Word11722` is always zero
 
@@ -6358,7 +6358,7 @@ it records is for a replay only (`Mouse.cpp:1939-1944`).
 (`Graphics.cpp:1794`), where the drag's word is `d.Word23144` (`Character.cpp:2658-2663`,
 `:5324-5329`). So a champion who dies in hand stays in hand. Put down, they are
 `CharacterAtPosition`'s -1, and `TAG0025a6` writes their facing and position to
-`d.CH16482[-1]` (`CSBCode.cpp:2149-2151`, `:2176`). Evidence: `tools/dump-marching-order.ts`.
+`d.CH16482[-1]` (`CSBCode.cpp:2149-2151`, `:2176`). Evidence: `tools/checks/marching-order.ts`.
 
 ## An object in hand is a colour-4 silhouette over the dungeon view
 
@@ -6377,7 +6377,7 @@ goes through the viewport palette. That palette is `Palette552[light]`
 (`WinScreen.cpp:1493-1496`), whose colours 9 and 10 `ModifyPalettes` sets from the level's
 monsters (`Code390e.cpp:323-343`, `CSBCode.cpp:2895`). Colour 4 is `066` at every light
 level. The port shows the icon itself there by default, an extra recorded in `DEBT.md` H.
-Evidence: `tools/dump-object-cursor.ts`.
+Evidence: `tools/checks/object-cursor.ts`.
 
 ## A load keeps the message area
 
@@ -6388,7 +6388,7 @@ screen and rebases their timeouts onto the loaded clock with
 (`SaveGame.cpp:1747-1748`, `ResetTime` at `CSBCode.cpp:1574`). The port does the same in
 `installRuntimeState`, which every load reaches. A load over a sleeping party (the port's
 in-game load; CSBWin loads only when a game starts) also shrinks the rows back, as the next
-tick's `SetNewSpeed(0, 15)` would (`CSBCode.cpp:622-626`). Evidence: `tools/dump-sleep.ts`.
+tick's `SetNewSpeed(0, 15)` would (`CSBCode.cpp:622-626`). Evidence: `tools/checks/sleep.ts`.
 
 ## The message area: one entry a pass, a scanline a VBL
 
@@ -6410,7 +6410,7 @@ tick's `SetNewSpeed(0, 15)` would (`CSBCode.cpp:622-626`). Evidence: `tools/dump
   leaves the print queue, `d.TextTimeout` and `d.PrintColumn` alone (`CSBCode.cpp:1451-1474`).
 
 The port: `Game.runFrame` and `ScrollingText` (`doc/CSBWIN_MESSAGES_REFERENCE.md` → "The
-port"). Evidence: `tools/dump-messages.ts`.
+port"). Evidence: `tools/checks/messages.ts`.
 
 ## The button flash: one VBL inverts plane 2, the next puts it back
 
@@ -6436,7 +6436,7 @@ result before the wall and monster tests, so a step they refuse, which brings no
 (`CSBCode.cpp:8397-8401`), flashes as well; only the filter's refusal (`:8207`) returns
 `NULL`. In `dm-atari/graphics.dat`, `d.MoveButn18496` is forward `(263-289, 125-145)`, right
 `(291-318, 147-167)`, backward `(263-289, 147-167)` and left `(234-261, 147-167)`.
-`tools/dump-button-flash.ts` checks the flash of all six arrows, the spell panel and the
+`tools/checks/button-flash.ts` checks the flash of all six arrows, the spell panel and the
 attack menu.
 
 The spell panel: `_MagicSelection` (`doc/CSBwin-src/Magic.cpp:548-584`) is `RESTARTABLE`.
@@ -6519,7 +6519,7 @@ default key sends F1-F4's keyscans, which the shipped `config.txt` makes caster 
 before any table sees them ("CSBWin has no keyboard controls", above), nor Ctrl-S, which
 it never sends: `UIM_CHAR` queues a character only through a `key` line
 (`doc/CSBwin-src/CSBUI.cpp:1099-1135`), and the file has none for `0x13`. Evidence:
-`tools/dump-key-bindings.ts`.
+`tools/checks/key-bindings.ts`.
 
 ## The freeze: button 147 in, button 148 out, no tick in between
 
@@ -6557,7 +6557,7 @@ it never sends: `UIM_CHAR` queues a character only through a `key` line
 
 The port: `handleMouseButton` (`src/renderer/ui/Mouse.ts`) and `freeze` / `thaw`
 (`src/engine/LoopState.ts`), the key tables in `UITables`' `graphic231.keys`. Evidence:
-`tools/dump-freeze.ts`.
+`tools/checks/freeze.ts`.
 
 ## Sleep: button 145 in, button 146 or a blow out, a tick every VBL in between
 
@@ -6595,13 +6595,13 @@ and weapon-ready areas), `d.PartySleeping = 1`, `DisplaySleepScreen()`, `d.Speed
   `WakeUp` calls `SetNewSpeed(d.Speed, 15)` (`CSBCode.cpp:7112`), so the message rows on
   screen last sixteen times as many ticks asleep, and waking divides what is left by 16,
   rounding up. The formula is in `doc/CSBWIN_MESSAGES_REFERENCE.md` → "Timeouts". Evidence:
-  `tools/dump-sleep.ts`.
+  `tools/checks/sleep.ts`.
 - Asleep, `DetermineMastery` returns 1 for every skill (`Code17818.cpp:29-36`). So
   `TenSecondUpdate`'s mana roll is `random112 < Wisdom + 2`, and each point of mana costs
   `max(7, 16 - 2)` = 14 stamina, whatever the champion's Wizard and Priest levels
   (`:215-240`).
 
-Evidence: `tools/dump-sleep.ts`.
+Evidence: `tools/checks/sleep.ts`.
 
 ## An empty-handed viewport click tests the objects before the front wall
 
@@ -6632,7 +6632,7 @@ on the **first** rectangle hit, then returns (`:1100-1137`):
   Then only the two near drop areas and button 5 answer (`:1168-1181`), with no throw.
   So before that closed imaginary false wall a click in the throw area does nothing.
 
-Evidence: `tools/dump-viewport-click.ts`.
+Evidence: `tools/checks/viewport-click.ts`.
 
 ## A busy champion is `CHARFLAG_attackDisable`, and one function each sets and clears it
 
@@ -6646,7 +6646,7 @@ Evidence: `tools/dump-viewport-click.ts`.
   after `busyTimer = -1` (`Timer.cpp:2645-2646`). `DrawAttackButton` shades the hand while it,
   `d.PotentialCharacterOrdinal` or `d.PartySleeping` is set (`Character.cpp:4892-4897`), and
   `PrepareAttack` opens no menu while it is set (`:4941`), by key or by a click on the hand
-  (evidence: `tools/dump-key-bindings.ts`).
+  (evidence: `tools/checks/key-bindings.ts`).
 - A champion busied again while busy keeps the bit, and the busy timer is replaced: with
   `D7 = d.Time + delay` and the old timer due at `D6`, the new one is due at
   `D7 + ((D6 - d.Time) >> 1)` if `D7 >= D6`, else at `D6 + delay / 2` (`Magic.cpp:517-530`).
@@ -6654,7 +6654,7 @@ Evidence: `tools/dump-viewport-click.ts`.
   an idle champion with a `TT_11` due at `d.Time`, and replaces a busy one's timer with one
   due when the old one was. Every replacement's `timerUByte6`, the slot a throw refills, is
   0 (`:515`). The callers guard it themselves: an attack disables only for a non-zero time
-  (`Attack.cpp:2151-2154`). Evidence: `tools/dump-throwing.ts` section 9.
+  (`Attack.cpp:2151-2154`). Evidence: `tools/checks/throwing.ts` section 9.
 - IAIDO is saved busy in `csbgame-flying-sword.dat`: `charFlags` 0x0018,
   with a `TT_11` as his `busyTimer`.
 - `_ExecuteAttack` records the attack in `attackType` after running it
@@ -6667,7 +6667,7 @@ Evidence: `tools/dump-viewport-click.ts`.
   queues one, deletes the champion's busy timer first (`Magic.cpp:516-528`), and nothing
   else deletes it. So the `TT_11` that fires is always the champion's `busyTimer`.
 
-Evidence: `tools/dump-save-roundtrip.ts`, section 5, and `tools/dump-throwing.ts`,
+Evidence: `tools/checks/save-roundtrip.ts`, section 5, and `tools/checks/throwing.ts`,
 section 8.
 
 ## CSBWin's timer queue is a binary heap
@@ -6700,7 +6700,7 @@ section 8.
   `SetTimer`'s `TT_BASH_DOOR` rule (`Timer.cpp:1102-1123`).
 
 `TimerQueue` keeps the same heap, with `timerLess` for `operator<`, and a save writes its
-array. Evidence: `tools/dump-timer-heap.ts`. Every committed save's queue is a heap under
+array. Evidence: `tools/checks/timer-heap.ts`. Every committed save's queue is a heap under
 `timerLess`, and each of three comparators with one rule broken fails on some save;
 `csbgame7.dat`'s queue drains in `timerLess` order; hand-worked arrays after each insertion
 and deletion; and a loaded game runs every timer due by its first tick,
@@ -6721,7 +6721,7 @@ and `MarkViewportUpdated` consumes that flag at once by calling `vblInterrupt()`
 steps (`doc/CSBwin-src/Code1f9e6.cpp:148-170`), from `globalPalette`, which the VBL kept
 equal to `d.Palette11978` (`doc/CSBwin-src/WinScreen.cpp:1493-1498`). The rest of the
 screen is in `doc/CSBWIN_TITLE_SCREEN_REFERENCE.md` → "The end of the game";
-`tools/dump-show-credits.ts` checks both halves.
+`tools/checks/show-credits.ts` checks both halves.
 
 
 ## "RESTART THIS GAME" clears `d` before the chooser, so any save loads after it
@@ -6736,7 +6736,7 @@ so is `d.gameState`. So the chooser `GameSetup` opens reads with `d.PartyHasDied
 "THAT'S NOT THE SAME GAME" test, taken only while that flag is set
 (`doc/CSBwin-src/SaveGame.cpp:1729-1731`), never runs: every save loads after a restart.
 The same zeroed `d.gameState` is `GAMESTATE_ResumeSavedGame`, which is why the chooser, not
-the entrance, comes first. `tools/dump-show-credits.ts` checks the button, and
+the entrance, comes first. `tools/checks/show-credits.ts` checks the button, and
 `doc/CSBWIN_TITLE_SCREEN_REFERENCE.md` → "The end of the game" has the rest of the screen.
 
 ## A restart empties the message strip, and keeps `printQueue`
@@ -6750,7 +6750,7 @@ zeroes the print position, `d.PushTextUp` and `d.PartySleeping` and sets
 (`:10660`, `:10667`). `printQueue` is a global (`:210`) whose only reader is the main loop
 (`:726`), so an entry queued before the death is printed in the new game's first pass.
 `doc/CSBWIN_MESSAGES_REFERENCE.md` → "Persistence" has the detail;
-`tools/dump-messages.ts` checks `ScrollingText.restart`.
+`tools/checks/messages.ts` checks `ScrollingText.restart`.
 
 ## A won game without palette switching fades up to black
 
@@ -6760,7 +6760,7 @@ only writer is the `d.DynamicPaletteSwitching` branch, which saves `d.Palette119
 with switching off — an inventory open — fades the champions up to sixteen zeros, black,
 and stays there (`RepeatGame` false, `:219-222`). The glyphs `DisplayHeroName` prints with
 (`:39-57`, `A`-`Z` minus 0x40) are font 0x22d's codes 1-26, which differ from its `A`-`Z`.
-`tools/dump-show-credits.ts` checks both.
+`tools/checks/show-credits.ts` checks both.
 
 ## The CSB win ends the tick where it happens, and 300 VBLs later the game
 
@@ -6770,7 +6770,7 @@ the `else` of `if (type in 7-10, 14, 15 && position == timer's)`
 `d.Word11694 = 1` and returns true before `RotateActuatorList` (`:2382`); `ProcessTimers`
 returns true at once, leaving the timers behind it queued (`doc/CSBwin-src/CSBCode.cpp:6518-6523`),
 and `MainLoop` runs `VBLDelay(_1_, 300)` and `ShowCredits(_2_, 1)` (`:637-643`), which does
-not return. `tools/dump-show-credits.ts` checks it.
+not return. `tools/checks/show-credits.ts` checks it.
 
 ## A `RESTARTABLE` sequence holds the main loop, and `_ProcessTimersViewportAndSound` is its tick
 
@@ -6794,7 +6794,7 @@ makes due, or one the VBL count made due during a rune's flash, runs in the VBL 
 sequence returns, and the entry queued behind the click is taken in the next.
 The port: `LoopScript`, `Game.runScript` and `Game.processTimersViewportAndSound`;
 `Game.runFrame` finishes the held pass in the VBL the script ends.
-Evidence: `tools/dump-loop-script.ts`, and `tools/dump-mouse-queue.ts` for the cast and the rune.
+Evidence: `tools/checks/loop-script.ts`, and `tools/checks/mouse-queue.ts` for the cast and the rune.
 
 ## The fusion: a dispell cloud, then Lord Chaos's escape
 
@@ -6821,7 +6821,7 @@ In order:
 - With nowhere to go, "Sorry, Mr. Chaos. You are toast." (`:213`): `FusionSequence(_3_)`
   (`:259`).
 
-The port: `AttackSystem.fusion`. Evidence: `tools/dump-fusion.ts`.
+The port: `AttackSystem.fusion`. Evidence: `tools/checks/fusion.ts`.
 
 ## `_FusionSequence`: the end of the game
 
@@ -6879,8 +6879,8 @@ Each view is a `_ProcessTimersViewportAndSound`: 33 of them and 1593 VBLs beside
 texts, and each text printed adds a view and 780 VBLs, so 37 and 4713 in the shipped
 dungeon. The port: `AttackSystem.fusionSequence`, the suspended callers in
 `executeAttack` and `handleAttackAreaClick` (`src/renderer/ui/Attack.ts`), and the dead
-keys in `handleUIKey`. Evidence: `tools/dump-fusion.ts`,
-`tools/dump-key-bindings.ts` for the menu and the keys, and `tools/dump-cloud-draw.ts` for
+keys in `handleUIKey`. Evidence: `tools/checks/fusion.ts`,
+`tools/checks/key-bindings.ts` for the menu and the keys, and `tools/checks/cloud-draw.ts` for
 the shimmer.
 
 ## The Grey Lord's speech reaches the strip one row per text once the strip scrolls
@@ -6913,7 +6913,7 @@ are CSBWin's VBLs, 780 and 600, with the strip's clock run on each of them
 scroll ends: every text is whole within 24 VBLs of its `PrintLines` and stays until the
 next is printed, and "THE END." is on the strip when the credits come, from either
 `d.PrintRow` (`DEBT.md` H, "The ending's speech is shown whole"). Evidence:
-`tools/dump-fusion.ts`.
+`tools/checks/fusion.ts`.
 
 ## `AddObjectToRoom` clears the new object's link before either arm
 
@@ -6926,7 +6926,7 @@ an `RNeof` root when the flag is set but the cell holds nothing (`:476-488`, tol
 converted dungeons), or is hung off the last object of the cell's chain (`:526-534`).
 With `mapX` -1 there is no cell, and it is hung off the last object of the chain
 `prevObj` is in. The port: `DungeonState.addObjectToCell` and
-`DungeonState.addObjectToChain`. Evidence: `tools/dump-add-object-to-room.ts`.
+`DungeonState.addObjectToChain`. Evidence: `tools/checks/add-object-to-room.ts`.
 
 ## `GAMEBLOCK1`: what `SaveGame` writes there, and which two fields are little-endian
 
@@ -6952,7 +6952,7 @@ and `tools/fixtures/gamefiles/csb/mini.dat` holds 127 words that are not zero th
 block's hash or checksum covers a field of `GAMEBLOCK1`, so a field of its second half
 is rewritten by changing that field and word 127 alone: `stampRandomGameID`
 (`src/data/SaveGameLoader.ts`) writes `RandomGameID` so, six bytes of the file
-(`tools/dump-save-stamp.ts`). Bytes 256-299 of `Byte740`, `FILL438` (302) and
+(`tools/checks/save-stamp.ts`). Bytes 256-299 of `Byte740`, `FILL438` (302) and
 `Checksum354`…`374` are never assigned. They are zero in every committed save.
 
 `_ReadEntireGame` sets `d.Word22596 = 2`, `d.Word22598 = 1`, `d.Word22594 = 1`,
@@ -6964,7 +6964,7 @@ game draws `d.RandomGameID` as the product of the low words of two `STRandom()` 
 an Atari DM save, it sets `Word22592` to 10 for fourteen levels and a sentinel of 99, 13
 for ten levels and 76, and 0 otherwise, and keeps the 2 and 1 above (`:2065-2081`);
 otherwise it copies all three words (`:2082-2085`). Every committed save holds 1, 2, 1
-and 13. `tools/dump-save-blocks-vs-file.ts` rewrites block 1 of each and finds it
+and 13. `tools/checks/save-blocks-vs-file.ts` rewrites block 1 of each and finds it
 byte-identical outside the unassigned bytes above and the checksums of the timer debris
 blocks 5 and 6 already exempt.
 
@@ -6983,8 +6983,8 @@ viewport returns without recording again; a throw that returns 0 records nothing
 through to the tail's record. So every entry taken past the held-step test counts once.
 The keyboard mode's entries are 0x4444 (`doc/CSBwin-src/Code13ea4.cpp:157-165`, `:240-248`) and a new
 game's is 0x3333 (`SaveGame.cpp:1623-1635`), neither of which counts. `totalMoveCount` is
-not `d.`'s, so a new game after a restart counts on. `tools/dump-mouse-queue.ts` checks the
-count, and `tools/dump-new-game.ts` the restart.
+not `d.`'s, so a new game after a restart counts on. `tools/checks/mouse-queue.ts` checks the
+count, and `tools/checks/new-game.ts` the restart.
 
 ## CSB's `graphics.dat`: the long 0x231, and six tables of its own
 
@@ -6997,7 +6997,7 @@ is 0x804, and its last 48 bytes are `missingButtons` word for word: `ENTER` (0xc
 187-199), each on the left button, then a zero terminator. Both files have 563 items. Of
 the 35 tables `buildGameTables` holds, CSB's differ from DM's in six: `monsterDesc`,
 `spells`, `skillNumber`, `experienceForAttacking`, `byte20046` and `textDecode`.
-`tools/dump-data-sets.ts` checks both.
+`tools/checks/data-sets.ts` checks both.
 
 ## The French 1.3 `graphics.dat`: longer words
 
@@ -7023,7 +7023,7 @@ reads each size from the file (`DEBT.md` H, "Word sizes from the file").
   rows. `drawFoodWaterPanel` (`src/renderer/ui/Character.ts`) reads each word at its own
   width, the same pixels in every other set.
 
-`tools/dump-data-sets.ts` checks both: the French set's tables differ from 1.2's in
+`tools/checks/data-sets.ts` checks both: the French set's tables differ from 1.2's in
 `attackNames` and `textDecode` only, and in every set graphics 30-32 cover their
 rectangles.
 
@@ -7057,7 +7057,7 @@ The readers take the value as it stands:
   `sw(D7W - d.SpellShield)` (`Character.cpp:2773`, `:2780`), and `TAG01680a` adds
   `d.PartyShield` to the armour (`:2461`), so a shield below zero adds to the damage.
 
-`tools/dump-character-damage.ts` checks the six timers, the wrap at each type's lowest
+`tools/checks/character-damage.ts` checks the six timers, the wrap at each type's lowest
 value, the save's bytes, and the blow and the armour under a shield below zero.
 
 ## `TAG01680a`: a wounded part and a sleeping party are less protected
@@ -7076,7 +7076,7 @@ of one body part, which `DamageCharacter` averages over the parts a blow could l
 7. `ApplyLimits(0, D7W >> 1, 100)` (`:2491`).
 
 `armourStrength` (`src/engine/MonsterAttack.ts`) is its port, and
-`tools/dump-character-damage.ts` replays the draws from the seed for a whole part, a
+`tools/checks/character-damage.ts` replays the draws from the seed for a whole part, a
 wounded one, a sleeping party, and both.
 
 ## The timer-type modifier lasts one timer, and every site reads it afresh
@@ -7106,7 +7106,7 @@ Each site reads `timerTypeModifier[pTimer->timerUByte9()]` when it needs it, not
 - `ProcessPortraitTimer6` reads the raw `uByte9` (`Timer.cpp:2115`).
 
 A `uByte9` past 2, which `&MESSAGE` can queue, reads past the array; the port reads it as
-3, no action. Evidence: `tools/dump-timer-modifier.ts`.
+3, no action. Evidence: `tools/checks/timer-modifier.ts`.
 
 ## `&PARAM@` compares the count unsigned, and does nothing past 100
 
@@ -7120,7 +7120,7 @@ variable that is not `DVT_WellDefined` zeroes it (`DSADBANK::Var`, `:142`, `NoVa
 `:228-239`), so they read 0, and `&PARAM!` skips them. Before marking variable `i + j`,
 the loop reads a variable: `Var(0)` in 15.9, `Var(j)`, the missing parameter's number, in
 20230608 (`doc/CSBwin-src/DSA.cpp:2978`). The port follows 20230608. `STKOP_ParamStore` (`:3001-3021`)
-does nothing past 100 either. Evidence: `tools/dump-dsa-parameters.ts`.
+does nothing past 100 either. Evidence: `tools/checks/dsa-parameters.ts`.
 
 ## `&CELL@` sets its array to 0 first, so `SetVarBit` never zeroes a bit
 
@@ -7131,7 +7131,7 @@ second variable with `Var(i, Var(i) | bit)`; those of a pit, a false wall and a 
 `SetVarBit` (`:3768-3811`), which zeroes a variable that is not well defined and does not
 mark it so (`:144`). Here it always is, so every room type's
 bits read back as set; a door's arm even sets the variable to 0 again before its bits.
-Evidence: `tools/dump-dsa-cell-fetch.ts`, which fails if the array is not set first.
+Evidence: `tools/checks/dsa-cell-fetch.ts`, which fails if the array is not set first.
 
 ## A DSA's extended cell flags are one `EXPOOL` record a column, and `&ECF!` re-adds it
 
@@ -7145,7 +7145,7 @@ flags are kept. `ExamineCell`, behind `&THISCELL` and `&NEIGHBORS` (`:2211-2321`
 door its state's bit with `=` rather than `|=` (`:2277`), which changes nothing since the
 bits are still 0 there, and has no case for room type 7, whose cell matches no mask. `&J*`
 and `&G*` both pop the state first and the column second (`:4739-4740`, `:4750-4751`).
-Evidence: `tools/dump-dsa-dungeon.ts`.
+Evidence: `tools/checks/dsa-dungeon.ts`.
 
 ## `DrawSize4Index` matches the record's facing against a mask shifted per member
 
@@ -7159,7 +7159,7 @@ always zero, so member `i` matches exactly when `monsterFacing` itself is 0, whi
 when the party faces south (2). A record facing 1 seen by a party facing south is drawn as
 its second member (ordinal 2), whichever way that member faces; from any other facing it
 is drawn as its first.
-`tools/dump-monster-design-options.ts` checks it, transcribed as written.
+`tools/checks/monster-design-options.ts` checks it, transcribed as written.
 
 ## The screen's five regions, as CSBWin's code places them
 
@@ -7188,5 +7188,5 @@ black there in DM and CSB, and a flame in Conflux (golden frame 18).
 
 No button the game reads in play crosses from one region into another, nor across a gap's
 edge but from its region's first column, in any data set under `tools/fixtures/gamefiles`; a
-list's click anywhere covers whole regions (`tools/dump-left-handed.ts`). The left-handed
+list's click anywhere covers whole regions (`tools/checks/left-handed.ts`). The left-handed
 screen moves the regions and their gaps on that ground (`src/renderer/LeftHanded.ts`).

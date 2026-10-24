@@ -18,7 +18,7 @@
  *   dungeon 24 (the OneDrive).
  *
  * Three steps make the rest, each by its own tool, in this order: `dm-atari`'s
- * `graphics.dat`, CSBWin's with three items of 1.2's (`tools/dump-dm-atari-graphics.ts
+ * `graphics.dat`, CSBWin's with three items of 1.2's (`tools/checks/dm-atari-graphics.ts
  * --write`); `csb`'s `utility-portraits.dat`, from the utility disk
  * (`tools/gen-utility-portraits.ts`); and every set's thumbnail (`tools/gen-thumbnails.ts`).
  *
@@ -161,7 +161,7 @@ const FILES: Record<string, [sha256: string, origin: Origin]> = {
  * each reads what the archives and the steps before it wrote, and writes only those.
  */
 const STEPS = {
-  dmAtariGraphics: (): string[] => ['tools/dump-dm-atari-graphics.ts', '--write'],
+  dmAtariGraphics: (): string[] => ['tools/checks/dm-atari-graphics.ts', '--write'],
   utilityPortraits: (): string[] => ['tools/gen-utility-portraits.ts', unpacked('csbAtari', CSB_UTILITY_STX)],
   thumbnails: (paths: string[]): string[] => ['tools/gen-thumbnails.ts',
     ...DATA_SETS.filter((set) => paths.some((path) => resolve(TREE, path) === resolve(thumbnailPath(set)))).map((set) => set.id)],

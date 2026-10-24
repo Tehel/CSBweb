@@ -389,7 +389,7 @@ const BTN_DELETE = 907;
 const BTN_ROW0 = 910;
 
 /**
- * Everything the layout depends on, in one place, so `tools/dump-save-menu.ts` can
+ * Everything the layout depends on, in one place, so `tools/checks/save-menu.ts` can
  * check it against the art instead of against a copy of these numbers.
  */
 export const SAVE_MENU_GEOMETRY = {

@@ -6,7 +6,7 @@
  *
  * Like `peek-dungeon.ts`, this is **not evidence** about the port. It models CSBWin itself,
  * outside the engine, where a route is searched far faster than `Game` could play it. It
- * is not in `tools/run-checks.mjs`. `tools/watch-3d2d1d-gravity.ts` plays the
+ * is not in `tools/run-checks.mjs`. `tools/checks/watch-3d2d1d-gravity.ts` plays the
  * walkthrough's first two legs through the real `Game`, and all of it is `DEBT.md` F21.
  *
  * Modelled from CSBWin:

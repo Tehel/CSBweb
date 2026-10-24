@@ -2,9 +2,9 @@
 
 Chaos Strikes Back's Hint Oracle, as CSBWin ports it in `doc/CSBwin-src/Hint.cpp`. The
 port reads its data with `readHintOracle` and `parseHcsbDat`
-(`src/data/HintOracleLoader.ts`), and `tools/dump-hint-oracle.ts` checks the retail files
+(`src/data/HintOracleLoader.ts`), and `tools/checks/hint-oracle.ts` checks the retail files
 against everything below. `HintOracleScreen` (`src/renderer/intro/HintOracle.ts`) is the
-screen, and `tools/dump-hint-oracle-screen.ts` runs it headlessly. The game opens it
+screen, and `tools/checks/hint-oracle-screen.ts` runs it headlessly. The game opens it
 from the inventory, on the party's square ("In the port: the inventory's button").
 
 ## What it is
@@ -109,7 +109,7 @@ cipher"). The key comes from the save's Extended Features block
 (`memcpy(hintKey, efb.hintKey, 8)`, `doc/CSBwin-src/SaveGame.cpp:384`). `readHintOracle`
 deciphers the file under the key when its first byte is not 0, then parses it with
 `parseHintOracle`. Every save this project has carries a zero key, and the shipped
-`hcsb.hct` is plain; `tools/dump-hint-key.ts` reads it enciphered.
+`hcsb.hct` is plain; `tools/checks/hint-key.ts` reads it enciphered.
 
 ## `hcsb.hct`
 
@@ -369,7 +369,7 @@ the close box replaced, and DONE on the title list closing the Oracle.
   (`openHintOracle`), the port's words, as CSBWin's error routine, `TAG0093a0_17`, draws
   nothing (`Hint.cpp:7903-7908`). An error while the Oracle runs closes it the same way.
 
-`tools/dump-hint-oracle-button.ts` checks the picture, and the click on the party's square
+`tools/checks/hint-oracle-button.ts` checks the picture, and the click on the party's square
 after a step, a teleporter and a pit. Golden frames 15 and 16 are a CSB inventory with
 the button and a hint's page opened through it. The title list is no frame: its palette
 cycle would make it differ from one run to the next.

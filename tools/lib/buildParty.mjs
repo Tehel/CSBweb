@@ -3,7 +3,7 @@
 // Stand at each of the first four preset heroes' mirrors, click the portrait
 // (`AddCharacter`) and press Resurrect (button 160). Driving the real Hall of Champions
 // needs no scaffolding in the app, only the calls that
-// `tools/dump-hall-of-champions.ts` drives headlessly.
+// `tools/checks/hall-of-champions.ts` drives headlessly.
 //
 // HALK first: champion 0 is the one the golden frames open an inventory and an attack
 // panel on, and DAROOU (first in mirror order) is empty-handed, which would leave

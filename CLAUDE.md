@@ -123,8 +123,9 @@ There is still **no test framework** (`PLAN.md` → "The evidence") — `npm tes
   and edits, publishes and deletes one, the tiles that moderate a published one, and the book that
   downloads a set's archive and lists its documents, where a moderator adds and removes them;
   and the statistics page its footer links to, as `api/stats` answers, a click selecting a set.
-- `tools/dump-*.ts` and `tools/watch-*.ts` stand the real engine up against the real game
-  files, print what happened, and assert invariants. **They are the regression suite for
+- `tools/checks/*.ts` stand the real engine up against the real game files, print what
+  happened, and assert invariants. Each is named for what it checks; a `watch-` tool runs
+  the clock and reports what emerged over time. **They are the regression suite for
   everything the frames cannot see** — tables, AI, damage, timers, movement. `npm test`
   runs every tool **listed** in `tools/run-checks.mjs` — there is no discovery, so a new
   tool is not evidence until it is added there. Run one on its own with
@@ -140,7 +141,7 @@ the "canary" technique for proving an extracted table sits at the right offset.
 
 `tools/probe-ui.mjs` is the third thing, and it is **not** evidence: it drives the running
 app over CDP to read live state, click the canvas and take screenshots, for bugs that only
-show up on screen. Use it to find out what is wrong, then prove it in a `dump-*.ts`. The
+show up on screen. Use it to find out what is wrong, then prove it in a `tools/checks/*.ts`. The
 `playtest-bug` and `probe-app` skills cover the debugging loop those two serve.
 `tools/peek-dungeon.ts` is the other thing that is not evidence: it prints what the data
 holds. That can be a level as an ASCII map, one square's flags and objects, or where an

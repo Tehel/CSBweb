@@ -1,0 +1,189 @@
+/**
+ * `&DEL` in a DSA defers its deletes to the end of the run (`doc/CSBwin-src/DSA.cpp`).
+ *
+ *  1. `EX_DEL` does not free anything: `DSADBANK::DeleteObject` (`:158-164`) pushes the
+ *     record on `m_objectDeleteList` through its own link, so the record is still
+ *     allocated for the rest of the run. The port called `deleteDBEntry` at once.
+ *  2. `ConsumateDeletes` (`:179-192`), after `PutState` (`:5484`), frees the lot and
+ *     reports whether the DSA's own actuator was among it; `ProcessDSATimer6` returns
+ *     that (`:5487`), and the timer walks that ran it stop walking the cell's chain
+ *     (`Timer.cpp:1433`, `:1757`, `:2230`). The port always returned false.
+ *  3. A scroll takes its text with it, the text condemned first (`DSA.cpp:1716-1723`).
+ *
+ * No dungeon this project loads defines a DSA, so the tool builds one: a single state
+ * whose column-0 program is `LOAD objId, LOAD location, &DEL`.
+ *
+ * Run: `npm test -- --only=dsa-delete.ts`
+ */
+import {
+  DBType, locationRelToInteger, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID,
+} from '../../src/core/types';
+import { Game } from '../../src/engine/Game';
+import type { TimerEntry } from '../../src/engine/TimerQueue';
+import { newGame, stockDungeon, stockGraphics } from '../lib/game';
+import { wrapMember, standInOf } from '../lib/standIn';
+import { check, finish } from '../lib/check';
+
+const OP_LOAD = 6;
+const OP_AMPERSAND = 11;
+const LOAD_U16 = 27;
+const LOAD_U32 = 30;
+const STK_DEL = 9;
+
+/** `LOAD objId, LOAD location, &DEL` — delete `objId` from the square at `location`. */
+function delProgram(objId: number, location: number): Uint16Array {
+  return Uint16Array.from([
+    OP_LOAD | (LOAD_U16 << 6), objId & 0xffff,
+    OP_LOAD | (LOAD_U32 << 6), location & 0xffff, (location >>> 16) & 0xffff,
+    OP_AMPERSAND | (STK_DEL << 6),
+  ]);
+}
+
+async function main(): Promise<void> {
+  const graphics = stockGraphics();
+
+  const makeGame = async (): Promise<Game> => {
+    const data = stockDungeon();
+    const game = newGame(data, graphics);
+    // Fixed seed, so the numbers below repeat run to run. This used to sit *after* a
+    // `return new Game(...)` — dead code, so every run of this tool was unseeded
+    // despite the comment. `tsc` never saw it because `tools/` was outside the
+    // type gate; it is inside it now.
+    game.setRandomSeed(0x12345678);
+    return game;
+  };
+
+  /** An empty open square on the start level that is not the start square. */
+  const emptySquare = (game: Game): Position => {
+    const dungeon = game.ctx.dungeon;
+    const start = dungeon.getStartPosition();
+    const map = dungeon.getMap(start.z);
+    if (!map) throw new Error('no start level');
+    for (let x = 0; x < map.descriptor.width; x++) {
+      for (let y = 0; y < map.descriptor.height; y++) {
+        const p = new Position(x, y, start.z);
+        if (x === start.x && y === start.y) continue;
+        if (((dungeon.getCellFlag(p) >> 5) & 7) !== RoomType.OPEN) continue;
+        if (dungeon.findFirstObject(p) !== OBJECT_ID_EOF) continue;
+        return p;
+      }
+    }
+    throw new Error('no empty open square');
+  };
+
+  /** A new type-47 actuator whose DSA is `selector`, in corner 0 of `at`. */
+  const addDsaActuator = (game: Game, at: Position, selector: number): ObjectID => {
+    const data = game.ctx.dungeon.getData();
+    data.databases.actuators.records.push({ nextObject: OBJECT_ID_EOF, word2: 47 | (selector << 7), word4: 0, word6: 0 });
+    const rn = game.ctx.dungeon.rnMaps.rn(DBType.ACTUATOR, data.databases.actuators.records.length - 1);
+    game.ctx.dungeon.addObjectToCell(at, rn);
+    return rn;
+  };
+
+  /** A copy of weapon 0, in corner 1 of `at`. */
+  const addWeapon = (game: Game, at: Position): ObjectID => {
+    const data = game.ctx.dungeon.getData();
+    data.databases.weapons.records.push({ ...data.databases.weapons.records[0], nextObject: OBJECT_ID_EOF });
+    const rn = game.ctx.dungeon.rnMaps.setPos(game.ctx.dungeon.rnMaps.rn(DBType.WEAPON, data.databases.weapons.records.length - 1), 1);
+    game.ctx.dungeon.addObjectToCell(at, rn);
+    return rn;
+  };
+
+  /** Install DSA 0 on `at`'s level, selector 0, running `programs` in turn as one state. */
+  const installDsa = (game: Game, at: Position, program: Uint16Array): void => {
+    const data = game.ctx.dungeon.getData();
+    data.dsaIndex = { entries: [{
+      description: 'test', state: 0, localState: 1, groupId: 0, numStates: 1, firstDisplayedState: 0,
+      states: [{ actions: [{ column: 0, program }] }],
+    }] };
+    data.dsaLevelIndex = [];
+    data.dsaLevelIndex[at.z] = [0];
+  };
+
+  const link = (game: Game, rn: ObjectID): number => game.ctx.dungeon.getDBRecordLink(rn);
+  // `DeleteDBEntry` frees the slot with the record, so a deleted RN names no record.
+  const after = (game: Game, rn: ObjectID): string =>
+    game.ctx.dungeon.rnMaps.dbType(rn) === DBType.UNKNOWN ? 'freed' : after(game, rn);
+  const inCell = (game: Game, at: Position): ObjectID[] => {
+    const out: ObjectID[] = [];
+    for (let rn = game.ctx.dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) out.push(rn);
+    return out;
+  };
+
+  /**
+   * Run the actuator's DSA as `ProcessDSATimer5` would, recording each condemned
+   * record's link as `&DEL` leaves it — still inside the run.
+   */
+  const run = (game: Game, slave: ObjectID, at: Position, watch: ObjectID[]): { result: boolean; midRun: number[] } => {
+    const dsa = game.systems.dsa;
+    const midRun: number[] = [];
+    const restore = wrapMember(dsa, 'executeAmpersand', (original) => (subcode, bank, exPkt) => {
+      const jump = original(subcode, bank, exPkt);
+      if (subcode === STK_DEL) for (const rn of watch) midRun.push(link(game, rn));
+      return jump;
+    });
+    const timer = standInOf<TimerEntry>({ uByte5: 0, uByte6: at.x, uByte7: at.y, uByte8: 0, uByte9: 0, level: at.z, time: 0 });
+    const result = dsa.processTimer5(slave, timer, at);
+    restore();
+    return { result, midRun };
+  };
+
+  /* --------------------------------------- 1-2. a DSA deletes a weapon ---------- */
+  {
+    const game = await makeGame();
+    const at = emptySquare(game);
+    const slave = addDsaActuator(game, at, 0);
+    const weapon = addWeapon(game, at);
+    const loc = locationRelToInteger({ l: at.z, x: at.x, y: at.y, p: 0 });
+    installDsa(game, at, delProgram(weapon, loc));
+    const { result, midRun } = run(game, slave, at, [weapon]);
+    console.log(`1. delete weapon ${weapon.toString(16)}: returned ${result}, link during the run ${midRun.map((v) => v.toString(16)).join(',')}, `
+      + `after ${after(game, weapon)}; cell now ${inCell(game, at).map((v) => v.toString(16)).join(',')}`);
+    check(midRun.length === 1 && midRun[0] !== OBJECT_ID_NULL, '&DEL leaves the record allocated until the run ends (DeleteObject only chains it)');
+    check(after(game, weapon) === 'freed', 'ConsumateDeletes frees it after the run');
+    check(inCell(game, at).length === 1 && inCell(game, at)[0] === slave, 'the weapon is gone from the square and the actuator stays');
+    check(result === false, 'a DSA that did not delete its own actuator returns false');
+  }
+
+  /* --------------------------------------- 2. a DSA deletes itself -------------- */
+  {
+    const game = await makeGame();
+    const at = emptySquare(game);
+    const slave = addDsaActuator(game, at, 0);
+    const loc = locationRelToInteger({ l: at.z, x: at.x, y: at.y, p: 0 });
+    installDsa(game, at, delProgram(slave, loc));
+    const { result, midRun } = run(game, slave, at, [slave]);
+    console.log(`2. the DSA deletes its own actuator ${slave.toString(16)}: returned ${result}, link during the run ${midRun.map((v) => v.toString(16)).join(',')}, after ${after(game, slave)}`);
+    check(result === true, 'ProcessDSATimer6 returns deletedSlave, so the timer walk stops');
+    check(midRun.length === 1 && midRun[0] !== OBJECT_ID_NULL, 'the slave is still allocated while its own program runs');
+    check(after(game, slave) === 'freed', 'and freed once it has finished');
+  }
+
+  /* --------------------------------------- 3. two deletes in one run ------------ */
+  {
+    const game = await makeGame();
+    const at = emptySquare(game);
+    const slave = addDsaActuator(game, at, 0);
+    const w1 = addWeapon(game, at);
+    const w2 = addWeapon(game, at);
+    const loc = locationRelToInteger({ l: at.z, x: at.x, y: at.y, p: 0 });
+    const p1 = delProgram(w1, loc);
+    const p2 = delProgram(w2, loc);
+    const both = new Uint16Array(p1.length + p2.length);
+    both.set(p1);
+    both.set(p2, p1.length);
+    installDsa(game, at, both);
+    const { midRun } = run(game, slave, at, [w1, w2]);
+    console.log(`3. two deletes: [w1, w2] links after each &DEL ${midRun.map((v) => v.toString(16)).join(',')}; after the run ${after(game, w1)}, ${after(game, w2)}`);
+    check(midRun.length === 4 && midRun[2] === OBJECT_ID_EOF && midRun[3] === w1,
+      'the delete list runs through the records\' links: w2 -> w1 -> RNeof');
+    check(after(game, w1) === 'freed' && after(game, w2) === 'freed', 'both are freed after the run');
+  }
+
+  finish();
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

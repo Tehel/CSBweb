@@ -119,7 +119,7 @@ Reached from a wall click on actuator type **127** whose state lacks `PORTRAIT_I
    at most nineteen characters (`:569-591`). DM's heroes leave the second line empty
    ("HALK", "THE BARBARIAN", ""); three of CSB's prison heroes fill it: "SPELLWEAVER OF
    KE" and "LT" are MANTIA's "SPELLWEAVER OF KELT", as SLOGAR's is "WEBBER OF
-   ARACHNIA" and VEN's "HIGH PRIEST OF SSHA" (`tools/dump-hall-of-champions.ts`). The
+   ARACHNIA" and VEN's "HIGH PRIEST OF SSHA" (`tools/checks/hall-of-champions.ts`). The
    gender letter follows, `'M'` or `'F'` (`:592-601`).
 
    Every number in that string is `DecodeCharacterValue` (`:415-432`): one hex nibble
@@ -149,7 +149,7 @@ Reached from a wall click on actuator type **127** whose state lacks `PORTRAIT_I
    The port reads the text at the click, as here: `HallOfChampions.heroTextInPartyCell`
    and `readHeroText` (`src/data/HeroExtractor.ts`). `extractPresetHeroes`, beside it,
    does the same reading ahead of play for the tools,
-   checked by `tools/dump-preset-heroes.ts`.
+   checked by `tools/checks/preset-heroes.ts`.
 7. Sets `d.PotentialCharacterOrdinal = NumCharacter + 1` and increments `NumCharacter`
    (`:705-706`) — the champion is *provisionally* in the party.
 8. Collects every object in the **mirror's** cell (the cell in front, at the opposite

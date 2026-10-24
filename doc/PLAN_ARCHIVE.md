@@ -514,7 +514,7 @@ one missing primitive.
    (`doc/CSBwin-src/data.cpp:1698-1744`), `AddCharacter`'s initial values
    (minimum 30, 10 for Luck, cap 224 — `doc/CSBwin-src/Character.cpp:641-660`) and
    `AdjustCurrentAttribute` (`doc/CSBwin-src/Character.cpp:3917-3951`).
-   `tools/dump-attributes.ts` asserts all of it against the real mirrors.
+   `tools/checks/attributes.ts` asserts all of it against the real mirrors.
 
    This was a prerequisite for nearly everything else in the phase — reincarnation
    penalties, the four attribute potions, the red box around the eye, the stats-panel
@@ -559,7 +559,7 @@ one missing primitive.
    deletes the champion's pending `TT_75` timers, and `killCharacter` calls it. Before
    this, `poisonCount` only ever went up.
 
-   `tools/dump-champion-state.ts` covers all three (36 checks) and caught a real defect
+   `tools/checks/champion-state.ts` covers all three (36 checks) and caught a real defect
    while doing it: `schedulePoison` called `addTimer` after
    `createTimerWithUByte5`, which queues the entry itself, so two copies fired in the
    same pass and poison ran at double rate.
@@ -609,7 +609,7 @@ one missing primitive.
    direction: without it a revived champion matches *themselves* and every
    resurrection relocates, and a full party sends the free-corner search off the end.
 
-   `tools/dump-vi-altar.ts` drives both arms, the refusal of a living champion and the
+   `tools/checks/vi-altar.ts` drives both arms, the refusal of a living champion and the
    corner search (20 checks). It found **a real bug before it could even run**:
    `MonsterAttack.ts` declared its own `MISC_BONES_OF_HERO = 25` next to the correct
    `5` in `src/core/constants.ts` (`doc/CSBwin-src/Objects.h:192`), so every champion
@@ -655,7 +655,7 @@ one missing primitive.
    are parsed off the end of the skill letters. All 24 shipped heroes still parse and
    take the 2/8 fallbacks.
 
-   `tools/dump-hall-of-champions.ts` drives the whole flow through `handleWallClick` at
+   `tools/checks/hall-of-champions.ts` drives the whole flow through `handleWallClick` at
    the real level-0 mirrors of HALK, BORIS, WU TSE and AZIZI (133 checks, including the
    edge-decoration geometry below). Verified in
    the browser too: menu, Cancel, Resurrect, and the spent mirror refusing a second
@@ -693,7 +693,7 @@ one missing primitive.
    and `d.Byte1414`. Both came out exactly as the C++ predicts — `,|.|;|:| ` and `"_"` —
    with the known-good `byte1412` unchanged beside them, which is the offset canary.
 
-   `tools/dump-reincarnate-entry.ts` (40 checks) drives the state machine. The load-
+   `tools/checks/reincarnate-entry.ts` (40 checks) drives the state machine. The load-
    bearing one is reading **every key centre of the grid out in order** and requiring
    the unbroken alphabet: the grid arithmetic has three traps — dead pixels between the
    keys, a carriage-return key that answers to two codes (86 and 97), and the shift by
@@ -726,7 +726,7 @@ one missing primitive.
    `src/engine/Feeding.ts` applies it, in CSBWin's order, through the `applyFeeding`
    UI hook. All ten acting potion types work, the Ya potion arms its `TT_72`
    expiry timer (newly ported), and a lethal `hitpointAdjust` goes through
-   `KillCharacter`. `tools/dump-feeding.ts` drives it over the **real potion records
+   `KillCharacter`. `tools/checks/feeding.ts` drives it over the **real potion records
    in `dungeon.dat`** (47 checks).
 
    `PotionType` in `src/core/constants.ts` was a guessed enum with eight invented
@@ -748,7 +748,7 @@ one missing primitive.
    cell it fell *from*, because nothing is relinked until the resolver returns.
    `climbDownIntoPit` sets the flag through `withSupressedPitDamage`, and the fall
    clears it, so only the first drop of a chain is free.
-   `tools/dump-pit-fall.ts` drops a party down a real pit in the shipped dungeon
+   `tools/checks/pit-fall.ts` drops a party down a real pit in the shipped dungeon
    (12 checks).
 
    This turned up **a second real bug in the Phase 12 damage chain**: `damageCharacter`
@@ -771,7 +771,7 @@ one missing primitive.
    ⚠️ **The golden frames cannot see this**, and said so: all five were byte-identical
    after the change, because graphic 33 is the same pixels as the background beneath it
    and the frames only ever capture a fed, undamaged party.
-   `tools/dump-status-boxes.ts` (28 checks) covers it instead — both rectangles out of
+   `tools/checks/status-boxes.ts` (28 checks) covers it instead — both rectangles out of
    `graphics.dat`, both graphics measured and proved to *differ*, and every arm of both
    predicates. Verified red in the browser too, at a champion made starving, poisoned
    and Strength-drained at once.
@@ -807,8 +807,8 @@ one missing primitive.
    `SwapExtendedFeaturesBlock` is a no-op unless `_bigEndian` (`SaveGame.cpp:276`). The
    quick-save format went to v4 — old quick-saves are refused, not upgraded.
 
-   `tools/dump-savegame-blocks.ts` (22 checks) is the first test the binary half has
-   ever had; `dump-savegame.ts` only ever covered the runtime JSON. A round trip cannot
+   `tools/checks/savegame-blocks.ts` (22 checks) is the first test the binary half has
+   ever had; `checks/savegame.ts` only ever covered the runtime JSON. A round trip cannot
    see a byte order, so the tool differences two saves instead: `scramble`'s keystream
    depends on the hash and word index but never on the content, so changing
    `handChar` from 2 to 3 must move **byte 21** of block 2 and nothing else, where a
@@ -961,7 +961,7 @@ All five are now retired — see step 6.
    flags were dead even when loading a save; and `ViewportPicking` read positions
    straight off `DB4` instead of the render state.
 
-   Verified with `tools/dump-monster-tables.ts` (new) — the attack names read `BLOCK`,
+   Verified with `tools/checks/monster-tables.ts` (new) — the attack names read `BLOCK`,
    `CHOP`, `PUNCH`, … in `ATTACKTYPE` order, which pins the graphic `0x230` offsets — and
    all five `tools/check-frames.sh` frames stayed byte-identical.
 2. 🔄 **Monster timers and movement.**
@@ -1007,7 +1007,7 @@ All five are now retired — see step 6.
      `D4D0Finish`, `TryUByte67`, `Process_Invincible`,
      `Process_Invincible_And_Finish` and `Standard_Finish`.
 
-   **Monsters now move, hunt and flee.** Verified with `tools/watch-monsters.ts`
+   **Monsters now move, hunt and flee.** Verified with `tools/checks/watch-monsters.ts`
    (new): on level 2 with the party at (6,14), most of the 22 groups move over 600
    ticks and none ends up inside a wall; the two groups adjacent to the party both enter
    fear state 6 — the break-formation-and-attack state — and close to distance 1,
@@ -1022,14 +1022,14 @@ All five are now retired — see step 6.
    counts the groups already waiting at a square and, past 31, deletes the monster
    unless it is `Unique()` or carries something (`Code11f52.cpp:2509-2545`).
 
-   Verified with `tools/dump-monster-move.ts` (new): an Ant Man moved from (1,16) to
+   Verified with `tools/checks/monster-move.ts` (new): an Ant Man moved from (1,16) to
    (2,16) leaves the old cell, appears in the new one, and its AI timer follows it
    rather than staying behind, while its `ITEM16` records (2,16) and remembers
    (1,16); a move onto an occupied square yields exactly one abeyance timer carrying
    that monster; and the abeyance timer correctly reschedules while blocked, then
    places the group once the destination clears.
 
-   Verified with `tools/dump-monster-activation.ts` (new): on level 3 the real
+   Verified with `tools/checks/monster-activation.ts` (new): on level 3 the real
    dungeon activates 13 groups — worms in the corridor at (2,1)-(6,1), munchers,
    rock piles, a Rive — each with exactly one AI timer whose `uByte5` is
    `255 - movementTicks06` for its type, and every DB4 pointing back at its own slot.
@@ -1073,7 +1073,7 @@ All five are now retired — see step 6.
    7. ✅ The champion melee pipeline from `Attack.cpp`, with the real attack panel —
       **done**, see step 7.
 
-   Verified with `tools/dump-monster-perception.ts` (new): on level 2 with the party
+   Verified with `tools/checks/monster-perception.ts` (new): on level 2 with the party
    beside a nest of Ant Men, the three at ranges 1-3 see it and the ones beyond do
    not (Ant Man `sightDistance` is 3); the one standing one cell away but facing
    north is correctly blind to a party to its south while smelling it in the right
@@ -1118,11 +1118,11 @@ All five are now retired — see step 6.
    ✅ **Both divergences closed** by `src/engine/CharacterStats.ts`:
    - `TAG01680a`'s `DetermineThrowingDistance(chIdx, hand)` term
      (`Character.cpp:2421`) is in, so a shield too heavy for its bearer protects less.
-     The full suit in `tools/watch-monster-attacks.ts` moved from 18% to 20%.
+     The full suit in `tools/checks/watch-monster-attacks.ts` moved from 18% to 20%.
    - **`Quickness` uses load**: a champion carrying 504 against a 500 max load averages
-     13.2, an empty-handed one 26.5 (`tools/dump-throwing.ts`).
+     13.2, an empty-handed one 26.5 (`tools/checks/throwing.ts`).
 
-   Verified with `tools/watch-monster-attacks.ts` (new): a four-champion party stood
+   Verified with `tools/checks/watch-monster-attacks.ts` (new): a four-champion party stood
    next to the monsters on level 2 takes its first hit at tick ~146, loses its first
    champion around tick ~160-240, and ends as four sets of `misc_BonesOfHero` with
    `value = 2` lying in the party's cell. A direct wound probe confirms the
@@ -1136,7 +1136,7 @@ All five are now retired — see step 6.
    `DsaSystem`'s object copy already do; it is invisible in play but drifts object
    indices from CSBWin's, which matters only for Phase 10's binary-compatible saves.
 
-   Verified with `tools/dump-monster-damage.ts` (new), four cases on the real
+   Verified with `tools/checks/monster-damage.ts` (new), four cases on the real
    dungeon: killing member 1 of a 4-strong Screamer group compacts HP
    `[100,110,120,130]` → `[100,120,130]` and status `[a0,a1,a2,a3]` → `[a0,a2,a3]`
    while its per-member timers go `[0,1,2,3]` → `[0,1,2]` and the group timer is left
@@ -1211,10 +1211,10 @@ All five are now retired — see step 6.
 
    Also added: `ClothingRecord.charges` (`DB6` bits 9-12), which no loader was
    reading, and `Game.setRandomSeed` so a whole-`Game` tool can pin `d.RandomNumber` —
-   `watch-monster-attacks.ts` and `dump-clouds.ts` were unseeded and are now
+   `checks/watch-monster-attacks.ts` and `checks/clouds.ts` were unseeded and are now
    reproducible.
 
-   ⚠️ **`dump-clouds.ts`'s half of that never took effect** and was only found when
+   ⚠️ **`checks/clouds.ts`'s half of that never took effect** and was only found when
    `tools/` was brought inside the type gate (Phase 15 step 1): its
    `game.setRandomSeed(0x12345678)` sat *after* a `return new Game(...)`, so it was
    dead code and every run drew a fresh `Math.random()` seed. Fixed; the tool now
@@ -1238,7 +1238,7 @@ All five are now retired — see step 6.
    - **`atk_SHOOT` overwrites the damage it computes** with the launcher's weapon class
      (`:1934-1935`). Plainly a bug in the original; kept.
 
-   Verified with `tools/dump-player-attacks.ts` (new), seven cases on the real dungeon:
+   Verified with `tools/checks/player-attacks.ts` (new), seven cases on the real dungeon:
    a sword's menu reads SWING / PARRY / CHOP with mastery requirements 2 and 3 and a
    bare hand reads PUNCH / KICK / WAR CRY — the canary that pins the graphic `0x230`
    offsets; each of the four corners reaches a different member of a two-worm group;
@@ -1255,8 +1255,8 @@ All five are now retired — see step 6.
 **Scope note.** `Attack.cpp`'s Lord Chaos endgame — `_Fusion`, `_FusionSequence` — is
 **deliberately deferred**: it cannot be exercised until both monsters and Lord Chaos work,
 so porting it now would land untested. `FluxCage`, `IsCellFluxcage` and `IsLordChaosHere`
-*are* ported, since they are reachable today. Validation is `tools/dump-player-attacks.ts`,
-`tools/watch-monster-attacks.ts` and `tools/check-frames.sh`, plus the dev-only AI trace
+*are* ported, since they are reachable today. Validation is `tools/checks/player-attacks.ts`,
+`tools/checks/watch-monster-attacks.ts` and `tools/check-frames.sh`, plus the dev-only AI trace
 mirroring CSBWin's own `AITraceActive`/`AttackTraceActive` output so the two codebases stay
 diffable; a real test framework stays Phase 15.
 
@@ -1286,8 +1286,8 @@ never carried out, because the project has **no test framework**.
    `undefined`, so the timer was never dispatched and the tool silently measured
    nothing. Turning it on surfaced 34 errors; all are fixed. Of those, two were real:
 
-   - `dump-clouds.ts`'s dead `setRandomSeed` (see Phase 12 step 7 above);
-   - `watch-monster-attacks.ts`'s clothing fixtures never gained the
+   - `checks/clouds.ts`'s dead `setRandomSeed` (see Phase 12 step 7 above);
+   - `checks/watch-monster-attacks.ts`'s clothing fixtures never gained the
      `ClothingRecord.charges` field Phase 12 added to the record.
 
    The rest were unused locals plus twenty `Property 'timerSystem' is private`, which
@@ -1328,7 +1328,7 @@ Goal: everything CSBWin does before the party is in the dungeon.
 
 Done, in `src/renderer/intro/` (`IntroHost.ts`, `TitleSequence.ts`, `PrisonDoor.ts`,
 `PrisonLevel.ts`, `BootSequence.ts`). Spec and citations:
-`doc/CSBWIN_TITLE_SCREEN_REFERENCE.md`; evidence: `tools/dump-intro.ts` (103 checks) and
+`doc/CSBWIN_TITLE_SCREEN_REFERENCE.md`; evidence: `tools/checks/intro.ts` (103 checks) and
 golden frames `07-entrance` / `08-credits`.
 
 1. ✅ **The title animation** — `_DisplayChaosStrikesBack` (`CSBCode.cpp:9308`). CSBWin's
@@ -1347,7 +1347,7 @@ golden frames `07-entrance` / `08-credits`.
    than from `ExpandGraphic`, and three opcodes disagreed. Graphic 5 is the only image in
    either data set that uses one of them, so the scroll slid right from (78,55) on while
    everything else looked fine. `src/core/imageDecoder.ts` is now a transcription of
-   `doc/CSBwin-src/CSBCode.cpp:10961`, and `tools/dump-image-codec.ts` checks it against
+   `doc/CSBwin-src/CSBCode.cpp:10961`, and `tools/checks/image-codec.ts` checks it against
    `tools/reference/csbwin-credits.png` — a capture of CSBWin's own screen, and the only
    ground truth in this project that did not come out of our own code.
 5. ✅ **"Resume"** — `openSaveMenu(ui, 'loadOnly')` on a cleared screen, which is what
@@ -1375,12 +1375,12 @@ Entries that were carried as debt and are now closed. Any sub-item still open is
 `DEBT.md`; this is the surrounding context, not the status.
 
 - ✅ **The level-3 monster timer stall — no longer reproduces.** Re-checked after
-  Phase 12 closed: `npx tsx tools/watch-monsters.ts 3 10 25 200` runs the documented
+  Phase 12 closed: `npx tsx tools/checks/watch-monsters.ts 3 10 25 200` runs the documented
   repro and the `50000 cap` warning never fires; 5 of 13 groups move and the Muncher
   at (11,29) walks its whole path to (9,25). The next-time computation the entry
   suspected (`Increment_Time_By_W52_Plus_Random` / `EnsureI60NonZero`) was ⏳ when the
   cloud work hit this, and was ported in Phase 12 step 2. Kept here as a record of the
-  diagnosis; `tools/dump-clouds.ts` still uses level 2 and need not change.
+  diagnosis; `tools/checks/clouds.ts` still uses level 2 and need not change.
 
   <details><summary>original entry</summary>
 
@@ -1394,7 +1394,7 @@ Entries that were carried as debt and are now closed. Any sub-item still open is
   (`Increment_Time_By_W52_Plus_Random` / `EnsureI60NonZero`, `doc/CSBwin-src/Monster.cpp`)
   is producing a zero delay where CSBWin guarantees a positive one. Found while porting
   clouds: it was masking the cloud timer on that level.
-  `tools/dump-clouds.ts` deliberately kills its test monster on level **2** to avoid it.
+  `tools/checks/clouds.ts` deliberately kills its test monster on level **2** to avoid it.
 
   </details>
 
@@ -1407,7 +1407,7 @@ Entries that were carried as debt and are now closed. Any sub-item still open is
   the `shieldHand` / `weaponHand` / `quiver` mirrors, which is exactly what every reader
   falls back to when the array reads null (`src/renderer/ui/Character.ts:538`). The
   removal therefore removed nothing. Fixed by mirroring slots 0, 1 and 8 the way
-  `setChampionPossession` and `DsaSystem` already do. `tools/dump-throwing.ts` section 7
+  `setChampionPossession` and `DsaSystem` already do. `tools/checks/throwing.ts` section 7
   covers it, deliberately reading the hands back through the UI's own accessor — reading
   `possessions` directly would have passed while the club was still in hand.
 
@@ -1426,7 +1426,7 @@ Entries that were carried as debt and are now closed. Any sub-item still open is
   glyphs in font `0x22d`, so they need `drawTextLineIndexRaw` rather than the upper-casing
   `drawTextLineIndex`; and `getRoleMastery` dropped CSBWin's `0x8000`
   (`doc/CSBwin-src/Character.cpp:4610`), so a potion or spell could have moved the printed
-  rank. Written up in `doc/PROVEN_FACTS.md`; `tools/dump-mastery-panel.ts` renders the real
+  rank. Written up in `doc/PROVEN_FACTS.md`; `tools/checks/mastery-panel.ts` renders the real
   panel and byte-compares the lines, since no golden frame covers this panel.
 
   ⏳ **Other empty placeholder tables may be hiding the same way.** This one produced no
@@ -1451,7 +1451,7 @@ Entries that were carried as debt and are now closed. Any sub-item still open is
   correctly aligned image. Left out on purpose, with the reasoning in the code.
 
   ⏳ **No golden frame covers an edge decoration**, which is why this survived so long.
-  `tools/dump-hall-of-champions.ts` now pins the geometry that makes position 7 special
+  `tools/checks/hall-of-champions.ts` now pins the geometry that makes position 7 special
   (both edge slots narrower than the bitmap; the front-left window ending flush with its
   right edge, the front-right starting flush with its left) across all 8 rect sets, but
   the pixels themselves are still verified only by screenshot. A sixth frame would want a
@@ -1473,7 +1473,7 @@ Entries that were carried as debt and are now closed. Any sub-item still open is
   The nesting was the trap and is written up in `doc/CSBWIN_MOVEMENT_REFERENCE.md`:
   `D4W != 0` guards the *party* arm alone, so a fully open up-down door still crushes a
   `VerticalSize() == 0` monster, and two of the 27 monster types in the shipped data
-  are that size. Verified by `tools/dump-door-crush.ts`, which shows level 2's door
+  are that size. Verified by `tools/checks/door-crush.ts`, which shows level 2's door
   stepping `1 → 0 → 1` over an Ant Man and the party losing 71 HP under it.
 
 - ✅ *(playtest)* **Monsters block the party.** `MoveParty`'s monster arm is ported into
@@ -1483,7 +1483,7 @@ Entries that were carried as debt and are now closed. Any sub-item still open is
   into. Before this the party walked straight through every monster, which made every
   combat encounter escapable and every combat playtest measure the wrong game.
   Ref: `doc/CSBwin-src/CSBCode.cpp:8373-8391`, written up in
-  `doc/CSBWIN_MOVEMENT_REFERENCE.md`. Verified by `tools/dump-party-collision.ts`.
+  `doc/CSBWIN_MOVEMENT_REFERENCE.md`. Verified by `tools/checks/party-collision.ts`.
 
   ⏳ **Three deferrals from the same block**, all pre-existing gaps rather than new:
   - The **wall-bump damage**: CSBWin answers a terrain-blocked move with
@@ -1509,7 +1509,7 @@ Entries that were carried as debt and are now closed. Any sub-item still open is
   40 a tick and is gone in 3-6, poison lingers ~85 ticks and hurts whoever stands in it,
   and a fireball bursts a door and vanishes. `CreateCloud`'s own blast damage came with
   it, along with `DamageMonsterGroup`, `DeterminePoisonDamage`, `DamageAllCharacters` and
-  `HitDoor`, none of which existed. Verified by `tools/dump-clouds.ts`.
+  `HitDoor`, none of which existed. Verified by `tools/checks/clouds.ts`.
   Ref: `doc/CSBwin-src/Timer.cpp:436`, `doc/CSBwin-src/Code11f52.cpp:1411`.
 
   ⚠️ `HitDoor`'s `delay` argument is not ported — only the zero case is reachable, since
@@ -1519,7 +1519,7 @@ Entries that were carried as debt and are now closed. Any sub-item still open is
   `Game.adjustStamina` — so a champion killed by a missile or by exhaustion left no
   bones and no possessions, and a party wiped by either did not lose the game. Both are
   routed through `MonsterAttack.damageCharacter` now, `DetermineMagicDamage` is ported,
-  and `tools/dump-champion-death.ts` checks all three paths produce the same six
+  and `tools/checks/champion-death.ts` checks all three paths produce the same six
   consequences. Closed, not debt.
 - 🚫 **`charFlags` redraw bookkeeping** (`CHARFLAG_*`, steps 5 and 8) is not modelled
   and will not be: this renderer redraws from state every frame, so there is nothing
@@ -1573,7 +1573,7 @@ already fixed during the move.
   is now fully ported: footprint aging, food/water consumption paid in stamina, HP
   regeneration (with the Ekkhard Cross bonus), attribute recovery and the facing
   reset. Food and water therefore now actually go down. Evidence:
-  `tools/dump-ten-second-update.ts`. The `d.Word11750` countdown is not ported: it
+  `tools/checks/ten-second-update.ts`. The `d.Word11750` countdown is not ported: it
   is a cursor-redraw counter set only by `CSBCode.cpp:969-975`, which has no
   counterpart here, so the branch is dead.
 
@@ -1587,7 +1587,7 @@ already fixed during the move.
   existing `resolveCellEffects` (already used by `wiggleObject`/the actuator path;
   nothing about the teleporter logic itself was wrong), and `dropObjectFromCursor`
   now lands the object wherever that resolves to.
-  Evidence: `tools/dump-teleporter-drop.ts` finds a real active, item-scoped
+  Evidence: `tools/checks/teleporter-drop.ts` finds a real active, item-scoped
   teleporter in `dungeon.dat`, drops a floor item onto it, and checks the item ends
   up at the destination rather than the drop cell — it fails on the pre-fix code.
 
@@ -1606,7 +1606,7 @@ already fixed during the move.
   to, with a pit in the way) never fired. Now calls the same
   `resolveDroppedObjectPosition` the cursor-drop fix uses, then
   `ActuatorSystem.triggerObjectMove` at the landing cell.
-  Evidence: `tools/dump-missile-drop.ts` throws a floor item at a real teleporter and
+  Evidence: `tools/checks/missile-drop.ts` throws a floor item at a real teleporter and
   at a real floor actuator in `dungeon.dat`; the actuator-trigger check fails on the
   pre-fix code (the teleporter check does not, in isolation, only because the
   in-flight path already covered it — kept anyway since it is what CSBWin's own
@@ -1633,7 +1633,7 @@ already fixed during the move.
   also corrects a latent twin of the same bug for a missile that runs out of range
   exactly as it flies off the edge of the map (`nextRoomType` 8/exterior), which had
   been using the advanced position too.
-  Evidence: `tools/dump-missile-drop.ts` scenario 3 throws a floor item at a real
+  Evidence: `tools/checks/missile-drop.ts` scenario 3 throws a floor item at a real
   closed door in `dungeon.dat`, records the missile's own resting corner the tick
   before the door blocks it, and checks the landed item sits at that exact corner.
   Fails on the pre-fix code (landed corner 0 where the resting corner was 3).
@@ -1661,9 +1661,9 @@ already fixed during the move.
   standing in for it on the small-blast tick. Both functions now call
   `hooks.queueSound(ordinal, x, y, 1)` with CSBWin's literal `soundNum`, exactly as
   the door and teleport code already did elsewhere in `TimerSystem`.
-  Evidence: `tools/dump-missile-drop.ts` scenario 4 throws a weapon and a misc item
+  Evidence: `tools/checks/missile-drop.ts` scenario 4 throws a weapon and a misc item
   at a real closed door and checks the ordinal `queueSound` receives (0 and 4);
-  `tools/dump-clouds.ts` throws a big and a small fireball and checks the same (5
+  `tools/checks/clouds.ts` throws a big and a small fireball and checks the same (5
   and 20). Both fail on the pre-fix code.
 
 - ✅ **Resolved: the teleporter/energy shimmer never animated, for two independent
@@ -1710,7 +1710,7 @@ already fixed during the move.
   reader (`this.checksum * 0xbb40e62d + 11 + buf[i]`), fixed too; it is currently
   dead code (no dungeon this project loads defines a DSA, per the note below), so it
   had no test to catch it.
-  Evidence: `tools/dump-graphic-random.ts` drives the LCG against an exact BigInt
+  Evidence: `tools/checks/graphic-random.ts` drives the LCG against an exact BigInt
   oracle from five seeds, then checks the specific failure mode directly — 64 draws
   of `% 32` from the class's own starting state must not land on one value. Fails
   on the pre-fix code (all draws land on 0); the `Math.imul` version spreads across
@@ -1731,7 +1731,7 @@ already fixed during the move.
   CSBWin's own `d.RandomNumber`-swap around `DrawViewport`
   (`doc/CSBwin-src/Viewport.cpp:6713-6714`), so drawing a door can never perturb the
   sequence monster AI and combat depend on.
-  Evidence: `tools/dump-door-lightning.ts` confirms the shipped dungeon actually
+  Evidence: `tools/checks/door-lightning.ts` confirms the shipped dungeon actually
   sets the bit, then drives `opStdDrawDoor` directly across 40 redraws of the same
   closed door and checks the drawn bitmap doesn't sit at a single, frozen pattern.
   Fails on the pre-fix code (always 1 distinct pattern); passes with 13 of 40 draws
@@ -1781,7 +1781,7 @@ already fixed during the move.
   second bug in the same place: a fired timer's index stayed live to `getTimer`.
 
   <sub>Context: `doc/PROVEN_FACTS.md` → “The timer array has a free list, and a save
-  carries its cursor”. Evidence: `tools/dump-save-roundtrip.ts`.</sub>
+  carries its cursor”. Evidence: `tools/checks/save-roundtrip.ts`.</sub>
 
 - ✅ **Resolved: champion titles missing their first character — and it is not a bug.**
   A reincarnated champion whose title was left empty. `_ReIncarnate` clears **one byte**
@@ -1813,7 +1813,7 @@ already fixed during the move.
   `MissileTraceEvent` and the nine `emitMissileTrace` sites in `TimerSystem` had no other
   consumer, nor did `Game.debugLaunchMissileDelayed` /
   `TimerSystem.launchDelayedMissile`, nor `main.ts`'s `getAddCharacterTables` (`Game`
-  builds its own). `MonsterSystemHooks.trace` **stays** — `tools/dump-monster-ai.ts`
+  builds its own). `MonsterSystemHooks.trace` **stays** — `tools/checks/monster-ai.ts`
   registers it. `src/dev.ts` is down to the F5/F9 quick-save from ~640 lines.
 - ✅ F5/F9 (quick-save/load) **stay**, and are no longer gated on `isDebugFeaturesEnabled()`
   — they are not scaffolding to be removed but the functional equivalent of the original
@@ -1891,7 +1891,7 @@ over the module (`ui/Objects.ts`' `resolveObjectNameIndex`, `getBaseObjectNameIn
 `descIndexForObject`; `Game`, `DsaSystem`, `ActuatorSystem` each keep a private one-liner
 that supplies their tables). A seventh copy the entry missed, in `ActuatorSystem`
 (`getBasicObjectType` / `getDescIndex` / `getBasicObjectTypeFromValue`), went too, as did
-the one in `tools/dump-level-items.ts`. The UI's `getBaseObjectNameIndex` and
+the one in `tools/checks/level-items.ts`. The UI's `getBaseObjectNameIndex` and
 `getAttackClass` take an RN only; `Feeding`'s explicit object-type path keeps the type as
 its name index, which is what the old guess returned. Every `DetermineMastery` hook
 (`CharacterStats`, `AttackSystem`, `Game`'s three, the UI's attack menu) and
@@ -1901,7 +1901,7 @@ its name index, which is what the old guess returned. Every `DetermineMastery` h
 Behaviour: unchanged on the stock dungeon — every DM chest is type 0, and none of the
 mastery or load objects (Firestaff, talismans, Elven Boots) is modifiable, so `NameIndex`
 and `GetBasicObjectType` agree on them. The failure value is now `OBJNI_NOT_AN_OBJECT`
-everywhere. Evidence: `tools/dump-object-index.ts` (new, in `npm test`) walks all 1950
+everywhere. Evidence: `tools/checks/object-index.ts` (new, in `npm test`) walks all 1950
 records of `dungeon.dat` and forces the compass, torch, scroll, waterskin and charged-weapon
 states; the golden frames are unchanged.
 
@@ -1951,7 +1951,7 @@ function — `getDescIndexForObjectType` (`ui/Objects.ts:141`) already exists. P
 caller at the new functions, including `CharacterStats`' hook at `NameIndex`, which closes
 that ⚠️.
 
-**Evidence.** Extend `tools/dump-object-name-index.ts` (or add a sibling) to walk every
+**Evidence.** Extend `tools/checks/object-name-index.ts` (or add a sibling) to walk every
 object record in `dungeon.dat` and assert the three functions over it — a chest, a lit and
 an unlit torch, a compass at each facing, an open scroll. Then `npm test -- --frames`,
 since the renderer and UI copies move.
@@ -2190,8 +2190,8 @@ normalise.
 The alternative — `null` as the one empty value, converted at the file boundary — is less
 churn but departs from CSBWin; "port, don't reinvent" argues for `RNnul`.
 
-**Evidence.** `npm test -- --frames`; `tools/dump-save-roundtrip.ts` and
-`tools/dump-live-save-file.ts` prove the boundary. A grep proves the normalizers are gone.
+**Evidence.** `npm test -- --frames`; `tools/checks/save-roundtrip.ts` and
+`tools/checks/live-save-file.ts` prove the boundary. A grep proves the normalizers are gone.
 If `RuntimeSaveState`'s shape changes, bump `RUNTIME_SAVE_VERSION`.
 
 ##### D3 ✅ Most state fields are optional
@@ -2274,7 +2274,7 @@ callers (`addChampion`, `setPartyState`, the runtime-save restore,
 `registerChampionBones`); `registerChampionBones`' `if (!fingerprint) return` had gone
 first, as a fix (below). Five `?? 0` / `?? -1` went. No tool needed to set fingerprints
 itself: the ones that put champions in the party without `addChampion` never kill them,
-and `dump-vi-altar`'s preset `0x1000 + i` went, since `addChampion` now overwrites it.
+and `checks/vi-altar`'s preset `0x1000 + i` went, since `addChampion` now overwrites it.
 `RUNTIME_SAVE_VERSION` stays 10: every runtime save already carries the field (the three in
 `static/gamefiles/saves/` load with their fingerprints and run). Evidence: `npm test`.
 
@@ -2283,7 +2283,7 @@ Found while splitting, and paid as separate fixes:
 - ✅ **`facing3`.** `AddCharacter` sets `pcA3->facing3 = d.partyFacing` (`Character.cpp:532`);
   the port left `damageFromDirection` unset, so the save writer wrote 0 and
   `ui/Attack.ts` fell back to `champ.facing`. **Paid** after D3d: `Game.addCharacter` sets
-  it with `facing` (`2def79c`). `tools/dump-hall-of-champions.ts` recruits DAROOU, whose mirror the
+  it with `facing` (`2def79c`). `tools/checks/hall-of-champions.ts` recruits DAROOU, whose mirror the
   party faces west, and failed before the fix (facing3 0, not 3).
 - ✅ **`byte33`.** The save writer wrote `incantationCursor ?? incantation.length`, and the
   engine never updates `incantationCursor`. So a champion loaded from a save keeps the
@@ -2295,14 +2295,14 @@ Found while splitting, and paid as separate fixes:
   `:5318-5319`). So the field is derivable and should go, like D5's `tiles`. **Paid in
   `76e0ee3`:**
   `incantationCursor` is gone, and the writer derives `incantation.length & 3`. The
-  fourteen committed saves still pack byte-identical. `tools/dump-character-block.ts`
+  fourteen committed saves still pack byte-identical. `tools/checks/character-block.ts`
   types two runes into a loaded champion and failed before the fix (byte33 0, not 2).
 - ✅ **A fingerprint of 0.** `registerChampionBones` returned early when a champion's
   fingerprint was 0, so their bones got no expool record and the Altar of Vi read the
   bones' `value` (2) as a champion index instead. CSBWin's `AddChampionBonesRecord` call is
   unconditional (`Character.cpp:2651`, `data.cpp:1639-1646`), and 0 is `AddCharacter`'s
   fingerprint for a champion recruited at level 0, (0, 0). **Paid** before D3g's refactor:
-  the guard is gone. `tools/dump-vi-altar.ts` section 1b kills a champion whose
+  the guard is gone. `tools/checks/vi-altar.ts` section 1b kills a champion whose
   fingerprint is 0 and failed before the fix (no record, nobody raised).
 
 Not debt, so staying optional:
@@ -2389,7 +2389,7 @@ has-objects and door writers, `TimerSystem.setDoorState` / `setCellFlag`,
 `DungeonState.getTile` went, with its five `isWall` / `isDoor` / `isPit` /
 `isTeleporter` / `isStairs` helpers, which had no caller; `hasObjects` reads the flag.
 `tiles` was never serialised, so `RUNTIME_SAVE_VERSION` stays 10. Three tools that wrote
-both copies write one; `dump-savegame`'s "the tiles agree with the flags" check went
+both copies write one; `checks/savegame`'s "the tiles agree with the flags" check went
 with the thing it checked. Evidence: `npm test -- --frames` passes unchanged before and
 after; a grep finds no `.tiles` or `TileData`.
 
@@ -2441,7 +2441,7 @@ counts from); `AttackSystem`'s door arm passes 2. A delayed hit queues `TT_BASH_
 (= 2, new in `TimerFunction`), and `processBashDoor` — `ProcessTT_BASH_DOOR`,
 `Timer.cpp:1492` — shatters the door when it fires. `TimerQueue` gained `SetTimer`'s
 `TT_BASH_DOOR` rule: queueing one deletes every `TT_1` / `TT_DOOR` timer on the cell
-(`Timer.cpp:1102-1123`). Evidence: `tools/dump-player-attacks.ts` case 8 (fails four checks
+(`Timer.cpp:1102-1123`). Evidence: `tools/checks/player-attacks.ts` case 8 (fails four checks
 before the fix); the fact is in `doc/PROVEN_FACTS.md`.
 
 Found on the way and fixed in `cbba108`: `hitDoor` compared the force with
@@ -2464,7 +2464,7 @@ unreachable; Phase 12 step 7 made it live. `HitDoor` itself is at
 `TT_BASH_DOOR`.
 
 Port the `delay` arm and whatever it queues, and fix the stale comment at
-`TimerSystem.ts:2505-2507`. Evidence: extend `tools/dump-player-attacks.ts` to bash a real
+`TimerSystem.ts:2505-2507`. Evidence: extend `tools/checks/player-attacks.ts` to bash a real
 door and check its state on the attack tick and after the delay.
 
 <sub>Context: `doc/PLAN_ARCHIVE.md` → “Clouds are alive”.</sub>
@@ -2489,7 +2489,7 @@ on it: the port turned a thrown Ven or Ful potion into its cloud **before** the 
 while CSBWin keeps `RNprojectile` as the potion until the tail (`:2095-2098`). So a bomb's
 first blow — on a monster *and* on a champion — was a fireball's instead of a thrown
 object's. The door arm reads the potion too since C9.
-Evidence: `tools/dump-missile-monster.ts` (9 of 15 checks fail before); the fact is in
+Evidence: `tools/checks/missile-monster.ts` (9 of 15 checks fail before); the fact is in
 `doc/PROVEN_FACTS.md`.
 
 <details><summary>original entry</summary>
@@ -2520,7 +2520,7 @@ one more divergence: CSBWin loops over `d.NumCharacter` less one while
 the port burned it. The torch test now uses `NameIndex` as CSBWin does (it used
 `GetBasicObjectType`, which agrees for every torch), and hands go 1 then 0.
 `SelectPaletteForLightLevel` / `DrawEightHands` need no call: both are derived from live
-state every frame. Evidence: `tools/dump-ninety-second-update.ts` (5 of 6 checks fail
+state every frame. Evidence: `tools/checks/ninety-second-update.ts` (5 of 6 checks fail
 before); the fact is in `doc/PROVEN_FACTS.md`.
 
 <details><summary>original entry</summary>
@@ -2530,7 +2530,7 @@ CSBWin calls `NinetySecondUpdate` when `(d.Time & 511) == 0`
 (`src/engine/Game.ts:1397`) fires on `tickCount % (TICKS_PER_SECOND * 90)` — every 360
 ticks instead of every 512, so about 1.4 times too often. Its body (torch burn-down) was
 never audited against `NinetySecondUpdate` (`doc/CSBwin-src/CSBCode.cpp:7398`). Port both,
-the way `processTenSecondUpdate` was; `tools/dump-ten-second-update.ts` is the model for
+the way `processTenSecondUpdate` was; `tools/checks/ten-second-update.ts` is the model for
 the evidence.
 
 </details>
@@ -2542,7 +2542,7 @@ the evidence.
 `sw(damage)`, then `chIdx == -1` → 0, the recruit → `chIdx + 1`, a won game → 1 (through a
 new `isGameWon` hook), a non-positive blow → 0, and only then the missing-champion and
 zero-health checks. The `sw` was a third, unlisted gap: a blow of `0x10005` now hurts for 5.
-Evidence: `tools/dump-champion-death.ts` → "DamageCharacter's early guards" (5 checks fail
+Evidence: `tools/checks/champion-death.ts` → "DamageCharacter's early guards" (5 checks fail
 before); the fact is in `doc/PROVEN_FACTS.md`.
 
 <details><summary>original entry</summary>
@@ -2567,7 +2567,7 @@ fixes, one needed nothing; what the re-reading found beyond them is C13.
   corners of the crossed side, `DamageCharacter(ch, 1, 24, 2)` on each, and sound 18 only
   if `k != 0`. The map edge is bumped the same way (`GetCellFlags` answers stone there).
   `MovementHooks` became required — only `Game` builds a `MovementSystem`. Evidence:
-  `tools/dump-party-collision.ts` case 5 (2 of 15 checks fail before); the fact is in
+  `tools/checks/party-collision.ts` case 5 (2 of 15 checks fail before); the fact is in
   `doc/PROVEN_FACTS.md`. Found on the way: the tool built its `Game` without `byte586`,
   and `MonsterAttack.determineAttackOrder` then silently uses `[0, 1, 2, 3]` — an F1
   placeholder.
@@ -2581,7 +2581,7 @@ fixes, one needed nothing; what the re-reading found beyond them is C13.
   `d.clockTick` is "a tick is due", and the VBL sets it again on every VBL once
   `vblCount >= d.Speed` (`:1076-1087`), so zeroing it holds a due tick for one VBL —
   `Game.clockTickCleared` skips the tick for the rest of the frame. `MovementResult`
-  carries CSBWin's `D5W` as `inhibited`. Evidence: `tools/dump-party-collision.ts` case 6
+  carries CSBWin's `D5W` as `inhibited`. Evidence: `tools/checks/party-collision.ts` case 6
   (4 of 21 checks fail before); the fact is in `doc/PROVEN_FACTS.md`.
 - 🚫 **The vertical-move guard** (`:8287-8291`), which refuses a Move Up / Move Down into
   a monster's cell outright. Nothing to port: CSBWin cannot reach it either. Move Up / Down
@@ -2602,7 +2602,7 @@ that. Clouds were wrong three ways: they rolled `GraphicRandom` instead of the v
 and ignored `tag006932`'s placement — the even-height `+1` on `y1` and the left-edge source
 column `Larger(LOCAL_30, LOCAL_22 - x - 1)` (`:265-287`). While there: `viewportRandom`
 starts at CSBWin's `0x34175432` (`Viewport.cpp:6704`) instead of a host random seed. No
-golden frame shows a cloud, so none moved. Evidence: `tools/dump-cloud-draw.ts` (7 of 14
+golden frame shows a cloud, so none moved. Evidence: `tools/checks/cloud-draw.ts` (7 of 14
 checks fail before); the fact is in `doc/PROVEN_FACTS.md`. The rest of `DrawClouds`' drift
 is C14.
 
@@ -2627,7 +2627,7 @@ missile drawing source in `Viewport.cpp` first, then port what it does.
 on the square and, from 31, deletes the group unless it is `Unique()` or carries something
 (`Code11f52.cpp:2508-2547`). `Unique()` goes through `monsterUnique`, which applies
 CSBWin's `drawAsSize4Monsters` gate — a constant `false` until G4 models the option.
-Evidence: `tools/dump-monster-move.ts` case 4 (3 of 18 checks fail before); the fact is in
+Evidence: `tools/checks/monster-move.ts` case 4 (3 of 18 checks fail before); the fact is in
 `doc/PROVEN_FACTS.md`.
 
 <details><summary>original entry</summary>
@@ -2649,7 +2649,7 @@ and C16.
   `d.HandChar`, the cursor's owner; the port matched a living champion's `partyPosition`
   against the actuator's wall position. And `PressurePadOrAlcove` passes `-1`, not the
   alcove's position (`Code11f52.cpp:3910`), which also changes `RotateActuatorList`'s
-  filter. Evidence: `tools/dump-local-action.ts` (3 of 6 checks fail before); the fact is
+  filter. Evidence: `tools/checks/local-action.ts` (3 of 6 checks fail before); the fact is
   in `doc/PROVEN_FACTS.md`.
 - ✅ **DSA cloud moves.** `DsaSystem.findCellSource` now hands a cloud over: the check
   pass finds its `TT_25` / `TT_24` (lowest slot, index compare) or returns
@@ -2657,7 +2657,7 @@ and C16.
   it — square, level and the placed ID (`:522-529`). **The old note that missiles need
   nothing was wrong:** `FindCellDestination` has a `dbMISSILE` arm (`:574-596`) that
   writes the new square into `timerWord8` and the new level; that is ported too.
-  Evidence: `tools/dump-dsa-move.ts` (8 of 13 checks fail before); the fact is in
+  Evidence: `tools/checks/dsa-move.ts` (8 of 13 checks fail before); the fact is in
   `doc/PROVEN_FACTS.md`. What is still not CSBWin's about a DSA cell move is C15.
 - ✅ **Deferred deletes.** `&DEL` now condemns through `DsaSystem.deleteObject` onto the
   bank's `objectDeleteList`, and `processTimer6Internal` ends with `consumateDeletes`,
@@ -2665,7 +2665,7 @@ and C16.
   Before, the walks stopped only by accident: the freed slave's link read `0xFFFF`,
   which decodes as a cloud and was skipped. The deferral itself is not yet observable
   in play, because the port never reuses a freed slot; it will be once slot reuse is
-  ported (C16). Evidence: `tools/dump-dsa-delete.ts` (4 of 9 checks fail before); the
+  ported (C16). Evidence: `tools/checks/dsa-delete.ts` (4 of 9 checks fail before); the
   fact is in `doc/PROVEN_FACTS.md`.
 
 The archived shimmer entry notes that no dungeon this project loads defines a DSA, so
@@ -2697,7 +2697,7 @@ that out-ranges `STRandom(128)`, fits in a pouch and is not a key; everything el
 the door with `HitDoor(DetermineMagicDamage + 1 + STRandom % that)`. `RN::IsAKey` is
 `objectIndex.IsAKey` now, and `TimerSystem` gets it and `ObjDesc.word4` as hooks from
 `Game`. The shipped data has one door type missiles pass (`0x36e`). Evidence:
-`tools/dump-missile-door.ts` (8 of 13 checks fail before, plus a data canary); the fact is
+`tools/checks/missile-door.ts` (8 of 13 checks fail before, plus a data canary); the fact is
 in `doc/PROVEN_FACTS.md`.
 
 <details><summary>original entry</summary>
@@ -2720,7 +2720,7 @@ Re-audited 2026-09-23; one of the three was live, the other two were overtaken.
   the Phase 9.5 stand-in in `Game.applyMissileDamageToParty` stamped it on every missile
   that reached the party, too — even a champion's own spell — so `AdjustSkills` doubled
   experience and the facing reset held off for a monster that had not attacked. It is
-  gone. Evidence: `tools/dump-last-monster-attack.ts` (1 of 2 checks fails before); the
+  gone. Evidence: `tools/checks/last-monster-attack.ts` (1 of 2 checks fails before); the
   fact is in `doc/PROVEN_FACTS.md`.
 - ✅ **The throw skill gain** was already CSBWin's: `Game.throwByCharacter` is
   `Mouse.cpp:723-757` line for line — 8 experience, +4 for a weapon, + `uByte3 / 4` when
@@ -2749,7 +2749,7 @@ gaps beyond the entry: CSBWin's `goto` back into the loop checks **`d.objectInHa
 well (`:3707-3713`), which the port never did, and the champion filter is `HP() != 0`, not
 the `alive` flag. The named hand/quiver fields are no longer read — `possessions[0]`, `[1]`
 and `[8]` hold the same objects (D1). The shipped dungeon has 22 type-8 sensors. Evidence:
-`tools/dump-does-party-have.ts` (4 of 7 checks fail before); the fact is in
+`tools/checks/does-party-have.ts` (4 of 7 checks fail before); the fact is in
 `doc/PROVEN_FACTS.md`.
 
 <details><summary>original entry</summary>
@@ -2779,7 +2779,7 @@ timer meeting a `TT_1` deletes and requeues. The re-reading found one more thing
 CSBWin timer search walks the **queue from its end** (`TIMER_SEARCH`, `:1209-1215`,
 `:2924-2933`), not the slots. `TimerQueue.searchOrder()` is that order; the duplicate rules
 and C8's DSA cloud-timer lookup (which took the lowest slot) use it. Evidence:
-`tools/dump-timer-dedupe.ts` (3 of 15 checks fail before); the facts are in
+`tools/checks/timer-dedupe.ts` (3 of 15 checks fail before); the facts are in
 `doc/PROVEN_FACTS.md`, and `doc/CSBWIN_TIMERS_REFERENCE.md` is corrected.
 
 - ✅ **The sequence number was stamped at the wrong time.** Paid in `438c652`.
@@ -2789,7 +2789,7 @@ and C8's DSA cloud-timer lookup (which took the lowest slot) use it. Evidence:
   rules ran, and `addTimer` — which `MonsterSystem`, `MonsterAI` and `DsaSystem` call with
   their own entries — kept whatever the entry carried (the DSA passed 0, a requeued monster
   timer its old number). The stamp breaks ties between timers due on the same tick, and is
-  saved (`gb2.TimerSequence`). `addTimer` stamps now. Evidence: `tools/dump-timer-dedupe.ts`
+  saved (`gb2.TimerSequence`). `addTimer` stamps now. Evidence: `tools/checks/timer-dedupe.ts`
   case 6 (2 of 17 checks fail before). **Not ported:** the repack when the counter reaches
   0xffff (`:1136-1188`) — the port's counter grows past 16 bits, and a save masks it.
 
@@ -2831,7 +2831,7 @@ unless said otherwise.
   champion's `staminaAdjustment` is `sw((3 * load) / MaxLoad + 1)` (`:8175-8188`), and
   `AdjustStamina` is applied to each after the party-move filter (`:8216-8222`) — for a
   blocked step as much as for a taken one. Now `MovementSystem.chargeStamina`, at the top
-  of every move (turns are free). Evidence: `tools/dump-party-collision.ts` case 7 (4 of
+  of every move (turns are free). Evidence: `tools/checks/party-collision.ts` case 7 (4 of
   26 checks fail before); the fact is in `doc/PROVEN_FACTS.md`.
 - ✅ **The move delay.** A taken step sets `d.partyMoveDisableTimer` to the slowest living
   champion's `TimeToMove` (`:8413-8434`); the tick counts it down (`:699-702`), and
@@ -2843,14 +2843,14 @@ unless said otherwise.
   `Game.setPartyMoveDelay` is the step's tail, `CharacterStats.timeToMove` is
   `TimeToMove`, and a throw sets the lock. All three words are `PartyState` fields, saved
   and loaded, which closes `PLAN.md` Phase 10's gap. Evidence:
-  `tools/dump-party-collision.ts` case 8 (it crashes before), `tools/dump-live-save-file.ts`
+  `tools/checks/party-collision.ts` case 8 (it crashes before), `tools/checks/live-save-file.ts`
   (2 of 191 checks fail before); the fact is in `doc/PROVEN_FACTS.md`. **Left:** CSBWin
   stamps `lastTime` for every mouse event, clicks included — C21.
 - ✅ **The key queue holds two keys, not three.** `CSBUI.cpp:154-156` is a 3-slot ring that
   refuses a key when `next == keyQueueStart` (`:1152-1160`), and the mouse queue each key
   moves on to at once is too: `TAG0196da` refuses a key when `MouseQEnd + 2 ==
   MouseQStart` (`CSBCode.cpp:8526-8530`). `Game.enqueueMovement` now lets two in.
-  Evidence: `tools/dump-party-collision.ts` case 9 (1 of 39 checks fails before).
+  Evidence: `tools/checks/party-collision.ts` case 9 (1 of 39 checks fails before).
   **Left:** CSBWin's mouse queue also carries clicks — C21. **Corrected by C21:** the
   mouse queue is 8 long, not 3 (`Data.h:1528` leaves `NoKeyQue` undefined, so `:1530` is
   the dead branch), and the key queue in front is emptied one key per message, so
@@ -2858,7 +2858,7 @@ unless said otherwise.
 - ✅ **`DiscardAllInput()` on a level change** (`:633`, after `LoadPartyLevel`): stairs, a
   pit or a teleporter to another level also throw away queued input. The port loads the
   level on arrival, so `Game.loadPartyLevelIfChanged` notes the change and `gameTick`
-  discards at its top, where CSBWin does. Evidence: `tools/dump-party-collision.ts` case
+  discards at its top, where CSBWin does. Evidence: `tools/checks/party-collision.ts` case
   10 (1 of 43 checks fails before); the fact is in `doc/PROVEN_FACTS.md`. Found on the
   way: a level change made *inside* `ProcessTimers` is loaded at the next tick, not at
   once — C20.
@@ -2867,7 +2867,7 @@ unless said otherwise.
   `RoomType.EMPTY` (7). Neither `dungeon.dat` nor any of the fourteen saves has a type-7
   cell, so nothing loaded changes. `MovementSystem.handleMovement` now computes `D5W` as
   CSBWin does, and `isWalkable` (its only caller) is gone. Evidence:
-  `tools/dump-party-collision.ts` case 11 (1 of 45 checks fails before). Found on the way:
+  `tools/checks/party-collision.ts` case 11 (1 of 45 checks fails before). Found on the way:
   D5.
 - 🚫 `CallPartyMoveFilter` (`:8206`) is a DSA filter — G2's kind, and no loaded dungeon
   defines one. Its `PM_SETDELAY` / `PM_ADDDELAY` arms (`:8209-8215`, `:8423-8433`) are
@@ -2883,7 +2883,7 @@ was never drawn. The cell under the party is now a tiling of the whole viewport
 (`d.Word2530`), not a 96×30 box. One assumption remains, recorded in the code and in
 `doc/PROVEN_FACTS.md`: C++ does not fix the order of `TAG008c98`'s two random arguments,
 and the port draws them right to left. The graphics are 48×31, not 48×32; CSBWin pads the
-missing row, and the tiling never reaches it. Evidence: `tools/dump-cloud-draw.ts`
+missing row, and the tiling never reaches it. Evidence: `tools/checks/cloud-draw.ts`
 sections 4-7 (47 of 90 checks fail before). No golden frame shows a cloud; they all
 still pass.
 
@@ -2908,7 +2908,7 @@ Found while porting C6's placement block; nothing here is fixed. All in
   `d.Byte5712`, and draws it with `TAG008c98` at `STRandom0_3() + 87`, `STRandom() & 63` —
   two more viewport-stream draws. The port blits `351 + typeIndex` into a fixed rectangle.
 
-Extend `tools/dump-cloud-draw.ts`, which already stubs the tables it needs.
+Extend `tools/checks/cloud-draw.ts`, which already stubs the tables it needs.
 
 </details>
 
@@ -2920,7 +2920,7 @@ findCellSource` / `findCellDestination` lift and set down through it and, for a 
 through `MonsterSystem.moveMonster` (its monster branch), with `groupIndex` reset to
 `0xd8` / `0xff` off the party's level (`MoveObject.cpp:504-521`) and a same-level monster
 moved square to square (`:539-571`). The pads' `unchangedRoom` is now "the party stands
-here", not "source is destination". Evidence: `tools/dump-dsa-move.ts` sections 4-8 (8 of
+here", not "source is destination". Evidence: `tools/checks/dsa-move.ts` sections 4-8 (8 of
 26 checks fail before); the fact is in `doc/PROVEN_FACTS.md`. Found on the way: C22, C23.
 
 <details><summary>original entry</summary>
@@ -2936,7 +2936,7 @@ monster moved within the party's level keeps its state: it is not lifted at the 
 (`removeObjectFromCell`, `addObjectToCell`) with only the actuator triggers, and have no
 monster arm. The port's equivalent of `MoveObject`'s cell-effect loop is
 `TimerSystem.resolveCellEffects`. Found while paying C8; no dungeon here has a DSA, so a
-`tools/` scenario has to build one (`tools/dump-dsa-move.ts` shows how).
+`tools/` scenario has to build one (`tools/checks/dsa-move.ts` shows how).
 
 </details>
 
@@ -2953,10 +2953,10 @@ image writer declares (`MonsterSystem`, `MonsterDamage` and the bones never bump
 header). `AllocateIndirectIndex` needed nothing: the port has no live indirect index, and
 the save writer numbers its own (see `doc/PROVEN_FACTS.md`, "An RN in block 10 or block 13
 cannot be byte-identical"). C8's deferred deletes are now observable:
-`tools/dump-dsa-delete.ts` shows a condemned record keeps its link for the rest of the run,
+`tools/checks/dsa-delete.ts` shows a condemned record keeps its link for the rest of the run,
 so nothing can take it. ⚠️ At 1024 records the allocator returns `null`, where CSBWin
 calls `MakeMoreRoomInDB` (`Character.cpp:183`) — unported, and unreachable in the shipped
-dungeons. Evidence: `tools/dump-db-reuse.ts` (7 of 11 checks fail before; the first arrow
+dungeons. Evidence: `tools/checks/db-reuse.ts` (7 of 11 checks fail before; the first arrow
 `dungeon.dat` makes is weapon 105, not 107); the fact is in `doc/PROVEN_FACTS.md`.
 
 <details><summary>original entry</summary>
@@ -2978,7 +2978,7 @@ allocator through it.
 
 **Paid in `7bfa5f6`.** `TimerSystem.wiggleObject` now retargets every `TT_25` / `TT_24`
 naming a moved cloud (corner ignored, as CSBWin's `RN` compare does) to the new square,
-level and placed ID (`Timer.cpp:2491-2510`). Evidence: `tools/dump-wiggle-cloud.ts` (2 of 12
+level and placed ID (`Timer.cpp:2491-2510`). Evidence: `tools/checks/wiggle-cloud.ts` (2 of 12
 checks fail before); the fact is in `doc/PROVEN_FACTS.md`. Found on the way: C18.
 
 <details><summary>original entry</summary>
@@ -3002,7 +3002,7 @@ findCellDestination` is the pattern.
 every `TT_25` does, but `processExpireObject` read `timerWord8` — 0 on a live timer — so the
 cage stood forever and `DeleteDBEntry(0)` freed door record 0, cutting that cell's chain
 after the door. Only a cage restored from a save worked: `restoreTimerQueue` fills both.
-`processExpireObject` reads `object` now. Evidence: `tools/dump-clouds.ts` section 6 (3 of
+`processExpireObject` reads `object` now. Evidence: `tools/checks/clouds.ts` section 6 (3 of
 27 checks fail before).
 
 ##### C19 ✅ `CastSpell` under a spell filter's overrides
@@ -3010,14 +3010,14 @@ after the door. Only a cage restored from a save worked: `restoreTimerQueue` fil
 **Paid in `2a5761e`.** `Game.castSpell` handles the filter's `action` first — its message
 prints for a dead caster, and an action with no message (8 and up) now casts instead of
 aborting — then takes the difficulty from the spell's own `skillRequired` and the
-`missileType` from the filter. Evidence: `tools/dump-cast-spell.ts`, new (5 of 8 checks
+`missileType` from the filter. Evidence: `tools/checks/cast-spell.ts`, new (5 of 8 checks
 fail before); the fact is in `doc/PROVEN_FACTS.md`.
 
 <details><summary>original entry</summary>
 
 Found re-reading `CastSpell` (`doc/CSBwin-src/Magic.cpp:1092`) for C10. All three need a DSA
 spell filter (`DsaSystem.processSpellFilter`) to show, and no dungeon here defines one, so a
-`tools/` scenario has to build it (`tools/dump-dsa-move.ts` shows how) or call
+`tools/` scenario has to build it (`tools/checks/dsa-move.ts` shows how) or call
 `Game.castSpell` with the parameters directly.
 
 - **The difficulty uses the spell's own skill.** `D4W = pSpell->skillRequired + spellPower`
@@ -3039,7 +3039,7 @@ spell filter (`DsaSystem.processSpellFilter`) to show, and no dungeon here defin
 `loadNewPartyLevel()` (`tag0006a4`: load, discard) at the top, then `processTimers` again
 for as long as a pass changed level. The port resolves the pit/teleporter chain when the
 party moves, so the `MoveObject(RNnul, -1, 0, x, y)` placement has nothing left to do.
-Evidence: `tools/dump-party-collision.ts` case 12, new: a `TT_PIT` opens under a party
+Evidence: `tools/checks/party-collision.ts` case 12, new: a `TT_PIT` opens under a party
 with a turn queued. Before the fix, 3 of its 4 checks failed, and the turn ran on the new
 level. The fact is in `doc/PROVEN_FACTS.md`.
 
@@ -3053,7 +3053,7 @@ y)`, input discarded, and `ProcessTimers` run again, all in the same tick (`:625
 `Game.gameTick` calls `loadPartyLevelIfChanged` only before `processTimers`, so such a level
 is loaded, and its input discarded, a tick late; a turn or step queued in between runs on
 the new level first. Evidence: a `tools/` scenario with a pit timer under a party that has
-a turn queued (`tools/dump-party-collision.ts` case 10 is the pattern).
+a turn queued (`tools/checks/party-collision.ts` case 10 is the pattern).
 
 </details>
 
@@ -3080,7 +3080,7 @@ mouse queue, a ring of `MOUSEQLEN` entries, and it holds keys and clicks alike.
   *Regression:* the move dropped the old `isWallDecorationHit(…) && handleWallClick()`
   fall-through. An alcove's wall decoration then swallowed every pickup from the alcove.
   Fixed by porting CSBWin's button order, objects before the wall
-  (`resolveEmptyHandedViewportClick`, `tools/dump-viewport-click.ts`).
+  (`resolveEmptyHandedViewportClick`, `tools/checks/viewport-click.ts`).
 - **The on-screen arrows (buttons 1-6).** They were queued but dropped; they now work.
 - **Removed.** `ui.mouseQueue` and the renderer's `processMouseQueue` are gone.
 
@@ -3091,9 +3091,9 @@ Still direct, and deliberately so:
 
 **Evidence:**
 
-- `tools/dump-mouse-queue.ts` is new, with 15 checks. It crashes before the fix, which
+- `tools/checks/mouse-queue.ts` is new, with 15 checks. It crashes before the fix, which
   had no queue API.
-- `tools/dump-party-collision.ts` case 9 now expects seven keys.
+- `tools/checks/party-collision.ts` case 9 now expects seven keys.
 - `npm test -- --frames` passes. The frames click through the queue.
 - Probed live: the forward and turn-left arrows move the party.
 
@@ -3120,7 +3120,7 @@ save or `tools/` scenario depends on it yet.
 before the 140 branch while `ui.pressingEye` is set (`Mouse.cpp:1818-1819`). The port
 has no pressed mouth, so only the eye is tested.
 
-Evidence: `tools/dump-mouse-queue.ts` case 8 queues 71 and then 140, once without a
+Evidence: `tools/checks/mouse-queue.ts` case 8 queues 71 and then 140, once without a
 button-up between them and once with one. Before the fix, 1 of 17 checks fails.
 
 <details><summary>original entry</summary>
@@ -3150,9 +3150,9 @@ as in CSBWin (`:3292-3331`, `:3370-3393`), so a group that goes into abeyance re
 pad. The AI-timer retarget left `moveMonster`: CSBWin's AI re-aims only `timer_70`
 (`Monster.cpp:1715`, `:2109`, `:2444`, `:2912`), which `MonsterAI` already did, and the
 DSA's re-aim of the rest (`MoveObject.cpp:539-571`) now lives in `DsaSystem.
-findCellDestination`. Evidence: `tools/dump-monster-pad.ts`, new, on a real type-1 pad
-(6 of 12 checks fail before); `tools/dump-monster-move.ts` case 1 now expects the timers to
-stay; `tools/dump-dsa-move.ts` section 6 still passes. The fact is in
+findCellDestination`. Evidence: `tools/checks/monster-pad.ts`, new, on a real type-1 pad
+(6 of 12 checks fail before); `tools/checks/monster-move.ts` case 1 now expects the timers to
+stay; `tools/checks/dsa-move.ts` section 6 still passes. The fact is in
 `doc/PROVEN_FACTS.md`, and the "must retarget" entry there is corrected. Found on the way:
 C24.
 
@@ -3168,7 +3168,7 @@ the new square whenever its `ITEM16` did not change — which is what the *DSA* 
 it too, where CSBWin's AI (`Monster.cpp:1715`, `:2109`, `:2444`, `:2912`) leaves the other
 timers behind. The DSA path now relies on it (C15); moving the retarget out means giving
 `DsaSystem.findCellDestination` its own. Needs a `tools/` scenario with a pad under a
-monster's path (`tools/dump-dsa-move.ts` sections 6-8 build a group). Size M.
+monster's path (`tools/checks/dsa-move.ts` sections 6-8 build a group). Size M.
 
 </details>
 
@@ -3180,28 +3180,28 @@ through `MoveObject` (`doc/CSBwin-src/Code11f52.cpp:2831`) now goes through
 
 - **`298d869`.** `TimerSystem.wiggleEverything` (`WiggleEverything`, `Timer.cpp:2428-2512`)
   moves each object through `moveObject`, walking the chain as CSBWin does, and re-aims a
-  missile's timer from what `moveObject` reports. Evidence: `tools/dump-wiggle-objects.ts`
+  missile's timer from what `moveObject` reports. Evidence: `tools/checks/wiggle-objects.ts`
   (4 of 9 checks fail before).
 - **`42ccf79`.** It moves the first monster through `moveMonster`, which gained the
-  unchanged-room return (`Code11f52.cpp:3218-3248`). Evidence: `tools/dump-wiggle-monster.ts`
+  unchanged-room return (`Code11f52.cpp:3218-3248`). Evidence: `tools/checks/wiggle-monster.ts`
   (5 of 9 fail before).
 - **`68a21b5`.** `Game.dropObjectFromCursor` is `moveObject(obj, -1, 0, x, y)`
   (`Mouse.cpp:882-890`) and `TimerSystem.dropMissileObject` is `moveObject(obj, -2, 0, x, y)`
   (`Timer.cpp:151-159`). Both had placed with `unchangedRoom` false where `MoveObject` passes
   "the party stands here" (`:3468-3483`), and the cursor drop had turned the item's corner on
   a relative teleporter although `oldX == -1` (`:3035-3041`). `resolveDroppedObjectPosition`
-  is gone. Evidence: `tools/dump-drop-move-object.ts`, new (3 of 8 fail before).
+  is gone. Evidence: `tools/checks/drop-move-object.ts`, new (3 of 8 fail before).
 - **`e1cf787`.** `MonsterDamage.deleteMonster` lifts the group with `moveMonster(obj, x, y,
   -1, 0)` (`:1038`, a new `moveMonster` hook), and `moveMonster` has the `newX < 0` path:
   `CheckMoveFromMissile` (which finds the cleared hit points and returns at once,
   `:2593-2596`), the lift through `PlaceOrRemoveObjectInRoom` or, levitating,
   `RemoveObjectFromRoom`, then `return 0` (`:3292-3332`). So a group killed on a pad releases
-  it. Evidence: `tools/dump-monster-pad.ts` section 6 (1 of 4 fails before).
+  it. Evidence: `tools/checks/monster-pad.ts` section 6 (1 of 4 fails before).
 - **`9152c0b`.** `resolveCellEffects` has the stairs arm (`:3143-3166`): a monster or an
   object, not the party or a missile, goes one level down unless bit 2 says up, then one
   square out through `ExitStairsDirection`, its corner turned to face the stairs; the loop
   goes on from there. The `oldX != -1` teleporter rule moved into the loop, since the stairs
-  turn a corner whatever `oldX` is. Evidence: `tools/dump-stairs-move.ts`, new (5 of 6 fail
+  turn a corner whatever `oldX` is. Evidence: `tools/checks/stairs-move.ts`, new (5 of 6 fail
   before).
 
 The facts are in `doc/PROVEN_FACTS.md`. Found on the way: C25.
@@ -3233,9 +3233,9 @@ the attach is `code++` (`:3411`), and `moveMonster` no longer writes `uByte10/11
 drops dead members' remains where it landed (`TAG00b522`, `:3138`), and a fatal fall or a
 forbidden level deletes the group after the loop (`:3182-3211`); a chained teleport reads
 the attached level's `ITEM16` (`:3023`). `DamageMonsterGroup` now empties the deferred
-droppings first (`:1368`). Evidence: `tools/dump-monster-move-code.ts`, new (13 of 17
-checks fail before); `tools/dump-monster-move.ts` case 1 (2 of 18 fail before);
-`tools/watch-monsters.ts` now finds groups on the map instead of in `uByte10/11`; the other
+droppings first (`:1368`). Evidence: `tools/checks/monster-move-code.ts`, new (13 of 17
+checks fail before); `tools/checks/monster-move.ts` case 1 (2 of 18 fail before);
+`tools/checks/watch-monsters.ts` now finds groups on the map instead of in `uByte10/11`; the other
 tools that made a group get it through `tools/lib/createMonster.ts`. (The new tool joined
 `tools/run-checks.mjs`'s list only in `42ccf79`: the runner has no discovery.) The facts are in
 `doc/PROVEN_FACTS.md`, and the older return-value entry there is corrected. Found on the
@@ -3268,7 +3268,7 @@ Found paying C22. `MoveObject`'s monster branch returns `LOCAL_14`
   teleport instead (`TimerSystem.ts`, `blocked`), leaving the group on the teleporter.
 
 Each is small; together they are one pass over `moveMonster` and its three `MonsterAI`
-callers. Extend `tools/dump-monster-pad.ts` or `tools/dump-monster-move.ts`. Size M.
+callers. Extend `tools/checks/monster-pad.ts` or `tools/checks/monster-move.ts`. Size M.
 
 </details>
 
@@ -3280,7 +3280,7 @@ array and the `weaponHand` / `shieldHand` mirrors but not `quiver`, and
 reads null — so after death the inventory still showed whatever had been in slot 8,
 though it now lay on the floor. CSBWin's `DropAllPossessions` empties all thirty
 (`doc/CSBwin-src/Character.cpp:2502-2523`). The fix clears the mirror; D1 then deletes
-it. Evidence: `tools/dump-champion-death.ts` arms slot 8 too and reads every slot back
+it. Evidence: `tools/checks/champion-death.ts` arms slot 8 too and reads every slot back
 through the UI's reader (3 of 41 checks fail before).
 
 ##### C28 ✅ `DropAllPossessions` is not CSBWin's
@@ -3292,7 +3292,7 @@ sets it down with `timerSystem.moveObject(obj, -1, 0, partyX, partyY)`. `Game` t
 the table was not handed in, rather than dropping nothing; eight tools that kill a
 champion now pass it. The drop is only as faithful as `removeCharacterPossession`, which
 is a bare slot clear — C30. The table and the order are in `doc/PROVEN_FACTS.md`.
-Evidence: `tools/dump-champion-death.ts` section 7 — `DropOrder` is a permutation of
+Evidence: `tools/checks/champion-death.ts` section 7 — `DropOrder` is a permutation of
 0-29 (the canary), the chain lists the objects in `DropOrder` order, and a possession
 dropped over an open pit falls through it (2 of 45 checks fail before).
 
@@ -3306,7 +3306,7 @@ drop presses pads and falls through pits like any cursor drop. `Game.dropAllPoss
 walks slots 0-29 in array order, writes the array directly, and splices each object in
 with `addObjectToCell`. Visible as the stacking order of a dead champion's belongings, and
 on a pad or a pit. `DropOrder` must come from the game data or CSBWin, not be guessed.
-Extend `tools/dump-champion-death.ts`. Size S-M.
+Extend `tools/checks/champion-death.ts`. Size S-M.
 
 </details>
 
@@ -3319,7 +3319,7 @@ through `encode` as 0, `RNempty`. CSBWin writes `d.objectInHand.ConvertToInteger
 anything that is not `RNnul` (`:2966-2973`), so a file this port wrote with an empty
 cursor would have loaded in CSBWin with `RNempty` in hand. Every committed save with an
 empty hand holds `0xffff`. The port's own reader accepted 0 as empty, which is why no
-round trip caught it. Evidence: `tools/dump-live-save-file.ts` now reads the written word
+round trip caught it. Evidence: `tools/checks/live-save-file.ts` now reads the written word
 back (2 of 193 checks fail before). The fact is in `doc/PROVEN_FACTS.md`.
 
 ##### C30 ✅ `removeCharacterPossession` is a bare slot clear
@@ -3333,7 +3333,7 @@ So a champion who dies wearing an Illumulet no longer leaves the party lit, and 
 shot or dropped torch no longer burns on the floor. The palette, hands, backpack redraw,
 `charFlags` and `load` have no counterpart (derived every frame, or re-summed). Left out
 and recorded in C34: `AdjustStatsForItemCarried` (C32), `TAG01b1c0` and `RepackChest`
-(both read UI state). Evidence: `tools/dump-champion-death.ts` section 8 kills one
+(both read UI state). Evidence: `tools/checks/champion-death.ts` section 8 kills one
 champion wearing an Illumulet with a lit torch and an open scroll in hand, and one
 wearing a Jewel Symal (5 of 56 checks fail before; the weapon and misc types are found
 through `ObjDesc`, and come out as DM's torch 2, Jewel Symal 2, Illumulet 3).
@@ -3358,14 +3358,14 @@ kills a champion wearing an Illumulet and holding a lit torch.
 them down through a new required `moveObject` hook (`TimerSystem.moveObject`), then
 registers the expool record with the same RN, as CSBWin does. The old path deleted the
 record when `addObjectToCell` failed; CSBWin has no such branch. Evidence:
-`tools/dump-champion-death.ts` section 7 — dying over an open pit, no bones stay on the pit,
+`tools/checks/champion-death.ts` section 7 — dying over an open pit, no bones stay on the pit,
 they land on the level below, still paired in the expool and in the champion's corner
 (2 of 49 checks fail before).
 
 Found paying C28. `KillCharacter` sets the bones down with `MoveObject(objD4, -1, 0,
 d.partyX, d.partyY)` (`doc/CSBwin-src/Character.cpp:2641-2650`), like the possessions,
 so over an open pit they fall. `MonsterAttack.killCharacter` splices them in with
-`addObjectToCell`. `tools/dump-champion-death.ts` section 7 already stands the party on
+`addObjectToCell`. `tools/checks/champion-death.ts` section 7 already stands the party on
 an open pit; assert where the bones end up, and check the expool record still pairs
 them.
 
@@ -3385,7 +3385,7 @@ CSBWin save nor the port's own needs anything on load and `RUNTIME_SAVE_VERSION`
 unchanged. A port save written *before* this commit holds unadjusted attributes: a
 champion recruited then with NABI's Staff or BORIS's Rabbit's Foot loses the bonus when
 the object comes off, once. Not ported: `SetCursed`, whose only caller is the unported
-`STKOP_SetCurse` (G1). Evidence: `tools/dump-item-bonuses.ts` — every row of the table
+`STKOP_SetCurse` (G1). Evidence: `tools/checks/item-bonuses.ts` — every row of the table
 against the real objects (the names in graphic `0x22c` are the canary, five of them
 DM's names for CSB's), the places a row does not apply, curses and the wrapped Luck
 minimum, and the four writers (3 of 99 checks fail with the writers stashed, 1 of 100 for
@@ -3479,7 +3479,7 @@ construction order stops mattering. `timer.moveObject` calls
 hook objects between subsystems (`TimerHooks`' `onDsaTimer*`, `damageMonster`,
 `onMonsterAI`…; `MonsterSystemHooks`; `AttackSystem`'s `hooks`). The five `queueSound`
 lambdas become `ctx.sounds.queueSound`. A call through the instance also keeps the tools'
-interception working: `dump-missile-monster` replaces `monsterDamage.damageMonster` on the
+interception working: `checks/missile-monster` replaces `monsterDamage.damageMonster` on the
 instance, and a direct `ctx.systems.monsterDamage.damageMonster(…)` still finds the
 replacement at call time. Only the calls that leave the engine stay callbacks, gathered in
 one `GameHost` the host passes to `Game`: `playSound`, `trace`, and the engine→UI notices
@@ -3525,7 +3525,7 @@ one builder; `main.ts` uses it, and so do the 44 tools, through `tools/lib/game.
 (`cursorFilter`, `messages`, `playSound`) and the tools' `timerHooks` / `monsterHooks`.
 **No tool depended on a table it had left out**: every tool's full output was diffed
 before and after, and the only differences were the five tools that vary from run to run
-anyway (recorded as F4), plus the graphics loader's log lines in `dump-viewport-click`,
+anyway (recorded as F4), plus the graphics loader's log lines in `checks/viewport-click`,
 which now loads graphics. Evidence: `npm test -- --frames`.
 
 **E1b ✅ (`a32d3d6`, `3c9d48f`, `9a49f22`, `eb10975`).** `src/engine/GameContext.ts`:
@@ -3547,7 +3547,7 @@ subsystem up alone use `newContext(data, graphics, parts)`. Behaviour-neutral: e
 deterministic tool's output byte-identical, frames identical, the author's three runtime
 saves load and play (no `RUNTIME_SAVE_VERSION` change: `GameState` is not saved as such,
 and `RuntimeSaveState`'s `gameWon` goes through the accessor). One tool had to change how
-it worked: `dump-missile-door` rewrote `TimerSystem`'s private table bag through a cast,
+it worked: `checks/missile-door` rewrote `TimerSystem`'s private table bag through a cast,
 and now builds its game over a copy of the tables with its own `doorCharacteristics`.
 
 *What E1c inherits.* Still second constructor arguments, for `ctx.systems` to retire:
@@ -3596,10 +3596,10 @@ wired went with their dead branches, each now an explicit default with a pointer
 method ignored (`timer` on the AI calls, the missile's position and direction on
 `applyMissileDamageToParty`) went too, and with them `processMissileEncounter`'s unused
 `direction`. `AttackSystem` reads `CHARDESC::Possession` itself. Behaviour-neutral: every
-tool's full output byte-identical after each commit, but for `dump-save-menu`'s payload
+tool's full output byte-identical after each commit, but for `checks/save-menu`'s payload
 size, which varies by one byte from run to run on its own (3 of 16 runs on an unchanged
 tree); frames identical. Two tools that stand a subsystem up alone now fill
-`ctx.systems`: `dump-local-action` (a real `DsaSystem`), `dump-monster-damage` (stand-ins
+`ctx.systems`: `checks/local-action` (a real `DsaSystem`), `checks/monster-damage` (stand-ins
 for the timer and actuator systems — its dead group is now lifted through
 `MonsterSystem.moveMonster`, as in a `Game`, where the missing hook used to unlink it
 bare; the output is unchanged).
@@ -3622,7 +3622,7 @@ and `newGame(data, graphics, host)` in `tools/lib/game.ts`. Gone: `GameOptions`,
 `MonsterDamageHooks`, `MonsterAiHooks`, `AttackSystemHooks`), `ActuatorSystem.getMessages`,
 `Game.onSleepChanged` and its listener list, the assignable `Game.openReincarnateScreen`.
 `SoundQueue` takes the host. Every subsystem now takes `ctx` and nothing else.
-`dump-monster-ai` passes its trace as the host's; `dump-sleep` and `dump-hall-of-champions`
+`checks/monster-ai` passes its trace as the host's; `checks/sleep` and `checks/hall-of-champions`
 pass `sleepChanged` / `openReincarnateScreen` at construction instead of registering them
 after it. Behaviour-neutral: every tool's full output byte-identical, frames identical. The
 "notices C34 needs" (close the attack menu, repack the open chest) are not added: C34 adds
@@ -3652,7 +3652,7 @@ system that ports its CSBWin file, even where the table above grouped it by topi
 (`MagicShield` is `Attack.cpp`'s, `DisableCharacterAction` and `AdjustSkills` are
 `Magic.cpp`'s). A `Game` method that only adapted a call for one caller moves into that
 caller. Each commit behaviour-neutral: every tool's full output byte-identical (but for
-`dump-save-menu`'s known one-byte wobble), frames identical.
+`checks/save-menu`'s known one-byte wobble), frames identical.
 
 | Commit | Group | Left `GameMethods` |
 | --- | --- | --- |
@@ -3788,7 +3788,7 @@ before moving, and decide the two open questions first:
   map preview and the tools).
 
 **Done (2026-09-26): `Game` less the loop.** Seven commits, each byte-identical on every
-tool's full output (but for `dump-save-menu`'s one-byte wobble), frames identical, and
+tool's full output (but for `checks/save-menu`'s one-byte wobble), frames identical, and
 the author's five runtime saves hash the same after load and after 600 ticks as on
 `b143003`. `RUNTIME_SAVE_VERSION` stays 10: the payload's shape did not change.
 
@@ -3812,20 +3812,20 @@ facades. Not moved, knowingly: `setPartyState` (two lines, the map preview's) an
 
 ##### F4 ✅ Four suite tools draw from an unseeded stream
 
-**Paid in `dccb6a9`.** `dump-monster-ai`, `dump-throwing` and `watch-monsters` call
-`game.setRandomSeed(0x12345678)`; `dump-attributes` built no `Game` at all — its `levelUp`
+**Paid in `dccb6a9`.** `checks/monster-ai`, `checks/throwing` and `checks/watch-monsters` call
+`game.setRandomSeed(0x12345678)`; `checks/attributes` built no `Game` at all — its `levelUp`
 calls fell back to a fresh unseeded `CsbRandom` each — and now shares one seeded stream.
 Each gives the same output on every run, and each still exercises what it asserts
-(`dump-attributes` sees six raises, 45 checks; `watch-monsters` 16 groups move).
-`dump-save-menu` still varies, by the save date. Found on the way, and left: `levelUp`'s
+(`checks/attributes` sees six raises, 45 checks; `checks/watch-monsters` 16 groups move).
+`checks/save-menu` still varies, by the save date. Found on the way, and left: `levelUp`'s
 `random` is optional and falls back to an unseeded stream, the F1 shape.
 
 
 *(Found paying E1a, 2026-09-25, by diffing every tool's output before and after.)*
-`dump-attributes`, `dump-monster-ai`, `dump-throwing` (its `Game`; its `CharacterStats`
-is seeded) and `watch-monsters` build a `Game` without `setRandomSeed`, so their output
-changes from run to run: `dump-attributes` even runs 47, 49 or 51 checks. They pass
+`checks/attributes`, `checks/monster-ai`, `checks/throwing` (its `Game`; its `CharacterStats`
+is seeded) and `checks/watch-monsters` build a `Game` without `setRandomSeed`, so their output
+changes from run to run: `checks/attributes` even runs 47, 49 or 51 checks. They pass
 because their assertions hold for any seed, but a run cannot be compared with the last one,
-which is what a refactor needs. (`dump-save-menu` varies too, by a byte of payload size;
+which is what a refactor needs. (`checks/save-menu` varies too, by a byte of payload size;
 that is the save date, not the random stream.) Fix: seed each, as the skill says
 (`game.setRandomSeed(0x12345678)`), then check the assertions still bite.

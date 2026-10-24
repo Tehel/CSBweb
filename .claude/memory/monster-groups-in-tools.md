@@ -7,7 +7,7 @@ metadata:
 
 **Where the groups are.** `csbgame7.dat` has no group of more than one monster on the
 party's level (6): only two lone type-9s, as wide as their square. Its groups of several
-are on levels 5 and 7; `tools/dump-dsa-monsters.ts` names them (`THREE`, `TWO`, `FOUR`,
+are on levels 5 and 7; `tools/checks/dsa-monsters.ts` names them (`THREE`, `TWO`, `FOUR`,
 and `WIDE_PAIR` on level 8). The other fixture saves have no monster on the party's level
 at all.
 
@@ -26,6 +26,6 @@ corners byte in that field (5, 6, …), so it gets an unrelated `ITEM16` back. T
 `I_MonsterStore`, and the DSA's monster move filter, and finding it took a scan of every
 fixture.
 
-**How to apply:** start a monster tool from `dump-dsa-monsters.ts`'s positions and
+**How to apply:** start a monster tool from `checks/dsa-monsters.ts`'s positions and
 `partyOnto`. A level change in play goes through `loadNewPartyLevel` instead
 ([[two-step-level-change]]).

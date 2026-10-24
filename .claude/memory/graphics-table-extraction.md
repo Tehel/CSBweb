@@ -24,6 +24,6 @@ Six-word records like `MONSTERDESC` are big-endian; the `fixItem26`-style helper
 
 **How to apply:** find the field in `Data.h`, locate the matching skip or `ABS_*`
 neighbour, replace it with a read, then add the new table's region to
-`tools/dump-graphics-tables.ts`, which writes it back over the item at its `Data.h`
+`tools/checks/graphics-tables.ts`, which writes it back over the item at its `Data.h`
 offset (items `0x22e` so far; `PLAN.md` Phase 15 step 4 has the rest). A canary in a
 `tools/` dump still proves what the bytes *mean* (the `verification-tools` skill).

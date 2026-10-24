@@ -2,7 +2,7 @@
 
 Everything here is read out of `doc/CSBwin-src/` or dumped from `graphics.dat` with the
 port's own parser. Rectangles marked **(from data)** were printed by
-`tools/dump-save-menu.ts`, which asserts them on every run.
+`tools/checks/save-menu.ts`, which asserts them on every run.
 
 CSBWin has exactly two menu primitives: **`_DoMenu` draws**, **`_WaitForMenuSelect` runs
 the modal click loop**. Neither draws a button frame — the frames are painted into
@@ -231,7 +231,7 @@ of "the main loop is not running".
 Ten VBLs is **1/6 s at 60 Hz**, which is how long the port holds it. `drawMenuPress`
 (`src/renderer/ui/Menu.ts`) paints pass A alone for the first five, then pass A with pass B
 over it, so the save menu, which redraws the whole screen each frame, shows what CSBWin's
-screen holds. Evidence: `tools/dump-save-menu.ts`, "the press animation".
+screen holds. Evidence: `tools/checks/save-menu.ts`, "the press animation".
 
 
 ## Entering and leaving
@@ -298,9 +298,9 @@ while it is set `GameScreen.presentViewport` shades the three areas. The arrow i
 (`tag0207ccDrawing`, `handleClothingClick` and the feeding call it); while it is set
 `drawCursorItem` draws the arrow. Over any dialog (`UIState.dialog`), the settings, the
 map and the champions too, it draws the arrow whatever is in hand, as each takes the whole
-screen (`tools/dump-object-cursor.ts`). No inventory is drawn while the menu is up.
-Evidence: `tools/dump-save-menu.ts`, "the disk menu over an open chest";
-`tools/dump-sleep.ts` and `tools/dump-hall-of-champions.ts` for the other callers, the
+screen (`tools/checks/object-cursor.ts`). No inventory is drawn while the menu is up.
+Evidence: `tools/checks/save-menu.ts`, "the disk menu over an open chest";
+`tools/checks/sleep.ts` and `tools/checks/hall-of-champions.ts` for the other callers, the
 latter also for the candidate's object on the cursor.
 
 

@@ -1,6 +1,6 @@
 ---
 name: verification-tools
-description: Write a tools/ verification script to prove a CSBWin port is faithful. Use when porting engine behaviour that cannot be seen on screen — data tables, AI, damage, timers, movement — or when asked to test/verify/check ported logic. This project has no test framework; these scripts are how correctness is demonstrated.
+description: Write a tools/checks/ verification script to prove a CSBWin port is faithful. Use when porting engine behaviour that cannot be seen on screen — data tables, AI, damage, timers, movement — or when asked to test/verify/check ported logic. This project has no test framework; these scripts are how correctness is demonstrated.
 ---
 
 # Verification tools
@@ -28,7 +28,7 @@ a change works is `tsc` passing, there is no evidence.
 
 1. `tsc --noEmit` — the real gate. `vite build` proves nothing (esbuild strips types
    without checking them).
-2. **Every `tools/*.ts` that has assertions**, re-run. They are the regression suite.
+2. **Every `tools/checks/*.ts` that has assertions**, re-run. They are the regression suite.
    Adding a table or changing a shared record breaks them silently otherwise.
 3. `npm test -- --frames` adds `tools/check-frames.sh`: twenty live screen states
    compared pixel by pixel, as palette slots and the palettes they were shown through. It starts its own dev server and headless Chrome (reusing yours if
@@ -61,25 +61,27 @@ line that overwrote two earlier failures. A tool that cannot fail is not evidenc
 
 ## Shape
 
-Two naming conventions, both run with `npm test -- --only=<name>.ts [args]` once the tool
-is listed in `run-checks.mjs`: the runner checks the types first, prints the tool's whole
-output, and hands it the arguments. `npx tsx tools/<name>.ts` runs a tool with type errors
-in it, or in what it imports, as if they were not there.
+Every tool lives in `tools/checks/`, named for what it checks, and runs with
+`npm test -- --only=<name>.ts [args]` once it is listed in `run-checks.mjs`: the runner
+checks the types first, prints the tool's whole output, and hands it the arguments. An
+`--only` that is a tool's whole name picks that tool alone, so `room-text.ts` is not also
+`open-room-text.ts`. `npx tsx tools/checks/<name>.ts` runs a tool with type errors in it,
+or in what it imports, as if they were not there.
 
-- `dump-*.ts` — inspect and assert on a specific mechanism.
-- `watch-*.ts` — run the clock and report what emerged over time.
+- `<mechanism>.ts` — inspect and assert on a specific mechanism.
+- `watch-<scenario>.ts` — run the clock and report what emerged over time.
 
 ```ts
 /**
  * One paragraph: what is invisible without this, and what the reader should look for.
  *
- * Run: `npm test -- --only=dump-thing.ts [level]`
+ * Run: `npm test -- --only=thing.ts [level]`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 // …engine imports…
 
-import { check, finish } from './lib/check';
+import { check, finish } from '../lib/check';
 
 async function main(): Promise<void> {
   // 1. Load the real files. Never synthesise a dungeon.
@@ -156,7 +158,7 @@ seeded `random` in `parts`; set `ctx.state.tickCount` for the clock). Subsystems
 each other through `ctx.systems` (`DEBT.md` E1c), which such a context leaves empty: fill
 what the path under test reaches, with the real system or a stand-in
 (`ctx.systems.missileEncounter = standInOf<MissileEncounter>({ createDeathCloud: () => { clouds++; } })`,
-`dump-monster-damage.ts`). A missing one fails loudly on `undefined`, never silently.
+`checks/monster-damage.ts`). A missing one fails loudly on `undefined`, never silently.
 Any partial value is `standInOf<T>({ … })`'s (`tools/lib/standIn.ts`): a record, a
 drawing context, a dungeon with the three members a draw reaches. `tsc` checks each
 member given against `T`'s; an `as unknown as` checks nothing, and a renamed member then
@@ -173,7 +175,7 @@ measured nothing because of it (the armour test without the clothing tables;
 table goes into `GameTables` and `buildGameTables`, and every tool has it. A tool that
 needs a *different* table builds its game over a copy:
 `new Game(data, { ...gameTablesOf(graphics), doorCharacteristics: [...] })`
-(`dump-missile-door.ts`). A tool that reads the screen's tables (`UITables`,
+(`checks/missile-door.ts`). A tool that reads the screen's tables (`UITables`,
 `ObjectTables`, `ViewportTables`) takes them off its `UIState` if it has one, and from
 `graphicsTablesOf(graphics)` otherwise, the same extraction its `GameTables` came from,
 rather than calling an extractor itself. A champion's carry tables are the game's
@@ -183,7 +185,7 @@ mutate the shared set.
 **A `Game` plays over the `DungeonData` it is built on, in place.** A champion recruited
 empties their mirror in it, so a second game over the
 same `DungeonData` starts where the first left off. Load the file again for each game
-(`prisonGame`, `tools/dump-rise.ts`).
+(`prisonGame`, `tools/checks/rise.ts`).
 
 **Find a genuine save through `tools/lib/saves.ts`.** The CSBWin saves are in
 `tools/fixtures/`, beside the golden frames: seven made to order for a check (a party
@@ -197,7 +199,7 @@ valid save will do, and put a new save made for a check in `tools/fixtures/`.
 unseeded run is not a test, and it spoils the refactor check below (`DEBT.md` F4).
 
 **A refactor is proven by diffing every tool's whole output, not only the verdicts.**
-Before a behaviour-neutral change, capture `npx tsx tools/<t>.ts` for every tool in
+Before a behaviour-neutral change, capture `npx tsx tools/checks/<t>.ts` for every tool in
 `run-checks.mjs` into a scratch directory; after it, capture again and `cmp` file by file.
 A passing check can hide a changed number the check does not look at. Run a differing
 tool twice on the old tree (a `git worktree` of `HEAD` in the scratchpad, with
@@ -235,7 +237,7 @@ window legitimately observes nothing. Size the window from the slowest thing inv
 **A target that walks away.** `createMonster` arms the group's AI, so a few ticks of
 `processTimers` can move it out of the cell before your missile arrives — the scenario
 then silently tests nothing. Call `game.ctx.timers.deleteMonsterMovementTimers(x, y, level)`
-after placing it (`dump-missile-monster.ts`).
+after placing it (`checks/missile-monster.ts`).
 
 **A timer pass runs on the game's clock.** `processTimers()` takes no time: it is
 `ProcessTimers(void)` and reads `d.Time`, `ctx.state.tickCount`, as does everything that
@@ -255,7 +257,7 @@ only when it is taken, by the handlers' `translate`: a tool with an interface pa
 `searchMouseButtons`, and one without uses `ButtonsAt` (`tools/lib/clicks.ts`), which
 says what button a point is and queues the click there. Empty the queue with
 `discardAllInput()`, and set `game.lastInputTime`, public for the tools
-(`dump-mouse-queue.ts`, `dump-party-collision.ts` case 6). `lastInputTime == 0` disables the one-per-tick gate, as
+(`checks/mouse-queue.ts`, `checks/party-collision.ts` case 6). `lastInputTime == 0` disables the one-per-tick gate, as
 `lastTime == 0` does in CSBWin, so start the clock first. Every tick runs the monsters
 too, so do anything that needs a monster where you found it before the VBLs that tick,
 or step with `runVbl(game, 1)` so none is due.
@@ -267,7 +269,7 @@ draws in the tool would need the RNG state and proves less.
 
 **Find objects by name index, and canary the name.** To stand up "a Staff" or "an
 Illumulet", search the `ObjDesc` rows of the right category for the `OBJNI_*` CSBWin
-tests (`typeNamed` in `dump-item-bonuses.ts` / `dump-champion-death.ts`) — bound the
+tests (`typeNamed` in `checks/item-bonuses.ts` / `checks/champion-death.ts`) — bound the
 search to the category's own rows, or a weapon type runs into the clothing rows — and
 check `objectTables.objectNames[objNI]` spells what you meant. The Atari DM names are not
 always CSB's: Staff of Irra is STAFF OF MANAR, Cross of Neta SNAKE STAFF, Serpent Staff
@@ -279,14 +281,14 @@ THE CONDUIT, Side Splitter DELTA, Dragon Fang THE INQUISITOR.
 
 | Tool | Pattern it demonstrates |
 | --- | --- |
-| `dump-monster-tables.ts` | Extracted-table dump with a canary |
-| `dump-monster-activation.ts` | Lifecycle + cross-checking two structures agree |
-| `dump-monster-perception.ts` | Probing a predicate against map geometry |
-| `dump-monster-damage.ts` | Multi-case with named sub-cases and a pinned counter-case |
-| `dump-monster-move.ts` | Before/after state around one operation |
-| `dump-monster-ai.ts` | Driving the real timer queue; gate coverage |
-| `watch-monsters.ts` | Emergent behaviour over time, with a safety invariant |
-| `watch-monster-attacks.ts` | Whole-system outcome plus isolated formula probes |
-| `dump-monster-tables.ts` | Asserting the canary rather than only printing it |
-| `dump-missile-monster.ts` | Firing real missiles at a placed group; spying on engine calls |
-| `dump-party-collision.ts` | Stepping `Game.runFrame` at chosen times; queued input |
+| `checks/monster-tables.ts` | Extracted-table dump with a canary |
+| `checks/monster-activation.ts` | Lifecycle + cross-checking two structures agree |
+| `checks/monster-perception.ts` | Probing a predicate against map geometry |
+| `checks/monster-damage.ts` | Multi-case with named sub-cases and a pinned counter-case |
+| `checks/monster-move.ts` | Before/after state around one operation |
+| `checks/monster-ai.ts` | Driving the real timer queue; gate coverage |
+| `checks/watch-monsters.ts` | Emergent behaviour over time, with a safety invariant |
+| `checks/watch-monster-attacks.ts` | Whole-system outcome plus isolated formula probes |
+| `checks/monster-tables.ts` | Asserting the canary rather than only printing it |
+| `checks/missile-monster.ts` | Firing real missiles at a placed group; spying on engine calls |
+| `checks/party-collision.ts` | Stepping `Game.runFrame` at chosen times; queued input |

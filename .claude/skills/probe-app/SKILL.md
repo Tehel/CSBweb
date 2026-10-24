@@ -1,11 +1,11 @@
 ---
 name: probe-app
-description: Look at the running CSBweb app and read its live state — take a screenshot, click the canvas, evaluate an expression against the real game object. Use when a bug only shows on screen (a panel prints the wrong word, a click lands on the wrong champion, an object is in the chain but not drawn) and a headless tools/dump-*.ts therefore cannot see it.
+description: Look at the running CSBweb app and read its live state — take a screenshot, click the canvas, evaluate an expression against the real game object. Use when a bug only shows on screen (a panel prints the wrong word, a click lands on the wrong champion, an object is in the chain but not drawn) and a headless tools/checks/*.ts therefore cannot see it.
 ---
 
 # Probing the running app
 
-`tools/dump-*.ts` stand the engine up without the UI, so they cannot see anything that goes
+`tools/checks/*.ts` stand the engine up without the UI, so they cannot see anything that goes
 wrong *on screen*. `tools/probe-ui.mjs` drives the real page over the Chrome DevTools
 Protocol instead, through the `window.__probe` handle `src/main.ts` exposes.
 
@@ -58,7 +58,7 @@ open that champion's inventory); the default is mask 2. `doc/UI_MODULE_MAP.md` a
 ## What it is not
 
 Nothing here asserts, so nothing here is evidence. The probe tells you *what* is wrong on
-screen; once you know, reproduce it in a `tools/dump-*.ts` with an assertion that fails,
+screen; once you know, reproduce it in a `tools/checks/*.ts` with an assertion that fails,
 and fix it there — see the `playtest-bug` and `verification-tools` skills. A bug proved
 only by a screenshot has no regression test.
 
@@ -68,7 +68,7 @@ only by a screenshot has no regression test.
 (`vite.config.mts`), so no player's setting can reach it. The constant is true on the
 dev server, and in a build only with `CSBWEB_PROBE=1`, which `tools/check-image.sh` gives
 the image it checks the golden frames against. A deployed bundle has no handle
-(`tools/dump-build.ts` asserts it).
+(`tools/checks/build.ts` asserts it).
 
 Leaving a probe browser running does not disturb `tools/check-frames.sh` — it reloads and
 re-seeds the page itself. Verified: `npm test -- --frames` passes 34/34 with one up.

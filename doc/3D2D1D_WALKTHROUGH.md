@@ -6,7 +6,7 @@ just get through.
 
 This route was computed with a model of CSBWin's movement, built from its source (see
 `3D2D1D_ANALYSIS.md`), not by playing. It needs vertical moves and gravity, which the port and
-the 2019 `CSBwin.exe` the dungeon ships with both play. `tools/watch-3d2d1d-gravity.ts`
+the 2019 `CSBwin.exe` the dungeon ships with both play. `tools/checks/watch-3d2d1d-gravity.ts`
 plays its first two legs through the port's engine. `npx tsx tools/solve-3d2d1d.ts solve` recomputes the key blocks, and
 `npx tsx tools/solve-3d2d1d.ts replay` checks this file against the model.
 
