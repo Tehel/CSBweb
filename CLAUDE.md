@@ -84,7 +84,7 @@ npm run dev            # Vite dev server on :9000
 npm run build          # tsc && vite build, and the server's module (--ssr)
 npm test               # the gate: tsc + every asserting tool  (~75s, a worker per core)
 npm test -- --only=dsa,save  # tsc + the tools whose name holds any of these
-npm test -- --frames   # …and the golden frames               (~40s more)
+npm test -- --frames   # …and the golden frames               (~100s more)
 npm run fetch-csbwin-src  # doc/CSBwin-src/, the C++ reference (needs 7z)
 npm run fetch-gamefiles   # tools/fixtures/gamefiles/, the data sets the tests and the dev server read (needs 7z)
 npm start              # the deployed server, server/, over dist/
@@ -103,7 +103,7 @@ There is still **no test framework** (`PLAN.md` → "The evidence") — `npm tes
 - `tools/check-frames.sh` compares thirty live screen states against `tools/frames/` — the
   cheapest way to prove a renderer or UI change kept every pixel. It starts its own dev
   server and headless Chrome, so it needs no setup. It is
-  out of the default run only because it costs a browser and ~40s. Run it before any renderer or UI commit. A frame is
+  out of the default run only because it costs a browser and ~100s. Run it before any renderer or UI commit. A frame is
   the 320x200 screen as CSBWin draws it, its palette slots and the palettes they were shown
   through (`tools/lib/frames.mjs`), not the canvas's colours: a slot drawn for another of
   the same colour fails, and a baseline captured on one machine is checkable on another. The probe also asserts on the spot what
