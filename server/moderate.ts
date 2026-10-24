@@ -26,7 +26,7 @@
  *
  * The same route with a form edits a set's text and files (`edit.ts`). Deleting an
  * approved set, taking an approval back, and the order of the sets and the default are
- * left to a moderator's hands on the VPS (`doc/DEPLOYMENT.md` → "Moderating the sets").
+ * left to a moderator's hands on the server (`doc/DEPLOYMENT.md` → "Moderating the sets").
  *
  * A reject deletes the row first, so the set is offered to nobody before its folder goes;
  * a folder that will not go is logged and left, a folder no row names, which the next

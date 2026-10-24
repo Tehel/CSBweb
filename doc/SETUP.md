@@ -49,7 +49,7 @@ and `~/csbweb` as the stack's folder. Replace them with your own.
 7. **Let your login run Docker:** `sudo usermod -aG docker $USER`, then log out and back
    in. `docker ps` should answer without `sudo`.
 
-8. **Install SQLite's shell:** `sudo apt install sqlite3`. You use it to look at the
+8. Optional: **Install SQLite's shell:** `sudo apt install sqlite3`. You use it to look at the
    store by hand (step 23). The server itself needs nothing but Docker.
 
 9. **Check the disk space:** `df -h ~` should show at least 500 MB free. That covers the

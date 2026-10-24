@@ -1,4 +1,4 @@
-# The stack on the VPS. `utils/deploy.sh` copies this file to
+# The stack on the server. `utils/deploy.sh` copies this file to
 # `<DEPLOY_DIR>/` and loads the image beside it, so the folders are:
 #
 #   <DEPLOY_DIR>/            this file, and its `.env`: required, even empty, since it is
@@ -11,7 +11,7 @@
 #   <DEPLOY_DIR>/files/      the files shared by link, served under `files/`, put there by
 #                            hand; read-only in the container
 #
-# The VPS runs Compose v1, hence the `version` key.
+# Compose v1 needs the `version` key; v2 ignores it, with a warning.
 version: '3.8'
 services:
   csbweb:
@@ -25,7 +25,7 @@ services:
       - ./gamefiles:/data/gamefiles
       - ./stats:/data/stats
       - ./files:/data/files:ro
-    # On a VPS other projects share: what the container may take, and what it may do.
+    # On a server other projects may share: what the container may take, and what it may do.
     # The server writes only to the mounted /data/gamefiles and /data/stats, so the rest is
     # read-only; it needs no capability, its port being above 1024 and its folders its
     # uid's; and nothing in it gains a privilege. `tools/check-image.sh` runs the image so.

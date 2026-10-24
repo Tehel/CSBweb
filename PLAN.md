@@ -79,8 +79,8 @@ against CSBWin's own screenshots, and the extras (X). No dungeon the port plays 
   `csb`), one chosen before the boot by `?dungeon=<id>`, which the welcome page's PLAY
   and CONTINUE set; the manifest's `dmRules` gives
   a set without an Extended Features block DM's rules.
-- The deployed game, at `https://csbweb.looten.net/`: a Docker container on the author's
-  VPS, its server's statistics and their nightly backup (`doc/DEPLOYMENT.md`,
+- The deployed game, the reference instance at `https://csbweb.looten.net/`: a Docker
+  container on a VPS, its server's statistics and their nightly backup (`doc/DEPLOYMENT.md`,
   `doc/STATISTICS.md`).
 - The game's page holds nothing beside the canvas (`index.html`): the settings, the map
   and the champions are dialogs drawn in it (`DEBT.md` U). Without a known `?dungeon=`
@@ -141,4 +141,4 @@ notes of the phases closed up to 2026-09-26; for a phase closed later, its line 
 | 14 | Structural cleanup |
 | 15 | Verification: the test runner, the golden frames, the render probe, the table items round-tripped |
 | 16 | Title screen and dungeon entrance |
-| 17 | Deployment: the game on the author's VPS (`doc/DEPLOYMENT.md`, `doc/STATISTICS.md`) |
+| 17 | Deployment: the reference instance (`doc/DEPLOYMENT.md`, `doc/STATISTICS.md`) |

@@ -1,5 +1,5 @@
 /**
- * What the server tells the author's phone: each change to the sets, through the VPS's ntfy
+ * What the server tells the moderators' phones: each change to the sets, through an ntfy
  * (`doc/DEPLOYMENT.md` → "Notifications"). A set published (`publish.ts`), approved,
  * rejected, withdrawn, hidden or shown (`moderate.ts`), edited (`edit.ts`), or given or
  * relieved of a document (`documents.ts`) is one message of two lines:

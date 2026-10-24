@@ -16,6 +16,9 @@ Every FTL dungeon plays, and so do the fans' dungeons the welcome page lists. A 
 also add a dungeon of their own. Saves are CSBWin's own files, so a game moves between the
 two.
 
+Play it at <https://csbweb.looten.net/>, the reference instance, or set up your own with
+[doc/SETUP.md](doc/SETUP.md).
+
 ## Development
 
 ### Prerequisites

@@ -1,7 +1,7 @@
 /**
  * A snapshot of the store (`store.ts`), the statistics and the data sets' tables, taken
  * while the server keeps serving, and a copy of the folders players' sets were uploaded to
- * (`doc/DEPLOYMENT.md` → "Backups"). The VPS's cron runs it in the container:
+ * (`doc/DEPLOYMENT.md` → "Backups"). The server's cron runs it in the container:
  *
  *   docker-compose exec -T csbweb node --disable-warning=ExperimentalWarning server/backup.ts
  *

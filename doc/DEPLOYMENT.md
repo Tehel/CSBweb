@@ -1,4 +1,4 @@
-# Deployment: the game on the author's VPS
+# Deployment: the reference instance
 
 > **Deployment is done by hand, by the author.** This page is reference for the person at
 > the keyboard, not a runbook for an assistant to execute. A session's job ends at "built,
@@ -7,13 +7,12 @@
 
 `doc/SETUP.md` builds an instance like it from nothing, step by step.
 
-The game is served at `https://csbweb.looten.net/`, from a Docker container on the author's
-VPS, which serves other projects too. A small Node server (`server/`) serves the built page,
+The reference instance is served at `https://csbweb.looten.net/`, from a Docker container
+on a VPS that serves other projects too. A small Node server (`server/`) serves the built page,
 the game files and the statistics' API (`doc/STATISTICS.md`). There are no logins. The game
 files are mounted from the host, never part of the image.
 
-The setup follows the author's other projects on the same VPS (`linkedin-games/player`
-above all): a two-stage Node 24 Alpine image with no `node_modules`, a loopback-only port
+The stack is a two-stage Node 24 Alpine image with no `node_modules`, a loopback-only port
 behind the host's nginx, and a deploy by `docker save`, `scp` and `docker load`.
 
 ## What runs where
@@ -400,7 +399,7 @@ and does not offer them again.
 
 ## The files shared by link
 
-`files/` beside the compose file holds what the author shares with a link, and
+`files/` beside the compose file holds what the instance's maintainer shares with a link, and
 `https://csbweb.looten.net/files/<path>` downloads `files/<path>`, sub-folders included:
 
 ```bash
@@ -534,7 +533,7 @@ of its multi-platform index, so that a rebuild takes the same bytes:
   `.env` can reach it, so the commit comes in as the build argument `CSBWEB_BUILD`.
 - **The runtime stage** has no `node_modules`: `package.json` (for `"type": "module"`),
   `server/`, `src/data/DataSets.ts` and the built `dist/`, the server's module in it. It runs as `USER node`, uid
-  1000, the VPS's `ubuntu`, so the mounted `stats/` is writable in the container and
+  1000, the server's login user (`doc/SETUP.md` step 5), so the mounted `stats/` is writable in the container and
   readable over SSH. The exec form makes Node PID 1, which receives SIGTERM, and
   `--disable-warning=ExperimentalWarning` silences `node:sqlite`'s warning.
 
@@ -568,9 +567,9 @@ Moving it on moves all four at once. The digest is the index's, which
   `tools/check-image.sh` runs the image with the same, the probe's publish included.
 - `restart: unless-stopped`, a 10 s `stop_grace_period`, a healthcheck on `api/health`
   (busybox's `wget`), and `json-file` logs rotated at 3 × 10 MB.
-- `version: '3.8'`, for the VPS's Compose v1.
+- `version: '3.8'`, for Compose v1, which the reference instance runs; v2 ignores it, with a warning.
 
-**`.env` on the VPS** is the stack's, beside the compose file, and `deploy.sh` does not copy
+**`.env` on the server** is the stack's, beside the compose file, and `deploy.sh` does not copy
 it. Compose reads it twice over: for `${CSBWEB_PORT}` in the compose file, and as the
 container's `env_file`. So it must exist, even empty, or Compose refuses to start the
 stack; and every variable in it reaches the container's environment, where it overrides
@@ -593,7 +592,7 @@ DEPLOY_HOST=<user>@<host>
 DEPLOY_DIR=<the absolute path of ~/csbweb>
 ```
 
-The path must be absolute. A `~` would be expanded on the author's machine when bash reads
+The path must be absolute. A `~` would be expanded on the deploying machine when bash reads
 the file, and quoted in the remote command anyway.
 
 ## Deploying
@@ -616,11 +615,11 @@ user (so that uid 1000 can write them, where Docker would make a missing mount r
 `docker-compose down && docker-compose up -d`: `docker-compose` where the server has it, else
 Compose v2's `docker compose`, which takes the same file and warns that `version` is obsolete.
 
-**Why `down && up -d`:** the VPS runs `docker-compose` 1.29.2, the last Python v1 release,
+**Why `down && up -d`:** the reference instance runs `docker-compose` 1.29.2, the last Python v1 release,
 against a current Docker Engine, and v1 cannot recreate a container there. It reads
 `ContainerConfig` from the old container's image, which images built by a modern Docker no
 longer carry, and fails with a `KeyError` after it has stopped the old container and before
-it has made the new one (`linkedin-games/player`'s `docs/deployment.md`). `down` first
+it has made the new one. `down` first
 never takes that path, at the cost of a few seconds' outage per deploy, during which nginx
 answers 502.
 
@@ -667,11 +666,11 @@ any set a new folder, the site's too. A folder is whole before a row names it an
 once, through a `.partial` name renamed when whole, and kept for good, a deleted set's and
 an edited set's old one included, since a snapshot still names it. It prints one JSON line, `backup_ok` with the folders copied and the
 number kept, and exits with 1 when the store cannot be read or a folder cannot be copied
-(`backup_failed`). The crontab line deletes the snapshots older than 14 days, and only
-them:
+(`backup_failed`). The crontab line, `doc/SETUP.md` step 27's (`docker-compose` under Compose v1), deletes the
+snapshots older than 14 days, and only them:
 
 ```
-17 3 * * * cd /home/ubuntu/csbweb && /usr/bin/docker-compose exec -T csbweb node --disable-warning=ExperimentalWarning server/backup.ts < /dev/null >> /home/ubuntu/csbweb/stats/backup.log 2>&1 && find /home/ubuntu/csbweb/stats/backups -name '*.db' -mtime +14 -delete
+17 3 * * * cd /home/you/csbweb && docker compose exec -T csbweb node --disable-warning=ExperimentalWarning server/backup.ts < /dev/null >> stats/backup.log 2>&1 && find stats/backups -name '*.db' -mtime +14 -delete
 ```
 
 **`< /dev/null` is not optional.** `docker-compose exec -T` reads stdin. Under cron that is
@@ -683,7 +682,7 @@ snapshot holds the events still in the WAL, the server keeps serving, and a miss
 exits 1; a player's folder is copied whole, the site's not, the next run keeps the copy,
 and a player's folder that is not there exits 1.
 
-`utils/pull-backups.sh` copies `stats/backups/` off the VPS, the snapshots and the players' folders, with `rsync`, into
+`utils/pull-backups.sh` copies `stats/backups/` off the server, the snapshots and the players' folders, with `rsync`, into
 `../backups/csbweb/` beside the checkout (`BACKUP_PULL_DIR` overrides it), reading the
 target from the local `.env`.
 

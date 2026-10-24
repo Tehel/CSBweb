@@ -1,6 +1,6 @@
 #!/bin/bash
-# Build the image, ship it to the VPS and restart the stack there (`doc/DEPLOYMENT.md`).
-# The author runs it by hand:
+# Build the image, ship it to the server and restart the stack there (`doc/DEPLOYMENT.md`).
+# Its maintainer runs it by hand:
 #
 #   npm run deploy              # the commit, as it is
 #   npm run deploy -- --dirty   # the working tree, though it differs from its commit
@@ -13,7 +13,7 @@
 #                               .env, gamefiles/ and stats/ (`docker-compose.yaml`)
 #
 # The image goes over as a file, and the stack is taken down and brought up again, since
-# the VPS's Compose v1 cannot recreate a container. `docker-compose` runs it where the
+# Compose v1 cannot recreate a container there. `docker-compose` runs it where the
 # server has it, else Compose v2's `docker compose`. The compose file goes with every
 # deploy, so the remote stack cannot drift from the repository. The game files do not:
 # they are uploaded on their own, when they change (`utils/install-official-sets.ts`).

@@ -280,7 +280,7 @@ Decisions taken with the author, for every row:
   approved, its saves moved to `<id>`, may follow as an item of its own.
 - **Moderation from the tiles, and nothing more**: deleting an approved set, taking an
   approval back, and the sets' order and default are left to a moderator's hands on the
-  VPS (`doc/DEPLOYMENT.md` → "Moderating the sets"). Hiding answers a complaint without
+  server (`doc/DEPLOYMENT.md` → "Moderating the sets"). Hiding answers a complaint without
   costing a player their saves.
 - **A moderator edits any set, the site's too, from its pen**: its text, a thumbnail, a
   description, and rarely a `.dat`. A folder never changes once written, which the backup
@@ -315,12 +315,7 @@ The page holds nothing beside the canvas (`index.html`): what it offered moved i
 as dialogs drawn in the game's 320x200 buffer like the save menu: the settings, the map,
 the champion table. The data set is chosen on the welcome page (`src/ui/welcomePage.ts`), which opens `?dungeon=`. The
 look is the save menu's, cut from graphic 0 and drawn in the UI palette's sixteen
-colours, and the design canvas "DMweb page flow"
-(`https://claude.ai/artifact/DiNNPrFfCkphD9LRNBckSG`) shows it: artboard 10, the widget
-kit, and artboard 5, the settings dialog. Reading the canvas's URL gives only its shell
-page; each artboard is a published file of it, `project/Kit.dc.html` and
-`project/Settings.dc.html` among them (`.claude/memory/design-canvas-files.md`). The kit is the look to follow; the screens,
-artboard 5 among them, are brainstorm material, not final designs. At 320x200 there is
+colours, the design canvas's widget kit (`src/renderer/ui/Widgets.ts`). At 320x200 there is
 one font size, so a setting is one line, and its description goes in a help line at the
 dialog's foot. Being in the buffer, the dialogs are under the CRT effect and in
 fullscreen, and the golden frames see them.
@@ -389,7 +384,7 @@ list", point 4), its check included.
 ## W — The public server
 
 `server/`, the page's host at `https://csbweb.looten.net/` (`doc/DEPLOYMENT.md`), is on the
-open internet behind the VPS's nginx. Its weak point is availability: what an anonymous
+open internet behind the host's nginx. Its weak point is availability: what an anonymous
 client can make it hold, compute or keep. What holds already: paths (`..`, `%2e%2e`,
 `%00`, dotfiles all refused), the body's size limit, events rebuilt from checked fields
 only, the rate limits counting an IPv6 client by its /64, a budget of events a day, a

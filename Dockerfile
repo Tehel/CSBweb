@@ -42,7 +42,7 @@ ENV PORT=8085 \
     FILES_DIR=/data/files \
     STATS_DB=/data/stats/stats.db
 EXPOSE 8085
-# uid 1000, the VPS's own user, so the mounted folders are writable here and readable
+# uid 1000, the server's login user (`doc/SETUP.md`), so the mounted folders are writable here and readable
 # over SSH.
 USER node
 # The exec form: Node is PID 1 and receives SIGTERM. `node:sqlite` still warns that it is
