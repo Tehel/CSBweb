@@ -60,7 +60,7 @@ csbweb/
 ├── server/                # the deployed server: the page, the data sets, the statistics
 ├── tools/                 # verification tools (checks/), the golden frames, the fetch commands
 ├── tools/fixtures/        # CSBWin saves the tools read; gamefiles/, the data sets (not ours, fetched)
-├── utils/                 # the maintainer's scripts: deploying, backups, the forum's dungeons submitted
+├── utils/                 # the maintainer's scripts: deploying, backups, the official games installed, the forum's dungeons submitted
 ├── doc/                   # CSBWin reference docs; CSBwin-src/ is the C++ (not ours, fetched)
 ├── PLAN.md, DEBT.md       # project status and technical debt
 ├── index.html, stats.html # the two pages, Vite's entries
@@ -73,6 +73,7 @@ csbweb/
 - **CSBWin reference docs**: [doc/CSBWIN_REFERENCE_INDEX.md](doc/CSBWIN_REFERENCE_INDEX.md)
 - **Verified facts**: [doc/PROVEN_FACTS.md](doc/PROVEN_FACTS.md)
 - **Saves**: [doc/SAVES.md](doc/SAVES.md)
+- **Your own instance, step by step**: [doc/SETUP.md](doc/SETUP.md)
 - **Deployment**: [doc/DEPLOYMENT.md](doc/DEPLOYMENT.md)
 
 ## People
@@ -98,8 +99,9 @@ I'm afraid.
 
 The code is [MIT](LICENSE). It is a TypeScript port written from CSBWin, Paul R. Stevens'
 C++ reconstruction of Dungeon Master: it follows CSBWin's behaviour and structure but
-contains none of its code. The MIT licence covers this project's own work, not the rights of
-CSBWin's author or of Dungeon Master's.
+contains none of its code. Paul R. Stevens has given the project his blessing to do as it
+likes with CSBWin's code, data and executables. The MIT licence covers this project's own
+work, not the rights of CSBWin's author or of Dungeon Master's.
 
 Dungeon Master and Chaos Strikes Back, their data files, manuals and artwork belong to their
 original authors at FTL Games / Software Heaven, Inc., and the fans' dungeons to their

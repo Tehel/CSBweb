@@ -12,10 +12,14 @@
 #   DEPLOY_DIR=<path>           the stack's folder there, absolute: the compose file, its
 #                               .env, gamefiles/ and stats/ (`docker-compose.yaml`)
 #
-# The VPS's Compose v1 cannot recreate a container, so the image goes over as a file and
-# the stack is taken down and brought up again. The compose file goes with every deploy,
-# so the remote stack cannot drift from the repository. The game files do not: they are
-# uploaded on their own, when they change.
+# The image goes over as a file, and the stack is taken down and brought up again, since
+# the VPS's Compose v1 cannot recreate a container. `docker-compose` runs it where the
+# server has it, else Compose v2's `docker compose`. The compose file goes with every
+# deploy, so the remote stack cannot drift from the repository. The game files do not:
+# they are uploaded on their own, when they change (`utils/install-official-sets.ts`).
+#
+# The stack's `.env` there must exist first (`doc/SETUP.md`): Compose refuses a stack
+# without it, and this stops before shipping anything.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -57,9 +61,12 @@ trap 'rm -rf "$tmp"' EXIT
 docker save csbweb:latest | gzip > "$tmp/csbweb.tar.gz"
 
 echo "shipping to $DEPLOY_HOST:$DEPLOY_DIR"
-# stats/ is made here, by the login user, so that the container's uid 1000 can write it.
-ssh "$DEPLOY_HOST" "mkdir -p '$DEPLOY_DIR/stats'"
+# The folders are made here, by the login user, so that the container's uid 1000 can write
+# them: one Docker made for a missing mount would be root's.
+ssh "$DEPLOY_HOST" "cd '$DEPLOY_DIR' 2>/dev/null && [ -f .env ] || { echo 'no $DEPLOY_DIR/.env on $DEPLOY_HOST: make it first (doc/SETUP.md)' >&2; exit 1; }
+  mkdir -p stats gamefiles files"
 scp "$tmp/csbweb.tar.gz" "$root/docker-compose.yaml" "$DEPLOY_HOST:$DEPLOY_DIR/"
-ssh "$DEPLOY_HOST" "cd '$DEPLOY_DIR' && gunzip -c csbweb.tar.gz | docker load && rm csbweb.tar.gz \
-  && docker-compose down && docker-compose up -d && docker-compose ps"
+compose='compose() { if command -v docker-compose >/dev/null 2>&1; then docker-compose "$@"; else docker compose "$@"; fi; }'
+ssh "$DEPLOY_HOST" "$compose; cd '$DEPLOY_DIR' && gunzip -c csbweb.tar.gz | docker load && rm csbweb.tar.gz \
+  && compose down && compose up -d && compose ps"
 echo "deployed $build"

@@ -6,8 +6,7 @@ metadata:
 ---
 
 A script that seeds or changes a CSBweb instance belongs in `utils/`, as part of the
-"set up an instance" procedure the author means to write, not in the scratchpad as a
-one-off. It finds its own inputs (`utils/submit-forum-dungeons.ts` reads the forum's list
+"set up an instance" procedure (`doc/SETUP.md`), not in the scratchpad as a one-off. It finds its own inputs (`utils/submit-forum-dungeons.ts` reads the forum's list
 itself), and takes the instance's URL and a `playerId` as arguments.
 
 **Why:** the author redirected a one-off submission plan twice: first to a script kept in
@@ -17,4 +16,6 @@ once it is approved.
 **How to apply:** anything that publishes asks a yes per item, showing what will be
 published (name, authors, description), offers a `--dry-run`, and fetches nothing heavy
 before the yes. `utils/` is in `tsconfig.json`'s `include`, so `npm test`'s `tsc` checks it.
-Document it in `doc/DEPLOYMENT.md`.
+Document it in `doc/DEPLOYMENT.md`, and in `doc/SETUP.md` where a new instance runs it.
+One that writes the site's own rows (`install-official-sets.ts`) works over SSH with the
+local `.env`'s target, as `deploy.sh` does, since a publish gives a set an owner.

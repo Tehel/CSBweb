@@ -44,7 +44,7 @@ Corollaries:
 | `doc/CSBWIN_REFERENCE_INDEX.md` | Index of the per-topic CSBWin reference docs. |
 | `doc/PROVEN_FACTS.md` | Verified facts with `File.cpp:line` citations. |
 | `doc/SAVES.md` | The port's own save design: the store, the playthrough, the dialog, F5 and F9. |
-| `doc/DEPLOYMENT.md` | The deployed game: the server, the image, the VPS, deploying and backups. `doc/STATISTICS.md`: what it counts. |
+| `doc/DEPLOYMENT.md` | The deployed game: the server, the image, the VPS, deploying and backups. `doc/SETUP.md`: a new instance, step by step. `doc/STATISTICS.md`: what it counts. |
 | `doc/CSBWIN_SYMBOL_INDEX.tsv` | Every CSBWin symbol → `File.cpp:line`. Grep this before grepping the tree. |
 | `doc/CSBwin-src/` | The C++ reference (not ours, git-ignored, fetched by `npm run fetch-csbwin-src`): `CSBwin_SRC_20230608`, CSBWin's last source and the build the author plays. |
 | `.claude/memory/` | Anything worth remembering across sessions: one fact per file, indexed one line each in `MEMORY.md`, imported above. Committed with the project, not Claude Code's own memory directory under `~/.claude/projects/`, which depends on where the checkout lives. |

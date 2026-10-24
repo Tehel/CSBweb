@@ -5,6 +5,8 @@
 > checked, here is the command"; SSH to the VPS is read-only inspection, and only when the
 > author allows it.
 
+`doc/SETUP.md` builds an instance like it from nothing, step by step.
+
 The game is served at `https://csbweb.looten.net/`, from a Docker container on the author's
 VPS, which serves other projects too. A small Node server (`server/`) serves the built page,
 the game files and the statistics' API (`doc/STATISTICS.md`). There are no logins. The game
@@ -309,7 +311,16 @@ server sends none.
 
 ### Writing the site's sets
 
-The site's sets are rows written by hand, in the store through `node:sqlite`, once their
+FTL's games, the manifest's `official` sets, are installed by
+`npx tsx utils/install-official-sets.ts [--dry-run]`, over SSH to the local `.env`'s target:
+one at a time, on a yes, it copies a set's files from `tools/fixtures/gamefiles/` into
+`gamefiles/<dir>/` (those its archive names, and CSB's `utility-portraits.dat`) and writes its
+row, the site's (no owner), approved, with the manifest's flags, then the manifest's default
+set where the table has none. It skips a set whose id or folder the table holds already. It
+does not publish them through `api/data-sets`: a published set has an owner, and so is no
+base set, and a publish carries no `mini.dat`.
+
+Any other site's set is a row written by hand, in the store through `node:sqlite`, once their
 folders are uploaded: a row with no `owner`, `approved`, its flags `0` or `1`, its
 `authors` a JSON list, and `data_set_defaults`'s one row, the default set, without which
 the welcome page selects nothing on a first visit. A set is added last in the list:
@@ -575,7 +586,7 @@ container recreated (a deploy, or `down && up -d`): `docker-compose restart` kee
 environment.
 
 **The local `.env`**, at the repository's root and gitignored, is the deploy target, so the
-repository names no host, login or remote path:
+repository names no host, login or remote path. `.env.template` is its model:
 
 ```
 DEPLOY_HOST=<user>@<host>
@@ -598,9 +609,12 @@ the image is built from, the build context (`.dockerignore`'s allowlist, untrack
 included), the `Dockerfile` or the compose file, and says what differs. A commit has passed
 `npm test`, so a clean tree is a checked one; a document changed beside it does not
 stop a deploy. `npm run deploy -- --dirty` deploys such a tree anyway. It builds
-`csbweb:latest`, with the commit as `CSBWEB_BUILD` (`-dirty` under `--dirty`), `docker save | gzip`s it, makes `stats/` over SSH as the
-login user (so that uid 1000 can write it), `scp`s the image and `docker-compose.yaml` into
-`DEPLOY_DIR`, then loads the image and runs `docker-compose down && docker-compose up -d`.
+`csbweb:latest`, with the commit as `CSBWEB_BUILD` (`-dirty` under `--dirty`), `docker save | gzip`s it, stops where
+`DEPLOY_DIR` has no `.env`, makes `stats/`, `gamefiles/` and `files/` over SSH as the login
+user (so that uid 1000 can write them, where Docker would make a missing mount root's),
+`scp`s the image and `docker-compose.yaml` into `DEPLOY_DIR`, then loads the image and runs
+`docker-compose down && docker-compose up -d`: `docker-compose` where the server has it, else
+Compose v2's `docker compose`, which takes the same file and warns that `version` is obsolete.
 
 **Why `down && up -d`:** the VPS runs `docker-compose` 1.29.2, the last Python v1 release,
 against a current Docker Engine, and v1 cannot recreate a container there. It reads
