@@ -128,10 +128,17 @@ process.on('exit', () => rmSync(scratch, { recursive: true, force: true }));
 const answers: string[] = [];
 let answered: ((line: string | null) => void) | null = null;
 let ended = false;
-rl.on('line', (line) => answered ? answered(line) : answers.push(line));
+/** `line` to the question waiting, once: a chunk's lines arrive together, and the next ones wait for their questions. */
+function answer(line: string | null): void {
+    const waiting = answered;
+    answered = null;
+    if (waiting) waiting(line);
+    else if (line !== null) answers.push(line);
+}
+rl.on('line', answer);
 rl.on('close', () => {
     ended = true;
-    answered?.(null);
+    answer(null);
 });
 
 /** The player's answer to `question`, `prefill` ready to edit on a terminal. The end of the input ends the run. */
