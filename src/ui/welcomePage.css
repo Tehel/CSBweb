@@ -310,10 +310,12 @@ body.welcome {
 /* The confirmation DELETE opens. */
 .delete-set { width: min(560px, calc(100vw - 32px)); }
 .delete-set-text { margin: 0; font-size: 18px; line-height: 1.5; }
-/* The dialog a tile's book opens (`showDocuments`): a set's description, its archive, then
+/* The dialog a tile's book opens (`showDocuments`): a set's description, its authors, its archive, then
    its documents, a link each, its size, and a moderator's cross. */
 .documents-description { margin: 0; font-size: 18px; line-height: 1.5; white-space: pre-line; overflow-wrap: anywhere; }
 .documents-description:empty { display: none; }
+.documents-authors { margin: 0; font-size: 18px; line-height: 1.5; color: var(--p2); overflow-wrap: anywhere; }
+.documents-authors:empty { display: none; }
 .documents-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 9px; font-size: 18px; }
 .documents-list li { display: flex; align-items: center; gap: 12px; min-height: 36px; }
 .documents-list a { color: var(--p11); overflow-wrap: anywhere; }

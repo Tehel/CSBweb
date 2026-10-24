@@ -973,6 +973,7 @@ check(siteForm.open === true && siteForm.title === 'Edit the published dungeon' 
   && siteForm.official === 'off',
   'the pen opens the form on the published set, its files the folder\'s, its id fixed, no PUBLISH nor DELETE, CONFIRM held until a change, the official game\'s checkbox offered, off');
 await typeIn('description', 'Edited by a moderator.');
+await typeIn('authors', 'Ann, Bob');
 await settled();
 const describedConfirm = (await form())?.confirm;
 await dropIn([['gamefiles/dm-atari/dungeon.dat', 'dungeon.dat']]);
@@ -991,7 +992,7 @@ check(afterSiteEdit.form === null && siteEdited?.dir === `${MINE}@2` && siteEdit
   && afterSiteEdit.picture === `gamefiles/${MINE}@2/${MINE}-thumbnail.png` && afterSiteEdit.page.pictures.every(Boolean) && afterSiteEdit.mine.selected === 'true',
   'CONFIRM edits the set on the site: the form closes, its text changed, its files in a new folder, whose thumbnail the page shows, the set still selected');
 // The book, to a moderator (`server/documents.ts`): under its title the set's description,
-// then the set's archive, which is made
+// its authors after "By: ", then the set's archive, which is made
 // in the page and downloaded as `<name>.zip` (`src/data/DataSetArchive.ts`); the set has no
 // document yet, which its dialog says, with ADD. A text chosen is added, a link that opens in a new tab, served from
 // the set's new folder; a name that is not a document's is refused in the dialog, nothing
@@ -999,6 +1000,7 @@ check(afterSiteEdit.form === null && siteEdited?.dir === `${MINE}@2` && siteEdit
 // CLOSE shows the page anew, the book on the set. Its owner, below, has the book, which
 // offers neither ADD nor a cross.
 const documentsDialog = () => evaluate(`(d=>d&&{ open: d.open, title: d.querySelector('h2').textContent, description: d.querySelector('.documents-description').textContent,
+  authors: d.querySelector('.documents-authors').textContent,
   items: [...d.querySelectorAll('.documents-list li')].map(li=>{const a=li.querySelector('a'), pack=li.querySelector('.documents-pack');
     return pack ? pack.textContent+'|'+li.querySelector('.documents-size').textContent : a ? [a.textContent, a.getAttribute('href'), a.target || (a.hasAttribute('download') ? 'download' : ''), li.querySelector('.documents-size').textContent,
       li.querySelector('.documents-remove')?.getAttribute('aria-label') ?? ''].join('|') : li.textContent;}),
@@ -1030,8 +1032,8 @@ await clickOn('#documents-close');
 const afterDocuments = { dialog: await documentsDialog(), mine: await mineOf() };
 const ARCHIVE = 'My Edited Dungeon.zip|every file';
 console.log('  the book:', JSON.stringify({ noDocument, packed, oneDocument, refusedDocument: refusedDocument?.status, twoDocuments, askedRemoval, afterRemoval }));
-check(noDocument?.open === true && noDocument.title === 'My Edited Dungeon: documents' && noDocument.description === 'Edited by a moderator.' && noDocument.items.join() === `${ARCHIVE},No document yet.` && noDocument.add,
-  'to a moderator, the book opens the set\'s description, its archive, then its documents, none yet, with ADD');
+check(noDocument?.open === true && noDocument.title === 'My Edited Dungeon: documents' && noDocument.description === 'Edited by a moderator.' && noDocument.authors === 'By: Ann, Bob' && noDocument.items.join() === `${ARCHIVE},No document yet.` && noDocument.add,
+  'to a moderator, the book opens the set\'s description, its authors, its archive, then its documents, none yet, with ADD');
 check(packed.downloaded.join() === 'My Edited Dungeon.zip' && packed.status === '', 'the archive, clicked, is made and downloaded as <name>.zip');
 check(oneDocument?.items.join() === `${ARCHIVE},Notes.txt|gamefiles/${MINE}@3/Notes.txt|_blank|14 B|Remove Notes.txt` && oneDocument.status === '' && servedDocument === 'Read me first.',
   'a text chosen is added: a link that opens in a new tab, from the set\'s new folder, its size, and a cross');
