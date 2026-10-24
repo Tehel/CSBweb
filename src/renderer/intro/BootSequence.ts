@@ -96,6 +96,16 @@ interface AttachedHost {
   detach: () => void;
 }
 
+/**
+ * The pre-game screens as the probes read them (`tools/probe-frames.mjs`, through
+ * `window.__probe.intro`): the VBLs the host has waited, whether a screen waits for a click
+ * or a key (`nextEvent`), and the Hint Oracle while it is up, whose wait for a button is
+ * its own (`HintOracleScreen.waiting`). Nothing of the game reads it.
+ */
+export const introProbe: { vbls: number; waiting: boolean; oracle: { readonly waiting: boolean } | null } = {
+  vbls: 0, waiting: false, oracle: null,
+};
+
 /** What a host needs from the page: `BootSequenceDeps` without the boot's own decisions. */
 type HostDeps = Pick<BootSequenceDeps, 'canvas' | 'gameScreen' | 'playSound'>;
 
@@ -123,6 +133,7 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
     if (waiting) {
       const resolve = waiting;
       waiting = null;
+      introProbe.waiting = false;
       resolve(event);
     } else {
       queue.push(event);
@@ -211,8 +222,12 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
         // otherwise run every animation here at double speed.
         const deadline = performance.now() + count * VBL_MS;
         const tick = (): void => {
-          if (performance.now() >= deadline) resolve();
-          else requestAnimationFrame(tick);
+          if (performance.now() < deadline) {
+            requestAnimationFrame(tick);
+            return;
+          }
+          introProbe.vbls += count;
+          resolve();
         };
         requestAnimationFrame(tick);
       }),
@@ -221,8 +236,12 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
     nextEvent: () =>
       new Promise<IntroEvent>((resolve) => {
         const queued = queue.shift();
-        if (queued) resolve(queued);
-        else waiting = resolve;
+        if (queued) {
+          resolve(queued);
+          return;
+        }
+        waiting = resolve;
+        introProbe.waiting = true;
       }),
     takeClick: () => {
       const at = queue.findIndex((event) => event.kind === 'click');
@@ -254,6 +273,7 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
       window.removeEventListener('keydown', onKeyDown);
       queue = [];
       waiting = null;
+      introProbe.waiting = false;
     },
   };
 }
@@ -694,9 +714,11 @@ export async function runHintOracle(
   const { host, detach } = createIntroHost(deps, uiTables.graphic232.palette552[0] ?? PALETTE_11914);
   try {
     const oracle = new HintOracleScreen(host, hints, files.dat, square);
+    introProbe.oracle = oracle;
     host.setCursorVisible(true);
     await oracle.run();
   } finally {
+    introProbe.oracle = null;
     host.setCursorVisible(false);
     detach();
   }

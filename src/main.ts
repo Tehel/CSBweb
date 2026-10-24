@@ -31,7 +31,7 @@ import { GameScreen } from './renderer/GameScreen';
 import { bindSaveDrop, bindUIEvents, showFatalMessage, showWelcomePage, welcomePageQuery } from './ui';
 import { ScrollingText } from './renderer/csbwin/ScrollingText';
 import { UIMode } from './renderer/ui/UIState';
-import { openHintOracle, runBootSequence, type BootSequenceDeps } from './renderer/intro/BootSequence';
+import { introProbe, openHintOracle, runBootSequence, type BootSequenceDeps } from './renderer/intro/BootSequence';
 import { reduceTitlePicture } from './renderer/intro/TitlePicture';
 import type { TitleFrame } from './renderer/intro/TitleThumbnail';
 import { showEndOfGame } from './renderer/intro/EndOfGame';
@@ -690,8 +690,9 @@ async function init() {
         // so the handle cannot reach a deployed bundle.
         if (__CSBWEB_PROBE__) {
             // `presetHeroes`: the heroes behind the dungeon's mirrors, for `tools/lib/buildParty.mjs`.
+            // `intro`: the pre-game screens' VBLs and waits (`introProbe`).
             const presetHeroes = () => extractPresetHeroes(built.game.ctx.dungeon.getData(), built.game.ctx.tables.textDecode, built.game.ctx.tables);
-            (window as unknown as Record<string, unknown>).__probe = { game, screen, sound, saves: built.saves, renderView, refreshScreen, presetHeroes, applySaveBytes };
+            (window as unknown as Record<string, unknown>).__probe = { game, screen, sound, saves: built.saves, renderView, refreshScreen, presetHeroes, applySaveBytes, intro: introProbe };
         }
         // Before the intro: the entrance's chooser takes a dropped save as the disk menu does.
         bindSaveDrop(built.screen);

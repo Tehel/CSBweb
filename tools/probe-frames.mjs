@@ -171,6 +171,14 @@ const until = async (expr, what, ms = 30000) => {
 };
 // `url` loaded, then `ready` true on it. A change of the fragment alone loads nothing,
 // and Chrome then names no loader.
+// `act` leaves the page: the next one loaded, then `ready` true on it.
+const leave = async (act, ready) => {
+  const loaded = new Promise(r => onLoaded = r);
+  await act();
+  await loaded;
+  onLoaded = null;
+  await until(ready, 'the page it leads to');
+};
 const navigate = async (url, ready) => {
   const loaded = new Promise(r => onLoaded = r);
   const { result } = await send('Page.navigate', { url });
@@ -196,8 +204,15 @@ const settled = () => evaluate(`(async()=>{const q=window.__settle, give=perform
     await new Promise((r) => setTimeout(r, 10));
   }
   return 1;})()`);
-// Nothing yet says the entrance is up, its fades done: a page of it is still given time.
+// A page ready once loaded, the app's or not.
 const LOADED = 'true';
+// The pre-game screens (`introProbe`, `src/renderer/intro/BootSequence.ts`), which run no
+// VBL of the game's. The entrance at rest is a screen of it waiting for a click or a key,
+// its fades done: the door, the credits, the chooser and its menus. A click it takes stops
+// the wait until its screen waits again. The chooser, a dialog of the screen's, plays its
+// buttons' presses and reads a file on the page's own time (`SaveMenuState`): at rest,
+// neither is under way.
+const ENTRANCE = `(p => p?.intro.waiting === true && !p.screen.ui.saveMenu?.press && !p.screen.ui.saveMenu?.busy)(window.__probe)`;
 // `n` of the game's VBLs (`Game.runFrame`) run from now, counted on the page. CSBWin takes
 // a click or a key in a VBL, and draws the view only in a tick (`VBL_PER_TICK` VBLs): a step
 // in play waits for a tick after the VBL taking it, one under a dialog, where the clock is
@@ -443,10 +458,9 @@ const abortedDelete = await evaluate(`(async()=>{const {saves}=window.__probe;co
   finally { IDBObjectStore.prototype.delete=own; }})()`);
 check(abortedDelete === 'failed, listed', `a delete whose transaction aborts fails, and the save is still listed (${abortedDelete})`);
 
-// The dungeon entrance, with the intro left on. The wait has to cover the FTL logo — 98
-// vertical blanks — and the whole title animation — about 116 — plus the entrance's own
-// fade; once that fade finishes the screen is static until the player clicks, so the
-// capture is stable.
+// The dungeon entrance, with the intro left on: the FTL logo, the title animation and the
+// entrance's own fade play first, and the frame is taken once the door waits for a click
+// (`ENTRANCE`), when the screen is static until the player clicks.
 //
 // This is the only evidence that the corridor behind the doors actually renders. It is
 // drawn by the real viewport renderer over a synthetic 5x5 level
@@ -1142,39 +1156,38 @@ check(Object.keys(states).sort().join() === moderated.dataSets.map((set) => set.
   && moderated.dataSets.every((set) => states[set.id] === colourOf(set)),
   "to a moderator, every set is listed, the hidden ones too, a pending set's name red, a hidden one's purple, red winning, the others' white");
 await clickOn('.pick[data-set="dm-atari"]');
-await clickOn('#welcome-play', true);
-await wait(9000);
+await leave(() => clickOn('#welcome-play', true), ENTRANCE);
 check(await evaluate(`location.search`) === '?dungeon=dm-atari&keepsaves=', 'PLAY opens the selected set, the page\'s other parameters kept');
 console.log('state: entrance');
 const entrance = await shot('07-entrance');
 // The scroll at the bottom of the button column (button id 202).
-await canvasClick(270, 192, 0); await wait(1500);
+await canvasClick(270, 192, 0); await until(ENTRANCE, 'the entrance at rest');
 console.log('state: credits');
 const credits = await shot('08-credits');
 // Back to the entrance, "resume" (id 201), the one save the chooser lists, its first
 // row, and LOAD (x 24..74, y 161..174):
 // the loaded game is played at once, with no "GAME LOADED, READY TO PLAY." before it, so
 // this is the adventure's first view of the save made above.
-await canvasClick(160, 100, 0); await wait(1000);
+await canvasClick(160, 100, 0); await until(ENTRANCE, 'the entrance at rest');
 check(!(await wheelTaken()), 'the entrance leaves the wheel to the page');
-await canvasClick(270, 84, 0);  await wait(1500);
+await canvasClick(270, 84, 0);  await until(ENTRANCE, 'the entrance at rest');
 check(await wheelTaken(), 'the entrance\'s chooser takes the wheel, for its list');
 // The cursor stays up as the chooser redraws, from `STShowCursor` to `STHideCursor`
 // (`doc/CSBwin-src/SaveGame.cpp:1687-1689`): after a notch of the wheel and two keys, the
 // arrow is still where the click that opened it left it, and the pointer leaving the
 // canvas takes it off. The pointer stays off for the comparisons below.
 const leaveCanvas = () => evaluate(`document.getElementById('game-canvas').dispatchEvent(new PointerEvent('pointerleave',{isPrimary:true,pointerType:'mouse'})),1`);
-await key('ArrowUp');   await wait(200);
-await key('ArrowDown'); await wait(200);
+await key('ArrowUp');   await until(ENTRANCE, 'the entrance at rest');
+await key('ArrowDown'); await until(ENTRANCE, 'the entrance at rest');
 const withArrow = await canvasPixels();
-await leaveCanvas(); await wait(200);
+await leaveCanvas();
 check(withArrow !== (await canvasPixels()), 'the entrance\'s chooser keeps its cursor up as it redraws');
 // And the keys the list takes in play. The one save is selected under its heading: the up
 // arrow moves the selection to the heading, and the down arrow back to the save.
 const chooserUp = await canvasPixels();
-await key('ArrowUp');   await wait(200);
+await key('ArrowUp');   await until(ENTRANCE, 'the entrance at rest');
 const onHeading = await canvasPixels();
-await key('ArrowDown'); await wait(200);
+await key('ArrowDown'); await until(ENTRANCE, 'the entrance at rest');
 check(onHeading !== chooserUp && onHeading !== entrance && (await canvasPixels()) === chooserUp,
   'the entrance\'s chooser takes the arrow keys, and stays up');
 // EXPORT (x 170..220, y 161..174) on that save: the page's own download
@@ -1182,7 +1195,8 @@ check(onHeading !== chooserUp && onHeading !== entrance && (await canvasPixels()
 // What the file holds is `tools/dump-save-menu.ts`'s to show.
 // The welcome page's archive was downloaded before it.
 const exportedFrom = downloads.length;
-await canvasClick(195, 168, 0); await wait(1000);
+await canvasClick(195, 168, 0); await until(ENTRANCE, 'the entrance at rest');
+for (const end = Date.now() + 5000; downloads.length === exportedFrom && Date.now() < end; ) await wait(20);
 const exported = downloads.slice(exportedFrom);
 console.log('  downloads:', exported.join(', ') || 'none');
 check(exported.length === 1 && /^csbweb-\d{8}-\d{6}\.dat$/.test(exported[0]),
@@ -1201,14 +1215,14 @@ const dropTaken = await evaluate(`(async()=>{
   document.getElementById('game-canvas').dispatchEvent(drop);
   return drop.defaultPrevented;
 })()`);
-await wait(1000);
+await settled(); await until(ENTRANCE, 'the entrance at rest');
 const refusal = await canvasPixels();
 check(dropTaken && refusal !== chooserUp && refusal !== entrance,
   'a save of another dungeon dropped on the chooser is taken by the page, and a menu comes up');
-await canvasClick(159, 147, 0); await wait(600);
-await leaveCanvas(); await wait(200);
+await canvasClick(159, 147, 0); await until(ENTRANCE, 'the entrance at rest');
+await leaveCanvas();
 check((await canvasPixels()) === chooserUp, 'its OK brings the chooser back, with nothing more listed');
-await canvasClick(100, 27, 0);  await wait(300);
+await canvasClick(100, 27, 0);  await until(ENTRANCE, 'the entrance at rest');
 await canvasClick(48, 168, 0);  await until(GAME, 'the loaded game');
 console.log('state: game loaded');       const loaded = await shot('12-game-loaded');
 
@@ -1219,15 +1233,14 @@ console.log('state: game loaded');       const loaded = await shot('12-game-load
 // entrance instead, without the title.
 const continued = async (search, ready) => {
   await navigate(`${APP}${search}`, ready);
-  if (ready === LOADED) await wait(3500);
-  await leaveCanvas(); await (ready === LOADED ? wait(200) : vbls(SHOWN));
+  await leaveCanvas(); if (ready === GAME) await vbls(SHOWN);
   return evaluate(`(()=>{const p=window.__probe; return p ? p.game.ctx.party.state.champions.map(c=>c.name.trim()).join(' · ') : null;})()`);
 };
 const continuedParty = await continued(`?dungeon=dm-atari&save=${saveId}&keepsaves`, GAME);
 console.log('  continued party:', continuedParty);
 check(continuedParty === atWelcome.preview[1] && (await canvasPixels()) === loaded,
   'CONTINUE reads its save straight into play: the screen the entrance\'s LOAD showed, the party the box named');
-await continued('?dungeon=dm-atari&save=nowhere&keepsaves', LOADED);
+await continued('?dungeon=dm-atari&save=nowhere&keepsaves', ENTRANCE);
 check((await canvasPixels()) === entrance, 'a save the store does not hold leaves the entrance, without the title');
 
 // A pressed crack switch (`doc/PROVEN_FACTS.md`, "Crack Switch (In) placement"): level 4,
@@ -1358,16 +1371,23 @@ await canvasClick(15, 15, 2);  await vbls(TICK);
 await leaveCanvas(); await vbls(SHOWN);
 console.log('state: CSB inventory');
 const csbInventory = await shot('15-csb-inventory');
-await realClick(214, 40); await wait(2500);
+// A real click on the Hint Oracle, and the Oracle waiting for a button again: its click
+// taken, two of its VBLs on, and whatever it set off drawn.
+const oracleAt = async (x, y) => {
+  const from = await evaluate(`window.__probe.intro.vbls`);
+  await realClick(x, y);
+  await until(`(i => i.vbls >= ${from} + 2 && i.oracle?.waiting === true)(window.__probe.intro)`, 'the Hint Oracle waiting for a button');
+};
+await oracleAt(214, 40);
 check(await evaluate(`window.__probe.screen.isHintOracleUp()`), 'a real click on the close box opens the Hint Oracle');
-await realClick(160, 36); await wait(3000);
-await leaveCanvas(); await wait(200);
+await oracleAt(160, 36);
+await leaveCanvas();
 console.log('state: hint page');         await shot('16-hint-oracle-page');
 // DONE (x 221-289, y 179-192) on the page goes back to the title list, and on the list
 // closes the Oracle: the inventory comes back as it was.
-await realClick(255, 185); await wait(3000);
-await realClick(255, 185); await wait(1500);
-await leaveCanvas(); await wait(200);
+await oracleAt(255, 185);
+await realClick(255, 185); await until(`window.__probe.intro.oracle === null`, 'the Hint Oracle closed'); await vbls(TICK);
+await leaveCanvas(); await vbls(SHOWN);
 check(!(await evaluate(`window.__probe.screen.isHintOracleUp()`)) && (await canvasPixels()) === csbInventory,
   'DONE on the page and then on the list closes the Oracle, back to frame 15');
 
@@ -1776,12 +1796,11 @@ await realMouse('mouseReleased', 19, 53); await vbls(SHOWN);
 await send('Page.addScriptToEvaluateOnNewDocument', { source: `
   try { localStorage.setItem('csbweb_settings_v2', JSON.stringify({ crt: true })); } catch (e) {}
 ` });
-await send('Page.navigate', { url: `${APP}?keepsaves&dungeon=dm-atari` });
-await wait(9000);
+await navigate(`${APP}?keepsaves&dungeon=dm-atari`, ENTRANCE);
 console.log('state: entrance, CRT effect saved on');
 check(await crtEffect() === 'on', 'the effect is on at the entrance');
 check(await canvasPixels() === entrance, 'the entrance is frame 07');
-await realClick(270, 192); await wait(1500);
+await realClick(270, 192); await until(ENTRANCE, 'the entrance at rest');
 check(await canvasPixels() === credits, 'a real click on the scroll brings up frame 08, the credits');
 
 check(!logs.some((line) => line.startsWith('error: CSP: ')), 'nothing the content security policy refuses');
