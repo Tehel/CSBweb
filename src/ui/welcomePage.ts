@@ -169,8 +169,7 @@ const PAGE = `
     <nav class="px px2" aria-label="Footer">
       <a aria-disabled="true" href="#about">About</a>
       <a href="stats">Stats</a>
-      <a aria-disabled="true">Source</a>
-      <a href="#credits">Credits</a>
+      <a href="https://github.com/Tehel/CSBweb" target="_blank">Source</a>
     </nav>
   </footer>
 </main>`;
