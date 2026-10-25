@@ -11,7 +11,7 @@
  *   under its title: first **the official games**, FTL's own (`DataSet.official`), in the
  *   manifest's order, then the player's own; then **the fan-made dungeons**, every other
  *   set, those the store holds a save of first, the one saved last first, the others
- *   following by name (`tileOrder`). A set the store holds a save of is drawn bright, any
+ *   following in the manifest's order, the server's `position` (`tileOrder`). A set the store holds a save of is drawn bright, any
  *   other dimmed. A section of no official game is not shown. A click selects a tile, and a click on the selected one
  *   leaves none selected. With no save at all, the manifest's default set is selected,
  *   where it names one, so that PLAY is a first visit's way in. A manifest with no set
@@ -815,12 +815,12 @@ function pixelArt(pixels: string[], colours: Record<string, string>): string {
 
 /**
  * `sets` in the grid's order: those `rows` holds a save of, the one with the latest save
- * first, then the others by name.
+ * first, then the others in `sets`' own order, the manifest's (a sort is stable).
  */
 function tileOrder(sets: DataSet[], rows: SaveEntry[]): DataSet[] {
     const lastSaved = new Map<string, number>();
     for (const row of rows) lastSaved.set(row.dataSet, Math.max(lastSaved.get(row.dataSet) ?? 0, row.savedAt));
-    return [...sets].sort((a, b) => (lastSaved.get(b.id) ?? -1) - (lastSaved.get(a.id) ?? -1) || a.name.localeCompare(b.name));
+    return [...sets].sort((a, b) => (lastSaved.get(b.id) ?? -1) - (lastSaved.get(a.id) ?? -1));
 }
 
 /**

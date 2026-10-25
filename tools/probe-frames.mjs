@@ -297,7 +297,7 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
                         return ((seed >>> 0) % 1000000) / 1000000; };
 ` });
 // The welcome page (`src/ui/welcomePage.ts`) of a store with no save: the manifest's
-// default set, dm-atari, is selected, so PLAY opens it, and every tile is dimmed, by name.
+// default set, dm-atari, is selected, so PLAY opens it, and every tile is dimmed, in the manifest's order.
 // The page with a save is checked further down.
 await navigate(`${APP}?dungeon=nowhere`, WELCOME);
 const firstVisit = await evaluate(`({tiles: [...document.querySelectorAll('.pick[data-set]')].map(t=>t.dataset.set+(t.classList.contains('dim')?'':'*')+(t.getAttribute('aria-pressed')==='true'?'!':'')).join(','),
@@ -309,7 +309,7 @@ console.log('state: welcome page, no save');
 console.log('  ', JSON.stringify(firstVisit));
 check(firstVisit.tiles === 'dm-atari!,kids-dungeon,csb,conflux-3.5,towers-of-chaos' && /dungeon=dm-atari/.test(firstVisit.play ?? '')
   && firstVisit.resume === null && firstVisit.above,
-  'no save: the official games in the manifest\'s order, then the others by name, dm-atari selected, PLAY opens it, CONTINUE disabled, the buttons above the grids');
+  'no save: the official games in the manifest\'s order, then the others too, dm-atari selected, PLAY opens it, CONTINUE disabled, the buttons above the grids');
 check(firstVisit.sections === 'Official games:dm-atari/kids-dungeon/csb|Fan-made dungeons:conflux-3.5/towers-of-chaos/add',
   'two sections, each under its title: the official games, then the fan-made dungeons, "+ Add my own" last');
 
@@ -336,6 +336,23 @@ console.log('state: welcome page, no set');
 console.log('  ', JSON.stringify(noSet));
 check(noSet.tiles === 'add' && noSet.play === 'disabled' && noSet.resume === 'disabled' && noSet.form && noSet.bases === 0 && !noSet.official,
   'no set: only "+ Add my own", PLAY and CONTINUE disabled, no section of official games, and its form offers no base set');
+
+// The fan-made dungeons with no save keep the manifest's order, the server's `position`,
+// not their names': a manifest listing The Towers of Chaos before Conflux shows them so.
+onPaused = ({ requestId }) => send('Fetch.fulfillRequest', { requestId, responseCode: 200,
+  responseHeaders: [{ name: 'Content-Type', value: 'application/json; charset=utf-8' }],
+  body: Buffer.from(JSON.stringify({ default: null, dataSets: [
+    { id: 'towers-of-chaos', name: 'The Towers of Chaos 3.3', dir: 'towers-of-chaos-3.3', csbGraphics: true },
+    { id: 'conflux-3.5', name: 'Conflux 3.5', dir: 'conflux-3.5-b8', csbGraphics: true },
+  ] })).toString('base64') });
+await send('Fetch.enable', { patterns: [{ urlPattern: '*/api/data-sets*' }] });
+await navigate(`${APP}?dungeon=nowhere`, WELCOME);
+await send('Fetch.disable');
+onPaused = null;
+const byPosition = await evaluate(`[...document.querySelectorAll('.welcome-custom .pick')].map(t=>t.classList.contains('add')?'add':t.dataset.set).join(',')`);
+console.log('state: welcome page, fan-made dungeons out of name order');
+console.log('  ', JSON.stringify(byPosition));
+check(byPosition === 'towers-of-chaos,conflux-3.5,add', 'the fan-made dungeons with no save in the manifest\'s order, not by name');
 // `?intro=0` skips the title animation and the dungeon entrance
 // (`src/renderer/intro/BootSequence.ts`), so the six frames below still open on the
 // adventure screen. The entrance gets frames of its own at the end.
@@ -468,7 +485,7 @@ check(abortedDelete === 'failed, listed', `a delete whose transaction aborts fai
 // the compositing but not the pixels the bytecode programs produce.
 // The welcome page (`src/ui/welcomePage.ts`): the page with no known `?dungeon=`, HTML and
 // no game. The store holds the one save made above, of dm-atari, so its tile is bright and
-// first, the others dimmed and by name, none is selected, and CONTINUE reads that save while no set is selected. Each tile
+// first, the others dimmed and in the manifest's order, none is selected, and CONTINUE reads that save while no set is selected. Each tile
 // shows its set's thumbnail, and the page fetches no game file to draw them. A click
 // selects a tile, and PLAY opens its set; a click on another set, with no save, leaves
 // CONTINUE disabled; a click on the selected tile selects none. Then PLAY's own click,
@@ -501,7 +518,7 @@ const atWelcome = await welcome();
 console.log('  ', JSON.stringify(atWelcome));
 const saveId = /[?&]save=([^&]+)/.exec(atWelcome.resume ?? '')?.[1];
 check(!atWelcome.canvas && atWelcome.tiles === 'dm-atari*,kids-dungeon,csb,conflux-3.5,towers-of-chaos',
-  'an unknown ?dungeon= is the welcome page, no game canvas, its tiles the sets not hidden, the one with a save bright and first, the others by name, none selected');
+  'an unknown ?dungeon= is the welcome page, no game canvas, its tiles the sets not hidden, the one with a save bright and first, the others in the manifest\'s order, none selected');
 check(atWelcome.pictures.length === 5 && atWelcome.pictures.every(Boolean) && atWelcome.gameFiles === 0,
   'each tile shows its set\'s 320x200 thumbnail, <id>-thumbnail.png, and the page fetches no .dat');
 check(atWelcome.play === null && /dungeon=dm-atari/.test(atWelcome.resume ?? '') && saveId !== undefined,
