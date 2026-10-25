@@ -1,9 +1,9 @@
 /**
  * Fetch the data sets the tests, the golden frames and the dev server read into
- * `tools/fixtures/gamefiles/`, one folder a set, as `tools/data-sets.json` names them. They
- * are FTL's and the fans' files, not ours to commit, so the folder is git-ignored and this
- * tool rebuilds it, byte for byte: every file must have its `FILES` SHA-256, which is what
- * the tools' assertions and the frames were written against.
+ * `tools/fixtures/gamefiles/`, one folder a set, as `tools/data-sets.json` names them, and a
+ * library the tools read. They are FTL's and the fans' files, not ours to commit, so the
+ * folder is git-ignored and this tool rebuilds it, byte for byte: every file must have its
+ * `FILES` SHA-256, which is what the tools' assertions and the frames were written against.
  *
  * Each file comes from one of `ARCHIVES`, pinned by its SHA-256, tried at each of its
  * sources in turn (the publisher's site, then the Wayback Machine's copy, or the Dungeon
@@ -14,6 +14,8 @@
  *   (`tools/lib/stx.ts`), and the CSB 2.1 utility disk's portraits;
  * - CSBWin's DM and CSB packages and 3D2D1D, from Paul R. Stevens' site: `dm-windows`, the
  *   `graphics.dat` the Kids dungeon plays, `csb`'s files, and `3D2D1D`;
+ * - his `CSBgraphics.dat`, the designers' library no set plays, a file of its own on his site:
+ *   `csbgraphics/`, the one folder that is not a set, which only the tools read;
  * - Conflux 3.5 beta 8 (his site, or the OneDrive), The Towers of Chaos 3.3 and the Kids
  *   dungeon 24 (the OneDrive).
  *
@@ -53,6 +55,8 @@ interface Archive {
   file: string;
   sha256: string;
   sources: (string | OneDriveSource)[];
+  /** A file served as it is, not an archive: it is copied, not unpacked. */
+  plain?: true;
 }
 
 const DMWEB = 'http://dmweb.free.fr/files';
@@ -87,6 +91,13 @@ const ARCHIVES = {
     file: '3D2D1D_CSBwin.zip',
     sha256: '0a32ed74079496e3e32ced793e6cc7fca62693f2cc4127cbf2aaa8dda733c4ab',
     sources: [`${PAUL}/Games/3D2D1D_CSBwin.zip`],
+  },
+  csbGraphics: {
+    file: 'CSBgraphics.dat',
+    sha256: 'd9d181c622732ef7e82fc788c6fe03f8c1c1de0e8d93e28f00fe1d6741367adb',
+    sources: [`${PAUL}/CSBgraphics.dat`,
+      'https://web.archive.org/web/20250108232147id_/http://www.dianneandpaul.net/CSBwin/CSBgraphics.dat'],
+    plain: true,
   },
   conflux: {
     file: 'Conflux_3.5_B8.7z',
@@ -126,6 +137,7 @@ const FILES: Record<string, [sha256: string, origin: Origin]> = {
   'conflux-3.5-b8/dungeon.dat': ['3097270c3e73dc96f3aa5d5c94b42f9f81a39a590036813ae5378aee6a677e23', { archive: 'conflux', path: 'Conflux_3.5_B8/Files/dungeon.dat' }],
   'conflux-3.5-b8/graphics.dat': ['94064802c1bd7e2b867e59b2a6dd605b204f6c5567e7097546548eed27677817', { archive: 'conflux', path: 'Conflux_3.5_B8/Files/graphics.dat' }],
   'conflux-3.5-b8/conflux-3.5-thumbnail.png': ['e2670aa65fa2b7c37272c55533001335534e7088155c263a74627367ebf6c56b', { step: 'thumbnails' }],
+  'csbgraphics/CSBgraphics.dat': ['d9d181c622732ef7e82fc788c6fe03f8c1c1de0e8d93e28f00fe1d6741367adb', { archive: 'csbGraphics', path: 'CSBgraphics.dat' }],
   'csb/csbgame2.dat': ['105104b30dde164e7000d388f251f3d6d3f83a56959f28f56220711d1e9f3a9e', { archive: 'csbWindows', path: 'csbgame2.dat' }],
   'csb/dungeon.dat': ['3cafd2fb9f255df93e99ae27d4bf60ff22cc8e43cfa90de7d29c04172b2542ba', { archive: 'csbWindows', path: 'dungeon.dat' }],
   'csb/graphics.dat': ['7cceef26a20acec6c5f9de659a6a0c57cdb24908687a2ca3a58e3c62cc6b0593', { archive: 'csbWindows', path: 'graphics.dat' }],
@@ -200,6 +212,11 @@ async function unpack(name: ArchiveName): Promise<void> {
       const sha = sha256(bytes);
       if (sha !== archive.sha256) throw new Error(`SHA-256 ${sha}, not ${archive.sha256}`);
       console.log(`${archive.file}: ${bytes.length} bytes from ${describe(source)}`);
+      if (archive.plain) {
+        mkdirSync(join(scratch, name));
+        writeFileSync(join(scratch, name, archive.file), bytes);
+        return;
+      }
       const file = join(scratch, archive.file);
       writeFileSync(file, bytes);
       const sevenZip = ['7z', '7zz', '7za'].find((tool) => !spawnSync(tool, ['i'], { stdio: 'ignore' }).error);
@@ -276,4 +293,4 @@ if (lines.length > 0) {
   console.error(`${GAMEFILES_DIR}/ differs from what this tool fetches:\n  ${lines.join('\n  ')}`);
   process.exit(1);
 }
-console.log(`${GAMEFILES_DIR}/: the ${Object.keys(FILES).length} files of ${new Set(Object.keys(FILES).map((p) => p.split('/')[0])).size} sets, each as pinned.`);
+console.log(`${GAMEFILES_DIR}/: the ${Object.keys(FILES).length} files of ${new Set(Object.keys(FILES).map((p) => p.split('/')[0])).size} folders, each as pinned.`);

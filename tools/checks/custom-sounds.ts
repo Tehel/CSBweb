@@ -32,7 +32,7 @@ import { newGame, stockGraphics, stockDungeon } from '../lib/game';
 /** The two `CSBgraphics.dat` here, with how many sound sections each holds. */
 const FILES: [string, number][] = [
   ['tools/fixtures/gamefiles/conflux-3.5-b8/CSBgraphics.dat', 611],
-  ['tools/fixtures/csbgraphics/CSBgraphics.dat', 618],
+  ['tools/fixtures/gamefiles/csbgraphics/CSBgraphics.dat', 618],
 ];
 
 const ascii = (bytes: Uint8Array, from: number, to: number): string => String.fromCharCode(...bytes.subarray(from, to));

@@ -3029,7 +3029,7 @@ Its size test, `fileSize < minSize + size` with `size = (width+1)/2 * height`, i
 in `ui32`s (`:251-252`, `:356-372`), so a product that wraps passes it.
 
 Every portrait section of both files here is 582 bytes, which is that layout with 16
-colours and 464 bytes of pixels: Conflux's 156 and `tools/fixtures/csbgraphics/CSBgraphics.dat`'s 197, from id 24 up.
+colours and 464 bytes of pixels: Conflux's 156 and `tools/fixtures/gamefiles/csbgraphics/CSBgraphics.dat`'s 197, from id 24 up.
 Verified, not inferred: seven of them, ids 44, 46, 47, 49, 50, 146 and 148 in both files,
 decode this way to cells 14, 12, 8, 4, 7, 23 and 22 of CSB's basic graphic 26, pixel for
 pixel (`tools/checks/portraits.ts`). Top-down rows or swapped nibbles would match none.
@@ -3162,7 +3162,7 @@ port takes the first path, as its `StartSound` does (`SoundManager.playCustomSou
 Once summed, every sound section of both files here is a whole WAV file, its 44-byte
 header included: `RIFF`, `WAVEfmt `, PCM, mono, 11025 Hz, 8-bit, and the `data` chunk's
 size at byte 40, which is why `ReadSound` reads the count there. Conflux's 611 and
-`tools/fixtures/csbgraphics/CSBgraphics.dat`'s 618, ids 220 up, all decode so (`tools/checks/custom-sounds.ts`): unsummed
+`tools/fixtures/gamefiles/csbgraphics/CSBgraphics.dat`'s 618, ids 220 up, all decode so (`tools/checks/custom-sounds.ts`): unsummed
 bytes would spell no header. One section in each, 705 (`coat`), has a 4-byte `fact` chunk
 at byte 36, holding 4574, before its `data` chunk of 4574 samples at byte 48, so
 `ReadSound` reads a count of 4 and `PlayCustomSound` plays four bytes, the `fact` chunk's

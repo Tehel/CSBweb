@@ -1,5 +1,5 @@
 /**
- * The viewport overlay's screen half (`src/renderer/csbwin/OverlayScreen.ts`), on `tools/fixtures/csbgraphics/CSBgraphics.dat`: the table
+ * The viewport overlay's screen half (`src/renderer/csbwin/OverlayScreen.ts`), on `tools/fixtures/gamefiles/csbgraphics/CSBgraphics.dat`: the table
  * `CreateOverlayTable` builds, and the viewport `UpdateScreenArea` composes through it.
  *
  * 1. **The straight branch** (`doc/CSBwin-src/Graphics.cpp:3096-3117`): each intensity as
@@ -34,7 +34,7 @@ import { check, finish } from '../lib/check';
 import { standInOf } from '../lib/standIn';
 
 const csbGraphics = new CSBGraphicsLoader();
-csbGraphics.loadFromArray(new Uint8Array(readFileSync('tools/fixtures/csbgraphics/CSBgraphics.dat')));
+csbGraphics.loadFromArray(new Uint8Array(readFileSync('tools/fixtures/gamefiles/csbgraphics/CSBgraphics.dat')));
 const sections = (type: CSBGraphicType): number =>
   Array.from({ length: 1000 }, (_, i) => i).filter((i) => csbGraphics.readSection(type, i, 0) !== null).length;
 console.log(`the fixture CSBgraphics.dat: ${sections(CSBGraphicType.ViewportOverlay)} overlays, ${sections(CSBGraphicType.OverlayPalette)} overlay palettes`);

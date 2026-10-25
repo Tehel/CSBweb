@@ -61,7 +61,7 @@ const CSB_GRAPHICS = 'tools/fixtures/gamefiles/csb/graphics.dat';
 /** The two `CSBgraphics.dat` here, with how many portrait sections each holds. */
 const CSB_GRAPHICS_FILES: [string, number][] = [
   ['tools/fixtures/gamefiles/conflux-3.5-b8/CSBgraphics.dat', 156],
-  ['tools/fixtures/csbgraphics/CSBgraphics.dat', 197],
+  ['tools/fixtures/gamefiles/csbgraphics/CSBgraphics.dat', 197],
 ];
 /** Portrait section → the cell of CSB's graphic 26 it is a copy of, in both files. */
 const CSB_CELL_COPIES = '44=14 46=12 47=8 49=4 50=7 146=23 148=22';

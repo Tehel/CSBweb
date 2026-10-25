@@ -196,7 +196,7 @@ check(csbOnly.result === 'ok', 'a world naming only a CSBgraphics.dat reads: gra
 
 console.log('');
 console.log('=== OpenCSBgraphicsFile at the first section read ===');
-const csbBytes = read('tools/fixtures/csbgraphics/CSBgraphics.dat');
+const csbBytes = read('tools/fixtures/gamefiles/csbgraphics/CSBgraphics.dat');
 const csbFold = foldedSignature(Signature(csbBytes)) || 1;
 
 /** A game over dm-atari, with the fixture CSBgraphics.dat opened through the game's checks. */

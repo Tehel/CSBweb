@@ -65,7 +65,8 @@ export interface DataSet {
      * opens only on demand (doc/CSBwin-src/Graphics.cpp:1864-1882, :3228-3300). It is a
      * library of resources for dungeon designers, which varies from release to release, so
      * a dungeon that uses it ships its own: Conflux and The Towers of Chaos do. DM and CSB
-     * use none. `tools/fixtures/csbgraphics/CSBgraphics.dat` is one such library, for the tools.
+     * use none. `tools/fixtures/gamefiles/csbgraphics/CSBgraphics.dat`, Paul R. Stevens', is
+     * one such library, for the tools (`npm run fetch-gamefiles`).
      */
     csbGraphics: boolean;
     /**

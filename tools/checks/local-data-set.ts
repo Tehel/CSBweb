@@ -251,7 +251,7 @@ async function checkForm(): Promise<void> {
   // and a block expecting a CSBgraphics.dat, before CSB's compressed dungeon.dat.
   const dmGraphics = (await diskFiles(dm).read('graphics.dat'))!;
   const fold = foldedSignature(Signature(dmGraphics));
-  const fixtureBytes = new Uint8Array(readFileSync('tools/fixtures/csbgraphics/CSBgraphics.dat'));
+  const fixtureBytes = new Uint8Array(readFileSync('tools/fixtures/gamefiles/csbgraphics/CSBgraphics.dat'));
   const fixture = blobOf(fixtureBytes);
   const csbFold = foldedSignature(Signature(fixtureBytes)) || 1;
   const naming = (records: [number, number][]): Blob => {

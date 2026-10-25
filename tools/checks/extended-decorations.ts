@@ -46,7 +46,7 @@ import { check, finish } from '../lib/check';
 import { graphicsTablesOf, newGame } from '../lib/game';
 
 const FILES = [
-  { name: 'tools fixture', path: 'tools/fixtures/csbgraphics/CSBgraphics.dat' },
+  { name: 'tools fixture', path: 'tools/fixtures/gamefiles/csbgraphics/CSBgraphics.dat' },
   { name: 'Conflux 3.5', path: 'tools/fixtures/gamefiles/conflux-3.5-b8/CSBgraphics.dat' },
 ];
 /** Two pictures to print: a bookshelf and a breaking wave. */
