@@ -31,7 +31,7 @@ import { applySaveBytes, buildSaveFile } from '../../src/engine/SaveGameFile';
 import { newGame, stockGame } from '../lib/game';
 import { check, finish } from '../lib/check';
 import { genuineSaves } from '../lib/saves';
-import { DEFAULT_DATA_SET } from '../lib/dataSets';
+import { STOCK_DATA_SET } from '../lib/dataSets';
 
 /** `fn` without the loaders' progress lines. */
 function quiet<T>(fn: () => T): T {
@@ -117,7 +117,7 @@ check(booted.ctx.rules.dmRules, 'DMRules forces DM_rules on (CSBCode.cpp:10796-1
 
 console.log('');
 console.log('=== the default data set, DM on the Atari files, plays by DM\'s rules ===');
-const dm = DEFAULT_DATA_SET;
+const dm = STOCK_DATA_SET;
 const ofSet = dmGame();
 ofSet.ctx.rules.dmRulesDesignOption = dm.dmRules;
 quiet(() => ofSet.readDungeonDat(new Uint8Array(readFileSync(resolve(dm.dir, 'dungeon.dat')))));

@@ -10,7 +10,8 @@
  *    digest against `node:crypto`'s of those bytes.
  * 2. The catalogue against the files here: every data set's `dungeon.dat`, and CSB's
  *    `mini.dat`, is a catalogue dungeon that lists the set, whole; no entry is left
- *    without its file, and no two dungeons share a digest.
+ *    without its file, and no two dungeons share a digest but a release and the dungeon
+ *    it is a variant of: Dungeon Master 1.0, of Dungeon Master.
  * 3. Each committed save, early ones and late ones, is its own dungeon's, whole, and
  *    matches no level of any other.
  * 4. The port's own save of a new game is its dungeon's.
@@ -24,7 +25,8 @@
  *    otherwise against the catalogue's dungeons of the other sets, with a set the
  *    catalogue does not list, a player's own or a published one, among them; the
  *    published sets' dungeons, whose levels' sizes break a tie, and the server's answer
- *    that gives them (`parsePublishedDungeons`).
+ *    that gives them (`parsePublishedDungeons`); and Dungeon Master 1.0 against
+ *    Dungeon Master, each in a set of the other.
  *
  * With a path, the digests of that file, a `dungeon.dat` or a save, are printed first,
  * as the catalogue lists them: that is how a dungeon is added to it.
@@ -49,6 +51,7 @@ import { stockDungeon, stockGame } from '../lib/game';
 import { genuineSaves, savePath } from '../lib/saves';
 
 const DM = 'Dungeon Master';
+const DM_10 = 'Dungeon Master 1.0';
 const CSB = 'Chaos Strikes Back';
 
 /** CSB's game is not its `dungeon.dat`, the prison, but this save (`doc/PROVEN_FACTS.md` → "A compressed `dungeon.dat`: CSB's prison"). */
@@ -150,12 +153,26 @@ async function checkCatalogue(): Promise<void> {
   check(DATA_SETS.every((set) => KNOWN_DUNGEONS.some((d) => d.dataSets.includes(set.id))), 'every data set plays a catalogue dungeon');
   console.log(`  ${KNOWN_DUNGEONS.length} dungeons, ${digests.length} levels`);
   // A dungeon may repeat a digest, as The Towers of Chaos does its unused levels: a match
-  // is level by level. Two dungeons may not share one.
+  // is level by level. Two dungeons may not share one, but for a release and the dungeon
+  // it is a variant of.
   const owners = new Map<string, Set<string>>();
   for (const dungeon of KNOWN_DUNGEONS) {
     for (const digest of dungeon.signature) owners.set(digest, (owners.get(digest) ?? new Set()).add(dungeon.name));
   }
-  check([...owners.values()].every((names) => names.size === 1), 'no two dungeons of the catalogue have a level with one digest');
+  check([...owners.values()].every((names) => names.size === 1 || (names.size === 2 && [...names].some((name) => variants(name, [...names])))),
+    'no two dungeons of the catalogue have a level with one digest, but a variant and its dungeon');
+  check(KNOWN_DUNGEONS.every((d) => d.variantOf === undefined || KNOWN_DUNGEONS.some((o) => o.name === d.variantOf && o.variantOf === undefined)),
+    'a variant names a catalogue dungeon, itself no variant');
+  const v10 = known(DM_10);
+  const shared = v10.signature.filter((digest, level) => digest === known(DM).signature[level]).length;
+  console.log(`  ${DM_10}: ${shared} of its ${v10.signature.length} levels are ${DM}'s`);
+  check(v10.variantOf === DM && shared === 13 && v10.signature[5] !== known(DM).signature[5],
+    `${DM_10} is ${DM} but for its level 6, which 1.1 gave the skeleton closets`);
+}
+
+/** Whether `name` is a variant of the other of `names`, a pair. */
+function variants(name: string, names: string[]): boolean {
+  return known(name).variantOf === names.find((other) => other !== name);
 }
 
 /* ------------------------------------------------------------- 3. the saves --- */
@@ -181,7 +198,8 @@ async function checkSaves(): Promise<void> {
       ...KNOWN_DUNGEONS.map((d, i) => `${counts[i]}/${d.signature.length}`), match?.dungeon.name ?? '-',
     ].join('\t'));
     check(match?.dungeon === known(own) && match.whole, `${name}: it is ${own}'s, every level`);
-    check(KNOWN_DUNGEONS.every((d, i) => d === known(own) || counts[i] === 0), `${name}: and no level of it is another dungeon's`);
+    check(KNOWN_DUNGEONS.every((d, i) => d === known(own) || d.variantOf === own || counts[i] === 0),
+      `${name}: and no level of it is another dungeon's, but a variant's`);
     if (own === DM && info) times.push(info.time);
   }
   check(saves.length === 10, `ten saves are read (got ${saves.length})`);
@@ -316,6 +334,16 @@ async function checkAgainstDataSet(): Promise<void> {
   check(say('mini.dat', mini, 'csb', csbOwn) === 'own' && say('the prison', prison, 'csb', csbOwn) === 'own',
     'the csb set has two dungeons of its own, its dungeon.dat and mini.dat');
   check(say('mini.dat', mini, 'dm-atari', [dm]) === `other, ${CSB}`, `and in Dungeon Master ${CSB} is another dungeon's`);
+  // Dungeon Master 1.0, a variant: a save of one release in a set of the other is a slightly
+  // different dungeon; neither release is the other's "other" dungeon, as neither is the
+  // running set's; in another game it is the release it is the whole of.
+  const v10 = await dungeonWalls(dungeonDat('tools/fixtures/gamefiles/dm-atari-1.0a/dungeon.dat'));
+  check(say('Dungeon Master 1.0', v10, 'dm-atari-1.2', [dm]) === 'different' && say('a save of Dungeon Master', save, 'dm-atari-1.0a', [v10]) === 'different',
+    `${DM_10} and ${DM} are slightly different dungeons, in a set of either`);
+  check(say('level 4 turned a quarter', { shapes: turned, signature }, 'dm-atari-1.0a', [v10]) === 'unknown',
+    `nor does the catalogue name ${DM} in a set of ${DM_10}, its release`);
+  check(say('Dungeon Master 1.0', v10, 'csb', csbOwn) === `other, ${DM_10}` && say('a save of Dungeon Master', save, 'csb', csbOwn) === `other, ${DM}`,
+    'in another game, each release is told by its walls');
   const unplayed: KnownDungeon = { name: 'unplayed', dataSets: [], signature };
   const result = checkDungeon(save, 'local:x', [], false, [unplayed]);
   check(say('a dungeon no data set plays', save, 'local:x', [], false, [unplayed]) === 'other, unplayed'

@@ -164,7 +164,10 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   (`dungeonSignature` over `levelWalls`, `src/data/DungeonSignature.ts`).
   Nothing finer: a teleporter a release moved, or a cell whose type play changed, leaves
   the signature alone, and a player seldom knows which release a save came from. So the
-  four Dungeon Master sets are one dungeon, and a save of one is a save of any. The
+  Dungeon Master sets from 1.1 on are one dungeon, and a save of one is a save of any.
+  The two 1.0 disks' are its variant (`KnownDungeon.variantOf`), level 6 without the
+  skeleton closets 1.1 added: a save of either release in a set of the other is a slightly
+  different dungeon, and neither is ever the "other" dungeon of a set of the other. The
   digest is SHA-256, through `crypto.subtle`, which a browser and Node both have built
   in, a browser in a secure context alone. The author's decision: the page is served
   from localhost and will be hosted over https, so it is always there, and nothing
@@ -638,12 +641,13 @@ with its saves' rows and files.
   world, a cell's attributes, objects and type among those not stone changing nothing, a
   wall opened or a cell walled changing its level's digest alone, the size in the
   digest, and a save of thirteen levels of the fourteen being most of Dungeon Master and
-  not the whole; `checkDungeon` in each of the four Dungeon Master sets and in `csb`
+  not the whole; `checkDungeon` in each of the Dungeon Master sets and in `csb`
   against their own files, thirteen levels the same of fourteen being a slightly
   different dungeon, the same shapes and no digest the same another, a level turned or
   a level fewer going on to the other sets, which never name the set's own, LOOK FOR A
   BETTER MATCH, a set whose `dungeon.dat` does not read, a known dungeon no data set
-  plays, and a set the catalogue does not list, holding Dungeon Master or most of it).
+  plays, and a set the catalogue does not list, holding Dungeon Master or most of it;
+  and Dungeon Master 1.0 and Dungeon Master, each in a set of the other).
 - **The import**: "the import" (a genuine save stored under its file's name, date and
   playthrough, byte for byte, and again under a numbered name; a file that names no
   playthrough joined to its party's or given the first its stream draws, stamped, the

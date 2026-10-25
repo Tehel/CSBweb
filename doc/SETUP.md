@@ -174,18 +174,22 @@ and `~/csbweb` as the stack's folder. Replace them with your own.
     ```
 
     It offers each of FTL's games that `tools/data-sets.json` lists, one at a time: Dungeon
-    Master and its versions, the Kid's dungeon, and Chaos Strikes Back. You can rename one
-    and edit its description and authors before you say yes. Each yes copies the set's
-    files to the server and writes its row: approved, official, and owned by the site, so
-    that a player's dungeon without its own graphics can play DM's or CSB's. The manifest's
-    default set, Dungeon Master, becomes the one the welcome page selects on a first visit.
-    A second run offers only what is not installed yet.
+    Master as each of the six Atari disks holds it (1.0 twice, 1.1, 1.2, the German 1.2 and
+    the French 1.3), CSBWin's own two, the Kid's dungeon, and Chaos Strikes Back. You can
+    rename one and edit its description and authors before you say yes. Each yes copies
+    the set's files to the server and writes its row: approved, official, and owned by the
+    site. Say yes to `dm-atari` and `csb` at least: a player's dungeon without its own
+    graphics plays one of theirs, `dm-atari`'s being CSBWin's Dungeon Master's with three
+    pictures from the 1.2 disk (`doc/PROVEN_FACTS.md`). The manifest's default set, the 1.2 disk's Dungeon Master,
+    becomes the one the welcome page selects on a first visit. A second run offers only
+    what is not installed yet.
 
 23. **Look at the store**, if you like: on the server,
     `sqlite3 ~/csbweb/stats/stats.db 'SELECT id, name, status, official, hidden FROM data_sets'`.
 
-24. **Reload the welcome page.** The games are listed under "Official games". Dungeon
-    Master ST 1.2, the 1.3 French and CSBWin's own Dungeon Master are installed hidden.
+24. **Reload the welcome page.** The games are listed under "Official games", the six
+    disks first. CSBWin's own two Dungeon Masters, `dm-atari` and `dm-windows`, are
+    installed hidden.
     As a moderator you see them, their names in purple, and `?dungeon=<id>` plays them for
     anyone. The eye on a tile hides or shows it.
 
@@ -194,7 +198,7 @@ and `~/csbweb` as the stack's folder. Replace them with your own.
     its ADD attaches a document, such as a manual. Every change takes effect at once,
     with no restart.
 
-26. **Play.** Pick Dungeon Master, then PLAY.
+26. **Play.** Pick Dungeon Master ST 1.2, then PLAY.
 
 ## Keeping it
 

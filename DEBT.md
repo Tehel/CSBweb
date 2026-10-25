@@ -1460,8 +1460,8 @@ Recorded so that nobody "fixes" them.
   the attribute as it stands. `tools/checks/dsa-objects.ts` checks it.
 - 🚫 **Word sizes from the file.** Two of CSBWin's constants are the English words'
   sizes: `AttackNames[300]` in graphic `0x230` and the source widths `DisplayFoodWater`
-  blits the food, water and poisoned labels with. The French 1.3 `graphics.dat` has
-  longer words in both places, so `parseGraphic230` sizes the names from the graphic's
+  blits the food, water and poisoned labels with. The French 1.3 and German 1.2
+  `graphics.dat` have longer words in both places, so `parseGraphic230` sizes the names from the graphic's
   length and `drawFoodWaterPanel` reads each label at its own width. Every other set gets
   CSBWin's numbers (`doc/PROVEN_FACTS.md` → "The French 1.3 `graphics.dat`: longer
   words").

@@ -176,7 +176,7 @@ import {
 } from '../../src/renderer/ui/Menu';
 import type { UIState } from '../../src/renderer/ui/UIState';
 import { SCREEN_HEIGHT, SCREEN_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../../src/renderer/ViewportGraphics';
-import { DEFAULT_DATA_SET, dataSetNamed, diskFiles } from '../lib/dataSets';
+import { STOCK_DATA_SET, dataSetNamed, diskFiles } from '../lib/dataSets';
 import { graphicsTablesOf, newGame, stockGame, stockGraphics } from '../lib/game';
 import { newUIState } from '../lib/ui';
 import { check, finish } from '../lib/check';
@@ -510,7 +510,7 @@ function entry(over: Partial<SaveEntry>): SaveEntry {
   return {
     id: 'x',
     name: 'x',
-    dataSet: DEFAULT_DATA_SET.id,
+    dataSet: STOCK_DATA_SET.id,
     playthrough: 0,
     quick: false,
     sleep: false,
@@ -691,11 +691,11 @@ function checkListLogic(): void {
     entry({ name: 'quick, another set', playthrough: 7, quick: true, dataSet: 'csb', savedAt: 400 }),
   ];
   const slot = (dataSet: string, playthrough: number): string => slotOf(slots, 'quick', dataSet, playthrough)?.name ?? 'none';
-  console.log(`  F5's slot: playthrough 7 "${slot(DEFAULT_DATA_SET.id, 7)}", 9 "${slot(DEFAULT_DATA_SET.id, 9)}", 7 in csb "${slot('csb', 7)}", 8 "${slot(DEFAULT_DATA_SET.id, 8)}"`);
-  check(slot(DEFAULT_DATA_SET.id, 7) === 'quick, newer', 'F5\'s slot is the playthrough\'s newest quick-save, never the menu\'s save');
-  check(slot(DEFAULT_DATA_SET.id, 9) === 'quick, another playthrough' && slot('csb', 7) === 'quick, another set',
+  console.log(`  F5's slot: playthrough 7 "${slot(STOCK_DATA_SET.id, 7)}", 9 "${slot(STOCK_DATA_SET.id, 9)}", 7 in csb "${slot('csb', 7)}", 8 "${slot(STOCK_DATA_SET.id, 8)}"`);
+  check(slot(STOCK_DATA_SET.id, 7) === 'quick, newer', 'F5\'s slot is the playthrough\'s newest quick-save, never the menu\'s save');
+  check(slot(STOCK_DATA_SET.id, 9) === 'quick, another playthrough' && slot('csb', 7) === 'quick, another set',
     'each playthrough has its own, in its own data set');
-  check(slot(DEFAULT_DATA_SET.id, 8) === 'none', 'a playthrough not quick-saved yet has none');
+  check(slot(STOCK_DATA_SET.id, 8) === 'none', 'a playthrough not quick-saved yet has none');
 
   // The last save used: the latest `usedAt`, which a write and a load both set.
   const used = [
@@ -907,7 +907,7 @@ async function checkQuickSaveOverOpenChest(graphics: GraphicsLoader): Promise<vo
 
   // F5's save, to a store in memory instead of the page's.
   const store = memoryStore();
-  const saves = new GameSaves(game, DEFAULT_DATA_SET, diskFiles(DEFAULT_DATA_SET), store, { portraitOf: () => undefined }, () => {});
+  const saves = new GameSaves(game, STOCK_DATA_SET, diskFiles(STOCK_DATA_SET), store, { portraitOf: () => undefined }, () => {});
   const row = await saves.save('running', 'quick');
   const fresh = await loadGame();
   applySaveBytes(fresh, await store.read(row.id));
@@ -1080,7 +1080,7 @@ async function checkSaveCall(): Promise<void> {
     discardText: () => {},
   };
   const toldSince = (from: number): string => told.slice(from).join('').replace(/\n/g, '/');
-  const stage = async (fail: boolean, dataSet = DEFAULT_DATA_SET, shared?: ReturnType<typeof memoryStore>, name = 'DAROO') => {
+  const stage = async (fail: boolean, dataSet = STOCK_DATA_SET, shared?: ReturnType<typeof memoryStore>, name = 'DAROO') => {
     const game = await loadGame({ messages });
     game.systems.hallOfChampions.addChampion(healthyChampion(name));
     let tailAtWrite: boolean | null = null;
@@ -1116,7 +1116,7 @@ async function checkSaveCall(): Promise<void> {
     check([first, second, third].every((e) => e.usedAt === e.savedAt), 'which is when it was last used');
     const playthrough = menu.game.ctx.state.block1.randomGameID;
     console.log(`  the row: data set ${first.dataSet}, ${first.playthrough === playthrough ? 'the game\'s' : 'ANOTHER'} playthrough, quick ${first.quick}; F5's: quick ${third.quick}`);
-    check(first.dataSet === DEFAULT_DATA_SET.id, 'the row names the game\'s data set');
+    check(first.dataSet === STOCK_DATA_SET.id, 'the row names the game\'s data set');
     check([first, second, third].every((e) => e.playthrough === playthrough),
       'and its playthrough, the game\'s d.RandomGameID, as the file holds it');
     check(!first.quick && !second.quick && third.quick, 'and whether the save is F5\'s or the menu\'s');
@@ -1159,7 +1159,7 @@ async function checkSaveCall(): Promise<void> {
       'so the next F5 leaves it alone, and makes a slot of its own');
 
     // Over a save of another playthrough: the row is the saved game's.
-    const other = await stage(false, DEFAULT_DATA_SET, menu.store, 'WUUF');
+    const other = await stage(false, STOCK_DATA_SET, menu.store, 'WUUF');
     const taken = await other.saves.save('stopped', second);
     const otherPlaythrough = other.game.ctx.state.block1.randomGameID;
     console.log(`  SAVE over a save of another playthrough: ${taken.id === second.id ? 'the same row' : 'ANOTHER ROW'}, ${taken.playthrough === otherPlaythrough ? 'the saved game\'s' : 'ANOTHER'} playthrough, party ${taken.champions.join('/')}`);
@@ -1190,7 +1190,7 @@ async function checkSaveCall(): Promise<void> {
     const champion = slowGame.ctx.party.state.champions[0]!;
     const atTheKey = champion.attributes.health;
     const slow = memoryStore(() => {}, false, () => { champion.attributes.health = 1; });
-    const slowSaves = new GameSaves(slowGame, DEFAULT_DATA_SET, diskFiles(DEFAULT_DATA_SET), slow, { portraitOf: () => undefined }, () => {});
+    const slowSaves = new GameSaves(slowGame, STOCK_DATA_SET, diskFiles(STOCK_DATA_SET), slow, { portraitOf: () => undefined }, () => {});
     const late = await slowSaves.save('running', 'quick');
     const held = readCsbwinCharacter(loadSaveGameState(await slow.read(late.id)).characterBlock!, 0).champion.attributes.health;
     console.log(`  clock running, a champion hurt while the store is listed: health ${atTheKey} at the key, ${held} in the file`);
@@ -1275,7 +1275,7 @@ async function checkSaveCall(): Promise<void> {
     console.log('=== one store, two data sets ===');
     const shared = memoryStore();
     const csbSet = dataSetNamed('csb');
-    const dm = await stage(false, DEFAULT_DATA_SET, shared, 'DAROO');
+    const dm = await stage(false, STOCK_DATA_SET, shared, 'DAROO');
     const csb = await stage(false, csbSet, shared, 'LEYLA');
     const dmOld = await dm.saves.save('stopped', 'new');
     const csbSame = await csb.saves.save('stopped', 'new');
@@ -1286,10 +1286,10 @@ async function checkSaveCall(): Promise<void> {
     const names = (entries: SaveEntry[]): string => entries.map((e) => e.name).join(', ');
     const dmList = await dm.saves.list();
     const csbList = await csb.saves.list();
-    console.log(`  ${DEFAULT_DATA_SET.id}: ${names(dmList)}`);
+    console.log(`  ${STOCK_DATA_SET.id}: ${names(dmList)}`);
     console.log(`  ${csbSet.id}: ${names(csbList)}`);
     console.log(`  every set: ${(await shared.list(null)).length} rows`);
-    check(csbSet.id === 'csb' && dmList.length === 2 && dmList.every((e) => e.dataSet === DEFAULT_DATA_SET.id)
+    check(csbSet.id === 'csb' && dmList.length === 2 && dmList.every((e) => e.dataSet === STOCK_DATA_SET.id)
       && dmList[0]!.id === dmNew.id && dmList[1]!.id === dmOld.id,
       'a game lists its own data set\'s saves, newest first');
     check(csbList.length === 2 && csbList.every((e) => e.dataSet === csbSet.id) && csbList[0]!.id === csbNew.id,
@@ -1308,13 +1308,13 @@ async function checkSaveCall(): Promise<void> {
     const reportsBefore = reports.length;
     await dm.saves.quickLoad();
     const loadedParty = dm.game.ctx.party.state.champions.map((c) => c.name).join('/');
-    console.log(`  F9 in ${DEFAULT_DATA_SET.id}: ${toldSince(beforeLoad)}, party ${loadedParty} (${reports.slice(reportsBefore).join(' | ')})`);
+    console.log(`  F9 in ${STOCK_DATA_SET.id}: ${toldSince(beforeLoad)}, party ${loadedParty} (${reports.slice(reportsBefore).join(' | ')})`);
     check(toldSince(beforeLoad) === '/15:GAME LOADED' && loadedParty === 'DAROO'
       && reports[reports.length - 1] === `Quick-loaded ${dmNew.name}`,
       'F9 loads the newest save of the game\'s playthrough, F5\'s here, and says so');
     const afterF9 = await dm.saves.list();
     const f9Row = afterF9.find((e) => e.id === dmNew.id);
-    console.log(`  the save F9 loaded: saved ${(now - (f9Row?.savedAt ?? 0)) / 60_000} minute ago, used ${(now - (f9Row?.usedAt ?? 0)) / 60_000}; the last used of ${DEFAULT_DATA_SET.id}: ${lastUsedSave(afterF9)?.id === dmNew.id ? 'that one' : 'ANOTHER'}`);
+    console.log(`  the save F9 loaded: saved ${(now - (f9Row?.savedAt ?? 0)) / 60_000} minute ago, used ${(now - (f9Row?.usedAt ?? 0)) / 60_000}; the last used of ${STOCK_DATA_SET.id}: ${lastUsedSave(afterF9)?.id === dmNew.id ? 'that one' : 'ANOTHER'}`);
     check(f9Row?.usedAt === now && f9Row.savedAt === dmNew.savedAt && f9Row.savedAt < now && lastUsedSave(afterF9)?.id === dmNew.id,
       'the save it loaded is marked as used then, its date kept: the last save used of its data set');
     check((await csb.saves.list()).every((e) => e.usedAt === e.savedAt), 'and the other set\'s rows are untouched');
@@ -1327,12 +1327,12 @@ async function checkSaveCall(): Promise<void> {
 
     // Another playthrough of the same set has no save of its own to load, and neither
     // has a set with no save at all.
-    const stranger = await stage(false, DEFAULT_DATA_SET, shared, 'WUUF');
+    const stranger = await stage(false, STOCK_DATA_SET, shared, 'WUUF');
     const empty = await stage(false, dataSetNamed('dm-windows'), shared);
     const beforeNone = told.length;
     await stranger.saves.quickLoad();
     await empty.saves.quickLoad();
-    console.log(`  F9 in another playthrough of ${DEFAULT_DATA_SET.id}, then in dm-windows: ${toldSince(beforeNone)}`);
+    console.log(`  F9 in another playthrough of ${STOCK_DATA_SET.id}, then in dm-windows: ${toldSince(beforeNone)}`);
     check(toldSince(beforeNone) === '/15:CAN\'T FIND SAVED GAME!/15:CAN\'T FIND SAVED GAME!'
       && stranger.game.ctx.party.state.champions[0]!.name === 'WUUF' && empty.game.ctx.party.state.champions[0]!.name === 'DAROO',
       'F9 in a playthrough with no save finds none (SaveGame.cpp:1710), whatever the others hold, and loads nothing');
@@ -1365,7 +1365,7 @@ async function checkSaveCall(): Promise<void> {
       const saved = await racing.saves.save('stopped', 'new');
       racing.game.ctx.party.state.champions[0]!.name = 'CHANGED';
       const slow = { ...racing.store, read: async (id: string) => { during(racing.game); return racing.store.read(id); } };
-      const racingSaves = new GameSaves(racing.game, DEFAULT_DATA_SET, diskFiles(DEFAULT_DATA_SET), slow,
+      const racingSaves = new GameSaves(racing.game, STOCK_DATA_SET, diskFiles(STOCK_DATA_SET), slow,
         { portraitOf: () => undefined }, (message: string) => { reports.push(message); });
       const beforeRace = told.length;
       now += 60_000;
@@ -1392,7 +1392,7 @@ async function checkSaveCall(): Promise<void> {
     console.log(`  the stream of seed ${hex(SEED)} draws ${hex(firstId)}, ${hex(secondId)}, ${hex(thirdId)}`);
     const drawn = memoryStore();
     /** A new game as the page reads one: `dungeon.dat`, then the store's say on its id. */
-    const fresh = async (store: SaveStore, dataSet = DEFAULT_DATA_SET) => {
+    const fresh = async (store: SaveStore, dataSet = STOCK_DATA_SET) => {
       const game = await loadGame({ messages });
       const before = game.ctx.state.block1.randomGameID;
       const saves = new GameSaves(game, dataSet, diskFiles(dataSet), store, { portraitOf: () => undefined },
@@ -1448,7 +1448,7 @@ const RIGHT = 1;
 async function menuRig(
   graphics: GraphicsLoader, store: SaveStore, champion: string,
   hooks: Partial<Pick<UIState, 'onHasNewFaces' | 'onMakeNewAdventure'>> = {},
-  dataSet: DataSet = DEFAULT_DATA_SET,
+  dataSet: DataSet = STOCK_DATA_SET,
   files: DataSetFiles = diskFiles(dataSet),
 ) {
   const game = await loadGame();
@@ -3061,7 +3061,7 @@ async function checkImport(graphics: GraphicsLoader): Promise<void> {
   // The games' playthroughs are given, so that every line printed is the same at each run.
   game.ctx.state.block1.randomGameID = 0x0da200;
   const screen = { portraitOf: () => undefined };
-  const saves = new GameSaves(game, DEFAULT_DATA_SET, diskFiles(DEFAULT_DATA_SET), store, screen, log, new CsbRandom(SEED));
+  const saves = new GameSaves(game, STOCK_DATA_SET, diskFiles(STOCK_DATA_SET), store, screen, log, new CsbRandom(SEED));
   const csbSaves = new GameSaves(game, dataSetNamed('csb'), diskFiles(dataSetNamed('csb')), store, screen, log, new CsbRandom(SEED));
   const read = (path: string): Uint8Array => new Uint8Array(readFileSync(resolve(path)));
   const same = (a: Uint8Array | undefined, b: Uint8Array | undefined): boolean =>
@@ -3099,14 +3099,14 @@ async function checkImport(graphics: GraphicsLoader): Promise<void> {
     if (own.kind !== 'stored') throw new Error(`csbgame7.dat was not stored: ${refusal(own)}`);
     show('a genuine save of Dungeon Master', own.entry);
     const info = readCsbwinSaveInfo(genuine)!;
-    check(own.entry.id === 'CSBGAME7.DAT' && own.entry.name === 'CSBGAME7.DAT' && own.entry.dataSet === DEFAULT_DATA_SET.id,
+    check(own.entry.id === 'CSBGAME7.DAT' && own.entry.name === 'CSBGAME7.DAT' && own.entry.dataSet === STOCK_DATA_SET.id,
       'a save of the data set\'s own dungeon is stored, under the file\'s name, as a row of the data set');
     check(own.entry.playthrough === info.randomGameID && info.randomGameID !== 0 && own.entry.level === info.level
       && own.entry.champions.join('/') === info.champions.join('/'), 'its playthrough, level and champions are the file\'s');
     check(own.entry.savedAt === written && own.entry.usedAt === now && own.entry.playTime === 0 && !own.entry.quick && !own.entry.unofficial,
       'its date is the file\'s; it is the last save used, counts no time played, and is neither F5\'s nor unofficial');
     check(same(store.files.get('CSBGAME7.DAT'), genuine), 'the stored file is the file, byte for byte');
-    check((await store.list(DEFAULT_DATA_SET.id)).some((row) => row.id === 'CSBGAME7.DAT') && lastUsedSave(await saves.list())?.id === 'CSBGAME7.DAT',
+    check((await store.list(STOCK_DATA_SET.id)).some((row) => row.id === 'CSBGAME7.DAT') && lastUsedSave(await saves.list())?.id === 'CSBGAME7.DAT',
       'the game\'s list has it, as the last save used');
     now += 60_000;
 
@@ -3158,7 +3158,7 @@ async function checkImport(graphics: GraphicsLoader): Promise<void> {
     const confirmed = await saves.importSave({ name: 'modified.dat', bytes: modified }, 'anyway');
     if (confirmed.kind !== 'stored') throw new Error('modified.dat was not stored');
     show('the same, imported anyway', confirmed.entry);
-    check(confirmed.entry.unofficial && confirmed.entry.dataSet === DEFAULT_DATA_SET.id && same(store.files.get('modified.dat'), modified),
+    check(confirmed.entry.unofficial && confirmed.entry.dataSet === STOCK_DATA_SET.id && same(store.files.get('modified.dat'), modified),
       'imported anyway, it is stored as a row of the data set, marked unofficial');
     now += 60_000;
 
@@ -3204,7 +3204,7 @@ async function checkImport(graphics: GraphicsLoader): Promise<void> {
     let askedFor = 0;
     const withPublished = (set: DataSet): GameSaves => new GameSaves(game, set, diskFiles(set), store, screen, log, new CsbRandom(SEED),
       async () => { askedFor++; return [keep, wuuf]; });
-    const inDm = withPublished(DEFAULT_DATA_SET);
+    const inDm = withPublished(STOCK_DATA_SET);
     const unasked = await inDm.importSave({ name: 'modified.dat', bytes: modified });
     check(unasked.kind === 'different' && askedFor === 0, 'an import held against the set\'s own dungeon does not ask for the published sets');
     const named = [
@@ -3213,9 +3213,9 @@ async function checkImport(graphics: GraphicsLoader): Promise<void> {
       await withPublished(dataSetNamed('csb')).importSave({ name: 'CSBGAME7.DAT', bytes: genuine }),
     ];
     console.log(`  with two sets published, the modified save looked for elsewhere, the unknown one and a save of Dungeon Master, in csb: ${named.map(refusal).join('; ')}`);
-    check(named.map(refusal).join('; ') === 'other (Wuuf; sets wuuf); other (Boris\'s keep; sets boris-keep); other (Dungeon Master; sets dm-atari dm-windows dm-atari-1.2 dm-atari-1.3-fr)'
+    check(named.map(refusal).join('; ') === 'other (Wuuf; sets wuuf); other (Boris\'s keep; sets boris-keep); other (Dungeon Master; sets dm-atari dm-windows dm-atari-1.1 dm-atari-1.2 dm-atari-1.2-de dm-atari-1.3-fr)'
       && askedFor === 3, 'LOOK FOR A BETTER MATCH and the other sets name a published set, askedFor for at each import that goes on to them, and Dungeon Master is still the catalogue\'s');
-    const inKeep = await withPublished({ ...DEFAULT_DATA_SET, id: 'boris-keep', name: 'Boris\'s keep' }).importSave({ name: 'unknown.dat', bytes: unknown }, 'elsewhere');
+    const inKeep = await withPublished({ ...STOCK_DATA_SET, id: 'boris-keep', name: 'Boris\'s keep' }).importSave({ name: 'unknown.dat', bytes: unknown }, 'elsewhere');
     console.log(`  the unknown save looked for elsewhere, in Boris's keep: ${refusal(inKeep)}`);
     check(inKeep.kind === 'other' && inKeep.dungeon === wuuf, 'a published set\'s own entry never names it, in it: the set most of its levels match does');
     const failing = await new GameSaves(game, dataSetNamed('csb'), diskFiles(dataSetNamed('csb')), store, screen, log, new CsbRandom(SEED),
@@ -3254,16 +3254,16 @@ async function checkImport(graphics: GraphicsLoader): Promise<void> {
       'in the csb set, a save of Chaos Strikes Back and mini.dat are stored, rows of that set');
     const dmInCsb = await csbSaves.importSave({ name: 'CSBGAME7.DAT', bytes: genuine }, 'anyway');
     console.log(`  a save of Dungeon Master, in the csb set: ${refusal(dmInCsb)}`);
-    check(dmInCsb.kind === 'other' && dmInCsb.dungeon.name === 'Dungeon Master' && dmInCsb.dungeon.dataSets.includes(DEFAULT_DATA_SET.id),
+    check(dmInCsb.kind === 'other' && dmInCsb.dungeon.name === 'Dungeon Master' && dmInCsb.dungeon.dataSets.includes(STOCK_DATA_SET.id),
       'and a save of Dungeon Master is another dungeon\'s there');
-    check((await saves.list()).every((row) => row.dataSet === DEFAULT_DATA_SET.id) && (await csbSaves.list()).length === 2,
+    check((await saves.list()).every((row) => row.dataSet === STOCK_DATA_SET.id) && (await csbSaves.list()).length === 2,
       'each game lists its own set\'s');
     now += 60_000;
 
     // A set the catalogue does not list, a published one, that holds Dungeon Master's
     // dungeon: its dungeon.dat says its saves, which the catalogue alone calls another's.
-    const published: DataSet = { ...DEFAULT_DATA_SET, id: 'published-dm', name: 'Published' };
-    const publishedSaves = new GameSaves(game, published, diskFiles(DEFAULT_DATA_SET), store, screen, log, new CsbRandom(SEED));
+    const published: DataSet = { ...STOCK_DATA_SET, id: 'published-dm', name: 'Published' };
+    const publishedSaves = new GameSaves(game, published, diskFiles(STOCK_DATA_SET), store, screen, log, new CsbRandom(SEED));
     const inPublished = await publishedSaves.importSave({ name: 'CSBGAME7.DAT', bytes: genuine });
     if (inPublished.kind === 'stored') show('in a published set holding Dungeon Master', inPublished.entry);
     check(inPublished.kind === 'stored' && inPublished.entry.dataSet === 'published-dm' && !inPublished.entry.unofficial,
@@ -3286,7 +3286,7 @@ async function checkImport(graphics: GraphicsLoader): Promise<void> {
       await localSaves.importSave({ name: 'unknown.dat', bytes: unknown }, 'anyway'),
     ];
     console.log(`  in it, a modified save, the same looked for elsewhere, a save of Chaos Strikes Back and an unknown one: ${asks.map(refusal).join('; ')}`);
-    check(asks.map(refusal).join('; ') === 'different; other (Dungeon Master; sets dm-atari dm-windows dm-atari-1.2 dm-atari-1.3-fr); '
+    check(asks.map(refusal).join('; ') === 'different; other (Dungeon Master; sets dm-atari dm-windows dm-atari-1.1 dm-atari-1.2 dm-atari-1.2-de dm-atari-1.3-fr); '
       + 'other (Chaos Strikes Back; sets csb); unknown' && (await localSaves.list()).length === 1,
       'in it, the same rules as in any set: a wall moved asks, and looked for elsewhere is Dungeon Master\'s; another shape is another set\'s; '
       + 'nothing is refused for being a local set\'s, and nothing stored unasked');
@@ -3430,7 +3430,7 @@ async function checkDrop(graphics: GraphicsLoader): Promise<void> {
     const stored = (await store.list(null)).find((row) => row.id === 'modified.dat');
     console.log(`  IMPORT ANYWAY: "${state.message}", the row ${stored ? `of set ${stored.dataSet}${stored.unofficial ? ', unofficial' : ', OFFICIAL'}` : 'NOT STORED'}`);
     console.log(daroo.list());
-    check(state.dropped === null && state.message === SaveMenu.SAVE_MENU_IMPORTED && stored?.unofficial === true && stored.dataSet === DEFAULT_DATA_SET.id,
+    check(state.dropped === null && state.message === SaveMenu.SAVE_MENU_IMPORTED && stored?.unofficial === true && stored.dataSet === STOCK_DATA_SET.id,
       'IMPORT ANYWAY stores it, a row of the running data set, unofficial');
     check(SaveMenu.selectedEntry(state)?.id === 'modified.dat' && store.files.size === 3, 'and it is listed and selected');
     now += 60_000;
@@ -3663,7 +3663,7 @@ async function checkUpgrade(): Promise<void> {
     v1('f.dat', 600, buffer(new Uint8Array(64))),
     v1('g.dat', 700, undefined),
   ];
-  const rows = upgradeSaveRecords(old, DEFAULT_DATA_SET.id);
+  const rows = upgradeSaveRecords(old, STOCK_DATA_SET.id);
   console.log(['id', 'name', 'data set', 'playthrough', 'quick', 'savedAt', 'level', 'champions', 'bytes'].join('\t'));
   for (const row of rows) {
     console.log([row.id, row.name, row.dataSet, row.playthrough === playthrough ? 'the file\'s' : 'ANOTHER', row.quick, row.savedAt, row.level, row.champions.join('/'), row.bytes.byteLength].join('\t'));
@@ -3677,7 +3677,7 @@ async function checkUpgrade(): Promise<void> {
   check(rows.every((r) => sameFile(r.bytes)), 'a row\'s bytes are the CSBWin file alone, the JSON\'s `raw` decoded');
   check(rows.every((r) => r.level === 9 && r.champions.join('/') === 'DAROO/LEYLA' && r.playthrough === playthrough),
     'the level, the party and the playthrough are read from the file, not kept from the old row');
-  check(rows.every((r) => r.dataSet === DEFAULT_DATA_SET.id && !r.quick), 'every row is the default data set\'s, and none is a quick save');
+  check(rows.every((r) => r.dataSet === STOCK_DATA_SET.id && !r.quick), 'every row is the default data set\'s, and none is a quick save');
   check(rows.map((r) => r.savedAt).join() === '100,200,300', 'the date is the old row\'s, and of two rows that come to one name the newer is kept');
   check(rows.every((r) => r.usedAt === r.savedAt), 'and is when the row was last used');
   check(rows.every((r) => r.playTime === 0), 'and a row counts no time played: no earlier build kept any');
@@ -3686,7 +3686,7 @@ async function checkUpgrade(): Promise<void> {
     applySaveBytes(fresh, new Uint8Array(row.bytes));
     check(fresh.ctx.party.state.position.z === 9 && fresh.ctx.party.state.champions.length === 2, `${row.id} loads`);
   }
-  check(upgradeSaveRecords([null, 'x', {}], DEFAULT_DATA_SET.id).length === 0, 'what is not a row is dropped, not thrown on');
+  check(upgradeSaveRecords([null, 'x', {}], STOCK_DATA_SET.id).length === 0, 'what is not a row is dropped, not thrown on');
 
   // Version 3: a row that names no playthrough is given one, stamped into its file.
   console.log('');
@@ -3713,15 +3713,15 @@ async function checkUpgrade(): Promise<void> {
   };
   const pair = ['DAROO', 'LEYLA'];
   const held = [
-    v2('pair, named, older', DEFAULT_DATA_SET.id, pair, 0x700, 100),
-    v2('pair, named, newer', DEFAULT_DATA_SET.id, pair, 0x900, 200),
-    v2('pair, nameless, oldest', DEFAULT_DATA_SET.id, pair, 0, 50),
-    v2('pair, nameless, newest', DEFAULT_DATA_SET.id, pair, 0, 300, { quick: true, usedAt: 400, playTime: 5000 }),
-    v2('wuuf, nameless, older', DEFAULT_DATA_SET.id, ['WUUF'], 0, 150),
-    v2('wuuf, nameless, newer', DEFAULT_DATA_SET.id, ['WUUF'], 0, 250),
+    v2('pair, named, older', STOCK_DATA_SET.id, pair, 0x700, 100),
+    v2('pair, named, newer', STOCK_DATA_SET.id, pair, 0x900, 200),
+    v2('pair, nameless, oldest', STOCK_DATA_SET.id, pair, 0, 50),
+    v2('pair, nameless, newest', STOCK_DATA_SET.id, pair, 0, 300, { quick: true, usedAt: 400, playTime: 5000 }),
+    v2('wuuf, nameless, older', STOCK_DATA_SET.id, ['WUUF'], 0, 150),
+    v2('wuuf, nameless, newer', STOCK_DATA_SET.id, ['WUUF'], 0, 250),
     v2('wuuf, nameless, csb', csbSet.id, ['WUUF'], 0, 260),
     // The ids the stream draws first, held already: one in each data set.
-    v2('halk, named', DEFAULT_DATA_SET.id, ['HALK'], firstId, 10),
+    v2('halk, named', STOCK_DATA_SET.id, ['HALK'], firstId, 10),
     v2('halk, named, csb', csbSet.id, ['HALK'], secondId, 20),
   ];
   const stamped = stampSaveRecords(held, drawFrom(SEED));
@@ -3746,7 +3746,7 @@ async function checkUpgrade(): Promise<void> {
   const newest = stamped.find((r) => r.name === 'pair, nameless, newest')!;
   const oldest = stamped.find((r) => r.name === 'pair, nameless, oldest')!;
   check(newest.id === newest.name && newest.quick && newest.savedAt === 300 && newest.usedAt === 400 && newest.playTime === 5000
-    && newest.level === 9 && newest.champions.join('/') === 'DAROO/LEYLA' && newest.dataSet === DEFAULT_DATA_SET.id,
+    && newest.level === 9 && newest.champions.join('/') === 'DAROO/LEYLA' && newest.dataSet === STOCK_DATA_SET.id,
     'a stamped row keeps the rest of what it held');
   check(!('usedAt' in oldest) && !('playTime' in oldest), 'and a row from before rows held a last use or a play time is given neither');
 
@@ -3783,7 +3783,7 @@ async function checkUpgrade(): Promise<void> {
   const early = stampSaveRecords(upgradeSaveRecords([
     v1('early.dmweb.json', 100, json({ ...wrapped, raw: Buffer.from(earlyFile).toString('base64') })),
     v1('early-too.dat', 200, buffer(earlyFile)),
-  ], DEFAULT_DATA_SET.id), drawFrom(SEED));
+  ], STOCK_DATA_SET.id), drawFrom(SEED));
   console.log(`  two version-1 rows of one party, their files naming none: ${early.map((r) => `${r.name} ${hex(r.playthrough)}`).join(', ')}`);
   check(early.length === 2 && early.every((r) => r.playthrough === firstId && readSaveFileFields(new Uint8Array(r.bytes))?.playthrough === firstId),
     'version-1 rows whose files name no playthrough come out of both upgrades in one, stamped');
@@ -3807,7 +3807,7 @@ async function checkUpgrade(): Promise<void> {
     return bytes;
   };
   const v3 = (name: string, bytes: Uint8Array, more: Partial<StoredSaveRecord> = {}): StoredSaveRecord =>
-    ({ id: name, name, dataSet: DEFAULT_DATA_SET.id, quick: false, savedAt: 100, ...readSaveFileFields(bytes)!, bytes: buffer(bytes), ...more });
+    ({ id: name, name, dataSet: STOCK_DATA_SET.id, quick: false, savedAt: 100, ...readSaveFileFields(bytes)!, bytes: buffer(bytes), ...more });
   /** What RISE answers the file: `TAG00260e`'s refusal, or "TAKEN". */
   const rise = (bytes: Uint8Array): string => {
     try {
@@ -3863,7 +3863,7 @@ async function checkUpgrade(): Promise<void> {
   const nameless = held[2]!;
   const later = [imported, nameless, brokenV3];
   const steps = (oldVersion: number): string => {
-    const now = upgradeStoredRows(later, oldVersion, DEFAULT_DATA_SET.id, drawFrom(SEED));
+    const now = upgradeStoredRows(later, oldVersion, STOCK_DATA_SET.id, drawFrom(SEED));
     return now.map((r, i) => now.length !== later.length ? 'DROPPED' : r === later[i] ? 'kept' : r.playthrough !== later[i]!.playthrough ? 'playthrough' : 'block 1').join(', ');
   };
   console.log(`  a file holding none of the four, a row naming no playthrough, a row not read: at 2 ${steps(2)}; at 3 ${steps(3)}; at ${ROWS_UPGRADED_VERSION} ${steps(ROWS_UPGRADED_VERSION)}`);
@@ -3874,7 +3874,7 @@ async function checkUpgrade(): Promise<void> {
 
   // Then every row's file goes to a store of its own (`splitSaveRecord`), the IndexedDB
   // half of which `tools/probe-frames.mjs` checks in a browser.
-  const upgraded = upgradeStoredRows(later, 2, DEFAULT_DATA_SET.id, drawFrom(SEED));
+  const upgraded = upgradeStoredRows(later, 2, STOCK_DATA_SET.id, drawFrom(SEED));
   const split = upgraded.map(splitSaveRecord);
   console.log(`  split: ${split.map(({ entry, file }) => `${entry.id} (${Object.keys(entry).join(' ')}), ${file.id} ${file.bytes.byteLength} bytes`).join('; ')}`);
   check(split.every(({ entry, file }, i) => !('bytes' in entry) && file.id === entry.id && file.bytes === upgraded[i]!.bytes),

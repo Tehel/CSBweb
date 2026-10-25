@@ -6,7 +6,7 @@
  *
  * Usage:
  *
- *   import { DATA_SETS, DEFAULT_DATA_SET, dataSetNamed } from './lib/dataSets';
+ *   import { DATA_SETS, STOCK_DATA_SET, dataSetNamed } from './lib/dataSets';
  *   readFileSync(`${dataSetNamed('csb').dir}/dungeon.dat`)
  */
 import { readFileSync } from 'node:fs';
@@ -21,7 +21,6 @@ export const MANIFEST_FILE = 'tools/data-sets.json';
 
 export const MANIFEST: DataSetManifest = parseManifest(readFileSync(MANIFEST_FILE, 'utf8'), GAMEFILES_DIR);
 export const DATA_SETS = MANIFEST.dataSets;
-export const DEFAULT_DATA_SET: DataSet = MANIFEST.defaultSet ?? (() => { throw new Error(`${MANIFEST_FILE} names no default set`); })();
 
 /** The set `id` names. A tool asks for a set it needs, so an unknown one throws. */
 export function dataSetNamed(id: string): DataSet {
@@ -29,6 +28,13 @@ export function dataSetNamed(id: string): DataSet {
   if (!set) throw new Error(`${MANIFEST_FILE} has no data set '${id}'`);
   return set;
 }
+
+/**
+ * The set the tools play where they name none: `dm-atari`, the stock files
+ * (`STOCK_DIR`, `./game.ts`). Not the manifest's default, which is the set the welcome
+ * page selects on a first visit.
+ */
+export const STOCK_DATA_SET: DataSet = dataSetNamed('dm-atari');
 
 /** `set`'s folder on disk, as `folderFiles` serves it to the page. */
 export function diskFiles(set: DataSet): DataSetFiles {

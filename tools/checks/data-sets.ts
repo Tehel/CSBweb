@@ -21,8 +21,8 @@ import { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import type { GameTables } from '../../src/engine/GameTables';
 import { MISSING_PRISON_DOOR_BUTTONS } from '../../src/renderer/intro/PrisonDoor';
 import { check, finish } from '../lib/check';
-import { DATA_SETS, DEFAULT_DATA_SET, MANIFEST, MANIFEST_FILE } from '../lib/dataSets';
-import { gameTablesOf, graphicsTablesOf, newGame } from '../lib/game';
+import { DATA_SETS, STOCK_DATA_SET, MANIFEST, MANIFEST_FILE } from '../lib/dataSets';
+import { gameTablesOf, graphicsTablesOf, newGame, STOCK_DIR } from '../lib/game';
 
 /** A file of `set`. */
 function fileOf(set: DataSet, name: string): string {
@@ -145,8 +145,10 @@ function main(): void {
   console.log('== the manifest\'s parser ==');
   checkParser();
 
-  console.log(`== ${MANIFEST_FILE}: ${DATA_SETS.length} sets, default ${DEFAULT_DATA_SET.id} ==`);
-  check(DEFAULT_DATA_SET.id === 'dm-atari', 'the tools play dm-atari where they name no set');
+  console.log(`== ${MANIFEST_FILE}: ${DATA_SETS.length} sets, default ${MANIFEST.defaultSet?.id}, the tools' ${STOCK_DATA_SET.id} ==`);
+  check(MANIFEST.defaultSet?.id === 'dm-atari-1.2' && !MANIFEST.defaultSet.hidden, 'a first visit selects Dungeon Master as the 1.2 disk holds it, listed');
+  check(resolve(STOCK_DATA_SET.dir) === resolve(STOCK_DIR) && STOCK_DATA_SET.hidden,
+    'the tools play dm-atari, the stock files, where they name no set, a set the welcome page does not list');
 
   const tablesOf = new Map<string, GameTables>();
   for (const set of DATA_SETS) {
@@ -228,6 +230,16 @@ function main(): void {
   const names = tablesOf.get('dm-atari-1.3-fr')!.attackNames;
   check(names[1] === 'FENDRE' && names[43] === 'FUSIONNER' && names.length === 44 + 20,
     'dm-atari-1.3-fr: 44 attack names, FENDRE to FUSIONNER, then the padding');
+
+  // The German 1.2 file too: its 0x230 is as long as the French one's, its attack names
+  // German, and its text decoding the English disk's, as German needs no letter more.
+  const de = byName('dm-atari-1.2-de');
+  const german = tableKeys(en).filter((k) => JSON.stringify(en[k]) !== JSON.stringify(de[k]));
+  console.log(`== tables that differ between dm-atari-1.2 and dm-atari-1.2-de: ${german.join(', ')} ==`);
+  check(german.join() === 'attackNames', 'dm-atari-1.2-de differs from 1.2 in its attack names only: its spells are 1.2\'s');
+  const deNames = tablesOf.get('dm-atari-1.2-de')!.attackNames;
+  check(deNames[1] === 'BLOCKIEREN' && deNames[43] === 'VERBINDEN' && deNames.length === 44 + 11,
+    'dm-atari-1.2-de: 44 attack names, BLOCKIEREN to VERBINDEN, then the padding');
 
   finish();
 }

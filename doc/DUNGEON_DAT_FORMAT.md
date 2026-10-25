@@ -95,7 +95,7 @@ timer moves it, and a `dungeon.dat` has no timers.
 
 The **seed** is added into the hash that places random wall and floor decorations
 (`Hash`, `doc/CSBwin-src/CSBCode.cpp:5740-5757`). It is 99 in every DM `dungeon.dat` here
-(`dm-atari`, `dm-atari-1.2`, `dm-atari-1.3-fr`, `dm-windows`), and in Kid's Dungeon,
+(the six Atari disks', `dm-atari` and `dm-windows`), and in Kid's Dungeon,
 Conflux and Towers of Chaos; 8 in Chaos Strikes Back's; 0 in 3D2D1D's.
 
 The **start** is bits 4-0 x, 9-5 y and 11-10 the facing (0 north, 1 east, 2 south,

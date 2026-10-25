@@ -24,7 +24,7 @@ import type { MessageSink } from '../../src/engine/GameHost';
 import { GameSaves } from '../../src/engine/GameSaves';
 import { GameInput, type KeyPress } from '../../src/renderer/GameInput';
 import type { GameScreen } from '../../src/renderer/GameScreen';
-import { DEFAULT_DATA_SET, diskFiles } from '../lib/dataSets';
+import { STOCK_DATA_SET, diskFiles } from '../lib/dataSets';
 import { check, finish } from '../lib/check';
 import { newGame } from '../lib/game';
 import { memoryStore, savePath } from '../lib/saves';
@@ -54,7 +54,7 @@ function stage() {
   const game: Game = newGame(dungeon, graphics, { messages, die: (error) => { died.push(error); } });
   applyCsbwinSave(game, new Uint8Array(readFileSync(savePath('csbgame7.dat'))));
   const store = memoryStore();
-  const saves = new GameSaves(game, DEFAULT_DATA_SET, diskFiles(DEFAULT_DATA_SET), store,
+  const saves = new GameSaves(game, STOCK_DATA_SET, diskFiles(STOCK_DATA_SET), store,
     { portraitOf: () => undefined }, () => {});
   return { game, store, saves, died };
 }

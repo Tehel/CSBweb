@@ -29,7 +29,7 @@ import { GameSaves, PRISON_WORD22592 } from '../../src/engine/GameSaves';
 import type { LoopScript } from '../../src/engine/LoopState';
 import { wakeUp } from '../../src/engine/MouseSystem';
 import { handleMouseButton } from '../../src/renderer/ui/Mouse';
-import { DEFAULT_DATA_SET, dataSetNamed, diskFiles } from '../lib/dataSets';
+import { STOCK_DATA_SET, dataSetNamed, diskFiles } from '../lib/dataSets';
 import { check, finish } from '../lib/check';
 import { newGame } from '../lib/game';
 import { memoryStore, savePath } from '../lib/saves';
@@ -55,7 +55,7 @@ const messages: MessageSink = {
 };
 
 /** `csbgame7.dat` read into a new game, with its saves over `store` and the console's lines. */
-function stage(store = memoryStore(), dataSet = DEFAULT_DATA_SET) {
+function stage(store = memoryStore(), dataSet = STOCK_DATA_SET) {
   const game: Game = newGame(dungeon, graphics, { messages });
   applyCsbwinSave(game, new Uint8Array(readFileSync(savePath('csbgame7.dat'))));
   const reports: string[] = [];
@@ -66,7 +66,7 @@ function stage(store = memoryStore(), dataSet = DEFAULT_DATA_SET) {
 
 function entry(over: Partial<SaveEntry>): SaveEntry {
   return {
-    id: 'x', name: 'x', dataSet: DEFAULT_DATA_SET.id, playthrough: 7, quick: false, sleep: false,
+    id: 'x', name: 'x', dataSet: STOCK_DATA_SET.id, playthrough: 7, quick: false, sleep: false,
     savedAt: 0, usedAt: 0, playTime: 0, level: 0, champions: [], unofficial: false, ...over,
   };
 }
@@ -83,12 +83,12 @@ function checkRow(): void {
   ];
   const name = (slot: 'quick' | 'sleep', dataSet: string, playthrough: number): string =>
     slotOf(rows, slot, dataSet, playthrough)?.name ?? 'none';
-  console.log(`  playthrough 7: F5's "${name('quick', DEFAULT_DATA_SET.id, 7)}", the Sleepsave "${name('sleep', DEFAULT_DATA_SET.id, 7)}"; `
-    + `9 "${name('sleep', DEFAULT_DATA_SET.id, 9)}", 7 in csb "${name('sleep', 'csb', 7)}", 8 "${name('sleep', DEFAULT_DATA_SET.id, 8)}"`);
-  check(name('quick', DEFAULT_DATA_SET.id, 7) === 'quick' && name('sleep', DEFAULT_DATA_SET.id, 7) === 'sleep, newer',
+  console.log(`  playthrough 7: F5's "${name('quick', STOCK_DATA_SET.id, 7)}", the Sleepsave "${name('sleep', STOCK_DATA_SET.id, 7)}"; `
+    + `9 "${name('sleep', STOCK_DATA_SET.id, 9)}", 7 in csb "${name('sleep', 'csb', 7)}", 8 "${name('sleep', STOCK_DATA_SET.id, 8)}"`);
+  check(name('quick', STOCK_DATA_SET.id, 7) === 'quick' && name('sleep', STOCK_DATA_SET.id, 7) === 'sleep, newer',
     'each slot is the playthrough\'s newest row of its own kind, never the other\'s nor the menu\'s');
-  check(name('sleep', DEFAULT_DATA_SET.id, 9) === 'sleep, another playthrough' && name('sleep', 'csb', 7) === 'sleep, another set'
-    && name('sleep', DEFAULT_DATA_SET.id, 8) === 'none', 'one Sleepsave per playthrough, in its own data set, and none before the first');
+  check(name('sleep', STOCK_DATA_SET.id, 9) === 'sleep, another playthrough' && name('sleep', 'csb', 7) === 'sleep, another set'
+    && name('sleep', STOCK_DATA_SET.id, 8) === 'none', 'one Sleepsave per playthrough, in its own data set, and none before the first');
 
   const afternoon = new Date(2026, 8, 13, 14, 5).getTime();
   const row = formatSaveRow(entry({ sleep: true, savedAt: afternoon, level: 14 }));
@@ -96,7 +96,7 @@ function checkRow(): void {
   check(row === '  2026-09-13 14:05 L14 SLEEPSAVE' && row.length <= 32, 'the Sleepsave\'s row reads SLEEPSAVE, as F5\'s reads QUICKSAVE, and fits');
 
   const stored: StoredSaveEntry = {
-    id: 'old', name: 'old', dataSet: DEFAULT_DATA_SET.id, playthrough: 7, quick: false,
+    id: 'old', name: 'old', dataSet: STOCK_DATA_SET.id, playthrough: 7, quick: false,
     savedAt: 1, level: 1, champions: [],
   };
   check(saveEntryOf(stored).sleep === false, 'a stored row from before rows held the flag is no Sleepsave');
@@ -169,7 +169,7 @@ async function checkSilentRefusals(): Promise<void> {
   console.log('');
   console.log('=== refused, silently ===');
   const before = told.length;
-  const refused = async (what: string, set: (s: ReturnType<typeof stage>) => void, dataSet = DEFAULT_DATA_SET): Promise<void> => {
+  const refused = async (what: string, set: (s: ReturnType<typeof stage>) => void, dataSet = STOCK_DATA_SET): Promise<void> => {
     const s = stage(memoryStore(), dataSet);
     set(s);
     await s.saves.sleepSave();

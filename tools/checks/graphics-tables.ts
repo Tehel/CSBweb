@@ -204,10 +204,12 @@ function layoutOf(graphic: number, startMarker: string, endMarker?: RegExp): Lay
 
 /**
  * The data sets whose item is longer than CSBWin's struct, in one field: the French 1.3
- * file's attack names take 400 bytes, not `AttackNames[300]`'s (`DEBT.md` H, "Word sizes
- * from the file"; `doc/PROVEN_FACTS.md` → "The French 1.3 `graphics.dat`: longer words").
+ * and German 1.2 files' attack names take 400 bytes, not `AttackNames[300]`'s (`DEBT.md`
+ * H, "Word sizes from the file"; `doc/PROVEN_FACTS.md` → "The French 1.3 `graphics.dat`:
+ * longer words"; `doc/ATARI_ST_DISK_REFERENCE.md` → "The German 1.2 disk").
  */
 const WIDER: Record<string, { graphic: number; field: string; by: number }> = {
+  'dm-atari-1.2-de': { graphic: 0x230, field: 'AttackNames', by: 100 },
   'dm-atari-1.3-fr': { graphic: 0x230, field: 'AttackNames', by: 100 },
 };
 

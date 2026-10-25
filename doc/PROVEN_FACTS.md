@@ -7022,7 +7022,9 @@ reads each size from the file (`DEBT.md` H, "Word sizes from the file").
   byte for byte. Read at CSBWin's fixed offsets, the spell table starts 100 bytes early,
   in the names' tail, and no incantation matches a spell. `parseGraphic230`
   (`src/data/tables/UITables.ts`) takes the names' length as what lies between the attack
-  tables and that tail: 300 in every other set.
+  tables and that tail: 300 in every other set but the German 1.2 file's
+  (`dm-atari-1.2-de/`), whose `0x230` is 1356 bytes too, its names German (`BLOCKIEREN` …
+  `VERBINDEN`) and its tables 1.2's byte for byte (`tools/checks/data-sets.ts`).
 - **Graphic 30, the food label, is 96 pixels wide** ("NOURRITURE"; "FOOD" is 48).
   `DisplayFoodWater` blits graphics 30, 31 and 32 with a source width of 24, 24 and 48
   bytes (`doc/CSBwin-src/Viewport.cpp:7250-7254`): 48, 48 and 96 pixels. The French

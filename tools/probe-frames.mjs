@@ -297,8 +297,10 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
                         return ((seed >>> 0) % 1000000) / 1000000; };
 ` });
 // The welcome page (`src/ui/welcomePage.ts`) of a store with no save: the manifest's
-// default set, dm-atari, is selected, so PLAY opens it, and every tile is dimmed, in the manifest's order.
-// The page with a save is checked further down.
+// default set, dm-atari-1.2, is selected, so PLAY opens it, and every tile is dimmed, in
+// the manifest's order: the six Atari disks of Dungeon Master, its Kid's dungeon and CSB,
+// then the fan-made dungeons. The page with a save is checked further down.
+const OFFICIAL = ['dm-atari-1.0a', 'dm-atari-1.0b', 'dm-atari-1.1', 'dm-atari-1.2', 'dm-atari-1.2-de', 'dm-atari-1.3-fr', 'kids-dungeon', 'csb'];
 await navigate(`${APP}?dungeon=nowhere`, WELCOME);
 const firstVisit = await evaluate(`({tiles: [...document.querySelectorAll('.pick[data-set]')].map(t=>t.dataset.set+(t.classList.contains('dim')?'':'*')+(t.getAttribute('aria-pressed')==='true'?'!':'')).join(','),
   play: document.getElementById('welcome-play').getAttribute('href'),
@@ -307,10 +309,10 @@ const firstVisit = await evaluate(`({tiles: [...document.querySelectorAll('.pick
   sections: [...document.querySelectorAll('.welcome-sets')].map(s=>s.querySelector('h2').textContent+':'+[...s.querySelectorAll('.pick')].map(t=>t.dataset.set??'add').join('/')).join('|')})`);
 console.log('state: welcome page, no save');
 console.log('  ', JSON.stringify(firstVisit));
-check(firstVisit.tiles === 'dm-atari!,kids-dungeon,csb,conflux-3.5,towers-of-chaos' && /dungeon=dm-atari/.test(firstVisit.play ?? '')
-  && firstVisit.resume === null && firstVisit.above,
-  'no save: the official games in the manifest\'s order, then the others too, dm-atari selected, PLAY opens it, CONTINUE disabled, the buttons above the grids');
-check(firstVisit.sections === 'Official games:dm-atari/kids-dungeon/csb|Fan-made dungeons:conflux-3.5/towers-of-chaos/add',
+check(firstVisit.tiles === [...OFFICIAL, 'conflux-3.5', 'towers-of-chaos'].map((id) => id === 'dm-atari-1.2' ? `${id}!` : id).join()
+  && /dungeon=dm-atari-1\.2(&|$)/.test(firstVisit.play ?? '') && firstVisit.resume === null && firstVisit.above,
+  'no save: the official games in the manifest\'s order, then the others too, dm-atari-1.2 selected, PLAY opens it, CONTINUE disabled, the buttons above the grids');
+check(firstVisit.sections === `Official games:${OFFICIAL.join('/')}|Fan-made dungeons:conflux-3.5/towers-of-chaos/add`,
   'two sections, each under its title: the official games, then the fan-made dungeons, "+ Add my own" last');
 
 // A new server's answer, no set and no default: the grid holds only "+ Add my own", PLAY
@@ -484,8 +486,8 @@ check(abortedDelete === 'failed, listed', `a delete whose transaction aborts fai
 // (`src/renderer/intro/PrisonLevel.ts`), and `tools/checks/intro.ts` can check the level and
 // the compositing but not the pixels the bytecode programs produce.
 // The welcome page (`src/ui/welcomePage.ts`): the page with no known `?dungeon=`, HTML and
-// no game. The store holds the one save made above, of dm-atari, so its tile is bright and
-// first, the others dimmed and in the manifest's order, none is selected, and CONTINUE reads that save while no set is selected. Each tile
+// no game. The store holds the one save made above, of dm-atari, a hidden set, so no tile
+// is bright, the tiles are in the manifest's order, none is selected, and CONTINUE reads that save while no set is selected. Each tile
 // shows its set's thumbnail, and the page fetches no game file to draw them. A click
 // selects a tile, and PLAY opens its set; a click on another set, with no save, leaves
 // CONTINUE disabled; a click on the selected tile selects none. Then PLAY's own click,
@@ -517,12 +519,12 @@ console.log('state: welcome page');
 const atWelcome = await welcome();
 console.log('  ', JSON.stringify(atWelcome));
 const saveId = /[?&]save=([^&]+)/.exec(atWelcome.resume ?? '')?.[1];
-check(!atWelcome.canvas && atWelcome.tiles === 'dm-atari*,kids-dungeon,csb,conflux-3.5,towers-of-chaos',
-  'an unknown ?dungeon= is the welcome page, no game canvas, its tiles the sets not hidden, the one with a save bright and first, the others in the manifest\'s order, none selected');
-check(atWelcome.pictures.length === 5 && atWelcome.pictures.every(Boolean) && atWelcome.gameFiles === 0,
+check(!atWelcome.canvas && atWelcome.tiles === [...OFFICIAL, 'conflux-3.5', 'towers-of-chaos'].join(),
+  'an unknown ?dungeon= is the welcome page, no game canvas, its tiles the sets not hidden, the hidden one with a save among none, in the manifest\'s order, none selected');
+check(atWelcome.pictures.length === OFFICIAL.length + 2 && atWelcome.pictures.every(Boolean) && atWelcome.gameFiles === 0,
   'each tile shows its set\'s 320x200 thumbnail, <id>-thumbnail.png, and the page fetches no .dat');
 check(atWelcome.play === null && /dungeon=dm-atari/.test(atWelcome.resume ?? '') && saveId !== undefined,
-  'none selected: PLAY is disabled, CONTINUE reads the last save used, of any set');
+  'none selected: PLAY is disabled, CONTINUE reads the last save used, of any set, a hidden one\'s too');
 check(atWelcome.preview.length === 3 && atWelcome.preview[0] === 'Dungeon Master' && atWelcome.preview[1].split(' · ').length === 4
   && /^Level \d+ · \d{4}-\d\d-\d\d \d\d:\d\d$/.test(atWelcome.preview[2]),
   'the box beside CONTINUE shows its set, its party of four, its level and when it was saved');
@@ -560,9 +562,6 @@ check(atCsb.tiles.includes('csb!') && /dungeon=csb/.test(atCsb.play ?? '') && !/
   'a set with no save selected: PLAY opens it, CONTINUE is disabled');
 await clickOn('.pick[data-set="csb"]');
 check((await welcome()).play === null, 'a click on the selected tile selects none');
-await clickOn('.pick[data-set="dm-atari"]');
-const atDm = await welcome();
-check(atDm.tiles.startsWith('dm-atari*!') && atDm.resume === atWelcome.resume, 'dm-atari selected: CONTINUE reads its last save');
 check(atWelcome.last === 'pick add +Add my own', 'the fan-made dungeons end with "+ Add my own", never selected');
 // HOW TO PLAY (`src/ui/howToPlay.ts`): the page opened at `#how-to-play` shows its
 // dialog, the moves, attacks and runes keyed as the player's settings have them, the 24
@@ -571,7 +570,7 @@ check(atWelcome.last === 'pick add +Add my own', 'the fan-made dungeons end with
 // Its links to print are the sheets `tools/gen-help-sheet.mjs` made for the preset shown,
 // which are there, and the sheet is the text that tool recorded (`sheets.json`): a sheet
 // changed without its files made again fails here. CLOSE takes the fragment off, and the
-// page's button opens it again. The selection made above is made again after.
+// page's button opens it again. Then the default set, dm-atari-1.2, is selected.
 const howToPlay = () => evaluate(`(async()=>{const d=document.querySelector('dialog.how-to-play');
   const keys=(s)=>[...d.querySelectorAll(s)].map(c=>[...c.querySelectorAll('.how-key')].map(k=>k.textContent).join(' ')).join();
   return d && { open: d.open, hash: location.hash,
@@ -611,7 +610,7 @@ await clickOn('#welcome-help');
 const reopened = await howToPlay();
 check(reopened?.open === true && reopened.hash === '#how-to-play', 'the page\'s HOW TO PLAY opens it');
 await clickOn('#how-close');
-await clickOn('.pick[data-set="dm-atari"]');
+await clickOn('.pick[data-set="dm-atari-1.2"]');
 // The form that adds a set (`src/ui/addDataSetForm.ts`), which "+ Add my own" opens: its
 // checklist, a row each for the name, the id and the six files, crossed where needed and
 // missing or wrong, checked where right. CANCEL closes it. Then the player's own set
@@ -733,7 +732,7 @@ check(stored?.thumbnail === 'image/png' && stored.sameThumbnail,
   'the thumbnail drawn from DM\'s graphics is the site\'s DM thumbnail, pixel for pixel');
 check(afterAdd.tiles.includes(`local:${MINE}!`) && new RegExp(`dungeon=local%3A${MINE}(&|$)`).test(afterAdd.play ?? ''), 'the page shows the new set, selected');
 // A save filed under the new set's id, a copy of dm-atari's one save made a millisecond
-// older. Its tile is bright and second, its picture the record's image, and it counts its
+// older. Its tile is bright and the fan-made dungeons' first, its picture the record's image, and it counts its
 // save; selected, PLAY and CONTINUE lead to it. "+ Add my own" stays last, and a click on
 // it opens the form and selects nothing.
 // Then the pen on the local set's picture, the only tile with one, opens the form on its
@@ -759,8 +758,8 @@ await saveDatabase({
 await navigate(`${APP}?dungeon=nowhere&keepsaves`, WELCOME);
 const withLocal = await welcome();
 console.log('  local set:', JSON.stringify(withLocal));
-check(withLocal.tiles === `dm-atari*,kids-dungeon,csb,local:${MINE}*,conflux-3.5,towers-of-chaos`
-  && withLocal.saves[3] === '1 save' && withLocal.pictures.length === 6 && withLocal.pictures.every(Boolean)
+check(withLocal.tiles === [...OFFICIAL, `local:${MINE}*`, 'conflux-3.5', 'towers-of-chaos'].join()
+  && withLocal.saves[OFFICIAL.length] === '1 save' && withLocal.pictures.length === OFFICIAL.length + 3 && withLocal.pictures.every(Boolean)
   && withLocal.gameFiles === 0 && withLocal.last === atWelcome.last,
   "a local set's tile: its save counted, bright, its picture the record's image, the add tile still last");
 await clickOn(`.pick[data-set="local:${MINE}"]`);
@@ -1148,10 +1147,11 @@ await evaluate(`history.back(),1`);
 await settled();
 const statsBack = await statsPage();
 check(statsBack.selected === statsFirst.selected && statsMatch(statsBack), 'back selects the first again');
-await navigate(`${APP}stats?set=dm-atari&keepsaves&keepsettings`, STATS);
-const statsDm = await statsPage();
-console.log('  ', JSON.stringify(statsDm));
-check(statsDm.selected === 'dm-atari' && statsMatch(statsDm), '?set=dm-atari selects it');
+const lastSet = statsFirst.expectedPicks.split(',').at(-1);
+await navigate(`${APP}stats?set=${encodeURIComponent(lastSet)}&keepsaves&keepsettings`, STATS);
+const statsLast = await statsPage();
+console.log('  ', JSON.stringify(statsLast));
+check(statsLast.selected === lastSet && statsMatch(statsLast), `?set=${lastSet}, the column's last, selects it`);
 // A tile's name says its set's state, to a moderator (`server/dataSets.ts`), whose answer
 // the dev server's manifest stands in for here, with `"moderator": true`, kids-dungeon
 // pending and 3d2d1d, a hidden set, pending too: every set is listed, the hidden ones

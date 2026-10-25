@@ -44,8 +44,12 @@ read through the image's sector records and the FAT, are in the collection's
 `extracted/<version>/`. The collection is dmweb.free.fr's
 `Game,Dungeon_Master,Atari_ST,Software.7z`. `tools/lib/stx.ts` reads an image's files in the
 same way, but for `BOOTER`, whose cluster holds track 0's sector 8, which the protection
-replaces by 247; `npm run fetch-gamefiles` takes 1.1's `DUNGEON.DAT` (`dm-atari`'s) and the
-1.2 English and 1.3 French disks' two data files from it.
+replaces by 247; `npm run fetch-gamefiles` takes every disk's two data files from it. Each
+disk is a data set of the repository's manifest, its files as the disk holds them:
+`dm-atari-1.0a` (8 December), `dm-atari-1.0b` (11 December), `dm-atari-1.1`, `dm-atari-1.2`,
+the manifest's default, `dm-atari-1.2-de` and `dm-atari-1.3-fr`. The 1.1 disk's
+`DUNGEON.DAT` is also `dm-atari`'s, the hidden set the tools play (`doc/PROVEN_FACTS.md` →
+"`dm-atari/graphics.dat` is CSBWin's with three items from the 1.2 disk").
 
 The collection's cracked copies agree with the originals where they can be read. The
 `GRAPHICS.DAT` and `DUNGEON.DAT` of `Floppy Disks MSA/…v1.1 (English) Cracked.msa` are
@@ -435,7 +439,7 @@ credits, the pressed crack's button and the crack's placement, and no other chan
 
 The 1.2 (German) image (md5 `97cc99bf5b594b8260f42d9d81320308`) is the English 1.2 disk
 translated: its `START.PAK` (95202 bytes, 1988-02-24) and both data files (1988-03-01)
-differ, and nothing in them but the language. Its files are not in the repository.
+differ, and nothing in them but the language. Its two data files are `dm-atari-1.2-de`'s.
 
 `dungeon.dat` differs from the English 1.2's only in its text, 1924 words against 1749,
 and the text records that point into it; every other database, the maps and the object
@@ -569,8 +573,7 @@ graphic 26 itself, copied as `dm-atari/graphics.dat` stores it, which the champi
 portraits are matched against. `tools/gen-utility-portraits.ts` builds the file from the
 disk image, and checks that every cell decodes to its `.CMP`'s pixels and goes back,
 through `writePortrait`, to its 464 bytes, and that item 1 decodes to graphic 26. Graphic 26 is byte-identical in the
-`graphics.dat` of `dm-atari`, `dm-atari-1.2`, `dm-atari-1.3-fr`, `dm-windows` and
-`kids-dungeon-24`. It is not in `3D2D1D`'s or Conflux's.
+`graphics.dat` of the six disks' sets, `dm-atari`, `dm-windows` and `kids-dungeon-24`. It is not in `3D2D1D`'s or Conflux's.
 
 ### The utility, `CHAOS.FTL`
 

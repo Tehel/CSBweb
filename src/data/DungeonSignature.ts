@@ -10,8 +10,9 @@
  * The signature is one digest per level, of the level's walls: its width, its height,
  * and a bit per cell, stone or anything else. Nothing finer goes in. What a release
  * moved, a teleporter or an object, and what play changes, a door, a pit, a wall's
- * objects, all leave it alone, so the four Dungeon Master sets here are one dungeon and
- * a save of any of them is a save of it.
+ * objects, all leave it alone, so the Dungeon Master sets from 1.1 on are one dungeon and
+ * a save of any of them is a save of it. The two 1.0 disks' are another, which 1.1 gave
+ * level 6's skeleton closets (`doc/ATARI_ST_DISK_REFERENCE.md`).
  *
  * The digest is SHA-256 through `crypto.subtle`, which a page has in a secure context
  * alone. The page is served from localhost and will be hosted over https, both secure,
@@ -66,6 +67,11 @@ export interface KnownDungeon {
      * not the catalogue's.
      */
     shapes?: DungeonShapes;
+    /**
+     * The catalogue dungeon this one is another release of, whose levels it may share:
+     * Dungeon Master 1.0's, of Dungeon Master's. No other two dungeons share a level.
+     */
+    variantOf?: string;
 }
 
 /**
@@ -74,14 +80,15 @@ export interface KnownDungeon {
  * `tools/checks/dungeon-signature.ts` holds every entry to the files here, and prints the
  * digests of a dungeon that is to be added.
  *
- * The four Dungeon Master sets are one dungeon. Chaos Strikes Back is two: its
+ * The Dungeon Master sets from 1.1 on are one dungeon, and the two 1.0 disks' its variant,
+ * thirteen of its levels and level 6 without the closets. Chaos Strikes Back is two: its
  * `dungeon.dat` is the prison, and the game is `mini.dat`'s (`doc/PROVEN_FACTS.md` → "A
  * compressed `dungeon.dat`: CSB's prison").
  */
 export const KNOWN_DUNGEONS: readonly KnownDungeon[] = [
     {
         name: 'Dungeon Master',
-        dataSets: ['dm-atari', 'dm-windows', 'dm-atari-1.2', 'dm-atari-1.3-fr'],
+        dataSets: ['dm-atari', 'dm-windows', 'dm-atari-1.1', 'dm-atari-1.2', 'dm-atari-1.2-de', 'dm-atari-1.3-fr'],
         signature: [
             '167ec1080a5ce33a678ad38ba810d9723c25a12d6380443ad24aab877a2c6507',
             '2601fa2a50a662417b081aa47633a2c99379316f745c3454b7c51e855ac07559',
@@ -89,6 +96,27 @@ export const KNOWN_DUNGEONS: readonly KnownDungeon[] = [
             '09ce9e15a93fb4182606112c9efb9eea2ca4935db3c1f3d47ed0198197e20cdb',
             '508fe5bfe1075872f3152dd0d14e4096314fea983e04b339774d8ff3e51181c9',
             '2c55ec179a626e417a075af9399077a759e30aa1626c32d20f29141aab0ee50f',
+            '4c4ca2d3f738ed73588cd02bd2cfeeaedd7ce4a2be34f26e20120a0c23dede68',
+            '2732e4a22ea4a8ff93d9332e0414efccffe9fe4e07999cde1cf8d878d3d91101',
+            '533e71826a528db1451fad87569c4e34a60cbb99c785dac07c1cb9a9f5b9728c',
+            'e275c1f1ca53ffd5d52a8608bd70555d47a484981bdbc484d45c29a92a6192b9',
+            '76bdf577ac0b1497c32b307af5afadb90e890ebca7163d3035e713b8d62ac950',
+            'ebf848e9aea42b3ac007efcbf58c031f1f0e8fd0fcddc00e309bdc4db6b9a5e4',
+            'fe041c65423dc507813a391a348c6311ecde3fed63a2e85b903f25286ee03b96',
+            'abc4d17013d93fa0d2d31e32e7e9851bece8e89a3f3cbcda44f9139022420361',
+        ],
+    },
+    {
+        name: 'Dungeon Master 1.0',
+        dataSets: ['dm-atari-1.0a', 'dm-atari-1.0b'],
+        variantOf: 'Dungeon Master',
+        signature: [
+            '167ec1080a5ce33a678ad38ba810d9723c25a12d6380443ad24aab877a2c6507',
+            '2601fa2a50a662417b081aa47633a2c99379316f745c3454b7c51e855ac07559',
+            'f6b6de7b6098eb7ec8028f84f531b736f14d8ccf6a240c2217eacdef723cbe14',
+            '09ce9e15a93fb4182606112c9efb9eea2ca4935db3c1f3d47ed0198197e20cdb',
+            '508fe5bfe1075872f3152dd0d14e4096314fea983e04b339774d8ff3e51181c9',
+            '01344b9c3c9eaacb426139687e0f4cc65002bb0bac5ae0adc4b760e3753731e0',
             '4c4ca2d3f738ed73588cd02bd2cfeeaedd7ce4a2be34f26e20120a0c23dede68',
             '2732e4a22ea4a8ff93d9332e0414efccffe9fe4e07999cde1cf8d878d3d91101',
             '533e71826a528db1451fad87569c4e34a60cbb99c785dac07c1cb9a9f5b9728c',
@@ -370,7 +398,8 @@ export type DungeonCheck =
  *   held against that dungeon alone: the set's `own` when every level's digest is the
  *   same, a slightly `different` dungeon when some are, and `unknown` when none is.
  * - Any other is not the set's, and goes on to the other sets, those of `known` that do
- *   not list the set: the known dungeon the save looks like (`identifyDungeon`), `other`,
+ *   not list the set, nor are another release of a dungeon that does (`variantOf`): the
+ *   known dungeon the save looks like (`identifyDungeon`), `other`,
  *   or `unknown` where there is none. Between two that match as many of its levels, one
  *   whose levels are the save's in number and size comes first, as an own dungeon
  *   would; only a published set's sizes are known. So does a `different` one the player
@@ -390,7 +419,9 @@ export function checkDungeon(
         const same = set.signature.filter((digest, level) => digest === save.signature[level]).length;
         return { kind: same === save.signature.length ? 'own' : same > 0 ? 'different' : 'unknown' };
     }
-    const others = known.filter((dungeon) => !dungeon.dataSets.includes(dataSet));
+    const release = (dungeon: KnownDungeon): string => dungeon.variantOf ?? dungeon.name;
+    const mine = new Set(known.filter((dungeon) => dungeon.dataSets.includes(dataSet)).map(release));
+    const others = known.filter((dungeon) => !mine.has(release(dungeon)));
     const match = identifyDungeon(save.signature, others, save.shapes);
     return match ? { kind: 'other', dungeon: match.dungeon } : { kind: 'unknown' };
 }
