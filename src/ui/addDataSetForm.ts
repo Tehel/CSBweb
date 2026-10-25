@@ -78,7 +78,7 @@ import {
 import { playerId } from './gameEvents';
 
 /** The sets a record without a `graphics.dat` may play the graphics of. */
-const BASE_SETS = ['dm-atari', 'csb'];
+const BASE_SETS = ['dm-atari', 'csb'] as const;
 
 /** A row of the checklist: the field or file it is about, and whether the set needs it. */
 interface ChecklistRow {
@@ -255,7 +255,11 @@ function openForm(
     dialog.innerHTML = FORM;
     const form = dialog.querySelector('form')!;
     const input = (name: string): HTMLInputElement => form.querySelector<HTMLInputElement>(`[name="${name}"]`)!;
-    const [name, id, authors, dmRules, official] = ['name', 'id', 'authors', 'dmRules', 'official'].map(input);
+    const name = input('name');
+    const id = input('id');
+    const authors = input('authors');
+    const dmRules = input('dmRules');
+    const official = input('official');
     // Only a moderator says a set is official (`server/publish.ts`).
     official.closest('label')!.hidden = !manifest.moderator;
     const description = form.querySelector('textarea')!;

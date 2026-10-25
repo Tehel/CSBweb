@@ -22,6 +22,7 @@ const MODULES = [
   'src/renderer/',
   'src/settings/',
   'src/stats/',
+  'src/ui/',
 ];
 
 const r = spawnSync(TSC, ['--noEmit', '--noUncheckedIndexedAccess', '--pretty', 'false'], { cwd: ROOT, encoding: 'utf8' });
