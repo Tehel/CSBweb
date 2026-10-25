@@ -91,7 +91,7 @@ function decodePicture(file: Uint8Array): { screen: Uint16Array; end: number } {
 
     const nextByte = (): number => {
         if (a0 >= file.length) throw new Error('swoosh.img: the picture runs past the end of the file');
-        return file[a0++];
+        return file[a0++]!;
     };
 
     // `$0154`–`$017a`: once the group's last pixel is drawn, the next group is entered.
@@ -109,16 +109,16 @@ function decodePicture(file: Uint8Array): { screen: Uint16Array; end: number } {
     // `$0120`–`$0152`: as much of the run as the current group holds, from `src[at]`, four
     // plane words ANDed with the mask and ORed into the screen.
     const drawRun = (src: Uint16Array, at: number): void => {
-        let mask = a4[d0];
+        let mask = a4[d0]!;
         if (d0 >= d1) {
             d0 -= d1;
-            mask &= a5[d0];
+            mask &= a5[d0]!;
             d1 = 0;
         } else {
             d1 -= d0 + 1;
             d0 = -1;
         }
-        for (let plane = 0; plane < GROUP_WORDS; plane++) screen[a1 + plane] |= src[at + plane] & mask;
+        for (let plane = 0; plane < GROUP_WORDS; plane++) screen[a1 + plane]! |= src[at + plane]! & mask;
         endOfGroup();
     };
 
@@ -126,7 +126,7 @@ function decodePicture(file: Uint8Array): { screen: Uint16Array; end: number } {
     // word's high byte (`d0` 8..15) or low byte (`d0` 0..7), which is the word's bit `d0`.
     const drawPixel = (c: number): void => {
         for (let plane = 0; plane < GROUP_WORDS; plane++) {
-            if (c & (1 << plane)) screen[a1 + plane] |= 1 << d0;
+            if (c & (1 << plane)) screen[a1 + plane]! |= 1 << d0;
         }
         d0 -= 1;
         endOfGroup();
@@ -171,7 +171,7 @@ function planesToIndices(screen: Uint16Array): Uint8Array {
         const group = (i >> 4) * GROUP_WORDS;
         const bit = 15 - (i & 15);
         let index = 0;
-        for (let plane = 0; plane < GROUP_WORDS; plane++) index |= ((screen[group + plane] >> bit) & 1) << plane;
+        for (let plane = 0; plane < GROUP_WORDS; plane++) index |= ((screen[group + plane]! >> bit) & 1) << plane;
         pixels[i] = index;
     }
     return pixels;

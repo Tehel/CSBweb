@@ -28,6 +28,7 @@ import {
   readU16LE,
   readU32BE,
   readU32LE,
+  readU8,
   writeU16BE,
   writeU16LE,
   writeU32BE,
@@ -305,8 +306,8 @@ function parseBlock1Hashes(buf: Uint8Array): Block1Hashes {
 /** `GAMEBLOCK1`'s own fields, in the byte orders `swapBlock1` leaves them (see `Block1`). */
 function parseBlock1(buf: Uint8Array): Block1 {
   return {
-    byte22598: buf[300],
-    byte22596: buf[301],
+    byte22598: readU8(buf, 300),
+    byte22596: readU8(buf, 301),
     saveOption: readU16LE(buf, 306),
     randomGameID: readU32BE(buf, 308),
     totalMoveCount: readU32LE(buf, 322),
@@ -689,7 +690,7 @@ export function saveSaveGameState(save: SaveGameState): Uint8Array {
   const timerQueue = new Uint8Array(maxTimers * 2);
   const queueOrder = save.timerQueue ?? [];
   for (let i = 0; i < Math.min(queueOrder.length, maxTimers); i++) {
-    writeU16BE(timerQueue, i * 2, queueOrder[i] & 0xffff);
+    writeU16BE(timerQueue, i * 2, queueOrder[i]! & 0xffff);
   }
 
   const block2Hash = 0;

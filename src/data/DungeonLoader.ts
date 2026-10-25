@@ -107,7 +107,7 @@ export function levelCellOffsets(descriptors: readonly MapDescriptor[]): number[
     descriptors.forEach((d, level) => {
         cellOffset = level === 0
             ? d.dataOffset
-            : cellOffset + ((d.dataOffset - descriptors[level - 1].dataOffset) & 0xffff);
+            : cellOffset + ((d.dataOffset - descriptors[level - 1]!.dataOffset) & 0xffff);
         offsets.push(cellOffset);
     });
     return offsets;
@@ -259,7 +259,7 @@ export class DungeonLoader {
         // Parse all databases
         const databases = this.parseDatabases(offsets.databases, header.objectCounts);
         // Database 11 — `EXPOOL` — is kept as its blocks (`DungeonData.expool`).
-        const expool = this.readExpool(offsets.databases[11], header.objectCounts[11]);
+        const expool = this.readExpool(offsets.databases[11]!, header.objectCounts[11]!);
 
         // Parse map data (tiles)
         const maps = this.parseMapData(offsets.mapData, mapDescriptors);
@@ -445,7 +445,7 @@ export class DungeonLoader {
         const bytes = this.file.read(0, this.file.length());
         if (end + 2 > bytes.length) return;
         let sum = 0;
-        for (let i = 0; i < end; i++) sum = (sum + bytes[i]) & 0xffff;
+        for (let i = 0; i < end; i++) sum = (sum + bytes[i]!) & 0xffff;
         if (readU16BE(bytes, end) !== sum) throw new Error('dungeon image checksum mismatch');
     }
 
@@ -580,19 +580,19 @@ export class DungeonLoader {
      */
     private parseDatabases(offsets: number[], counts: ui16[]): Databases {
         return {
-            doors: this.parseDoorDatabase(offsets[DBType.DOOR], counts[DBType.DOOR]),
-            teleporters: this.parseTeleporterDatabase(offsets[DBType.TELEPORTER], counts[DBType.TELEPORTER]),
-            texts: this.parseTextDatabase(offsets[DBType.TEXT], counts[DBType.TEXT]),
-            actuators: this.parseActuatorDatabase(offsets[DBType.ACTUATOR], counts[DBType.ACTUATOR]),
-            creatures: this.parseCreatureDatabase(offsets[DBType.CREATURE], counts[DBType.CREATURE]),
-            weapons: this.parseWeaponDatabase(offsets[DBType.WEAPON], counts[DBType.WEAPON]),
-            clothing: this.parseClothingDatabase(offsets[DBType.CLOTHING], counts[DBType.CLOTHING]),
-            scrolls: this.parseScrollDatabase(offsets[DBType.SCROLL], counts[DBType.SCROLL]),
-            potions: this.parsePotionDatabase(offsets[DBType.POTION], counts[DBType.POTION]),
-            containers: this.parseContainerDatabase(offsets[DBType.CHEST], counts[DBType.CHEST]),
-            misc: this.parseMiscDatabase(offsets[DBType.MISC], counts[DBType.MISC]),
-            missiles: this.parseMissileDatabase(offsets[DBType.MISSILE], counts[DBType.MISSILE]),
-            clouds: this.parseCloudDatabase(offsets[DBType.CLOUD], counts[DBType.CLOUD])
+            doors: this.parseDoorDatabase(offsets[DBType.DOOR]!, counts[DBType.DOOR]!),
+            teleporters: this.parseTeleporterDatabase(offsets[DBType.TELEPORTER]!, counts[DBType.TELEPORTER]!),
+            texts: this.parseTextDatabase(offsets[DBType.TEXT]!, counts[DBType.TEXT]!),
+            actuators: this.parseActuatorDatabase(offsets[DBType.ACTUATOR]!, counts[DBType.ACTUATOR]!),
+            creatures: this.parseCreatureDatabase(offsets[DBType.CREATURE]!, counts[DBType.CREATURE]!),
+            weapons: this.parseWeaponDatabase(offsets[DBType.WEAPON]!, counts[DBType.WEAPON]!),
+            clothing: this.parseClothingDatabase(offsets[DBType.CLOTHING]!, counts[DBType.CLOTHING]!),
+            scrolls: this.parseScrollDatabase(offsets[DBType.SCROLL]!, counts[DBType.SCROLL]!),
+            potions: this.parsePotionDatabase(offsets[DBType.POTION]!, counts[DBType.POTION]!),
+            containers: this.parseContainerDatabase(offsets[DBType.CHEST]!, counts[DBType.CHEST]!),
+            misc: this.parseMiscDatabase(offsets[DBType.MISC]!, counts[DBType.MISC]!),
+            missiles: this.parseMissileDatabase(offsets[DBType.MISSILE]!, counts[DBType.MISSILE]!),
+            clouds: this.parseCloudDatabase(offsets[DBType.CLOUD]!, counts[DBType.CLOUD]!)
         };
     }
 
@@ -812,7 +812,7 @@ export class DungeonLoader {
                 records.push({
                     nextObject,
                     open: (flags & 0x1) !== 0,
-                    textReference: index && textRn < index.length ? index.indexMap[textRn] : textRn & 0x3FF,
+                    textReference: index && textRn < index.length ? index.indexMap[textRn]! : textRn & 0x3FF,
                     textObject: textRn,
                     word4Bits1_15: (flags >> 1) & 0x7fff
                 });
@@ -945,16 +945,17 @@ export class DungeonLoader {
         const cellOffsets = levelCellOffsets(descriptors);
 
         for (const descriptor of descriptors) {
-            this.file.seek(offset + cellOffsets[descriptor.mapIndex]);
+            this.file.seek(offset + cellOffsets[descriptor.mapIndex]!);
 
             const cellFlags: CellFlag[][] = [];
 
             // Read the cell flags column by column
             for (let x = 0; x < descriptor.width; x++) {
-                cellFlags[x] = [];
+                const column: CellFlag[] = [];
+                cellFlags[x] = column;
 
                 for (let y = 0; y < descriptor.height; y++) {
-                    cellFlags[x][y] = this.file.readU8();
+                    column[y] = this.file.readU8();
                 }
             }
 

@@ -99,8 +99,8 @@ export class GraphicsLoader {
         for (let i = 0; i < itemCount; i++) {
             entries.push({
                 index: i,
-                compressedSize: compressedSizes[i],
-                decompressedSize: decompressedSizes[i]
+                compressedSize: compressedSizes[i]!,
+                decompressedSize: decompressedSizes[i]!
             });
         }
 
@@ -117,7 +117,7 @@ export class GraphicsLoader {
         if (!this.data) throw new Error('Graphics not loaded');
         if (index >= this.data.itemCount) throw new Error(`Invalid graphic index: ${index}`);
 
-        const entry = this.data.entries[index];
+        const entry = this.data.entries[index]!;
 
         // Return cached if available
         if (entry.rawData) return entry.rawData;
@@ -126,7 +126,7 @@ export class GraphicsLoader {
         const dataStartOffset = 2 + this.data.itemCount * 2 * 2;
         let offset = dataStartOffset;
         for (let i = 0; i < index; i++) {
-            offset += this.data.entries[i].compressedSize;
+            offset += this.data.entries[i]!.compressedSize;
         }
 
         // Read compressed data

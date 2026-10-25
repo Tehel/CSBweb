@@ -269,7 +269,7 @@ function formatChampions(champions: string[]): string {
  * 32, and the last then loses its last letter.
  */
 export function formatPlaythroughRow(playthrough: Playthrough, folded: boolean, maxChars = 32): string {
-    const row = `${folded ? '+' : '-'} ${formatChampions(playthrough.saves[0].champions)}`;
+    const row = `${folded ? '+' : '-'} ${formatChampions(playthrough.saves[0]!.champions)}`;
     return row.length > maxChars ? row.slice(0, maxChars) : row;
 }
 

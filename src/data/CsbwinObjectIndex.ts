@@ -54,7 +54,7 @@ export interface CsbwinObjectIndex {
 export function formChecksum(buf: Uint8Array): number {
     let result = 0;
     for (let i = 0; i < buf.length; i++) {
-        result = (Math.imul(result, 0xbb40e62d) + 11 + buf[i]) >>> 0;
+        result = (Math.imul(result, 0xbb40e62d) + 11 + buf[i]!) >>> 0;
     }
     return result >>> 0;
 }

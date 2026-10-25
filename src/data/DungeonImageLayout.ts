@@ -120,7 +120,7 @@ export function computeDungeonImageLayout(
   let cursor = databaseStart;
   for (let db = 0; db < 16; db++) {
     databases.push(cursor);
-    cursor += objectCounts[db] * (recordSizes[db] ?? 0);
+    cursor += objectCounts[db]! * (recordSizes[db] ?? 0);
   }
   if (cursor > data.length) return null;
 

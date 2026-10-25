@@ -167,14 +167,14 @@ export function rc4PrepareKey(keyData: Uint8Array, keyDataLen: number): Uint8Arr
     const state = new Uint8Array(RC4_SIZE);
     for (let counter = 0; counter < RC4_SIZE; counter++) state[counter] = counter & 0xff;
     const swapByte = (a: number, b: number): void => {
-        state[a] ^= state[b];
-        state[b] ^= state[a];
-        state[a] ^= state[b];
+        state[a]! ^= state[b]!;
+        state[b]! ^= state[a]!;
+        state[a]! ^= state[b]!;
     };
     let index1 = 0;
     let index2 = 0;
     for (let counter = 0; counter < 256; counter++) {
-        index2 = (keyData[index1] + state[counter] + index2) % 256;
+        index2 = (keyData[index1]! + state[counter]! + index2) % 256;
         swapByte(counter, index2);
         index1 = (index1 + 1) % keyDataLen;
     }
@@ -183,10 +183,10 @@ export function rc4PrepareKey(keyData: Uint8Array, keyDataLen: number): Uint8Arr
     let y = 0;
     for (let counter = 256; counter < RC4_SIZE; counter++) {
         x = (x + 1) % 256;
-        y = (state[x] + y) % 256;
+        y = (state[x]! + y) % 256;
         swapByte(x, y);
-        const xorIndex = (state[x] + state[y]) % 256;
-        state[counter] ^= state[xorIndex];
+        const xorIndex = (state[x]! + state[y]!) % 256;
+        state[counter]! ^= state[xorIndex]!;
     }
     return state;
 }
@@ -196,7 +196,7 @@ export function rc4PrepareKey(keyData: Uint8Array, keyDataLen: number): Uint8Arr
  * from `position`, the buffer's place in its file. Its own inverse.
  */
 export function rc4Encipher(state: Uint8Array, buffer: Uint8Array, position: number): void {
-    for (let i = 0; i < buffer.length; i++) buffer[i] ^= state[(position + i) % RC4_SIZE];
+    for (let i = 0; i < buffer.length; i++) buffer[i]! ^= state[(position + i) % RC4_SIZE]!;
 }
 
 /**
@@ -259,7 +259,7 @@ class RcsReader {
             // Plain `*` loses precision here (see `GraphicRandom`'s
             // comment for why): `Math.imul` gives the exact 32-bit-wraparound product
             // `ui32(0xbb40e62d)` means in C.
-            this.checksum = (Math.imul(this.checksum, 0xbb40e62d) + 11 + buf[i]) >>> 0;
+            this.checksum = (Math.imul(this.checksum, 0xbb40e62d) + 11 + buf[i]!) >>> 0;
         }
         this.offset = end;
         return buf;
@@ -372,7 +372,7 @@ class WcsWriter {
 
     writeBytes(buf: ArrayLike<number>): void {
         for (let i = 0; i < buf.length; i++) {
-            const b = buf[i] & 0xff;
+            const b = buf[i]! & 0xff;
             this.checksum = (Math.imul(this.checksum, 0xbb40e62d) + 11 + b) >>> 0;
             this.bytes.push(b);
         }
@@ -592,7 +592,7 @@ export function readExtendedFeatures(file: Uint8Array): {
             offset += 3;
             if (level > 63) break;
             if (selector < 32) {
-                dsaLevelIndex[level][selector] = index;
+                dsaLevelIndex[level]![selector] = index;
             }
         }
     }
@@ -663,7 +663,7 @@ export function buildExtendedFeaturesPrefix(prefix: ExtendedFeaturesPrefix): Uin
     const dataMapLength = typeMap.length;
 
     const indexBytes = new Uint8Array(dataMapLength * 2);
-    for (let i = 0; i < dataMapLength; i++) writeU16LE(indexBytes, i * 2, indexMap[i]);
+    for (let i = 0; i < dataMapLength; i++) writeU16LE(indexBytes, i * 2, indexMap[i]!);
 
     const block = new Uint8Array(EXTENDED_FEATURES_SIZE);
     for (let i = 0; i < EXTENDED_SENTINEL.length; i++) {

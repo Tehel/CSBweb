@@ -129,7 +129,7 @@ function buildLevelDescriptors(descriptors: readonly MapDescriptor[]): Uint8Arra
  */
 function buildColumnIndex(columnIndex: readonly number[]): Uint8Array {
     const buf = new Uint8Array(columnIndex.length * 2);
-    for (let i = 0; i < columnIndex.length; i++) writeU16BE(buf, i * 2, columnIndex[i] & 0xffff);
+    for (let i = 0; i < columnIndex.length; i++) writeU16BE(buf, i * 2, columnIndex[i]! & 0xffff);
     return buf;
 }
 
@@ -148,7 +148,7 @@ export function cellFlagArraySize(maps: readonly MapData[]): number {
     const cellOffsets = levelCellOffsets(maps.map((map) => map.descriptor));
     let end = 0;
     maps.forEach((map, level) => {
-        end = Math.max(end, cellOffsets[level] + mapCellFlagLength(map));
+        end = Math.max(end, cellOffsets[level]! + mapCellFlagLength(map));
     });
     return end;
 }
@@ -174,7 +174,7 @@ export function buildCellFlagArray(maps: readonly MapData[], size: number): Uint
     const buf = new Uint8Array(size);
     const cellOffsets = levelCellOffsets(maps.map((map) => map.descriptor));
     maps.forEach((map, level) => {
-        let at = cellOffsets[level];
+        let at = cellOffsets[level]!;
         const { width, height } = map.descriptor;
         if (at + mapCellFlagLength(map) > size) {
             throw new Error(
@@ -182,7 +182,8 @@ export function buildCellFlagArray(maps: readonly MapData[], size: number): Uint
             );
         }
         for (let x = 0; x < width; x++) {
-            for (let y = 0; y < height; y++) buf[at++] = map.cellFlags[x][y] & 0xff;
+            const flags = map.cellFlags[x]!;
+            for (let y = 0; y < height; y++) buf[at++] = flags[y]! & 0xff;
         }
         for (const table of [
             map.monsterTypes, map.wallDecorationTOC, map.floorDecorationTOC, map.doorDecorationTOC,
@@ -206,7 +207,7 @@ export function buildCellFlagArray(maps: readonly MapData[], size: number): Uint
  */
 function buildObjectList(objectList: readonly number[]): Uint8Array {
     const buf = new Uint8Array(objectList.length * 2);
-    for (let i = 0; i < objectList.length; i++) writeU16BE(buf, i * 2, objectList[i] & 0xffff);
+    for (let i = 0; i < objectList.length; i++) writeU16BE(buf, i * 2, objectList[i]! & 0xffff);
     return buf;
 }
 
@@ -225,7 +226,7 @@ function buildObjectList(objectList: readonly number[]): Uint8Array {
  */
 function buildIndirectTextIndex(indirectTextIndex: readonly number[]): Uint8Array {
     const buf = new Uint8Array(indirectTextIndex.length * 4);
-    for (let i = 0; i < indirectTextIndex.length; i++) writeU32LE(buf, i * 4, indirectTextIndex[i] >>> 0);
+    for (let i = 0; i < indirectTextIndex.length; i++) writeU32LE(buf, i * 4, indirectTextIndex[i]! >>> 0);
     return buf;
 }
 
@@ -241,7 +242,7 @@ function buildIndirectTextIndex(indirectTextIndex: readonly number[]): Uint8Arra
 function buildCompressedText(compressedText: readonly number[]): Uint8Array {
     const buf = new Uint8Array(4 + compressedText.length * 2);
     writeU32LE(buf, 0, compressedText.length >>> 0);
-    for (let i = 0; i < compressedText.length; i++) writeU16BE(buf, 4 + i * 2, compressedText[i] & 0xffff);
+    for (let i = 0; i < compressedText.length; i++) writeU16BE(buf, 4 + i * 2, compressedText[i]! & 0xffff);
     return buf;
 }
 
@@ -256,7 +257,7 @@ function buildCompressedText(compressedText: readonly number[]): Uint8Array {
  */
 function buildTextWords(textWords: readonly number[]): Uint8Array {
     const buf = new Uint8Array(textWords.length * 2);
-    for (let i = 0; i < textWords.length; i++) writeU16BE(buf, i * 2, textWords[i] & 0xffff);
+    for (let i = 0; i < textWords.length; i++) writeU16BE(buf, i * 2, textWords[i]! & 0xffff);
     return buf;
 }
 
@@ -331,7 +332,7 @@ function buildDatabase(
 
     const buf = new Uint8Array(declared * size);
     for (let i = 0; i < declared; i++) {
-        writeRecord(buf, i * size, db, records[i], options);
+        writeRecord(buf, i * size, db, records[i]!, options);
     }
     return buf;
 }
@@ -606,7 +607,7 @@ export function buildDungeonImage(
  */
 export function buildImageChecksum(image: Uint8Array): Uint8Array {
     let sum = 0;
-    for (let i = 0; i < image.length; i++) sum = (sum + image[i]) & 0xffff;
+    for (let i = 0; i < image.length; i++) sum = (sum + image[i]!) & 0xffff;
     const buf = new Uint8Array(2);
     writeU16BE(buf, 0, sum);
     return buf;

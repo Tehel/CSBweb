@@ -85,7 +85,7 @@ function getObjectListIndex(data: DungeonData, map: MapData, mapIndex: number, x
   const cellFlag = map.cellFlags[x]?.[y] ?? 0;
   if ((cellFlag & 0x10) === 0) return -1;
 
-  const baseCol = data.levelIndex[mapIndex] + x;
+  const baseCol = data.levelIndex[mapIndex]! + x;
   const colBase = data.columnIndex[baseCol] ?? 0;
   let idx = colBase;
 

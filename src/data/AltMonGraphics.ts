@@ -8,7 +8,7 @@
  * a level to sections of its choosing (`AltGraphicMapping`); otherwise graphic `n` of
  * type `mt` is section `3 * mt + n - 1`, and 0 is the type's own pictures.
  */
-import { readU16LE, readU32LE } from '../core/bytes';
+import { readU16LE, readU32LE, readU8 } from '../core/bytes';
 import { Die } from '../core/Die';
 import { CSBGraphicType, decodePlanar, type CSBGraphicsLoader, type IndexedBitmap } from './CSBGraphicsLoader';
 import { altMonGraphicsKey, Expool, type ExpoolDatabase } from './CsbwinExpool';
@@ -52,23 +52,23 @@ export interface AltMonGraph {
 /** `MONSTERDESC` read little-endian, unswapped and unchecked, as the section holds it. */
 function readMonsterDesc(raw: Uint8Array, at: number): MonsterDesc {
   return {
-    type: raw[at],
-    attackSound: raw[at + 1],
+    type: readU8(raw, at),
+    attackSound: readU8(raw, at + 1),
     word2: readU16LE(raw, at + 2),
     word4: readU16LE(raw, at + 4),
-    movementTicks06: raw[at + 6],
-    attackTicks07: raw[at + 7],
-    defense08: raw[at + 8],
-    baseHealth09: raw[at + 9],
-    attack10: raw[at + 10],
-    poisonAttack11: raw[at + 11],
-    dexterity12: raw[at + 12],
-    unused13: raw[at + 13],
+    movementTicks06: readU8(raw, at + 6),
+    attackTicks07: readU8(raw, at + 7),
+    defense08: readU8(raw, at + 8),
+    baseHealth09: readU8(raw, at + 9),
+    attack10: readU8(raw, at + 10),
+    poisonAttack11: readU8(raw, at + 11),
+    dexterity12: readU8(raw, at + 12),
+    unused13: readU8(raw, at + 13),
     word14: readU16LE(raw, at + 14),
     word16: readU16LE(raw, at + 16),
     word18: readU16LE(raw, at + 18),
     word20: readU16LE(raw, at + 20),
-    uByte22: [raw[at + 22], raw[at + 23], raw[at + 24], raw[at + 25]],
+    uByte22: [readU8(raw, at + 22), readU8(raw, at + 23), readU8(raw, at + 24), readU8(raw, at + 25)],
   };
 }
 
@@ -77,14 +77,14 @@ function readItem12(raw: Uint8Array, at: number): MonsterGraphicDesc {
   return {
     word0: readU16LE(raw, at),
     word2: readU16LE(raw, at + 2),
-    frontRearByteWidth: raw[at + 4],
-    frontRearHeight: raw[at + 5],
-    sideByteWidth: raw[at + 6],
-    sideHeight: raw[at + 7],
-    attackByteWidth: raw[at + 8],
-    attackHeight: raw[at + 9],
-    uByte10: raw[at + 10],
-    uByte11: raw[at + 11],
+    frontRearByteWidth: readU8(raw, at + 4),
+    frontRearHeight: readU8(raw, at + 5),
+    sideByteWidth: readU8(raw, at + 6),
+    sideHeight: readU8(raw, at + 7),
+    attackByteWidth: readU8(raw, at + 8),
+    attackHeight: readU8(raw, at + 9),
+    uByte10: readU8(raw, at + 10),
+    uByte11: readU8(raw, at + 11),
   };
 }
 
@@ -93,7 +93,7 @@ function readItem110(raw: Uint8Array, at: number): { x: number; y: number }[][] 
   const cells: { x: number; y: number }[][] = [];
   for (let cell = 0; cell < 11; cell++) {
     const pairs: { x: number; y: number }[] = [];
-    for (let p = 0; p < 5; p++) pairs.push({ x: raw[at + 10 * cell + 2 * p], y: raw[at + 10 * cell + 2 * p + 1] });
+    for (let p = 0; p < 5; p++) pairs.push({ x: readU8(raw, at + 10 * cell + 2 * p), y: readU8(raw, at + 10 * cell + 2 * p + 1) });
     cells.push(pairs);
   }
   return cells;
@@ -153,7 +153,7 @@ export function GetAlternateBasicGraphicAddress(pGraph: AltMonGraph, graphicFBSA
   let bitmap = decoded.get(graphicFBSAE);
   if (!bitmap || bitmap.width !== width || bitmap.height !== height) {
     const { buffer, byteOffset } = pGraph.graphic;
-    const at = Math.min(byteOffset + (pGraph.graphicOffsets[graphicFBSAE] | 0), buffer.byteLength);
+    const at = Math.min(byteOffset + (pGraph.graphicOffsets[graphicFBSAE] ?? 0), buffer.byteLength);
     bitmap = { width, height, pixels: decodePlanar(new Uint8Array(buffer, at), width, height) };
     decoded.set(graphicFBSAE, bitmap);
   }

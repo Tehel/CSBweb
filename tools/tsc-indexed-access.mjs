@@ -17,6 +17,7 @@ const TSC = resolve(ROOT, 'node_modules/.bin/tsc');
 const MODULES = [
   'src/audio/',
   'src/core/',
+  'src/data/',
   'src/lib/',
   'src/renderer/',
   'src/settings/',

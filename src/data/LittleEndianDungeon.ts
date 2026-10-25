@@ -32,7 +32,7 @@
  * checksum of every byte before it. A file with an Extended Features block, compressed
  * (33028) or enciphered, is CSBWin's or the Atari's, never the PC's, and is never told.
  */
-import { readU16BE, readU16LE } from '../core/bytes';
+import { readU16BE, readU16LE, readU8 } from '../core/bytes';
 
 const HEADER_SIZE = 44;
 const DESCRIPTOR_SIZE = 16;
@@ -51,7 +51,7 @@ type WordReader = (bytes: Uint8Array, at: number) => number;
 /** Where `bytes`' sections start, its words read by `word`; `null` where its header names no level. */
 function sections(bytes: Uint8Array, word: WordReader) {
     if (bytes.length < HEADER_SIZE) return null;
-    const numMaps = bytes[4];
+    const numMaps = bytes[4]!;
     if (numMaps === 0) return null;
     const columns = HEADER_SIZE + numMaps * DESCRIPTOR_SIZE;
     if (columns > bytes.length) return null;
@@ -65,7 +65,7 @@ function sections(bytes: Uint8Array, word: WordReader) {
     let at = text + word(bytes, 6) * 2;
     for (let db = 0; db < 16; db++) {
         databases.push(at);
-        at += word(bytes, 12 + db * 2) * RECORD_SIZES[db];
+        at += word(bytes, 12 + db * 2) * RECORD_SIZES[db]!;
     }
     return { numMaps, columns, objectList, text, databases, cellFlags: at, end: at + word(bytes, 2) };
 }
@@ -77,7 +77,7 @@ function isWhole(bytes: Uint8Array, word: WordReader): boolean {
     if (bytes.length === layout.end) return true;
     if (bytes.length !== layout.end + 2) return false;
     let sum = 0;
-    for (let i = 0; i < layout.end; i++) sum = (sum + bytes[i]) & 0xffff;
+    for (let i = 0; i < layout.end; i++) sum = (sum + bytes[i]!) & 0xffff;
     return word(bytes, layout.end) === sum;
 }
 
@@ -86,19 +86,19 @@ function swapWords(bytes: Uint8Array, word: WordReader): Uint8Array<ArrayBuffer>
     const layout = sections(bytes, word)!;
     const out = bytes.slice();
     const swap = (at: number): void => {
-        out[at] = bytes[at + 1];
-        out[at + 1] = bytes[at];
+        out[at] = readU8(bytes, at + 1);
+        out[at + 1] = readU8(bytes, at);
     };
     for (const at of HEADER_WORDS) swap(at);
     for (let db = 0; db < 16; db++) swap(12 + db * 2);
     for (let map = 0; map < layout.numMaps; map++) {
         for (const at of DESCRIPTOR_WORDS) swap(HEADER_SIZE + map * DESCRIPTOR_SIZE + at);
     }
-    for (let at = layout.columns; at < layout.databases[0]; at += 2) swap(at);
+    for (let at = layout.columns; at < layout.databases[0]!; at += 2) swap(at);
     for (let db = 0; db < 16; db++) {
-        const size = RECORD_SIZES[db];
-        for (let record = layout.databases[db]; size > 0 && record < (layout.databases[db + 1] ?? layout.cellFlags); record += size) {
-            for (const at of RECORD_WORDS[db]) swap(record + at);
+        const size = RECORD_SIZES[db]!;
+        for (let record = layout.databases[db]!; size > 0 && record < (layout.databases[db + 1] ?? layout.cellFlags); record += size) {
+            for (const at of RECORD_WORDS[db]!) swap(record + at);
         }
     }
     if (bytes.length === layout.end + 2) swap(layout.end);

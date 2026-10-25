@@ -337,14 +337,16 @@ function readViewportPosition22e(raw: Uint8Array, off: number): ViewportPosition
 
   const table: ViewportPositionTable = new Array(sets);
   for (let s = 0; s < sets; s++) {
-    table[s] = new Array(relCells);
+    const set: { x: number; y: number }[][] = new Array(relCells);
+    table[s] = set;
     for (let rc = 0; rc < relCells; rc++) {
-      table[s][rc] = new Array(positions);
+      const cell: { x: number; y: number }[] = new Array(positions);
+      set[rc] = cell;
       const base = off + s * bytesPerSet + rc * bytesPerRelCell;
       for (let p = 0; p < positions; p++) {
         const x = raw[base + p * 2] ?? 0;
         const y = raw[base + p * 2 + 1] ?? 0;
-        table[s][rc][p] = { x, y };
+        cell[p] = { x, y };
       }
     }
   }
@@ -362,14 +364,16 @@ function readMonsterPositions22e(raw: Uint8Array, off: number): MonsterPositionT
 
   const table: MonsterPositionTable = new Array(sets);
   for (let s = 0; s < sets; s++) {
-    table[s] = new Array(relCells);
+    const set: { x: number; y: number }[][] = new Array(relCells);
+    table[s] = set;
     for (let rc = 0; rc < relCells; rc++) {
-      table[s][rc] = new Array(positions);
+      const cell: { x: number; y: number }[] = new Array(positions);
+      set[rc] = cell;
       const base = off + s * bytesPerSet + rc * bytesPerRelCell;
       for (let p = 0; p < positions; p++) {
         const x = raw[base + p * 2] ?? 0;
         const y = raw[base + p * 2 + 1] ?? 0;
-        table[s][rc][p] = { x, y };
+        cell[p] = { x, y };
       }
     }
   }
@@ -695,10 +699,11 @@ function readDecorationDescSets(
 
   const out: DecorationDesc[][] = new Array(sets);
   for (let s = 0; s < sets; s++) {
-    out[s] = new Array(entries);
+    const set: DecorationDesc[] = new Array(entries);
+    out[s] = set;
     for (let i = 0; i < entries; i++) {
       const base = off + (s * entries + i) * stride;
-      out[s][i] = {
+      set[i] = {
         x1: raw[base + 0] ?? 0,
         x2: raw[base + 1] ?? 0,
         y1: raw[base + 2] ?? 0,
@@ -904,11 +909,11 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
 
   // Sanity checks: these should be tight for DM/CSB distributions.
   for (let i = 0; i < graphicClasses.length; i++) {
-    const gc = graphicClasses[i];
+    const gc = graphicClasses[i]!;
     if (gc.byte5 > 2) throw new Error(`graphics.dat 0x22e s5604[${i}].byte5 out of range: ${gc.byte5}`);
   }
   for (let i = 0; i < objDescGraphicClass.length; i++) {
-    if (objDescGraphicClass[i] > 84) throw new Error(`graphics.dat 0x22f ObjDesc[${i}].graphicClass out of range`);
+    if (objDescGraphicClass[i]! > 84) throw new Error(`graphics.dat 0x22f ObjDesc[${i}].graphicClass out of range`);
   }
 
   return {

@@ -1,5 +1,6 @@
 import type { GraphicsLoader } from '../GraphicsLoader';
 import type { RectPos } from './UITables';
+import { readU8 } from '../../core/bytes';
 
 export interface ViewportTables {
   // Core wall rectangles (CSBWin `d.wallRectangles[14]`)
@@ -50,23 +51,23 @@ const GRAPHIC_22E_INDEX = 0x22e; // 558
 
 function readRectPosBytes(buf: Uint8Array, off: number) {
   return {
-    x1: buf[off + 0],
-    x2: buf[off + 1],
-    y1: buf[off + 2],
-    y2: buf[off + 3],
-    u4: buf[off + 4],
-    u5: buf[off + 5],
-    u6: buf[off + 6],
-    u7: buf[off + 7],
+    x1: readU8(buf, off + 0),
+    x2: readU8(buf, off + 1),
+    y1: readU8(buf, off + 2),
+    y2: readU8(buf, off + 3),
+    u4: readU8(buf, off + 4),
+    u5: readU8(buf, off + 5),
+    u6: readU8(buf, off + 6),
+    u7: readU8(buf, off + 7),
   };
 }
 
 function readRectPosByte4(buf: Uint8Array, off: number): RectPos {
   return {
-    x1: buf[off + 0],
-    x2: buf[off + 1],
-    y1: buf[off + 2],
-    y2: buf[off + 3],
+    x1: readU8(buf, off + 0),
+    x2: readU8(buf, off + 1),
+    y1: readU8(buf, off + 2),
+    y2: readU8(buf, off + 3),
   };
 }
 
@@ -284,8 +285,8 @@ export function extractViewportTables(graphics: GraphicsLoader): ViewportTables 
 
   const seeThruWallsRect = toRectPos(raw, tail.seeThruWallsRectOffset);
   const seeThruWallsRect2 = toRectPos(raw, tail.seeThruWallsRectOffset + 4);
-  const seeThruWallsRectUByte4 = raw[tail.seeThruWallsRectOffset + 4];
-  const seeThruWallsRectUByte6 = raw[tail.seeThruWallsRectOffset + 6];
+  const seeThruWallsRectUByte4 = readU8(raw, tail.seeThruWallsRectOffset + 4);
+  const seeThruWallsRectUByte6 = readU8(raw, tail.seeThruWallsRectOffset + 6);
   const seeThruDoorEdgeRect = toRectPos(raw, tail.uByte2542Offset);
   const championPortraitRect = readRectPosByte4(raw, tail.byte2546Offset);
 

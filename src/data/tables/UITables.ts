@@ -1,6 +1,7 @@
 import type { GraphicsLoader } from '../GraphicsLoader';
 import type { IndexedBitmap } from '../CSBGraphicsLoader';
 import type { SpellDefinition } from '../spellTypes';
+import type { Tuple } from '../../core/types';
 
 export interface Rect {
   x1: number;
@@ -276,12 +277,12 @@ function readWordRect(view: DataView, off: number, name: string = '?'): WordRect
   };
 }
 
-function readWordRectArray(view: DataView, off: number, count: number, basename: string = '?'): WordRect[] {
+function readWordRectArray<N extends number>(view: DataView, off: number, count: N, basename: string = '?'): Tuple<WordRect, N> {
   const out: WordRect[] = [];
   for (let i = 0; i < count; i++) {
     out.push(readWordRect(view, off + i * 8, `${basename}-${i}`));
   }
-  return out;
+  return out as Tuple<WordRect, N>;
 }
 
 function readI16Array(view: DataView, off: number, count: number): number[] {

@@ -3,6 +3,7 @@
  * the files a game was made with (`openGraphicsFile`, `OpenCSBgraphicsFile`,
  * `doc/CSBwin-src/Graphics.cpp:1788-1843`, `:1864-1920`; `src/engine/FileSignatures.ts`).
  */
+import { readU32LE } from '../core/bytes';
 import { md5 } from '../core/md5';
 
 /** `graphicSignature1/2` or `CSBgraphicSignature1/2` (`doc/CSBwin-src/data.cpp:46-48`). */
@@ -17,8 +18,7 @@ export interface FileSignature {
  */
 export function Signature(bytes: Uint8Array): FileSignature {
     const result = md5(bytes);
-    const word = (at: number): number =>
-        (result[at] | (result[at + 1] << 8) | (result[at + 2] << 16) | (result[at + 3] << 24)) >>> 0;
+    const word = (at: number): number => readU32LE(result, at);
     const signature1 = word(0);
     return { signature1: signature1 === 0 ? 1 : signature1, signature2: word(4) };
 }

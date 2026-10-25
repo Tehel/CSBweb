@@ -141,7 +141,7 @@ function readPortrait(block: Uint8Array, base: number): ui8[] | undefined {
       for (let bit = 0; bit < 16; bit++) {
         let colour = 0;
         for (let plane = 0; plane < 4; plane++) {
-          colour |= ((planes[plane] >> (15 - bit)) & 1) << plane;
+          colour |= ((planes[plane]! >> (15 - bit)) & 1) << plane;
         }
         if (colour !== 0) any = true;
         pixels[y * PORTRAIT_WIDTH + group * 16 + bit] = colour;
@@ -335,11 +335,11 @@ export function writePortrait(block: Uint8Array, base: number, pixels?: ui8[]): 
       for (let bit = 0; bit < 16; bit++) {
         const colour = pixels[y * PORTRAIT_WIDTH + group * 16 + bit] ?? 0;
         for (let plane = 0; plane < 4; plane++) {
-          planes[plane] |= ((colour >> plane) & 1) << (15 - bit);
+          planes[plane]! |= ((colour >> plane) & 1) << (15 - bit);
         }
       }
       const word = at + y * PORTRAIT_BYTES_PER_LINE + group * 8;
-      for (let plane = 0; plane < 4; plane++) setU16BE(block, word + plane * 2, planes[plane]);
+      for (let plane = 0; plane < 4; plane++) setU16BE(block, word + plane * 2, planes[plane]!);
     }
   }
 }
@@ -494,7 +494,7 @@ export function buildCsbwinCharacterBlock(
 ): Uint8Array {
   const block = new Uint8Array(CHARACTER_BLOCK_SIZE);
   for (let i = 0; i < Math.min(4, champions.length); i++) {
-    writeCsbwinCharacter(block, i, champions[i], options);
+    writeCsbwinCharacter(block, i, champions[i]!, options);
   }
   for (let i = champions.length; i < 4; i++) {
     const vacant = vacantCharacters[i];
@@ -508,8 +508,8 @@ export function buildCsbwinCharacterBlock(
 /** The bytes from `at` reversed in place, `n` of them. */
 function reverseBytes(record: Uint8Array, at: number, n: number): void {
   for (let i = 0; i < n / 2; i++) {
-    const b = record[at + i];
-    record[at + i] = record[at + n - 1 - i];
+    const b = record[at + i]!;
+    record[at + i] = record[at + n - 1 - i]!;
     record[at + n - 1 - i] = b;
   }
 }

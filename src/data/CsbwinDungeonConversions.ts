@@ -56,7 +56,7 @@ export function ComputeTextLength(words: readonly ui16[], startWord: number): nu
     let len = 0;
     let idx = startWord;
     while (idx < words.length) {
-        const word = words[idx++];
+        const word = words[idx++]!;
         len++;
         if (((word >> 10) & 0x1f) === 31 || ((word >> 5) & 0x1f) === 31 || (word & 0x1f) === 31) {
             return len;
@@ -256,15 +256,16 @@ function field<K extends string>(record: { [key in K]?: ObjectID }, key: K): { g
  */
 export function convertObjectReferences(data: DungeonData): void {
     for (let level = 0; level < data.maps.length; level++) {
-        const map = data.maps[level];
+        const map = data.maps[level]!;
         const { width, height } = map.descriptor;
         for (let x = 0; x < width; x++) {
-            let column = data.columnIndex[data.levelIndex[level] + x];
+            let column = data.columnIndex[data.levelIndex[level]! + x]!;
+            const flags = map.cellFlags[x]!;
             for (let y = 0; y < height; y++) {
-                if ((map.cellFlags[x][y] & 0x10) === 0) continue;
+                if ((flags[y]! & 0x10) === 0) continue;
                 const at = column;
                 ConvertListOfObjects(data, {
-                    get: () => data.objectList[at],
+                    get: () => data.objectList[at]!,
                     set: (rn) => { data.objectList[at] = rn; },
                 }, false);
                 column++;
@@ -318,9 +319,10 @@ export function CheckCelltypes(data: DungeonData): void {
     for (const map of data.maps) {
         const { width, height } = map.descriptor;
         for (let x = 0; x < width; x++) {
+            const flags = map.cellFlags[x]!;
             for (let y = 0; y < height; y++) {
-                const cell = map.cellFlags[x][y];
-                if ((cell >> 5) > RoomType.FALSEWALL) map.cellFlags[x][y] = (cell & 0x1f) | (RoomType.OPEN << 5);
+                const cell = flags[y]!;
+                if ((cell >> 5) > RoomType.FALSEWALL) flags[y] = (cell & 0x1f) | (RoomType.OPEN << 5);
             }
         }
     }

@@ -36,8 +36,9 @@ export function levelWalls(map: MapData): Uint8Array<ArrayBuffer> {
     walls[1] = height;
     let cell = 0;
     for (let x = 0; x < width; x++) {
+        const flags = map.cellFlags[x]!;
         for (let y = 0; y < height; y++, cell++) {
-            if (getRoomType(map.cellFlags[x][y]) !== RoomType.STONE) walls[2 + (cell >> 3)] |= 0x80 >> (cell & 7);
+            if (getRoomType(flags[y]!) !== RoomType.STONE) walls[2 + (cell >> 3)]! |= 0x80 >> (cell & 7);
         }
     }
     return walls;
@@ -374,7 +375,7 @@ export async function dungeonWalls(dungeon: DungeonData): Promise<DungeonWalls> 
 
 /** Whether two dungeons have as many levels, each as wide and as high as the other's. */
 function sameShapes(a: DungeonShapes, b: DungeonShapes): boolean {
-    return a.length === b.length && a.every(([width, height], level) => width === b[level][0] && height === b[level][1]);
+    return a.length === b.length && a.every(([width, height], level) => width === b[level]![0] && height === b[level]![1]);
 }
 
 /**

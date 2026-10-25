@@ -24,7 +24,7 @@
  * has the directory block as CSBWin's does. Only a world in play that nothing has
  * written a record to has no block yet, as `dungeon.dat` has none.
  */
-import { readU32BE, writeU32BE } from '../core/bytes';
+import { readU32BE, readU32LE, writeU32BE } from '../core/bytes';
 import { DBType } from '../core/types';
 import type { RuntimeFileSignatures } from './FileSignature';
 
@@ -116,7 +116,7 @@ function overlayPaletteKey(i: number): number {
 function overlayPaletteRecord(palette: Uint8Array, i: number): number[] {
     const record: number[] = [];
     for (let at = 64 * i; at < 64 * (i + 1); at += 4) {
-        record.push((palette[at] | (palette[at + 1] << 8) | (palette[at + 2] << 16) | (palette[at + 3] << 24)) >>> 0);
+        record.push(readU32LE(palette, at));
     }
     return record;
 }
@@ -204,7 +204,7 @@ export class Expool {
         this.setM(result, this.m(hashi));
         this.setM(hashi, result);
         this.setM(result + 1, key);
-        for (let i = 0; i < size; i++) this.setM(result + 2 + i, record[i]);
+        for (let i = 0; i < size; i++) this.setM(result + 2 + i, record[i]!);
     }
 
     /**
@@ -324,7 +324,7 @@ export class Expool {
                 saved = false;
                 continue;
             }
-            for (let j = 0; j < 16; j++) this.setM(p + 2 + j, values[16 * i + j]);
+            for (let j = 0; j < 16; j++) this.setM(p + 2 + j, values[16 * i + j]!);
         }
         return saved;
     }
@@ -358,7 +358,7 @@ export class Expool {
     /** `EXPOOL::CopyChampionBonesRecord` (`doc/CSBwin-src/data.cpp:1658-1668`), or null. */
     copyChampionBonesRecord(bonesObject: number): number | null {
         const record = this.locate(championBonesKey(bonesObject));
-        return record?.length === 1 ? record[0] : null;
+        return record?.length === 1 ? record[0]! : null;
     }
 
     /**
@@ -367,7 +367,7 @@ export class Expool {
      */
     getChampionBonesRecord(bonesObject: number): number | null {
         const record = this.read(championBonesKey(bonesObject));
-        return record?.length === 1 ? record[0] : null;
+        return record?.length === 1 ? record[0]! : null;
     }
 }
 
@@ -399,7 +399,7 @@ export function readOverlayPalette(db: ExpoolDatabase): Uint8Array | null {
         const record = expool.locate(overlayPaletteKey(i));
         if (!record || record.length < 16) return null;
         for (let j = 0; j < 16; j++) {
-            for (let b = 0; b < 4; b++) palette[64 * i + 4 * j + b] = (record[j] >>> (8 * b)) & 0xff;
+            for (let b = 0; b < 4; b++) palette[64 * i + 4 * j + b] = (record[j]! >>> (8 * b)) & 0xff;
         }
     }
     return palette;
@@ -442,7 +442,7 @@ export function readRuntimeFileSignatures(db: ExpoolDatabase): RuntimeFileSignat
     const expool = new Expool(db);
     const first = (edbt: number, i: number): number => {
         const record = expool.locate(((EDT_DATABASE << 24) + (edbt << 16) + i) >>> 0);
-        return record && record.length > 0 ? record[0] : 0;
+        return record && record.length > 0 ? record[0]! : 0;
     };
     const debuging = first(EDBT_DEBUGING, 0);
     return {
@@ -458,7 +458,7 @@ export function specialLocationsFromExpool(bytes: Uint8Array): Record<number, nu
     const locations: Record<number, number> = {};
     const read = (key: number): void => {
         const record = expool.locate(key);
-        if (record && record.length >= 1) locations[key] = record[0];
+        if (record && record.length >= 1) locations[key] = record[0]!;
     };
     for (let esl = 0; esl <= ESL_SPECIAL_LOCATION_MAX; esl++) read(((EDT_SPECIAL_LOCATIONS << 24) | esl) >>> 0);
     // A level's own monster move filter, keyed with `(level + 1) << 8`
