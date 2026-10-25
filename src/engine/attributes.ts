@@ -24,7 +24,7 @@
  * the wrapped value still exports to an Atari save file bit-for-bit
  * (`doc/CSBwin-src/data.cpp:1698-1744`).
  */
-import type { ui8 } from '../core/types';
+import type { Tuple, ui8 } from '../core/types';
 import type { Champion } from './gameTypes';
 
 /** `#define Luck 0 … #define AntiFire 6` (`doc/CSBwin-src/CSB.h:631-637`). */
@@ -46,6 +46,9 @@ export interface Attribute {
   current: ui8;
   minimum: ui8;
 }
+
+/** A champion's seven attributes, `CHARDESC.Attributes[7]`, indexed by `AttributeIndex`. */
+export type Attributes = Tuple<Attribute, typeof ATTRIBUTE_COUNT>;
 
 /** `ub()` — the unsigned-byte truncation every `ATTRIBUTE` setter applies. */
 const ub = (value: number): number => value & 0xff;
@@ -106,15 +109,16 @@ export const ADD_CHARACTER_ATTRIBUTE_MINIMUM = 30;
 export const ADD_CHARACTER_LUCK_MINIMUM = 10;
 export const ADD_CHARACTER_ATTRIBUTE_CAP = 224;
 
-export function makeAddCharacterAttributes(values: ArrayLike<number>): Attribute[] {
+export function makeAddCharacterAttributes(values: ArrayLike<number>): Attributes {
   const attrs: Attribute[] = [];
   for (let i = 0; i < ATTRIBUTE_COUNT; i++) {
     let value = values[i] ?? 0;
     if (value > ADD_CHARACTER_ATTRIBUTE_CAP) value = ADD_CHARACTER_ATTRIBUTE_CAP;
     attrs.push(makeAttribute(value, value, ADD_CHARACTER_ATTRIBUTE_MINIMUM));
   }
-  setAttributeMinimum(attrs[AttributeIndex.Luck], ADD_CHARACTER_LUCK_MINIMUM);
-  return attrs;
+  const stats = attrs as Attributes;
+  setAttributeMinimum(stats[AttributeIndex.Luck], ADD_CHARACTER_LUCK_MINIMUM);
+  return stats;
 }
 
 /**

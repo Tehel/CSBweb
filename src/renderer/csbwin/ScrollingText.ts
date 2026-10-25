@@ -275,7 +275,7 @@ export class ScrollingText {
 
       this.textTimeout[row] = time + (this.partySleeping ? TEXT_TIMEOUT_TICKS_SLEEPING : TEXT_TIMEOUT_TICKS);
       // A row must never expire before the row above it.
-      if (row > 0 && this.textTimeout[row - 1] !== -1 && this.textTimeout[row]! <= this.textTimeout[row - 1]!) {
+      if (row > 0 && this.textTimeout[row - 1] !== -1 && this.textTimeout[row] <= this.textTimeout[row - 1]!) {
         this.textTimeout[row] = this.textTimeout[row - 1]!;
       }
       this.futureLines.shift();

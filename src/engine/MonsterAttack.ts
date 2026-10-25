@@ -880,8 +880,8 @@ export class MonsterAttack {
     let pos = attackerPos;
     if ((attackFromDirection & 1) === 0) pos++;
     const index = 2 * attackFromDirection + (Math.trunc(pos / 2) & 1);
-    const row = this.ctx.tables.byte586[index & 0x7];
-    return [row[0], row[1], row[2], row[3]];
+    const row = this.ctx.tables.byte586[index & 0x7]!;
+    return [row[0]!, row[1]!, row[2]!, row[3]!];
   }
 
   /**

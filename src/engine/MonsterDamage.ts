@@ -363,7 +363,7 @@ export class MonsterDamage {
     const record = this.dungeon.locateExpoolRecord(key);
     if (record === null || record.length < 4) {
       const nil = [0, 0, 0, 0];
-      if (subtype < 4) nil[subtype]++;
+      if (subtype < 4) nil[subtype]!++;
       this.dungeon.writeExpoolRecord(key, nil);
     } else if (subtype < record.length) {
       this.dungeon.writeLocatedExpoolWord(key, subtype, record[subtype]! + 1);

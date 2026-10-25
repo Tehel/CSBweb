@@ -69,7 +69,8 @@ keeps what it has, and nothing new goes in.
 
 ## Tech stack
 
-Vanilla TypeScript (strict, `noUnusedLocals`/`noUnusedParameters`) + Vite. No framework.
+Vanilla TypeScript (strict, `noUnusedLocals`/`noUnusedParameters`, and `src/` under
+`noUncheckedIndexedAccess`: `tools/tsc-indexed-access.mjs`) + Vite. No framework.
 One Node, 24, everywhere: `.nvmrc`, `engines`, `@types/node` and the image's, pinned
 (`doc/DEPLOYMENT.md` → "The image and the stack").
 A single 320×200 `<canvas>` is the whole screen, CSS-scaled to 960×600 with

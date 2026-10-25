@@ -244,27 +244,27 @@ function marshalParameters(params: PartyAttackParameters): number[] {
 }
 
 function unmarshalParameters(params: PartyAttackParameters, words: ArrayLike<number>): void {
-  params.charIdx = words[0] | 0;
-  params.attackType = words[1] | 0;
-  params.attackX = words[2] | 0;
-  params.attackY = words[3] | 0;
-  params.monsterUnderAttack = words[4] | 0;
-  params.monsterType = words[5] | 0;
-  params.skillNumber = words[6] | 0;
-  params.staminaCost = words[7] | 0;
-  params.experienceGained = words[8] | 0;
-  params.disableTime = words[9] | 0;
-  params.neededMana = words[10] | 0;
-  params.unused = words[11] | 0;
-  params.decrementCharges = words[12] | 0;
-  params.activateMonster = words[13] | 0;
-  for (let i = 0; i < 10; i++) params.userInfo[i] = words[14 + i] | 0;
+  params.charIdx = words[0]! | 0;
+  params.attackType = words[1]! | 0;
+  params.attackX = words[2]! | 0;
+  params.attackY = words[3]! | 0;
+  params.monsterUnderAttack = words[4]! | 0;
+  params.monsterType = words[5]! | 0;
+  params.skillNumber = words[6]! | 0;
+  params.staminaCost = words[7]! | 0;
+  params.experienceGained = words[8]! | 0;
+  params.disableTime = words[9]! | 0;
+  params.neededMana = words[10]! | 0;
+  params.unused = words[11]! | 0;
+  params.decrementCharges = words[12]! | 0;
+  params.activateMonster = words[13]! | 0;
+  for (let i = 0; i < 10; i++) params.userInfo[i] = words[14 + i]! | 0;
   // dataType is read back before the union arm, since it selects the arm.
-  params.dataType = words[24] | 0;
+  params.dataType = words[24]! | 0;
   const fields = attdepFields(params);
   for (let i = 0; i < fields.length; i++) {
-    const [obj, key] = fields[i];
-    (obj as Record<string, number>)[key] = words[25 + i] | 0;
+    const [obj, key] = fields[i]!;
+    (obj as Record<string, number>)[key] = words[25 + i]! | 0;
   }
 }
 
@@ -1198,8 +1198,8 @@ export class AttackSystem {
     params.attackType = initialAttackType;
 
     const facing = pChar.facing & 3;
-    params.attackX = party.position.x + this.ctx.tables.deltaX[facing];
-    params.attackY = party.position.y + this.ctx.tables.deltaY[facing];
+    params.attackX = party.position.x + this.ctx.tables.deltaX[facing]!;
+    params.attackY = party.position.y + this.ctx.tables.deltaY[facing]!;
 
     const tables = this.ctx.tables;
     const attackName = tables.attackNames[initialAttackType] ?? String(initialAttackType);
@@ -1374,8 +1374,8 @@ export class AttackSystem {
 
       case AttackType.atk_FUSE:
         this.setCharToPartyFacing(pChar);
-        params.attackX = party.position.x + this.ctx.tables.deltaX[party.facing & 3];
-        params.attackY = party.position.y + this.ctx.tables.deltaY[party.facing & 3];
+        params.attackX = party.position.x + this.ctx.tables.deltaX[party.facing & 3]!;
+        params.attackY = party.position.y + this.ctx.tables.deltaY[party.facing & 3]!;
         params.dataType = AttackDataType.ADT_Fusion;
         this.callAttackFilter(filter, params, 1);
         this.fusion(params.attackX, params.attackY);
@@ -1425,8 +1425,8 @@ export class AttackSystem {
       }
 
       case AttackType.atk_CLIMBDOWN: {
-        params.attackX = party.position.x + this.ctx.tables.deltaX[party.facing & 3];
-        params.attackY = party.position.y + this.ctx.tables.deltaY[party.facing & 3];
+        params.attackX = party.position.x + this.ctx.tables.deltaX[party.facing & 3]!;
+        params.attackY = party.position.y + this.ctx.tables.deltaY[party.facing & 3]!;
         const target = new Position(params.attackX, params.attackY, party.position.z);
         const roomType = (this.ctx.dungeon.getCellFlag(target) & 0xff) >> 5;
         // Climbing down is only possible into an empty pit; anything in it and the

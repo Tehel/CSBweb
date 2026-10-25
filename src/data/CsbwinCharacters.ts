@@ -27,7 +27,7 @@
  */
 import { CHARFLAG_MALE, getChampionPossession } from '../core/charDesc';
 import type { Champion, PartyState, Skill, VacantCharacter } from '../engine/gameTypes';
-import type { Attribute } from '../engine/attributes';
+import type { Attribute, Attributes } from '../engine/attributes';
 import { OBJECT_ID_NULL, type i8, type i16, type ui8, type ObjectID } from '../core/types';
 import { CHARDESC_SIZE, decodeCharField, encodeCharField } from './CsbwinSaveInfo';
 import {
@@ -65,13 +65,13 @@ interface CsbwinCharacter {
   occupied: boolean;
 }
 
-function readAttributes(block: Uint8Array, base: number): Attribute[] {
+function readAttributes(block: Uint8Array, base: number): Attributes {
   const stats: Attribute[] = [];
   for (let i = 0; i < 7; i++) {
     const at = base + ATTRIBUTES_OFFSET + i * 3;
     stats.push({ maximum: readU8(block, at), current: readU8(block, at + 1), minimum: readU8(block, at + 2) });
   }
-  return stats;
+  return stats as Attributes;
 }
 
 function readSkills(block: Uint8Array, base: number): Skill[] {

@@ -308,8 +308,8 @@ export class HallOfChampions {
     const party = this.ctx.party.state;
     const facing = party.facing & 3;
     return new Position(
-      party.position.x + this.ctx.tables.deltaX[facing],
-      party.position.y + this.ctx.tables.deltaY[facing],
+      party.position.x + this.ctx.tables.deltaX[facing]!,
+      party.position.y + this.ctx.tables.deltaY[facing]!,
       party.position.z,
     );
   }

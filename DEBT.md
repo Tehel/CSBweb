@@ -114,7 +114,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E36 | Type escape hatches that check nothing | M | ⏳ |
 | E25 | One helper for each rule, where copies drift | M | ⏳ |
 | E26 | Systems named after CSBWin's files, not what they do | M | ⏳ |
 | D21 | A save has nine shapes | L | ⏳ |
@@ -469,7 +468,7 @@ Copies of one rule drift apart. The copies left:
 - **The room type**, `(cellFlag >> 5) & 0x7`, written out 28 times beside 4 calls of
   `getRoomType`; the facing byte packed at `WorldMove.ts:616` and `DungeonState.ts:914`.
 - **The database dispatch**, five times: two 13-case switches (`DungeonState.ts:458-570`),
-  ten `getXxxRecord` getters (`:775-856`), `SmartDiscard.ts:223-230`,
+  ten `getXxxRecord` getters (`:775-856`), `SmartDiscard.ts:224-231`,
   `objectIndex.ts:86-94` and `MakeMoreRoomInDB.ts:95-98`, beside `DATABASE_KEY` (`:62`)
   and `getRecord` (`:688`).
 - **The global text's key**, `((EDT_GLOBAL_TEXT << 24) | (index & 0xffff)) >>> 0`, at
@@ -675,30 +674,6 @@ loader's cache keyed by format, or the parameter dropped with the dead fallback.
 Paying it: the look-up tables built once a present and shared by the three conversions;
 `DsaVars` allocated on first use; the traces behind a test or a closure. The frames record
 palette codes, so none moves.
-
-### E36 ⏳ Type escape hatches that check nothing
-
-`noUncheckedIndexedAccess` is off for the engine (250 errors there with it on), so its
-172 `x[i]!` assert nothing: 37 in `DsaSystem.ts` among them. Their `!` documents where an index was proved,
-and the compiler holds none of them to it.
-
-What stands: `tools/tsc-indexed-access.mjs`, which `npm test` runs, holds the modules in
-its `MODULES` to the flag: `src/renderer/` (the intro, the bytecode, `csbwin/` and the
-interface among it), `src/core/`, `src/data/`, `src/audio/`, `src/lib/`, `src/settings/` and
-`src/stats/` and the page's `src/ui/`, so each `!` left there is an index the code proves. Where a damaged or
-short file can send a read past its end, the read says what it gets, 0, as `src/core/bytes.ts`'s
-do: the LZW, SND and `ExpandData` streams' tails and tables, and an IMG opcode a
-stream cuts off. A table of a fixed length is a `Tuple` (`src/core/types.ts`)
-once its reader has checked the length, and a constant index into it needs none:
-`hcsb.dat`'s fifty words, a CSB wall or floor decoration's descriptors, the message strip's
-four rows and `framesAcross`'s frames. No `??`, `?.`, `!` or `as` in `src/` is redundant by the
-types, read with the flag on (`navigator.storage?.` aside, a browser's feature test);
-CSBWin's `RNempty` is `OBJECT_ID_EMPTY`; `noImplicitReturns` and `noImplicitOverride` are on
-(`exactOptionalPropertyTypes` raises 37).
-
-Paying the rest: the engine (250 errors, 58 of them in `DsaSystem.ts`) added to
-`MODULES`, or left out if the author prefers; the item is paid when the list is decided
-and held.
 
 ### E39 ⏳ The About and Credits pages
 

@@ -1711,7 +1711,7 @@ export class DsaSystem {
             // Past the last variable, "Gloal fetch from non-existent variable" pushes
             // 0xcdcdcdcd (`doc/CSBwin-src/DSA.cpp:1303-1307`).
             if (index >= this.globalVariables.length) this.ctx.host.trace('Gloal fetch from non-existent variable');
-            const value = index < this.globalVariables.length ? this.globalVariables[index] : 0xcdcdcdcd;
+            const value = index < this.globalVariables.length ? this.globalVariables[index]! : 0xcdcdcdcd;
             bank.stack.push(value);
             break;
           }
@@ -1953,7 +1953,7 @@ export class DsaSystem {
         if (!this.dungeon.isValidLocation(locr)) break;
         const map = this.dungeon.getMap(locr.l);
         if (!map) break;
-        const cellFlag = map.cellFlags[locr.x][locr.y];
+        const cellFlag = map.cellFlags[locr.x]![locr.y]!;
         if (((cellFlag >> 5) & 0x7) !== RoomType.PIT) break;
         const next = value !== 0 ? (cellFlag | 0x01) : (cellFlag & 0xfe);
         this.updateCellFlag(locr, next);
@@ -1966,7 +1966,7 @@ export class DsaSystem {
         if (!this.dungeon.isValidLocation(locr)) break;
         const map = this.dungeon.getMap(locr.l);
         if (!map) break;
-        const cellFlag = map.cellFlags[locr.x][locr.y];
+        const cellFlag = map.cellFlags[locr.x]![locr.y]!;
         if (((cellFlag >> 5) & 0x7) === RoomType.STONE) break;
         let firstDisabled: ObjectID | null = null;
         const pos = new Position(locr.x, locr.y, locr.l);
@@ -2201,7 +2201,7 @@ export class DsaSystem {
           bank.stack.push(-1);
           break;
         }
-        if (((map.cellFlags[locr.x][locr.y] >> 5) & 0x7) === RoomType.STONE) {
+        if (((map.cellFlags[locr.x]![locr.y]! >> 5) & 0x7) === RoomType.STONE) {
           bank.stack.push(-1);
           break;
         }
@@ -2291,7 +2291,7 @@ export class DsaSystem {
         if (!this.dungeon.isValidLocation(locr)) break;
         const map = this.dungeon.getMap(locr.l);
         if (!map) break;
-        const cellFlag = map.cellFlags[locr.x][locr.y];
+        const cellFlag = map.cellFlags[locr.x]![locr.y]!;
         const roomType = (cellFlag >> 5) & 0x7;
         if (arraySize === 0) break;
         bank.setVar(arrayIndex, roomType);
@@ -2372,7 +2372,7 @@ export class DsaSystem {
         if (arrayIndex < 0 || arrayIndex + arraySize > 100) break;
         const map = this.dungeon.getMap(locr.l);
         if (!map) break;
-        let cellFlag = map.cellFlags[locr.x][locr.y];
+        let cellFlag = map.cellFlags[locr.x]![locr.y]!;
         const roomType = (cellFlag >> 5) & 0x7;
         if (arraySize === 0) break;
         if (bank.getVar(arrayIndex) !== roomType) break;
@@ -3325,10 +3325,10 @@ export class DsaSystem {
       result[0] = (monster.numMonM1 & 0x3) + 1;
       result[1] = monster.creatureType;
       for (let i = 0; i < 4; i++) result[2 + i] = monster.hp[i] ?? 0;
-      if (monsterInvisible(this.ctx.rules, monster)) result[6] |= 1;
-      if (monsterDrawAsSize4(this.ctx.rules, monster)) result[6] |= 2;
-      if (monsterUnique(this.ctx.rules, monster)) result[6] |= 4;
-      if (monsterPoisoned(this.ctx.rules, monster)) result[6] |= 8;
+      if (monsterInvisible(this.ctx.rules, monster)) result[6]! |= 1;
+      if (monsterDrawAsSize4(this.ctx.rules, monster)) result[6]! |= 2;
+      if (monsterUnique(this.ctx.rules, monster)) result[6]! |= 4;
+      if (monsterPoisoned(this.ctx.rules, monster)) result[6]! |= 8;
       result[7] = monster.alternateGraphics;
     }
     const n = Math.min(8, num);
@@ -3749,7 +3749,7 @@ export class DsaSystem {
       if (roomType !== RoomType.STONE && roomType !== RoomType.FALSEWALL) {
         targetPos = 0;
       }
-      const mapping = this.byte1596[roomType];
+      const mapping = this.byte1596[roomType]!;
       if (mapping === 0) {
         this.ctx.host.trace(`Illegal DSA timer target (${targetX},${targetY}) L${level}`);
         return;
@@ -3816,7 +3816,7 @@ export class DsaSystem {
     dstRec.destMap = srcRec.destMap;
     const srcMap = this.dungeon.getMap(src.l);
     if (!srcMap) return;
-    this.updateCellFlag(dst, srcMap.cellFlags[src.x][src.y]);
+    this.updateCellFlag(dst, srcMap.cellFlags[src.x]![src.y]!);
   }
 
   private findFirstTeleporter(position: Position): ObjectID {
@@ -3869,7 +3869,7 @@ export class DsaSystem {
     if (!map) return;
     if (locr.x < 0 || locr.y < 0) return;
     if (locr.x >= map.descriptor.width || locr.y >= map.descriptor.height) return;
-    map.cellFlags[locr.x][locr.y] = cellFlag & 0xff;
+    map.cellFlags[locr.x]![locr.y] = cellFlag & 0xff;
   }
 
   private modifyDescription(locrInt: number, index: number, color: number): void {

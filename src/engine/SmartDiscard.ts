@@ -77,8 +77,8 @@ export class SDObjList {
         this.numEntry++;
         while (index !== 0) {
             const parent = Math.trunc((index - 1) / 2);
-            if (this.sdobj[parent].priority >= p.priority) break;
-            this.sdobj[index] = this.sdobj[parent];
+            if (this.sdobj[parent]!.priority >= p.priority) break;
+            this.sdobj[index] = this.sdobj[parent]!;
             index = parent;
         }
         this.sdobj[index] = p;
@@ -87,7 +87,7 @@ export class SDObjList {
     /** `AddObjectIncr` (`:173-201`): a full list drops its lowest for a higher one. */
     addObjectIncr(p: SDObj): void {
         if (this.numEntry >= SD_LIST_SIZE) {
-            if (p.priority > this.sdobj[0].priority) {
+            if (p.priority > this.sdobj[0]!.priority) {
                 this.deleteObjectIncr(null);
             } else {
                 return;
@@ -97,8 +97,8 @@ export class SDObjList {
         this.numEntry++;
         while (index !== 0) {
             const parent = Math.trunc((index - 1) / 2);
-            if (this.sdobj[parent].priority <= p.priority) break;
-            this.sdobj[index] = this.sdobj[parent];
+            if (this.sdobj[parent]!.priority <= p.priority) break;
+            this.sdobj[index] = this.sdobj[parent]!;
             index = parent;
         }
         this.sdobj[index] = p;
@@ -131,28 +131,28 @@ export class SDObjList {
             const c2Index = c1Index + 1;
             if (c1Index >= this.numEntry) break;
             if (c2Index >= this.numEntry) {
-                this.sdobj[index] = this.sdobj[c1Index];
+                this.sdobj[index] = this.sdobj[c1Index]!;
                 this.numEntry--;
                 return true;
             }
-            if (c1First(this.sdobj[c1Index].priority, this.sdobj[c2Index].priority)) {
-                this.sdobj[index] = this.sdobj[c1Index];
+            if (c1First(this.sdobj[c1Index]!.priority, this.sdobj[c2Index]!.priority)) {
+                this.sdobj[index] = this.sdobj[c1Index]!;
                 index = c1Index;
             } else {
-                this.sdobj[index] = this.sdobj[c2Index];
+                this.sdobj[index] = this.sdobj[c2Index]!;
                 index = c2Index;
             }
         }
         this.numEntry--;
         if (index === this.numEntry) return true;
-        const priority = this.sdobj[this.numEntry].priority;
+        const priority = this.sdobj[this.numEntry]!.priority;
         while (index !== 0) {
             const parent = Math.trunc((index - 1) / 2);
-            if (stopAt(this.sdobj[parent].priority, priority)) break;
-            this.sdobj[index] = this.sdobj[parent];
+            if (stopAt(this.sdobj[parent]!.priority, priority)) break;
+            this.sdobj[index] = this.sdobj[parent]!;
             index = parent;
         }
-        this.sdobj[index] = this.sdobj[this.numEntry];
+        this.sdobj[index] = this.sdobj[this.numEntry]!;
         return true;
     }
 
@@ -163,14 +163,14 @@ export class SDObjList {
         let low = 0;
         this.numEntry = 0;
         while (high > low) {
-            const temp = this.sdobj[low];
-            this.addObjectDecr(this.sdobj[high]);
+            const temp = this.sdobj[low]!;
+            this.addObjectDecr(this.sdobj[high]!);
             this.sdobj[high] = temp;
             high--;
             low++;
         }
         while (low < num) {
-            const temp = this.sdobj[low];
+            const temp = this.sdobj[low]!;
             this.addObjectDecr(temp);
             low++;
         }
@@ -184,8 +184,9 @@ export class SDObjList {
      */
     searchStillAvailable(p: SDObj): ObjectID | null {
         for (let i = 0; i < this.numEntry; i++) {
-            if (this.sdobj[i].key === p.key) {
-                return this.sdobj[i].priority >= p.priority ? this.sdobj[i].object : null;
+            const entry = this.sdobj[i]!;
+            if (entry.key === p.key) {
+                return entry.priority >= p.priority ? entry.object : null;
             }
         }
         return null;
@@ -292,7 +293,7 @@ export function scanOneCell(ctx: GameContext, s: SmartDiscardState, list: SDObjL
                 break;
             }
         }
-        const pile = ++pileSize[idx * 4 + pos];
+        const pile = ++pileSize[idx * 4 + pos]!;
         priority += pile;
         if (pile > 20) priority += excessFactor * (pile - 20);
         if (isTriggered && pile === 1) continue;
@@ -407,7 +408,7 @@ export function smartDiscard(ctx: GameContext, initialize: boolean): void {
                     s.currentMode = SmartDiscardMode.Scan;
                     return;
                 }
-                const record = records[s.currentIndex];
+                const record = records[s.currentIndex]!;
                 s.currentIndex++;
                 if (record.nextObject === OBJECT_ID_NULL) continue;
                 s.totalCount++;

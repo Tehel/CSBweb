@@ -213,7 +213,7 @@ export class DungeonState {
         if (index < 0 || index >= this.data.maps.length) {
             return null;
         }
-        return this.data.maps[index];
+        return this.data.maps[index]!;
     }
 
     /**
@@ -230,7 +230,7 @@ export class DungeonState {
         const targetLevel = map.descriptor.level + delta;
 
         for (let idx = 0; idx < this.data.maps.length; idx++) {
-            const candidate = this.data.maps[idx];
+            const candidate = this.data.maps[idx]!;
             const desc = candidate.descriptor;
             if (desc.level !== targetLevel) continue;
 
@@ -285,7 +285,7 @@ export class DungeonState {
         // Check bounds
         if (x < 0 || x >= map.descriptor.width || y < 0 || y >= map.descriptor.height) return 0;
 
-        return map.cellFlags[x][y];
+        return map.cellFlags[x]![y]!;
     }
 
     /**
@@ -299,15 +299,15 @@ export class DungeonState {
         if (!map) return -1;
         if (x < 0 || x >= map.descriptor.width || y < 0 || y >= map.descriptor.height) return -1;
 
-        const cellFlag = map.cellFlags[x][y];
+        const cellFlag = map.cellFlags[x]![y]!;
         if ((cellFlag & 0x10) === 0) return -1;
 
-        const baseCol = this.data.levelIndex[z] + x;
-        const colBase = this.data.columnIndex[baseCol];
+        const baseCol = this.data.levelIndex[z]! + x;
+        const colBase = this.data.columnIndex[baseCol]!;
         let idx = colBase;
 
         for (let yy = 0; yy < y; yy++) {
-            if ((map.cellFlags[x][yy] & 0x10) !== 0) idx++;
+            if ((map.cellFlags[x]![yy]! & 0x10) !== 0) idx++;
         }
 
         return idx;
@@ -345,19 +345,19 @@ export class DungeonState {
         if (x < 0 || y < 0 || x >= map.descriptor.width || y >= map.descriptor.height) return false;
 
         this.setDBRecordLink(rn, OBJECT_ID_EOF);
-        const cellFlag = map.cellFlags[x][y];
+        const cellFlag = map.cellFlags[x]![y]!;
         const hasObjects = (cellFlag & 0x10) !== 0;
-        const baseCol = this.data.levelIndex[z] + x;
+        const baseCol = this.data.levelIndex[z]! + x;
 
         if (!hasObjects) {
             if (baseCol < 0 || baseCol >= this.data.columnIndex.length) return false;
             let idx = this.data.columnIndex[baseCol] ?? 0;
             for (let yy = 0; yy < y; yy++) {
-                if ((map.cellFlags[x][yy] & 0x10) !== 0) idx++;
+                if ((map.cellFlags[x]![yy]! & 0x10) !== 0) idx++;
             }
             this.data.objectList.splice(idx, 0, rn);
             for (let col = baseCol + 1; col < this.data.columnIndex.length; col++) {
-                this.data.columnIndex[col] = (this.data.columnIndex[col] + 1) & 0xffff;
+                this.data.columnIndex[col] = (this.data.columnIndex[col]! + 1) & 0xffff;
             }
             this.setCellHasObjects(map, x, y, true);
             this.data.header.objectListSize = this.data.objectList.length;
@@ -414,9 +414,9 @@ export class DungeonState {
             const next = this.getDBRecordLink(head);
             if (next === OBJECT_ID_EOF) {
                 this.data.objectList.splice(idx, 1);
-                const baseCol = this.data.levelIndex[z] + x;
+                const baseCol = this.data.levelIndex[z]! + x;
                 for (let col = baseCol + 1; col < this.data.columnIndex.length; col++) {
-                    this.data.columnIndex[col] = (this.data.columnIndex[col] - 1) & 0xffff;
+                    this.data.columnIndex[col] = (this.data.columnIndex[col]! - 1) & 0xffff;
                 }
                 this.setCellHasObjects(map, x, y, false);
                 this.data.header.objectListSize = this.data.objectList.length;
@@ -444,10 +444,10 @@ export class DungeonState {
     }
 
     private setCellHasObjects(map: MapData, x: number, y: number, hasObjects: boolean): void {
-        let cellFlag = map.cellFlags[x][y];
+        let cellFlag = map.cellFlags[x]![y]!;
         if (hasObjects) cellFlag |= 0x10;
         else cellFlag &= 0xef;
-        map.cellFlags[x][y] = cellFlag;
+        map.cellFlags[x]![y] = cellFlag;
     }
 
     /**
@@ -593,7 +593,7 @@ export class DungeonState {
         let { emptyIndexEntry, emptyDBEntry } = this.rnMaps.findEmptyIndexEntry(dbType);
         if (emptyDBEntry === -1) {
             for (let i = 1; i < database.records.length; i++) {
-                if (database.records[i].nextObject !== OBJECT_ID_NULL) continue;
+                if (database.records[i]!.nextObject !== OBJECT_ID_NULL) continue;
                 emptyDBEntry = i;
                 break;
             }
@@ -659,7 +659,7 @@ export class DungeonState {
         records.push(...new DungeonLoader().clearedRecords(dbType, 100, this.data));
         database.count = newSize & 0xffff;
         this.data.header.objectCounts[dbType] = newSize & 0xffff;
-        records[iNew].nextObject = OBJECT_ID_EOF;
+        records[iNew]!.nextObject = OBJECT_ID_EOF;
         return iNew;
     }
 

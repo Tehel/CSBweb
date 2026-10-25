@@ -314,12 +314,12 @@ export class TimerQueue {
     const numTimer = this.queue.length;
     if (numTimer === 1) return;
     let d7 = timerQueueIndex;
-    const moving = this.queue[d7];
+    const moving = this.queue[d7]!;
     let swapped = false;
     while (d7 !== 0) {
       const d6 = (d7 - 1) >> 1;
-      if (!timerLess(moving, this.queue[d6])) break;
-      this.queue[d7] = this.queue[d6];
+      if (!timerLess(moving, this.queue[d6]!)) break;
+      this.queue[d7] = this.queue[d6]!;
       d7 = d6;
       swapped = true;
     }
@@ -327,9 +327,9 @@ export class TimerQueue {
       const lastParent = Math.trunc((numTimer - 2) / 2);
       while (d7 <= lastParent) {
         let d6 = 2 * d7 + 1;
-        if (d6 + 1 < numTimer && timerLess(this.queue[d6 + 1], this.queue[d6])) d6++;
-        if (!timerLess(this.queue[d6], moving)) break;
-        this.queue[d7] = this.queue[d6];
+        if (d6 + 1 < numTimer && timerLess(this.queue[d6 + 1]!, this.queue[d6]!)) d6++;
+        if (!timerLess(this.queue[d6]!, moving)) break;
+        this.queue[d7] = this.queue[d6]!;
         d7 = d6;
       }
     }

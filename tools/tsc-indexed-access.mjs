@@ -1,11 +1,11 @@
-// `tsc --noEmit --noUncheckedIndexedAccess`, held to the modules listed below: `npm test`
-// runs it beside the plain `tsc`.
+// `tsc --noEmit --noUncheckedIndexedAccess`, held to `src/`: `npm test` runs it beside the
+// plain `tsc`, which checks the tools and the server too, without the flag.
 //
-// With the flag, an index reads as possibly `undefined`, so each `x[i]!` that is left is
-// an index the code has proved and says so; without it, a `!` asserts nothing. The whole
-// tree raises too many errors to turn it on at once, so the modules where data comes from
-// files are held to it one by one (DEBT.md E36). tsc checks every file the listed ones
-// import as well, so its errors elsewhere are left out here, not fixed.
+// With the flag, an index reads as possibly `undefined`, so each `x[i]!` in `src/` is an
+// index the code has proved, and says so. Where a damaged or short file can send a read
+// past its end, the read says what it gets instead, 0, as `src/core/bytes.ts`'s do; a
+// table of a fixed length is a `Tuple` (`src/core/types.ts`) once its reader has checked
+// the length, and a constant index into it needs no `!`.
 import { spawnSync } from 'node:child_process';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,16 +14,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const TSC = resolve(ROOT, 'node_modules/.bin/tsc');
 
 /** The paths held to the flag: a folder ends in `/`. */
-const MODULES = [
-  'src/audio/',
-  'src/core/',
-  'src/data/',
-  'src/lib/',
-  'src/renderer/',
-  'src/settings/',
-  'src/stats/',
-  'src/ui/',
-];
+const MODULES = ['src/'];
 
 const r = spawnSync(TSC, ['--noEmit', '--noUncheckedIndexedAccess', '--pretty', 'false'], { cwd: ROOT, encoding: 'utf8' });
 const out = (r.stdout ?? '') + (r.stderr ?? '');

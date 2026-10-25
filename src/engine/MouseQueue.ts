@@ -105,7 +105,7 @@ export class MouseQueue {
 
   /** The entry `HandleMouseEvents` would take next, left in place. */
   head(): MouseQueueEntry {
-    return this.entries[this.start];
+    return this.entries[this.start]!;
   }
 
   /** `MouseQStart++`, wrapped: the head is taken. */

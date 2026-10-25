@@ -73,7 +73,7 @@ export class ActuatorSystem {
    * `_ResurrectReincarnateCancel` prints their name in (`doc/CSBwin-src/CSBCode.cpp:6856`).
    */
   getChampionMessageColor(chIdx: number): number {
-    return this.byte1386[chIdx];
+    return this.byte1386[chIdx]!;
   }
 
   triggerPressurePads(position: Position, facing: number, pressed: boolean, unchangedRoom = false): boolean {
@@ -148,7 +148,7 @@ export class ActuatorSystem {
     for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
       const decoded = this.dungeon.rnMaps.decode(rn);
       if (decoded.category === DBType.ACTUATOR) {
-        remainingActuators[decoded.position & 0x3] += 1;
+        remainingActuators[decoded.position & 0x3]! += 1;
       } else if (decoded.category >= DBType.CREATURE) {
         break;
       }
@@ -166,7 +166,7 @@ export class ActuatorSystem {
 
       if (decoded.category === DBType.ACTUATOR) {
         const actuatorPos = decoded.position & 0x3;
-        remainingActuators[actuatorPos] = Math.max(0, remainingActuators[actuatorPos] - 1);
+        remainingActuators[actuatorPos] = Math.max(0, remainingActuators[actuatorPos]! - 1);
         const rec = this.dungeon.getActuatorRecord(rn);
         const actuatorType = rec ? getActuatorType(rec) : 0;
         if (!rec || actuatorType === 0) {
@@ -517,13 +517,13 @@ export class ActuatorSystem {
     if (!map) return;
     if (targetX < 0 || targetY < 0 || targetX >= map.descriptor.width || targetY >= map.descriptor.height) return;
 
-    const cellFlag = map.cellFlags[targetX][targetY];
+    const cellFlag = map.cellFlags[targetX]![targetY]!;
     const targetRoomType = (cellFlag >> 5) & 0x7;
     const targetPos = (targetRoomType === RoomType.STONE || targetRoomType === RoomType.FALSEWALL)
       ? getActuatorTargetPos(actuator)
       : 0;
 
-    const timerFunction = this.byte1596[targetRoomType];
+    const timerFunction = this.byte1596[targetRoomType]!;
     if (timerFunction === 0) {
       this.ctx.host.trace(
         `Illegal actuator timer target (${targetX},${targetY}) L${source.z}, room type ${targetRoomType}`,
@@ -639,13 +639,13 @@ export class ActuatorSystem {
         // The champion who owns the cursor, d.HandChar — not whoever stands in cell mapPos.
         const handChar = party.cursorOwner;
         if (handChar !== -1) {
-          this.applySkillIncrease(party.champions[handChar], handChar, 8, adjustment, experienceMultiplier, AdjustSkillsWhy.SkillIncreaser1);
+          this.applySkillIncrease(party.champions[handChar]!, handChar, 8, adjustment, experienceMultiplier, AdjustSkillsWhy.SkillIncreaser1);
         }
         return;
       }
       adjustment = Math.trunc(adjustment / (party.champions.length || 1));
       for (let i = 0; i < party.champions.length; i++) {
-        const champ = party.champions[i];
+        const champ = party.champions[i]!;
         // `if (d.CH16482[D7W].HP() != 0)` (`doc/CSBwin-src/Mouse.cpp:226`).
         if ((champ.attributes.health | 0) === 0) continue;
         this.applySkillIncrease(champ, i, 8, adjustment, experienceMultiplier, AdjustSkillsWhy.SkillIncreaser2);

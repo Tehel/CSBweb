@@ -45,7 +45,7 @@ export function makeMoreRoomInDB(ctx: GameContext, dbType: DBType): ObjectID {
     const party = ctx.party.state.position;
     const partyLevel = party.z | 0;
     const numLevel = dungeon.getMapCount();
-    let level = ctx.levelCleared[dbType];
+    let level = ctx.levelCleared[dbType]!;
     if (partyLevel === level) {
         level++;
         if (level >= numLevel) level = 0;

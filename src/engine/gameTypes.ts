@@ -6,7 +6,7 @@
  */
 
 import type { i8, ui8, ui16, ui32, i16, i32, Direction, Position, ObjectID } from '../core/types';
-import type { Attribute } from './attributes';
+import type { Attributes } from './attributes';
 
 /**
  * Champion attributes (stats)
@@ -27,7 +27,7 @@ export interface ChampionAttributes {
      * two. Read and write it through the helpers in `attributes.ts`, which carry
      * CSBWin's byte-wrap and its "above 240 means negative" rule.
      */
-    stats: Attribute[];
+    stats: Attributes;
 }
 
 export interface Skill {

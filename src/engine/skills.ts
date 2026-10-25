@@ -68,7 +68,7 @@ export function createSkillsFromSubskillLevels(levels: number[], allowNeophyte =
     const level = Math.max(0, Math.min(17, rawLevel | 0));
     if (level === 0 && !allowNeophyte) continue;
     const experience = limitSkillExperience(125 << level);
-    skills[SUBSKILL_START + i].experience = experience;
+    skills[SUBSKILL_START + i]!.experience = experience;
   }
   populateBaseSkillExperience(skills);
   return skills;
@@ -81,7 +81,7 @@ function populateBaseSkillExperience(skills: Skill[]): void {
     for (let i = 0; i < SUBSKILLS_PER_BASE; i++) {
       total += skills[start + i]?.experience ?? 0;
     }
-    skills[base].experience = limitSkillExperience(total);
+    skills[base]!.experience = limitSkillExperience(total);
   }
 }
 
@@ -92,8 +92,8 @@ export function ensureSkills(skills: Skill[] | null | undefined): Skill[] {
       for (let i = 0; i < skills.length && i < TOTAL_SKILLS; i++) {
         const entry = skills[i];
         if (!entry) continue;
-        next[i].tempAdjust = entry.tempAdjust | 0;
-        next[i].experience = entry.experience | 0;
+        next[i]!.tempAdjust = entry.tempAdjust | 0;
+        next[i]!.experience = entry.experience | 0;
       }
     }
     return next;
@@ -233,7 +233,7 @@ export function adjustSkills(
   const oldMastery = determineMastery(champ, basicSkill | 0xc000, { partySleeping });
   const skills = ensureSkills(champ.skills);
   champ.skills = skills;
-  const skillEntry = skills[skillNumber];
+  const skillEntry = skills[skillNumber]!;
 
   const filtered = ctx.systems.dsa.processAdjustSkillsFilter({
     chIdx,
@@ -260,7 +260,7 @@ export function adjustSkills(
   }
 
   if (skillNumber >= 4) {
-    const base = skills[basicSkill];
+    const base = skills[basicSkill]!;
     base.experience = limitSkillExperience(base.experience + (adjustedExp & 0xffff));
   }
 
@@ -301,10 +301,10 @@ export function addToSkill(
   const oldMastery = determineMastery(champ, basicSkill | 0xc000, { partySleeping });
 
   const skills = ensureSkills(champ.skills);
-  const skillEntry = skills[skillNumber];
+  const skillEntry = skills[skillNumber]!;
   skillEntry.experience = limitSkillExperience(skillEntry.experience + (experience & 0xffff));
   if (skillNumber >= 4) {
-    const base = skills[basicSkill];
+    const base = skills[basicSkill]!;
     base.experience = limitSkillExperience(base.experience + (experience & 0xffff));
   }
   champ.skills = skills;
@@ -326,14 +326,14 @@ export function addToSkill(
  * fragments in the champion's own colour, `d.Byte1386[chIdx]`, flowing onto one line.
  */
 function printLevelUp(ctx: GameContext, chIdx: number, basicSkill: number): void {
-  const champ = ctx.party.state.champions[chIdx];
+  const champ = ctx.party.state.champions[chIdx]!;
   const labels = ['FIGHTER', 'NINJA', 'PRIEST', 'WIZARD']; // d.Pointer16596
-  const color = ctx.tables.byte1386[chIdx];
+  const color = ctx.tables.byte1386[chIdx]!;
   const messages = ctx.host.messages;
   messages.printLinefeed();
   messages.quePrintLines(color, champ.name);
   messages.quePrintLines(color, ' JUST GAINED A ');
-  messages.quePrintLines(color, labels[basicSkill]);
+  messages.quePrintLines(color, labels[basicSkill]!);
   messages.quePrintLines(color, ' LEVEL');
 }
 

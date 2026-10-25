@@ -154,8 +154,9 @@ export class SoundQueue {
     }
     let prevByte = 0;
     for (let i = 0; i < fileData.length; i++) {
-      fileData[i] = (fileData[i] + prevByte) & 0xff;
-      prevByte = fileData[i];
+      const byte = (fileData[i]! + prevByte) & 0xff;
+      fileData[i] = byte;
+      prevByte = byte;
     }
     const [start, numSample] = wavDataChunk(fileData) ?? [44, readU32LE(fileData, 40)];
     if (numSample + start > fileData.length) {

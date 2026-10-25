@@ -71,9 +71,9 @@ export type MissileDropTarget = { monster: ObjectID } | null;
 
 /** A door's state, the low three bits of its cell's flags, as the door timer and `HitDoor` write it. */
 export function setDoorState(map: MapData, x: number, y: number, doorState: number): void {
-  const cellFlag = map.cellFlags[x][y];
+  const cellFlag = map.cellFlags[x]![y]!;
   const newCellFlag = (cellFlag & 0xf8) | (doorState & 0x7);
-  map.cellFlags[x][y] = newCellFlag;
+  map.cellFlags[x]![y] = newCellFlag;
 }
 
 export class TimerSystem {
@@ -612,11 +612,11 @@ export class TimerSystem {
     const action = this.getTimerAction(timer);
     let nextAction = action;
     if (action === ActuatorAction.TOGGLE) {
-      const isSet = (map.cellFlags[target.x][target.y] & 0x04) !== 0;
+      const isSet = (map.cellFlags[target.x]![target.y]! & 0x04) !== 0;
       nextAction = isSet ? ActuatorAction.CLEAR : ActuatorAction.SET;
     }
 
-    const cellFlag = map.cellFlags[target.x][target.y];
+    const cellFlag = map.cellFlags[target.x]![target.y]!;
     if (nextAction === ActuatorAction.CLEAR) {
       if (this.isPartyAt(target) || this.isNonMaterialMonsterAt(target)) {
         timer.time = (timer.time + 1) >>> 0;
@@ -642,11 +642,11 @@ export class TimerSystem {
     this.activateDsa(timer, this.getTimerAction(timer));
 
     if (this.getTimerAction(timer) === ActuatorAction.TOGGLE) {
-      const isSet = (map.cellFlags[timer.uByte6][timer.uByte7] & 0x08) !== 0;
+      const isSet = (map.cellFlags[timer.uByte6]![timer.uByte7]! & 0x08) !== 0;
       timer.uByte9 = isSet ? ActuatorAction.CLEAR : ActuatorAction.SET;
     }
 
-    const cellFlag = map.cellFlags[timer.uByte6][timer.uByte7];
+    const cellFlag = map.cellFlags[timer.uByte6]![timer.uByte7]!;
     if (this.getTimerAction(timer) === ActuatorAction.SET) {
       this.setCellFlag(map, timer.uByte6, timer.uByte7, cellFlag | 0x08);
       this.wiggleEverything(timer.uByte6, timer.uByte7, timer.level);
@@ -668,11 +668,11 @@ export class TimerSystem {
     this.activateDsa(timer, this.getTimerAction(timer));
 
     if (this.getTimerAction(timer) === ActuatorAction.TOGGLE) {
-      const isSet = (map.cellFlags[timer.uByte6][timer.uByte7] & 0x08) !== 0;
+      const isSet = (map.cellFlags[timer.uByte6]![timer.uByte7]! & 0x08) !== 0;
       timer.uByte9 = isSet ? ActuatorAction.CLEAR : ActuatorAction.SET;
     }
 
-    const cellFlag = map.cellFlags[timer.uByte6][timer.uByte7];
+    const cellFlag = map.cellFlags[timer.uByte6]![timer.uByte7]!;
     if (timer.uByte9 === ActuatorAction.SET) {
       const wasClosed = (cellFlag & 0x08) === 0;
       this.setCellFlag(map, timer.uByte6, timer.uByte7, cellFlag | 0x08);
@@ -697,7 +697,7 @@ export class TimerSystem {
 
     this.activateDsa(timer, this.getTimerAction(timer));
 
-    const doorState = map.cellFlags[timer.uByte6][timer.uByte7] & 0x7;
+    const doorState = map.cellFlags[timer.uByte6]![timer.uByte7]! & 0x7;
     if (doorState === 5) return;
     if (this.getTimerAction(timer) === ActuatorAction.TOGGLE) {
       timer.uByte9 = doorState === 0 ? ActuatorAction.CLEAR : ActuatorAction.SET;
@@ -1048,7 +1048,7 @@ export class TimerSystem {
           return;
         }
         chIdx = found;
-        if (!this.isChampionDead(this.ctx.party.state.champions[chIdx])) return;
+        if (!this.isChampionDead(this.ctx.party.state.champions[chIdx]!)) return;
       } else {
         // `chIndex = DB10A2->value()` (`doc/CSBwin-src/Timer.cpp:2788`). Bones with no
         // expool record were placed by the dungeon rather than by a death, and their
@@ -1142,7 +1142,7 @@ export class TimerSystem {
   }
 
   private setCellFlag(map: MapData, x: number, y: number, cellFlag: number): void {
-    map.cellFlags[x][y] = cellFlag;
+    map.cellFlags[x]![y] = cellFlag;
   }
 
   private isPartyAt(position: Position): boolean {
@@ -1460,9 +1460,9 @@ export class TimerSystem {
         // missile meets the exterior wall.
         const map = this.dungeon.getMap(timer.level)!;
         const onMap = curMapX >= 0 && curMapY >= 0 && curMapX < map.descriptor.width && curMapY < map.descriptor.height;
-        const nextCellFlags = onMap ? map.cellFlags[curMapX][curMapY] : 0;
+        const nextCellFlags = onMap ? map.cellFlags[curMapX]![curMapY]! : 0;
         const nextRoomType = onMap ? (nextCellFlags >> 5) & 0x7 : RoomType.EXTERIOR;
-        const origCellFlags = map.cellFlags[origMapX][origMapY];
+        const origCellFlags = map.cellFlags[origMapX]![origMapY]!;
         const nextIsStoneWall = nextRoomType === RoomType.STONE || nextRoomType === RoomType.EXTERIOR;
         const nextIsFalseWall = nextRoomType === RoomType.FALSEWALL;
         const falseWallIsSolid = (nextCellFlags & 0x5) === 0;
@@ -1508,7 +1508,7 @@ export class TimerSystem {
     } else {
       const map = this.dungeon.getMap(timer.level);
       if (map) {
-        const cellFlag = map.cellFlags[curMapX][curMapY];
+        const cellFlag = map.cellFlags[curMapX]![curMapY]!;
         if (((cellFlag >> 5) & 0x7) === RoomType.DOOR) {
           if (this.ctx.systems.missileEncounter.processMissileEncounter(RoomType.DOOR, curMapX, curMapY, curMapX, curMapY, timer.level, curPos, missileRn)) {
             this.timers.missileFilterObject = OBJECT_ID_NULL;

@@ -96,7 +96,7 @@ export function CheckMonster(
 export function CheckMonsters(dungeon: DungeonState, monsterDesc: ArrayLike<MonsterDesc>, messageBox: MessageBox): void {
   const numLevel = dungeon.getData().maps.length;
   for (let level = 0; level < numLevel; level++) {
-    const { width, height } = dungeon.getData().maps[level].descriptor;
+    const { width, height } = dungeon.getData().maps[level]!.descriptor;
     for (let x = 0; x < width; x++) {
       for (let y = 0; y < height; y++) {
         const position = new Position(x, y, level);

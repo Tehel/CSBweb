@@ -136,14 +136,14 @@ export class MissileEncounter {
           whoLeavesNewCell[tailPosLeft] = whoLeavesCell[headPosLeft];
           numCellsToTry = 2;
         } else {
-          whoLeavesCell[headPosLeft] = whoLeavesCell[tailPosLeft];
+          whoLeavesCell[headPosLeft] = whoLeavesCell[tailPosLeft]!;
         }
 
         if (whoLeavesCell[headPosRight]) {
           whoLeavesNewCell[tailPosRight] = whoLeavesCell[headPosRight];
           numCellsToTry = 2;
         } else {
-          whoLeavesCell[headPosRight] = whoLeavesCell[tailPosRight];
+          whoLeavesCell[headPosRight] = whoLeavesCell[tailPosRight]!;
         }
       }
     }
@@ -164,7 +164,7 @@ export class MissileEncounter {
           if (!timer) continue;
           if (timer.function === TimerFunction.TT_MISSILE0) continue;
           const missilePos = this.dungeon.rnMaps.pos(missileRn) & 0x3;
-          const leaving = whoLeavesCell[missilePos];
+          const leaving = whoLeavesCell[missilePos]!;
           if (leaving === 0) continue;
 
           const hit = this.processMissileEncounter(
@@ -196,7 +196,7 @@ export class MissileEncounter {
       if (numCellsToTry > 1 && cellIdx === 0 && sameLevelNewPos) {
         missileX = sameLevelNewPos.x;
         missileY = sameLevelNewPos.y;
-        for (let i = 0; i < 4; i++) whoLeavesCell[i] = whoLeavesNewCell[i];
+        for (let i = 0; i < 4; i++) whoLeavesCell[i] = whoLeavesNewCell[i]!;
       }
     }
   }

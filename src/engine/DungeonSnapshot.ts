@@ -212,8 +212,9 @@ function decodeBytes(encoded: string): Uint8Array {
 function encodeWords(words: ArrayLike<ui16>): string {
     const bytes = new Uint8Array(words.length * 2);
     for (let i = 0; i < words.length; i++) {
-        bytes[i * 2] = (words[i] >> 8) & 0xff;
-        bytes[i * 2 + 1] = words[i] & 0xff;
+        const word = words[i]!;
+        bytes[i * 2] = (word >> 8) & 0xff;
+        bytes[i * 2 + 1] = word & 0xff;
     }
     return encodeBytes(bytes);
 }
@@ -221,7 +222,7 @@ function encodeWords(words: ArrayLike<ui16>): string {
 function decodeWords(encoded: string): ui16[] {
     const bytes = decodeBytes(encoded);
     const words: ui16[] = [];
-    for (let i = 0; i + 1 < bytes.length; i += 2) words.push((bytes[i] << 8) | bytes[i + 1]);
+    for (let i = 0; i + 1 < bytes.length; i += 2) words.push((bytes[i]! << 8) | bytes[i + 1]!);
     return words;
 }
 
@@ -278,11 +279,12 @@ function cloneRecord<T extends object>(record: T): T {
 
 function encodeCellFlags(cellFlags: ui8[][]): string {
     const width = cellFlags.length;
-    const height = width > 0 ? cellFlags[0].length : 0;
+    const height = width > 0 ? cellFlags[0]!.length : 0;
     const bytes = new Uint8Array(width * height);
     let at = 0;
     for (let x = 0; x < width; x++) {
-        for (let y = 0; y < height; y++) bytes[at++] = cellFlags[x][y] & 0xff;
+        const column = cellFlags[x]!;
+        for (let y = 0; y < height; y++) bytes[at++] = column[y]! & 0xff;
     }
     let binary = '';
     for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -297,8 +299,9 @@ function decodeCellFlags(encoded: string, width: number, height: number): ui8[][
     const cellFlags: ui8[][] = [];
     let at = 0;
     for (let x = 0; x < width; x++) {
-        cellFlags[x] = [];
-        for (let y = 0; y < height; y++) cellFlags[x][y] = binary.charCodeAt(at++) & 0xff;
+        const column: ui8[] = [];
+        cellFlags[x] = column;
+        for (let y = 0; y < height; y++) column[y] = binary.charCodeAt(at++) & 0xff;
     }
     return cellFlags;
 }
@@ -342,10 +345,10 @@ export function applyDungeonSnapshot(data: DungeonData, snapshot: DungeonSnapsho
 
     data.maps.forEach((map, index) => {
         const { width, height } = map.descriptor;
-        const cellFlags = decodeCellFlags(snapshot.cellFlags[index], width, height);
+        const cellFlags = decodeCellFlags(snapshot.cellFlags[index]!, width, height);
         for (let x = 0; x < width; x++) {
             for (let y = 0; y < height; y++) {
-                map.cellFlags[x][y] = cellFlags[x][y];
+                map.cellFlags[x]![y] = cellFlags[x]![y]!;
             }
         }
     });

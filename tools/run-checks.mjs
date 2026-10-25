@@ -470,7 +470,7 @@ const sections = [
     { name: 'tsc --noEmit', cmd: TSC, args: ['--noEmit'], show: 'failure' },
     // The server as Node strips it: erasable syntax only (server/tsconfig.json).
     { name: 'tsc --noEmit -p server', cmd: TSC, args: ['--noEmit', '-p', 'server'], show: 'failure' },
-    // The modules held to noUncheckedIndexedAccess so far (DEBT.md E36).
+    // src/ held to noUncheckedIndexedAccess.
     { name: 'tsc-indexed-access.mjs', cmd: process.execPath, args: [resolve(ROOT, 'tools/tsc-indexed-access.mjs')], show: 'failure' },
   ]],
   ['checks', checks.map(tool)],
