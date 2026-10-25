@@ -921,12 +921,15 @@ New verification debt goes here; it can be taken anywhere ("Priority", point 5).
   for its pacing section (`:129-173`) and not for this one.
 - `tools/checks/loop-die.ts` waits `1000 / 60 * failOn + 150` real milliseconds, then checks
   the frames counted (`:23`, `:36`): the same kind, not yet seen to fail.
+- `tools/checks/stats.ts` times the statistics' answers over 200,000 events and checks the
+  slowest is under 250 ms (`:439`). Alone it takes about 120 ms; in a full `npm test` it can take
+  251 ms, and so fail.
 - `runAsync` waits for each tool's `close` with no limit (`tools/run-checks.mjs:365-375`), so
   a tool left with a handle open hangs the whole suite.
 
-Paying it: both tools on a pinned clock, or the engine's clock taken from `GameHost`, which
+Paying it: the two loop tools on a pinned clock, or the engine's clock taken from `GameHost`, which
 would retire the patching of globals; a timeout per tool, reported as a failure with the
-output so far.
+output so far; `stats.ts` given a bound that load does not reach, or its timing printed and not checked.
 
 ### F16 ⏳ A tool can pass having checked less than it says
 
