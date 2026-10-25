@@ -292,9 +292,9 @@ const NOT_CARRIED: Array<{ pattern: string; why: string; holds: (d: Difference, 
   },
   {
     pattern: '.party.champions[].load',
-    why: 'CHARDESC.load is the sum the writer computes; the live field is what a file said',
+    why: 'CHARDESC.load is the sum the writer computes, without the hand; the live field is what a file said',
     holds: (d, { live }) =>
-      d.now === live.systems.characterStats.characterLoad(live.ctx.party.state.champions[d.path[2] as number]!),
+      d.now === live.systems.characterStats.savedLoad(live.ctx.party.state.champions[d.path[2] as number]!),
   },
   {
     pattern: '.game.footprints.prints[]',

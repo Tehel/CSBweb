@@ -348,8 +348,8 @@ export function writePortrait(block: Uint8Array, base: number, pixels?: ui8[]): 
 interface CsbwinCharacterWriteOptions {
   /**
    * `CHARDESC.load`, in tenths of a kilogram. CSBWin keeps it incrementally; this port
-   * re-sums it (`CharacterStats.characterLoad`), so a live game passes that function
-   * here. Without it the champion's own `load` is written — what the save it came from
+   * re-sums it, so a live game passes `CharacterStats.characterLoad` here, or
+   * `CharacterStats.savedLoad` for a save file, which holds it without the object in hand. Without it the champion's own `load` is written — what the save it came from
    * said — and failing that, 0.
    */
   load?: (champion: Champion) => number;

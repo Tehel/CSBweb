@@ -1354,10 +1354,10 @@ Recorded so that nobody "fixes" them.
   (`doc/CSBwin-src/Code11f52.cpp:990`, `:995`): a new record's count goes into the stack past
   its array, an existing one's into the pool past the record. The port writes the record
   of zeros and raises no count (`MonsterDamage.processMonsterDeleteFilter`).
-- 🚫 **`CHARDESC.load` is recomputed** from the possessions, rather than cached and adjusted
-  at each of CSBWin's eight possession writers. Same value, and it cannot drift. `Party.ts`
-  made the same choice for `SetHandOwner`. Recorded in the module comment of
-  `src/engine/CharacterStats.ts`.
+- 🚫 **`CHARDESC.load` is recomputed** from the possessions, and the object in hand for the
+  cursor's owner, rather than cached and adjusted at each of CSBWin's possession writers
+  and `SetHandOwner`; a save file's without the hand, as `SaveGame` writes it. Same value,
+  and it cannot drift. `tools/checks/hand-owner.ts` checks the hand's share; recorded in the module comment of `src/engine/CharacterStats.ts`.
 - 🚫 **`_FlashAttackDamage` does not stop the game, and lasts two ticks.** CSBWin's ends in
   `VBLDelay(15)`, which halts everything for a quarter of a second, and the tick due by
   then draws the buttons over the damage (`doc/CSBwin-src/Attack.cpp:1039`,

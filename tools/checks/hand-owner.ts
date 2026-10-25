@@ -126,17 +126,40 @@ async function main(): Promise<void> {
     check(slot === 1 && category === DBType.WEAPON,
       `slot 1 should hold a WEAPON record, got slot ${slot} ${DBType[category] ?? category}`);
 
+    const stats = game.systems.characterStats;
+    const load = stats.characterLoad(first);
+    const weight = stats.getObjectWeight(object);
+    console.log(`load ${load}, the object weighs ${weight}`);
+    check(weight > 0, 'the object should weigh something, or the load checks below prove nothing');
+
     // CSBWin numbers the inventory buttons from 8: slot = button - 8.
     handleClothingClick(ui, slot + 8);
     row('clicked the slot', party.state);
     check(party.state.objectInHand === object, 'the slot object should be in the hand');
     check(getChampionPossession(first, slot) === OBJECT_ID_NULL, 'the slot should now be empty');
+    // The object in hand weighs on the cursor's owner: `PutObjectInHand` adds what
+    // `RemoveCharacterPossession` took off (doc/CSBwin-src/CSBCode.cpp:6932-6936).
+    check(stats.characterLoad(first) === load,
+      `the owner's load should not change with the object in hand (${stats.characterLoad(first)} vs ${load})`);
+
+    // `SetHandOwner` moves the weight with the cursor (doc/CSBwin-src/CSBCode.cpp:8491-8492, :8505-8507).
+    const other = party.state.champions[1];
+    other.attributes.health = 40;
+    const otherLoad = stats.characterLoad(other);
+    setHandOwner(game.ctx, 1);
+    row('cursor to champion 1', party.state);
+    check(stats.characterLoad(first) === load - weight && stats.characterLoad(other) === otherLoad + weight,
+      `the object's weight should move with the cursor (${stats.characterLoad(first)}, ${stats.characterLoad(other)})`);
+    setHandOwner(game.ctx, 0);
+    check(stats.characterLoad(first) === load && stats.characterLoad(other) === otherLoad,
+      'the weight should come back with the cursor');
 
     handleClothingClick(ui, slot + 8);
     row('clicked it again', party.state);
     check(party.state.objectInHand === OBJECT_ID_NULL,
       'the hand should be empty again');
     check(getChampionPossession(first, slot) === object, 'the object should be back in its slot');
+    check(stats.characterLoad(first) === load, 'the load should be as it was with the object back');
   }
 
   finish();

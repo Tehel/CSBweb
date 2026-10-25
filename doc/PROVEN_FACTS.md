@@ -3381,10 +3381,19 @@ been hit saves the party's facing there. It is the way the portrait turns on the
 
 ### `CHARDESC.load` agrees with this port's own sum
 
-CSBWin keeps `load` (offset 272) incrementally, adjusting it at each of its eight
-possession writers; this port re-sums it from the object weights instead
-(`src/engine/CharacterStats.ts`). For all **18 champions of the eight committed
-saves** the two agree exactly (`tools/checks/csbwin-load.ts`). That is the only outside
+CSBWin keeps `load` (offset 272) incrementally, adjusting it at each of its possession
+writers; this port re-sums it from the object weights instead
+(`src/engine/CharacterStats.ts`). The live `load` includes the object in hand for the
+cursor's owner, `d.HandChar`: `PutObjectInHand` adds its weight
+(`doc/CSBwin-src/CSBCode.cpp:6932-6936`), `RemoveObjectFromHand` takes it off
+(`doc/CSBwin-src/Mouse.cpp:640-643`) and `SetHandOwner` moves it to the new owner
+(`doc/CSBwin-src/CSBCode.cpp:8491-8492`, `:8505-8507`). A save file's does not: `SaveGame`
+takes the hand's weight off before it writes and gives it back after
+(`doc/CSBwin-src/SaveGame.cpp:1024-1032`, `:1351-1356`), and the read adds it again through
+`TAG0138ec`'s `ObjectToCursor` (`doc/CSBwin-src/CSBCode.cpp:6381`). For all **18 champions
+of the eight committed saves** the file's figure is the port's sum of the possessions
+(`savedLoad`), and the live one that sum and the hand (`characterLoad`;
+`csbgame-item-on-cursor.dat` holds an object in hand) (`tools/checks/csbwin-load.ts`). That is the only outside
 check the weight system has: `WEAPONDESC`, the clothing and misc weight arrays, the
 water-flask rule and the recursion into chests all have to be right for it to hold.
 

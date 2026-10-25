@@ -155,8 +155,9 @@ export class Party {
  * restores it with the game (`doc/CSBwin-src/SaveGame.cpp:1045` and `:1760`).
  *
  * The `load` arithmetic CSBWin does here has no counterpart: this port recomputes a
- * champion's load from its possessions instead of tracking it incrementally
- * (`computeLoadWeight`), and counts the object in hand against whoever owns the cursor.
+ * champion's load instead of tracking it incrementally, and
+ * `CharacterStats.characterLoad` counts the object in hand against whoever owns the
+ * cursor.
  *
  * Both champions' names are drawn again in their new colour, `CHARFLAG_cursor` and
  * `DrawCharacterState` (`doc/CSBwin-src/CSBCode.cpp:8488-8494`, `:8509-8510`), which is

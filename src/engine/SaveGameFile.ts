@@ -221,8 +221,9 @@ function buildBlock2FromGame(game: Game, runtime: RuntimeState): Block2 {
  * the live party.
  *
  * The two things a `Champion` does not carry are supplied here, both from the running
- * game: `CHARDESC.load`, which CSBWin keeps incrementally and this port re-sums
- * (`CharacterStats.characterLoad`), and the portrait pixels for a champion the *engine*
+ * game: `CHARDESC.load`, which CSBWin keeps incrementally and this port re-sums,
+ * written without the object in hand as `SaveGame` writes it
+ * (`CharacterStats.savedLoad`), and the portrait pixels for a champion the *engine*
  * created, who carries `portraitGraphic` (a cell of basic graphic 26, or past 23 a
  * portrait of `CSBgraphics.dat`) because the engine holds no graphics to blit from.
  * `AddCharacter` blits that portrait into the character record once
@@ -254,7 +255,7 @@ function buildCharacterBlock(
             invisible: party.invisible,
         },
         {
-            load: (champion) => game.systems.characterStats.characterLoad(champion),
+            load: (champion) => game.systems.characterStats.savedLoad(champion),
             portraitOf: (champion) => options.portraitOf?.(champion),
         },
         party.vacantCharacters,

@@ -11,12 +11,13 @@
  * champion dodged as well as an empty one.
  *
  * **One structural divergence, deliberate.** CSBWin caches the carried weight in
- * `CHARDESC.load` and adjusts it at each of its eight possession writers
+ * `CHARDESC.load` and adjusts it at each of its possession writers
  * (`Character.cpp:1931`, `:1970`, `Mouse.cpp:643`, `:1225`, `CSBCode.cpp:4532`,
- * `:6936`, `Magic.cpp:1257`). `characterLoad()` here re-sums the possessions instead.
- * The value is the same — the cache is only ever the running sum of those weights —
- * and a recomputation cannot drift out of step with the inventory the way a cache
- * spread across the UI and the engine can. Recorded in PLAN.md.
+ * `:6936`, `:8492`, `:8507`, `Magic.cpp:1257`). `characterLoad()` here re-sums instead.
+ * The value is the same — the cache is only ever the running sum of the possessions'
+ * weights, and of the object in hand for the champion who owns the cursor — and a
+ * recomputation cannot drift out of step with the inventory the way a cache spread
+ * across the UI and the engine can. Recorded in `DEBT.md` H.
  */
 import { applyLimits, div, sw } from '../core/intCast';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../core/types';
@@ -99,8 +100,29 @@ export class CharacterStats {
   /**
    * `CHARDESC.load` — everything the champion is carrying, in tenths of a kilogram.
    * Re-summed rather than cached; see the module comment.
+   *
+   * The object in hand weighs on `d.HandChar`: `PutObjectInHand` adds its weight to the
+   * cursor's owner (`doc/CSBwin-src/CSBCode.cpp:6932-6936`), `RemoveObjectFromHand`
+   * takes it off (`doc/CSBwin-src/Mouse.cpp:640-643`), and `SetHandOwner` moves it from
+   * the old owner to the new (`doc/CSBwin-src/CSBCode.cpp:8491-8492`, `:8505-8507`). So
+   * an object taken from the owner's inventory leaves their load as it was.
    */
   characterLoad(champ: Champion): number {
+    let total = this.savedLoad(champ);
+    const party = this.ctx.party.state;
+    if (party.cursorOwner !== -1 && party.champions[party.cursorOwner] === champ) {
+      total += this.getObjectWeight(party.objectInHand);
+    }
+    return total;
+  }
+
+  /**
+   * The `CHARDESC.load` a save file holds: the possessions alone. `SaveGame` takes the
+   * object in hand off the cursor's owner before it writes the characters, and gives it
+   * back after (`doc/CSBwin-src/SaveGame.cpp:1024-1032`, `:1351-1356`); a read adds it
+   * again, through `TAG0138ec`'s `ObjectToCursor` (`doc/CSBwin-src/CSBCode.cpp:6381`).
+   */
+  savedLoad(champ: Champion): number {
     const visited = new Set<ObjectID>();
     let total = 0;
     for (const item of champ.possessions) {

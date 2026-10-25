@@ -299,17 +299,26 @@ function main(): void {
     }
 
     // `CHARDESC.load` against the port's own sum. CSBWin keeps the total incrementally
-    // at its eight possession writers; this port re-sums it from the object weights
-    // instead (`CharacterStats.characterLoad`, whose module comment says why). The two
+    // at its possession writers; this port re-sums it from the object weights instead
+    // (`CharacterStats`, whose module comment says why). A file holds it without the
+    // object in hand (`CharacterStats.savedLoad`), which the read gives back to the
+    // cursor's owner: `csbgame-item-on-cursor.dat` has one, and checks both. The two
     // agreeing on every champion of every committed save is the only outside check
     // there is on the weight tables — `WEAPONDESC`, the clothing and misc weight
     // arrays, the water-flask rule and the recursion into chests — since nothing else
     // in the repository knows what a real party weighs.
-    for (const champion of party.champions) {
+    const stats = game.systems.characterStats;
+    for (const [chIdx, champion] of party.champions.entries()) {
       check(
-        game.systems.characterStats.characterLoad(champion) === champion.load,
+        stats.savedLoad(champion) === champion.load,
         `${name}/${champion.name}: the load this port re-sums is the one CSBWin stored ` +
-          `(${game.systems.characterStats.characterLoad(champion)} vs ${champion.load})`,
+          `(${stats.savedLoad(champion)} vs ${champion.load})`,
+      );
+      const hand = chIdx === party.cursorOwner ? stats.getObjectWeight(party.objectInHand) : 0;
+      check(
+        stats.characterLoad(champion) === champion.load + hand,
+        `${name}/${champion.name}: the live load is the stored one and the object in hand ` +
+          `(${stats.characterLoad(champion)} vs ${champion.load} + ${hand})`,
       );
     }
 
