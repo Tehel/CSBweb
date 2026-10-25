@@ -12,8 +12,8 @@
  *   /assets/…         dist/assets/…, hashed names   immutable
  *   /server/…         404: the server's own module (`CHECK_MODULE`), never served
  *   /gamefiles/…      GAMEFILES_DIR/…               no-cache, with ETag and Last-Modified
- *   /files/…          FILES_DIR/…, the author's files shared by link, as the game files are;
- *                     404 everywhere when there is no such folder
+ *   /files/…          FILES_DIR/…, the author's files shared by link, as the game files are,
+ *                     under `FILES_POLICY`; 404 everywhere when there is no such folder
  *   /api/data-sets    the page's list of sets, from the store's table (`dataSets.ts`), for
  *                     the player its `X-Player-Id` names; POST: that player's own set
  *                     published, pending (`publish.ts`)
@@ -30,7 +30,8 @@
  *   /api/stats/<id>   a public set's (`StatsStore.setStats`), 404 for any other    max-age 30 s
  *   /api/stats/<id>/<level>  the deaths on its level's squares (`levelStats`)     max-age 30 s
  *
- * Every answer, the API's and every error's as a file's, carries `SECURITY_HEADERS`. A POST a
+ * Every answer, the API's and every error's as a file's, carries `SECURITY_HEADERS`, a shared
+ * file's with `FILES_POLICY` for its policy. A POST a
  * browser says another site's page sent is refused with 403 (`isCrossSite`).
  * Every file answers a conditional GET with 304. A path with a `.` segment, a backslash or
  * a NUL, encoded or not, is refused before it reaches the disk, so no request leaves the
@@ -221,6 +222,13 @@ export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
     'Strict-Transport-Security': 'max-age=31536000',
 };
 
+/**
+ * The policy a shared file's answer carries instead of the page's: a page the author shares
+ * may hold its images inline, as `data:` URLs, which the page's policy does not fetch. Its
+ * scripts are still its origin's only, none inline.
+ */
+export const FILES_POLICY = "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'";
+
 /** The server, not yet listening. */
 export function createAppServer(options: ServerOptions, api: ApiOptions): Server {
     const statsCache = new AnswerCache(STATS_CACHE_MS, api.now);
@@ -289,6 +297,7 @@ function route({ distDir, gamefilesDir, filesDir }: ServerOptions, api: ApiOptio
         return serveFile(req, res, join(gamefilesDir, ...segments.slice(1)), NO_CACHE);
     }
     if (segments[0] === FILES) {
+        res.setHeader('Content-Security-Policy', FILES_POLICY);
         if (filesDir === undefined) return send(res, 404, 'Not found');
         return serveFile(req, res, join(filesDir, ...segments.slice(1)), NO_CACHE);
     }

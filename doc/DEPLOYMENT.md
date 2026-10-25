@@ -408,7 +408,9 @@ scp manual.pdf <vps>:csbweb/files/      # https://csbweb.looten.net/files/manual
 
 A file is served as the game files are (`server/app.ts`), its type read from its extension
 in any case (`CONTENT_TYPES`), `application/octet-stream` for one the table does not name,
-which a browser downloads rather than shows. A missing file and a folder are 404: there is
+which a browser downloads rather than shows. An HTML page may hold its images inline, as
+`data:` URLs, which its policy fetches (`FILES_POLICY`), and its styles; its scripts must be
+files beside it, as the game's are. A missing file and a folder are 404: there is
 no listing, so a link is the only way to a file, but **anyone who has the link has the
 file**. A dot-file is never served. The container mounts the folder read-only, and the
 server does not check it at start-up: a folder that is not there serves nothing. It is not
@@ -478,7 +480,7 @@ comma-separated `<playerId>[=<alias>]`, spaces around a comma or the `=` ignored
 | `/assets/…` | `dist/assets/…`, hashed names | `immutable` |
 | `/server/…` | 404: `dist/server/` is the server's module | |
 | `/gamefiles/…` | `GAMEFILES_DIR/…` | `no-cache`, ETag and Last-Modified |
-| `/files/…` | `FILES_DIR/…`, the files shared by link | `no-cache`, ETag and Last-Modified |
+| `/files/…` | `FILES_DIR/…`, the files shared by link, under their own policy | `no-cache`, ETag and Last-Modified |
 | `/api/data-sets` | the `data_sets` table's sets the `X-Player-Id` may see, as a manifest; POST: a set published | `no-store`, `Vary: X-Player-Id` |
 | `/api/data-sets/<id>` | POST: the set approved, rejected, hidden or shown by a moderator, or withdrawn by its owner; with a form, edited by a moderator | `no-store` |
 | `/api/data-sets/<id>/documents` | POST: a document added to the set by a moderator, with a form, or removed, with JSON | `no-store` |
@@ -504,6 +506,8 @@ Every answer, the API's and every error's included, carries the same headers
   inline (`index.html`'s `<style>`), its images `blob:` URLs (a set's thumbnail). Vite would
   inline a small asset as a `data:` URL, which the policy does not fetch, so the one small
   file the page fetches, `swoosh.img`, is imported `?url&no-inline` (`src/main.ts`).
+  A shared file's answer carries `FILES_POLICY` instead, the same with `img-src 'self'
+  data:`: an HTML page shared under `files/` may hold its images inline, but not its scripts.
 - `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, and
   `Strict-Transport-Security: max-age=31536000`, without `includeSubDomains`, which would
   bind the VPS's other projects. A browser ignores it over plain HTTP, as the dev server

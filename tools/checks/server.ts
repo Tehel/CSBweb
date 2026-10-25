@@ -21,8 +21,9 @@
  *     download, a 304, a HEAD, or downloads the client abandons after their first bytes;
  *   - `/files/…`: a shared file, in a sub-folder too, its type by its extension in any
  *     case, `application/octet-stream` for one it does not name; a missing file and a
- *     folder 404, never a listing; POST 405; and, with no shared folder, or one that is not
- *     there, every path 404;
+ *     folder 404, never a listing; POST 405; `FILES_POLICY` on a file and a 404 there, with
+ *     the other security headers; and, with no shared folder, or one that is not there,
+ *     every path 404;
  *   - no path leaves the three folders, `..` and `.` raw, percent-encoded or behind a
  *     backslash, and no dot-file is served;
  *   - `/api/health`, and a 405 for a method that is not GET or HEAD;
@@ -106,7 +107,7 @@ import { join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { deflateSync } from 'node:zlib';
 
-import { CHECK_MODULE, checkFiles, createAppServer, fillWalls, pathSegments, SECURITY_HEADERS, type ApiOptions, type ServerOptions } from '../../server/app.ts';
+import { CHECK_MODULE, checkFiles, createAppServer, FILES_POLICY, fillWalls, pathSegments, SECURITY_HEADERS, type ApiOptions, type ServerOptions } from '../../server/app.ts';
 import { ANYONE, DataSetStore, manifestText, parseModerators } from '../../server/dataSets.ts';
 import { RateLimit } from '../../server/events.ts';
 import { NOBODY, notificationText } from '../../server/notify.ts';
@@ -378,6 +379,14 @@ async function checkAnswers(port: number, manifest: string, gamefilesDir: string
         check((await ask(port, path)).status === 404, `${path}: 404, not a listing`);
     }
     check((await ask(port, '/files/notes.txt', 'POST')).status === 405, 'POST: 405');
+    for (const [what, path] of [['a shared file', '/files/notes.txt'], ['a 404 there', '/files/nothing.txt']]) {
+        const { status, headers } = await ask(port, path!);
+        const others = Object.entries(SECURITY_HEADERS).filter(([name]) => name !== 'Content-Security-Policy');
+        check(headers['content-security-policy'] === FILES_POLICY && others.every(([name, value]) => headers[name.toLowerCase()] === value),
+            `${what} (${status}) carries FILES_POLICY, and the other security headers`);
+    }
+    check(/img-src 'self' data:/.test(FILES_POLICY) && /default-src 'self'/.test(FILES_POLICY) && !/script-src/.test(FILES_POLICY) && /frame-ancestors 'none'/.test(FILES_POLICY),
+        'its policy: images inline too, scripts from the origin only, none inline, and no framing');
 
     console.log('\nPaths that would leave the folders:');
     for (const path of [
