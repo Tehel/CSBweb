@@ -347,7 +347,7 @@ the language.</p>
   <li><span class="date">8 Dec<br>1987</span><span class="dot"></span><span class="what"><strong>1.0</strong><span>The first release.</span></span></li>
   <li><span class="date">11 Dec<br>1987</span><span class="dot"></span><span class="what"><strong>1.0, again</strong><span>Also labelled 1.0, three days later: fixes to the crack switch, the doors of level 2 and a few traps.</span></span></li>
   <li><span class="date">7 Jan<br>1988</span><span class="dot"></span><span class="what"><strong>1.1</strong><span>The rebalance: stamina costs, the Dragon, the Snake Staff, new items and a new ambush.</span></span></li>
-  <li><span class="date">1 Mar<br>1988</span><span class="dot"></span><span class="what"><strong>1.2</strong><span>Four weapons flagged, WAR CRY trains another skill, two potions renamed.</span></span></li>
+  <li><span class="date">1 Mar<br>1988</span><span class="dot"></span><span class="what"><strong>1.2</strong><span>Four weapons flagged, WAR CRY trains Parry too, two potions renamed.</span></span></li>
   <li class="lang"><span class="date">1 Mar<br>1988</span><span class="dot"></span><span class="what"><strong>1.2 German</strong><span>The English 1.2, translated.</span></span></li>
   <li class="lang"><span class="date">20 May<br>1988</span><span class="dot"></span><span class="what"><strong>1.3 French</strong><span>The English 1.2, translated, with a font extended for French.</span></span></li>
 </ol>
@@ -493,8 +493,11 @@ door that could only be opened from one side gets a second switch, on the far si
 <ul>
   <li><strong>The dungeon changes by four bits.</strong> The Sling and the three Rocks
   that 1.1 added are flagged <em>important</em>, like the champions' starting kit.</li>
-  <li><strong>WAR CRY trains Parry</strong>, a Fighter skill, where it trained Influence, a
-  Priest skill.</li>
+  <li><strong>WAR CRY trains Parry too.</strong> Every cry earns 7 experience, which 1.2
+  gives to Parry, a Fighter skill, where it went to Influence, a Priest skill. A cry at a
+  monster still earns Influence 12 more, 6 if the monster is not frightened, as in every
+  version: that part is written in the game's code, not in its tables. So against a
+  monster Influence still grows fastest, and a cry at nothing now trains Parry alone.</li>
   <li><strong>Two potions are renamed:</strong> UNVEN becomes BRO, and MON becomes MA.</li>
 </ul>
 
@@ -535,7 +538,7 @@ WATER, the resurrection screen.</p>
   1.1's Sling, Rocks and skeleton ambush, with 1.0's stamina costs, 1.0's Dragon, the
   jumping crack, the torch's first picture, the Snake Staff drawn as a torch, the
   ANTIVEN potion, and WAR CRY
-  training Influence.</p>
+  training Influence alone.</p>
 </div>
 
 <div class="table-wrap">
@@ -548,11 +551,10 @@ WATER, the resurrection screen.</p>
     <tr><td class="name">Stamina costs, SHOOT experience, the Dragon's range, OH EW RA's skill</td><td class="why">1.0</td><td class="why">1.1</td></tr>
     <tr><td class="name">The Snake Staff drawn as a torch</td><td class="why">1.0</td><td class="why">1.1</td></tr>
     <tr><td class="name">ANTIVEN POTION, MON POTION</td><td class="why">1.0</td><td class="why">1.1, 1.2</td></tr>
-    <tr><td class="name">WAR CRY training Influence</td><td class="why">1.0, 1.1</td><td class="why">1.2</td></tr>
+    <tr><td class="name">WAR CRY training Influence alone</td><td class="why">1.0, 1.1</td><td class="why">1.2</td></tr>
   </tbody>
-  <caption>The port's DM (<code>dm-atari</code>) takes three items from the 1.2 disk: the
-  credits, the pressed crack and its placement. The other rows are still 1.0's there, as in
-  CSBWin.</caption>
+  <caption>On this site, each of the six versions is on the welcome page, played from that
+  disk's own dungeon.dat and graphics.dat, unchanged.</caption>
 </table>
 </div>
 

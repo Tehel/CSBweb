@@ -381,6 +381,15 @@ differs in two items: `0x22c` renames `UNVEN POTION` and `MON POTION` to `BRO PO
 `MA POTION`, and in `0x230`, `skillNumber[8]`, WAR CRY's skill, 14 (Influence) becomes 7
 (Parry).
 
+That entry names only the skill of `_Attack`'s closing award, `experienceForAttacking[8]`,
+7 on every disk (`doc/CSBwin-src/Attack.cpp:2159-2161`). `WarCryEtc` trains Influence
+itself, skill 14 written in the code, in every version: at a monster, 12, halved to 6 when
+the shout fails (`Attack.cpp:1445-1447`, `:1509-1512`, `:1540`), and nothing with no
+monster in front (`:1438-1441`). The shout's own mastery is Influence's too (`:1484`). So
+from 1.2 a WAR CRY at a monster trains both, Influence by more, and one at nothing trains
+Parry alone, halved as every Fighter skill is when no monster has attacked lately
+(`AdjustSkills`, `doc/CSBwin-src/Magic.cpp:188`).
+
 The raw offsets: `Byte4100` starts at byte 3146 of `0x22e` (read through
 `readWallDecorationRectSetIndex`), and `s5604` follows the port's `computeOffsetFromWall`.
 `MonsterDescriptor` starts at byte 676 of `0x22f` (`10340 - 9664`, 26 bytes an entry) and
@@ -415,7 +424,7 @@ the sections above list for `graphics.dat`, and in the four `important` bits:
 | `0x230` | `experienceForAttacking[32]` (SHOOT) | 20 | 9 | 1.1 |
 | `0x230` | `Byte20046[2, 15, 19, 25]` | 10, 17, 40, 25 | 8, 13, 26, 17 | 1.1 |
 | `0x230` | `Spells[4].byte5` | 18 | 15 | 1.1 |
-| `0x230` | `skillNumber[8]` (WAR CRY) | 7 | 14 | 1.2 |
+| `0x230` | `skillNumber[8]` (WAR CRY's closing award) | 7 | 14 | 1.2 |
 
 **`dm-atari/graphics.dat` is CSBWin's file with 1.2's items 5, 232 and `0x22e`**: the
 credits, the pressed crack's button and the crack's placement, and no other change
