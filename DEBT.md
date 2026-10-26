@@ -411,14 +411,15 @@ against each other, and the file formats.
 
 ### E27 ⏳ `DsaSystem.ts` is one 5,000-line class
 
-`DsaSystem.ts` (3,636 lines) holds the interpreter, a port of `MoveObject` for `&MOVE`,
-and `executeAmpersand` (`:828`), which runs an operation of `DSA_OPERATIONS`
-(`src/engine/dsa/DsaOperations.ts`) and keeps the rest in a switch of 1,090 lines. The
+`DsaSystem.ts` (3,469 lines) holds the interpreter, a port of `MoveObject` for `&MOVE`,
+and `executeAmpersand` (`:831`), which runs an operation of `DSA_OPERATIONS`
+(`src/engine/dsa/DsaOperations.ts`) and keeps the rest in a switch of 975 lines. The
 machine's data and its decoding are already apart, in `src/engine/dsa/DsaMachine.ts`: the
-stack, the bank, the execution packet and the `ProgramCursor` that `executeRun` (`:474`)
-reads its programs through. So are the seventeen filter sites, in
-`src/engine/dsa/DsaFilters.ts` (`ctx.systems.dsa.filters`), which reach the machine
-through `DsaFilterMachine`, and the stack's operations, in `dsa/ops/stack.ts`.
+stack, the bank, the execution packet, `OVERRIDE`'s corner (`DsaOverride`) and the
+`ProgramCursor` that `executeRun` (`:477`) reads its programs through. So are the
+seventeen filter sites, in `src/engine/dsa/DsaFilters.ts` (`ctx.systems.dsa.filters`),
+which reach the machine through `DsaFilterMachine`, and two domains of operations, in
+`dsa/ops/stack.ts` and `dsa/ops/messages.ts`.
 
 Paying it, into `src/engine/dsa/` beside `DsaTypes.ts`. Each command's body keeps CSBWin's
 order and names, and each step is proven by every tool's whole output, byte-identical. The
@@ -430,13 +431,17 @@ steps, one commit each:
 3. ⏳ **The operations,** one domain per commit, each a `ReadonlyMap<StkOp, DsaOperation>`
    in `dsa/ops/<domain>.ts` that `DSA_OPERATIONS` joins, an operation given twice failing
    at the join. An operation is handed the bank, the packet and a `DsaOperationMachine`,
-   which grows with each domain by what its cases read of `DsaSystem` (only `ctx` so
-   far), as `DsaFilterMachine` does. `tools/checks/dsa-census.ts` counts the table and the
+   which grows with each domain by what its cases read of `DsaSystem` (so far `ctx`, the
+   filters, the override, the parameters, the message sequence and `isValidObjectId`), as
+   `DsaFilterMachine` does. `tools/checks/dsa-census.ts` counts the table and the
    cases left in `executeAmpersand`, none in both; `tools/checks/dsa-delete.ts:120` wraps
    `executeAmpersand`, which stays the one entry. The domains:
    - ✅ the stack, its arithmetic and the variables (`ops/stack.ts`: `&FETCH`, `&STORE`,
      `&VSET`, `&RANDOM`, `&BITCOUNT`, whose `BIT_COUNTS` `&COUNTINJURY` still imports);
-   - ⏳ text and messages; objects; `&MOVE` (with its `MoveObject` port and
+   - ✅ text, messages and the sound (`ops/messages.ts`: `&MESSAGE`, `&DESCRIBE` and its
+     `ModifyDescription`, `&SAY`, the text bank's operations, `&GLOBALTEXT!` and its
+     `SetGlobalText`, `&SOUND`, `&MODIFYMESSAGE`);
+   - ⏳ objects; `&MOVE` (with its `MoveObject` port and
      `DsaMoveError`); characters; monsters; the dungeon;
    - ⏳ last, the run's own: the parameters, `&SETNEWSTATE`, the gear jumps and gosub,
      `&%INDIRECT` and the `I_` operations. With it the switch is gone, and `execute`
@@ -718,11 +723,11 @@ after the chains; a fixture whose champions carry something.
 `&DEL` takes an object off its square with `MoveObject(thisObj, x, y, -1, 0)` and `&ADD`
 puts its copy on one with `MoveObject(newObj, -1, 0, x, y)`
 (`doc/CSBwin-src/DSA.cpp:1702`, `:2057`). The port does both by hand
-(`src/engine/DsaSystem.ts:854-855`, `:892-894`): `removeObjectFromCell` then
+(`src/engine/DsaSystem.ts:857-858`, `:895-897`): `removeObjectFromCell` then
 `triggerObjectMove`; `setPos`, `triggerObjectMove`, then `addObjectToCell`. What that loses:
 
 - no pit or teleporter on the square is resolved (`WorldMove.resolveCellEffects`, which
-  `&MOVE` already reaches through `WorldMove.moveObject`, `objectMover`, `:3322-3328`);
+  `&MOVE` already reaches through `WorldMove.moveObject`, `objectMover`, `:3155-3161`);
 - `unchangedRoom` is always false, where `MoveObject` passes whether the party stands there
   (`Code11f52.cpp:3314-3328`, `:3458-3473`), so floor actuators of types 1 and 2 fire under
   the party where CSBWin's do not;

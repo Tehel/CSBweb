@@ -49,18 +49,15 @@ import type { CsbRandom } from '../core/random';
 import type { MonsterDesc } from '../data/tables/MonsterDesc';
 import { monsterHorizontalSize } from '../data/tables/MonsterDesc';
 import { monsterDrawAsSize4, monsterInvisible, monsterPoisoned, monsterUnique } from './monsterTypes';
-import { printWithSubstitution } from './PrintWithSubstitution';
-import { findChampionByFingerprint } from './Party';
 import { swapCharacter } from './SwapCharacter';
 import { forgetThrownWeapon } from './ThrownWeapons';
 import { getFromWings, locateInWings, saveToWings, wingsChampion } from './Wings';
 import { readU32LE, writeU32LE } from '../core/bytes';
-import { decodeCharField } from '../data/CsbwinSaveInfo';
-import { GetText } from '../data/DecodeText';
-import { Esl, globalTextBytes, globalTextKey, messageParametersKey, readGlobalVariables, specialLocationKey } from '../data/CsbwinExpool';
-import { DsaBank, ProgramCursor, type ExecutionPacket, type GearJump } from './dsa/DsaMachine';
+import { Esl, messageParametersKey, readGlobalVariables, specialLocationKey } from '../data/CsbwinExpool';
+import { DsaBank, DsaOverride, ProgramCursor, type ExecutionPacket, type GearJump } from './dsa/DsaMachine';
 import { DSA_OPERATIONS, type DsaOperationMachine } from './dsa/DsaOperations';
 import { BIT_COUNTS } from './dsa/ops/stack';
+import { globalText } from './dsa/ops/messages';
 import { DsaFilters } from './dsa/DsaFilters';
 import { CursorFilterType, DsaVars, DsaVarType, StkOp } from './dsa/DsaTypes';
 
@@ -224,8 +221,7 @@ export class DsaSystem {
    * stands, for a `die`'s message, as `SAVEPEXPKT` keeps it through a nested run (`:5050-5051`).
    */
   private where: { locr: LocationRel; state: number; column: number } | null = null;
-  private overridePos = 0;
-  private overrideP = false;
+  private readonly override = new DsaOverride();
   private readonly monsterDesc: ArrayLike<MonsterDesc>;
   /** What the operations of `DSA_OPERATIONS` reach of the machine. */
   private readonly operationMachine: DsaOperationMachine;
@@ -239,7 +235,6 @@ export class DsaSystem {
     this.carryLocation = ctx.tables.carryLocation;
     this.monsterDesc = ctx.tables.monsterDesc;
     this.globalVariables = Int32Array.from(readGlobalVariables(ctx.dungeon.getData()));
-    this.operationMachine = { ctx };
     this.filters = new DsaFilters(ctx, {
       setParameters: (count, values) => this.setParameters(count, values),
       setParameter: (index, value) => { this.parameters[1 + index] = value; },
@@ -249,9 +244,17 @@ export class DsaSystem {
       adjustSkillsParameters: () => this.adjustSkillsParameters,
       runFilterDsa: (rn, timer, location, vars) => { this.processTimer6Internal(rn, timer, location, true, vars); },
       findFirstDsaActuator: (position) => this.findFirstDsaActuator(position),
-      globalText: (index) => this.globalText(index),
+      globalText: (index) => globalText(this.dungeon, index),
       isValidObjectId: (objectId): objectId is ObjectID => this.isValidObjectId(objectId),
     });
+    this.operationMachine = {
+      ctx,
+      filters: this.filters,
+      override: this.override,
+      parameters: () => this.parameters,
+      nextParameterMessageSequence: () => this.parameterMessageSequence++,
+      isValidObjectId: (objectId): objectId is ObjectID => this.isValidObjectId(objectId),
+    };
   }
 
   setParameters(count: number, values: ArrayLike<number>): void {
@@ -404,7 +407,7 @@ export class DsaSystem {
     const msgType = 3 * (timer.uByte8 & 3) + action;
     // An `OVERRIDE` no operation used dies with its run (`doc/CSBwin-src/DSA.cpp:5417`),
     // and a run nested in another's clears the caller's.
-    this.overrideP = false;
+    this.override.p = false;
 
     const bank = new DsaBank(vars, (line) => this.ctx.host.trace(line), (errorNum, underflow) =>
       die(this.ctx.host, errorNum, underflow ? this.debugMessage('DSA stack underflow') : 'SystemError'));
@@ -787,10 +790,10 @@ export class DsaSystem {
             const what = (word >> 6) & 0x7;
             const value = (word >> 9) & 0x7;
             if (what !== 1) break;
-            this.overrideP = true;
-            this.overridePos = value;
+            this.override.p = true;
+            this.override.pos = value;
             if (value === 7) {
-              this.overridePos = cursor.word() & 0xff;
+              this.override.pos = cursor.word() & 0xff;
             }
             const relState = cursor.relState(word, 12, 4, -8);
             nextState = curState + relState;
@@ -975,50 +978,6 @@ export class DsaSystem {
         const locr = locationRelFromInteger(location);
         if (!this.dungeon.isValidLocation(locr)) break;
         this.teleportParty(locr);
-        break;
-      }
-      case StkOp.MESSAGE: {
-        // `STKOP_Message` (`doc/CSBwin-src/DSA.cpp:3046-3090`): a `TT_ParameterMessage`
-        // timer to the target, and the first `numParam` DSA parameters in `EXPOOL` under
-        // its index, for the DSAs it reaches (`readRoomTimerParameters`).
-        const delay = bank.stack.pop() >>> 0;
-        const numParam = bank.stack.pop() >>> 0;
-        const msgType = bank.stack.pop();
-        const target = locationRelFromInteger(bank.stack.pop());
-        if (numParam > 29) break;
-        if (this.overrideP) {
-          target.p = this.overridePos & 3;
-          this.overrideP = false;
-        }
-        const actionTime = (this.ctx.state.tickCount + delay) >>> 0;
-        const timer = this.timers.createTimerWithUByte5(
-          TimerFunction.TT_PARAMETER_MESSAGE, target.x, target.y, target.p, msgType, actionTime, target.l,
-          this.parameterMessageSequence++,
-        );
-        this.dungeon.writeExpoolRecord(messageParametersKey(timer.index), Array.from(this.parameters.subarray(1, 1 + numParam)));
-        break;
-      }
-      case StkOp.SOUND: {
-        // `STKOP_Sound` (`doc/CSBwin-src/DSA.cpp:4613-4625`).
-        bank.stack.pop(); // flags, which `PlayCustomSound` does not use
-        const volume = bank.stack.pop();
-        const soundNum = bank.stack.pop();
-        this.ctx.sounds.playCustomSound(soundNum, volume);
-        break;
-      }
-      case StkOp.DESCRIBE: {
-        const color = bank.stack.pop();
-        const index = bank.stack.pop();
-        let locrInt = bank.stack.pop();
-        if (this.overrideP) {
-          this.overrideP = false;
-          if (locrInt >= 0) {
-            const locr = locationRelFromInteger(locrInt);
-            locr.p = this.overridePos & 0x3;
-            locrInt = locationRelToInteger(locr);
-          }
-        }
-        this.modifyDescription(locrInt, index, color);
         break;
       }
       case StkOp.COPY: {
@@ -1340,17 +1299,6 @@ export class DsaSystem {
         bank.stack.push(result);
         break;
       }
-      case StkOp.MODIFY_MESSAGE: {
-        // Popped `unsigned int` and capped at 3, no action (`doc/CSBwin-src/DSA.cpp:4936-4944`).
-        const s = Math.min(bank.stack.pop() >>> 0, 3);
-        const c = Math.min(bank.stack.pop() >>> 0, 3);
-        const t = Math.min(bank.stack.pop() >>> 0, 3);
-        const modifier = this.ctx.systems.timer.timerTypeModifier;
-        modifier[0] = s;
-        modifier[1] = c;
-        modifier[2] = t;
-        break;
-      }
       case StkOp.NUM_PARAM:
         bank.stack.push(this.parameters[0] ?? 0);
         break;
@@ -1551,66 +1499,6 @@ export class DsaSystem {
       case StkOp.CHAR_STORE:
         this.charStore(bank);
         break;
-      case StkOp.SAY: {
-        // `DSA.cpp:3138-3161`: the first text of the square, at any corner.
-        const color = bank.stack.pop();
-        const locr = locationRelFromInteger(bank.stack.pop());
-        if (!this.dungeon.isValidLocation(locr)) break;
-        let rn = this.dungeon.findFirstObject(new Position(locr.x, locr.y, locr.l));
-        while (rn !== OBJECT_ID_EOF && this.dungeon.rnMaps.dbType(rn) !== DBType.TEXT) {
-          rn = this.dungeon.getDBRecordLink(rn);
-        }
-        if (rn === OBJECT_ID_EOF) break;
-        const record = this.dungeon.getTextRecord(rn);
-        if (!record) break;
-        const text = this.dungeon.decodeTextString(record, 0x8002, this.ctx.tables.textDecode, 999) ?? '';
-        printWithSubstitution(this.ctx, text, color);
-        break;
-      }
-      case StkOp.DISCARD_TEXT:
-        // `DSA.cpp:3162-3168`.
-        this.ctx.host.messages.discardText();
-        break;
-      case StkOp.TEXT_FETCH: {
-        // `DSA.cpp:3169-3194`.
-        const textIndex = bank.stack.pop() >>> 0;
-        const objIndex = bank.stack.pop();
-        if (textIndex > 9) break;
-        if (!this.isValidObjectId(objIndex)) break;
-        if (this.dungeon.rnMaps.dbType(objIndex) !== DBType.TEXT) break;
-        const record = this.dungeon.getTextRecord(objIndex);
-        if (!record) break;
-        bank.setText(this.dungeon.decodeTextString(record, 0x8002, this.ctx.tables.textDecode, 999) ?? '', textIndex);
-        break;
-      }
-      case StkOp.GLOBAL_TEXT_STORE: {
-        // `DSA.cpp:3195-3203`.
-        const globalIndex = bank.stack.pop();
-        const localIndex = bank.stack.pop();
-        this.setGlobalText(bank.getText(localIndex), globalIndex);
-        break;
-      }
-      case StkOp.CHAR_NAME_FETCH: {
-        // `DSA.cpp:3205-3238`: the first champion with the fingerprint, else the one in
-        // the wings (`LocateInWings`).
-        // `SetText(pName, 8, index)` copies nine bytes, the name's eight and a ninth:
-        // only a name of eight letters, which runs on into the title, would show it.
-        const index = bank.stack.pop() & 0xffff;
-        const fingerprint = bank.stack.pop() & 0xffff;
-        const party = this.ctx.party.state;
-        const charIdx = findChampionByFingerprint(party, fingerprint);
-        const inWings = charIdx >= 0 ? null : locateInWings(this.dungeon, fingerprint);
-        const name = charIdx >= 0 ? party.champions[charIdx]!.name : inWings ? decodeCharField(inWings.subarray(0, 8)) : '';
-        bank.setText(name.slice(0, 8), index);
-        break;
-      }
-      case StkOp.TEXT_SAY: {
-        // `DSA.cpp:3240-3253`.
-        const color = bank.stack.pop();
-        const index = bank.stack.pop();
-        printWithSubstitution(this.ctx, bank.getText(index), color);
-        break;
-      }
       case StkOp.EXPERIENCE_PLUS: {
         // `DSA.cpp:4543-4558`. A negative index reads nobody (`DEBT.md` H).
         const experience = bank.stack.pop();
@@ -2558,9 +2446,9 @@ export class DsaSystem {
         return null;
     }
     const locr = locationRelFromInteger(target);
-    if (this.overrideP) {
-      locr.p = this.overridePos & 3;
-      this.overrideP = false;
+    if (this.override.p) {
+      locr.p = this.override.pos & 3;
+      this.override.p = false;
     }
     return locr;
   }
@@ -2713,61 +2601,6 @@ export class DsaSystem {
     if (locr.x < 0 || locr.y < 0) return;
     if (locr.x >= map.descriptor.width || locr.y >= map.descriptor.height) return;
     map.cellFlags[locr.x]![locr.y] = cellFlag & 0xff;
-  }
-
-  private modifyDescription(locrInt: number, index: number, color: number): void {
-    const ctx = this.filters.viewingFilterContext;
-    if (!ctx) return;
-    if (index < 0 || index > 7) return;
-    ctx.phraseColorOverrides[index] = color | 0;
-    if (locrInt === -1) {
-      ctx.phraseMask |= 1 << index;
-      return;
-    }
-    if (locrInt === -2) {
-      ctx.phraseMask &= ~(1 << index);
-      return;
-    }
-    // Every text at the location sets the phrase, so the last wins, and an empty one
-    // enables it too. CSBWin checks no `IsValid`: `FindFirstObject` finds nothing off the
-    // level's cells, and the port nothing on a level that does not exist, where CSBWin
-    // reads past its tables.
-    const locr = locationRelFromInteger(locrInt);
-    const pos = new Position(locr.x, locr.y, locr.l);
-    for (let rn = this.dungeon.findFirstObject(pos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      const { category, position } = this.dungeon.rnMaps.decode(rn);
-      if (category !== DBType.TEXT) continue;
-      if (position !== locr.p) continue;
-      const record = this.dungeon.getTextRecord(rn);
-      if (!record) continue;
-      ctx.phraseTextOverrides[index] = GetText(this.dungeon.getData(), record.textOffset, this.ctx.tables.textDecode);
-      ctx.phraseMask |= 1 << index;
-    }
-  }
-
-  /**
-   * `(char *)pRecord` of the `EXPOOL`'s global text `index`, as the action name filter reads
-   * it (`doc/CSBwin-src/CSBCode.cpp:8807-8815`): its bytes, in memory order, up to the first
-   * 0. Null when there is no such record, or an empty one.
-   */
-  private globalText(index: number): string | null {
-    const record = this.dungeon.locateExpoolRecord(globalTextKey(index));
-    if (record === null || record.length === 0) return null;
-    return String.fromCharCode(...globalTextBytes(record));
-  }
-
-  /**
-   * `SetGlobalText` (`doc/CSBwin-src/CSBCode.cpp:5360-5372`): the text, at most 99 bytes
-   * and its zero, as the `EXPOOL` record `(EDT_GlobalText << 24) | index`, four bytes to a
-   * longword in memory order. The record is `(len + 4) / 4` longwords; CSBWin fills the
-   * bytes past the zero from an uninitialised buffer, the port with zeros. A new record
-   * goes in front of the old, which stays in the pool.
-   */
-  private setGlobalText(text: string, index: number): void {
-    const len = Math.min(text.length, 99);
-    const record = new Array<number>(Math.floor((len + 4) / 4)).fill(0);
-    for (let i = 0; i < len; i++) record[i >> 2] = (record[i >> 2]! | ((text.charCodeAt(i) & 0xff) << (8 * (i & 3)))) >>> 0;
-    this.dungeon.writeExpoolRecord(globalTextKey(index), record);
   }
 
   /** `RN::checkIndirectIndex(i)` (`doc/CSBwin-src/data.cpp:530-535`): a slot of the maps. */

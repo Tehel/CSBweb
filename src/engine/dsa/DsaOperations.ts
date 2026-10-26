@@ -1,6 +1,9 @@
+import type { ObjectID } from '../../core/types';
 import type { GameContext } from '../GameContext';
 import type { StkOp } from './DsaTypes';
-import type { DsaBank, ExecutionPacket, GearJump } from './DsaMachine';
+import type { DsaFilters } from './DsaFilters';
+import type { DsaBank, DsaOverride, ExecutionPacket, GearJump } from './DsaMachine';
+import { messageOperations } from './ops/messages';
 import { stackOperations } from './ops/stack';
 
 /**
@@ -9,6 +12,14 @@ import { stackOperations } from './ops/stack';
  */
 export interface DsaOperationMachine {
   readonly ctx: GameContext;
+  /** The filter sites, whose viewing filter `&DESCRIBE` changes. */
+  readonly filters: DsaFilters;
+  readonly override: DsaOverride;
+  /** `pDSAparameters`, the array of the moment, which `NEWDSAPARAMETERS` swaps: its count, then its words. */
+  parameters(): Int32Array;
+  /** `parameterMessageSequence++`. */
+  nextParameterMessageSequence(): number;
+  isValidObjectId(objectId: number): objectId is ObjectID;
 }
 
 /** A case of `EX_AMPERSAND`'s switch: `JUMP*`'s transfer, or nothing. */
@@ -27,4 +38,4 @@ function join(...domains: ReadonlyMap<StkOp, DsaOperation>[]): ReadonlyMap<StkOp
 }
 
 /** The `&` operations `executeAmpersand` dispatches to, by subcode. */
-export const DSA_OPERATIONS = join(stackOperations);
+export const DSA_OPERATIONS = join(stackOperations, messageOperations);

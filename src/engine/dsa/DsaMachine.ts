@@ -3,6 +3,15 @@ import type { DsaDefinition } from '../../data/dungeonTypes';
 import { DsaVarType, type DsaVars } from './DsaTypes';
 
 /**
+ * `Override_P` and `Override_Pos` (`doc/CSBwin-src/DSA.cpp:444-445`): the corner an
+ * `OVERRIDE` command sets, which the next target an operation takes is given and clears.
+ */
+export class DsaOverride {
+  p = false;
+  pos = 0;
+}
+
+/**
  * `STACK` (`doc/CSBwin-src/DSA.cpp:370-424`): 100 values, and `die` on an overflow
  * (`0xdcd6`), an underflow (`0xdcd7`), a pick or a poke past the bottom (`0xdcdb`) and a
  * roll past it (`0xdcda`). `fail` is that `die`, `underflow` asking for its "DSA stack
