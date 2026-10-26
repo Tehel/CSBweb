@@ -1,7 +1,6 @@
 import {
   DBType,
   OBJECT_ID_EOF,
-  OBJECT_ID_NULL,
   type ObjectID,
   type LocationRel,
   locationRelFromInteger,
@@ -33,7 +32,6 @@ import { extendedCellFlagsKey, type DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
 import { TimerFunction } from './TimerQueue';
 import type { TimerEntry, TimerQueue } from './TimerQueue';
-import { monsterDrawAsSize4, monsterInvisible, monsterPoisoned, monsterUnique } from './monsterTypes';
 import { Esl, messageParametersKey, readGlobalVariables, specialLocationKey } from '../data/CsbwinExpool';
 import { DsaBank, DsaOverride, ProgramCursor, type ExecutionPacket, type GearJump } from './dsa/DsaMachine';
 import { DSA_OPERATIONS, type DsaOperationMachine } from './dsa/DsaOperations';
@@ -750,22 +748,6 @@ export class DsaSystem {
     const operation = DSA_OPERATIONS.get(subcode);
     if (operation) return operation(bank, exPkt, this.operationMachine);
     switch (subcode) {
-      case StkOp.DEL_MON: {
-        // `doc/CSBwin-src/DSA.cpp:2497-2504`, `EX_DELMON` (`:1742-1749`).
-        bank.noFilter();
-        const indx = bank.stack.pop();
-        const locr = locationRelFromInteger(bank.stack.pop());
-        this.ctx.systems.monsterDamage.deleteMonsterInGroup(locr, indx >>> 0);
-        break;
-      }
-      case StkOp.INS_MON: {
-        // `DSA.cpp:2505-2512`, `EX_INSMON` (`:1751-1758`).
-        bank.noFilter();
-        const posMask = bank.stack.pop();
-        const locr = locationRelFromInteger(bank.stack.pop());
-        this.ctx.systems.monsterDamage.insertMonsterInGroup(locr, posMask >>> 0);
-        break;
-      }
       case StkOp.FALSE_PIT: {
         const value = bank.stack.pop();
         const loc = bank.stack.pop();
@@ -1092,28 +1074,6 @@ export class DsaSystem {
       }
       case StkOp.NUM_PARAM:
         bank.stack.push(this.parameters[0] ?? 0);
-        break;
-      case StkOp.MON_POSS:
-        this.monPoss(bank);
-        break;
-      case StkOp.MONSTER_FETCH:
-        this.monsterFetch(bank);
-        break;
-      case StkOp.MONSTER_STORE:
-        this.monsterStore(bank);
-        break;
-      case StkOp.MON_BLK: {
-        // `DSA.cpp:4626-4639`.
-        const flags = bank.stack.pop();
-        const inhibit = this.ctx.systems.monsterAI.monsterMoveInhibit;
-        inhibit[0] = flags & 1;
-        inhibit[1] = flags & 2;
-        inhibit[2] = flags & 4;
-        inhibit[3] = flags & 8;
-        break;
-      }
-      case StkOp.MON_LAND_D:
-        this.monLandD(bank);
         break;
       case StkOp.THROW: {
         // `DSA.cpp:4559-4583`.
@@ -1568,95 +1528,6 @@ export class DsaSystem {
     missile.damageRemaining = damage & 0xff;
     const timer = this.timers.getTimer(missile.timerIndex);
     if (timer) timer.timerWord8 = ((timer.timerWord8 & ~(0x3 << 10)) | ((direction & 3) << 10)) & 0xffff;
-  }
-
-  /**
-   * `STKOP_MonPoss` (`doc/CSBwin-src/DSA.cpp:3359-3389`): the slot of the group's
-   * `possindex`th possession, counted from 0, or -1 past the last. When the slot popped is
-   * no group, `object` keeps the default `RN`, `RNnul`, and its integer 0xffff is pushed.
-   */
-  private monPoss(bank: DsaBank): void {
-    let possIndex = bank.stack.pop() >>> 0;
-    const idx = bank.stack.pop();
-    let object: ObjectID = OBJECT_ID_NULL;
-    const monster = this.isValidObjectId(idx) ? this.dungeon.getCreatureRecord(idx) : null;
-    if (monster) {
-      for (object = monster.possession; possIndex > 0 && object !== OBJECT_ID_EOF;
-        object = this.dungeon.getDBRecordLink(object)) {
-        possIndex--;
-      }
-    }
-    bank.stack.push(object === OBJECT_ID_EOF ? -1 : object);
-  }
-
-  /**
-   * `STKOP_MonsterFetch` (`doc/CSBwin-src/DSA.cpp:3993-4057`): up to `num` of eight words
-   * about the group at a slot, into the variables from `index` on: how many it is, its
-   * type, the four hit points, the flags (1 invisible, 2 drawn as size 4, 4 unique, 8
-   * poisoned, each through its gated `DB4` accessor) and the alternate graphics. A slot
-   * that is no group reads zeros, and -1 for the type.
-   */
-  private monsterFetch(bank: DsaBank): void {
-    const num = bank.stack.pop() >>> 0;
-    const index = bank.stack.pop() >>> 0;
-    const id = bank.stack.pop();
-    const result = new Int32Array(8);
-    result[1] = -1;
-    const monster = this.isValidObjectId(id) ? this.dungeon.getCreatureRecord(id) : null;
-    if (monster) {
-      result[0] = (monster.numMonM1 & 0x3) + 1;
-      result[1] = monster.creatureType;
-      for (let i = 0; i < 4; i++) result[2 + i] = monster.hp[i] ?? 0;
-      if (monsterInvisible(this.ctx.rules, monster)) result[6]! |= 1;
-      if (monsterDrawAsSize4(this.ctx.rules, monster)) result[6]! |= 2;
-      if (monsterUnique(this.ctx.rules, monster)) result[6]! |= 4;
-      if (monsterPoisoned(this.ctx.rules, monster)) result[6]! |= 8;
-      result[7] = monster.alternateGraphics;
-    }
-    const n = Math.min(8, num);
-    for (let i = 0; i < n; i++) bank.setVar(index + i, result[i]!);
-  }
-
-  /**
-   * `STKOP_MonsterStore` (`doc/CSBwin-src/DSA.cpp:4076-4127`): the hit points, flags and
-   * alternate graphics `&MONSTER@` reads, written back from the variables from `index`
-   * on, as far as `num` reaches; the count and the type are not. The flags are written
-   * whatever the design options. `num` is unsigned, so `num - 2` of 0 or 1 lets all four
-   * hit points be written.
-   */
-  private monsterStore(bank: DsaBank): void {
-    const num = bank.stack.pop() >>> 0;
-    const index = bank.stack.pop() >>> 0;
-    const id = bank.stack.pop();
-    bank.noFilter();
-    if (!this.isValidObjectId(id)) return;
-    const monster = this.dungeon.getCreatureRecord(id);
-    if (!monster) return; // "Not a Monster"
-    for (let i = 0; i < 4 && i < ((num - 2) >>> 0); i++) monster.hp[i] = bank.getVar(index + i + 2) & 0xffff;
-    if (num > 6) {
-      const flags = bank.getVar(index + 6);
-      monster.invisible = (flags & 1) !== 0;
-      monster.drawAsSize4 = (flags & 2) !== 0;
-      monster.unique = (flags & 4) !== 0;
-      monster.poisoned = (flags & 8) !== 0;
-    }
-    if (num > 7) monster.alternateGraphics = bank.getVar(index + 7) & 7;
-  }
-
-  /**
-   * `STKOP_MonLandD` (`doc/CSBwin-src/DSA.cpp:4769-4791`): in the monster move filter, the
-   * group's location as `1024 * level + 32 * x + y` and its distance to the party less
-   * one, from the filter's parameters, into variables `idx` and `idx + 1`. Outside that
-   * filter it does nothing, not even pop.
-   */
-  private monLandD(bank: DsaBank): void {
-    if (!this.filters.monsterMoveFilterActive) return;
-    const idx = bank.stack.pop() >>> 0;
-    if (idx > 98) return;
-    const p = this.parameters;
-    bank.setVar(idx, 1024 * p[1]! + 32 * p[2]! + p[3]!);
-    const distance = Math.abs(p[2]! - p[6]!) + Math.abs(p[3]! - p[7]!);
-    bank.setVar(idx + 1, distance - 1);
   }
 
   private getDsa(index: number): DsaDefinition | null {

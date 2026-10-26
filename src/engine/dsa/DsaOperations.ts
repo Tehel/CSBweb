@@ -5,6 +5,7 @@ import type { DsaFilters } from './DsaFilters';
 import type { DsaBank, DsaOverride, ExecutionPacket, GearJump } from './DsaMachine';
 import { characterOperations } from './ops/characters';
 import { messageOperations } from './ops/messages';
+import { monsterOperations } from './ops/monsters';
 import { moveOperations } from './ops/move';
 import { objectOperations } from './ops/objects';
 import { stackOperations } from './ops/stack';
@@ -42,5 +43,5 @@ function join(...domains: ReadonlyMap<StkOp, DsaOperation>[]): ReadonlyMap<StkOp
 
 /** The `&` operations `executeAmpersand` dispatches to, by subcode. */
 export const DSA_OPERATIONS = join(
-  stackOperations, messageOperations, objectOperations, moveOperations, characterOperations,
+  stackOperations, messageOperations, objectOperations, moveOperations, characterOperations, monsterOperations,
 );
