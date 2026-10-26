@@ -9,6 +9,7 @@ import { messageOperations } from './ops/messages';
 import { monsterOperations } from './ops/monsters';
 import { moveOperations } from './ops/move';
 import { objectOperations } from './ops/objects';
+import { runOperations } from './ops/run';
 import { stackOperations } from './ops/stack';
 
 /**
@@ -27,6 +28,12 @@ export interface DsaOperationMachine {
   /** `disableSaves = …`, which `&DISABLESAVES` sets (`doc/CSBwin-src/data.cpp:58`). */
   setDisableSaves(disable: boolean): void;
   isValidObjectId(objectId: number): objectId is ObjectID;
+  /** `adjustSkillsParameters`, which `&SETADJUSTSKILLSPARAMETERS!` sets and the adjust-skills filter reads. */
+  adjustSkillsParameters(): Int32Array;
+  /** `Execute`, a run nested in this one on the same bank: `&GOSUB*`'s. */
+  execute(exPkt: ExecutionPacket, bank: DsaBank): number;
+  /** `EX_AMPERSAND`, which `&%INDIRECT` runs again on the operation its record names. */
+  executeAmpersand(subcode: number, bank: DsaBank, exPkt: ExecutionPacket): GearJump | void;
 }
 
 /** A case of `EX_AMPERSAND`'s switch: `JUMP*`'s transfer, or nothing. */
@@ -47,5 +54,5 @@ function join(...domains: ReadonlyMap<StkOp, DsaOperation>[]): ReadonlyMap<StkOp
 /** The `&` operations `executeAmpersand` dispatches to, by subcode. */
 export const DSA_OPERATIONS = join(
   stackOperations, messageOperations, objectOperations, moveOperations, characterOperations, monsterOperations,
-  dungeonOperations,
+  dungeonOperations, runOperations,
 );

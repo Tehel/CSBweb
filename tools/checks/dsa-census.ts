@@ -2,7 +2,7 @@
  * The census of DSA operations: which of CSBWin's `&` operations the port lacks, and how
  * often a dungeon's programs call each one.
  *
- * 1. **CSBWin's list.** `StkOp` (`src/engine/DsaSystem.ts`) is `STKOP`
+ * 1. **CSBWin's list.** `StkOp` (`src/engine/dsa/DsaTypes.ts`) is `STKOP`
  *    (`doc/CSBwin-src/Data.h:1736-1876`), 138 values: 0 to 126 and 129 to 139.
  *    `EX_AMPERSAND`'s switch (`doc/CSBwin-src/DSA.cpp:2393-4983`) has a case for every one
  *    but four. `I_Indirect` is unpacked before the switch (`:2346-2392`), so it is an
@@ -11,10 +11,9 @@
  *    are not operations, and the port owes them nothing. `I_FilteredCast` is only a word
  *    of a parameter record that `I_Indirect` runs as `FilteredCast` (`:2359`), which no
  *    operation writes. That leaves 135.
- * 2. **The port's list** is `DSA_OPERATIONS` (`src/engine/dsa/DsaOperations.ts`) and the
- *    `case StkOp.…` labels still in `executeAmpersand`, none in both. What it lacks
- *    is pinned below in `LEFT`, which is empty: the port has every operation, and an
- *    operation taken out fails here.
+ * 2. **The port's list** is `DSA_OPERATIONS` (`src/engine/dsa/DsaOperations.ts`), the
+ *    one table `executeAmpersand` runs. What it lacks is pinned below in `LEFT`, which is
+ *    empty: the port has every operation, and an operation taken out fails here.
  * 3. **The census** (`dsaCensus`, `src/engine/DungeonCensus.ts`, which the form that
  *    adds a set shows): every program of the dungeon decodes to its exact length with
  *    CSBWin's operand layout. The default dungeon is Conflux 3.5's.
@@ -35,21 +34,6 @@ const CONFLUX = 'tools/fixtures/gamefiles/conflux-3.5-b8/dungeon.dat';
 /** What the port lacks, in `STKOP` order: nothing. */
 const LEFT: readonly string[] = [];
 
-/** `DSA_OPERATIONS`' subcodes and the `case StkOp.…` labels of `executeAmpersand`, the port's operations. */
-function portedOperations(): Set<number> {
-  const source = readFileSync(resolve('src/engine/DsaSystem.ts'), 'utf8');
-  const start = source.indexOf('\n  executeAmpersand(');
-  const end = source.indexOf('\n  private ', start + 1);
-  const ported = new Set<number>(DSA_OPERATIONS.keys());
-  for (const [, name] of source.slice(start, end).matchAll(/case StkOp\.(\w+):/g)) {
-    const value = StkOp[name as keyof typeof StkOp];
-    check(value !== undefined, `executeAmpersand names StkOp.${name}`);
-    check(value === undefined || !DSA_OPERATIONS.has(value), `StkOp.${name} is DSA_OPERATIONS' or a case, not both`);
-    if (value !== undefined) ported.add(value);
-  }
-  return ported;
-}
-
 function main(): void {
   const path = process.argv[2] ?? CONFLUX;
   const data = new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync(resolve(path))));
@@ -60,7 +44,7 @@ function main(): void {
   const owed = all.filter((op) => !NOT_OPERATIONS.has(op));
   check(owed.length === 135, `CSBWin has 135 operations (${owed.length})`);
 
-  const ported = portedOperations();
+  const ported = new Set<number>(DSA_OPERATIONS.keys());
   const missing = owed.filter((op) => !ported.has(op));
   check([...ported].every((op) => !NOT_OPERATIONS.has(op)), 'the port gives no case to Noop, 2Dup or I_FilteredCast');
 

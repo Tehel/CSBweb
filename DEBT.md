@@ -411,16 +411,15 @@ against each other, and the file formats.
 
 ### E27 ⏳ `DsaSystem.ts` is one 5,000-line class
 
-`DsaSystem.ts` (1,146 lines) holds the interpreter and `executeAmpersand` (`:740`),
-which runs an operation of `DSA_OPERATIONS` (`src/engine/dsa/DsaOperations.ts`) and keeps
-the rest in a switch of 130 lines, the run's own. The machine's data and its decoding are already apart,
-in `src/engine/dsa/DsaMachine.ts`: the stack, the bank, the execution packet, `OVERRIDE`'s
-corner (`DsaOverride`) and the `ProgramCursor` that `executeRun` (`:386`) reads its programs through. So are the
-seventeen filter sites, in `src/engine/dsa/DsaFilters.ts` (`ctx.systems.dsa.filters`),
-which reach the machine through `DsaFilterMachine`, and seven domains of operations, in
-`dsa/ops/stack.ts`, `dsa/ops/messages.ts`, `dsa/ops/objects.ts`, `dsa/ops/move.ts`,
-`dsa/ops/characters.ts`, `dsa/ops/monsters.ts` and `dsa/ops/dungeon.ts`.
-`NOFILTER` is the bank's `noFilter()`.
+`DsaSystem.ts` (925 lines) holds the interpreter, `execute` and `executeRun` (`:365`),
+and `executeAmpersand` (`:719`), which runs an operation of `DSA_OPERATIONS`
+(`src/engine/dsa/DsaOperations.ts`) or warns of a subcode it has none for. The machine's
+data and its decoding are already apart, in `src/engine/dsa/DsaMachine.ts`: the stack, the
+bank, the execution packet, `OVERRIDE`'s corner (`DsaOverride`) and the `ProgramCursor`
+that `executeRun` reads its programs through. So are the seventeen filter sites, in
+`src/engine/dsa/DsaFilters.ts` (`ctx.systems.dsa.filters`), which reach the machine
+through `DsaFilterMachine`, and every operation, in eight domains under `dsa/ops/`, which
+reach it through `DsaOperationMachine`. `NOFILTER` is the bank's `noFilter()`.
 
 Paying it, into `src/engine/dsa/` beside `DsaTypes.ts`. Each command's body keeps CSBWin's
 order and names, and each step is proven by every tool's whole output, byte-identical. The
@@ -429,42 +428,18 @@ steps, one commit each:
 1. ✅ **The machine's data and its decoding**, in `dsa/DsaMachine.ts`.
 2. ✅ **The filters**, in `dsa/DsaFilters.ts`, the plain sites through one `runFilter`
    with their codecs, the spell's in `filterParameters.ts`.
-3. ⏳ **The operations,** one domain per commit, each a `ReadonlyMap<StkOp, DsaOperation>`
-   in `dsa/ops/<domain>.ts` that `DSA_OPERATIONS` joins, an operation given twice failing
-   at the join. An operation is handed the bank, the packet and a `DsaOperationMachine`,
-   which grows with each domain by what its cases read of `DsaSystem` (so far `ctx`, the
-   filters, the override, the parameters, the message sequence, `isValidObjectId` and
-   `setDisableSaves`), as
-   `DsaFilterMachine` does. `tools/checks/dsa-census.ts` counts the table and the
-   cases left in `executeAmpersand`, none in both; `tools/checks/dsa-delete.ts:120` wraps
-   `executeAmpersand`, which stays the one entry. The domains:
-   - ✅ the stack, its arithmetic and the variables (`ops/stack.ts`: `&FETCH`, `&STORE`,
-     `&VSET`, `&RANDOM`, `&BITCOUNT`, whose `BIT_COUNTS` `&COUNTINJURY` imports);
-   - ✅ text, messages and the sound (`ops/messages.ts`: `&MESSAGE`, `&DESCRIBE` and its
-     `ModifyDescription`, `&SAY`, the text bank's operations, `&GLOBALTEXT!` and its
-     `SetGlobalText`, `&SOUND`, `&MODIFYMESSAGE`);
-   - ✅ the objects (`ops/objects.ts`: `&DEL`, `&ADD` and its `copyItem`, `&OBJECTID`,
-     `&TYPE`, `&COPY`, `&ISCARRIED`, the five fields' getters and setters, `SetCursed`;
-     `choosePositionFromMask` and `detachedGroupIndex`, which `ops/move.ts` imports);
-   - ✅ `&MOVE` (`ops/move.ts`: its `MoveObject` port and `DsaMoveError`; the tools
-     reach `moveObjectDsa` and the character arms through `dsa.operationMachine`);
-   - ✅ the champions and the party (`ops/characters.ts`: `CH_POSS`, `MASTERY`,
-     `PARTY_FETCH`, `CHAR_FETCH`, `CHAR_STORE` and its `charStore`, `TALENTS_FETCH`,
-     `TALENTS_STORE`, `WHO_HAS_TALENT`, `WHERE_IS_CHAR`, `CAUSE_POISON`, `SWAP_CHARACTER`,
-     `EXPERIENCE_PLUS`, `COUNT_INJURY`);
-   - ✅ the monsters (`ops/monsters.ts`: `&DELMON`, `&INSMON`, `MON_POSS`, `MONSTER_FETCH`,
-     `MONSTER_STORE`, `&MONBLK`, `MON_LAND_D`);
-   - ✅ the dungeon (`ops/dungeon.ts`: `&FALSEPIT`, the generator delay's fetch and store,
-     `&TELEPORTPARTY` and its `teleportParty`, `&TIME@`, `&CELL@`, `&CELL!`, `&GLOBAL@`,
-     `&THROW`, the casts, the skins, `&CREATECLOUD`, the missile info's fetch and store,
-     `&LOCTOABS`, the extended cell flags, `&MULTIPLIER@`, `&PARTYDISTANCE`, `&THISCELL` and
-     `&NEIGHBORS` and their `ExamineCell`, the overlay, palette and jitter, `&DISABLESAVES`,
-     `&DSAINFO@`; `updateCellFlag` and `findFirstTeleporter`, which `COPYTELEPORTER` imports);
-   - ⏳ last, the run's own: the parameters, `&SETNEWSTATE`, `&THISDSAID`, the gear jumps and gosub,
-     `&%INDIRECT` and the `I_` operations. With it the switch is gone, and `execute`
-     and `executeRun` move to `DsaMachine.ts`.
-4. ⏳ **The façade.** `DsaSystem.ts` keeps what `ctx.systems.dsa` answers (`filters`,
-   `operationMachine`, the timers, the globals, the parameters) and nothing else.
+3. ✅ **The operations,** one `ReadonlyMap<StkOp, DsaOperation>` per domain in
+   `dsa/ops/` (`stack`, `messages`, `objects`, `move`, `characters`, `monsters`, `dungeon`
+   and `run`, the run's own: its parameters, `&SETNEWSTATE`, `&THISDSAID`, the gear jumps
+   and gosub, `&%INDIRECT` and the `I_` operations), which `DSA_OPERATIONS` joins, an
+   operation given twice failing at the join. `tools/checks/dsa-census.ts` counts the
+   table; `tools/checks/dsa-delete.ts:120` wraps `executeAmpersand`, which stays the one
+   entry, `&%INDIRECT` included.
+4. ⏳ **The façade.** `execute` and `executeRun` move to `DsaMachine.ts`, with what only
+   they read (the commands, `getTarget`, `loadParameter` and `storeParameter`,
+   `copyTeleporter`, the run's `where`), and `DsaSystem.ts` keeps what
+   `ctx.systems.dsa` answers (`filters`, `operationMachine`, the timers, the globals, the
+   parameters) and nothing else.
 
 ### E28 ⏳ The bytecode interpreter decodes through switches and maps built per call
 
