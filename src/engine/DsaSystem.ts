@@ -58,7 +58,9 @@ import { readU32LE, writeU32LE } from '../core/bytes';
 import { decodeCharField } from '../data/CsbwinSaveInfo';
 import { GetText } from '../data/DecodeText';
 import { Esl, globalTextBytes, globalTextKey, messageParametersKey, readGlobalVariables, specialLocationKey } from '../data/CsbwinExpool';
-import { DsaBank, ProgramCursor, type ExecutionPacket } from './dsa/DsaMachine';
+import { DsaBank, ProgramCursor, type ExecutionPacket, type GearJump } from './dsa/DsaMachine';
+import { DSA_OPERATIONS, type DsaOperationMachine } from './dsa/DsaOperations';
+import { BIT_COUNTS } from './dsa/ops/stack';
 import { DsaFilters } from './dsa/DsaFilters';
 import { CursorFilterType, DsaVars, DsaVarType, StkOp } from './dsa/DsaTypes';
 
@@ -170,17 +172,8 @@ const enum DsaMoveError {
   DER_NoCloudsPlease = -15,
 }
 
-/** `bitCounts` (`doc/CSBwin-src/DSA.cpp:46`): the set bits of a nibble. */
-const BIT_COUNTS = [0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4];
-
 /** `teleporterBit` (`doc/CSBwin-src/DSA.cpp:2209`): `ExamineCell`'s bit for a teleporter's `what`. */
 const TELEPORTER_BIT = [11, 15, 13, 17];
-
-/** `JUMP*`'s transfer, which `execute` takes as `EX_JUMP`'s (`doc/CSBwin-src/DSA.cpp:4738-4746`). */
-interface GearJump {
-  state: number;
-  col: number;
-}
 
 /** `talents`' offset in a `CHARDESC`, a longword `swapCharacter` leaves little-endian. */
 const CHARDESC_TALENTS = 276;
@@ -234,6 +227,8 @@ export class DsaSystem {
   private overridePos = 0;
   private overrideP = false;
   private readonly monsterDesc: ArrayLike<MonsterDesc>;
+  /** What the operations of `DSA_OPERATIONS` reach of the machine. */
+  private readonly operationMachine: DsaOperationMachine;
 
   constructor(private readonly ctx: GameContext) {
     this.dungeon = ctx.dungeon;
@@ -244,6 +239,7 @@ export class DsaSystem {
     this.carryLocation = ctx.tables.carryLocation;
     this.monsterDesc = ctx.tables.monsterDesc;
     this.globalVariables = Int32Array.from(readGlobalVariables(ctx.dungeon.getData()));
+    this.operationMachine = { ctx };
     this.filters = new DsaFilters(ctx, {
       setParameters: (count, values) => this.setParameters(count, values),
       setParameter: (index, value) => { this.parameters[1 + index] = value; },
@@ -824,31 +820,15 @@ export class DsaSystem {
     return finalState;
   }
 
-  /** Public so that `tools/` can watch an operation run, in the middle of a program. */
+  /**
+   * `EX_AMPERSAND`'s switch (`doc/CSBwin-src/DSA.cpp:2393-4983`): an operation of
+   * `DSA_OPERATIONS`, else one of the cases still here. Public so that `tools/` can watch
+   * an operation run, in the middle of a program.
+   */
   executeAmpersand(subcode: number, bank: DsaBank, exPkt: ExecutionPacket): GearJump | void {
+    const operation = DSA_OPERATIONS.get(subcode);
+    if (operation) return operation(bank, exPkt, this.operationMachine);
     switch (subcode) {
-      case StkOp.TWO_DROP:
-        bank.stack.pop();
-        bank.stack.pop();
-        break;
-      case StkOp.ONE_PLUS:
-        bank.stack.push(bank.stack.pop() + 1);
-        break;
-      case StkOp.SWAP:
-        bank.stack.roll(1);
-        break;
-      case StkOp.NEG:
-        bank.stack.push(-bank.stack.pop());
-        break;
-      case StkOp.COMP:
-        bank.stack.push(~bank.stack.pop());
-        break;
-      case StkOp.DUP: {
-        const v = bank.stack.pop();
-        bank.stack.push(v);
-        bank.stack.push(v);
-        break;
-      }
       case StkOp.DEL: {
         const location = bank.stack.pop();
         const objId = bank.stack.pop();
@@ -945,19 +925,6 @@ export class DsaSystem {
       case StkOp.TYPE:
         bank.stack.push(this.getTypeId(bank.stack.pop()));
         break;
-      case StkOp.FETCH: {
-        const idx = bank.stack.pop();
-        bank.stack.push(bank.getVar(idx));
-        break;
-      }
-      case StkOp.STORE: {
-        const idx = bank.stack.pop();
-        bank.setVar(idx, bank.stack.pop());
-        break;
-      }
-      case StkOp.DROP:
-        bank.stack.pop();
-        break;
       case StkOp.FALSE_PIT: {
         const value = bank.stack.pop();
         const loc = bank.stack.pop();
@@ -1052,103 +1019,6 @@ export class DsaSystem {
           }
         }
         this.modifyDescription(locrInt, index, color);
-        break;
-      }
-      case StkOp.PLUS:
-        bank.stack.push(bank.stack.pop() + bank.stack.pop());
-        break;
-      case StkOp.GEAR:
-        // An `i32` product, which wraps (`DSA.cpp:2534-2540`).
-        bank.stack.push(Math.imul(bank.stack.pop(), bank.stack.pop()));
-        break;
-      case StkOp.ONE_MINUS:
-        bank.stack.push(bank.stack.pop() - 1);
-        break;
-      case StkOp.ROLL:
-        bank.stack.roll(bank.stack.pop());
-        break;
-      case StkOp.ROT:
-        bank.stack.roll(2);
-        break;
-      case StkOp.MINUS_ROLL:
-        bank.stack.minusRoll(bank.stack.pop());
-        break;
-      case StkOp.MINUS_ROT:
-        bank.stack.minusRoll(2);
-        break;
-      case StkOp.PICK:
-        bank.stack.pick(bank.stack.pop());
-        break;
-      case StkOp.TWO_PICK:
-        bank.stack.pick(2);
-        break;
-      case StkOp.OVER:
-        bank.stack.pick(1);
-        break;
-      case StkOp.POKE:
-        bank.stack.poke(bank.stack.pop());
-        break;
-      case StkOp.EQUAL:
-        bank.stack.push(bank.stack.pop() === bank.stack.pop() ? 1 : 0);
-        break;
-      case StkOp.NOT_EQUAL:
-        bank.stack.push(bank.stack.pop() === bank.stack.pop() ? 0 : 1);
-        break;
-      case StkOp.NOT:
-        bank.stack.push(bank.stack.pop() === 0 ? 1 : 0);
-        break;
-      case StkOp.AND:
-        bank.stack.push(bank.stack.pop() & bank.stack.pop());
-        break;
-      case StkOp.XOR:
-        bank.stack.push(bank.stack.pop() ^ bank.stack.pop());
-        break;
-      case StkOp.OR:
-        bank.stack.push(bank.stack.pop() | bank.stack.pop());
-        break;
-      case StkOp.SHIFT: {
-        const v = bank.stack.pop();
-        const w = bank.stack.pop();
-        bank.stack.push(v >= 0 ? (w << (v & 31)) : (w >> ((-v) & 31)));
-        break;
-      }
-      case StkOp.RSHIFT: {
-        const v = bank.stack.pop();
-        const w = bank.stack.pop();
-        bank.stack.push(v >= 0 ? (w >> (v & 31)) : (w << ((-v) & 31)));
-        break;
-      }
-      case StkOp.LESS: {
-        const v = bank.stack.pop();
-        const w = bank.stack.pop();
-        bank.stack.push(w < v ? 1 : 0);
-        break;
-      }
-      case StkOp.ULESS: {
-        const v = bank.stack.pop() >>> 0;
-        const w = bank.stack.pop() >>> 0;
-        bank.stack.push(w < v ? 1 : 0);
-        break;
-      }
-      case StkOp.SLASH: {
-        const v = bank.stack.pop();
-        const w = bank.stack.pop();
-        bank.stack.push(v === 0 ? 0 : Math.trunc(w / v));
-        break;
-      }
-      case StkOp.PERCENT: {
-        const v = bank.stack.pop();
-        const w = bank.stack.pop();
-        bank.stack.push(v === 0 ? 0 : w % v);
-        break;
-      }
-      case StkOp.RANDOM: {
-        let v = bank.stack.pop() >>> 0;
-        if (v === 0) v = 1;
-        // `(ui32)STRandom() % V` with `ui32 V` (doc/CSBwin-src/DSA.cpp:2721-2733) — the
-        // full 24-bit draw modulo V, unsigned, *not* `STRandom(V)`, which masks to 16 bits.
-        const result = (this.random.next() >>> 0) % v;
-        bank.stack.push(result | 0);
         break;
       }
       case StkOp.COPY: {
@@ -1939,17 +1809,6 @@ export class DsaSystem {
       case StkOp.NEIGHBORS:
         this.examineCell(0, 3, bank);
         break;
-      case StkOp.BIT_COUNT: {
-        // `doc/CSBwin-src/DSA.cpp:4833-4850`.
-        const v = bank.stack.pop() >>> 0;
-        let count = 0;
-        for (let shift = 0; shift < 32; shift += 4) count += BIT_COUNTS[(v >>> shift) & 0x0f]!;
-        bank.stack.push(count);
-        break;
-      }
-      case StkOp.VSET:
-        this.vset(bank);
-        break;
       case StkOp.OVERLAY: {
         // `doc/CSBwin-src/DSA.cpp:2920-2931`.
         const onum = bank.stack.pop();
@@ -2179,31 +2038,6 @@ export class DsaSystem {
     if (party.z === locr.l && party.x === locr.x && party.y === locr.y) return 1 << 29;
     if (this.dungeon.findFirstMonster(new Position(locr.x, locr.y, locr.l)) !== OBJECT_ID_EOF) return 1 << 30;
     return 0x80000000 | 0;
-  }
-
-  /**
-   * `&VSET` (`doc/CSBwin-src/DSA.cpp:4851-4898`): `n` variables from `dst` set to `-src`
-   * for a negative `src`, to `src - 100` past 99, and otherwise copied from the variables
-   * at `src`, their states with them. `n` and `dst` are unsigned, `src` signed. A count
-   * whose sum with `dst` or `src` wraps past 2^32 runs CSBWin past its 100 variables; the
-   * port stops at the last (`DEBT.md` H, "An index CSBWin does not bound reads nobody").
-   */
-  private vset(bank: DsaBank): void {
-    let n = bank.stack.pop() >>> 0;
-    const dst = bank.stack.pop() >>> 0;
-    const src = bank.stack.pop() | 0;
-    if (dst > 99) return;
-    if (dst + n > 100) n = 100 - dst;
-    const { values, definedFlags } = bank.vars;
-    if (src < 0 || src > 99) {
-      const value = src < 0 ? -src : src - 100;
-      for (let i = 0; i < n && dst + i < 100; i++) values[dst + i] = value;
-      definedFlags.fill(DsaVarType.WellDefined, dst, Math.min(100, dst + n));
-    } else {
-      if (src + n > 100) n = 100 - src;
-      values.copyWithin(dst, src, Math.min(100, src + n));
-      definedFlags.copyWithin(dst, src, Math.min(100, src + n));
-    }
   }
 
   /**

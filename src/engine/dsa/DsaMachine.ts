@@ -177,6 +177,12 @@ export interface ExecutionPacket {
   subroutineLevel: number;
 }
 
+/** `JUMP*`'s transfer, which `execute` takes as `EX_JUMP`'s (`doc/CSBwin-src/DSA.cpp:4738-4746`). */
+export interface GearJump {
+  state: number;
+  col: number;
+}
+
 function signExtend(value: number, bits: number): number {
   const sign = 1 << (bits - 1);
   return (value & (sign - 1)) - (value & sign);
