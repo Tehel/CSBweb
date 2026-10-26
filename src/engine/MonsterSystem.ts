@@ -31,7 +31,6 @@ import {
   monsterDelayFromAttackToMove,
   monsterDelayFromMoveToAttack,
   monsterHorizontalSize,
-  monsterLevitating,
   monsterNibble12,
   monsterNibble14,
   monsterNonAttackingMirrorOK,
@@ -519,9 +518,8 @@ export class MonsterSystem {
     // "Proper level && oldX >= 0 means an ITEM16 exists"
     // (doc/CSBwin-src/Code11f52.cpp:2899).
     const item16Attached = level === partyLevel && fromDungeon;
-    // `Levitating(objD7)` (`:2876`, `:2452-2472`): a flying monster.
-    const desc = this.ctx.tables.monsterDesc[monster.creatureType];
-    const levitated = desc !== undefined && monsterLevitating(desc);
+    // `Levitating(objD7)` (`:2876`): a flying monster.
+    const levitated = this.ctx.systems.worldMove.levitating(monsterRn);
 
     // A monster leaving a square may run into a missile sitting in it (`:2878-2884`).
     if (fromDungeon && level === partyLevel) {
@@ -536,7 +534,7 @@ export class MonsterSystem {
 
     // Lifted and not set down again (`:3332`).
     if (newX < 0) {
-      if (fromDungeon) this.liftMonster(monsterRn, oldX, oldY, level, levitated, mmr);
+      if (fromDungeon) this.ctx.systems.worldMove.removeFromRoom(monsterRn, oldX, oldY, level, levitated, mmr);
       return { code: 0, position: requested };
     }
 
@@ -573,7 +571,7 @@ export class MonsterSystem {
       return { code: 0, position: destination };
     }
 
-    if (fromDungeon) this.liftMonster(placed, oldX, oldY, level, levitated, mmr);
+    if (fromDungeon) this.ctx.systems.worldMove.removeFromRoom(placed, oldX, oldY, level, levitated, mmr);
 
     // The destination is unusable if the party is standing there or another monster
     // already is. CSBWin then parks the group on a TT_60/TT_61 timer to retry.
@@ -617,28 +615,6 @@ export class MonsterSystem {
     }
 
     return { code, position: destination };
-  }
-
-  /**
-   * The removal half of `MoveObject` for a group (`doc/CSBwin-src/Code11f52.cpp:3292-3331`):
-   * a levitating group through `RemoveObjectFromRoom`, any other through
-   * `PlaceOrRemoveObjectInRoom` with `unchangedRoom` = "the party stands here".
-   */
-  private liftMonster(
-    monsterRn: ObjectID,
-    oldX: number,
-    oldY: number,
-    level: number,
-    levitated: boolean,
-    mmr: MmRecord | undefined,
-  ): void {
-    const old = new Position(oldX, oldY, level);
-    mmr?.objectRemoved(monsterRn);
-    this.dungeon.removeObjectFromCell(old, monsterRn);
-    if (levitated) return;
-    const party = this.ctx.party.state.position;
-    const partyThere = level === (party.z | 0) && oldX === (party.x | 0) && oldY === (party.y | 0);
-    this.ctx.systems.actuators.triggerObjectMove(old, monsterRn, false, partyThere, this.ctx.party.state.facing);
   }
 
   /**

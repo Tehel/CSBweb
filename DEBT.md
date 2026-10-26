@@ -114,7 +114,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E26 | Systems named after CSBWin's files, not what they do | M | ⏳ |
 | D21 | A save has nine shapes | L | ⏳ |
 | E27 | `DsaSystem.ts` is one 5,000-line class | L | ⏳ |
 | E28 | The bytecode interpreter decodes through switches and maps built per call | M | ⏳ |
@@ -441,17 +440,6 @@ gather or split CSBWin's functions as the code's concerns ask. What still follow
 the behaviour, the names of ported functions, which keep the two codebases greppable
 against each other, and the file formats.
 
-### E26 ⏳ Systems named after CSBWin's files, not what they do
-
-- **`MoveObject` is in two halves.** `WorldMove.ts:174-202` and `MonsterSystem.ts:552-560`,
-  `:652-667` each do the missile check, the removal and the pad's release, and the
-  levitation test is written twice (`WorldMove.isMonsterLevitating`,
-  `MonsterSystem.ts:549`).
-
-Paying it: one `MoveObject`, the monster's half calling the shared parts. The other
-systems are named for what they do already: `ChampionDamage` (the champions' damage,
-death, poison, armour and luck), `Fusion.ts` (the end), and `MagicShield` in `MagicSystem`.
-
 ### E27 ⏳ `DsaSystem.ts` is one 5,000-line class
 
 `DsaSystem.ts` (4,976 lines) holds the interpreter, seventeen filter sites, a port of
@@ -573,7 +561,7 @@ controls again.
   near copy, eleven (`TimerQueue.ts:200-259`), at 26 call sites
   (`createTimer(TT_LIGHT, 0, 0, 0, 0, time >>> 0, z, undefined, 0, deltaSteps)`,
   `TimerSystem.ts:290`). `WorldMove.resolveCellEffects` takes nine, with
-  `objectType = -1` meaning the party (`WorldMove.ts:272-282`).
+  `objectType = -1` meaning the party (`WorldMove.ts:277-287`).
 
 Paying it: the callbacks as constructor dependencies, with a tool builder that fails on a
 missing one (or `GameSystems` partial for a bare context); named constructors per timer

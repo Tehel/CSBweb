@@ -131,10 +131,9 @@ export class WorldMove {
    * level `level` (`d.LoadedLevel`, CSBWin's `AttachedLevel_4`). `oldX < 0` places an
    * object that lies nowhere, `newX < 0` lifts one without placing it.
    *
-   * A monster may be lifted here — `CheckMoveFromMissile` on the party's level
-   * (`:2882-2888`), then the removal (`:3293-3331`); nothing of the monster branch runs
-   * for `newX < 0` (`:3332`). *Placing* a monster is that branch
-   * (`:3362-3459`), which is `MonsterSystem.moveMonster`; it is refused here.
+   * A monster is `MonsterSystem.moveMonster`'s, which a lift here is handed to. *Placing*
+   * one is the monster branch (`:3362-3459`), which its callers call directly; it is
+   * refused here.
    *
    * What is placed goes through the teleporter / pit loop (`resolveCellEffects`); a
    * levitating thing — a missile, a flying monster — neither falls nor presses a pad
@@ -163,21 +162,15 @@ export class WorldMove {
   ): { removed: boolean; placed: ObjectID | null; position: Position | null; newDir?: number } {
     const decoded = this.dungeon.rnMaps.decode(object);
     const type = decoded.category;
-    if (type === DBType.CREATURE && newX >= 0) {
-      throw new Error('moveObject: placing a monster is MonsterSystem.moveMonster');
+    if (type === DBType.CREATURE) {
+      if (newX >= 0) throw new Error('moveObject: placing a monster is MonsterSystem.moveMonster');
+      const { code } = this.ctx.systems.monsters.moveMonster(object, oldX, oldY, newX, newY, level);
+      return { removed: code !== 0, placed: null, position: null };
     }
     const party = this.ctx.party.state;
-    const levitated = type === DBType.MISSILE
-      || (type === DBType.CREATURE && this.isMonsterLevitating(this.dungeon.getCreatureRecord(object)));
+    const levitated = this.levitating(object);
     const partyOn = (x: number, y: number, z: number): boolean =>
       z === (party.position.z | 0) && x === (party.position.x | 0) && y === (party.position.y | 0);
-
-    if (oldX >= 0 && type === DBType.CREATURE && level === (party.position.z | 0)) {
-      const to = newX >= 0 ? new Position(newX, newY, level) : null;
-      if (this.ctx.systems.missileEncounter.checkMonsterMoveFromMissile(new Position(oldX, oldY, level), to, object)) {
-        return { removed: true, placed: null, position: null };
-      }
-    }
 
     let moved = object;
     let destination: Position | null = null;
@@ -202,11 +195,7 @@ export class WorldMove {
       }
     }
 
-    if (oldX >= 0) {
-      const old = new Position(oldX, oldY, level);
-      this.dungeon.removeObjectFromCell(old, object);
-      if (!levitated) this.ctx.systems.actuators.triggerObjectMove(old, moved, false, partyOn(oldX, oldY, level), party.facing);
-    }
+    if (oldX >= 0) this.removeFromRoom(moved, oldX, oldY, level, levitated);
     if (!destination) return { removed: false, placed: null, position: null };
 
     this.dungeon.addObjectToCell(destination, moved);
@@ -216,6 +205,22 @@ export class WorldMove {
       );
     }
     return { removed: false, placed: moved, position: destination, newDir };
+  }
+
+  /**
+   * The removal half of `MoveObject` (`doc/CSBwin-src/Code11f52.cpp:3292-3331`), for an
+   * object or a group: a levitating one through `RemoveObjectFromRoom`, any other through
+   * `PlaceOrRemoveObjectInRoom`, which releases a pad, with `unchangedRoom` = "the party
+   * stands here". `mmr` is a group's `pmmr` (`MonsterSystem.moveMonster`).
+   */
+  removeFromRoom(object: ObjectID, oldX: number, oldY: number, level: number, levitated: boolean, mmr?: MmRecord): void {
+    const old = new Position(oldX, oldY, level);
+    mmr?.objectRemoved(object);
+    this.dungeon.removeObjectFromCell(old, object);
+    if (levitated) return;
+    const party = this.ctx.party.state.position;
+    const partyThere = level === (party.z | 0) && oldX === (party.x | 0) && oldY === (party.y | 0);
+    this.ctx.systems.actuators.triggerObjectMove(old, object, false, partyThere, this.ctx.party.state.facing);
   }
 
   /**
@@ -247,7 +252,7 @@ export class WorldMove {
   ): { position: Position; code: number; audible: boolean; groupDied: boolean; corner: number } {
     const rec = this.dungeon.getCreatureRecord(monsterRn);
     const decoded = this.dungeon.rnMaps.decode(monsterRn);
-    const canFall = !this.isMonsterLevitating(rec);
+    const canFall = !this.levitating(monsterRn);
     const facing = rec?.facing ?? 0;
     const partyLevel = this.ctx.party.state.position.z;
     const item16Attached = destination.z === partyLevel && oldX >= 0;
@@ -526,11 +531,17 @@ export class WorldMove {
     return (cellFlag & 0x01) === 0;
   }
 
-  private isMonsterLevitating(rec: CreatureRecord | null): boolean {
-    if (!rec) return false;
-    const desc = this.ctx.tables.monsterDesc[rec.creatureType];
-    if (!desc) return false;
-    return monsterLevitating(desc);
+  /**
+   * `Levitating` (`doc/CSBwin-src/Code11f52.cpp:2452`): a missile, or a flying monster,
+   * which neither falls nor presses a pad.
+   */
+  levitating(object: ObjectID): boolean {
+    const type = this.dungeon.rnMaps.dbType(object);
+    if (type === DBType.MISSILE) return true;
+    if (type !== DBType.CREATURE) return false;
+    const rec = this.dungeon.getCreatureRecord(object);
+    const desc = rec ? this.ctx.tables.monsterDesc[rec.creatureType] : undefined;
+    return desc !== undefined && monsterLevitating(desc);
   }
 
   /**
