@@ -411,15 +411,15 @@ against each other, and the file formats.
 
 ### E27 ⏳ `DsaSystem.ts` is one 5,000-line class
 
-`DsaSystem.ts` (1,829 lines) holds the interpreter and `executeAmpersand` (`:747`),
+`DsaSystem.ts` (1,146 lines) holds the interpreter and `executeAmpersand` (`:740`),
 which runs an operation of `DSA_OPERATIONS` (`src/engine/dsa/DsaOperations.ts`) and keeps
-the rest in a switch of 575 lines. The machine's data and its decoding are already apart,
+the rest in a switch of 130 lines, the run's own. The machine's data and its decoding are already apart,
 in `src/engine/dsa/DsaMachine.ts`: the stack, the bank, the execution packet, `OVERRIDE`'s
-corner (`DsaOverride`) and the `ProgramCursor` that `executeRun` (`:393`) reads its programs through. So are the
+corner (`DsaOverride`) and the `ProgramCursor` that `executeRun` (`:386`) reads its programs through. So are the
 seventeen filter sites, in `src/engine/dsa/DsaFilters.ts` (`ctx.systems.dsa.filters`),
-which reach the machine through `DsaFilterMachine`, and six domains of operations, in
+which reach the machine through `DsaFilterMachine`, and seven domains of operations, in
 `dsa/ops/stack.ts`, `dsa/ops/messages.ts`, `dsa/ops/objects.ts`, `dsa/ops/move.ts`,
-`dsa/ops/characters.ts` and `dsa/ops/monsters.ts`.
+`dsa/ops/characters.ts`, `dsa/ops/monsters.ts` and `dsa/ops/dungeon.ts`.
 `NOFILTER` is the bank's `noFilter()`.
 
 Paying it, into `src/engine/dsa/` beside `DsaTypes.ts`. Each command's body keeps CSBWin's
@@ -433,7 +433,8 @@ steps, one commit each:
    in `dsa/ops/<domain>.ts` that `DSA_OPERATIONS` joins, an operation given twice failing
    at the join. An operation is handed the bank, the packet and a `DsaOperationMachine`,
    which grows with each domain by what its cases read of `DsaSystem` (so far `ctx`, the
-   filters, the override, the parameters, the message sequence and `isValidObjectId`), as
+   filters, the override, the parameters, the message sequence, `isValidObjectId` and
+   `setDisableSaves`), as
    `DsaFilterMachine` does. `tools/checks/dsa-census.ts` counts the table and the
    cases left in `executeAmpersand`, none in both; `tools/checks/dsa-delete.ts:120` wraps
    `executeAmpersand`, which stays the one entry. The domains:
@@ -453,8 +454,13 @@ steps, one commit each:
      `EXPERIENCE_PLUS`, `COUNT_INJURY`);
    - ✅ the monsters (`ops/monsters.ts`: `&DELMON`, `&INSMON`, `MON_POSS`, `MONSTER_FETCH`,
      `MONSTER_STORE`, `&MONBLK`, `MON_LAND_D`);
-   - ⏳ the dungeon;
-   - ⏳ last, the run's own: the parameters, `&SETNEWSTATE`, the gear jumps and gosub,
+   - ✅ the dungeon (`ops/dungeon.ts`: `&FALSEPIT`, the generator delay's fetch and store,
+     `&TELEPORTPARTY` and its `teleportParty`, `&TIME@`, `&CELL@`, `&CELL!`, `&GLOBAL@`,
+     `&THROW`, the casts, the skins, `&CREATECLOUD`, the missile info's fetch and store,
+     `&LOCTOABS`, the extended cell flags, `&MULTIPLIER@`, `&PARTYDISTANCE`, `&THISCELL` and
+     `&NEIGHBORS` and their `ExamineCell`, the overlay, palette and jitter, `&DISABLESAVES`,
+     `&DSAINFO@`; `updateCellFlag` and `findFirstTeleporter`, which `COPYTELEPORTER` imports);
+   - ⏳ last, the run's own: the parameters, `&SETNEWSTATE`, `&THISDSAID`, the gear jumps and gosub,
      `&%INDIRECT` and the `I_` operations. With it the switch is gone, and `execute`
      and `executeRun` move to `DsaMachine.ts`.
 4. ⏳ **The façade.** `DsaSystem.ts` keeps what `ctx.systems.dsa` answers (`filters`,

@@ -35,6 +35,7 @@ import {
 } from '../../src/core/types';
 import { RN_FIREBALL } from '../../src/core/spellRn';
 import type { Game } from '../../src/engine/Game';
+import { teleportParty } from '../../src/engine/dsa/ops/dungeon';
 import { MovementAction, type Champion } from '../../src/engine/gameTypes';
 import { newGame, stockGraphics, stockDungeon } from '../lib/game';
 import { wrapMember } from '../lib/standIn';
@@ -223,7 +224,7 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
 {
   const { game, log } = makeGame();
   stand(game, log, from, facing);
-  game.systems.dsa.teleportParty({ l: game.ctx.dungeon.getMap(pit.z)!.descriptor.level, x: pit.x, y: pit.y, p: 0 });
+  teleportParty(game.ctx, { l: game.ctx.dungeon.getMap(pit.z)!.descriptor.level, x: pit.x, y: pit.y, p: 0 });
   tick(game, log);
   compare('3. the DSA teleport onto the pit', log, [`missile ${at(from)}->${at(from)}`, ...fallTail(from, below)]);
 }
