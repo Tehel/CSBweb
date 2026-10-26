@@ -411,14 +411,15 @@ against each other, and the file formats.
 
 ### E27 ⏳ `DsaSystem.ts` is one 5,000-line class
 
-`DsaSystem.ts` (2,240 lines) holds the interpreter and `executeAmpersand` (`:767`),
+`DsaSystem.ts` (1,958 lines) holds the interpreter and `executeAmpersand` (`:749`),
 which runs an operation of `DSA_OPERATIONS` (`src/engine/dsa/DsaOperations.ts`) and keeps
-the rest in a switch of 845 lines. The machine's data and its decoding are already apart,
+the rest in a switch of 613 lines. The machine's data and its decoding are already apart,
 in `src/engine/dsa/DsaMachine.ts`: the stack, the bank, the execution packet, `OVERRIDE`'s
-corner (`DsaOverride`) and the `ProgramCursor` that `executeRun` (`:413`) reads its programs through. So are the
+corner (`DsaOverride`) and the `ProgramCursor` that `executeRun` (`:395`) reads its programs through. So are the
 seventeen filter sites, in `src/engine/dsa/DsaFilters.ts` (`ctx.systems.dsa.filters`),
-which reach the machine through `DsaFilterMachine`, and four domains of operations, in
-`dsa/ops/stack.ts`, `dsa/ops/messages.ts`, `dsa/ops/objects.ts` and `dsa/ops/move.ts`.
+which reach the machine through `DsaFilterMachine`, and five domains of operations, in
+`dsa/ops/stack.ts`, `dsa/ops/messages.ts`, `dsa/ops/objects.ts`, `dsa/ops/move.ts` and
+`dsa/ops/characters.ts`.
 `NOFILTER` is the bank's `noFilter()`.
 
 Paying it, into `src/engine/dsa/` beside `DsaTypes.ts`. Each command's body keeps CSBWin's
@@ -437,7 +438,7 @@ steps, one commit each:
    cases left in `executeAmpersand`, none in both; `tools/checks/dsa-delete.ts:120` wraps
    `executeAmpersand`, which stays the one entry. The domains:
    - ✅ the stack, its arithmetic and the variables (`ops/stack.ts`: `&FETCH`, `&STORE`,
-     `&VSET`, `&RANDOM`, `&BITCOUNT`, whose `BIT_COUNTS` `&COUNTINJURY` still imports);
+     `&VSET`, `&RANDOM`, `&BITCOUNT`, whose `BIT_COUNTS` `&COUNTINJURY` imports);
    - ✅ text, messages and the sound (`ops/messages.ts`: `&MESSAGE`, `&DESCRIBE` and its
      `ModifyDescription`, `&SAY`, the text bank's operations, `&GLOBALTEXT!` and its
      `SetGlobalText`, `&SOUND`, `&MODIFYMESSAGE`);
@@ -446,7 +447,11 @@ steps, one commit each:
      `choosePositionFromMask` and `detachedGroupIndex`, which `ops/move.ts` imports);
    - ✅ `&MOVE` (`ops/move.ts`: its `MoveObject` port and `DsaMoveError`; the tools
      reach `moveObjectDsa` and the character arms through `dsa.operationMachine`);
-   - ⏳ characters; monsters; the dungeon;
+   - ✅ the champions and the party (`ops/characters.ts`: `CH_POSS`, `MASTERY`,
+     `PARTY_FETCH`, `CHAR_FETCH`, `CHAR_STORE` and its `charStore`, `TALENTS_FETCH`,
+     `TALENTS_STORE`, `WHO_HAS_TALENT`, `WHERE_IS_CHAR`, `CAUSE_POISON`, `SWAP_CHARACTER`,
+     `EXPERIENCE_PLUS`, `COUNT_INJURY`);
+   - ⏳ monsters; the dungeon;
    - ⏳ last, the run's own: the parameters, `&SETNEWSTATE`, the gear jumps and gosub,
      `&%INDIRECT` and the `I_` operations. With it the switch is gone, and `execute`
      and `executeRun` move to `DsaMachine.ts`.
