@@ -425,7 +425,7 @@ export function handleClothingClick(ui: UIState, button: number): void {
   // click (`doc/CSBwin-src/CSBCode.cpp:7025-7031`).
   const dsa = ui.ctx.systems.dsa;
   const place = { object: objectInHand, type: CursorFilterType.PlaceOnCharacter, p1: chIdx, p2: slot, p3: 0, p4: 0 };
-  dsa.cursorFilter(place);
+  dsa.filters.cursorFilter(place);
   if (place.type === CursorFilterType.Cancel) return;
 
   // `RemoveCharacterPossession` and `AddCharacterPossession` are the engine's; a chest
@@ -445,7 +445,7 @@ export function handleClothingClick(ui: UIState, button: number): void {
       character.removeCharacterPossession(chIdx, slot);
     }
     // `CURSORFILTER_PickFromCharacter`, whose cancel nothing reads (`:7041-7050`).
-    dsa.cursorFilter({ object: slotObject, type: CursorFilterType.PickFromCharacter, p1: chIdx, p2: slot, p3: 0, p4: 0 });
+    dsa.filters.cursorFilter({ object: slotObject, type: CursorFilterType.PickFromCharacter, p1: chIdx, p2: slot, p3: 0, p4: 0 });
     ui.partyState.objectInHand = slotObject;
   }
   if (objectInHand !== OBJECT_ID_NULL) {

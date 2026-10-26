@@ -77,7 +77,7 @@ function move(game: Game, full: number, empty: number): ObjectID {
   const { full, object } = slots(game);
   const arriving = game.ctx.party.state.champions[CHAMPION]!.possessions[full + 1] ?? object;
   dsa.setParameters(2, [111, 222]);
-  dsa.equipFilter(CHAMPION, full, object, arriving);
+  dsa.filters.equipFilter(CHAMPION, full, object, arriving);
   const g = dsa.getGlobalVariables();
   console.log(`2. leaving (column 1) saw [${g.slice(10, 15).join(', ')}]; arriving (column 0) saw [${g.slice(0, 5).join(', ')}] and variable 50 = ${g[5]}; the second DSA ${g[30] === UNSET && g[40] === UNSET ? 'did not run' : 'ran'}`);
   check(g.slice(10, 15).join() === [4, CHAMPION, full, object, 0].join(),

@@ -276,7 +276,7 @@ export function applyViewingFilter(
 ): ViewingFilterResult | null {
   const selected = ui.partyState.selectedCharacterIndex;
   if (selected < 0) return null;
-  return ui.ctx.systems.dsa.processViewingFilter({
+  return ui.ctx.systems.dsa.filters.processViewingFilter({
     site,
     phraseMask,
     objectId,

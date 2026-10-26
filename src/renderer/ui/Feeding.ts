@@ -29,7 +29,7 @@ const SOUND_GULP = 8;
  * Works out what the object on the cursor is worth and fills in a `FeedParameters`
  * block. Nothing on the champion changes here: `applyFeedParameters` in
  * `src/engine/Feeding.ts` does that, after the feeding filter's DSAs have had their
- * chance to rewrite the block (`DsaSystem.feedingFilter`).
+ * chance to rewrite the block (`DsaFilters.feedingFilter`).
  */
 export function computeFeedParameters(
   ui: UIState,
@@ -134,7 +134,7 @@ export function handleMouthPress(ui: UIState): void {
   if (!derived) return;
   // `objNID6`, which the filter cannot change, as it can `fp.objectType` (`:4474`).
   const objNID6 = derived.objectType;
-  const fp = ui.ctx.systems.dsa.feedingFilter(derived);
+  const fp = ui.ctx.systems.dsa.filters.feedingFilter(derived);
   if (!applyFeedParameters(ui.ctx, selected, fp)) return;
 
   if (fp.chew) {
@@ -157,7 +157,7 @@ export function handleMouthPress(ui: UIState): void {
     // `CURSORFILTER_Eat`, whose cancel nothing reads (`doc/CSBwin-src/Character.cpp:4488-4496`).
     const inHand = ui.partyState.objectInHand;
     if (inHand !== OBJECT_ID_NULL) {
-      ui.ctx.systems.dsa.cursorFilter({ object: inHand, type: CursorFilterType.Eat, p1: 0, p2: 0, p3: 0, p4: 0 });
+      ui.ctx.systems.dsa.filters.cursorFilter({ object: inHand, type: CursorFilterType.Eat, p1: 0, p2: 0, p3: 0, p4: 0 });
     }
     // `RemoveObjectFromHand()` (`:4497`), and its `TAG002572`.
     ui.partyState.objectInHand = OBJECT_ID_NULL;

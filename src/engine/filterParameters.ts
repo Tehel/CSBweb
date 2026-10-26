@@ -1,10 +1,12 @@
 /**
  * The parameter blocks the filters hand their DSAs (`pDSAparameters`), each a C struct
  * the filter copies in a longword at a time and copies back once the DSA has run: the
- * feeding, monster attack, delete monster and party move filters'. Each block's
- * interface sits beside its two codecs, so the interpreter (`DsaSystem`) reads them
- * without importing the systems that fill them.
+ * feeding, monster attack, delete monster, party move and spell filters'. Each block's
+ * interface sits beside its two codecs, so the filters (`dsa/DsaFilters.ts`) read them
+ * without importing the systems that fill them; the spell's is `magicTypes.ts`'s.
  */
+
+import type { SpellParameters } from './magicTypes';
 
 /**
  * `FEEDPARAMETERS` (`doc/CSBwin-src/Character.cpp:3956-3983`).
@@ -287,7 +289,7 @@ export function deleteMonsterParametersFromWords(p: DeleteMonsterParameters, wor
 
 /**
  * `PARTYMOVEDATA` (doc/CSBwin-src/CSB.h:4328-4379), the block the party move filter reads
- * and may rewrite (`CallPartyMoveFilter`, `DsaSystem.partyMoveFilter`). The locations are
+ * and may rewrite (`CallPartyMoveFilter`, `DsaFilters.partyMoveFilter`). The locations are
  * `LOCATIONREL` integers whose position is the party's facing.
  */
 export interface PartyMoveData {
@@ -330,5 +332,45 @@ export function partyMoveDataFromWords(word: (index: number) => number): PartyMo
     staminaAdjustment: [w(3), w(4), w(5), w(6)],
     relDirection: w(7), absDirection: w(8), fromLocation: w(9), toLocation: w(10),
     fromLocationType: w(11), toLocationType: w(12),
+  };
+}
+
+/** `sizeof(SPELL_PARAMETERS) / 4` (`doc/CSBwin-src/Magic.cpp:914`): its 14 longwords. */
+export const SPELL_PARAMETER_WORDS = 14;
+
+/**
+ * `memcpy(pDSAparameters + 1, pSpellParameters, sizeof(*pSpellParameters))`
+ * (`doc/CSBwin-src/Magic.cpp:913`): the block as the spell filter's DSA sees it, a
+ * longword per field in the struct's order (`CSB.h:2835-2855`).
+ */
+export function spellParametersToWords(p: SpellParameters): number[] {
+  return [
+    p.action, p.incantation, p.chIdx, p.disableTime, p.missileType, p.locationAbs, p.facing,
+    p.skillRequired, p.spellByte5, p.spellClass, p.unused1, p.unused2, p.unused3, p.unused4,
+  ].map((word) => word | 0);
+}
+
+/**
+ * `memcpy(pSpellParameters, pDSAparameters + 1, sizeof(*pSpellParameters))`
+ * (`doc/CSBwin-src/Magic.cpp:916`): the block back from the spell filter's DSA, `word(i)`
+ * its longword `i`. `DSACastSpell` reads a program's own parameters so (`:1408-1418`).
+ */
+export function spellParametersFromWords(word: (index: number) => number): SpellParameters {
+  const w = (index: number): number => word(index) | 0;
+  return {
+    action: w(0),
+    incantation: w(1),
+    chIdx: w(2),
+    disableTime: w(3),
+    missileType: w(4),
+    locationAbs: w(5),
+    facing: w(6),
+    skillRequired: w(7),
+    spellByte5: w(8),
+    spellClass: w(9),
+    unused1: w(10),
+    unused2: w(11),
+    unused3: w(12),
+    unused4: w(13),
   };
 }

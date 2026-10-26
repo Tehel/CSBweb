@@ -186,7 +186,7 @@ export class Game implements MainLoop {
         this.ctx = ctx;
         ctx.dungeon.makeMoreRoomInDB = (db) => makeMoreRoomInDB(ctx, db);
         ctx.sounds.soundFilter = (ordinal, highVolume, level, x, y) =>
-            ctx.systems.dsa.soundFilter(ordinal, highVolume, level, x, y);
+            ctx.systems.dsa.filters.soundFilter(ordinal, highVolume, level, x, y);
         ctx.dungeon.textSubstitution = {
             handChar: () => ctx.party.state.cursorOwner,
             characterName: (index) => ctx.party.state.champions[index]?.name ?? null,
@@ -421,10 +421,10 @@ export class Game implements MainLoop {
         if (this.resumedSavedGame) {
             const object = party.objectInHand;
             if (object === OBJECT_ID_NULL) return;
-            this.systems.dsa.cursorFilter({ object, type: CursorFilterType.ResumeSavedGame, p1: 0, p2: 0, p3: 0, p4: 0 });
+            this.systems.dsa.filters.cursorFilter({ object, type: CursorFilterType.ResumeSavedGame, p1: 0, p2: 0, p3: 0, p4: 0 });
             return;
         }
-        this.systems.dsa.cursorFilter({ object: OBJECT_ID_NULL, type: CursorFilterType.EnteringPrison, p1: 0, p2: 0, p3: 0, p4: 0 });
+        this.systems.dsa.filters.cursorFilter({ object: OBJECT_ID_NULL, type: CursorFilterType.EnteringPrison, p1: 0, p2: 0, p3: 0, p4: 0 });
         party.objectInHand = OBJECT_ID_NULL;
     }
 

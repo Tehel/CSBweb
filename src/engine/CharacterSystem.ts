@@ -187,7 +187,7 @@ export class CharacterSystem {
   private setPossession(chIdx: number, slot: number, value: ObjectID): void {
     const champion = this.ctx.party.state.champions[chIdx];
     if (!champion) return;
-    this.ctx.systems.dsa.equipFilter(chIdx, slot, getChampionPossession(champion, slot), value);
+    this.ctx.systems.dsa.filters.equipFilter(chIdx, slot, getChampionPossession(champion, slot), value);
     this.setPossessionDirect(champion, slot, value);
   }
 

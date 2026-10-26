@@ -760,7 +760,7 @@ export class ActuatorSystem {
     pos: number,
   ): boolean {
     const cfp = { object, type, p1: position.z, p2: position.x, p3: position.y, p4: pos };
-    this.ctx.systems.dsa.cursorFilter(cfp);
+    this.ctx.systems.dsa.filters.cursorFilter(cfp);
     return cfp.type !== CursorFilterType.Cancel;
   }
 

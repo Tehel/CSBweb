@@ -131,7 +131,7 @@ const ran = (g: number[]): boolean => g[0] === 1;
   const distance = Math.abs(at.x - party.x) + Math.abs(at.y - party.y);
   check(g[8] === 1024 * at.z + 32 * at.x + at.y && g[9] === distance - 1,
     '&MONL&D works in the filter: the group\'s location, and its distance to the party less one');
-  check(!dsa.monsterMoveFilterActive, 'monsterMoveFilterActive is cleared after the filter');
+  check(!dsa.filters.monsterMoveFilterActive, 'monsterMoveFilterActive is cleared after the filter');
   check([0, 1, 2].map((i) => dsa.getParameter(i)).join() === '7,8,9', 'the caller\'s parameters are as they were');
 }
 
@@ -292,7 +292,7 @@ function turnsUntil(game: Game, rn: ObjectID, stop: (p: Post, from: Position) =>
   check(p.group === rn && p.party.join() === [party.z, party.x, party.y].join(), 'the group, the party\'s level and square');
   check(!flagged(p, MonsterEvents.MonMove_differentCell), 'no MonMove_differentCell');
   check(p.variable === 42, 'the post-move filter has the variables the pre-move filter left (one DSAVARS)');
-  check(!dsa.monsterMoveFilterActive, 'monsterMoveFilterActive is cleared after it');
+  check(!dsa.filters.monsterMoveFilterActive, 'monsterMoveFilterActive is cleared after it');
   check([0, 1, 2].map((i) => dsa.getParameter(i)).join() === '7,8,9', 'the caller\'s parameters are as they were');
 
   const reaction = postGame();

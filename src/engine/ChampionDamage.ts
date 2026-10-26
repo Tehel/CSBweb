@@ -171,7 +171,7 @@ export class ChampionDamage {
 
     // The damage filter's DSA may set what is dealt, to anything a word holds
     // (`doc/CSBwin-src/Character.cpp:2834-2898`).
-    dealt = sw(this.ctx.systems.dsa.damageCharFilter(chIdx, champ.fingerprint, damage, dealt, woundMask, kind));
+    dealt = sw(this.ctx.systems.dsa.filters.damageCharFilter(chIdx, champ.fingerprint, damage, dealt, woundMask, kind));
     // `d.PendingDamage[chIdx] += D7W` (`:2905`): the HP stay as they are until the tick's
     // `DisplayCharacterDamage`, which takes the sum off, kills, and shows it over the
     // portrait.
@@ -250,7 +250,7 @@ export class ChampionDamage {
    */
   killCharacter(chIdx: number): void {
     // The character death filter's DSA, before anything changes (`:2540-2594`).
-    this.ctx.systems.dsa.charDeathFilter(chIdx);
+    this.ctx.systems.dsa.filters.charDeathFilter(chIdx);
     const party = this.ctx.party.state;
     const champ = getPartyChampion(this.ctx.party.state, chIdx);
     if (!champ) return;

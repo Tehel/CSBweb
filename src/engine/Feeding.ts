@@ -6,7 +6,7 @@
  * fills in a `FEEDPARAMETERS` block, hands the whole block to the feeding filter's DSAs
  * so a dungeon can rewrite any field of it, and only then applies the result. That
  * indirection is the reason the struct exists, so it is kept as one here: the UI half
- * in `src/renderer/ui/Feeding.ts` derives the block, `DsaSystem.feedingFilter` hands it
+ * in `src/renderer/ui/Feeding.ts` derives the block, `DsaFilters.feedingFilter` hands it
  * to the DSAs as 27 words (`filterParameters.ts`), and this file applies it, reaching
  * the engine (`CurePoison`, `AdjustStamina`, `KillCharacter`, the shield timer) through
  * the context.

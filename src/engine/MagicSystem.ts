@@ -22,6 +22,7 @@ import { markAllPortraitsChanged } from './Party';
 import { selectPaletteForLightLevel } from './LightLevel';
 import { setClockTick, waitForButtonFlash } from './LoopState';
 import type { SpellParameters } from './magicTypes';
+import { spellParametersFromWords } from './filterParameters';
 import { encodeMissileTimerWord8, spellObjectId } from './missileHelpers';
 import { GetBasicObjectType } from './objectIndex';
 import { AdjustSkillsWhy } from './skills';
@@ -127,7 +128,7 @@ export class MagicSystem {
     if (!champion) return 0;
     if (champion.incantation.length === 0) return 0;
     const params = this.fillSpellParameters(casterIdx, champion.incantation, party);
-    const filtered = this.ctx.systems.dsa.processSpellFilter(params);
+    const filtered = this.ctx.systems.dsa.filters.processSpellFilter(params);
     return this.castSpell(casterIdx, filtered ?? params);
   }
 
@@ -139,23 +140,8 @@ export class MagicSystem {
    */
   dsaCastSpell(filter: boolean): void {
     const dsa = this.ctx.systems.dsa;
-    let params: SpellParameters = {
-      action: dsa.getParameter(0),
-      incantation: dsa.getParameter(1),
-      chIdx: dsa.getParameter(2),
-      disableTime: dsa.getParameter(3),
-      missileType: dsa.getParameter(4),
-      locationAbs: dsa.getParameter(5),
-      facing: dsa.getParameter(6),
-      skillRequired: dsa.getParameter(7),
-      spellByte5: dsa.getParameter(8),
-      spellClass: dsa.getParameter(9),
-      unused1: dsa.getParameter(10),
-      unused2: dsa.getParameter(11),
-      unused3: dsa.getParameter(12),
-      unused4: dsa.getParameter(13),
-    };
-    if (filter) params = dsa.processSpellFilter(params) ?? params;
+    let params = spellParametersFromWords((i) => dsa.getParameter(i));
+    if (filter) params = dsa.filters.processSpellFilter(params) ?? params;
     this.castSpell(0, params);
   }
 

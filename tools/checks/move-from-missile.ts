@@ -23,7 +23,7 @@
  *     port's deletes no timer, not even one queued since in the slot the missile's timer
  *     left.
  *
- * The filter is stood in for at the DSA boundary, `DsaSystem.processMissileEncounterFilter`,
+ * The filter is stood in for at the DSA boundary, `DsaFilters.processMissileEncounterFilter`,
  * which records its parameters and answers 0, the default action.
  *
  * Run: `npm test -- --only=move-from-missile.ts`
@@ -117,7 +117,7 @@ console.log(`party at (${party.x},${party.y}) L${party.z}; the eastbound missile
 
 const calls: FilterCall[] = [];
 let onWall: (() => void) | null = null;
-standIn(game.systems.dsa, 'processMissileEncounterFilter', (o) => {
+standIn(game.systems.dsa.filters, 'processMissileEncounterFilter', (o) => {
   calls.push({ type: o.type, missile: o.missile, direction: o.direction, filterObjectSet: tq.missileFilterObject !== OBJECT_ID_NULL });
   if (o.type === 4 && onWall) {
     const move = onWall;

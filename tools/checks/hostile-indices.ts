@@ -145,7 +145,7 @@ function thrown(run: () => unknown): Error | null {
   placeFilterDsas(describe, 3, [[...int(locr), ...int(2), ...int(9), op(StkOp.DESCRIBE)]]);
   let phrase: string | null | undefined;
   const described = thrown(() => {
-    const result = describe.systems.dsa.processViewingFilter({
+    const result = describe.systems.dsa.filters.processViewingFilter({
       site: ViewingFilterSite.DESCRIPTION, phraseMask: 0, objectId: target.rnMaps.rn(DBType.WEAPON, 0), selectedCharacter: 0,
     });
     phrase = result?.phraseTextOverrides[2];

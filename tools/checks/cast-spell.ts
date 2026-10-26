@@ -1,7 +1,7 @@
 /**
  * Prove `CastSpell` honours a spell filter's overrides where CSBWin does, and only there.
  *
- * A DSA spell filter (`DsaSystem.processSpellFilter`) can rewrite the `SPELL_PARAMETERS`
+ * A DSA spell filter (`DsaFilters.processSpellFilter`) can rewrite the `SPELL_PARAMETERS`
  * `CastSpell` receives (`doc/CSBwin-src/Magic.cpp:1092`). No dungeon this port loads defines
  * one, so this calls `MagicSystem.castSpell` with the parameters directly:
  *

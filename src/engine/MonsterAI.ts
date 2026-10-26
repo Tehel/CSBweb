@@ -210,7 +210,7 @@ export class MonsterAI {
   }): void {
     const mmr = new MmRecord();
     this.turn(options, mmr);
-    this.ctx.systems.dsa.postMonsterMoveFilter(mmr);
+    this.ctx.systems.dsa.filters.postMonsterMoveFilter(mmr);
   }
 
   private turn(
@@ -241,7 +241,7 @@ export class MonsterAI {
     );
 
     // "Now let the Monster Movement Filter DSA do its thing" (doc/CSBwin-src/Monster.cpp:3319-3365).
-    this.ctx.systems.dsa.monsterMoveFilter(level, mapX, mapY, monsterRn, timerFunction, mmr);
+    this.ctx.systems.dsa.filters.monsterMoveFilter(level, mapX, mapY, monsterRn, timerFunction, mmr);
 
     const checks = this.initialChecks(monsterRn, mapX, mapY, level, timerFunction, timeUntilAlternateUpdate, mmr);
     if (checks.handled) return;

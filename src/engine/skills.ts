@@ -235,7 +235,7 @@ export function adjustSkills(
   champ.skills = skills;
   const skillEntry = skills[skillNumber]!;
 
-  const filtered = ctx.systems.dsa.processAdjustSkillsFilter({
+  const filtered = ctx.systems.dsa.filters.processAdjustSkillsFilter({
     chIdx,
     skillNumber,
     experience: adjustedExp,

@@ -83,7 +83,7 @@ export function tryPickViewportObject(ui: UIState, x: number, y: number): boolea
   if (isMonsterBlockingPickup(ui, hit.relativeLocation, target)) return false;
   // `CURSORFILTER_PickFromFloor`, which may cancel the pick-up (`doc/CSBwin-src/Mouse.cpp:828-836`).
   const cfp = { object: hit.rn, type: CursorFilterType.PickFromFloor, p1: target.z, p2: target.x, p3: target.y, p4: hit.relativeLocation };
-  ui.ctx.systems.dsa.cursorFilter(cfp);
+  ui.ctx.systems.dsa.filters.cursorFilter(cfp);
   if (cfp.type === CursorFilterType.Cancel) return false;
   // `TAG01a148` ends with `d.clockTick = 1` (`doc/CSBwin-src/Mouse.cpp:841`), which only
   // its returns for no cursor owner, a monster in the way and a cancel skip.

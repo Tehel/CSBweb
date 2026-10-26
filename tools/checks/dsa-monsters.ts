@@ -248,7 +248,7 @@ function addTimer(game: Game, at: Position, fn: number): void {
     varFetch(10), globalStore(1), varFetch(11), globalStore(2)];
   const outside = run(program);
   const inside = run(program, (game) => {
-    game.systems.dsa.monsterMoveFilterActive = true;
+    game.systems.dsa.filters.monsterMoveFilterActive = true;
     // The filter's parameters: the group's level, x and y, its slot, the party's level, x and y.
     game.systems.dsa.setParameters(7, [7, 5, 9, 1687, 7, 8, 12]);
   });

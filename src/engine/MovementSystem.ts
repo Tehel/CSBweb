@@ -178,7 +178,7 @@ export class MovementSystem {
         // directions are the stairway's, 3 up and 2 down. CSBWin leaves `delay` and the
         // stamina adjustments unset; they are 0 here.
         const stairDirection = (cellFlags & 4) !== 0 ? 3 : 2;
-        const pmd = this.ctx.systems.dsa.partyMoveFilter({
+        const pmd = this.ctx.systems.dsa.filters.partyMoveFilter({
             moveType: PM_BEGINTURN,
             flags: 0,
             delay: 0,
@@ -271,7 +271,7 @@ export class MovementSystem {
         // moved between the two. `relDirection` is `button`, `MoveParty`'s argument, 3-6
         // (`:8198`), not the 0-3 the struct's comment promises (`CSB.h:4354`).
         const location = partyLocation(position, party.facing);
-        const pmd = this.ctx.systems.dsa.partyMoveFilter({
+        const pmd = this.ctx.systems.dsa.filters.partyMoveFilter({
             moveType: PM_ATTEMPTMOVE,
             flags: 0,
             delay: 0,
@@ -589,7 +589,7 @@ export class MovementSystem {
         // for a move down or up. `toLocation` faces the way the party does. CSBWin leaves
         // `delay` and the stamina adjustments unset; they are 0 here.
         const direction = upOrDown + 2;
-        const pmd = this.ctx.systems.dsa.partyMoveFilter({
+        const pmd = this.ctx.systems.dsa.filters.partyMoveFilter({
             moveType: PM_STAIRWAY,
             flags: 0,
             delay: 0,

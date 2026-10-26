@@ -53,7 +53,7 @@ function nameAttackOptions(ctx: GameContext): AttackOptions {
   for (let i = 0; i < 3; i++) {
     let name = attackTypeName(ctx, face.possibleAttackTypes[i]!);
     if (i < count) {
-      const filtered = ctx.systems.dsa.actionNameFilter(chIdx, i, count, face.possibleAttackTypes[i]!);
+      const filtered = ctx.systems.dsa.filters.actionNameFilter(chIdx, i, count, face.possibleAttackTypes[i]!);
       if (filtered) {
         face.possibleAttackTypes[i] = filtered.attackType;
         if (filtered.name !== null) name = filtered.name;

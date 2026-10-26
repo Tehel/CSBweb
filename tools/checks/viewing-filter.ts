@@ -1,6 +1,6 @@
 /**
  * The viewing filter at `DescribeObject`'s two sites, with two DSAs on its square, run
- * through `DsaSystem.processViewingFilter` against a genuine save (`csbgame7.dat`).
+ * through `DsaFilters.processViewingFilter` against a genuine save (`csbgame7.dat`).
  *
  * 1. **Every DSA at the location runs** (`doc/CSBwin-src/Character.cpp:3490-3532`,
  *    `:3753-3787`): each loop goes on with `continue`, a filter call apiece, the second
@@ -111,7 +111,7 @@ const paramStore = (index: number, value: number): number[] =>
 const withFilter = (programs: number[][]): Game => withFilterDsas(ESL_VIEWINGFILTER, programs);
 
 function view(game: Game, site: ViewingFilterSite, phraseMask: number, objectId: ObjectID): ViewingFilterResult | null {
-  return game.systems.dsa.processViewingFilter({ site, phraseMask, objectId, selectedCharacter: 0 });
+  return game.systems.dsa.filters.processViewingFilter({ site, phraseMask, objectId, selectedCharacter: 0 });
 }
 
 const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;

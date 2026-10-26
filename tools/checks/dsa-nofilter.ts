@@ -43,7 +43,7 @@ for (const { name, cite, words, handFull } of OPERATIONS) {
   const filterSaid: string[] = [];
   const game = withFilterDsas(ESL_CURSORFILTER, [words], { trace: (line) => { filterSaid.push(line); } });
   hand(game);
-  game.systems.dsa.cursorFilter({ object: OBJECT_ID_NULL, type: CursorFilterType.Unknown, p1: 0, p2: 0, p3: 0, p4: 0 });
+  game.systems.dsa.filters.cursorFilter({ object: OBJECT_ID_NULL, type: CursorFilterType.Unknown, p1: 0, p2: 0, p3: 0, p4: 0 });
 
   const plainSaid: string[] = [];
   run(words, (g) => {

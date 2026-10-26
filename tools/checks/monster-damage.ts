@@ -23,6 +23,7 @@ import { WorldMove } from '../../src/engine/WorldMove';
 import type { MissileEncounter } from '../../src/engine/MissileEncounter';
 import type { ActuatorSystem } from '../../src/engine/ActuatorSystem';
 import type { DsaSystem } from '../../src/engine/DsaSystem';
+import type { DsaFilters } from '../../src/engine/dsa/DsaFilters';
 import { MonsterType, StateOfFear } from '../../src/engine/monsterTypes';
 import type { PartyState } from '../../src/engine/gameTypes';
 import { graphicsTablesOf, newContext, stockDungeon, stockGraphics } from '../lib/game';
@@ -71,7 +72,7 @@ async function main(): Promise<void> {
     checkMonsterMoveFromMissile: () => false,
   });
   ctx.systems.actuators = standInOf<ActuatorSystem>({ triggerObjectMove: () => false });
-  ctx.systems.dsa = standInOf<DsaSystem>({ deleteMonsterFilter: () => {} });
+  ctx.systems.dsa = standInOf<DsaSystem>({ filters: standInOf<DsaFilters>({ deleteMonsterFilter: () => {} }) });
 
   const pool = dungeon.getItem16Pool();
   const active = pool.map((slot, i) => ({ slot, i })).filter((e) => e.slot.word0 >= 0);

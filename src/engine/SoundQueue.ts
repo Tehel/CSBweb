@@ -17,7 +17,7 @@
  * `TimerSystem` answers with `QueueSound(ordinal, x, y, 1)` on the timer's level.
  *
  * `SoundFilter` (`doc/CSBwin-src/Sound.cpp:675`) may hand the sound to the dungeon's DSAs
- * instead (`DsaSystem.soundFilter`).
+ * instead (`DsaFilters.soundFilter`).
  *
  * `PlayCustomSound`, a DSA's `&SOUND`, plays here too, at once and at no distance, a
  * sample of `graphics.dat` or a sound of `CSBgraphics.dat`.
@@ -42,7 +42,7 @@ export class SoundQueue {
 
   /**
    * `SoundFilter(ordinal, highVolume, soundLocr)`, with the location as level, x and y:
-   * `DsaSystem.soundFilter` once `Game` has one, 0 when a DSA took the sound. Until then,
+   * `DsaFilters.soundFilter` once `Game` has one, 0 when a DSA took the sound. Until then,
    * and in a tool's context with no DSA system, 1, as for a dungeon with no filter.
    */
   soundFilter: (ordinal: number, highVolume: number, level: number, x: number, y: number) => number = () => 1;

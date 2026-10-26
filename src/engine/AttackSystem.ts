@@ -332,7 +332,7 @@ export class AttackSystem {
   /** `CallAttackFilter` (`doc/CSBwin-src/Attack.cpp:457`). */
   private callAttackFilter(filter: PartyAttackFilter | null, params: PartyAttackParameters, msg: number): void {
     if (!filter) return;
-    const words = this.ctx.systems.dsa.callPartyAttackFilter(filter, marshalParameters(params), msg);
+    const words = this.ctx.systems.dsa.filters.callPartyAttackFilter(filter, marshalParameters(params), msg);
     unmarshalParameters(params, words);
     // "Party attack Filter error: Set illegal character index" — CSBWin puts up a
     // message box and carries on with champion 0.
@@ -825,7 +825,7 @@ export class AttackSystem {
     if (!pChar) return 0;
     if (!isAlive(pChar)) return 0;
 
-    const filter = this.ctx.systems.dsa.findPartyAttackFilter();
+    const filter = this.ctx.systems.dsa.filters.findPartyAttackFilter();
     this.ctx.systems.dsa.setupAttackParameters();
     const params = createAttackParameters();
     params.charIdx = initialChIdx;

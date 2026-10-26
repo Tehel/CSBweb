@@ -372,7 +372,7 @@ export class MonsterDamage {
     dmp.level = level;
     dmp.x = mapX;
     dmp.y = mapY;
-    this.ctx.systems.dsa.deleteMonsterFilter(dmp);
+    this.ctx.systems.dsa.filters.deleteMonsterFilter(dmp);
   }
 
   /**

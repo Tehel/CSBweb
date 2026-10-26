@@ -470,7 +470,7 @@ export class MissileEncounter {
     // direction of the last missile `MissileTimer` ran, also for an encounter it did not
     // cause, a party or a monster walking away from a missile.
     const direction = ((this.timers.missileFilterTimer?.timerWord8 ?? 0) >> 10) & 0x3;
-    return this.ctx.systems.dsa.processMissileEncounterFilter({
+    return this.ctx.systems.dsa.filters.processMissileEncounterFilter({
       type,
       position,
       posInCell: posInCell & 0x3,

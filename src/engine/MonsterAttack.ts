@@ -102,7 +102,7 @@ export class MonsterAttack {
       return false;
     }
 
-    this.ctx.systems.dsa.monsterAttackFilter(this.attackParameters);
+    this.ctx.systems.dsa.filters.monsterAttackFilter(this.attackParameters);
     const amended = this.attackParameters;
 
     if (amended.monsterShouldLaunchMissile !== 0) {

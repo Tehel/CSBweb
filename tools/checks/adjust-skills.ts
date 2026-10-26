@@ -57,7 +57,7 @@ party.position = new Position(6, 14, 2);
 
 const filtered: number[] = [];
 const dsa = ctx.systems.dsa;
-standIn(dsa, 'processAdjustSkillsFilter', (params) => { filtered.push(params.why); return null; });
+standIn(dsa.filters, 'processAdjustSkillsFilter', (params) => { filtered.push(params.why); return null; });
 
 /** One point short of Fighter mastery 2: 500 experience halves once (`DetermineMastery`). */
 function primeFighter(): void {
@@ -125,7 +125,7 @@ const retarget = (answer: { chIdx: number; skillNumber: number }, champ1Fighter:
   for (const s of party.champions[1].skills) { s.experience = 0; s.tempAdjust = 0; }
   party.champions[1].skills[0].experience = champ1Fighter;
   party.lastMonsterAttackTime = ctx.state.tickCount;
-  const restore = standIn(dsa, 'processAdjustSkillsFilter', (params) => {
+  const restore = standIn(dsa.filters, 'processAdjustSkillsFilter', (params) => {
     filtered.push(params.why);
     return { chIdx: answer.chIdx, skillNumber: answer.skillNumber, experience: params.experience };
   });

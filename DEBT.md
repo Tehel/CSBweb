@@ -125,6 +125,7 @@ In payoff order: the first row is the next item.
 | C177 | An Atari-era save loads with its possessions, timers and hand unconverted | M | ⏳ |
 | C173 | The DSA's `&ADD` and `&DEL` on a square bypass `MoveObject` | M | ⏳ |
 | C186 | A decoration's position set past its rectangles' table is not drawn | S | ⏳ |
+| C187 | The adjust skills filter hands each DSA the one before's words unmasked, and its `why` | S | ⏳ |
 | F15 | Tools that read the wall clock, and a runner with no timeout | S | ⏳ |
 | F16 | A tool can pass having checked less than it says | S | ⏳ |
 | F18 | One `tsconfig` for the browser, the tools and the server | S | ⏳ |
@@ -150,7 +151,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C187 · D22 · E42 · F22 · G31 · P13 · R17 · U13 · W8 · X16. An ID recorded and paid in one commit has no
+Next free IDs: C188 · D22 · E42 · F22 · G31 · P13 · R17 · U13 · W8 · X16. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -410,26 +411,20 @@ against each other, and the file formats.
 
 ### E27 ⏳ `DsaSystem.ts` is one 5,000-line class
 
-`DsaSystem.ts` (4,448 lines) holds the interpreter, seventeen filter sites, a port of
-`MoveObject` for `&MOVE`, and `executeAmpersand`, a single function of 1,246 lines
-(`:1474`). The machine's data and its decoding are already apart, in
-`src/engine/dsa/DsaMachine.ts`: the stack, the bank, the execution packet and the
-`ProgramCursor` that `executeRun` (`:1124`) reads its programs through.
-
-Seven filter sites have no doc comment (`processMissileEncounterFilter`,
-`processAdjustSkillsFilter`, `processSpellFilter`, `processTimer5`, `6` and `7`). A
-spell's parameters are marshalled field by field both ways (`processSpellFilter`,
-`:945-988`, and again in `MagicSystem.ts:142-157`), where every other block has a codec
-in `filterParameters.ts`.
+`DsaSystem.ts` (3,802 lines) holds the interpreter, a port of `MoveObject` for `&MOVE`,
+and `executeAmpersand`, a single function of 1,232 lines (`:828`). The machine's data and
+its decoding are already apart, in `src/engine/dsa/DsaMachine.ts`: the stack, the bank,
+the execution packet and the `ProgramCursor` that `executeRun` (`:478`) reads its programs
+through. So are the seventeen filter sites, in `src/engine/dsa/DsaFilters.ts`
+(`ctx.systems.dsa.filters`), which reach the machine through `DsaFilterMachine`.
 
 Paying it, into `src/engine/dsa/` beside `DsaTypes.ts`. Each command's body keeps CSBWin's
 order and names, and each step is proven by every tool's whole output, byte-identical. The
 steps, one commit each:
 
 1. ✅ **The machine's data and its decoding**, in `dsa/DsaMachine.ts`.
-2. ⏳ **The filters.** `dsa/DsaFilters.ts`: one `runFilter(esl, words, options)` the
-   seventeen sites call with their codecs; the spell's codec joins `filterParameters.ts`,
-   and `MagicSystem.dsaCastSpell` reads through it. The seven sites get their doc comments.
+2. ✅ **The filters**, in `dsa/DsaFilters.ts`, the plain sites through one `runFilter`
+   with their codecs, the spell's in `filterParameters.ts`.
 3. ⏳ **The operations,** one domain per commit: stack and arithmetic, text and messages,
    objects, `&MOVE` (with its `MoveObject` port and `DsaMoveError`), characters, monsters,
    the dungeon. Each goes to `dsa/ops/<domain>.ts`, and `executeAmpersand` becomes a
@@ -437,8 +432,8 @@ steps, one commit each:
    instead of `executeAmpersand`'s text; `tools/checks/dsa-delete.ts:120` wraps the
    dispatch instead of the method. With the last domain, `execute` and `executeRun` move
    to `DsaMachine.ts`.
-4. ⏳ **The façade.** `DsaSystem.ts` keeps what `ctx.systems.dsa` answers (the filter
-   entry points, the timers, the globals, the parameters) and nothing else.
+4. ⏳ **The façade.** `DsaSystem.ts` keeps what `ctx.systems.dsa` answers (`filters`,
+   the timers, the globals, the parameters) and nothing else.
 
 ### E28 ⏳ The bytecode interpreter decodes through switches and maps built per call
 
@@ -714,11 +709,11 @@ after the chains; a fixture whose champions carry something.
 `&DEL` takes an object off its square with `MoveObject(thisObj, x, y, -1, 0)` and `&ADD`
 puts its copy on one with `MoveObject(newObj, -1, 0, x, y)`
 (`doc/CSBwin-src/DSA.cpp:1702`, `:2057`). The port does both by hand
-(`src/engine/DsaSystem.ts:1520-1521`, `:1558-1560`): `removeObjectFromCell` then
+(`src/engine/DsaSystem.ts:874-875`, `:912-914`): `removeObjectFromCell` then
 `triggerObjectMove`; `setPos`, `triggerObjectMove`, then `addObjectToCell`. What that loses:
 
 - no pit or teleporter on the square is resolved (`WorldMove.resolveCellEffects`, which
-  `&MOVE` already reaches through `WorldMove.moveObject`, `objectMover`, `:4134-4140`);
+  `&MOVE` already reaches through `WorldMove.moveObject`, `objectMover`, `:3488-3494`);
 - `unchangedRoom` is always false, where `MoveObject` passes whether the party stands there
   (`Code11f52.cpp:3314-3328`, `:3458-3473`), so floor actuators of types 1 and 2 fire under
   the party where CSBWin's do not;
@@ -754,6 +749,24 @@ Paying it: each read at the set's offset in `d`, through item `0x22e` while it l
 (the item ends at `d.Word2530`, `doc/PROVEN_FACTS.md` → "Item `0x22e` is laid out exactly
 as `Data.h` declares its span"), and what lies past it decided; a check with a level that
 names floor decoration 69.
+
+### C187 ⏳ The adjust skills filter hands each DSA the one before's words unmasked, and its `why`
+
+`AdjustSkills` runs every DSA at `ESL_ADJUSTSKILLSFILTER`'s location on its locals
+(`doc/CSBwin-src/Magic.cpp:256-316`), and after each takes back `chIdx & 3`,
+`skillNumber % 20` and `experience & 0xfffff` (`:307-309`), which the next DSA is handed;
+`why` is never read back, so every DSA is handed the caller's. The port's
+`processAdjustSkillsFilter` (`src/engine/dsa/DsaFilters.ts`) reads back the four words
+unmasked, `why` among them, and hands them on so; `adjustSkills`
+(`src/engine/skills.ts:244-248`) masks the three once, after the last DSA. With one DSA
+the two agree, but for `skillNumber`'s sign: C's `%` keeps it, so a filter's -1 stays -1,
+fails `skillNumber >= 4` and gives the basic skill nothing (`Magic.cpp:335`), where the
+port's wrap makes it 19, which does. No dungeon the port plays is known to have two
+adjust-skills DSAs, nor one that answers a negative skill.
+
+Paying it: the three masks, `%` as C's, in the codec's `fromWords`, `why` not read back,
+and `adjustSkills` taking the masked values as they are; a check with two DSAs at the
+location, the first changing all four words, and one answering skill -1.
 
 ### C150 ⏸️ Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops
 
