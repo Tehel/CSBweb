@@ -17,6 +17,8 @@ import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, getRoomType,
 import {
   ActuatorAction,
   getActuatorAction,
+  getActuatorDelay,
+  getActuatorDisableTime,
   getActuatorDsaSelector,
   getActuatorDsaState,
   getActuatorTargetPos,
@@ -26,6 +28,7 @@ import {
   getActuatorValue,
   isActuatorLocalActionOnly,
   isActuatorNormallyClosed,
+  isActuatorOnceOnly,
 } from '../data/actuatorHelpers';
 import type {
   ActuatorRecord, ContainerRecord, CreatureRecord, DoorRecord, TeleporterRecord, TextRecord,
@@ -142,7 +145,7 @@ export function actuatorTrigger(
       case 3:
         return { words: value === 0 ? 'Pad: the party' : `Pad: the party facing ${SIDES[(value - 1) & 3]}`, objectType: null };
       case 4: return { words: `Pad: ${name} put on it`, objectType: value };
-      case 6: return { words: 'Monster generator', objectType: null };
+      case 6: return { words: generatorWords(a), objectType: null };
       case 7: return { words: 'Pad: a monster', objectType: null };
       case 8: return { words: `Pad: the party carrying ${name}`, objectType: value };
       case 9: return { words: 'Pad: the party stepping on', objectType: null };
@@ -168,6 +171,24 @@ export function actuatorTrigger(
     }
   }
   return null;
+}
+
+/**
+ * A monster generator, as a timer on its square fires it (`doc/CSBwin-src/Timer.cpp:1771-1820`):
+ * `CreateMonster` takes the value's low five bits as the monster type
+ * (`doc/CSBwin-src/Monster.cpp:130`); the delay is the count, or with its bit 3 a random
+ * count of 1 to its low three bits; a normally closed one makes them invisible. Then a
+ * once-only generator is spent, and one with a disable time rests that many ticks, 64 per
+ * step past 126 from 128 on.
+ */
+function generatorWords(a: ActuatorRecord): string {
+  const delay = getActuatorDelay(a);
+  const count = (delay & 8) !== 0 ? `1 to ${delay & 7}` : String(delay);
+  const invisible = isActuatorNormallyClosed(a) ? ', invisible' : '';
+  const disable = getActuatorDisableTime(a);
+  const rest = isActuatorOnceOnly(a) ? ', once'
+    : disable === 0 ? '' : `, then off ${disable >= 128 ? 64 * (disable - 126) : disable} ticks`;
+  return `Generator: ${count} x ${monsterName(getActuatorValue(a) & 0x1f)}${invisible}${rest}`;
 }
 
 /**

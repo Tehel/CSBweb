@@ -16,6 +16,8 @@
  * 6. **What has no target**: a local action, a generator and the launchers are no
  *    sender (`doc/CSBwin-src/CSB.h:1014-1023`).
  * 7. **A DSA**: Conflux 3.5's (4,0) of map 1 shows its description and state.
+ * 8. **A generator**: DM's (5,12) of map 9 makes 1 to 4 flying eyes, its delay 12 (bit 3
+ *    and 4), then rests 512 ticks, its disable time 134 (`doc/CSBwin-src/Timer.cpp:1771-1820`).
  *
  * Run: `npm test -- --only=map-cell-info.ts`
  */
@@ -114,6 +116,10 @@ function main(): void {
   const lines = dsa.describe(at);
   show(at, lines);
   check(!!line(lines, 'E side: Script "Decoration AB", state 0'), 'Conflux\'s DSA at (4,0) of map 1 shows its description and state');
+
+  // 8. A generator.
+  check(!!line(describe(9, 5, 12), 'Generator: 1 to 4 x Flying eye, then off 512 ticks'),
+    'the generator at (5,12) of map 9 makes 1 to 4 flying eyes, then rests 512 ticks');
 
   finish();
 }
