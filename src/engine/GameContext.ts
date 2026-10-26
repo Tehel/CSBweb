@@ -133,7 +133,7 @@ export interface GameContext {
   /**
    * `d.LevelCleared[16]` (`doc/CSBwin-src/Data.h:956`), one per database: the level
    * `MakeMoreRoomInDB` last took an object from, where its next sweep starts. Zero at
-   * the start and never saved.
+   * every game read (`initializeGameContext`) and never saved.
    */
   readonly levelCleared: Uint8Array;
   /** `DM_rules` and `DMRulesDesignOption`, which outlive a game (`RulesOptions`). */
@@ -365,6 +365,21 @@ export function createGameContext(
     // Empty until `Game` fills it; a tool that stands one subsystem up fills what it needs.
     systems: {} as GameSystems,
   };
+}
+
+/**
+ * `d.Initialize()`'s share of the context. Its `memset` zeroes the whole of `d`
+ * (`DBank::Initialize`, `doc/CSBwin-src/CSBCode.cpp:333-339`) before the restart's read
+ * (`Code1f9e6.cpp:309`), as the program's start leaves it before the boot's, so every
+ * game read (`readGame`) begins with these as a new context has them. The rest of the
+ * context's `d.` the read sets itself (`installRuntimeState`), and the restart resets the
+ * loop's (`Game.resumeMainLoop`).
+ */
+export function initializeGameContext(ctx: GameContext): void {
+  ctx.levelCleared.fill(0);
+  ctx.state.word1868 = false;
+  ctx.state.currentPalette = 0;
+  Object.assign(ctx.interface, createInterfaceState());
 }
 
 /** `RN::NameIndex()` (`engine/objectIndex`), with the party's facing for a lit torch. */

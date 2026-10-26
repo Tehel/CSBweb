@@ -126,7 +126,6 @@ In payoff order: the first row is the next item.
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | C177 | An Atari-era save loads with its possessions, timers and hand unconverted | M | ⏳ |
 | C173 | The DSA's `&ADD` and `&DEL` on a square bypass `MoveObject` | M | ⏳ |
-| C181 | What `d.Initialize()` zeroes survives a restart | S | ⏳ |
 | C184 | A decoration number past its table's end has no position set | S | ⏳ |
 | C185 | A missile spell flies along the Spell Filter's facing, not the champion's | S | ⏳ |
 | F15 | Tools that read the wall clock, and a runner with no timeout | S | ⏳ |
@@ -790,20 +789,6 @@ which of them meet a pit, a teleporter, the party's square or a monster is not t
 Paying it: both through the world `MoveObject` (`objectMover()`, as `findCellSource` and
 `findCellDestination` do), then `setPos`; a tool with a pit, a teleporter, the party's
 square, and a monster group added on the party's level.
-
-### C181 ⏳ What `d.Initialize()` zeroes survives a restart
-
-"RESTART THIS GAME" runs `d.Initialize()` before `GameSetup`
-(`doc/CSBwin-src/Code1f9e6.cpp:309`), and its `memset (this, 0, sizeof (*this))` zeroes
-every `d.` field it does not set again (`DBank::Initialize`, `CSBCode.cpp:333-339`). The
-port reads the new game into the same context, and nothing resets `ctx.levelCleared`
-(`d.LevelCleared`, `src/engine/GameContext.ts:135`, written only by
-`MakeMoreRoomInDB`): after a restart, or a new game in the same page, the sweep of a full
-database starts from the last game's level. The other `d.` fields the context keeps are to
-check the same way.
-
-Paying it: one reset of the context's `d.` fields, called by every new game and restart
-(the read's pipeline, `readGame`); a check that a restart's `levelCleared` is zero.
 
 ### C184 ⏳ A decoration number past its table's end has no position set
 

@@ -8,6 +8,7 @@ import type { DungeonData } from '../data/dungeonTypes';
 import { readDeleteDuplicateTimers } from '../data/CsbwinExpool';
 import { Die } from '../core/Die';
 import { die } from './Die';
+import { initializeGameContext } from './GameContext';
 import { readFileSignatures } from './FileSignatures';
 import type { Game } from './Game';
 import { prepareRuntimeState, type ReadState } from './RuntimeSave';
@@ -38,8 +39,9 @@ export interface GameRead {
  *    block leaving them as they were; `deleteDuplicateTimers`; and the state put into the
  *    world, the timer queue made ready (`prepareRuntimeState`). An error here leaves the
  *    running game as it was, and is the caller's to report.
- * 2. **Installed**: the signatures, the rules, the world (`Game.installWorld`) and the
- *    state (`Game.installReadState`), by assignments that cannot throw.
+ * 2. **Installed**: the signatures, the rules, the context's `d.` as `d.Initialize()`
+ *    leaves it (`initializeGameContext`), the world (`Game.installWorld`) and the state
+ *    (`Game.installReadState`), by assignments that cannot throw.
  * 3. **Started**: the overlay the block names (`Overlay.readExtendedFeatures`), which reads
  *    `CSBgraphics.dat` against the signatures just installed, then the party's level
  *    loaded and the databases thinned (`Game.startReadState`). The new game is in by now,
@@ -62,6 +64,7 @@ export function readGame(game: Game, read: GameRead): void {
     Object.assign(ctx.runtimeFileSignatures, runtimeFileSignatures);
     Object.assign(ctx.rules, rules);
     Object.assign(ctx.signatures, signatures);
+    initializeGameContext(ctx);
     game.installWorld(read.world, deleteDuplicateTimers);
     game.installReadState(prepared);
 

@@ -24,6 +24,9 @@
  *  4. A missile's timer goes, and its object falls where it flew; its record is taken
  *     as a group's is.
  *  5. The cloud database is never made room in.
+ *  6. Every game read starts the sweep over: `d.Initialize()` zeroes `d.LevelCleared` before
+ *     the restart's read (`Code1f9e6.cpp:309`), and with it `d.Word1868` and
+ *     `d.CurrentPalette` (`initializeGameContext`).
  *
  * Run: `npm test -- --only=make-more-room.ts`
  */
@@ -33,6 +36,7 @@ import { getActuatorType } from '../../src/data/actuatorHelpers';
 import type { Databases, MiscRecord } from '../../src/data/dungeonTypes';
 import { dbMax } from '../../src/engine/DungeonState';
 import type { Game } from '../../src/engine/Game';
+import { applySaveBytes, buildSaveFile } from '../../src/engine/SaveGameFile';
 import { newGame, stockGraphics, stockDungeon } from '../lib/game';
 import { check, finish } from '../lib/check';
 
@@ -278,6 +282,28 @@ const where = (p: Position): string => `${p.z}:${p.x},${p.y}`;
   fill(game, 'clouds', () => ({ cloudType: 0, value: 0 }));
   const got = ctx.dungeon.findEmptyDBEntry('clouds', { nextObject: OBJECT_ID_EOF, cloudType: 0, value: 0 } as never);
   check(got === OBJECT_ID_NULL, 'a full cloud database refuses the record');
+}
+
+/* ------------------------------------------------- 6. a game read ---- */
+{
+  const game = makeGame();
+  const ctx = game.ctx;
+  const dirty = (): void => {
+    ctx.levelCleared[DBType.MISC] = 3;
+    ctx.levelCleared[DBType.CREATURE] = 5;
+    ctx.state.word1868 = true;
+    ctx.state.currentPalette = 4;
+  };
+  const clean = (): boolean => ctx.levelCleared.every((level) => level === 0)
+    && !ctx.state.word1868 && ctx.state.currentPalette === 0;
+  const save = buildSaveFile(game);
+  dirty();
+  game.readNewGame(stockDungeon());
+  console.log(`6. a new game read: LevelCleared ${[...ctx.levelCleared].join(',')}, Word1868 ${ctx.state.word1868}, palette ${ctx.state.currentPalette}`);
+  check(clean(), "a new game read: LevelCleared, Word1868 and CurrentPalette are 0");
+  dirty();
+  applySaveBytes(game, save);
+  check(clean(), "a saved game read: LevelCleared, Word1868 and CurrentPalette are 0");
 }
 
 finish();

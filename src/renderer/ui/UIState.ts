@@ -404,7 +404,7 @@ export function initializePlayState(ui: UIState): void {
  * A saved game read in play (`GameHost.savedGameRead`), which only the port has: CSBWin
  * reads a game only after `d.Initialize()` (`doc/CSBwin-src/CSBCode.cpp:333-340`), so the
  * screen's share of `d` is a new game's, as `initialPlayState` leaves it, and the party
- * is the one read. `ctx.interface` is the engine's to reset (`Game.savedGameRead`). The
+ * is the one read. `ctx.interface` is the engine's to reset (`initializeGameContext`). The
  * caller sets the button lists.
  */
 export function savedGameRead(ui: UIState): void {
