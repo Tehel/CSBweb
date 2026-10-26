@@ -126,7 +126,6 @@ In payoff order: the first row is the next item.
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | C177 | An Atari-era save loads with its possessions, timers and hand unconverted | M | ⏳ |
 | C173 | The DSA's `&ADD` and `&DEL` on a square bypass `MoveObject` | M | ⏳ |
-| C185 | A missile spell flies along the Spell Filter's facing, not the champion's | S | ⏳ |
 | C186 | A decoration's position set past its rectangles' table is not drawn | S | ⏳ |
 | F15 | Tools that read the wall clock, and a runner with no timeout | S | ⏳ |
 | F16 | A tool can pass having checked less than it says | S | ⏳ |
@@ -789,23 +788,6 @@ which of them meet a pit, a teleporter, the party's square or a monster is not t
 Paying it: both through the world `MoveObject` (`objectMover()`, as `findCellSource` and
 `findCellDestination` do), then `setPos`; a tool with a pit, a teleporter, the party's
 square, and a monster group added on the party's level.
-
-### C185 ⏳ A missile spell flies along the Spell Filter's facing, not the champion's
-
-`CastSpell` takes the party's facing, or the Spell Filter's when it gives one, and gives up
-on a facing past 3 (`doc/CSBwin-src/Magic.cpp:1157-1163`); that is all it does with it. Its
-missile case turns the caster to the party's facing and calls
-`CharacterThrowsSpell(chIdx, spell, range, 0)` (`:1267-1287`), which launches from the
-champion's side of the square along the champion's facing (`LaunchObject`, `:452-467`). The
-port's missile case turns the caster the same way, then launches from the side and along the
-direction of the filter's facing (`MagicSystem.castSpell`, `src/engine/MagicSystem.ts:282-307`).
-Without a Spell Filter, or one that leaves the facing at -1, the two agree. Its range and
-start repeat `characterThrowsSpell` and `launchObject` (`adjustSpellMissileRange`,
-`computeSpellLaunchPos`, `:454-468`).
-
-Paying it: the missile case calls `characterThrowsSpell(casterIdx, spellObjectId(missileType),
-range, 0)`, as CSBWin does, and the two copies go; a check with a Spell Filter that turns the
-facing.
 
 ### C186 ⏳ A decoration's position set past its rectangles' table is not drawn
 

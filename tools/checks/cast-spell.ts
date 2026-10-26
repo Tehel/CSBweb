@@ -19,6 +19,9 @@
  * - Zokathra (missile type 7) goes into the first empty hand, and with both hands full is
  *   dropped in the party's cell with `MoveObject(obj_2, -1, 0, d.partyX, d.partyY)`
  *   (`:1362-1389`), so the pads there see it placed, with `unchangedRoom` true.
+ * - a missile spell turns its caster to the party's facing and is thrown from the
+ *   caster's side along it (`CharacterThrowsSpell`, `:1267-1287`): a filter's facing,
+ *   checked at `:1157-1163`, does not turn the missile.
  *
  * Run: `npm test -- --only=cast-spell.ts`
  */
@@ -151,6 +154,19 @@ async function main(): Promise<void> {
   const zokFull = zokathra(2);
   restoreTrigger();
 
+  // A missile spell, the party facing north and a filter's facing east.
+  const launches: string[] = [];
+  const restoreLaunch = wrapMember(magic, 'launchThrownMissile', (realLaunch) =>
+    (object, position, posInCell, direction, range, damage, decayRate, startTime) => {
+      launches.push(`corner ${posInCell} direction ${direction}`);
+      return realLaunch(object, position, posInCell, direction, range, damage, decayRate, startTime);
+    });
+  game.ctx.party.state.facing = 0;
+  const filteredMissile = cast({ spellClass: 2, missileType: 0, facing: 1 }, (c) => { c.facing = 2; });
+  const casterFacing = game.ctx.party.state.champions[0].facing;
+  restoreLaunch();
+  console.log(`missile, party north, filter east: result ${filteredMissile.result}, caster facing ${casterFacing}, ${launches.join('; ')}`);
+
   const row = (label: string, r: ReturnType<typeof cast>): void =>
     console.log(`${label.padEnd(28)} result ${r.result}  exp +${r.experience}  seeThru ${r.seeThruWalls}  printed ${JSON.stringify(r.printed)}`);
   row('unfiltered', plain);
@@ -194,6 +210,9 @@ async function main(): Promise<void> {
     'Zokathra with both hands full lies in the party\'s cell, at corner 0');
   check(zokFull.pads.length === 1 && zokFull.pads[0] === `(${party.x},${party.y},${party.z}) place unchanged true`,
     `Zokathra with both hands full is placed through MoveObject, so the pads see it (Magic.cpp:1382-1389): ${JSON.stringify(zokFull.pads)}`);
+  check(filteredMissile.result === 1 && casterFacing === 0 && launches.length === 1
+    && launches[0] === 'corner 0 direction 0',
+    `a missile spell flies from the caster's corner along the party's facing, not the filter's: ${launches.join('; ')}`);
 
   finish();
 }

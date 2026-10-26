@@ -212,6 +212,7 @@ export class MagicSystem {
     if (!champion) return 0;
     if (!isAlive(champion)) return 0;
 
+    // The facing is checked, and nothing else reads it (`:1157-1163`).
     let facing = this.ctx.party.state.facing;
     if (spellParameters.facing !== -1) facing = spellParameters.facing;
     if (facing < 0 || facing > 3) return 0;
@@ -280,28 +281,16 @@ export class MagicSystem {
         break;
       }
       case 2: {
+        // The caster turned to the party's facing, and the spell thrown along it: a Spell
+        // Filter's facing does not reach the missile (`doc/CSBwin-src/Magic.cpp:1267-1287`).
         champion.facing = this.ctx.party.state.facing;
         let masteryForRange = mastery;
         if (missileType === 4) masteryForRange *= 2;
-        const range = applyLimits(
-          21,
-          (2 * masteryForRange + 4) * (spellPower + 2),
-          255,
-        );
-        const { range: adjustedRange, decayRate } = this.adjustSpellMissileRange(
-          range,
-          champion.attributes.maxMana | 0,
-        );
-        const posInCell = this.computeSpellLaunchPos(champion.partyPosition, facing);
-        this.launchThrownMissile(
+        this.characterThrowsSpell(
+          casterIdx,
           spellObjectId(missileType),
-          this.ctx.party.state.position,
-          posInCell,
-          facing,
-          adjustedRange,
-          90,
-          decayRate,
-          this.ctx.state.tickCount,
+          applyLimits(21, (2 * masteryForRange + 4) * (spellPower + 2), 255),
+          0,
         );
         break;
       }
@@ -449,22 +438,6 @@ export class MagicSystem {
     const rand = this.randomInt(8);
     const term = (spellPower - 1) * skillRequired;
     return rand + 16 * required + 8 * term + required * required;
-  }
-
-  private adjustSpellMissileRange(range: number, maxMana: number): { range: number; decayRate: number } {
-    const manaFactor = Math.min(8, Math.trunc(maxMana / 8));
-    let decayRate = 10 - manaFactor;
-    let adjusted = range | 0;
-    if (adjusted < 4 * decayRate) {
-      adjusted += 3;
-      decayRate -= 1;
-    }
-    return { range: adjusted, decayRate };
-  }
-
-  private computeSpellLaunchPos(championPos: number, facing: number): number {
-    const offset = ((championPos - facing + 1) & 2) >> 1;
-    return (offset + facing) & 0x3;
   }
 
   queueUtilityTimer(functionType: number, duration: number, timerWord6: number): void {

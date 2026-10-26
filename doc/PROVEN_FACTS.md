@@ -710,7 +710,7 @@ A filter's `facing` is checked and nothing more: `CastSpell` returns 0 for one p
 (`:1157-1163`), and no case reads it. The missile case turns the caster to
 `d.partyFacing` and casts through `CharacterThrowsSpell(chIdx, spell, range, 0)`
 (`:1267-1287`), whose `LaunchObject` launches along `pChar->facing` (`:452-467`), so the
-spell flies the party's way whatever the filter gives (C185 in `DEBT.md`).
+spell flies the party's way whatever the filter gives. Evidence: `tools/checks/cast-spell.ts`.
 
 ## A champion's hit points are 0 to 999
 
