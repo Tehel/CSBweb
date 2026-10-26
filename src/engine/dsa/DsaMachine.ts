@@ -102,6 +102,14 @@ export class DsaBank {
     this.stack = new DsaStack(fail);
   }
 
+  /**
+   * `NOFILTER` (`doc/CSBwin-src/DSA.cpp:458-463`): an operation that changes the dungeon,
+   * run from a filter, warns the dungeon's author.
+   */
+  noFilter(): void {
+    if (this.filter) this.trace('Filter Modifying Dungeon');
+  }
+
   /** `DSADBANK::SetText` (`doc/CSBwin-src/DSA.cpp:195-206`): an index past 9 sets nothing. */
   setText(text: string, index: number): void {
     if (index > 9) return;

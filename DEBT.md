@@ -411,15 +411,16 @@ against each other, and the file formats.
 
 ### E27 ⏳ `DsaSystem.ts` is one 5,000-line class
 
-`DsaSystem.ts` (3,469 lines) holds the interpreter, a port of `MoveObject` for `&MOVE`,
-and `executeAmpersand` (`:831`), which runs an operation of `DSA_OPERATIONS`
-(`src/engine/dsa/DsaOperations.ts`) and keeps the rest in a switch of 975 lines. The
+`DsaSystem.ts` (2,863 lines) holds the interpreter, a port of `MoveObject` for `&MOVE`,
+and `executeAmpersand` (`:819`), which runs an operation of `DSA_OPERATIONS`
+(`src/engine/dsa/DsaOperations.ts`) and keeps the rest in a switch of 852 lines. The
 machine's data and its decoding are already apart, in `src/engine/dsa/DsaMachine.ts`: the
 stack, the bank, the execution packet, `OVERRIDE`'s corner (`DsaOverride`) and the
-`ProgramCursor` that `executeRun` (`:477`) reads its programs through. So are the
+`ProgramCursor` that `executeRun` (`:465`) reads its programs through. So are the
 seventeen filter sites, in `src/engine/dsa/DsaFilters.ts` (`ctx.systems.dsa.filters`),
-which reach the machine through `DsaFilterMachine`, and two domains of operations, in
-`dsa/ops/stack.ts` and `dsa/ops/messages.ts`.
+which reach the machine through `DsaFilterMachine`, and three domains of operations, in
+`dsa/ops/stack.ts`, `dsa/ops/messages.ts` and `dsa/ops/objects.ts`. `NOFILTER` is the
+bank's `noFilter()`.
 
 Paying it, into `src/engine/dsa/` beside `DsaTypes.ts`. Each command's body keeps CSBWin's
 order and names, and each step is proven by every tool's whole output, byte-identical. The
@@ -441,8 +442,11 @@ steps, one commit each:
    - ✅ text, messages and the sound (`ops/messages.ts`: `&MESSAGE`, `&DESCRIBE` and its
      `ModifyDescription`, `&SAY`, the text bank's operations, `&GLOBALTEXT!` and its
      `SetGlobalText`, `&SOUND`, `&MODIFYMESSAGE`);
-   - ⏳ objects; `&MOVE` (with its `MoveObject` port and
-     `DsaMoveError`); characters; monsters; the dungeon;
+   - ✅ the objects (`ops/objects.ts`: `&DEL`, `&ADD` and its `copyItem`, `&OBJECTID`,
+     `&TYPE`, `&COPY`, `&ISCARRIED`, the five fields' getters and setters, `SetCursed`;
+     `choosePositionFromMask` and `detachedGroupIndex`, which `&MOVE` still imports);
+   - ⏳ `&MOVE` (with its `MoveObject` port and `DsaMoveError`); characters; monsters;
+     the dungeon;
    - ⏳ last, the run's own: the parameters, `&SETNEWSTATE`, the gear jumps and gosub,
      `&%INDIRECT` and the `I_` operations. With it the switch is gone, and `execute`
      and `executeRun` move to `DsaMachine.ts`.
@@ -723,11 +727,11 @@ after the chains; a fixture whose champions carry something.
 `&DEL` takes an object off its square with `MoveObject(thisObj, x, y, -1, 0)` and `&ADD`
 puts its copy on one with `MoveObject(newObj, -1, 0, x, y)`
 (`doc/CSBwin-src/DSA.cpp:1702`, `:2057`). The port does both by hand
-(`src/engine/DsaSystem.ts:857-858`, `:895-897`): `removeObjectFromCell` then
+(`src/engine/dsa/ops/objects.ts:541-542`, `:564-566`): `removeObjectFromCell` then
 `triggerObjectMove`; `setPos`, `triggerObjectMove`, then `addObjectToCell`. What that loses:
 
 - no pit or teleporter on the square is resolved (`WorldMove.resolveCellEffects`, which
-  `&MOVE` already reaches through `WorldMove.moveObject`, `objectMover`, `:3155-3161`);
+  `&MOVE` already reaches through `WorldMove.moveObject`, `objectMover`, `src/engine/DsaSystem.ts:2742-2749`);
 - `unchangedRoom` is always false, where `MoveObject` passes whether the party stands there
   (`Code11f52.cpp:3314-3328`, `:3458-3473`), so floor actuators of types 1 and 2 fire under
   the party where CSBWin's do not;
@@ -1353,7 +1357,7 @@ Recorded so that nobody "fixes" them.
   (`doc/PROVEN_FACTS.md` → "`AdjustStatsForItemCarried`"). There the curse costs no
   Luck, and taking the object off gives 3 Luck for good. The author's decision: the
   port passes the slot found, whoever the bearer (`setCursed`,
-  `src/engine/DsaSystem.ts`), so a curse costs 3 Luck at once on every champion and the
+  `src/engine/dsa/ops/objects.ts`), so a curse costs 3 Luck at once on every champion and the
   object taken off gives them back. No save format changes: the Luck a save carries is
   the attribute as it stands. `tools/checks/dsa-objects.ts` checks it.
 - 🚫 **Word sizes from the file.** Two of CSBWin's constants are the English words'

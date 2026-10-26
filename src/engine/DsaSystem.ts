@@ -1,6 +1,5 @@
 import {
   DBType,
-  TilePosition,
   OBJECT_ID_EOF,
   OBJECT_ID_NULL,
   type ObjectID,
@@ -12,7 +11,7 @@ import {
   rnEquals,
   getRoomType,
 } from '../core/types';
-import { DescIndex, GetBasicObjectType } from './objectIndex';
+import { DescIndex } from './objectIndex';
 import { addToSkill } from './skills';
 import { isAlive, masteryOf } from './rules';
 import { attributeCurrent, attributeMaximum, attributeMinimum, setAttributeCurrent, setAttributeMaximum, setAttributeMinimum } from './attributes';
@@ -21,7 +20,7 @@ import { sw } from '../core/intCast';
 import {
   RN_DISPELL_MISSILE, RN_FIREBALL, RN_FLUX_CAGE, RN_MONSTER_DEATH, RN_POISON_CLOUD, RN_ZO_SPELL,
 } from '../core/spellRn';
-import type { ActuatorRecord, CreatureRecord, DsaDefinition, DsaState, TeleporterRecord } from '../data/dungeonTypes';
+import type { ActuatorRecord, DsaDefinition, DsaState, TeleporterRecord } from '../data/dungeonTypes';
 import {
   getActuatorDsaSelector,
   getActuatorDsaState,
@@ -29,8 +28,6 @@ import {
   getActuatorParameterA,
   getActuatorParameterB,
   getActuatorType,
-  isActuatorAudible,
-  isActuatorOnceOnly,
   setActuatorDsaState,
   setActuatorDisableTime,
   setActuatorParameterA,
@@ -47,7 +44,6 @@ import type { MonsterSystem } from './MonsterSystem';
 import type { WorldMove } from './WorldMove';
 import type { CsbRandom } from '../core/random';
 import type { MonsterDesc } from '../data/tables/MonsterDesc';
-import { monsterHorizontalSize } from '../data/tables/MonsterDesc';
 import { monsterDrawAsSize4, monsterInvisible, monsterPoisoned, monsterUnique } from './monsterTypes';
 import { swapCharacter } from './SwapCharacter';
 import { forgetThrownWeapon } from './ThrownWeapons';
@@ -58,6 +54,7 @@ import { DsaBank, DsaOverride, ProgramCursor, type ExecutionPacket, type GearJum
 import { DSA_OPERATIONS, type DsaOperationMachine } from './dsa/DsaOperations';
 import { BIT_COUNTS } from './dsa/ops/stack';
 import { globalText } from './dsa/ops/messages';
+import { choosePositionFromMask, detachedGroupIndex } from './dsa/ops/objects';
 import { DsaFilters } from './dsa/DsaFilters';
 import { CursorFilterType, DsaVars, DsaVarType, StkOp } from './dsa/DsaTypes';
 
@@ -432,15 +429,6 @@ export class DsaSystem {
     // and every timer walk that runs a DSA breaks out of the cell's chain on it
     // (`Timer.cpp:1433`, `:1757`, `:2230`) — the slave's link is no longer the cell's.
     return this.consumateDeletes(bank, rn);
-  }
-
-  /**
-   * `DSADBANK::DeleteObject` (`doc/CSBwin-src/DSA.cpp:158-164`) — condemn a record by
-   * pushing it on the run's delete list through its own link. Nothing is freed yet.
-   */
-  private deleteObject(bank: DsaBank, rn: ObjectID): void {
-    this.dungeon.setDBRecordLink(rn, bank.objectDeleteList);
-    bank.objectDeleteList = rn;
   }
 
   /**
@@ -832,39 +820,9 @@ export class DsaSystem {
     const operation = DSA_OPERATIONS.get(subcode);
     if (operation) return operation(bank, exPkt, this.operationMachine);
     switch (subcode) {
-      case StkOp.DEL: {
-        const location = bank.stack.pop();
-        const objId = bank.stack.pop();
-        this.noFilter(bank);
-        if (location < 0) {
-          const removed = this.deleteFromNegativeLocation(location);
-          if (removed !== null && removed !== undefined) {
-            this.deleteLinkedScrollText(removed, bank);
-            this.deleteObject(bank, removed);
-          }
-          break;
-        }
-        const locr = locationRelFromInteger(location);
-        if (!this.dungeon.isValidLocation(locr)) {
-          this.ctx.host.trace('Illegal location in DSA &DEL');
-          break;
-        }
-        const pos = new Position(locr.x, locr.y, locr.l);
-        for (let rn = this.dungeon.findFirstObject(pos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-          if (!this.isValidObjectId(objId) || !rnEquals(rn, objId)) continue;
-          const { category } = this.dungeon.rnMaps.decode(rn);
-          if (!this.canDeleteFromCell(category)) break;
-          this.dungeon.removeObjectFromCell(pos, rn);
-          this.ctx.systems.actuators.triggerObjectMove(pos, rn, false, false, this.ctx.party.state.facing);
-          this.deleteLinkedScrollText(rn, bank);
-          this.deleteObject(bank, rn);
-          break;
-        }
-        break;
-      }
       case StkOp.DEL_MON: {
         // `doc/CSBwin-src/DSA.cpp:2497-2504`, `EX_DELMON` (`:1742-1749`).
-        this.noFilter(bank);
+        bank.noFilter();
         const indx = bank.stack.pop();
         const locr = locationRelFromInteger(bank.stack.pop());
         this.ctx.systems.monsterDamage.deleteMonsterInGroup(locr, indx >>> 0);
@@ -872,62 +830,12 @@ export class DsaSystem {
       }
       case StkOp.INS_MON: {
         // `DSA.cpp:2505-2512`, `EX_INSMON` (`:1751-1758`).
-        this.noFilter(bank);
+        bank.noFilter();
         const posMask = bank.stack.pop();
         const locr = locationRelFromInteger(bank.stack.pop());
         this.ctx.systems.monsterDamage.insertMonsterInGroup(locr, posMask >>> 0);
         break;
       }
-      case StkOp.ADD: {
-        const objId = bank.stack.pop();
-        const location = bank.stack.pop();
-        const posMask = bank.stack.pop() & 0xf;
-        this.noFilter(bank);
-        if (!this.canAddToLocation(location)) break;
-        if (!this.isValidObjectId(objId)) break;
-        const cloned = this.copyItem(objId);
-        bank.mostRecentInterestingObjectID = cloned ?? OBJECT_ID_EOF;
-        if (cloned === null) break;
-        if (location >= 0) {
-          const locr = locationRelFromInteger(location);
-          if (!this.dungeon.isValidLocation(locr)) break;
-          const pos = this.choosePositionFromMask(posMask);
-          const placed = this.dungeon.rnMaps.setPos(cloned, pos);
-          this.ctx.systems.actuators.triggerObjectMove(new Position(locr.x, locr.y, locr.l), placed, true, false, this.ctx.party.state.facing);
-          this.dungeon.addObjectToCell(new Position(locr.x, locr.y, locr.l), placed);
-        } else if (location === -1) {
-          const party = this.ctx.party.state;
-          if (!party) break;
-          // `CURSORFILTER_DSA_ADD` for the copy, which cannot cancel; `ObjectToCursor`
-          // then fills the hand, whatever the filter put there (`DSA.cpp:2063-2072`).
-          this.filters.cursorFilter({ object: cloned, type: CursorFilterType.DSA_ADD, p1: 0, p2: 0, p3: 0, p4: 0 });
-          party.objectInHand = cloned;
-        } else if (location > -1000) {
-          const party = this.ctx.party.state;
-          if (!party) break;
-          const loc = this.decodeCharacterLocation(location);
-          if (!loc) break;
-          const champ = this.getChampion(party, loc.chIdx);
-          if (!champ) break;
-          this.ctx.systems.character.addCharacterPossession(loc.chIdx, cloned, loc.posIdx);
-        } else {
-          const monsterId = this.decodeMonsterLocation(location);
-          if (monsterId === null) break;
-          const monster = this.dungeon.getCreatureRecord(monsterId);
-          if (!monster) break;
-          // `doc/CSBwin-src/DSA.cpp:2084-2086`: the copy, its link already `RNeof`,
-          // heads an empty chain, else `AddObjectToRoom(newObj, *pDest, -1, 0, NULL)`.
-          if (monster.possession === OBJECT_ID_EOF) monster.possession = cloned;
-          else this.dungeon.addObjectToChain(cloned, monster.possession);
-        }
-        break;
-      }
-      case StkOp.OBJECT_ID:
-        bank.stack.push(bank.mostRecentInterestingObjectID);
-        break;
-      case StkOp.TYPE:
-        bank.stack.push(this.getTypeId(bank.stack.pop()));
-        break;
       case StkOp.FALSE_PIT: {
         const value = bank.stack.pop();
         const loc = bank.stack.pop();
@@ -974,31 +882,10 @@ export class DsaSystem {
       }
       case StkOp.TELEPORT_PARTY: {
         const location = bank.stack.pop();
-        this.noFilter(bank);
+        bank.noFilter();
         const locr = locationRelFromInteger(location);
         if (!this.dungeon.isValidLocation(locr)) break;
         this.teleportParty(locr);
-        break;
-      }
-      case StkOp.COPY: {
-        const dstId = bank.stack.pop();
-        const srcId = bank.stack.pop();
-        if (!this.isValidObjectId(srcId) || !this.isValidObjectId(dstId)) break;
-        const srcDecoded = this.dungeon.rnMaps.decode(srcId);
-        const dstDecoded = this.dungeon.rnMaps.decode(dstId);
-        if (srcDecoded.category !== dstDecoded.category) break;
-        this.noFilter(bank);
-        if (srcDecoded.category === DBType.ACTUATOR) {
-          const src = this.dungeon.getActuatorRecord(srcId);
-          const dst = this.dungeon.getActuatorRecord(dstId);
-          if (!src || !dst) break;
-          // `memcpy(((ui8 *)pDst)+2, ((ui8 *)pSrc)+2, sizeof(*pSrc)-2)` (`DSA.cpp:4717`): the
-          // whole record past its link, a big actuator's `word8` with it.
-          dst.word2 = src.word2;
-          dst.word4 = src.word4;
-          dst.word6 = src.word6;
-          if (src.word8 !== undefined) dst.word8 = src.word8;
-        }
         break;
       }
       case StkOp.MOVE: {
@@ -1012,7 +899,7 @@ export class DsaSystem {
         const srcPosMsk = bank.stack.pop();
         const srcObjMsk = bank.stack.pop();
         const srcType = bank.stack.pop();
-        this.noFilter(bank);
+        bank.noFilter();
         this.moveObjectDsa(
           srcType,
           srcObjMsk,
@@ -1207,7 +1094,7 @@ export class DsaSystem {
         const arraySize = bank.stack.pop();
         const arrayIndex = bank.stack.pop();
         const loc = bank.stack.pop();
-        this.noFilter(bank);
+        bank.noFilter();
         const locr = locationRelFromInteger(loc);
         if (!this.dungeon.isValidLocation(locr)) break;
         if (arrayIndex < 0 || arrayIndex + arraySize > 100) break;
@@ -1460,7 +1347,7 @@ export class DsaSystem {
         // `DSA.cpp:4349-4363`.
         const charIdx = bank.stack.pop();
         const val = bank.stack.pop();
-        this.noFilter(bank);
+        bank.noFilter();
         if (charIdx >= this.ctx.party.state.champions.length) break;
         if (charIdx < 0) break;
         this.ctx.systems.championDamage.poisonCharacter(charIdx, val);
@@ -1490,7 +1377,7 @@ export class DsaSystem {
       }
       case StkOp.SWAP_CHARACTER: {
         // `DSA.cpp:4414-4426`.
-        this.noFilter(bank);
+        bank.noFilter();
         const fingerPrint = bank.stack.pop();
         const index = bank.stack.pop();
         bank.stack.push(swapCharacter(this.ctx, index, fingerPrint));
@@ -1521,25 +1408,6 @@ export class DsaSystem {
       case StkOp.MON_LAND_D:
         this.monLandD(bank);
         break;
-      case StkOp.IS_CARRIED:
-        this.isCarried(bank);
-        break;
-      case StkOp.GET_CURSE:
-      case StkOp.GET_BROKEN:
-      case StkOp.GET_POISONED:
-      case StkOp.GET_CHARGES:
-      case StkOp.GET_SUB_TYPE:
-        bank.stack.push(this.getObjectField(subcode, bank.stack.pop()));
-        break;
-      case StkOp.SET_CURSE:
-      case StkOp.SET_BROKEN:
-      case StkOp.SET_POISONED:
-      case StkOp.SET_CHARGES:
-      case StkOp.SET_SUB_TYPE: {
-        const value = bank.stack.pop();
-        this.setObjectField(subcode, bank.stack.pop(), value);
-        break;
-      }
       case StkOp.THROW: {
         // `DSA.cpp:4559-4583`.
         const delta = bank.stack.pop();
@@ -1549,7 +1417,7 @@ export class DsaSystem {
         const launchLocation = locationRelFromInteger(bank.stack.pop());
         const objectLocation = locationRelFromInteger(bank.stack.pop());
         const objectType = bank.stack.pop();
-        this.noFilter(bank);
+        bank.noFilter();
         this.ctx.systems.timer.throwMissile(objectType, launchLocation, direction, objectLocation, range, damage,
           delta, this.ctx.state.tickCount);
         break;
@@ -1557,7 +1425,7 @@ export class DsaSystem {
       case StkOp.CAST:
       case StkOp.FILTERED_CAST:
         // `DSA.cpp:3092-3107`.
-        this.noFilter(bank);
+        bank.noFilter();
         this.ctx.systems.magic.dsaCastSpell(subcode === StkOp.FILTERED_CAST);
         break;
       case StkOp.GET_SKIN: {
@@ -1929,14 +1797,6 @@ export class DsaSystem {
   }
 
   /**
-   * `NOFILTER` (`doc/CSBwin-src/DSA.cpp:458-463`): an operation that changes the dungeon,
-   * run from a filter, warns the dungeon's author.
-   */
-  private noFilter(bank: DsaBank): void {
-    if (bank.filter) this.ctx.host.trace('Filter Modifying Dungeon');
-  }
-
-  /**
    * `STKOP_CreateCloud` (`doc/CSBwin-src/DSA.cpp:2741-2788`): a cloud of one of five
    * spells, or a Fluxcage, made at a location of any level, as a missile's would be. A
    * type with no spell is "Illegal cloud type", and makes nothing. CSBWin does not check
@@ -1947,7 +1807,7 @@ export class DsaSystem {
     const size = bank.stack.pop();
     const type = bank.stack.pop();
     const locr = locationRelFromInteger(bank.stack.pop());
-    this.noFilter(bank);
+    bank.noFilter();
     let spellObj: ObjectID = OBJECT_ID_EOF;
     switch (type) {
       case 0: spellObj = RN_FIREBALL; break;
@@ -2077,7 +1937,7 @@ export class DsaSystem {
     const num = bank.stack.pop() >>> 0;
     const index = bank.stack.pop() >>> 0;
     const id = bank.stack.pop();
-    this.noFilter(bank);
+    bank.noFilter();
     if (!this.isValidObjectId(id)) return;
     const monster = this.dungeon.getCreatureRecord(id);
     if (!monster) return; // "Not a Monster"
@@ -2120,7 +1980,7 @@ export class DsaSystem {
     const index = bank.stack.pop() >>> 0;
     let charIdx = bank.stack.pop();
     if (charIdx === 4) charIdx = party.cursorOwner;
-    this.noFilter(bank);
+    bank.noFilter();
     if (((index + num) >>> 0) > 100) return;
     if (charIdx >= party.champions.length) return;
     if (charIdx < 0) return;
@@ -2152,191 +2012,6 @@ export class DsaSystem {
       setAttributeCurrent(attr, value & 0xff);
     }
     if (n > 58) pc.talents = bank.getVar(index + 58) >>> 0;
-  }
-
-  /**
-   * `&CURSE@`, `&BROKEN@`, `&POISONED@`, `&CHARGES@` and `&SUBTYPE@`
-   * (`doc/CSBwin-src/DSA.cpp:3412-3440`, `:3459-3484`, `:3512-3537`, `:3565-3596`,
-   * `:3630-3652`): the field of the object at slot `objIndex`, 0 for an invalid slot or a
-   * database without it. A potion's charges are its strength, a misc object's its
-   * `value()`; only a weapon has a poison bit, and only a misc object a subtype.
-   */
-  private getObjectField(subcode: number, objIndex: number): number {
-    if (!this.isValidObjectId(objIndex)) return 0;
-    const dbType = this.dungeon.rnMaps.dbType(objIndex);
-    const weapon = dbType === DBType.WEAPON ? this.dungeon.getWeaponRecord(objIndex) : null;
-    const clothing = dbType === DBType.CLOTHING ? this.dungeon.getClothingRecord(objIndex) : null;
-    const potion = dbType === DBType.POTION ? this.dungeon.getPotionRecord(objIndex) : null;
-    const misc = dbType === DBType.MISC ? this.dungeon.getMiscRecord(objIndex) : null;
-    const bit = (b: boolean | undefined): number => (b ? 1 : 0);
-    switch (subcode) {
-      case StkOp.GET_CURSE:
-        return weapon ? bit(weapon.cursed) : clothing ? bit(clothing.cursed) : misc ? bit(misc.cursed) : 0;
-      case StkOp.GET_BROKEN:
-        return weapon ? bit(weapon.broken) : clothing ? bit(clothing.broken) : 0;
-      case StkOp.GET_POISONED:
-        return weapon ? bit(weapon.poisoned) : 0;
-      case StkOp.GET_CHARGES:
-        return weapon ? weapon.charges : clothing ? clothing.charges
-          : potion ? potion.power : misc ? misc.specialState : 0;
-      default:
-        return misc ? misc.subType ?? 0 : 0;
-    }
-  }
-
-  /**
-   * `&CURSE!`, `&BROKEN!`, `&POISONED!`, `&CHARGES!` and `&SUBTYPE!`
-   * (`doc/CSBwin-src/DSA.cpp:3441-3458`, `:3485-3511`, `:3538-3564`, `:3597-3629`,
-   * `:3653-3676`): the setters of `getObjectField`'s fields, each value cut to its
-   * field's width by `SETWBITS` (`CSB.h:749-777`), a flag set by any non-zero value.
-   * A curse goes through `SetCursed`.
-   */
-  private setObjectField(subcode: number, objIndex: number, value: number): void {
-    if (!this.isValidObjectId(objIndex)) return;
-    const dbType = this.dungeon.rnMaps.dbType(objIndex);
-    if (subcode === StkOp.SET_CURSE) {
-      this.setCursed(objIndex, value !== 0);
-      return;
-    }
-    const weapon = dbType === DBType.WEAPON ? this.dungeon.getWeaponRecord(objIndex) : null;
-    const clothing = dbType === DBType.CLOTHING ? this.dungeon.getClothingRecord(objIndex) : null;
-    const potion = dbType === DBType.POTION ? this.dungeon.getPotionRecord(objIndex) : null;
-    const misc = dbType === DBType.MISC ? this.dungeon.getMiscRecord(objIndex) : null;
-    switch (subcode) {
-      case StkOp.SET_BROKEN:
-        if (weapon) weapon.broken = value !== 0;
-        else if (clothing) clothing.broken = value !== 0;
-        break;
-      case StkOp.SET_POISONED:
-        if (weapon) weapon.poisoned = value !== 0;
-        break;
-      case StkOp.SET_CHARGES:
-        if (weapon) weapon.charges = value & 0xf;
-        else if (clothing) clothing.charges = value & 0xf;
-        else if (potion) potion.power = value & 0xff;
-        else if (misc) misc.specialState = value & 3;
-        break;
-      default:
-        if (misc) misc.subType = value & 0x1f;
-    }
-  }
-
-  /**
-   * `SetCursed` (`doc/CSBwin-src/Character.cpp:1787-1821`): the curse bracketed by
-   * `AdjustStatsForItemCarried`'s -1 and +1 on the champion carrying the object, at the
-   * slot it is in. CSBWin's search leaves only its inner loop, so it passes that slot
-   * only when the bearer is the last champion, and slot 30 for any other; the port's
-   * leaves both (`DEBT.md` H).
-   */
-  private setCursed(obj: ObjectID, curse: boolean): void {
-    const champions = this.ctx.party.state.champions;
-    let pCH: Champion | null = null;
-    let loc = -1;
-    search: for (let ch = 0; ch < champions.length; ch++) {
-      for (loc = 0; loc < 30; loc++) {
-        if (obj === getChampionPossession(champions[ch]!, loc)) {
-          pCH = champions[ch]!;
-          break search;
-        }
-      }
-    }
-    const character = this.ctx.systems.character;
-    if (pCH) character.adjustStatsForItemCarried(pCH, loc, -1, obj);
-    let record: { cursed?: boolean } | null = null;
-    switch (this.dungeon.rnMaps.dbType(obj)) {
-      case DBType.WEAPON: record = this.dungeon.getWeaponRecord(obj); break;
-      case DBType.CLOTHING: record = this.dungeon.getClothingRecord(obj); break;
-      case DBType.MISC: record = this.dungeon.getMiscRecord(obj); break;
-      default: break;
-    }
-    if (record) record.cursed = curse;
-    if (pCH) character.adjustStatsForItemCarried(pCH, loc, +1, obj);
-  }
-
-  /**
-   * `EX_IsCarried` (`doc/CSBwin-src/DSA.cpp:1614-1642`). An object ID asks where that
-   * object is: `256 * chIdx` plus its slot, 255 for the hand, or -1. A negative one is a
-   * basic object type, -1 for type 0, and asks how many such objects are carried. A chest
-   * is searched, and so is what it holds. Champion 4 is the hand's owner, 5 every
-   * champion.
-   */
-  private isCarried(bank: DsaBank): void {
-    const party = this.ctx.party.state;
-    const objid = bank.stack.pop();
-    const charnum = bank.stack.pop();
-    bank.stack.push(0);
-    for (let chidx = 0; chidx < party.champions.length; chidx++) {
-      if (charnum === chidx || (charnum === 4 && chidx === party.cursorOwner) || charnum === 5) {
-        if (this.forEach(bank, -chidx - 1, objid)) {
-          bank.stack.push(bank.stack.pop() + 256 * chidx);
-          return;
-        }
-      }
-    }
-    if (objid >= 0) {
-      bank.stack.pop();
-      bank.stack.push(-1);
-    }
-  }
-
-  /**
-   * `ForEach` with `IsCarriedCallback` (`doc/CSBwin-src/DSA.cpp:1521-1612`), true to end the
-   * search. `thisObj` below 0 is champion `-thisObj - 1`: a find replaces the count on the
-   * stack with the slot.
-   */
-  private forEach(bank: DsaBank, thisObj: number, srcObj: number): boolean {
-    if (thisObj === OBJECT_ID_NULL) return false;
-    if (thisObj < 0) {
-      const chIdx = -thisObj - 1;
-      const champ = this.ctx.party.state.champions[chIdx]!;
-      for (let i = 0; i < 30; i++) {
-        if (this.forEach(bank, getChampionPossession(champ, i), srcObj)) {
-          bank.stack.pop();
-          bank.stack.push(i);
-          return true;
-        }
-      }
-      if (chIdx === this.ctx.party.state.cursorOwner) {
-        if (this.forEach(bank, this.ctx.party.state.objectInHand, srcObj)) {
-          bank.stack.pop();
-          bank.stack.push(255);
-          return true;
-        }
-      }
-      return false;
-    }
-    const obj = thisObj as ObjectID;
-    // `IsCarriedCallback`.
-    if (srcObj < 0) {
-      const type = -srcObj === 1 ? 0 : -srcObj;
-      if (type === GetBasicObjectType(this.dungeon, this.ctx.tables.objDescObjectType, obj)) {
-        bank.stack.push(bank.stack.pop() + 1);
-      }
-    } else if (srcObj === thisObj) {
-      bank.stack.push(bank.stack.pop() + 1);
-      return true;
-    }
-    switch (this.dungeon.rnMaps.decode(obj).category) {
-      case DBType.SCROLL:
-      case DBType.POTION:
-      case DBType.MISC:
-      case DBType.CLOTHING:
-      case DBType.WEAPON:
-        break;
-      case DBType.CHEST: {
-        const chest = this.dungeon.getContainerRecord(obj);
-        for (let contents = chest?.containedObject ?? OBJECT_ID_EOF; contents !== OBJECT_ID_EOF;
-          contents = this.dungeon.getDBRecordLink(contents)) {
-          if (this.forEach(bank, contents, srcObj)) return true;
-        }
-        break;
-      }
-      default:
-        // `NotImplemented(0xdd6a)`.
-        this.ctx.host.trace('DSA &ISCARRIED: not implemented 0xdd6a');
-        break;
-    }
-    return false;
   }
 
   private getDsa(index: number): DsaDefinition | null {
@@ -2606,94 +2281,6 @@ export class DsaSystem {
   /** `RN::checkIndirectIndex(i)` (`doc/CSBwin-src/data.cpp:530-535`): a slot of the maps. */
   private isValidObjectId(objectId: number): objectId is ObjectID {
     return objectId >= 0 && this.dungeon.rnMaps.checkIndirectIndex(objectId);
-  }
-
-
-  private canDeleteFromCell(category: DBType): boolean {
-    return (
-      category === DBType.ACTUATOR ||
-      category === DBType.MISC ||
-      category === DBType.POTION ||
-      category === DBType.WEAPON ||
-      category === DBType.CLOTHING
-    );
-  }
-
-  private deleteFromNegativeLocation(location: number): ObjectID | null {
-    const party = this.ctx.party.state;
-    if (!party) return null;
-    if (location === -1) {
-      if (party.objectInHand === OBJECT_ID_NULL) return null;
-      // `CURSORFILTER_DSA_DEL`, which cannot cancel; `RemoveObjectFromHand` then takes
-      // whatever the hand holds once it returns (`doc/CSBwin-src/DSA.cpp:1658-1666`).
-      this.filters.cursorFilter({ object: party.objectInHand, type: CursorFilterType.DSA_DEL, p1: 0, p2: 0, p3: 0, p4: 0 });
-      const removed = party.objectInHand;
-      if (removed === OBJECT_ID_NULL) return null;
-      party.objectInHand = OBJECT_ID_NULL;
-      return removed;
-    }
-    const loc = this.decodeCharacterLocation(location);
-    if (!loc) return null;
-    const champ = this.getChampion(party, loc.chIdx);
-    if (!champ) return null;
-    const possessions = champ.possessions;
-    if (loc.posIdx < 0 || loc.posIdx >= possessions.length) return null;
-    const removed = possessions[loc.posIdx]!;
-    if (removed === OBJECT_ID_NULL) return null;
-    return this.ctx.systems.character.removeCharacterPossession(loc.chIdx, loc.posIdx);
-  }
-
-  /** `EX_DEL`'s scroll arm (`doc/CSBwin-src/DSA.cpp:1716-1723`): its text goes first. */
-  private deleteLinkedScrollText(rn: ObjectID, bank: DsaBank): void {
-    if (!this.isValidObjectId(rn)) return;
-    const { category } = this.dungeon.rnMaps.decode(rn);
-    if (category !== DBType.SCROLL) return;
-    const scroll = this.dungeon.getScrollRecord(rn);
-    if (!scroll) return;
-    // `pScroll->text()`, the six-byte scroll's RN.
-    this.deleteObject(bank, scroll.textObject ?? this.dungeon.rnMaps.rn(DBType.TEXT, scroll.textReference & 0x3ff));
-  }
-
-
-  private canAddToLocation(location: number): boolean {
-    if (location >= 0) {
-      const locr = locationRelFromInteger(location);
-      return this.dungeon.isValidLocation(locr);
-    }
-    const party = this.ctx.party.state;
-    if (!party) return false;
-    if (location === -1) {
-      return party.objectInHand === OBJECT_ID_NULL;
-    }
-    if (location > -1000) {
-      const loc = this.decodeCharacterLocation(location);
-      if (!loc) return false;
-      const champ = this.getChampion(party, loc.chIdx);
-      if (!champ) return false;
-      if (loc.posIdx < 0 || loc.posIdx >= 30) return false;
-      return champ.possessions[loc.posIdx] === OBJECT_ID_NULL;
-    }
-    const monsterId = this.decodeMonsterLocation(location);
-    if (monsterId === null) return false;
-    return this.dungeon.getCreatureRecord(monsterId) !== null;
-  }
-
-  private decodeCharacterLocation(location: number): { chIdx: number; posIdx: number } | null {
-    if (location >= -1 || location <= -1000) return null;
-    const value = -location;
-    const chIdx = Math.floor(value / 100) - 1;
-    const posIdx = value % 100;
-    if (chIdx < 0 || posIdx < 0) return null;
-    return { chIdx, posIdx };
-  }
-
-  private decodeMonsterLocation(location: number): ObjectID | null {
-    if (location > -1000) return null;
-    const monsterId = Math.trunc(-location / 1000);
-    if (!this.isValidObjectId(monsterId)) return null;
-    const decoded = this.dungeon.rnMaps.decode(monsterId);
-    if (decoded.category !== DBType.CREATURE) return null;
-    return monsterId;
   }
 
   private getChampion(party: PartyState, index: number): Champion | null {
@@ -3069,7 +2656,7 @@ export class DsaSystem {
     const locr = locationRelFromInteger(dstLoc);
     if (!this.dungeon.isValidLocation(locr)) return DsaMoveError.DER_InvalidCellLocation;
     if (dstDepth !== 0) return DsaMoveError.DER_IllegalDepth;
-    const pos = this.choosePositionFromMask(dstPosMsk, locr.p & 3);
+    const pos = choosePositionFromMask(this.random, dstPosMsk, locr.p & 3);
     if (doit) {
       const decoded = this.dungeon.rnMaps.decode(object);
       const placed = this.dungeon.rnMaps.setPos(object, pos);
@@ -3083,7 +2670,7 @@ export class DsaSystem {
         // Off the party's level, or arriving on it from elsewhere: the group has no
         // `ITEM16` until `MoveObject` attaches one (`:504-521`).
         const monster = this.dungeon.getCreatureRecord(object);
-        if (monster) monster.groupIndex = this.detachedGroupIndex(monster);
+        if (monster) monster.groupIndex = detachedGroupIndex(this.monsterDesc, monster);
       }
       if (decoded.category === DBType.CLOUD) {
         const timer = this.timers.getTimer(hTimer);
@@ -3159,12 +2746,6 @@ export class DsaSystem {
       moveMonster: (monster, oldX, oldY, newX, newY, level, cornerAfter) =>
         monsters.moveMonster(monster, oldX, oldY, newX, newY, level, cornerAfter),
     };
-  }
-
-  /** `groupIndex(0xd8)`, or `0xff` for a monster that fills the cell (`MoveObject.cpp:511-518`). */
-  private detachedGroupIndex(monster: CreatureRecord): number {
-    const desc = this.monsterDesc[monster.creatureType];
-    return desc && monsterHorizontalSize(desc) === 2 ? 0xff : 0xd8;
   }
 
   private findChestDestination(dstLoc: number, dstDepth: number, object: ObjectID, doit: boolean): number {
@@ -3252,195 +2833,8 @@ export class DsaSystem {
     return false;
   }
 
-  private getTypeId(objectId: number): number {
-    if (!this.isValidObjectId(objectId)) return -1;
-    const { category, index } = this.dungeon.rnMaps.decode(objectId);
-    const data = this.dungeon.getData().databases;
-    let id = 0;
-    switch (category) {
-      case DBType.DOOR: {
-        const rec = data.doors.records[index];
-        if (!rec) return -1;
-        id = (rec.hasButton ? 1 : 0);
-        if (rec.destructibleByChop) id |= 0x02;
-        if (rec.destructibleByFireball) id |= 0x04;
-        if (rec.vertical) id |= 0x08;
-        id |= (rec.ornateNumber & 0xf) << 4;
-        id |= (rec.doorType & 0x1) << 8;
-        break;
-      }
-      case DBType.TELEPORTER: {
-        const rec = data.teleporters.records[index];
-        if (!rec) return -1;
-        id = rec.rotation & 0x3;
-        if (rec.absoluteRotation) id |= 0x04;
-        id |= (rec.scope & 0x3) << 3;
-        if (rec.sound) id |= 0x20;
-        break;
-      }
-      case DBType.TEXT: {
-        const rec = data.texts.records[index];
-        if (!rec) return -1;
-        id = rec.visible ? 1 : 0;
-        break;
-      }
-      case DBType.ACTUATOR: {
-        const rec = data.actuators.records[index];
-        if (!rec) return -1;
-        id = 0;
-        if (isActuatorAudible(rec)) id |= 0x01;
-        if (isActuatorOnceOnly(rec)) id |= 0x02;
-        id |= (getActuatorType(rec) & 0x7f) << 2;
-        break;
-      }
-      case DBType.CREATURE: {
-        const rec = data.creatures.records[index];
-        if (!rec) return -1;
-        id = rec.creatureType & 0xff;
-        break;
-      }
-      case DBType.WEAPON: {
-        const rec = data.weapons.records[index];
-        if (!rec) return -1;
-        id = rec.weaponType & 0x7f;
-        break;
-      }
-      case DBType.CLOTHING: {
-        const rec = data.clothing.records[index];
-        if (!rec) return -1;
-        id = rec.clothingType & 0x7f;
-        break;
-      }
-      case DBType.SCROLL:
-        id = 0;
-        break;
-      case DBType.POTION: {
-        const rec = data.potions.records[index];
-        if (!rec) return -1;
-        id = ((rec.potionType & 0x7f) << 8) | (rec.power & 0xff);
-        break;
-      }
-      case DBType.CHEST: {
-        const rec = data.containers.records[index];
-        if (!rec) return -1;
-        let count = 0;
-        for (
-          let rn = rec.containedObject;
-          rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL;
-          rn = this.dungeon.getDBRecordLink(rn)
-        ) {
-          count += 1;
-        }
-        id = count;
-        break;
-      }
-      case DBType.MISC: {
-        const rec = data.misc.records[index];
-        if (!rec) return -1;
-        id = rec.miscType & 0x7f;
-        break;
-      }
-      case DBType.CLOUD: {
-        const rec = data.clouds.records[index];
-        if (!rec) return -1;
-        id = rec.cloudType & 0x7f;
-        break;
-      }
-      default:
-        id = 0;
-        break;
-    }
-    return category * 10000 + id;
-  }
-
   private getActuator(rn: ObjectID): ActuatorRecord | null {
     return this.dungeon.getActuatorRecord(rn);
-  }
-
-  private choosePositionFromMask(mask: number, fallback: TilePosition = TilePosition.NORTH): TilePosition {
-    const m = mask & 0xf;
-    if (m === 0) return fallback;
-    const positions: TilePosition[] = [];
-    for (let p = 0; p < 4; p++) {
-      if ((m & (1 << p)) !== 0) positions.push(p as TilePosition);
-    }
-    if (positions.length === 0) return fallback;
-    const idx = this.random.below(positions.length); // STRandom(n), doc/CSBwin-src/DSA.cpp:2043
-    return positions[idx] ?? fallback;
-  }
-
-  private copyItem(objectId: number): ObjectID | null {
-    if (!this.isValidObjectId(objectId)) return null;
-    const { category, index, position } = this.dungeon.rnMaps.decode(objectId);
-    const data = this.dungeon.getData();
-    // Each copy takes a record through `FindEmptyDB<n>Entry(true)` (`DSA.cpp:1774-1869`,
-    // `DungeonState.findEmptyDBEntry`).
-    const placed = (rn: ObjectID): ObjectID | null =>
-      rn === OBJECT_ID_NULL ? null : this.dungeon.rnMaps.setPos(rn, position);
-
-    switch (category) {
-      case DBType.ACTUATOR: {
-        const rec = data.databases.actuators.records[index];
-        if (!rec) return null;
-        return placed(this.dungeon.findEmptyDBEntry('actuators', { ...rec, nextObject: OBJECT_ID_EOF }, true));
-      }
-      case DBType.MISC: {
-        const rec = data.databases.misc.records[index];
-        if (!rec) return null;
-        return placed(this.dungeon.findEmptyDBEntry('misc', { ...rec, nextObject: OBJECT_ID_EOF }, true));
-      }
-      case DBType.WEAPON: {
-        const rec = data.databases.weapons.records[index];
-        if (!rec) return null;
-        return placed(this.dungeon.findEmptyDBEntry('weapons', { ...rec, nextObject: OBJECT_ID_EOF }, true));
-      }
-      case DBType.CLOTHING: {
-        const rec = data.databases.clothing.records[index];
-        if (!rec) return null;
-        return placed(this.dungeon.findEmptyDBEntry('clothing', { ...rec, nextObject: OBJECT_ID_EOF }, true));
-      }
-      case DBType.POTION: {
-        const rec = data.databases.potions.records[index];
-        if (!rec) return null;
-        return placed(this.dungeon.findEmptyDBEntry('potions', { ...rec, nextObject: OBJECT_ID_EOF }, true));
-      }
-      case DBType.CREATURE: {
-        const rec = data.databases.creatures.records[index];
-        if (!rec) return null;
-        const copiedPossessions = this.copyItemList(rec.possession);
-        // The copy must not inherit the original's ITEM16 slot. CSBWin parks it at
-        // 0xd8, or 0xff for a monster that fills the whole cell, so that every
-        // `groupIndex() < d.MaxITEM16` test reads it as unattached
-        // (doc/CSBwin-src/DSA.cpp:1885-1888).
-        return placed(this.dungeon.findEmptyDBEntry('creatures', {
-          ...rec,
-          // The record byte by byte (`DSA.cpp:1879-1882`): the copy's hit points its own.
-          hp: [...rec.hp],
-          nextObject: OBJECT_ID_EOF,
-          possession: copiedPossessions,
-          groupIndex: this.detachedGroupIndex(rec),
-        }, true));
-      }
-      default:
-        this.ctx.host.trace(`DSA &ADD unsupported object type ${category}`);
-        return null;
-    }
-  }
-
-  private copyItemList(head: ObjectID): ObjectID {
-    let result = OBJECT_ID_EOF;
-    let last = OBJECT_ID_EOF;
-    for (let rn = head; rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL; rn = this.dungeon.getDBRecordLink(rn)) {
-      const copied = this.copyItem(rn);
-      if (copied === null) return OBJECT_ID_EOF;
-      if (result === OBJECT_ID_EOF) {
-        result = copied;
-      } else {
-        this.dungeon.setDBRecordLink(last, copied);
-      }
-      last = copied;
-    }
-    return result;
   }
 
   /**
