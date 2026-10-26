@@ -69,8 +69,8 @@ big-endian except the two fields `swapBlock1` leaves alone (`:443-461`).
 | 378 | `Word22592` | BE | `d.Word22592` | `d.Word22592`, or from the dungeon for an Atari save |
 | 380 | `Byte22808[132]` | bytes | `d.Byte22808` | `d.Byte22808` |
 
-This port reads every field into `SaveGameState.block1` and writes them back
-(`src/data/SaveGameLoader.ts`); the game holds the `d.` side in `GameState.block1`, which
+This port reads every field into `SaveFile.block1` and encodes them back (`encodeBlock1`,
+`src/data/SaveFile.ts`); the game holds the `d.` side in `GameState.block1`, which
 `buildCsbwinRuntimeState` fills as `LoadGame` does and `buildSaveFile` writes with
 `SaveOption` 1. The values, the new game's draw and the Atari branch are in
 `doc/PROVEN_FACTS.md` → "`GAMEBLOCK1`: what `SaveGame` writes there, and which two fields
@@ -111,8 +111,8 @@ mouse-queue entry `HandleMouseEvents` takes, once".
 `SetHandOwner`/`SelectMagicCaster`: those validate the champion and rewrite their
 facing, which a load must not do to a state that was already valid.
 
-This port parses **every** field in the table into `SaveGameState.block2` and writes
-every one of them back: `buildBlock2` in `src/data/SaveGameLoader.ts` is the exact
+This port parses **every** field in the table into `SaveFile.block2` and writes
+every one of them back: `encodeBlock2` in `src/data/SaveFile.ts` is the exact
 inverse of `parseBlock2`, and `buildBlock2FromGame` in `src/engine/SaveGameFile.ts`
 fills the struct from the live game — the clock and seed, the party position group,
 `FirstAvailTimer` from `TimerQueue`'s free cursor, `ITEM16QueLen` from `MonsterSystem`,
@@ -206,11 +206,13 @@ reaches the status box.
 
 ## What the port writes and reads
 
-`saveSaveGameState` (`src/data/SaveGameLoader.ts`) writes all sixteen blocks, scrambled
+`writeSaveFile` (`src/data/SaveFile.ts`) writes all sixteen blocks, scrambled
 and checksummed as CSBWin's are, and `buildSaveFile` (`src/engine/SaveGameFile.ts`) hands
-it the Extended Features header (`buildLiveExtendedFeatures`,
-`src/data/CsbwinExtendedFeatures.ts`), the world's object indirect index as it holds it,
-the character block and the dungeon image, so the game's own save writes a whole file. `applyCsbwinSave` (`src/engine/CsbwinSaveGame.ts`)
+it every block plain: block 0 built from the Extended Features header
+(`buildLiveExtendedFeatures`, `src/data/CsbwinExtendedFeatures.ts`) and the world's object
+indirect index as it holds it, blocks 1 to 6 encoded from the live game, and the dungeon
+image, so the game's own save writes a whole file. `readSaveFile` reads them back, each
+block's plain bytes beside what it says, all of them required. `applyCsbwinSave` (`src/engine/CsbwinSaveGame.ts`)
 reads one back: `loadCsbwinWorld` (`src/data/CsbwinDungeonImage.ts`) parses the image,
 `src/data/CsbwinCharacters.ts` unpacks `CHARDESC[4]` and the party tail, portraits
 included, and the world keeps the file's object indirect index, of which every RN in a

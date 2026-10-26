@@ -40,7 +40,7 @@ import { readU16BE, writeU32BE } from '../../src/core/bytes';
 import { readExtendedFeatures } from '../../src/data/CsbwinExtendedFeatures';
 import { readCsbwinSaveInfo } from '../../src/data/CsbwinSaveInfo';
 import { BLOCK1_SIZE, readUnscrambleBlock, scrambleAndWrite } from '../../src/data/CsbwinSaveStream';
-import { holdsNoBlock1Words, stampBlock1Words, stampRandomGameID } from '../../src/data/SaveGameLoader';
+import { holdsNoBlock1Words, stampBlock1Words, stampRandomGameID } from '../../src/data/SaveFile';
 import { check, finish } from '../lib/check';
 import { genuineSaves } from '../lib/saves';
 

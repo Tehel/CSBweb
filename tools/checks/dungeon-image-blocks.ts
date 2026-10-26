@@ -537,17 +537,17 @@ function main(): void {
     const bytes = new Uint8Array(readFileSync(path));
     const { dungeon: world, save } = loadCsbwinWorld(bytes);
     const parsed = save.imageLayout!;
-    const base = save.dungeonImageOffset!;
+    const base = save.imageOffset!;
     const declared = save.cellFlagArraySize ?? 0;
     const options = {
-      indirectText: save.indirectText ?? false,
-      bigActuators: save.bigActuators ?? false,
-      newScrolls: (save.version ?? 0) >= 0x42,
+      indirectText: save.extended.indirectText,
+      bigActuators: save.extended.bigActuators,
+      newScrolls: save.extended.version >= 0x42,
     };
     const index = roundTripIndex(world);
     check(
-      !!save.objectIndex && index.typeMap.join() === save.objectIndex.typeMap.join()
-        && index.indexMap.join() === save.objectIndex.indexMap.join(),
+      !!save.extended.objectIndex && index.typeMap.join() === save.extended.objectIndex.typeMap.join()
+        && index.indexMap.join() === save.extended.objectIndex.indexMap.join(),
       `${name}: the object indirect index is written as the file has it`);
     console.log(`${name}  (image at ${base}, cell flags at ${parsed.cellFlags}, index ${index.length} slots)`);
     compare({

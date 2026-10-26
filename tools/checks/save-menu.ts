@@ -155,7 +155,7 @@ import { drawRandomGameID } from '../../src/engine/GameContext';
 import { GameSaves, NOT_A_SAVED_GAME, SAVED_GAME_DAMAGED, drawPlaythrough, importedFileName, makeSaveFileName } from '../../src/engine/GameSaves';
 import { applySaveBytes, buildSaveFile } from '../../src/engine/SaveGameFile';
 import { readExtendedFeatures } from '../../src/data/CsbwinExtendedFeatures';
-import { holdsNoBlock1Words, loadSaveGameState, readsGameBlock1, stampRandomGameID } from '../../src/data/SaveGameLoader';
+import { holdsNoBlock1Words, readSaveFile, readsGameBlock1, stampRandomGameID } from '../../src/data/SaveFile';
 import { ReadSavedGame, TAG00260e } from '../../src/engine/Chaos';
 import { readCsbwinCharacter } from '../../src/data/CsbwinCharacters';
 import type { IndexedBitmap } from '../../src/renderer/csbwin/CanvasBlitter';
@@ -1192,7 +1192,7 @@ async function checkSaveCall(): Promise<void> {
     const slow = memoryStore(() => {}, false, () => { champion.attributes.health = 1; });
     const slowSaves = new GameSaves(slowGame, STOCK_DATA_SET, diskFiles(STOCK_DATA_SET), slow, { portraitOf: () => undefined }, () => {});
     const late = await slowSaves.save('running', 'quick');
-    const held = readCsbwinCharacter(loadSaveGameState(await slow.read(late.id)).characterBlock!, 0).champion.attributes.health;
+    const held = readCsbwinCharacter(readSaveFile(await slow.read(late.id)).blocks.characters, 0).champion.attributes.health;
     console.log(`  clock running, a champion hurt while the store is listed: health ${atTheKey} at the key, ${held} in the file`);
     check(held === atTheKey, 'F5\'s file holds the party as it stood at the key, with the dungeon it was saved with');
 

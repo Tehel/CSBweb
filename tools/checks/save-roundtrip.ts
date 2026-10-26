@@ -61,7 +61,7 @@ import { Game } from '../../src/engine/Game';
 import type { RuntimeSaveState } from '../../src/engine/RuntimeSave';
 import { TimerFunction } from '../../src/engine/TimerQueue';
 import { applySaveBytes, buildSaveFile } from '../../src/engine/SaveGameFile';
-import { loadSaveGameState } from '../../src/data/SaveGameLoader';
+import { readSaveFile } from '../../src/data/SaveFile';
 import { readCsbwinCharacter } from '../../src/data/CsbwinCharacters';
 import { CHARFLAG_ATTACK_DISABLE } from '../../src/core/charDesc';
 import { MovementAction, type Champion } from '../../src/engine/gameTypes';
@@ -583,7 +583,7 @@ function main(): void {
     const cursor = q.getFirstAvailTimer();
     const max = q.getMaxTimers();
     const raw = buildSaveFile(filled);
-    const block2 = loadSaveGameState(raw).block2!;
+    const block2 = readSaveFile(raw).block2;
     // The restore re-creates the monster timers of the party's level
     // (`reloadAfterSaveGame`), and their deletes lower the cursor into the skipped slots,
     // so the cursor is checked on the state the file gives, before that runs.
@@ -612,7 +612,7 @@ function main(): void {
   for (const file of ['csbgame7.dat', 'csbgame4-door-opening.dat']) {
     const live = fromCsbwinSave(file);
     const state = live.getRuntimeSaveState();
-    const block2 = loadSaveGameState(buildSaveFile(live)).block2;
+    const block2 = readSaveFile(buildSaveFile(live)).block2;
     if (!block2) { check(false, `${file}: the written prefix should carry a block 2`); continue; }
 
     const party = state.party;
@@ -661,7 +661,7 @@ function main(): void {
     const champion = (g: Game): Champion => g.ctx.party.state.champions[0]!;
     /** Champion 0 as the block 4 of a save written now has them. */
     const written = (g: Game): Champion => readCsbwinCharacter(
-      loadSaveGameState(buildSaveFile(g)).characterBlock!, 0).champion;
+      readSaveFile(buildSaveFile(g)).blocks.characters, 0).champion;
     const busy = (c: Champion): boolean => (c.charFlags & CHARFLAG_ATTACK_DISABLE) !== 0;
     const hex = (n: number): string => `0x${(n & 0xffff).toString(16).padStart(4, '0')}`;
     const report = (label: string, g: Game): void => {

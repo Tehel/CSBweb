@@ -569,7 +569,7 @@ function main(): void {
       // What the file holds, read from its own bytes.
       const parsed = loadCsbwinWorld(file);
       const layout = parsed.save.imageLayout;
-      const index = parsed.save.objectIndex;
+      const index = parsed.save.extended.objectIndex;
       if (bones === undefined || !layout || !index) {
         fail('the death left no bones, or the file no image');
       } else {

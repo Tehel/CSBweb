@@ -1,6 +1,6 @@
 /**
  * The dungeon image's arithmetic, which the reader (`DungeonLoader`), a save's read
- * (`loadSaveGameState`), the writer (`CsbwinDungeonImageWriter`) and `Chaos` share: how
+ * (`readSaveFile`), the writer (`CsbwinDungeonImageWriter`) and `Chaos` share: how
  * large each database's record is, and where each section of an image sits.
  */
 import { readU16BE, readU32LE } from '../core/bytes';

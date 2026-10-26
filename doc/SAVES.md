@@ -89,7 +89,7 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   `GAMEBLOCK1` where CSBWin reads one, the first thing `_ReadEntireGame` checks
   (`doc/CSBwin-src/SaveGame.cpp:1724-1726`, `ReadUnscrambleBlock` at
   `CSBCode.cpp:9272-9300`), is "NOT A SAVED GAME" (`readsGameBlock1`,
-  `src/data/SaveGameLoader.ts`): a `dungeon.dat`, a `graphics.dat`, any other file, and
+  `src/data/SaveFile.ts`): a `dungeon.dat`, a `graphics.dat`, any other file, and
   a save cut short before the end of that block. CSB's `mini.dat` holds one, and is a
   save. A file that has one and does not read past it is CSBWin's "SAVED GAME DAMAGED!"
   (`SaveGame.cpp:2117`). CSBWin says that line of both, as it only ever reads its own
@@ -265,7 +265,7 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   champions' names, in the same order), the newest when several do (`joinedPlaythrough`,
   `src/data/saves/SaveStore.ts`); with none, a new one, drawn as a new game's is. It is
   stamped into the file, `GAMEBLOCK1`'s `RandomGameID` and nothing else of the game
-  (`stampRandomGameID`, `src/data/SaveGameLoader.ts`), so the row and its file agree
+  (`stampRandomGameID`, `src/data/SaveFile.ts`), so the row and its file agree
   and an export carries it. The store's upgrade to its version 3 stamps the rows of an
   earlier version by that rule (`stampSaveRecords`, `src/data/saves/legacyRows.ts`),
   one row at a time, so that the rows of one party and data set are one playthrough;

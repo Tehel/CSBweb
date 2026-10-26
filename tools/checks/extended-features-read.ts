@@ -53,7 +53,7 @@ import {
 } from '../../src/data/CsbwinExtendedFeatures';
 import { formChecksum } from '../../src/data/CsbwinObjectIndex';
 import { DungeonLoader } from '../../src/data/DungeonLoader';
-import { loadSaveGameState, stampRandomGameID } from '../../src/data/SaveGameLoader';
+import { readSaveFile, stampRandomGameID } from '../../src/data/SaveFile';
 import { loadCsbwinWorld } from '../../src/data/CsbwinDungeonImage';
 import type { DungeonData } from '../../src/data/dungeonTypes';
 import { applySaveBytes, buildSaveFile } from '../../src/engine/SaveGameFile';
@@ -195,7 +195,7 @@ function checkGivenUp(): void {
 
   const damaged = save.slice();
   damaged[300] ^= 0x01;                    // one of the block's fill bytes
-  const loadDamaged = outcome(() => { loadSaveGameState(damaged); return 'loaded'; });
+  const loadDamaged = outcome(() => { readSaveFile(damaged); return 'loaded'; });
   console.log(`  byte 300 changed: ${blockOf(damaged)}; LoadGame: ${loadDamaged}`);
   check(blockOf(damaged) === 'offset 0, no block', 'a wrong checksum: the file is one with no block');
   check(loadDamaged === 'threw "savegame block1 checksum mismatch"',
@@ -282,7 +282,7 @@ function checkEnciphering(): void {
   console.log(`  loadCsbwinWorld: ${world}`);
   check(world === `${plainData.maps.length} levels`, 'the enciphered save reads, its image closing at the file\'s end');
   // Deciphered once: `loadCsbwinWorld` reads the image from the bytes the blocks were read from.
-  check(isDeepStrictEqual(loadSaveGameState(save).data, saved.data) && loadSaveGameState(plainSave).data === plainSave,
+  check(isDeepStrictEqual(readSaveFile(save).extended.data, saved.data) && readSaveFile(plainSave).extended.data === plainSave,
     'the read hands on the file deciphered, and a plain file as given, for the image to be read from');
 
   const other = plainGame;
@@ -293,7 +293,7 @@ function checkEnciphering(): void {
   check(readExtendedFeatures(buildSaveFile(other)).simpleEncipher, 'so the game\'s next save is enciphered');
 
   const stamped = stampRandomGameID(save, 0x12345678);
-  check(sentinelOf(stamped) !== EXTENDED_SENTINEL && loadSaveGameState(stamped).block1?.randomGameID === 0x12345678,
+  check(sentinelOf(stamped) !== EXTENDED_SENTINEL && readSaveFile(stamped).block1.randomGameID === 0x12345678,
     'a save stamped with a new game id stays enciphered, and reads with the id');
 }
 

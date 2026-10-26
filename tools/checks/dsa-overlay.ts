@@ -34,7 +34,7 @@ import { readFileSync } from 'node:fs';
 
 import { CSBGraphicsLoader, CSBGraphicType } from '../../src/data/CSBGraphicsLoader';
 import { EF_EXTENDED_FLAGS } from '../../src/data/CsbwinExtendedFeatures';
-import { loadSaveGameState } from '../../src/data/SaveGameLoader';
+import { readSaveFile } from '../../src/data/SaveFile';
 import { readU16LE, readU32LE } from '../../src/core/bytes';
 import { applyCsbwinSave } from '../../src/engine/CsbwinSaveGame';
 import { StkOp } from '../../src/engine/dsa/DsaTypes';
@@ -181,7 +181,7 @@ console.log('6. A save');
     applyCsbwinSave(game, file);
     return game;
   };
-  const efbOf = (file: Uint8Array) => loadSaveGameState(file).extendedFeatures!;
+  const efbOf = (file: Uint8Array) => readSaveFile(file).extended.header!;
 
   const none = efbOf(buildSaveFile(freshGame()));
   console.log(`  never shown one: ordinal ${none.overlayOrdinal}, flags 0x${none.extendedFlags.toString(16)}`);

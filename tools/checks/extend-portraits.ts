@@ -107,7 +107,7 @@ for (const path of genuineSaves()) {
   const positioned = found.filter((i) => getActuatorPosition(world.dungeon.databases.actuators.records[i]) !== 0);
   keptPositions += positioned.length;
   console.log(`  ${name.padEnd(34)} ${found.length} mirrors, ${positioned.length} with a Position`);
-  check(world.save.expandedPortraits === true, `${name}: the block carries ExpandedPortraits`);
+  check(world.save.extended.expandedPortraits === true, `${name}: the block carries ExpandedPortraits`);
 }
 check(keptPositions > 0,
   `the saves' mirrors keep their Position (${keptPositions}), which ExtendPortraits would zero`);
@@ -119,7 +119,7 @@ for (const file of ATARI_SAVES) {
   const world = loadCsbwinWorld(new Uint8Array(readFileSync(resolve(file))));
   const found = mirrors(world.dungeon);
   console.log(`  ${file}: ${found.length} mirrors`);
-  check(world.save.expandedPortraits === false, `${file}: no ExpandedPortraits, so it would be cleaned`);
+  check(world.save.extended.expandedPortraits === false, `${file}: no ExpandedPortraits, so it would be cleaned`);
   check(found.every((i) => !portraitBits(world.dungeon.databases.actuators.records[i])),
     `${file}: every mirror is clean`);
 }

@@ -2,7 +2,7 @@
  * A save file, built from a live game and read back into one.
  *
  * A save is a CSBWin file and nothing else: the scrambled, checksummed sixteen blocks
- * `saveSaveGameState` writes, which CSBWin itself opens. `buildSaveFile` makes one from
+ * `writeSaveFile` writes, which CSBWin itself opens. `buildSaveFile` makes one from
  * the running game, and `applySaveBytes` reads one back, the port's or a genuine one, as
  * `_ReadEntireGame` does (`applyCsbwinSave`): the file's world is installed whole,
  * whatever world the game was running, so a save of any dungeon loads into any running
@@ -12,14 +12,23 @@
  * "What is not restored", which `tools/checks/save-roundtrip.ts` holds to its list.
  */
 import { Die } from '../core/Die';
-import { saveSaveGameState, type Block1, type Block2, type SaveGameState } from '../data/SaveGameLoader';
+import {
+    encodeBlock1,
+    encodeBlock2,
+    encodeItem16,
+    encodeTimers,
+    encodeTimerQueue,
+    writeSaveFile,
+    type Block1,
+    type Block2,
+    type SaveFileBlocks,
+} from '../data/SaveFile';
 import { applyCsbwinSave } from './CsbwinSaveGame';
 import { buildCsbwinCharacterBlock } from '../data/CsbwinCharacters';
 import { objectIndexOf } from '../data/CsbwinObjectIndex';
 import { buildDungeonImage, cellFlagArraySize } from '../data/CsbwinDungeonImageWriter';
-import { buildLiveExtendedFeatures } from '../data/CsbwinExtendedFeatures';
+import { buildExtendedFeaturesPrefix, buildLiveExtendedFeatures } from '../data/CsbwinExtendedFeatures';
 import { Expool } from '../data/CsbwinExpool';
-import type { TimerRecord } from '../data/dungeonTypes';
 import type { Game } from './Game';
 import { getRuntimeState, type RuntimeState } from './RuntimeSave';
 import type { Champion } from './gameTypes';
@@ -35,7 +44,7 @@ export interface SaveFileOptions {
 }
 
 /**
- * Blocks 0 and 7-15 of the file.
+ * The file's blocks, from the running game.
  *
  * Every RN in them — the object list, every record link, the thirty possession slots of
  * every champion, `GAMEBLOCK2.ObjectInHand` and the object a timer is carrying — is a
@@ -43,19 +52,7 @@ export interface SaveFileOptions {
  * as the world holds them (`objectIndexOf`), as CSBWin writes `dataTypeMap` and
  * `dataIndexMap` (`doc/CSBwin-src/SaveGame.cpp:952-958`, `:1010-1011`).
  */
-function buildFileBlocks(
-    game: Game,
-    runtime: RuntimeState,
-    timers: TimerRecord[],
-    options: SaveFileOptions,
-): {
-    extendedFeatures: SaveGameState['extendedFeatures'];
-    dungeonImage: Uint8Array;
-    characterBlock: Uint8Array;
-    objectIndex: SaveGameState['objectIndex'];
-    objectInHand: number;
-    timers: TimerRecord[];
-} {
+function buildFileBlocks(game: Game, runtime: RuntimeState, options: SaveFileOptions): SaveFileBlocks {
     const dungeon = game.ctx.dungeon.getData();
 
     // The world has to be save-shaped, which `DungeonLoader` guarantees by converting on
@@ -81,83 +78,57 @@ function buildFileBlocks(
     expool.storeOverlayPalette(runtime.game.overlayPalette);
     if (runtime.game.disableSaves) expool.writeDisableSaves();
 
-    const party = runtime.party;
-    // `gb2.ObjectInHand = d.objectInHand.ConvertToInteger()` (`doc/CSBwin-src/SaveGame.cpp:1058`):
-    // an empty cursor is `RNnul`, never `RNempty` (0), which CSBWin would load as an object.
-    const objectInHand = party.objectInHand & 0xffff;
-
+    const { item16, timers, timerQueue } = runtime.dungeon;
+    const { typeMap, indexMap } = objectIndexOf(dungeon.rnMaps);
     return {
-        extendedFeatures: buildLiveExtendedFeatures({
-            cellFlagArraySize: cellFlagArraySize(dungeon.maps),
-            extendedWallDecorations: dungeon.extendedWallDecorations,
-            spellFilterLocation: dungeon.spellFilterLocation,
-            dmRules: game.ctx.rules.dmRules,
-            dmRulesDesignOption: game.ctx.rules.dmRulesDesignOption,
-            invisibleMonsters: game.ctx.rules.invisibleMonsters,
-            drawAsSize4Monsters: game.ctx.rules.drawAsSize4Monsters,
-            simpleEncipher: game.ctx.rules.simpleEncipher,
-            supressDSAWarningOption: game.ctx.rules.supressDSAWarningOption,
-            bGravityGame: game.ctx.rules.bGravityGame,
-            bThreeDMovements: game.ctx.rules.bThreeDMovements,
+        block0: buildExtendedFeaturesPrefix({
+            header: buildLiveExtendedFeatures({
+                cellFlagArraySize: cellFlagArraySize(dungeon.maps),
+                extendedWallDecorations: dungeon.extendedWallDecorations,
+                spellFilterLocation: dungeon.spellFilterLocation,
+                dmRules: game.ctx.rules.dmRules,
+                dmRulesDesignOption: game.ctx.rules.dmRulesDesignOption,
+                invisibleMonsters: game.ctx.rules.invisibleMonsters,
+                drawAsSize4Monsters: game.ctx.rules.drawAsSize4Monsters,
+                simpleEncipher: game.ctx.rules.simpleEncipher,
+                supressDSAWarningOption: game.ctx.rules.supressDSAWarningOption,
+                bGravityGame: game.ctx.rules.bGravityGame,
+                bThreeDMovements: game.ctx.rules.bThreeDMovements,
+                dsaIndex: dungeon.dsaIndex,
+                signatures: game.ctx.signatures,
+                hintKey: dungeon.hintKey,
+                gameInfo: dungeon.gameInfo,
+                overlay: game.ctx.overlay.toExtendedFeatures(),
+            }),
+            typeMap,
+            indexMap,
+            // The DSAs as play left them: a DSA whose `localState` is 1 keeps its state in
+            // its own `m_state` (`DsaSystem.putState`), which `DSA::Write` writes.
             dsaIndex: dungeon.dsaIndex,
-            signatures: game.ctx.signatures,
-            hintKey: dungeon.hintKey,
-            gameInfo: dungeon.gameInfo,
-            overlay: game.ctx.overlay.toExtendedFeatures(),
+            gameInfo: dungeon.gameInfo?.text,
+            dsaLevelIndex: dungeon.dsaLevelIndex,
         }),
-        dungeonImage: buildDungeonImage(dungeon, {
-            indirectText: true,
-            bigActuators: true,
-            newScrolls: true,
-        }),
-        characterBlock: buildCharacterBlock(game, runtime, options),
-        objectIndex: objectIndexOf(dungeon.rnMaps),
-        objectInHand,
-        timers,
-    };
-}
-
-/**
- * The save file of the game as it stands: all sixteen blocks. The `SaveGameState` half
- * mirrors what `LoadGame` reads back out of `GAMEBLOCK2`
- * (`doc/CSBwin-src/SaveGame.cpp:1760-1761`).
- */
-export function buildSaveFile(game: Game, options: SaveFileOptions = {}): Uint8Array {
-    const runtime = getRuntimeState(game.ctx);
-    const { item16, timers } = runtime.dungeon;
-    const file = buildFileBlocks(game, runtime, timers, options);
-    const world = game.ctx.dungeon.getData();
-    const saveGameState: SaveGameState = {
-        item16,
-        timers: file.timers,
-        timerQueue: runtime.dungeon.timerQueue,
-        timerSequence: runtime.dungeon.timerSequence,
-        maxItem16: item16.length,
-        maxTimers: timers.length,
+        block1: encodeBlock1(buildBlock1FromGame(runtime)),
+        block2: encodeBlock2(buildBlock2FromGame(game, runtime)),
+        item16: encodeItem16(item16),
+        characters: buildCharacterBlock(game, runtime, options),
         // The 16-byte `TIMER`, which is what every committed save uses and the only form
         // with `m_timerLevel` in a byte of its own. `buildLiveExtendedFeatures` declares
         // `SequencedTimers | ExtendedTimers` to match; the two must agree or block 5 is
         // read at the wrong stride.
-        sequencedTimers: true,
-        extendedTimers: true,
-        handChar: runtime.party.cursorOwner,
-        magicCaster: runtime.party.magicCasterIndex,
-        block1: buildBlock1FromGame(runtime),
-        block2: {
-            ...buildBlock2FromGame(game, runtime),
-            objectInHand: file.objectInHand,
-        },
-        characterBlock: file.characterBlock,
-        extendedFeatures: file.extendedFeatures,
-        gameInfo: world.gameInfo?.text,
-        objectIndex: file.objectIndex,
-        dsaLevelIndex: world.dsaLevelIndex,
-        // The DSAs as play left them: a DSA whose `localState` is 1 keeps its state in
-        // its own `m_state` (`DsaSystem.putState`), which `DSA::Write` writes.
-        dsaIndex: world.dsaIndex,
-        dungeonImage: file.dungeonImage,
+        timers: encodeTimers(timers, 16, timerQueue),
+        timerQueue: encodeTimerQueue(timerQueue, timers.length),
+        image: buildDungeonImage(dungeon, {
+            indirectText: true,
+            bigActuators: true,
+            newScrolls: true,
+        }),
     };
-    return saveSaveGameState(saveGameState);
+}
+
+/** The save file of the game as it stands: all sixteen blocks. */
+export function buildSaveFile(game: Game, options: SaveFileOptions = {}): Uint8Array {
+    return writeSaveFile(buildFileBlocks(game, getRuntimeState(game.ctx), options));
 }
 
 /**
@@ -194,6 +165,8 @@ function buildBlock2FromGame(game: Game, runtime: RuntimeState): Block2 {
     return {
         time: runtime.game.tickCount >>> 0,
         ranseed: runtime.game.randomSeed >>> 0,
+        // `gb2.ObjectInHand = d.objectInHand.ConvertToInteger()` (`doc/CSBwin-src/SaveGame.cpp:1058`):
+        // an empty cursor is `RNnul`, never `RNempty` (0), which CSBWin would load as an object.
         objectInHand: party.objectInHand & 0xffff,
         numCharacter: party.champions.length,
         partyX: party.position.x,

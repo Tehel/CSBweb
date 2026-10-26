@@ -5,12 +5,12 @@
  * and writer, which on its own proves nothing — it is the trap that tool was written to
  * document. This is the other argument, the one `tools/checks/character-block.ts` makes
  * for block 4: take a **genuine** save, parse it, write the blocks again from what came
- * out, and compare with the file's own bytes. No bug symmetrical between our reader and
+ * out (`rewriteSaveFile`), and compare with the file's own bytes. No bug symmetrical between our reader and
  * our writer can satisfy it, because CSBWin wrote the bytes.
  *
  * The comparison is made on the *scrambled* bytes, straight out of both files, which is
  * legitimate because `SaveGame` writes zero for all five block hashes
- * (`doc/CSBwin-src/SaveGame.cpp:1088-1092`) and so does `saveSaveGameState`: with the
+ * (`doc/CSBwin-src/SaveGame.cpp:1088-1092`) and so does `encodeBlock1`: with the
  * same hash the keystream is the same, so equal plaintext is equal ciphertext and a
  * diff is a diff either way.
  *
@@ -40,12 +40,12 @@
  */
 import { readFileSync } from 'node:fs';
 
-import { loadSaveGameState, saveSaveGameState } from '../../src/data/SaveGameLoader';
+import { readSaveFile } from '../../src/data/SaveFile';
 import { loadCsbwinWorld } from '../../src/data/CsbwinDungeonImage';
 import { formChecksum, objectIndexOf, readObjectIndirectIndex } from '../../src/data/CsbwinObjectIndex';
 import { OBJECT_ID_NULL } from '../../src/core/types';
 import { check, finish } from '../lib/check';
-import { genuineSaves } from '../lib/saves';
+import { genuineSaves, rewriteSaveFile } from '../lib/saves';
 
 const BLOCK1_SIZE = 512;
 const BLOCK2_SIZE = 128;
@@ -126,21 +126,21 @@ function main(): void {
   for (const path of saves) {
     const name = path.split('/').pop() ?? path;
     const file = new Uint8Array(readFileSync(path));
-    const state = loadSaveGameState(file);
-    const written = saveSaveGameState(state);
+    const state = readSaveFile(file);
+    const written = rewriteSaveFile(state);
 
     // Block 0 is variable-length, so it is compared first and then becomes the origin
     // both files' block 1 is measured from.
-    const prefix = state.extendedFeaturesSize ?? 0;
+    const prefix = state.extended.offset;
     check(written.length >= prefix, `${name}: the written file carries a block-0 prefix`);
-    const timerSize = state.extendedTimers ? 16 : state.sequencedTimers ? 12 : 10;
-    const live = new Set(state.timerQueue ?? []);
-    const liveWords = (state.timerQueue ?? []).length * 2;
-    const dataMapLength = state.objectIndex?.length ?? 0;
+    const timerSize = state.extended.extendedTimers ? 16 : state.extended.sequencedTimers ? 12 : 10;
+    const live = new Set(state.timerQueue);
+    const liveWords = state.timerQueue.length * 2;
+    const dataMapLength = state.extended.objectIndex?.length ?? 0;
     // Whether blocks 5 and 6 differ from the file in their exempt bytes, which block 1's
     // checksums of them sum: a region's own exemption carries over to its checksum.
-    const block5At = prefix + BLOCK1_SIZE + BLOCK2_SIZE + 16 * state.maxItem16 + CHARACTER_SIZE;
-    const block5Size = timerSize * state.maxTimers;
+    const block5At = prefix + BLOCK1_SIZE + BLOCK2_SIZE + 16 * state.block2.maxItem16 + CHARACTER_SIZE;
+    const block5Size = timerSize * state.block2.maxTimers;
     const differsAt = (at: number, size: number, exempt: (i: number) => boolean): boolean => {
       for (let i = 0; i < size; i++) {
         if (exempt(i) && written[at + i] !== file[at + i]) return true;
@@ -149,7 +149,7 @@ function main(): void {
     };
     const timerDebris = differsAt(block5At, block5Size,
       (i) => timerSize === 16 && i % 16 >= 13 && !live.has(Math.floor(i / 16)));
-    const queueDebris = differsAt(block5At + block5Size, 2 * state.maxTimers, (i) => i >= liveWords);
+    const queueDebris = differsAt(block5At + block5Size, 2 * state.block2.maxTimers, (i) => i >= liveWords);
     const regions: Region[] = [
       {
         name: 'block 0  ext features', size: prefix, assert: true,
@@ -165,17 +165,17 @@ function main(): void {
         exemptWhy: 'the bytes SaveGame never assigns, or the sums of blocks 5-6\'s debris',
       },
       { name: 'block 2  GAMEBLOCK2', size: BLOCK2_SIZE, assert: true, field: block2Field },
-      { name: 'block 3  ITEM16', size: 16 * state.maxItem16, assert: true },
+      { name: 'block 3  ITEM16', size: 16 * state.block2.maxItem16, assert: true },
       { name: 'block 4  characters', size: CHARACTER_SIZE, assert: true },
       {
-        name: 'block 5  timers', size: timerSize * state.maxTimers, assert: true,
+        name: 'block 5  timers', size: timerSize * state.block2.maxTimers, assert: true,
         field: (i) => `timer ${Math.floor(i / timerSize)} +${i % timerSize}`,
         exempt: (i) =>
           timerSize === 16 && i % 16 >= 13 && !live.has(Math.floor(i / 16)),
         exemptWhy: 'unused13 of a freed slot',
       },
       {
-        name: 'block 6  timer queue', size: 2 * state.maxTimers, assert: true,
+        name: 'block 6  timer queue', size: 2 * state.block2.maxTimers, assert: true,
         exempt: (i) => i >= liveWords,
         exemptWhy: 'the queue past NumTimer',
       },
@@ -265,12 +265,12 @@ function main(): void {
       }
     }
 
-    console.log([name, save.objectIndex?.length ?? 0, reread.length, references].join('\t'));
+    console.log([name, save.extended.objectIndex?.length ?? 0, reread.length, references].join('\t'));
     check(references > 1000, `${name}: the world holds references worth checking (${references})`);
     check(broken === 0, `${name}: every reference names a live slot of the maps (${broken} do not)`);
     check(
-      !!save.objectIndex && reread.typeMap.join() === save.objectIndex.typeMap.join()
-        && reread.indexMap.join() === save.objectIndex.indexMap.join(),
+      !!save.extended.objectIndex && reread.typeMap.join() === save.extended.objectIndex.typeMap.join()
+        && reread.indexMap.join() === save.extended.objectIndex.indexMap.join(),
       `${name}: the maps written are the file's, slot for slot`);
   }
 

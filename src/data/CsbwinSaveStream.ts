@@ -2,7 +2,7 @@
  * What blocks 1 to 6 of a CSBWin save are wrapped in: each is XORed word by word with a
  * running hash and carries a checksum, and `GAMEBLOCK1` holds the hashes and checksums
  * of the other five (`doc/CSBWIN_SAVEGAME_REFERENCE.md`). Nothing here knows a block's
- * fields: those are `SaveGameLoader.ts`'s.
+ * fields: those are `SaveFile.ts`'s.
  *
  * Every word is big-endian, as CSBWin's `LE16()` reads it on the little-endian build
  * (`doc/CSBwin-src/CSBTypes.h:151`).

@@ -43,7 +43,7 @@ import { buildDsaSection, readExtendedFeatures, EXTENDED_FEATURES_SIZE } from '.
 import type { DsaDefinition } from '../../src/data/dungeonTypes';
 import { DungeonLoader } from '../../src/data/DungeonLoader';
 import { loadCsbwinWorld } from '../../src/data/CsbwinDungeonImage';
-import { loadSaveGameState } from '../../src/data/SaveGameLoader';
+import { readSaveFile } from '../../src/data/SaveFile';
 import { applyCsbwinSave } from '../../src/engine/CsbwinSaveGame';
 import { buildSaveFile } from '../../src/engine/SaveGameFile';
 import { StkOp } from '../../src/engine/dsa/DsaTypes';
@@ -135,7 +135,7 @@ console.log('3 and 4. The global variables at a save, and the round trip');
   check(data.expool!.length === blocks && second.length === first.length,
     'a second save writes the globals into the same records, and the pool keeps its size');
   check(same(readGlobalVariables(data).map((v) => v | 0), values), "the records hold the game's globals once saved");
-  check(loadSaveGameState(first).extendedFeatures?.numDSA === 3, "the file's header counts the three DSAs");
+  check(readSaveFile(first).extended.header?.numDSA === 3, "the file's header counts the three DSAs");
 
   const other = freshGame();
   applyCsbwinSave(other, first);

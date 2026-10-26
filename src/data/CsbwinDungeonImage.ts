@@ -13,28 +13,27 @@
  * them, are in `doc/PROVEN_FACTS.md` → "The dungeon image layout in a save file".
  */
 import { DungeonLoader } from './DungeonLoader';
-import { loadSaveGameState } from './SaveGameLoader';
+import { readSaveFile, type SaveFile } from './SaveFile';
 import type { DungeonData } from './dungeonTypes';
 
 export interface CsbwinWorld {
     dungeon: DungeonData;
-    /** Everything blocks 0-6 carried, already unscrambled and checksummed. */
-    save: ReturnType<typeof loadSaveGameState>;
+    /** The file's blocks, already unscrambled and checksummed, and what each says. */
+    save: SaveFile;
 }
 
 /**
- * Parse a whole CSBWin save: blocks 0-6 through `loadSaveGameState`, then the dungeon
+ * Parse a whole CSBWin save: blocks 0-6 through `readSaveFile`, then the dungeon
  * image through `DungeonLoader`.
  *
  * Throws if any block or the image fails its checksum or the layout does not close, so a
  * caller that gets a result has a world it can trust rather than a half-parsed one.
  */
 export function loadCsbwinWorld(file: Uint8Array): CsbwinWorld {
-    const save = loadSaveGameState(file);
+    const save = readSaveFile(file);
     // An enciphered save is read deciphered, the image as its blocks (`readExtendedFeatures`).
-    const bytes = save.data;
-    const imageOffset = save.dungeonImageOffset;
-    if (imageOffset === undefined) throw new Error('save has no dungeon image');
+    const bytes = save.extended.data;
+    const { imageOffset, cellFlagArraySize } = save;
 
     const layout = save.imageLayout;
     if (!layout) throw new Error('the dungeon image header did not parse');
@@ -44,7 +43,6 @@ export function loadCsbwinWorld(file: Uint8Array): CsbwinWorld {
     // there is only `WriteAndChecksum`'s final word (`doc/CSBwin-src/SaveGame.cpp:1320`).
     // If any section length is wrong the sum misses, and parsing on would read records
     // out of the middle of neighbouring sections rather than fail.
-    const cellFlagArraySize = save.cellFlagArraySize ?? 0;
     const end = layout.cellFlags + cellFlagArraySize;
     if (cellFlagArraySize === 0 || end !== bytes.length - 2) {
         throw new Error(
@@ -53,12 +51,12 @@ export function loadCsbwinWorld(file: Uint8Array): CsbwinWorld {
     }
 
     const loader = new DungeonLoader();
-    const objectIndex = save.objectIndex;
+    const { objectIndex, bigActuators, version, indirectText, expandedPortraits } = save.extended;
     const dungeon = loader.loadFromArray(bytes.subarray(imageOffset), {
-        bigActuators: save.bigActuators ?? false,
-        newScrolls: (save.version ?? 0) >= 0x42, // extended features version 'B'
-        indirectText: save.indirectText ?? false,
-        expandedPortraits: save.expandedPortraits ?? false,
+        bigActuators,
+        newScrolls: version >= 0x42, // extended features version 'B'
+        indirectText,
+        expandedPortraits,
         cellFlagArraySize,
         // Every RN in a save's image is a slot number in the object indirect index, not
         // the packed RN `dungeon.dat` stores — see `src/data/CsbwinObjectIndex.ts`.

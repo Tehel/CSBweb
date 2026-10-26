@@ -33,7 +33,7 @@ import type { DataSet } from '../data/DataSets';
 import type { DataSetFiles } from '../data/DataSetFiles';
 import { DungeonLoader } from '../data/DungeonLoader';
 import { checkDungeon, dungeonWalls, KNOWN_DUNGEONS, type DungeonCheck, type DungeonWalls, type KnownDungeon } from '../data/DungeonSignature';
-import { readsGameBlock1, stampRandomGameID } from '../data/SaveGameLoader';
+import { readsGameBlock1, stampRandomGameID } from '../data/SaveFile';
 import type { UtilityPortraits } from '../data/UtilityPortraits';
 import {
     SAVE_FILE_EXTENSION, joinedPlaythrough, readSaveFileFields, saveFileFieldsOf, slotOf,
@@ -412,7 +412,7 @@ export class GameSaves {
      */
     async importSave(file: ImportedFile, answer: ImportAnswer | null = null): Promise<ImportResult> {
         let walls: DungeonWalls;
-        let fields: SaveFileFields | null;
+        let fields: SaveFileFields;
         try {
             const world = loadCsbwinWorld(file.bytes);
             walls = await dungeonWalls(world.dungeon);
@@ -425,7 +425,6 @@ export class GameSaves {
             this.log(`${file.name} does not read as a saved game`, error);
             throw new SaveFileError(SAVED_GAME_DAMAGED);
         }
-        if (!fields) throw new SaveFileError(SAVED_GAME_DAMAGED);
         const own = await this.ownDungeons();
         const elsewhere = answer === 'elsewhere';
         let check = checkDungeon(walls, this.dataSet.id, own, elsewhere);

@@ -35,7 +35,7 @@ import { readFileSync } from 'node:fs';
 import { RoomType } from '../../src/core/types';
 import { readCsbwinPartyTail } from '../../src/data/CsbwinCharacters';
 import { applyCsbwinSave } from '../../src/engine/CsbwinSaveGame';
-import { loadSaveGameState } from '../../src/data/SaveGameLoader';
+import { readSaveFile } from '../../src/data/SaveFile';
 import type { Game } from '../../src/engine/Game';
 import { PartyFootprints } from '../../src/engine/PartyFootprints';
 import { applySaveBytes, buildSaveFile } from '../../src/engine/SaveGameFile';
@@ -102,7 +102,7 @@ function scenario(save: string, power: number): void {
   check(last === count, `${label}: each move while the spell runs raises the range's end to the count`);
 
   const file = buildSaveFile(game);
-  const tail = readCsbwinPartyTail(loadSaveGameState(file).characterBlock!);
+  const tail = readCsbwinPartyTail(readSaveFile(file).blocks.characters);
   console.log(`${label}: saved tail count=${tail.numFootprintEnt} range=[${tail.indexOfFirstMagicFootprint},` +
     `${tail.indexOfLastMagicFootprint}) active=${tail.magicFootprintsActive}`);
   check(tail.numFootprintEnt === count, `${label}: the save writes the trail's count`);

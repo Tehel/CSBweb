@@ -2,7 +2,7 @@
  * Prove the binary save blocks are laid out the way CSBWin lays them out.
  *
  * `tools/checks/savegame.ts` covers the runtime state a read restores. It never touches
- * the file: the CSBWin-shaped byte blocks that `SaveGameLoader` writes and reads.
+ * the file: the CSBWin-shaped byte blocks that `SaveFile.ts` writes and reads.
  *
  * Two things are pinned here, and only one of them can be pinned by a round trip.
  *
@@ -15,7 +15,7 @@
  * big-endian (`doc/CSBwin-src/CSBCode.cpp:9162` reads every word through `LE16`, which
  * is a swap on the little-endian build CSBWin ships as); this port used to read and
  * write them little-endian. Reader and writer agreed, every checksum matched, and
- * `saveSaveGameState` → `loadSaveGameState` round-tripped perfectly — in a format no
+ * `writeSaveFile` → `readSaveFile` round-tripped perfectly — in a format no
  * other program could read. So a round trip proves nothing here, and the canary below
  * is what does the work instead:
  *
@@ -33,11 +33,19 @@
  *
  * Run: `npm test -- --only=savegame-blocks.ts`
  */
-import { loadSaveGameState, saveSaveGameState, type SaveGameState } from '../../src/data/SaveGameLoader';
+import {
+  encodeBlock2,
+  encodeItem16,
+  encodeTimerQueue,
+  encodeTimers,
+  readSaveFile,
+  writeSaveFile,
+  type Block2,
+} from '../../src/data/SaveFile';
 import type { Item16Record, TimerRecord } from '../../src/data/dungeonTypes';
 import { check, fail, finish } from '../lib/check';
 
-/** Where `saveSaveGameState` puts block 2: straight after the 512-byte block 1. */
+/** Where `writeSaveFile` puts block 2: straight after the 512-byte block 1. */
 const BLOCK2_OFFSET = 512;
 const BLOCK2_SIZE = 128;
 
@@ -92,18 +100,32 @@ function makeTimer(): TimerRecord {
   };
 }
 
-function makeSave(handChar: number, magicCaster: number): SaveGameState {
+/** `GAMEBLOCK2` of one `ITEM16` and one queued timer, every other field zero. */
+function makeBlock2(handChar: number, magicCaster: number): Block2 {
   return {
-    item16: [makeItem16()],
-    timers: [makeTimer()],
-    timerQueue: [0],
-    maxItem16: 1,
-    maxTimers: 1,
-    sequencedTimers: false,
-    extendedTimers: false,
-    handChar,
-    magicCaster,
+    time: 0, ranseed: 0, objectInHand: 0, numCharacter: 0,
+    partyX: 0, partyY: 0, partyFacing: 0, partyLevel: 0,
+    handChar, magicCaster, numTimer: 1, firstAvailTimer: 0,
+    maxTimers: 1, item16QueLen: 0, lastMonsterAttackTime: 0, lastPartyMoveTime: 0,
+    partyMoveDisableTimer: 0, word11712: 0, word11714: 0, maxItem16: 1, timerSequence: 0,
   };
+}
+
+/**
+ * A file of blocks 1 to 6, with no Extended Features block, so in the 10-byte `TIMER`
+ * a file without one declares.
+ */
+function makeSave(handChar: number, magicCaster: number): Uint8Array {
+  return writeSaveFile({
+    block0: new Uint8Array(0),
+    block1: new Uint8Array(BLOCK2_OFFSET),
+    block2: encodeBlock2(makeBlock2(handChar, magicCaster)),
+    item16: encodeItem16([makeItem16()]),
+    characters: new Uint8Array(3328),
+    timers: encodeTimers([makeTimer()], 10, [0]),
+    timerQueue: encodeTimerQueue([0], 1),
+    image: new Uint8Array(0),
+  });
 }
 
 /** Byte offsets within block 2 at which two serialized saves differ. */
@@ -118,28 +140,28 @@ function block2Diff(a: Uint8Array, b: Uint8Array): number[] {
 function main(): void {
   // ---- The fields round-trip ----------------------------------------------
 
-  const written = saveSaveGameState(makeSave(2, 3));
-  const read = loadSaveGameState(written);
+  const written = makeSave(2, 3);
+  const read = readSaveFile(written);
 
   console.log('field\twritten\tread back');
   const row = (what: string, wrote: unknown, got: unknown): void => {
     console.log([what, wrote, got].join('\t'));
   };
-  row('gb2.handChar', 2, read.handChar);
-  row('gb2.MagicCaster', 3, read.magicCaster);
-  row('gb2.MaxTimers', 1, read.maxTimers);
-  row('gb2.MaxITEM16', 1, read.maxItem16);
-  row('timers[0].word8', '0xbeef', `0x${(read.timers?.[0]?.timerWord8 ?? 0).toString(16)}`);
+  row('gb2.handChar', 2, read.block2.handChar);
+  row('gb2.MagicCaster', 3, read.block2.magicCaster);
+  row('gb2.MaxTimers', 1, read.block2.maxTimers);
+  row('gb2.MaxITEM16', 1, read.block2.maxItem16);
+  row('timers[0].word8', '0xbeef', `0x${(read.timers[0]?.timerWord8 ?? 0).toString(16)}`);
   console.log('');
 
-  check(read.handChar === 2, 'gb2.handChar should round-trip');
-  check(read.magicCaster === 3, 'gb2.MagicCaster should round-trip');
-  check(read.maxTimers === 1, 'gb2.MaxTimers should round-trip');
-  check(read.maxItem16 === 1, 'gb2.MaxITEM16 should round-trip');
+  check(read.block2.handChar === 2, 'gb2.handChar should round-trip');
+  check(read.block2.magicCaster === 3, 'gb2.MagicCaster should round-trip');
+  check(read.block2.maxTimers === 1, 'gb2.MaxTimers should round-trip');
+  check(read.block2.maxItem16 === 1, 'gb2.MaxITEM16 should round-trip');
   // Every `TIMER` field. A save that carries only `timerWord8` cannot say *when*
   // anything fires, which is how doors and fuses used to be lost across a load.
   const wroteTimer = makeTimer();
-  const gotTimer = read.timers?.[0];
+  const gotTimer = read.timers[0];
   if (!gotTimer) {
     fail('the TIMER record should come back at all');
   } else {
@@ -149,7 +171,7 @@ function main(): void {
     }
   }
   check(
-    (read.timerQueue ?? []).join(',') === '0',
+    read.timerQueue.join(',') === '0',
     'the timer queue order should round-trip',
   );
 
@@ -172,17 +194,17 @@ function main(): void {
   // `d.HandChar` is -1 for "nobody", and the field is an `i16`: an unsigned read would
   // bring it back as 65535 and every `chIdx >= 0` test downstream would take the wrong
   // arm.
-  const empty = loadSaveGameState(saveSaveGameState(makeSave(-1, -1)));
-  row('gb2.handChar (none)', -1, empty.handChar);
-  check(empty.handChar === -1, 'a handChar of -1 should come back negative, not 0xffff');
-  check(empty.magicCaster === -1, 'a MagicCaster of -1 should come back negative, not 0xffff');
+  const empty = readSaveFile(makeSave(-1, -1));
+  row('gb2.handChar (none)', -1, empty.block2.handChar);
+  check(empty.block2.handChar === -1, 'a handChar of -1 should come back negative, not 0xffff');
+  check(empty.block2.magicCaster === -1, 'a MagicCaster of -1 should come back negative, not 0xffff');
   console.log('');
 
   // ---- The byte-order canary ----------------------------------------------
 
-  const lowByte = block2Diff(written, saveSaveGameState(makeSave(3, 3)));
-  const wholeWord = block2Diff(written, saveSaveGameState(makeSave(0x0200, 3)));
-  const caster = block2Diff(written, saveSaveGameState(makeSave(2, 4)));
+  const lowByte = block2Diff(written, makeSave(3, 3));
+  const wholeWord = block2Diff(written, makeSave(0x0200, 3));
+  const caster = block2Diff(written, makeSave(2, 4));
 
   console.log('change\tdiffers at (byte offsets in block 2)');
   console.log(`handChar 2 -> 3\t${lowByte.join(',')}`);

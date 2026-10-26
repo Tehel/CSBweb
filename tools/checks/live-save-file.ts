@@ -5,7 +5,7 @@
  * save** — bytes CSBWin wrote, re-serialised. This one starts where the game does: a
  * real `Game` on `dungeon.dat`, played, with `buildSaveFile` writing the file the
  * disk menu and F5 write. Until the three load-time conversions were ported that was
- * impossible, and `saveSaveGameState` emitted a blocks 0-6 prefix no reader can load.
+ * impossible, and the writer emitted a blocks 0-6 prefix no reader can load.
  *
  * **Why it is a round trip and not a byte comparison.** There is nothing to compare
  * against: no CSBWin file exists for a game this port played. So the claim this tool
@@ -317,14 +317,14 @@ function writeAndReload(label: string, game: Game): Game | null {
     fail(`${label}: the file this port wrote should parse as a whole — ${(error as Error).message}`);
     return null;
   }
-  check(parsed.save.extendedFeatures !== undefined, `${label}: it carries an Extended Features block`);
-  check(parsed.save.dungeonImageOffset !== undefined, `${label}: and a dungeon image`);
+  check(parsed.save.extended.header !== undefined, `${label}: it carries an Extended Features block`);
+  check(parsed.save.imageOffset !== undefined, `${label}: and a dungeon image`);
   // Plus `DMRules` when the game holds `DMRulesDesignOption` (`SaveGame.cpp:977-978`).
   const flagsExpected = game.ctx.rules.dmRulesDesignOption ? 0xe9 : 0xa9;
-  check((parsed.save.extendedFeatures?.flags ?? 0) === flagsExpected,
+  check((parsed.save.extended.header?.flags ?? 0) === flagsExpected,
     `${label}: flags declare LevelDSAInfo|IndirectText|ExpandedPortraits|BigActuators, and DMRules ` +
-    `with the design option (0x${(parsed.save.extendedFeatures?.flags ?? 0).toString(16)})`);
-  check(parsed.save.sequencedTimers === true && parsed.save.extendedTimers === true,
+    `with the design option (0x${(parsed.save.extended.header?.flags ?? 0).toString(16)})`);
+  check(parsed.save.extended.sequencedTimers === true && parsed.save.extended.extendedTimers === true,
     `${label}: and the 16-byte TIMER the block 5 writer used`);
   check(parsed.save.cellFlagArraySize === 12366,
     `${label}: cellFlagArraySize is the 12366 dungeon.dat declares ` +
@@ -332,16 +332,16 @@ function writeAndReload(label: string, game: Game): Game | null {
   check(parsed.dungeon.header.textDataSize === (parsed.dungeon.indirectTextIndex ?? []).length,
     `${label}: NumWordsInTextArray is the index length the conversion wrote`);
   const held = objectIndexOf(game.ctx.dungeon.rnMaps);
-  check(!!parsed.save.objectIndex && parsed.save.objectIndex.typeMap.join() === held.typeMap.join()
-    && parsed.save.objectIndex.indexMap.join() === held.indexMap.join(),
+  check(!!parsed.save.extended.objectIndex && parsed.save.extended.objectIndex.typeMap.join() === held.typeMap.join()
+    && parsed.save.extended.objectIndex.indexMap.join() === held.indexMap.join(),
     `${label}: block 0 carries the game's object indirect index, slot for slot (${held.length} slots)`);
   // `gb2.ObjectInHand = d.objectInHand.ConvertToInteger()` (`SaveGame.cpp:1058`): an
   // empty cursor is `RNnul`, as in every committed save that has one. `RNempty` (0)
   // would load in CSBWin as an object in hand (`:1773`, `:2966`).
-  check(parsed.save.block1?.saveOption === 1, `${label}: SaveOption is SAVE AND PLAY's 1`);
+  check(parsed.save.block1.saveOption === 1, `${label}: SaveOption is SAVE AND PLAY's 1`);
   const inHand = game.ctx.party.state.objectInHand;
   if (inHand === OBJECT_ID_NULL) {
-    const word = parsed.save.block2?.objectInHand;
+    const word = parsed.save.block2.objectInHand;
     check(word === 0xffff, `${label}: the empty cursor is written as RNnul (0x${(word ?? 0).toString(16)})`);
   }
 
@@ -525,7 +525,7 @@ function main(): void {
   console.log('\n=== 3. GAMEBLOCK1 of an Atari DM save ===');
   const world = loadCsbwinWorld(new Uint8Array(readFileSync(savePath('csbgame7.dat'))));
   const own = buildCsbwinRuntimeState(world).game.block1;
-  world.save.block1!.byte22596 = 1;
+  world.save.block1.byte22596 = 1;
   const atari = buildCsbwinRuntimeState(world).game.block1;
   console.log(`  csbgame7.dat as written: Word22592 ${own?.word22592}, Word22596 ${own?.word22596}; ` +
     `with Byte22596 1: ${atari?.word22592}, ${atari?.word22596}`);

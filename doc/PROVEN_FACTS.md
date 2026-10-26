@@ -3575,7 +3575,7 @@ sits at or above `FirstAvailTimer` in every one:
 | `csbgame4-door-opening.dat` | 2 | 2 | 2 | 2 |
 | `csbgame7.dat` | 76 | 110 | 110 | 76 |
 
-This port keeps no such mark, so `saveSaveGameState` writes 0xcd for a slot that is live
+This port keeps no such mark, so `encodeTimers` writes 0xcd for a slot that is live
 *now* and 0 otherwise — right for a slot CSBWin has never freed, and invisible either
 way. `tools/checks/save-blocks-vs-file.ts` asserts every other byte of block 5 against the
 file and exempts these three in freed slots by name.
@@ -4168,7 +4168,7 @@ whatever file is read after it.
 `rc4PrepareKey` and `rc4Encipher` (`src/data/CsbwinExtendedFeatures.ts`) are the two
 functions, and `simpleEncipher` puts a whole file through them. `readExtendedFeatures`
 hands back an enciphered file deciphered whole, which every reader reads on from;
-`ctx.rules.simpleEncipher` is the global, and `saveSaveGameState` enciphers a save whose
+`ctx.rules.simpleEncipher` is the global, and `writeSaveFile` enciphers a save whose
 block declares `SimpleEncryption`. `tools/checks/extended-features-read.ts` checks the
 stream against `RC4.cpp` compiled as it stands, and against Conflux 3.5's `dungeon.dat`
 (`tools/fixtures/gamefiles/conflux-3.5-b8/`), which is such a file: deciphered, it opens with the
@@ -6979,7 +6979,7 @@ each zero is written in place of a commented-out `STRandom()` (`SaveGame.cpp:733
 and `tools/fixtures/gamefiles/csb/mini.dat` holds 127 words that are not zero there. No other
 block's hash or checksum covers a field of `GAMEBLOCK1`, so a field of its second half
 is rewritten by changing that field and word 127 alone: `stampRandomGameID`
-(`src/data/SaveGameLoader.ts`) writes `RandomGameID` so, six bytes of the file
+(`src/data/SaveFile.ts`) writes `RandomGameID` so, six bytes of the file
 (`tools/checks/save-stamp.ts`). Bytes 256-299 of `Byte740`, `FILL438` (302) and
 `Checksum354`…`374` are never assigned. They are zero in every committed save.
 

@@ -13,12 +13,24 @@
  *   for (const path of genuineSaves()) …
  *   readFileSync(savePath('csbgame4-door-opening.dat'))
  *
- * And `memoryStore`, a save store in memory, for a tool that runs the page's saves.
+ * And `memoryStore`, a save store in memory, for a tool that runs the page's saves, and
+ * `rewriteSaveFile`, a file read and written again through the port's own codecs.
  */
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import { sortSaveEntries, type SaveEntry, type SaveStore } from '../../src/data/saves/SaveStore';
+import { buildExtendedFeaturesPrefix } from '../../src/data/CsbwinExtendedFeatures';
+import type { CsbwinObjectIndex } from '../../src/data/CsbwinObjectIndex';
+import {
+  encodeBlock1,
+  encodeBlock2,
+  encodeItem16,
+  encodeTimerQueue,
+  encodeTimers,
+  writeSaveFile,
+  type SaveFile,
+} from '../../src/data/SaveFile';
 
 export const SAVE_DIR = 'tools/fixtures';
 
@@ -50,6 +62,57 @@ export function savePath(name: string): string {
   const path = resolve(SAVE_DIR, name);
   if (!existsSync(path)) throw new Error(`no save called ${name} in ${SAVE_DIR}`);
   return path;
+}
+
+/** What `rewriteSaveFile` encodes: a read file's views, and the two it rebuilds. */
+export interface RewrittenViews extends Pick<SaveFile, 'block1' | 'block2' | 'item16' | 'timers' | 'timerQueue'> {
+  /** Block 4, written as given. */
+  characters: Uint8Array;
+  /** The maps block 0 carries; the file's own by default. */
+  objectIndex: CsbwinObjectIndex | undefined;
+  /** Blocks 7-14, none by default: the file is then its blocks 0-6. */
+  image: Uint8Array;
+}
+
+/**
+ * A save read and written again, each block encoded from what the read says by the
+ * port's own codecs, as the port would write the same game: block 0 rebuilt from its
+ * header, `numTimer` the queue's length. `changes` replaces any of the views first. The
+ * file's own bytes go out only for block 4, which `CsbwinCharacters.ts` reads whole.
+ */
+export function rewriteSaveFile(save: SaveFile, changes: Partial<RewrittenViews> = {}): Uint8Array {
+  const views: RewrittenViews = {
+    block1: save.block1,
+    block2: save.block2,
+    item16: save.item16,
+    timers: save.timers,
+    timerQueue: save.timerQueue,
+    characters: save.blocks.characters,
+    objectIndex: save.extended.objectIndex,
+    image: new Uint8Array(0),
+    ...changes,
+  };
+  const ef = save.extended;
+  const timerSize = ef.extendedTimers ? 16 : ef.sequencedTimers ? 12 : 10;
+  return writeSaveFile({
+    block0: ef.header
+      ? buildExtendedFeaturesPrefix({
+        header: ef.header,
+        typeMap: views.objectIndex?.typeMap ?? new Uint8Array(0),
+        indexMap: views.objectIndex?.indexMap ?? new Uint16Array(0),
+        dsaIndex: ef.dsaIndex,
+        gameInfo: ef.gameInfo,
+        dsaLevelIndex: ef.dsaLevelIndex,
+      })
+      : new Uint8Array(0),
+    block1: encodeBlock1(views.block1),
+    block2: encodeBlock2({ ...views.block2, numTimer: views.timerQueue.length }),
+    item16: encodeItem16(views.item16),
+    characters: views.characters,
+    timers: encodeTimers(views.timers, timerSize, views.timerQueue),
+    timerQueue: encodeTimerQueue(views.timerQueue, views.block2.maxTimers),
+    image: views.image,
+  });
 }
 
 /**

@@ -36,7 +36,7 @@ import { readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 
 import { applyCsbwinSave } from '../../src/engine/CsbwinSaveGame';
-import { loadSaveGameState } from '../../src/data/SaveGameLoader';
+import { readSaveFile } from '../../src/data/SaveFile';
 import { TimerFunction, TimerQueue, timerLess, type TimerEntry } from '../../src/engine/TimerQueue';
 import { newGame, stockDungeon, stockGame, stockGraphics } from '../lib/game';
 import { check, finish } from '../lib/check';
@@ -60,8 +60,8 @@ function heapFault(queue: readonly TimerEntry[], less: Less): number {
 function savedEntries(file: string): {
   entries: TimerEntry[]; sequence: number; time: number; maxTimers: number; firstAvailTimer: number;
 } {
-  const save = loadSaveGameState(new Uint8Array(readFileSync(savePath(file))));
-  const entries = (save.timerQueue ?? []).map((index): TimerEntry => {
+  const save = readSaveFile(new Uint8Array(readFileSync(savePath(file))));
+  const entries = save.timerQueue.map((index): TimerEntry => {
     const t = save.timers![index];
     return {
       index, time: t.time, level: t.level, function: t.function, uByte5: t.uByte5,
@@ -70,8 +70,8 @@ function savedEntries(file: string): {
     };
   });
   return {
-    entries, sequence: save.timerSequence ?? 0, time: save.block2?.time ?? 0,
-    maxTimers: save.maxTimers, firstAvailTimer: save.block2?.firstAvailTimer ?? 0,
+    entries, sequence: save.block2.timerSequence, time: save.block2.time,
+    maxTimers: save.block2.maxTimers, firstAvailTimer: save.block2.firstAvailTimer,
   };
 }
 
@@ -266,7 +266,7 @@ function checkLoadedGames(files: string[]): void {
 function checkTableSize(files: string[]): void {
   console.log('\n=== 5. the table\'s size ===');
   const size = stockGame().ctx.timers.getMaxTimers();
-  const saved = files.map((file) => loadSaveGameState(new Uint8Array(readFileSync(savePath(file)))).maxTimers);
+  const saved = files.map((file) => readSaveFile(new Uint8Array(readFileSync(savePath(file)))).block2.maxTimers);
   console.log(`  a new game: ${size} slots; the saves: ${[...new Set(saved)].join(', ')}`);
   check(size === 467, `a new game's table is 100 + (182 + 75) + (0 + 60) + (0 + 50) = 467 slots, not ${size}`);
   check(saved.every((n) => n === size), 'and every committed save carries that gb2.MaxTimers');

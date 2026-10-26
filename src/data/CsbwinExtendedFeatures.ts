@@ -453,6 +453,9 @@ export function buildDsaSection(index: DsaIndex): Uint8Array {
     return wcs.result();
 }
 
+/** What `readExtendedFeatures` reads of a file's block 0. */
+export type ExtendedFeaturesRead = ReturnType<typeof readExtendedFeatures>;
+
 /**
  * `ReadExtendedFeatures` (`doc/CSBwin-src/SaveGame.cpp:299-440`) over the front of a file,
  * a save's or a `dungeon.dat`'s: the block, the object maps, the DSAs, the game
@@ -905,7 +908,7 @@ export function readGameInfo(size: number, text: Uint8Array): GameInfo {
  * `BigActuators` (`:986-988`), which are the shapes of blocks 11-13 and of `CHARDESC`.
  * They must agree with the image actually written, which is what
  * `convertOriginalDungeon` guarantees. `DMRules` is `DMRulesDesignOption` (`:977-978`).
- * `SimpleEncryption` is `simpleEncipher` (`:968-971`), and `saveSaveGameState` then
+ * `SimpleEncryption` is `simpleEncipher` (`:968-971`), and `writeSaveFile` then
  * enciphers the whole file (`:939-946`). `AutoRecord` is an option this port does not
  * model and writes off. Measured: every committed save carries 0xe9, the four (0xa9)
  * plus `DMRules`.

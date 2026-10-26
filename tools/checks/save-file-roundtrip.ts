@@ -3,7 +3,7 @@
  *
  * Every other tool in this group compares one block with the bytes CSBWin wrote.
  * This one is the other half: it takes a genuine save, parses it
- * completely, **re-serialises the entire file** through `saveSaveGameState` with a
+ * completely, **re-serialises the entire file** through `writeSaveFile` with a
  * dungeon image and a closing checksum, and then hands the result to this port's own
  * reader. If anything the writer emits disagrees with what the reader expects, the file
  * either fails to parse at all — the image closure check in `loadCsbwinWorld` is
@@ -24,7 +24,6 @@
  */
 import { readFileSync } from 'node:fs';
 
-import { saveSaveGameState } from '../../src/data/SaveGameLoader';
 import { loadCsbwinWorld } from '../../src/data/CsbwinDungeonImage';
 import { buildCsbwinCharacterBlock, readCsbwinParty, readCsbwinPartyTail } from '../../src/data/CsbwinCharacters';
 import { objectIndexOf } from '../../src/data/CsbwinObjectIndex';
@@ -35,7 +34,7 @@ import {
 } from '../../src/data/CsbwinDungeonImageWriter';
 import type { DungeonData, Databases, TimerRecord } from '../../src/data/dungeonTypes';
 import { check, finish } from '../lib/check';
-import { genuineSaves } from '../lib/saves';
+import { genuineSaves, rewriteSaveFile } from '../lib/saves';
 
 const DATABASE_KEYS: Array<keyof Databases> = [
   'doors', 'teleporters', 'texts', 'actuators', 'creatures', 'weapons', 'clothing',
@@ -53,25 +52,24 @@ function rewrite(bytes: Uint8Array): {
 } {
   const { dungeon, save } = loadCsbwinWorld(bytes);
 
-  const block = save.characterBlock!;
-  const champions = readCsbwinParty(block, save.block2!.numCharacter).map((c) => c.champion);
+  const block = save.blocks.characters;
+  const champions = readCsbwinParty(block, save.block2.numCharacter).map((c) => c.champion);
   const tail = readCsbwinPartyTail(block);
 
   const image = buildDungeonImage(dungeon, {
-    indirectText: save.indirectText ?? false,
-    bigActuators: save.bigActuators ?? false,
-    newScrolls: (save.version ?? 0) >= 0x42,
+    indirectText: save.extended.indirectText,
+    bigActuators: save.extended.bigActuators,
+    newScrolls: save.extended.version >= 0x42,
   });
   const index = objectIndexOf(dungeon.rnMaps);
-  const written = saveSaveGameState({
-    ...save,
+  const written = rewriteSaveFile(save, {
     objectIndex: index,
-    characterBlock: buildCsbwinCharacterBlock(champions, tail),
-    dungeonImage: image,
+    characters: buildCsbwinCharacterBlock(champions, tail),
+    image,
   });
   return {
     written, image, slots: index.length,
-    timerObjects: objectCarryingTimers(save.timers ?? [], save.timerQueue ?? []).map(({ slot, at, rn }) => (
+    timerObjects: objectCarryingTimers(save.timers, save.timerQueue).map(({ slot, at, rn }) => (
       { slot, at, object: rn }
     )),
   };
@@ -165,7 +163,7 @@ function main(): void {
 
     // The Extended Features block declares block 14's length and the reader believes it,
     // so the two must agree or the image will not close.
-    check((save.extendedFeatures?.cellFlagArraySize ?? 0) === cellFlagArraySize(before.maps),
+    check((save.extended.header?.cellFlagArraySize ?? 0) === cellFlagArraySize(before.maps),
       `${name}: the declared cell flag array length is the one we measure`);
 
     const sum = buildImageChecksum(image);
@@ -181,8 +179,8 @@ function main(): void {
 
     /* ---- the party, which is where the possession slots are ---- */
 
-    const theirs = readCsbwinParty(save.characterBlock!, save.block2!.numCharacter);
-    const ours = readCsbwinParty(round.save.characterBlock!, round.save.block2!.numCharacter);
+    const theirs = readCsbwinParty(save.blocks.characters, save.block2.numCharacter);
+    const ours = readCsbwinParty(round.save.blocks.characters, round.save.block2.numCharacter);
     check(theirs.length === ours.length, `${name}: the party is still ${theirs.length} champions`);
     let slotsWrong = 0;
     theirs.forEach((c, i) => {
@@ -199,19 +197,19 @@ function main(): void {
     // The object-carrying timers, which are the one RN the reader leaves raw and the
     // writer therefore has to translate by hand. `csbgame-flying-sword.dat` has one.
     for (const { slot, at, object } of timerObjects) {
-      const timer = round.save.timers?.[slot];
+      const timer = round.save.timers[slot];
       const word = at === 6 ? timer?.timerWord6 : timer?.timerWord8;
       check(((word ?? 0) & 0xffff) === object,
         `${name}: timer ${slot} still carries the same flying object`);
     }
 
-    const objectInHand = round.save.block2?.objectInHand;
-    const expected = save.block2?.objectInHand;
+    const objectInHand = round.save.block2.objectInHand;
+    const expected = save.block2.objectInHand;
     check(objectInHand === expected, `${name}: GAMEBLOCK2.ObjectInHand names the same object`);
     check(
-      !!round.save.objectIndex && !!save.objectIndex
-        && round.save.objectIndex.typeMap.join() === save.objectIndex.typeMap.join()
-        && round.save.objectIndex.indexMap.join() === save.objectIndex.indexMap.join(),
+      !!round.save.extended.objectIndex && !!save.extended.objectIndex
+        && round.save.extended.objectIndex.typeMap.join() === save.extended.objectIndex.typeMap.join()
+        && round.save.extended.objectIndex.indexMap.join() === save.extended.objectIndex.indexMap.join(),
       `${name}: the object indirect index survives slot for slot`);
   }
 

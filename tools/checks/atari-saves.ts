@@ -38,7 +38,7 @@ import { cellFlagArraySize } from '../../src/data/CsbwinDungeonImageWriter';
 import { applyCsbwinSave } from '../../src/engine/CsbwinSaveGame';
 import type { DungeonData } from '../../src/data/dungeonTypes';
 import { GraphicsLoader } from '../../src/data/GraphicsLoader';
-import { loadSaveGameState } from '../../src/data/SaveGameLoader';
+import { readSaveFile } from '../../src/data/SaveFile';
 import { newGame, stockDungeon } from '../lib/game';
 import { check, finish } from '../lib/check';
 import { savePath } from '../lib/saves';
@@ -62,12 +62,12 @@ for (const name of ATARI_SAVES) {
   const bytes = new Uint8Array(readFileSync(resolve(CSB, name)));
   console.log(`\n=== ${name} — ${bytes.length} bytes ===`);
 
-  const state = loadSaveGameState(bytes);
-  const image = state.dungeonImageOffset ?? 0;
+  const state = readSaveFile(bytes);
+  const image = state.imageOffset ?? 0;
   const word2 = readU16BE(bytes, image + 2);
-  console.log(`  Extended Features: ${state.extendedFeatures ? 'present' : 'absent'}, ` +
+  console.log(`  Extended Features: ${state.extended.header ? 'present' : 'absent'}, ` +
     `image at ${image}, header word 2 = ${word2}, cell flag size = ${state.cellFlagArraySize}`);
-  check(state.extendedFeatures === undefined, `${name}: has no Extended Features block`);
+  check(state.extended.header === undefined, `${name}: has no Extended Features block`);
   check(state.cellFlagArraySize === word2 && word2 > 0,
     `${name}: the cell flag size is the image header's word 2 (${word2})`);
 
@@ -125,7 +125,7 @@ for (const name of ATARI_SAVES) {
     && installed.levelIndex.join() === d.levelIndex.join()
     && installed.header.randomSeed === d.header.randomSeed,
     `${name}: the levels' descriptors, levelIndex and the header are the save's`);
-  const gb2 = world.save.block2!;
+  const gb2 = world.save.block2;
   const party = game.ctx.party.state;
   console.log(`  party at (${party.position.x},${party.position.y}) level ${party.position.z}, ` +
     `${party.champions.map((c) => c.name).join(', ')}`);
@@ -152,8 +152,8 @@ for (const name of ATARI_SAVES) {
 }
 
 // The control: the block's own size stands.
-const control = loadSaveGameState(new Uint8Array(readFileSync(savePath(CONTROL))));
-const declared = control.extendedFeatures?.cellFlagArraySize ?? 0;
+const control = readSaveFile(new Uint8Array(readFileSync(savePath(CONTROL))));
+const declared = control.extended.header?.cellFlagArraySize ?? 0;
 console.log(`\ncontrol ${CONTROL}: block declares ${declared}, taken ${control.cellFlagArraySize}`);
 check(declared > 0 && control.cellFlagArraySize === declared, 'a CSBWin save keeps its block\'s cell flag size');
 

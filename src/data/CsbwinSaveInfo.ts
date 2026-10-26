@@ -3,7 +3,7 @@
  *
  * A save's row holds its level, its roster and its playthrough, read from the file when
  * the row is written (`src/data/saves/SaveStore.ts`). They come out of blocks 1, 2 and 4,
- * which `loadSaveGameState` already unscrambles and checksums — this module only unpacks
+ * which `readSaveFile` already unscrambles and checksums — this module only unpacks
  * the champion names out of the raw character block it hands back.
  *
  * Of the image, the best part of a megabyte, it reads only the layout
@@ -11,7 +11,7 @@
  * file whose blocks unscramble but whose image is damaged has a row and fails on LOAD,
  * with the reason on the menu's status line.
  */
-import { loadSaveGameState, type SaveGameState } from './SaveGameLoader';
+import { readSaveFile, type SaveFile } from './SaveFile';
 
 /**
  * `CHARDESC` is 800 bytes (`doc/CSBwin-src/CSB.h:2542-2653`, whose last member is
@@ -112,20 +112,19 @@ export interface CsbwinSaveInfo {
  */
 export function readCsbwinSaveInfo(bytes: Uint8Array): CsbwinSaveInfo | null {
     try {
-        return csbwinSaveInfoOf(loadSaveGameState(bytes));
+        return csbwinSaveInfoOf(readSaveFile(bytes));
     } catch {
         return null;
     }
 }
 
 /**
- * The listing fields of a save already read (`loadSaveGameState`), so that a caller who
- * has read the file reads none of it again; `null` without its blocks 1 and 2.
+ * The listing fields of a save already read (`readSaveFile`), so that a caller who has
+ * read the file reads none of it again.
  */
-export function csbwinSaveInfoOf(state: SaveGameState): CsbwinSaveInfo | null {
-    const { block1, block2 } = state;
-    if (!block1 || !block2) return null;
-    const roster = state.characterBlock ? readCharacterNames(state.characterBlock) : [];
+export function csbwinSaveInfoOf(save: SaveFile): CsbwinSaveInfo {
+    const { block1, block2 } = save;
+    const roster = readCharacterNames(save.blocks.characters);
     const champions = roster
         .slice(0, Math.max(0, Math.min(4, block2.numCharacter)))
         .map((c) => c.name)

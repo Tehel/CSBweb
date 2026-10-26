@@ -34,7 +34,7 @@
  * All four are pure, so the tools run them (`tools/checks/save-menu.ts`,
  * `tools/checks/save-stamp.ts`); `idb.ts` calls them once, in the upgrade.
  */
-import { holdsNoBlock1Words, stampBlock1Words, stampRandomGameID } from '../SaveGameLoader';
+import { holdsNoBlock1Words, stampBlock1Words, stampRandomGameID } from '../SaveFile';
 import {
     SAVE_FILE_EXTENSION, joinedPlaythrough, readSaveFileFields, saveEntryOf,
     type DrawPlaythrough, type SaveFileRecord, type SaveRecord, type StoredSaveEntry, type StoredSaveRecord,

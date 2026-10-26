@@ -398,33 +398,34 @@ New state-representation debt goes here, and jumps the queue.
 
 ### D21 ⏳ A save has nine shapes
 
-What a save is passes through `ExtendedFeaturesBlock`, `readExtendedFeatures`'s result,
-`SaveGameState`, `Block1`/`Block2` and `Block1State`, `CsbwinWorld`, `UtilityGame`,
-`DungeonData`, `DungeonSnapshot` and `RuntimeSaveState`.
+What a save is passes through `SaveFile` and `SaveFileBlocks`, `Block1State`,
+`CsbwinWorld`, `UtilityGame`, `DungeonData`, `DungeonSnapshot` and `RuntimeSaveState`.
 
-- **`SaveGameState` is both the reader's output and the writer's input**: some 35 optional
-  fields, image contents beside block fields, fields given twice with precedence rules
-  (`timerQueue.length ?? block2.numTimer`, `handChar ?? block2.handChar`,
-  `sequencedTimers`/`extendedTimers` beside the header's `extendedFlags`). `objectInHand` is
-  set twice in `buildSaveFile`, and `block1?` defaults to `emptyBlock1()`, the four zero
-  words the utility refuses as "ALREADY UTILIZED". Its reader always gives `timers`,
-  `timerQueue` and `timerSequence`, which `buildCsbwinRuntimeState` still reads through
-  `?? []` and `?? 0` (`src/engine/CsbwinSaveGame.ts:300-302`).
-- **`Chaos` reads and writes the file again**: `Chaos.readGame` (`src/engine/Chaos.ts:102`)
-  walks blocks 1 to 6 with its own hash and checksum offsets, and `TAG000fc4` (`:327`)
-  writes the scramble and the checksum again.
-- A load installs the world, then applies a snapshot of that same world over it
-  (`src/engine/CsbwinSaveGame.ts:350`), where a new game's read applies none (`ReadState`'s
-  optional `snapshot`).
+Done: each database has its codec, `{ read, write }` in the `DBType`-keyed
+`DATABASE_CODECS` (`src/data/DatabaseCodecs.ts`), which `DungeonLoader`, the image writer
+and `clearedRecords` share, a record's size being `dbEntrySize`, CSBWin's table. And the
+file has one: `readSaveFile` and `writeSaveFile` (`src/data/SaveFile.ts`), over
+`SaveFileBlocks`, every block plain as the file holds it, which is what the writer
+writes, and `SaveFile`, those blocks with what each says, every field required. The
+loader (`loadCsbwinWorld`), the game's writer (`buildSaveFile`) and `CsbwinSaveInfo` go
+through it; `legacyRows`' stamps are its `restampBlock1`.
 
-Paying it, in steps. The records are done: each database has its codec, `{ read, write }`
-in the `DBType`-keyed `DATABASE_CODECS` (`src/data/DatabaseCodecs.ts`), which
-`DungeonLoader`, the image writer and `clearedRecords` share, a record's size being
-`dbEntrySize`, CSBWin's table. What is left: one pure `SaveFile` codec with required fields
-(each block's bytes and its parsed view), shared by the loader, the writer, `Chaos`,
-`legacyRows` and `CsbwinSaveInfo`; then `toSaveFile(game)` and `fromSaveFile(game, file)`
-on the engine's side, and `RuntimeSaveState` out of the save path. C178 is the kind of
-asymmetry it removes.
+What is left, in steps:
+
+1. **`Chaos` reads and writes the file again**: `Chaos.readGame` (`src/engine/Chaos.ts:102`)
+   walks blocks 0 to 6 with its own hash and checksum offsets, and `TAG000fc4` (`:327`)
+   writes the scramble and the checksums again. `UtilityGame` is `SaveFileBlocks` with
+   the image cut at its cell flags: `ReadSavedGame` becomes `readSaveFile` and its own
+   checks (the names cleared past their terminators, the image read and summed), and
+   `TAG000fc4` its edits of `GAMEBLOCK1` and `writeSaveFile`, whose checksums take the
+   hashes the block holds, as `_TAG000fc4`'s do.
+2. **`toSaveFile(game)` and `fromSaveFile(game, file)` on the engine's side, and
+   `RuntimeSaveState` out of the save path.** A load installs the world, then applies a
+   snapshot of that same world over it (`src/engine/CsbwinSaveGame.ts:346`), where a new
+   game's read applies none (`ReadState`'s optional `snapshot`), and the seven fields a
+   save carries beside its image are assigned to the world and put in the snapshot,
+   twice over (`applyCsbwinSave`, `buildCsbwinRuntimeState`). C178 is the kind of
+   asymmetry it removes.
 
 ---
 

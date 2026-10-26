@@ -31,7 +31,7 @@ import {
   readCsbwinPartyTail,
 } from '../../src/data/CsbwinCharacters';
 import { CHARDESC_SIZE } from '../../src/data/CsbwinSaveInfo';
-import { loadSaveGameState, saveSaveGameState } from '../../src/data/SaveGameLoader';
+import { readSaveFile, writeSaveFile } from '../../src/data/SaveFile';
 import { loadCsbwinWorld } from '../../src/data/CsbwinDungeonImage';
 import { applyCsbwinSave, buildCsbwinRuntimeState } from '../../src/engine/CsbwinSaveGame';
 import type { Champion } from '../../src/engine/gameTypes';
@@ -79,9 +79,9 @@ function main(): void {
 
   for (const path of saves) {
     const name = path.split('/').pop() ?? path;
-    const state = loadSaveGameState(new Uint8Array(readFileSync(path)));
-    const original = state.characterBlock;
-    const numCharacter = state.block2?.numCharacter ?? 0;
+    const state = readSaveFile(new Uint8Array(readFileSync(path)));
+    const original = state.blocks.characters;
+    const numCharacter = state.block2.numCharacter;
     if (!original) { check(false, `${name}: should carry a character block`); continue; }
     check(original.length === CHARACTER_BLOCK_SIZE, `${name}: block 4 is 3328 bytes`);
 
@@ -124,8 +124,8 @@ function main(): void {
 
   /* ---- the paths a live game takes, which no committed save can exercise ---- */
 
-  const state = loadSaveGameState(new Uint8Array(readFileSync(resolve(FIXTURE))));
-  const original = state.characterBlock!;
+  const state = readSaveFile(new Uint8Array(readFileSync(resolve(FIXTURE))));
+  const original = state.blocks.characters;
   const tail = readCsbwinPartyTail(original);
   const champion = readCsbwinCharacter(original, 0).champion;
 
@@ -180,22 +180,21 @@ function main(): void {
   );
 
   // 4. And through the file: block 4 packed, scrambled, checksummed, written, read back.
-  //    `saveSaveGameState` used to put 3328 zeros here whatever it was given.
   const champions = [champion, readCsbwinCharacter(original, 1).champion];
-  const file = saveSaveGameState({
-    item16: [], timers: [], maxItem16: 0, maxTimers: 0,
-    sequencedTimers: false, extendedTimers: false,
-    characterBlock: buildCsbwinCharacterBlock(champions, tail),
+  const file = writeSaveFile({
+    block0: new Uint8Array(0), block1: new Uint8Array(512), block2: new Uint8Array(128),
+    item16: new Uint8Array(0), characters: buildCsbwinCharacterBlock(champions, tail),
+    timers: new Uint8Array(0), timerQueue: new Uint8Array(0), image: new Uint8Array(0),
   });
-  const reread = loadSaveGameState(file);
+  const reread = readSaveFile(file);
   check(
-    reread.characterBlock !== undefined &&
+    reread.blocks.characters !== undefined &&
       champions.every((c, i) =>
-        JSON.stringify(readCsbwinCharacter(reread.characterBlock!, i).champion) === JSON.stringify(c)),
+        JSON.stringify(readCsbwinCharacter(reread.blocks.characters, i).champion) === JSON.stringify(c)),
     'the champions survive scramble, checksum and unscramble in a written file',
   );
   check(
-    JSON.stringify(readCsbwinPartyTail(reread.characterBlock!)) === JSON.stringify(tail),
+    JSON.stringify(readCsbwinPartyTail(reread.blocks.characters)) === JSON.stringify(tail),
     'and so does the party state beside them',
   );
 
@@ -212,10 +211,10 @@ function main(): void {
   applyCsbwinSave(game, oneHero);
   // The same file again, with champion 0's record in slot 2 as a Cancel would leave it.
   const world = loadCsbwinWorld(oneHero);
-  const record = world.save.characterBlock!.slice(0, CHARDESC_SIZE);
-  world.save.characterBlock!.set(record, 2 * CHARDESC_SIZE);
+  const record = world.save.blocks.characters.slice(0, CHARDESC_SIZE);
+  world.save.blocks.characters.set(record, 2 * CHARDESC_SIZE);
   game.applyRuntimeSaveState(buildCsbwinRuntimeState(world));
-  const written = loadSaveGameState(buildSaveFile(game)).characterBlock!;
+  const written = readSaveFile(buildSaveFile(game)).blocks.characters;
   check(
     written.subarray(2 * CHARDESC_SIZE, 3 * CHARDESC_SIZE).join() === record.join()
       && written.subarray(CHARDESC_SIZE, 2 * CHARDESC_SIZE).every((b) => b === 0),

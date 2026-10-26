@@ -42,7 +42,7 @@ import { readFileSync } from 'node:fs';
 import { RN_POISON_CLOUD } from '../../src/core/spellRn';
 import { Position } from '../../src/core/types';
 import { applyCsbwinSave } from '../../src/engine/CsbwinSaveGame';
-import { loadSaveGameState } from '../../src/data/SaveGameLoader';
+import { readSaveFile } from '../../src/data/SaveFile';
 import { Game } from '../../src/engine/Game';
 import { TimerFunction, timerLess, type TimerEntry } from '../../src/engine/TimerQueue';
 import { stockGame } from '../lib/game';
@@ -87,13 +87,13 @@ function main(): void {
 
   for (const { file, action, label } of cases) {
     const bytes = new Uint8Array(readFileSync(savePath(file)));
-    const save = loadSaveGameState(bytes);
-    const queue = save.timerQueue ?? [];
+    const save = readSaveFile(bytes);
+    const queue = save.timerQueue;
     const gb2 = save.block2;
     if (!gb2) { check(false, `${file}: GAMEBLOCK2 should be present`); continue; }
 
     for (const index of queue) {
-      const t = save.timers?.[index];
+      const t = save.timers[index];
       if (!t) { check(false, `${file}: queue names timer ${index}, which is not in the table`); continue; }
       console.log([file, index, t.time, t.function, t.uByte5, t.uByte6, t.uByte7, t.uByte8, t.uByte9, t.sequence, t.level].join('\t'));
     }
@@ -101,7 +101,7 @@ function main(): void {
     check(queue.length === gb2.numTimer, `${file}: the queue holds gb2.NumTimer entries (${queue.length} vs ${gb2.numTimer})`);
     check(queue.length > 0, `${file}: the queue is not empty`);
     check(
-      (save.timers?.length ?? 0) === save.maxTimers,
+      save.timers.length === save.block2.maxTimers,
       `${file}: the timer table is MaxTimers long`,
     );
 
@@ -115,7 +115,7 @@ function main(): void {
     }
     check(heap, `${file}: the queue is a heap under timerLess`);
 
-    const door = (save.timers ?? []).filter(
+    const door = save.timers.filter(
       (t, i) => queue.includes(i) && t.function === TimerFunction.TT_DOOR_STEP,
     );
     check(door.length === 1, `${file}: exactly one TT_DOOR_STEP timer is queued`);
@@ -133,7 +133,7 @@ function main(): void {
     // Sequence numbers are stamped from a counter GAMEBLOCK2 also carries, so every
     // queued timer must have been stamped before the next one to be handed out.
     check(
-      (save.timers ?? []).every((r, i) => !queue.includes(i) || r.sequence < gb2.timerSequence),
+      save.timers.every((r, i) => !queue.includes(i) || r.sequence < gb2.timerSequence),
       `${file}: every queued timer's sequence is below gb2.TimerSequence (${gb2.timerSequence})`,
     );
 

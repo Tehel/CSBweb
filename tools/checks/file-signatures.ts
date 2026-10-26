@@ -128,7 +128,7 @@ for (const set of DATA_SETS) {
 console.log(`  ${'conflux-3.5-b8'.padEnd(16)} ${named(new DungeonLoader().loadDungeonDat(read('tools/fixtures/gamefiles/conflux-3.5-b8/dungeon.dat')))}`);
 for (const path of genuineSaves()) {
   const world = loadCsbwinWorld(read(path));
-  console.log(`  ${path.split('/').pop()!.padEnd(30)} ${named(Object.assign(world.dungeon, { extendedFeatures: world.save.extendedFeatures }))}`);
+  console.log(`  ${path.split('/').pop()!.padEnd(30)} ${named(Object.assign(world.dungeon, { extendedFeatures: world.save.extended.header }))}`);
   const game = newGame(new DungeonLoader().loadDungeonDat(read('tools/fixtures/gamefiles/csb/dungeon.dat')), graphicsOf.get('csb')!);
   const result = outcome(() => applySaveBytes(game, read(path)));
   check(result === 'ok', `${path}: reads under CSB's graphics.dat (${describe(result)})`);

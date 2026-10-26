@@ -64,7 +64,7 @@ import { readGameInfo } from '../data/CsbwinExtendedFeatures';
 import { readDisableSaves, readGlobalVariables, readOverlayPalette, specialLocationsFromExpool } from '../data/CsbwinExpool';
 import { readCsbwinParty, readCsbwinPartyTail } from '../data/CsbwinCharacters';
 import { CHARDESC_SIZE } from '../data/CsbwinSaveInfo';
-import type { Block2 } from '../data/SaveGameLoader';
+import type { Block2 } from '../data/SaveFile';
 import { CheckMonsters } from './CheckMonsters';
 import { captureDungeonSnapshot } from './DungeonSnapshot';
 import { DungeonState } from './DungeonState';
@@ -102,7 +102,6 @@ function objectInHandOf(gb2: Block2): ObjectID {
  */
 export function validateCsbwinWorld(world: CsbwinWorld): void {
     const gb2 = world.save.block2;
-    if (!gb2) throw new Error('save has no GAMEBLOCK2');
     const { maps } = world.dungeon;
     const map = maps[gb2.partyLevel];
     if (!map) throw new Error(`the party is on level ${gb2.partyLevel}, of levels 0 to ${maps.length - 1}`);
@@ -133,7 +132,7 @@ export function validateCsbwinWorld(world: CsbwinWorld): void {
     if (firstAvailTimer < 0 || firstAvailTimer > maxTimers) {
         throw new Error(`the first free timer is ${firstAvailTimer}, of ${maxTimers}`);
     }
-    for (const index of world.save.timerQueue ?? []) {
+    for (const index of world.save.timerQueue) {
         if (index >= maxTimers) throw new Error(`the timer queue names timer ${index}, of ${maxTimers}`);
     }
 }
@@ -147,9 +146,8 @@ export function validateCsbwinWorld(world: CsbwinWorld): void {
  * restoring a state that was already valid.
  */
 function buildPartyState(world: CsbwinWorld): PartyState {
-    const block = world.save.characterBlock;
+    const block = world.save.blocks.characters;
     const gb2 = world.save.block2;
-    if (!block || !gb2) throw new Error('save has no character block or GAMEBLOCK2');
 
     const party = readCsbwinParty(block, gb2.numCharacter);
     const tail = readCsbwinPartyTail(block);
@@ -211,7 +209,6 @@ function buildPartyState(world: CsbwinWorld): PartyState {
  */
 function buildBlock1State(world: CsbwinWorld): Block1State {
     const gb1 = world.save.block1;
-    if (!gb1) throw new Error('save has no GAMEBLOCK1');
     const block1: Block1State = {
         randomGameID: gb1.randomGameID >>> 0,
         word22592: 13,
@@ -248,8 +245,8 @@ function missilesOf(world: CsbwinWorld): MissileRecord[] {
 
 /** `ReadGameInfo` over the save's block (`readGameInfo`); none for a save without one. */
 function gameInfoOf(world: CsbwinWorld): GameInfo | undefined {
-    const block = world.save.extendedFeatures;
-    return block ? readGameInfo(block.gameInfoSize, world.save.gameInfo ?? new Uint8Array(0)) : undefined;
+    const { header, gameInfo } = world.save.extended;
+    return header ? readGameInfo(header.gameInfoSize, gameInfo ?? new Uint8Array(0)) : undefined;
 }
 
 /** `EDT_SpecialLocations`, the image's EXPOOL records of special locations. */
@@ -266,10 +263,8 @@ function specialLocationsOf(world: CsbwinWorld): Record<number, number> | undefi
  */
 export function buildCsbwinRuntimeState(world: CsbwinWorld): RuntimeSaveState {
     const gb2 = world.save.block2;
-    if (!gb2) throw new Error('save has no GAMEBLOCK2');
-    const block = world.save.characterBlock;
-    if (!block) throw new Error('save has no character block');
-    const tail = readCsbwinPartyTail(block);
+    const ef = world.save.extended;
+    const tail = readCsbwinPartyTail(world.save.blocks.characters);
 
     return {
         party: buildPartyState(world),
@@ -297,9 +292,9 @@ export function buildCsbwinRuntimeState(world: CsbwinWorld): RuntimeSaveState {
         },
         dungeon: {
             item16: world.save.item16,
-            timers: world.save.timers ?? [],
-            timerQueue: world.save.timerQueue ?? [],
-            timerSequence: world.save.timerSequence ?? 0,
+            timers: world.save.timers,
+            timerQueue: world.save.timerQueue,
+            timerSequence: gb2.timerSequence,
             firstAvailTimer: gb2.firstAvailTimer,
             // The image holds none of these seven: the save carries them beside it.
             snapshot: captureDungeonSnapshot({
@@ -308,12 +303,12 @@ export function buildCsbwinRuntimeState(world: CsbwinWorld): RuntimeSaveState {
                     ...world.dungeon.databases,
                     missiles: { ...world.dungeon.databases.missiles, records: missilesOf(world) },
                 },
-                dsaLevelIndex: world.save.dsaLevelIndex,
-                dsaIndex: world.save.dsaIndex,
+                dsaLevelIndex: ef.dsaLevelIndex,
+                dsaIndex: ef.dsaIndex,
                 specialLocations: specialLocationsOf(world),
-                extendedWallDecorations: world.save.extendedWallDecorations,
-                spellFilterLocation: world.save.spellFilterLocation,
-                hintKey: world.save.hintKey,
+                extendedWallDecorations: ef.extendedWallDecorations,
+                spellFilterLocation: ef.spellFilterLocation,
+                hintKey: ef.header?.hintKey,
                 gameInfo: gameInfoOf(world),
             }),
         },
@@ -328,25 +323,26 @@ export function buildCsbwinRuntimeState(world: CsbwinWorld): RuntimeSaveState {
 export function applyCsbwinSave(game: Game, bytes: Uint8Array): CsbwinWorld {
     const world = loadCsbwinWorld(bytes);
     validateCsbwinWorld(world);
+    const ef = world.save.extended;
     readGame(game, {
         world: world.dungeon,
-        extendedFeatures: world.save.extendedFeatures,
-        simpleEncipher: world.save.simpleEncipher,
+        extendedFeatures: ef.header,
+        simpleEncipher: ef.simpleEncipher,
         state: () => {
             // `_ReadEntireGame`'s `CheckMonsters` (doc/CSBwin-src/SaveGame.cpp:2029), before
             // `reloadAfterSaveGame` detaches the save's `ITEM16`s (`src/engine/CheckMonsters.ts`).
             CheckMonsters(new DungeonState(world.dungeon), game.ctx.tables.monsterDesc, (line) => game.ctx.host.trace(line));
             Object.assign(world.dungeon, {
-                dsaLevelIndex: world.save.dsaLevelIndex,
-                dsaIndex: world.save.dsaIndex,
+                dsaLevelIndex: ef.dsaLevelIndex,
+                dsaIndex: ef.dsaIndex,
                 specialLocations: specialLocationsOf(world),
-                extendedWallDecorations: world.save.extendedWallDecorations,
-                spellFilterLocation: world.save.spellFilterLocation,
-                hintKey: world.save.hintKey,
+                extendedWallDecorations: ef.extendedWallDecorations,
+                spellFilterLocation: ef.spellFilterLocation,
+                hintKey: ef.header?.hintKey,
                 gameInfo: gameInfoOf(world),
             });
             // The image's records are already big-actuator records.
-            if (world.save.bigActuators) world.dungeon.bigActuators = true;
+            if (ef.bigActuators) world.dungeon.bigActuators = true;
             // The snapshot puts back what the installed world already holds.
             return buildCsbwinRuntimeState(world);
         },

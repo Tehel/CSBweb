@@ -71,7 +71,7 @@ function main(): void {
       check(false, `${name}: should load — ${(error as Error).message}`);
       continue;
     }
-    const block = world.save.characterBlock;
+    const block = world.save.blocks.characters;
     const gb2 = world.save.block2;
     if (!block || !gb2) {
       check(false, `${name}: block 4 and GAMEBLOCK2 should both be present`);

@@ -35,30 +35,36 @@ import { loadCsbwinWorld, type CsbwinWorld } from '../../src/data/CsbwinDungeonI
 import { buildDungeonImage } from '../../src/data/CsbwinDungeonImageWriter';
 import { objectIndexOf } from '../../src/data/CsbwinObjectIndex';
 import { CHARDESC_SIZE } from '../../src/data/CsbwinSaveInfo';
-import { saveSaveGameState, type Block2, type SaveGameState } from '../../src/data/SaveGameLoader';
+import type { Block2 } from '../../src/data/SaveFile';
 import { Die } from '../../src/core/Die';
 import type { Game } from '../../src/engine/Game';
 import type { LoopScript } from '../../src/engine/LoopState';
 import { SaveFileError, applySaveBytes } from '../../src/engine/SaveGameFile';
 import { check, finish } from '../lib/check';
 import { TICK_DUE, runVbl, stockGame } from '../lib/game';
-import { savePath } from '../lib/saves';
+import { rewriteSaveFile, savePath, type RewrittenViews } from '../lib/saves';
 
 const DAMAGED_FROM = savePath('csbgame7.dat');
 
-/** `csbgame7.dat` written again, its state as `edit` makes it. */
-function rewritten(edit: (save: SaveGameState, world: CsbwinWorld) => SaveGameState): Uint8Array {
+/** `csbgame7.dat` written again, its state as `edit` changes it. */
+function rewritten(edit: (views: RewrittenViews, world: CsbwinWorld) => Partial<RewrittenViews>): Uint8Array {
   const world = loadCsbwinWorld(new Uint8Array(readFileSync(DAMAGED_FROM)));
   const save = world.save;
-  return saveSaveGameState(edit({
-    ...save,
+  const views: RewrittenViews = {
+    block1: save.block1,
+    block2: save.block2,
+    item16: save.item16,
+    timers: save.timers,
+    timerQueue: save.timerQueue,
+    characters: save.blocks.characters,
     objectIndex: objectIndexOf(world.dungeon.rnMaps),
-    dungeonImage: buildDungeonImage(world.dungeon, {
-      indirectText: save.indirectText ?? false,
-      bigActuators: save.bigActuators ?? false,
-      newScrolls: (save.version ?? 0) >= 0x42,
+    image: buildDungeonImage(world.dungeon, {
+      indirectText: save.extended.indirectText,
+      bigActuators: save.extended.bigActuators,
+      newScrolls: save.extended.version >= 0x42,
     }),
-  }, world));
+  };
+  return rewriteSaveFile(save, { ...views, ...edit(views, world) });
 }
 
 /** `csbgame7.dat` written again with its object index cut to a quarter of its slots. */
@@ -66,13 +72,13 @@ function cutObjectIndex(): Uint8Array {
   return rewritten((save) => {
     const index = save.objectIndex!;
     const length = index.length >> 2;
-    return { ...save, objectIndex: { length, typeMap: index.typeMap.slice(0, length), indexMap: index.indexMap.slice(0, length) } };
+    return { objectIndex: { length, typeMap: index.typeMap.slice(0, length), indexMap: index.indexMap.slice(0, length) } };
   });
 }
 
 /** `csbgame7.dat` written again with these fields of `GAMEBLOCK2`. */
 function withBlock2(fields: Partial<Block2>): Uint8Array {
-  return rewritten((save) => ({ ...save, ...fields, block2: { ...save.block2!, ...fields } }));
+  return rewritten((save) => ({ block2: { ...save.block2, ...fields } }));
 }
 
 /** DM's stock dungeon, its random stream and its game id pinned, 100 VBLs into play. */
@@ -137,7 +143,7 @@ function checkBuildError(): void {
 function checkWorldHeld(): void {
   console.log('=== a save is held against its world before the read builds ===');
   const world = loadCsbwinWorld(new Uint8Array(readFileSync(DAMAGED_FROM)));
-  const { maxTimers } = world.save.block2!;
+  const { maxTimers } = world.save.block2;
   const queue = world.save.timerQueue!;
   const cases: Array<{ what: string; bytes: Uint8Array; refused: RegExp }> = [
     { what: 'the party on level 40', bytes: withBlock2({ partyLevel: 40 }), refused: /ON LEVEL 40, OF LEVELS 0 TO 13/ },
@@ -152,13 +158,13 @@ function checkWorldHeld(): void {
     },
     {
       what: 'more timers than the table',
-      bytes: rewritten((save) => ({ ...save, timerQueue: [...queue, ...Array.from({ length: maxTimers + 1 - queue.length }, () => 0)] })),
+      bytes: rewritten(() => ({ timerQueue: [...queue, ...Array.from({ length: maxTimers + 1 - queue.length }, () => 0)] })),
       refused: new RegExp(`THE TIMER QUEUE IS ${maxTimers + 1} TIMERS, OF ${maxTimers}`),
     },
     { what: 'the first free timer past the table', bytes: withBlock2({ firstAvailTimer: maxTimers + 1 }), refused: /THE FIRST FREE TIMER IS/ },
     {
       what: 'a queued timer past the table',
-      bytes: rewritten((save) => ({ ...save, timerQueue: [maxTimers, ...queue.slice(1)] })),
+      bytes: rewritten(() => ({ timerQueue: [maxTimers, ...queue.slice(1)] })),
       refused: new RegExp(`THE TIMER QUEUE NAMES TIMER ${maxTimers}, OF ${maxTimers}`),
     },
   ];
@@ -178,12 +184,12 @@ function checkWorldHeld(): void {
   }
 
   // Slot 1 cleared, as `AddCharacter` leaves a slot it has not filled (`Character.cpp:479`).
-  const block = world.save.characterBlock!;
+  const block = world.save.blocks.characters;
   const names = [0, 1, 2, 3].map((i) => readCsbwinCharacter(block, i).champion.name);
   const cleared = rewritten((save) => {
-    const characters = save.characterBlock!.slice();
+    const characters = save.characters.slice();
     characters.fill(0, CHARDESC_SIZE, 2 * CHARDESC_SIZE);
-    return { ...save, characterBlock: characters, handChar: 2, block2: { ...save.block2!, handChar: 2 } };
+    return { characters, block2: { ...save.block2, handChar: 2 } };
   });
   const read = stockGame();
   applySaveBytes(read, cleared);

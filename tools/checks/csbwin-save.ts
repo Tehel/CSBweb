@@ -27,7 +27,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { loadSaveGameState } from '../../src/data/SaveGameLoader';
+import { readSaveFile } from '../../src/data/SaveFile';
 import { loadCsbwinWorld } from '../../src/data/CsbwinDungeonImage';
 import { specialLocationsFromExpool } from '../../src/data/CsbwinExpool';
 // The CHARDESC offsets and the name decode are shared with the save/load menu, which
@@ -81,7 +81,7 @@ function main(): void {
 
     let state;
     try {
-      state = loadSaveGameState(bytes);
+      state = readSaveFile(bytes);
     } catch (error) {
       check(false, `${name}: should load — ${(error as Error).message}`);
       continue;
@@ -97,16 +97,16 @@ function main(): void {
     const missiles = world?.dungeon.databases.missiles.records;
     const specialLocations = world?.dungeon.expool ? specialLocationsFromExpool(world.dungeon.expool) ?? undefined : undefined;
 
-    console.log(`  extended features  : sequencedTimers=${state.sequencedTimers} ` +
-      `extendedTimers=${state.extendedTimers} bigActuators=${state.bigActuators ?? false} ` +
-      `extendedWallDecorations=${state.extendedWallDecorations ?? false}`);
-    console.log(`  DSA programs       : ${state.dsaIndex?.entries.filter(Boolean).length ?? 0}`);
-    console.log(`  DSA level index    : ${state.dsaLevelIndex ? 'present' : 'absent'}`);
-    console.log(`  spellFilterLocation: ${state.spellFilterLocation ?? '—'}`);
-    console.log(`  MaxITEM16          : ${state.maxItem16}`);
-    console.log(`  MaxTimers          : ${state.maxTimers}`);
-    console.log(`  handChar           : ${state.handChar}`);
-    console.log(`  magicCaster        : ${state.magicCaster}`);
+    console.log(`  extended features  : sequencedTimers=${state.extended.sequencedTimers} ` +
+      `extendedTimers=${state.extended.extendedTimers} bigActuators=${state.extended.bigActuators} ` +
+      `extendedWallDecorations=${state.extended.extendedWallDecorations ?? false}`);
+    console.log(`  DSA programs       : ${state.extended.dsaIndex?.entries.filter(Boolean).length ?? 0}`);
+    console.log(`  DSA level index    : ${state.extended.dsaLevelIndex ? 'present' : 'absent'}`);
+    console.log(`  spellFilterLocation: ${state.extended.spellFilterLocation ?? '—'}`);
+    console.log(`  MaxITEM16          : ${state.block2.maxItem16}`);
+    console.log(`  MaxTimers          : ${state.block2.maxTimers}`);
+    console.log(`  handChar           : ${state.block2.handChar}`);
+    console.log(`  magicCaster        : ${state.block2.magicCaster}`);
     console.log(`  missile records    : ${missiles === undefined ? 'unreadable (see below)' : missiles.length}`);
     console.log(`  special locations  : ${specialLocations === undefined ? 'unreadable (see below)' : Object.keys(specialLocations).length}`);
 
@@ -130,7 +130,7 @@ function main(): void {
       check(false, `${name}: GAMEBLOCK2 should have been parsed`);
     }
 
-    const block = state.characterBlock;
+    const block = state.blocks.characters;
     if (block) {
       check(block.length === 3328, `${name}: the character block is 3328 bytes`);
       const roster: string[] = [];
@@ -163,7 +163,7 @@ function main(): void {
     // `d.gameState == GAMESTATE_ResumeSavedGame`, so that function skips its own
     // extended-features/compression preamble (`:2557-2558`) and streams straight on
     // from the current file position: the image is plain, uncompressed, big-endian.
-    const image = state.dungeonImageOffset;
+    const image = state.imageOffset;
     if (image !== undefined) {
       const seed = readU16BE(bytes, image);
       const numMaps = bytes[image + 4] ?? 0;
@@ -226,25 +226,25 @@ function main(): void {
 
     const liveGroups = state.item16.filter((r) => r.word0 !== 0).length;
     console.log(`  active monster groups: ${liveGroups} of ${state.item16.length}`);
-    const liveTimers = (state.timers ?? []).filter((t) => t.timerWord8 !== 0).length;
-    console.log(`  timers with word8 set: ${liveTimers} of ${state.timers?.length ?? 0}`);
+    const liveTimers = state.timers.filter((t) => t.timerWord8 !== 0).length;
+    console.log(`  timers with word8 set: ${liveTimers} of ${state.timers.length}`);
 
     // Sanity on the numbers themselves. A block that checksums clean but decodes to
     // nonsense would mean the checksum is being computed over the wrong bytes.
-    check(state.maxItem16 > 0 && state.maxItem16 < 4096, `${name}: MaxITEM16 ${state.maxItem16} is plausible`);
-    check(state.maxTimers > 0 && state.maxTimers < 4096, `${name}: MaxTimers ${state.maxTimers} is plausible`);
-    check(state.item16.length === state.maxItem16, `${name}: the ITEM16 pool is MaxITEM16 records long`);
+    check(state.block2.maxItem16 > 0 && state.block2.maxItem16 < 4096, `${name}: MaxITEM16 ${state.block2.maxItem16} is plausible`);
+    check(state.block2.maxTimers > 0 && state.block2.maxTimers < 4096, `${name}: MaxTimers ${state.block2.maxTimers} is plausible`);
+    check(state.item16.length === state.block2.maxItem16, `${name}: the ITEM16 pool is MaxITEM16 records long`);
     check(
-      (state.timers?.length ?? 0) === state.maxTimers,
+      state.timers.length === state.block2.maxTimers,
       `${name}: the timer table is MaxTimers records long`,
     );
     check(
-      (state.handChar ?? -1) >= -1 && (state.handChar ?? -1) <= 3,
-      `${name}: handChar ${state.handChar} is a champion index or -1`,
+      (state.block2.handChar ?? -1) >= -1 && (state.block2.handChar ?? -1) <= 3,
+      `${name}: handChar ${state.block2.handChar} is a champion index or -1`,
     );
     check(
-      (state.magicCaster ?? -1) >= -1 && (state.magicCaster ?? -1) <= 3,
-      `${name}: magicCaster ${state.magicCaster} is a champion index or -1`,
+      (state.block2.magicCaster ?? -1) >= -1 && (state.block2.magicCaster ?? -1) <= 3,
+      `${name}: magicCaster ${state.block2.magicCaster} is a champion index or -1`,
     );
   }
 

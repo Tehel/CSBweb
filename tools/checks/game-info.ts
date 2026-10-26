@@ -22,7 +22,7 @@
 import { readFileSync } from 'node:fs';
 import { readGameInfo } from '../../src/data/CsbwinExtendedFeatures';
 import { DungeonLoader } from '../../src/data/DungeonLoader';
-import { loadSaveGameState } from '../../src/data/SaveGameLoader';
+import { readSaveFile } from '../../src/data/SaveFile';
 import { applyCsbwinSave } from '../../src/engine/CsbwinSaveGame';
 import type { Game } from '../../src/engine/Game';
 import { buildSaveFile } from '../../src/engine/SaveGameFile';
@@ -36,8 +36,8 @@ const ascii = (bytes: Uint8Array | undefined): string => String.fromCharCode(...
 /** The game information a save of `game` writes: its block's size and the bytes after the DSAs. */
 function saved(game: Game): { size: number; text: string; bytes: Uint8Array } {
   const bytes = buildSaveFile(game);
-  const state = loadSaveGameState(bytes);
-  return { size: state.extendedFeatures?.gameInfoSize ?? NaN, text: ascii(state.gameInfo), bytes };
+  const state = readSaveFile(bytes);
+  return { size: state.extended.header?.gameInfoSize ?? NaN, text: ascii(state.extended.gameInfo), bytes };
 }
 
 /** A new game on the stock graphics, with `bytes` read in, as F9 reads a save. */

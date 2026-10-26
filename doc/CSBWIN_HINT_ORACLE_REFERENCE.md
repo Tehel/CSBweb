@@ -15,7 +15,7 @@ party stands. It reads more of the save than it uses here (the monster groups an
 characters too, `Hint.cpp:5821-5841`), but the hints offered depend only on the party's
 position: `_TAG00799a_9` takes the words at bytes 12, 14 and 18 of the second block
 (`Hint.cpp:6858-6863`), which are `partyX`, `partyY` and `partyLevel`
-(`src/data/SaveGameLoader.ts`, `readI16BE(buf, 12/14/18)`).
+(`src/data/SaveFile.ts`, `readI16BE(buf, 12/14/18)`).
 
 The screen lists the titles of the hints that apply, at most `MAXHINTINDICES` = 9 of
 them (`Hint.cpp:11`, the loop in `_TAG00799a_6`, `:6756`), though the button table

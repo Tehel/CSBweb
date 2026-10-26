@@ -86,8 +86,8 @@ function loadWorld(path: string): World {
   try { world = quietly(() => loadCsbwinWorld(bytes)); } catch { world = null; }
   if (world) {
     const b2 = world.save.block2;
-    const timers = world.save.timers ?? [];
-    const queue = world.save.timerQueue ?? [];
+    const timers = world.save.timers;
+    const queue = world.save.timerQueue;
     return {
       data: world.dungeon,
       dungeon: new DungeonState(world.dungeon),

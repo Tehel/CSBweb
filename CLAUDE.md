@@ -163,7 +163,7 @@ data/       DataSets (the manifest's sets), LocalDataSets (a player's own, a rec
             DungeonFileWriter (a `dungeon.dat` written, with its Extended Features block),
             GraphicsLoader, CSBGraphicsLoader, CSBGraphicsWriter (a
             `CSBgraphics.dat` written: overlays, overlay palettes, wall decorations),
-            SaveGameLoader, HeroExtractor, HintOracleLoader (CSB's `hcsb.hct`),
+            SaveFile (a save's sixteen blocks, read and written), HeroExtractor, HintOracleLoader (CSB's `hcsb.hct`),
             SwooshLoader (the Atari disk's `swoosh.img`), UtilityPortraits (the CSB utility disk's faces, RISE's NEW FACE)
   saves/    The saves behind the disk icon: SaveStore (a save's row, the CSBWin file
             beside what a list needs), BrowserSaveStore (IndexedDB, the one store),

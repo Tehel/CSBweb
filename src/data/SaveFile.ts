@@ -1,12 +1,14 @@
 /**
- * The block codecs of a CSBWin save, reader and writer: GAMEBLOCK1 and GAMEBLOCK2,
- * `ITEM16`, the characters, the timers and the timer queue, scrambled as
- * `CsbwinSaveStream.ts` does it, and where the dungeon image behind them sits
- * (`loadSaveGameState`, `saveSaveGameState`). Block 0, the Extended Features prefix, is
- * `CsbwinExtendedFeatures.ts`'s.
+ * A CSBWin save file, read and written: its sixteen blocks as the file holds them
+ * (`SaveFileBlocks`), and what each says (`SaveFile`). `readSaveFile` unscrambles and
+ * checksums blocks 1 to 6, as `CsbwinSaveStream.ts` does it, and finds the dungeon image
+ * behind them; `writeSaveFile` writes the blocks back, and the codecs of each block
+ * (`encodeBlock2`, …) make them. Block 0, the Extended Features prefix, is
+ * `CsbwinExtendedFeatures.ts`'s to read and build, and the image's records
+ * `DatabaseCodecs.ts`'s.
  */
 
-import type { Item16Record, TimerRecord, DsaIndex } from './dungeonTypes';
+import type { Item16Record, TimerRecord } from './dungeonTypes';
 import { computeDungeonImageLayout, type DungeonImageLayout } from './DungeonImageLayout';
 import {
   BLOCK1_SIZE,
@@ -17,10 +19,8 @@ import {
   scrambleAndWrite,
   unscrambleStream,
 } from './CsbwinSaveStream';
-import type { CsbwinObjectIndex } from './CsbwinObjectIndex';
-import { buildExtendedFeaturesPrefix, EF_FLAGS, readExtendedFeatures, simpleEncipher } from './CsbwinExtendedFeatures';
+import { EF_FLAGS, readExtendedFeatures, simpleEncipher, type ExtendedFeaturesRead } from './CsbwinExtendedFeatures';
 import { buildImageChecksum } from './CsbwinDungeonImageWriter';
-import type { ExtendedFeaturesBlock } from './CsbwinExtendedFeatures';
 import {
   readI16BE,
   readI32BE,
@@ -35,128 +35,101 @@ import {
   writeU32LE,
 } from '../core/bytes';
 
-export interface SaveGameState {
+/**
+ * A save file's blocks as the file holds them, each plain: unscrambled, deciphered, with
+ * no hash, checksum or fold filled in. They are what `writeSaveFile` writes, whole, and
+ * what a read gives back (`SaveFile.blocks`), so a file read and written again is the
+ * file. A field is changed by encoding its block again (`encodeBlock2`, …), or by
+ * writing its bytes, as `Chaos.cpp` does.
+ */
+export interface SaveFileBlocks {
+  /**
+   * Block 0, the Extended Features prefix: the 512-byte header, the object maps, the
+   * DSAs, the game information and the DSA level index (`buildExtendedFeaturesPrefix`).
+   * Empty for a file with none, an Atari-era save. Its `SimpleEncryption` flag
+   * enciphers the whole file as it is written.
+   */
+  block0: Uint8Array;
+  /**
+   * `GAMEBLOCK1`, 512 bytes (`encodeBlock1`). The five hashes at 312 are the ones the
+   * other five blocks are scrambled with; the writer fills the five checksums at 344
+   * and the fold of the first half.
+   */
+  block1: Uint8Array;
+  /** `GAMEBLOCK2`, 128 bytes (`encodeBlock2`). */
+  block2: Uint8Array;
+  /** `gb2.MaxITEM16` `ITEM16`s, 16 bytes each (`encodeItem16`). */
+  item16: Uint8Array;
+  /**
+   * Block 4, 3328 bytes. It is **not** only the four champions: `CHARDESC[4]` is 3200
+   * bytes and the remaining 128 are party-wide state (`Brightness`, `SeeThruWalls`, the
+   * shield timers, `PartyFootprints[24]`, `Invisible`, …), bracketed in
+   * `doc/CSBwin-src/Data.h:780-798`. `src/data/CsbwinCharacters.ts` unpacks it and packs
+   * it.
+   */
+  characters: Uint8Array;
+  /** `gb2.MaxTimers` `TIMER`s, in the form block 0's flags declare (`encodeTimers`). */
+  timers: Uint8Array;
+  /** `gb2.MaxTimers` words, the first `gb2.NumTimer` of them live (`encodeTimerQueue`). */
+  timerQueue: Uint8Array;
+  /**
+   * Blocks 7-14, the dungeon image, as `buildDungeonImage`
+   * (`src/data/CsbwinDungeonImageWriter.ts`) builds it; the writer closes the file with
+   * its sum, block 15. Empty, the file is the blocks 0-6 prefix.
+   *
+   * Every RN in it is a slot of the object indirect index whose maps block 0 carries,
+   * so the two are one numbering.
+   */
+  image: Uint8Array;
+}
+
+/**
+ * A save file read (`readSaveFile`): its blocks, and what each says.
+ *
+ * Every field is the file's: none is a default, and none says what another already
+ * does. Every RN in the file — the object list, every record's link, a chest's
+ * contents, a monster's possessions, a champion's thirty slots, `ObjectInHand` — is a
+ * slot number of the object indirect index (`extended.objectIndex`) rather than a packed
+ * RN, so nothing that reads an object out of the file is meaningful without it. The
+ * world keeps it as its `RnMaps` (`src/data/CsbwinObjectIndex.ts`).
+ */
+export interface SaveFile {
+  blocks: SaveFileBlocks;
+  /**
+   * Block 0 read, `readExtendedFeatures`' result: its header (`header`, absent for a file
+   * with none), the flags that shape the other blocks, the object index, the DSAs, the
+   * game information, `offset`, which is `ExtendedFeaturesSize`
+   * (`doc/CSBwin-src/SaveGame.cpp:1722`), and `data`, the file as `READ` gives it:
+   * deciphered when `simpleEncipher`, else the file as given. The other blocks are read
+   * from `data`, so a file is deciphered once.
+   */
+  extended: ExtendedFeaturesRead;
+  block1: Block1;
+  block2: Block2;
   item16: Item16Record[];
-  timers?: TimerRecord[];
+  /** The timer table, in the 16-byte form whatever form the file is in (`parseTimers`). */
+  timers: TimerRecord[];
   /**
    * The live timer queue: `gb2.NumTimer` indices into `timers`, in the order of CSBWin's
-   * heap (`GameTimers::TimerQueue`), not their firing order. Empty when the file carries
-   * none.
+   * heap (`GameTimers::TimerQueue`), not their firing order.
    */
-  timerQueue?: number[];
-  /** `gb2.TimerSequence` — the stamp the next queued timer takes. */
-  timerSequence?: number;
-  maxItem16: number;
-  maxTimers: number;
-  sequencedTimers: boolean;
-  extendedTimers: boolean;
-  bigActuators?: boolean;
+  timerQueue: number[];
   /**
-   * `EXTENDEDFEATURESBLOCK.flags & ExpandedPortraits`. False for a file with no block,
-   * whose mirrors `ExtendPortraits` then cleans (`src/data/CsbwinDungeonConversions.ts`).
-   */
-  expandedPortraits?: boolean;
-  /** `EXTENDEDFEATURESBLOCK.flags & IndirectText` — the text section's shape. */
-  indirectText?: boolean;
-  /** `EXTENDEDFEATURESBLOCK.version` (offset 36); `'B'` (0x42) and up use new scrolls. */
-  version?: number;
-  dsaLevelIndex?: number[][];
-  dsaIndex?: DsaIndex;
-  extendedWallDecorations?: boolean;
-  spellFilterLocation?: number;
-  /** `EXTENDEDFEATURESBLOCK.hintKey`, absent for a file without a block. */
-  hintKey?: Uint8Array;
-  /**
-   * `gb2.handChar` — the champion index holding the cursor, -1 for nobody.
-   * `LoadGame` restores `d.HandChar` from it (`doc/CSBwin-src/SaveGame.cpp:1760`).
-   */
-  handChar?: number;
-  /** `gb2.MagicCaster`, restored on the next line of the same function (`:1761`). */
-  magicCaster?: number;
-  /**
-   * `GAMEBLOCK1` less the five blocks' hashes and checksums, which the writer computes.
-   * Present when the block was parsed; `saveSaveGameState` writes `emptyBlock1()` without it.
-   */
-  block1?: Block1;
-  /**
-   * The rest of `GAMEBLOCK2`, as `LoadGame` reads it
-   * (`doc/CSBwin-src/SaveGame.cpp:1741-1774`). Present when the block was parsed.
-   */
-  block2?: Block2;
-  /**
-   * The 512-byte "Extended Features" header, field for field. Present exactly when the
-   * file carries a block 0; `saveSaveGameState` writes the whole prefix back when it is.
-   */
-  extendedFeatures?: ExtendedFeaturesBlock;
-  /**
-   * The file was enciphered whole (`readExtendedFeatures`' `simpleEncipher`), and read
-   * deciphered. `saveSaveGameState` enciphers what it writes by the header's
-   * `SimpleEncryption` instead, which CSBWin sets exactly when it enciphers.
-   */
-  simpleEncipher?: boolean;
-  /**
-   * The file as `READ` gives it (`readExtendedFeatures`' `data`): deciphered when
-   * `simpleEncipher`, else the file as given. The dungeon image is read from it
-   * (`loadCsbwinWorld`), so a file is deciphered once. Only a read sets it.
-   */
-  data?: Uint8Array;
-  /**
-   * `gameInfo` as the file holds it, without the terminator `ReadGameInfo` appends.
-   * Carried verbatim: it is a free-text blob the game only ever shows.
-   */
-  gameInfo?: Uint8Array;
-  /**
-   * `ExtendedFeaturesSize` (`doc/CSBwin-src/SaveGame.cpp:1722`) — how many bytes of
-   * block 0 precede GAMEBLOCK1, and so where block 1 starts. Zero for a file with no
-   * Extended Features prefix at all.
-   */
-  extendedFeaturesSize?: number;
-  /**
-   * Byte offset at which the plain, unscrambled dungeon image begins — immediately
-   * after the timer queue. `LoadGame` calls `ReadDatabases()` there
+   * Where in `extended.data` the plain dungeon image begins — immediately after the
+   * timer queue. `LoadGame` calls `ReadDatabases()` there
    * (`doc/CSBwin-src/SaveGame.cpp:1909`), and because a save is loaded with
    * `d.gameState == GAMESTATE_ResumeSavedGame` that function skips its own
    * extended-features/compression preamble and reads straight on from the current
    * file position (`doc/CSBwin-src/SaveGame.cpp:2557-2558`).
    */
-  dungeonImageOffset?: number;
-  /** Where every section of the dungeon image sits. Absent if the header did not parse. */
-  imageLayout?: DungeonImageLayout;
+  imageOffset: number;
+  /** Where every section of the dungeon image sits; `null` if its header does not read. */
+  imageLayout: DungeonImageLayout | null;
   /**
    * `ReadDatabases`' `cellflagArraySize` — the last section's length: the Extended
    * Features block's, or, when that is 0, the image header's word 2.
    */
-  cellFlagArraySize?: number;
-  /**
-   * The object indirect index. Every RN in this file — the object list, every record's
-   * link, a chest's contents, a monster's possessions, a champion's thirty slots — is a
-   * slot number in it rather than a packed RN, so nothing that reads an object out of
-   * the file is meaningful without it. The world keeps it as its `RnMaps`
-   * (`src/data/CsbwinObjectIndex.ts`).
-   */
-  objectIndex?: CsbwinObjectIndex;
-  /**
-   * The raw, unscrambled 3328-byte block 4. It is **not** only the four champions:
-   * `CHARDESC[4]` is 3200 bytes and the remaining 128 are party-wide state
-   * (`Brightness`, `SeeThruWalls`, the shield timers, `PartyFootprints[24]`,
-   * `Invisible`, …), bracketed in `doc/CSBwin-src/Data.h:780-798`. Handed over raw
-   * because it is the unit both halves work in: `src/data/CsbwinCharacters.ts`
-   * unpacks it on the way in and packs it on the way out, and `saveSaveGameState`
-   * writes whatever is here into block 4 verbatim.
-   */
-  characterBlock?: Uint8Array;
-  /**
-   * Blocks 7-14 — the whole dungeon image — already serialised, as
-   * `buildDungeonImage` (`src/data/CsbwinDungeonImageWriter.ts`) produces it.
-   * `saveSaveGameState` appends it after the timer queue and closes the file with
-   * `WriteAndChecksum`'s word; without it the file is the blocks 0-6 prefix.
-   *
-   * It is handed over ready-made rather than built here because the image needs the
-   * whole `DungeonData` and the object indirect index whose maps block 0 carries, and
-   * those two have to be the same index — the slot numbers in the image and the slot
-   * numbers in the maps are one numbering.
-   */
-  dungeonImage?: Uint8Array;
+  cellFlagArraySize: number;
 }
 
 /**
@@ -188,14 +161,6 @@ export interface Block1 {
   word22592: number;
   /** `Byte22808[132]` (380), moved as a unit to and from `d.Byte22808`. */
   byte22808: Uint8Array;
-}
-
-/** Every field zero, for a caller that has none of them. */
-function emptyBlock1(): Block1 {
-  return {
-    byte22598: 0, byte22596: 0, saveOption: 0, randomGameID: 0, totalMoveCount: 0,
-    word22594: 0, word22592: 0, byte22808: new Uint8Array(132),
-  };
 }
 
 /** The ten words of `GAMEBLOCK1` that open the other five scrambled blocks. */
@@ -253,17 +218,6 @@ export interface Block2 {
   word11714: number;
   maxItem16: number;
   timerSequence: number;
-}
-
-/** Every field zero, for a caller that has only some of them. */
-function emptyBlock2(): Block2 {
-  return {
-    time: 0, ranseed: 0, objectInHand: 0, numCharacter: 0,
-    partyX: 0, partyY: 0, partyFacing: 0, partyLevel: 0,
-    handChar: -1, magicCaster: -1, numTimer: 0, firstAvailTimer: 0,
-    maxTimers: 0, item16QueLen: 0, lastMonsterAttackTime: 0, lastPartyMoveTime: 0,
-    partyMoveDisableTimer: 0, word11712: 0, word11714: 0, maxItem16: 0, timerSequence: 0,
-  };
 }
 
 const BLOCK2_SIZE = 128;
@@ -443,72 +397,77 @@ function parseTimerQueue(buf: Uint8Array, maxTimers: number, numTimer: number): 
   return out;
 }
 
-export function loadSaveGameState(file: Uint8Array): SaveGameState & { data: Uint8Array } {
+/** A timer's size in the file, by block 0's flags: `TIMER`'s three forms. */
+function timerSizeOf(extended: ExtendedFeaturesRead): number {
+  return extended.extendedTimers ? 16 : extended.sequencedTimers ? 12 : 10;
+}
+
+/**
+ * A save file read, as `LoadGame` reads blocks 0 to 6
+ * (`doc/CSBwin-src/SaveGame.cpp:1722-1825`), and where the dungeon image behind them
+ * sits. Throws when a block does not unscramble or fails its checksum; an image that
+ * does not read is the caller's to refuse (`imageLayout`).
+ */
+export function readSaveFile(file: Uint8Array): SaveFile {
   const extended = readExtendedFeatures(file);
   const saveData = extended.data;
   let offset = extended.offset;
   const { buf: block1Buf, next: afterBlock1 } = readUnscrambleBlock(saveData, offset);
   offset = afterBlock1;
 
-  const block1 = parseBlock1Hashes(block1Buf);
+  const hashes = parseBlock1Hashes(block1Buf);
 
   const { buf: block2Buf, next: afterBlock2 } = unscrambleStream(
     saveData,
     offset,
     BLOCK2_SIZE,
-    block1.block2Hash,
-    block1.block2Checksum
+    hashes.block2Hash,
+    hashes.block2Checksum
   );
   offset = afterBlock2;
 
   const block2 = parseBlock2(block2Buf);
 
-  let item16: Item16Record[] = [];
+  let item16Buf: Uint8Array = new Uint8Array(0);
   if (block2.maxItem16 > 0) {
     const { buf, next } = unscrambleStream(
       saveData,
       offset,
       block2.maxItem16 * 16,
-      block1.item16Hash,
-      block1.item16Checksum
+      hashes.item16Hash,
+      hashes.item16Checksum
     );
     offset = next;
-    item16 = parseItem16(buf, block2.maxItem16);
+    item16Buf = buf;
   }
 
   const { buf: characterBlock, next: afterCharacters } = unscrambleStream(
     saveData,
     offset,
     CHARACTER_SIZE,
-    block1.characterHash,
-    block1.characterChecksum
+    hashes.characterHash,
+    hashes.characterChecksum
   );
   offset = afterCharacters;
 
-  const sequencedTimers = extended.sequencedTimers;
-  const extendedTimers = extended.extendedTimers;
-  const timerSize = extendedTimers ? 16 : sequencedTimers ? 12 : 10;
+  const timerSize = timerSizeOf(extended);
 
   const { buf: timersBuf, next: afterTimers } = unscrambleStream(
     saveData,
     offset,
     block2.maxTimers * timerSize,
-    block1.timersHash,
-    block1.timersChecksum
+    hashes.timersHash,
+    hashes.timersChecksum
   );
   offset = afterTimers;
-
-  const timers = parseTimers(timersBuf, block2.maxTimers, timerSize);
 
   const { buf: timerQueueBuf, next: afterTimerQueue } = unscrambleStream(
     saveData,
     offset,
     block2.maxTimers * 2,
-    block1.timerQueueHash,
-    block1.timerQueueChecksum
+    hashes.timerQueueHash,
+    hashes.timerQueueChecksum
   );
-
-  const timerQueue = parseTimerQueue(timerQueueBuf, block2.maxTimers, block2.numTimer);
 
   // A save's image has a level: one that reads as none is not an image.
   const read = computeDungeonImageLayout(saveData, afterTimerQueue, {
@@ -517,43 +476,54 @@ export function loadSaveGameState(file: Uint8Array): SaveGameState & { data: Uin
     newScrolls: extended.version >= 0x42, // 'B'
   });
   const layout = read && read.numMaps >= 1 ? read : null;
+  // A file with no Extended Features block declares no size, and `ReadDatabases` then
+  // takes the image header's `LegacyCellFlagArraySize`, its word 2
+  // (`doc/CSBwin-src/SaveGame.cpp:2624-2627`, `CSB.h:2135`): the Atari-era saves.
+  const cellFlagArraySize = extended.cellFlagArraySize || readU16BE(saveData, afterTimerQueue + 2);
+  // The image runs to the end of its cell flags, and the word after it closes the file;
+  // without a layout, to the end of the file.
+  const imageEnd = layout ? Math.min(layout.cellFlags + cellFlagArraySize, saveData.length) : saveData.length;
 
   return {
-    item16,
-    timers,
-    maxItem16: block2.maxItem16,
-    maxTimers: block2.maxTimers,
-    sequencedTimers,
-    extendedTimers,
-    bigActuators: extended.bigActuators,
-    expandedPortraits: extended.expandedPortraits,
-    indirectText: extended.indirectText,
-    version: extended.version,
-    dsaLevelIndex: extended.dsaLevelIndex,
-    dsaIndex: extended.dsaIndex,
-    extendedWallDecorations: extended.extendedWallDecorations,
-    spellFilterLocation: extended.spellFilterLocation,
-    hintKey: extended.header?.hintKey,
-    handChar: block2.handChar,
-    magicCaster: block2.magicCaster,
+    blocks: {
+      block0: saveData.slice(0, extended.offset),
+      block1: block1Buf,
+      block2: block2Buf,
+      item16: item16Buf,
+      characters: characterBlock,
+      timers: timersBuf,
+      timerQueue: timerQueueBuf,
+      image: saveData.slice(afterTimerQueue, Math.max(afterTimerQueue, imageEnd)),
+    },
+    extended,
     block1: parseBlock1(block1Buf),
     block2,
-    characterBlock,
-    extendedFeatures: extended.header,
-    simpleEncipher: extended.simpleEncipher,
-    data: saveData,
-    gameInfo: extended.gameInfo,
-    extendedFeaturesSize: extended.offset,
-    dungeonImageOffset: afterTimerQueue,
-    imageLayout: layout ?? undefined,
-    // A file with no Extended Features block declares no size, and `ReadDatabases` then
-    // takes the image header's `LegacyCellFlagArraySize`, its word 2
-    // (`doc/CSBwin-src/SaveGame.cpp:2624-2627`, `CSB.h:2135`): the Atari-era saves.
-    cellFlagArraySize: extended.cellFlagArraySize || readU16BE(saveData, afterTimerQueue + 2),
-    objectIndex: extended.objectIndex,
-    timerQueue,
-    timerSequence: block2.timerSequence,
+    item16: parseItem16(item16Buf, block2.maxItem16),
+    timers: parseTimers(timersBuf, block2.maxTimers, timerSize),
+    timerQueue: parseTimerQueue(timerQueueBuf, block2.maxTimers, block2.numTimer),
+    imageOffset: afterTimerQueue,
+    imageLayout: layout,
+    cellFlagArraySize,
   };
+}
+
+/**
+ * `GAMEBLOCK1`, packed — the inverse of `parseBlock1`. `SaveGame` memsets the block
+ * (`doc/CSBwin-src/SaveGame.cpp:881-882`) and fills it from `d.` (`:1083-1097`), the five
+ * hashes 0; `swapBlock1` then turns the fields it lists big-endian and leaves
+ * `SaveOption` and `totalMoveCount` native (see `Block1`).
+ */
+export function encodeBlock1(b1: Block1): Uint8Array {
+  const block1Plain = new Uint8Array(BLOCK1_SIZE);
+  block1Plain[300] = b1.byte22598 & 0xff;
+  block1Plain[301] = b1.byte22596 & 0xff;
+  writeU16LE(block1Plain, 306, b1.saveOption);
+  writeU32BE(block1Plain, 308, b1.randomGameID);
+  writeU32LE(block1Plain, 322, b1.totalMoveCount);
+  writeU16BE(block1Plain, 376, b1.word22594);
+  writeU16BE(block1Plain, 378, b1.word22592);
+  block1Plain.set(b1.byte22808.subarray(0, 132), 380);
+  return block1Plain;
 }
 
 /**
@@ -566,7 +536,7 @@ export function loadSaveGameState(file: Uint8Array): SaveGameState & { data: Uin
  * Bytes 50-127 are `FILL180`, which `SaveGame` clears before writing (`:1055`), so they
  * are left as the zeros `new Uint8Array` supplies.
  */
-function buildBlock2(b: Block2): Uint8Array {
+export function encodeBlock2(b: Block2): Uint8Array {
   const buf = new Uint8Array(BLOCK2_SIZE);
   writeU32BE(buf, 0, b.time >>> 0);
   writeU32BE(buf, 4, b.ranseed >>> 0);
@@ -592,35 +562,11 @@ function buildBlock2(b: Block2): Uint8Array {
   return buf;
 }
 
-export function saveSaveGameState(save: SaveGameState): Uint8Array {
-  const maxItem16 = save.maxItem16;
-  const maxTimers = save.maxTimers;
-  const sequencedTimers = save.sequencedTimers;
-  const extendedTimers = save.extendedTimers;
-  const timerSize = extendedTimers ? 16 : sequencedTimers ? 12 : 10;
-
-  const block2 = buildBlock2({
-    ...(save.block2 ?? emptyBlock2()),
-    // The six the rest of `SaveGameState` carries in their own right. `SaveGame` takes
-    // each of them from the live counter rather than from a stored block
-    // (`doc/CSBwin-src/SaveGame.cpp:1045-1052`), so a caller that has the counters and
-    // no block 2 still gets them right, and a caller that has both agrees with itself.
-    numTimer: save.timerQueue?.length ?? save.block2?.numTimer ?? 0,
-    maxTimers,
-    maxItem16,
-    handChar: save.handChar ?? save.block2?.handChar ?? -1,
-    magicCaster: save.magicCaster ?? save.block2?.magicCaster ?? -1,
-    timerSequence: save.timerSequence ?? save.block2?.timerSequence ?? 0,
-  });
-
-  const item16 = new Uint8Array(maxItem16 * 16);
-  for (let i = 0; i < maxItem16; i++) {
+/** The `ITEM16`s, packed — the exact inverse of `parseItem16`. */
+export function encodeItem16(records: readonly Item16Record[]): Uint8Array {
+  const item16 = new Uint8Array(records.length * 16);
+  records.forEach((rec, i) => {
     const base = i * 16;
-    const rec = save.item16[i];
-    if (!rec) continue;
-    // Every field `parseItem16` reads, `word0` (the group's object RN) and the
-    // per-monster state at 4-11 included: the runtime half of a save carries
-    // `dungeon.item16` too, but a save with only these blocks must keep its groups.
     writeU16BE(item16, base + 0, rec.word0);
     item16[base + 2] = rec.facings & 0xff;
     item16[base + 3] = rec.positions & 0xff;
@@ -636,23 +582,24 @@ export function saveSaveGameState(save: SaveGameState): Uint8Array {
     item16[base + 13] = rec.singleMonsterStatus[1] ?? 0;
     item16[base + 14] = rec.singleMonsterStatus[2] ?? 0;
     item16[base + 15] = rec.singleMonsterStatus[3] ?? 0;
-  }
+  });
+  return item16;
+}
 
-  // Block 4, from `buildCsbwinCharacterBlock` if the caller packed one, and 3328 zero
-  // bytes otherwise.
-  const character = new Uint8Array(CHARACTER_SIZE);
-  if (save.characterBlock) character.set(save.characterBlock.subarray(0, CHARACTER_SIZE));
-
-  // The whole `TIMER`, in the form the header's flags declare. `parseTimers` is the exact inverse; `tools/checks/savegame-blocks.ts` round-trips it.
-  const timers = new Uint8Array(maxTimers * timerSize);
-  const timerRecords = save.timers ?? [];
+/**
+ * The whole `TIMER` table, in the form `timerSize` names: 16 bytes when block 0
+ * declares `ExtendedTimers`, 12 for `SequencedTimers` alone, 10 for neither.
+ * `parseTimers` is the exact inverse; `tools/checks/savegame-blocks.ts` round-trips it.
+ * `timerQueue` says which slots are live, for `unused13` alone.
+ */
+export function encodeTimers(records: readonly TimerRecord[], timerSize: 10 | 12 | 16, timerQueue: readonly number[]): Uint8Array {
+  const extendedTimers = timerSize === 16;
+  const timers = new Uint8Array(records.length * timerSize);
   // Which slots hold a live timer: `TIMER_SEARCH::FindNextTimer` walks the queue, so a
-  // slot is live exactly when the queue names it. Only used for `unused13` below.
-  const liveSlots = new Set(save.timerQueue ?? []);
-  for (let i = 0; i < maxTimers; i++) {
+  // slot is live exactly when the queue names it.
+  const liveSlots = new Set(timerQueue);
+  records.forEach((rec, i) => {
     const base = i * timerSize;
-    const rec = timerRecords[i];
-    if (!rec) continue;
     // In the 16-byte form the time is the whole longword and the level has its own
     // byte; in the shorter forms the level rides in the top byte of the time
     // (`doc/CSBwin-src/CSB.h:1881-1884`).
@@ -685,104 +632,60 @@ export function saveSaveGameState(save: SaveGameState): Uint8Array {
       timers[base + 14] = pad;
       timers[base + 15] = pad;
     }
+  });
+  return timers;
+}
+
+/** The timer queue, `maxTimers` words of which the queue fills the first — the inverse of `parseTimerQueue`. */
+export function encodeTimerQueue(timerQueue: readonly number[], maxTimers: number): Uint8Array {
+  const out = new Uint8Array(maxTimers * 2);
+  for (let i = 0; i < Math.min(timerQueue.length, maxTimers); i++) {
+    writeU16BE(out, i * 2, timerQueue[i]! & 0xffff);
   }
+  return out;
+}
 
-  const timerQueue = new Uint8Array(maxTimers * 2);
-  const queueOrder = save.timerQueue ?? [];
-  for (let i = 0; i < Math.min(queueOrder.length, maxTimers); i++) {
-    writeU16BE(timerQueue, i * 2, queueOrder[i]! & 0xffff);
-  }
+/**
+ * The file of `blocks`, as `SaveGame` writes it (`doc/CSBwin-src/SaveGame.cpp:1083-1320`).
+ *
+ * Each of blocks 2 to 6 is checksummed with the hash `GAMEBLOCK1` holds for it
+ * (`GenChecksum`), the checksum written into `GAMEBLOCK1`, which is folded and scrambled
+ * (`ScrambleAndWrite`), and each block scrambled with its hash (`WriteScrambled`). Block 0
+ * goes before them, the image after, and the word that closes the file after that.
+ */
+export function writeSaveFile(blocks: SaveFileBlocks): Uint8Array {
+  const block1 = blocks.block1.slice();
+  const streams = [blocks.block2, blocks.item16, blocks.characters, blocks.timers, blocks.timerQueue]
+    .map((block) => block.slice());
+  // The five hashes at 312 and the five checksums at 344, block by block.
+  const hashes = streams.map((_, i) => readU16BE(block1, 312 + 2 * i));
+  streams.forEach((block, i) => {
+    writeU16BE(block1, 344 + 2 * i, genChecksum(block, hashes[i]!, block.length / 2));
+  });
 
-  const block2Hash = 0;
-  const item16Hash = 0;
-  const characterHash = 0;
-  const timersHash = 0;
-  const timerQueueHash = 0;
-
-  const block2Checksum = genChecksum(block2, block2Hash, BLOCK2_SIZE / 2);
-  const item16Checksum = genChecksum(item16, item16Hash, item16.length / 2);
-  const characterChecksum = genChecksum(character, characterHash, CHARACTER_SIZE / 2);
-  const timersChecksum = genChecksum(timers, timersHash, timers.length / 2);
-  const timerQueueChecksum = genChecksum(timerQueue, timerQueueHash, timerQueue.length / 2);
-
-  // `SaveGame` memsets the block (`doc/CSBwin-src/SaveGame.cpp:881-882`) and fills it
-  // from `d.` (`:1083-1097`); `swapBlock1` then turns the fields it lists big-endian
-  // and leaves `SaveOption` and `totalMoveCount` native (see `Block1`).
-  const b1 = save.block1 ?? emptyBlock1();
-  const block1Plain = new Uint8Array(BLOCK1_SIZE);
-  block1Plain[300] = b1.byte22598 & 0xff;
-  block1Plain[301] = b1.byte22596 & 0xff;
-  writeU16LE(block1Plain, 306, b1.saveOption);
-  writeU32BE(block1Plain, 308, b1.randomGameID);
-  writeU16BE(block1Plain, 312, block2Hash);
-  writeU16BE(block1Plain, 314, item16Hash);
-  writeU16BE(block1Plain, 316, characterHash);
-  writeU16BE(block1Plain, 318, timersHash);
-  writeU16BE(block1Plain, 320, timerQueueHash);
-  writeU32LE(block1Plain, 322, b1.totalMoveCount);
-  writeU16BE(block1Plain, 344, block2Checksum);
-  writeU16BE(block1Plain, 346, item16Checksum);
-  writeU16BE(block1Plain, 348, characterChecksum);
-  writeU16BE(block1Plain, 350, timersChecksum);
-  writeU16BE(block1Plain, 352, timerQueueChecksum);
-  writeU16BE(block1Plain, 376, b1.word22594);
-  writeU16BE(block1Plain, 378, b1.word22592);
-  block1Plain.set(b1.byte22808.subarray(0, 132), 380);
-
-  scrambleAndWrite(block1Plain);
-
-  scramble(block2, block2Hash, BLOCK2_SIZE / 2);
-  scramble(item16, item16Hash, item16.length / 2);
-  scramble(character, characterHash, CHARACTER_SIZE / 2);
-  scramble(timers, timersHash, timers.length / 2);
-  scramble(timerQueue, timerQueueHash, timerQueue.length / 2);
-
-  // Block 0: the Extended Features prefix, when the caller has one. `SaveGame` writes
-  // it before GAMEBLOCK1 and only for a CSB-era file — a plain Atari-era save has none,
-  // and `ReadExtendedFeatures` seeks back and returns 0 for such a file
-  // (`doc/CSBwin-src/SaveGame.cpp:944-1023`, `:324-326`).
-  const prefix = save.extendedFeatures
-    ? buildExtendedFeaturesPrefix({
-        header: save.extendedFeatures,
-        typeMap: save.objectIndex?.typeMap ?? new Uint8Array(0),
-        indexMap: save.objectIndex?.indexMap ?? new Uint16Array(0),
-        dsaIndex: save.dsaIndex,
-        gameInfo: save.gameInfo,
-        dsaLevelIndex: save.dsaLevelIndex,
-      })
-    : new Uint8Array(0);
+  scrambleAndWrite(block1);
+  streams.forEach((block, i) => scramble(block, hashes[i]!, block.length / 2));
 
   // Blocks 7-14 and then block 15, the one word that closes the file. `WriteAndChecksum`
   // sums the bytes of every section it writes into a `ui16` from zero
   // (`doc/CSBwin-src/SaveGame.cpp:687-706`) and the total goes out big-endian (`:1320`).
-  const image = save.dungeonImage ?? new Uint8Array(0);
+  const image = blocks.image;
   const checksum = image.length > 0 ? buildImageChecksum(image) : new Uint8Array(0);
 
-  const totalSize = prefix.length + BLOCK1_SIZE + block2.length + item16.length +
-    character.length + timers.length + timerQueue.length + image.length + checksum.length;
-  const out = new Uint8Array(totalSize);
+  // Block 0 is written before GAMEBLOCK1, and only for a CSB-era file — a plain
+  // Atari-era save has none, and `ReadExtendedFeatures` seeks back and returns 0 for
+  // such a file (`doc/CSBwin-src/SaveGame.cpp:944-1023`, `:324-326`).
+  const parts = [blocks.block0, block1, ...streams, image, checksum];
+  const out = new Uint8Array(parts.reduce((n, part) => n + part.length, 0));
   let offset = 0;
-  out.set(prefix, offset);
-  offset += prefix.length;
-  out.set(block1Plain, offset);
-  offset += block1Plain.length;
-  out.set(block2, offset);
-  offset += block2.length;
-  out.set(item16, offset);
-  offset += item16.length;
-  out.set(character, offset);
-  offset += character.length;
-  out.set(timers, offset);
-  offset += timers.length;
-  out.set(timerQueue, offset);
-  offset += timerQueue.length;
-  out.set(image, offset);
-  offset += image.length;
-  out.set(checksum, offset);
+  for (const part of parts) {
+    out.set(part, offset);
+    offset += part.length;
+  }
   // `SaveGame` sets `SimpleEncryption` when it has marked the file enciphered, and every
   // `WRITE` then enciphers by the position in the file, the block included
   // (`doc/CSBwin-src/SaveGame.cpp:939-946`, `:968-971`, `system.cpp:315-329`).
-  if (save.extendedFeatures && (save.extendedFeatures.flags & EF_FLAGS.SimpleEncryption) !== 0) {
+  if (blocks.block0.length > 37 && ((blocks.block0[37] ?? 0) & EF_FLAGS.SimpleEncryption) !== 0) {
     return simpleEncipher(out);
   }
   return out;

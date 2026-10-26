@@ -10,7 +10,7 @@
  * are pure, so that `tools/checks/save-menu.ts` can assert them headlessly.
  */
 import { csbwinSaveInfoOf, readCsbwinSaveInfo, type CsbwinSaveInfo } from '../CsbwinSaveInfo';
-import type { SaveGameState } from '../SaveGameLoader';
+import type { SaveFile } from '../SaveFile';
 
 /** One row of the list: what a save is listed by, without its bytes. */
 export interface SaveEntry {
@@ -115,16 +115,16 @@ export type SaveFileFields = Pick<SaveEntry, 'playthrough' | 'level' | 'champion
  * any `.dat` is listed. `null` for a file that is not a CSBWin save, which has no row.
  */
 export function readSaveFileFields(bytes: Uint8Array): SaveFileFields | null {
-    return fieldsOf(readCsbwinSaveInfo(bytes));
+    const info = readCsbwinSaveInfo(bytes);
+    return info && fieldsOf(info);
 }
 
 /** A file's part of its row, out of the file already read (`csbwinSaveInfoOf`). */
-export function saveFileFieldsOf(state: SaveGameState): SaveFileFields | null {
-    return fieldsOf(csbwinSaveInfoOf(state));
+export function saveFileFieldsOf(save: SaveFile): SaveFileFields {
+    return fieldsOf(csbwinSaveInfoOf(save));
 }
 
-function fieldsOf(info: CsbwinSaveInfo | null): SaveFileFields | null {
-    if (!info) return null;
+function fieldsOf(info: CsbwinSaveInfo): SaveFileFields {
     return { playthrough: info.randomGameID, level: info.level, champions: info.champions };
 }
 

@@ -122,7 +122,7 @@ function main(): void {
       source.ctx.rules.invisibleMonsters = invisibleMonsters;
       source.ctx.rules.drawAsSize4Monsters = drawAsSize4Monsters;
       const file = buildSaveFile(source);
-      const extendedFlags = quiet(() => loadCsbwinWorld(file)).save.extendedFeatures?.extendedFlags ?? -1;
+      const extendedFlags = quiet(() => loadCsbwinWorld(file)).save.extended.header?.extendedFlags ?? -1;
       console.log(`  ${options(source.ctx.rules)}: extendedFlags 0x${extendedFlags.toString(16)}`);
       check((extendedFlags & EF_EXTENDED_FLAGS.InvisibleMonsters) !== 0 === invisibleMonsters
         && (extendedFlags & EF_EXTENDED_FLAGS.DrawAsSize4Monsters) !== 0 === drawAsSize4Monsters,

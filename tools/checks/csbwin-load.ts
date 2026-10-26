@@ -291,7 +291,7 @@ function main(): void {
       );
       const written = new Uint8Array(CHARDESC_SIZE);
       writeCsbwinCharacter(written, 0, champion);
-      const file = world.save.characterBlock!.subarray(i * CHARDESC_SIZE + 276, i * CHARDESC_SIZE + 286);
+      const file = world.save.blocks.characters.subarray(i * CHARDESC_SIZE + 276, i * CHARDESC_SIZE + 286);
       check(
         written.subarray(276, 286).every((b, j) => b === file[j]),
         `${name}/${champion.name}: talents, fingerprint and the cause of damage go back as the file holds them`,

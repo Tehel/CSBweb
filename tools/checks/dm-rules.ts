@@ -72,7 +72,7 @@ let withBoth = 0;
 for (const path of genuineSaves()) {
   const file = basename(path);
   const bytes = new Uint8Array(readFileSync(path));
-  const header = quiet(() => loadCsbwinWorld(bytes)).save.extendedFeatures;
+  const header = quiet(() => loadCsbwinWorld(bytes)).save.extended.header;
   if (!header) { check(false, `${file}: carries an Extended Features block`); continue; }
   const design = (header.flags & 0x40) !== 0;
   const option = (header.extendedFlags & 0x08) !== 0;
@@ -136,7 +136,7 @@ for (const [dmRules, dmRulesDesignOption] of [[false, false], [true, false], [fa
   source.ctx.rules.dmRules = dmRules;
   source.ctx.rules.dmRulesDesignOption = dmRulesDesignOption;
   const file = buildSaveFile(source);
-  const header = quiet(() => loadCsbwinWorld(file)).save.extendedFeatures;
+  const header = quiet(() => loadCsbwinWorld(file)).save.extended.header;
   const flags = header?.flags ?? -1;
   const extendedFlags = header?.extendedFlags ?? -1;
   console.log(`  DM_rules ${dmRules}, design ${dmRulesDesignOption}: ` +
