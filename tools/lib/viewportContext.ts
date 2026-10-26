@@ -2,13 +2,15 @@
  * A drawing's context for a tool that draws without a `ViewportRenderer`: `members`, and for
  * everything else what a drawing reads as nothing there. No bitmap, rectangle, ornament or
  * floor decoration, no graphic (`getGraphicBitmap` answers `null`), an empty cache, an empty
- * background library and monster cache, nothing summarised, a new picking, and a viewport of
- * colour 0. The tables and the dungeon are stand-ins holding nothing, so a drawing that
- * reaches one the tool did not give throws rather than draw nothing. A trace prints.
+ * background library and monster cache, nothing summarised, a new picking, a new drawing
+ * state, and a viewport of colour 0. The tables and the dungeon are stand-ins holding
+ * nothing, so a drawing that reaches one the tool did not give throws rather than draw
+ * nothing. A trace prints.
  */
 
 import type { InterpreterContext } from '../../src/renderer/bytecode/BytecodeInterpreter';
 import { emptyViewportPicking } from '../../src/renderer/bytecode/Types';
+import { ViewportDrawState } from '../../src/renderer/bytecode/ViewportDrawState';
 import { createPaletteIndexViewportBuffer } from '../../src/renderer/csbwin/CanvasBlitter';
 import { AltMonCache } from '../../src/data/AltMonGraphics';
 import { BackgroundLib } from '../../src/data/BackgroundLib';
@@ -62,6 +64,7 @@ export function viewportContextOf(members: Partial<InterpreterContext>): Interpr
     seeThroughWalls: false,
     roomData: [],
     picking: emptyViewportPicking(),
+    drawState: new ViewportDrawState(),
     // A member given as `undefined` is one the tool does not have.
     ...Object.fromEntries(Object.entries(members).filter(([, value]) => value !== undefined)),
   };

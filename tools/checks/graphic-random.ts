@@ -17,12 +17,13 @@
  *
  * This drives the real implementation and a BigInt oracle (exact by construction,
  * no float64 involved) from several seeds and checks every step agrees, then checks
- * the specific failure mode directly: across 64 draws from the seed the module starts
- * at, `% 32` must not be the same value every time.
+ * the specific failure mode directly: across 64 draws from the seed the drawing's state
+ * starts at, `% 32` must not be the same value every time.
  *
  * Run: `npm test -- --only=graphic-random.ts`
  */
-import { GraphicRandom, graphicRandomState } from '../../src/renderer/bytecode/DrawDoor';
+import { GraphicRandom } from '../../src/renderer/bytecode/DrawDoor';
+import { ViewportDrawState } from '../../src/renderer/bytecode/ViewportDrawState';
 import { check, finish } from '../lib/check';
 
 const MULTIPLIER = 0xbb40e62dn;
@@ -33,8 +34,10 @@ function oracleNext(state: bigint): bigint {
   return (state * MULTIPLIER + INCREMENT) & MASK32;
 }
 
+const drawState = new ViewportDrawState();
+
 function resetGraphicRandomState(seed: number): void {
-  graphicRandomState.r = seed;
+  drawState.graphicRandom = seed;
 }
 
 function main(): void {
@@ -45,7 +48,7 @@ function main(): void {
     let allMatch = true;
     for (let i = 0; i < 200; i++) {
       oracle = oracleNext(oracle);
-      const got = GraphicRandom(1_000_000_003); // a modulus far bigger than any low-bit blind spot
+      const got = GraphicRandom(drawState, 1_000_000_003); // a modulus far bigger than any low-bit blind spot
       const want = Number(oracle >> 7n) % 1_000_000_003;
       if (got !== want) {
         allMatch = false;
@@ -60,7 +63,7 @@ function main(): void {
   console.log('=== the specific failure mode: mod-32 must not be constant ===');
   resetGraphicRandomState(12345);
   const draws: number[] = [];
-  for (let i = 0; i < 64; i++) draws.push(GraphicRandom(32));
+  for (let i = 0; i < 64; i++) draws.push(GraphicRandom(drawState, 32));
   const distinctValues = new Set(draws).size;
   console.log(`64 draws of % 32 from the state the class starts at: ${distinctValues} distinct values`);
   console.log(draws.join(' '));

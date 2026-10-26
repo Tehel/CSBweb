@@ -8,6 +8,7 @@
 import { Opcode } from './Opcodes';
 import type { SummarizeRoomData, ViewportPicking } from './Types';
 import { ViewportDraw } from './ViewportDraw';
+import type { ViewportDrawState } from './ViewportDrawState';
 import { DrawFloorDecorations, DrawWallDecoration, drawWallText } from './DrawDecorations';
 import { DrawDoor, DrawDoorSwitch, DrawTeleporter } from './DrawDoor';
 import { DrawRoomObjects } from './DrawRoomObjects';
@@ -28,7 +29,7 @@ import type { ObjectTables } from '../../data/tables/ObjectTables';
 import type { RectPos } from '../../data/tables/UITables';
 import type { CSBGraphicsLoader } from '../../data/CSBGraphicsLoader';
 import type { BackgroundLib } from '../../data/BackgroundLib';
-import { OBJECT_ID_EOF, Position, RoomType, type ObjectID, getRoomType } from '../../core/types';
+import { OBJECT_ID_EOF, Position, RoomType, getRoomType } from '../../core/types';
 
 /**
  * What `DrawViewport` and the drawing it runs read: CSBWin's `d.` for them. Everything the
@@ -152,6 +153,11 @@ export interface InterpreterContext {
 
   /** What this frame leaves for the interface to pick from. */
   picking: ViewportPicking;
+  /**
+   * What the drawing keeps from one frame to the next, CSBWin's statics: the stacks and the
+   * two random streams. The renderer's own, for the page.
+   */
+  drawState: ViewportDrawState;
 }
 
 /**
@@ -576,63 +582,9 @@ STD_RECTANGLE_POINTERS[StdRectPtr.RECT_StdSeeThruWallsRect2] = (context) => cont
 /** An opcode's handler, given the machine and the constant its table entry holds. */
 type OpcodeHandler = (machine: BytecodeInterpreter, operand: number) => boolean;
 
-/**
- * CSBWin's `stack` and `rstack` (`doc/CSBwin-src/Viewport.cpp:2215-2247`): static rings of
- * 256 words, each indexed by a byte that `push` decrements first. They are kept from one
- * `Interpret` to the next, and a program that pops more than it pushed reads what an
- * earlier one left. `pop` and `rpop` return an `i16`; `popRN` reads the word unsigned.
- */
-const stack = new Uint16Array(256);
-const rstack = new Uint16Array(256);
-let sp = 0;
-let rsp = 0;
-
-function pop(): number {
-  const v = stack[sp]!;
-  sp = (sp + 1) & 0xff;
-  return (v << 16) >> 16;
-}
-
-/** `push(i32 v)`: `stack[--sp] = (i16)v`, the low sixteen bits. */
-function push(v: number): void {
-  sp = (sp - 1) & 0xff;
-  stack[sp] = v;
-}
-
-/**
- * `popRN` (`Viewport.cpp:2249-2258`): the word, unsigned. CSBWin checks it with
- * `checkIndirectIndex`; the port passes it on unchecked.
- */
-function popRN(): ObjectID {
-  const n = stack[sp]!;
-  sp = (sp + 1) & 0xff;
-  return n as ObjectID;
-}
-
-function rpop(): number {
-  const v = rstack[rsp]!;
-  rsp = (rsp + 1) & 0xff;
-  return (v << 16) >> 16;
-}
-
-function rpush(v: number): void {
-  rsp = (rsp - 1) & 0xff;
-  rstack[rsp] = v;
-}
-
 /** `(i16)n`: a word of the code read as a signed jump. */
 function i16(n: number): number {
   return (n << 16) >> 16;
-}
-
-/** The two rings' indexes, `sp` and `rsp`, for the tools that check a program leaves them as it found them. */
-export function interpreterStackPointers(): { sp: number; rsp: number } {
-  return { sp, rsp };
-}
-
-/** The data stack's top `n` words as `pop` reads them, the top first, for the tools. */
-export function interpreterStackTop(n: number): number[] {
-  return Array.from({ length: n }, (_, i) => (stack[(sp + i) & 0xff]! << 16) >> 16);
 }
 
 /** The most opcodes one `Interpret` runs before it takes its program for one that never returns. */
@@ -651,9 +603,12 @@ export class BytecodeInterpreter {
   private hasAlcove = 0;
   /** The derived graphics a program allocates, by number (CSBWin `AllocateDerivedGraphic`). */
   private derivedGraphics = new Map<number, Uint8Array>();
+  /** The stacks, kept from one `Interpret` to the next: the context's `drawState`. */
+  private readonly state: ViewportDrawState;
 
   constructor(context: InterpreterContext) {
     this.context = context;
+    this.state = context.drawState;
     this.draw = new ViewportDraw(context);
   }
 
@@ -671,7 +626,7 @@ export class BytecodeInterpreter {
     this.cellNum = cellNum;
     this.removeMortarJoint = true;
     this.hasAlcove = 0;
-    rpush(0xffff);
+    this.state.rpush(0xffff);
 
     for (let steps = 0; ; steps++) {
       if (steps === INTERPRET_STEP_BUDGET) {
@@ -706,7 +661,7 @@ export class BytecodeInterpreter {
       for (const opcode of opcodes) on(opcode, run, opcode);
     };
 
-    onEach(CONSTANT_OPCODES, (_, value) => { push(value); return true; });
+    onEach(CONSTANT_OPCODES, (m, value) => { m.state.push(value); return true; });
     onEach(XY_OPCODES, (m, cell) => m.opCellXY(cell));
     onEach(CONTENTS_OPCODES, (m, cell) => m.opCellContents(cell));
     onEach(DOOR_STATE_OPCODES, (m, cell) => m.opCellDecoration(cell, 0));
@@ -719,8 +674,8 @@ export class BytecodeInterpreter {
     on(Opcode.JumpNZ, (m) => m.opJumpNZ());
     on(Opcode.Jump, (m) => m.opJump());
     on(Opcode.Literal, (m) => m.opLiteral());
-    on(Opcode.ToR, () => { rpush(pop()); return true; });
-    on(Opcode.RTo, () => { push(rpop()); return true; });
+    on(Opcode.ToR, (m) => { m.state.rpush(m.state.pop()); return true; });
+    on(Opcode.RTo, (m) => { m.state.push(m.state.rpop()); return true; });
 
     on(Opcode.StdBltShape, (m) => m.opStdBltShape());
     on(Opcode.StdBltShapeToViewport, (m) => m.opStdBltShapeToViewport(false));
@@ -741,20 +696,20 @@ export class BytecodeInterpreter {
     on(Opcode.HasDecoration, (m) => m.opHasDecoration());
     on(Opcode.DoorSwitch, (m) => m.opDoorSwitch());
     // The last `StdDrawWallDecoration`'s result (`Viewport.cpp:2639`).
-    on(Opcode.Alcove, (m) => { push(m.hasAlcove ? 1 : 0); return true; });
-    on(Opcode.SeeThroughWalls, (m) => { push(m.context.seeThroughWalls ? 1 : 0); return true; });
+    on(Opcode.Alcove, (m) => { m.state.push(m.hasAlcove ? 1 : 0); return true; });
+    on(Opcode.SeeThroughWalls, (m) => { m.state.push(m.context.seeThroughWalls ? 1 : 0); return true; });
     on(Opcode.LeaveMortarJoint, (m) => { m.removeMortarJoint = false; return true; });
 
     // See-Thru-Walls through the F1 wall (`Viewport.cpp:2964-3023`).
-    on(Opcode.StdAllocateDerivedGraphic, (m) => { m.allocateDerivedGraphic(pop()); return true; });
-    on(Opcode.StdSeeThruWallsRectUByte4, (m) => { push(m.context.seeThruWallsRectUByte4); return true; });
-    on(Opcode.StdSeeThruWallsRectUByte6, (m) => { push(m.context.seeThruWallsRectUByte6); return true; });
+    on(Opcode.StdAllocateDerivedGraphic, (m) => { m.allocateDerivedGraphic(m.state.pop()); return true; });
+    on(Opcode.StdSeeThruWallsRectUByte4, (m) => { m.state.push(m.context.seeThruWallsRectUByte4); return true; });
+    on(Opcode.StdSeeThruWallsRectUByte6, (m) => { m.state.push(m.context.seeThruWallsRectUByte6); return true; });
     on(Opcode.StdBltToDerivedGraphic, (m) => m.opStdBltDerivedGraphic(true));
     on(Opcode.StdBltFromDerivedGraphic, (m) => m.opStdBltDerivedGraphic(false));
     on(Opcode.StdDeleteDerivedGraphic, (m) => {
-      m.derivedGraphics.delete(pop());
+      m.derivedGraphics.delete(m.state.pop());
       // CSBWin's case has no `break` and falls into `StdHoleInWallBitmap` (Viewport.cpp:3022-3023).
-      push(StdBitmapPtr.BMP_StdHoleInWallBitmap);
+      m.state.push(StdBitmapPtr.BMP_StdHoleInWallBitmap);
       return true;
     });
 
@@ -783,7 +738,7 @@ export class BytecodeInterpreter {
    */
   private executeOpcode(opcode: number): boolean {
     if (opcode < FIRST_OPCODE) {
-      rpush(this.pc);
+      this.state.rpush(this.pc);
       this.pc = opcode;
       return true;
     }
@@ -802,7 +757,7 @@ export class BytecodeInterpreter {
 
   /** `Return` (`Viewport.cpp:3024-3028`): back to the caller, or out at the sentinel. */
   private opReturn(): boolean {
-    const raddr = rpop() & 0xffff;
+    const raddr = this.state.rpop() & 0xffff;
     if (raddr === 0xffff) return false;
     this.pc = raddr;
     return true;
@@ -818,45 +773,45 @@ export class BytecodeInterpreter {
     const lib = this.context.backgroundLib;
     switch (opcode) {
       case Opcode.CurrentSkin:
-        push(roomData[this.cellNum]!.skinNumber);
+        this.state.push(roomData[this.cellNum]!.skinNumber);
         break;
       case Opcode.SkinNumber: {
         // CSBWin indexes `roomData[21]` with whatever was popped; past it the port reads 0.
-        const relativeCell = pop();
-        push(roomData[relativeCell]?.skinNumber ?? 0);
+        const relativeCell = this.state.pop();
+        this.state.push(roomData[relativeCell]?.skinNumber ?? 0);
         break;
       }
       case Opcode.CurrentCell:
-        push(roomData[this.cellNum]!.relativeCellNumber);
+        this.state.push(roomData[this.cellNum]!.relativeCellNumber);
         break;
       case Opcode.WallGraphicID:
-        push(lib.GetWallGraphicID(pop() >>> 0));
+        this.state.push(lib.GetWallGraphicID(this.state.pop() >>> 0));
         break;
       case Opcode.FloorGraphicID:
-        push(lib.GetFloorGraphicID(pop() >>> 0));
+        this.state.push(lib.GetFloorGraphicID(this.state.pop() >>> 0));
         break;
       case Opcode.MiddleGraphicID:
-        push(lib.GetMiddleGraphicID(pop() >>> 0));
+        this.state.push(lib.GetMiddleGraphicID(this.state.pop() >>> 0));
         break;
       case Opcode.CeilingGraphicID:
-        push(lib.GetCeilingGraphicID(pop() >>> 0));
+        this.state.push(lib.GetCeilingGraphicID(this.state.pop() >>> 0));
         break;
       case Opcode.WallMaskID:
-        push(lib.GetWallMaskID(pop() >>> 0));
+        this.state.push(lib.GetWallMaskID(this.state.pop() >>> 0));
         break;
       case Opcode.FloorMaskID:
-        push(lib.GetFloorMaskID(pop() >>> 0));
+        this.state.push(lib.GetFloorMaskID(this.state.pop() >>> 0));
         break;
       case Opcode.MiddleMaskID:
-        push(lib.GetMiddleMaskID(pop() >>> 0));
+        this.state.push(lib.GetMiddleMaskID(this.state.pop() >>> 0));
         break;
       case Opcode.CeilingMaskID:
-        push(lib.GetCeilingMaskID(pop() >>> 0));
+        this.state.push(lib.GetCeilingMaskID(this.state.pop() >>> 0));
         break;
       case Opcode.WallDecorationID: {
-        const wallDecorationNum = pop();
-        const skinNum = pop();
-        push(lib.GetWallDecorationID(skinNum >>> 0, wallDecorationNum >>> 0));
+        const wallDecorationNum = this.state.pop();
+        const skinNum = this.state.pop();
+        this.state.push(lib.GetWallDecorationID(skinNum >>> 0, wallDecorationNum >>> 0));
         break;
       }
     }
@@ -876,9 +831,9 @@ export class BytecodeInterpreter {
     const lib = this.context.backgroundLib;
     switch (opcode) {
       case Opcode.DrawCustomGraphic: {
-        const maskNumber = pop();
-        const maskID = pop();
-        const graphicID = pop();
+        const maskNumber = this.state.pop();
+        const maskID = this.state.pop();
+        const graphicID = this.state.pop();
         const pMask = lib.GetMask(maskID >>> 0, maskNumber >>> 0, 12);
         const pGraphic = lib.GetBitmap(graphicID >>> 0, 2);
         this.applyToViewport((bmp) => ApplyBackground(bmp, pMask, pGraphic?.data ?? null, pGraphic?.bitmapSize ?? 0));
@@ -890,10 +845,10 @@ export class BytecodeInterpreter {
         break;
       }
       case Opcode.CreateVirtualBitmap: {
-        const maskNumber = pop();
-        const maskID = pop();
-        const virtualGraphicID = pop();
-        const graphicID = pop();
+        const maskNumber = this.state.pop();
+        const maskID = this.state.pop();
+        const virtualGraphicID = this.state.pop();
+        const graphicID = this.state.pop();
         trace?.(`  CreateVirtualBitmap(${graphicID}, ${virtualGraphicID}, ${maskID}, ${maskNumber}`);
         const pGraphic = lib.GetBitmap(graphicID >>> 0, 2);
         if (pGraphic === null) break; // do nothing
@@ -903,34 +858,34 @@ export class BytecodeInterpreter {
         break;
       }
       case Opcode.DrawCustomDecoration: {
-        const locationNumber = pop();
-        const decorationNumber = pop();
-        const decorationID = pop();
+        const locationNumber = this.state.pop();
+        const decorationNumber = this.state.pop();
+        const decorationID = this.state.pop();
         const decoration = lib.GetDecorationBitmap(decorationID >>> 0, decorationNumber >>> 0, locationNumber >>> 0);
         if (decoration === null) break;
         this.applyToViewport((bmp) => ApplyDecoration(bmp, decoration.bitmap, decoration.location, decoration.bitmapSize));
         break;
       }
       case Opcode.CreateVirtualMask: {
-        const newMaskNumber = pop();
-        const newMaskID = pop();
-        const Cyc = pop();
-        const Cyy = pop();
-        const Cyx = pop();
-        const Cxc = pop();
-        const Cxy = pop();
-        const Cxx = pop();
+        const newMaskNumber = this.state.pop();
+        const newMaskID = this.state.pop();
+        const Cyc = this.state.pop();
+        const Cyy = this.state.pop();
+        const Cyx = this.state.pop();
+        const Cxc = this.state.pop();
+        const Cxy = this.state.pop();
+        const Cxx = this.state.pop();
         // `BACKGROUND_MASK`'s words: `ui16`s, and `dstX` an `i16`.
-        const height = pop() & 0xffff;
-        const width = pop() & 0xffff;
-        const dstY = pop() & 0xffff;
-        const dstX = pop();
-        const srcY = pop() & 0xffff;
-        const srcX = pop() & 0xffff;
+        const height = this.state.pop() & 0xffff;
+        const width = this.state.pop() & 0xffff;
+        const dstY = this.state.pop() & 0xffff;
+        const dstX = this.state.pop();
+        const srcY = this.state.pop() & 0xffff;
+        const srcX = this.state.pop() & 0xffff;
         const bMask = { srcX, srcY, dstX, dstY, width, height };
         const aMask = { Cxx, Cxy, Cxc, Cyx, Cyy, Cyc, srcX: 0, srcY: 0, srcWidth: 0, srcHeight: 0, dstWidth: 0, dstHeight: 0 };
-        const oldMaskNumber = pop();
-        const oldMaskID = pop();
+        const oldMaskNumber = this.state.pop();
+        const oldMaskID = this.state.pop();
         trace?.(`CreateVirtualMask(${oldMaskID}, ${oldMaskNumber}, bmask, amask, ${newMaskID}, ${newMaskNumber}`);
         trace?.(`   bMask = ${srcX} ${srcY} ${dstX} ${dstY} ${width} ${height}`);
         trace?.(`   aMask = ${Cxx} ${Cxy} ${Cxc} ${Cyx} ${Cyy} ${Cyc}`);
@@ -944,20 +899,20 @@ export class BytecodeInterpreter {
         break;
       }
       case Opcode.CreateVirtualAffineMask: {
-        const newMaskNumber = pop();
-        const newMaskID = pop();
-        const dstHeight = pop();
-        const dstWidth = pop();
-        const srcHeight = pop();
-        const srcWidth = pop();
-        const srcY = pop();
-        const srcX = pop();
-        const Cyc = pop();
-        const Cyy = pop();
-        const Cyx = pop();
-        const Cxc = pop();
-        const Cxy = pop();
-        const Cxx = pop();
+        const newMaskNumber = this.state.pop();
+        const newMaskID = this.state.pop();
+        const dstHeight = this.state.pop();
+        const dstWidth = this.state.pop();
+        const srcHeight = this.state.pop();
+        const srcWidth = this.state.pop();
+        const srcY = this.state.pop();
+        const srcX = this.state.pop();
+        const Cyc = this.state.pop();
+        const Cyy = this.state.pop();
+        const Cyx = this.state.pop();
+        const Cxc = this.state.pop();
+        const Cxy = this.state.pop();
+        const Cxx = this.state.pop();
         const aMask = { Cxx, Cxy, Cxc, Cyx, Cyy, Cyc, srcX, srcY, srcWidth, srcHeight, dstWidth, dstHeight };
         trace?.(`CreateVirtualAffineMask (aMask, ${newMaskID} ${newMaskNumber}`);
         trace?.(`    aMask = ${Cxx} ${Cxy} ${Cxc} ${Cyx} ${Cyy} ${Cyc} ${srcX} ${srcY} ${srcWidth} ${srcHeight} ${dstWidth} ${dstHeight}`);
@@ -986,33 +941,33 @@ export class BytecodeInterpreter {
     const lib = this.context.backgroundLib;
     switch (opcode) {
       case Opcode.GetMaskHeader: {
-        const maskNumber = pop();
-        const maskID = pop();
+        const maskNumber = this.state.pop();
+        const maskID = this.state.pop();
         const pMask = lib.GetMask(maskID >>> 0, maskNumber >>> 0, 12);
         if (pMask === null) break;
         // `BACKGROUND_MASK` (`CSB.h:330-339`): srcX, srcY, dstX, dstY, width, height.
-        for (let i = 0; i < 6; i++) push(readU16LE(pMask.data, pMask.offset + 2 * i));
+        for (let i = 0; i < 6; i++) this.state.push(readU16LE(pMask.data, pMask.offset + 2 * i));
         break;
       }
       case Opcode.NeedVirtualMaskQ: {
-        const maskNumber = pop();
-        const maskID = pop();
+        const maskNumber = this.state.pop();
+        const maskID = this.state.pop();
         const pMask = lib.MaskExists(maskID >>> 0, maskNumber >>> 0);
-        push(pMask === null ? 1 : 0);
+        this.state.push(pMask === null ? 1 : 0);
         break;
       }
       case Opcode.BitmapInfo: {
         let width = 0;
         let height = 0;
-        const graphicID = pop();
+        const graphicID = this.state.pop();
         const pGraphic = lib.GetBitmap(graphicID >>> 0, 4);
         if (pGraphic !== null) {
           width = readU32LE(pGraphic.data, 0);
           // A width of 0 divides by zero in CSBWin; the port leaves the height 0.
           if (width !== 0) height = Math.floor(((pGraphic.bitmapSize - 1) * 8) / width);
         }
-        push(width);
-        push(height);
+        this.state.push(width);
+        this.state.push(height);
         break;
       }
     }
@@ -1021,103 +976,104 @@ export class BytecodeInterpreter {
 
   /** The stack words (`Viewport.cpp:3123-3193`), on the ring itself where CSBWin works on it. */
   private opStackWord(opcode: number): boolean {
+    const s = this.state;
     let n: number;
     let temp: number;
     switch (opcode) {
       case Opcode.SWAP:
-        temp = stack[sp]!;
-        stack[sp] = stack[(sp + 1) & 0xff]!;
-        stack[(sp + 1) & 0xff] = temp;
+        temp = s.stack[s.sp]!;
+        s.stack[s.sp] = s.stack[(s.sp + 1) & 0xff]!;
+        s.stack[(s.sp + 1) & 0xff] = temp;
         break;
       case Opcode.DROP:
-        sp = (sp + 1) & 0xff;
+        s.sp = (s.sp + 1) & 0xff;
         break;
       case Opcode.TwoDrop:
-        sp = (sp + 2) & 0xff;
+        s.sp = (s.sp + 2) & 0xff;
         break;
       case Opcode.OVER:
-        push(stack[(sp + 1) & 0xff]!);
+        this.state.push(s.stack[(s.sp + 1) & 0xff]!);
         break;
       case Opcode.ROT:
-        temp = stack[(sp + 2) & 0xff]!;
-        stack[(sp + 2) & 0xff] = stack[(sp + 1) & 0xff]!;
-        stack[(sp + 1) & 0xff] = stack[sp]!;
-        stack[sp] = temp;
+        temp = s.stack[(s.sp + 2) & 0xff]!;
+        s.stack[(s.sp + 2) & 0xff] = s.stack[(s.sp + 1) & 0xff]!;
+        s.stack[(s.sp + 1) & 0xff] = s.stack[s.sp]!;
+        s.stack[s.sp] = temp;
         break;
       case Opcode.DUP:
-        push(stack[sp]!);
+        this.state.push(s.stack[s.sp]!);
         break;
       case Opcode.TwoDup:
-        push(stack[(sp + 1) & 0xff]!);
-        push(stack[(sp + 1) & 0xff]!);
+        this.state.push(s.stack[(s.sp + 1) & 0xff]!);
+        this.state.push(s.stack[(s.sp + 1) & 0xff]!);
         break;
       case Opcode.QuestionDUP:
-        if (stack[sp] !== 0) push(stack[sp]!);
+        if (s.stack[s.sp] !== 0) this.state.push(s.stack[s.sp]!);
         break;
       case Opcode.PICK:
-        temp = stack[sp]!;
-        stack[sp] = stack[(sp + temp) & 0xff]!;
+        temp = s.stack[s.sp]!;
+        s.stack[s.sp] = s.stack[(s.sp + temp) & 0xff]!;
         break;
       case Opcode.ROLL:
-        n = pop() - 1;
-        temp = stack[(sp + n) & 0xff]!;
-        for (let x = n; x > 0; x--) stack[(sp + x) & 0xff] = stack[(sp + x - 1) & 0xff]!;
-        stack[sp] = temp;
+        n = this.state.pop() - 1;
+        temp = s.stack[(s.sp + n) & 0xff]!;
+        for (let x = n; x > 0; x--) s.stack[(s.sp + x) & 0xff] = s.stack[(s.sp + x - 1) & 0xff]!;
+        s.stack[s.sp] = temp;
         break;
       case Opcode.PLUS:
-        push(pop() + pop());
+        this.state.push(this.state.pop() + this.state.pop());
         break;
       case Opcode.MINUS:
-        n = pop();
-        push(pop() - n);
+        n = this.state.pop();
+        this.state.push(this.state.pop() - n);
         break;
       case Opcode.GEAR:
-        push(pop() * pop());
+        this.state.push(this.state.pop() * this.state.pop());
         break;
       case Opcode.SLASH:
         // C's division, toward zero. By zero CSBWin faults; the port pushes 0.
-        n = pop();
-        push(Math.trunc(pop() / n));
+        n = this.state.pop();
+        this.state.push(Math.trunc(this.state.pop() / n));
         break;
       case Opcode.EQUAL:
-        push(pop() === pop() ? 1 : 0);
+        this.state.push(this.state.pop() === this.state.pop() ? 1 : 0);
         break;
       case Opcode.LESS:
-        n = pop();
-        push(n < pop() ? 1 : 0);
+        n = this.state.pop();
+        this.state.push(n < this.state.pop() ? 1 : 0);
         break;
       case Opcode.GREATER:
-        n = pop();
-        push(n > pop() ? 1 : 0);
+        n = this.state.pop();
+        this.state.push(n > this.state.pop() ? 1 : 0);
         break;
       case Opcode.ULESS:
-        n = pop();
-        push((n >>> 0) < (pop() >>> 0) ? 1 : 0);
+        n = this.state.pop();
+        this.state.push((n >>> 0) < (this.state.pop() >>> 0) ? 1 : 0);
         break;
       case Opcode.ZEROEQUAL:
       case Opcode.NOT:
-        push(pop() === 0 ? 1 : 0);
+        this.state.push(this.state.pop() === 0 ? 1 : 0);
         break;
       case Opcode.ZEROLESS:
-        push(pop() < 0 ? 1 : 0);
+        this.state.push(this.state.pop() < 0 ? 1 : 0);
         break;
       case Opcode.ZEROGREATER:
-        push(pop() > 0 ? 1 : 0);
+        this.state.push(this.state.pop() > 0 ? 1 : 0);
         break;
       case Opcode.AND:
-        push(pop() & pop());
+        this.state.push(this.state.pop() & this.state.pop());
         break;
       case Opcode.OR:
-        push(pop() | pop());
+        this.state.push(this.state.pop() | this.state.pop());
         break;
       case Opcode.LSHIFT:
-        n = pop();
-        push(pop() << n);
+        n = this.state.pop();
+        this.state.push(this.state.pop() << n);
         break;
       case Opcode.IsOdd: {
         // `d.partyLevel + d.partyX + d.partyY + d.partyFacing`: the view's square and facing.
         const party = this.context.viewParty;
-        push((party.z + party.x + party.y + party.facing) & 1);
+        this.state.push((party.z + party.x + party.y + party.facing) & 1);
         break;
       }
     }
@@ -1126,8 +1082,8 @@ export class BytecodeInterpreter {
 
   private opStdBltShape(): boolean {
     // CSBWin: pop rectangle pointer, pop bitmap pointer, then blit with transparentColor=10.
-    const rectanglePtr = pop();
-    const bitmapPtr = pop();
+    const rectanglePtr = this.state.pop();
+    const bitmapPtr = this.state.pop();
 
     const bitmap = this.resolveStdBitmapPointer(bitmapPtr);
     const rectRef = this.resolveStdRectanglePointer(rectanglePtr);
@@ -1137,7 +1093,7 @@ export class BytecodeInterpreter {
   }
 
   private opJumpZ(): boolean {
-    const condition = pop();
+    const condition = this.state.pop();
     const offset = i16(this.program[this.pc]!);
     this.pc++;
 
@@ -1149,7 +1105,7 @@ export class BytecodeInterpreter {
   }
 
   private opJumpNZ(): boolean {
-    const condition = pop();
+    const condition = this.state.pop();
     const offset = i16(this.program[this.pc]!);
     this.pc++;
 
@@ -1172,15 +1128,15 @@ export class BytecodeInterpreter {
     const value = this.program[this.pc]!;
     this.pc++;
 
-    push(value);
+    this.state.push(value);
 
     return true;
   }
 
   private opStdBltShapeToViewport(mirror: boolean): boolean {
     // CSBWin StdBltShapeToViewport / StdMirrorShapeToViewport (Viewport.cpp:2856-2866)
-    const rectanglePtr = pop();
-    const bitmapPtr = pop();
+    const rectanglePtr = this.state.pop();
+    const bitmapPtr = this.state.pop();
     const rectRef = this.resolveStdRectanglePointer(rectanglePtr);
     const bitmap = this.resolveStdBitmapPointer(bitmapPtr);
     if (!rectRef || Array.isArray(rectRef) || !bitmap) {
@@ -1193,8 +1149,8 @@ export class BytecodeInterpreter {
 
   private opStdGraphicToViewport(mirror: boolean): boolean {
     // CSBWin StdGraphicToViewport / StdMirrorGraphicToViewport (Viewport.cpp:2906-2915)
-    const rectanglePtr = pop();
-    const graphicNum = pop();
+    const rectanglePtr = this.state.pop();
+    const graphicNum = this.state.pop();
     const rectRef = this.resolveStdRectanglePointer(rectanglePtr);
     if (!rectRef || Array.isArray(rectRef)) {
       return true;
@@ -1211,35 +1167,35 @@ export class BytecodeInterpreter {
 
   private opGetDecoration0(): boolean {
     // CSBWin `GetDecoration0` (Viewport.cpp:2882-2885)
-    const relativeCell = pop();
+    const relativeCell = this.state.pop();
     const v = this.context.roomData[relativeCell]?.decorations[0] ?? 0;
-    push(v);
+    this.state.push(v);
     return true;
   }
 
   private opHasDecoration(): boolean {
     // CSBWin Viewport.cpp:2640-2644
-    const wallDecorationPos = pop();
-    const relativeCell = pop();
+    const wallDecorationPos = this.state.pop();
+    const relativeCell = this.state.pop();
     const cell = this.context.roomData[relativeCell];
     const has = cell ? (cell.decorations[wallDecorationPos as 0 | 1 | 2] !== 0 ? 1 : 0) : 0;
-    push(has);
+    this.state.push(has);
     return true;
   }
 
   private opDoorSwitch(): boolean {
-    const relativeCell = pop();
+    const relativeCell = this.state.pop();
     const doorIndex = this.context.roomData[relativeCell | 0]?.decorations[1] ?? 0;
     const rec = this.context.dungeonState.getDoorRecordByIndex(doorIndex | 0);
     const hasSwitch = rec?.hasButton ? 1 : 0;
-    push(hasSwitch);
+    this.state.push(hasSwitch);
     return true;
   }
 
   private opStdDrawFloorDecoration(): boolean {
     // CSBWin StdDrawFloorDecoration: (relativeCell floorGraphicOrdinal ...)
-    const floorGraphicOrdinal = pop();
-    const relativeCell = pop();
+    const floorGraphicOrdinal = this.state.pop();
+    const relativeCell = this.state.pop();
 
     const floorCell = BytecodeInterpreter.floorDrawingLocations[relativeCell | 0] ?? 0;
     DrawFloorDecorations(this.draw, floorGraphicOrdinal | 0, floorCell | 0);
@@ -1247,9 +1203,9 @@ export class BytecodeInterpreter {
   }
 
   private opStdDrawCeilingPit(): boolean {
-    const mapY = pop();
-    const mapX = pop();
-    const relCellRF = pop();
+    const mapY = this.state.pop();
+    const mapX = this.state.pop();
+    const relCellRF = this.state.pop();
 
     const dungeon = this.context.dungeonState;
     const level = this.context.frameMapIndex;
@@ -1299,14 +1255,14 @@ export class BytecodeInterpreter {
    * `TAG0088b2` between a standard bitmap and a derived graphic, every argument off the stack.
    */
   private opStdBltDerivedGraphic(toDerived: boolean): boolean {
-    const xparentColor = pop();
-    const dstWidth = pop();
-    const srcWidth = pop();
-    const srcY = pop();
-    const srcX = pop();
-    const pDstRect = this.resolveStdRectanglePointer(pop());
-    const dstPtr = pop();
-    const srcPtr = pop();
+    const xparentColor = this.state.pop();
+    const dstWidth = this.state.pop();
+    const srcWidth = this.state.pop();
+    const srcY = this.state.pop();
+    const srcX = this.state.pop();
+    const pDstRect = this.resolveStdRectanglePointer(this.state.pop());
+    const dstPtr = this.state.pop();
+    const srcPtr = this.state.pop();
     const dst = toDerived ? this.derivedGraphics.get(dstPtr) : this.resolveStdBitmapPointer(dstPtr)?.pixels;
     const src = toDerived ? this.resolveStdBitmapPointer(srcPtr)?.pixels : this.derivedGraphics.get(srcPtr);
     if (!src || !dst || !pDstRect || Array.isArray(pDstRect)) return true;
@@ -1342,8 +1298,8 @@ export class BytecodeInterpreter {
 
   private opStdDrawDoorSwitch(): boolean {
     // CSBWin `StdDrawDoorSwitch` (Viewport.cpp:2893-2896)
-    const distance = pop();
-    const switchId = pop();
+    const distance = this.state.pop();
+    const switchId = this.state.pop();
 
     DrawDoorSwitch(this.draw, switchId | 0, distance | 0);
     return true;
@@ -1361,11 +1317,11 @@ export class BytecodeInterpreter {
   ];
 
   private opStdDrawRoomObjects(): boolean {
-    const drawOrder = pop();
-    const relCellRF = pop();
-    const mapY = pop();
-    const mapX = pop();
-    const firstObject = popRN();
+    const drawOrder = this.state.pop();
+    const relCellRF = this.state.pop();
+    const mapY = this.state.pop();
+    const mapX = this.state.pop();
+    const firstObject = this.state.popRN();
 
     const facing = this.context.frameFacing;
     const idx = relCellRF | 0;
@@ -1377,8 +1333,8 @@ export class BytecodeInterpreter {
 
   private opStdDrawTeleporter(): boolean {
     // CSBWin `StdDrawTeleporter` (Viewport.cpp:2898-2903)
-    const wallRectPtr = pop();
-    const teleporterRectPtr = pop();
+    const wallRectPtr = this.state.pop();
+    const teleporterRectPtr = this.state.pop();
 
     const wallRect = this.resolveStdRectanglePointer(wallRectPtr);
     const teleporterRect = this.resolveStdRectanglePointer(teleporterRectPtr);
@@ -1392,10 +1348,10 @@ export class BytecodeInterpreter {
 
   private opStdDrawDoor(): boolean {
     // CSBWin `StdDrawDoor` (Viewport.cpp:2596-2617)
-    const rectPtr = pop();
-    const doorGraphicIndex = pop();
-    const doorState = pop();
-    const doorRecordIndex = pop();
+    const rectPtr = this.state.pop();
+    const doorGraphicIndex = this.state.pop();
+    const doorState = this.state.pop();
+    const doorRecordIndex = this.state.pop();
 
     const rectRef = this.resolveStdRectanglePointer(rectPtr);
     if (!rectRef || !Array.isArray(rectRef)) {
@@ -1410,9 +1366,9 @@ export class BytecodeInterpreter {
 
   private opStdDrawWallDecoration(): boolean {
     // CSBWin `StdDrawWallDecoration` (Viewport.cpp:2949-2956)
-    const wallDecorationDrawLocation = pop();
-    const wallDecorationPos = pop();
-    const relativeCell = pop();
+    const wallDecorationDrawLocation = this.state.pop();
+    const wallDecorationPos = this.state.pop();
+    const relativeCell = this.state.pop();
 
     const rd = this.context.roomData[relativeCell | 0];
     const graphicOrdinal = rd?.decorations[wallDecorationPos as 0 | 1 | 2] ?? 0;
@@ -1430,9 +1386,9 @@ export class BytecodeInterpreter {
 
   private opStdDrawWallText(): boolean {
     // CSBWin `StdDrawWallText` (Viewport.cpp:2937-2947)
-    const wallDecorationDrawLocation = pop();
-    const wallDecorationPos = pop();
-    const relativeCell = pop();
+    const wallDecorationDrawLocation = this.state.pop();
+    const wallDecorationPos = this.state.pop();
+    const relativeCell = this.state.pop();
 
     const rd = this.context.roomData[relativeCell | 0];
     const textRN = rd?.text[wallDecorationPos as 0 | 1 | 2] ?? OBJECT_ID_EOF;
@@ -1448,26 +1404,26 @@ export class BytecodeInterpreter {
   /** `F4L1xy`…: the cell's map square. */
   private opCellXY(cell: number): boolean {
     const rd = this.context.roomData[cell];
-    push(rd?.x ?? 0);
-    push(rd?.y ?? 0);
+    this.state.push(rd?.x ?? 0);
+    this.state.push(rd?.y ?? 0);
     return true;
   }
 
   /** `F4L1Contents`…: the cell's first object. */
   private opCellContents(cell: number): boolean {
-    push(this.context.roomData[cell]?.rn2 ?? 0);
+    this.state.push(this.context.roomData[cell]?.rn2 ?? 0);
     return true;
   }
 
   /** A door's state (`decorations[0]`), its record index (`[1]`), or a floor decoration (`[2]`). */
   private opCellDecoration(cell: number, index: 0 | 1 | 2): boolean {
-    push(this.context.roomData[cell]?.decorations[index] ?? 0);
+    this.state.push(this.context.roomData[cell]?.decorations[index] ?? 0);
     return true;
   }
 
   /** A stair graphic of the level's wall set (`STAIR_GRAPHIC_OPCODES`). */
   private opStairGraphic(offset: number): boolean {
-    push(90 + this.context.wallGraphicSet * 18 + offset);
+    this.state.push(90 + this.context.wallGraphicSet * 18 + offset);
     return true;
   }
 

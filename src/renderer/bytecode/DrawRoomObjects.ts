@@ -36,7 +36,7 @@ import { ordinalAtPositionBytes } from '../../engine/monsterPosition';
 import { monsterDrawAsSize4, monsterInvisible, type MonsterDesignOptions } from '../../engine/monsterTypes';
 import { DBType, OBJECT_ID_EOF, type ObjectID } from '../../core/types';
 import { applyLimits } from '../../core/intCast';
-import { viewportRandom, type ViewportDraw } from './ViewportDraw';
+import type { ViewportDraw } from './ViewportDraw';
 import { DrawTeleporter } from './DrawDoor';
 
 /**
@@ -956,8 +956,8 @@ export function DrawClouds(draw: ViewportDraw, relativeCellNumber: number, first
 
     // tag006932 (`doc/CSBwin-src/Code51a4.cpp:257-313`). Both coin flips come from
     // the viewport's stream, the flip first; `GraphicRandom` is DrawTeleporter's alone.
-    const flip = viewportRandom.bool() !== 0; // w_142 → TAG008840
-    const mirror = viewportRandom.bool() !== 0; // LOCAL_36 → Mirror
+    const flip = draw.context.drawState.viewportRandom.bool() !== 0; // w_142 → TAG008840
+    const mirror = draw.context.drawState.viewportRandom.bool() !== 0; // LOCAL_36 → Mirror
     // LOCAL_30: CSBWin's rows are padded to 16 pixels and `Mirror` moves the padding to
     // the left, so the blit skips it. Our bitmaps are unpadded: we read LOCAL_30 fewer.
     const mirrorPad = mirror ? 2 * (7 - ((halfWidth - 1) & 7)) : 0;
@@ -1049,8 +1049,8 @@ function drawCloudUnderParty(
   // within 90 groups, 30 rows. Recolouring at the graphic's own size keeps every row.
   if (poison) src = shrinkBlt(src, src.width, src.height, src.width, src.height, tables.cloudColorMap);
 
-  const P7 = viewportRandom.next() & 63;
-  const P6 = viewportRandom.zeroTo3() + 87;
+  const P7 = draw.context.drawState.viewportRandom.next() & 63;
+  const P6 = draw.context.drawState.viewportRandom.zeroTo3() + 87;
   tag008c98(src, draw.context.viewportIndexBuffer, null, tables.cloudUnderPartyRect, P6, P7, 112, 138, 0, 0); // d.Word2530
 }
 

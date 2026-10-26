@@ -114,7 +114,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E28 | The bytecode interpreter's context and state | L | ⏳ step 2 of 3 next |
+| E28 | The bytecode interpreter's context and state | L | ⏳ step 3 of 3 next |
 | E29 | `GameScreen` is the canvas, the compose order, the palettes and a façade | L | ⏳ |
 | E31 | Late wiring with silent defaults, and long parameter lists | M | ⏳ |
 | E32 | Four ways to read bytes, and eight graphics caches | M | ⏳ |
@@ -425,16 +425,16 @@ holds the drawing's inputs, every one the game always sets required, and an unkn
 goes to its `trace`, `GameHost.trace`; a tool fills what it leaves out with
 `viewportContextOf` (`tools/lib/viewportContext.ts`). What a frame leaves for the interface
 is a `ViewportPicking` (`src/renderer/bytecode/Types.ts`), which `ViewportRenderer.draw`
-returns and `GameScreen` keeps as `ui.picking`. What is left, a step each, in this order:
+returns and `GameScreen` keeps as `ui.picking`. What the drawing keeps from one frame to the
+next, CSBWin's statics (the two stacks, `viewportRandom` and `GraphicRandom`'s `r`), is a
+`ViewportDrawState` (`src/renderer/bytecode/ViewportDrawState.ts`), the context's
+`drawState`: the renderer's own, and a tool's from `viewportContextOf`. What is left, the
+last step:
 
-2. **The state.** The drawing's state is module-wide: the interpreter's `stack`, `rstack`,
-   `sp` and `rsp`, `viewportRandom` (`ViewportDraw.ts:32`) and `graphicRandomState`
-   (`DrawDoor.ts:205`), which tools reseed by hand. Paying it: an object the
-   `ViewportRenderer` owns.
 3. **The monster colours.** `selectLevel` writes the level's monster colours into the
    shared tables (`tables.monsterColorMapMedium[...]`,
-   `src/renderer/ViewportRenderer.ts:217-222`), the game's one `GraphicsTables`, which
-   tools cache per loader. Its comment (`:167-170`) says they are applied "whether or not
+   `src/renderer/ViewportRenderer.ts:219-224`), the game's one `GraphicsTables`, which
+   tools cache per loader. Its comment (`:169-172`) says they are applied "whether or not
    the view is drawn"; its one caller runs only when it is. Paying it: per-level copies of
    the two colour maps.
 

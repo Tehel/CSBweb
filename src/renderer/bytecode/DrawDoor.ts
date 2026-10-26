@@ -16,7 +16,8 @@ import {
   tag008c98,
   type IndexedBitmap,
 } from '../csbwin/CanvasBlitter';
-import { viewportRandom, type ViewportDraw } from './ViewportDraw';
+import type { ViewportDraw } from './ViewportDraw';
+import type { ViewportDrawState } from './ViewportDrawState';
 
 /**
  * `DrawDoor` (`doc/CSBwin-src/CSBCode.cpp:4199`): door record `db0Index` in `doorState`
@@ -71,11 +72,11 @@ export function DrawDoor(
   // never perturb the game's own RNG, so this draws from a dedicated instance.
   const isLightningDoor = ((draw.context.doorTOC[doorType] ?? 0) & 0x400) !== 0;
   if (isLightningDoor && s !== 5) {
-    if (viewportRandom.bool()) {
+    if (draw.context.drawState.viewportRandom.bool()) {
       bitmap = draw.getMirroredBitmap(bitmap);
       ownBitmap = false;
     }
-    if (viewportRandom.bool()) {
+    if (draw.context.drawState.viewportRandom.bool()) {
       bitmap = draw.getFlippedBitmapVertical(bitmap);
       ownBitmap = false;
     }
@@ -196,15 +197,6 @@ export function DrawDoorSwitch(draw: ViewportDraw, doorSwitchId: number, distanc
 }
 
 /**
- * `GraphicRandom`'s state (`doc/CSBwin-src/CSBCode.cpp:576`): a C function-static, which
- * lives for the whole process rather than one call. The teleporter's shimmer is this
- * counter advancing frame over frame, not the caller re-seeding it, so it lives at module
- * level, past the one `BytecodeInterpreter` each redraw builds, or every frame would
- * replay the same jitter and the effect would render frozen. A tool seeds it here.
- */
-export const graphicRandomState = { r: 12345 };
-
-/**
  * `GraphicRandom` (`doc/CSBwin-src/CSBCode.cpp:574`).
  *
  * `r = r * ui32(0xbb40e62d) + 11;` is a 32-bit-wraparound multiply in C — free.
@@ -214,12 +206,13 @@ export const graphicRandomState = { r: 12345 };
  * state reached is a multiple of 4096 after the previous rounding, canceling the
  * `% 32` and `% 2` of the shimmer's jitter. `Math.imul` truncates to 32 bits *before*
  * rounding, matching the C `ui32` multiply exactly (`tools/checks/graphic-random.ts`).
- * `DrawTeleporter` is its only caller in CSBWin; clouds use `viewportRandom`.
+ * `DrawTeleporter` is its only caller in CSBWin; clouds use `viewportRandom`. Its `r` is
+ * the drawing's (`ViewportDrawState.graphicRandom`).
  */
-export function GraphicRandom(maxExclusive: number): number {
+export function GraphicRandom(state: ViewportDrawState, maxExclusive: number): number {
   if (maxExclusive <= 0) return 0;
-  graphicRandomState.r = (Math.imul(graphicRandomState.r, 0xbb40e62d) + 11) >>> 0;
-  return ((graphicRandomState.r >>> 7) % maxExclusive) >>> 0;
+  state.graphicRandom = (Math.imul(state.graphicRandom, 0xbb40e62d) + 11) >>> 0;
+  return ((state.graphicRandom >>> 7) % maxExclusive) >>> 0;
 }
 
 /**
@@ -249,7 +242,7 @@ export function DrawTeleporter(draw: ViewportDraw, teleporterRect: RectPos, wall
 
   const source = getGraphic(teleporterRect.x1 + 73);
   if (!source) return;
-  const P7 = GraphicRandom(32);
-  const P6 = teleporterRect.x2 + GraphicRandom(2);
+  const P7 = GraphicRandom(draw.context.drawState, 32);
+  const P6 = teleporterRect.x2 + GraphicRandom(draw.context.drawState, 2);
   tag008c98(source, viewport, mask, wallRect, P6, P7, 112, teleporterRect.y1, teleporterRect.srcX ?? 0, 0);
 }

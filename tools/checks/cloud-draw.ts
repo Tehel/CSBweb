@@ -51,9 +51,10 @@ import { DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../../
 import { applyLimits } from '../../src/core/intCast';
 import { CsbRandom } from '../../src/core/random';
 import { RN_POISON_CLOUD } from '../../src/core/spellRn';
-import { DrawTeleporter, graphicRandomState } from '../../src/renderer/bytecode/DrawDoor';
+import { DrawTeleporter } from '../../src/renderer/bytecode/DrawDoor';
 import { DrawClouds, DrawRoomObjects } from '../../src/renderer/bytecode/DrawRoomObjects';
-import { ViewportDraw, viewportRandom } from '../../src/renderer/bytecode/ViewportDraw';
+import { ViewportDraw } from '../../src/renderer/bytecode/ViewportDraw';
+import { ViewportDrawState } from '../../src/renderer/bytecode/ViewportDrawState';
 import { createPaletteIndexViewportBuffer, shrinkBlt, type IndexedBitmap } from '../../src/renderer/csbwin/CanvasBlitter';
 import { getCachedGraphicBitmap } from '../../src/renderer/ViewportGraphics';
 import { ViewportRenderer } from '../../src/renderer/ViewportRenderer';
@@ -96,6 +97,8 @@ const cloudBitmap = {
 // overridden here so the test places the cloud where it wants.
 const RELATIVE_CELL = 0;
 const REL_CELL = RELATIVE_CELL + 3;
+// The drawing's state every context below the renderer's shares, as a game's frames share one.
+const drawState = new ViewportDrawState();
 // The cloud's RN, the one slot of maps whose only record is the cloud.
 const rnMaps = new RnMaps(() => undefined);
 const cloudRn = rnMaps.rn(DBType.CLOUD, 0);
@@ -109,6 +112,7 @@ function drawCloudAt(px: number, py: number, viewportSeed: number): Drawn {
   cloudPositions7042[REL_CELL * 2 + 1] = py;
   const viewportIndexBuffer = createPaletteIndexViewportBuffer(224, 136, 0);
   const context = viewportContextOf({
+    drawState,
     viewportIndexBuffer,
     objectTables: { ...realTables, cloudPositions7042, cloudScaleBase, cloudScale },
     getGraphicBitmap: () => cloudBitmap,
@@ -118,7 +122,7 @@ function drawCloudAt(px: number, py: number, viewportSeed: number): Drawn {
       getCloudRecord: () => cloud,
     }),
   });
-  viewportRandom.setSeed(viewportSeed);
+  drawState.viewportRandom.setSeed(viewportSeed);
   DrawClouds(new ViewportDraw(context), RELATIVE_CELL, cloudRn, 0, 0);
 
   const { width, pixels } = viewportIndexBuffer;
@@ -148,20 +152,20 @@ const mirrored = (rows: number[][]) => rows.map((r) => [...r].reverse());
 const flipped = (rows: number[][]) => [...rows].reverse();
 
 // 0. The stream's seed is CSBWin's static initialiser, not a host random value.
-check(viewportRandom.getSeed() === 0x34175432,
+check(drawState.viewportRandom.getSeed() === 0x34175432,
   'viewportRandom starts at 0x34175432 (Viewport.cpp:6704)');
 
 // 1. The stream. Two draws from the viewport's own stream, none from GraphicRandom.
 {
   const seed = 0x1234567;
-  const graphicRandomBefore = graphicRandomState.r;
+  const graphicRandomBefore = drawState.graphicRandom;
   drawCloudAt(100, 60, seed);
   const oracle = new CsbRandom(seed);
   oracle.bool();
   oracle.bool();
-  check(viewportRandom.getSeed() === oracle.getSeed(),
+  check(drawState.viewportRandom.getSeed() === oracle.getSeed(),
     'one cloud consumes exactly two STRandomBool() draws from the viewport stream');
-  check(graphicRandomState.r === graphicRandomBefore,
+  check(drawState.graphicRandom === graphicRandomBefore,
     'a cloud draws nothing from GraphicRandom (only DrawTeleporter calls it)');
 }
 
@@ -279,12 +283,13 @@ function drawScene(sc: Scene): SceneResult {
   const requested: number[] = [];
   const rec = { nextObject: OBJECT_ID_EOF, value: sc.value, cloudType: sc.cloudType, bit7: true };
   const context = viewportContextOf({
+    drawState,
     viewportIndexBuffer,
     objectTables: { ...realTables, cloudPositions7042 },
     getGraphicBitmap: (n: number) => { requested.push(n); return fakeGraphic(n); },
     dungeonState: standInOf<DungeonState>({ rnMaps, getDBRecordLink: () => OBJECT_ID_EOF, getCloudRecord: () => rec }),
   });
-  viewportRandom.setSeed(sc.seed ?? seedFor(false, false));
+  drawState.viewportRandom.setSeed(sc.seed ?? seedFor(false, false));
   DrawClouds(new ViewportDraw(context), sc.relCell - 3, cloudRn, 0, 0);
   const { width, pixels } = viewportIndexBuffer;
   let x1 = 999, y1 = 999, x2 = -1, y2 = -1;
@@ -300,7 +305,7 @@ function drawScene(sc: Scene): SceneResult {
   return {
     requested, pixels, width,
     drawn: x2 < 0 ? null : { x1, y1, x2, y2, rows },
-    seedAfter: viewportRandom.getSeed(),
+    seedAfter: drawState.viewportRandom.getSeed(),
   };
 }
 const toRows = (b: { width: number; height: number; pixels: Uint8Array }) =>
@@ -398,6 +403,7 @@ for (const word1868 of [false, true]) {
     const rec = { nextObject: OBJECT_ID_EOF, value: 0, cloudType: 50, bit7: false };
     const viewportIndexBuffer = createPaletteIndexViewportBuffer(224, 136, 0);
     const context = viewportContextOf({
+      drawState,
       viewportIndexBuffer,
       objectTables: realTables,
       wallRectangles: viewportTables.wallRectangles,
@@ -407,20 +413,20 @@ for (const word1868 of [false, true]) {
       word1868,
     });
     const seed = 0x2468ace;
-    graphicRandomState.r = seed;
+    drawState.graphicRandom = seed;
     // Position list 1: the cell's first position, at the cloud's (0) with facing 0.
     DrawRoomObjects(new ViewportDraw(context), cloudRn, 0, 0, 0, relativeCell, 0x1);
-    const after = graphicRandomState.r;
+    const after = drawState.graphicRandom;
     // The one shimmer the cell owes, drawn directly from the same `GraphicRandom` state:
     // the cell's drawing must match it pixel for pixel, or be nothing at all.
     const teleporter = viewportTables.teleporterRectangles[relativeCell]!;
     const wall = viewportTables.wallRectangles[relativeCell]!;
     const expected = createPaletteIndexViewportBuffer(224, 136, 0);
-    graphicRandomState.r = seed;
+    drawState.graphicRandom = seed;
     DrawTeleporter(new ViewportDraw({ ...context, viewportIndexBuffer: expected }), { ...teleporter, x1: teleporter.x1 + 1 }, wall);
     const pixels: Uint8Array = viewportIndexBuffer.pixels;
     const untouched = after === seed && pixels.every((p) => p === 0);
-    const drawn = after === graphicRandomState.r && expected.pixels.some((p) => p !== 0)
+    const drawn = after === drawState.graphicRandom && expected.pixels.some((p) => p !== 0)
       && Buffer.compare(pixels, expected.pixels) === 0;
     const shimmers = drawn ? 1 : untouched ? 0 : -1;
     const what = `cell ${relativeCell + 3}, d.Word1868 ${word1868 ? 1 : 0}`;
@@ -442,6 +448,7 @@ for (const facing of [0, 1, 2, 3]) {
     const rec = { nextObject: OBJECT_ID_EOF, value: 0, cloudType, bit7: false };
     const viewportIndexBuffer = createPaletteIndexViewportBuffer(224, 136, 0);
     const context = viewportContextOf({
+      drawState,
       viewportIndexBuffer,
       objectTables: realTables,
       getGraphicBitmap: (n: number) => fakeGraphic(n),
@@ -531,8 +538,8 @@ check([0, 1, 2].every((c) => realTables.cloudPositions7042[2 * c + 1] === 47) &&
       trace: (line) => console.log(line),
     });
     const frame = (viewportSeed: number, graphicSeed: number): Uint8Array => {
-      viewportRandom.setSeed(viewportSeed);
-      graphicRandomState.r = graphicSeed;
+      renderer.context.drawState.viewportRandom.setSeed(viewportSeed);
+      renderer.context.drawState.graphicRandom = graphicSeed;
       renderer.selectLevel(LEVEL);
       renderer.draw(at, 0, false, false);
       return renderer.buffer.pixels.slice();
@@ -556,16 +563,16 @@ check([0, 1, 2].every((c) => realTables.cloudPositions7042[2 * c + 1] === 47) &&
       const empty = frame(seed, GRAPHIC_SEED);
       game.ctx.systems.missileEncounter.createCloud(RN_POISON_CLOUD, 255, x, y, new Position(x, y, LEVEL), 255);
       const drawn = frame(seed, GRAPHIC_SEED);
-      const seedAfter = viewportRandom.getSeed();
+      const seedAfter = renderer.context.drawState.viewportRandom.getSeed();
       // The same cloud drawn alone over the empty frame, from the stream where the frame took it.
       const expected = createPaletteIndexViewportBuffer(224, 136, 0);
       expected.pixels.set(empty);
-      viewportRandom.setSeed(seed);
+      renderer.context.drawState.viewportRandom.setSeed(seed);
       DrawClouds(new ViewportDraw({ ...renderer.context, viewportIndexBuffer: expected }), relativeCell, cloudAt(game.ctx.dungeon, x, y), 0, 0);
       const changed = differing(empty, drawn);
       console.log(`  a poison cloud in ${name} (${x},${y}): ${changed} pixels of the frame change`);
       check(changed > 0, `a poison cloud in ${name} shows in the frame`);
-      check(Buffer.compare(drawn, expected.pixels) === 0 && seedAfter === viewportRandom.getSeed(),
+      check(Buffer.compare(drawn, expected.pixels) === 0 && seedAfter === renderer.context.drawState.viewportRandom.getSeed(),
         `and it is DrawClouds' cell ${relativeCell + 3}, pixel for pixel, with its two draws from the stream`);
     }
     // A Fluxcage: the shimmer beside the party, nothing four rows ahead.
@@ -575,7 +582,7 @@ check([0, 1, 2].every((c) => realTables.cloudPositions7042[2 * c + 1] === 47) &&
       const empty = frame(seed, GRAPHIC_SEED);
       game.ctx.systems.missileEncounter.createFluxcage(new Position(x, y, LEVEL), 0);
       const drawn = frame(seed, GRAPHIC_SEED);
-      const graphicAfter = graphicRandomState.r;
+      const graphicAfter = renderer.context.drawState.graphicRandom;
       const changed = differing(empty, drawn);
       console.log(`  a Fluxcage in ${name}: ${changed} pixels of the frame change`);
       if (relativeCell < 0) {
@@ -585,10 +592,10 @@ check([0, 1, 2].every((c) => realTables.cloudPositions7042[2 * c + 1] === 47) &&
         const teleporter = tables.teleporterRectangles[relativeCell]!;
         const expected = createPaletteIndexViewportBuffer(224, 136, 0);
         expected.pixels.set(empty);
-        graphicRandomState.r = GRAPHIC_SEED;
+        renderer.context.drawState.graphicRandom = GRAPHIC_SEED;
         DrawTeleporter(new ViewportDraw({ ...renderer.context, viewportIndexBuffer: expected }),
           { ...teleporter, x1: teleporter.x1 + 1 }, tables.wallRectangles[relativeCell]!);
-        check(changed > 0 && Buffer.compare(drawn, expected.pixels) === 0 && graphicAfter === graphicRandomState.r,
+        check(changed > 0 && Buffer.compare(drawn, expected.pixels) === 0 && graphicAfter === renderer.context.drawState.graphicRandom,
           `a Fluxcage in ${name} shimmers over teleporterRectangles[${relativeCell}] one pixel on, pixel for pixel`);
       }
     }

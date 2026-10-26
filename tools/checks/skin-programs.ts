@@ -45,8 +45,6 @@ import { DungeonLoader } from '../../src/data/DungeonLoader';
 import { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import {
   BytecodeInterpreter,
-  interpreterStackPointers,
-  interpreterStackTop,
   type InterpreterContext,
 } from '../../src/renderer/bytecode/BytecodeInterpreter';
 import { Opcode } from '../../src/renderer/bytecode/Opcodes';
@@ -96,10 +94,10 @@ function bareContext(backgroundLib?: BackgroundLib): InterpreterContext {
  * and how far it moved the return stack.
  */
 function run(ctx: InterpreterContext, code: number[], cellNum = 0): { left: number[]; rsp: number } {
-  const before = interpreterStackPointers();
+  const state = ctx.drawState;
+  const before = { sp: state.sp, rsp: state.rsp };
   new BytecodeInterpreter(ctx).interpret(code, 0, cellNum);
-  const after = interpreterStackPointers();
-  return { left: interpreterStackTop((before.sp - after.sp) & 0xff), rsp: (before.rsp - after.rsp) & 0xff };
+  return { left: state.stackTop((before.sp - state.sp) & 0xff), rsp: (before.rsp - state.rsp) & 0xff };
 }
 
 function machine(): void {
@@ -152,7 +150,7 @@ function machine(): void {
 
   run(ctx, [...L(42), O.Return]);
   const kept = run(ctx, [...L(1), O.PLUS, O.Return]);
-  check(kept.left.length === 0 && interpreterStackTop(1)[0] === 43,
+  check(kept.left.length === 0 && ctx.drawState.stackTop(1)[0] === 43,
     'the data stack is kept from one Interpret to the next: a PLUS adds the 42 an earlier program left');
 
   const traced: string[] = [];
@@ -305,9 +303,9 @@ function views(): void {
               if (skin !== 0 && lib.GetCode(skin) !== null) expected.push(`  Draw Cell ${c} skin ${skin}`);
             }
             trace.length = 0;
-            const before = interpreterStackPointers();
+            const before = { sp: renderer.context.drawState.sp, rsp: renderer.context.drawState.rsp };
             renderer.draw(new Position(x, y, z), facing, false, false);
-            const after = interpreterStackPointers();
+            const after = { sp: renderer.context.drawState.sp, rsp: renderer.context.drawState.rsp };
             viewCount++;
             skinnedCells += expected.length;
             const drawn = trace.filter((line) => line.startsWith('  Draw Cell'));

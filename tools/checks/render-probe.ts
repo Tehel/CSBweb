@@ -51,7 +51,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { atariToRGB, OBJECT_ID_EOF, Position, RoomType } from '../../src/core/types';
-import { BytecodeInterpreter, interpreterStackPointers } from '../../src/renderer/bytecode/BytecodeInterpreter';
+import { BytecodeInterpreter } from '../../src/renderer/bytecode/BytecodeInterpreter';
 import { GraphicRoomType, ViewRoomType, type SummarizeRoomData } from '../../src/renderer/bytecode/Types';
 import type { IndexedBitmap } from '../../src/renderer/csbwin/CanvasBlitter';
 import {
@@ -160,10 +160,10 @@ function main(): void {
         const before = warnings.length;
         renderer.buffer.pixels.fill(UNDRAWN);
         renderer.context.roomData = roomDataFor(renderer.objectTables, start, passFacing, cell, type as GraphicRoomType, doorIndex);
-        const stacks = interpreterStackPointers();
+        const stacks = { sp: renderer.context.drawState.sp, rsp: renderer.context.drawState.rsp };
         new BytecodeInterpreter(renderer.context).interpret(program, 0, cell);
         check(warnings.length === before, `${pass} ${name} runs without a warning: ${warnings.slice(before).join('; ')}`);
-        const after = interpreterStackPointers();
+        const after = { sp: renderer.context.drawState.sp, rsp: renderer.context.drawState.rsp };
         check(after.sp === stacks.sp && after.rsp === stacks.rsp,
           `${pass} ${name} leaves both stacks as it found them (sp ${stacks.sp} -> ${after.sp}, rsp ${stacks.rsp} -> ${after.rsp})`);
 

@@ -21,7 +21,8 @@
  * Run: `npm test -- --only=teleporter-shimmer.ts`
  */
 import type { RectPos } from '../../src/data/tables/UITables';
-import { DrawTeleporter, GraphicRandom, graphicRandomState } from '../../src/renderer/bytecode/DrawDoor';
+import { DrawTeleporter, GraphicRandom } from '../../src/renderer/bytecode/DrawDoor';
+import { ViewportDrawState } from '../../src/renderer/bytecode/ViewportDrawState';
 import { ViewportDraw } from '../../src/renderer/bytecode/ViewportDraw';
 import { createPaletteIndexViewportBuffer, mirrorBitmap, type IndexedBitmap } from '../../src/renderer/csbwin/CanvasBlitter';
 import { getCachedGraphicBitmap } from '../../src/renderer/ViewportGraphics';
@@ -132,21 +133,22 @@ for (const { what, teleporter: t, wall } of cases) {
   let same = 0;
   for (const seed of SEEDS) {
     const port = createPaletteIndexViewportBuffer(224, 136, BACKGROUND);
-    graphicRandomState.r = seed;
-    DrawTeleporter(new ViewportDraw(viewportContextOf({ viewportIndexBuffer: port, getGraphicBitmap: graphic })), t, wall);
-    const after = graphicRandomState.r;
+    const drawState = new ViewportDrawState();
+    drawState.graphicRandom = seed;
+    DrawTeleporter(new ViewportDraw(viewportContextOf({ viewportIndexBuffer: port, getGraphicBitmap: graphic, drawState })), t, wall);
+    const after = drawState.graphicRandom;
 
     const want = createPaletteIndexViewportBuffer(224, 136, BACKGROUND).pixels;
-    graphicRandomState.r = seed;
-    const P7 = GraphicRandom(32);
-    const P6 = t.x2 + GraphicRandom(2);
+    drawState.graphicRandom = seed;
+    const P7 = GraphicRandom(drawState, 32);
+    const P6 = t.x2 + GraphicRandom(drawState, 2);
     let mask: IndexedBitmap | null = null;
     if (t.y2 !== 0xff) {
       const m = graphic((t.y2 & 0x7f) + 69)!;
       mask = t.y2 & 0x80 ? mirrorBitmap(m) : m;
     }
     oracle(graphic(t.x1 + 73)!, want, mask, wall, P6, P7, t.y1, t.srcX ?? 0, 0);
-    check(after === graphicRandomState.r, `${what}, seed ${seed}: two GraphicRandom draws`);
+    check(after === drawState.graphicRandom, `${what}, seed ${seed}: two GraphicRandom draws`);
     if (Buffer.compare(port.pixels, want) === 0) same++;
     drawings.add(Buffer.from(port.pixels).toString('base64'));
   }

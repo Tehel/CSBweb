@@ -207,7 +207,8 @@ renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens
             LeftHanded (the left-handed screen: CSBWin's regions moved, a click moved back),
             ViewportRenderer (the dungeon view only), DrawViewport, ViewportGraphics
   bytecode/ BytecodeInterpreter, ViewportDraw (what the drawing shares with it),
-            DrawDecorations and DrawDoor (CSBCode.cpp's drawing), DrawRoomObjects
+            ViewportDrawState (what it keeps from frame to frame: the stacks and the
+            two random streams), DrawDecorations and DrawDoor (CSBCode.cpp's drawing), DrawRoomObjects
             (Code51a4.cpp's: objects, monsters, missiles, clouds), ApplyBackground (a
             skin's own graphics, on the viewport as Atari planar bytes), BytecodePrograms
             (168 cell programs), Opcodes

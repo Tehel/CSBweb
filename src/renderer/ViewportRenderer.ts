@@ -24,6 +24,7 @@ import type { PartyFootprints } from '../engine/PartyFootprints';
 import type { GameState } from '../engine/gameTypes';
 import type { MonsterDesignOptions } from '../engine/monsterTypes';
 import type { InterpreterContext } from './bytecode/BytecodeInterpreter';
+import { ViewportDrawState } from './bytecode/ViewportDrawState';
 import { emptyViewportPicking, type ViewportPicking } from './bytecode/Types';
 import type { IndexedBitmap, PaletteIndexViewportBuffer } from './csbwin/CanvasBlitter';
 import { createPaletteIndexViewportBuffer, cropBitmap, mirrorBitmap, tag0088b2Index } from './csbwin/CanvasBlitter';
@@ -161,6 +162,7 @@ export class ViewportRenderer {
       seeThroughWalls: false,
       roomData: [],
       picking: emptyViewportPicking(),
+      drawState: new ViewportDrawState(),
     };
   }
 

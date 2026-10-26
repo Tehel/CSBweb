@@ -8,7 +8,6 @@
  * and calls a drawing function with it, and can replace a blit helper on that instance.
  */
 
-import { CsbRandom } from '../../core/random';
 import type { RectPos } from '../../data/tables/UITables';
 import {
   bltShapeToViewportIndex,
@@ -18,18 +17,6 @@ import {
   type IndexedBitmap,
 } from '../csbwin/CanvasBlitter';
 import type { InterpreterContext } from './BytecodeInterpreter';
-
-/**
- * `viewportRandom` (`doc/CSBwin-src/Viewport.cpp:6713-6714`): CSBWin saves
- * `d.RandomNumber`, swaps this stream in for the duration of `DrawViewport`, and
- * restores the game's own value afterward, so every `STRandomBool()` a drawing
- * function calls — the lightning door's mirror/flip, for one — reads this and
- * never the sequence monster AI and combat depend on. It lives at module level, as
- * `GraphicRandom`'s state does: it has to survive past the one `BytecodeInterpreter`
- * that calls it, or every frame would reroll from the same point and the effect
- * would never move.
- */
-export const viewportRandom = new CsbRandom(0x34175432); // `Viewport.cpp:6704`
 
 export class ViewportDraw {
   private mirrorCache = new WeakMap<IndexedBitmap, IndexedBitmap>();
