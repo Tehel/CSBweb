@@ -50,6 +50,7 @@
  * cannot do that — with a menu open the panel area is the option list, not the four
  * champion buttons (`handleAttackAreaClick`) — so there is no click to synthesise.
  */
+import { isAlive } from '../../engine/rules';
 import { selectMagicCaster } from '../../engine/Party';
 import { attackMenuButton, prepareAttack } from './Attack';
 import { magicSelection } from './MagicPanel';
@@ -442,7 +443,7 @@ function selectCaster(ui: UIState, chIdx: number): void {
   if (championPending(ui)) return;
   const champion = party.champions[chIdx];
   // `SelectMagicCaster` refuses a champion whose `HP()` is 0 (`doc/CSBwin-src/Magic.cpp:727`).
-  if (!champion || (champion.attributes.health | 0) === 0) return;
+  if (!champion || !isAlive(champion)) return;
   if (champion.attributes.maxMana === 0) return;
   selectMagicCaster(party, chIdx);
 }

@@ -15,16 +15,17 @@ import { OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../core/
 import { MSG_COLOR_SPELL } from './ActuatorSystem';
 import { AttributeIndex, championAttribute } from './attributes';
 import type { DungeonState } from './DungeonState';
-import { nameIndexOf, type GameContext } from './GameContext';
+import type { GameContext } from './GameContext';
 import { CHARFLAG_ATTACK_DISABLE, getChampionPossession } from '../core/charDesc';
 import type { Champion, PartyState } from './gameTypes';
 import { markAllPortraitsChanged } from './Party';
 import { selectPaletteForLightLevel } from './LightLevel';
 import { setClockTick, waitForButtonFlash } from './LoopState';
 import type { SpellParameters } from './magicTypes';
-import { encodeMissileTimerWord8 } from './missileHelpers';
+import { encodeMissileTimerWord8, spellObjectId } from './missileHelpers';
 import { GetBasicObjectType } from './objectIndex';
-import { adjustSkills, AdjustSkillsWhy, determineMastery } from './skills';
+import { AdjustSkillsWhy } from './skills';
+import { adjustSkillsOnPartyLevel, isAlive, masteryOf } from './rules';
 import { TimerFunction, type TimerQueue } from './TimerQueue';
 
 export class MagicSystem {
@@ -209,7 +210,7 @@ export class MagicSystem {
     }
     // `if (chIdx >= d.NumCharacter) return 0;` and `if (pcA3->HP() == 0) return 0;` (`:1152-1155`).
     if (!champion) return 0;
-    if ((champion.attributes.health | 0) <= 0) return 0;
+    if (!isAlive(champion)) return 0;
 
     let facing = this.ctx.party.state.facing;
     if (spellParameters.facing !== -1) facing = spellParameters.facing;
@@ -246,10 +247,7 @@ export class MagicSystem {
     // (`:1208-1213`).
     const required = sw(spell.skillRequired + spellPower);
     const w4 = this.computeSpellExperience(required, spellPower, skillRequired);
-    const mastery = determineMastery(champion, spellByte5, {
-      partySleeping: this.ctx.party.state.sleeping,
-      getObjectNameIndex: (objectId) => nameIndexOf(this.ctx, objectId),
-    });
+    const mastery = masteryOf(this.ctx, champion, spellByte5);
 
     if (mastery < required) {
       const wisdom = championAttribute(champion, AttributeIndex.Wisdom);
@@ -258,7 +256,7 @@ export class MagicSystem {
       for (let i = 0; i < diff; i += 1) {
         if (this.randomInt(128) > threshold) {
           const gained = w4 >> diff;
-          this.applySpellSkillGain(casterIdx, spellByte5, gained, AdjustSkillsWhy.CastSpell1);
+          adjustSkillsOnPartyLevel(this.ctx, casterIdx, spellByte5, gained, AdjustSkillsWhy.CastSpell1);
           this.spellErrorMsg(champion, 0, spellByte5);
           return 0;
         }
@@ -296,7 +294,7 @@ export class MagicSystem {
         );
         const posInCell = this.computeSpellLaunchPos(champion.partyPosition, facing);
         this.launchThrownMissile(
-          this.spellObjectId(missileType),
+          spellObjectId(missileType),
           this.ctx.party.state.position,
           posInCell,
           facing,
@@ -391,7 +389,7 @@ export class MagicSystem {
         break;
     }
 
-    this.applySpellSkillGain(casterIdx, spellByte5, w4, AdjustSkillsWhy.CastSpell2);
+    adjustSkillsOnPartyLevel(this.ctx, casterIdx, spellByte5, w4, AdjustSkillsWhy.CastSpell2);
     let disableTime = (spell.word6 >> 10) & 0x3f;
     if (spellParameters.disableTime !== -1) disableTime = spellParameters.disableTime;
     this.disableCharacterAction(casterIdx, disableTime);
@@ -447,16 +445,6 @@ export class MagicSystem {
     return null;
   }
 
-  /**
-   * `AdjustSkills` on the party's level, whatever the gain: a gain of 0 still runs the
-   * Adjust Skills Filter, whose answer may give some (`doc/CSBwin-src/Magic.cpp:255-322`).
-   */
-  applySpellSkillGain(chIdx: number, skillNumber: number, experience: number, why: AdjustSkillsWhy): void {
-    const map = this.dungeon.getMap(this.ctx.party.state.position.z);
-    const experienceMultiplier = map?.descriptor.difficulty ?? 0;
-    adjustSkills(this.ctx, chIdx, skillNumber, experience, why, experienceMultiplier);
-  }
-
   private computeSpellExperience(required: number, spellPower: number, skillRequired: number): number {
     const rand = this.randomInt(8);
     const term = (spellPower - 1) * skillRequired;
@@ -477,10 +465,6 @@ export class MagicSystem {
   private computeSpellLaunchPos(championPos: number, facing: number): number {
     const offset = ((championPos - facing + 1) & 2) >> 1;
     return (offset + facing) & 0x3;
-  }
-
-  private spellObjectId(missileType: number): ObjectID {
-    return ((0xff80 + (missileType & 0x7f)) & 0xffff) as ObjectID;
   }
 
   queueUtilityTimer(functionType: number, duration: number, timerWord6: number): void {

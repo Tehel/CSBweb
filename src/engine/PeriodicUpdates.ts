@@ -6,7 +6,7 @@
  * Neither update has state of its own, so they are functions over the context, as
  * `wakeUp` is.
  */
-import { OBJECT_ID_NULL, type ObjectID } from '../core/types';
+import { OBJECT_ID_NULL } from '../core/types';
 import { sw } from '../core/intCast';
 import { OBJNI_EKKHARD_CROSS, OBJNI_TORCH_A, OBJNI_TORCH_D } from '../core/objectNameIndex';
 import {
@@ -22,7 +22,8 @@ import { selectPaletteForLightLevel } from './LightLevel';
 import { drawAllCharacterState } from './Party';
 import { GetBasicObjectType } from './objectIndex';
 import { settleMasteryGains } from './MasteryGains';
-import { determineMastery, ensureSkills } from './skills';
+import { ensureSkills } from './skills';
+import { isAlive, masteryOf } from './rules';
 
 /** `(d.Time&511)==0` — the loop's test for `NinetySecondUpdate` (doc/CSBwin-src/CSBCode.cpp:690). */
 export function isNinetySecondTick(time: number): boolean {
@@ -108,13 +109,12 @@ export function tenSecondUpdate(ctx: GameContext): void {
     const random112 = (time & 0x40)
         | ((time & 0x80) >> 2)
         | ((time & 0x100) >> 4);
-    const getObjectNameIndex = (objectId: ObjectID): number => nameIndexOf(ctx, objectId);
 
     for (let chIdx = 0; chIdx < party.champions.length; chIdx++) {
         const champ = party.champions[chIdx];
         if (!champ) continue;
         const attrs = champ.attributes;
-        if ((attrs.health | 0) === 0) continue;
+        if (!isAlive(champ)) continue;
         if (party.potentialChampionIndex === chIdx) continue;
         const maxMana = attrs.maxMana | 0;
         const mana = attrs.mana | 0;
@@ -123,8 +123,7 @@ export function tenSecondUpdate(ctx: GameContext): void {
             // (doc/CSBwin-src/Code17818.cpp:29-36): the roll is Wisdom + 2, and each
             // point costs 14 stamina, whatever the champion's levels.
             const magicMastery =
-                determineMastery(champ, 3, { getObjectNameIndex, partySleeping: sleeping })
-                + determineMastery(champ, 2, { getObjectNameIndex, partySleeping: sleeping });
+                masteryOf(ctx, champ, 3) + masteryOf(ctx, champ, 2);
             const wisdom = championAttribute(champ, AttributeIndex.Wisdom);
             if (random112 >= magicMastery + wisdom) {
                 if (mana > maxMana) {

@@ -705,6 +705,19 @@ filter's `skillRequired` replaces the spell's only in the experience,
 which is what classes 2 and 3 act on; the class-1 potion type is `pSpell->word6` whatever
 the filter says (`:1252`). Evidence: `tools/checks/cast-spell.ts`.
 
+A filter's `facing` is checked and nothing more: `CastSpell` returns 0 for one past 3
+(`:1157-1163`), and no case reads it. The missile case turns the caster to
+`d.partyFacing` and casts through `CharacterThrowsSpell(chIdx, spell, range, 0)`
+(`:1267-1287`), whose `LaunchObject` launches along `pChar->facing` (`:452-467`), so the
+spell flies the party's way whatever the filter gives (C185 in `DEBT.md`).
+
+## A champion's hit points are 0 to 999
+
+`CHARDESC::HP` asserts its value is at most `MAXHP`, 999, as an unsigned, so never
+negative (`doc/CSBwin-src/data.cpp:1879-1883`, `CSB.h:2511`). CSBWin's tests of a living
+champion, `HP() != 0`, `HP() > 0` and `HP() <= 0`, therefore agree; the port asks them all
+as `isAlive` (`src/engine/rules.ts`).
+
 ## Zokathra goes into a hand, or is dropped like any drop
 
 `CastSpell`'s class-3 type 7 makes a `misc_ZokathraSpell` in a new misc record

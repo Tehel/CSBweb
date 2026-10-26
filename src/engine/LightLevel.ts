@@ -20,12 +20,13 @@ import { sw } from '../core/intCast';
 import type { GameContext } from './GameContext';
 import { getChampionPossession } from '../core/charDesc';
 import { GetBasicObjectType } from './objectIndex';
+import { levelDifficulty } from './rules';
 
 export function selectPaletteForLightLevel(ctx: GameContext): void {
   const party = ctx.party.state;
   const state = ctx.state;
   // `d.pCurLevelDesc->experienceMultiplier()`: the level loaded is the party's here.
-  const experienceMultiplier = ctx.dungeon.getMap(party.position.z)?.descriptor.difficulty ?? 0;
+  const experienceMultiplier = levelDifficulty(ctx);
   if (experienceMultiplier === 0) {
     state.currentPalette = 0;
     return;

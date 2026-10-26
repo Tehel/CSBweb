@@ -7,6 +7,7 @@
  * engine's, at the events that draw it (`tag0189d4`, `describeObject`, `repackChest`,
  * `src/engine/CharacterSystem.ts`); the screen draws what they left in `ctx.interface`.
  */
+import { isAlive } from '../../engine/rules';
 import { OBJNI_OPEN_CHEST, OBJNI_OPEN_SCROLL, OBJNI_SPECIAL_D, OBJNI_SPECIAL_E } from '../../core/objectNameIndex';
 import { DBType, OBJECT_ID_NULL, ObjectID } from '../../core/types';
 import { ViewingFilterSite } from '../../engine/dsa/DsaTypes';
@@ -36,7 +37,7 @@ export function drawInventoryScreen(ui: UIState): void {
   if (selected < 0) return;
 
   const champion = ui.partyState.champions[selected] ?? null;
-  if (!champion || (champion.attributes.health | 0) === 0) return;
+  if (!champion || !isAlive(champion)) return;
 
   const iconSlots = ui.uiTables.graphic232.iconDisplay;
   const word612 = ui.uiTables.graphic232.word612;

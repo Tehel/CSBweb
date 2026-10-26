@@ -31,6 +31,7 @@ import type { Game } from '../../src/engine/Game';
 import { AttackType } from '../../src/engine/monsterTypes';
 import { TimerFunction, type TimerEntry } from '../../src/engine/TimerQueue';
 import { AdjustSkillsWhy, adjustSkills } from '../../src/engine/skills';
+import { adjustSkillsOnPartyLevel } from '../../src/engine/rules';
 import { globalStore, int, op, report, run, varFetch, varStore } from '../lib/dsa';
 import { check, finish } from '../lib/check';
 import { standInOf } from '../lib/standIn';
@@ -76,7 +77,7 @@ const ADJUST_SKILLS_FILTER_KEY = (3 << 24) | 6;
   check(skill.experience - before === 0x2345, 'the skill takes the low word of the filter\'s answer');
 
   const zero = run([...int(0), globalStore(2)], undefined, undefined, filter([op(StkOp.NUM_PARAM), globalStore(3)]));
-  zero.game.systems.magic.applySpellSkillGain(0, 0, 0, AdjustSkillsWhy.CastSpell1);
+  adjustSkillsOnPartyLevel(zero.game.ctx, 0, 0, 0, AdjustSkillsWhy.CastSpell1);
   const ran = zero.game.systems.dsa.getGlobalVariables()[3];
   console.log(`   a gain of 0: the filter ${ran === 9 ? 'runs' : 'does not run'}`);
   check(ran === 9, 'a gain of 0 runs the filter');

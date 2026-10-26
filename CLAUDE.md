@@ -196,7 +196,8 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
             read names), DungeonCensus (what a dungeon holds: its items, monsters and
             DSAs, counted), LocalDataSetCheck (a player's own set checked as the boot
             reads it: the form's and the server's), Die (CSBWin's `die`), RelativeXY (a square counted in steps
-            through `d.DeltaX`), skills, AddCharacter, objectIndex
+            through `d.DeltaX`), skills, rules (what the systems all read of the
+            party: a champion alive, a mastery, the level's difficulty), AddCharacter, objectIndex
             (the one DescIndex / GetBasicObjectType / NameIndex)
 renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens),
             GameInput (where a click or a key goes once the page has read it),

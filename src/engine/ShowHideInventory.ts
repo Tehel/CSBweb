@@ -8,6 +8,7 @@
  * the same names (`GameHost.showHideInventory`, `tag02076e`, `tag0207cc`,
  * `releaseEyeOrMouth`).
  */
+import { isAlive } from './rules';
 import { drawLegalAttackTypes } from './AttackMenu';
 import type { GameContext } from './GameContext';
 import { setClockTick, waitForButtonFlash } from './LoopState';
@@ -31,7 +32,7 @@ export function showHideInventory(ctx: GameContext, chIdx: number): void {
   if (chIdx !== 4) {
     if (chIdx < 0 || chIdx > 3) return;
     const champ = getPartyChampion(party, chIdx);
-    if (!champ || (champ.attributes.health | 0) === 0) return;
+    if (!champ || !isAlive(champ)) return;
   }
   if (ctx.interface.pressingMouth) return;
   if (ctx.interface.pressingEye) return;

@@ -155,7 +155,7 @@ async function main(): Promise<void> {
 
   const meanDistance = (ch: Champion, hand: number): number => {
     let total = 0;
-    for (let i = 0; i < SAMPLES; i++) total += stats.determineThrowingDistance(ch, hand, false);
+    for (let i = 0; i < SAMPLES; i++) total += stats.determineThrowingDistance(ch, hand);
     return Math.round((total / SAMPLES) * 10) / 10;
   };
 

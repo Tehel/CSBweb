@@ -1,3 +1,4 @@
+import { isAlive } from './rules';
 import { GetBasicObjectType } from './objectIndex';
 import {
   rnEquals,
@@ -8,6 +9,7 @@ import {
   Position,
   RoomType,
   type ObjectID,
+  getRoomType,
 } from '../core/types';
 import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
@@ -96,7 +98,7 @@ export class ActuatorSystem {
     if (!map) return false;
     const cellFlag = map.cellFlags[position.x]?.[position.y];
     if (cellFlag === undefined) return false;
-    const roomType = (cellFlag >> 5) & 0x7;
+    const roomType = getRoomType(cellFlag);
     const movedObjectDBType = object === OBJECT_ID_NULL ? -1 : this.dungeon.rnMaps.dbType(object);
     const movedObjectNameIndex = object === OBJECT_ID_NULL ? OBJNI_NOT_AN_OBJECT : this.getBasicObjectType(object);
     const positionOfObject = roomType === RoomType.STONE
@@ -518,7 +520,7 @@ export class ActuatorSystem {
     if (targetX < 0 || targetY < 0 || targetX >= map.descriptor.width || targetY >= map.descriptor.height) return;
 
     const cellFlag = map.cellFlags[targetX]![targetY]!;
-    const targetRoomType = (cellFlag >> 5) & 0x7;
+    const targetRoomType = getRoomType(cellFlag);
     const targetPos = (targetRoomType === RoomType.STONE || targetRoomType === RoomType.FALSEWALL)
       ? getActuatorTargetPos(actuator)
       : 0;
@@ -616,7 +618,7 @@ export class ActuatorSystem {
     };
     const party = this.ctx.party.state;
     for (const champ of party.champions) {
-      if ((champ.attributes.health | 0) === 0) continue;
+      if (!isAlive(champ)) continue;
       for (let slot = 0; slot < 30; slot++) {
         if (matches(champ.possessions[slot])) return true;
       }
@@ -633,7 +635,7 @@ export class ActuatorSystem {
       // SkillIncreaser(8, 300, mapPos == -1 ? 0 : 1) (doc/CSBwin-src/Mouse.cpp:210-231).
       let adjustment = 300;
       const party = this.ctx.party.state;
-      const experienceMultiplier = this.dungeon.getMap(mapZ)?.descriptor.difficulty ?? 0;
+      const experienceMultiplier = this.dungeon.levelDifficulty(mapZ);
 
       if (mapPos !== -1) {
         // The champion who owns the cursor, d.HandChar — not whoever stands in cell mapPos.
@@ -647,7 +649,7 @@ export class ActuatorSystem {
       for (let i = 0; i < party.champions.length; i++) {
         const champ = party.champions[i]!;
         // `if (d.CH16482[D7W].HP() != 0)` (`doc/CSBwin-src/Mouse.cpp:226`).
-        if ((champ.attributes.health | 0) === 0) continue;
+        if (!isAlive(champ)) continue;
         this.applySkillIncrease(champ, i, 8, adjustment, experienceMultiplier, AdjustSkillsWhy.SkillIncreaser2);
       }
       return;

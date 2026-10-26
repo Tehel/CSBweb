@@ -176,7 +176,7 @@ import {
   menuButtonList,
   menuButtonRect,
   menuHitTest,
-  menuPressFinished,
+  playMenuPress,
   splitLongLine,
   type MenuPress,
 } from './Menu';
@@ -461,8 +461,6 @@ export interface SaveMenuState extends WheelTravel {
   /** The dialog's message, at the foot of the preview's panel: an error, or what the last action did. */
   message: string;
   press: MenuPress | null;
-  /** What the press animation will do when it finishes. */
-  pending: (() => void) | null;
   /** The action the question on screen asks about, in the dialog's place, or `null`. */
   confirm: SaveMenuQuestion | null;
   /**
@@ -476,7 +474,6 @@ export interface SaveMenuState extends WheelTravel {
    * raised for the question `alone`, so that NOT YET closes it.
    */
   adventure: { source: SaveEntry | null; alone: boolean } | null;
-  frameHandle: number | null;
   /** The save a click last selected, and when (`nowMs`): a second click on it soon after is LOAD. */
   lastSaveClick: { id: string; atMs: number } | null;
   /** Where the pointer is, in screen coordinates, or `null` off the canvas (`saveMenuPointer`). */
@@ -536,11 +533,9 @@ export function openSaveMenu(ui: UIState, mode: SaveMenuMode = 'full'): void {
     busy: true,
     message: '',
     press: null,
-    pending: null,
     confirm: null,
     dropped: null,
     adventure: null,
-    frameHandle: null,
     lastSaveClick: null,
     pointer: ui.hoverPoint,
     newFace: null,
@@ -565,7 +560,6 @@ export function askBeginAdventure(ui: UIState, source: SaveEntry | null): void {
 export function closeSaveMenu(ui: UIState): void {
   if (!ui.saveMenu) return;
   const { mode } = ui.saveMenu;
-  if (ui.saveMenu.frameHandle !== null) cancelFrame(ui.saveMenu.frameHandle);
   releaseLongPress(ui.saveMenu);
   ui.saveMenu = null;
   closeDialog(ui);
@@ -1149,16 +1143,6 @@ function armDelete(ui: UIState, state: SaveMenuState): void {
 
 /* ------------------------------------------------------ the press animation ---- */
 
-function scheduleFrame(cb: () => void): number {
-  if (typeof requestAnimationFrame === 'function') return requestAnimationFrame(() => cb());
-  return setTimeout(cb, 16) as unknown as number;
-}
-
-function cancelFrame(handle: number): void {
-  if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(handle);
-  else clearTimeout(handle);
-}
-
 /**
  * `_WaitForMenuSelect` flashes the chosen button for two five-VBL passes and only
  * *then* returns the choice (`doc/CSBwin-src/Menu.cpp:100-180`), so the action happens
@@ -1174,26 +1158,13 @@ function beginPress(ui: UIState, state: SaveMenuState, buttons: UIButton[], butt
   // The rectangle is passed exactly as the table holds it: `_WaitForMenuSelect` MemMoves
   // the button's four words straight into its own rect and grows them from there
   // (`doc/CSBwin-src/Menu.cpp:99-104`), exclusive `xMax`/`yMax` and all.
-  state.press = { buttonId, rect, startedMs: nowMs() };
-  state.pending = then;
-
-  const tick = (): void => {
-    const live = ui.saveMenu;
-    if (!live || !live.press) return;
-    if (menuPressFinished(live.press, nowMs())) {
-      live.frameHandle = null;
-      live.press = null;
-      const pending = live.pending;
-      live.pending = null;
-      ui.renderLastFrame();
-      if (pending) pending();
-      return;
-    }
+  const press: MenuPress = { buttonId, rect, startedMs: nowMs() };
+  state.press = press;
+  playMenuPress(ui, press, () => ui.saveMenu?.press === press, () => {
+    state.press = null;
     ui.renderLastFrame();
-    live.frameHandle = scheduleFrame(tick);
-  };
-  state.frameHandle = scheduleFrame(tick);
-  ui.renderLastFrame();
+    then();
+  });
 }
 
 /* -------------------------------------------------------------- the actions ---- */

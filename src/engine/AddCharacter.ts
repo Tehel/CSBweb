@@ -8,6 +8,7 @@
  * (`doc/CSBwin-src/CSBCode.cpp:6674`).
  */
 
+import { isAlive } from './rules';
 import { DescIndexOfRecord } from './objectIndex';
 import { DBType, OBJECT_ID_NULL, type Direction, type ObjectID } from '../core/types';
 import type { DatabaseRecord, HeroInventoryItem } from '../data/dungeonTypes';
@@ -86,7 +87,7 @@ export function characterAtPosition(champions: Champion[], position: number): nu
     const champ = champions[i];
     if (!champ) continue;
     if ((champ.partyPosition | 0) !== position) continue;
-    if ((champ.attributes.health | 0) !== 0) return i;
+    if (isAlive(champ)) return i;
   }
   return -1;
 }

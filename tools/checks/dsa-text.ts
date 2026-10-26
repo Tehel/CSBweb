@@ -20,7 +20,7 @@
  * Run: `npm test -- --only=dsa-text.ts`
  */
 import { DBType, OBJECT_ID_EOF, Position, locationRelToInteger, type ObjectID } from '../../src/core/types';
-import { EDT_GLOBAL_TEXT } from '../../src/data/DecodeText';
+import { globalTextKey } from '../../src/data/CsbwinExpool';
 import { StkOp } from '../../src/engine/dsa/DsaTypes';
 import type { Game } from '../../src/engine/Game';
 import { printWithSubstitution } from '../../src/engine/PrintWithSubstitution';
@@ -136,7 +136,7 @@ console.log('3. &GLOBALTEXT!');
       ...int(6), ...int(0x100), op(StkOp.GLOBAL_TEXT_STORE),
     ];
   }, listen);
-  const key = (index: number): number => ((EDT_GLOBAL_TEXT << 24) | index) >>> 0;
+  const key = globalTextKey;
   const rec = game.ctx.dungeon.locateExpoolRecord(key(0x7b));
   const bytes = rec ? rec.flatMap((w) => [0, 1, 2, 3].map((k) => (w >>> (8 * k)) & 0xff)) : [];
   console.log(`  "${name}" -> ${rec?.map((w) => w.toString(16).padStart(8, '0')).join(' ') ?? 'no record'}`);

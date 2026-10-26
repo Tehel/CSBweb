@@ -36,6 +36,7 @@
  * is held, as under every dialog, and the game is left as it was. It is shown through the
  * interface's palette whole, as the settings are (`SettingsDialog.ts` → "The palette").
  */
+import { isAlive } from '../../engine/rules';
 import type { Rect, UIButton } from '../../data/tables/UITables';
 import { attributeMaximum } from '../../engine/attributes';
 import type { Champion } from '../../engine/gameTypes';
@@ -292,7 +293,7 @@ export function drawChampionDialog(ui: UIState): void {
 /** A column's colour: lit where marked, dim for a dead champion, else the option colour. */
 function columnColor(state: ChampionDialogState, champion: Champion, chIdx: number): number {
   if (state.marked === chIdx) return LIT_COLOR;
-  return champion.attributes.health === 0 ? DIM_COLOR : MENU_OPTION_COLOR;
+  return !isAlive(champion) ? DIM_COLOR : MENU_OPTION_COLOR;
 }
 
 /**

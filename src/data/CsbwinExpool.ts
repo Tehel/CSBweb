@@ -38,10 +38,57 @@ const RN_EOF = 0xfffe;
 const EDT_MESSAGE_PARAMETERS = 1;
 /** `EDT_SpecialLocations` (`doc/CSBwin-src/CSB.h:1537`). */
 const EDT_SPECIAL_LOCATIONS = 3;
-/** The last `ESL_*`, `ESL_DAMAGECHARFILTER` (`doc/CSBwin-src/CSB.h:1553`). */
-const ESL_SPECIAL_LOCATION_MAX = 15;
-/** `ESL_MONSTERMOVEFILTER` (`doc/CSBwin-src/CSB.h:1540`), which a level may have its own of. */
-const ESL_MONSTER_MOVE_FILTER = 2;
+/** `EDT_GlobalText` (`doc/CSBwin-src/CSB.h:1576`). */
+const EDT_GLOBAL_TEXT = 10;
+
+/**
+ * `ESL_*` (`doc/CSBwin-src/CSB.h:1536-1553`): the special locations, each the square of
+ * the DSAs a filter or the indirect actions run. `MONSTER_MOVE_FILTER` a level may have
+ * its own of.
+ */
+export enum Esl {
+    MONSTER_ATTACK_FILTER = 0,
+    FEEDING_FILTER = 1,
+    MONSTER_MOVE_FILTER = 2,
+    VIEWING_FILTER = 3,
+    PARTY_ATTACK_FILTER = 4,
+    INDIRECT_ACTIONS = 5,
+    ADJUST_SKILLS_FILTER = 6,
+    DELETE_MONSTER_FILTER = 7,
+    SOUND_FILTER = 8,
+    CURSOR_FILTER = 9,
+    ACTION_NAME_FILTER = 10,
+    CHAR_DEATH_FILTER = 11,
+    EQUIP_FILTER = 12,
+    MISSILE_ENCOUNTER_FILTER = 13,
+    PARTY_MOVE_FILTER = 14,
+    DAMAGE_CHAR_FILTER = 15,
+}
+
+/**
+ * `(EDT_SpecialLocations << 24) | esl`, the key of special location `esl`'s record; with
+ * `level`, `| ((level + 1) << 8)`, the key of that level's own.
+ */
+export function specialLocationKey(esl: Esl, level?: number): number {
+    const own = level === undefined ? 0 : (level + 1) << 8;
+    return ((EDT_SPECIAL_LOCATIONS << 24) | esl | own) >>> 0;
+}
+
+/** `(EDT_GlobalText << 24) | index`, the key of global text `index` (`doc/CSBwin-src/CSBCode.cpp:5360-5372`). */
+export function globalTextKey(index: number): number {
+    return ((EDT_GLOBAL_TEXT << 24) | (index & 0xffff)) >>> 0;
+}
+
+/** A global text's record as its bytes: four to a longword in memory order, up to the first 0. */
+export function globalTextBytes(record: readonly number[]): number[] {
+    const bytes: number[] = [];
+    for (let b = 0; b < record.length * 4; b++) {
+        const c = ((record[b >> 2] ?? 0) >>> (8 * (b & 3))) & 0xff;
+        if (c === 0) break;
+        bytes.push(c);
+    }
+    return bytes;
+}
 /** `MONSTERMOVEFILTERCACHE`'s levels (`doc/CSBwin-src/CSB.h:451`). */
 const MONSTER_MOVE_FILTER_LEVELS = 64;
 /** `EDT_Database` (`doc/CSBwin-src/CSB.h:1555`). */
@@ -460,11 +507,11 @@ export function specialLocationsFromExpool(bytes: Uint8Array): Record<number, nu
         const record = expool.locate(key);
         if (record && record.length >= 1) locations[key] = record[0]!;
     };
-    for (let esl = 0; esl <= ESL_SPECIAL_LOCATION_MAX; esl++) read(((EDT_SPECIAL_LOCATIONS << 24) | esl) >>> 0);
+    for (let esl = 0; esl <= Esl.DAMAGE_CHAR_FILTER; esl++) read(specialLocationKey(esl));
     // A level's own monster move filter, keyed with `(level + 1) << 8`
     // (`MONSTERMOVEFILTERCACHE::GetLocation`, doc/CSBwin-src/Monster.cpp:3094).
     for (let level = 0; level < MONSTER_MOVE_FILTER_LEVELS; level++) {
-        read(((EDT_SPECIAL_LOCATIONS << 24) | ESL_MONSTER_MOVE_FILTER | ((level + 1) << 8)) >>> 0);
+        read(specialLocationKey(Esl.MONSTER_MOVE_FILTER, level));
     }
     return Object.keys(locations).length === 0 ? null : locations;
 }

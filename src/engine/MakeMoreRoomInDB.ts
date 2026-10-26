@@ -19,6 +19,7 @@
  */
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';
 import { getActuatorType } from '../data/actuatorHelpers';
+import type { ClothingRecord, MiscRecord, PotionRecord, WeaponRecord } from '../data/dungeonTypes';
 import type { GameContext } from './GameContext';
 import { DeleteMonsterWhy, deleteMonsterParameters } from './filterParameters';
 
@@ -92,11 +93,8 @@ export function makeMoreRoomInDB(ctx: GameContext, dbType: DBType): ObjectID {
                         case DBType.WEAPON:
                         case DBType.MISC:
                         case DBType.POTION: {
-                            const important = dbType === DBType.CLOTHING ? dungeon.getClothingRecord(rn)!.important
-                                : dbType === DBType.WEAPON ? dungeon.getWeaponRecord(rn)!.important
-                                    : dbType === DBType.MISC ? dungeon.getMiscRecord(rn)!.important
-                                        : dungeon.getPotionRecord(rn)!.important;
-                            if (important) continue;
+                            const record = dungeon.getRecord(rn) as ClothingRecord | WeaponRecord | MiscRecord | PotionRecord;
+                            if (record.important) continue;
                             ctx.systems.worldMove.moveObject(rn, x, y, -1, 0, level);
                             break;
                         }

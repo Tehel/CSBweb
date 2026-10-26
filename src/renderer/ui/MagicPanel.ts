@@ -7,6 +7,7 @@
  * The attack buttons and the attack menu live in `ui/Attack.ts`, beside the rest of the
  * `Character.cpp` port.
  */
+import { isAlive } from '../../engine/rules';
 import { fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex, drawTextLineIndexRaw } from '../csbwin/TextRenderer';
 import { searchButtonList } from './HitTest';
@@ -46,7 +47,7 @@ export function drawSpellControls(ui: UIState): void {
     // No tab without mana: a deliberate divergence (`DEBT.md` → H, "No caster tab without
     // mana").
     if (champion.attributes.maxMana === 0) continue;
-    if (i !== chIdx && champion.attributes.health === 0) continue;
+    if (i !== chIdx && !isAlive(champion)) continue;
     const [x1, x2, y2] = tabs[i]!;
     fillRectIndex(screen, { x1, x2, y1: 0x2a, y2 }, 4);
     if (i === chIdx) drawTextLineIndex(screen, ui.fontData, x1 + 2, 0x30, 0, 4, champion.name);
@@ -101,7 +102,7 @@ export function drawSpellPanel(ui: UIState): void {
   }
 
   const caster = ui.partyState.champions[ui.partyState.magicCasterIndex];
-  if (!caster || (caster.attributes.health | 0) === 0) return;
+  if (!caster || !isAlive(caster)) return;
 
   drawSpellMenuCharacters(ui, caster.incantation.length);
   drawMagicIncantation(ui, caster.incantation);

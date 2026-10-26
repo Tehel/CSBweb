@@ -11,7 +11,8 @@
  * `DsaSystem.moveObjectDsa`. A monster lifted on the party's level first meets the
  * missiles in its way through `CheckMoveFromMissile`, which is `MissileEncounter`'s.
  */
-import { DBType, isSamePosition, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
+import { isAlive } from './rules';
+import { DBType, isSamePosition, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID, getRoomType } from '../core/types';
 import type { CreatureRecord, Item16Record, TeleporterRecord } from '../data/dungeonTypes';
 import { monsterHorizontalSize, monsterLevitating } from '../data/tables/MonsterDesc';
 import type { DungeonState } from './DungeonState';
@@ -24,6 +25,7 @@ import { StateOfFear } from './monsterTypes';
 import { decodeMissileTimerWord8 } from './missileHelpers';
 import type { TimerQueue } from './TimerQueue';
 import type { MmRecord } from './MmRecord';
+import { groupFacingsByte } from './monsterPosition';
 
 /** `soundTELEPORT` (`doc/CSBwin-src/CSB.h:628`). */
 const SOUND_TELEPORT = 17;
@@ -383,7 +385,7 @@ export class WorldMove {
       // through `ExitStairsDirection`, its corner turned to face the stairs. The loop
       // goes on from the square it lands on.
       const cellFlag = this.dungeon.getCellFlag(position);
-      if (((cellFlag >> 5) & 0x7) === RoomType.STAIRS && objectType >= DBType.CREATURE && objectType !== DBType.MISSILE) {
+      if (getRoomType(cellFlag) === RoomType.STAIRS && objectType >= DBType.CREATURE && objectType !== DBType.MISSILE) {
         if ((cellFlag & 0x04) === 0) {
           // `IncrementLevel` finds no level only in a malformed dungeon, where CSBWin would
           // `LoadLevel(-1)`; the object stays on the stairs instead.
@@ -412,7 +414,7 @@ export class WorldMove {
     if (!map) return null;
     const cellFlag = map.cellFlags[position.x]?.[position.y];
     if (cellFlag === undefined) return null;
-    const roomType = (cellFlag >> 5) & 0x7;
+    const roomType = getRoomType(cellFlag);
     if (roomType !== RoomType.TELEPORTER) return null;
     if ((cellFlag & 0x08) === 0) return null;
 
@@ -482,7 +484,7 @@ export class WorldMove {
       for (let chIdx = 0; chIdx < party.champions.length; chIdx++) {
         const champ = party.champions[chIdx];
         if (!champ) continue;
-        if (champ.attributes.health === 0) continue;
+        if (!isAlive(champ)) continue;
         const maxLoad = this.ctx.systems.characterStats.maxLoad(champ);
         if (maxLoad <= 0) continue;
         const load = this.ctx.systems.characterStats.characterLoad(champ);
@@ -518,7 +520,7 @@ export class WorldMove {
     if (!map) return false;
     const cellFlag = map.cellFlags[position.x]?.[position.y];
     if (cellFlag === undefined) return false;
-    const roomType = (cellFlag >> 5) & 0x7;
+    const roomType = getRoomType(cellFlag);
     if (roomType !== RoomType.PIT) return false;
     if ((cellFlag & 0x08) === 0) return false;
     return (cellFlag & 0x01) === 0;
@@ -552,7 +554,7 @@ export class WorldMove {
     const rotation = teleporter.rotation & 0x3;
     const absolute = teleporter.absoluteRotation;
 
-    let facings = useItem16 ? (item16.facings & 0xff) : this.encodeFacingByte(monster.facing);
+    let facings = useItem16 ? (item16.facings & 0xff) : groupFacingsByte(monster.facing);
     let positions = useItem16 ? (item16.positions & 0xff) : (monster.groupIndex & 0xff);
 
     let newFacings = absolute ? rotation : (facings + rotation) & 0x3;
@@ -605,10 +607,5 @@ export class WorldMove {
     const partyLevel = this.ctx.party.state.position.z;
     if (level !== partyLevel) return null;
     return this.dungeon.getAttachedItem16(monster);
-  }
-
-  private encodeFacingByte(facing: number): number {
-    const face = facing & 0x3;
-    return (face | (face << 2) | (face << 4) | (face << 6)) & 0xff;
   }
 }

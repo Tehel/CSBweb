@@ -14,6 +14,7 @@
  * Tags are made whether or not the extra is on; only the gather reads them, and only
  * with it on. They are never saved: a load forgets them (`installRuntimeState`).
  */
+import { isAlive } from './rules';
 import { OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID, type Position } from '../core/types';
 import type { DatabaseRecord } from '../data/dungeonTypes';
 import type { GameContext } from './GameContext';
@@ -104,7 +105,7 @@ export function gatherThrownWeapons(ctx: GameContext, at: Position): void {
   for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
     const tag = tagOf(ctx, rn);
     const champion = tag && party.champions[tag.chIdx];
-    if (tag && champion && (champion.attributes.health | 0) !== 0) lying.push({ object: rn, tag, champion });
+    if (tag && champion && isAlive(champion)) lying.push({ object: rn, tag, champion });
   }
   const take = (object: ObjectID, chIdx: number, slot: number): void => {
     if (!dungeon.removeObjectFromCell(at, object)) return;

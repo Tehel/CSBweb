@@ -1,4 +1,5 @@
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, rnEquals, type LocationRel, type ObjectID } from '../core/types';
+import { isAlive } from './rules';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, rnEquals, type LocationRel, type ObjectID, getRoomType } from '../core/types';
 import type { CsbRandom } from '../core/random';
 import { sb, sw } from '../core/intCast';
 import { readI16BE, writeU16BE } from '../core/bytes';
@@ -269,7 +270,7 @@ export class TimerSystem {
     champion.busyTimerIndex = -1;
     champion.charFlags &= ~CHARFLAG_ATTACK_DISABLE;
     if (champion.attackType !== -1) champion.attackStatModifier = 0;
-    if ((champion.attributes.health | 0) !== 0) {
+    if (isAlive(champion)) {
       // A bow that has just been fired reloads itself from slot 12, then from
       // slots 7-9, taking the first object of the matching ammunition class
       // (`TAG0153c2`, `doc/CSBwin-src/Timer.cpp:2656-2672`).
@@ -718,7 +719,7 @@ export class TimerSystem {
     const y = timer.uByte7;
     const cellFlag = map.cellFlags[x]?.[y];
     if (cellFlag === undefined) return;
-    if (((cellFlag >> 5) & 7) !== RoomType.DOOR) return;
+    if (getRoomType(cellFlag) !== RoomType.DOOR) return;
     let doorState = cellFlag & 0x7;
     if (doorState === 5) return;
 
@@ -823,7 +824,7 @@ export class TimerSystem {
     const y = timer.uByte7;
     const cellFlag = map.cellFlags[x]?.[y];
     if (cellFlag === undefined) return false;
-    const roomType = (cellFlag >> 5) & 0x7;
+    const roomType = getRoomType(cellFlag);
     if (roomType !== RoomType.STONE) {
       this.processOpenRoom(timer);
       return false;
@@ -991,7 +992,7 @@ export class TimerSystem {
       }
     } else if (THROWN_SPELLS.has(missileTypeWord)) {
       // `objectToThrow.CreateSpell(missileType & 0x7f)`: `0xff80` plus the spell, the word itself.
-      projectileObject = (0xff80 + (missileType & 0x7f)) as ObjectID;
+      projectileObject = spellObjectId(missileType);
     }
 
     if (projectileObject === OBJECT_ID_EOF) return false;
@@ -1138,7 +1139,7 @@ export class TimerSystem {
   }
 
   private isChampionDead(champ: PartyState['champions'][number]): boolean {
-    return champ.attributes.health <= 0;
+    return !isAlive(champ);
   }
 
   private setCellFlag(map: MapData, x: number, y: number, cellFlag: number): void {
@@ -1213,7 +1214,7 @@ export class TimerSystem {
     // so a 0 takes that level's multiplier (`Timer.cpp:1782-1786`), and the group is made
     // there (`CreateMonster`'s `MoveObject` on `d.LoadedLevel`, `Code11f52.cpp:2892`).
     const hitPointMultiplier = getActuatorHitPointMultiplier(actuator)
-      || (this.dungeon.getMap(timer.level)?.descriptor.difficulty ?? 0);
+      || this.dungeon.levelDifficulty(timer.level);
     const facing = this.random.zeroTo3(); // doc/CSBwin-src/Timer.cpp:1791
     const drawAsSize4 = getActuatorDrawAsSize4(actuator);
     const normallyClosed = isActuatorNormallyClosed(actuator);
@@ -1461,13 +1462,13 @@ export class TimerSystem {
         const map = this.dungeon.getMap(timer.level)!;
         const onMap = curMapX >= 0 && curMapY >= 0 && curMapX < map.descriptor.width && curMapY < map.descriptor.height;
         const nextCellFlags = onMap ? map.cellFlags[curMapX]![curMapY]! : 0;
-        const nextRoomType = onMap ? (nextCellFlags >> 5) & 0x7 : RoomType.EXTERIOR;
+        const nextRoomType = onMap ? getRoomType(nextCellFlags) : RoomType.EXTERIOR;
         const origCellFlags = map.cellFlags[origMapX]![origMapY]!;
         const nextIsStoneWall = nextRoomType === RoomType.STONE || nextRoomType === RoomType.EXTERIOR;
         const nextIsFalseWall = nextRoomType === RoomType.FALSEWALL;
         const falseWallIsSolid = (nextCellFlags & 0x5) === 0;
         const nextIsStairs = nextRoomType === RoomType.STAIRS;
-        const origIsStairs = ((origCellFlags >> 5) & 0x7) === RoomType.STAIRS;
+        const origIsStairs = getRoomType(origCellFlags) === RoomType.STAIRS;
         if (nextIsStoneWall || (nextIsFalseWall && falseWallIsSolid) || (nextIsStairs && origIsStairs)) {
           if (this.ctx.systems.missileEncounter.processMissileEncounter(nextRoomType, origMapX, origMapY, origMapX, origMapY, timer.level, curPos, missileRn)) {
             this.timers.missileFilterObject = OBJECT_ID_NULL;
@@ -1509,7 +1510,7 @@ export class TimerSystem {
       const map = this.dungeon.getMap(timer.level);
       if (map) {
         const cellFlag = map.cellFlags[curMapX]![curMapY]!;
-        if (((cellFlag >> 5) & 0x7) === RoomType.DOOR) {
+        if (getRoomType(cellFlag) === RoomType.DOOR) {
           if (this.ctx.systems.missileEncounter.processMissileEncounter(RoomType.DOOR, curMapX, curMapY, curMapX, curMapY, timer.level, curPos, missileRn)) {
             this.timers.missileFilterObject = OBJECT_ID_NULL;
             return;
@@ -1625,7 +1626,7 @@ export class TimerSystem {
     const position = new Position(x, y, timer.level);
     if (!cloud) return;
 
-    const roomType = (this.dungeon.getCellFlag(position) >> 5) & 7;
+    const roomType = getRoomType(this.dungeon.getCellFlag(position));
     const party = this.ctx.party.state;
     const partyHere =
       timer.level === party.position.z && x === party.position.x && y === party.position.y;
@@ -1635,7 +1636,7 @@ export class TimerSystem {
     const monsterType = monster ? monster.creatureType : -1;
     const desc = monster ? this.ctx.tables.monsterDesc[monsterType] : null;
 
-    const kind = (0xff80 + (cloud.cloudType & 0x7f)) & 0xffff;
+    const kind = spellObjectId(cloud.cloudType);
 
     // How hard the cloud bites this tick, from what is left of it.
     let damage: number;

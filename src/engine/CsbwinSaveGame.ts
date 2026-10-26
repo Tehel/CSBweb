@@ -63,7 +63,6 @@ import { loadCsbwinWorld, type CsbwinWorld } from '../data/CsbwinDungeonImage';
 import { readGameInfo } from '../data/CsbwinExtendedFeatures';
 import { readDisableSaves, readGlobalVariables, readOverlayPalette, specialLocationsFromExpool } from '../data/CsbwinExpool';
 import { readCsbwinParty, readCsbwinPartyTail } from '../data/CsbwinCharacters';
-import { databaseRecords } from '../data/CsbwinObjectIndex';
 import { CHARDESC_SIZE } from '../data/CsbwinSaveInfo';
 import type { Block2 } from '../data/SaveGameLoader';
 import { CheckMonsters } from './CheckMonsters';
@@ -76,7 +75,7 @@ import type { RuntimeSaveState } from './RuntimeSave';
 import { DBType, OBJECT_ID_NULL, Position } from '../core/types';
 import type { Direction, ObjectID } from '../core/types';
 import type { Block1State, PartyState } from './gameTypes';
-import type { GameInfo, MissileRecord } from '../data/dungeonTypes';
+import { databaseRecords, type GameInfo, type MissileRecord } from '../data/dungeonTypes';
 
 /**
  * `d.objectInHand.NonExtendedInteger(b.gb2.ObjectInHand)` (`doc/CSBwin-src/SaveGame.cpp:1773`):

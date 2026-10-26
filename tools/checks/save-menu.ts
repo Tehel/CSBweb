@@ -391,7 +391,7 @@ function checkLayout(graphics: GraphicsLoader): void {
 
   const blank: SaveMenu.SaveMenuState = {
     mode: 'full', entries: [], unfolded: new Set(), rows: [], selected: -1, scrollTop: 0, wheelDelta: 0, busy: true, message: '',
-    press: null, pending: null, confirm: null, dropped: null, adventure: null, frameHandle: null, lastSaveClick: null, pointer: null, newFace: null,
+    press: null, confirm: null, dropped: null, adventure: null, lastSaveClick: null, pointer: null, newFace: null,
     deleteArmed: null, longPress: null,
   };
   ui.saveMenu = blank;

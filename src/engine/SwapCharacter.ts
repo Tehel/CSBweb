@@ -9,6 +9,7 @@
  * of one this port created comes from the host (`GameHost.portraitOf`), and comes back as
  * a save's champion does, with the pixels.
  */
+import { isAlive } from './rules';
 import { writeU16BE } from '../core/bytes';
 import { writeCsbwinCharacter } from '../data/CsbwinCharacters';
 import { CHARDESC_SIZE } from '../data/CsbwinSaveInfo';
@@ -163,7 +164,7 @@ function removeCharacter(ctx: GameContext, chIdx: number): void {
   let livingChar: number;
   for (livingChar = 0; livingChar < party.champions.length; livingChar++) {
     // Find a living party member.
-    if (chIdx !== livingChar && party.champions[livingChar]!.attributes.health !== 0) break;
+    if (chIdx !== livingChar && isAlive(party.champions[livingChar]!)) break;
   }
   if (chIdx === party.cursorOwner) setHandOwner(ctx, livingChar);
   if (chIdx === party.magicCasterIndex) selectMagicCaster(party, livingChar);

@@ -23,7 +23,7 @@ import type { CsbRandom } from '../core/random';
 import { MISC_BONES_OF_HERO } from '../core/constants';
 import type { CreatureRecord, Item16Record } from '../data/dungeonTypes';
 import type { DungeonState } from './DungeonState';
-import { nameIndexOf, type GameContext } from './GameContext';
+import type { GameContext } from './GameContext';
 import { CHARFLAG_CHEST_OR_SCROLL, getChampionPossession } from '../core/charDesc';
 import type { Champion } from './gameTypes';
 import { drawCharacterState, getPartyChampion } from './Party';
@@ -31,7 +31,8 @@ import { MonsterType, StateOfFear } from './monsterTypes';
 import { selectMagicCaster, setHandOwner } from './Party';
 import { AttributeIndex, attributeCurrent, championAttribute, setAttributeCurrentWithinLimits } from './attributes';
 import { getPrimaryAndSecondaryDirection } from './MonsterPerception';
-import { adjustSkills, AdjustSkillsWhy, determineMastery } from './skills';
+import { adjustSkills, AdjustSkillsWhy } from './skills';
+import { isAlive, levelDifficulty, masteryOf } from './rules';
 import type { MonsterDesc } from '../data/tables/MonsterDesc';
 import { monsterWord14_12_15, monsterWord16_8_11, monsterWord2Bit4 } from '../data/tables/MonsterDesc';
 import { wakeUp } from './MouseSystem';
@@ -78,11 +79,6 @@ export class MonsterAttack {
   constructor(private readonly ctx: GameContext) {
     this.dungeon = ctx.dungeon;
     this.random = ctx.random;
-  }
-
-  /** The party's level's difficulty, the experience multiplier. */
-  private getExperienceMultiplier(): number {
-    return this.dungeon.getMap(this.ctx.party.state.position.z)?.descriptor.difficulty ?? 0;
   }
 
   /**
@@ -282,7 +278,7 @@ export class MonsterAttack {
     if (monsterWord2Bit4(desc)) {
       let target = this.random.zeroTo3();
       let tries = 0;
-      while (tries < 4 && (getPartyChampion(this.ctx.party.state, target)?.attributes.health ?? 0) === 0) {
+      while (tries < 4 && !isAlive(getPartyChampion(this.ctx.party.state, target))) {
         target = (target + 1) & 0x3;
         tries++;
       }
@@ -350,17 +346,17 @@ export class MonsterAttack {
     const party = this.ctx.party.state;
     const champ = getPartyChampion(this.ctx.party.state, chIdx);
     if (!champ) return 0;
-    if (champ.attributes.health === 0) return 0;
+    if (!isAlive(champ)) return 0;
     if (party.sleeping) wakeUp(this.ctx);
 
     const desc = this.ctx.tables.monsterDesc[monster.creatureType];
     if (!desc) return 0;
-    const experienceTerm = 2 * this.getExperienceMultiplier();
+    const experienceTerm = 2 * levelDifficulty(this.ctx);
 
     // Being attacked trains the Fighter defence skill regardless of the outcome.
     adjustSkills(
       this.ctx, chIdx, 7, monsterWord16_8_11(desc), AdjustSkillsWhy.MonsterDamagesCharacter,
-      this.getExperienceMultiplier(),
+      levelDifficulty(this.ctx),
     );
 
     if (!party.sleeping) {
@@ -387,10 +383,7 @@ export class MonsterAttack {
 
     let damage = experienceTerm + this.random.below(16) + desc.attack10;
     // `DetermineMastery(chIdx, 7)`, no flag: the Firestaff in hand counts, and asleep it is 1.
-    damage -= 2 * determineMastery(champ, 7, {
-      partySleeping: this.ctx.party.state.sleeping,
-      getObjectNameIndex: (objectId) => nameIndexOf(this.ctx, objectId),
-    });
+    damage -= 2 * masteryOf(this.ctx, champ, 7);
     if (damage <= 1) {
       if (this.random.bool() !== 0) return 0;
       damage = this.random.zeroTo3() + 2;
@@ -490,7 +483,7 @@ export class MonsterAttack {
     if (dealt <= 0) return 0;
     const champ = getPartyChampion(party, chIdx);
     if (!champ) return 0;
-    if (champ.attributes.health === 0) return 0;
+    if (!isAlive(champ)) return 0;
 
     if (kind !== 0) {
       // Average the armour over every body part the blow could land on.
@@ -614,7 +607,7 @@ export class MonsterAttack {
     const champ = getPartyChampion(this.ctx.party.state, chIdx);
     if (!champ) return;
     champ.timerIndex = -1;
-    if ((champ.attributes.health | 0) === 0) return;
+    if (!isAlive(champ)) return;
     this.ctx.host.tag011366(chIdx);
   }
 
@@ -677,7 +670,7 @@ export class MonsterAttack {
       const other = party.champions[i];
       if (!other) continue;
       if (potential === i) continue;
-      if (other.attributes.health === 0) continue;
+      if (!isAlive(other)) continue;
       living = i;
       break;
     }
@@ -738,7 +731,7 @@ export class MonsterAttack {
       const worn = rec.clothingType;
       if (((this.ctx.tables.clothingFlags[worn] ?? 0) & 0x80) === 0) continue; // not a shield
       const throwingDistance = this.ctx.systems.characterStats.determineThrowingDistance(
-        champ, hand, this.ctx.party.state.sleeping,
+        champ, hand,
       );
       const strength = this.clothingArmourValue(worn, scale) + throwingDistance;
       const weight = this.ctx.tables.byte1412[bodyPart] ?? 0;
@@ -934,7 +927,7 @@ export class MonsterAttack {
     const party = this.ctx.party.state;
     const live: number[] = [];
     party.champions.forEach((ch, i) => {
-      if (ch.attributes.health > 0) live.push(i);
+      if (isAlive(ch)) live.push(i);
     });
     if (live.length === 0) return -1;
     return live[this.random.below(live.length)] ?? -1;

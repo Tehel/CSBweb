@@ -28,7 +28,7 @@ import type { ObjectTables } from '../../data/tables/ObjectTables';
 import type { RectPos } from '../../data/tables/UITables';
 import type { CSBGraphicsLoader } from '../../data/CSBGraphicsLoader';
 import type { BackgroundLib } from '../../data/BackgroundLib';
-import { OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../../core/types';
+import { OBJECT_ID_EOF, Position, RoomType, type ObjectID, getRoomType } from '../../core/types';
 
 /**
  * Execution context - simulates CSBWin's global state
@@ -1509,7 +1509,7 @@ export class BytecodeInterpreter {
     if (!aboveMap) return true;
 
     const cellFlag = aboveMap.cellFlags[posAbove.x]?.[posAbove.y] ?? 0;
-    const roomType = (cellFlag >> 5) & 0x7;
+    const roomType = getRoomType(cellFlag);
     if (roomType !== RoomType.PIT) return true;
     if ((cellFlag & 0x08) === 0) return true;
 

@@ -24,7 +24,7 @@ import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../core/ty
 import { nameIndexOf, type GameContext } from './GameContext';
 import { getChampionPossession } from '../core/charDesc';
 import type { Champion } from './gameTypes';
-import { determineMastery } from './skills';
+import { masteryOf } from './rules';
 import { OBJNI_BOOTS_OF_SPEED, OBJNI_ELVEN_BOOTS } from '../core/objectNameIndex';
 import type { WeaponDesc } from '../data/tables/ObjectTables';
 import { AttributeIndex, championAttribute } from './attributes';
@@ -193,7 +193,7 @@ export class CharacterStats {
    * whichever skill its `uByte1` class selects; low stamina scales the lot; and a
    * wound on that very hand halves it.
    */
-  determineThrowingDistance(champ: Champion, hand: number, partySleeping: boolean): number {
+  determineThrowingDistance(champ: Champion, hand: number): number {
     let d7 = sw((this.ctx.random.next() & 15) + championAttribute(champ, AttributeIndex.Strength));
 
     const obj = getChampionPossession(champ, hand);
@@ -217,9 +217,11 @@ export class CharacterStats {
         d7 = sw(d7 + desc.uByte2);
         const weaponClass = desc.uByte1;
         let mastery = 0;
-        if (weaponClass === 0 || weaponClass === 2) mastery = this.mastery(champ, 4, partySleeping);
-        if (weaponClass !== 0 && weaponClass < 16) mastery = sw(mastery + this.mastery(champ, 10, partySleeping));
-        if (weaponClass >= 16 && weaponClass < 112) mastery = sw(mastery + this.mastery(champ, 11, partySleeping));
+        // `DetermineMastery` with no flag bits (`doc/CSBwin-src/Character.cpp:2338`): the
+        // temporary adjustment and the Firestaff/pendant possession bonuses both count.
+        if (weaponClass === 0 || weaponClass === 2) mastery = masteryOf(this.ctx, champ, 4);
+        if (weaponClass !== 0 && weaponClass < 16) mastery = sw(mastery + masteryOf(this.ctx, champ, 10));
+        if (weaponClass >= 16 && weaponClass < 112) mastery = sw(mastery + masteryOf(this.ctx, champ, 11));
         d7 = sw(d7 + 2 * mastery);
       }
     }
@@ -259,18 +261,6 @@ export class CharacterStats {
     const rec = this.ctx.dungeon.getWeaponRecord(rn);
     if (!rec) return null;
     return this.ctx.tables.weaponDesc[rec.weaponType] ?? null;
-  }
-
-  /**
-   * `DetermineMastery(chIdx, skill)` with **no flag bits**: CSBWin's throwing chain
-   * passes the plain skill number (`doc/CSBwin-src/Character.cpp:2338`), so the
-   * temporary adjustment and the Firestaff/pendant possession bonuses both count.
-   */
-  private mastery(champ: Champion, skill: number, partySleeping: boolean): number {
-    return determineMastery(champ, skill, {
-      partySleeping,
-      getObjectNameIndex: (objectId: ObjectID) => nameIndexOf(this.ctx, objectId),
-    });
   }
 }
 

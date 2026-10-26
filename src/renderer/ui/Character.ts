@@ -6,6 +6,7 @@
  * possession slots those panels read. Writing a slot is the engine's
  * (`CharacterSystem.addCharacterPossession` / `removeCharacterPossession`).
  */
+import { isAlive } from '../../engine/rules';
 import { ImageFormat } from '../../core/imageDecoder';
 import { OBJECT_ID_NULL, ObjectID } from '../../core/types';
 import { getExternalPortraitAddress } from '../../data/CSBGraphicsLoader';
@@ -343,7 +344,7 @@ export function drawPartyStatus(ui: UIState): void {
     }
 
     // `if (pcA3->HP() != 0)`, and graphic 8 otherwise (`doc/CSBwin-src/Character.cpp:1266`).
-    if (champion && (champion.attributes.health | 0) === 0) {
+    if (champion && !isAlive(champion)) {
       const deadGraphic = ui.getGraphicBitmap(8);
       if (deadGraphic) {
         tag0088b2Index(
@@ -394,14 +395,14 @@ export function drawPartyStatus(ui: UIState): void {
       drawCharacterDamage(ui, chIdx, champion, true);
     }
 
-    if (champion && (champion.attributes.health | 0) !== 0) {
+    if (champion && isAlive(champion)) {
       drawShieldDots(ui, baseX, champion);
     }
 
     // `DrawCharacterState` draws the square inside `if (pcA3->HP() != 0)`, and only for a
     // champion in the party (`doc/CSBwin-src/Character.cpp:1313`, `:1462-1480`): an empty
     // box has none, and `KillCharacter` blanks a dead champion's (`:2669-2672`).
-    if (champion && champion.attributes.health !== 0) {
+    if (champion && isAlive(champion)) {
       const dir = (champion.partyPosition + 4 - facing) & 3;
       drawPositionSquare(ui, ui.screenIndexBuffer, g232.wRectPos1454[dir]!, chIdx, champion, facing);
     }
@@ -433,7 +434,7 @@ export function drawPartyStatus(ui: UIState): void {
 function drawCharacterDamage(ui: UIState, chIdx: number, champion: Champion, inventoryOpen: boolean): void {
   const shown = ui.characterDamage[chIdx];
   if (!shown) return;
-  if ((champion.attributes.health | 0) === 0 || shown.inventoryOpen !== inventoryOpen) {
+  if (!isAlive(champion) || shown.inventoryOpen !== inventoryOpen) {
     ui.characterDamage[chIdx] = null;
     return;
   }
@@ -612,7 +613,7 @@ export function drawTopBarHandIcons(ui: UIState): void {
 
   for (let chIdx = 0; chIdx < 4; chIdx++) {
     const champion = ui.partyState.champions[chIdx] ?? null;
-    if (!champion || (champion.attributes.health | 0) === 0) continue;
+    if (!champion || !isAlive(champion)) continue;
     if (selected === chIdx) continue;
 
     for (let hand = 0; hand <= 1; hand++) {
@@ -637,7 +638,7 @@ export function drawTopBarHandIcons(ui: UIState): void {
 
 function drawLifeBars(ui: UIState, chIdx: number, champion: Champion): void {
   // `if (pcA3->HP() > 0)` (`doc/CSBwin-src/Character.cpp:921`).
-  if ((champion.attributes.health | 0) <= 0) return;
+  if (!isAlive(champion)) return;
   const offsets = ui.uiTables.graphic232.word1526[chIdx];
   const masks = ui.uiTables.graphic232.word1502[chIdx];
   if (!offsets || !masks) return;

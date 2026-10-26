@@ -1,4 +1,4 @@
-import { DBType, OBJECT_ID_EOF, type ui8, Position, RoomType } from '../../core/types';
+import { DBType, OBJECT_ID_EOF, type ui8, Position, RoomType, getRoomType } from '../../core/types';
 import { GraphicRoomType, ViewRoomType, type SummarizeRoomData } from '../bytecode/Types';
 import { ECF_FOOTPRINTS, type DungeonState } from '../../engine/DungeonState';
 import type { PartyFootprints } from '../../engine/PartyFootprints';
@@ -46,12 +46,12 @@ function getCellFlagsViewport(dungeon: DungeonState, position: Position): number
   // (1/2/4/8) when the adjacent in-bounds cell is OPEN or PIT, so exterior walls can host random decorations.
   if (legalY) {
     if (x === -1) {
-      const rt = (map.cellFlags[0]![y]! >> 5) & 7;
+      const rt = getRoomType(map.cellFlags[0]![y]!);
       if (rt === RoomType.OPEN || rt === RoomType.PIT) return 4;
       return 0;
     }
     if (x === w) {
-      const rt = (map.cellFlags[w - 1]![y]! >> 5) & 7;
+      const rt = getRoomType(map.cellFlags[w - 1]![y]!);
       if (rt === RoomType.OPEN || rt === RoomType.PIT) return 1;
       return 0;
     }
@@ -60,12 +60,12 @@ function getCellFlagsViewport(dungeon: DungeonState, position: Position): number
 
   if (legalX) {
     if (y === -1) {
-      const rt = (map.cellFlags[x]![0]! >> 5) & 7;
+      const rt = getRoomType(map.cellFlags[x]![0]!);
       if (rt === RoomType.OPEN || rt === RoomType.PIT) return 2;
       return 0;
     }
     if (y === h) {
-      const rt = (map.cellFlags[x]![h - 1]! >> 5) & 7;
+      const rt = getRoomType(map.cellFlags[x]![h - 1]!);
       if (rt === RoomType.OPEN || rt === RoomType.PIT) return 8;
       return 0;
     }
@@ -354,7 +354,7 @@ export function summarizeRoomInfoCsbwin(
   const pos = new Position(rslt.x, rslt.y, z)
 
   let cellFlags = getCellFlagsViewport(dungeon, pos);
-  const baseRoomType = ((cellFlags >> 5) & 7) as RoomType;
+  const baseRoomType = getRoomType(cellFlags);
   rslt.roomType = baseRoomType;
 
   const firstObject = dungeon.findFirstObject(pos);

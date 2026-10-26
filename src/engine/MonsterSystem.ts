@@ -14,7 +14,7 @@
  * The AI itself lives in `MonsterAI.ts`; this module owns only the bookkeeping that
  * decides which groups are *active* and when they next get a turn.
  */
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID, getRoomType } from '../core/types';
 import type { CsbRandom } from '../core/random';
 import type { CreatureRecord, Item16Record } from '../data/dungeonTypes';
 import { ITEM16_FREE, SMS_ATTACKING, SMS_MIRROR } from '../data/dungeonTypes';
@@ -751,7 +751,7 @@ export class MonsterSystem {
     const map = this.dungeon.getMap(level);
     if (!map) return false;
     if (mapX < 0 || mapY < 0 || mapX >= map.descriptor.width || mapY >= map.descriptor.height) return false;
-    const roomType = (this.dungeon.getCellFlag(new Position(mapX, mapY, level)) >> 5) & 0x7;
+    const roomType = getRoomType(this.dungeon.getCellFlag(new Position(mapX, mapY, level)));
     return (
       roomType === RoomType.OPEN ||
       roomType === RoomType.TELEPORTER ||

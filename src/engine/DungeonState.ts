@@ -5,7 +5,7 @@
  * Based on CSBWin's dungeon data access
  */
 
-import { ui8, ui16, Position, CellFlag, ObjectID, Direction, cellHasObjects, type LocationRel } from '../core/types';
+import { ui8, ui16, Position, CellFlag, ObjectID, Direction, cellHasObjects, type LocationRel, getRoomType } from '../core/types';
 import type {
     ClothingRecord,
     ContainerRecord,
@@ -22,10 +22,10 @@ import type {
     TeleporterRecord,
     WeaponRecord,
     ActuatorRecord,
-    Database,
     DatabaseRecord,
     Databases,
 } from '../data/dungeonTypes';
+import { DATABASE_CATEGORY, databaseOf } from '../data/dungeonTypes';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, RoomType, rnEquals } from '../core/types';
 import type { TextRecord } from '../data/dungeonTypes';
 import type { TextDecodeTables } from '../data/tables/ObjectTables';
@@ -33,6 +33,7 @@ import type { DirectionTables } from './RelativeXY';
 import { DecodeText, SubstituteCharacterNames, type TextSubstitution } from '../data/DecodeText';
 import { Expool } from '../data/CsbwinExpool';
 import { SkinCache } from './SkinCache';
+import { groupFacingsByte } from './monsterPosition';
 import { DungeonLoader } from '../data/DungeonLoader';
 import type { DungeonSnapshot } from './DungeonSnapshot';
 import { applyDungeonSnapshot, captureDungeonSnapshot } from './DungeonSnapshot';
@@ -41,26 +42,6 @@ import type { RnMaps } from '../core/RnMaps';
 /**
  * DungeonState - manages dungeon data and queries
  */
-/** The database each `Databases` key holds. */
-export const DATABASE_CATEGORY: Record<keyof Databases, DBType> = {
-    doors: DBType.DOOR,
-    teleporters: DBType.TELEPORTER,
-    texts: DBType.TEXT,
-    actuators: DBType.ACTUATOR,
-    creatures: DBType.CREATURE,
-    weapons: DBType.WEAPON,
-    clothing: DBType.CLOTHING,
-    scrolls: DBType.SCROLL,
-    potions: DBType.POTION,
-    containers: DBType.CHEST,
-    misc: DBType.MISC,
-    missiles: DBType.MISSILE,
-    clouds: DBType.CLOUD,
-};
-
-/** The `Databases` key of each database the port holds records for. */
-const DATABASE_KEY: Partial<Record<DBType, keyof Databases>> = Object.fromEntries(
-    Object.entries(DATABASE_CATEGORY).map(([key, db]) => [db, key])) as Partial<Record<DBType, keyof Databases>>;
 
 /**
  * `DATABASES::Max` (`doc/CSBwin-src/CSB.h:1649`): the most records `Enlarge` grows
@@ -216,6 +197,11 @@ export class DungeonState {
         return this.data.maps[index]!;
     }
 
+    /** `experienceMultiplier()` of level `level`'s descriptor, its difficulty: 0 past the last level. */
+    levelDifficulty(level: number): number {
+        return this.getMap(level)?.descriptor.difficulty ?? 0;
+    }
+
     /**
      * Find the map index and coordinates for a level delta using CSBWin's IncrementLevel logic.
      *
@@ -263,7 +249,7 @@ export class DungeonState {
             if (newX < 0 || newY < 0 || newX >= map.descriptor.width || newY >= map.descriptor.height) continue;
 
             const cellFlag = this.getCellFlag(new Position(newX, newY, z));
-            const roomType = (cellFlag >> 5) & 0x7;
+            const roomType = getRoomType(cellFlag);
 
             if (roomType === RoomType.STONE || roomType === RoomType.STAIRS) continue;
             if (roomType === RoomType.FALSEWALL && (cellFlag & 0x05) === 0) continue;
@@ -456,117 +442,15 @@ export class DungeonState {
      * Ported from CSBWin `GetDBRecordLink()` (doc/CSBwin-src/CSBCode.cpp:5155-5165).
      */
     getDBRecordLink(rn: ObjectID): ObjectID {
-        if (rn === OBJECT_ID_EOF || rn === OBJECT_ID_NULL) return OBJECT_ID_EOF;
-        const { category, index } = this.rnMaps.decode(rn);
-
-        switch (category) {
-            case DBType.DOOR:
-                return this.data.databases.doors.records[index]?.nextObject ?? OBJECT_ID_EOF;
-            case DBType.TELEPORTER:
-                return this.data.databases.teleporters.records[index]?.nextObject ?? OBJECT_ID_EOF;
-            case DBType.TEXT:
-                return this.data.databases.texts.records[index]?.nextObject ?? OBJECT_ID_EOF;
-            case DBType.ACTUATOR:
-                return this.data.databases.actuators.records[index]?.nextObject ?? OBJECT_ID_EOF;
-            case DBType.CREATURE:
-                return this.data.databases.creatures.records[index]?.nextObject ?? OBJECT_ID_EOF;
-            case DBType.WEAPON:
-                return this.data.databases.weapons.records[index]?.nextObject ?? OBJECT_ID_EOF;
-            case DBType.CLOTHING:
-                return this.data.databases.clothing.records[index]?.nextObject ?? OBJECT_ID_EOF;
-            case DBType.SCROLL:
-                return this.data.databases.scrolls.records[index]?.nextObject ?? OBJECT_ID_EOF;
-            case DBType.POTION:
-                return this.data.databases.potions.records[index]?.nextObject ?? OBJECT_ID_EOF;
-            case DBType.CHEST:
-                return this.data.databases.containers.records[index]?.nextObject ?? OBJECT_ID_EOF;
-            case DBType.MISC:
-                return this.data.databases.misc.records[index]?.nextObject ?? OBJECT_ID_EOF;
-            case DBType.MISSILE:
-                return this.data.databases.missiles.records[index]?.nextObject ?? OBJECT_ID_EOF;
-            case DBType.CLOUD:
-                return this.data.databases.clouds.records[index]?.nextObject ?? OBJECT_ID_EOF;
-            default:
-                return OBJECT_ID_EOF;
-        }
+        return this.getRecord(rn)?.nextObject ?? OBJECT_ID_EOF;
     }
 
     /**
      * Update the next link pointer for a database record.
      */
     setDBRecordLink(rn: ObjectID, next: ObjectID): void {
-        if (rn === OBJECT_ID_EOF || rn === OBJECT_ID_NULL) return;
-        const { category, index } = this.rnMaps.decode(rn);
-
-        switch (category) {
-            case DBType.DOOR:
-                if (this.data.databases.doors.records[index]) {
-                    this.data.databases.doors.records[index].nextObject = next;
-                }
-                break;
-            case DBType.TELEPORTER:
-                if (this.data.databases.teleporters.records[index]) {
-                    this.data.databases.teleporters.records[index].nextObject = next;
-                }
-                break;
-            case DBType.TEXT:
-                if (this.data.databases.texts.records[index]) {
-                    this.data.databases.texts.records[index].nextObject = next;
-                }
-                break;
-            case DBType.ACTUATOR:
-                if (this.data.databases.actuators.records[index]) {
-                    this.data.databases.actuators.records[index].nextObject = next;
-                }
-                break;
-            case DBType.CREATURE:
-                if (this.data.databases.creatures.records[index]) {
-                    this.data.databases.creatures.records[index].nextObject = next;
-                }
-                break;
-            case DBType.WEAPON:
-                if (this.data.databases.weapons.records[index]) {
-                    this.data.databases.weapons.records[index].nextObject = next;
-                }
-                break;
-            case DBType.CLOTHING:
-                if (this.data.databases.clothing.records[index]) {
-                    this.data.databases.clothing.records[index].nextObject = next;
-                }
-                break;
-            case DBType.SCROLL:
-                if (this.data.databases.scrolls.records[index]) {
-                    this.data.databases.scrolls.records[index].nextObject = next;
-                }
-                break;
-            case DBType.POTION:
-                if (this.data.databases.potions.records[index]) {
-                    this.data.databases.potions.records[index].nextObject = next;
-                }
-                break;
-            case DBType.CHEST:
-                if (this.data.databases.containers.records[index]) {
-                    this.data.databases.containers.records[index].nextObject = next;
-                }
-                break;
-            case DBType.MISC:
-                if (this.data.databases.misc.records[index]) {
-                    this.data.databases.misc.records[index].nextObject = next;
-                }
-                break;
-            case DBType.MISSILE:
-                if (this.data.databases.missiles.records[index]) {
-                    this.data.databases.missiles.records[index].nextObject = next;
-                }
-                break;
-            case DBType.CLOUD:
-                if (this.data.databases.clouds.records[index]) {
-                    this.data.databases.clouds.records[index].nextObject = next;
-                }
-                break;
-            default:
-                break;
-        }
+        const record = this.getRecord(rn);
+        if (record) record.nextObject = next;
     }
 
     /**
@@ -588,8 +472,8 @@ export class DungeonState {
      * (`makeMoreRoomInDB`) and stores `record` over the record of the RN that gives.
      */
     findEmptyDBEntry<K extends keyof Databases>(db: K, record: Databases[K]['records'][number], important = false): ObjectID {
-        const database = this.data.databases[db] as Database<DatabaseRecord>;
         const dbType = DATABASE_CATEGORY[db];
+        const database = databaseOf(this.data.databases, dbType)!;
         let { emptyIndexEntry, emptyDBEntry } = this.rnMaps.findEmptyIndexEntry(dbType);
         if (emptyDBEntry === -1) {
             for (let i = 1; i < database.records.length; i++) {
@@ -629,10 +513,9 @@ export class DungeonState {
     addNewGameSpares(byte7302: ArrayLike<number>): void {
         for (let db = 0; db < 16; db++) {
             const spares = byte7302[db] ?? 0;
-            const key = DATABASE_KEY[db as DBType];
+            const database = databaseOf(this.data.databases, db as DBType);
             if (spares === 0) continue;
-            if (key === undefined) throw new Error(`Byte7302 gives database ${db} ${spares} spare records`);
-            const database = this.data.databases[key] as Database<DatabaseRecord>;
+            if (database === undefined) throw new Error(`Byte7302 gives database ${db} ${spares} spare records`);
             database.records.push(...new DungeonLoader().clearedRecords(db as DBType, spares, this.data));
             database.count = database.records.length & 0xffff;
             this.data.header.objectCounts[db] = database.count;
@@ -649,9 +532,8 @@ export class DungeonState {
      * `m_noEnlarge`, so it always goes ahead.
      */
     enlarge(dbType: DBType): number {
-        const key = DATABASE_KEY[dbType];
-        if (key === undefined) return -1;
-        const database = this.data.databases[key] as Database<DatabaseRecord>;
+        const database = databaseOf(this.data.databases, dbType);
+        if (database === undefined) return -1;
         const records = database.records;
         if (records.length >= dbMax(dbType)) return -1;
         const iNew = records.length;
@@ -671,9 +553,7 @@ export class DungeonState {
     deleteDBEntry(rn: ObjectID): void {
         if (rn === OBJECT_ID_EOF || rn === OBJECT_ID_NULL) return;
         const { category, index } = this.rnMaps.decode(rn);
-        const key = DATABASE_KEY[category];
-        if (key === undefined) return;
-        const rec = (this.data.databases[key] as Database<DatabaseRecord>).records[index];
+        const rec = databaseOf(this.data.databases, category)?.records[index];
         if (!rec) return;
         if (!this.rnMaps.deleteIndexEntry(category, index)) return;
         rec.nextObject = OBJECT_ID_NULL;
@@ -686,9 +566,7 @@ export class DungeonState {
     getRecord(rn: ObjectID): DatabaseRecord | null {
         if (rn === OBJECT_ID_EOF || rn === OBJECT_ID_NULL) return null;
         const { category, index } = this.rnMaps.decode(rn);
-        const key = DATABASE_KEY[category];
-        if (key === undefined) return null;
-        return (this.data.databases[key] as Database<DatabaseRecord>).records[index] ?? null;
+        return databaseOf(this.data.databases, category)?.records[index] ?? null;
     }
 
     /**
@@ -756,10 +634,15 @@ export class DungeonState {
         return doorCharacteristics[index & 0x3] ?? 0;
     }
 
-    getTextRecord(rn: ObjectID): TextRecord | null {
+    /** The record `rn` names in database `key`, or null when it names another database's. */
+    private recordIn<K extends keyof Databases>(rn: ObjectID, key: K): Databases[K]['records'][number] | null {
         const { category, index } = this.rnMaps.decode(rn);
-        if (category !== DBType.TEXT) return null;
-        return this.data.databases.texts.records[index] ?? null;
+        if (category !== DATABASE_CATEGORY[key]) return null;
+        return this.data.databases[key].records[index] ?? null;
+    }
+
+    getTextRecord(rn: ObjectID): TextRecord | null {
+        return this.recordIn(rn, 'texts');
     }
 
     getDsaLevelIndex(level: number, selector: number): number | null {
@@ -771,9 +654,7 @@ export class DungeonState {
     }
 
     getActuatorRecord(rn: ObjectID): ActuatorRecord | null {
-        const { category, index } = this.rnMaps.decode(rn);
-        if (category !== DBType.ACTUATOR) return null;
-        return this.data.databases.actuators.records[index] ?? null;
+        return this.recordIn(rn, 'actuators');
     }
 
     getDoorRecordByIndex(index: number): DoorRecord | null {
@@ -781,64 +662,44 @@ export class DungeonState {
     }
 
     getTeleporterRecord(rn: ObjectID): TeleporterRecord | null {
-        const { category, index } = this.rnMaps.decode(rn);
-        if (category !== DBType.TELEPORTER) return null;
-        return this.data.databases.teleporters.records[index] ?? null;
+        return this.recordIn(rn, 'teleporters');
     }
 
 
     getWeaponRecord(rn: ObjectID): WeaponRecord | null {
-        const { category, index } = this.rnMaps.decode(rn);
-        if (category !== DBType.WEAPON) return null;
-        return this.data.databases.weapons.records[index] ?? null;
+        return this.recordIn(rn, 'weapons');
     }
 
     getClothingRecord(rn: ObjectID): ClothingRecord | null {
-        const { category, index } = this.rnMaps.decode(rn);
-        if (category !== DBType.CLOTHING) return null;
-        return this.data.databases.clothing.records[index] ?? null;
+        return this.recordIn(rn, 'clothing');
     }
 
     getScrollRecord(rn: ObjectID): ScrollRecord | null {
-        const { category, index } = this.rnMaps.decode(rn);
-        if (category !== DBType.SCROLL) return null;
-        return this.data.databases.scrolls.records[index] ?? null;
+        return this.recordIn(rn, 'scrolls');
     }
 
     getPotionRecord(rn: ObjectID): PotionRecord | null {
-        const { category, index } = this.rnMaps.decode(rn);
-        if (category !== DBType.POTION) return null;
-        return this.data.databases.potions.records[index] ?? null;
+        return this.recordIn(rn, 'potions');
     }
 
     getContainerRecord(rn: ObjectID): ContainerRecord | null {
-        const { category, index } = this.rnMaps.decode(rn);
-        if (category !== DBType.CHEST) return null;
-        return this.data.databases.containers.records[index] ?? null;
+        return this.recordIn(rn, 'containers');
     }
 
     getMiscRecord(rn: ObjectID): MiscRecord | null {
-        const { category, index } = this.rnMaps.decode(rn);
-        if (category !== DBType.MISC) return null;
-        return this.data.databases.misc.records[index] ?? null;
+        return this.recordIn(rn, 'misc');
     }
 
     getCreatureRecord(rn: ObjectID): CreatureRecord | null {
-        const { category, index } = this.rnMaps.decode(rn);
-        if (category !== DBType.CREATURE) return null;
-        return this.data.databases.creatures.records[index] ?? null;
+        return this.recordIn(rn, 'creatures');
     }
 
     getMissileRecord(rn: ObjectID): MissileRecord | null {
-        const { category, index } = this.rnMaps.decode(rn);
-        if (category !== DBType.MISSILE) return null;
-        return this.data.databases.missiles.records[index] ?? null;
+        return this.recordIn(rn, 'missiles');
     }
 
     getCloudRecord(rn: ObjectID): CloudRecord | null {
-        const { category, index } = this.rnMaps.decode(rn);
-        if (category !== DBType.CLOUD) return null;
-        return this.data.databases.clouds.records[index] ?? null;
+        return this.recordIn(rn, 'clouds');
     }
 
     getItem16Record(index: number): Item16Record | null {
@@ -910,11 +771,9 @@ export class DungeonState {
 
         // No ITEM16: `groupIndex` is itself the packed positions byte, and the whole
         // group faces whichever way DB4.word14 says.
-        const face = creature.facing & 0x3;
-        const facings = (face | (face << 2) | (face << 4) | (face << 6)) & 0xff;
         return {
             positions: creature.groupIndex,
-            facings,
+            facings: groupFacingsByte(creature.facing),
             statuses: new Uint8Array(4)
         };
     }

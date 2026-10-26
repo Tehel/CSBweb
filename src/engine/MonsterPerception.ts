@@ -20,7 +20,7 @@
  * would land on the party — so those are gathered into `MoveProbe` below and handed
  * back explicitly.
  */
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID, getRoomType } from '../core/types';
 import type { CsbRandom } from '../core/random';
 import type { CreatureRecord } from '../data/dungeonTypes';
 import type { DungeonState } from './DungeonState';
@@ -146,7 +146,7 @@ export class MonsterPerception {
   blockedTypeA(level: number, mapX: number, mapY: number): boolean {
     const position = new Position(mapX, mapY, level);
     const flag = this.dungeon.getCellFlag(position);
-    const roomType = (flag >> 5) & 0x7;
+    const roomType = getRoomType(flag);
 
     if (roomType === RoomType.DOOR) {
       const doorPosition = flag & 0x7;
@@ -167,7 +167,7 @@ export class MonsterPerception {
   /** `StoneOrClosedFalseWall` (`doc/CSBwin-src/Monster.cpp:354`). Doors do not block. */
   stoneOrClosedFalseWall(level: number, mapX: number, mapY: number): boolean {
     const flag = this.dungeon.getCellFlag(new Position(mapX, mapY, level));
-    const roomType = (flag >> 5) & 0x7;
+    const roomType = getRoomType(flag);
     if (roomType === RoomType.STONE) return true;
     if (roomType !== RoomType.FALSEWALL) return false;
     if ((flag & 4) !== 0) return false;
@@ -423,7 +423,7 @@ export class MonsterPerception {
 
     const target = new Position(step.x, step.y, level);
     const flag = this.dungeon.getCellFlag(target);
-    const roomType = (flag >> 5) & 0x7;
+    const roomType = getRoomType(flag);
 
     if (roomType === RoomType.STONE) return probe;
     if (roomType === RoomType.STAIRS) return probe;

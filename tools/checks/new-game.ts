@@ -41,7 +41,7 @@ import { CsbRandom } from '../../src/core/random';
 import { OBJECT_ID_NULL, Position } from '../../src/core/types';
 import { emptyDungeonData } from '../../src/data/DungeonLoader';
 import type { Game } from '../../src/engine/Game';
-import { DATABASE_CATEGORY } from '../../src/engine/DungeonState';
+import { DATABASE_CATEGORY } from '../../src/data/dungeonTypes';
 import { drawRandomGameID } from '../../src/engine/GameContext';
 import { MovementAction } from '../../src/engine/gameTypes';
 import { applySaveBytes, buildSaveFile } from '../../src/engine/SaveGameFile';

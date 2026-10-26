@@ -46,6 +46,7 @@ import type {
   PotionRecord,
   WeaponRecord,
 } from '../data/dungeonTypes';
+import { databaseRecords } from '../data/dungeonTypes';
 import type { DungeonState } from './DungeonState';
 
 /** The first `d.ObjDesc` row of each database (`OBJ_DESC_INDEX`, `doc/CSBwin-src/Objects.h:247-379`). */
@@ -83,16 +84,7 @@ export function DescIndex(dungeon: DungeonState, rn: ObjectID): number {
   const category = dungeon.rnMaps.dbType(rn);
   if (!OBJECT_DATABASES.has(category)) return -1;
   const index = dungeon.rnMaps.idx(rn);
-  const { databases } = dungeon.getData();
-  const records: ArrayLike<DatabaseRecord> | undefined =
-    category === DBType.SCROLL ? databases.scrolls.records :
-    category === DBType.CHEST ? databases.containers.records :
-    category === DBType.MISC ? databases.misc.records :
-    category === DBType.WEAPON ? databases.weapons.records :
-    category === DBType.CLOTHING ? databases.clothing.records :
-    category === DBType.POTION ? databases.potions.records :
-    undefined;
-  return DescIndexOfRecord(category, records?.[index] ?? null);
+  return DescIndexOfRecord(category, databaseRecords(dungeon.getData().databases, category)[index] ?? null);
 }
 
 /**

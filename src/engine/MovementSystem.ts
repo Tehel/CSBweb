@@ -5,6 +5,7 @@
  * Based on CSBWin's movement and collision system
  */
 
+import { isAlive } from './rules';
 import type { Party } from './Party';
 import type { DungeonState } from './DungeonState';
 import type { MovementResult } from './gameTypes';
@@ -148,7 +149,7 @@ export class MovementSystem {
         const party = this.party.state;
         let time2move = 1;
         for (const champ of party.champions) {
-            if (champ.attributes.health !== 0) {
+            if (isAlive(champ)) {
                 time2move = sw(Math.max(time2move, this.ctx.systems.characterStats.timeToMove(champ)));
             }
         }
@@ -169,7 +170,7 @@ export class MovementSystem {
         const direction = action === MovementAction.TURN_LEFT ? 1 : 2;
         const party = this.party.state;
         const cellFlags = this.dungeon.getCellFlag(party.position);
-        const roomType = (cellFlags >> 5) & 0x7;
+        const roomType = getRoomType(cellFlags);
 
         // The party move filter, `PM_BEGINTURN` (doc/CSBwin-src/CSBCode.cpp:7957-7981).
         // `toLocation` faces `(facing + ((direction == 0) ? 1 : -1)) & 3`, and `direction`
@@ -224,7 +225,7 @@ export class MovementSystem {
         const party = this.party.state;
         const position = party.position;
         const cellFlagsFrom = this.dungeon.getCellFlag(position);
-        const roomTypeFrom = (cellFlagsFrom >> 5) & 0x7;
+        const roomTypeFrom = getRoomType(cellFlagsFrom);
         // `move` sends only the moves here, never a turn. `direction` is `MoveParty`'s:
         // 0-3 a step relative to the facing, 4 down and 5 up (`:8091-8093`).
         const relDirection = this.getRelativeDirection(action)!;
@@ -243,7 +244,7 @@ export class MovementSystem {
                 const to = RelativeXY(tables, party.facing, tables.word18560[relDirection]!, tables.word18568[relDirection]!, position.x, position.y);
                 newPosition = new Position(to.x, to.y, position.z);
                 cellFlagsTo = this.dungeon.getCellFlag(newPosition);
-                roomTypeTo = (cellFlagsTo >> 5) & 0x7;
+                roomTypeTo = getRoomType(cellFlagsTo);
             } else {
                 cellFlagsTo = 0;
                 roomTypeTo = RoomType.STONE;
@@ -481,7 +482,7 @@ export class MovementSystem {
         if (next !== null) {
             newPosition = next;
             const cellFlagsTo = this.dungeon.getCellFlag(direction === 5 ? next : position);
-            if (((cellFlagsTo >> 5) & 0x7) === RoomType.PIT) roomTypeTo = RoomType.PIT;
+            if (getRoomType(cellFlagsTo) === RoomType.PIT) roomTypeTo = RoomType.PIT;
         }
         if (roomTypeTo !== RoomType.STONE) {
             if (this.dungeon.findFirstMonster(newPosition) !== OBJECT_ID_EOF) {
@@ -527,9 +528,9 @@ export class MovementSystem {
             if (x < 0 || y < 0 || level < 0 || level >= numLevels) continue;
             const descriptor = this.dungeon.getMap(level)!.descriptor;
             if (x > descriptor.width - 1 || y > descriptor.height - 1) continue;
-            const roomTypeHere = (this.dungeon.getCellFlag(party.position) >> 5) & 0x7;
+            const roomTypeHere = getRoomType(this.dungeon.getCellFlag(party.position));
             const target = new Position(x, y, level);
-            const roomTypeThere = (this.dungeon.getCellFlag(target) >> 5) & 0x7;
+            const roomTypeThere = getRoomType(this.dungeon.getCellFlag(target));
             if (axis !== 2) {
                 if (roomTypeThere !== RoomType.PIT && roomTypeThere !== RoomType.OPEN) continue;
             } else if (delta === 1) {
@@ -597,7 +598,7 @@ export class MovementSystem {
             absDirection: direction,
             fromLocation: partyLocation(stairs, facing),
             toLocation: partyLocation(next, facing),
-            fromLocationType: (this.dungeon.getCellFlag(stairs) >> 5) & 0x7,
+            fromLocationType: getRoomType(this.dungeon.getCellFlag(stairs)),
             toLocationType: RoomType.STAIRS,
         });
         if ((pmd.flags & PM_INHIBITMOVE) !== 0) return { success: false };

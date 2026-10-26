@@ -14,6 +14,7 @@
  * (`Data.h:866`) is here, where three of its four writers are; the fourth,
  * `CheckMonsterVersusMissiles`, is `MonsterAI`'s.
  */
+import { isAlive } from './rules';
 import { DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
 import { PotionType } from '../core/constants';
 import type { CsbRandom } from '../core/random';
@@ -103,7 +104,7 @@ export class MissileEncounter {
       for (const champion of party.champions) {
         // `CharacterAtPosition`, which skips a champion whose `HP()` is 0
         // (`doc/CSBwin-src/Code11f52.cpp:2601`, `:4102`).
-        if ((champion.attributes.health | 0) === 0) continue;
+        if (!isAlive(champion)) continue;
         const pos = champion.partyPosition & 0x3;
         whoLeavesCell[pos] = (pos + 1) & 0xff;
       }

@@ -10,9 +10,11 @@ import {
   Position,
   RoomType,
   rnEquals,
+  getRoomType,
 } from '../core/types';
 import { DescIndex, GetBasicObjectType } from './objectIndex';
-import { addToSkill, determineMastery } from './skills';
+import { addToSkill } from './skills';
+import { isAlive, masteryOf } from './rules';
 import { attributeCurrent, attributeMaximum, attributeMinimum, setAttributeCurrent, setAttributeMaximum, setAttributeMinimum } from './attributes';
 import { die } from './Die';
 import { sw } from '../core/intCast';
@@ -36,7 +38,7 @@ import {
   setActuatorParameterB,
 } from '../data/actuatorHelpers';
 import { extendedCellFlagsKey, type DungeonState } from './DungeonState';
-import { nameIndexOf, type GameContext } from './GameContext';
+import type { GameContext } from './GameContext';
 import { getChampionPossession } from '../core/charDesc';
 import type { PartyState, Champion } from './gameTypes';
 import { vacantPossession } from '../data/CsbwinCharacters';
@@ -56,8 +58,8 @@ import { forgetThrownWeapon } from './ThrownWeapons';
 import { getFromWings, locateInWings, saveToWings, wingsChampion } from './Wings';
 import { readU32LE, writeU32LE } from '../core/bytes';
 import { decodeCharField } from '../data/CsbwinSaveInfo';
-import { EDT_GLOBAL_TEXT, GetText } from '../data/DecodeText';
-import { messageParametersKey, readGlobalVariables } from '../data/CsbwinExpool';
+import { GetText } from '../data/DecodeText';
+import { Esl, globalTextBytes, globalTextKey, messageParametersKey, readGlobalVariables, specialLocationKey } from '../data/CsbwinExpool';
 import { FEED_PARAMETER_WORDS, feedParametersFromWords, feedParametersToWords, type FeedParameters } from './filterParameters';
 import { ATTACK_PARAMETER_WORDS, attackParametersFromWords, attackParametersToWords, type AttackParameters } from './filterParameters';
 import { DELETE_MONSTER_PARAMETER_WORDS, deleteMonsterParametersFromWords, deleteMonsterParametersToWords, type DeleteMonsterParameters } from './filterParameters';
@@ -102,30 +104,8 @@ enum TargetType {
   GEAR = 3,
 }
 
-
-const EDT_SPECIAL_LOCATIONS = 3;
 /** `gameVolume`'s default (`doc/CSBwin-src/Data.h:42`, `data.cpp:278`). */
 const VOLUME_FULL = 0;
-const ESL_MISSILE_ENCOUNTER_FILTER = 13;
-const ESL_ADJUST_SKILLS_FILTER = 6;
-const ESL_VIEWING_FILTER = 3;
-const ESL_PARTY_ATTACK_FILTER = 4;
-const VIEWING_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_VIEWING_FILTER;
-const PARTY_ATTACK_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_PARTY_ATTACK_FILTER;
-const ESL_SOUND_FILTER = 8;
-const ESL_ACTION_NAME_FILTER = 10;
-const ESL_FEEDING_FILTER = 1;
-const ESL_CHAR_DEATH_FILTER = 11;
-const ESL_DAMAGE_CHAR_FILTER = 15;
-const ESL_EQUIP_FILTER = 12;
-const ESL_PARTY_MOVE_FILTER = 14;
-const ESL_MONSTER_ATTACK_FILTER = 0;
-const ESL_DELETE_MONSTER_FILTER = 7;
-const ESL_MONSTER_MOVE_FILTER = 2;
-const ESL_CURSOR_FILTER = 9;
-const MONSTER_MOVE_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_MONSTER_MOVE_FILTER;
-const ESL_INDIRECT_ACTIONS = 5;
-const INDIRECT_ACTIONS_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_INDIRECT_ACTIONS;
 
 /**
  * `EX_AMPERSAND`'s unpacking of `I_Indirect` (`doc/CSBwin-src/DSA.cpp:2351-2370`): the
@@ -596,8 +576,8 @@ export class DsaSystem {
    * which every `run` of it shares: `SetPossession` calls one DSA twice, the second time
    * with timer function 0 after the first's 1 (`Character.cpp:2980-2991`).
    */
-  private forEachFilterDsa(esl: number, each: (run: (timerFunction?: number) => void) => void, firstOnly = false): boolean {
-    const special = this.dungeon.getSpecialLocation((EDT_SPECIAL_LOCATIONS << 24) | esl);
+  private forEachFilterDsa(esl: Esl, each: (run: (timerFunction?: number) => void) => void, firstOnly = false): boolean {
+    const special = this.dungeon.getSpecialLocation(specialLocationKey(esl));
     if (special === null) return false;
     return this.forEachDsaAt(locationRelFromInteger(special), each, firstOnly);
   }
@@ -656,7 +636,7 @@ export class DsaSystem {
       const d2 = distanceSquared * 10000;
       for (let i = 0; i < 3; i++) distance100 = Math.trunc((distance100 + Math.trunc(d2 / distance100)) / 2);
     }
-    this.newDsaParameters(() => this.forEachFilterDsa(ESL_SOUND_FILTER, (run) => {
+    this.newDsaParameters(() => this.forEachFilterDsa(Esl.SOUND_FILTER, (run) => {
       this.setParameters(9, [
         soundNumber + 1, highVolume, distanceSquared, level, x, y, VOLUME_FULL, 0, distance100,
       ]);
@@ -678,7 +658,7 @@ export class DsaSystem {
    */
   feedingFilter(fp: FeedParameters): FeedParameters {
     let block = fp;
-    this.forEachFilterDsa(ESL_FEEDING_FILTER, (run) => {
+    this.forEachFilterDsa(Esl.FEEDING_FILTER, (run) => {
       this.setParameters(FEED_PARAMETER_WORDS, feedParametersToWords(block));
       run();
       block = feedParametersFromWords((i) => this.getParameter(i));
@@ -696,7 +676,7 @@ export class DsaSystem {
    * caller's parameters and leave them theirs.
    */
   cursorFilter(cfp: CursorFilterPacket): void {
-    this.forEachFilterDsa(ESL_CURSOR_FILTER, (run) => {
+    this.forEachFilterDsa(Esl.CURSOR_FILTER, (run) => {
       this.setParameters(6, [cfp.object, cfp.type, cfp.p1, cfp.p2, cfp.p3, cfp.p4]);
       run();
       cfp.object = this.getParameter(0);
@@ -715,7 +695,7 @@ export class DsaSystem {
    * champion's index. Nothing comes back.
    */
   charDeathFilter(chIdx: number): void {
-    this.newDsaParameters(() => this.forEachFilterDsa(ESL_CHAR_DEATH_FILTER, (run) => {
+    this.newDsaParameters(() => this.forEachFilterDsa(Esl.CHAR_DEATH_FILTER, (run) => {
       this.setParameters(1, [chIdx]);
       run();
     }, true));
@@ -731,7 +711,7 @@ export class DsaSystem {
    * `arriving`, each when it is not `RNnul` (`:2980-2991`). Nothing comes back.
    */
   equipFilter(chIdx: number, slot: number, leaving: ObjectID, arriving: ObjectID): void {
-    this.newDsaParameters(() => this.forEachFilterDsa(ESL_EQUIP_FILTER, (run) => {
+    this.newDsaParameters(() => this.forEachFilterDsa(Esl.EQUIP_FILTER, (run) => {
       this.setParameters(4, [chIdx, slot, 0, 0]);
       if (leaving !== OBJECT_ID_NULL) {
         this.parameters[3] = leaving;
@@ -753,7 +733,7 @@ export class DsaSystem {
    */
   partyMoveFilter(pmd: PartyMoveData): PartyMoveData {
     let block = pmd;
-    this.newDsaParameters(() => this.forEachFilterDsa(ESL_PARTY_MOVE_FILTER, (run) => {
+    this.newDsaParameters(() => this.forEachFilterDsa(Esl.PARTY_MOVE_FILTER, (run) => {
       this.setParameters(PARTY_MOVE_DATA_WORDS, partyMoveDataToWords(block));
       run();
       block = partyMoveDataFromWords((i) => this.getParameter(i));
@@ -770,7 +750,7 @@ export class DsaSystem {
    * (`:1171`).
    */
   monsterAttackFilter(p: AttackParameters): void {
-    this.forEachFilterDsa(ESL_MONSTER_ATTACK_FILTER, (run) => this.newDsaParameters(() => {
+    this.forEachFilterDsa(Esl.MONSTER_ATTACK_FILTER, (run) => this.newDsaParameters(() => {
       this.setParameters(ATTACK_PARAMETER_WORDS, attackParametersToWords(p));
       run();
       attackParametersFromWords(p, (i) => this.getParameter(i));
@@ -786,7 +766,7 @@ export class DsaSystem {
    * DSAs run on parameters of their own, which they share.
    */
   deleteMonsterFilter(p: DeleteMonsterParameters): void {
-    this.newDsaParameters(() => this.forEachFilterDsa(ESL_DELETE_MONSTER_FILTER, (run) => {
+    this.newDsaParameters(() => this.forEachFilterDsa(Esl.DELETE_MONSTER_FILTER, (run) => {
       this.setParameters(DELETE_MONSTER_PARAMETER_WORDS, deleteMonsterParametersToWords(p));
       run();
       deleteMonsterParametersFromWords(p, (i) => this.getParameter(i));
@@ -813,9 +793,9 @@ export class DsaSystem {
         : OBJECT_ID_EOF;
       return { locr, maxDistance: (record & 0xf80000) >>> 19, partyLevelOnly: (record & 0x040000) >>> 18, filterObj };
     };
-    let location = fromRecord(this.dungeon.getSpecialLocation((MONSTER_MOVE_FILTER_KEY | ((level + 1) << 8)) >>> 0));
+    let location = fromRecord(this.dungeon.getSpecialLocation(specialLocationKey(Esl.MONSTER_MOVE_FILTER, level)));
     if (location.partyLevelOnly === 0xffff) {
-      this.monsterMoveFilterGlobal ??= fromRecord(this.dungeon.getSpecialLocation(MONSTER_MOVE_FILTER_KEY));
+      this.monsterMoveFilterGlobal ??= fromRecord(this.dungeon.getSpecialLocation(specialLocationKey(Esl.MONSTER_MOVE_FILTER)));
       location = { ...this.monsterMoveFilterGlobal };
     }
     this.monsterMoveFilterLocations.set(level, location);
@@ -916,7 +896,7 @@ export class DsaSystem {
    */
   damageCharFilter(chIdx: number, fingerprint: number, damage: number, dealt: number, mask: number, kind: number): number {
     let result = dealt;
-    this.newDsaParameters(() => this.forEachFilterDsa(ESL_DAMAGE_CHAR_FILTER, (run) => {
+    this.newDsaParameters(() => this.forEachFilterDsa(Esl.DAMAGE_CHAR_FILTER, (run) => {
       this.setParameters(7, [chIdx, fingerprint, damage, dealt, mask, kind, 0]);
       run();
       result = this.getParameter(3);
@@ -948,7 +928,7 @@ export class DsaSystem {
   ): { attackType: number; name: string | null } | null {
     if (this.actionNameDsa === OBJECT_ID_NULL) {
       this.actionNameDsa = OBJECT_ID_EOF;
-      const special = this.dungeon.getSpecialLocation((EDT_SPECIAL_LOCATIONS << 24) | ESL_ACTION_NAME_FILTER);
+      const special = this.dungeon.getSpecialLocation(specialLocationKey(Esl.ACTION_NAME_FILTER));
       if (special !== null) {
         const locr = locationRelFromInteger(special);
         if (this.dungeon.isValidLocation(locr)) {
@@ -984,7 +964,7 @@ export class DsaSystem {
       p: options.posInCell & 0x3,
     });
     let result = 0;
-    this.newDsaParameters(() => this.forEachFilterDsa(ESL_MISSILE_ENCOUNTER_FILTER, (run) => {
+    this.newDsaParameters(() => this.forEachFilterDsa(Esl.MISSILE_ENCOUNTER_FILTER, (run) => {
       this.setParameters(7, [
         0,
         options.type | 0,
@@ -1011,7 +991,7 @@ export class DsaSystem {
    * parameter 0 always 0 (`:4583-4586`). Null when no DSA stands there.
    */
   processViewingFilter(options: ViewingFilterOptions): ViewingFilterResult | null {
-    const special = this.dungeon.getSpecialLocation(VIEWING_FILTER_KEY);
+    const special = this.dungeon.getSpecialLocation(specialLocationKey(Esl.VIEWING_FILTER));
     if (special === null) return null;
     const locrFilter = locationRelFromInteger(special);
     if (!this.dungeon.isValidLocation(locrFilter)) return null;
@@ -1072,7 +1052,7 @@ export class DsaSystem {
     let experience = options.experience | 0;
     let why = options.why | 0;
 
-    const found = this.newDsaParameters(() => this.forEachFilterDsa(ESL_ADJUST_SKILLS_FILTER, (run) => {
+    const found = this.newDsaParameters(() => this.forEachFilterDsa(Esl.ADJUST_SKILLS_FILTER, (run) => {
       this.setParameters(9, [
         chIdx,
         skillNumber,
@@ -1104,7 +1084,7 @@ export class DsaSystem {
    * the reason `CallAttackFilter` is free.
    */
   findPartyAttackFilter(): PartyAttackFilter | null {
-    const special = this.dungeon.getSpecialLocation(PARTY_ATTACK_FILTER_KEY);
+    const special = this.dungeon.getSpecialLocation(specialLocationKey(Esl.PARTY_ATTACK_FILTER));
     if (special === null) return null;
     const locrFilter = locationRelFromInteger(special);
     if (!this.dungeon.isValidLocation(locrFilter)) return null;
@@ -1954,7 +1934,7 @@ export class DsaSystem {
         const map = this.dungeon.getMap(locr.l);
         if (!map) break;
         const cellFlag = map.cellFlags[locr.x]![locr.y]!;
-        if (((cellFlag >> 5) & 0x7) !== RoomType.PIT) break;
+        if (getRoomType(cellFlag) !== RoomType.PIT) break;
         const next = value !== 0 ? (cellFlag | 0x01) : (cellFlag & 0xfe);
         this.updateCellFlag(locr, next);
         break;
@@ -1967,7 +1947,7 @@ export class DsaSystem {
         const map = this.dungeon.getMap(locr.l);
         if (!map) break;
         const cellFlag = map.cellFlags[locr.x]![locr.y]!;
-        if (((cellFlag >> 5) & 0x7) === RoomType.STONE) break;
+        if (getRoomType(cellFlag) === RoomType.STONE) break;
         let firstDisabled: ObjectID | null = null;
         const pos = new Position(locr.x, locr.y, locr.l);
         for (let rn = this.dungeon.findFirstObject(pos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
@@ -2201,7 +2181,7 @@ export class DsaSystem {
           bank.stack.push(-1);
           break;
         }
-        if (((map.cellFlags[locr.x]![locr.y]! >> 5) & 0x7) === RoomType.STONE) {
+        if (getRoomType(map.cellFlags[locr.x]![locr.y]!) === RoomType.STONE) {
           bank.stack.push(-1);
           break;
         }
@@ -2292,7 +2272,7 @@ export class DsaSystem {
         const map = this.dungeon.getMap(locr.l);
         if (!map) break;
         const cellFlag = map.cellFlags[locr.x]![locr.y]!;
-        const roomType = (cellFlag >> 5) & 0x7;
+        const roomType = getRoomType(cellFlag);
         if (arraySize === 0) break;
         bank.setVar(arrayIndex, roomType);
         if (arraySize < 2) break;
@@ -2373,7 +2353,7 @@ export class DsaSystem {
         const map = this.dungeon.getMap(locr.l);
         if (!map) break;
         let cellFlag = map.cellFlags[locr.x]![locr.y]!;
-        const roomType = (cellFlag >> 5) & 0x7;
+        const roomType = getRoomType(cellFlag);
         if (arraySize === 0) break;
         if (bank.getVar(arrayIndex) !== roomType) break;
         if (arraySize < 2) break;
@@ -2509,10 +2489,7 @@ export class DsaSystem {
         }
         if (flags & 1) skillIndex |= 0x4000;
         if (flags & 2) skillIndex |= 0x8000;
-        bank.stack.push(determineMastery(champ, skillIndex, {
-          partySleeping: party.sleeping,
-          getObjectNameIndex: (rn: ObjectID) => nameIndexOf(this.ctx, rn),
-        }));
+        bank.stack.push(masteryOf(this.ctx, champ, skillIndex));
         break;
       }
       case StkOp.MONSTER_FETCH:
@@ -2738,7 +2715,7 @@ export class DsaSystem {
         const skillnum = bank.stack.pop();
         const charnum = bank.stack.pop();
         const champ = this.getChampion(this.ctx.party.state, charnum);
-        if (champ && champ.attributes.health > 0) addToSkill(this.ctx, charnum, skillnum, experience);
+        if (champ && isAlive(champ)) addToSkill(this.ctx, charnum, skillnum, experience);
         break;
       }
       case StkOp.MON_BLK: {
@@ -2824,7 +2801,7 @@ export class DsaSystem {
         const champions = this.ctx.party.state.champions;
         for (let chidx = 0; chidx < champions.length; chidx++, chMask >>= 1) {
           if ((chMask & 1) === 0) continue;
-          if (champions[chidx]!.attributes.health <= 0) continue;
+          if (!isAlive(champions[chidx]!)) continue;
           const injuries = champions[chidx]!.wounds & injuryMask;
           count += BIT_COUNTS[injuries & 15]! + BIT_COUNTS[(injuries >> 4) & 15]!
             + BIT_COUNTS[(injuries >> 8) & 15]! + BIT_COUNTS[(injuries >> 12) & 15]!;
@@ -2883,7 +2860,7 @@ export class DsaSystem {
         // before the descriptors, and 1 past the last.
         const level = bank.stack.pop();
         if (level < this.dungeon.getMapCount()) {
-          bank.stack.push(this.dungeon.getMap(level)?.descriptor.difficulty ?? 0);
+          bank.stack.push(this.dungeon.levelDifficulty(level));
         } else {
           bank.stack.push(1);
         }
@@ -3064,7 +3041,7 @@ export class DsaSystem {
    * time, which differs only after a load of another dungeon.
    */
   private indirect(bank: DsaBank, type: number, array: boolean, numVar: number, numParam: number): void {
-    const location = this.dungeon.getSpecialLocation(INDIRECT_ACTIONS_KEY);
+    const location = this.dungeon.getSpecialLocation(specialLocationKey(Esl.INDIRECT_ACTIONS));
     if (location === null) return;
     const indirectLocr = locationRelFromInteger(location);
     const record = [type, numVar];
@@ -3119,7 +3096,7 @@ export class DsaSystem {
       } else {
         const cellPos = new Position(cellLocr.x, cellLocr.y, cellLocr.l);
         const cf = this.dungeon.getCellFlag(cellPos);
-        switch ((cf >> 5) & 7) {
+        switch (getRoomType(cf)) {
           case RoomType.STONE:
             cellBits |= (1 << 1) | (1 << 31);
             break;
@@ -3745,7 +3722,7 @@ export class DsaSystem {
       if (!map) return;
       const cellFlag = map.cellFlags[targetX]?.[targetY];
       if (cellFlag === undefined) return;
-      const roomType = (cellFlag >> 5) & 0x7;
+      const roomType = getRoomType(cellFlag);
       if (roomType !== RoomType.STONE && roomType !== RoomType.FALSEWALL) {
         targetPos = 0;
       }
@@ -3916,22 +3893,16 @@ export class DsaSystem {
    * 0. Null when there is no such record, or an empty one.
    */
   private globalText(index: number): string | null {
-    const record = this.dungeon.locateExpoolRecord(((EDT_GLOBAL_TEXT << 24) | (index & 0xffff)) >>> 0);
+    const record = this.dungeon.locateExpoolRecord(globalTextKey(index));
     if (record === null || record.length === 0) return null;
-    let text = '';
-    for (let b = 0; b < record.length * 4; b++) {
-      const c = ((record[b >> 2] ?? 0) >>> (8 * (b & 3))) & 0xff;
-      if (c === 0) break;
-      text += String.fromCharCode(c);
-    }
-    return text;
+    return String.fromCharCode(...globalTextBytes(record));
   }
 
   private setGlobalText(text: string, index: number): void {
     const len = Math.min(text.length, 99);
     const record = new Array<number>(Math.floor((len + 4) / 4)).fill(0);
     for (let i = 0; i < len; i++) record[i >> 2] = (record[i >> 2]! | ((text.charCodeAt(i) & 0xff) << (8 * (i & 3)))) >>> 0;
-    this.dungeon.writeExpoolRecord(((EDT_GLOBAL_TEXT << 24) | (index & 0xffff)) >>> 0, record);
+    this.dungeon.writeExpoolRecord(globalTextKey(index), record);
   }
 
   private isValidObjectId(objectId: number): objectId is ObjectID {

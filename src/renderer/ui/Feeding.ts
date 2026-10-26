@@ -5,6 +5,7 @@
  * in the cursor is worth as food or water, whether the record survives being consumed,
  * and the short chew animation the portrait plays afterwards.
  */
+import { isAlive } from '../../engine/rules';
 import { OBJNI_APPLE, OBJNI_DRAGON_STEAK, OBJNI_SPECIAL_G, OBJNI_SPECIAL_H, OBJNI_WATER, OBJNI_WATERSKIN } from '../../core/objectNameIndex';
 import { PotionType } from '../../core/constants';
 import { CursorFilterType } from '../../engine/dsa/DsaTypes';
@@ -112,7 +113,7 @@ export function handleMouthPress(ui: UIState): void {
   const selected = ui.partyState.selectedCharacterIndex;
   if (selected < 0) return;
   const champ = ui.partyState.champions[selected] ?? null;
-  if (!champ || (champ.attributes.health | 0) === 0) return;
+  if (!champ || !isAlive(champ)) return;
 
   const objectId = ui.partyState.objectInHand;
   if (objectId === OBJECT_ID_NULL) {
@@ -183,7 +184,7 @@ export function drinkAtWaterFountain(ui: UIState): void {
   if (!ui.context.facingWaterFountain) return;
   const chIdx = ui.partyState.cursorOwner;
   const champ = ui.partyState.champions[chIdx];
-  if (!champ || (champ.attributes.health | 0) === 0) return;
+  if (!champ || !isAlive(champ)) return;
   const fp = clearFeedParameters();
   fp.characterIndex = chIdx;
   fp.waterValue = WATERSKIN_GULP;

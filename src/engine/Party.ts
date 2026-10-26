@@ -5,6 +5,7 @@
  * Based on CSBWin's party management system
  */
 
+import { isAlive } from './rules';
 import { OBJECT_ID_NULL, ui8, Direction, Position } from '../core/types';
 import type { PartyState, Champion } from './gameTypes';
 import { CHARFLAG_CHEST_OR_SCROLL, CHARFLAG_CURSOR, CHARFLAG_PORTRAIT_CHANGED } from '../core/charDesc';
@@ -171,7 +172,7 @@ export function setHandOwner(ctx: GameContext, chIdx: number): void {
         const champion = getPartyChampion(party, chIdx);
         if (!champion) return;
         // `if ( (chIdx != -1) && (d.CH16482[chIdx].HP()==0) ) return;` (`doc/CSBwin-src/CSBCode.cpp:8484`).
-        if (champion.attributes.health === 0) return;
+        if (!isAlive(champion)) return;
     }
     party.cursorOwner = -1;
     if (current !== -1) drawCharacterState(ctx, current, CHARFLAG_CURSOR);
@@ -286,7 +287,7 @@ export function selectMagicCaster(party: PartyState, chIdx: number): void {
     if (chIdx !== -1) {
         const champion = getPartyChampion(party, chIdx);
         if (!champion) return;
-        if (champion.attributes.health === 0) return;
+        if (!isAlive(champion)) return;
     }
     party.magicCasterIndex = chIdx;
 }

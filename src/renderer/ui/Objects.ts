@@ -19,7 +19,8 @@ import { DBType, ObjectID } from '../../core/types';
 import { ViewingFilterResult, ViewingFilterSite } from '../../engine/dsa/DsaTypes';
 import { Champion } from '../../engine/gameTypes';
 import { copyCharacter } from '../../engine/Party';
-import { determineMastery as determineMasteryEngine, possessionMasteryBonus } from '../../engine/skills';
+import { possessionMasteryBonus } from '../../engine/skills';
+import { masteryOf } from '../../engine/rules';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
 import { UIState } from './UIState';
 export type ItemDescriptionLine = { text: string; color: number };
@@ -136,7 +137,7 @@ function showsPotionPower(ui: UIState, objectNameIndex: number): boolean {
   const selected = ui.partyState.selectedCharacterIndex;
   if (selected < 0) return false;
   const champ = ui.partyState.champions[selected];
-  return !!champ && determineMastery(ui, champ, 2) > 1;
+  return !!champ && masteryOf(ui.ctx, champ, 2) > 1;
 }
 
 function formatWeightText(weight: number): string {
@@ -552,18 +553,11 @@ export function getInventoryPlaceholderIndex(champion: Champion, slot: number): 
   return OBJNI_SPECIAL_F;
 }
 
-export function determineMastery(ui: UIState, champion: Champion, skill: number): number {
-  return determineMasteryEngine(champion, skill, {
-    partySleeping: ui.partyState.sleeping,
-    getObjectNameIndex: (objectId) => resolveObjectNameIndex(ui, objectId),
-  });
-}
-
 /**
  * `DetermineMastery(chIdx, role|0x8000)` (`doc/CSBwin-src/Character.cpp:4610`) — the rank
  * the eye panel prints is the earned one, so the `0x8000` flag drops the temporary
  * adjustment a spell or potion may be carrying.
  */
 export function getRoleMastery(ui: UIState, champion: Champion, roleIndex: number): number {
-  return determineMastery(ui, champion, roleIndex | 0x8000);
+  return masteryOf(ui.ctx, champion, roleIndex | 0x8000);
 }

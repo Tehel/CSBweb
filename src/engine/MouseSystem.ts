@@ -18,16 +18,18 @@ import {
   RoomType,
   type ObjectID,
   Position,
+  getRoomType,
 } from '../core/types';
 import { ActuatorAction } from '../data/actuatorHelpers';
 import { CursorFilterType } from './dsa/DsaTypes';
-import { nameIndexOf, type GameContext } from './GameContext';
+import type { GameContext } from './GameContext';
 import { setClockTick, speed, VBL_PER_TICK } from './LoopState';
 import { tag0207cc } from './ShowHideInventory';
 import type { Champion } from './gameTypes';
 import { tagThrownWeapon } from './ThrownWeapons';
 import { copyCharacter } from './Party';
-import { AdjustSkillsWhy, determineMastery } from './skills';
+import { AdjustSkillsWhy } from './skills';
+import { adjustSkillsOnPartyLevel, isAlive, masteryOf } from './rules';
 import { TimerFunction } from './TimerQueue';
 
 interface DropCursorOptions {
@@ -54,7 +56,7 @@ export class MouseSystem {
     const champion = this.ctx.party.state.champions[options.chIdx];
     if (!champion) return 0;
     const throwingDistance = this.ctx.systems.characterStats.determineThrowingDistance(
-      champion, 1, this.ctx.party.state.sleeping,
+      champion, 1,
     );
     const obj = this.ctx.systems.character.removeCharacterPossession(options.chIdx, 1);
     if (obj === OBJECT_ID_NULL) return 0;
@@ -146,7 +148,7 @@ export class MouseSystem {
       champion = party.champions[chIdx];
     }
     if (!champion) return;
-    if (champion.attributes.health !== 0) return;
+    if (isAlive(champion)) return;
 
     this.ctx.systems.timer.scheduleViAltar(obj, location, posInCell, this.ctx.state.tickCount);
   }
@@ -177,7 +179,7 @@ export class MouseSystem {
     const saved = champion.possessions[1]!;
     this.ctx.systems.character.setPossessionDirect(champion, 1, obj);
     const throwingDistance = this.ctx.systems.characterStats.determineThrowingDistance(
-      champion, 1, party.sleeping,
+      champion, 1,
     );
     this.ctx.systems.character.setPossessionDirect(champion, 1, saved);
 
@@ -230,13 +232,10 @@ export class MouseSystem {
         experience += Math.trunc(weaponBonus / 4);
       }
     }
-    this.ctx.systems.magic.applySpellSkillGain(chIdx, 10, experience, AdjustSkillsWhy.ThrowByCharacter);
+    adjustSkillsOnPartyLevel(this.ctx, chIdx, 10, experience, AdjustSkillsWhy.ThrowByCharacter);
 
     const base = throwingDistance + weaponBonus;
-    const mastery = determineMastery(champion, 10, {
-      partySleeping: party.sleeping,
-      getObjectNameIndex: (objectId: ObjectID) => nameIndexOf(this.ctx, objectId),
-    });
+    const mastery = masteryOf(this.ctx, champion, 10);
     const range = base + this.ctx.random.below(16) + Math.trunc(base / 2) + mastery;
     const damage = applyLimits(40, 8 * mastery + (this.ctx.random.next() & 31), 200);
     const decayRate = Math.max(5, 11 - mastery);
@@ -332,7 +331,7 @@ export class MouseSystem {
     if (!map) return false;
     const cellFlag = map.cellFlags[target.x]?.[target.y];
     if (cellFlag === undefined) return false;
-    if (((cellFlag >> 5) & 0x7) !== RoomType.DOOR) return false;
+    if (getRoomType(cellFlag) !== RoomType.DOOR) return false;
 
     const nsDoor = (cellFlag & 0x8) >> 3;
     const facingIsNS = facing & 0x1;

@@ -21,6 +21,12 @@ import type { CreatureRecord } from '../data/dungeonTypes';
 import { monsterHorizontalSize, type MonsterDesc } from '../data/tables/MonsterDesc';
 import type { DungeonState } from './DungeonState';
 
+/** The facings byte of a group whose members all face `facing`: its two bits for each member. */
+export function groupFacingsByte(facing: number): number {
+  const face = facing & 0x3;
+  return (face | (face << 2) | (face << 4) | (face << 6)) & 0xff;
+}
+
 /**
  * `OrdinalOfMonsterAtPosition(pDB4, pos)` (`doc/CSBwin-src/Code11f52.cpp:654`): reads the
  * group's position and facing bytes and its descriptor's `horizontalSize`, then asks

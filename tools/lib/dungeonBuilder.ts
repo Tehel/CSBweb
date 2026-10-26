@@ -32,10 +32,11 @@ import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position } from '../../src/core/
 import type { Direction, ObjectID } from '../../src/core/types';
 import { ActuatorAction, getActuatorType, isActuatorLocalActionOnly } from '../../src/data/actuatorHelpers';
 import { ComputeTextLength, textStart } from '../../src/data/CsbwinDungeonConversions';
-import { databaseRecords, rnMapsOf } from '../../src/data/CsbwinObjectIndex';
+import { rnMapsOf } from '../../src/data/CsbwinObjectIndex';
 import type {
   ActuatorRecord, DatabaseRecord, Databases, DsaDefinition, DungeonData, MapDescriptor, ScrollRecord, TeleporterRecord, TextRecord,
 } from '../../src/data/dungeonTypes';
+import { databaseRecords } from '../../src/data/dungeonTypes';
 
 /** One object on a square, or held by another. */
 export interface BObject {

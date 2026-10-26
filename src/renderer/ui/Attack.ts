@@ -31,21 +31,20 @@
  * `DrawLegalAttackTypes` draws over it.
  */
 import { OBJNI_SPECIAL_C } from '../../core/objectNameIndex';
-import { DBType, OBJECT_ID_NULL, type ObjectID } from '../../core/types';
+import { DBType, OBJECT_ID_NULL } from '../../core/types';
 import { drawLegalAttackTypes, tag01b1c0 } from '../../engine/AttackMenu';
 import type { AttackOptions } from '../../engine/GameHost';
 import { ATTACK_TYPE_NONE, ATTACK_CLASS_EMPTY_HAND } from '../../engine/monsterTypes';
 import { getPartyChampion } from '../../engine/Party';
 import { CHARFLAG_ATTACK_DISABLE, getChampionPossession, SLOT_WEAPON_HAND } from '../../core/charDesc';
-import type { Champion } from '../../engine/gameTypes';
-import { determineMastery } from '../../engine/skills';
+import { isAlive, masteryOf } from '../../engine/rules';
 import { flashButton, setClockTick } from '../../engine/LoopState';
 import { fillRectIndex, shrinkBlt, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex, textOutToScreenCentered } from '../csbwin/TextRenderer';
 import { Rect } from '../../data/tables/UITables';
 import { drawObjectIconMask, shadeRectIndex } from './Draw';
 import { searchButtonList } from './HitTest';
-import { getAttackClass, getBaseObjectNameIndex, resolveObjectNameIndex } from './Objects';
+import { getAttackClass, getBaseObjectNameIndex } from './Objects';
 import { nowMs, UIState } from './UIState';
 
 /**
@@ -110,7 +109,7 @@ export function getLegalAttackTypes(ui: UIState, chIdx: number, row: ArrayLike<n
     }
     required &= 0x7f;
     const skill = (ui.uiTables.graphic230.skillNumber[attackType] ?? 0) & 0xff;
-    const mastery = champ ? masteryOf(ui, champ, skill) : 0;
+    const mastery = champ ? masteryOf(ui.ctx, champ, skill) : 0;
     if (mastery < required) continue;
     ui.ctx.interface.possibleAttackTypes[count] = attackType;
     ui.ctx.interface.byte20256[count] = required;
@@ -118,16 +117,6 @@ export function getLegalAttackTypes(ui: UIState, chIdx: number, row: ArrayLike<n
   }
   ui.ctx.interface.word20248 = count;
   for (let i = count; i < 3; i++) ui.ctx.interface.possibleAttackTypes[i] = -1;
-}
-
-function masteryOf(ui: UIState, champ: Champion, skill: number): number {
-  return determineMastery(champ, skill, {
-    partySleeping: ui.partyState.sleeping,
-    getObjectNameIndex: (objectId: ObjectID) => {
-      const value = resolveObjectNameIndex(ui, objectId);
-      return value >= 0 ? value : null;
-    },
-  });
 }
 
 /**
@@ -141,7 +130,7 @@ export function prepareAttack(ui: UIState, chIdx: number): void {
   const champ = ui.partyState && getPartyChampion(ui.partyState, chIdx);
   if (!champ) return;
   if ((champ.charFlags & CHARFLAG_ATTACK_DISABLE) !== 0) return;
-  if ((champ.attributes.health | 0) === 0) return;
+  if (!isAlive(champ)) return;
 
   const weapon = getChampionPossession(champ, SLOT_WEAPON_HAND);
   let attackClass: number;
@@ -297,7 +286,7 @@ export function attackFlashHeld(ui: UIState): boolean {
 export function drawAttackButton(ui: UIState, chIdx: number): void {
   const rect = attackButtonRect(chIdx);
   const champ = ui.partyState && getPartyChampion(ui.partyState, chIdx);
-  const alive = !!champ && (champ.attributes.health | 0) !== 0;
+  const alive = !!champ && isAlive(champ);
 
   if (!alive) {
     fillRectIndex(ui.screenIndexBuffer, rect, 0);

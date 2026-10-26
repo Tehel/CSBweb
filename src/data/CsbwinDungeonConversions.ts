@@ -29,8 +29,7 @@
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, RoomType } from '../core/types';
 import type { ObjectID, ui16, ui32 } from '../core/types';
 import { getActuatorType } from './actuatorHelpers';
-import { databaseRecords } from './CsbwinObjectIndex';
-import type { DungeonData } from './dungeonTypes';
+import { databaseRecords, type DungeonData } from './dungeonTypes';
 
 /** Which of the three shapes a world is in. `true` means "already converted". */
 interface DungeonImageShape {

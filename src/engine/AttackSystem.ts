@@ -29,7 +29,7 @@
  * which a boxed-in Lord Chaos starts and which holds the main loop to the credits.
  */
 import { printWithSubstitution } from './PrintWithSubstitution';
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID, getRoomType } from '../core/types';
 import { div, sb, sw } from '../core/intCast';
 import { nameIndexOf, type GameContext } from './GameContext';
 import { getChampionPossession } from '../core/charDesc';
@@ -50,7 +50,8 @@ import { characterAtPosition } from './AddCharacter';
 import {
   RN_DISPELL_MISSILE, RN_FIREBALL, RN_LIGHTNING, RN_POISON_BOLT, RN_POISON_CLOUD,
 } from '../core/spellRn';
-import { AdjustSkillsWhy, determineMastery } from './skills';
+import { AdjustSkillsWhy } from './skills';
+import { adjustSkillsOnPartyLevel, isAlive, levelDifficulty, masteryOf } from './rules';
 import type { MonsterDesc } from '../data/tables/MonsterDesc';
 import {
   monsterBravery,
@@ -304,12 +305,6 @@ export class AttackSystem {
     return nameIndexOf(this.ctx, rn);
   }
 
-  /** `d.pCurLevelDesc->experienceMultiplier()`. */
-  private levelDifficulty(): number {
-    const party = this.ctx.party.state;
-    return this.ctx.dungeon.getMap(party.position.z)?.descriptor.difficulty ?? 0;
-  }
-
   private descFor(monsterType: number): MonsterDesc | null {
     return this.ctx.tables.monsterDesc[monsterType] ?? null;
   }
@@ -317,15 +312,6 @@ export class AttackSystem {
   /** `FindFirstMonster(x, y)` on the party's level. */
   private findFirstMonsterAt(mapX: number, mapY: number): ObjectID {
     return this.ctx.dungeon.findFirstMonster(new Position(mapX, mapY, this.ctx.party.state.position.z));
-  }
-
-  /**
-   * `CharacterAtPosition` (`doc/CSBwin-src/Code11f52.cpp:4084`), shared with
-   * `AddCharacter` and the Vi altar rather than kept as a second copy — the two
-   * transcriptions had already drifted apart on whether a dead champion holds a corner.
-   */
-  private characterAtPosition(pos: number): number {
-    return characterAtPosition(this.champions(), pos);
   }
 
   /**
@@ -386,7 +372,7 @@ export class AttackSystem {
       this.ctx.systems.monsterAttack.adjustStamina(params.charIdx, phys.staminaAdjust);
     }
     if (phys.skillAdjust !== 0) {
-      this.ctx.systems.magic.applySpellSkillGain(params.charIdx, params.skillNumber, phys.skillAdjust, AdjustSkillsWhy.PhysicalAttack);
+      adjustSkillsOnPartyLevel(this.ctx, params.charIdx, params.skillNumber, phys.skillAdjust, AdjustSkillsWhy.PhysicalAttack);
     }
 
     const monster = this.ctx.dungeon.getCreatureRecord(monsterRn);
@@ -442,13 +428,13 @@ export class AttackSystem {
       this.physicalAttackFilter(filter, params);
       return 0;
     }
-    if ((champ.attributes.health | 0) === 0) {
+    if (!isAlive(champ)) {
       this.trace('Character is dead.  Return 0');
       this.physicalAttackFilter(filter, params);
       return 0;
     }
 
-    const levelDifficulty = this.levelDifficulty();
+    const difficulty = levelDifficulty(this.ctx);
     const monster = this.ctx.dungeon.getCreatureRecord(params.monsterUnderAttack as ObjectID);
     const desc = monster ? this.descFor(monster.creatureType) : null;
     if (!desc) {
@@ -473,7 +459,7 @@ export class AttackSystem {
     // --- Did it connect? Quickness against the monster's dexterity, then two
     //     independent second chances: a flat 1-in-4, then Luck.
     const quickness = this.ctx.systems.monsterAttack.quickness(champ);
-    let required = sw(random.below(32) + desc.dexterity12 + levelDifficulty - 16);
+    let required = sw(random.below(32) + desc.dexterity12 + difficulty - 16);
     let luckyHit = false;
     this.trace(`character's quickenss = ${quickness}`);
     this.trace(`required quickness = ${required}`);
@@ -494,7 +480,7 @@ export class AttackSystem {
 
     // --- The damage roll proper.
     const throwingDistance = this.ctx.systems.characterStats.determineThrowingDistance(
-      champ, 1, this.ctx.party.state.sleeping,
+      champ, 1,
     );
     let d7 = sw(throwingDistance);
     let d6 = 0;
@@ -503,7 +489,7 @@ export class AttackSystem {
     if (throwingDistance !== 0) {
       d7 = sw(d7 + random.below(div(d7, 2) + 1));
       d7 = sw(div(d7 * p8, 32));
-      let d4 = sw(random.below(32) + desc.defense08 + levelDifficulty);
+      let d4 = sw(random.below(32) + desc.defense08 + difficulty);
       // The two blades that cut through armour.
       if (weaponNI === OBJNI_DIAMOND_EDGE) d4 = sw(d4 - div(d4, 4));
       else if (weaponNI === OBJNI_EXECUTIONER) d4 = sw(d4 - div(d4, 8));
@@ -553,7 +539,7 @@ export class AttackSystem {
     }
 
     // A flat +10 for mastery of the attack's own skill, on a 1-in-64-scaled roll.
-    const mastery = sw(this.masteryOf(champ, params.skillNumber));
+    const mastery = sw(masteryOf(this.ctx, champ, params.skillNumber));
     if (sw(random.below(64)) < mastery) {
       d7 += 10;
       this.trace(`Add 10 to D7W because Mastery(${params.skillNumber})=${mastery} --> ${d7}`);
@@ -607,7 +593,7 @@ export class AttackSystem {
       if (relative === 2) step = 2;
       if (relative === 2 || relative === 3) {
         step++;
-        if (this.characterAtPosition((champ.partyPosition + step) & 3) !== -1) {
+        if (characterAtPosition(this.champions(), (champ.partyPosition + step) & 3) !== -1) {
           this.attackDamageToDisplay = -1; // "CAN'T REACH"
           this.trace('Attempt to attack through party member.  Return 0');
           this.physicalAttackFilter(filter, params);
@@ -673,7 +659,7 @@ export class AttackSystem {
     }
 
     const champ = getPartyChampion(this.ctx.party.state, params.charIdx);
-    wc.mastery = sw(wc.mastery + sw(champ ? this.masteryOf(champ, 14) : 0));
+    wc.mastery = sw(wc.mastery + sw(champ ? masteryOf(this.ctx, champ, 14) : 0));
 
     const monster = this.ctx.dungeon.getCreatureRecord(this.monsterUnderAttack);
     const desc = monster ? this.descFor(monster.creatureType) : null;
@@ -704,7 +690,7 @@ export class AttackSystem {
       success = 1;
     }
 
-    this.ctx.systems.magic.applySpellSkillGain(params.charIdx, 14, wc.skillIncrement, AdjustSkillsWhy.WarCryEtc);
+    adjustSkillsOnPartyLevel(this.ctx, params.charIdx, 14, wc.skillIncrement, AdjustSkillsWhy.WarCryEtc);
     return success;
   }
 
@@ -1136,7 +1122,7 @@ export class AttackSystem {
   private fluxCage(mapX: number, mapY: number, params: PartyAttackParameters): void {
     const party = this.ctx.party.state;
     const position = new Position(mapX, mapY, party.position.z);
-    const roomType = (this.ctx.dungeon.getCellFlag(position) >> 5) & 7;
+    const roomType = getRoomType(this.ctx.dungeon.getCellFlag(position));
     if (roomType === RoomType.STONE || roomType === RoomType.STAIRS) return;
     const cage = this.ctx.systems.missileEncounter.createFluxcage(position, this.ctx.state.tickCount);
     if (cage === null) return;
@@ -1160,16 +1146,6 @@ export class AttackSystem {
     }
   }
 
-  private masteryOf(champ: Champion, skill: number): number {
-    return determineMastery(champ, skill, {
-      partySleeping: this.ctx.party.state.sleeping,
-      getObjectNameIndex: (objectId: ObjectID) => {
-        const value = this.nameIndexOf(objectId);
-        return value >= 0 ? value : null;
-      },
-    });
-  }
-
   // ----------------------------------------------------------------- _Attack
 
   /**
@@ -1189,7 +1165,7 @@ export class AttackSystem {
     if (initialChIdx >= champions.length) return 0;
     const pChar = champions[initialChIdx];
     if (!pChar) return 0;
-    if ((pChar.attributes.health | 0) === 0) return 0;
+    if (!isAlive(pChar)) return 0;
 
     const filter = this.ctx.systems.dsa.findPartyAttackFilter();
     this.ctx.systems.dsa.setupAttackParameters();
@@ -1234,7 +1210,7 @@ export class AttackSystem {
       params.skillNumber === 16 || params.skillNumber === 17 || params.skillNumber === 18 ||
       params.skillNumber === 19 || params.skillNumber === 3
     ) {
-      params.neededMana = sw(7 - Math.min(6, this.masteryOf(pChar, params.skillNumber)));
+      params.neededMana = sw(7 - Math.min(6, masteryOf(this.ctx, pChar, params.skillNumber)));
     } else {
       params.neededMana = 0;
     }
@@ -1272,7 +1248,7 @@ export class AttackSystem {
           params.dataType = AttackDataType.ADT_HitDoor;
           params.disableTime = 6;
           params.attdep.hitDoor.strength =
-            this.ctx.systems.characterStats.determineThrowingDistance(pChar, 1, party.sleeping);
+            this.ctx.systems.characterStats.determineThrowingDistance(pChar, 1);
           this.callAttackFilter(filter, params, 1);
           this.ctx.systems.missileEncounter.hitDoor(
             new Position(params.attackX, params.attackY, party.position.z),
@@ -1390,7 +1366,7 @@ export class AttackSystem {
         if (neededHP > 0) {
           if ((pChar.attributes.mana | 0) !== 0) {
             successfulAttack = 1;
-            params.attdep.heal.HPIncrement = sw(Math.min(10, this.masteryOf(pChar, 13)));
+            params.attdep.heal.HPIncrement = sw(Math.min(10, masteryOf(this.ctx, pChar, 13)));
             params.experienceGained = 2;
             this.callAttackFilter(filter, params, 1);
             // Two mana per helping, and the experience grows with every helping — so a
@@ -1414,7 +1390,7 @@ export class AttackSystem {
       }
 
       case AttackType.atk_WINDOW: {
-        const duration = sw(this.ctx.random.below(this.masteryOf(pChar, params.skillNumber) + 8) + 5);
+        const duration = sw(this.ctx.random.below(masteryOf(this.ctx, pChar, params.skillNumber) + 8) + 5);
         // `d.SeeThruWalls++` plus the `TT_73` timer (`doc/CSBwin-src/Attack.cpp:2018`).
         this.ctx.party.state.seeThruWalls = sb(this.ctx.party.state.seeThruWalls + 1);
         this.ctx.systems.magic.queueUtilityTimer(TimerFunction.TT_73, duration, 0);
@@ -1533,7 +1509,7 @@ export class AttackSystem {
       this.ctx.systems.monsterAttack.adjustStamina(params.charIdx, params.staminaCost);
     }
     if (params.experienceGained !== 0) {
-      this.ctx.systems.magic.applySpellSkillGain(params.charIdx, params.skillNumber, params.experienceGained, AdjustSkillsWhy.Attack);
+      adjustSkillsOnPartyLevel(this.ctx, params.charIdx, params.skillNumber, params.experienceGained, AdjustSkillsWhy.Attack);
     }
     if (params.activateMonster !== 0) {
       // `ProcessTimers29to41(x, y, TT_M1, 0)` — wake the group we just hit.
@@ -1616,7 +1592,7 @@ export class AttackSystem {
     this.setCharToPartyFacing(pChar);
     const projectile = this.ctx.systems.character.removeCharacterPossession(params.charIdx, 0);
     this.ctx.sounds.queueSound(16, party.position.x, party.position.y, 1, party.position.z);
-    const mastery = sw(this.masteryOf(pChar, 11));
+    const mastery = sw(masteryOf(this.ctx, pChar, 11));
     params.attdep.shoot.range = launcherDesc.uByte3 + ammoDesc.uByte3;
     params.attdep.shoot.damage = 2 * (launcherDesc.word4 + mastery);
     params.attdep.shoot.damage = weaponClass; // See the ⚠️ above.

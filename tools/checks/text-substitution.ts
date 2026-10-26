@@ -18,9 +18,9 @@
  */
 import { readFileSync } from 'node:fs';
 
-import { DecodeText, EDT_GLOBAL_TEXT, SubstituteCharacterNames, type TextSubstitution } from '../../src/data/DecodeText';
+import { DecodeText, SubstituteCharacterNames, type TextSubstitution } from '../../src/data/DecodeText';
 import { DungeonLoader } from '../../src/data/DungeonLoader';
-import { Expool } from '../../src/data/CsbwinExpool';
+import { Expool, globalTextKey } from '../../src/data/CsbwinExpool';
 import { check, finish } from '../lib/check';
 import { gameTablesOf, newGame, stockGraphics, stockDungeon } from '../lib/game';
 
@@ -88,7 +88,7 @@ const bare = dungeon.decodeText(rec, 0x8002, 990, tables)!;
 console.log(`  without global text 123: ${JSON.stringify(text(bare.text))}${bare.ok ? '' : ' (-1)'}`);
 check(text(bare.text) === '' && !bare.ok, 'text 4 stops at .R.AAHL and returns -1');
 check(dungeon.decodeMessageText(rec, tables) === null, 'the floor message is not printed when DecodeText returns -1');
-new Expool(dungeon.getData()).write(((EDT_GLOBAL_TEXT << 24) | 0x7b) >>> 0, record('RAAHL'));
+new Expool(dungeon.getData()).write(globalTextKey(0x7b), record('RAAHL'));
 const full = dungeon.decodeText(rec, 0x8002, 990, tables)!;
 console.log(`  with it: ${JSON.stringify(text(full.text))}`);
 check(text(full.text) === 'RAAHL S VISION IS VEILED. THE DEPTH OF THE PIT IS A MYSTERY.' && full.ok,

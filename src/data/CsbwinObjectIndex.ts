@@ -35,8 +35,7 @@
  * gave the record if it lies in a chain.
  */
 import { RnMaps } from '../core/RnMaps';
-import { DBType } from '../core/types';
-import type { DatabaseRecord, Databases } from './dungeonTypes';
+import { databaseRecords, type Databases } from './dungeonTypes';
 
 export interface CsbwinObjectIndex {
     /** `dataMapLength` — slot 0 included, though it is never referenced. */
@@ -97,29 +96,6 @@ export function readObjectIndirectIndex(
     }
 
     return { length: dataMapLength, typeMap, indexMap };
-}
-
-/** The databases this port carries records for, by `DBType`. */
-const DATABASE_KEYS: Partial<Record<DBType, keyof Databases>> = {
-    [DBType.DOOR]: 'doors',
-    [DBType.TELEPORTER]: 'teleporters',
-    [DBType.TEXT]: 'texts',
-    [DBType.ACTUATOR]: 'actuators',
-    [DBType.CREATURE]: 'creatures',
-    [DBType.WEAPON]: 'weapons',
-    [DBType.CLOTHING]: 'clothing',
-    [DBType.SCROLL]: 'scrolls',
-    [DBType.POTION]: 'potions',
-    [DBType.CHEST]: 'containers',
-    [DBType.MISC]: 'misc',
-    [DBType.MISSILE]: 'missiles',
-    [DBType.CLOUD]: 'clouds',
-};
-
-/** Database `db`'s records, or none for a database this port does not carry. */
-export function databaseRecords(databases: Databases, db: DBType): readonly DatabaseRecord[] {
-    const key = DATABASE_KEYS[db];
-    return key ? databases[key].records : [];
 }
 
 /**

@@ -114,7 +114,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E25 | One helper for each rule, where copies drift | M | ⏳ |
 | E26 | Systems named after CSBWin's files, not what they do | M | ⏳ |
 | D21 | A save has nine shapes | L | ⏳ |
 | E27 | `DsaSystem.ts` is one 5,000-line class | L | ⏳ |
@@ -129,6 +128,7 @@ In payoff order: the first row is the next item.
 | C173 | The DSA's `&ADD` and `&DEL` on a square bypass `MoveObject` | M | ⏳ |
 | C181 | What `d.Initialize()` zeroes survives a restart | S | ⏳ |
 | C184 | A decoration number past its table's end has no position set | S | ⏳ |
+| C185 | A missile spell flies along the Spell Filter's facing, not the champion's | S | ⏳ |
 | F15 | Tools that read the wall clock, and a runner with no timeout | S | ⏳ |
 | F16 | A tool can pass having checked less than it says | S | ⏳ |
 | F18 | One `tsconfig` for the browser, the tools and the server | S | ⏳ |
@@ -154,7 +154,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C185 · D22 · E42 · F22 · G31 · P13 · R17 · U13 · W8 · X16. An ID recorded and paid in one commit has no
+Next free IDs: C186 · D22 · E42 · F22 · G31 · P13 · R17 · U13 · W8 · X16. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -412,16 +412,16 @@ What a save is passes through `ExtendedFeaturesBlock`, `readExtendedFeatures`'s 
   set twice in `buildSaveFile`, and `block1?` defaults to `emptyBlock1()`, the four zero
   words the utility refuses as "ALREADY UTILIZED". Its reader always gives `timers`,
   `timerQueue` and `timerSequence`, which `buildCsbwinRuntimeState` still reads through
-  `?? []` and `?? 0` (`src/engine/CsbwinSaveGame.ts:301-303`).
+  `?? []` and `?? 0` (`src/engine/CsbwinSaveGame.ts:300-302`).
 - **`Chaos` reads and writes the file again**: `Chaos.readGame` (`src/engine/Chaos.ts:102`)
   walks blocks 1 to 6 with its own hash and checksum offsets, and `TAG000fc4` (`:327`)
   writes the scramble and the checksum again.
 - **The records' codecs are inverses kept by hand**: thirteen `parse*Database` methods in
   `DungeonLoader` read them, and `CsbwinDungeonImageWriter.writeRecord`'s switch of fourteen
-  `record as XRecord` casts writes them (`:388-528`); `DatabaseRecord` is a union with no
+  `record as XRecord` casts writes them (`:370-510`); `DatabaseRecord` is a union with no
   discriminant.
 - A load installs the world, then applies a snapshot of that same world over it
-  (`src/engine/CsbwinSaveGame.ts:351`), where a new game's read applies none (`ReadState`'s
+  (`src/engine/CsbwinSaveGame.ts:350`), where a new game's read applies none (`ReadState`'s
   optional `snapshot`).
 
 Paying it, in steps: a codec per database type, `{ size, read, write }` in a `DBType`-keyed
@@ -443,48 +443,6 @@ gather or split CSBWin's functions as the code's concerns ask. What still follow
 the behaviour, the names of ported functions, which keep the two codebases greppable
 against each other, and the file formats.
 
-### E25 ⏳ One helper for each rule, where copies drift
-
-Copies of one rule drift apart. The copies left:
-
-- **Mastery**: `determineMastery`'s options default to "awake" and "no possessions"
-  (`src/engine/skills.ts:116-121`, `:150`), and eight callers build them by hand
-  (`CharacterStats`, `AttackSystem`, `src/renderer/ui/Attack.ts`, `MouseSystem`,
-  `DsaSystem`, `PeriodicUpdates`, `MonsterAttack`, `MagicSystem`).
-- **`CharacterAtPosition`**: the two copies `AttackSystem.ts:320-322` says had drifted,
-  beside `characterAtPosition` (`src/engine/AddCharacter.ts`). "Alive" is tested five ways:
-  `(health | 0) === 0`, `health === 0`, `health > 0`, `attributes?.health ?? 0`, `!== 0`.
-- **A level's difficulty**, `getMap(party.z)?.descriptor.difficulty ?? 0`, six times
-  (`AttackSystem.ts:307`, `MonsterAttack.ts:167`, `MagicSystem.ts:456`, `LightLevel.ts:28`,
-  `ActuatorSystem.ts:635`, `TimerSystem.ts:1215`).
-- **Skill gain on the party's level** is `MagicSystem.applySpellSkillGain` (`:454`), used
-  for blows, war cries and throws (`AttackSystem.ts:386`, `:704`, `:1533`,
-  `MouseSystem.ts:231`).
-- **A spell's RN**, `0xff80 + (x & 0x7f)`, at `TimerSystem.ts:993`, `:1637` and
-  `MagicSystem.ts:482-484`, beside `missileHelpers.spellObjectId` (`:26`);
-  `adjustSpellMissileRange` and `computeSpellLaunchPos` (`MagicSystem.ts:466-481`) repeat
-  `characterThrowsSpell` and `launchObject`; `DsaSystem.ts:4676-4679` repeats
-  `MonsterSystem.detachedGroupIndexFor`.
-- **The room type**, `(cellFlag >> 5) & 0x7`, written out 28 times beside 4 calls of
-  `getRoomType`; the facing byte packed at `WorldMove.ts:616` and `DungeonState.ts:914`.
-- **The database dispatch**, five times: two 13-case switches (`DungeonState.ts:458-570`),
-  ten `getXxxRecord` getters (`:775-856`), `SmartDiscard.ts:224-231`,
-  `objectIndex.ts:86-94` and `MakeMoreRoomInDB.ts:95-98`, beside `DATABASE_KEY` (`:62`)
-  and `getRecord` (`:688`).
-- **The global text's key**, `((EDT_GLOBAL_TEXT << 24) | (index & 0xffff)) >>> 0`, at
-  `Game.ts:193`, `DsaSystem.ts:4101` and `:4116`, and its decode at `DsaSystem.ts:4103-4109`
-  and `DecodeText.ts:269-272`; `EDT_SPECIAL_LOCATIONS` and `ESL_MONSTER_MOVE_FILTER` both in
-  `CsbwinExpool.ts:40-44` and `DsaSystem.ts:329-351`, and the fifteen `ESL_*` loose
-  constants.
-- **A menu's press played out**: `playMenuPress` (`src/renderer/ui/Menu.ts`), which the
-  settings dialog's EXIT question uses, beside the save menu's own copy of it in
-  `beginPress`, `scheduleFrame` and `cancelFrame` (`src/renderer/ui/SaveMenu.ts`).
-
-Paying it: a module of rule helpers (`masteryOf(ctx, champ, skill)`,
-`characterAtPosition`, `isAlive`, `levelDifficulty(ctx)`, `adjustSkillsOnPartyLevel`,
-`spellObjectId`, `roomTypeOf`); the save menu's press through `playMenuPress`; one `recordsOf(db)` and a generic record getter; the text
-codec beside `messageParametersKey`, with an `Esl` enum. The commit changes no output.
-
 ### E26 ⏳ Systems named after CSBWin's files, not what they do
 
 - **`MonsterAttack` is mostly the champions' health.** Of thirty calls into
@@ -495,7 +453,7 @@ codec beside `messageParametersKey`, with an `Esl` enum. The commit changes no o
   `DsaSystem`…
 - **`AttackSystem` holds the end of the game**, `_FusionSequence` and the credits' script,
   about 200 lines, and `applyMagicShield`, which `MagicSystem` calls.
-- **`MoveObject` is in two halves.** `WorldMove.ts:172-200` and `MonsterSystem.ts:552-560`,
+- **`MoveObject` is in two halves.** `WorldMove.ts:174-202` and `MonsterSystem.ts:552-560`,
   `:652-667` each do the missile check, the removal and the pad's release, and the
   levitation test is written twice (`WorldMove.isMonsterLevitating`,
   `MonsterSystem.ts:549`).
@@ -525,7 +483,7 @@ Five doc comments sit over the wrong function (`:147` over `CursorFilterType`;
 and seven filter sites have none (`processMissileEncounterFilter`,
 `processAdjustSkillsFilter`, `processSpellFilter`, `processTimer5`, `6` and `7`). A spell's
 parameters are marshalled field by field both ways (`:1380-1412`, and again in
-`MagicSystem.ts:141-156`), where every other block has a codec.
+`MagicSystem.ts:142-157`), where every other block has a codec.
 
 Paying it, in steps, into `src/engine/dsa/`, beside `DsaTypes.ts`: `DsaMachine.ts`, the
 stack, the bank, `execute` over a `ProgramCursor` (`word()`, `nextState(word, shift, bits,
@@ -592,7 +550,8 @@ Paying it: a `ScreenComposer` without the DOM (the screen's index buffer, the pa
 
 The screen is drawn by clocks that do not know each other: the engine's `setTimeout` VBL
 loop, and `requestAnimationFrame` loops for the chewing mouth
-(`src/renderer/ui/Feeding.ts:227-248`), a menu button's press (`SaveMenu.ts:997-1043`), the
+(`src/renderer/ui/Feeding.ts:228-249`), a menu button's press (`playMenuPress`,
+`src/renderer/ui/Menu.ts:414-426`), the
 intro's VBL (`BootSequence.ts:193-203`) and the CRT (`src/lib/crt.ts:232-249`).
 
 - `renderLastFrame`, which the chew, the menus and Reincarnate draw through, skips
@@ -602,8 +561,8 @@ intro's VBL (`BootSequence.ts:193-203`) and the CRT (`src/lib/crt.ts:232-249`).
 - The CRT uploads the canvas and runs its shader at device pixels at every display frame,
   changed or not: about 2.3 million pixels a frame at a device ratio of 2, up to 120 times a
   second.
-- The rAF scheduler is written twice (`Feeding.ts:229-232`, `SaveMenu.ts:997-1005`, each
-  with `as unknown as number`), and a menu's press runs on two clocks
+- The rAF scheduler is written twice (`Feeding.ts:230-233`, with `as unknown as number`, and
+  `playMenuPress`), and a menu's press runs on two clocks
   (`BootSequence.ts:507-510` passes made-up times).
 - Input has two stacks, `GameInput` on `document` and the intro's `IntroHost` on `window`.
 
@@ -615,16 +574,16 @@ controls again.
 
 - `Game`'s constructor wires callbacks into objects built before it:
   `DungeonState.makeMoreRoomInDB`, `textSubstitution` and `timerWord8Lookup`
-  (`DungeonState.ts:90`, `:95`, `:140`; `Game.ts:186-194`), and `SoundQueue.soundFilter`
+  (`DungeonState.ts:71`, `:76`, `:120`; `Game.ts:185-193`), and `SoundQueue.soundFilter`
   (`= () => 1`, `SoundQueue.ts:48`); `TimerSystem`'s constructor writes into `ctx.dungeon`
-  (`:94`). A bare `createGameContext` gets, silently, a full database that refuses records,
+  (`:96`). A bare `createGameContext` gets, silently, a full database that refuses records,
   untranslated texts and no sound filter, and `systems: {} as GameSystems`
   (`GameContext.ts:363`) types every system as present.
 - `TimerQueue.createTimer` takes ten positional parameters and `createTimerWithUByte5`, its
   near copy, eleven (`TimerQueue.ts:200-259`), at 26 call sites
   (`createTimer(TT_LIGHT, 0, 0, 0, 0, time >>> 0, z, undefined, 0, deltaSteps)`,
   `TimerSystem.ts:290`). `WorldMove.resolveCellEffects` takes nine, with
-  `objectType = -1` meaning the party (`WorldMove.ts:269-279`).
+  `objectType = -1` meaning the party (`WorldMove.ts:272-282`).
 
 Paying it: the callbacks as constructor dependencies, with a tool builder that fails on a
 missing one (or `GameSystems` partial for a bare context); named constructors per timer
@@ -861,6 +820,23 @@ plays is known to number one past ten floor or twelve door decorations.
 Paying it: the set read on through the bytes that follow, as they lie in item `0x22e`, once
 that layout is shown to be `d`'s; and a check with a level whose TOC names one.
 
+### C185 ⏳ A missile spell flies along the Spell Filter's facing, not the champion's
+
+`CastSpell` takes the party's facing, or the Spell Filter's when it gives one, and gives up
+on a facing past 3 (`doc/CSBwin-src/Magic.cpp:1157-1163`); that is all it does with it. Its
+missile case turns the caster to the party's facing and calls
+`CharacterThrowsSpell(chIdx, spell, range, 0)` (`:1267-1287`), which launches from the
+champion's side of the square along the champion's facing (`LaunchObject`, `:452-467`). The
+port's missile case turns the caster the same way, then launches from the side and along the
+direction of the filter's facing (`MagicSystem.castSpell`, `src/engine/MagicSystem.ts:282-307`).
+Without a Spell Filter, or one that leaves the facing at -1, the two agree. Its range and
+start repeat `characterThrowsSpell` and `launchObject` (`adjustSpellMissileRange`,
+`computeSpellLaunchPos`, `:454-468`).
+
+Paying it: the missile case calls `characterThrowsSpell(casterIdx, spellObjectId(missileType),
+range, 0)`, as CSBWin does, and the two copies go; a check with a Spell Filter that turns the
+facing.
+
 ### C150 ⏸️ Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops
 
 Not a divergence yet: the port does what CSBWin's source does. Recorded because only play
@@ -1051,7 +1027,7 @@ CSBWin records a game as the mouse-queue entries it takes, each with its tick an
 needs, where the port stands against it, and what sharing recordings would take.
 
 The port has neither. It keeps only the recorder's count, `totalMoveCount`, which a save
-stores (`Game.recordFileRecord`, `src/engine/Game.ts:1002`), and `extraTicks` is always on
+stores (`Game.recordFileRecord`, `src/engine/Game.ts:1001`), and `extraTicks` is always on
 (`src/engine/MovementSystem.ts:115-116`). Conflux 3.5's `AutoRecord` (`doc/RECORDING.md`)
 asks for a recorder the port does not have.
 

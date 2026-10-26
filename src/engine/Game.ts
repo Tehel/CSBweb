@@ -8,7 +8,7 @@
 
 import type { DungeonData } from '../data/dungeonTypes';
 import { DungeonLoader } from '../data/DungeonLoader';
-import { readDeleteDuplicateTimers, readDisableSaves, readGlobalVariables } from '../data/CsbwinExpool';
+import { globalTextKey, readDeleteDuplicateTimers, readDisableSaves, readGlobalVariables } from '../data/CsbwinExpool';
 import { Die } from '../core/Die';
 import { die } from './Die';
 import { readGame } from './ReadGame';
@@ -45,7 +45,6 @@ import { isNinetySecondTick, isTenSecondTick, ninetySecondUpdate, tenSecondUpdat
 import { DsaSystem } from './DsaSystem';
 import { CursorFilterType } from './dsa/DsaTypes';
 import { OBJECT_ID_NULL, Position } from '../core/types';
-import { EDT_GLOBAL_TEXT } from '../data/DecodeText';
 import { VBL_FREQUENCY } from '../core/constants';
 
 import { CharacterStats } from './CharacterStats';
@@ -191,7 +190,7 @@ export class Game implements MainLoop {
         ctx.dungeon.textSubstitution = {
             handChar: () => ctx.party.state.cursorOwner,
             characterName: (index) => ctx.party.state.champions[index]?.name ?? null,
-            globalText: (index) => ctx.dungeon.locateExpoolRecord(((EDT_GLOBAL_TEXT << 24) | (index & 0xffff)) >>> 0),
+            globalText: (index) => ctx.dungeon.locateExpoolRecord(globalTextKey(index)),
             globalVariable: (index) => ctx.systems.dsa.getGlobalVariable(index),
         };
         Object.assign(ctx.systems, {

@@ -8,7 +8,7 @@
  * rather than projecting the click back into the dungeon.
  */
 import { OBJNI_BONES_A, OBJNI_EMPTY_FLASK, OBJNI_WATER, OBJNI_WATERSKIN } from '../../core/objectNameIndex';
-import { OBJECT_ID_EOF, OBJECT_ID_NULL, ObjectID, Position, RoomType } from '../../core/types';
+import { OBJECT_ID_EOF, OBJECT_ID_NULL, ObjectID, Position, RoomType, getRoomType } from '../../core/types';
 import { CreatureRecord } from '../../data/dungeonTypes';
 import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { GraphicRoomType } from '../bytecode/Types';
@@ -200,7 +200,7 @@ function isFrontCellStoneOrVisibleFalseWall(ui: UIState): boolean {
   if (target.x < 0 || target.y < 0 || target.x >= map.descriptor.width || target.y >= map.descriptor.height) return true;
   const cellFlag = map.cellFlags[target.x]?.[target.y];
   if (cellFlag === undefined) return true;
-  const roomType = (cellFlag >> 5) & 0x7;
+  const roomType = getRoomType(cellFlag);
   if (roomType === RoomType.STONE) return true;
   if (roomType === RoomType.FALSEWALL && (cellFlag & 0x5) === 0) return true;
   return false;

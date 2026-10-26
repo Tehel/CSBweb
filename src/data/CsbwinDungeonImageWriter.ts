@@ -37,6 +37,7 @@ import type {
     DoorRecord, DungeonData, DungeonHeader, MapData, MapDescriptor, MiscRecord,
     MissileRecord, PotionRecord, ScrollRecord, TeleporterRecord, TextRecord, WeaponRecord,
 } from './dungeonTypes';
+import { databaseOf } from './dungeonTypes';
 
 /** `sizeof(DUNGEONDATINDEX)` — six words plus `dbSizes[16]`. */
 export const DUNGEON_IMAGE_HEADER_SIZE = 44;
@@ -323,7 +324,9 @@ function buildDatabase(
         return new Uint8Array(0);
     }
 
-    const records = databaseRecords(dungeon, db);
+    const database = databaseOf(dungeon.databases, db as DBType);
+    if (!database) throw new Error(`database ${db} has no records in this port`);
+    const records = database.records;
     if (records.length !== declared) {
         throw new Error(
             `database ${db} holds ${records.length} records, the header declares ${declared}`,
@@ -335,27 +338,6 @@ function buildDatabase(
         writeRecord(buf, i * size, db, records[i]!, options);
     }
     return buf;
-}
-
-/** The records of one database, by `DBType`, or `null` for the three with no parser. */
-function databaseRecords(dungeon: DungeonData, db: number): DatabaseRecord[] {
-    const d = dungeon.databases;
-    switch (db) {
-        case DBType.DOOR: return d.doors.records;
-        case DBType.TELEPORTER: return d.teleporters.records;
-        case DBType.TEXT: return d.texts.records;
-        case DBType.ACTUATOR: return d.actuators.records;
-        case DBType.CREATURE: return d.creatures.records;
-        case DBType.WEAPON: return d.weapons.records;
-        case DBType.CLOTHING: return d.clothing.records;
-        case DBType.SCROLL: return d.scrolls.records;
-        case DBType.POTION: return d.potions.records;
-        case DBType.CHEST: return d.containers.records;
-        case DBType.MISC: return d.misc.records;
-        case DBType.MISSILE: return d.missiles.records;
-        case DBType.CLOUD: return d.clouds.records;
-        default: throw new Error(`database ${db} has no records in this port`);
-    }
 }
 
 /**

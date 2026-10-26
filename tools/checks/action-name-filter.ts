@@ -20,7 +20,7 @@
  */
 import { StkOp } from '../../src/engine/dsa/DsaTypes';
 import type { Game } from '../../src/engine/Game';
-import { EDT_GLOBAL_TEXT } from '../../src/data/DecodeText';
+import { globalTextKey } from '../../src/data/CsbwinExpool';
 import { drawAttackPanel, prepareAttack } from '../../src/renderer/ui/Attack';
 import { createPaletteIndexViewportBuffer } from '../../src/renderer/csbwin/CanvasBlitter';
 import type { UIState } from '../../src/renderer/ui/UIState';
@@ -75,7 +75,7 @@ function champion(game: Game): number {
 function setGlobalText(game: Game, index: number, text: string): void {
   const record = new Array<number>(Math.floor((text.length + 4) / 4)).fill(0);
   for (let i = 0; i < text.length; i++) record[i >> 2] = (record[i >> 2]! | (text.charCodeAt(i) << (8 * (i & 3)))) >>> 0;
-  game.ctx.dungeon.writeExpoolRecord(((EDT_GLOBAL_TEXT << 24) | index) >>> 0, record);
+  game.ctx.dungeon.writeExpoolRecord(globalTextKey(index), record);
 }
 
 /** The attack panel's pixels as `drawAttackPanel` composes it. */

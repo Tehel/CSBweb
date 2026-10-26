@@ -26,7 +26,7 @@
 import { readU32LE } from '../../src/core/bytes';
 import { readCsbwinCharacter, writeCsbwinCharacter } from '../../src/data/CsbwinCharacters';
 import { CHARDESC_SIZE } from '../../src/data/CsbwinSaveInfo';
-import { EDT_GLOBAL_TEXT } from '../../src/data/DecodeText';
+import { globalTextKey } from '../../src/data/CsbwinExpool';
 import { computeChampionFingerprint } from '../../src/engine/AddCharacter';
 import { applyCsbwinSave } from '../../src/engine/CsbwinSaveGame';
 import { StkOp } from '../../src/engine/dsa/DsaTypes';
@@ -192,7 +192,7 @@ check(base.ctx.party.state.champions.every((c) => c.fingerprint !== FP), `nobody
     ...int(FP), ...int(0), op(StkOp.CHAR_NAME_FETCH),
     ...int(0), ...int(0x10070), op(StkOp.GLOBAL_TEXT_STORE),
   ], prepare);
-  const rec = named.game.ctx.dungeon.locateExpoolRecord(((EDT_GLOBAL_TEXT << 24) | 0x70) >>> 0);
+  const rec = named.game.ctx.dungeon.locateExpoolRecord(globalTextKey(0x70));
   const text = rec ? String.fromCharCode(...rec.flatMap((w) => [0, 1, 2, 3].map((k) => (w >>> (8 * k)) & 0xff))).replace(/\0.*$/s, '') : '';
   console.log(`   &CHARNAME@ ${FP.toString(16)}: "${text}"`);
   check(text === pc.name, '&CHARNAME@ names the champion in the wings');

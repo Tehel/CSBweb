@@ -11,8 +11,8 @@ import type {
     CellFlag,
     Position,
     Direction,
-    DBType
 } from '../core/types';
+import { DBType } from '../core/types';
 import type { ExtendedFeaturesBlock } from './CsbwinExtendedFeatures';
 import type { RnMaps } from '../core/RnMaps';
 
@@ -502,6 +502,38 @@ export interface Databases {
     misc: Database<MiscRecord>;
     missiles: Database<MissileRecord>;
     clouds: Database<CloudRecord>;
+}
+
+/** The database each `Databases` key holds. */
+export const DATABASE_CATEGORY: Record<keyof Databases, DBType> = {
+    doors: DBType.DOOR,
+    teleporters: DBType.TELEPORTER,
+    texts: DBType.TEXT,
+    actuators: DBType.ACTUATOR,
+    creatures: DBType.CREATURE,
+    weapons: DBType.WEAPON,
+    clothing: DBType.CLOTHING,
+    scrolls: DBType.SCROLL,
+    potions: DBType.POTION,
+    containers: DBType.CHEST,
+    misc: DBType.MISC,
+    missiles: DBType.MISSILE,
+    clouds: DBType.CLOUD,
+};
+
+/** The `Databases` key of each database the port carries records for. */
+const DATABASE_KEY: Partial<Record<DBType, keyof Databases>> = Object.fromEntries(
+    Object.entries(DATABASE_CATEGORY).map(([key, db]) => [db, key])) as Partial<Record<DBType, keyof Databases>>;
+
+/** Database `db`, or `undefined` for one the port carries no records for. */
+export function databaseOf(databases: Databases, db: DBType): Database<DatabaseRecord> | undefined {
+    const key = DATABASE_KEY[db];
+    return key === undefined ? undefined : databases[key] as Database<DatabaseRecord>;
+}
+
+/** Database `db`'s records, or none for a database the port carries no records for. */
+export function databaseRecords(databases: Databases, db: DBType): DatabaseRecord[] {
+    return databaseOf(databases, db)?.records ?? [];
 }
 
 /**

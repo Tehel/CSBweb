@@ -17,7 +17,7 @@
  */
 import { getActuatorType } from '../data/actuatorHelpers';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';
-import type { Database, DatabaseRecord } from '../data/dungeonTypes';
+import { databaseRecords } from '../data/dungeonTypes';
 import { dbMax } from './DungeonState';
 import type { GameContext } from './GameContext';
 
@@ -221,15 +221,6 @@ export function createSmartDiscardState(): SmartDiscardState {
     };
 }
 
-function databaseOf(ctx: GameContext, dbNum: number): Database<DatabaseRecord> {
-    const dbs = ctx.dungeon.getData().databases;
-    switch (dbNum) {
-        case DBType.WEAPON: return dbs.weapons as Database<DatabaseRecord>;
-        case DBType.CLOTHING: return dbs.clothing as Database<DatabaseRecord>;
-        default: return dbs.misc as Database<DatabaseRecord>;
-    }
-}
-
 /**
  * `ScanOneCell` (`doc/CSBwin-src/SmartDiscard.cpp:454-619`): list the current cell's
  * objects of the current database, each at its priority, and return how many objects
@@ -394,7 +385,7 @@ export function smartDiscard(ctx: GameContext, initialize: boolean): void {
         case SmartDiscardMode.Count: {
             // Each record's type index and `important()` are read only for commented-out
             // statistics and an `ASSERT` (`:825-875`); the count is all that is kept.
-            const records = databaseOf(ctx, s.currentDBNum).records;
+            const records = databaseRecords(ctx.dungeon.getData().databases, s.currentDBNum as DBType);
             for (let repeat = 0; repeat < 50; repeat++) {
                 if (s.currentIndex >= records.length) {
                     if (s.totalCount < discardLimit(s.currentDBNum)) {

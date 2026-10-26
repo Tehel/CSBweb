@@ -8,6 +8,7 @@
  * every other button to `handleMouseButton`, the dispatcher on the `word0` ids
  * `searchButtonList` returns.
  */
+import { isAlive } from '../../engine/rules';
 import { IndexedBitmap, createPaletteIndexViewportBuffer, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { decodeCursorBitmap } from '../../data/tables/UITables';
 import { canPlaceInSlot, drawPositionSquare } from './Character';
@@ -322,7 +323,7 @@ export function tag01a6ea(ui: UIState, clickX: number, clickY: number): void {
     const selected = ui.partyState.selectedCharacterIndex;
     if (selected < 0) return;
     const champ = getPartyChampion(ui.partyState, selected);
-    if (!champ || (champ.attributes.health | 0) === 0) return;
+    if (!champ || !isAlive(champ)) return;
     const chestView = getActiveChestView(ui, champ);
     if (!chestView || chestView.source !== 'hand') return;
     const button = searchButtonList(buttons.buttons18324, clickX, clickY, 2);
@@ -397,7 +398,7 @@ export function handleClothingClick(ui: UIState, button: number): void {
     if (ui.partyState.selectedCharacterIndex === chIdx) return;
     const champ = getPartyChampion(ui.partyState, chIdx);
     // `if (d.CH16482[D7W].HP() == 0) return;` (`doc/CSBwin-src/CSBCode.cpp:6999`).
-    if (!champ || (champ.attributes.health | 0) === 0) return;
+    if (!champ || !isAlive(champ)) return;
     slot = button & 1;
   } else {
     chIdx = ui.partyState.selectedCharacterIndex;
@@ -407,7 +408,7 @@ export function handleClothingClick(ui: UIState, button: number): void {
 
   if (slot < 0 || slot >= 38) return;
   const champ = getPartyChampion(ui.partyState, chIdx);
-  if (!champ || (champ.attributes.health | 0) === 0) return;
+  if (!champ || !isAlive(champ)) return;
 
   const isChestSlot = slot >= 30;
   if (isChestSlot && !getActiveChestView(ui, champ)) return;

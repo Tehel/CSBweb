@@ -7,6 +7,7 @@
  * `DungeonState.decodeText` applies it.
  */
 import type { ui16 } from '../core/types';
+import { globalTextBytes } from './CsbwinExpool';
 import { textStart } from './CsbwinDungeonConversions';
 import type { DungeonData, TextRecord } from './dungeonTypes';
 import type { TextDecodeTables } from './tables/ObjectTables';
@@ -182,9 +183,6 @@ export interface TextSubstitution {
     globalVariable(index: number): number | null;
 }
 
-/** `EDT_GlobalText` (`doc/CSBwin-src/CSB.h:1576`). */
-export const EDT_GLOBAL_TEXT = 10;
-
 const DOT = 0x2e;
 const A = 0x41;
 
@@ -266,10 +264,7 @@ export function SubstituteCharacterNames(
                 if (!record) {
                     result = false;
                 } else {
-                    for (let b = 0; b < record.length * 4; b++) {
-                        const c = ((record[b >> 2] ?? 0) >>> (8 * (b & 3))) & 0xff;
-                        if (c === 0 || !put(c)) break;
-                    }
+                    for (const c of globalTextBytes(record)) if (!put(c)) break;
                 }
                 continue;
             }
