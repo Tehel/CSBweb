@@ -301,6 +301,283 @@ enum StdBitmapPtr {
   BMP_StdHoleInWallBitmap,
 }
 
+/** The first opcode. A word below it calls the subroutine at that address (`Viewport.cpp:3299-3305`). */
+const FIRST_OPCODE = Opcode.Return;
+
+/** The relative cells (`RF4L1`…), as `roomData` and `cellNames` (`src/renderer/DrawViewport.ts`) number them. */
+const RF = {
+  F3L2: 2, F4L1: 4, F4R1: 5, F4: 6, F3L1: 7, F3R1: 8, F3: 9, F3R2: 10,
+  F2L1: 12, F2R1: 13, F2: 14, F1L1: 15, F1R1: 16, F1: 17, F0L1: 18, F0R1: 19, F0: 20,
+} as const;
+
+/**
+ * The opcodes that push a constant (`Viewport.cpp:2488-2870`): a relative cell, a wall
+ * decoration's position, a door's graphics index, a draw order, a `RELATIVE_WALL_NUMBERS`
+ * value, or a `BITMAP_POINTERS` or `RECT_POINTERS` value, which `StdBitmapPointers` and
+ * `StdRectanglePointers` resolve when an opcode draws with it.
+ */
+const CONSTANT_OPCODES: ReadonlyArray<readonly [Opcode, number]> = [
+  [Opcode.F4L1, RF.F4L1], [Opcode.F4R1, RF.F4R1], [Opcode.F4, RF.F4],
+  [Opcode.F3L2, RF.F3L2], [Opcode.F3L1, RF.F3L1], [Opcode.F3R1, RF.F3R1], [Opcode.F3, RF.F3], [Opcode.F3R2, RF.F3R2],
+  [Opcode.F2L1, RF.F2L1], [Opcode.F2R1, RF.F2R1], [Opcode.F2, RF.F2],
+  [Opcode.F1L1, RF.F1L1], [Opcode.F1R1, RF.F1R1], [Opcode.F1, RF.F1],
+  [Opcode.F0L1, RF.F0L1], [Opcode.F0R1, RF.F0R1], [Opcode.F0, RF.F0],
+
+  [Opcode.StdDoorGraphicsF3, 2], [Opcode.StdDoorGraphicsF2, 1], [Opcode.StdDoorGraphicsF1, 0],
+  [Opcode.wallDecorationRight, 0], [Opcode.wallDecorationFront, 1], [Opcode.wallDecorationLeft, 2],
+
+  [Opcode.DrawOrder00, 0x00], [Opcode.DrawOrder01, 0x01], [Opcode.DrawOrder02, 0x02],
+  [Opcode.DrawOrder18, 0x18], [Opcode.DrawOrder21, 0x21], [Opcode.DrawOrder28, 0x28],
+  [Opcode.DrawOrder32, 0x32], [Opcode.DrawOrder39, 0x39], [Opcode.DrawOrder41, 0x41],
+  [Opcode.DrawOrder49, 0x49], [Opcode.DrawOrder3421, 0x3421], [Opcode.DrawOrder218, 0x218],
+  [Opcode.DrawOrder321, 0x321], [Opcode.DrawOrder349, 0x349], [Opcode.DrawOrder412, 0x412],
+  [Opcode.DrawOrder431, 0x431], [Opcode.DrawOrder342, 0x342], [Opcode.DrawOrder4312, 0x4312],
+  [Opcode.DrawOrder128, 0x128], [Opcode.DrawOrder439, 0x439],
+
+  // `RELATIVE_WALL_NUMBERS`
+  [Opcode.WallF3L1Right, 0], [Opcode.WallF3R1Left, 1], [Opcode.WallF3L1Front, 2], [Opcode.WallF3Front, 3],
+  [Opcode.WallF3R1Front, 4], [Opcode.WallF2L1Right, 5], [Opcode.WallF2R1Left, 6], [Opcode.WallF2L1Front, 7],
+  [Opcode.WallF2Front, 8], [Opcode.WallF2R1Front, 9], [Opcode.WallF1L1Right, 10], [Opcode.WallF1R1Left, 11],
+  [Opcode.WallF1Front, 12],
+
+  [Opcode.StdWallBitmapF3L2, StdBitmapPtr.BMP_StdWallBitmapF3L2],
+  [Opcode.StdWallBitmapF3L1, StdBitmapPtr.BMP_StdWallBitmapF3L1],
+  [Opcode.StdWallBitmapF3, StdBitmapPtr.BMP_StdWallBitmapF3],
+  [Opcode.StdWallBitmapF3R1, StdBitmapPtr.BMP_StdWallBitmapF3R1],
+  [Opcode.StdWallBitmapF3R2, StdBitmapPtr.BMP_StdWallBitmapF3R2],
+  [Opcode.StdWallBitmapF2L1, StdBitmapPtr.BMP_StdWallBitmapF2L1],
+  [Opcode.StdWallBitmapF2, StdBitmapPtr.BMP_StdWallBitmapF2],
+  [Opcode.StdWallBitmapF2R1, StdBitmapPtr.BMP_StdWallBitmapF2R1],
+  [Opcode.StdWallBitmapF1L1, StdBitmapPtr.BMP_StdWallBitmapF1L1],
+  [Opcode.StdWallBitmapF1, StdBitmapPtr.BMP_StdWallBitmapF1],
+  [Opcode.StdWallBitmapF1R1, StdBitmapPtr.BMP_StdWallBitmapF1R1],
+  [Opcode.StdWallBitmapF0L1, StdBitmapPtr.BMP_StdWallBitmapF0L1],
+  [Opcode.StdWallBitmapF0R1, StdBitmapPtr.BMP_StdWallBitmapF0R1],
+
+  [Opcode.StdDoorFacingFrameLeftBitmapF3L1, StdBitmapPtr.BMP_StdDoorFacingFrameLeftBitmapF3L1],
+  [Opcode.StdDoorFacingFrameLeftBitmapF3, StdBitmapPtr.BMP_StdDoorFacingFrameLeftBitmapF3],
+  [Opcode.StdDoorFacingFrameLeftBitmapF3R1, StdBitmapPtr.BMP_StdDoorFacingFrameLeftBitmapF3R1],
+  [Opcode.StdDoorFacingFrameLeftBitmapF2, StdBitmapPtr.BMP_StdDoorFacingFrameLeftBitmapF2],
+  [Opcode.StdDoorFacingFrameLeftBitmapF1, StdBitmapPtr.BMP_StdDoorFacingFrameLeftBitmapF1],
+  [Opcode.StdDoorFacingFrameRightBitmapF1, StdBitmapPtr.BMP_StdDoorFacingFrameRightBitmapF1],
+  [Opcode.StdDoorEdgeFrameBitmapF0, StdBitmapPtr.BMP_StdDoorEdgeFrameBitmapF0],
+  [Opcode.StdDoorFacingTopTrackBitmapF2, StdBitmapPtr.BMP_StdDoorFacingTopTrackBitmapF2],
+  [Opcode.StdDoorFacingTopTrackBitmapF1, StdBitmapPtr.BMP_StdDoorFacingTopTrackBitmapF1],
+
+  [Opcode.StdBitmapViewport, StdBitmapPtr.BMP_StdBitmapViewport],
+  [Opcode.StdHoleInWallBitmap, StdBitmapPtr.BMP_StdHoleInWallBitmap],
+
+  [Opcode.StdWallRectangleF3L2, StdRectPtr.RECT_StdWallRectangleF3L2],
+  [Opcode.StdWallRectangleF3L1, StdRectPtr.RECT_StdWallRectangleF3L1],
+  [Opcode.StdWallRectangleF3, StdRectPtr.RECT_StdWallRectangleF3],
+  [Opcode.StdWallRectangleF3R1, StdRectPtr.RECT_StdWallRectangleF3R1],
+  [Opcode.StdWallRectangleF3R2, StdRectPtr.RECT_StdWallRectangleF3R2],
+  [Opcode.StdWallRectangleF2L1, StdRectPtr.RECT_StdWallRectangleF2L1],
+  [Opcode.StdWallRectangleF2, StdRectPtr.RECT_StdWallRectangleF2],
+  [Opcode.StdWallRectangleF2R1, StdRectPtr.RECT_StdWallRectangleF2R1],
+  [Opcode.StdWallRectangleF1L1, StdRectPtr.RECT_StdWallRectangleF1L1],
+  [Opcode.StdWallRectangleF1, StdRectPtr.RECT_StdWallRectangleF1],
+  [Opcode.StdWallRectangleF1R1, StdRectPtr.RECT_StdWallRectangleF1R1],
+  [Opcode.StdWallRectangleF0L1, StdRectPtr.RECT_StdWallRectangleF0L1],
+  [Opcode.StdWallRectangleF0, StdRectPtr.RECT_StdWallRectangleF0],
+  [Opcode.StdWallRectangleF0R1, StdRectPtr.RECT_StdWallRectangleF0R1],
+
+  [Opcode.StdFloorPitRectangleF3L1, StdRectPtr.RECT_StdFloorPitRectangleF3L1],
+  [Opcode.StdFloorPitRectangleF3, StdRectPtr.RECT_StdFloorPitRectangleF3],
+  [Opcode.StdFloorPitRectangleF3R1, StdRectPtr.RECT_StdFloorPitRectangleF3R1],
+  [Opcode.StdFloorPitRectangleF2L1, StdRectPtr.RECT_StdFloorPitRectangleF2L1],
+  [Opcode.StdFloorPitRectangleF2, StdRectPtr.RECT_StdFloorPitRectangleF2],
+  [Opcode.StdFloorPitRectangleF2R1, StdRectPtr.RECT_StdFloorPitRectangleF2R1],
+  [Opcode.StdFloorPitRectangleF1L1, StdRectPtr.RECT_StdFloorPitRectangleF1L1],
+  [Opcode.StdFloorPitRectangleF1, StdRectPtr.RECT_StdFloorPitRectangleF1],
+  [Opcode.StdFloorPitRectangleF1R1, StdRectPtr.RECT_StdFloorPitRectangleF1R1],
+  [Opcode.StdFloorPitRectangleF0L1, StdRectPtr.RECT_StdFloorPitRectangleF0L1],
+  [Opcode.StdFloorPitRectangleF0, StdRectPtr.RECT_StdFloorPitRectangleF0],
+  [Opcode.StdFloorPitRectangleF0R1, StdRectPtr.RECT_StdFloorPitRectangleF0R1],
+
+  [Opcode.StdTeleporterRectangleF3L1, StdRectPtr.RECT_StdTeleporterRectangleF3L1],
+  [Opcode.StdTeleporterRectangleF3, StdRectPtr.RECT_StdTeleporterRectangleF3],
+  [Opcode.StdTeleporterRectangleF3R1, StdRectPtr.RECT_StdTeleporterRectangleF3R1],
+  [Opcode.StdTeleporterRectangleF2L1, StdRectPtr.RECT_StdTeleporterRectangleF2L1],
+  [Opcode.StdTeleporterRectangleF2, StdRectPtr.RECT_StdTeleporterRectangleF2],
+  [Opcode.StdTeleporterRectangleF2R1, StdRectPtr.RECT_StdTeleporterRectangleF2R1],
+  [Opcode.StdTeleporterRectangleF1L1, StdRectPtr.RECT_StdTeleporterRectangleF1L1],
+  [Opcode.StdTeleporterRectangleF1, StdRectPtr.RECT_StdTeleporterRectangleF1],
+  [Opcode.StdTeleporterRectangleF1R1, StdRectPtr.RECT_StdTeleporterRectangleF1R1],
+  [Opcode.StdTeleporterRectangleF0L1, StdRectPtr.RECT_StdTeleporterRectangleF0L1],
+  [Opcode.StdTeleporterRectangleF0, StdRectPtr.RECT_StdTeleporterRectangleF0],
+  [Opcode.StdTeleporterRectangleF0R1, StdRectPtr.RECT_StdTeleporterRectangleF0R1],
+
+  [Opcode.StdStairFacingUpRectangleF3L1, StdRectPtr.RECT_StdStairFacingUpRectangleF3L1],
+  [Opcode.StdStairFacingUpRectangleF3, StdRectPtr.RECT_StdStairFacingUpRectangleF3],
+  [Opcode.StdStairFacingUpRectangleF3R1, StdRectPtr.RECT_StdStairFacingUpRectangleF3R1],
+  [Opcode.StdStairFacingUpRectangleF2L1, StdRectPtr.RECT_StdStairFacingUpRectangleF2L1],
+  [Opcode.StdStairFacingUpRectangleF2, StdRectPtr.RECT_StdStairFacingUpRectangleF2],
+  [Opcode.StdStairFacingUpRectangleF2R1, StdRectPtr.RECT_StdStairFacingUpRectangleF2R1],
+  [Opcode.StdStairFacingUpRectangleF1L1, StdRectPtr.RECT_StdStairFacingUpRectangleF1L1],
+  [Opcode.StdStairFacingUpRectangleF1, StdRectPtr.RECT_StdStairFacingUpRectangleF1],
+  [Opcode.StdStairFacingUpRectangleF1R1, StdRectPtr.RECT_StdStairFacingUpRectangleF1R1],
+  [Opcode.StdStairFacingUpRectangleF0L, StdRectPtr.RECT_StdStairFacingUpRectangleF0L],
+  [Opcode.StdStairFacingUpRectangleF0R, StdRectPtr.RECT_StdStairFacingUpRectangleF0R],
+
+  [Opcode.StdStairFacingDownRectangleF3L1, StdRectPtr.RECT_StdStairFacingDownRectangleF3L1],
+  [Opcode.StdStairFacingDownRectangleF3, StdRectPtr.RECT_StdStairFacingDownRectangleF3],
+  [Opcode.StdStairFacingDownRectangleF3R1, StdRectPtr.RECT_StdStairFacingDownRectangleF3R1],
+  [Opcode.StdStairFacingDownRectangleF2L1, StdRectPtr.RECT_StdStairFacingDownRectangleF2L1],
+  [Opcode.StdStairFacingDownRectangleF2, StdRectPtr.RECT_StdStairFacingDownRectangleF2],
+  [Opcode.StdStairFacingDownRectangleF2R1, StdRectPtr.RECT_StdStairFacingDownRectangleF2R1],
+  [Opcode.StdStairFacingDownRectangleF1L1, StdRectPtr.RECT_StdStairFacingDownRectangleF1L1],
+  [Opcode.StdStairFacingDownRectangleF1, StdRectPtr.RECT_StdStairFacingDownRectangleF1],
+  [Opcode.StdStairFacingDownRectangleF1R1, StdRectPtr.RECT_StdStairFacingDownRectangleF1R1],
+  [Opcode.StdStairFacingDownRectangleF0L, StdRectPtr.RECT_StdStairFacingDownRectangleF0L],
+  [Opcode.StdStairFacingDownRectangleF0R, StdRectPtr.RECT_StdStairFacingDownRectangleF0R],
+
+  [Opcode.StdStairEdgeRectF2L1, StdRectPtr.RECT_StdStairEdgeRectangleF2L1],
+  [Opcode.StdStairEdgeRectF2R1, StdRectPtr.RECT_StdStairEdgeRectangleF2R1],
+  [Opcode.StdStairEdgeUpRectF1L1, StdRectPtr.RECT_StdStairEdgeUpRectangleF1L1],
+  [Opcode.StdStairEdgeUpRectF1R1, StdRectPtr.RECT_StdStairEdgeUpRectangleF1R1],
+  [Opcode.StdStairEdgeDownRectF1L1, StdRectPtr.RECT_StdStairEdgeDownRectangleF1L1],
+  [Opcode.StdStairEdgeDownRectF1R1, StdRectPtr.RECT_StdStairEdgeDownRectangleF1R1],
+  [Opcode.StdStairEdgeRectF0L1, StdRectPtr.RECT_StdStairEdgeRectangleF0L],
+  [Opcode.StdStairEdgeRectF0R1, StdRectPtr.RECT_StdStairEdgeRectangleF0R],
+
+  [Opcode.StdDoorRectsF3L1, StdRectPtr.RECT_StdDoorRectsF3L1],
+  [Opcode.StdDoorRectsF3, StdRectPtr.RECT_StdDoorRectsF3],
+  [Opcode.StdDoorRectsF3R1, StdRectPtr.RECT_StdDoorRectsF3R1],
+  [Opcode.StdDoorRectsF2L1, StdRectPtr.RECT_StdDoorRectsF2L1],
+  [Opcode.StdDoorRectsF2, StdRectPtr.RECT_StdDoorRectsF2],
+  [Opcode.StdDoorRectsF2R1, StdRectPtr.RECT_StdDoorRectsF2R1],
+  [Opcode.StdDoorRectsF1L1, StdRectPtr.RECT_StdDoorRectsF1L1],
+  [Opcode.StdDoorRectsF1, StdRectPtr.RECT_StdDoorRectsF1],
+  [Opcode.StdDoorRectsF1R1, StdRectPtr.RECT_StdDoorRectsF1R1],
+  [Opcode.StdDoorRectsF0, StdRectPtr.RECT_StdDoorRectsF0],
+
+  [Opcode.StdDoorFacingTopTrackRectF2L1, StdRectPtr.RECT_StdDoorFacingTopTrackRectF2L1],
+  [Opcode.StdDoorFacingTopTrackRectF2, StdRectPtr.RECT_StdDoorFacingTopTrackRectF2],
+  [Opcode.StdDoorFacingTopTrackRectF2R1, StdRectPtr.RECT_StdDoorFacingTopTrackRectF2R1],
+  [Opcode.StdDoorFacingTopTrackRectF1L1, StdRectPtr.RECT_StdDoorFacingTopTrackRectF1L1],
+  [Opcode.StdDoorFacingTopTrackRectF1, StdRectPtr.RECT_StdDoorFacingTopTrackRectF1],
+  [Opcode.StdDoorFacingTopTrackRectF1R1, StdRectPtr.RECT_StdDoorFacingTopTrackRectF1R1],
+  [Opcode.StdDoorEdgeFrameRectF0, StdRectPtr.RECT_StdDoorEdgeFrameRectF0],
+  [Opcode.StdDoorFacingTopTrackRectF0, StdRectPtr.RECT_StdDoorEdgeFrameRectF0],
+  [Opcode.StdDoorFacingFrameRectF3L1, StdRectPtr.RECT_StdDoorFacingFrameRectF3L1],
+  [Opcode.StdDoorFacingFrameRectF3R1, StdRectPtr.RECT_StdDoorFacingFrameRectF3R1],
+  [Opcode.StdDoorFacingFrameRightRectF3, StdRectPtr.RECT_StdDoorFacingFrameRightRectF3],
+  [Opcode.StdDoorFacingFrameLeftRectF3, StdRectPtr.RECT_StdDoorFacingFrameLeftRectF3],
+  [Opcode.StdDoorFacingFrameRightRectF2, StdRectPtr.RECT_StdDoorFacingFrameRightRectF2],
+  [Opcode.StdDoorFacingFrameLeftRectF2, StdRectPtr.RECT_StdDoorFacingFrameLeftRectF2],
+  [Opcode.StdDoorFacingFrameRightRectF1, StdRectPtr.RECT_StdDoorFacingFrameRightRectF1],
+  [Opcode.StdDoorFacingFrameLeftRectF1, StdRectPtr.RECT_StdDoorFacingFrameLeftRectF1],
+
+  [Opcode.StdSeeThruWallsRect, StdRectPtr.RECT_StdSeeThruWallsRect],
+  [Opcode.StdSeeThruWallsRect2, StdRectPtr.RECT_StdSeeThruWallsRect2],
+  [Opcode.MinusOne, -1],
+  [Opcode.Zero, 0],
+];
+
+/** `F4L1xy`…: the cell whose map square each pushes (`Viewport.cpp:2508`). */
+const XY_OPCODES: ReadonlyArray<readonly [Opcode, number]> = [
+  [Opcode.F4L1xy, RF.F4L1], [Opcode.F4R1xy, RF.F4R1], [Opcode.F4xy, RF.F4],
+  [Opcode.F3L2xy, RF.F3L2], [Opcode.F3L1xy, RF.F3L1], [Opcode.F3R1xy, RF.F3R1], [Opcode.F3xy, RF.F3], [Opcode.F3R2xy, RF.F3R2],
+  [Opcode.F2L1xy, RF.F2L1], [Opcode.F2R1xy, RF.F2R1], [Opcode.F2xy, RF.F2],
+  [Opcode.F1L1xy, RF.F1L1], [Opcode.F1R1xy, RF.F1R1], [Opcode.F1xy, RF.F1],
+  [Opcode.F0L1xy, RF.F0L1], [Opcode.F0R1xy, RF.F0R1], [Opcode.F0xy, RF.F0],
+];
+
+/** `F4L1Contents`…: the cell whose first object each pushes (`Viewport.cpp:2528`). */
+const CONTENTS_OPCODES: ReadonlyArray<readonly [Opcode, number]> = [
+  [Opcode.F4L1Contents, RF.F4L1], [Opcode.F4R1Contents, RF.F4R1], [Opcode.F4Contents, RF.F4],
+  [Opcode.F3L2Contents, RF.F3L2], [Opcode.F3L1Contents, RF.F3L1], [Opcode.F3R1Contents, RF.F3R1],
+  [Opcode.F3Contents, RF.F3], [Opcode.F3R2Contents, RF.F3R2],
+  [Opcode.F2L1Contents, RF.F2L1], [Opcode.F2R1Contents, RF.F2R1], [Opcode.F2Contents, RF.F2],
+  [Opcode.F1L1Contents, RF.F1L1], [Opcode.F1R1Contents, RF.F1R1], [Opcode.F1Contents, RF.F1],
+  [Opcode.F0L1Contents, RF.F0L1], [Opcode.F0R1Contents, RF.F0R1], [Opcode.F0Contents, RF.F0],
+];
+
+/** `F3L1DoorRecordIndex`…: the cell whose `decorations[1]`, its door's index, each pushes (`Viewport.cpp:2546`). */
+const DOOR_RECORD_INDEX_OPCODES: ReadonlyArray<readonly [Opcode, number]> = [
+  [Opcode.F3L1DoorRecordIndex, RF.F3L1], [Opcode.F3DoorRecordIndex, RF.F3], [Opcode.F3R1DoorRecordIndex, RF.F3R1],
+  [Opcode.F2L1DoorRecordIndex, RF.F2L1], [Opcode.F2DoorRecordIndex, RF.F2], [Opcode.F2R1DoorRecordIndex, RF.F2R1],
+  [Opcode.F1L1DoorRecordIndex, RF.F1L1], [Opcode.F1DoorRecordIndex, RF.F1], [Opcode.F1R1DoorRecordIndex, RF.F1R1],
+  [Opcode.F0DoorRecordIndex, RF.F0],
+];
+
+/** `F3L1DoorState`…: the cell whose `decorations[0]`, its door's state, each pushes (`Viewport.cpp:2557`). */
+const DOOR_STATE_OPCODES: ReadonlyArray<readonly [Opcode, number]> = [
+  [Opcode.F3L1DoorState, RF.F3L1], [Opcode.F3DoorState, RF.F3], [Opcode.F3R1DoorState, RF.F3R1],
+  [Opcode.F2L1DoorState, RF.F2L1], [Opcode.F2DoorState, RF.F2], [Opcode.F2R1DoorState, RF.F2R1],
+  [Opcode.F1L1DoorState, RF.F1L1], [Opcode.F1DoorState, RF.F1], [Opcode.F1R1DoorState, RF.F1R1],
+  [Opcode.F0DoorState, RF.F0],
+];
+
+/**
+ * `FloorDecorationGraphicOrdinalF3L1`…: the cell whose `decorations[2]`, its floor
+ * decoration, each pushes (`Viewport.cpp:2724`).
+ */
+const FLOOR_DECORATION_OPCODES: ReadonlyArray<readonly [Opcode, number]> = [
+  [Opcode.FloorDecorationGraphicOrdinalF3L1, RF.F3L1], [Opcode.FloorDecorationGraphicOrdinalF3, RF.F3],
+  [Opcode.FloorDecorationGraphicOrdinalF3R1, RF.F3R1], [Opcode.FloorDecorationGraphicOrdinalF2L1, RF.F2L1],
+  [Opcode.FloorDecorationGraphicOrdinalF2, RF.F2], [Opcode.FloorDecorationGraphicOrdinalF2R1, RF.F2R1],
+  [Opcode.FloorDecorationGraphicOrdinalF1L1, RF.F1L1], [Opcode.FloorDecorationGraphicOrdinalF1, RF.F1],
+  [Opcode.FloorDecorationGraphicOrdinalF1R1, RF.F1R1], [Opcode.FloorDecorationGraphicOrdinalF0L1, RF.F0L1],
+  [Opcode.FloorDecorationGraphicOrdinalF0, RF.F0], [Opcode.FloorDecorationGraphicOrdinalF0R1, RF.F0R1],
+];
+
+/**
+ * The stairs' graphics (`Viewport.cpp:2737-2757`, `:2807-2814`), each as its offset from
+ * the wall set's first, `90 + 18 * wallGraphicSet` (`Code390e.cpp:117-127`):
+ * `StairFacingUpGraphic[6]` to `[0]` at 0 to 6, `StairFacingDownGraphic[6]` to `[0]` at
+ * 7 to 13, and `StairEdgeGraphic[3]` to `[0]` at 14 to 17.
+ */
+const STAIR_GRAPHIC_OPCODES: ReadonlyArray<readonly [Opcode, number]> = [
+  [Opcode.StdStairFacingUpGraphicF3L1, 0], [Opcode.StdStairFacingUpGraphicF3R1, 0], [Opcode.StdStairFacingUpGraphicF3, 1],
+  [Opcode.StdStairFacingUpGraphicF2L1, 2], [Opcode.StdStairFacingUpGraphicF2R1, 2], [Opcode.StdStairFacingUpGraphicF2, 3],
+  [Opcode.StdStairFacingUpGraphicF1L1, 4], [Opcode.StdStairFacingUpGraphicF1R1, 4], [Opcode.StdStairFacingUpGraphicF1, 5],
+  [Opcode.StdStairFacingUpGraphicF0, 6],
+  [Opcode.StdStairFacingDownGraphicF3L1, 7], [Opcode.StdStairFacingDownGraphicF3R1, 7], [Opcode.StdStairFacingDownGraphicF3, 8],
+  [Opcode.StdStairFacingDownGraphicF2L1, 9], [Opcode.StdStairFacingDownGraphicF2R1, 9], [Opcode.StdStairFacingDownGraphicF2, 10],
+  [Opcode.StdStairFacingDownGraphicF1L1, 11], [Opcode.StdStairFacingDownGraphicF1R1, 11], [Opcode.StdStairFacingDownGraphicF1, 12],
+  [Opcode.StdStairFacingDownGraphicF0, 13],
+  [Opcode.StdStairEdgeGraphicF2, 14], [Opcode.StdStairEdgeGraphicUpF1, 15], [Opcode.StdStairEdgeGraphicDownF1, 16],
+  [Opcode.StdStairEdgeGraphicF0L1, 17], [Opcode.StdStairEdgeGraphicF0R1, 17],
+];
+
+/** The context's lists that `StdRectanglePointers` reads a rectangle of. */
+type RectList =
+  | 'wallRectangles' | 'floorPitRectangles' | 'teleporterRectangles' | 'stairEdgeRectangles'
+  | 'stairFacingDownRectangles' | 'stairFacingUpRectangles' | 'doorTrackTopRectangles' | 'doorFrameRectangles';
+
+/**
+ * `StdRectanglePointers` (`Viewport.cpp:2298-2411`) as a table built once, indexed by
+ * `RECT_POINTERS`: where each rectangle is in the context. `RECT_StdDoorRectsF0` has none,
+ * as CSBWin's returns no `d.DoorRectsF0` (`:2404`).
+ */
+const STD_RECTANGLE_POINTERS: Array<(context: InterpreterContext) => RectPos | RectPos[] | undefined> = [];
+
+/** The pointers from `first` on, in `RECT_POINTERS`' order: the entries `indexes` of `list`. */
+function stdRectangles(first: StdRectPtr, list: RectList, indexes: readonly number[]): void {
+  indexes.forEach((index, i) => {
+    STD_RECTANGLE_POINTERS[first + i] = (context) => context[list]?.[index];
+  });
+}
+
+stdRectangles(StdRectPtr.RECT_StdWallRectangleF3L2, 'wallRectangles', [13, 1, 0, 2, 12, 4, 3, 5, 7, 6, 8, 10, 9, 11]);
+stdRectangles(StdRectPtr.RECT_StdFloorPitRectangleF3L1, 'floorPitRectangles', [11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0]);
+stdRectangles(StdRectPtr.RECT_StdStairFacingDownRectangleF3L1, 'stairFacingDownRectangles', [10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0]);
+stdRectangles(StdRectPtr.RECT_StdStairFacingUpRectangleF3L1, 'stairFacingUpRectangles', [10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0]);
+stdRectangles(StdRectPtr.RECT_StdTeleporterRectangleF3L1, 'teleporterRectangles', [1, 0, 2, 4, 3, 5, 7, 6, 8, 10, 9, 11]);
+stdRectangles(StdRectPtr.RECT_StdStairEdgeRectangleF2L1, 'stairEdgeRectangles', [7, 6, 5, 4, 3, 2, 1, 0]);
+stdRectangles(StdRectPtr.RECT_StdDoorFacingTopTrackRectF2L1, 'doorTrackTopRectangles', [5, 4, 3, 2, 1, 0, 6]);
+stdRectangles(StdRectPtr.RECT_StdDoorFacingFrameRectF3L1, 'doorFrameRectangles', [7, 6, 0, 1, 2, 3, 4, 5]);
+(['F3L1', 'F3', 'F3R1', 'F2L1', 'F2', 'F2R1', 'F1L1', 'F1', 'F1R1'] as const).forEach((name, i) => {
+  STD_RECTANGLE_POINTERS[StdRectPtr.RECT_StdDoorRectsF3L1 + i] = (context) => context.doorRects?.[name];
+});
+STD_RECTANGLE_POINTERS[StdRectPtr.RECT_StdSeeThruWallsRect] = (context) => context.seeThruWallsRect;
+STD_RECTANGLE_POINTERS[StdRectPtr.RECT_StdSeeThruWallsRect2] = (context) => context.seeThruWallsRect2;
+
+/** An opcode's handler, given the machine and the constant its table entry holds. */
+type OpcodeHandler = (machine: BytecodeInterpreter, operand: number) => boolean;
+
 /**
  * CSBWin's `stack` and `rstack` (`doc/CSBwin-src/Viewport.cpp:2215-2247`): static rings of
  * 256 words, each indexed by a byte that `push` decrements first. They are kept from one
@@ -360,15 +637,10 @@ export function interpreterStackTop(n: number): number[] {
   return Array.from({ length: n }, (_, i) => (stack[(sp + i) & 0xff]! << 16) >> 16);
 }
 
-/**
- * Bytecode interpreter - direct port from CSBWin Viewport.cpp
- *
- * This function executes a bytecode program by iterating through
- * the opcode array and dispatching to handler functions.
- */
 /** The most opcodes one `Interpret` runs before it takes its program for one that never returns. */
 const INTERPRET_STEP_BUDGET = 1 << 20;
 
+/** CSBWin's `Interpret`, the machine that runs a viewport program (`Viewport.cpp:2425-3308`). */
 export class BytecodeInterpreter {
   private context: InterpreterContext;
   private pc: number = 0;  // Program counter
@@ -417,518 +689,113 @@ export class BytecodeInterpreter {
   }
 
   /**
-   * Execute a single opcode
-   * Returns false if execution should stop (Return opcode)
+   * `Interpret`'s switch (`Viewport.cpp:2486-3307`) as a table built once, indexed by
+   * `opcode - FIRST_OPCODE`: each opcode's handler, and the constant it takes.
+   */
+  private static readonly decode: ReadonlyArray<{ readonly run: OpcodeHandler; readonly operand: number } | undefined> =
+    BytecodeInterpreter.buildDecode();
+
+  private static buildDecode(): Array<{ run: OpcodeHandler; operand: number } | undefined> {
+    const table: Array<{ run: OpcodeHandler; operand: number } | undefined> = [];
+    const on = (opcode: Opcode, run: OpcodeHandler, operand = 0): void => {
+      table[opcode - FIRST_OPCODE] = { run, operand };
+    };
+    const onEach = (opcodes: ReadonlyArray<readonly [Opcode, number]>, run: OpcodeHandler): void => {
+      for (const [opcode, operand] of opcodes) on(opcode, run, operand);
+    };
+    /** The groups whose handler switches on the opcode itself. */
+    const onOpcodes = (opcodes: readonly Opcode[], run: OpcodeHandler): void => {
+      for (const opcode of opcodes) on(opcode, run, opcode);
+    };
+
+    onEach(CONSTANT_OPCODES, (_, value) => { push(value); return true; });
+    onEach(XY_OPCODES, (m, cell) => m.opCellXY(cell));
+    onEach(CONTENTS_OPCODES, (m, cell) => m.opCellContents(cell));
+    onEach(DOOR_STATE_OPCODES, (m, cell) => m.opCellDecoration(cell, 0));
+    onEach(DOOR_RECORD_INDEX_OPCODES, (m, cell) => m.opCellDecoration(cell, 1));
+    onEach(FLOOR_DECORATION_OPCODES, (m, cell) => m.opCellDecoration(cell, 2));
+    onEach(STAIR_GRAPHIC_OPCODES, (m, offset) => m.opStairGraphic(offset));
+
+    on(Opcode.Return, (m) => m.opReturn());
+    on(Opcode.JumpZ, (m) => m.opJumpZ());
+    on(Opcode.JumpNZ, (m) => m.opJumpNZ());
+    on(Opcode.Jump, (m) => m.opJump());
+    on(Opcode.Literal, (m) => m.opLiteral());
+    on(Opcode.ToR, () => { rpush(pop()); return true; });
+    on(Opcode.RTo, () => { push(rpop()); return true; });
+
+    on(Opcode.StdBltShape, (m) => m.opStdBltShape());
+    on(Opcode.StdBltShapeToViewport, (m) => m.opStdBltShapeToViewport(false));
+    on(Opcode.StdMirrorShapeToViewport, (m) => m.opStdBltShapeToViewport(true));
+    on(Opcode.StdGraphicToViewport, (m) => m.opStdGraphicToViewport(false));
+    on(Opcode.StdMirrorGraphicToViewport, (m) => m.opStdGraphicToViewport(true));
+    on(Opcode.StdDrawCeilingPit, (m) => m.opStdDrawCeilingPit());
+    on(Opcode.StdDrawSeeThruDoorEdge, (m) => m.opStdDrawSeeThruDoorEdge());
+    on(Opcode.StdDrawDoorSwitch, (m) => m.opStdDrawDoorSwitch());
+    on(Opcode.StdDrawFloorDecoration, (m) => m.opStdDrawFloorDecoration());
+    on(Opcode.StdDrawTeleporter, (m) => m.opStdDrawTeleporter());
+    on(Opcode.StdDrawRoomObjects, (m) => m.opStdDrawRoomObjects());
+    on(Opcode.StdDrawDoor, (m) => m.opStdDrawDoor());
+    on(Opcode.StdDrawWallDecoration, (m) => m.opStdDrawWallDecoration());
+    on(Opcode.StdDrawWallText, (m) => m.opStdDrawWallText());
+
+    on(Opcode.GetDecoration0, (m) => m.opGetDecoration0());
+    on(Opcode.HasDecoration, (m) => m.opHasDecoration());
+    on(Opcode.DoorSwitch, (m) => m.opDoorSwitch());
+    // The last `StdDrawWallDecoration`'s result (`Viewport.cpp:2639`).
+    on(Opcode.Alcove, (m) => { push(m.hasAlcove ? 1 : 0); return true; });
+    on(Opcode.SeeThroughWalls, (m) => { push(m.context.seeThroughWalls ? 1 : 0); return true; });
+    on(Opcode.LeaveMortarJoint, (m) => { m.removeMortarJoint = false; return true; });
+
+    // See-Thru-Walls through the F1 wall (`Viewport.cpp:2964-3023`).
+    on(Opcode.StdAllocateDerivedGraphic, (m) => { m.allocateDerivedGraphic(pop()); return true; });
+    on(Opcode.StdSeeThruWallsRectUByte4, (m) => { push(m.context.seeThruWallsRectUByte4 ?? 0); return true; });
+    on(Opcode.StdSeeThruWallsRectUByte6, (m) => { push(m.context.seeThruWallsRectUByte6 ?? 0); return true; });
+    on(Opcode.StdBltToDerivedGraphic, (m) => m.opStdBltDerivedGraphic(true));
+    on(Opcode.StdBltFromDerivedGraphic, (m) => m.opStdBltDerivedGraphic(false));
+    on(Opcode.StdDeleteDerivedGraphic, (m) => {
+      m.derivedGraphics.delete(pop());
+      // CSBWin's case has no `break` and falls into `StdHoleInWallBitmap` (Viewport.cpp:3022-3023).
+      push(StdBitmapPtr.BMP_StdHoleInWallBitmap);
+      return true;
+    });
+
+    onOpcodes([
+      Opcode.CurrentSkin, Opcode.SkinNumber, Opcode.CurrentCell, Opcode.WallGraphicID, Opcode.FloorGraphicID,
+      Opcode.MiddleGraphicID, Opcode.CeilingGraphicID, Opcode.WallMaskID, Opcode.FloorMaskID, Opcode.MiddleMaskID,
+      Opcode.CeilingMaskID, Opcode.WallDecorationID,
+    ], (m, opcode) => m.opSkinQuery(opcode));
+    onOpcodes([
+      Opcode.DrawCustomGraphic, Opcode.CreateVirtualBitmap, Opcode.DrawCustomDecoration, Opcode.CreateVirtualMask,
+      Opcode.CreateVirtualAffineMask,
+    ], (m, opcode) => m.opCustomGraphic(opcode));
+    onOpcodes([Opcode.GetMaskHeader, Opcode.NeedVirtualMaskQ, Opcode.BitmapInfo], (m, opcode) => m.opBackgroundQuery(opcode));
+    onOpcodes([
+      Opcode.SWAP, Opcode.DROP, Opcode.TwoDrop, Opcode.OVER, Opcode.ROT, Opcode.DUP, Opcode.TwoDup, Opcode.QuestionDUP,
+      Opcode.PICK, Opcode.ROLL, Opcode.PLUS, Opcode.MINUS, Opcode.GEAR, Opcode.SLASH, Opcode.EQUAL, Opcode.LESS,
+      Opcode.GREATER, Opcode.ULESS, Opcode.ZEROEQUAL, Opcode.NOT, Opcode.ZEROLESS, Opcode.ZEROGREATER, Opcode.AND,
+      Opcode.OR, Opcode.LSHIFT, Opcode.IsOdd,
+    ], (m, opcode) => m.opStackWord(opcode));
+    return table;
+  }
+
+  /**
+   * One opcode, through `decode`; false when `Interpret` returns. A word below
+   * `FIRST_OPCODE` calls the subroutine at that address (`Viewport.cpp:3299-3305`).
    */
   private executeOpcode(opcode: number): boolean {
-    switch (opcode) {
-      case Opcode.Return:
-        return this.opReturn();
-
-      case Opcode.StdBltShape:
-        return this.opStdBltShape();
-
-      case Opcode.StdBltShapeToViewport:
-        return this.opStdBltShapeToViewport(false);
-
-      case Opcode.StdMirrorShapeToViewport:
-        return this.opStdBltShapeToViewport(true);
-
-      case Opcode.StdGraphicToViewport:
-        return this.opStdGraphicToViewport(false);
-
-      case Opcode.StdMirrorGraphicToViewport:
-        return this.opStdGraphicToViewport(true);
-
-      case Opcode.JumpZ:
-        return this.opJumpZ();
-
-      case Opcode.JumpNZ:
-        return this.opJumpNZ();
-
-      case Opcode.Jump:
-        return this.opJump();
-
-      case Opcode.Literal:
-        return this.opLiteral();
-
-      case Opcode.GetDecoration0:
-        return this.opGetDecoration0();
-
-      case Opcode.SeeThroughWalls:
-        push(this.context.seeThroughWalls ? 1 : 0);
-        return true;
-
-      case Opcode.LeaveMortarJoint:
-        this.removeMortarJoint = false;
-        return true;
-
-      // Bitmap opcodes - push bitmap pointer to stack
-      case Opcode.StdWallBitmapF3L2:
-      case Opcode.StdWallBitmapF3L1:
-      case Opcode.StdWallBitmapF3:
-      case Opcode.StdWallBitmapF3R1:
-      case Opcode.StdWallBitmapF3R2:
-      case Opcode.StdWallBitmapF2L1:
-      case Opcode.StdWallBitmapF2:
-      case Opcode.StdWallBitmapF2R1:
-      case Opcode.StdWallBitmapF1L1:
-      case Opcode.StdWallBitmapF1:
-      case Opcode.StdWallBitmapF1R1:
-      case Opcode.StdWallBitmapF0L1:
-      case Opcode.StdWallBitmapF0R1:
-        return this.opWallBitmap(opcode);
-
-      // Rectangle opcodes - push rectangle pointer to stack
-      case Opcode.StdWallRectangleF3L2:
-      case Opcode.StdWallRectangleF3L1:
-      case Opcode.StdWallRectangleF3:
-      case Opcode.StdWallRectangleF3R1:
-      case Opcode.StdWallRectangleF3R2:
-      case Opcode.StdWallRectangleF2L1:
-      case Opcode.StdWallRectangleF2:
-      case Opcode.StdWallRectangleF2R1:
-      case Opcode.StdWallRectangleF1L1:
-      case Opcode.StdWallRectangleF1:
-      case Opcode.StdWallRectangleF1R1:
-      case Opcode.StdWallRectangleF0L1:
-      case Opcode.StdWallRectangleF0:
-      case Opcode.StdWallRectangleF0R1:
-        return this.opWallRectangle(opcode);
-
-      // Cell opcodes - push CSBWin relative cell number
-      case Opcode.F4L1:
-      case Opcode.F4:
-      case Opcode.F4R1:
-      case Opcode.F3L2:
-      case Opcode.F3L1:
-      case Opcode.F3:
-      case Opcode.F3R1:
-      case Opcode.F3R2:
-      case Opcode.F2L1:
-      case Opcode.F2:
-      case Opcode.F2R1:
-      case Opcode.F1L1:
-      case Opcode.F1:
-      case Opcode.F1R1:
-      case Opcode.F0L1:
-      case Opcode.F0:
-      case Opcode.F0R1:
-        return this.opCellNumber(opcode);
-
-      // Decoration/condition opcodes
-      case Opcode.Alcove:
-        return this.opCondition(opcode);
-
-      case Opcode.DoorSwitch:
-        return this.opDoorSwitch();
-
-      case Opcode.wallDecorationRight:
-      case Opcode.wallDecorationFront:
-      case Opcode.wallDecorationLeft:
-        return this.opWallDecorationPos(opcode);
-
-      case Opcode.HasDecoration:
-        return this.opHasDecoration();
-
-      case Opcode.FloorDecorationGraphicOrdinalF3L1:
-      case Opcode.FloorDecorationGraphicOrdinalF3:
-      case Opcode.FloorDecorationGraphicOrdinalF3R1:
-      case Opcode.FloorDecorationGraphicOrdinalF2L1:
-      case Opcode.FloorDecorationGraphicOrdinalF2:
-      case Opcode.FloorDecorationGraphicOrdinalF2R1:
-      case Opcode.FloorDecorationGraphicOrdinalF1L1:
-      case Opcode.FloorDecorationGraphicOrdinalF1:
-      case Opcode.FloorDecorationGraphicOrdinalF1R1:
-      case Opcode.FloorDecorationGraphicOrdinalF0L1:
-      case Opcode.FloorDecorationGraphicOrdinalF0:
-      case Opcode.FloorDecorationGraphicOrdinalF0R1:
-        return this.opFloorDecorationGraphicOrdinal(opcode);
-
-      // Drawing opcodes
-      case Opcode.StdDrawCeilingPit:
-        return this.opStdDrawCeilingPit();
-      case Opcode.StdDrawSeeThruDoorEdge:
-        return this.opStdDrawSeeThruDoorEdge();
-
-      // See-Thru-Walls through the F1 wall (Viewport.cpp:2964-3023).
-      case Opcode.StdAllocateDerivedGraphic:
-        this.allocateDerivedGraphic(pop());
-        return true;
-      case Opcode.StdBitmapViewport:
-        push(StdBitmapPtr.BMP_StdBitmapViewport);
-        return true;
-      case Opcode.StdSeeThruWallsRect:
-        push(StdRectPtr.RECT_StdSeeThruWallsRect);
-        return true;
-      case Opcode.StdSeeThruWallsRect2:
-        push(StdRectPtr.RECT_StdSeeThruWallsRect2);
-        return true;
-      case Opcode.StdSeeThruWallsRectUByte4:
-        push(this.context.seeThruWallsRectUByte4 ?? 0);
-        return true;
-      case Opcode.StdSeeThruWallsRectUByte6:
-        push(this.context.seeThruWallsRectUByte6 ?? 0);
-        return true;
-      case Opcode.MinusOne:
-        push(-1);
-        return true;
-      case Opcode.Zero:
-        push(0);
-        return true;
-      case Opcode.StdBltToDerivedGraphic:
-        return this.opStdBltDerivedGraphic(true);
-      case Opcode.StdBltFromDerivedGraphic:
-        return this.opStdBltDerivedGraphic(false);
-      case Opcode.StdDeleteDerivedGraphic:
-        this.derivedGraphics.delete(pop());
-        // CSBWin's case has no `break` and falls into `StdHoleInWallBitmap` (Viewport.cpp:3022-3023).
-        push(StdBitmapPtr.BMP_StdHoleInWallBitmap);
-        return true;
-      case Opcode.StdHoleInWallBitmap:
-        push(StdBitmapPtr.BMP_StdHoleInWallBitmap);
-        return true;
-
-      case Opcode.StdDrawDoorSwitch:
-        return this.opStdDrawDoorSwitch();
-
-      case Opcode.StdDrawFloorDecoration:
-        return this.opStdDrawFloorDecoration();
-
-      case Opcode.StdDrawTeleporter:
-        return this.opStdDrawTeleporter();
-
-      case Opcode.StdDrawRoomObjects:
-        return this.opStdDrawRoomObjects();
-
-      case Opcode.StdDrawDoor:
-        return this.opStdDrawDoor();
-
-      case Opcode.StdDrawWallDecoration:
-        return this.opStdDrawWallDecoration();
-
-      case Opcode.StdDrawWallText:
-        return this.opStdDrawWallText();
-
-      // Floor pit rectangles - push rectangle index
-      case Opcode.StdFloorPitRectangleF3L1:
-      case Opcode.StdFloorPitRectangleF3:
-      case Opcode.StdFloorPitRectangleF3R1:
-      case Opcode.StdFloorPitRectangleF2L1:
-      case Opcode.StdFloorPitRectangleF2:
-      case Opcode.StdFloorPitRectangleF2R1:
-      case Opcode.StdFloorPitRectangleF1L1:
-      case Opcode.StdFloorPitRectangleF1:
-      case Opcode.StdFloorPitRectangleF1R1:
-      case Opcode.StdFloorPitRectangleF0L1:
-      case Opcode.StdFloorPitRectangleF0:
-      case Opcode.StdFloorPitRectangleF0R1:
-        return this.opFloorPitRectangle(opcode);
-
-      // Teleporter rectangles - push rectangle index
-      case Opcode.StdTeleporterRectangleF3L1:
-      case Opcode.StdTeleporterRectangleF3:
-      case Opcode.StdTeleporterRectangleF3R1:
-      case Opcode.StdTeleporterRectangleF2L1:
-      case Opcode.StdTeleporterRectangleF2:
-      case Opcode.StdTeleporterRectangleF2R1:
-      case Opcode.StdTeleporterRectangleF1L1:
-      case Opcode.StdTeleporterRectangleF1:
-      case Opcode.StdTeleporterRectangleF1R1:
-      case Opcode.StdTeleporterRectangleF0L1:
-      case Opcode.StdTeleporterRectangleF0:
-      case Opcode.StdTeleporterRectangleF0R1:
-        return this.opTeleporterRectangle(opcode);
-
-      // Stair rectangles (facing up)
-      case Opcode.StdStairFacingUpRectangleF3L1:
-      case Opcode.StdStairFacingUpRectangleF3:
-      case Opcode.StdStairFacingUpRectangleF3R1:
-      case Opcode.StdStairFacingUpRectangleF2L1:
-      case Opcode.StdStairFacingUpRectangleF2:
-      case Opcode.StdStairFacingUpRectangleF2R1:
-      case Opcode.StdStairFacingUpRectangleF1L1:
-      case Opcode.StdStairFacingUpRectangleF1:
-      case Opcode.StdStairFacingUpRectangleF1R1:
-      case Opcode.StdStairFacingUpRectangleF0L:
-      case Opcode.StdStairFacingUpRectangleF0R:
-        return this.opStairRectangle(opcode);
-
-      // Stair rectangles (facing down)
-      case Opcode.StdStairFacingDownRectangleF3L1:
-      case Opcode.StdStairFacingDownRectangleF3:
-      case Opcode.StdStairFacingDownRectangleF3R1:
-      case Opcode.StdStairFacingDownRectangleF2L1:
-      case Opcode.StdStairFacingDownRectangleF2:
-      case Opcode.StdStairFacingDownRectangleF2R1:
-      case Opcode.StdStairFacingDownRectangleF1L1:
-      case Opcode.StdStairFacingDownRectangleF1:
-      case Opcode.StdStairFacingDownRectangleF1R1:
-      case Opcode.StdStairFacingDownRectangleF0L:
-      case Opcode.StdStairFacingDownRectangleF0R:
-        return this.opStairRectangle(opcode);
-
-      // Stair graphics (facing up)
-      case Opcode.StdStairFacingUpGraphicF3L1:
-      case Opcode.StdStairFacingUpGraphicF3:
-      case Opcode.StdStairFacingUpGraphicF3R1:
-      case Opcode.StdStairFacingUpGraphicF2L1:
-      case Opcode.StdStairFacingUpGraphicF2:
-      case Opcode.StdStairFacingUpGraphicF2R1:
-      case Opcode.StdStairFacingUpGraphicF1L1:
-      case Opcode.StdStairFacingUpGraphicF1:
-      case Opcode.StdStairFacingUpGraphicF1R1:
-      case Opcode.StdStairFacingUpGraphicF0:
-        return this.opStairGraphic(opcode);
-
-      // Stair graphics (facing down)
-      case Opcode.StdStairFacingDownGraphicF3L1:
-      case Opcode.StdStairFacingDownGraphicF3:
-      case Opcode.StdStairFacingDownGraphicF3R1:
-      case Opcode.StdStairFacingDownGraphicF2L1:
-      case Opcode.StdStairFacingDownGraphicF2:
-      case Opcode.StdStairFacingDownGraphicF2R1:
-      case Opcode.StdStairFacingDownGraphicF1L1:
-      case Opcode.StdStairFacingDownGraphicF1:
-      case Opcode.StdStairFacingDownGraphicF1R1:
-      case Opcode.StdStairFacingDownGraphicF0:
-        return this.opStairGraphic(opcode);
-
-      // Stair edge graphics and rectangles
-      case Opcode.StdStairEdgeGraphicF2:
-      case Opcode.StdStairEdgeGraphicUpF1:
-      case Opcode.StdStairEdgeGraphicDownF1:
-      case Opcode.StdStairEdgeGraphicF0L1:
-      case Opcode.StdStairEdgeGraphicF0R1:
-        return this.opStairEdgeGraphic(opcode);
-
-      case Opcode.StdStairEdgeRectF2L1:
-      case Opcode.StdStairEdgeRectF2R1:
-      case Opcode.StdStairEdgeUpRectF1L1:
-      case Opcode.StdStairEdgeUpRectF1R1:
-      case Opcode.StdStairEdgeDownRectF1L1:
-      case Opcode.StdStairEdgeDownRectF1R1:
-      case Opcode.StdStairEdgeRectF0L1:
-      case Opcode.StdStairEdgeRectF0R1:
-        return this.opStairEdgeRectangle(opcode);
-
-      // Door opcodes (bitmaps, rectangles, states, indices)
-      case Opcode.StdDoorEdgeFrameBitmapF0:
-      case Opcode.StdDoorFacingFrameLeftBitmapF2:
-      case Opcode.StdDoorFacingFrameLeftBitmapF1:
-      case Opcode.StdDoorFacingFrameRightBitmapF1:
-      case Opcode.StdDoorFacingFrameLeftBitmapF3:
-      case Opcode.StdDoorFacingFrameLeftBitmapF3R1:
-      case Opcode.StdDoorFacingFrameLeftBitmapF3L1:
-      case Opcode.StdDoorFacingTopTrackBitmapF1:
-      case Opcode.StdDoorFacingTopTrackBitmapF2:
-        return this.opDoorBitmap(opcode);
-
-      case Opcode.F3L1DoorRecordIndex:
-      case Opcode.F3DoorRecordIndex:
-      case Opcode.F3R1DoorRecordIndex:
-      case Opcode.F2L1DoorRecordIndex:
-      case Opcode.F2DoorRecordIndex:
-      case Opcode.F2R1DoorRecordIndex:
-      case Opcode.F1L1DoorRecordIndex:
-      case Opcode.F1DoorRecordIndex:
-      case Opcode.F1R1DoorRecordIndex:
-      case Opcode.F0DoorRecordIndex:
-        return this.opDoorRecordIndex(opcode);
-
-      case Opcode.F3L1DoorState:
-      case Opcode.F3DoorState:
-      case Opcode.F3R1DoorState:
-      case Opcode.F2L1DoorState:
-      case Opcode.F2DoorState:
-      case Opcode.F2R1DoorState:
-      case Opcode.F1L1DoorState:
-      case Opcode.F1DoorState:
-      case Opcode.F1R1DoorState:
-      case Opcode.F0DoorState:
-        return this.opDoorState(opcode);
-
-      case Opcode.StdDoorGraphicsF3:
-      case Opcode.StdDoorGraphicsF2:
-      case Opcode.StdDoorGraphicsF1:
-        return this.opDoorGraphics(opcode);
-
-      case Opcode.StdDoorRectsF3L1:
-      case Opcode.StdDoorRectsF3:
-      case Opcode.StdDoorRectsF3R1:
-      case Opcode.StdDoorRectsF2L1:
-      case Opcode.StdDoorRectsF2:
-      case Opcode.StdDoorRectsF2R1:
-      case Opcode.StdDoorRectsF1L1:
-      case Opcode.StdDoorRectsF1:
-      case Opcode.StdDoorRectsF1R1:
-      case Opcode.StdDoorRectsF0:
-        return this.opDoorRects(opcode);
-
-      case Opcode.StdDoorEdgeFrameRectF0:
-      case Opcode.StdDoorFacingTopTrackRectF2L1:
-      case Opcode.StdDoorFacingTopTrackRectF2:
-      case Opcode.StdDoorFacingTopTrackRectF2R1:
-      case Opcode.StdDoorFacingTopTrackRectF1L1:
-      case Opcode.StdDoorFacingTopTrackRectF1:
-      case Opcode.StdDoorFacingTopTrackRectF1R1:
-      case Opcode.StdDoorFacingTopTrackRectF0:
-      case Opcode.StdDoorFacingFrameRectF3L1:
-      case Opcode.StdDoorFacingFrameRectF3R1:
-      case Opcode.StdDoorFacingFrameRightRectF3:
-      case Opcode.StdDoorFacingFrameLeftRectF3:
-      case Opcode.StdDoorFacingFrameRightRectF2:
-      case Opcode.StdDoorFacingFrameLeftRectF2:
-      case Opcode.StdDoorFacingFrameRightRectF1:
-      case Opcode.StdDoorFacingFrameLeftRectF1:
-        return this.opDoorFrameRectangle(opcode);
-
-      // Drawing order opcodes - push draw order value
-      case Opcode.DrawOrder00:
-      case Opcode.DrawOrder01:
-      case Opcode.DrawOrder02:
-      case Opcode.DrawOrder18:
-      case Opcode.DrawOrder21:
-      case Opcode.DrawOrder28:
-      case Opcode.DrawOrder32:
-      case Opcode.DrawOrder39:
-      case Opcode.DrawOrder41:
-      case Opcode.DrawOrder49:
-      case Opcode.DrawOrder128:
-      case Opcode.DrawOrder218:
-      case Opcode.DrawOrder321:
-      case Opcode.DrawOrder342:
-      case Opcode.DrawOrder349:
-      case Opcode.DrawOrder412:
-      case Opcode.DrawOrder431:
-      case Opcode.DrawOrder439:
-      case Opcode.DrawOrder3421:
-      case Opcode.DrawOrder4312:
-        return this.opDrawOrder(opcode);
-
-      // XY position opcodes - push x,y coordinates
-      case Opcode.F4L1xy:
-      case Opcode.F4xy:
-      case Opcode.F4R1xy:
-      case Opcode.F3L2xy:
-      case Opcode.F3L1xy:
-      case Opcode.F3xy:
-      case Opcode.F3R1xy:
-      case Opcode.F3R2xy:
-      case Opcode.F2L1xy:
-      case Opcode.F2xy:
-      case Opcode.F2R1xy:
-      case Opcode.F1L1xy:
-      case Opcode.F1xy:
-      case Opcode.F1R1xy:
-      case Opcode.F0L1xy:
-      case Opcode.F0xy:
-      case Opcode.F0R1xy:
-        return this.opCellXY(opcode);
-
-      // Contents opcodes - push contents/object list
-      case Opcode.F4L1Contents:
-      case Opcode.F4Contents:
-      case Opcode.F4R1Contents:
-      case Opcode.F3L2Contents:
-      case Opcode.F3L1Contents:
-      case Opcode.F3Contents:
-      case Opcode.F3R1Contents:
-      case Opcode.F3R2Contents:
-      case Opcode.F2L1Contents:
-      case Opcode.F2Contents:
-      case Opcode.F2R1Contents:
-      case Opcode.F1L1Contents:
-      case Opcode.F1Contents:
-      case Opcode.F1R1Contents:
-      case Opcode.F0L1Contents:
-      case Opcode.F0Contents:
-      case Opcode.F0R1Contents:
-        return this.opCellContents(opcode);
-
-      // Wall position opcodes (for decorations)
-      case Opcode.WallF3L1Front:
-      case Opcode.WallF3L1Right:
-      case Opcode.WallF3Front:
-      case Opcode.WallF3R1Left:
-      case Opcode.WallF3R1Front:
-      case Opcode.WallF2L1Front:
-      case Opcode.WallF2L1Right:
-      case Opcode.WallF2Front:
-      case Opcode.WallF2R1Left:
-      case Opcode.WallF2R1Front:
-      case Opcode.WallF1L1Right:
-      case Opcode.WallF1Front:
-      case Opcode.WallF1R1Left:
-        return this.opWallPosition(opcode);
-
-      case Opcode.ToR:
-        rpush(pop());
-        return true;
-      case Opcode.RTo:
-        push(rpop());
-        return true;
-      case Opcode.CurrentSkin:
-      case Opcode.SkinNumber:
-      case Opcode.CurrentCell:
-      case Opcode.WallGraphicID:
-      case Opcode.FloorGraphicID:
-      case Opcode.MiddleGraphicID:
-      case Opcode.CeilingGraphicID:
-      case Opcode.WallMaskID:
-      case Opcode.FloorMaskID:
-      case Opcode.MiddleMaskID:
-      case Opcode.CeilingMaskID:
-      case Opcode.WallDecorationID:
-        return this.opSkinQuery(opcode);
-      case Opcode.DrawCustomGraphic:
-      case Opcode.CreateVirtualBitmap:
-      case Opcode.DrawCustomDecoration:
-      case Opcode.CreateVirtualMask:
-      case Opcode.CreateVirtualAffineMask:
-        return this.opCustomGraphic(opcode);
-      case Opcode.GetMaskHeader:
-      case Opcode.NeedVirtualMaskQ:
-      case Opcode.BitmapInfo:
-        return this.opBackgroundQuery(opcode);
-      case Opcode.SWAP:
-      case Opcode.DROP:
-      case Opcode.TwoDrop:
-      case Opcode.OVER:
-      case Opcode.ROT:
-      case Opcode.DUP:
-      case Opcode.TwoDup:
-      case Opcode.QuestionDUP:
-      case Opcode.PICK:
-      case Opcode.ROLL:
-      case Opcode.PLUS:
-      case Opcode.MINUS:
-      case Opcode.GEAR:
-      case Opcode.SLASH:
-      case Opcode.EQUAL:
-      case Opcode.LESS:
-      case Opcode.GREATER:
-      case Opcode.ULESS:
-      case Opcode.ZEROEQUAL:
-      case Opcode.NOT:
-      case Opcode.ZEROLESS:
-      case Opcode.ZEROGREATER:
-      case Opcode.AND:
-      case Opcode.OR:
-      case Opcode.LSHIFT:
-      case Opcode.IsOdd:
-        return this.opStackWord(opcode);
-
-      default:
-        if (opcode < 60000) {
-          rpush(this.pc);
-          this.pc = opcode;
-          return true;
-        }
-        // `InterpretError("Unknown display opcode...")`, and `Interpret` returns.
-        console.warn(`WARNING: Unimplemented opcode ${opcode}`);
-        return false;
+    if (opcode < FIRST_OPCODE) {
+      rpush(this.pc);
+      this.pc = opcode;
+      return true;
     }
+    const decoded = BytecodeInterpreter.decode[opcode - FIRST_OPCODE];
+    if (decoded === undefined) {
+      // `InterpretError("Unknown display opcode...")`, and `Interpret` returns.
+      console.warn(`WARNING: Unimplemented opcode ${opcode}`);
+      return false;
+    }
+    return decoded.run(this, decoded.operand);
   }
 
   // ============================================================
@@ -1267,37 +1134,19 @@ export class BytecodeInterpreter {
     const rectanglePtr = pop();
     const bitmapPtr = pop();
 
-    // StdBltShape(bitmapPtr=${bitmapPtr}, rectPtr=${rectanglePtr})
-
     const bitmap = this.resolveStdBitmapPointer(bitmapPtr);
     const rectRef = this.resolveStdRectanglePointer(rectanglePtr);
-    if (!bitmap) {
-      // ERROR: Unknown StdBitmapPointers(${bitmapPtr})
-      return true;
-    }
-    if (!rectRef) {
-      // ERROR: Unknown StdRectanglePointers(${rectanglePtr})
-      return true;
-    }
-    if (Array.isArray(rectRef)) {
-      // ERROR: StdBltShape expects a single RectPos, got an array
-      return true;
-    }
-
+    if (!bitmap || !rectRef || Array.isArray(rectRef)) return true;
     this.draw.blitShapeBitmapToViewport(bitmap, rectRef, false);
-
     return true;
   }
 
   private opJumpZ(): boolean {
-    // Pop condition from stack
     const condition = pop();
-    // Next value is jump offset
     const offset = i16(this.program[this.pc]!);
     this.pc++;
 
     if (condition === 0) {
-      // -> Jumping ${offset} instructions
       this.pc += offset;
     }
 
@@ -1310,7 +1159,6 @@ export class BytecodeInterpreter {
     this.pc++;
 
     if (condition !== 0) {
-      // -> Jumping ${offset} instructions
       this.pc += offset;
     }
 
@@ -1321,50 +1169,16 @@ export class BytecodeInterpreter {
     const offset = i16(this.program[this.pc]!);
     this.pc++;
 
-    // -> Jumping ${offset} instructions
     this.pc += offset;
     return true;
   }
 
   private opLiteral(): boolean {
-    // Next value is the literal to push
     const value = this.program[this.pc]!;
     this.pc++;
 
-    // Literal(${value})
     push(value);
 
-    return true;
-  }
-
-  private opWallBitmap(opcode: number): boolean {
-    // Push CSBWin BITMAP_POINTERS value (resolved later by StdBitmapPointers).
-    const mapping: { [key: number]: number } = {
-      [Opcode.StdWallBitmapF3L2]: StdBitmapPtr.BMP_StdWallBitmapF3L2,
-      [Opcode.StdWallBitmapF3L1]: StdBitmapPtr.BMP_StdWallBitmapF3L1,
-      [Opcode.StdWallBitmapF3]: StdBitmapPtr.BMP_StdWallBitmapF3,
-      [Opcode.StdWallBitmapF3R1]: StdBitmapPtr.BMP_StdWallBitmapF3R1,
-      [Opcode.StdWallBitmapF3R2]: StdBitmapPtr.BMP_StdWallBitmapF3R2,
-      [Opcode.StdWallBitmapF2L1]: StdBitmapPtr.BMP_StdWallBitmapF2L1,
-      [Opcode.StdWallBitmapF2]: StdBitmapPtr.BMP_StdWallBitmapF2,
-      [Opcode.StdWallBitmapF2R1]: StdBitmapPtr.BMP_StdWallBitmapF2R1,
-      [Opcode.StdWallBitmapF1L1]: StdBitmapPtr.BMP_StdWallBitmapF1L1,
-      [Opcode.StdWallBitmapF1]: StdBitmapPtr.BMP_StdWallBitmapF1,
-      [Opcode.StdWallBitmapF1R1]: StdBitmapPtr.BMP_StdWallBitmapF1R1,
-      [Opcode.StdWallBitmapF0L1]: StdBitmapPtr.BMP_StdWallBitmapF0L1,
-      [Opcode.StdWallBitmapF0R1]: StdBitmapPtr.BMP_StdWallBitmapF0R1,
-    };
-    const ptr = mapping[opcode] ?? StdBitmapPtr.BMP_StdWallBitmapF3;
-    // WallBitmapPtr[${ptr}]
-    push(ptr);
-    return true;
-  }
-
-  private opWallRectangle(opcode: number): boolean {
-    // Push CSBWin RECT_POINTERS value (resolved later by StdRectanglePointers)
-    const rectPtr = this.getStdWallRectanglePointer(opcode);
-    // WallRectanglePtr[${rectPtr}]
-    push(rectPtr);
     return true;
   }
 
@@ -1375,11 +1189,9 @@ export class BytecodeInterpreter {
     const rectRef = this.resolveStdRectanglePointer(rectanglePtr);
     const bitmap = this.resolveStdBitmapPointer(bitmapPtr);
     if (!rectRef || Array.isArray(rectRef) || !bitmap) {
-      // ERROR: Invalid args bitmapPtr=${bitmapPtr} rectPtr=${rectanglePtr}
       return true;
     }
 
-    // ${mirror ? 'StdMirrorShapeToViewport' : 'StdBltShapeToViewport'}(bitmapPtr=${bitmapPtr}, rectPtr=${rectanglePtr})
     this.draw.blitShapeBitmapToViewport(bitmap, rectRef, mirror);
     return true;
   }
@@ -1390,23 +1202,19 @@ export class BytecodeInterpreter {
     const graphicNum = pop();
     const rectRef = this.resolveStdRectanglePointer(rectanglePtr);
     if (!rectRef || Array.isArray(rectRef)) {
-      // ERROR: Invalid rectanglePtr=${rectanglePtr}
       return true;
     }
 
     const getGraphic = this.context.getGraphicBitmap;
     if (!getGraphic) {
-      // ERROR: Missing context.getGraphicBitmap
       return true;
     }
 
     const bitmap = getGraphic(graphicNum);
     if (!bitmap) {
-      // ERROR: Could not resolve basic graphic ${graphicNum}
       return true;
     }
 
-    // ${mirror ? 'StdMirrorGraphicToViewport' : 'StdGraphicToViewport'}(graphic=${graphicNum}, rectPtr=${rectanglePtr})
     this.draw.blitShapeBitmapToViewport(bitmap, rectRef, mirror);
     return true;
   }
@@ -1415,33 +1223,6 @@ export class BytecodeInterpreter {
     // CSBWin `GetDecoration0` (Viewport.cpp:2882-2885)
     const relativeCell = pop();
     const v = this.context.roomData[relativeCell]?.decorations[0] ?? 0;
-    // GetDecoration0(cell=${relativeCell}) -> ${v}
-    push(v);
-    return true;
-  }
-
-  private opCellNumber(opcode: number): boolean {
-    const cell = this.relativeCellFromCellOpcode(opcode);
-    // CellNumber(${Opcode[opcode]}) -> ${cell}
-    push(cell);
-    return true;
-  }
-
-  private opCondition(opcode: number): boolean {
-    if (opcode === Opcode.Alcove) {
-      // CSBWin uses the last StdDrawWallDecoration result (Viewport.cpp:2953).
-      push(this.hasAlcove ? 1 : 0);
-      return true;
-    }
-    // Condition(${Opcode[opcode]}) -> 0
-    push(0);
-    return true;
-  }
-
-  private opWallDecorationPos(opcode: number): boolean {
-    // CSBWin Viewport.cpp:2648-2650
-    const v = opcode === Opcode.wallDecorationFront ? 1 : opcode === Opcode.wallDecorationLeft ? 2 : 0;
-    // WallDecorationPos(${Opcode[opcode]}) -> ${v}
     push(v);
     return true;
   }
@@ -1452,7 +1233,6 @@ export class BytecodeInterpreter {
     const relativeCell = pop();
     const cell = this.context.roomData[relativeCell];
     const has = cell ? (cell.decorations[wallDecorationPos as 0 | 1 | 2] !== 0 ? 1 : 0) : 0;
-    // HasDecoration(cell=${relativeCell}, pos=${wallDecorationPos}) -> ${has}
     push(has);
     return true;
   }
@@ -1468,14 +1248,6 @@ export class BytecodeInterpreter {
     const rec = dungeon.getDoorRecordByIndex(doorIndex | 0);
     const hasSwitch = rec?.hasButton ? 1 : 0;
     push(hasSwitch);
-    return true;
-  }
-
-  private opFloorDecorationGraphicOrdinal(opcode: number): boolean {
-    const cell = this.relativeCellFromFloorDecorationOpcode(opcode);
-    const v = this.context.roomData[cell]?.decorations[2] ?? 0;
-    // FloorDecorationGraphicOrdinal(${Opcode[opcode]}) cell=${cell} -> ${v}
-    push(v);
     return true;
   }
 
@@ -1617,7 +1389,6 @@ export class BytecodeInterpreter {
     const idx = relCellRF | 0;
     const relativeCell = BytecodeInterpreter.objectDrawingLocations[idx] ?? 0;
 
-    // StdDrawRoomObjects(first=${firstObject}, x=${mapX}, y=${mapY}, rf=${relCellRF} -> rel=${relativeCell}, drawOrder=0x${drawOrder.toString(16)})
     DrawRoomObjects(this.draw, firstObject, facing, mapX | 0, mapY | 0, relativeCell | 0, drawOrder | 0);
     return true;
   }
@@ -1630,7 +1401,6 @@ export class BytecodeInterpreter {
     const wallRect = this.resolveStdRectanglePointer(wallRectPtr);
     const teleporterRect = this.resolveStdRectanglePointer(teleporterRectPtr);
     if (!wallRect || Array.isArray(wallRect) || !teleporterRect || Array.isArray(teleporterRect)) {
-      // ERROR: StdDrawTeleporter - invalid rectangle pointers
       return true;
     }
 
@@ -1647,7 +1417,6 @@ export class BytecodeInterpreter {
 
     const rectRef = this.resolveStdRectanglePointer(rectPtr);
     if (!rectRef || !Array.isArray(rectRef)) {
-      // ERROR: StdDrawDoor - expected door rect array from rectPtr=${rectPtr}
       return true;
     }
 
@@ -1694,235 +1463,35 @@ export class BytecodeInterpreter {
   // HELPER FUNCTIONS
   // ============================================================
 
-  private getStdWallRectanglePointer(opcode: number): StdRectPtr {
-    // Direct port of CSBWin's opcode→RECT_POINTERS mapping (Viewport.cpp:2304+).
-    const mapping: { [key: number]: StdRectPtr } = {
-      [Opcode.StdWallRectangleF3L2]: StdRectPtr.RECT_StdWallRectangleF3L2,
-      [Opcode.StdWallRectangleF3L1]: StdRectPtr.RECT_StdWallRectangleF3L1,
-      [Opcode.StdWallRectangleF3]: StdRectPtr.RECT_StdWallRectangleF3,
-      [Opcode.StdWallRectangleF3R1]: StdRectPtr.RECT_StdWallRectangleF3R1,
-      [Opcode.StdWallRectangleF3R2]: StdRectPtr.RECT_StdWallRectangleF3R2,
-      [Opcode.StdWallRectangleF2L1]: StdRectPtr.RECT_StdWallRectangleF2L1,
-      [Opcode.StdWallRectangleF2]: StdRectPtr.RECT_StdWallRectangleF2,
-      [Opcode.StdWallRectangleF2R1]: StdRectPtr.RECT_StdWallRectangleF2R1,
-      [Opcode.StdWallRectangleF1L1]: StdRectPtr.RECT_StdWallRectangleF1L1,
-      [Opcode.StdWallRectangleF1]: StdRectPtr.RECT_StdWallRectangleF1,
-      [Opcode.StdWallRectangleF1R1]: StdRectPtr.RECT_StdWallRectangleF1R1,
-      [Opcode.StdWallRectangleF0L1]: StdRectPtr.RECT_StdWallRectangleF0L1,
-      [Opcode.StdWallRectangleF0]: StdRectPtr.RECT_StdWallRectangleF0,
-      [Opcode.StdWallRectangleF0R1]: StdRectPtr.RECT_StdWallRectangleF0R1,
-    };
-    return mapping[opcode] ?? StdRectPtr.RECT_StdWallRectangleF3;
+  /** `F4L1xy`…: the cell's map square. */
+  private opCellXY(cell: number): boolean {
+    const rd = this.context.roomData[cell];
+    push(rd?.x ?? 0);
+    push(rd?.y ?? 0);
+    return true;
   }
 
-  /** Public so that `tools/` can stand in fixed rectangles for a context without them. */
+  /** `F4L1Contents`…: the cell's first object. */
+  private opCellContents(cell: number): boolean {
+    push(this.context.roomData[cell]?.rn2 ?? 0);
+    return true;
+  }
+
+  /** A door's state (`decorations[0]`), its record index (`[1]`), or a floor decoration (`[2]`). */
+  private opCellDecoration(cell: number, index: 0 | 1 | 2): boolean {
+    push(this.context.roomData[cell]?.decorations[index] ?? 0);
+    return true;
+  }
+
+  /** A stair graphic of the level's wall set (`STAIR_GRAPHIC_OPCODES`). */
+  private opStairGraphic(offset: number): boolean {
+    push(90 + (this.context.wallGraphicSet ?? 0) * 18 + offset);
+    return true;
+  }
+
+  /** `StdRectanglePointers`, through `STD_RECTANGLE_POINTERS`. Public so that `tools/` can stand in fixed rectangles for a context without them. */
   resolveStdRectanglePointer(ptr: number): RectPos | RectPos[] | null {
-    // Direct port of CSBWin's StdRectanglePointers() (Viewport.cpp:2298+),
-    // but returning TS references instead of raw pointers.
-    switch (ptr) {
-      case StdRectPtr.RECT_StdWallRectangleF3L2:
-        return this.context.wallRectangles[13] ?? null;
-      case StdRectPtr.RECT_StdWallRectangleF3L1:
-        return this.context.wallRectangles[1] ?? null;
-      case StdRectPtr.RECT_StdWallRectangleF3:
-        return this.context.wallRectangles[0] ?? null;
-      case StdRectPtr.RECT_StdWallRectangleF3R1:
-        return this.context.wallRectangles[2] ?? null;
-      case StdRectPtr.RECT_StdWallRectangleF3R2:
-        return this.context.wallRectangles[12] ?? null;
-      case StdRectPtr.RECT_StdWallRectangleF2L1:
-        return this.context.wallRectangles[4] ?? null;
-      case StdRectPtr.RECT_StdWallRectangleF2:
-        return this.context.wallRectangles[3] ?? null;
-      case StdRectPtr.RECT_StdWallRectangleF2R1:
-        return this.context.wallRectangles[5] ?? null;
-      case StdRectPtr.RECT_StdWallRectangleF1L1:
-        return this.context.wallRectangles[7] ?? null;
-      case StdRectPtr.RECT_StdWallRectangleF1:
-        return this.context.wallRectangles[6] ?? null;
-      case StdRectPtr.RECT_StdWallRectangleF1R1:
-        return this.context.wallRectangles[8] ?? null;
-      case StdRectPtr.RECT_StdWallRectangleF0L1:
-        return this.context.wallRectangles[10] ?? null;
-      case StdRectPtr.RECT_StdWallRectangleF0:
-        return this.context.wallRectangles[9] ?? null;
-      case StdRectPtr.RECT_StdWallRectangleF0R1:
-        return this.context.wallRectangles[11] ?? null;
-
-      case StdRectPtr.RECT_StdFloorPitRectangleF3L1:
-        return this.context.floorPitRectangles?.[11] ?? null;
-      case StdRectPtr.RECT_StdFloorPitRectangleF3:
-        return this.context.floorPitRectangles?.[10] ?? null;
-      case StdRectPtr.RECT_StdFloorPitRectangleF3R1:
-        return this.context.floorPitRectangles?.[9] ?? null;
-      case StdRectPtr.RECT_StdFloorPitRectangleF2L1:
-        return this.context.floorPitRectangles?.[8] ?? null;
-      case StdRectPtr.RECT_StdFloorPitRectangleF2:
-        return this.context.floorPitRectangles?.[7] ?? null;
-      case StdRectPtr.RECT_StdFloorPitRectangleF2R1:
-        return this.context.floorPitRectangles?.[6] ?? null;
-      case StdRectPtr.RECT_StdFloorPitRectangleF1L1:
-        return this.context.floorPitRectangles?.[5] ?? null;
-      case StdRectPtr.RECT_StdFloorPitRectangleF1:
-        return this.context.floorPitRectangles?.[4] ?? null;
-      case StdRectPtr.RECT_StdFloorPitRectangleF1R1:
-        return this.context.floorPitRectangles?.[3] ?? null;
-      case StdRectPtr.RECT_StdFloorPitRectangleF0L1:
-        return this.context.floorPitRectangles?.[2] ?? null;
-      case StdRectPtr.RECT_StdFloorPitRectangleF0:
-        return this.context.floorPitRectangles?.[1] ?? null;
-      case StdRectPtr.RECT_StdFloorPitRectangleF0R1:
-        return this.context.floorPitRectangles?.[0] ?? null;
-
-      case StdRectPtr.RECT_StdTeleporterRectangleF3L1:
-        return this.context.teleporterRectangles?.[1] ?? null;
-      case StdRectPtr.RECT_StdTeleporterRectangleF3:
-        return this.context.teleporterRectangles?.[0] ?? null;
-      case StdRectPtr.RECT_StdTeleporterRectangleF3R1:
-        return this.context.teleporterRectangles?.[2] ?? null;
-      case StdRectPtr.RECT_StdTeleporterRectangleF2L1:
-        return this.context.teleporterRectangles?.[4] ?? null;
-      case StdRectPtr.RECT_StdTeleporterRectangleF2:
-        return this.context.teleporterRectangles?.[3] ?? null;
-      case StdRectPtr.RECT_StdTeleporterRectangleF2R1:
-        return this.context.teleporterRectangles?.[5] ?? null;
-      case StdRectPtr.RECT_StdTeleporterRectangleF1L1:
-        return this.context.teleporterRectangles?.[7] ?? null;
-      case StdRectPtr.RECT_StdTeleporterRectangleF1:
-        return this.context.teleporterRectangles?.[6] ?? null;
-      case StdRectPtr.RECT_StdTeleporterRectangleF1R1:
-        return this.context.teleporterRectangles?.[8] ?? null;
-      case StdRectPtr.RECT_StdTeleporterRectangleF0L1:
-        return this.context.teleporterRectangles?.[10] ?? null;
-      case StdRectPtr.RECT_StdTeleporterRectangleF0:
-        return this.context.teleporterRectangles?.[9] ?? null;
-      case StdRectPtr.RECT_StdTeleporterRectangleF0R1:
-        return this.context.teleporterRectangles?.[11] ?? null;
-
-      case StdRectPtr.RECT_StdStairFacingDownRectangleF3L1:
-        return this.context.stairFacingDownRectangles?.[10] ?? null;
-      case StdRectPtr.RECT_StdStairFacingDownRectangleF3:
-        return this.context.stairFacingDownRectangles?.[9] ?? null;
-      case StdRectPtr.RECT_StdStairFacingDownRectangleF3R1:
-        return this.context.stairFacingDownRectangles?.[8] ?? null;
-      case StdRectPtr.RECT_StdStairFacingDownRectangleF2L1:
-        return this.context.stairFacingDownRectangles?.[7] ?? null;
-      case StdRectPtr.RECT_StdStairFacingDownRectangleF2:
-        return this.context.stairFacingDownRectangles?.[6] ?? null;
-      case StdRectPtr.RECT_StdStairFacingDownRectangleF2R1:
-        return this.context.stairFacingDownRectangles?.[5] ?? null;
-      case StdRectPtr.RECT_StdStairFacingDownRectangleF1L1:
-        return this.context.stairFacingDownRectangles?.[4] ?? null;
-      case StdRectPtr.RECT_StdStairFacingDownRectangleF1:
-        return this.context.stairFacingDownRectangles?.[3] ?? null;
-      case StdRectPtr.RECT_StdStairFacingDownRectangleF1R1:
-        return this.context.stairFacingDownRectangles?.[2] ?? null;
-      case StdRectPtr.RECT_StdStairFacingDownRectangleF0L:
-        return this.context.stairFacingDownRectangles?.[1] ?? null;
-      case StdRectPtr.RECT_StdStairFacingDownRectangleF0R:
-        return this.context.stairFacingDownRectangles?.[0] ?? null;
-
-      case StdRectPtr.RECT_StdStairFacingUpRectangleF3L1:
-        return this.context.stairFacingUpRectangles?.[10] ?? null;
-      case StdRectPtr.RECT_StdStairFacingUpRectangleF3:
-        return this.context.stairFacingUpRectangles?.[9] ?? null;
-      case StdRectPtr.RECT_StdStairFacingUpRectangleF3R1:
-        return this.context.stairFacingUpRectangles?.[8] ?? null;
-      case StdRectPtr.RECT_StdStairFacingUpRectangleF2L1:
-        return this.context.stairFacingUpRectangles?.[7] ?? null;
-      case StdRectPtr.RECT_StdStairFacingUpRectangleF2:
-        return this.context.stairFacingUpRectangles?.[6] ?? null;
-      case StdRectPtr.RECT_StdStairFacingUpRectangleF2R1:
-        return this.context.stairFacingUpRectangles?.[5] ?? null;
-      case StdRectPtr.RECT_StdStairFacingUpRectangleF1L1:
-        return this.context.stairFacingUpRectangles?.[4] ?? null;
-      case StdRectPtr.RECT_StdStairFacingUpRectangleF1:
-        return this.context.stairFacingUpRectangles?.[3] ?? null;
-      case StdRectPtr.RECT_StdStairFacingUpRectangleF1R1:
-        return this.context.stairFacingUpRectangles?.[2] ?? null;
-      case StdRectPtr.RECT_StdStairFacingUpRectangleF0L:
-        return this.context.stairFacingUpRectangles?.[1] ?? null;
-      case StdRectPtr.RECT_StdStairFacingUpRectangleF0R:
-        return this.context.stairFacingUpRectangles?.[0] ?? null;
-
-      case StdRectPtr.RECT_StdStairEdgeRectangleF2L1:
-        return this.context.stairEdgeRectangles?.[7] ?? null;
-      case StdRectPtr.RECT_StdStairEdgeRectangleF2R1:
-        return this.context.stairEdgeRectangles?.[6] ?? null;
-      case StdRectPtr.RECT_StdStairEdgeDownRectangleF1L1:
-        return this.context.stairEdgeRectangles?.[3] ?? null;
-      case StdRectPtr.RECT_StdStairEdgeUpRectangleF1L1:
-        return this.context.stairEdgeRectangles?.[5] ?? null;
-      case StdRectPtr.RECT_StdStairEdgeDownRectangleF1R1:
-        return this.context.stairEdgeRectangles?.[2] ?? null;
-      case StdRectPtr.RECT_StdStairEdgeUpRectangleF1R1:
-        return this.context.stairEdgeRectangles?.[4] ?? null;
-      case StdRectPtr.RECT_StdStairEdgeRectangleF0L:
-        return this.context.stairEdgeRectangles?.[1] ?? null;
-      case StdRectPtr.RECT_StdStairEdgeRectangleF0R:
-        return this.context.stairEdgeRectangles?.[0] ?? null;
-
-      case StdRectPtr.RECT_StdDoorFacingTopTrackRectF2L1:
-        return this.context.doorTrackTopRectangles?.[5] ?? null;
-      case StdRectPtr.RECT_StdDoorFacingTopTrackRectF2:
-        return this.context.doorTrackTopRectangles?.[4] ?? null;
-      case StdRectPtr.RECT_StdDoorFacingTopTrackRectF2R1:
-        return this.context.doorTrackTopRectangles?.[3] ?? null;
-      case StdRectPtr.RECT_StdDoorFacingTopTrackRectF1L1:
-        return this.context.doorTrackTopRectangles?.[2] ?? null;
-      case StdRectPtr.RECT_StdDoorFacingTopTrackRectF1:
-        return this.context.doorTrackTopRectangles?.[1] ?? null;
-      case StdRectPtr.RECT_StdDoorFacingTopTrackRectF1R1:
-        return this.context.doorTrackTopRectangles?.[0] ?? null;
-      case StdRectPtr.RECT_StdDoorEdgeFrameRectF0:
-        return this.context.doorTrackTopRectangles?.[6] ?? null;
-
-      case StdRectPtr.RECT_StdDoorFacingFrameRectF3L1:
-        return this.context.doorFrameRectangles?.[7] ?? null;
-      case StdRectPtr.RECT_StdDoorFacingFrameRectF3R1:
-        return this.context.doorFrameRectangles?.[6] ?? null;
-      case StdRectPtr.RECT_StdDoorFacingFrameRightRectF1:
-        return this.context.doorFrameRectangles?.[0] ?? null;
-      case StdRectPtr.RECT_StdDoorFacingFrameLeftRectF1:
-        return this.context.doorFrameRectangles?.[1] ?? null;
-      case StdRectPtr.RECT_StdDoorFacingFrameRightRectF2:
-        return this.context.doorFrameRectangles?.[2] ?? null;
-      case StdRectPtr.RECT_StdDoorFacingFrameLeftRectF2:
-        return this.context.doorFrameRectangles?.[3] ?? null;
-      case StdRectPtr.RECT_StdDoorFacingFrameRightRectF3:
-        return this.context.doorFrameRectangles?.[4] ?? null;
-      case StdRectPtr.RECT_StdDoorFacingFrameLeftRectF3:
-        return this.context.doorFrameRectangles?.[5] ?? null;
-
-      case StdRectPtr.RECT_StdDoorRectsF3L1:
-        return this.context.doorRects?.F3L1 ?? null;
-      case StdRectPtr.RECT_StdDoorRectsF3:
-        return this.context.doorRects?.F3 ?? null;
-      case StdRectPtr.RECT_StdDoorRectsF3R1:
-        return this.context.doorRects?.F3R1 ?? null;
-      case StdRectPtr.RECT_StdDoorRectsF2L1:
-        return this.context.doorRects?.F2L1 ?? null;
-      case StdRectPtr.RECT_StdDoorRectsF2:
-        return this.context.doorRects?.F2 ?? null;
-      case StdRectPtr.RECT_StdDoorRectsF2R1:
-        return this.context.doorRects?.F2R1 ?? null;
-      case StdRectPtr.RECT_StdDoorRectsF1L1:
-        return this.context.doorRects?.F1L1 ?? null;
-      case StdRectPtr.RECT_StdDoorRectsF1:
-        return this.context.doorRects?.F1 ?? null;
-      case StdRectPtr.RECT_StdDoorRectsF1R1:
-        return this.context.doorRects?.F1R1 ?? null;
-      case StdRectPtr.RECT_StdDoorRectsF0:
-        return null; // CSBWin's StdRectanglePointers does not return d.DoorRectsF0 (Viewport.cpp:2404).
-
-      case StdRectPtr.RECT_StdSeeThruWallsRect:
-        return this.context.seeThruWallsRect ?? null;
-      case StdRectPtr.RECT_StdSeeThruWallsRect2:
-        return this.context.seeThruWallsRect2 ?? null;
-
-      default:
-        return null;
-    }
+    return STD_RECTANGLE_POINTERS[ptr]?.(this.context) ?? null;
   }
 
   private resolveStdBitmapPointer(ptr: number): IndexedBitmap | null {
@@ -1978,490 +1547,5 @@ export class BytecodeInterpreter {
       default:
         return null;
     }
-  }
-
-  private opFloorPitRectangle(opcode: number): boolean {
-    const mapping: { [key: number]: StdRectPtr } = {
-      [Opcode.StdFloorPitRectangleF3L1]: StdRectPtr.RECT_StdFloorPitRectangleF3L1,
-      [Opcode.StdFloorPitRectangleF3]: StdRectPtr.RECT_StdFloorPitRectangleF3,
-      [Opcode.StdFloorPitRectangleF3R1]: StdRectPtr.RECT_StdFloorPitRectangleF3R1,
-      [Opcode.StdFloorPitRectangleF2L1]: StdRectPtr.RECT_StdFloorPitRectangleF2L1,
-      [Opcode.StdFloorPitRectangleF2]: StdRectPtr.RECT_StdFloorPitRectangleF2,
-      [Opcode.StdFloorPitRectangleF2R1]: StdRectPtr.RECT_StdFloorPitRectangleF2R1,
-      [Opcode.StdFloorPitRectangleF1L1]: StdRectPtr.RECT_StdFloorPitRectangleF1L1,
-      [Opcode.StdFloorPitRectangleF1]: StdRectPtr.RECT_StdFloorPitRectangleF1,
-      [Opcode.StdFloorPitRectangleF1R1]: StdRectPtr.RECT_StdFloorPitRectangleF1R1,
-      [Opcode.StdFloorPitRectangleF0L1]: StdRectPtr.RECT_StdFloorPitRectangleF0L1,
-      [Opcode.StdFloorPitRectangleF0]: StdRectPtr.RECT_StdFloorPitRectangleF0,
-      [Opcode.StdFloorPitRectangleF0R1]: StdRectPtr.RECT_StdFloorPitRectangleF0R1,
-    };
-    const rectPtr = mapping[opcode] ?? StdRectPtr.RECT_StdFloorPitRectangleF0;
-    // FloorPitRectanglePtr(${Opcode[opcode]})[${rectPtr}]
-    push(rectPtr);
-    return true;
-  }
-
-  private opTeleporterRectangle(opcode: number): boolean {
-    const mapping: { [key: number]: StdRectPtr } = {
-      [Opcode.StdTeleporterRectangleF3L1]: StdRectPtr.RECT_StdTeleporterRectangleF3L1,
-      [Opcode.StdTeleporterRectangleF3]: StdRectPtr.RECT_StdTeleporterRectangleF3,
-      [Opcode.StdTeleporterRectangleF3R1]: StdRectPtr.RECT_StdTeleporterRectangleF3R1,
-      [Opcode.StdTeleporterRectangleF2L1]: StdRectPtr.RECT_StdTeleporterRectangleF2L1,
-      [Opcode.StdTeleporterRectangleF2]: StdRectPtr.RECT_StdTeleporterRectangleF2,
-      [Opcode.StdTeleporterRectangleF2R1]: StdRectPtr.RECT_StdTeleporterRectangleF2R1,
-      [Opcode.StdTeleporterRectangleF1L1]: StdRectPtr.RECT_StdTeleporterRectangleF1L1,
-      [Opcode.StdTeleporterRectangleF1]: StdRectPtr.RECT_StdTeleporterRectangleF1,
-      [Opcode.StdTeleporterRectangleF1R1]: StdRectPtr.RECT_StdTeleporterRectangleF1R1,
-      [Opcode.StdTeleporterRectangleF0L1]: StdRectPtr.RECT_StdTeleporterRectangleF0L1,
-      [Opcode.StdTeleporterRectangleF0]: StdRectPtr.RECT_StdTeleporterRectangleF0,
-      [Opcode.StdTeleporterRectangleF0R1]: StdRectPtr.RECT_StdTeleporterRectangleF0R1,
-    };
-    const rectPtr = mapping[opcode] ?? StdRectPtr.RECT_StdTeleporterRectangleF0;
-    // TeleporterRectanglePtr(${Opcode[opcode]})[${rectPtr}]
-    push(rectPtr);
-    return true;
-  }
-
-  private opStairRectangle(opcode: number): boolean {
-    const mapping: { [key: number]: StdRectPtr } = {
-      // Facing up
-      [Opcode.StdStairFacingUpRectangleF3L1]: StdRectPtr.RECT_StdStairFacingUpRectangleF3L1,
-      [Opcode.StdStairFacingUpRectangleF3]: StdRectPtr.RECT_StdStairFacingUpRectangleF3,
-      [Opcode.StdStairFacingUpRectangleF3R1]: StdRectPtr.RECT_StdStairFacingUpRectangleF3R1,
-      [Opcode.StdStairFacingUpRectangleF2L1]: StdRectPtr.RECT_StdStairFacingUpRectangleF2L1,
-      [Opcode.StdStairFacingUpRectangleF2]: StdRectPtr.RECT_StdStairFacingUpRectangleF2,
-      [Opcode.StdStairFacingUpRectangleF2R1]: StdRectPtr.RECT_StdStairFacingUpRectangleF2R1,
-      [Opcode.StdStairFacingUpRectangleF1L1]: StdRectPtr.RECT_StdStairFacingUpRectangleF1L1,
-      [Opcode.StdStairFacingUpRectangleF1]: StdRectPtr.RECT_StdStairFacingUpRectangleF1,
-      [Opcode.StdStairFacingUpRectangleF1R1]: StdRectPtr.RECT_StdStairFacingUpRectangleF1R1,
-      [Opcode.StdStairFacingUpRectangleF0L]: StdRectPtr.RECT_StdStairFacingUpRectangleF0L,
-      [Opcode.StdStairFacingUpRectangleF0R]: StdRectPtr.RECT_StdStairFacingUpRectangleF0R,
-
-      // Facing down
-      [Opcode.StdStairFacingDownRectangleF3L1]: StdRectPtr.RECT_StdStairFacingDownRectangleF3L1,
-      [Opcode.StdStairFacingDownRectangleF3]: StdRectPtr.RECT_StdStairFacingDownRectangleF3,
-      [Opcode.StdStairFacingDownRectangleF3R1]: StdRectPtr.RECT_StdStairFacingDownRectangleF3R1,
-      [Opcode.StdStairFacingDownRectangleF2L1]: StdRectPtr.RECT_StdStairFacingDownRectangleF2L1,
-      [Opcode.StdStairFacingDownRectangleF2]: StdRectPtr.RECT_StdStairFacingDownRectangleF2,
-      [Opcode.StdStairFacingDownRectangleF2R1]: StdRectPtr.RECT_StdStairFacingDownRectangleF2R1,
-      [Opcode.StdStairFacingDownRectangleF1L1]: StdRectPtr.RECT_StdStairFacingDownRectangleF1L1,
-      [Opcode.StdStairFacingDownRectangleF1]: StdRectPtr.RECT_StdStairFacingDownRectangleF1,
-      [Opcode.StdStairFacingDownRectangleF1R1]: StdRectPtr.RECT_StdStairFacingDownRectangleF1R1,
-      [Opcode.StdStairFacingDownRectangleF0L]: StdRectPtr.RECT_StdStairFacingDownRectangleF0L,
-      [Opcode.StdStairFacingDownRectangleF0R]: StdRectPtr.RECT_StdStairFacingDownRectangleF0R,
-    };
-    const rectPtr = mapping[opcode] ?? StdRectPtr.RECT_StdStairFacingUpRectangleF0L;
-    // StairRectanglePtr(${Opcode[opcode]})[${rectPtr}]
-    push(rectPtr);
-    return true;
-  }
-
-  private opStairGraphic(opcode: number): boolean {
-    // Port from CSBWin Viewport.cpp:2737-2757 and Code390e.cpp:117-127.
-    const wallSet = this.context.wallGraphicSet ?? 0;
-    const base = 90 + wallSet * 18;
-    const up = (i: number) => base + i; // up[6]=base+0 ... up[0]=base+6
-    const down = (i: number) => base + 7 + i; // down[6]=base+7 ... down[0]=base+13
-
-    let graphicIndex = base;
-    switch (opcode) {
-      // Facing down
-      case Opcode.StdStairFacingDownGraphicF3L1:
-      case Opcode.StdStairFacingDownGraphicF3R1:
-        graphicIndex = down(0);
-        break;
-      case Opcode.StdStairFacingDownGraphicF3:
-        graphicIndex = down(1);
-        break;
-      case Opcode.StdStairFacingDownGraphicF2L1:
-      case Opcode.StdStairFacingDownGraphicF2R1:
-        graphicIndex = down(2);
-        break;
-      case Opcode.StdStairFacingDownGraphicF2:
-        graphicIndex = down(3);
-        break;
-      case Opcode.StdStairFacingDownGraphicF1L1:
-      case Opcode.StdStairFacingDownGraphicF1R1:
-        graphicIndex = down(4);
-        break;
-      case Opcode.StdStairFacingDownGraphicF1:
-        graphicIndex = down(5);
-        break;
-      case Opcode.StdStairFacingDownGraphicF0:
-        graphicIndex = down(6);
-        break;
-
-      // Facing up
-      case Opcode.StdStairFacingUpGraphicF3L1:
-      case Opcode.StdStairFacingUpGraphicF3R1:
-        graphicIndex = up(0);
-        break;
-      case Opcode.StdStairFacingUpGraphicF3:
-        graphicIndex = up(1);
-        break;
-      case Opcode.StdStairFacingUpGraphicF2L1:
-      case Opcode.StdStairFacingUpGraphicF2R1:
-        graphicIndex = up(2);
-        break;
-      case Opcode.StdStairFacingUpGraphicF2:
-        graphicIndex = up(3);
-        break;
-      case Opcode.StdStairFacingUpGraphicF1L1:
-      case Opcode.StdStairFacingUpGraphicF1R1:
-        graphicIndex = up(4);
-        break;
-      case Opcode.StdStairFacingUpGraphicF1:
-        graphicIndex = up(5);
-        break;
-      case Opcode.StdStairFacingUpGraphicF0:
-        graphicIndex = up(6);
-        break;
-    }
-
-    // StairGraphic(${Opcode[opcode]}) -> ${graphicIndex}
-    push(graphicIndex);
-    return true;
-  }
-
-  private opStairEdgeGraphic(opcode: number): boolean {
-    // Port from CSBWin Viewport.cpp:2807-2814 and Code390e.cpp:117-127.
-    const wallSet = this.context.wallGraphicSet ?? 0;
-    const base = 90 + wallSet * 18;
-    const edge = (i: number) => base + 14 + i; // edge[3]=base+14 ... edge[0]=base+17 (reverse mapped below)
-
-    let graphicIndex = base;
-    switch (opcode) {
-      case Opcode.StdStairEdgeGraphicF2:
-        graphicIndex = edge(0); // StairEdgeGraphic[3]
-        break;
-      case Opcode.StdStairEdgeGraphicUpF1:
-        graphicIndex = edge(1); // StairEdgeGraphic[2]
-        break;
-      case Opcode.StdStairEdgeGraphicDownF1:
-        graphicIndex = edge(2); // StairEdgeGraphic[1]
-        break;
-      case Opcode.StdStairEdgeGraphicF0L1:
-      case Opcode.StdStairEdgeGraphicF0R1:
-        graphicIndex = edge(3); // StairEdgeGraphic[0]
-        break;
-    }
-
-    // StairEdgeGraphic(${Opcode[opcode]}) -> ${graphicIndex}
-    push(graphicIndex);
-    return true;
-  }
-
-  private opStairEdgeRectangle(opcode: number): boolean {
-    const mapping: { [key: number]: StdRectPtr } = {
-      [Opcode.StdStairEdgeRectF2L1]: StdRectPtr.RECT_StdStairEdgeRectangleF2L1,
-      [Opcode.StdStairEdgeRectF2R1]: StdRectPtr.RECT_StdStairEdgeRectangleF2R1,
-      [Opcode.StdStairEdgeUpRectF1L1]: StdRectPtr.RECT_StdStairEdgeUpRectangleF1L1,
-      [Opcode.StdStairEdgeUpRectF1R1]: StdRectPtr.RECT_StdStairEdgeUpRectangleF1R1,
-      [Opcode.StdStairEdgeDownRectF1L1]: StdRectPtr.RECT_StdStairEdgeDownRectangleF1L1,
-      [Opcode.StdStairEdgeDownRectF1R1]: StdRectPtr.RECT_StdStairEdgeDownRectangleF1R1,
-      [Opcode.StdStairEdgeRectF0L1]: StdRectPtr.RECT_StdStairEdgeRectangleF0L,
-      [Opcode.StdStairEdgeRectF0R1]: StdRectPtr.RECT_StdStairEdgeRectangleF0R,
-    };
-    const rectPtr = mapping[opcode] ?? StdRectPtr.RECT_StdStairEdgeRectangleF0L;
-    // StairEdgeRectanglePtr(${Opcode[opcode]})[${rectPtr}]
-    push(rectPtr);
-    return true;
-  }
-
-  private opDoorBitmap(opcode: number): boolean {
-    // Push CSBWin BITMAP_POINTERS value (Viewport.cpp:2837-2846).
-    const mapping: { [key: number]: number } = {
-      [Opcode.StdDoorFacingFrameLeftBitmapF3L1]: StdBitmapPtr.BMP_StdDoorFacingFrameLeftBitmapF3L1,
-      [Opcode.StdDoorFacingFrameLeftBitmapF3]: StdBitmapPtr.BMP_StdDoorFacingFrameLeftBitmapF3,
-      [Opcode.StdDoorFacingFrameLeftBitmapF3R1]: StdBitmapPtr.BMP_StdDoorFacingFrameLeftBitmapF3R1,
-      [Opcode.StdDoorFacingFrameLeftBitmapF2]: StdBitmapPtr.BMP_StdDoorFacingFrameLeftBitmapF2,
-      [Opcode.StdDoorFacingFrameLeftBitmapF1]: StdBitmapPtr.BMP_StdDoorFacingFrameLeftBitmapF1,
-      [Opcode.StdDoorFacingFrameRightBitmapF1]: StdBitmapPtr.BMP_StdDoorFacingFrameRightBitmapF1,
-      [Opcode.StdDoorEdgeFrameBitmapF0]: StdBitmapPtr.BMP_StdDoorEdgeFrameBitmapF0,
-      [Opcode.StdDoorFacingTopTrackBitmapF2]: StdBitmapPtr.BMP_StdDoorFacingTopTrackBitmapF2,
-      [Opcode.StdDoorFacingTopTrackBitmapF1]: StdBitmapPtr.BMP_StdDoorFacingTopTrackBitmapF1,
-    };
-    const ptr = mapping[opcode] ?? StdBitmapPtr.BMP_StdDoorFacingFrameLeftBitmapF1;
-    // DoorBitmapPtr(${Opcode[opcode]}) -> ${ptr}
-    push(ptr);
-    return true;
-  }
-
-  private opDoorRecordIndex(opcode: number): boolean {
-    const cell = this.relativeCellFromDoorOpcode(opcode);
-    const v = this.context.roomData[cell]?.decorations[1] ?? 0;
-    // DoorRecordIndex(${Opcode[opcode]}) cell=${cell} -> ${v}
-    push(v);
-    return true;
-  }
-
-  private opDoorState(opcode: number): boolean {
-    const cell = this.relativeCellFromDoorOpcode(opcode);
-    const v = this.context.roomData[cell]?.decorations[0] ?? 0;
-    // DoorState(${Opcode[opcode]}) cell=${cell} -> ${v}
-    push(v);
-    return true;
-  }
-
-  private opDoorGraphics(opcode: number): boolean {
-    // CSBWin Viewport.cpp:2568-2570
-    const graphicsIndex =
-      opcode === Opcode.StdDoorGraphicsF3 ? 2 : opcode === Opcode.StdDoorGraphicsF2 ? 1 : 0;
-    // DoorGraphics(${Opcode[opcode]})[${graphicsIndex}]
-    push(graphicsIndex);
-    return true;
-  }
-
-  private opDoorRects(opcode: number): boolean {
-    const mapping: { [key: number]: StdRectPtr } = {
-      [Opcode.StdDoorRectsF3L1]: StdRectPtr.RECT_StdDoorRectsF3L1,
-      [Opcode.StdDoorRectsF3]: StdRectPtr.RECT_StdDoorRectsF3,
-      [Opcode.StdDoorRectsF3R1]: StdRectPtr.RECT_StdDoorRectsF3R1,
-      [Opcode.StdDoorRectsF2L1]: StdRectPtr.RECT_StdDoorRectsF2L1,
-      [Opcode.StdDoorRectsF2]: StdRectPtr.RECT_StdDoorRectsF2,
-      [Opcode.StdDoorRectsF2R1]: StdRectPtr.RECT_StdDoorRectsF2R1,
-      [Opcode.StdDoorRectsF1L1]: StdRectPtr.RECT_StdDoorRectsF1L1,
-      [Opcode.StdDoorRectsF1]: StdRectPtr.RECT_StdDoorRectsF1,
-      [Opcode.StdDoorRectsF1R1]: StdRectPtr.RECT_StdDoorRectsF1R1,
-      [Opcode.StdDoorRectsF0]: StdRectPtr.RECT_StdDoorRectsF0,
-    };
-    const rectPtr = mapping[opcode] ?? StdRectPtr.RECT_StdDoorRectsF1;
-    // DoorRectsPtr(${Opcode[opcode]})[${rectPtr}]
-    push(rectPtr);
-    return true;
-  }
-
-  private opDoorFrameRectangle(opcode: number): boolean {
-    const mapping: { [key: number]: StdRectPtr } = {
-      // Door track top (and door edge frame at F0)
-      [Opcode.StdDoorFacingTopTrackRectF2L1]: StdRectPtr.RECT_StdDoorFacingTopTrackRectF2L1,
-      [Opcode.StdDoorFacingTopTrackRectF2]: StdRectPtr.RECT_StdDoorFacingTopTrackRectF2,
-      [Opcode.StdDoorFacingTopTrackRectF2R1]: StdRectPtr.RECT_StdDoorFacingTopTrackRectF2R1,
-      [Opcode.StdDoorFacingTopTrackRectF1L1]: StdRectPtr.RECT_StdDoorFacingTopTrackRectF1L1,
-      [Opcode.StdDoorFacingTopTrackRectF1]: StdRectPtr.RECT_StdDoorFacingTopTrackRectF1,
-      [Opcode.StdDoorFacingTopTrackRectF1R1]: StdRectPtr.RECT_StdDoorFacingTopTrackRectF1R1,
-      [Opcode.StdDoorEdgeFrameRectF0]: StdRectPtr.RECT_StdDoorEdgeFrameRectF0,
-      [Opcode.StdDoorFacingTopTrackRectF0]: StdRectPtr.RECT_StdDoorEdgeFrameRectF0,
-
-      // Door facing frames
-      [Opcode.StdDoorFacingFrameRectF3L1]: StdRectPtr.RECT_StdDoorFacingFrameRectF3L1,
-      [Opcode.StdDoorFacingFrameRectF3R1]: StdRectPtr.RECT_StdDoorFacingFrameRectF3R1,
-      [Opcode.StdDoorFacingFrameRightRectF3]: StdRectPtr.RECT_StdDoorFacingFrameRightRectF3,
-      [Opcode.StdDoorFacingFrameLeftRectF3]: StdRectPtr.RECT_StdDoorFacingFrameLeftRectF3,
-      [Opcode.StdDoorFacingFrameRightRectF2]: StdRectPtr.RECT_StdDoorFacingFrameRightRectF2,
-      [Opcode.StdDoorFacingFrameLeftRectF2]: StdRectPtr.RECT_StdDoorFacingFrameLeftRectF2,
-      [Opcode.StdDoorFacingFrameRightRectF1]: StdRectPtr.RECT_StdDoorFacingFrameRightRectF1,
-      [Opcode.StdDoorFacingFrameLeftRectF1]: StdRectPtr.RECT_StdDoorFacingFrameLeftRectF1,
-    };
-    const rectPtr = mapping[opcode] ?? StdRectPtr.RECT_StdDoorFacingFrameRightRectF1;
-    // DoorFrameRectanglePtr(${Opcode[opcode]})[${rectPtr}]
-    push(rectPtr);
-    return true;
-  }
-
-  private opDrawOrder(opcode: number): boolean {
-    // Port of CSBWin's draw order constant opcodes (Viewport.cpp:2618-2637).
-    const drawOrderMap: { [key: number]: number } = {
-      [Opcode.DrawOrder00]: 0x00,
-      [Opcode.DrawOrder01]: 0x01,
-      [Opcode.DrawOrder02]: 0x02,
-      [Opcode.DrawOrder18]: 0x18,
-      [Opcode.DrawOrder21]: 0x21,
-      [Opcode.DrawOrder28]: 0x28,
-      [Opcode.DrawOrder32]: 0x32,
-      [Opcode.DrawOrder39]: 0x39,
-      [Opcode.DrawOrder41]: 0x41,
-      [Opcode.DrawOrder49]: 0x49,
-      [Opcode.DrawOrder3421]: 0x3421,
-      [Opcode.DrawOrder218]: 0x218,
-      [Opcode.DrawOrder321]: 0x321,
-      [Opcode.DrawOrder349]: 0x349,
-      [Opcode.DrawOrder412]: 0x412,
-      [Opcode.DrawOrder431]: 0x431,
-      [Opcode.DrawOrder342]: 0x342,
-      [Opcode.DrawOrder4312]: 0x4312,
-      [Opcode.DrawOrder128]: 0x128,
-      [Opcode.DrawOrder439]: 0x439,
-    };
-
-    const drawOrder = drawOrderMap[opcode] ?? 0;
-    // DrawOrder(${drawOrder})
-    push(drawOrder);
-    return true;
-  }
-
-  private opCellXY(opcode: number): boolean {
-    const cell = this.relativeCellFromXYOpcode(opcode);
-    const rd = this.context.roomData[cell];
-    const x = rd?.x ?? 0;
-    const y = rd?.y ?? 0;
-    // CellXY(${Opcode[opcode]}) cell=${cell} -> (x=${x}, y=${y})
-    push(x);
-    push(y);
-    return true;
-  }
-
-  private opCellContents(opcode: number): boolean {
-    const cell = this.relativeCellFromContentsOpcode(opcode);
-    const v = this.context.roomData[cell]?.rn2 ?? 0;
-    // CellContents(${Opcode[opcode]}) cell=${cell} -> ${v}
-    push(v);
-    return true;
-  }
-
-  private opWallPosition(opcode: number): boolean {
-    // CSBWin Viewport.cpp:2652-2664 maps these to RELATIVE_WALL_NUMBERS values.
-    const mapping: { [key: number]: number } = {
-      [Opcode.WallF3L1Right]: 0,
-      [Opcode.WallF3R1Left]: 1,
-      [Opcode.WallF3L1Front]: 2,
-      [Opcode.WallF3Front]: 3,
-      [Opcode.WallF3R1Front]: 4,
-      [Opcode.WallF2L1Right]: 5,
-      [Opcode.WallF2R1Left]: 6,
-      [Opcode.WallF2L1Front]: 7,
-      [Opcode.WallF2Front]: 8,
-      [Opcode.WallF2R1Front]: 9,
-      [Opcode.WallF1L1Right]: 10,
-      [Opcode.WallF1R1Left]: 11,
-      [Opcode.WallF1Front]: 12,
-    };
-    const v = mapping[opcode] ?? 0;
-    // WallPosition(${Opcode[opcode]}) -> ${v}
-    push(v);
-    return true;
-  }
-
-  private relativeCellFromCellOpcode(opcode: number): number {
-    // Matches the `cellNames` order in `src/renderer/DrawViewport.ts`.
-    switch (opcode) {
-      case Opcode.F4L1:
-        return 4;
-      case Opcode.F4R1:
-        return 5;
-      case Opcode.F4:
-        return 6;
-      case Opcode.F3L2:
-        return 2;
-      case Opcode.F3L1:
-        return 7;
-      case Opcode.F3R1:
-        return 8;
-      case Opcode.F3:
-        return 9;
-      case Opcode.F3R2:
-        return 10;
-      case Opcode.F2L1:
-        return 12;
-      case Opcode.F2R1:
-        return 13;
-      case Opcode.F2:
-        return 14;
-      case Opcode.F1L1:
-        return 15;
-      case Opcode.F1R1:
-        return 16;
-      case Opcode.F1:
-        return 17;
-      case Opcode.F0L1:
-        return 18;
-      case Opcode.F0R1:
-        return 19;
-      case Opcode.F0:
-        return 20;
-      default:
-        return 0;
-    }
-  }
-
-  private relativeCellFromContentsOpcode(opcode: number): number {
-    const map: { [key: number]: number } = {
-      [Opcode.F4L1Contents]: 4,
-      [Opcode.F4R1Contents]: 5,
-      [Opcode.F4Contents]: 6,
-      [Opcode.F3L2Contents]: 2,
-      [Opcode.F3L1Contents]: 7,
-      [Opcode.F3R1Contents]: 8,
-      [Opcode.F3Contents]: 9,
-      [Opcode.F3R2Contents]: 10,
-      [Opcode.F2L1Contents]: 12,
-      [Opcode.F2R1Contents]: 13,
-      [Opcode.F2Contents]: 14,
-      [Opcode.F1L1Contents]: 15,
-      [Opcode.F1R1Contents]: 16,
-      [Opcode.F1Contents]: 17,
-      [Opcode.F0L1Contents]: 18,
-      [Opcode.F0R1Contents]: 19,
-      [Opcode.F0Contents]: 20,
-    };
-    return map[opcode] ?? 0;
-  }
-
-  private relativeCellFromXYOpcode(opcode: number): number {
-    const map: { [key: number]: number } = {
-      [Opcode.F4L1xy]: 4,
-      [Opcode.F4R1xy]: 5,
-      [Opcode.F4xy]: 6,
-      [Opcode.F3L2xy]: 2,
-      [Opcode.F3L1xy]: 7,
-      [Opcode.F3R1xy]: 8,
-      [Opcode.F3xy]: 9,
-      [Opcode.F3R2xy]: 10,
-      [Opcode.F2L1xy]: 12,
-      [Opcode.F2R1xy]: 13,
-      [Opcode.F2xy]: 14,
-      [Opcode.F1L1xy]: 15,
-      [Opcode.F1R1xy]: 16,
-      [Opcode.F1xy]: 17,
-      [Opcode.F0L1xy]: 18,
-      [Opcode.F0R1xy]: 19,
-      [Opcode.F0xy]: 20,
-    };
-    return map[opcode] ?? 0;
-  }
-
-  private relativeCellFromDoorOpcode(opcode: number): number {
-    const map: { [key: number]: number } = {
-      [Opcode.F3L1DoorRecordIndex]: 7,
-      [Opcode.F3DoorRecordIndex]: 9,
-      [Opcode.F3R1DoorRecordIndex]: 8,
-      [Opcode.F2L1DoorRecordIndex]: 12,
-      [Opcode.F2DoorRecordIndex]: 14,
-      [Opcode.F2R1DoorRecordIndex]: 13,
-      [Opcode.F1L1DoorRecordIndex]: 15,
-      [Opcode.F1DoorRecordIndex]: 17,
-      [Opcode.F1R1DoorRecordIndex]: 16,
-      [Opcode.F0DoorRecordIndex]: 20,
-
-      [Opcode.F3L1DoorState]: 7,
-      [Opcode.F3DoorState]: 9,
-      [Opcode.F3R1DoorState]: 8,
-      [Opcode.F2L1DoorState]: 12,
-      [Opcode.F2DoorState]: 14,
-      [Opcode.F2R1DoorState]: 13,
-      [Opcode.F1L1DoorState]: 15,
-      [Opcode.F1DoorState]: 17,
-      [Opcode.F1R1DoorState]: 16,
-      [Opcode.F0DoorState]: 20,
-    };
-    return map[opcode] ?? 0;
-  }
-
-  private relativeCellFromFloorDecorationOpcode(opcode: number): number {
-    const map: { [key: number]: number } = {
-      [Opcode.FloorDecorationGraphicOrdinalF3L1]: 7,
-      [Opcode.FloorDecorationGraphicOrdinalF3]: 9,
-      [Opcode.FloorDecorationGraphicOrdinalF3R1]: 8,
-      [Opcode.FloorDecorationGraphicOrdinalF2L1]: 12,
-      [Opcode.FloorDecorationGraphicOrdinalF2]: 14,
-      [Opcode.FloorDecorationGraphicOrdinalF2R1]: 13,
-      [Opcode.FloorDecorationGraphicOrdinalF1L1]: 15,
-      [Opcode.FloorDecorationGraphicOrdinalF1]: 17,
-      [Opcode.FloorDecorationGraphicOrdinalF1R1]: 16,
-      [Opcode.FloorDecorationGraphicOrdinalF0L1]: 18,
-      [Opcode.FloorDecorationGraphicOrdinalF0]: 20,
-      [Opcode.FloorDecorationGraphicOrdinalF0R1]: 19,
-    };
-    return map[opcode] ?? 0;
   }
 }
