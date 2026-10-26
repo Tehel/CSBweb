@@ -22,7 +22,7 @@
  *
  * Run: `npm test -- --only=door-lightning.ts`
  */
-import { BytecodeInterpreter, type InterpreterContext } from '../../src/renderer/bytecode/BytecodeInterpreter';
+import { BytecodeInterpreter } from '../../src/renderer/bytecode/BytecodeInterpreter';
 import { Opcode } from '../../src/renderer/bytecode/Opcodes';
 import { createPaletteIndexViewportBuffer } from '../../src/renderer/csbwin/CanvasBlitter';
 import type { DoorRecord } from '../../src/data/dungeonTypes';
@@ -30,6 +30,7 @@ import type { DungeonState } from '../../src/engine/DungeonState';
 import { check, finish } from '../lib/check';
 import { graphicsTablesOf, stockGraphics } from '../lib/game';
 import { standIn, standInOf } from '../lib/standIn';
+import { viewportContextOf } from '../lib/viewportContext';
 
 const graphics = stockGraphics();
 const objectTables = graphicsTablesOf(graphics).objects;
@@ -43,7 +44,7 @@ check(lightningIndex >= 0, 'the shipped dungeon.dat defines at least one lightni
 const doorGraphicBitmap = { width: 8, height: 8, pixels: new Uint8Array(64).map((_, i) => (i % 8) + Math.floor(i / 8)) };
 const viewportIndexBuffer = createPaletteIndexViewportBuffer(320, 200, 0);
 
-const context = standInOf<InterpreterContext>({
+const context = viewportContextOf({
   viewportIndexBuffer,
   roomData: [],
   doorGraphics: [[0, 0], [0, 0], [0, 0]],

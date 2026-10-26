@@ -103,6 +103,7 @@ function main(): void {
     palette552: all.ui.graphic232.palette552,
     graphicCache,
     getGraphicBitmap: (graphicNum) => getCachedGraphicBitmap(graphics, graphicCache, graphicNum),
+    trace: (line) => console.log(line),
   });
   renderer.selectLevel(0);
   renderer.draw(dungeon.getStartPosition(), 0, false, false);

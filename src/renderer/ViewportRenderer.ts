@@ -3,8 +3,8 @@
  *
  * It owns the interpreter context, the level's wall, door and floor/ceiling bitmaps, and
  * the viewport's palettes with the level's monster colours applied. It draws into
- * `buffer`, the 224x136 viewport; putting that on the screen, with the interface around
- * it, is `GameScreen`'s.
+ * `buffer`, the 224x136 viewport, and returns what the frame leaves to pick from; putting
+ * the view on the screen, with the interface around it, is `GameScreen`'s.
  */
 
 import type { GraphicsLoader } from '../data/GraphicsLoader';
@@ -24,6 +24,7 @@ import type { PartyFootprints } from '../engine/PartyFootprints';
 import type { GameState } from '../engine/gameTypes';
 import type { MonsterDesignOptions } from '../engine/monsterTypes';
 import type { InterpreterContext } from './bytecode/BytecodeInterpreter';
+import { emptyViewportPicking, type ViewportPicking } from './bytecode/Types';
 import type { IndexedBitmap, PaletteIndexViewportBuffer } from './csbwin/CanvasBlitter';
 import { createPaletteIndexViewportBuffer, cropBitmap, mirrorBitmap, tag0088b2Index } from './csbwin/CanvasBlitter';
 import type { ViewportTables } from '../data/tables/ViewportTables';
@@ -35,7 +36,7 @@ import {
   VIEWPORT_WIDTH,
   VIEWPORT_HEIGHT,
 } from './ViewportGraphics';
-import { getOrSet, OBJECT_ID_EOF, Position } from '../core/types';
+import { getOrSet, Position } from '../core/types';
 
 type IndexedBitmapSet = IndexedBitmap[]
 
@@ -72,6 +73,8 @@ interface ViewportRendererDeps {
   /** The screen's graphics cache, which the interpreter shares with the interface. */
   graphicCache: Map<string, IndexedBitmap>;
   getGraphicBitmap: (graphicNum: number) => IndexedBitmap | null;
+  /** Where a diagnostic of the drawing goes, `GameHost.trace`. */
+  trace: (line: string) => void;
 }
 
 export class ViewportRenderer {
@@ -131,6 +134,7 @@ export class ViewportRenderer {
       seeThruWallsRectUByte6: viewportTables.seeThruWallsRectUByte6,
       seeThruDoorEdgeRect: viewportTables.seeThruDoorEdgeRect,
       championPortraitRect: viewportTables.championPortraitRect,
+      word1868: false,
       wallGraphicSet: 0,
       backgroundGraphicSet: 0,
       getGraphicBitmap: deps.getGraphicBitmap,
@@ -140,14 +144,23 @@ export class ViewportRenderer {
       altMonCache: new AltMonCache(),
       backgroundLib: new BackgroundLib(deps.csbGraphicsLoader),
       dungeonState: this.dungeonState,
+      viewParty: { x: 0, y: 0, z: 0, facing: 0 },
+      trace: deps.trace,
       footprints: deps.footprints,
       gameState: deps.gameState,
       rules: deps.rules,
+      frameFacing: 0,
+      frameMapIndex: 0,
+      doorGraphics: [],
+      doorTOC: [0, 0],
+      doorOrnaments: Array.from({ length: 17 }, (_, i): [number, number] => (i >= 15 ? [i + 286, 1] : [0, 0])),
+      loadedFloorDecorations: Array.from({ length: 16 }, (_, i): [number, number] => (i === 15 ? [241, 1] : [0, 0])),
+      numWallDecoration: 0,
+      useMirrorImages: false,
       viewportIndexBuffer: this.buffer,
       seeThroughWalls: false,
       roomData: [],
-      doorOrnaments: Array.from({ length: 17 }, (_, i): [number, number] => (i >= 15 ? [i + 286, 1] : [0, 0])),
-      loadedFloorDecorations: Array.from({ length: 16 }, (_, i): [number, number] => (i === 15 ? [241, 1] : [0, 0])),
+      picking: emptyViewportPicking(),
     };
   }
 
@@ -167,11 +180,12 @@ export class ViewportRenderer {
    * `case SeeThroughWalls: push(d.SeeThruWalls?1:0);` (doc/CSBwin-src/Viewport.cpp:2645).
    * The engine maintains the counter (`Magic.cpp:1316` increments it, TT_73 decrements
    * it — see `TimerSystem.processSeeThruWallsTimer`). `word1868` is `d.Word1868`, which
-   * hides the Fluxcages' shimmer (`InterpreterContext.word1868`).
+   * hides the Fluxcages' shimmer (`InterpreterContext.word1868`). Returns what the frame
+   * leaves for the interface to pick from.
    */
-  draw(position: Position, facing: number, seeThroughWalls: boolean, word1868: boolean): void {
+  draw(position: Position, facing: number, seeThroughWalls: boolean, word1868: boolean): ViewportPicking {
     this.context.word1868 = word1868;
-    this.drawViewportFrame(this.dungeonState, position, facing, this.dungeonState.getMap(position.z), seeThroughWalls);
+    return this.drawViewportFrame(this.dungeonState, position, facing, this.dungeonState.getMap(position.z), seeThroughWalls);
   }
 
   private resetViewportPalettes(): void {
@@ -243,7 +257,7 @@ export class ViewportRenderer {
     facing: number,
     map: MapData | null,
     seeThroughWalls: boolean,
-  ): void {
+  ): ViewportPicking {
     const { x, y, z } = position;
 
     // Select current wall + floor/ceiling style based on map descriptor (CSBWin LEVELDESC.word14 bits).
@@ -268,7 +282,7 @@ export class ViewportRenderer {
 
     // `d.Word2514[i] = { 303 + DoorDecorationTOC[i], Byte4122[DoorDecorationTOC[i]] }`
     // (`doc/CSBwin-src/Code390e.cpp:275-284`).
-    const doorOrnaments = this.context.doorOrnaments!;
+    const doorOrnaments = this.context.doorOrnaments;
     const doorDecorationTOC = map?.doorDecorationTOC ?? [];
     for (let i = 0; i < doorDecorationTOC.length; i++) {
       const decoration = doorDecorationTOC[i]!;
@@ -277,7 +291,7 @@ export class ViewportRenderer {
 
     // `d.LoadedFloorDecorations[i] = { 247 + 6 * FloorDecorationTOC[i], Byte4110[FloorDecorationTOC[i]] }`
     // (`doc/CSBwin-src/Code390e.cpp:263-274`).
-    const loadedFloorDecorations = this.context.loadedFloorDecorations!;
+    const loadedFloorDecorations = this.context.loadedFloorDecorations;
     const floorDecorationTOC = map?.floorDecorationTOC ?? [];
     for (let i = 0; i < floorDecorationTOC.length; i++) {
       const decoration = floorDecorationTOC[i]!;
@@ -307,18 +321,15 @@ export class ViewportRenderer {
     const wb = this.getBitmapsSet(wallGraphicSet);
     this.context.wallBitmaps = useMirrorImages ? wb.wallMirrored : wb.wall;
     this.context.doorBitmaps = wb.doors;
-    this.context.doorSwitchRects = [];
-    this.context.viewportObjectButtons = Array.from({ length: 6 }, () => ({ x1: 255, x2: 0, y1: 0, y2: 0 }));
-    this.context.viewportObjectRNs = new Array(5).fill(OBJECT_ID_EOF);
-    this.context.facingAlcove = false;
-    this.context.facingViAltar = false;
-    this.context.facingWaterFountain = false;
+    const picking = emptyViewportPicking();
+    this.context.picking = picking;
 
     // Per-frame context for opcodes that need global state (CSBWin Interpret() params).
     this.context.frameFacing = facing;
 
     // Execute the main viewport drawing function (writes to index buffer via interpreter)
     DrawViewport(this.context, dungeonState, position, facing, this.objectTables);
+    return picking;
   }
 
   private getBitmapsSet(wallGraphicSet: number): WallBitmapSet {
@@ -354,7 +365,7 @@ export class ViewportRenderer {
     out[2] = mirrorBitmap(normal[2]!); // F1
 
     const wallRects = this.context.wallRectangles;
-    if (wallRects && this.mirrorWallRectF2 && this.mirrorWallRectF3) {
+    if (this.mirrorWallRectF2 && this.mirrorWallRectF3) {
       const derivedF3 = this.buildMirrorWallBitmap(normal[4]!, wallRects[0]!, this.mirrorWallRectF3, 11);
       const derivedF2 = this.buildMirrorWallBitmap(normal[3]!, wallRects[3]!, this.mirrorWallRectF2, 8);
       out[4] = derivedF3 ?? mirrorBitmap(normal[4]!);
@@ -447,17 +458,18 @@ export class ViewportRenderer {
   /**
    * `DrawViewport(2, 2, 0)` over the synthetic prison level — the corridor seen through the
    * doorway on the entrance screen (`doc/CSBwin-src/CSBCode.cpp:9705`). Returns a copy of
-   * `d.pViewportBMP`, which the door animation re-blits on every frame.
+   * `d.pViewportBMP`, which the door animation re-blits on every frame, and what the frame
+   * leaves to pick from, which it writes over the game's as CSBWin's does.
    *
    * `lastPaletteLevel` is cleared so the first real frame after this re-applies the level's
    * monster palette overrides; this level has none and must not be allowed to stand in for
    * one.
    */
-  renderPrisonInterior(seeThroughWalls: boolean): IndexedBitmap {
+  renderPrisonInterior(seeThroughWalls: boolean): { view: IndexedBitmap; picking: ViewportPicking } {
     const seed = this.dungeonState.getData().header.randomSeed;
     const dungeonState = createPrisonDungeonState(seed);
     this.context.word1868 = false;
-    this.drawViewportFrame(
+    const picking = this.drawViewportFrame(
       dungeonState,
       prisonPartyPosition(),
       PRISON_PARTY_POSITION.facing,
@@ -466,6 +478,6 @@ export class ViewportRenderer {
     );
     this.lastPaletteLevel = null;
     const src = this.buffer;
-    return { width: src.width, height: src.height, pixels: Uint8Array.from(src.pixels) };
+    return { view: { width: src.width, height: src.height, pixels: Uint8Array.from(src.pixels) }, picking };
   }
 }

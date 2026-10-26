@@ -23,7 +23,6 @@ import { StkOp, ViewingFilterSite } from '../../src/engine/dsa/DsaTypes';
 import type { DungeonState } from '../../src/engine/DungeonState';
 import { DrawDoor } from '../../src/renderer/bytecode/DrawDoor';
 import type { ViewportDraw } from '../../src/renderer/bytecode/ViewportDraw';
-import type { InterpreterContext } from '../../src/renderer/bytecode/BytecodeInterpreter';
 import {
   createPaletteIndexViewportBuffer, fillRectIndex, tag0088b2Index, type IndexedBitmap,
 } from '../../src/renderer/csbwin/CanvasBlitter';
@@ -31,6 +30,7 @@ import { check, finish } from '../lib/check';
 import { freshGame, globalStore, int, op, placeFilterDsas, report, run } from '../lib/dsa';
 import { graphicsTablesOf, stockGraphics } from '../lib/game';
 import { standInOf } from '../lib/standIn';
+import { viewportContextOf } from '../lib/viewportContext';
 
 /** What `run` threw, or `null`. */
 function thrown(run: () => unknown): Error | null {
@@ -71,7 +71,7 @@ function thrown(run: () => unknown): Error | null {
   const door: IndexedBitmap = { width: 8, height: 8, pixels: new Uint8Array(64).fill(3) };
   const draw = (ornament: [number, number]): { error: Error | null; drawn: number } => {
     const viewport = createPaletteIndexViewportBuffer(224, 136, 0);
-    const context = standInOf<InterpreterContext>({
+    const context = viewportContextOf({
       viewportIndexBuffer: viewport,
       objectTables,
       doorOrnaments: [ornament],

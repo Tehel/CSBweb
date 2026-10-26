@@ -62,7 +62,6 @@ function drawWallDecorationGraphic(
   const viewport = draw.context.viewportIndexBuffer;
   const getGraphic = draw.context.getGraphicBitmap;
   const csbGraphics = draw.context.csbGraphics;
-  if (!tables || !dungeon || !viewport || !getGraphic) return false;
 
   if ((graphicOrdinal & 0x10000) !== 0) {
     if (!csbGraphics) return false;
@@ -70,12 +69,12 @@ function drawWallDecorationGraphic(
     return false;
   }
 
-  const map = dungeon.getMap(draw.context.frameMapIndex ?? 0);
+  const map = dungeon.getMap(draw.context.frameMapIndex);
   if (!map?.wallDecorationTOC) return false;
 
   // CSBWin: `graphicIndex = graphicOrdinal-1` (CSBCode.cpp:3235-3239)
   const graphicIndex = (graphicOrdinal - 1) | 0;
-  const numWallDecoration = draw.context.numWallDecoration ?? 0;
+  const numWallDecoration = draw.context.numWallDecoration;
   if (graphicIndex < 0 || graphicIndex > numWallDecoration) return false;
 
   const decorationIndex = graphicIndex === numWallDecoration ? 0 : (map.wallDecorationTOC[graphicIndex] ?? 0);
@@ -118,19 +117,15 @@ function drawWallDecorationGraphic(
   const distanceBand = Math.floor(relativePosition / 5); // 0=F3, 1=F2, 2=F1
   const mirror = relativePosition === 11 || relativePosition === 6 || relativePosition === 1;
   if (relativePosition === 12) {
-    if (draw.context.viewportObjectButtons?.[5]) {
-      const button = draw.context.viewportObjectButtons[5];
-      button.x1 = x1;
-      button.x2 = x2;
-      button.y1 = y1;
-      button.y2 = y2;
-    }
-    if (draw.context.facingAlcove !== undefined) draw.context.facingAlcove = isAlcove;
-    if (draw.context.facingViAltar !== undefined) draw.context.facingViAltar = decorationIndex === 2;
-    if (draw.context.facingWaterFountain !== undefined) {
-      const fountainIdx = tables.fountainDecorationIndex;
-      draw.context.facingWaterFountain = decorationIndex === (fountainIdx | 0);
-    }
+    const picking = draw.context.picking;
+    const button = picking.viewportObjectButtons[5]!;
+    button.x1 = x1;
+    button.x2 = x2;
+    button.y1 = y1;
+    button.y2 = y2;
+    picking.facingAlcove = isAlcove;
+    picking.facingViAltar = decorationIndex === 2;
+    picking.facingWaterFountain = decorationIndex === (tables.fountainDecorationIndex | 0);
   }
 
   if (relativePosition >= 10) {
@@ -221,7 +216,6 @@ function drawChampionPortrait(draw: ViewportDraw, championPortraitOrdinal: numbe
   const viewport = draw.context.viewportIndexBuffer;
   const rect = draw.context.championPortraitRect;
   const getGraphic = draw.context.getGraphicBitmap;
-  if (!viewport || !rect || !getGraphic) return;
 
   if (charID > 23) {
     // `GetExternalPortraitAddress` (`:3771`): the 32x29 portrait itself, from its corner.
@@ -278,7 +272,6 @@ function drawExtendedWallDecoration(
 ): void {
   const tables = draw.context.objectTables;
   const viewport = draw.context.viewportIndexBuffer;
-  if (!tables || !viewport) return;
 
   const id = graphicOrdinal & 0xffff;
   if (id === 0) return;
@@ -367,7 +360,6 @@ export function drawWallText(draw: ViewportDraw, textRN: ObjectID, relativePosit
   const dungeon = draw.context.dungeonState;
   const viewport = draw.context.viewportIndexBuffer;
   const getGraphic = draw.context.getGraphicBitmap;
-  if (!tables || !dungeon || !viewport || !getGraphic) return;
 
   const rec = dungeon.getTextRecord(textRN);
   if (!rec) return;
@@ -377,7 +369,7 @@ export function drawWallText(draw: ViewportDraw, textRN: ObjectID, relativePosit
 
   // CSBWin draws real text only on the front wall immediately in front of the party (relativePosition==12).
   if (relativePosition !== 12) {
-    const numWallDecoration = draw.context.numWallDecoration ?? 0;
+    const numWallDecoration = draw.context.numWallDecoration;
     DrawWallDecoration(draw, numWallDecoration + 1, relativePosition, 0, textBytes);
     return;
   }
@@ -444,11 +436,9 @@ export function drawWallText(draw: ViewportDraw, textRN: ObjectID, relativePosit
 
 export function DrawFloorDecorations(draw: ViewportDraw, graphicOrdinal: number, relativeCell: number): void {
   const tables = draw.context.objectTables;
-  const viewport = draw.context.viewportIndexBuffer;
   const getGraphic = draw.context.getGraphicBitmap;
   const csbGraphics = draw.context.csbGraphics;
   const loaded = draw.context.loadedFloorDecorations;
-  if (!tables || !viewport || !getGraphic || !loaded) return;
 
   const drawFootprints = (graphicOrdinal & 0x8000) !== 0;
   const extFloorDecoration = (graphicOrdinal & 0x4000) !== 0;
@@ -495,7 +485,7 @@ export function DrawFloorDecorations(draw: ViewportDraw, graphicOrdinal: number,
     let mirror = relativeCell === 8 || relativeCell === 5 || relativeCell === 2;
     if (
       graphicIndex === 15 &&
-      (draw.context.useMirrorImages ?? false) &&
+      draw.context.useMirrorImages &&
       (relativeCell === 7 || relativeCell === 4 || relativeCell !== 1)
     ) {
       mirror = true;
@@ -521,7 +511,6 @@ export function DrawFloorDecorations(draw: ViewportDraw, graphicOrdinal: number,
 function drawExtendedFloorDecoration(draw: ViewportDraw, ext: ExtendedFloorDecoration, relativeCell: number): void {
   const tables = draw.context.objectTables;
   const viewport = draw.context.viewportIndexBuffer;
-  if (!tables || !viewport) return;
 
   if (relativeCell < 0 || relativeCell >= ext.desc.length) return;
 
@@ -545,7 +534,7 @@ function drawExtendedFloorDecoration(draw: ViewportDraw, ext: ExtendedFloorDecor
     }
   }
 
-  const facing = draw.context.frameFacing ?? 0;
+  const facing = draw.context.frameFacing;
   const mirrorFlags = ext.mirrorFlags & 0xffff;
   const useMirror = (((mirrorFlags >>> (facing + 9)) ^ (mirrorFlags >>> relativeCell)) & 1) !== 0;
   if (useMirror) bitmap = draw.getMirroredBitmap(bitmap);

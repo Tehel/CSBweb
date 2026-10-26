@@ -250,7 +250,7 @@ function main(): void {
   const noFile = portraitOnScreen(render([hero], 0), 0);
   check(noFile.every((v, i) => v === ERROR_PORTRAIT.pixels[i]),
     'a champion with charID past 23 and no CSBgraphics.dat shows the error portrait');
-  ui.context.csbGraphics = conflux;
+  ui.csbGraphics = conflux;
   const onScreen = portraitOnScreen(render([hero], 0), 0);
   const shown = onScreen.every((v, i) => v === external.pixels[i]);
   console.log(`portrait ${CONFLUX_HERO_PORTRAIT} in the status box: ${shown ? 'matches' : 'WRONG'}`);

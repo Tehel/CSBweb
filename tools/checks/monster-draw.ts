@@ -31,16 +31,18 @@ import { DBType, OBJECT_ID_EOF } from '../../src/core/types';
 import { DrawRoomObjects, mapColorValue } from '../../src/renderer/bytecode/DrawRoomObjects';
 import { ViewportDraw } from '../../src/renderer/bytecode/ViewportDraw';
 import { createPaletteIndexViewportBuffer } from '../../src/renderer/csbwin/CanvasBlitter';
-import type { CreatureRecord } from '../../src/data/dungeonTypes';
+import type { CreatureRecord, DungeonData, DungeonHeader } from '../../src/data/dungeonTypes';
 import type { DungeonState } from '../../src/engine/DungeonState';
-import type { InterpreterContext } from '../../src/renderer/bytecode/BytecodeInterpreter';
 import { check, finish } from '../lib/check';
 import { standIn, wrapMember, standInOf } from '../lib/standIn';
+import { viewportContextOf } from '../lib/viewportContext';
 import { graphicsTablesOf, stockGraphics } from '../lib/game';
 import { RnMaps } from '../../src/core/RnMaps';
 
 const graphics = stockGraphics();
 const tables = graphicsTablesOf(graphics).objects;
+/** A pool without records, which `GetAlternateGraphicsRecord` reads: no group draws another graphic. */
+const NO_POOL = standInOf<DungeonData>({ header: standInOf<DungeonHeader>({ objectCounts: new Array(16).fill(0) }) });
 
 const RAT = 4;
 const WORM = 15;
@@ -80,7 +82,7 @@ function draw(group: Group, relativeCell: number, drawOrder: number): Sprite[] {
   const record = standInOf<CreatureRecord>({ creatureType: group.type, numMonM1: group.numMonM1 });
   const blits: Array<{ x1: number; x2: number; y2: number; w: number; graphic: number }> = [];
   let lastGraphic = -1;
-  const context = standInOf<InterpreterContext>({
+  const context = viewportContextOf({
     viewportIndexBuffer: createPaletteIndexViewportBuffer(224, 136, 0),
     objectTables: tables,
     getGraphicBitmap: (n: number) => {
@@ -90,6 +92,7 @@ function draw(group: Group, relativeCell: number, drawOrder: number): Sprite[] {
     },
     dungeonState: standInOf<DungeonState>({
       rnMaps,
+      getData: () => NO_POOL,
       getDBRecordLink: () => OBJECT_ID_EOF,
       getCreatureRecord: () => record,
       getMonsterRenderState: () => ({ positions, facings, statuses: STATUSES }),
@@ -178,7 +181,7 @@ function frontMirrored(type: number, relativeCell: number, status: number): bool
   const transparent = tables.monsterGraphics[type]!.uByte10 & 15;
   const [left, right] = [1, 2, 3, 4, 5].filter((c) => c !== transparent);
   let first: number | null = null;
-  const context = standInOf<InterpreterContext>({
+  const context = viewportContextOf({
     viewportIndexBuffer: createPaletteIndexViewportBuffer(224, 136, 0),
     objectTables: tables,
     getGraphicBitmap: (n: number) => {
@@ -188,6 +191,7 @@ function frontMirrored(type: number, relativeCell: number, status: number): bool
     },
     dungeonState: standInOf<DungeonState>({
       rnMaps,
+      getData: () => NO_POOL,
       getDBRecordLink: () => OBJECT_ID_EOF,
       getCreatureRecord: () => record,
       getMonsterRenderState: () => ({ positions: 255, facings: 0xaa, statuses: new Uint8Array([status, 0, 0, 0]) }),

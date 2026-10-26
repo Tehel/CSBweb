@@ -43,7 +43,7 @@ import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectI
 import { ActuatorAction, getActuatorAction, getActuatorType } from '../../src/data/actuatorHelpers';
 import { MovementAction } from '../../src/engine/gameTypes';
 import type { Champion } from '../../src/engine/gameTypes';
-import type { InterpreterContext } from '../../src/renderer/bytecode/BytecodeInterpreter';
+import { emptyViewportPicking } from '../../src/renderer/bytecode/Types';
 import { tryPickViewportObject } from '../../src/renderer/ui/ViewportPicking';
 import { setHandOwner } from '../../src/engine/Party';
 import { ensureSkills } from '../../src/engine/skills';
@@ -52,7 +52,7 @@ import { newGame, runVbl, TICK_DUE, stockDungeon, stockGraphics } from '../lib/g
 import { newUIState } from '../lib/ui';
 import { check, finish } from '../lib/check';
 import { ButtonsAt } from '../lib/clicks';
-import { standIn, wrapMember, standInOf } from '../lib/standIn';
+import { standIn, wrapMember } from '../lib/standIn';
 import { freeze, thaw } from '../../src/engine/LoopState';
 import { handleMouseButton, handleMouseUnclick } from '../../src/renderer/ui/Mouse';
 import { testChampion } from '../lib/champion';
@@ -657,16 +657,17 @@ async function main(): Promise<void> {
     if (game.ctx.dungeon.rnMaps.dbType(rn) >= DBType.WEAPON) floorItem = rn;
   }
   const unset = { x1: 255, y1: 0, x2: 0, y2: 0 };
-  const drawnView = ui.context;
-  ui.context = standInOf<InterpreterContext>({
+  const drawnView = ui.picking;
+  ui.picking = {
+    ...emptyViewportPicking(),
     viewportObjectButtons: [{ x1: 10, y1: 10, x2: 30, y2: 30 }, unset, unset, unset, unset, unset],
     viewportObjectRNs: [floorItem, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF],
-  });
+  };
   const pickFrames = framesToTick(() => tryPickViewportObject(ui, 20, 20 + 33));
   const picked = party.objectInHand === floorItem;
   row('TAG01a148 (pick-up)', picked ? 'picked up' : 'left', pickFrames, '-', 'set');
   check(picked && pickFrames === 1, 'a pick-up makes a tick due (TAG01a148, d.clockTick = 1)');
-  ui.context = drawnView;
+  ui.picking = drawnView;
   party.objectInHand = OBJECT_ID_NULL;
 
   // The attack menu of an empty hand, opened on champion 0's button (116).

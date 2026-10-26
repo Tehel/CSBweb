@@ -6,7 +6,7 @@
  */
 
 import { Opcode } from './Opcodes';
-import { SummarizeRoomData } from './Types';
+import type { SummarizeRoomData, ViewportPicking } from './Types';
 import { ViewportDraw } from './ViewportDraw';
 import { DrawFloorDecorations, DrawWallDecoration, drawWallText } from './DrawDecorations';
 import { DrawDoor, DrawDoorSwitch, DrawTeleporter } from './DrawDoor';
@@ -31,26 +31,28 @@ import type { BackgroundLib } from '../../data/BackgroundLib';
 import { OBJECT_ID_EOF, Position, RoomType, type ObjectID, getRoomType } from '../../core/types';
 
 /**
- * Execution context - simulates CSBWin's global state
+ * What `DrawViewport` and the drawing it runs read: CSBWin's `d.` for them. Everything the
+ * game always sets is required, so a drawing never stops short for want of it; a tool fills
+ * what it leaves out with `viewportContextOf` (`tools/lib/viewportContext.ts`). What the
+ * drawing leaves for the interface is `picking`, a new one each frame.
  */
 export interface InterpreterContext {
-  // Graphics data
+  /** The level's wall bitmaps, mirrored or not (`ViewportRenderer.drawViewportFrame`). */
   wallBitmaps: IndexedBitmap[];
-  doorBitmaps?: IndexedBitmap[]; // pDoorBitmaps[0..7]
-  wallRectangles: RectPos[];
-  floorBitmap?: ImageData;   // Floor graphic (optional)
-  ceilingBitmap?: ImageData; // Ceiling graphic (optional)
+  /** `pDoorBitmaps[0..7]`. */
+  doorBitmaps: IndexedBitmap[];
 
-  // Additional CSBWin viewport rectangle tables (from `graphics.dat` item 0x22e)
-  floorPitRectangles?: RectPos[];
-  ceilingPitRectangles?: RectPos[];
-  teleporterRectangles?: RectPos[];
-  stairEdgeRectangles?: RectPos[];
-  stairFacingDownRectangles?: RectPos[];
-  stairFacingUpRectangles?: RectPos[];
-  doorTrackTopRectangles?: RectPos[];
-  doorFrameRectangles?: RectPos[];
-  doorRects?: {
+  // CSBWin's viewport rectangle tables (from `graphics.dat` item 0x22e)
+  wallRectangles: RectPos[];
+  floorPitRectangles: RectPos[];
+  ceilingPitRectangles: RectPos[];
+  teleporterRectangles: RectPos[];
+  stairEdgeRectangles: RectPos[];
+  stairFacingDownRectangles: RectPos[];
+  stairFacingUpRectangles: RectPos[];
+  doorTrackTopRectangles: RectPos[];
+  doorFrameRectangles: RectPos[];
+  doorRects: {
     F1R1: RectPos[];
     F1: RectPos[];
     F1L1: RectPos[];
@@ -61,53 +63,56 @@ export interface InterpreterContext {
     F3: RectPos[];
     F3L1: RectPos[];
   };
-  seeThruWallsRect?: RectPos;
-  seeThruWallsRect2?: RectPos;
-  seeThruWallsRectUByte4?: number; // d.SeeThruWallsRect.b.uByte4
-  seeThruWallsRectUByte6?: number; // d.SeeThruWallsRect.b.uByte6
-  seeThruDoorEdgeRect?: RectPos;
+  seeThruWallsRect: RectPos;
+  seeThruWallsRect2: RectPos;
+  seeThruWallsRectUByte4: number; // d.SeeThruWallsRect.b.uByte4
+  seeThruWallsRectUByte6: number; // d.SeeThruWallsRect.b.uByte6
+  seeThruDoorEdgeRect: RectPos;
   /** `(RectPos *)d.Byte2546` — where a Hall of Champions portrait lands in the viewport. */
-  championPortraitRect?: RectPos;
+  championPortraitRect: RectPos;
   /**
    * `d.Word1868`: set, a Fluxcage's shimmer is not drawn (`DrawRoomObjects`,
    * `doc/CSBwin-src/Code51a4.cpp:2774`). Only `_FusionSequence` sets it (`Attack.cpp:2369`).
    */
-  word1868?: boolean;
+  word1868: boolean;
 
-  // Current per-frame style context (CSBWin LEVELDESC.word14 bits)
-  wallGraphicSet?: number;
-  backgroundGraphicSet?: number;
+  // The level's style (CSBWin LEVELDESC.word14 bits)
+  wallGraphicSet: number;
+  backgroundGraphicSet: number;
 
-  // Basic graphics resolver (CSBWin `GetBasicGraphicAddress(n)` used by `GraphicToViewport`)
-  getGraphicBitmap?: (graphicNum: number) => IndexedBitmap | null;
-  graphicCache?: Map<string, IndexedBitmap>;
+  /** CSBWin `GetBasicGraphicAddress(n)`, which `GraphicToViewport` draws with. */
+  getGraphicBitmap: (graphicNum: number) => IndexedBitmap | null;
+  graphicCache: Map<string, IndexedBitmap>;
 
   // CSBWin object rendering tables (graphics.dat 0x22e + 0x22f)
-  objectTables?: ObjectTables;
+  objectTables: ObjectTables;
+  /** `CSBgraphics.dat`, absent from a game that has none. */
   csbGraphics?: CSBGraphicsLoader;
   /**
    * `altMonCache`: the alternate monster graphics `DrawMonster` has read from `csbGraphics`,
    * and the pictures derived from them. Emptied at each game's start (`CleanupAltMonCache`).
    */
-  altMonCache?: AltMonCache;
+  altMonCache: AltMonCache;
   /**
    * `backgroundLib`: the `CGT_Backgrounds` sections of `csbGraphics` a skin's program draws
    * with. Emptied at each game's start, with `altMonCache` (`CleanupGraphics`,
    * `doc/CSBwin-src/Graphics.cpp:2230-2232`).
    */
-  backgroundLib?: BackgroundLib;
-  dungeonState?: DungeonState;
+  backgroundLib: BackgroundLib;
+  dungeonState: DungeonState;
   /**
    * The square and facing `DrawViewport` draws from: `IsOdd` reads them as `d.partyLevel`,
    * `d.partyX`, `d.partyY` and `d.partyFacing` (`doc/CSBwin-src/Viewport.cpp:3192`). They
    * are the party's everywhere but in the prison, where nothing is skinned.
    */
-  viewParty?: { x: number; y: number; z: number; facing: number };
+  viewParty: { x: number; y: number; z: number; facing: number };
   /**
    * CSBWin's graphic trace (`GTRACE_*`, on while `traceViewportDrawing` is set): the lines
    * a skin's drawing writes. Absent, as in a game, nothing is traced.
    */
   graphicTrace?: (line: string) => void;
+  /** Where a diagnostic goes, `GameHost.trace`: an unknown opcode, CSBWin's `InterpretError`. */
+  trace: (line: string) => void;
   /** `d.PartyFootprints`, which `SummarizeRoomInfo` searches for the magic prints. */
   footprints?: PartyFootprints;
   /** The game's state, whose `tickCount` (`d.Time`) `SummarizeRoomInfo` reads. */
@@ -117,10 +122,10 @@ export interface InterpreterContext {
    * read (`doc/CSBwin-src/Code51a4.cpp:2205`, `:420`). Absent, both are off, as at CSBWin's start.
    */
   rules?: MonsterDesignOptions;
-  frameFacing?: number;
-  frameMapIndex?: number;
-  doorGraphics?: number[][]; // d.DoorGraphic[3][2] resolved for current level (Code390e.cpp:180+)
-  doorTOC?: number[]; // d.DoorTOC[2], resolved from DoorCharacteristics for the current level
+  frameFacing: number;
+  frameMapIndex: number;
+  doorGraphics: number[][]; // d.DoorGraphic[3][2] resolved for current level (Code390e.cpp:180+)
+  doorTOC: number[]; // d.DoorTOC[2], resolved from DoorCharacteristics for the current level
   /**
    * `d.Word2514[17][2]`: per door ornament, its graphic and its position set
    * (`d.Byte4122`). Slots 15 and 16, the bashed door (graphic 301) and See-Thru-Walls
@@ -128,32 +133,25 @@ export interface InterpreterContext {
    * from its `DoorDecorationTOC` (`Code390e.cpp:275-284`), which leaves any slot past
    * the level's count as the last level to fill it left it.
    */
-  doorOrnaments?: Array<[number, number]>;
+  doorOrnaments: Array<[number, number]>;
   /**
    * `d.LoadedFloorDecorations[16][2]`: per floor decoration, its first graphic and its
    * rectangle set (`d.Byte4110`). Slot 15, the footprints (graphic 241, set 1), is set
    * once (`doc/CSBwin-src/CSBCode.cpp:10394-10397`), and the level's own from its
    * `FloorDecorationTOC` (`Code390e.cpp:263-274`), at most fifteen of them.
    */
-  loadedFloorDecorations?: Array<[number, number]>;
-  numWallDecoration?: number; // d.NumWallDecoration (CSBCode.cpp:5863)
-  useMirrorImages?: boolean; // d.UseMirrorImages (Viewport.cpp:6747)
+  loadedFloorDecorations: Array<[number, number]>;
+  numWallDecoration: number; // d.NumWallDecoration (CSBCode.cpp:5863)
+  useMirrorImages: boolean; // d.UseMirrorImages (Viewport.cpp:6747)
 
-  viewportIndexBuffer?: PaletteIndexViewportBuffer;
-  seeThroughWalls?: boolean; // d.SeeThruWalls (Viewport.cpp:2646)
-  facingAlcove?: boolean;
-  facingViAltar?: boolean;
-  facingWaterFountain?: boolean;
+  viewportIndexBuffer: PaletteIndexViewportBuffer;
+  seeThroughWalls: boolean; // d.SeeThruWalls (Viewport.cpp:2646)
 
   // Room data for all 21 cells
   roomData: SummarizeRoomData[];
 
-  doorSwitchRects?: RectPos[];
-  viewportObjectButtons?: RectPos[];
-  viewportObjectRNs?: ObjectID[];
-
-  // Monster attack animation state hook (used for sound triggers)
-
+  /** What this frame leaves for the interface to pick from. */
+  picking: ViewportPicking;
 }
 
 /**
@@ -557,7 +555,7 @@ const STD_RECTANGLE_POINTERS: Array<(context: InterpreterContext) => RectPos | R
 /** The pointers from `first` on, in `RECT_POINTERS`' order: the entries `indexes` of `list`. */
 function stdRectangles(first: StdRectPtr, list: RectList, indexes: readonly number[]): void {
   indexes.forEach((index, i) => {
-    STD_RECTANGLE_POINTERS[first + i] = (context) => context[list]?.[index];
+    STD_RECTANGLE_POINTERS[first + i] = (context) => context[list][index];
   });
 }
 
@@ -570,7 +568,7 @@ stdRectangles(StdRectPtr.RECT_StdStairEdgeRectangleF2L1, 'stairEdgeRectangles', 
 stdRectangles(StdRectPtr.RECT_StdDoorFacingTopTrackRectF2L1, 'doorTrackTopRectangles', [5, 4, 3, 2, 1, 0, 6]);
 stdRectangles(StdRectPtr.RECT_StdDoorFacingFrameRectF3L1, 'doorFrameRectangles', [7, 6, 0, 1, 2, 3, 4, 5]);
 (['F3L1', 'F3', 'F3R1', 'F2L1', 'F2', 'F2R1', 'F1L1', 'F1', 'F1R1'] as const).forEach((name, i) => {
-  STD_RECTANGLE_POINTERS[StdRectPtr.RECT_StdDoorRectsF3L1 + i] = (context) => context.doorRects?.[name];
+  STD_RECTANGLE_POINTERS[StdRectPtr.RECT_StdDoorRectsF3L1 + i] = (context) => context.doorRects[name];
 });
 STD_RECTANGLE_POINTERS[StdRectPtr.RECT_StdSeeThruWallsRect] = (context) => context.seeThruWallsRect;
 STD_RECTANGLE_POINTERS[StdRectPtr.RECT_StdSeeThruWallsRect2] = (context) => context.seeThruWallsRect2;
@@ -749,8 +747,8 @@ export class BytecodeInterpreter {
 
     // See-Thru-Walls through the F1 wall (`Viewport.cpp:2964-3023`).
     on(Opcode.StdAllocateDerivedGraphic, (m) => { m.allocateDerivedGraphic(pop()); return true; });
-    on(Opcode.StdSeeThruWallsRectUByte4, (m) => { push(m.context.seeThruWallsRectUByte4 ?? 0); return true; });
-    on(Opcode.StdSeeThruWallsRectUByte6, (m) => { push(m.context.seeThruWallsRectUByte6 ?? 0); return true; });
+    on(Opcode.StdSeeThruWallsRectUByte4, (m) => { push(m.context.seeThruWallsRectUByte4); return true; });
+    on(Opcode.StdSeeThruWallsRectUByte6, (m) => { push(m.context.seeThruWallsRectUByte6); return true; });
     on(Opcode.StdBltToDerivedGraphic, (m) => m.opStdBltDerivedGraphic(true));
     on(Opcode.StdBltFromDerivedGraphic, (m) => m.opStdBltDerivedGraphic(false));
     on(Opcode.StdDeleteDerivedGraphic, (m) => {
@@ -791,8 +789,8 @@ export class BytecodeInterpreter {
     }
     const decoded = BytecodeInterpreter.decode[opcode - FIRST_OPCODE];
     if (decoded === undefined) {
-      // `InterpretError("Unknown display opcode...")`, and `Interpret` returns.
-      console.warn(`WARNING: Unimplemented opcode ${opcode}`);
+      // `InterpretError("Unknown display opcode\nCode = %d.")`, and `Interpret` returns.
+      this.context.trace(`Unknown display opcode ${opcode}`);
       return false;
     }
     return decoded.run(this, decoded.operand);
@@ -832,33 +830,33 @@ export class BytecodeInterpreter {
         push(roomData[this.cellNum]!.relativeCellNumber);
         break;
       case Opcode.WallGraphicID:
-        push(lib?.GetWallGraphicID(pop() >>> 0) ?? 0);
+        push(lib.GetWallGraphicID(pop() >>> 0));
         break;
       case Opcode.FloorGraphicID:
-        push(lib?.GetFloorGraphicID(pop() >>> 0) ?? 0);
+        push(lib.GetFloorGraphicID(pop() >>> 0));
         break;
       case Opcode.MiddleGraphicID:
-        push(lib?.GetMiddleGraphicID(pop() >>> 0) ?? 0);
+        push(lib.GetMiddleGraphicID(pop() >>> 0));
         break;
       case Opcode.CeilingGraphicID:
-        push(lib?.GetCeilingGraphicID(pop() >>> 0) ?? 0);
+        push(lib.GetCeilingGraphicID(pop() >>> 0));
         break;
       case Opcode.WallMaskID:
-        push(lib?.GetWallMaskID(pop() >>> 0) ?? 0);
+        push(lib.GetWallMaskID(pop() >>> 0));
         break;
       case Opcode.FloorMaskID:
-        push(lib?.GetFloorMaskID(pop() >>> 0) ?? 0);
+        push(lib.GetFloorMaskID(pop() >>> 0));
         break;
       case Opcode.MiddleMaskID:
-        push(lib?.GetMiddleMaskID(pop() >>> 0) ?? 0);
+        push(lib.GetMiddleMaskID(pop() >>> 0));
         break;
       case Opcode.CeilingMaskID:
-        push(lib?.GetCeilingMaskID(pop() >>> 0) ?? 0);
+        push(lib.GetCeilingMaskID(pop() >>> 0));
         break;
       case Opcode.WallDecorationID: {
         const wallDecorationNum = pop();
         const skinNum = pop();
-        push(lib?.GetWallDecorationID(skinNum >>> 0, wallDecorationNum >>> 0) ?? 0);
+        push(lib.GetWallDecorationID(skinNum >>> 0, wallDecorationNum >>> 0));
         break;
       }
     }
@@ -881,8 +879,8 @@ export class BytecodeInterpreter {
         const maskNumber = pop();
         const maskID = pop();
         const graphicID = pop();
-        const pMask = lib?.GetMask(maskID >>> 0, maskNumber >>> 0, 12) ?? null;
-        const pGraphic = lib?.GetBitmap(graphicID >>> 0, 2) ?? null;
+        const pMask = lib.GetMask(maskID >>> 0, maskNumber >>> 0, 12);
+        const pGraphic = lib.GetBitmap(graphicID >>> 0, 2);
         this.applyToViewport((bmp) => ApplyBackground(bmp, pMask, pGraphic?.data ?? null, pGraphic?.bitmapSize ?? 0));
         trace?.(`   DrawCustomGraphic(${graphicID}, ${maskID}, ${maskNumber})`);
         if (pMask !== null) {
@@ -897,18 +895,18 @@ export class BytecodeInterpreter {
         const virtualGraphicID = pop();
         const graphicID = pop();
         trace?.(`  CreateVirtualBitmap(${graphicID}, ${virtualGraphicID}, ${maskID}, ${maskNumber}`);
-        const pGraphic = lib?.GetBitmap(graphicID >>> 0, 2) ?? null;
+        const pGraphic = lib.GetBitmap(graphicID >>> 0, 2);
         if (pGraphic === null) break; // do nothing
-        const pAffineMask = lib!.GetMask(maskID >>> 0, maskNumber >>> 0, 48);
+        const pAffineMask = lib.GetMask(maskID >>> 0, maskNumber >>> 0, 48);
         if (pAffineMask === null) break; // do nothing
-        lib!.CreateVirtualBitmap(pGraphic.data, pGraphic.bitmapSize, virtualGraphicID >>> 0, pAffineMask);
+        lib.CreateVirtualBitmap(pGraphic.data, pGraphic.bitmapSize, virtualGraphicID >>> 0, pAffineMask);
         break;
       }
       case Opcode.DrawCustomDecoration: {
         const locationNumber = pop();
         const decorationNumber = pop();
         const decorationID = pop();
-        const decoration = lib?.GetDecorationBitmap(decorationID >>> 0, decorationNumber >>> 0, locationNumber >>> 0) ?? null;
+        const decoration = lib.GetDecorationBitmap(decorationID >>> 0, decorationNumber >>> 0, locationNumber >>> 0);
         if (decoration === null) break;
         this.applyToViewport((bmp) => ApplyDecoration(bmp, decoration.bitmap, decoration.location, decoration.bitmapSize));
         break;
@@ -938,7 +936,6 @@ export class BytecodeInterpreter {
         trace?.(`   aMask = ${Cxx} ${Cxy} ${Cxc} ${Cyx} ${Cyy} ${Cyc}`);
         if (width <= 0) break;
         if ((width & 15) !== 0) break;
-        if (!lib) break;
         const pNewMask = lib.CreateNewMask(newMaskID >>> 0, newMaskNumber >>> 0, bMask);
         if (pNewMask === null) break;
         const pOldMask = lib.GetMask(oldMaskID >>> 0, oldMaskNumber >>> 0, 6);
@@ -966,7 +963,7 @@ export class BytecodeInterpreter {
         trace?.(`    aMask = ${Cxx} ${Cxy} ${Cxc} ${Cyx} ${Cyy} ${Cyc} ${srcX} ${srcY} ${srcWidth} ${srcHeight} ${dstWidth} ${dstHeight}`);
         if (dstWidth <= 0) break;
         if ((dstWidth & 15) !== 0) break;
-        lib?.CreateNewAffineMask(newMaskID >>> 0, newMaskNumber >>> 0, aMask);
+        lib.CreateNewAffineMask(newMaskID >>> 0, newMaskNumber >>> 0, aMask);
         break;
       }
     }
@@ -975,9 +972,7 @@ export class BytecodeInterpreter {
 
   /** Runs a drawing on the viewport as CSBWin's `d.pViewportBMP` bytes, and writes them back. */
   private applyToViewport(draw: (viewportBMP: ViewportBMP) => void): void {
-    const viewport = this.context.viewportIndexBuffer;
-    if (!viewport) return;
-    const viewportBMP = new ViewportBMP(viewport);
+    const viewportBMP = new ViewportBMP(this.context.viewportIndexBuffer);
     draw(viewportBMP);
     viewportBMP.flush();
   }
@@ -993,7 +988,7 @@ export class BytecodeInterpreter {
       case Opcode.GetMaskHeader: {
         const maskNumber = pop();
         const maskID = pop();
-        const pMask = lib?.GetMask(maskID >>> 0, maskNumber >>> 0, 12) ?? null;
+        const pMask = lib.GetMask(maskID >>> 0, maskNumber >>> 0, 12);
         if (pMask === null) break;
         // `BACKGROUND_MASK` (`CSB.h:330-339`): srcX, srcY, dstX, dstY, width, height.
         for (let i = 0; i < 6; i++) push(readU16LE(pMask.data, pMask.offset + 2 * i));
@@ -1002,7 +997,7 @@ export class BytecodeInterpreter {
       case Opcode.NeedVirtualMaskQ: {
         const maskNumber = pop();
         const maskID = pop();
-        const pMask = lib?.MaskExists(maskID >>> 0, maskNumber >>> 0) ?? null;
+        const pMask = lib.MaskExists(maskID >>> 0, maskNumber >>> 0);
         push(pMask === null ? 1 : 0);
         break;
       }
@@ -1010,7 +1005,7 @@ export class BytecodeInterpreter {
         let width = 0;
         let height = 0;
         const graphicID = pop();
-        const pGraphic = lib?.GetBitmap(graphicID >>> 0, 4) ?? null;
+        const pGraphic = lib.GetBitmap(graphicID >>> 0, 4);
         if (pGraphic !== null) {
           width = readU32LE(pGraphic.data, 0);
           // A width of 0 divides by zero in CSBWin; the port leaves the height 0.
@@ -1122,7 +1117,7 @@ export class BytecodeInterpreter {
       case Opcode.IsOdd: {
         // `d.partyLevel + d.partyX + d.partyY + d.partyFacing`: the view's square and facing.
         const party = this.context.viewParty;
-        push(party ? (party.z + party.x + party.y + party.facing) & 1 : 0);
+        push((party.z + party.x + party.y + party.facing) & 1);
         break;
       }
     }
@@ -1205,12 +1200,7 @@ export class BytecodeInterpreter {
       return true;
     }
 
-    const getGraphic = this.context.getGraphicBitmap;
-    if (!getGraphic) {
-      return true;
-    }
-
-    const bitmap = getGraphic(graphicNum);
+    const bitmap = this.context.getGraphicBitmap(graphicNum);
     if (!bitmap) {
       return true;
     }
@@ -1240,12 +1230,7 @@ export class BytecodeInterpreter {
   private opDoorSwitch(): boolean {
     const relativeCell = pop();
     const doorIndex = this.context.roomData[relativeCell | 0]?.decorations[1] ?? 0;
-    const dungeon = this.context.dungeonState;
-    if (!dungeon) {
-      push(0);
-      return true;
-    }
-    const rec = dungeon.getDoorRecordByIndex(doorIndex | 0);
+    const rec = this.context.dungeonState.getDoorRecordByIndex(doorIndex | 0);
     const hasSwitch = rec?.hasButton ? 1 : 0;
     push(hasSwitch);
     return true;
@@ -1267,10 +1252,7 @@ export class BytecodeInterpreter {
     const relCellRF = pop();
 
     const dungeon = this.context.dungeonState;
-    const getGraphic = this.context.getGraphicBitmap;
-    const ceilingRects = this.context.ceilingPitRectangles;
     const level = this.context.frameMapIndex;
-    if (!dungeon || !getGraphic || !ceilingRects || level === undefined) return true;
 
     const relIndex = relCellRF | 0;
     const relativeCell = BytecodeInterpreter.objectDrawingLocations[relIndex] ?? 0;
@@ -1290,10 +1272,10 @@ export class BytecodeInterpreter {
     const cell2mirror = [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1];
     if (relativeCell < 0 || relativeCell >= cell2graphic.length) return true;
 
-    const rect = ceilingRects[cell2rect[relativeCell] ?? 0];
+    const rect = this.context.ceilingPitRectangles[cell2rect[relativeCell] ?? 0];
     if (!rect) return true;
 
-    const bitmap = getGraphic(cell2graphic[relativeCell] ?? 0);
+    const bitmap = this.context.getGraphicBitmap(cell2graphic[relativeCell] ?? 0);
     if (!bitmap) return true;
 
     const mirror = (cell2mirror[relativeCell] ?? 0) !== 0;
@@ -1338,17 +1320,17 @@ export class BytecodeInterpreter {
    * says the source X offset "isn't right"; it is ported as it stands.
    */
   private opStdDrawSeeThruDoorEdge(): boolean {
-    const doorEdge = this.context.doorBitmaps?.[1];
-    const hole = this.context.getGraphicBitmap?.(41);
+    const doorEdge = this.context.doorBitmaps[1];
+    const hole = this.context.getGraphicBitmap(41);
     const rect = this.context.seeThruDoorEdgeRect;
     const trackTop = this.context.doorTrackTopRectangles;
-    if (!doorEdge || !hole || !rect || !trackTop?.[0] || !trackTop[6]) return true;
+    if (!doorEdge || !hole || !trackTop[0] || !trackTop[6]) return true;
     const tempBitmap: IndexedBitmap = { width: doorEdge.width, height: doorEdge.height, pixels: doorEdge.pixels.slice(0, 1968 * 2) };
     tag0088b2Explicit(
       hole.pixels,
       tempBitmap.pixels,
       rect,
-      trackTop[0].x1 - (this.context.seeThruWallsRectUByte4 ?? 0),
+      trackTop[0].x1 - this.context.seeThruWallsRectUByte4,
       0,
       48,
       16,
@@ -1385,7 +1367,7 @@ export class BytecodeInterpreter {
     const mapX = pop();
     const firstObject = popRN();
 
-    const facing = this.context.frameFacing ?? 0;
+    const facing = this.context.frameFacing;
     const idx = relCellRF | 0;
     const relativeCell = BytecodeInterpreter.objectDrawingLocations[idx] ?? 0;
 
@@ -1422,7 +1404,7 @@ export class BytecodeInterpreter {
 
     // `d.DoorGraphic[doorGraphicIndex]`; index 0 is F1, nearness 2 (`doc/CSBwin-src/Viewport.cpp:2598-2605`).
     const graphicIndex = doorGraphicIndex | 0;
-    DrawDoor(this.draw, doorRecordIndex | 0, doorState | 0, this.context.doorGraphics?.[graphicIndex], 2 - graphicIndex, rectRef);
+    DrawDoor(this.draw, doorRecordIndex | 0, doorState | 0, this.context.doorGraphics[graphicIndex], 2 - graphicIndex, rectRef);
     return true;
   }
 
@@ -1485,7 +1467,7 @@ export class BytecodeInterpreter {
 
   /** A stair graphic of the level's wall set (`STAIR_GRAPHIC_OPCODES`). */
   private opStairGraphic(offset: number): boolean {
-    push(90 + (this.context.wallGraphicSet ?? 0) * 18 + offset);
+    push(90 + this.context.wallGraphicSet * 18 + offset);
     return true;
   }
 
@@ -1497,7 +1479,7 @@ export class BytecodeInterpreter {
   private resolveStdBitmapPointer(ptr: number): IndexedBitmap | null {
     // Port of CSBWin `StdBitmapPointers()` (Viewport.cpp:2261+).
     const wall = this.context.wallBitmaps;
-    const door = this.context.doorBitmaps ?? [];
+    const door = this.context.doorBitmaps;
 
     switch (ptr) {
       case StdBitmapPtr.BMP_StdWallBitmapF3L2:
@@ -1540,9 +1522,9 @@ export class BytecodeInterpreter {
         return door[0] ?? null;
 
       case StdBitmapPtr.BMP_StdBitmapViewport:
-        return this.context.viewportIndexBuffer ?? null;
+        return this.context.viewportIndexBuffer;
       case StdBitmapPtr.BMP_StdHoleInWallBitmap:
-        return this.context.getGraphicBitmap?.(41) ?? null;
+        return this.context.getGraphicBitmap(41);
 
       default:
         return null;

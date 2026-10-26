@@ -197,6 +197,7 @@ function drawing(): void {
     palette552: tables.ui.graphic232.palette552,
     graphicCache,
     getGraphicBitmap: (graphicNum) => getCachedGraphicBitmap(graphics, graphicCache, graphicNum),
+    trace: (line) => console.log(line),
     footprints,
   });
   const frame = (): Uint8Array => {

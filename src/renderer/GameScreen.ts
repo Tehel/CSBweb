@@ -205,6 +205,7 @@ export class GameScreen {
       palette552,
       graphicCache,
       getGraphicBitmap: (graphicNum) => this.getGraphicBitmap(graphicNum),
+      trace: (line) => deps.ctx.host.trace(line),
     });
     this.uiPalette = palette552[0]!.slice();
     this.screen = createPaletteIndexViewportBuffer(SCREEN_WIDTH, SCREEN_HEIGHT, 0);
@@ -212,7 +213,8 @@ export class GameScreen {
     const ui = createUIState({
       graphicsLoader,
       ctx: deps.ctx,
-      context: this.viewport.context,
+      viewport: this.viewport.buffer,
+      csbGraphics: deps.csbGraphicsLoader,
       screenIndexBuffer: this.screen,
       uiTables: deps.tables.ui,
       objectTables: this.viewport.objectTables,
@@ -628,8 +630,8 @@ export class GameScreen {
     // `Cleanup(false)`'s `backgroundLib.Cleanup` and `CleanupAltMonCache`, before the game
     // that follows a lost one (`doc/CSBwin-src/Code1f9e6.cpp:302`, `Graphics.cpp:2230-2232`).
     // The first game starts with the screen's own, empty.
-    this.viewport.context.backgroundLib?.Cleanup();
-    this.viewport.context.altMonCache?.CleanupAltMonCache();
+    this.viewport.context.backgroundLib.Cleanup();
+    this.viewport.context.altMonCache.CleanupAltMonCache();
     initializePlayState(this.ui);
     this.setUIMode(UIMode.Adventure);
   }
@@ -650,7 +652,7 @@ export class GameScreen {
    */
   drawViewport(position: Position, facing: number, word1868: boolean): void {
     this.viewport.selectLevel(position.z);
-    this.viewport.draw(position, facing, this.seeThroughWalls(), word1868);
+    this.ui.picking = this.viewport.draw(position, facing, this.seeThroughWalls(), word1868);
     this.viewportDrawn = true;
     if (!this.ui.hintOracleUp) this.presentViewport();
   }
@@ -860,7 +862,9 @@ export class GameScreen {
 
   /** The entrance's view through the doorway: `ViewportRenderer.renderPrisonInterior`. */
   renderPrisonInterior(): IndexedBitmap {
-    return this.viewport.renderPrisonInterior(this.seeThroughWalls());
+    const { view, picking } = this.viewport.renderPrisonInterior(this.seeThroughWalls());
+    this.ui.picking = picking;
+    return view;
   }
 
   /**

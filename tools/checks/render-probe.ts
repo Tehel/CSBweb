@@ -118,6 +118,7 @@ function main(): void {
     palette552: tables.ui.graphic232.palette552,
     graphicCache,
     getGraphicBitmap: (graphicNum) => getCachedGraphicBitmap(graphics, graphicCache, graphicNum),
+    trace: (line) => console.log(line),
   });
 
   const start = game.ctx.party.state.position;

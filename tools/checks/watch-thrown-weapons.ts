@@ -276,8 +276,8 @@ const where = (p: Position | null): string => (p ? `(${p.x},${p.y}) map ${p.z}` 
   const ui = newUIState(stockGraphics(), game.ctx);
   const button = { x1: 10, x2: 20, y1: 10, y2: 20 };
   const none = { x1: 255, x2: 0, y1: 0, y2: 0 };
-  ui.context.viewportObjectButtons = [button, none, none, none, none, none];
-  ui.context.viewportObjectRNs = [dagger, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF];
+  ui.picking.viewportObjectButtons = [button, none, none, none, none, none];
+  ui.picking.viewportObjectRNs = [dagger, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF];
   check(tryPickViewportObject(ui, 15, 15 + VIEWPORT_Y) && party.objectInHand === dagger, '7. the dagger is picked up into the hand');
   check(!game.ctx.thrownWeapons.has(dagger), '7. the tag is gone');
   // Laid down again by hand, it is a dropped object like any other.

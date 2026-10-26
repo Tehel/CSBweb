@@ -47,8 +47,7 @@ export function blitBasicGraphicToViewport(ui: UIState, index: number, rect: Rec
  * loop skips while the party sleeps (`:647`).
  */
 export function displaySleepScreen(ui: UIState): void {
-  const viewport = ui.context.viewportIndexBuffer;
-  if (!viewport) return;
+  const viewport = ui.viewport;
   viewport.pixels.fill(0);
   if (ui.fontData) drawTextLineIndex(viewport, ui.fontData, 93, 65, 4, 0, 'WAKE UP');
 }
@@ -60,8 +59,7 @@ export function displaySleepScreen(ui: UIState): void {
  * viewport again until the thaw.
  */
 export function displayFrozenScreen(ui: UIState): void {
-  const viewport = ui.context.viewportIndexBuffer;
-  if (!viewport) return;
+  const viewport = ui.viewport;
   viewport.pixels.fill(0);
   if (ui.fontData) drawTextLineIndex(viewport, ui.fontData, 81, 69, 4, 0, 'GAME FROZEN');
 }

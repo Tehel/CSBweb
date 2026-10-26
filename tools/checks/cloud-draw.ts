@@ -58,11 +58,11 @@ import { createPaletteIndexViewportBuffer, shrinkBlt, type IndexedBitmap } from 
 import { getCachedGraphicBitmap } from '../../src/renderer/ViewportGraphics';
 import { ViewportRenderer } from '../../src/renderer/ViewportRenderer';
 import type { DungeonState } from '../../src/engine/DungeonState';
-import type { InterpreterContext } from '../../src/renderer/bytecode/BytecodeInterpreter';
 import { check, finish } from '../lib/check';
 import { graphicsTablesOf, newGame, stockDungeon, stockGraphics } from '../lib/game';
 import { RnMaps } from '../../src/core/RnMaps';
 import { standInOf } from '../lib/standIn';
+import { viewportContextOf } from '../lib/viewportContext';
 
 const graphics = stockGraphics();
 const viewportTables = graphicsTablesOf(graphics).viewport;
@@ -108,7 +108,7 @@ function drawCloudAt(px: number, py: number, viewportSeed: number): Drawn {
   cloudPositions7042[REL_CELL * 2] = px;
   cloudPositions7042[REL_CELL * 2 + 1] = py;
   const viewportIndexBuffer = createPaletteIndexViewportBuffer(224, 136, 0);
-  const context = standInOf<InterpreterContext>({
+  const context = viewportContextOf({
     viewportIndexBuffer,
     objectTables: { ...realTables, cloudPositions7042, cloudScaleBase, cloudScale },
     getGraphicBitmap: () => cloudBitmap,
@@ -278,7 +278,7 @@ function drawScene(sc: Scene): SceneResult {
   const viewportIndexBuffer = createPaletteIndexViewportBuffer(224, 136, 0);
   const requested: number[] = [];
   const rec = { nextObject: OBJECT_ID_EOF, value: sc.value, cloudType: sc.cloudType, bit7: true };
-  const context = standInOf<InterpreterContext>({
+  const context = viewportContextOf({
     viewportIndexBuffer,
     objectTables: { ...realTables, cloudPositions7042 },
     getGraphicBitmap: (n: number) => { requested.push(n); return fakeGraphic(n); },
@@ -397,7 +397,7 @@ for (const word1868 of [false, true]) {
   for (const relativeCell of [0, 1, 4]) {
     const rec = { nextObject: OBJECT_ID_EOF, value: 0, cloudType: 50, bit7: false };
     const viewportIndexBuffer = createPaletteIndexViewportBuffer(224, 136, 0);
-    const context = standInOf<InterpreterContext>({
+    const context = viewportContextOf({
       viewportIndexBuffer,
       objectTables: realTables,
       wallRectangles: viewportTables.wallRectangles,
@@ -441,7 +441,7 @@ for (const facing of [0, 1, 2, 3]) {
   for (const [cloudType, pos] of [[100, (facing + 2) & 3], [101, (facing + 2) & 3], [100, facing]]) {
     const rec = { nextObject: OBJECT_ID_EOF, value: 0, cloudType, bit7: false };
     const viewportIndexBuffer = createPaletteIndexViewportBuffer(224, 136, 0);
-    const context = standInOf<InterpreterContext>({
+    const context = viewportContextOf({
       viewportIndexBuffer,
       objectTables: realTables,
       getGraphicBitmap: (n: number) => fakeGraphic(n),
@@ -528,6 +528,7 @@ check([0, 1, 2].every((c) => realTables.cloudPositions7042[2 * c + 1] === 47) &&
       palette552: tables.ui.graphic232.palette552,
       graphicCache,
       getGraphicBitmap: (graphicNum) => getCachedGraphicBitmap(graphics, graphicCache, graphicNum),
+      trace: (line) => console.log(line),
     });
     const frame = (viewportSeed: number, graphicSeed: number): Uint8Array => {
       viewportRandom.setSeed(viewportSeed);

@@ -12,8 +12,9 @@ import type { ImportAnswer, ImportResult, ImportedFile } from '../../engine/Game
 import type { GameContext } from '../../engine/GameContext';
 import { createInterfaceState } from '../../engine/InterfaceState';
 import type { PartyState } from '../../engine/gameTypes';
-import type { InterpreterContext } from '../bytecode/BytecodeInterpreter';
-import type { IndexedBitmap, createPaletteIndexViewportBuffer } from '../csbwin/CanvasBlitter';
+import { emptyViewportPicking, type ViewportPicking } from '../bytecode/Types';
+import type { CSBGraphicsLoader } from '../../data/CSBGraphicsLoader';
+import type { IndexedBitmap, PaletteIndexViewportBuffer, createPaletteIndexViewportBuffer } from '../csbwin/CanvasBlitter';
 import type { KeyXlate, UIButton, UITables } from '../../data/tables/UITables';
 import type { ObjectTables } from '../../data/tables/ObjectTables';
 import type { FontData } from '../csbwin/TextRenderer';
@@ -60,8 +61,15 @@ export interface UIState {
    * load and weight figures the engine acts on, so both come out of the same code).
    */
   readonly ctx: GameContext;
-  /** The viewport's interpreter state, `ViewportRenderer.context`: what the view last drew. */
-  context: InterpreterContext;
+  /**
+   * What the view last drawn left to pick from, `ViewportRenderer.draw`'s, which
+   * `GameScreen` keeps; empty before the first.
+   */
+  picking: ViewportPicking;
+  /** The viewport, 224x136 palette indices: `d.pViewportBMP`, `ViewportRenderer.buffer`. */
+  viewport: PaletteIndexViewportBuffer;
+  /** `CSBgraphics.dat`, whose portraits past 23 a champion shows; absent from a game without one. */
+  csbGraphics?: CSBGraphicsLoader;
   /** `d.LogicalScreenBase`, the whole screen as palette indices. */
   screenIndexBuffer: ScreenIndexBuffer;
   readonly uiTables: UITables;
@@ -414,7 +422,7 @@ export function savedGameRead(ui: UIState): void {
 
 /** What the interface reads, all of it there before the first frame. */
 type UISources = Pick<UIState,
-  | 'graphicsLoader' | 'ctx' | 'context' | 'screenIndexBuffer' | 'uiTables' | 'objectTables'
+  | 'graphicsLoader' | 'ctx' | 'viewport' | 'csbGraphics' | 'screenIndexBuffer' | 'uiTables' | 'objectTables'
   | 'fontData' | 'graphicCache'>;
 
 /** What the interface asks of the screen and of the page. */
@@ -428,6 +436,7 @@ export function createUIState(sources: UISources, hooks: UIHooks): UIState {
     ...sources,
     get partyState() { return this.ctx.party.state; },
     partyGeneration: sources.ctx.party.generation,
+    picking: emptyViewportPicking(),
     ...initialPlayState(),
     dialog: null,
     saveMenu: null,

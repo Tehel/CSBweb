@@ -32,21 +32,15 @@ export function DrawDoor(
   nearness: number,
   rect: RectPos[],
 ): void {
-  const dungeon = draw.context.dungeonState;
-  if (!dungeon) return;
-
-  const record = dungeon.getDoorRecordByIndex(db0Index);
+  const record = draw.context.dungeonState.getDoorRecordByIndex(db0Index);
   if (!record) return;
 
   const doorType = record.doorType & 1;
   const doorGraphicNum = graphicNum?.[doorType] ?? -1;
   if (doorGraphicNum < 0) return;
 
-  const getGraphic = draw.context.getGraphicBitmap;
   const viewport = draw.context.viewportIndexBuffer;
-  if (!getGraphic || !viewport) return;
-
-  const graphic = getGraphic(doorGraphicNum);
+  const graphic = draw.context.getGraphicBitmap(doorGraphicNum);
   if (!graphic) return;
 
   const s = doorState;
@@ -75,7 +69,7 @@ export function DrawDoor(
   // into `d.RandomNumber`, which `DrawViewport` sets to a viewport-only stream for
   // exactly this reason (`doc/CSBwin-src/Viewport.cpp:6713-6714`) — rendering must
   // never perturb the game's own RNG, so this draws from a dedicated instance.
-  const isLightningDoor = ((draw.context.doorTOC?.[doorType] ?? 0) & 0x400) !== 0;
+  const isLightningDoor = ((draw.context.doorTOC[doorType] ?? 0) & 0x400) !== 0;
   if (isLightningDoor && s !== 5) {
     if (viewportRandom.bool()) {
       bitmap = draw.getMirroredBitmap(bitmap);
@@ -88,7 +82,7 @@ export function DrawDoor(
   }
 
   // The near door under See-Thru-Walls (`:4233-4239`).
-  if (rect === draw.context.doorRects?.F1 && draw.context.seeThroughWalls) drawOrnament(17, 2);
+  if (rect === draw.context.doorRects.F1 && draw.context.seeThroughWalls) drawOrnament(17, 2);
 
   const blit = (r: RectPos | undefined) => {
     if (!r) return;
@@ -121,8 +115,8 @@ export function DrawDoor(
 function TAG004b26(draw: ViewportDraw, door: IndexedBitmap, ornament: number, nearness: number): void {
   const tables = draw.context.objectTables;
   const getGraphic = draw.context.getGraphicBitmap;
-  const slot = draw.context.doorOrnaments?.[ornament - 1];
-  if (!tables || !getGraphic || !slot) return;
+  const slot = draw.context.doorOrnaments[ornament - 1];
+  if (!slot) return;
   const [graphicNum, set] = slot;
   // A set past `d.Byte5070`'s four, which CSBWin reads on past its table, is not drawn
   // (DEBT.md C186).
@@ -134,7 +128,7 @@ function TAG004b26(draw: ViewportDraw, door: IndexedBitmap, ornament: number, ne
   if (nearness !== 2) {
     const cache = draw.context.graphicCache;
     const key = `doorOrnament:${graphicNum}:${set}:${nearness}`;
-    const cached = cache?.get(key);
+    const cached = cache.get(key);
     if (cached) {
       ornamentBitmap = cached;
     } else {
@@ -149,7 +143,7 @@ function TAG004b26(draw: ViewportDraw, door: IndexedBitmap, ornament: number, ne
         rect.height,
         colorMap
       );
-      cache?.set(key, ornamentBitmap);
+      cache.set(key, ornamentBitmap);
     }
   }
 
@@ -167,7 +161,6 @@ export function DrawDoorSwitch(draw: ViewportDraw, doorSwitchId: number, distanc
   const tables = draw.context.objectTables;
   const viewport = draw.context.viewportIndexBuffer;
   const getGraphic = draw.context.getGraphicBitmap;
-  if (!tables || !viewport || !getGraphic) return;
 
   const setIndex = tables.doorSwitchRectIndex[doorSwitchId - 1] ?? 0;
   const rectSet = tables.doorSwitchRectSets[setIndex];
@@ -197,8 +190,8 @@ export function DrawDoorSwitch(draw: ViewportDraw, doorSwitchId: number, distanc
 
   bltShapeToViewportIndex(bitmap, viewport, { x1: desc.x1, y1: desc.y1, x2: desc.x2, y2: desc.y2 });
 
-  if (distance === 3 && draw.context.doorSwitchRects) {
-    draw.context.doorSwitchRects.push({ x1: desc.x1, y1: desc.y1, x2: desc.x2, y2: desc.y2 });
+  if (distance === 3) {
+    draw.context.picking.doorSwitchRects.push({ x1: desc.x1, y1: desc.y1, x2: desc.x2, y2: desc.y2 });
   }
 }
 
@@ -243,7 +236,6 @@ export function GraphicRandom(maxExclusive: number): number {
 export function DrawTeleporter(draw: ViewportDraw, teleporterRect: RectPos, wallRect: RectPos): void {
   const viewport = draw.context.viewportIndexBuffer;
   const getGraphic = draw.context.getGraphicBitmap;
-  if (!viewport || !getGraphic) return;
 
   let mask: IndexedBitmap | null = null;
   if (teleporterRect.y2 !== 0xff) {

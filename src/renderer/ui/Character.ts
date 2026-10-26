@@ -560,7 +560,7 @@ export function getChampionPortrait(ui: UIState, champion: Champion): IndexedBit
  */
 export function getPortraitBitmap(ui: UIState, portraitIndex: number): IndexedBitmap | null {
   if (portraitIndex < 0) return null;
-  if (portraitIndex > 23) return getExternalPortraitAddress(ui.context.csbGraphics, portraitIndex);
+  if (portraitIndex > 23) return getExternalPortraitAddress(ui.csbGraphics, portraitIndex);
   const cached = ui.portraitCache.get(portraitIndex);
   if (cached) return cached;
 

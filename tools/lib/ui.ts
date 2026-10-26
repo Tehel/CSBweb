@@ -2,10 +2,10 @@
  * How a tool builds the interface's state: whole, as `GameScreen` builds it.
  *
  * `newUIState` hands `createUIState` the game's tables and font from `graphics`, a blank
- * 320x200 screen, and the interpreter context of a `ViewportRenderer` over `ctx` that has
- * drawn no view yet (no room summary, no object buttons: what the screen has before its
- * first frame). A tool replaces the screen or the context afterwards to draw into a
- * buffer of its own or to stage a view. The hooks do nothing unless the tool passes its
+ * 320x200 screen, and the viewport of a `ViewportRenderer` over `ctx` that has drawn no
+ * view yet, with the empty picking the screen has before its first frame. A tool replaces
+ * the screen, the viewport or the picking afterwards to draw into a buffer of its own or
+ * to stage a view. The hooks do nothing unless the tool passes its
  * own; the save/load screen lists no save, and `onReadSave`, `onMakeNewAdventure`,
  * `onSaveGame`, `onExportSave`, `onDeleteSave` and `onImportSave` throw, as there is no store and no world to serialize.
  * The settings are the defaults, kept nowhere, the CRT effect can be shown, and there is
@@ -48,11 +48,12 @@ export function newUIState(graphics: GraphicsLoader, ctx: GameContext, hooks: Pa
     palette552: tables.ui.graphic232.palette552,
     graphicCache,
     getGraphicBitmap: (graphicNum) => getGraphicBitmap(graphicNum),
+    trace: (line) => console.log(line),
   });
   const ui = createUIState({
     graphicsLoader: graphics,
     ctx,
-    context: viewport.context,
+    viewport: viewport.buffer,
     screenIndexBuffer: createPaletteIndexViewportBuffer(SCREEN_WIDTH, SCREEN_HEIGHT, 0),
     uiTables: tables.ui,
     objectTables: tables.objects,

@@ -181,7 +181,7 @@ export function handleMouthPress(ui: UIState): void {
  * as by a fill (`fillAtWaterFountain`).
  */
 export function drinkAtWaterFountain(ui: UIState): void {
-  if (!ui.context.facingWaterFountain) return;
+  if (!ui.picking.facingWaterFountain) return;
   const chIdx = ui.partyState.cursorOwner;
   const champ = ui.partyState.champions[chIdx];
   if (!champ || !isAlive(champ)) return;

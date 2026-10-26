@@ -114,7 +114,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E28 | The bytecode interpreter's context and state | L | ⏳ step 1 of 3 next |
+| E28 | The bytecode interpreter's context and state | L | ⏳ step 2 of 3 next |
 | E29 | `GameScreen` is the canvas, the compose order, the palettes and a façade | L | ⏳ |
 | E31 | Late wiring with silent defaults, and long parameter lists | M | ⏳ |
 | E32 | Four ways to read bytes, and eight graphics caches | M | ⏳ |
@@ -420,27 +420,21 @@ against each other, and the file formats.
 operand (`BytecodeInterpreter.decode`), the constants the opcodes push are tables
 (`CONSTANT_OPCODES`…), and `StdRectanglePointers` is one too (`STD_RECTANGLE_POINTERS`).
 The programs are CSBWin's `pStdDrawCode[21][8]` (`BytecodePrograms.ts`, indexed by
-`getBytecodeProgram`, `src/renderer/DrawViewport.ts`). What is left, a step each, in this
-order:
+`getBytecodeProgram`, `src/renderer/DrawViewport.ts`). The context, `InterpreterContext`,
+holds the drawing's inputs, every one the game always sets required, and an unknown opcode
+goes to its `trace`, `GameHost.trace`; a tool fills what it leaves out with
+`viewportContextOf` (`tools/lib/viewportContext.ts`). What a frame leaves for the interface
+is a `ViewportPicking` (`src/renderer/bytecode/Types.ts`), which `ViewportRenderer.draw`
+returns and `GameScreen` keeps as `ui.picking`. What is left, a step each, in this order:
 
-1. **The context.** `InterpreterContext` (`BytecodeInterpreter.ts:36-157`) carries the
-   drawing's inputs and the picking's outputs alike (`viewportObjectButtons`,
-   `viewportObjectRNs`, the `facing*` flags, `doorSwitchRects`, written by
-   `DrawDecorations`, `DrawRoomObjects` and `DrawDoor`, read by
-   `src/renderer/ui/ViewportPicking.ts`) in 49 optional fields, so 22
-   `if (!tables || !viewport || !getGraphic) return;` draw nothing and say nothing when a
-   dependency is missing; `floorBitmap` and `ceilingBitmap` are dead. An unknown opcode is
-   a `console.warn` (`executeOpcode`), where the renderer reports through
-   `GameHost.trace`. Paying it: `draw()` returning the picking for the UI, the inputs
-   required and a tool helper filling defaults, a `trace` hook.
 2. **The state.** The drawing's state is module-wide: the interpreter's `stack`, `rstack`,
    `sp` and `rsp`, `viewportRandom` (`ViewportDraw.ts:32`) and `graphicRandomState`
-   (`DrawDoor.ts:212`), which tools reseed by hand. Paying it: an object the
+   (`DrawDoor.ts:205`), which tools reseed by hand. Paying it: an object the
    `ViewportRenderer` owns.
 3. **The monster colours.** `selectLevel` writes the level's monster colours into the
    shared tables (`tables.monsterColorMapMedium[...]`,
-   `src/renderer/ViewportRenderer.ts:203-208`), the game's one `GraphicsTables`, which
-   tools cache per loader. Its comment (`:154-157`) says they are applied "whether or not
+   `src/renderer/ViewportRenderer.ts:217-222`), the game's one `GraphicsTables`, which
+   tools cache per loader. Its comment (`:167-170`) says they are applied "whether or not
    the view is drawn"; its one caller runs only when it is. Paying it: per-level copies of
    the two colour maps.
 

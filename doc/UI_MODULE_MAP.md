@@ -107,8 +107,9 @@ not drawn.
 
 Worth knowing before touching `ViewportPicking.ts`: the bytecode renderer records, for every
 object and wall feature it blits, the screen rectangle it occupied plus the object's RN
-(`context.viewportObjectButtons` / `viewportObjectRNs`). A click is resolved by scanning
-that frame's records — CSBWin does the same rather than projecting the click back into the
+(`viewportObjectButtons` / `viewportObjectRNs` of the frame's `ViewportPicking`, which
+`ViewportRenderer.draw` returns and `GameScreen` keeps as `ui.picking`). A click is resolved
+by scanning that frame's records — CSBWin does the same rather than projecting the click back into the
 dungeon.
 
 ## Verifying a change here

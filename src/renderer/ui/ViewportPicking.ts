@@ -2,7 +2,7 @@
  * Clicking inside the 3D viewport: what the point under the cursor refers to.
  *
  * The bytecode renderer records, for every object and wall feature it blits, the screen
- * rectangle it occupied plus the object's RN (`context.viewportObjectButtons` /
+ * rectangle it occupied plus the object's RN (`ViewportPicking.viewportObjectButtons` /
  * `viewportObjectRNs`). Picking is therefore a reverse lookup over that frame's output —
  * CSBWin does the same thing (`doc/CSBwin-src/Mouse.cpp`, `doc/CSBwin-src/Viewport.cpp`)
  * rather than projecting the click back into the dungeon.
@@ -11,7 +11,7 @@ import { OBJNI_BONES_A, OBJNI_EMPTY_FLASK, OBJNI_WATER, OBJNI_WATERSKIN } from '
 import { OBJECT_ID_EOF, OBJECT_ID_NULL, ObjectID, Position, RoomType, getRoomType } from '../../core/types';
 import { CreatureRecord } from '../../data/dungeonTypes';
 import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
-import { GraphicRoomType } from '../bytecode/Types';
+import { ViewRoomType } from '../bytecode/Types';
 import { resolveObjectNameIndex } from './Objects';
 import { UIState } from './UIState';
 import { setClockTick } from '../../engine/LoopState';
@@ -26,8 +26,8 @@ type ViewportCursorAction =
   | { kind: 'wall' };
 
 function isDoorSwitchHit(ui: UIState, x: number, y: number): boolean {
-  const rects = ui.context.doorSwitchRects;
-  if (!rects || rects.length === 0) return false;
+  const rects = ui.picking.doorSwitchRects;
+  if (rects.length === 0) return false;
   const vx = x - VIEWPORT_X;
   const vy = y - VIEWPORT_Y;
   for (const rect of rects) {
@@ -49,7 +49,7 @@ type EmptyHandedViewportTarget = 'doorSwitch' | 'wall' | 'object' | 'stone';
  *
  * A click that hit no button is `'stone'`, which makes a sound, when it lands on the bare
  * stone ahead (`:1139-1158`): the party is not facing an alcove, `d.CellTypeJustAhead`
- * (`roomData[17].roomType`, `Viewport.cpp:6789-6792`) is stone, the cell's own flags are
+ * (`ViewportPicking.cellTypeJustAhead`, `Viewport.cpp:6789-6792`) is stone, the cell's own flags are
  * stone or a false wall neither open nor imaginary (`(cf & 5) == 0`), and the click is
  * within x 33-189, y 44-150. A closed imaginary false wall passes the first test and fails
  * the second.
@@ -61,17 +61,16 @@ export function resolveEmptyHandedViewportClick(ui: UIState, x: number, y: numbe
   for (let button = 0; button < 6; button++) {
     if (!isViewportButtonHit(ui, button, x, y)) continue;
     if (button < 5) return 'object';
-    return ui.context.facingAlcove ? null : 'wall';
+    return ui.picking.facingAlcove ? null : 'wall';
   }
-  if (ui.context.facingAlcove) return null;
-  if (ui.context.roomData[17]?.roomType !== RoomType.STONE) return null;
+  if (ui.picking.facingAlcove) return null;
+  if (ui.picking.cellTypeJustAhead !== RoomType.STONE) return null;
   if (!isFrontCellStoneOrVisibleFalseWall(ui)) return null;
   if (x < 33 || x > 189 || y < 44 || y > 150) return null;
   return 'stone';
 }
 
 export function tryPickViewportObject(ui: UIState, x: number, y: number): boolean {
-  if (!ui.context.viewportObjectButtons || !ui.context.viewportObjectRNs) return false;
   if (ui.partyState.objectInHand !== OBJECT_ID_NULL) return false;
   if (ui.partyState.cursorOwner < 0) return false;
 
@@ -108,7 +107,7 @@ export function resolveViewportCursorAction(ui: UIState, x: number, y: number): 
   // `d.CellTypeJustAhead == 0` (`doc/CSBwin-src/Mouse.cpp:1166`), which is all this arm
   // tests: a false wall that is not open summarises as stone, imaginary or not
   // (`Codea59a.cpp:278-279`), unlike the bare-stone sound's `(cf & 5) == 0`.
-  const stoneAhead = ui.context.roomData[17]?.roomType === RoomType.STONE;
+  const stoneAhead = ui.picking.cellTypeJustAhead === RoomType.STONE;
   const doorFacingAhead = isFrontCellDoorFacing(ui);
 
   if (stoneAhead) {
@@ -116,9 +115,9 @@ export function resolveViewportCursorAction(ui: UIState, x: number, y: number): 
     if (dropPos !== null) return { kind: 'drop', pos: dropPos };
 
     if (isViewportButtonHit(ui, 5, x, y)) {
-      if (ui.context.facingAlcove) {
+      if (ui.picking.facingAlcove) {
         let viAltar = false;
-        if (ui.context.facingViAltar) {
+        if (ui.picking.facingViAltar) {
           const objectNameIndex = resolveObjectNameIndex(ui, objectId);
           viAltar = objectNameIndex === OBJNI_BONES_A;
         }
@@ -143,7 +142,7 @@ export function resolveViewportCursorAction(ui: UIState, x: number, y: number): 
  * fills it. The caller touches the wall afterwards either way (`TouchWallF1`, `:1228-1229`).
  */
 export function fillAtWaterFountain(ui: UIState): void {
-  if (!ui.context.facingWaterFountain) return;
+  if (!ui.picking.facingWaterFountain) return;
 
   const objectId = ui.partyState.objectInHand;
   const objectNameIndex = resolveObjectNameIndex(ui, objectId);
@@ -170,8 +169,8 @@ export function findDropAreaHit(ui: UIState, x: number, y: number, count: number
 }
 
 function isViewportButtonHit(ui: UIState, index: number, x: number, y: number): boolean {
-  const buttons = ui.context.viewportObjectButtons;
-  if (!buttons || index < 0 || index >= buttons.length) return false;
+  const buttons = ui.picking.viewportObjectButtons;
+  if (index < 0 || index >= buttons.length) return false;
   const rect = buttons[index];
   if (!rect || rect.x1 === 255) return false;
   const vx = x - VIEWPORT_X;
@@ -206,15 +205,13 @@ function isFrontCellStoneOrVisibleFalseWall(ui: UIState): boolean {
   return false;
 }
 
+/** `d.CellTypeJustAhead == roomDOORFACING` (`doc/CSBwin-src/Mouse.cpp:1054`). */
 function isFrontCellDoorFacing(ui: UIState): boolean {
-  const rd = ui.context.roomData[17];
-  return rd?.graphicRoomType === GraphicRoomType.DOOR_FACING;
+  return ui.picking.cellTypeJustAhead === ViewRoomType.DOOR_FACING;
 }
 
 function findViewportObjectHit(ui: UIState, x: number, y: number): { relativeLocation: number; rn: ObjectID } | null {
-  const buttons = ui.context.viewportObjectButtons;
-  const rns = ui.context.viewportObjectRNs;
-  if (!buttons || !rns) return null;
+  const { viewportObjectButtons: buttons, viewportObjectRNs: rns } = ui.picking;
 
   const vx = x - VIEWPORT_X;
   const vy = y - VIEWPORT_Y;
@@ -226,8 +223,8 @@ function findViewportObjectHit(ui: UIState, x: number, y: number): { relativeLoc
     if (!rect || rect.x1 === 255) continue;
     if (vx < rect.x1 || vx > rect.x2 || vy < rect.y1 || vy > rect.y2) continue;
     const rn = rns[i];
-    // `ViewportRenderer` fills the five with `RNeof` before the interpreter writes the
-    // objects it drew.
+    // A frame's picking starts the five at `RNeof` (`emptyViewportPicking`), before the
+    // interpreter writes the objects it drew.
     if (rn === undefined || rn === OBJECT_ID_EOF) continue;
     return { relativeLocation: i, rn };
   }

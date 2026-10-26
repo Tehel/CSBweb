@@ -14,7 +14,7 @@
  *
  * The buttons are the ones the renderer records for this very alcove — level 2, the
  * party at (4,17) facing east — read off the live app. The dispatch is what is under
- * test, not the renderer, so they are written into the context by hand.
+ * test, not the renderer, so they are written into the picking by hand.
  *
  * A click that touches no button makes a sound on the bare stone ahead
  * (`Mouse.cpp:1139-1158`): not an alcove, `d.CellTypeJustAhead` stone, the cell's flags
@@ -73,7 +73,7 @@ function itemsAt(game: Game, cell: Position): ObjectID[] {
 
 function makeUI(game: Game, rn: ObjectID, facingAlcove: boolean): UIState {
   const ui = newUIState(stockGraphics(), game.ctx);
-  Object.assign(ui.context, {
+  Object.assign(ui.picking, {
     facingAlcove,
     doorSwitchRects: [],
     viewportObjectButtons: [UNSET, UNSET, UNSET, UNSET, { ...BUTTON_4 }, { ...BUTTON_5 }].map((b) => ({ ...b })),
@@ -82,7 +82,7 @@ function makeUI(game: Game, rn: ObjectID, facingAlcove: boolean): UIState {
   return ui;
 }
 
-/** `roomData[17]`, the cell ahead, as `DrawViewport` summarises it. */
+/** `roomData[17]`, the cell ahead, as `DrawViewport` summarises it: its `roomType` is `d.CellTypeJustAhead`. */
 function summaryAhead(game: Game): SummarizeRoomData {
   const party = game.ctx.party.state;
   const ahead = [party.position.north, party.position.east, party.position.south, party.position.west][party.facing & 3];
@@ -104,15 +104,13 @@ function summaryAhead(game: Game): SummarizeRoomData {
 
 /** The party facing a face with nothing drawn on it: no object, no decoration. */
 function bareUI(game: Game, facingAlcove: boolean): UIState {
-  const roomData: SummarizeRoomData[] = [];
-  roomData[17] = summaryAhead(game);
   const ui = newUIState(stockGraphics(), game.ctx);
-  Object.assign(ui.context, {
+  Object.assign(ui.picking, {
     facingAlcove,
     doorSwitchRects: [],
     viewportObjectButtons: [UNSET, UNSET, UNSET, UNSET, UNSET, UNSET].map((b) => ({ ...b })),
     viewportObjectRNs: [OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF],
-    roomData,
+    cellTypeJustAhead: summaryAhead(game).roomType,
   });
   return ui;
 }
@@ -180,7 +178,7 @@ function main(): void {
     game.ctx.party.state.position = party;
     game.ctx.party.state.facing = facing;
     const ui = bareUI(game, alcove);
-    const ahead = ui.context!.roomData[17];
+    const ahead = summaryAhead(game);
     const cf = game.ctx.dungeon.getMap(party.z)?.cellFlags[ahead.x]?.[ahead.y] ?? -1;
     const got = resolveEmptyHandedViewportClick(ui, x, y);
     console.log([`(${party.x},${party.y},${party.z})`, facing, `(${ahead.x},${ahead.y})`, `0x${cf.toString(16)}`, ahead.roomType, alcove, `${x},${y}`, String(got)].join('\t'));
@@ -215,7 +213,7 @@ function main(): void {
     game.ctx.party.state.position = party;
     game.ctx.party.state.facing = facing;
     const ui = bareUI(game, false);
-    const ahead = ui.context!.roomData[17];
+    const ahead = summaryAhead(game);
     const got = resolveViewportCursorAction(ui, x, y);
     const does = got === null ? 'null' : got.kind === 'drop' ? `drop ${got.pos}` : got.kind === 'throw' ? `throw ${got.side}` : got.kind;
     console.log([`(${party.x},${party.y},${party.z})`, facing, `(${ahead.x},${ahead.y})`, ahead.roomType, `${x},${y}`, does].join('\t'));

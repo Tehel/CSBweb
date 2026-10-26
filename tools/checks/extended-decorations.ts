@@ -174,6 +174,7 @@ for (const file of FILES) {
     palette552: tables.ui.graphic232.palette552,
     graphicCache,
     getGraphicBitmap: (graphicNum) => getCachedGraphicBitmap(graphics, graphicCache, graphicNum),
+    trace: (line) => console.log(line),
     csbGraphicsLoader: csb,
   });
   const viewport: IndexedBitmap = { width: 224, height: 136, pixels: new Uint8Array(224 * 136) };

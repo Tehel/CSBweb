@@ -96,10 +96,6 @@ export function DrawRoomObjects(
 
   const dungeon = draw.context.dungeonState;
   const tables = draw.context.objectTables;
-  if (!dungeon || !tables) {
-    // (skip) missing dungeonState/objectTables
-    return;
-  }
 
   // Only the cells 0..9 draw objects and missiles (`ProcessOnePosition`,
   // `doc/CSBwin-src/Code51a4.cpp:2223-2224`, `:2301-2302`). A monster is drawn in cells
@@ -178,9 +174,9 @@ export function DrawRoomObjects(
     if (monsterRecord && monsterState) {
       // `GetAlternateGraphicsRecord(pMonster)` at each position, on `d.LoadedLevel`
       // (`Code51a4.cpp:2259-2295`): the group's pictures from `CSBgraphics.dat`, or its type's own.
-      const pAltMonsterGraphic = draw.context.altMonCache?.GetAlternateGraphicsRecord(
-        draw.context.csbGraphics, dungeon.getData(), draw.context.frameMapIndex ?? 0, monsterRecord,
-      ) ?? null;
+      const pAltMonsterGraphic = draw.context.altMonCache.GetAlternateGraphicsRecord(
+        draw.context.csbGraphics, dungeon.getData(), draw.context.frameMapIndex, monsterRecord,
+      );
       DrawMonster(
         draw, monsterRecord, monsterState, facing, relativeCellNumber, curAbsPos, relLoc, sideOfDoor,
         middleLeftRight, positionList, positionListIndex, pAltMonsterGraphic,
@@ -302,7 +298,6 @@ function drawSingleObject(
 ): { nextSmallOffset: number } {
   const viewport = draw.context.viewportIndexBuffer;
   const getGraphic = draw.context.getGraphicBitmap;
-  if (!viewport || !getGraphic) return { nextSmallOffset: currentSmallOffset };
 
   const nearSideOfCell = relativeLocationWithinCell >= 2;
 
@@ -376,8 +371,9 @@ function drawSingleObject(
   if (x2 > 223) x2 = 223;
   if (y2 > 135) y2 = 135;
 
-  if (touchable && draw.context.viewportObjectButtons && draw.context.viewportObjectRNs) {
-    const button = draw.context.viewportObjectButtons[relativeLocationWithinCell];
+  if (touchable) {
+    const { viewportObjectButtons, viewportObjectRNs } = draw.context.picking;
+    const button = viewportObjectButtons[relativeLocationWithinCell];
     if (button) {
       if (button.x1 === 255) {
         button.x1 = x1;
@@ -399,8 +395,8 @@ function drawSingleObject(
         button.y1 = Math.min(button.y1, y1);
         button.y2 = Math.max(button.y2, y2);
       }
-      if (relativeLocationWithinCell < draw.context.viewportObjectRNs.length) {
-        draw.context.viewportObjectRNs[relativeLocationWithinCell] = objRn;
+      if (relativeLocationWithinCell < viewportObjectRNs.length) {
+        viewportObjectRNs[relativeLocationWithinCell] = objRn;
       }
     }
   }
@@ -481,7 +477,6 @@ function DrawMonster(
   pAlternateGraphic: AltMonGraph | null,
 ): void {
   const tables = draw.context.objectTables;
-  if (!tables) return;
 
   // "LOCAL_96 means working on last of far positions."
   const local96 =
@@ -575,7 +570,6 @@ function drawMonsterAt(
 ): void {
   const tables = draw.context.objectTables;
   const getGraphic = draw.context.getGraphicBitmap;
-  if (!tables || !draw.context.viewportIndexBuffer || !getGraphic) return;
 
   // The alternate reads `word4` alone of its `MONSTERDESC`.
   const mtDesc = pAlternateGraphic ? pAlternateGraphic.monsterDesc : pmtDesc;
@@ -740,9 +734,7 @@ export function drawMissilesAtPosition(
   relativeLocation: number,
   middleLeftRight: number,
 ): void {
-  const viewport = draw.context.viewportIndexBuffer;
   const getGraphic = draw.context.getGraphicBitmap;
-  if (!viewport || !getGraphic) return;
 
   const vp = tables.viewportPosition[0]?.[relativeCellNumber]?.[relativeLocation];
   const centerX = vp?.x ?? 0;
@@ -878,9 +870,7 @@ export function drawMissilesAtPosition(
 export function DrawClouds(draw: ViewportDraw, relativeCellNumber: number, firstObject: ObjectID, facing: number, curAbsPos: number): boolean {
   const tables = draw.context.objectTables;
   const dungeon = draw.context.dungeonState;
-  const viewport = draw.context.viewportIndexBuffer;
   const getGraphic = draw.context.getGraphicBitmap;
-  if (!tables || !dungeon || !viewport || !getGraphic) return false;
 
   const relCell = relativeCellNumber + 3; // RelativeCellNumber
   const relCellGroup = Math.floor(relCell / 3); // RelativeCell_46
@@ -1015,13 +1005,13 @@ function TAG005088(
   // The derived graphic's number, `14*type + P2/2 + 436`, keys our cache.
   const key = `derived:${14 * type + Math.trunc(p2 / 2) + 436}`;
   const cache = draw.context.graphicCache;
-  let base = cache?.get(key) ?? null;
+  let base = cache.get(key) ?? null;
   if (!base) {
     const src = getGraphic(Math.min(type, 2) + 348);
     if (!src) return null;
     const colorMap = type === 3 ? tables.cloudColorMap : IDENTITY_COLOR_MAP;
     base = shrinkBlt(src, src.width, src.height, 2 * halfWidth, height, colorMap);
-    cache?.set(key, base);
+    cache.set(key, base);
   }
   return { base, halfWidth, height };
 }
@@ -1061,9 +1051,7 @@ function drawCloudUnderParty(
 
   const P7 = viewportRandom.next() & 63;
   const P6 = viewportRandom.zeroTo3() + 87;
-  const viewport = draw.context.viewportIndexBuffer;
-  if (!viewport) return;
-  tag008c98(src, viewport, null, tables.cloudUnderPartyRect, P6, P7, 112, 138, 0, 0); // d.Word2530
+  tag008c98(src, draw.context.viewportIndexBuffer, null, tables.cloudUnderPartyRect, P6, P7, 112, 138, 0, 0); // d.Word2530
 }
 
 function getDerivedObjectBitmap(
@@ -1077,10 +1065,8 @@ function getDerivedObjectBitmap(
 ): IndexedBitmap | null {
   const cache = draw.context.graphicCache;
   const key = `obj:${graphicNum}:${distanceFromUs}:${mirror ? 1 : 0}`;
-  if (cache) {
-    const cached = cache.get(key);
-    if (cached) return cached;
-  }
+  const cached = cache.get(key);
+  if (cached) return cached;
 
   let out: IndexedBitmap;
   if (distanceFromUs === 0) {
@@ -1094,6 +1080,6 @@ function getDerivedObjectBitmap(
     out = mirror ? draw.getMirroredBitmap(scaled) : scaled;
   }
 
-  cache?.set(key, out);
+  cache.set(key, out);
   return out;
 }

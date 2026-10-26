@@ -38,10 +38,11 @@ import { readU16LE, readU32LE } from '../../src/core/bytes';
 import { BackgroundLib, type BackgroundPointer } from '../../src/data/BackgroundLib';
 import { CSBGraphicsLoader, CSBGraphicType, decodePlanar } from '../../src/data/CSBGraphicsLoader';
 import { ApplyBackground, ApplyDecoration, ViewportBMP } from '../../src/renderer/bytecode/ApplyBackground';
-import { BytecodeInterpreter, type InterpreterContext } from '../../src/renderer/bytecode/BytecodeInterpreter';
+import { BytecodeInterpreter } from '../../src/renderer/bytecode/BytecodeInterpreter';
 import { Opcode } from '../../src/renderer/bytecode/Opcodes';
 import { createPaletteIndexViewportBuffer, type PaletteIndexViewportBuffer } from '../../src/renderer/csbwin/CanvasBlitter';
 import { check, finish } from '../lib/check';
+import { viewportContextOf } from '../lib/viewportContext';
 
 const SETS = [
   { name: 'Conflux 3.5', dir: 'conflux-3.5-b8' },
@@ -241,10 +242,10 @@ function interpreter(): void {
   const viewport = randomViewport();
   const expected = reference(viewport, lib.GetMask(9, 3, 12)!, lib.GetBitmap(143, 2)!.data)!;
   const trace: string[] = [];
-  const ctx: InterpreterContext = {
-    wallBitmaps: [], wallRectangles: [], roomData: [], backgroundLib: lib, viewportIndexBuffer: viewport,
+  const ctx = viewportContextOf({
+    backgroundLib: lib, viewportIndexBuffer: viewport,
     graphicTrace: (line) => trace.push(line),
-  };
+  });
   new BytecodeInterpreter(ctx).interpret([...L(143), ...L(9), ...L(3), Opcode.DrawCustomGraphic, Opcode.Return], 0, 0);
   for (const line of trace) console.log(`  ${line}`);
   check(differing(expected, viewport.pixels).length === 0,

@@ -8,8 +8,8 @@
  * 3. Executing bytecode programs to draw each cell
  */
 
-import { BytecodeInterpreter, InterpreterContext } from './bytecode/BytecodeInterpreter';
-import { GraphicRoomType, SummarizeRoomData } from './bytecode/Types';
+import { BytecodeInterpreter, type InterpreterContext } from './bytecode/BytecodeInterpreter';
+import { GraphicRoomType, type SummarizeRoomData } from './bytecode/Types';
 import { pStdDrawCode } from './bytecode/BytecodePrograms';
 import type { DungeonState } from '../engine/DungeonState';
 import { RelativeXY, type DirectionTables } from '../engine/RelativeXY';
@@ -88,6 +88,7 @@ export function DrawViewport(
     // Gather room information for this cell
     summarizeRoomInfoCsbwin(room, dungeonState, position, facing, context.objectTables, context.footprints,
       context.gameState?.tickCount);
+    if (cellNum === 17) context.picking.cellTypeJustAhead = room.roomType;
   }
 
   // Store room data in context for opcodes to access
@@ -99,7 +100,7 @@ export function DrawViewport(
     if (skinNumber !== 0) {
       // A skin's own program, from its cell table; a skin with none draws nothing
       // (`Viewport.cpp:6796-6813`).
-      const pCode = context.backgroundLib?.GetCode(skinNumber) ?? null;
+      const pCode = context.backgroundLib.GetCode(skinNumber);
       if (pCode !== null) {
         const code = skinCodeWords(pCode);
         const startOffset = skinProgramStart(code, cellNum, graphicRoomType);

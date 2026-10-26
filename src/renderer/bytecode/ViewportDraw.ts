@@ -79,18 +79,12 @@ export class ViewportDraw {
     transparentColor: number,
     mirror: boolean = false
   ): void {
-    if (!this.context.viewportIndexBuffer) return;
     const src = mirror ? this.getMirroredBitmap(bitmap) : bitmap;
     tag0088b2Index(src, this.context.viewportIndexBuffer, rect, transparentColor);
   }
 
   blitShapeBitmapToViewport(bitmap: IndexedBitmap, rect: RectPos, mirror: boolean): void {
     // -> Blitting ${mirror ? 'mirrored ' : ''}bitmap ${bitmap.width}x${bitmap.height} to rect (${rect.x1}, ${rect.y1}, ${rect.x2}, ${rect.y2}
-
-    if (!this.context.viewportIndexBuffer) {
-      // ERROR: Missing viewportIndexBuffer
-      return;
-    }
 
     const src = mirror ? this.getMirroredBitmap(bitmap) : bitmap;
     bltShapeToViewportIndex(src, this.context.viewportIndexBuffer, rect);

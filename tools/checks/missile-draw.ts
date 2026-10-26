@@ -30,12 +30,12 @@ import { RN_FIREBALL, RN_LIGHTNING } from '../../src/core/spellRn';
 import type { MissileRecord } from '../../src/data/dungeonTypes';
 import { DungeonState } from '../../src/engine/DungeonState';
 import { GetBasicObjectType } from '../../src/engine/objectIndex';
-import type { InterpreterContext } from '../../src/renderer/bytecode/BytecodeInterpreter';
 import { drawMissilesAtPosition, GetGraphicClass } from '../../src/renderer/bytecode/DrawRoomObjects';
 import { ViewportDraw } from '../../src/renderer/bytecode/ViewportDraw';
 import { createPaletteIndexViewportBuffer } from '../../src/renderer/csbwin/CanvasBlitter';
 import { check, finish } from '../lib/check';
 import { standIn, standInOf } from '../lib/standIn';
+import { viewportContextOf } from '../lib/viewportContext';
 import { graphicsTablesOf, stockGraphics, stockDungeon } from '../lib/game';
 
 async function main(): Promise<void> {
@@ -97,7 +97,7 @@ async function main(): Promise<void> {
   const draw = (relativeCell: number, relativeLocation: number): Drawn => {
     const asked: number[] = [];
     const viewportIndexBuffer = createPaletteIndexViewportBuffer(224, 136, 0);
-    const context = standInOf<InterpreterContext>({
+    const context = viewportContextOf({
       viewportIndexBuffer,
       objectTables: tables,
       dungeonState: view,
@@ -166,7 +166,7 @@ async function main(): Promise<void> {
     // Its left half colour 5, its right half 6: mirrored, the left edge is 6.
     const w = gc.widthBytes * 2;
     const viewportIndexBuffer = createPaletteIndexViewportBuffer(224, 136, 0);
-    const context = standInOf<InterpreterContext>({
+    const context = viewportContextOf({
       viewportIndexBuffer, objectTables: tables, dungeonState: view, graphicCache: new Map(),
       getGraphicBitmap: () => ({ width: w, height: gc.height, pixels: Uint8Array.from({ length: w * gc.height }, (_, i) => (i % w < w / 2 ? 5 : 6)) }),
     });

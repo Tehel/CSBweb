@@ -24,7 +24,6 @@ import { OBJNI_WATERSKIN } from '../../src/core/objectNameIndex';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../../src/core/types';
 import type { RectPos } from '../../src/data/tables/UITables';
 import type { Game } from '../../src/engine/Game';
-import type { SummarizeRoomData } from '../../src/renderer/bytecode/Types';
 import { handleMouseButton } from '../../src/renderer/ui/Mouse';
 import { resolveObjectNameIndex } from '../../src/renderer/ui/Objects';
 import type { UIState } from '../../src/renderer/ui/UIState';
@@ -59,15 +58,13 @@ function scene(fountain: boolean): Scene {
   party.cursorOwner = 0;
   party.objectInHand = OBJECT_ID_NULL;
   const ui = newUIState(stockGraphics(), game.ctx);
-  const roomData: SummarizeRoomData[] = [];
-  roomData[17] = { roomType: RoomType.STONE } as SummarizeRoomData;
-  Object.assign(ui.context, {
+  Object.assign(ui.picking, {
     facingAlcove: false,
     facingWaterFountain: fountain,
     doorSwitchRects: [],
     viewportObjectButtons: [UNSET, UNSET, UNSET, UNSET, UNSET, BUTTON_5].map((b) => ({ ...b })),
     viewportObjectRNs: [OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF],
-    roomData,
+    cellTypeJustAhead: RoomType.STONE,
   });
   const s: Scene = { game, ui, wallTouches: 0, sounds: [] };
   wrapMember(game.systems.mouse, 'handleWallClick', (original) => () => { s.wallTouches++; return original(); });

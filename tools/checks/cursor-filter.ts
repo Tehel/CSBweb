@@ -296,8 +296,8 @@ for (const cancelled of [false, true]) {
   const ui = newUIState(stockGraphics(), game.ctx);
   const button = { x1: 10, x2: 20, y1: 10, y2: 20 };
   const none = { x1: 255, x2: 0, y1: 0, y2: 0 };
-  ui.context.viewportObjectButtons = [button, none, none, none, none, none];
-  ui.context.viewportObjectRNs = [lying, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF];
+  ui.picking.viewportObjectButtons = [button, none, none, none, none, none];
+  ui.picking.viewportObjectRNs = [lying, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF];
   const picked = tryPickViewportObject(ui, 15, 15 + VIEWPORT_Y);
   const g = game.systems.dsa.getGlobalVariables();
   console.log(`PickFromFloor${cancelled ? ', cancelled' : ''}: ${packet(g)}, picked ${picked}`);

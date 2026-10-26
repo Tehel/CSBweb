@@ -28,9 +28,10 @@ import {
 } from '../../src/data/CsbwinExtendedFeatures';
 import { DungeonLoader } from '../../src/data/DungeonLoader';
 import { Die } from '../../src/core/Die';
-import { BytecodeInterpreter, type InterpreterContext } from '../../src/renderer/bytecode/BytecodeInterpreter';
+import { BytecodeInterpreter } from '../../src/renderer/bytecode/BytecodeInterpreter';
 import { Opcode } from '../../src/renderer/bytecode/Opcodes';
 import { check, finish } from '../lib/check';
+import { viewportContextOf } from '../lib/viewportContext';
 
 /**
  * What `run` threw, or `null`. A `RangeError` is `null` too: that is V8 refusing an
@@ -189,7 +190,7 @@ function main(): void {
   check(empty?.pixels.length === 0 && elapsed < 1000, 'a portrait 0 wide reads at once, with no pixels');
 
   console.log('== a viewport program ==');
-  const interpreter = new BytecodeInterpreter({} as InterpreterContext);
+  const interpreter = new BytecodeInterpreter(viewportContextOf({}));
   const hang = thrown(() => interpreter.interpret([Opcode.Jump, 0xfffe], 0, 0));
   console.log(`  a Jump to itself: ${hang?.message.split('\n').join(' ')}`);
   check(hang instanceof Die, 'Interpret ends a program that runs past its step budget in die');

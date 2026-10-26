@@ -216,6 +216,7 @@ function main(): void {
         palette552: tables.ui.graphic232.palette552,
         graphicCache,
         getGraphicBitmap: (n) => getCachedGraphicBitmap(graphics, graphicCache, n),
+        trace: (line) => console.log(line),
       });
       renderer.selectLevel(arena.party.z);
       renderer.draw(arena.party, EAST, false, false);

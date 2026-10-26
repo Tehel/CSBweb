@@ -37,9 +37,9 @@ import { DrawRoomObjects, mapColorValue } from '../../src/renderer/bytecode/Draw
 import { ViewportDraw } from '../../src/renderer/bytecode/ViewportDraw';
 import { createPaletteIndexViewportBuffer, mirrorBitmap, shrinkBlt } from '../../src/renderer/csbwin/CanvasBlitter';
 import type { DungeonState } from '../../src/engine/DungeonState';
-import type { InterpreterContext } from '../../src/renderer/bytecode/BytecodeInterpreter';
 import { check, finish } from '../lib/check';
 import { wrapMember, standInOf } from '../lib/standIn';
+import { viewportContextOf } from '../lib/viewportContext';
 import { graphicsTablesOf, stockGraphics, stockDungeon } from '../lib/game';
 
 const graphics = stockGraphics();
@@ -82,7 +82,7 @@ function drawScene(scene: Scene, cache: AltMonCache, files: Pick<CSBGraphicsLoad
   const record = standInOf<CreatureRecord>({ creatureType: scene.type ?? MUMMY, numMonM1: 0, alternateGraphics: scene.alternateGraphics });
   const blits: Blit[] = [];
   const ownGraphics: number[] = [];
-  const context = standInOf<InterpreterContext>({
+  const context = viewportContextOf({
     viewportIndexBuffer: createPaletteIndexViewportBuffer(224, 136, 0),
     objectTables: tables,
     getGraphicBitmap: (n: number) => {

@@ -58,6 +58,7 @@ import { getCachedGraphicBitmap } from '../../src/renderer/ViewportGraphics';
 import { ViewportRenderer } from '../../src/renderer/ViewportRenderer';
 import { check, finish } from '../lib/check';
 import { graphicsTablesOf, newGame } from '../lib/game';
+import { viewportContextOf } from '../lib/viewportContext';
 
 const all = process.argv.includes('--all');
 const SETS = [
@@ -84,10 +85,10 @@ function cell(n: number, skinNumber: number): SummarizeRoomData {
 
 /** A context with nothing to draw with: enough for the words that only read and compute. */
 function bareContext(backgroundLib?: BackgroundLib): InterpreterContext {
-  return {
-    wallBitmaps: [], wallRectangles: [], backgroundLib,
+  return viewportContextOf({
+    backgroundLib,
     roomData: Array.from({ length: 21 }, (_, n) => cell(n, 0)),
-  };
+  });
 }
 
 /**
@@ -154,13 +155,10 @@ function machine(): void {
   check(kept.left.length === 0 && interpreterStackTop(1)[0] === 43,
     'the data stack is kept from one Interpret to the next: a PLUS adds the 42 an earlier program left');
 
-  const warn = console.warn;
-  const warnings: string[] = [];
-  console.warn = (...args: unknown[]) => { warnings.push(args.join(' ')); };
-  const stopped = run(ctx, [...L(1), O.FloorDecorationID, ...L(2), O.Return]);
-  console.warn = warn;
-  check(stopped.left.join() === '1' && stopped.rsp === 1 && warnings.length === 1,
-    `FloorDecorationID, which Interpret has no case for, ends the program, its sentinel left on the return stack (${warnings[0]})`);
+  const traced: string[] = [];
+  const stopped = run({ ...ctx, trace: (line) => traced.push(line) }, [...L(1), O.FloorDecorationID, ...L(2), O.Return]);
+  check(stopped.left.join() === '1' && stopped.rsp === 1 && traced.length === 1,
+    `FloorDecorationID, which Interpret has no case for, ends the program, its sentinel left on the return stack (${traced[0]})`);
 }
 
 function reads(): void {
@@ -275,6 +273,7 @@ function views(): void {
       palette552: tables.ui.graphic232.palette552,
       graphicCache,
       getGraphicBitmap: (graphicNum) => getCachedGraphicBitmap(graphics, graphicCache, graphicNum),
+      trace: (line) => console.log(line),
       csbGraphicsLoader: csb,
     });
     const lib = renderer.context.backgroundLib!;

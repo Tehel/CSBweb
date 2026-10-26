@@ -222,7 +222,7 @@ async function main(): Promise<void> {
     const width = 224;
     const height = 136;
     const pixels = new Uint8Array(width * height).fill(9);
-    ui.context.viewportIndexBuffer = { width, height, pixels };
+    ui.viewport = { width, height, pixels };
     Draw.displayFrozenScreen(ui);
     let ink = 0;
     let other = 0;
