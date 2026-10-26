@@ -293,11 +293,6 @@ export class CellInfo {
     return out;
   }
 
-  /** Every square the info of `at` names on `at`'s own map. */
-  related(lines: readonly InfoLine[], map: number): CellRef[] {
-    return lines.flatMap((line) => (line.link && line.link.map === map ? [line.link] : []));
-  }
-
   /* -------------------------------------------------------------- the sections ---- */
 
   /**

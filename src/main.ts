@@ -401,14 +401,17 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // The KEYS tab labels a key with what this keyboard prints on it, where the
         // browser says (`readKeyboardLayout`).
         keyboardLayout: () => keyboardLayout,
-        // A click on the map dialog's square moves the party there, on a page opened with
-        // `?dev` alone. A script holding the loop (the fusion) runs on the party where it stands.
-        // The game sends no statistics from then on (`GameEvents.teleported`).
-        onTeleport: new URLSearchParams(window.location.search).has('dev') ? (x, y) => {
+        // A press held on the map dialog's square moves the party there, on a page opened
+        // with `?dev` alone: on its level at once, to another as `devChangeLevel` goes. A
+        // script holding the loop (the fusion) runs on the party where it stands. The game
+        // sends no statistics from then on (`GameEvents.teleported`).
+        onTeleport: new URLSearchParams(window.location.search).has('dev') ? (map, x, y) => {
             if (game.isRunningScript()) return;
             const state = game.ctx.party.state;
-            game.setPartyState({ ...state, position: new Position(x, y, state.position.z) });
+            if (map === state.position.z) game.setPartyState({ ...state, position: new Position(x, y, map) });
+            else if (!game.devTeleport(map, x, y)) return;
             events.teleported();
+            refreshScreen();
         } : null,
         // The Hint Oracle's button: the screen has stopped the clock and shaded the
         // interface, and the Oracle has the canvas until it closes.

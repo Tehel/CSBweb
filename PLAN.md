@@ -89,7 +89,7 @@ against CSBWin's own screenshots, and the extras (X). No dungeon the port plays 
   TO PLAY, also at `#how-to-play`, is the newcomer's sheet (`src/ui/howToPlay.ts`): the keys as the player's settings
   have them, with a chooser of the presets' moves, the runes in the game's font with the manual's names, the first
   steps and the mouse, and a PDF and a PNG of it to print, for each preset and each label layout, which
-  `tools/gen-help-sheet.mjs` makes (the frames' probe fails a sheet changed without them made again). The map dialog's teleport is behind `?dev`, and so is a move down or up a level whatever is there (`Game.devChangeLevel`). The page has no log of its
+  `tools/gen-help-sheet.mjs` makes (the frames' probe fails a sheet changed without them made again). The map dialog's teleport, a press held on a square of any level (`Game.devTeleport`), is behind `?dev`, and so is a move down or up a level whatever is there (`Game.devChangeLevel`). The page has no log of its
   own: what it reports goes to the console, a move's position at debug level, what F5,
   F9 or the Sleepsave did at info level.
 

@@ -101,7 +101,7 @@ was hiding among the type errors.
 There is still **no test framework** (`PLAN.md` → "The evidence") — `npm test` is a runner
 (`tools/run-checks.mjs`) over two standing forms of evidence, and both must pass:
 
-- `tools/check-frames.sh` compares thirty live screen states against `tools/frames/` — the
+- `tools/check-frames.sh` compares thirty-one live screen states against `tools/frames/` — the
   cheapest way to prove a renderer or UI change kept every pixel. It starts its own dev
   server and headless Chrome, so it needs no setup. It is
   out of the default run only because it costs a browser and ~80s. Run it before any renderer or UI commit. A frame is
@@ -116,7 +116,7 @@ There is still **no test framework** (`PLAN.md` → "The evidence") — `npm tes
   opened by Esc and by a double click, the clock held under it, a setting kept across a
   reload, its slider dragged off the canvas, and its EXIT leading to the welcome
   page, a click on the left-handed screen landing where it is shown, the map dialog opened by a long
-  press, and only with MAP VIEW on, the champion dialog opened by a long press on
+  press, and only with MAP VIEW on, its next level and a square shown, the champion dialog opened by a long press on
   the stat bars, where a tap opens the inventory at its release, and fullscreen, entered
   by a tap and by a click, the screen and the effect sized and centred in it, at 16:10
   and at 4:3; the save store held by another tab; and the welcome page's tiles, its fonts, its selection, its HOW TO PLAY, where PLAY and

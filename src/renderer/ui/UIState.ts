@@ -338,10 +338,10 @@ export interface UIState {
    */
   readonly keyboardLayout: () => KeyboardLayoutMap | null;
   /**
-   * Move the party to the square `(x, y)` of its level, or `null` where the page does not
-   * let a click on the map dialog do it: only a page opened with `?dev` does.
+   * Move the party to the square `(x, y)` of map `map`, or `null` where the page does not
+   * let a press held on the map dialog do it: only a page opened with `?dev` does.
    */
-  readonly onTeleport: ((x: number, y: number) => void) | null;
+  readonly onTeleport: ((map: number, x: number, y: number) => void) | null;
 
   /* ---- back into the renderer ---- */
   getGraphicBitmap(graphicNum: number, format?: ImageFormat): IndexedBitmap | null;

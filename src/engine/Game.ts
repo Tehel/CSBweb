@@ -729,14 +729,28 @@ export class Game implements MainLoop {
         const to = this.ctx.dungeon.getMap(here.z + delta)?.descriptor;
         if (!from || !to) return false;
         const clamp = (v: number, size: number): number => Math.min(Math.max(v, 0), size - 1);
-        const next = new Position(
+        return this.devTeleport(
+            here.z + delta,
             clamp(from.offsetX + here.x - to.offsetX, to.width),
             clamp(from.offsetY + here.y - to.offsetY, to.height),
-            here.z + delta,
         );
+    }
+
+    /**
+     * `?dev`'s move of the party to the square `(x, y)` of another map, the map dialog's
+     * long press: lifted off its square, as `devChangeLevel` lifts it, and put down there
+     * when the next tick loads the level (`loadNewPartyLevel`), whatever is there. False,
+     * and nothing done, for no such map or square, in a script, or with a level change
+     * already under way.
+     */
+    devTeleport(map: number, x: number, y: number): boolean {
+        if (this.isRunningScript() || this.ctx.loop.newPartyLevel !== -1) return false;
+        const to = this.ctx.dungeon.getMap(map)?.descriptor;
+        if (!to || x < 0 || y < 0 || x >= to.width || y >= to.height) return false;
+        const here = this.ctx.party.state.position;
         this.ctx.systems.worldMove.moveParty(here.x, here.y, -1, 0);
-        this.ctx.loop.newPartyLevel = next.z;
-        this.ctx.party.state.position = new Position(next.x, next.y, here.z);
+        this.ctx.loop.newPartyLevel = map;
+        this.ctx.party.state.position = new Position(x, y, here.z);
         return true;
     }
 

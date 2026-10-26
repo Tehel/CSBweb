@@ -547,10 +547,12 @@ function drawScrollbar(ui: UIState, list: ListWidget, count: number, scrollTop: 
 
 /**
  * A list over its panel, which is drawn already: the scrollbar, then the rows shown from
- * `scrollTop`, the selected one inverted on a bar across the panel's interior.
+ * `scrollTop`, the selected one inverted on a bar across the panel's interior, the others
+ * in `rowColor`'s colour, the option colour by default.
  */
 export function drawList(
   ui: UIState, list: ListWidget, count: number, scrollTop: number, selected: number, rowText: (index: number) => string,
+  rowColor: (index: number) => number = () => MENU_OPTION_COLOR,
 ): void {
   drawScrollbar(ui, list, count, scrollTop);
   for (let row = 0; row < list.rows; row++) {
@@ -559,7 +561,7 @@ export function drawList(
     const highlighted = index === selected;
     if (highlighted) fillRectIndex(ui.screenIndexBuffer, listRowRect(list, row), MENU_OPTION_COLOR);
     drawText(ui, rowText(index), listTextX(list), list.rowFirstY + row * LINE_STEP,
-      highlighted ? MENU_PANEL_COLOR : MENU_OPTION_COLOR, highlighted ? MENU_OPTION_COLOR : MENU_PANEL_COLOR);
+      highlighted ? MENU_PANEL_COLOR : rowColor(index), highlighted ? MENU_OPTION_COLOR : MENU_PANEL_COLOR);
   }
 }
 
