@@ -9,7 +9,9 @@
  *    at the party's square as the party's.
  * 3. **Where squares lead**: a teleporter's destination, and the teleporter among what
  *    arrives there; stairs and a pit's destination, `IncrementLevel`'s
- *    (`doc/CSBwin-src/CSBCode.cpp:4774`).
+ *    (`doc/CSBwin-src/CSBCode.cpp:4774`). A teleporter's turn, and one sending to its own
+ *    square on level 3 only turning: right at (3,4), left at (5,0), to face south at (5,4)
+ *    (`doc/CSBwin-src/Code11f52.cpp:3002-3012`).
  * 4. **A held pad, normally closed**: (25,3) closes the pit at (24,5) while pressed
  *    (`PressurePadOrAlcove`, `doc/CSBwin-src/Code11f52.cpp:3878-3895`).
  * 5. **A door's button**.
@@ -89,6 +91,12 @@ function main(): void {
   const teleporter = describe(1, 30, 3);
   check(!!line(teleporter, 'Sends everything to L2 (30,1)', { map: 1, x: 30, y: 1 }), 'the teleporter at (30,3) sends everything to (30,1)');
   check(!!line(describe(1, 30, 1), 'L2 (30,3)', { map: 1, x: 30, y: 3 }), '(30,1) names the teleporter at (30,3) among its arrivals');
+  check(!!line(describe(1, 31, 1), 'Sends everything to L2 (29,4), facing E', { map: 1, x: 29, y: 4 }), 'the teleporter at (31,1) sends everything to (29,4), facing east');
+  const right = describe(2, 3, 4);
+  check(!!line(right, 'Turns everything right') && !line(right, 'Sends') && !line(right, 'Teleporters to here'),
+    'the teleporter at (3,4) of level 3, to its own square, only turns everything right, and is no arrival of its own');
+  check(!!line(describe(2, 5, 0), 'Turns everything left'), 'the one at (5,0) turns everything left');
+  check(!!line(describe(2, 5, 4), 'Turns everything to face S'), 'the one at (5,4) turns everything to face south');
   const up = ctx.dungeon.incrementLevel(new Position(3, 1, 1), -1)!;
   check(!!line(describe(1, 3, 1), 'Leads to L1', { map: up.z, x: up.x, y: up.y }), `the stairs up at (3,1) lead to IncrementLevel's (${up.x},${up.y}) of map ${up.z}`);
   const down = ctx.dungeon.incrementLevel(new Position(24, 5, 1), 1)!;

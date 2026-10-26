@@ -298,7 +298,7 @@ export class CellInfo {
     for (const rn of objects) {
       const category = dungeon.rnMaps.dbType(rn);
       if (category === DBType.DOOR) this.door(rn, out);
-      if (category === DBType.TELEPORTER) this.teleporter(rn, out);
+      if (category === DBType.TELEPORTER) this.teleporter(at, rn, out);
     }
     for (const rn of objects) {
       if (dungeon.rnMaps.dbType(rn) === DBType.ACTUATOR) this.actuator(at, rn, room, out);
@@ -343,12 +343,26 @@ export class CellInfo {
     if (breaks.length) out.push({ text: `Breaks to ${breaks.join(' and ')}`, indent: 0 });
   }
 
-  /** A teleporter's destination and what it takes (`DB1`, `src/data/dungeonTypes.ts`). */
-  private teleporter(rn: ObjectID, out: InfoLine[]): void {
+  /**
+   * A teleporter's destination, what it takes and how it turns them (`DB1`,
+   * `src/data/dungeonTypes.ts`): to a facing when absolute, else by quarter turns
+   * clockwise (`MoveObject`, `doc/CSBwin-src/Code11f52.cpp:3002-3012`). One sending to
+   * its own square only turns.
+   */
+  private teleporter(at: CellRef, rn: ObjectID, out: InfoLine[]): void {
     const t = this.source.dungeon.getRecord(rn) as TeleporterRecord | null;
     if (!t) return;
+    const scope = SCOPES[t.scope & 3];
+    const rotation = t.rotation & 3;
     const link = { map: t.destMap, x: t.destX, y: t.destY };
-    out.push({ text: `Sends ${SCOPES[t.scope & 3]} to ${this.place(link)}`, indent: 0, link });
+    if (link.map === at.map && link.x === at.x && link.y === at.y) {
+      const text = t.absoluteRotation ? `Turns ${scope} to face ${SIDES[rotation]}`
+        : rotation ? `Turns ${scope} ${TURNS[rotation]}` : `Leaves ${scope} as they are`;
+      out.push({ text, indent: 0 });
+      return;
+    }
+    const turn = t.absoluteRotation ? `, facing ${SIDES[rotation]}` : rotation ? `, turned ${TURNS[rotation]}` : '';
+    out.push({ text: `Sends ${scope} to ${this.place(link)}${turn}`, indent: 0, link });
   }
 
   private actuator(at: CellRef, rn: ObjectID, room: number, out: InfoLine[]): void {
@@ -439,7 +453,8 @@ export class CellInfo {
 
   /** The teleporters that send something to `at`, each a link to its square. */
   private arrivedFrom(at: CellRef, out: InfoLine[]): void {
-    const from = this.arrivalsOf().get(`${at.map},${at.x},${at.y}`) ?? [];
+    const from = (this.arrivalsOf().get(`${at.map},${at.x},${at.y}`) ?? [])
+      .filter((f) => f.map !== at.map || f.x !== at.x || f.y !== at.y);
     if (!from.length) return;
     out.push({ text: 'Teleporters to here:', indent: 0 });
     for (const link of from) out.push({ text: this.place(link), indent: 1, link });
@@ -605,6 +620,9 @@ export class CellInfo {
 
 /** What a teleporter takes, `DB1`'s scope (`src/data/dungeonTypes.ts`, `TeleporterRecord.scope`). */
 const SCOPES = ['items', 'monsters', 'items and party', 'everything'];
+
+/** A relative teleporter's quarter turns, clockwise as the facings count (N, E, S, W). */
+const TURNS = ['', 'right', 'around', 'left'];
 
 /** A name with its indefinite article: "a gold key", "an iron key". */
 function withArticle(name: string): string {
