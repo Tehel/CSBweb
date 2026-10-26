@@ -371,8 +371,10 @@ export class MissileEncounter {
         return this.finishMissileEncounter(missileRn, missile, absorbedMonster, position, objectPos, tailProjectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY, mmr);
       }
       case -1: {
-        // The monster arm (`doc/CSBwin-src/Code11f52.cpp:1995-2077`).
-        const monsterRn = this.dungeon.findFirstMonster(position);
+        // The monster arm (`doc/CSBwin-src/Code11f52.cpp:1995-2077`). The group is the one
+        // at `objX, objY`, not at the missile: `CheckMoveFromMissile`'s second cell meets a
+        // missile in the square the group steps into, while the group is still in its own.
+        const monsterRn = this.dungeon.findFirstMonster(new Position(objX, objY, position.z));
         if (monsterRn === OBJECT_ID_EOF) return false;
         const monster = this.dungeon.getCreatureRecord(monsterRn);
         if (!monster) return false;

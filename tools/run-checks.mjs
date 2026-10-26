@@ -173,6 +173,7 @@ const CHECKS = [
   { tool: 'watch-smart-discard.ts' },
   { tool: 'make-more-room.ts' },
   { tool: 'missile-monster.ts' },
+  { tool: 'missile-crossing.ts' },
   { tool: 'missile-door.ts' },
   { tool: 'move-from-missile.ts' },
   { tool: 'missile-teleport.ts' },
