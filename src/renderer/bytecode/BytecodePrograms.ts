@@ -13,7 +13,7 @@ import { Opcode } from './Opcodes';
 // F0 PROGRAMS (distance 0 - center)
 // =============================================================================
 
-export const StdDrawF0Stone: number[] = [
+const StdDrawF0Stone: number[] = [
   Opcode.F0,
   Opcode.F0xy,
   Opcode.StdDrawCeilingPit,
@@ -25,7 +25,7 @@ export const StdDrawF0Stone: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF0Open: number[] = [
+const StdDrawF0Open: number[] = [
   Opcode.F0,
   Opcode.F0xy,
   Opcode.StdDrawCeilingPit,
@@ -37,7 +37,7 @@ export const StdDrawF0Open: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF0Pit: number[] = [
+const StdDrawF0Pit: number[] = [
   Opcode.F0,
   Opcode.GetDecoration0,
   Opcode.JumpZ,
@@ -61,7 +61,7 @@ export const StdDrawF0Pit: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF0Teleporter: number[] = [
+const StdDrawF0Teleporter: number[] = [
   Opcode.F0,
   Opcode.F0xy,
   Opcode.StdDrawCeilingPit,
@@ -80,7 +80,7 @@ export const StdDrawF0Teleporter: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF0StairFacing: number[] = [
+const StdDrawF0StairFacing: number[] = [
   Opcode.F0,
   Opcode.GetDecoration0,
   Opcode.JumpZ,
@@ -110,7 +110,7 @@ export const StdDrawF0StairFacing: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF0StairEdge: number[] = [
+const StdDrawF0StairEdge: number[] = [
   Opcode.F0,
   Opcode.F0xy,
   Opcode.StdDrawCeilingPit,
@@ -122,7 +122,7 @@ export const StdDrawF0StairEdge: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF0DoorEdge: number[] = [
+const StdDrawF0DoorEdge: number[] = [
   Opcode.SeeThroughWalls,
   Opcode.JumpZ,
   3,
@@ -143,7 +143,7 @@ export const StdDrawF0DoorEdge: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF0DoorFacing: number[] = [
+const StdDrawF0DoorFacing: number[] = [
   Opcode.F0,
   Opcode.F0xy,
   Opcode.StdDrawCeilingPit,
@@ -159,14 +159,14 @@ export const StdDrawF0DoorFacing: number[] = [
 // F0L1 PROGRAMS (distance 0 - left side)
 // =============================================================================
 
-export const StdDrawF0L1Stone: number[] = [
+const StdDrawF0L1Stone: number[] = [
   Opcode.StdWallBitmapF0L1,
   Opcode.StdWallRectangleF0L1,
   Opcode.StdBltShape,
   Opcode.Return,
 ];
 
-export const StdDrawF0L1Open: number[] = [
+const StdDrawF0L1Open: number[] = [
   Opcode.F0L1Contents,
   Opcode.F0L1xy,
   Opcode.F0L1,
@@ -178,7 +178,7 @@ export const StdDrawF0L1Open: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF0L1Pit: number[] = [
+const StdDrawF0L1Pit: number[] = [
   Opcode.F0L1,
   Opcode.GetDecoration0,
   Opcode.JumpZ,
@@ -202,7 +202,7 @@ export const StdDrawF0L1Pit: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF0L1Teleporter: number[] = [
+const StdDrawF0L1Teleporter: number[] = [
   Opcode.F0L1Contents,
   Opcode.F0L1xy,
   Opcode.F0L1,
@@ -221,18 +221,18 @@ export const StdDrawF0L1Teleporter: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF0L1StairFacing: number[] = [
+const StdDrawF0L1StairFacing: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF0L1StairEdge: number[] = [
+const StdDrawF0L1StairEdge: number[] = [
   Opcode.StdStairEdgeGraphicF0L1,
   Opcode.StdStairEdgeRectF0L1,
   Opcode.StdGraphicToViewport,
   Opcode.Return,
 ];
 
-export const StdDrawF0L1DoorEdge: number[] = [
+const StdDrawF0L1DoorEdge: number[] = [
   Opcode.F0L1,
   Opcode.F0L1xy,
   Opcode.StdDrawCeilingPit,
@@ -242,7 +242,7 @@ export const StdDrawF0L1DoorEdge: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF0L1DoorFacing: number[] = [
+const StdDrawF0L1DoorFacing: number[] = [
   Opcode.Return,
 ];
 
@@ -250,14 +250,14 @@ export const StdDrawF0L1DoorFacing: number[] = [
 // F0R1 PROGRAMS (distance 0 - right side)
 // =============================================================================
 
-export const StdDrawF0R1Stone: number[] = [
+const StdDrawF0R1Stone: number[] = [
   Opcode.StdWallBitmapF0R1,
   Opcode.StdWallRectangleF0R1,
   Opcode.StdBltShape,
   Opcode.Return,
 ];
 
-export const StdDrawF0R1Open: number[] = [
+const StdDrawF0R1Open: number[] = [
   Opcode.F0R1,
   Opcode.F0R1xy,
   Opcode.StdDrawCeilingPit,
@@ -269,7 +269,7 @@ export const StdDrawF0R1Open: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF0R1Pit: number[] = [
+const StdDrawF0R1Pit: number[] = [
   Opcode.F0R1,
   Opcode.GetDecoration0,
   Opcode.JumpZ,
@@ -293,7 +293,7 @@ export const StdDrawF0R1Pit: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF0R1Teleporter: number[] = [
+const StdDrawF0R1Teleporter: number[] = [
   Opcode.F0R1,
   Opcode.F0R1xy,
   Opcode.StdDrawCeilingPit,
@@ -312,18 +312,18 @@ export const StdDrawF0R1Teleporter: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF0R1StairFacing: number[] = [
+const StdDrawF0R1StairFacing: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF0R1StairEdge: number[] = [
+const StdDrawF0R1StairEdge: number[] = [
   Opcode.StdStairEdgeGraphicF0R1,
   Opcode.StdStairEdgeRectF0R1,
   Opcode.StdMirrorGraphicToViewport,
   Opcode.Return,
 ];
 
-export const StdDrawF0R1DoorEdge: number[] = [
+const StdDrawF0R1DoorEdge: number[] = [
   Opcode.F0R1,
   Opcode.F0R1xy,
   Opcode.StdDrawCeilingPit,
@@ -333,7 +333,7 @@ export const StdDrawF0R1DoorEdge: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF0R1DoorFacing: number[] = [
+const StdDrawF0R1DoorFacing: number[] = [
   Opcode.Return,
 ];
 
@@ -341,7 +341,7 @@ export const StdDrawF0R1DoorFacing: number[] = [
 // F1 PROGRAMS (distance 1 - center)
 // =============================================================================
 
-export const StdDrawF1Stone: number[] = [
+const StdDrawF1Stone: number[] = [
   Opcode.SeeThroughWalls, Opcode.JumpZ, 28,
     Opcode.Literal, 1, Opcode.StdAllocateDerivedGraphic,
     Opcode.StdBitmapViewport,                  // source
@@ -383,7 +383,7 @@ export const StdDrawF1Stone: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF1Open: number[] = [
+const StdDrawF1Open: number[] = [
   Opcode.F1,
   Opcode.FloorDecorationGraphicOrdinalF1,
   Opcode.StdDrawFloorDecoration,
@@ -398,7 +398,7 @@ export const StdDrawF1Open: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF1Pit: number[] = [
+const StdDrawF1Pit: number[] = [
   Opcode.F1,
   Opcode.GetDecoration0,
   Opcode.JumpZ,
@@ -425,7 +425,7 @@ export const StdDrawF1Pit: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF1Teleporter: number[] = [
+const StdDrawF1Teleporter: number[] = [
   Opcode.F1,
   Opcode.FloorDecorationGraphicOrdinalF1,
   Opcode.StdDrawFloorDecoration,
@@ -447,7 +447,7 @@ export const StdDrawF1Teleporter: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF1StairFacing: number[] = [
+const StdDrawF1StairFacing: number[] = [
   Opcode.F1,
   Opcode.GetDecoration0,
   Opcode.JumpZ,
@@ -474,15 +474,15 @@ export const StdDrawF1StairFacing: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF1StairEdge: number[] = [
+const StdDrawF1StairEdge: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF1DoorEdge: number[] = [
+const StdDrawF1DoorEdge: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF1DoorFacing: number[] = [
+const StdDrawF1DoorFacing: number[] = [
   Opcode.F1,
   Opcode.FloorDecorationGraphicOrdinalF1,
   Opcode.StdDrawFloorDecoration,
@@ -526,7 +526,7 @@ export const StdDrawF1DoorFacing: number[] = [
 // F1L1 PROGRAMS (distance 1 - left side)
 // =============================================================================
 
-export const StdDrawF1L1Stone: number[] = [
+const StdDrawF1L1Stone: number[] = [
   Opcode.StdWallBitmapF1L1,
   Opcode.StdWallRectangleF1L1,
   Opcode.StdBltShape,
@@ -541,7 +541,7 @@ export const StdDrawF1L1Stone: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF1L1Open: number[] = [
+const StdDrawF1L1Open: number[] = [
   Opcode.F1L1,
   Opcode.FloorDecorationGraphicOrdinalF1L1,
   Opcode.StdDrawFloorDecoration,
@@ -556,7 +556,7 @@ export const StdDrawF1L1Open: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF1L1Pit: number[] = [
+const StdDrawF1L1Pit: number[] = [
   Opcode.F1L1,
   Opcode.GetDecoration0,
   Opcode.JumpZ,
@@ -583,7 +583,7 @@ export const StdDrawF1L1Pit: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF1L1Teleporter: number[] = [
+const StdDrawF1L1Teleporter: number[] = [
   Opcode.F1L1,
   Opcode.FloorDecorationGraphicOrdinalF1L1,
   Opcode.StdDrawFloorDecoration,
@@ -605,7 +605,7 @@ export const StdDrawF1L1Teleporter: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF1L1StairFacing: number[] = [
+const StdDrawF1L1StairFacing: number[] = [
   Opcode.F1L1,
   Opcode.GetDecoration0,
   Opcode.JumpZ,
@@ -632,7 +632,7 @@ export const StdDrawF1L1StairFacing: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF1L1StairEdge: number[] = [
+const StdDrawF1L1StairEdge: number[] = [
   Opcode.F1L1,
   Opcode.GetDecoration0,
   Opcode.JumpZ,
@@ -659,7 +659,7 @@ export const StdDrawF1L1StairEdge: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF1L1DoorEdge: number[] = [
+const StdDrawF1L1DoorEdge: number[] = [
   Opcode.F1L1,
   Opcode.FloorDecorationGraphicOrdinalF1L1,
   Opcode.StdDrawFloorDecoration,
@@ -674,7 +674,7 @@ export const StdDrawF1L1DoorEdge: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF1L1DoorFacing: number[] = [
+const StdDrawF1L1DoorFacing: number[] = [
   Opcode.F1L1,
   Opcode.FloorDecorationGraphicOrdinalF1L1,
   Opcode.StdDrawFloorDecoration,
@@ -703,7 +703,7 @@ export const StdDrawF1L1DoorFacing: number[] = [
 // F1R1 PROGRAMS (distance 1 - right side)
 // =============================================================================
 
-export const StdDrawF1R1Stone: number[] = [
+const StdDrawF1R1Stone: number[] = [
   Opcode.StdWallBitmapF1R1,
   Opcode.StdWallRectangleF1R1,
   Opcode.StdBltShape,
@@ -718,7 +718,7 @@ export const StdDrawF1R1Stone: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF1R1Open: number[] = [
+const StdDrawF1R1Open: number[] = [
   Opcode.F1R1,
   Opcode.FloorDecorationGraphicOrdinalF1R1,
   Opcode.StdDrawFloorDecoration,
@@ -733,7 +733,7 @@ export const StdDrawF1R1Open: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF1R1Pit: number[] = [
+const StdDrawF1R1Pit: number[] = [
   Opcode.F1R1,
   Opcode.GetDecoration0,
   Opcode.JumpZ,
@@ -760,7 +760,7 @@ export const StdDrawF1R1Pit: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF1R1Teleporter: number[] = [
+const StdDrawF1R1Teleporter: number[] = [
   Opcode.F1R1,
   Opcode.FloorDecorationGraphicOrdinalF1R1,
   Opcode.StdDrawFloorDecoration,
@@ -782,7 +782,7 @@ export const StdDrawF1R1Teleporter: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF1R1StairFacing: number[] = [
+const StdDrawF1R1StairFacing: number[] = [
   Opcode.F1R1,
   Opcode.GetDecoration0,
   Opcode.JumpZ,
@@ -809,7 +809,7 @@ export const StdDrawF1R1StairFacing: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF1R1StairEdge: number[] = [
+const StdDrawF1R1StairEdge: number[] = [
   Opcode.F1R1,
   Opcode.GetDecoration0,
   Opcode.JumpZ,
@@ -836,7 +836,7 @@ export const StdDrawF1R1StairEdge: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF1R1DoorEdge: number[] = [
+const StdDrawF1R1DoorEdge: number[] = [
   Opcode.F1R1,
   Opcode.FloorDecorationGraphicOrdinalF1R1,
   Opcode.StdDrawFloorDecoration,
@@ -851,7 +851,7 @@ export const StdDrawF1R1DoorEdge: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF1R1DoorFacing: number[] = [
+const StdDrawF1R1DoorFacing: number[] = [
   Opcode.F1R1,
   Opcode.FloorDecorationGraphicOrdinalF1R1,
   Opcode.StdDrawFloorDecoration,
@@ -880,7 +880,7 @@ export const StdDrawF1R1DoorFacing: number[] = [
 // F2 PROGRAMS (distance 2 - center)
 // =============================================================================
 
-export const StdDrawF2Stone: number[] = [
+const StdDrawF2Stone: number[] = [
   Opcode.StdWallBitmapF2,
   Opcode.StdWallRectangleF2,
   Opcode.StdBltShape,
@@ -903,7 +903,7 @@ export const StdDrawF2Stone: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF2Open: number[] = [
+const StdDrawF2Open: number[] = [
   Opcode.F2,
   Opcode.FloorDecorationGraphicOrdinalF2,
   Opcode.StdDrawFloorDecoration,
@@ -918,7 +918,7 @@ export const StdDrawF2Open: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF2Pit: number[] = [
+const StdDrawF2Pit: number[] = [
   Opcode.F2,
   Opcode.GetDecoration0,
   Opcode.JumpZ,
@@ -945,7 +945,7 @@ export const StdDrawF2Pit: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF2Teleporter: number[] = [
+const StdDrawF2Teleporter: number[] = [
   Opcode.F2,
   Opcode.FloorDecorationGraphicOrdinalF2,
   Opcode.StdDrawFloorDecoration,
@@ -967,7 +967,7 @@ export const StdDrawF2Teleporter: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF2StairFacing: number[] = [
+const StdDrawF2StairFacing: number[] = [
   Opcode.F2,
   Opcode.GetDecoration0,
   Opcode.JumpZ,
@@ -994,15 +994,15 @@ export const StdDrawF2StairFacing: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF2StairEdge: number[] = [
+const StdDrawF2StairEdge: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF2DoorEdge: number[] = [
+const StdDrawF2DoorEdge: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF2DoorFacing: number[] = [
+const StdDrawF2DoorFacing: number[] = [
   Opcode.F2,
   Opcode.FloorDecorationGraphicOrdinalF2,
   Opcode.StdDrawFloorDecoration,
@@ -1046,7 +1046,7 @@ export const StdDrawF2DoorFacing: number[] = [
 // F2L1 PROGRAMS (distance 2 - left side)
 // =============================================================================
 
-export const StdDrawF2L1Stone: number[] = [
+const StdDrawF2L1Stone: number[] = [
   Opcode.StdWallBitmapF2L1,
   Opcode.StdWallRectangleF2L1,
   Opcode.StdBltShape,
@@ -1077,7 +1077,7 @@ export const StdDrawF2L1Stone: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF2L1Open: number[] = [
+const StdDrawF2L1Open: number[] = [
   Opcode.F2L1,
   Opcode.FloorDecorationGraphicOrdinalF2L1,
   Opcode.StdDrawFloorDecoration,
@@ -1092,7 +1092,7 @@ export const StdDrawF2L1Open: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF2L1Pit: number[] = [
+const StdDrawF2L1Pit: number[] = [
   Opcode.F2L1,
   Opcode.GetDecoration0,
   Opcode.JumpZ,
@@ -1119,7 +1119,7 @@ export const StdDrawF2L1Pit: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF2L1Teleporter: number[] = [
+const StdDrawF2L1Teleporter: number[] = [
   Opcode.F2L1,
   Opcode.FloorDecorationGraphicOrdinalF2L1,
   Opcode.StdDrawFloorDecoration,
@@ -1141,7 +1141,7 @@ export const StdDrawF2L1Teleporter: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF2L1StairFacing: number[] = [
+const StdDrawF2L1StairFacing: number[] = [
   Opcode.F2L1,
   Opcode.GetDecoration0,
   Opcode.JumpZ,
@@ -1168,7 +1168,7 @@ export const StdDrawF2L1StairFacing: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF2L1StairEdge: number[] = [
+const StdDrawF2L1StairEdge: number[] = [
   Opcode.StdStairEdgeGraphicF2,
   Opcode.StdStairEdgeRectF2L1,
   Opcode.StdGraphicToViewport,
@@ -1186,7 +1186,7 @@ export const StdDrawF2L1StairEdge: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF2L1DoorEdge: number[] = [
+const StdDrawF2L1DoorEdge: number[] = [
   Opcode.F2L1,
   Opcode.FloorDecorationGraphicOrdinalF2L1,
   Opcode.StdDrawFloorDecoration,
@@ -1201,7 +1201,7 @@ export const StdDrawF2L1DoorEdge: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF2L1DoorFacing: number[] = [
+const StdDrawF2L1DoorFacing: number[] = [
   Opcode.F2L1,
   Opcode.FloorDecorationGraphicOrdinalF2L1,
   Opcode.StdDrawFloorDecoration,
@@ -1233,7 +1233,7 @@ export const StdDrawF2L1DoorFacing: number[] = [
 // F2R1 PROGRAMS (distance 2 - right side)
 // =============================================================================
 
-export const StdDrawF2R1Stone: number[] = [
+const StdDrawF2R1Stone: number[] = [
   Opcode.StdWallBitmapF2R1,
   Opcode.StdWallRectangleF2R1,
   Opcode.StdBltShape,
@@ -1264,7 +1264,7 @@ export const StdDrawF2R1Stone: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF2R1Open: number[] = [
+const StdDrawF2R1Open: number[] = [
   Opcode.F2R1,
   Opcode.FloorDecorationGraphicOrdinalF2R1,
   Opcode.StdDrawFloorDecoration,
@@ -1279,7 +1279,7 @@ export const StdDrawF2R1Open: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF2R1Pit: number[] = [
+const StdDrawF2R1Pit: number[] = [
   Opcode.F2R1,
   Opcode.GetDecoration0,
   Opcode.JumpZ,
@@ -1306,7 +1306,7 @@ export const StdDrawF2R1Pit: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF2R1Teleporter: number[] = [
+const StdDrawF2R1Teleporter: number[] = [
   Opcode.F2R1,
   Opcode.FloorDecorationGraphicOrdinalF2R1,
   Opcode.StdDrawFloorDecoration,
@@ -1328,7 +1328,7 @@ export const StdDrawF2R1Teleporter: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF2R1StairFacing: number[] = [
+const StdDrawF2R1StairFacing: number[] = [
   Opcode.F2R1,
   Opcode.GetDecoration0,
   Opcode.JumpZ,
@@ -1355,7 +1355,7 @@ export const StdDrawF2R1StairFacing: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF2R1StairEdge: number[] = [
+const StdDrawF2R1StairEdge: number[] = [
   Opcode.StdStairEdgeGraphicF2,
   Opcode.StdStairEdgeRectF2R1,
   Opcode.StdMirrorGraphicToViewport,
@@ -1373,7 +1373,7 @@ export const StdDrawF2R1StairEdge: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF2R1DoorEdge: number[] = [
+const StdDrawF2R1DoorEdge: number[] = [
   Opcode.F2R1,
   Opcode.FloorDecorationGraphicOrdinalF2R1,
   Opcode.StdDrawFloorDecoration,
@@ -1388,7 +1388,7 @@ export const StdDrawF2R1DoorEdge: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF2R1DoorFacing: number[] = [
+const StdDrawF2R1DoorFacing: number[] = [
   Opcode.F2R1,
   Opcode.FloorDecorationGraphicOrdinalF2R1,
   Opcode.StdDrawFloorDecoration,
@@ -1417,7 +1417,7 @@ export const StdDrawF2R1DoorFacing: number[] = [
 // F3 PROGRAMS (distance 3 - center)
 // =============================================================================
 
-export const StdDrawF3Stone: number[] = [
+const StdDrawF3Stone: number[] = [
   Opcode.StdWallBitmapF3,
   Opcode.StdWallRectangleF3,
   Opcode.StdBltShape,
@@ -1440,7 +1440,7 @@ export const StdDrawF3Stone: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF3Open: number[] = [
+const StdDrawF3Open: number[] = [
   Opcode.F3,
   Opcode.FloorDecorationGraphicOrdinalF3,
   Opcode.StdDrawFloorDecoration,
@@ -1452,7 +1452,7 @@ export const StdDrawF3Open: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF3Pit: number[] = [
+const StdDrawF3Pit: number[] = [
   Opcode.F3,
   Opcode.GetDecoration0,
   Opcode.JumpNZ,
@@ -1472,7 +1472,7 @@ export const StdDrawF3Pit: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF3Teleporter: number[] = [
+const StdDrawF3Teleporter: number[] = [
   Opcode.F3,
   Opcode.FloorDecorationGraphicOrdinalF3,
   Opcode.StdDrawFloorDecoration,
@@ -1491,7 +1491,7 @@ export const StdDrawF3Teleporter: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF3StairFacing: number[] = [
+const StdDrawF3StairFacing: number[] = [
   Opcode.F3,
   Opcode.GetDecoration0,
   Opcode.JumpZ,
@@ -1515,15 +1515,15 @@ export const StdDrawF3StairFacing: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF3StairEdge: number[] = [
+const StdDrawF3StairEdge: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF3DoorEdge: number[] = [
+const StdDrawF3DoorEdge: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF3DoorFacing: number[] = [
+const StdDrawF3DoorFacing: number[] = [
   Opcode.F3,
   Opcode.FloorDecorationGraphicOrdinalF3,
   Opcode.StdDrawFloorDecoration,
@@ -1564,7 +1564,7 @@ export const StdDrawF3DoorFacing: number[] = [
 // F3L1 PROGRAMS (distance 3 - left side)
 // =============================================================================
 
-export const StdDrawF3L1Stone: number[] = [
+const StdDrawF3L1Stone: number[] = [
   Opcode.StdWallBitmapF3L1,
   Opcode.StdWallRectangleF3L1,
   Opcode.StdBltShape,
@@ -1595,7 +1595,7 @@ export const StdDrawF3L1Stone: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF3L1Open: number[] = [
+const StdDrawF3L1Open: number[] = [
   Opcode.F3L1,
   Opcode.FloorDecorationGraphicOrdinalF3L1,
   Opcode.StdDrawFloorDecoration,
@@ -1607,7 +1607,7 @@ export const StdDrawF3L1Open: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF3L1Pit: number[] = [
+const StdDrawF3L1Pit: number[] = [
   Opcode.F3L1,
   Opcode.GetDecoration0,
   Opcode.JumpNZ,
@@ -1627,7 +1627,7 @@ export const StdDrawF3L1Pit: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF3L1Teleporter: number[] = [
+const StdDrawF3L1Teleporter: number[] = [
   Opcode.F3L1,
   Opcode.FloorDecorationGraphicOrdinalF3L1,
   Opcode.StdDrawFloorDecoration,
@@ -1646,7 +1646,7 @@ export const StdDrawF3L1Teleporter: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF3L1StairFacing: number[] = [
+const StdDrawF3L1StairFacing: number[] = [
   Opcode.F3L1,
   Opcode.GetDecoration0,
   Opcode.JumpZ,
@@ -1670,7 +1670,7 @@ export const StdDrawF3L1StairFacing: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF3L1StairEdge: number[] = [
+const StdDrawF3L1StairEdge: number[] = [
   Opcode.F3L1,
   Opcode.FloorDecorationGraphicOrdinalF3L1,
   Opcode.StdDrawFloorDecoration,
@@ -1682,7 +1682,7 @@ export const StdDrawF3L1StairEdge: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF3L1DoorEdge: number[] = [
+const StdDrawF3L1DoorEdge: number[] = [
   Opcode.F3L1,
   Opcode.FloorDecorationGraphicOrdinalF3L1,
   Opcode.StdDrawFloorDecoration,
@@ -1694,7 +1694,7 @@ export const StdDrawF3L1DoorEdge: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF3L1DoorFacing: number[] = [
+const StdDrawF3L1DoorFacing: number[] = [
   Opcode.F3L1,
   Opcode.FloorDecorationGraphicOrdinalF3L1,
   Opcode.StdDrawFloorDecoration,
@@ -1723,7 +1723,7 @@ export const StdDrawF3L1DoorFacing: number[] = [
 // F3L2 PROGRAMS (distance 3 - far left corner)
 // =============================================================================
 
-export const StdDrawF3L2Stone: number[] = [
+const StdDrawF3L2Stone: number[] = [
   Opcode.StdWallBitmapF3L2,
   Opcode.StdWallRectangleF3L2,
   Opcode.StdBltShape,
@@ -1734,7 +1734,7 @@ export const StdDrawF3L2Stone: number[] = [
 // F3R1 PROGRAMS (distance 3 - right side)
 // =============================================================================
 
-export const StdDrawF3R1Stone: number[] = [
+const StdDrawF3R1Stone: number[] = [
   Opcode.StdWallBitmapF3R1,
   Opcode.StdWallRectangleF3R1,
   Opcode.StdBltShape,
@@ -1765,7 +1765,7 @@ export const StdDrawF3R1Stone: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF3R1Open: number[] = [
+const StdDrawF3R1Open: number[] = [
   Opcode.F3R1,
   Opcode.FloorDecorationGraphicOrdinalF3R1,
   Opcode.StdDrawFloorDecoration,
@@ -1777,7 +1777,7 @@ export const StdDrawF3R1Open: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF3R1Pit: number[] = [
+const StdDrawF3R1Pit: number[] = [
   Opcode.F3R1,
   Opcode.GetDecoration0,
   Opcode.JumpNZ,
@@ -1797,7 +1797,7 @@ export const StdDrawF3R1Pit: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF3R1Teleporter: number[] = [
+const StdDrawF3R1Teleporter: number[] = [
   Opcode.F3R1,
   Opcode.FloorDecorationGraphicOrdinalF3R1,
   Opcode.StdDrawFloorDecoration,
@@ -1816,7 +1816,7 @@ export const StdDrawF3R1Teleporter: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF3R1StairFacing: number[] = [
+const StdDrawF3R1StairFacing: number[] = [
   Opcode.F3R1,
   Opcode.GetDecoration0,
   Opcode.JumpZ,
@@ -1840,7 +1840,7 @@ export const StdDrawF3R1StairFacing: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF3R1StairEdge: number[] = [
+const StdDrawF3R1StairEdge: number[] = [
   Opcode.F3R1,
   Opcode.FloorDecorationGraphicOrdinalF3R1,
   Opcode.StdDrawFloorDecoration,
@@ -1852,7 +1852,7 @@ export const StdDrawF3R1StairEdge: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF3R1DoorEdge: number[] = [
+const StdDrawF3R1DoorEdge: number[] = [
   Opcode.F3R1,
   Opcode.FloorDecorationGraphicOrdinalF3R1,
   Opcode.StdDrawFloorDecoration,
@@ -1864,7 +1864,7 @@ export const StdDrawF3R1DoorEdge: number[] = [
   Opcode.Return,
 ];
 
-export const StdDrawF3R1DoorFacing: number[] = [
+const StdDrawF3R1DoorFacing: number[] = [
   Opcode.F3R1,
   Opcode.FloorDecorationGraphicOrdinalF3R1,
   Opcode.StdDrawFloorDecoration,
@@ -1902,7 +1902,7 @@ export const StdDrawF3R1DoorFacing: number[] = [
 // F3R2 PROGRAMS (distance 3 - far right corner)
 // =============================================================================
 
-export const StdDrawF3R2Stone: number[] = [
+const StdDrawF3R2Stone: number[] = [
   Opcode.StdWallBitmapF3R2,
   Opcode.StdWallRectangleF3R2,
   Opcode.StdBltShape,
@@ -1913,7 +1913,7 @@ export const StdDrawF3R2Stone: number[] = [
 // F4 PROGRAMS (distance 4 - center)
 // =============================================================================
 
-export const StdDrawF4Any: number[] = [
+const StdDrawF4Any: number[] = [
   Opcode.F4Contents,
   Opcode.F4xy,
   Opcode.F4,
@@ -1926,7 +1926,7 @@ export const StdDrawF4Any: number[] = [
 // F4L1 PROGRAMS (distance 4 - left)
 // =============================================================================
 
-export const StdDrawF4L1Any: number[] = [
+const StdDrawF4L1Any: number[] = [
   Opcode.F4L1Contents,
   Opcode.F4L1xy,
   Opcode.F4L1,
@@ -1939,7 +1939,7 @@ export const StdDrawF4L1Any: number[] = [
 // F4R1 PROGRAMS (distance 4 - right)
 // =============================================================================
 
-export const StdDrawF4R1Any: number[] = [
+const StdDrawF4R1Any: number[] = [
   Opcode.F4R1Contents,
   Opcode.F4R1xy,
   Opcode.F4R1,
@@ -1952,146 +1952,222 @@ export const StdDrawF4R1Any: number[] = [
 // PROGRAM LOOKUP TABLE
 // =============================================================================
 
+/** An empty slot: the cell draws nothing for that room type. */
+const NOP = null;
+
 /**
- * Complete lookup table mapping cell/room type to bytecode programs.
- * This replaces CSBWin's pStdDrawCode[21][8] array.
- *
- * Key format: "{CellName}_{RoomType}"
- * Room types: Stone, Open, Pit, Teleporter, StairFacing, StairEdge, DoorEdge, DoorFacing
+ * CSBWin's `pStdDrawCode[21][8]` (`doc/CSBwin-src/Viewport.cpp:1952-2201`): the program
+ * for each relative cell, in `DrawViewport`'s cell order, and each `GraphicRoomType`.
  */
-export const BytecodePrograms: { [key: string]: number[] } = {
-  // F0 (distance 0 - center)
-  'F0_Stone': StdDrawF0Stone,
-  'F0_Open': StdDrawF0Open,
-  'F0_Pit': StdDrawF0Pit,
-  'F0_Teleporter': StdDrawF0Teleporter,
-  'F0_StairFacing': StdDrawF0StairFacing,
-  'F0_StairEdge': StdDrawF0StairEdge,
-  'F0_DoorEdge': StdDrawF0DoorEdge,
-  'F0_DoorFacing': StdDrawF0DoorFacing,
-
-  // F0L1 (distance 0 - left)
-  'F0L1_Stone': StdDrawF0L1Stone,
-  'F0L1_Open': StdDrawF0L1Open,
-  'F0L1_Pit': StdDrawF0L1Pit,
-  'F0L1_Teleporter': StdDrawF0L1Teleporter,
-  'F0L1_StairFacing': StdDrawF0L1StairFacing,
-  'F0L1_StairEdge': StdDrawF0L1StairEdge,
-  'F0L1_DoorEdge': StdDrawF0L1DoorEdge,
-  'F0L1_DoorFacing': StdDrawF0L1DoorFacing,
-
-  // F0R1 (distance 0 - right)
-  'F0R1_Stone': StdDrawF0R1Stone,
-  'F0R1_Open': StdDrawF0R1Open,
-  'F0R1_Pit': StdDrawF0R1Pit,
-  'F0R1_Teleporter': StdDrawF0R1Teleporter,
-  'F0R1_StairFacing': StdDrawF0R1StairFacing,
-  'F0R1_StairEdge': StdDrawF0R1StairEdge,
-  'F0R1_DoorEdge': StdDrawF0R1DoorEdge,
-  'F0R1_DoorFacing': StdDrawF0R1DoorFacing,
-
-  // F1 (distance 1 - center)
-  'F1_Stone': StdDrawF1Stone,
-  'F1_Open': StdDrawF1Open,
-  'F1_Pit': StdDrawF1Pit,
-  'F1_Teleporter': StdDrawF1Teleporter,
-  'F1_StairFacing': StdDrawF1StairFacing,
-  'F1_StairEdge': StdDrawF1StairEdge,
-  'F1_DoorEdge': StdDrawF1DoorEdge,
-  'F1_DoorFacing': StdDrawF1DoorFacing,
-
-  // F1L1 (distance 1 - left)
-  'F1L1_Stone': StdDrawF1L1Stone,
-  'F1L1_Open': StdDrawF1L1Open,
-  'F1L1_Pit': StdDrawF1L1Pit,
-  'F1L1_Teleporter': StdDrawF1L1Teleporter,
-  'F1L1_StairFacing': StdDrawF1L1StairFacing,
-  'F1L1_StairEdge': StdDrawF1L1StairEdge,
-  'F1L1_DoorEdge': StdDrawF1L1DoorEdge,
-  'F1L1_DoorFacing': StdDrawF1L1DoorFacing,
-
-  // F1R1 (distance 1 - right)
-  'F1R1_Stone': StdDrawF1R1Stone,
-  'F1R1_Open': StdDrawF1R1Open,
-  'F1R1_Pit': StdDrawF1R1Pit,
-  'F1R1_Teleporter': StdDrawF1R1Teleporter,
-  'F1R1_StairFacing': StdDrawF1R1StairFacing,
-  'F1R1_StairEdge': StdDrawF1R1StairEdge,
-  'F1R1_DoorEdge': StdDrawF1R1DoorEdge,
-  'F1R1_DoorFacing': StdDrawF1R1DoorFacing,
-
-  // F2 (distance 2 - center)
-  'F2_Stone': StdDrawF2Stone,
-  'F2_Open': StdDrawF2Open,
-  'F2_Pit': StdDrawF2Pit,
-  'F2_Teleporter': StdDrawF2Teleporter,
-  'F2_StairFacing': StdDrawF2StairFacing,
-  'F2_StairEdge': StdDrawF2StairEdge,
-  'F2_DoorEdge': StdDrawF2DoorEdge,
-  'F2_DoorFacing': StdDrawF2DoorFacing,
-
-  // F2L1 (distance 2 - left)
-  'F2L1_Stone': StdDrawF2L1Stone,
-  'F2L1_Open': StdDrawF2L1Open,
-  'F2L1_Pit': StdDrawF2L1Pit,
-  'F2L1_Teleporter': StdDrawF2L1Teleporter,
-  'F2L1_StairFacing': StdDrawF2L1StairFacing,
-  'F2L1_StairEdge': StdDrawF2L1StairEdge,
-  'F2L1_DoorEdge': StdDrawF2L1DoorEdge,
-  'F2L1_DoorFacing': StdDrawF2L1DoorFacing,
-
-  // F2R1 (distance 2 - right)
-  'F2R1_Stone': StdDrawF2R1Stone,
-  'F2R1_Open': StdDrawF2R1Open,
-  'F2R1_Pit': StdDrawF2R1Pit,
-  'F2R1_Teleporter': StdDrawF2R1Teleporter,
-  'F2R1_StairFacing': StdDrawF2R1StairFacing,
-  'F2R1_StairEdge': StdDrawF2R1StairEdge,
-  'F2R1_DoorEdge': StdDrawF2R1DoorEdge,
-  'F2R1_DoorFacing': StdDrawF2R1DoorFacing,
-
-  // F3 (distance 3 - center)
-  'F3_Stone': StdDrawF3Stone,
-  'F3_Open': StdDrawF3Open,
-  'F3_Pit': StdDrawF3Pit,
-  'F3_Teleporter': StdDrawF3Teleporter,
-  'F3_StairFacing': StdDrawF3StairFacing,
-  'F3_StairEdge': StdDrawF3StairEdge,
-  'F3_DoorEdge': StdDrawF3DoorEdge,
-  'F3_DoorFacing': StdDrawF3DoorFacing,
-
-  // F3L1 (distance 3 - left)
-  'F3L1_Stone': StdDrawF3L1Stone,
-  'F3L1_Open': StdDrawF3L1Open,
-  'F3L1_Pit': StdDrawF3L1Pit,
-  'F3L1_Teleporter': StdDrawF3L1Teleporter,
-  'F3L1_StairFacing': StdDrawF3L1StairFacing,
-  'F3L1_StairEdge': StdDrawF3L1StairEdge,
-  'F3L1_DoorEdge': StdDrawF3L1DoorEdge,
-  'F3L1_DoorFacing': StdDrawF3L1DoorFacing,
-
-  // F3L2 (distance 3 - far left corner)
-  'F3L2_Stone': StdDrawF3L2Stone,
-
-  // F3R1 (distance 3 - right)
-  'F3R1_Stone': StdDrawF3R1Stone,
-  'F3R1_Open': StdDrawF3R1Open,
-  'F3R1_Pit': StdDrawF3R1Pit,
-  'F3R1_Teleporter': StdDrawF3R1Teleporter,
-  'F3R1_StairFacing': StdDrawF3R1StairFacing,
-  'F3R1_StairEdge': StdDrawF3R1StairEdge,
-  'F3R1_DoorEdge': StdDrawF3R1DoorEdge,
-  'F3R1_DoorFacing': StdDrawF3R1DoorFacing,
-
-  // F3R2 (distance 3 - far right corner)
-  'F3R2_Stone': StdDrawF3R2Stone,
-
-  // F4 (distance 4 - center)
-  'F4_Any': StdDrawF4Any,
-
-  // F4L1 (distance 4 - left)
-  'F4L1_Any': StdDrawF4L1Any,
-
-  // F4R1 (distance 4 - right)
-  'F4R1_Any': StdDrawF4R1Any,
-};
+export const pStdDrawCode: readonly (readonly (readonly number[] | null)[])[] = [
+  [ // F4L2
+    NOP,
+    NOP,
+    NOP,
+    NOP,
+    NOP,
+    NOP,
+    NOP,
+    NOP,
+  ],
+  [ // F4R2
+    NOP,
+    NOP,
+    NOP,
+    NOP,
+    NOP,
+    NOP,
+    NOP,
+    NOP,
+  ],
+  [ // F3L2
+    StdDrawF3L2Stone,
+    NOP,
+    NOP,
+    NOP,
+    NOP,
+    NOP,
+    NOP,
+    NOP,
+  ],
+  [ // F3R2
+    StdDrawF3R2Stone,
+    NOP,
+    NOP,
+    NOP,
+    NOP,
+    NOP,
+    NOP,
+    NOP,
+  ],
+  [ // F4L1
+    StdDrawF4L1Any,
+    StdDrawF4L1Any,
+    StdDrawF4L1Any,
+    StdDrawF4L1Any,
+    StdDrawF4L1Any,
+    StdDrawF4L1Any,
+    StdDrawF4L1Any,
+    StdDrawF4L1Any,
+  ],
+  [ // F4R1
+    StdDrawF4R1Any,
+    StdDrawF4R1Any,
+    StdDrawF4R1Any,
+    StdDrawF4R1Any,
+    StdDrawF4R1Any,
+    StdDrawF4R1Any,
+    StdDrawF4R1Any,
+    StdDrawF4R1Any,
+  ],
+  [ // F4
+    StdDrawF4Any,
+    StdDrawF4Any,
+    StdDrawF4Any,
+    StdDrawF4Any,
+    StdDrawF4Any,
+    StdDrawF4Any,
+    StdDrawF4Any,
+    StdDrawF4Any,
+  ],
+  [ // F3L1
+    StdDrawF3L1Stone,
+    StdDrawF3L1Open,
+    StdDrawF3L1Pit,
+    StdDrawF3L1Teleporter,
+    StdDrawF3L1DoorEdge,
+    StdDrawF3L1DoorFacing,
+    StdDrawF3L1StairEdge,
+    StdDrawF3L1StairFacing,
+  ],
+  [ // F3R1
+    StdDrawF3R1Stone,
+    StdDrawF3R1Open,
+    StdDrawF3R1Pit,
+    StdDrawF3R1Teleporter,
+    StdDrawF3R1DoorEdge,
+    StdDrawF3R1DoorFacing,
+    StdDrawF3R1StairEdge,
+    StdDrawF3R1StairFacing,
+  ],
+  [ // F3
+    StdDrawF3Stone,
+    StdDrawF3Open,
+    StdDrawF3Pit,
+    StdDrawF3Teleporter,
+    StdDrawF3DoorEdge,
+    StdDrawF3DoorFacing,
+    StdDrawF3StairEdge,
+    StdDrawF3StairFacing,
+  ],
+  [ // F2L2
+    NOP,
+    NOP,
+    NOP,
+    NOP,
+    NOP,
+    NOP,
+    NOP,
+    NOP,
+  ],
+  [ // F2R2
+    NOP,
+    NOP,
+    NOP,
+    NOP,
+    NOP,
+    NOP,
+    NOP,
+    NOP,
+  ],
+  [ // F2L1
+    StdDrawF2L1Stone,
+    StdDrawF2L1Open,
+    StdDrawF2L1Pit,
+    StdDrawF2L1Teleporter,
+    StdDrawF2L1DoorEdge,
+    StdDrawF2L1DoorFacing,
+    StdDrawF2L1StairEdge,
+    StdDrawF2L1StairFacing,
+  ],
+  [ // F2R1
+    StdDrawF2R1Stone,
+    StdDrawF2R1Open,
+    StdDrawF2R1Pit,
+    StdDrawF2R1Teleporter,
+    StdDrawF2R1DoorEdge,
+    StdDrawF2R1DoorFacing,
+    StdDrawF2R1StairEdge,
+    StdDrawF2R1StairFacing,
+  ],
+  [ // F2
+    StdDrawF2Stone,
+    StdDrawF2Open,
+    StdDrawF2Pit,
+    StdDrawF2Teleporter,
+    StdDrawF2DoorEdge,
+    StdDrawF2DoorFacing,
+    StdDrawF2StairEdge,
+    StdDrawF2StairFacing,
+  ],
+  [ // F1L1
+    StdDrawF1L1Stone,
+    StdDrawF1L1Open,
+    StdDrawF1L1Pit,
+    StdDrawF1L1Teleporter,
+    StdDrawF1L1DoorEdge,
+    StdDrawF1L1DoorFacing,
+    StdDrawF1L1StairEdge,
+    StdDrawF1L1StairFacing,
+  ],
+  [ // F1R1
+    StdDrawF1R1Stone,
+    StdDrawF1R1Open,
+    StdDrawF1R1Pit,
+    StdDrawF1R1Teleporter,
+    StdDrawF1R1DoorEdge,
+    StdDrawF1R1DoorFacing,
+    StdDrawF1R1StairEdge,
+    StdDrawF1R1StairFacing,
+  ],
+  [ // F1
+    StdDrawF1Stone,
+    StdDrawF1Open,
+    StdDrawF1Pit,
+    StdDrawF1Teleporter,
+    StdDrawF1DoorEdge,
+    StdDrawF1DoorFacing,
+    StdDrawF1StairEdge,
+    StdDrawF1StairFacing,
+  ],
+  [ // F0L1
+    StdDrawF0L1Stone,
+    StdDrawF0L1Open,
+    StdDrawF0L1Pit,
+    StdDrawF0L1Teleporter,
+    StdDrawF0L1DoorEdge,
+    StdDrawF0L1DoorFacing,
+    StdDrawF0L1StairEdge,
+    StdDrawF0L1StairFacing,
+  ],
+  [ // F0R1
+    StdDrawF0R1Stone,
+    StdDrawF0R1Open,
+    StdDrawF0R1Pit,
+    StdDrawF0R1Teleporter,
+    StdDrawF0R1DoorEdge,
+    StdDrawF0R1DoorFacing,
+    StdDrawF0R1StairEdge,
+    StdDrawF0R1StairFacing,
+  ],
+  [ // F0
+    StdDrawF0Stone,
+    StdDrawF0Open,
+    StdDrawF0Pit,
+    StdDrawF0Teleporter,
+    StdDrawF0DoorEdge,
+    StdDrawF0DoorFacing,
+    StdDrawF0StairEdge,
+    StdDrawF0StairFacing,
+  ],
+];

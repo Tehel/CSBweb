@@ -52,7 +52,6 @@ import { resolve } from 'node:path';
 
 import { atariToRGB, OBJECT_ID_EOF, Position, RoomType } from '../../src/core/types';
 import { BytecodeInterpreter, interpreterStackPointers } from '../../src/renderer/bytecode/BytecodeInterpreter';
-import { BytecodePrograms } from '../../src/renderer/bytecode/BytecodePrograms';
 import { GraphicRoomType, ViewRoomType, type SummarizeRoomData } from '../../src/renderer/bytecode/Types';
 import type { IndexedBitmap } from '../../src/renderer/csbwin/CanvasBlitter';
 import {
@@ -149,14 +148,14 @@ function main(): void {
         if (pass === 'normal') {
           check((program === null) === nop, `${name} ${nop ? 'is' : 'is not'} a NOP slot, as in CSBWin`);
           if (ANY_CELLS.includes(cellNames[cell])) {
-            check(program === BytecodePrograms[`${cellNames[cell]}_Any`], `${name} runs StdDraw${cellNames[cell]}Any`);
+            check(program === getBytecodeProgram(cell, 0), `${name} runs StdDraw${cellNames[cell]}Any`);
           }
         }
         if (!program) {
           tiles.push(new Uint8Array(224 * 136).fill(GUTTER));
           continue;
         }
-        if (!BytecodePrograms[name]) fallbacks++;
+        if (ANY_CELLS.includes(cellNames[cell])) fallbacks++;
         const before = warnings.length;
         renderer.buffer.pixels.fill(UNDRAWN);
         renderer.context.roomData = roomDataFor(renderer.objectTables, start, passFacing, cell, type as GraphicRoomType, doorIndex);

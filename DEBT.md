@@ -114,7 +114,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E28 | The bytecode interpreter's programs, context and state | L | ⏳ step 1 of 4 next |
+| E28 | The bytecode interpreter's context and state | L | ⏳ step 1 of 3 next |
 | E29 | `GameScreen` is the canvas, the compose order, the palettes and a façade | L | ⏳ |
 | E31 | Late wiring with silent defaults, and long parameter lists | M | ⏳ |
 | E32 | Four ways to read bytes, and eight graphics caches | M | ⏳ |
@@ -414,19 +414,16 @@ gather or split CSBWin's functions as the code's concerns ask. What still follow
 the behaviour, the names of ported functions, which keep the two codebases greppable
 against each other, and the file formats.
 
-### E28 ⏳ The bytecode interpreter's programs, context and state
+### E28 ⏳ The bytecode interpreter's context and state
 
 `Interpret`'s switch is a table built once, opcode to handler and
 operand (`BytecodeInterpreter.decode`), the constants the opcodes push are tables
 (`CONSTANT_OPCODES`…), and `StdRectanglePointers` is one too (`STD_RECTANGLE_POINTERS`).
-What is left, a step each, in this order:
+The programs are CSBWin's `pStdDrawCode[21][8]` (`BytecodePrograms.ts`, indexed by
+`getBytecodeProgram`, `src/renderer/DrawViewport.ts`). What is left, a step each, in this
+order:
 
-1. **The programs.** One is found by building `${cellName}_${roomTypeName}`, with an
-   `_Any` fallback, in a map of 101 exported `StdDraw*` constants nothing else imports
-   (`BytecodePrograms.ts:1962`, `getBytecodeProgram`, `src/renderer/DrawViewport.ts:196`),
-   where CSBWin indexes `pStdDrawCode[21][8]` (`doc/CSBwin-src/Viewport.cpp:1952`).
-   Paying it: `pStdDrawCode` as a 21-by-8 array, the constants unexported.
-2. **The context.** `InterpreterContext` (`BytecodeInterpreter.ts:36-157`) carries the
+1. **The context.** `InterpreterContext` (`BytecodeInterpreter.ts:36-157`) carries the
    drawing's inputs and the picking's outputs alike (`viewportObjectButtons`,
    `viewportObjectRNs`, the `facing*` flags, `doorSwitchRects`, written by
    `DrawDecorations`, `DrawRoomObjects` and `DrawDoor`, read by
@@ -436,11 +433,11 @@ What is left, a step each, in this order:
    a `console.warn` (`executeOpcode`), where the renderer reports through
    `GameHost.trace`. Paying it: `draw()` returning the picking for the UI, the inputs
    required and a tool helper filling defaults, a `trace` hook.
-3. **The state.** The drawing's state is module-wide: the interpreter's `stack`, `rstack`,
+2. **The state.** The drawing's state is module-wide: the interpreter's `stack`, `rstack`,
    `sp` and `rsp`, `viewportRandom` (`ViewportDraw.ts:32`) and `graphicRandomState`
    (`DrawDoor.ts:212`), which tools reseed by hand. Paying it: an object the
    `ViewportRenderer` owns.
-4. **The monster colours.** `selectLevel` writes the level's monster colours into the
+3. **The monster colours.** `selectLevel` writes the level's monster colours into the
    shared tables (`tables.monsterColorMapMedium[...]`,
    `src/renderer/ViewportRenderer.ts:203-208`), the game's one `GraphicsTables`, which
    tools cache per loader. Its comment (`:154-157`) says they are applied "whether or not

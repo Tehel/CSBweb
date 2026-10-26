@@ -10,7 +10,7 @@
 
 import { BytecodeInterpreter, InterpreterContext } from './bytecode/BytecodeInterpreter';
 import { GraphicRoomType, SummarizeRoomData } from './bytecode/Types';
-import { BytecodePrograms } from './bytecode/BytecodePrograms';
+import { pStdDrawCode } from './bytecode/BytecodePrograms';
 import type { DungeonState } from '../engine/DungeonState';
 import { RelativeXY, type DirectionTables } from '../engine/RelativeXY';
 import { summarizeRoomInfoCsbwin } from './csbwin/SummarizeRoomInfo';
@@ -150,8 +150,8 @@ export function skinProgramStart(code: ArrayLike<number>, cellNum: number, graph
 }
 
 /**
- * The 21 cells' names in the program table, by relative cell number: F and the cell's
- * `relativeY`, then L or R and the size of its `relativeX`.
+ * The 21 cells' names in CSBWin's programs (`StdDrawF1L1Stone`…), by relative cell number:
+ * F and the cell's `relativeY`, then L or R and the size of its `relativeX`.
  */
 export const cellNames = [
   'F4L2',
@@ -177,7 +177,7 @@ export const cellNames = [
   'F0',
 ];
 
-/** The program table's name for each `GraphicRoomType`. */
+/** The programs' name for each `GraphicRoomType`, `pStdDrawCode`'s second index. */
 export const roomTypeNames = [
   'Stone',
   'Open',
@@ -189,27 +189,7 @@ export const roomTypeNames = [
   'StairFacing',
 ];
 
-/**
- * Get the bytecode program for a given cell and room type
- * Port from CSBWin's pStdDrawCode lookup
- */
-export function getBytecodeProgram(cellNum: number, graphicRoomType: number): number[] | null {
-  // Map cell number and room type to bytecode program key
-  // Cell names: F0, F0L1, F0R1, F1, F1L1, F1R1, etc.
-  // Room types: Stone, Open, Pit, Teleporter, StairFacing, StairEdge, DoorFacing, DoorEdge
-
-  const cellName = cellNames[cellNum];
-  const roomTypeName = roomTypeNames[graphicRoomType] || 'Stone';
-
-  // Look up program in BytecodePrograms table
-  const key = `${cellName}_${roomTypeName}`;
-  const program = BytecodePrograms[key];
-
-  if (!program) {
-    // Fall back to generic program if available
-    const fallbackKey = `${cellName}_Any`;
-    return BytecodePrograms[fallbackKey] || null;
-  }
-
-  return program;
+/** CSBWin's `pStdDrawCode[cellNum][graphicRoomType]` (`Viewport.cpp:6816`); `null` is a `NOP` slot. */
+export function getBytecodeProgram(cellNum: number, graphicRoomType: GraphicRoomType): readonly number[] | null {
+  return pStdDrawCode[cellNum]?.[graphicRoomType] ?? null;
 }
