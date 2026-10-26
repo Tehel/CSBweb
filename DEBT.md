@@ -114,7 +114,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E28 | The bytecode interpreter's context and state | L | ⏳ step 3 of 3 next |
 | E29 | `GameScreen` is the canvas, the compose order, the palettes and a façade | L | ⏳ |
 | E31 | Late wiring with silent defaults, and long parameter lists | M | ⏳ |
 | E32 | Four ways to read bytes, and eight graphics caches | M | ⏳ |
@@ -413,33 +412,6 @@ The structure need no longer follow CSBWin's files (the author's decision): a mo
 gather or split CSBWin's functions as the code's concerns ask. What still follows CSBWin is
 the behaviour, the names of ported functions, which keep the two codebases greppable
 against each other, and the file formats.
-
-### E28 ⏳ The bytecode interpreter's context and state
-
-`Interpret`'s switch is a table built once, opcode to handler and
-operand (`BytecodeInterpreter.decode`), the constants the opcodes push are tables
-(`CONSTANT_OPCODES`…), and `StdRectanglePointers` is one too (`STD_RECTANGLE_POINTERS`).
-The programs are CSBWin's `pStdDrawCode[21][8]` (`BytecodePrograms.ts`, indexed by
-`getBytecodeProgram`, `src/renderer/DrawViewport.ts`). The context, `InterpreterContext`,
-holds the drawing's inputs, every one the game always sets required, and an unknown opcode
-goes to its `trace`, `GameHost.trace`; a tool fills what it leaves out with
-`viewportContextOf` (`tools/lib/viewportContext.ts`). What a frame leaves for the interface
-is a `ViewportPicking` (`src/renderer/bytecode/Types.ts`), which `ViewportRenderer.draw`
-returns and `GameScreen` keeps as `ui.picking`. What the drawing keeps from one frame to the
-next, CSBWin's statics (the two stacks, `viewportRandom` and `GraphicRandom`'s `r`), is a
-`ViewportDrawState` (`src/renderer/bytecode/ViewportDrawState.ts`), the context's
-`drawState`: the renderer's own, and a tool's from `viewportContextOf`. What is left, the
-last step:
-
-3. **The monster colours.** `selectLevel` writes the level's monster colours into the
-   shared tables (`tables.monsterColorMapMedium[...]`,
-   `src/renderer/ViewportRenderer.ts:219-224`), the game's one `GraphicsTables`, which
-   tools cache per loader. Its comment (`:169-172`) says they are applied "whether or not
-   the view is drawn"; its one caller runs only when it is. Paying it: per-level copies of
-   the two colour maps.
-
-Pixel for pixel: `tools/checks/render-probe.ts`, `tools/checks/skin-programs.ts` and the
-golden frames.
 
 ### E29 ⏳ `GameScreen` is the canvas, the compose order, the palettes and a façade
 

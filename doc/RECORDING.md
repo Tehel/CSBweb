@@ -119,7 +119,7 @@ What holds:
   comes from `Math.random()` once, at the first draw (`random.ts:47`), which a recording
   would write down as CSBWin's `0x3333` does.
 - **Drawing has its own stream**, `viewportRandom`, as CSBWin's `DrawViewport` does
-  (`src/renderer/bytecode/ViewportDraw.ts:23-32`); nothing under `src/renderer` or `src/ui` draws from
+  (`src/renderer/bytecode/ViewportDrawState.ts:24-33`); nothing under `src/renderer` or `src/ui` draws from
   the game's.
 - **The engine reads no clock**: under `src/engine` and `src/core`, `Date.now()` serves
   only the loop's pacing (`src/engine/Game.ts:501-520`) and a save's date

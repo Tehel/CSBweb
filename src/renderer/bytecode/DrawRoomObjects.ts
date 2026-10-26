@@ -670,14 +670,14 @@ function drawMonsterAt(
       graphicNumFBSAE++;
       distanceFromUs = 1;
       b102 = monsterWord4Bit7(mtDesc) && !showSideView && !showBackView && !showAttackView;
-      distancePalette = tables.monsterColorMapMedium;
+      distancePalette = draw.context.monsterColorMapMedium;
       scaleFactor = 20; // 20/32 = 0.625
     } else {
       // Three or more rows ahead.
       b102 = false;
       distanceFromUs = 2;
       frontViewMirror = false;
-      distancePalette = tables.monsterColorMapFar;
+      distancePalette = draw.context.monsterColorMapFar;
       scaleFactor = 16; // 16/32 = 0.5
     }
     dstByteWidth = (srcByteWidth * scaleFactor + (scaleFactor >> 1)) >> 5;

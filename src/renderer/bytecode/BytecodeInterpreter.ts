@@ -142,6 +142,14 @@ export interface InterpreterContext {
    * `FloorDecorationTOC` (`Code390e.cpp:263-274`), at most fifteen of them.
    */
   loadedFloorDecorations: Array<[number, number]>;
+  /**
+   * `d.Byte6628[16]` and `d.Byte6612[16]`: the colour maps a monster two rows ahead, and
+   * three or more, is shrunk through (`doc/CSBwin-src/Code51a4.cpp:801`), the level's own:
+   * `ModifyPalettes` writes colours 9 and 10 for its monsters (`CSBCode.cpp:2895-2910`).
+   * The renderer's copies of the tables'.
+   */
+  monsterColorMapMedium: Uint8Array;
+  monsterColorMapFar: Uint8Array;
   numWallDecoration: number; // d.NumWallDecoration (CSBCode.cpp:5863)
   useMirrorImages: boolean; // d.UseMirrorImages (Viewport.cpp:6747)
 

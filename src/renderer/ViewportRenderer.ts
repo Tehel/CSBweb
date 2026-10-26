@@ -156,6 +156,8 @@ export class ViewportRenderer {
       doorTOC: [0, 0],
       doorOrnaments: Array.from({ length: 17 }, (_, i): [number, number] => (i >= 15 ? [i + 286, 1] : [0, 0])),
       loadedFloorDecorations: Array.from({ length: 16 }, (_, i): [number, number] => (i === 15 ? [241, 1] : [0, 0])),
+      monsterColorMapMedium: this.objectTables.monsterColorMapMedium.slice(),
+      monsterColorMapFar: this.objectTables.monsterColorMapFar.slice(),
       numWallDecoration: 0,
       useMirrorImages: false,
       viewportIndexBuffer: this.buffer,
@@ -167,8 +169,10 @@ export class ViewportRenderer {
   }
 
   /**
-   * The level the party is on, for the monster colours: re-applied only when it changes,
-   * whether or not the view is drawn (it is not while the party sleeps).
+   * The level the party is on, for the monster colours, re-applied only when it changes:
+   * the palettes and the context's colour maps, as `ReadGraphicsForLevel` sets them when
+   * the level loads (`doc/CSBwin-src/Code390e.cpp:323-343`). The screen calls it before
+   * each `DrawViewport` of the party's, the first to read them since the level changed.
    */
   selectLevel(z: number): void {
     if (this.lastPaletteLevel === z) return;
@@ -216,11 +220,12 @@ export class ViewportRenderer {
       const entry = scheme.paletteEntries[i];
       if (entry !== undefined) palette[whichColor] = entry;
     }
-    if (whichColor >= 0 && whichColor < tables.monsterColorMapMedium.length) {
-      tables.monsterColorMapMedium[whichColor] = scheme.monsterColorMapMedium;
+    const { monsterColorMapMedium, monsterColorMapFar } = this.context;
+    if (whichColor >= 0 && whichColor < monsterColorMapMedium.length) {
+      monsterColorMapMedium[whichColor] = scheme.monsterColorMapMedium;
     }
-    if (whichColor >= 0 && whichColor < tables.monsterColorMapFar.length) {
-      tables.monsterColorMapFar[whichColor] = scheme.monsterColorMapFar;
+    if (whichColor >= 0 && whichColor < monsterColorMapFar.length) {
+      monsterColorMapFar[whichColor] = scheme.monsterColorMapFar;
     }
   }
 

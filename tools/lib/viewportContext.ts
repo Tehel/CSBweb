@@ -58,6 +58,9 @@ export function viewportContextOf(members: Partial<InterpreterContext>): Interpr
     doorTOC: [],
     doorOrnaments: [],
     loadedFloorDecorations: [],
+    // The colour maps of the tables given, as `graphics.dat` holds them, before any level's.
+    monsterColorMapMedium: members.objectTables?.monsterColorMapMedium?.slice() ?? new Uint8Array(16),
+    monsterColorMapFar: members.objectTables?.monsterColorMapFar?.slice() ?? new Uint8Array(16),
     numWallDecoration: 0,
     useMirrorImages: false,
     viewportIndexBuffer: createPaletteIndexViewportBuffer(224, 136, 0),
