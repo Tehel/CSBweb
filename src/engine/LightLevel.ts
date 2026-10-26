@@ -9,7 +9,7 @@
  * `:1908`, `:1997`, `:2022`), a `TT_LIGHT` timer (`TimerSystem`, `CSBCode.cpp:6576`), a
  * level loaded (`MonsterSystem.loadPartyLevel`, `:829`), the torches burning down
  * (`ninetySecondUpdate`, `:7443`), a light timer set (`MagicSystem.setBrightnessTimer`,
- * `Magic.cpp:842`) and the fusion (`AttackSystem`, `Attack.cpp:2277`).
+ * `Magic.cpp:842`) and the fusion (`Fusion.ts`, `Attack.cpp:2277`).
  *
  * `d.Word11778 = 1`, which tells the VBL handler to load the new palette (`:7394`,
  * `:1021-1024`), has no counterpart: the screen reads `d.CurrentPalette` whenever it

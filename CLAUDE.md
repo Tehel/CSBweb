@@ -179,6 +179,7 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
             blows it sets off),
             ActuatorSystem, DsaSystem, MagicSystem, CharacterSystem, AttackSystem,
             ChampionDamage (what a blow does to a champion: damage, death, poison, armour, luck),
+            Fusion (Lord Chaos's end: `_Fusion` and `_FusionSequence`),
             AttackMenu (the attack menu's `d.`: closed, named, and its panel's tick),
             MouseSystem (Mouse.cpp's engine half), HallOfChampions, the Monster* systems,
             MouseQueue and LoopState (the loop's `d.` state, at `ctx.mouseQueue` /

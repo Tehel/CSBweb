@@ -443,16 +443,14 @@ against each other, and the file formats.
 
 ### E26 ⏳ Systems named after CSBWin's files, not what they do
 
-- **`AttackSystem` holds the end of the game**, `_FusionSequence` and the credits' script,
-  about 200 lines, and `applyMagicShield`, which `MagicSystem` calls.
 - **`MoveObject` is in two halves.** `WorldMove.ts:174-202` and `MonsterSystem.ts:552-560`,
   `:652-667` each do the missile check, the removal and the pad's release, and the
   levitation test is written twice (`WorldMove.isMonsterLevitating`,
   `MonsterSystem.ts:549`).
 
-Paying it, in steps: `Fusion.ts` for the end; then one `MoveObject`, the monster's half
-calling the shared parts. The champions' damage, death, poison, armour and luck are
-`ChampionDamage` already, out of `MonsterAttack`.
+Paying it: one `MoveObject`, the monster's half calling the shared parts. The other
+systems are named for what they do already: `ChampionDamage` (the champions' damage,
+death, poison, armour and luck), `Fusion.ts` (the end), and `MagicShield` in `MagicSystem`.
 
 ### E27 ⏳ `DsaSystem.ts` is one 5,000-line class
 

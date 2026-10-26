@@ -38,6 +38,7 @@
 import { DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../../src/core/types';
 import { CsbRandom } from '../../src/core/random';
 import { CloudType } from '../../src/engine/cloudTypes';
+import { isCellFluxcage } from '../../src/engine/Fusion';
 import type { Game } from '../../src/engine/Game';
 import { createGameHost, type MessageSink } from '../../src/engine/GameHost';
 import { CHARFLAG_PORTRAIT_CHANGED } from '../../src/core/charDesc';
@@ -388,9 +389,9 @@ function checkBoxedIn(inventoryOpen: boolean, withoutB = false, stripState: 'fre
   check(a.portraits.length === 1 && a.portraits[0]!.chIdx === 0 && a.portraits[0]!.views === 0,
     'MarkAllPortraitsChanged draws the box afresh before the first view (Attack.cpp:2281)');
   check(lordChaos.hp[0]! > 9000 && lordChaos.hp[0]! <= 10000, 'his hit points are 10000, less the first fireball');
-  check(!game.systems.attack.isCellFluxcage(CX, CY) && !game.systems.attack.isCellFluxcage(CX, CY + 1),
+  check(!isCellFluxcage(game.ctx, CX, CY) && !isCellFluxcage(game.ctx, CX, CY + 1),
     'the Fluxcages on his square and the party\'s are gone');
-  check(game.systems.attack.isCellFluxcage(CX, CY - 1) && game.systems.attack.isCellFluxcage(CX + 1, CY),
+  check(isCellFluxcage(game.ctx, CX, CY - 1) && isCellFluxcage(game.ctx, CX + 1, CY),
     'and the ones around him stay');
   check(champion.attributes.stamina === stamina && champion.attackType === attackType,
     'the attack\'s tail does not run: no stamina spent, no attack type recorded');

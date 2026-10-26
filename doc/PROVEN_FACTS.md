@@ -6849,7 +6849,7 @@ In order:
 - With nowhere to go, "Sorry, Mr. Chaos. You are toast." (`:213`): `FusionSequence(_3_)`
   (`:259`).
 
-The port: `AttackSystem.fusion`. Evidence: `tools/checks/fusion.ts`.
+The port: `fusion` (`src/engine/Fusion.ts`). Evidence: `tools/checks/fusion.ts`.
 
 ## `_FusionSequence`: the end of the game
 
@@ -6905,7 +6905,7 @@ In `dm-atari/dungeon.dat` cell (0, 0) of level 12 holds four texts, chained D, C
 
 Each view is a `_ProcessTimersViewportAndSound`: 33 of them and 1593 VBLs besides the
 texts, and each text printed adds a view and 780 VBLs, so 37 and 4713 in the shipped
-dungeon. The port: `AttackSystem.fusionSequence`, the suspended callers in
+dungeon. The port: `fusionSequence` (`src/engine/Fusion.ts`), the suspended callers in
 `executeAttack` and `handleAttackAreaClick` (`src/renderer/ui/Attack.ts`), and the dead
 keys in `handleUIKey`. Evidence: `tools/checks/fusion.ts`,
 `tools/checks/key-bindings.ts` for the menu and the keys, and `tools/checks/cloud-draw.ts` for

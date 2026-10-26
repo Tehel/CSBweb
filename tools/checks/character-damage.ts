@@ -225,7 +225,7 @@ console.log('=== DrawCharacterState: the name and the box drawn again ===');
   g.ctx.state.tickCount = 200;
   for (const [isSpellShield, name, timer] of [[true, 'spell', 'TT_77'], [false, 'fire', 'TT_78']] as const) {
     draws.length = 0;
-    g.systems.attack.applyMagicShield(party.champions[0]!, isSpellShield, 320, 0);
+    g.systems.magic.applyMagicShield(party.champions[0]!, isSpellShield, 320, 0);
     const up = isSpellShield ? party.spellShield : party.fireShield;
     console.log(`MagicShield, ${name}: shield ${up}, [${draws.join('; ')}]`);
     check(up === 10 && draws.join(';') === all, `a ${name} shield starting is MarkAllPortraitsChanged (Attack.cpp:1237)`);

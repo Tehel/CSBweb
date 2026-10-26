@@ -22,7 +22,7 @@
  *
  * A won game, `d.Word11694` set, has no dying sound, and after the fade shows the
  * champions instead, for good (`:171-225`, `showChampions`). The CSB win's actuator type
- * 18 sets it (`Game.gameTick`), and so does `_FusionSequence` (`AttackSystem.fusionSequence`).
+ * 18 sets it (`Game.gameTick`), and so does `_FusionSequence` (`Fusion.ts`'s `fusionSequence`).
  */
 import { fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex, drawTextLineIndexRaw } from '../csbwin/TextRenderer';

@@ -579,7 +579,7 @@ void StartSound(ui8 *SoundBytes, i32 /*timerData*/, i32 highVolume)   // Sound.c
 CSB win (`:636-643`); and "SAVE AND QUIT" with `P1 = 0` (`SaveGame.cpp:1350`). `_FusionSequence`
 ends in it too (`Attack.cpp:2431`). The port has the first two
 (`src/renderer/intro/ShowCredits.ts`, `Game.gameTick`) and the fusion's
-(`AttackSystem.fusionSequence`); it has no "SAVE AND QUIT"
+(`Fusion.ts`'s `fusionSequence`); it has no "SAVE AND QUIT"
 (`doc/CSBWIN_MENU_REFERENCE.md` → "Deliberate divergences in this port").
 
 **The tick of death.** `KillCharacter` sets `d.GameIsLost` (`Character.cpp:2685`). The tick

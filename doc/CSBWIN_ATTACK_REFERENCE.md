@@ -116,10 +116,10 @@ skill reward is halved. Either way skill 14 is credited.
 there he tries to escape, in shuffled directions: a square next to him first, then one two
 away, which lets him jump over the party or a monster but never through a Fluxcage or a
 wall. Boxed in, `_FusionSequence` starts. The rules are in `doc/PROVEN_FACTS.md` → "The
-fusion: a dispell cloud, then Lord Chaos's escape"; the port is `AttackSystem.fusion`, the
+fusion: a dispell cloud, then Lord Chaos's escape"; the port is `fusion` in `src/engine/Fusion.ts`, the
 evidence `tools/checks/fusion.ts`. `_FusionSequence` (`:2222`), the ending itself, holds the
 main loop to the credits: `doc/PROVEN_FACTS.md` → "`_FusionSequence`: the end of the
-game", ported as `AttackSystem.fusionSequence`.
+game", ported as `fusionSequence`, beside it.
 
 ## The menu
 
