@@ -55,8 +55,9 @@ import type { OpenedSave, SaveEntry } from '../../src/data/saves';
 import { readSaveFileFields } from '../../src/data/saves/SaveStore';
 import { PORTRAIT_HEIGHT, PORTRAIT_WIDTH, readCsbwinCharacter } from '../../src/data/CsbwinCharacters';
 import { CHARDESC_SIZE } from '../../src/data/CsbwinSaveInfo';
+import type { SaveFileBlocks } from '../../src/data/SaveFile';
 import { UTILITY_PORTRAITS_FILE, UtilityPortraits, readUtilityPortraits } from '../../src/data/UtilityPortraits';
-import { ReadSavedGame, UtilityDiskMessages, UtilityError, makeNewAdventure, type UtilityGame } from '../../src/engine/Chaos';
+import { ReadSavedGame, UtilityDiskMessages, UtilityError, makeNewAdventure } from '../../src/engine/Chaos';
 import type { Game } from '../../src/engine/Game';
 import type { Champion } from '../../src/engine/gameTypes';
 import { GameSaves, PRISON_WORD22592 } from '../../src/engine/GameSaves';
@@ -516,7 +517,7 @@ function cellOf(sheet: { width: number; pixels: Uint8Array }, charID: number): n
 }
 
 /** A save's champions: name, title, and their portrait's pixels. */
-function championsOf(game: UtilityGame): { name: string; title: string; portrait: string }[] {
+function championsOf(game: SaveFileBlocks): { name: string; title: string; portrait: string }[] {
   const out = [];
   for (let i = 0; i < readU16(game.block2, 10); i++) {
     const { champion } = readCsbwinCharacter(game.characters, i);
@@ -533,7 +534,7 @@ function readU16(bytes: Uint8Array, at: number): number {
  * Where two adventures' records differ, as `block:offset` ranges: a portrait's 464 bytes
  * are `characters:<champion>.portrait`.
  */
-function differences(a: UtilityGame, b: UtilityGame): string[] {
+function differences(a: SaveFileBlocks, b: SaveFileBlocks): string[] {
   const out = new Set<string>();
   for (const block of ['block1', 'block2', 'item16', 'characters', 'timers', 'timerQueue', 'image'] as const) {
     const x = a[block];

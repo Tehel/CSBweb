@@ -399,7 +399,7 @@ New state-representation debt goes here, and jumps the queue.
 ### D21 ⏳ A save has nine shapes
 
 What a save is passes through `SaveFile` and `SaveFileBlocks`, `Block1State`,
-`CsbwinWorld`, `UtilityGame`, `DungeonData`, `DungeonSnapshot` and `RuntimeSaveState`.
+`CsbwinWorld`, `DungeonData`, `DungeonSnapshot` and `RuntimeSaveState`.
 
 Done: each database has its codec, `{ read, write }` in the `DBType`-keyed
 `DATABASE_CODECS` (`src/data/DatabaseCodecs.ts`), which `DungeonLoader`, the image writer
@@ -408,18 +408,13 @@ file has one: `readSaveFile` and `writeSaveFile` (`src/data/SaveFile.ts`), over
 `SaveFileBlocks`, every block plain as the file holds it, which is what the writer
 writes, and `SaveFile`, those blocks with what each says, every field required. The
 loader (`loadCsbwinWorld`), the game's writer (`buildSaveFile`) and `CsbwinSaveInfo` go
-through it; `legacyRows`' stamps are its `restampBlock1`.
+through it; `legacyRows`' stamps are its `restampBlock1`. So does the UTILITY's
+`Chaos.ts`: its record is `SaveFileBlocks`, which `ReadSavedGame` reads with
+`readSaveFile` and its own checks, and `TAG000fc4` writes with `writeSaveFile`.
 
-What is left, in steps:
+What is left:
 
-1. **`Chaos` reads and writes the file again**: `Chaos.readGame` (`src/engine/Chaos.ts:102`)
-   walks blocks 0 to 6 with its own hash and checksum offsets, and `TAG000fc4` (`:327`)
-   writes the scramble and the checksums again. `UtilityGame` is `SaveFileBlocks` with
-   the image cut at its cell flags: `ReadSavedGame` becomes `readSaveFile` and its own
-   checks (the names cleared past their terminators, the image read and summed), and
-   `TAG000fc4` its edits of `GAMEBLOCK1` and `writeSaveFile`, whose checksums take the
-   hashes the block holds, as `_TAG000fc4`'s do.
-2. **`toSaveFile(game)` and `fromSaveFile(game, file)` on the engine's side, and
+1. **`toSaveFile(game)` and `fromSaveFile(game, file)` on the engine's side, and
    `RuntimeSaveState` out of the save path.** A load installs the world, then applies a
    snapshot of that same world over it (`src/engine/CsbwinSaveGame.ts:346`), where a new
    game's read applies none (`ReadState`'s optional `snapshot`), and the seven fields a

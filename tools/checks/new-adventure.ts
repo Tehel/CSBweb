@@ -38,8 +38,8 @@ import {
   UtilityDiskMessages,
   UtilityError,
   makeNewAdventure,
-  type UtilityGame,
 } from '../../src/engine/Chaos';
+import type { SaveFileBlocks } from '../../src/data/SaveFile';
 import { applyCsbwinSave } from '../../src/engine/CsbwinSaveGame';
 import { check, finish } from '../lib/check';
 import { newGame, stockDungeon } from '../lib/game';
@@ -54,7 +54,7 @@ const SEED = 0x2468ace0;
 
 const hex = (n: number): string => `0x${(n >>> 0).toString(16).padStart(8, '0')}`;
 const same = (a: Uint8Array, b: Uint8Array): boolean => a.length === b.length && a.every((x, i) => x === b[i]);
-const name = (g: UtilityGame, i: number): string => {
+const name = (g: SaveFileBlocks, i: number): string => {
   let s = '';
   for (let j = i * 800; g.characters[j] !== 0 && j < i * 800 + 8; j++) s += String.fromCharCode(g.characters[j]!);
   return s;
@@ -213,7 +213,7 @@ function load(made: Uint8Array): void {
 
 function refusals(): void {
   console.log('\n=== 4. the refusals ===');
-  const fresh = (): UtilityGame => ReadSavedGame(CSBGAME7, 0);
+  const fresh = (): SaveFileBlocks => ReadSavedGame(CSBGAME7, 0);
   const cases: Array<[string, () => unknown, string]> = [];
   const noParty = fresh();
   noParty.block2.set([0, 0], 10);

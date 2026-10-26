@@ -12,22 +12,16 @@
  * offset in the file's byte order, with CSBWin's own byte-order slips kept (`TAG002724`).
  *
  * CSBWin keeps the two games in one buffer, `e.Pnt24812`, of two 4112-byte records: the
- * source save at 0 and `mini.dat` at 4112. A record's fields here are `UtilityGame`'s.
+ * source save at 0 and `mini.dat` at 4112. A record here is the file's `SaveFileBlocks`
+ * (`ReadSavedGame`).
  */
 import { readU16BE, readU32LE, writeU16BE, writeU32LE } from '../core/bytes';
 import type { CsbRandom } from '../core/random';
-import { readExtendedFeatures } from '../data/CsbwinExtendedFeatures';
 import { readCsbwinCharacter, writePortrait } from '../data/CsbwinCharacters';
 import { CHARDESC_SIZE } from '../data/CsbwinSaveInfo';
-import {
-    genChecksum,
-    readUnscrambleBlock,
-    scramble,
-    scrambleAndWrite,
-    unscrambleStream,
-} from '../data/CsbwinSaveStream';
+import { unscrambleStream } from '../data/CsbwinSaveStream';
 import { buildImageChecksum } from '../data/CsbwinDungeonImageWriter';
-import { computeDungeonImageLayout } from '../data/DungeonImageLayout';
+import { readSaveFile, writeSaveFile, type SaveFile, type SaveFileBlocks } from '../data/SaveFile';
 import type { UtilityPortraits } from '../data/UtilityPortraits';
 import { CHARFLAG_MALE } from '../core/charDesc';
 
@@ -45,44 +39,8 @@ export const UtilityDiskMessages = {
 /** A refusal: the dialog CSBWin shows, by its `UtilityDiskMessages` text. */
 export class UtilityError extends Error {}
 
-const BLOCK2_SIZE = 128;
-/** `CHARDESC[4]` and the 128 bytes of party state after them: `MyUnscrambleStream(A4+772, 3328)`. */
-const CHARACTERS_SIZE = 3328;
-
-/**
- * One of `e.Pnt24812`'s two records, as `_ReadSavedGame` fills it (`:2789-3164`), in the
- * file's byte order.
- *
- * Only CSBWin's own form is read, the one whose `GAMEBLOCK1` unscrambles with word 29
- * (`wordGear(A4+2) == 2`). `_ReadSavedGame` falls back to word 10 (`:2966-2981`), but
- * a block that unscrambles only with it stops CSBWin in `NotImplemented(0x1868)`
- * (`:2984-2999`); the port calls the file damaged (`DEBT.md` H).
- */
-export interface UtilityGame {
-    /** `A4+38`: `GAMEBLOCK1`, plain. */
-    block1: Uint8Array;
-    /** `A4+550`: `GAMEBLOCK2`, plain. */
-    block2: Uint8Array;
-    /** `A4+4100`: the `ITEM16`s, plain. */
-    item16: Uint8Array;
-    /** `A4+772`: the four `CHARDESC`s and the party state, plain. */
-    characters: Uint8Array;
-    /** `A4+4104`: the timers, plain. */
-    timers: Uint8Array;
-    /** `A4+4108`: the timer queue, plain. */
-    timerQueue: Uint8Array;
-    /** What `TAG00142e` reads after the timer queue, in order: the dungeon, to its cell flags. */
-    image: Uint8Array;
-    /**
-     * `ExtendedFeaturesVersion != '@'`: whether the file opened with an Extended Features
-     * block. `ReadExtendedFeatures` sets the global for the file just read
-     * (`doc/CSBwin-src/SaveGame.cpp:299-424`), so at `_TAG000fc4` it is `mini.dat`'s.
-     */
-    extendedFeatures: boolean;
-}
-
 /** `LE16(wordGear(A4+560))`: `gb2.numcharacter`. */
-function numCharacter(game: UtilityGame): number {
+function numCharacter(game: SaveFileBlocks): number {
     return readU16BE(game.block2, 10);
 }
 
@@ -90,8 +48,19 @@ function numCharacter(game: UtilityGame): number {
  * `_ReadSavedGame` (`doc/CSBwin-src/Chaos.cpp:2789-3164`), past the dialogs that choose
  * the file: the record of `bytes`, or the refusal `_ReadSavedGame` shows, message 14 for
  * the saved game (`P1` 0) and 25 for `mini.dat` (`P1` 1).
+ *
+ * The record is the file's blocks as `readSaveFile` reads them, each plain and in the
+ * file's byte order, at `e.Pnt24812`'s offsets: `GAMEBLOCK1` at `A4+38`, `GAMEBLOCK2` at
+ * `A4+550`, the four `CHARDESC`s and the party state at `A4+772`, and the `ITEM16`s, the
+ * timers and the timer queue behind the pointers at `A4+4100`, `+4104` and `+4108`. The
+ * image is what `TAG00142e` reads after the timer queue, the dungeon to its cell flags.
+ *
+ * Only CSBWin's own form is read, the one whose `GAMEBLOCK1` unscrambles with word 29
+ * (`wordGear(A4+2) == 2`). `_ReadSavedGame` falls back to word 10 (`:2966-2981`), but
+ * a block that unscrambles only with it stops CSBWin in `NotImplemented(0x1868)`
+ * (`:2984-2999`); the port calls the file damaged (`DEBT.md` H).
  */
-export function ReadSavedGame(bytes: Uint8Array, P1: 0 | 1): UtilityGame {
+export function ReadSavedGame(bytes: Uint8Array, P1: 0 | 1): SaveFileBlocks {
     try {
         return readGame(bytes);
     } catch {
@@ -99,40 +68,28 @@ export function ReadSavedGame(bytes: Uint8Array, P1: 0 | 1): UtilityGame {
     }
 }
 
-function readGame(file: Uint8Array): UtilityGame {
-    // `ReadExtendedFeatures(e.GameFile)` (`:2957`) marks an enciphered file's handle, so
-    // every read after it is deciphered.
-    const extended = readExtendedFeatures(file);
-    const bytes = extended.data;
-    let offset = extended.offset;
-    const { buf: block1, next } = readUnscrambleBlock(bytes, offset);
-    offset = next;
-    const stream = (size: number, hashAt: number, checksumAt: number): Uint8Array => {
-        const { buf, next: after } = unscrambleStream(
-            bytes, offset, size, readU16BE(block1, hashAt), readU16BE(block1, checksumAt),
-        );
-        offset = after;
-        return buf;
-    };
-    // `pnt_4646 = pnt_4126 + 312` and `pnt_4642 = pnt_4126 + 344`: the five hashes and
-    // the five checksums.
-    const block2 = stream(BLOCK2_SIZE, 312, 344);
-    const item16 = stream(16 * readU16BE(block2, 46), 314, 346);
-    const characters = stream(CHARACTERS_SIZE, 316, 348);
+/**
+ * `readSaveFile`, and what `_ReadSavedGame` checks beyond `LoadGame`: the `ITEM16`s'
+ * checksum when there are none, the names, and the dungeon.
+ */
+function readGame(bytes: Uint8Array): SaveFileBlocks {
+    const file = readSaveFile(bytes);
+    const { blocks } = file;
+    // `LoadGame` skips the `ITEM16`s when there are none (`doc/CSBwin-src/SaveGame.cpp:1793`),
+    // but `MyUnscrambleStream` of their `16*MaxITEM16` bytes still checks their checksum
+    // (`doc/CSBwin-src/Chaos.cpp:3028-3032`).
+    if (file.block2.maxItem16 === 0) {
+        unscrambleStream(blocks.item16, 0, 0, readU16BE(blocks.block1, 314), readU16BE(blocks.block1, 346));
+    }
     // A name is 8 bytes and a title 20, and whatever follows a name's or a title's first
     // zero is cleared, for each of the `numcharacter` champions (`:3043-3079`).
-    const count = readU16BE(block2, 10);
-    for (let w2 = 0; w2 < count; w2++) {
+    for (let w2 = 0; w2 < numCharacter(blocks); w2++) {
         const base = CHARDESC_SIZE * w2;
-        clearAfterTerminator(characters, base, 8);
-        clearAfterTerminator(characters, base + 8, 20);
+        clearAfterTerminator(blocks.characters, base, 8);
+        clearAfterTerminator(blocks.characters, base + 8, 20);
     }
-    const timerSize = extended.extendedTimers ? 16 : extended.sequencedTimers ? 12 : 10;
-    const maxTimers = readU16BE(block2, 28);
-    const timers = stream(timerSize * maxTimers, 318, 350);
-    const timerQueue = stream(2 * maxTimers, 320, 352);
-    const image = readDungeon(bytes, offset, extended);
-    return { block1, block2, item16, characters, timers, timerQueue, image, extendedFeatures: extended.header !== undefined };
+    readDungeon(file);
+    return blocks;
 }
 
 function clearAfterTerminator(buf: Uint8Array, at: number, length: number): void {
@@ -146,29 +103,17 @@ function clearAfterTerminator(buf: Uint8Array, at: number, length: number): void
  * summed into a word, which the word after the cell flags must equal. A file that ends
  * before that word is taken, as `ReadGameFile`'s failure there returns 1.
  */
-function readDungeon(
-    bytes: Uint8Array,
-    start: number,
-    extended: ReturnType<typeof readExtendedFeatures>,
-): Uint8Array {
-    const layout = computeDungeonImageLayout(bytes, start, {
-        indirectText: extended.indirectText,
-        bigActuators: extended.bigActuators,
-        newScrolls: extended.version >= 0x42, // 'B'
-    });
-    if (!layout || layout.numMaps < 1) throw new Error('the dungeon does not read');
-    // `cellArraySize = LE16(wordGear(A0+2)); if (cellflagArraySize != 0) cellArraySize = cellflagArraySize;`
-    const cellArraySize = extended.cellFlagArraySize || readU16BE(bytes, start + 2);
-    const end = layout.cellFlags + cellArraySize;
-    if (end > bytes.length) throw new Error('the dungeon is cut short');
-    const image = bytes.slice(start, end);
-    if (end + 2 <= bytes.length) {
-        const checksum = buildImageChecksum(image);
-        if (bytes[end] !== checksum[0] || bytes[end + 1] !== checksum[1]) {
+function readDungeon(file: SaveFile): void {
+    if (!file.imageLayout) throw new Error('the dungeon does not read');
+    const data = file.extended.data;
+    const end = file.imageLayout.cellFlags + file.cellFlagArraySize;
+    if (end > data.length) throw new Error('the dungeon is cut short');
+    if (end + 2 <= data.length) {
+        const checksum = buildImageChecksum(file.blocks.image);
+        if (data[end] !== checksum[0] || data[end + 1] !== checksum[1]) {
             throw new Error('the dungeon checksum does not match');
         }
     }
-    return image;
 }
 
 /** A C string at `at` of the characters, `strcmp`'s operand: to its first zero. */
@@ -182,7 +127,7 @@ function cString(buf: Uint8Array, at: number): string {
  * `_CheckChampionNames` (`doc/CSBwin-src/Chaos.cpp:1774-1812`): every one of the saved
  * game's `e.Word24814` champions has a name, and no two the same.
  */
-export function CheckChampionNames(source: UtilityGame): void {
+export function CheckChampionNames(source: SaveFileBlocks): void {
     const word24814 = numCharacter(source);
     for (let d7 = 0; d7 < word24814; d7++) {
         const a4 = CHARDESC_SIZE * d7;
@@ -201,7 +146,7 @@ export function CheckChampionNames(source: UtilityGame): void {
  * Atari Dungeon Master save (`Byte22596` 1) nor has `Word22594` 1, or whose
  * `Word22592` is past 13, is message 30, "ALREADY UTILIZED". Then the names.
  */
-export function TAG00260e(source: UtilityGame): void {
+export function TAG00260e(source: SaveFileBlocks): void {
     if (numCharacter(source) === 0) throw new UtilityError(UtilityDiskMessages[29]);
     const pBlock1 = source.block1;
     if (pBlock1[301] !== 1 && readU16BE(pBlock1, 376) !== 1) {
@@ -215,7 +160,7 @@ export function TAG00260e(source: UtilityGame): void {
  * `_TAG0026c4` (`doc/CSBwin-src/Chaos.cpp:3243-3259`): `mini.dat` is the new adventure,
  * its `Byte22596` 2 or more and its `Word22592` 13; message 30 otherwise.
  */
-export function TAG0026c4(mini: UtilityGame): void {
+export function TAG0026c4(mini: SaveFileBlocks): void {
     if (mini.block1[301]! >= 2 && readU16BE(mini.block1, 378) === 13) return;
     throw new UtilityError(UtilityDiskMessages[30]);
 }
@@ -238,7 +183,7 @@ export function TAG0026c4(mini: UtilityGame): void {
  * of the file's word CSBWin keeps 0x1000 and clears `CHARFLAG_male`. The port keeps
  * `CHARFLAG_male` and clears the rest, as the mask reads.
  */
-export function TAG002724(source: UtilityGame, mini: UtilityGame, random: CsbRandom): void {
+export function TAG002724(source: SaveFileBlocks, mini: SaveFileBlocks, random: CsbRandom): void {
     const pnt4 = mini.block1;
     const pnt8 = source.block1;
     pnt4.set(pnt8.subarray(256, 288), 256);
@@ -303,7 +248,7 @@ export function TAG002724(source: UtilityGame, mini: UtilityGame, random: CsbRan
  * no DM champion's stays, and so do the names and titles. The source is this call's own
  * copy, so nothing is swapped back.
  */
-export function swapInNewFaces(source: UtilityGame, portraits: UtilityPortraits): void {
+export function swapInNewFaces(source: SaveFileBlocks, portraits: UtilityPortraits): void {
     for (let d7 = 0; d7 < numCharacter(source); d7++) {
         const face = portraits.newFaceFor(readCsbwinCharacter(source.characters, d7).champion.portrait);
         if (face) writePortrait(source.characters, CHARDESC_SIZE * d7, face);
@@ -314,40 +259,25 @@ export function swapInNewFaces(source: UtilityGame, portraits: UtilityPortraits)
  * `_TAG000fc4(1)` (`doc/CSBwin-src/Chaos.cpp:2001-2327`): the new adventure's record
  * written as a save file, past the dialog that names it.
  *
- * `SaveOption`'s neighbour `Byte22598` becomes 2, the sixteen hash words from 312 are
- * zeroed (`totalMoveCount` among them), each block's checksum is taken with hash 0, and
- * `GAMEBLOCK1` is written as `WriteFirstBlock` does (`:1716-1758`), which is
- * `ScrambleAndWrite`'s fold. The dungeon goes out as it was read, and the word after it
- * is its byte sum.
+ * `SaveOption`'s neighbour `Byte22598` becomes 2 and the sixteen hash words from 312 are
+ * zeroed (`totalMoveCount` among them), and the record goes out as `writeSaveFile`
+ * writes it: each block's checksum taken with its hash, 0, and `GAMEBLOCK1` written as
+ * `WriteFirstBlock` does (`:1716-1758`), which is `ScrambleAndWrite`'s fold. The dungeon
+ * goes out as it was read, and the word after it is its byte sum.
  *
  * When `mini.dat` opened with an Extended Features block, CSBWin writes a new one from
  * the globals the read left (`:2141-2200`). The port refuses such a file, which no known
  * `mini.dat` is (`DEBT.md` H).
  */
-export function TAG000fc4(source: UtilityGame, mini: UtilityGame): Uint8Array {
+export function TAG000fc4(source: SaveFileBlocks, mini: SaveFileBlocks): Uint8Array {
     CheckChampionNames(source);
-    if (mini.extendedFeatures) {
+    if (mini.block0.length > 0) {
         throw new Error('a mini.dat with an Extended Features block is not supported');
     }
     const block1 = mini.block1.slice();
-    const blocks = [mini.block2, mini.item16, mini.characters, mini.timers, mini.timerQueue].map((b) => b.slice());
     block1[300] = 2;
     for (let d7 = 0; d7 < 16; d7++) writeU16BE(block1, 312 + 2 * d7, 0);
-    const hashes = [0, 1, 2, 3, 4].map((d7) => readU16BE(block1, 312 + 2 * d7));
-    for (let d7 = 0; d7 < 5; d7++) {
-        writeU16BE(block1, 344 + 2 * d7, genChecksum(blocks[d7]!, hashes[d7]!, blocks[d7]!.length / 2));
-    }
-    scrambleAndWrite(block1);
-    for (let d7 = 0; d7 < 5; d7++) scramble(blocks[d7]!, hashes[d7]!, blocks[d7]!.length / 2);
-    const checksum = buildImageChecksum(mini.image);
-    const parts = [block1, ...blocks, mini.image, checksum];
-    const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
-    let at = 0;
-    for (const part of parts) {
-        out.set(part, at);
-        at += part.length;
-    }
-    return out;
+    return writeSaveFile({ ...mini, block1 });
 }
 
 /**
