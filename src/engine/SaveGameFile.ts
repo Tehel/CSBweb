@@ -2,9 +2,10 @@
  * A save file, built from a live game and read back into one.
  *
  * A save is a CSBWin file and nothing else: the scrambled, checksummed sixteen blocks
- * `writeSaveFile` writes, which CSBWin itself opens. `buildSaveFile` makes one from
- * the running game, and `applySaveBytes` reads one back, the port's or a genuine one, as
- * `_ReadEntireGame` does (`applyCsbwinSave`): the file's world is installed whole,
+ * `writeSaveFile` writes, which CSBWin itself opens. `toSaveFile` makes its blocks from
+ * the running game, `buildSaveFile` its bytes, and `applySaveBytes` reads one back, the
+ * port's or a genuine one, as `_ReadEntireGame` does (`fromSaveFile`, through
+ * `applyCsbwinSave`): the file's world is installed whole,
  * whatever world the game was running, so a save of any dungeon loads into any running
  * game.
  *
@@ -44,7 +45,8 @@ export interface SaveFileOptions {
 }
 
 /**
- * The file's blocks, from the running game.
+ * The file's blocks, from the running game: the world it runs on, and what it holds
+ * beside it (`getRuntimeState`).
  *
  * Every RN in them — the object list, every record link, the thirty possession slots of
  * every champion, `GAMEBLOCK2.ObjectInHand` and the object a timer is carrying — is a
@@ -52,8 +54,9 @@ export interface SaveFileOptions {
  * as the world holds them (`objectIndexOf`), as CSBWin writes `dataTypeMap` and
  * `dataIndexMap` (`doc/CSBwin-src/SaveGame.cpp:952-958`, `:1010-1011`).
  */
-function buildFileBlocks(game: Game, runtime: RuntimeState, options: SaveFileOptions): SaveFileBlocks {
+export function toSaveFile(game: Game, options: SaveFileOptions = {}): SaveFileBlocks {
     const dungeon = game.ctx.dungeon.getData();
+    const runtime = getRuntimeState(game.ctx);
 
     // The world has to be save-shaped, which `DungeonLoader` guarantees by converting on
     // load (`src/data/CsbwinDungeonConversions.ts`). Refuse rather than write a file
@@ -128,7 +131,7 @@ function buildFileBlocks(game: Game, runtime: RuntimeState, options: SaveFileOpt
 
 /** The save file of the game as it stands: all sixteen blocks. */
 export function buildSaveFile(game: Game, options: SaveFileOptions = {}): Uint8Array {
-    return writeSaveFile(buildFileBlocks(game, getRuntimeState(game.ctx), options));
+    return writeSaveFile(toSaveFile(game, options));
 }
 
 /**

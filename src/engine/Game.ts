@@ -24,7 +24,7 @@ import { createGameContext, newGameState, type GameContext, type GameSystems } f
 import { createGameHost, type GameHost } from './GameHost';
 import {
     getRuntimeSaveState, installRuntimeState, prepareRuntimeState, startRuntimeState, timerQueueState,
-    type PreparedState, type ReadState, type RuntimeSaveState,
+    type PreparedState, type RuntimeSaveState,
 } from './RuntimeSave';
 import { MonsterPerception } from './MonsterPerception';
 import { MonsterDamage } from './MonsterDamage';
@@ -335,7 +335,6 @@ export class Game implements MainLoop {
                         // `InitializeItem16`'s pool (`MonsterSystem.initializeItem16`).
                         item16: data.item16?.length ? data.item16 : newItem16Pool(),
                         ...timerQueueState(newGame.timers),
-                        missiles: data.databases.missiles.records,
                     },
                 };
             },
@@ -1070,12 +1069,16 @@ export class Game implements MainLoop {
     }
 
     /**
-     * Restore `save` over the running world, as a read restores its own over the world it
-     * installs (`readGame`): `prepareRuntimeState`, then `installReadState` and
-     * `startReadState`. For the tools, which take a game back to a state they captured.
+     * Restore `save` over the running world: its snapshot, then what a read installs
+     * beside its world (`readGame`), `prepareRuntimeState`, `installReadState` and
+     * `startReadState`. For the tools, which take a game back to a state they captured
+     * (`getRuntimeSaveState`).
      */
-    applyRuntimeSaveState(save: ReadState): void {
+    applyRuntimeSaveState(save: RuntimeSaveState): void {
         const world = this.ctx.dungeon.getData();
+        // The snapshot lands before the `ITEM16` pool, which is re-derived from the
+        // creature records it puts back (`startRuntimeState`).
+        this.ctx.dungeon.applySnapshot(save.dungeon.snapshot);
         const prepared = prepareRuntimeState(world, save);
         // A new skin cache, over the records the snapshot put back.
         this.ctx.dungeon.install(world);

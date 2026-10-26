@@ -24,13 +24,17 @@ export interface CsbwinWorld {
 
 /**
  * Parse a whole CSBWin save: blocks 0-6 through `readSaveFile`, then the dungeon
- * image through `DungeonLoader`.
+ * image through `DungeonLoader` (`readCsbwinWorld`).
  *
  * Throws if any block or the image fails its checksum or the layout does not close, so a
  * caller that gets a result has a world it can trust rather than a half-parsed one.
  */
 export function loadCsbwinWorld(file: Uint8Array): CsbwinWorld {
-    const save = readSaveFile(file);
+    return readCsbwinWorld(readSaveFile(file));
+}
+
+/** The dungeon image of a save `readSaveFile` read, through `DungeonLoader`. */
+export function readCsbwinWorld(save: SaveFile): CsbwinWorld {
     // An enciphered save is read deciphered, the image as its blocks (`readExtendedFeatures`).
     const bytes = save.extended.data;
     const { imageOffset, cellFlagArraySize } = save;

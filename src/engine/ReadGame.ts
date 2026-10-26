@@ -11,7 +11,7 @@ import { die } from './Die';
 import { initializeGameContext } from './GameContext';
 import { readFileSignatures } from './FileSignatures';
 import type { Game } from './Game';
-import { prepareRuntimeState, type ReadState } from './RuntimeSave';
+import { prepareRuntimeState, type RuntimeState } from './RuntimeSave';
 
 /** What a read takes from its file, `dungeon.dat` or a save. */
 export interface GameRead {
@@ -24,7 +24,7 @@ export interface GameRead {
      * What the read makes of the world before it is installed, `CheckMonsters`
      * (`doc/CSBwin-src/SaveGame.cpp:2029`) first, and the state that goes with it.
      */
-    state(): ReadState;
+    state(): RuntimeState;
 }
 
 /**

@@ -114,7 +114,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| D21 | A save has nine shapes | L | ⏳ |
 | E27 | `DsaSystem.ts` is one 5,000-line class | L | ⏳ |
 | E28 | The bytecode interpreter decodes through switches and maps built per call | M | ⏳ |
 | E29 | `GameScreen` is the canvas, the compose order, the palettes and a façade | L | ⏳ |
@@ -395,32 +394,6 @@ or `tools/checks/stats.ts`.
 ## D — State representation
 
 New state-representation debt goes here, and jumps the queue.
-
-### D21 ⏳ A save has nine shapes
-
-What a save is passes through `SaveFile` and `SaveFileBlocks`, `Block1State`,
-`CsbwinWorld`, `DungeonData`, `DungeonSnapshot` and `RuntimeSaveState`.
-
-Done: each database has its codec, `{ read, write }` in the `DBType`-keyed
-`DATABASE_CODECS` (`src/data/DatabaseCodecs.ts`), which `DungeonLoader`, the image writer
-and `clearedRecords` share, a record's size being `dbEntrySize`, CSBWin's table. And the
-file has one: `readSaveFile` and `writeSaveFile` (`src/data/SaveFile.ts`), over
-`SaveFileBlocks`, every block plain as the file holds it, which is what the writer
-writes, and `SaveFile`, those blocks with what each says, every field required. The
-loader (`loadCsbwinWorld`), the game's writer (`buildSaveFile`) and `CsbwinSaveInfo` go
-through it; `legacyRows`' stamps are its `restampBlock1`. So does the UTILITY's
-`Chaos.ts`: its record is `SaveFileBlocks`, which `ReadSavedGame` reads with
-`readSaveFile` and its own checks, and `TAG000fc4` writes with `writeSaveFile`.
-
-What is left:
-
-1. **`toSaveFile(game)` and `fromSaveFile(game, file)` on the engine's side, and
-   `RuntimeSaveState` out of the save path.** A load installs the world, then applies a
-   snapshot of that same world over it (`src/engine/CsbwinSaveGame.ts:346`), where a new
-   game's read applies none (`ReadState`'s optional `snapshot`), and the seven fields a
-   save carries beside its image are assigned to the world and put in the snapshot,
-   twice over (`applyCsbwinSave`, `buildCsbwinRuntimeState`). C178 is the kind of
-   asymmetry it removes.
 
 ---
 

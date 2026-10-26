@@ -17,7 +17,7 @@
  * - the party stands where `GAMEBLOCK2` says, facing where it says, on its level;
  * - the champions are the file's, name by name, with the file's hit points;
  * - **every cell flag in all fourteen maps** matches the save's world — the sharpest
- *   available statement that the snapshot landed, since the flags are what doors, pits
+ *   available statement that the world landed, since the flags are what doors, pits
  *   and teleporters live in;
  * - the object chain the engine walks at the party's own cell is the one the file
  *   holds, and every possession names a live record **in the live dungeon**, which is
@@ -330,8 +330,8 @@ function main(): void {
 
     // And the runtime state of the loaded game, restored into another. It carries only
     // the fields `DungeonSnapshot`'s `DUNGEON_DATA_SOURCES` marks `snapshot`, so a CSBWin
-    // load that put something into a field it does not carry would be lost to the save
-    // writer, which takes the world from it. The walk asks that of every such field, the
+    // load that put something into a field it does not carry would not come back when a
+    // tool takes a game back to the state. The walk asks that of every such field, the
     // checks after it of the party.
     const second = loadWorld();
     second.applyRuntimeSaveState(JSON.parse(JSON.stringify(game.getRuntimeSaveState())));

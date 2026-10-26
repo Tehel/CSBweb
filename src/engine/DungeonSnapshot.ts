@@ -1,8 +1,8 @@
 /**
- * A snapshot of everything in the dungeon that play can change. The state a read
- * restores (`RuntimeSave.ts`) carries it, and a save's load restores its world through
- * it (`src/engine/CsbwinSaveGame.ts`). It is never written: a save is the CSBWin file
- * (`src/engine/SaveGameFile.ts`).
+ * A snapshot of everything in the dungeon that play can change. The tools' whole state
+ * carries it (`RuntimeSave.getRuntimeSaveState`), to take a game back to a state they
+ * captured. A game read installs its file's world itself (`readGame`), and a save is the
+ * CSBWin file (`src/engine/SaveGameFile.ts`), so neither goes through it.
  *
  * `DUNGEON_DATA_SOURCES` is the list of what it holds: every field of `DungeonData`, and
  * where a restore takes it from. It is typed over every key, so a field added to
@@ -33,7 +33,7 @@
  * - `dsaLevelIndex`, `dsaIndex`, `specialLocations`, `extendedWallDecorations`,
  *   `spellFilterLocation`, `hintKey` and `gameInfo` are carried for the same reason. `dungeon.dat` has none of
  *   them; a CSBWin save's Extended Features block and `EXPOOL` do, and a CSBWin load
- *   writes them into the world (`buildCsbwinRuntimeState`). Only each DSA's `state`
+ *   writes them into the world (`fromSaveFile`). Only each DSA's `state`
  *   changes in play, but `dsaIndex` goes in whole, since it is the save's.
  */
 import type { ui8, ui16, ui32, ObjectID } from '../core/types';

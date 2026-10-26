@@ -115,7 +115,7 @@ way only from:
 What holds:
 
 - **The random stream is CSBWin's**, one LCG in the game's context
-  (`src/core/random.ts`), restored from a save (`src/engine/RuntimeSave.ts:171`). Its seed
+  (`src/core/random.ts`), restored from a save (`src/engine/RuntimeSave.ts:166`). Its seed
   comes from `Math.random()` once, at the first draw (`random.ts:47`), which a recording
   would write down as CSBWin's `0x3333` does.
 - **Drawing has its own stream**, `viewportRandom`, as CSBWin's `DrawViewport` does

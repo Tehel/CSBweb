@@ -207,13 +207,13 @@ reaches the status box.
 ## What the port writes and reads
 
 `writeSaveFile` (`src/data/SaveFile.ts`) writes all sixteen blocks, scrambled
-and checksummed as CSBWin's are, and `buildSaveFile` (`src/engine/SaveGameFile.ts`) hands
+and checksummed as CSBWin's are, and `toSaveFile` (`src/engine/SaveGameFile.ts`) hands
 it every block plain: block 0 built from the Extended Features header
 (`buildLiveExtendedFeatures`, `src/data/CsbwinExtendedFeatures.ts`) and the world's object
 indirect index as it holds it, blocks 1 to 6 encoded from the live game, and the dungeon
 image, so the game's own save writes a whole file. `readSaveFile` reads them back, each
-block's plain bytes beside what it says, all of them required. `applyCsbwinSave` (`src/engine/CsbwinSaveGame.ts`)
-reads one back: `loadCsbwinWorld` (`src/data/CsbwinDungeonImage.ts`) parses the image,
+block's plain bytes beside what it says, all of them required. `fromSaveFile` (`src/engine/CsbwinSaveGame.ts`)
+reads one back: `readCsbwinWorld` (`src/data/CsbwinDungeonImage.ts`) parses the image,
 `src/data/CsbwinCharacters.ts` unpacks `CHARDESC[4]` and the party tail, portraits
 included, and the world keeps the file's object indirect index, of which every RN in a
 save is a slot, not a packed RN ("Every object reference in a save is an indirect
@@ -368,9 +368,11 @@ world keeps the file's maps as its `RnMaps` (`src/core/RnMaps.ts`,
 
 ## The load
 
-`src/engine/CsbwinSaveGame.ts` (`applyCsbwinSave`) restores a genuine save into
-a running `Game`: it builds a `RuntimeSaveState` from `GAMEBLOCK2`, block 4 and the
-image, and reads it with its world through `readGame`, the path every read takes. The
+`src/engine/CsbwinSaveGame.ts` (`fromSaveFile`, and `applyCsbwinSave` from the bytes)
+restores a genuine save into a running `Game`: the image becomes the world, the seven
+things the save carries beside it written into it, and `GAMEBLOCK2` and block 4 become
+the `RuntimeState` beside it (`buildCsbwinRuntimeState`), both read through `readGame`,
+the path every read takes. The
 port's own save is such a file and loads the same way: `applySaveBytes` in
 `src/engine/SaveGameFile.ts` is what the disk menu's LOAD and F9 call
 (`doc/SAVES.md`).

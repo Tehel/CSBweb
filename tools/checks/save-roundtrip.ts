@@ -589,7 +589,7 @@ function main(): void {
     // so the cursor is checked on the state the file gives, before that runs.
     const fromFile = buildCsbwinRuntimeState(loadCsbwinWorld(raw));
     const fresh = loadWorld();
-    fresh.applyRuntimeSaveState(fromFile);
+    applyCsbwinSave(fresh, raw);
     console.log(`max ${firstMax} -> ${max}, cursor ${cursor}; written MaxTimers ${block2.maxTimers} ` +
       `FirstAvailTimer ${block2.firstAvailTimer}; read back ${fromFile.dungeon.timers?.length} / ` +
       `${fromFile.dungeon.firstAvailTimer}; restored ${fresh.ctx.timers.getMaxTimers()} / ${fresh.ctx.timers.getFirstAvailTimer()}`);

@@ -1,17 +1,15 @@
 /**
- * Load a genuine CSBWin save into the running game.
+ * Load a genuine CSBWin save into the running game (`fromSaveFile`).
  *
- * `loadCsbwinWorld` parses the dungeon image into a real `DungeonData`,
+ * `readCsbwinWorld` parses the dungeon image into a real `DungeonData`,
  * `readCsbwinParty` unpacks `CHARDESC[4]`, and the save's object indirect index, which
  * the world keeps as its `RnMaps`, makes every object reference in either of them mean
- * something. This module turns the three into the `RuntimeSaveState` the engine
- * restores.
+ * something.
  *
  * The save's world becomes the running game's (`readGame`), structure and all,
  * as `_ReadEntireGame` reads it (`doc/CSBwin-src/SaveGame.cpp:2536`), so a save of any
- * dungeon loads into any running game. The rest goes through `RuntimeSaveState`, the
- * shape every read restores, whose snapshot then puts back what the world already
- * holds.
+ * dungeon loads into any running game. What the save carries beside its world goes
+ * through `RuntimeState` (`buildCsbwinRuntimeState`), the shape every read installs.
  *
  * What is restored, and from where:
  *
@@ -21,8 +19,8 @@
  * | The four champions | block 4's `CHARDESC[4]` |
  * | Brightness, the three shields, the footprint ring, `freezeLifeTimer`, invisibility | block 4's 128-byte party tail (`doc/CSBwin-src/Data.h:781-797`) |
  * | The header, every level's descriptor and tables, cell flags, object chains, column index, every database record (a free missile's object read as `RNnul`, `missilesOf`), the text arrays | the dungeon image, installed |
- * | `dsaLevelIndex`, `dsaIndex`, `specialLocations`, the extended-feature flags | the Extended Features block and `EXPOOL`, added to the same snapshot |
- * | `ITEM16` | block 3, put back beside the snapshot (`prepareRuntimeState`) |
+ * | `dsaLevelIndex`, `dsaIndex`, `specialLocations`, the extended-feature flags | the Extended Features block and `EXPOOL`, written into the same world |
+ * | `ITEM16` | block 3, put into the world (`prepareRuntimeState`) |
  * | The timer table and the queue that orders it | blocks 5 and 6, into `TimerQueue.restore` (`installRuntimeState`) |
  * | `d.RandomGameID`, `totalMoveCount`, `d.Byte22808`, `d.Word22592`-`d.Word22598` | `GAMEBLOCK1` (`buildBlock1State`) |
  * | The DSA global variables, and their number | `EXPOOL` (`readGlobalVariables`, `doc/CSBwin-src/SaveGame.cpp:1916-1930`) |
@@ -59,23 +57,22 @@
  *   deleted monster carried or a deleted chest held, is not written
  *   (`doc/CSBwin-src/data.cpp:995-1017`).
  */
-import { loadCsbwinWorld, type CsbwinWorld } from '../data/CsbwinDungeonImage';
+import { readCsbwinWorld, type CsbwinWorld } from '../data/CsbwinDungeonImage';
 import { readGameInfo } from '../data/CsbwinExtendedFeatures';
 import { readDisableSaves, readGlobalVariables, readOverlayPalette, specialLocationsFromExpool } from '../data/CsbwinExpool';
 import { readCsbwinParty, readCsbwinPartyTail } from '../data/CsbwinCharacters';
 import { CHARDESC_SIZE } from '../data/CsbwinSaveInfo';
-import type { Block2 } from '../data/SaveFile';
+import { readSaveFile, type Block2, type SaveFile } from '../data/SaveFile';
 import { CheckMonsters } from './CheckMonsters';
-import { captureDungeonSnapshot } from './DungeonSnapshot';
 import { DungeonState } from './DungeonState';
 import type { Game } from './Game';
 import { identityOverlayPalette } from './OverlayPalette';
 import { readGame } from './ReadGame';
-import type { RuntimeSaveState } from './RuntimeSave';
+import type { RuntimeState } from './RuntimeSave';
 import { DBType, OBJECT_ID_NULL, Position } from '../core/types';
 import type { Direction, ObjectID } from '../core/types';
 import type { Block1State, PartyState } from './gameTypes';
-import { databaseRecords, type GameInfo, type MissileRecord } from '../data/dungeonTypes';
+import { databaseRecords, type GameInfo } from '../data/dungeonTypes';
 
 /**
  * `d.objectInHand.NonExtendedInteger(b.gb2.ObjectInHand)` (`doc/CSBwin-src/SaveGame.cpp:1773`):
@@ -236,11 +233,10 @@ function buildBlock1State(world: CsbwinWorld): Block1State {
  * whose slot may have been freed since, so it is read as `RNnul`, as `DungeonLoader`
  * reads it when the save has an object index (`readRNOfRecord`).
  */
-function missilesOf(world: CsbwinWorld): MissileRecord[] {
-    return world.dungeon.databases.missiles.records.map((record) => ({
-        ...record,
-        projectileObject: record.nextObject === OBJECT_ID_NULL ? OBJECT_ID_NULL : record.projectileObject,
-    }));
+function clearFreeMissiles(world: CsbwinWorld): void {
+    for (const record of world.dungeon.databases.missiles.records) {
+        if (record.nextObject === OBJECT_ID_NULL) record.projectileObject = OBJECT_ID_NULL;
+    }
 }
 
 /** `ReadGameInfo` over the save's block (`readGameInfo`); none for a save without one. */
@@ -255,15 +251,15 @@ function specialLocationsOf(world: CsbwinWorld): Record<number, number> | undefi
 }
 
 /**
- * Everything a CSBWin save says, in the shape a read installs (`readGame`).
+ * Everything a CSBWin save says beside its world, in the shape a read installs
+ * (`readGame`).
  *
  * No `Game` is touched, so a verification tool can build one and read it without
  * standing a game up. It is not pure: `readDisableSaves` takes its records out of the
  * world's `expool`, as `LoadGame` does, so it is built once per world.
  */
-export function buildCsbwinRuntimeState(world: CsbwinWorld): RuntimeSaveState {
+export function buildCsbwinRuntimeState(world: CsbwinWorld): RuntimeState {
     const gb2 = world.save.block2;
-    const ef = world.save.extended;
     const tail = readCsbwinPartyTail(world.save.blocks.characters);
 
     return {
@@ -296,32 +292,17 @@ export function buildCsbwinRuntimeState(world: CsbwinWorld): RuntimeSaveState {
             timerQueue: world.save.timerQueue,
             timerSequence: gb2.timerSequence,
             firstAvailTimer: gb2.firstAvailTimer,
-            // The image holds none of these seven: the save carries them beside it.
-            snapshot: captureDungeonSnapshot({
-                ...world.dungeon,
-                databases: {
-                    ...world.dungeon.databases,
-                    missiles: { ...world.dungeon.databases.missiles, records: missilesOf(world) },
-                },
-                dsaLevelIndex: ef.dsaLevelIndex,
-                dsaIndex: ef.dsaIndex,
-                specialLocations: specialLocationsOf(world),
-                extendedWallDecorations: ef.extendedWallDecorations,
-                spellFilterLocation: ef.spellFilterLocation,
-                hintKey: ef.header?.hintKey,
-                gameInfo: gameInfoOf(world),
-            }),
         },
     };
 }
 
 /**
- * Parse a CSBWin save and read it into the running game (`readGame`): its world, the
- * image, structure and all, with the seven the save carries beside it, and its state.
- * Throws on a bad file.
+ * Read a CSBWin save into the running game (`readGame`): its world, the image,
+ * structure and all, with the seven the save carries beside it, and its state. Throws on
+ * a bad file. The world it returns is the one the game now runs on.
  */
-export function applyCsbwinSave(game: Game, bytes: Uint8Array): CsbwinWorld {
-    const world = loadCsbwinWorld(bytes);
+export function fromSaveFile(game: Game, file: SaveFile): CsbwinWorld {
+    const world = readCsbwinWorld(file);
     validateCsbwinWorld(world);
     const ef = world.save.extended;
     readGame(game, {
@@ -332,6 +313,8 @@ export function applyCsbwinSave(game: Game, bytes: Uint8Array): CsbwinWorld {
             // `_ReadEntireGame`'s `CheckMonsters` (doc/CSBwin-src/SaveGame.cpp:2029), before
             // `reloadAfterSaveGame` detaches the save's `ITEM16`s (`src/engine/CheckMonsters.ts`).
             CheckMonsters(new DungeonState(world.dungeon), game.ctx.tables.monsterDesc, (line) => game.ctx.host.trace(line));
+            clearFreeMissiles(world);
+            // The image holds none of these seven: the save carries them beside it.
             Object.assign(world.dungeon, {
                 dsaLevelIndex: ef.dsaLevelIndex,
                 dsaIndex: ef.dsaIndex,
@@ -343,9 +326,13 @@ export function applyCsbwinSave(game: Game, bytes: Uint8Array): CsbwinWorld {
             });
             // The image's records are already big-actuator records.
             if (ef.bigActuators) world.dungeon.bigActuators = true;
-            // The snapshot puts back what the installed world already holds.
             return buildCsbwinRuntimeState(world);
         },
     });
     return world;
+}
+
+/** Parse a CSBWin save's bytes and read it into the running game (`fromSaveFile`). */
+export function applyCsbwinSave(game: Game, bytes: Uint8Array): CsbwinWorld {
+    return fromSaveFile(game, readSaveFile(bytes));
 }

@@ -1,16 +1,19 @@
 /**
- * The state a read restores: the whole mutable world as one plain snapshot, and its
- * restore. Every game read comes through it, a save's (`CsbwinSaveGame.ts` builds one
- * from the file) and a new game's (`Game.readNewGame`), and the save writer takes the
- * running game's as what to write (`SaveGameFile.ts`). It is never a file: a save is
- * `SaveGame.cpp`'s binary one. It has no CSBWin home, so it is a module over the context
- * rather than a system. Which fields of the dungeon it carries, and which it leaves to
- * the file the world was built from, is `DUNGEON_DATA_SOURCES` (`DungeonSnapshot.ts`).
+ * The state a read installs beside its world, and its install. Every game read comes
+ * through it, a save's (`CsbwinSaveGame.ts` builds one from the file) and a new game's
+ * (`Game.readNewGame`), and the save writer takes the running game's as what to write
+ * (`SaveGameFile.ts`). It is never a file: a save is `SaveGame.cpp`'s binary one. It has
+ * no CSBWin home, so it is a module over the context rather than a system.
+ *
+ * The tools add the world to it, as one plain snapshot (`getRuntimeSaveState`), to take a
+ * game back to a state they captured (`Game.applyRuntimeSaveState`). Which fields of the
+ * dungeon the snapshot carries, and which it leaves to the file the world was built from,
+ * is `DUNGEON_DATA_SOURCES` (`DungeonSnapshot.ts`).
  */
 import type { DungeonData, Item16Record, TimerRecord } from '../data/dungeonTypes';
 import type { ObjectID } from '../core/types';
 import { sw } from '../core/intCast';
-import { applyDungeonSnapshot, type DungeonSnapshot } from './DungeonSnapshot';
+import type { DungeonSnapshot } from './DungeonSnapshot';
 import type { GameContext } from './GameContext';
 import { VBL_PER_TICK } from './LoopState';
 import type { Block1State, PartyState } from './gameTypes';
@@ -19,8 +22,9 @@ import type { FootprintsSnapshot } from './PartyFootprints';
 import type { TimerEntry, TimerQueue } from './TimerQueue';
 
 /**
- * The runtime state but the world: what a save file writes beside the world it reads for
- * itself (`buildSaveFile`). Every part is a copy, both ways: a captured state shares
+ * The runtime state but the world: what a read installs beside the world it reads
+ * (`readGame`), and what a save file writes beside the world it reads for itself
+ * (`toSaveFile`). Every part is a copy, both ways: a captured state shares
  * nothing with the game it came from, and a restored one nothing with the state it was
  * restored from.
  */
@@ -59,20 +63,12 @@ interface RuntimeDungeonState {
     firstAvailTimer: number;
 }
 
-/** The whole runtime state, its world with it (`getRuntimeSaveState`). */
+/** The whole runtime state, its world with it (`getRuntimeSaveState`): the tools'. */
 export interface RuntimeSaveState extends RuntimeState {
     dungeon: RuntimeDungeonState & {
         /** Everything play can change: cell flags, object chains, all DB records. */
         snapshot: DungeonSnapshot;
     };
-}
-
-/**
- * What a read restores (`readGame`): the runtime state, its world's snapshot left out
- * where the world the read installs is already the state's, as a new game's is.
- */
-export interface ReadState extends RuntimeState {
-    dungeon: RuntimeDungeonState & { snapshot?: DungeonSnapshot };
 }
 
 /** The timer table and its queue as `RuntimeState` carries them (`buildTimerRecords`). */
@@ -87,7 +83,7 @@ export function timerQueueState(timers: TimerQueue): Pick<RuntimeDungeonState,
     };
 }
 
-/** The runtime state, its world with it. */
+/** The runtime state, its world with it, for the tools. */
 export function getRuntimeSaveState(ctx: GameContext): RuntimeSaveState {
     const state = getRuntimeState(ctx);
     return { ...state, dungeon: { ...state.dungeon, snapshot: ctx.dungeon.captureSnapshot() } };
@@ -123,19 +119,18 @@ function cloneItem16(item16: Item16Record[]): Item16Record[] {
  * entries built from its table, the rest as the state gives it.
  */
 export interface PreparedState {
-    save: ReadState;
+    save: RuntimeState;
     timers: TimerEntry[];
 }
 
 /**
- * The half of a restore that builds: the state's world put into `world` (its snapshot,
- * then the `ITEM16` pool the state carries beside it), and the timer queue's entries. It touches nothing but `world`, so a read builds it over a world
- * not yet installed, and an error here leaves the running game as it was (`readGame`).
- * The snapshot lands before the pool, which is re-derived from the creature records it
- * puts back (`startRuntimeState`).
+ * The half of a restore that builds: the `ITEM16` pool the state carries beside its
+ * world put into `world`, and the timer queue's entries. It touches nothing but `world`,
+ * so a read builds it over a world not yet installed, and an error here leaves the
+ * running game as it was (`readGame`). The pool is re-derived from the world's creature
+ * records (`startRuntimeState`).
  */
-export function prepareRuntimeState(world: DungeonData, save: ReadState): PreparedState {
-    if (save.dungeon.snapshot) applyDungeonSnapshot(world, save.dungeon.snapshot);
+export function prepareRuntimeState(world: DungeonData, save: RuntimeState): PreparedState {
     // `DUNGEON_DATA_SOURCES`' one `runtimeSave` field.
     world.item16 = cloneItem16(save.dungeon.item16);
     return { save, timers: timerEntriesOf(save.dungeon.timers, save.dungeon.timerQueue) };

@@ -191,7 +191,7 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
             `TAG0207cc`, the interface put aside and back: their `d.` work, and the eye
             let go at a death), SmartDiscard (thinning a filling database), MakeMoreRoomInDB (making
             room in a full one),
-            RuntimeSave (the state a read restores), SaveGameFile (the CSBWin file a
+            RuntimeSave (the state a read installs beside its world), SaveGameFile (the CSBWin file a
             save is, written from the game and read back), GameSaves (a save built and
             written to the store, or read back: the disk menu's, the boot's and F5/F9's),
             Chaos (the UTILITY's "MAKE NEW ADVENTURE": a saved game's party into

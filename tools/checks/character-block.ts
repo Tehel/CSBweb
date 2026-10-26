@@ -32,8 +32,7 @@ import {
 } from '../../src/data/CsbwinCharacters';
 import { CHARDESC_SIZE } from '../../src/data/CsbwinSaveInfo';
 import { readSaveFile, writeSaveFile } from '../../src/data/SaveFile';
-import { loadCsbwinWorld } from '../../src/data/CsbwinDungeonImage';
-import { applyCsbwinSave, buildCsbwinRuntimeState } from '../../src/engine/CsbwinSaveGame';
+import { applyCsbwinSave, fromSaveFile } from '../../src/engine/CsbwinSaveGame';
 import type { Champion } from '../../src/engine/gameTypes';
 import { buildSaveFile } from '../../src/engine/SaveGameFile';
 import { newGame, stockGraphics, stockDungeon } from '../lib/game';
@@ -210,10 +209,10 @@ function main(): void {
   const game = newGame(stockDungeon(), stockGraphics());
   applyCsbwinSave(game, oneHero);
   // The same file again, with champion 0's record in slot 2 as a Cancel would leave it.
-  const world = loadCsbwinWorld(oneHero);
-  const record = world.save.blocks.characters.slice(0, CHARDESC_SIZE);
-  world.save.blocks.characters.set(record, 2 * CHARDESC_SIZE);
-  game.applyRuntimeSaveState(buildCsbwinRuntimeState(world));
+  const cancelled = readSaveFile(oneHero);
+  const record = cancelled.blocks.characters.slice(0, CHARDESC_SIZE);
+  cancelled.blocks.characters.set(record, 2 * CHARDESC_SIZE);
+  fromSaveFile(game, cancelled);
   const written = readSaveFile(buildSaveFile(game)).blocks.characters;
   check(
     written.subarray(2 * CHARDESC_SIZE, 3 * CHARDESC_SIZE).join() === record.join()

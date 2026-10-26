@@ -168,7 +168,7 @@ export class DungeonState {
     }
 
     /**
-     * Snapshot everything play can change, for the state a read restores (`RuntimeSave.ts`).
+     * Snapshot everything play can change, for the tools' whole state (`RuntimeSave.ts`).
      * See `src/engine/DungeonSnapshot.ts` for what counts as mutable and why.
      */
     captureSnapshot(): DungeonSnapshot {
