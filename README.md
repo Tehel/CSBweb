@@ -7,10 +7,14 @@ Dungeon Master and Chaos Strikes Back, in the browser, written in TypeScript.
 CSBweb makes Dungeon Master (the original Atari ST version) and its sequel playable on
 anything with a web browser, from the original game data files.
 
-It is a port of CSBWin, Paul R. Stevens' C++ version of the game, which he wrote by
-disassembling the Atari ST binary. CSBWin's source is the specification: the port follows
-it function by function, under the same names, so the two codebases can be read side by
-side.
+Its engine is ported from CSBWin, Paul R. Stevens' C++ version of the game, which he wrote
+by disassembling the Atari ST binary. CSBWin's source is still the specification for how
+the game plays. The timers, the monsters, the spells and the formulas follow it, in the
+same order and with the same numbers. The functions ported from it keep its names, so a
+behaviour can be traced from one codebase to the other. The code around them is the
+port's own: its structure, and everything CSBWin never had, from the browser and touch
+screens to the save dialog, players' own dungeons and the site. Where the port departs
+from CSBWin on purpose, `DEBT.md` lists each departure and the reason for it.
 
 Every FTL dungeon plays, and so do the fans' dungeons the welcome page lists. A player can
 also add a dungeon of their own. Saves are CSBWin's own files, so a game moves between the

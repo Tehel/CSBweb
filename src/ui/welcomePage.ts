@@ -123,11 +123,11 @@ const PAGE = `
     <div class="welcome-grid" role="group" aria-labelledby="welcome-custom-title"></div>
   </section>
   <section class="welcome-about" id="about">
-    <p class="welcome-lead">The 1987 dungeon, rebuilt one function at a time from CSBWin. There is nothing to install: open the page and go down the stairs.</p>
+    <p class="welcome-lead">The 1987 dungeon, rebuilt from CSBWin's source. There is nothing to install: open the page and go down the stairs.</p>
     <div class="welcome-columns">
       <div>
         <h2 class="px">Faithful to the tick</h2>
-        <p>A mechanical port of Paul R. Stevens' CSBWin, function by function. The timers, the monsters, the spells and the odd corners all match the Atari ST original.</p>
+        <p>The rules are Paul R. Stevens' CSBWin, ported from its source and checked against it: the timers, the monsters, the spells and the odd corners all match the Atari ST original. Everything around them, from the browser to the touch screen, is new.</p>
       </div>
       <div>
         <h2 class="px">Your saves, both ways</h2>
@@ -165,7 +165,7 @@ const PAGE = `
     </div>
   </section>
   <footer class="welcome-footer">
-    <p>Dungeon Master © 1987 and Chaos Strikes Back © 1989 FTL Games, Software Heaven, Inc. Their names, pictures, sounds and data files belong to their rights holders, and are served here only to be played. The other dungeons belong to their authors. The engine is a port of CSBWin by Paul R. Stevens. CSBweb is a free, non-commercial fan project, not affiliated with or endorsed by any of them. Rights holders: write to csbweb[at]looten.net, and whatever you ask is taken down.</p>
+    <p>Dungeon Master © 1987 and Chaos Strikes Back © 1989 FTL Games, Software Heaven, Inc. Their names, pictures, sounds and data files belong to their rights holders, and are served here only to be played. The other dungeons belong to their authors. The game's engine is ported from CSBWin by Paul R. Stevens. CSBweb is a free, non-commercial fan project, not affiliated with or endorsed by any of them. Rights holders: write to csbweb[at]looten.net, and whatever you ask is taken down.</p>
     <nav class="px px2" aria-label="Footer">
       <a aria-disabled="true" href="#about">About</a>
       <a href="stats">Stats</a>
