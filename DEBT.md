@@ -114,7 +114,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E27 | `DsaSystem.ts` is one 5,000-line class | L | ⏳ |
 | E28 | The bytecode interpreter decodes through switches and maps built per call | M | ⏳ |
 | E29 | `GameScreen` is the canvas, the compose order, the palettes and a façade | L | ⏳ |
 | E31 | Late wiring with silent defaults, and long parameter lists | M | ⏳ |
@@ -408,38 +407,6 @@ The structure need no longer follow CSBWin's files (the author's decision): a mo
 gather or split CSBWin's functions as the code's concerns ask. What still follows CSBWin is
 the behaviour, the names of ported functions, which keep the two codebases greppable
 against each other, and the file formats.
-
-### E27 ⏳ `DsaSystem.ts` is one 5,000-line class
-
-`DsaSystem.ts` (925 lines) holds the interpreter, `execute` and `executeRun` (`:365`),
-and `executeAmpersand` (`:719`), which runs an operation of `DSA_OPERATIONS`
-(`src/engine/dsa/DsaOperations.ts`) or warns of a subcode it has none for. The machine's
-data and its decoding are already apart, in `src/engine/dsa/DsaMachine.ts`: the stack, the
-bank, the execution packet, `OVERRIDE`'s corner (`DsaOverride`) and the `ProgramCursor`
-that `executeRun` reads its programs through. So are the seventeen filter sites, in
-`src/engine/dsa/DsaFilters.ts` (`ctx.systems.dsa.filters`), which reach the machine
-through `DsaFilterMachine`, and every operation, in eight domains under `dsa/ops/`, which
-reach it through `DsaOperationMachine`. `NOFILTER` is the bank's `noFilter()`.
-
-Paying it, into `src/engine/dsa/` beside `DsaTypes.ts`. Each command's body keeps CSBWin's
-order and names, and each step is proven by every tool's whole output, byte-identical. The
-steps, one commit each:
-
-1. ✅ **The machine's data and its decoding**, in `dsa/DsaMachine.ts`.
-2. ✅ **The filters**, in `dsa/DsaFilters.ts`, the plain sites through one `runFilter`
-   with their codecs, the spell's in `filterParameters.ts`.
-3. ✅ **The operations,** one `ReadonlyMap<StkOp, DsaOperation>` per domain in
-   `dsa/ops/` (`stack`, `messages`, `objects`, `move`, `characters`, `monsters`, `dungeon`
-   and `run`, the run's own: its parameters, `&SETNEWSTATE`, `&THISDSAID`, the gear jumps
-   and gosub, `&%INDIRECT` and the `I_` operations), which `DSA_OPERATIONS` joins, an
-   operation given twice failing at the join. `tools/checks/dsa-census.ts` counts the
-   table; `tools/checks/dsa-delete.ts:120` wraps `executeAmpersand`, which stays the one
-   entry, `&%INDIRECT` included.
-4. ⏳ **The façade.** `execute` and `executeRun` move to `DsaMachine.ts`, with what only
-   they read (the commands, `getTarget`, `loadParameter` and `storeParameter`,
-   `copyTeleporter`, the run's `where`), and `DsaSystem.ts` keeps what
-   `ctx.systems.dsa` answers (`filters`, `operationMachine`, the timers, the globals, the
-   parameters) and nothing else.
 
 ### E28 ⏳ The bytecode interpreter decodes through switches and maps built per call
 
@@ -1471,7 +1438,7 @@ Recorded so that nobody "fixes" them.
   16 and all, 128 KB past that array of four (`:4201`), and the port takes nothing; and
   `&EXPERIENCE+` reads the HP of a negative one from the `d.` variables before the array,
   then hands it to `AddToSkill` (`:4553`). The port reads zeros, leaves the talents and
-  adds nothing (`executeAmpersand`, `src/engine/DsaSystem.ts`). A slot from 0 to 3 that no
+  adds nothing (`src/engine/dsa/ops/characters.ts`). A slot from 0 to 3 that no
   champion fills is a different case, and is read as CSBWin reads it
   (`PartyState.vacantCharacters`). Two more reads past an array go the same way:
   `DSADBANK::GetText` takes a text index past 9 once a text is set
@@ -1553,7 +1520,7 @@ Recorded so that nobody "fixes" them.
   - Table names like `byte20090`, `word1074` and `uByte590` are CSBWin's own
     (`d.Byte20090`…), kept greppable by rule.
   - Names like `tag0207cc`, `TAG02076e` and `_FusionSequence` are CSBWin's, kept wherever a
-    module gathers or splits the functions (E27, E28): the structure need no longer follow
+    module gathers or splits the functions (`src/engine/dsa/`, E28): the structure need no longer follow
     CSBWin's files, but a ported function stays greppable against its C++.
   - `src/renderer/intro/PrisonLevel.ts` imitating part of `DungeonState`'s API is a
     deliberate, documented stand-in dungeon.

@@ -1,5 +1,23 @@
-import { OBJECT_ID_EOF, type LocationRel, type ObjectID } from '../../core/types';
-import type { DsaDefinition } from '../../data/dungeonTypes';
+import {
+  DBType,
+  OBJECT_ID_EOF,
+  Position,
+  locationRelFromInteger,
+  locationRelToInteger,
+  type LocationRel,
+  type ObjectID,
+} from '../../core/types';
+import type { ActuatorRecord, DsaDefinition, DsaState } from '../../data/dungeonTypes';
+import {
+  getActuatorParameterA,
+  getActuatorParameterB,
+  getActuatorType,
+  setActuatorParameterA,
+  setActuatorParameterB,
+} from '../../data/actuatorHelpers';
+import type { DungeonState } from '../DungeonState';
+import type { GameContext } from '../GameContext';
+import { findFirstTeleporter, updateCellFlag } from './ops/dungeon';
 import { DsaVarType, type DsaVars } from './DsaTypes';
 
 /**
@@ -251,5 +269,560 @@ export class ProgramCursor {
     if (relState !== -maxState) return relState;
     const next = this.word();
     return signed ? (next << 16) >> 16 : next;
+  }
+}
+
+enum DsaCommand {
+  MESSAGE = 1,
+  OVERRIDE = 2,
+  NOOP = 3,
+  COPYTELEPORTER = 4,
+  GOSUB = 5,
+  LOAD = 6,
+  FETCH = 7,
+  EQUAL = 8,
+  QUESTION = 9,
+  AMPERSAND = 11,
+  JUMP = 12,
+  STORE = 13,
+  COPYTELEPORTER32 = 14,
+  MESSAGE32 = 15,
+  CASE = 16,
+  VARIABLEFETCH = 17,
+  VARIABLESTORE = 18,
+  GLOBALFETCH = 19,
+  GLOBALSTORE = 20,
+  AMPERSAND2 = 21,
+  DESSAGE32 = 22,
+}
+
+enum MessageType {
+  NULL = 0,
+  SET = 1,
+  CLEAR = 2,
+  TOGGLE = 3,
+}
+
+enum TargetType {
+  A = 0,
+  B = 1,
+  ABS = 2,
+  GEAR = 3,
+}
+
+/**
+ * What `Execute` reaches beyond its run: CSBWin's globals, and the `&` operations and
+ * the switch action, which the façade answers.
+ */
+export interface DsaInterpreterHost {
+  readonly ctx: GameContext;
+  readonly override: DsaOverride;
+  /** `globalVariables`, the array of the moment, which a read replaces. */
+  globalVariables(): Int32Array;
+  executeAmpersand(subcode: number, bank: DsaBank, exPkt: ExecutionPacket): GearJump | void;
+  queueDsaSwitchAction(
+    delay: number, tmrAct: number, level: number, targetX: number, targetY: number, targetPos: number, morD: 'M' | 'D',
+  ): void;
+}
+
+/**
+ * `Execute` (`doc/CSBwin-src/DSA.cpp:5054`) and its commands, `EX_NOOP` to `EX_FETCH`
+ * (`:575-5044`): a DSA's programs run, state by state, on a bank.
+ */
+export class DsaInterpreter {
+  private readonly ctx: GameContext;
+  private readonly dungeon: DungeonState;
+  private readonly override: DsaOverride;
+  /** The commands warned of once. */
+  private warnedCommands = new Set<number>();
+  /**
+   * `pExPkt`, "only for debugging purposes" (`doc/CSBwin-src/DSA.cpp:277`): where the run
+   * stands, for a `die`'s message, as `SAVEPEXPKT` keeps it through a nested run (`:5050-5051`).
+   */
+  private where: { locr: LocationRel; state: number; column: number } | null = null;
+
+  constructor(private readonly host: DsaInterpreterHost) {
+    this.ctx = host.ctx;
+    this.dungeon = host.ctx.dungeon;
+    this.override = host.override;
+  }
+
+  execute(exPkt: ExecutionPacket, bank: DsaBank): number {
+    const saved = this.where;
+    try {
+      return this.executeRun(exPkt, bank);
+    } finally {
+      this.where = saved;
+    }
+  }
+
+  /** `constructDebugMessage` (`doc/CSBwin-src/DSA.cpp:278-289`). */
+  debugMessage(msg: string): string {
+    const w = this.where;
+    return w ? `${msg}\nDSA at ${w.locr.l}(${w.locr.x},${w.locr.y})\nRow=${w.state};Col=${w.column}` : msg;
+  }
+
+  private executeRun(exPkt: ExecutionPacket, bank: DsaBank): number {
+    let finalState = -1;
+    let curState = exPkt.curState;
+    let column = exPkt.column;
+
+    do {
+      this.where = { locr: exPkt.locrMaster, state: curState, column };
+      const state = this.getDsaState(exPkt.slave, curState);
+      if (!state) {
+        if (finalState === -1) finalState = curState;
+        return finalState;
+      }
+      const program = this.getProgramForColumn(state, column);
+      if (!program || program.length === 0) {
+        if (finalState === -1) finalState = curState;
+        return finalState;
+      }
+      const cursor = new ProgramCursor(program);
+      let transferState = -1;
+      let transferCol = -1;
+      let nextState = curState;
+
+      while (cursor.remaining > 0) {
+        const word = cursor.word();
+        const opcode = word & 0x3f;
+        switch (opcode) {
+          case DsaCommand.NOOP: {
+            const relState = cursor.relState(word, 6, 10, -512);
+            nextState = curState + relState;
+            break;
+          }
+          case DsaCommand.MESSAGE:
+          case DsaCommand.MESSAGE32:
+          case DsaCommand.DESSAGE32: {
+            const relState = cursor.relState(word, 12, 4, -8);
+            nextState = curState + relState;
+            const msgType = (word >> 6) & 0x3;
+            const delayType = (word >> 8) & 0x3;
+            const targetType = (word >> 10) & 0x3;
+            let delay = 0;
+            const masterRec = this.getActuator(exPkt.rnMaster);
+            if (delayType === 1) delay = masterRec ? getActuatorParameterA(masterRec) : 0;
+            else if (delayType === 2) delay = masterRec ? getActuatorParameterB(masterRec) : 0;
+            else if (delayType === 3) {
+              delay = cursor.word();
+            }
+            const target = this.getTarget(targetType, opcode !== DsaCommand.MESSAGE, cursor, bank, exPkt.rnMaster);
+            if (msgType !== MessageType.NULL && target) {
+              const action = msgType - 1;
+              const morD = opcode === DsaCommand.DESSAGE32 ? 'D' : 'M';
+              this.host.queueDsaSwitchAction(delay, action, target.l, target.x, target.y, target.p, morD);
+            }
+            break;
+          }
+          case DsaCommand.COPYTELEPORTER:
+          case DsaCommand.COPYTELEPORTER32: {
+            const relState = cursor.relState(word, 10, 6, -32);
+            nextState = curState + relState;
+            const targetFrom = (word >> 6) & 0x3;
+            const targetTo = (word >> 8) & 0x3;
+            const locSrc = this.getTarget(targetFrom, opcode === DsaCommand.COPYTELEPORTER32, cursor, bank, exPkt.rnMaster);
+            const locDst = this.getTarget(targetTo, opcode === DsaCommand.COPYTELEPORTER32, cursor, bank, exPkt.rnMaster);
+            if (locSrc && locDst) this.copyTeleporter(locSrc, locDst);
+            break;
+          }
+          case DsaCommand.GOSUB: {
+            const relState = cursor.relState(word, 13, 3, -4);
+            nextState = curState + relState;
+            let row = (word >> 6) & 0x3f;
+            const colFlag = (word >> 12) & 0x1;
+            if (row === 63) {
+              row = cursor.word();
+            }
+            let col = 0;
+            if (colFlag !== 0) {
+              col = cursor.word();
+            }
+            const subPacket: ExecutionPacket = {
+              ...exPkt,
+              curState: row,
+              column: col,
+              subroutineLevel: exPkt.subroutineLevel + 1,
+              slave: exPkt.master,
+            };
+            this.execute(subPacket, bank);
+            break;
+          }
+          case DsaCommand.JUMP: {
+            const relState = cursor.relState(word, 13, 3, -4);
+            nextState = curState + relState;
+            let row = (word >> 6) & 0x3f;
+            const colFlag = (word >> 12) & 0x1;
+            if (row === 63) {
+              row = cursor.word();
+            }
+            transferState = row;
+            transferCol = 0;
+            if (colFlag !== 0) {
+              transferCol = cursor.word();
+            }
+            break;
+          }
+          case DsaCommand.QUESTION: {
+            const relState = cursor.relState(word, 6, 4, 2);
+            nextState = curState + relState;
+            const ifColumn = (word >> 10) & 0x1;
+            const ifCmd = (word >> 11) & 0x3;
+            const elseColumn = (word >> 13) & 0x1;
+            const elseCmd = (word >> 14) & 0x3;
+
+            const cond = bank.stack.pop() !== 0;
+            let cmd = 0;
+            let addr = 0;
+            let col = 0;
+            if (cond) {
+              cmd = ifCmd;
+              if (cmd !== 0) {
+                addr = cursor.word();
+              }
+              if (ifColumn !== 0) {
+                col = cursor.word();
+              }
+              if (elseCmd !== 0) {
+                cursor.skip();
+              }
+              if (elseColumn !== 0) {
+                cursor.skip();
+              }
+            } else {
+              if (ifCmd !== 0) {
+                cursor.skip();
+              }
+              if (ifColumn !== 0) {
+                cursor.skip();
+              }
+              cmd = elseCmd;
+              if (cmd !== 0) {
+                addr = cursor.word();
+              }
+              if (elseColumn !== 0) {
+                col = cursor.word();
+              }
+            }
+            if (cmd === 1) {
+              transferState = addr;
+              transferCol = col;
+            } else if (cmd === 2) {
+              const subPacket: ExecutionPacket = {
+                ...exPkt,
+                curState: addr,
+                column: col,
+                subroutineLevel: exPkt.subroutineLevel + 1,
+                slave: exPkt.master,
+              };
+              this.execute(subPacket, bank);
+            }
+            break;
+          }
+          case DsaCommand.CASE: {
+            const relState = cursor.relState(word, 6, 10, -512);
+            nextState = curState + relState;
+            const value = bank.stack.pop();
+            const numCase = cursor.word();
+            // `EX_CASE`'s binary search over the cases, in unsigned order
+            // (`doc/CSBwin-src/DSA.cpp:1005-1031`): on an unsorted table, or a value given
+            // twice, it finds what the search finds, not the first.
+            const key = value >>> 0;
+            const word32 = (at: number): number => ((cursor.at(at + 1) << 16) | cursor.at(at)) >>> 0;
+            let base = cursor.position;
+            for (let n = numCase; n > 0;) {
+              const m = n >> 1;
+              const at = base + 4 * m;
+              const caseValue = word32(at);
+              if (caseValue === key) {
+                const target = word32(at + 2);
+                transferState = (target >>> 8) & 0xffff;
+                transferCol = target & 0xff;
+                break;
+              }
+              if (caseValue > key) {
+                n = m;
+              } else {
+                base = at + 4;
+                n -= m + 1;
+              }
+            }
+            cursor.skip(4 * numCase);
+            break;
+          }
+          case DsaCommand.EQUAL: {
+            const relState = cursor.relState(word, 6, 10, -512);
+            const v1 = bank.stack.pop();
+            const v2 = bank.stack.pop();
+            bank.stack.push(v1 === v2 ? 1 : 0);
+            nextState = curState + relState;
+            break;
+          }
+          case DsaCommand.LOAD: {
+            const relState = cursor.relState(word, 11, 5, -16, true);
+            nextState = curState + relState;
+            const where = (word >> 6) & 0x1f;
+            // `m_PC` is a `ui16 *` (`doc/CSBwin-src/DSA.cpp:251`): LOAD_INTEGER pushes the
+            // word unsigned (`:1100-1107`).
+            if (where === 26) {
+              bank.stack.push(cursor.word());
+            } else if (where === 27) {
+              bank.stack.push(cursor.word());
+            } else if (where === 28) {
+              bank.stack.push(locationRelToInteger(exPkt.locrMaster));
+            } else if (where === 30) {
+              const lo = cursor.word();
+              const hi = cursor.word();
+              bank.stack.push((hi << 16) | lo);
+            } else if (where <= 25) {
+              const value = this.loadParameter(where, exPkt.rnMaster);
+              bank.stack.push(value);
+            }
+            // 29 (`LOAD_ABS32`) and 31 are "Illegal DSA load command", and push nothing
+            // (`:1139-1144`).
+            break;
+          }
+          case DsaCommand.STORE: {
+            // `EX_STORE` (`doc/CSBwin-src/DSA.cpp:1318-1387`): a `where` above 25 is
+            // "Illegal DSA store command", which pops nothing and leaves the next state.
+            const where = (word >> 6) & 0x1f;
+            if (where > 25) break;
+            this.storeParameter(where, exPkt.rnMaster, bank.stack.pop());
+            const relState = cursor.relState(word, 11, 5, -16);
+            nextState = curState + relState;
+            break;
+          }
+          case DsaCommand.VARIABLESTORE: {
+            const relState = cursor.relState(word, 13, 3, -4, true);
+            nextState = curState + relState;
+            const index = (word >> 6) & 0x7f;
+            bank.setVar(index, bank.stack.pop());
+            break;
+          }
+          case DsaCommand.VARIABLEFETCH: {
+            const relState = cursor.relState(word, 13, 3, -4, true);
+            nextState = curState + relState;
+            const index = (word >> 6) & 0x7f;
+            bank.stack.push(bank.getVar(index));
+            break;
+          }
+          case DsaCommand.GLOBALSTORE: {
+            const relState = cursor.relState(word, 13, 3, -4, true);
+            nextState = curState + relState;
+            const index = (word >> 6) & 0x7f;
+            const globalVariables = this.host.globalVariables();
+            const value = bank.stack.pop();
+            // `DSA.cpp:1269-1276`.
+            if (index >= globalVariables.length) {
+              this.ctx.host.trace('Global Store to non-existent variable');
+            } else {
+              globalVariables[index] = value;
+            }
+            break;
+          }
+          case DsaCommand.GLOBALFETCH: {
+            const relState = cursor.relState(word, 13, 3, -4, true);
+            nextState = curState + relState;
+            const index = (word >> 6) & 0x7f;
+            const globalVariables = this.host.globalVariables();
+            // Past the last variable, "Gloal fetch from non-existent variable" pushes
+            // 0xcdcdcdcd (`doc/CSBwin-src/DSA.cpp:1303-1307`).
+            if (index >= globalVariables.length) this.ctx.host.trace('Gloal fetch from non-existent variable');
+            const value = index < globalVariables.length ? globalVariables[index]! : 0xcdcdcdcd;
+            bank.stack.push(value);
+            break;
+          }
+          case DsaCommand.FETCH: {
+            const relState = cursor.relState(word, 6, 10, -512);
+            nextState = curState + relState;
+            const objMask = bank.stack.pop();
+            const posMask = bank.stack.pop();
+            const location = bank.stack.pop();
+            let depth = bank.stack.pop();
+            const locr = locationRelFromInteger(location);
+            if (!this.dungeon.isValidLocation(locr)) {
+              bank.stack.push(-1);
+              break;
+            }
+            let positionMask = posMask;
+            if (positionMask === -1) positionMask = 1 << locr.p;
+            let result = -1;
+            const pos = new Position(locr.x, locr.y, locr.l);
+            for (let rn = this.dungeon.findFirstObject(pos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
+              const decoded = this.dungeon.rnMaps.decode(rn);
+              if (((1 << (decoded.position & 3)) & positionMask) === 0) continue;
+              if (((1 << decoded.category) & objMask) === 0) continue;
+              if (depth === 0) {
+                result = rn;
+                break;
+              }
+              depth -= 1;
+            }
+            bank.stack.push(result);
+            break;
+          }
+          case DsaCommand.AMPERSAND:
+          case DsaCommand.AMPERSAND2: {
+            const relState = cursor.relState(word, 13, 3, -4);
+            nextState = curState + relState;
+            const subcode = ((word >> 6) & 0x7f) + (opcode === DsaCommand.AMPERSAND2 ? 128 : 0);
+            const jump = this.host.executeAmpersand(subcode, bank, exPkt);
+            if (jump) {
+              transferState = jump.state;
+              transferCol = jump.col;
+            }
+            break;
+          }
+          case DsaCommand.OVERRIDE: {
+            // `EX_OVERRIDE` (`doc/CSBwin-src/DSA.cpp:1038-1073`): any `what` but 1 is
+            // "Illegal DSA override command", which leaves the next state.
+            const what = (word >> 6) & 0x7;
+            const value = (word >> 9) & 0x7;
+            if (what !== 1) break;
+            this.override.p = true;
+            this.override.pos = value;
+            if (value === 7) {
+              this.override.pos = cursor.word() & 0xff;
+            }
+            const relState = cursor.relState(word, 12, 4, -8);
+            nextState = curState + relState;
+            break;
+          }
+          default:
+            // "Unknown DSA command code", and the run returns the state it is in
+            // (`doc/CSBwin-src/DSA.cpp:5263-5265`).
+            if (!this.warnedCommands.has(opcode)) {
+              this.warnedCommands.add(opcode);
+              this.ctx.host.trace(`Unknown DSA command code ${opcode}`);
+            }
+            return curState;
+        }
+
+        if (transferState >= 0) break;
+        if (finalState === -1 && nextState >= 0) finalState = nextState;
+      }
+
+      if (nextState >= 0 && finalState === -1) finalState = nextState;
+      curState = transferState;
+      column = transferCol;
+      transferState = -1;
+      transferCol = -1;
+    } while (curState >= 0);
+
+    return finalState;
+  }
+
+  private getDsaState(dsa: DsaDefinition, state: number): DsaState | null {
+    return dsa.states[state] ?? null;
+  }
+
+  private getProgramForColumn(state: DsaState, column: number): Uint16Array | null {
+    for (const action of state.actions) {
+      if (action.column === column) return action.program;
+    }
+    return null;
+  }
+
+  private getTarget(
+    targetType: number,
+    thirtyTwo: boolean,
+    cursor: ProgramCursor,
+    bank: DsaBank,
+    rnMaster: ObjectID,
+  ): LocationRel | null {
+    let target = 0;
+    switch (targetType) {
+      case TargetType.A: {
+        const rec = this.getActuator(rnMaster);
+        target = rec ? getActuatorParameterA(rec) : 0;
+        break;
+      }
+      case TargetType.B: {
+        const rec = this.getActuator(rnMaster);
+        target = rec ? getActuatorParameterB(rec) : 0;
+        break;
+      }
+      case TargetType.ABS: {
+        target = cursor.word();
+        if (thirtyTwo) {
+          target |= (cursor.word() << 16) >>> 0;
+        }
+        break;
+      }
+      case TargetType.GEAR:
+        target = bank.stack.pop();
+        break;
+      default:
+        return null;
+    }
+    const locr = locationRelFromInteger(target);
+    if (this.override.p) {
+      locr.p = this.override.pos & 3;
+      this.override.p = false;
+    }
+    return locr;
+  }
+
+  private loadParameter(where: number, rnMaster: ObjectID): number {
+    let rn = rnMaster;
+    let slot = where;
+    while (slot > 1) {
+      rn = this.dungeon.getDBRecordLink(rn);
+      if (rn === OBJECT_ID_EOF) break;
+      const decoded = this.dungeon.rnMaps.decode(rn);
+      if (decoded.category !== DBType.ACTUATOR) continue;
+      const rec = this.getActuator(rn);
+      if (!rec || getActuatorType(rec) !== 47) continue;
+      slot -= 2;
+    }
+    if (rn === OBJECT_ID_EOF) return 0;
+    const rec = this.getActuator(rn);
+    if (!rec) return 0;
+    return slot === 0 ? getActuatorParameterA(rec) : getActuatorParameterB(rec);
+  }
+
+  private storeParameter(where: number, rnMaster: ObjectID, value: number): void {
+    let rn = rnMaster;
+    let slot = where;
+    while (slot > 1) {
+      rn = this.dungeon.getDBRecordLink(rn);
+      if (rn === OBJECT_ID_EOF) break;
+      const decoded = this.dungeon.rnMaps.decode(rn);
+      if (decoded.category !== DBType.ACTUATOR) continue;
+      const rec = this.getActuator(rn);
+      if (!rec || getActuatorType(rec) !== 47) continue;
+      slot -= 2;
+    }
+    if (rn === OBJECT_ID_EOF) return;
+    const rec = this.getActuator(rn);
+    if (!rec) return;
+    if (slot === 0) setActuatorParameterA(rec, value);
+    else setActuatorParameterB(rec, value);
+  }
+
+  private copyTeleporter(src: LocationRel, dst: LocationRel): void {
+    const srcPos = new Position(src.x, src.y, src.l);
+    const dstPos = new Position(dst.x, dst.y, dst.l);
+    const srcRn = findFirstTeleporter(this.dungeon, srcPos);
+    const dstRn = findFirstTeleporter(this.dungeon, dstPos);
+    if (srcRn === OBJECT_ID_EOF || dstRn === OBJECT_ID_EOF) return;
+    const srcRec = this.dungeon.getTeleporterRecord(srcRn);
+    const dstRec = this.dungeon.getTeleporterRecord(dstRn);
+    if (!srcRec || !dstRec) return;
+    dstRec.sound = srcRec.sound;
+    dstRec.scope = srcRec.scope;
+    dstRec.absoluteRotation = srcRec.absoluteRotation;
+    dstRec.rotation = srcRec.rotation;
+    dstRec.destX = srcRec.destX;
+    dstRec.destY = srcRec.destY;
+    dstRec.destMap = srcRec.destMap;
+    const srcMap = this.dungeon.getMap(src.l);
+    if (!srcMap) return;
+    updateCellFlag(this.dungeon, dst, srcMap.cellFlags[src.x]![src.y]!);
+  }
+
+  private getActuator(rn: ObjectID): ActuatorRecord | null {
+    return this.dungeon.getActuatorRecord(rn);
   }
 }
