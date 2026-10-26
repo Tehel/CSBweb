@@ -8,7 +8,7 @@
  * (`:2812`), and `d.SupressPitDamage`.
  *
  * Not the DSA's ten-argument `MoveObject` (`MoveObject.cpp:721`), which is
- * `DsaSystem.moveObjectDsa`. A monster lifted on the party's level first meets the
+ * `moveObjectDsa` (`dsa/ops/move.ts`). A monster lifted on the party's level first meets the
  * missiles in its way through `CheckMoveFromMissile`, which is `MissileEncounter`'s.
  */
 import { isAlive } from './rules';

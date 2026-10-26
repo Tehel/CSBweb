@@ -411,16 +411,15 @@ against each other, and the file formats.
 
 ### E27 ⏳ `DsaSystem.ts` is one 5,000-line class
 
-`DsaSystem.ts` (2,863 lines) holds the interpreter, a port of `MoveObject` for `&MOVE`,
-and `executeAmpersand` (`:819`), which runs an operation of `DSA_OPERATIONS`
-(`src/engine/dsa/DsaOperations.ts`) and keeps the rest in a switch of 852 lines. The
-machine's data and its decoding are already apart, in `src/engine/dsa/DsaMachine.ts`: the
-stack, the bank, the execution packet, `OVERRIDE`'s corner (`DsaOverride`) and the
-`ProgramCursor` that `executeRun` (`:465`) reads its programs through. So are the
+`DsaSystem.ts` (2,240 lines) holds the interpreter and `executeAmpersand` (`:767`),
+which runs an operation of `DSA_OPERATIONS` (`src/engine/dsa/DsaOperations.ts`) and keeps
+the rest in a switch of 845 lines. The machine's data and its decoding are already apart,
+in `src/engine/dsa/DsaMachine.ts`: the stack, the bank, the execution packet, `OVERRIDE`'s
+corner (`DsaOverride`) and the `ProgramCursor` that `executeRun` (`:413`) reads its programs through. So are the
 seventeen filter sites, in `src/engine/dsa/DsaFilters.ts` (`ctx.systems.dsa.filters`),
-which reach the machine through `DsaFilterMachine`, and three domains of operations, in
-`dsa/ops/stack.ts`, `dsa/ops/messages.ts` and `dsa/ops/objects.ts`. `NOFILTER` is the
-bank's `noFilter()`.
+which reach the machine through `DsaFilterMachine`, and four domains of operations, in
+`dsa/ops/stack.ts`, `dsa/ops/messages.ts`, `dsa/ops/objects.ts` and `dsa/ops/move.ts`.
+`NOFILTER` is the bank's `noFilter()`.
 
 Paying it, into `src/engine/dsa/` beside `DsaTypes.ts`. Each command's body keeps CSBWin's
 order and names, and each step is proven by every tool's whole output, byte-identical. The
@@ -444,14 +443,15 @@ steps, one commit each:
      `SetGlobalText`, `&SOUND`, `&MODIFYMESSAGE`);
    - ✅ the objects (`ops/objects.ts`: `&DEL`, `&ADD` and its `copyItem`, `&OBJECTID`,
      `&TYPE`, `&COPY`, `&ISCARRIED`, the five fields' getters and setters, `SetCursed`;
-     `choosePositionFromMask` and `detachedGroupIndex`, which `&MOVE` still imports);
-   - ⏳ `&MOVE` (with its `MoveObject` port and `DsaMoveError`); characters; monsters;
-     the dungeon;
+     `choosePositionFromMask` and `detachedGroupIndex`, which `ops/move.ts` imports);
+   - ✅ `&MOVE` (`ops/move.ts`: its `MoveObject` port and `DsaMoveError`; the tools
+     reach `moveObjectDsa` and the character arms through `dsa.operationMachine`);
+   - ⏳ characters; monsters; the dungeon;
    - ⏳ last, the run's own: the parameters, `&SETNEWSTATE`, the gear jumps and gosub,
      `&%INDIRECT` and the `I_` operations. With it the switch is gone, and `execute`
      and `executeRun` move to `DsaMachine.ts`.
 4. ⏳ **The façade.** `DsaSystem.ts` keeps what `ctx.systems.dsa` answers (`filters`,
-   the timers, the globals, the parameters) and nothing else.
+   `operationMachine`, the timers, the globals, the parameters) and nothing else.
 
 ### E28 ⏳ The bytecode interpreter decodes through switches and maps built per call
 
@@ -731,7 +731,7 @@ puts its copy on one with `MoveObject(newObj, -1, 0, x, y)`
 `triggerObjectMove`; `setPos`, `triggerObjectMove`, then `addObjectToCell`. What that loses:
 
 - no pit or teleporter on the square is resolved (`WorldMove.resolveCellEffects`, which
-  `&MOVE` already reaches through `WorldMove.moveObject`, `objectMover`, `src/engine/DsaSystem.ts:2742-2749`);
+  `&MOVE` already reaches through `WorldMove.moveObject`, `objectMover`, `src/engine/dsa/ops/move.ts:519-526`);
 - `unchangedRoom` is always false, where `MoveObject` passes whether the party stands there
   (`Code11f52.cpp:3314-3328`, `:3458-3473`), so floor actuators of types 1 and 2 fire under
   the party where CSBWin's do not;
@@ -745,7 +745,7 @@ Conflux has some 32 `&ADD`, 42 indirect `&ADD`, 26 `&DEL` and 42 indirect `&DEL`
 which of them meet a pit, a teleporter, the party's square or a monster is not traced.
 
 Paying it: both through the world `MoveObject` (`objectMover()`, as `findCellSource` and
-`findCellDestination` do), then `setPos`; a tool with a pit, a teleporter, the party's
+`findCellDestination` do, in `src/engine/dsa/ops/move.ts`), then `setPos`; a tool with a pit, a teleporter, the party's
 square, and a monster group added on the party's level.
 
 ### C186 ⏳ A decoration's position set past its rectangles' table is not drawn
@@ -1493,7 +1493,7 @@ Recorded so that nobody "fixes" them.
   that is not there and `&MULTIPLIER@` of a negative one read a level descriptor past
   the array (`DSA.cpp:324-325`, `:3985`): the port reads zeros. And `&VSET` with a count
   whose sum with `dst` or `src` wraps past 2^32 writes past the 100 variables
-  (`:4863`, `:4882`): the port stops at the last (`DsaSystem.vset`). `RemoveCharacter`,
+  (`:4863`, `:4882`): the port stops at the last (`vset`, `src/engine/dsa/ops/stack.ts`). `RemoveCharacter`,
   with no other champion living, hands the cursor and the magic tab to slot
   `d.NumCharacter` (`Character.cpp:5343-5360`), which `SetHandOwner` and
   `SelectMagicCaster` take when its HP is not zero: the record a slot past the party

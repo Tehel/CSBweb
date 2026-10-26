@@ -31,6 +31,7 @@ import {
 } from '../../src/core/types';
 import { Game } from '../../src/engine/Game';
 import { TimerFunction } from '../../src/engine/TimerQueue';
+import { moveObjectDsa } from '../../src/engine/dsa/ops/move';
 import { newGame, processTimersAt, stockDungeon, stockGraphics } from '../lib/game';
 import { check, finish } from '../lib/check';
 import { createMonsterAt } from '../lib/createMonster';
@@ -81,7 +82,8 @@ async function main(): Promise<void> {
   };
 
   const move = (game: Game, category: DBType, from: Position, to: Position, corner: number): number =>
-    game.systems.dsa.moveObjectDsa(
+    moveObjectDsa(
+      game.systems.dsa.operationMachine,
       CELL, 1 << category, 0xf, locationRelToInteger({ l: from.z, x: from.x, y: from.y, p: 0 }), 0,
       CELL, 0, 1 << corner, locationRelToInteger({ l: to.z, x: to.x, y: to.y, p: 0 }), 0,
     );

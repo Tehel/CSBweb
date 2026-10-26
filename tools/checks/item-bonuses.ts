@@ -42,6 +42,7 @@ import { graphicsTablesOf, newGame, presetHeroesOfGame, stockDungeon, stockGraph
 import { newUIState } from '../lib/ui';
 import { check, finish } from '../lib/check';
 import { handleClothingClick } from '../../src/renderer/ui/Mouse';
+import { findCharacterDestination, findCharacterSource } from '../../src/engine/dsa/ops/move';
 import { testChampion } from '../lib/champion';
 import { standInOf } from '../lib/standIn';
 
@@ -300,12 +301,12 @@ async function main(): Promise<void> {
       'the inventory click puts the bonus on and takes it off');
 
     // The DSA's `&MOVE` to and from a character (`MoveObject.cpp:435`, `:160`).
-    const dsa = g.systems.dsa;
+    const dsa = g.systems.dsa.operationMachine;
     const towers = newObject(g, NI.OBJNI_POWERTOWERS);
     const strength = b.attributes.stats[AttributeIndex.Strength]!;
-    dsa.findCharacterDestination(1, 4, towers, true);
+    findCharacterDestination(dsa, 1, 4, towers, true);
     const dsaOn = strength.current;
-    dsa.findCharacterSource(1, 4, true);
+    findCharacterSource(dsa, 1, 4, true);
     console.log(`a DSA move: Strength 41 -> ${dsaOn} with Powertowers on -> ${strength.current} off`);
     check(dsaOn === 51 && strength.current === 41, 'a DSA move puts the bonus on and takes it off');
   }
@@ -403,9 +404,9 @@ async function main(): Promise<void> {
     check(unlit === `${brightness} 0 ${NI.OBJNI_ILLUMULET_A}`, 'and taken off it goes dark again');
     party.objectInHand = OBJECT_ID_NULL;
     const symal = newObject(g, NI.OBJNI_JEWEL_SYMAL_A);
-    g.systems.dsa.findCharacterDestination(1, 10, symal, true);
+    findCharacterDestination(g.systems.dsa.operationMachine, 1, 10, symal, true);
     const symalOn = gNameIndex(symal);
-    g.systems.dsa.findCharacterSource(1, 10, true);
+    findCharacterSource(g.systems.dsa.operationMachine, 1, 10, true);
     console.log(`a Jewel Symal round the neck by a DSA move: name ${symalOn}, off: ${gNameIndex(symal)}`);
     check(symalOn === NI.OBJNI_JEWEL_SYMAL_B && gNameIndex(symal) === NI.OBJNI_JEWEL_SYMAL_A,
       'a worn Jewel Symal reads as its _b, and as its _a again off');

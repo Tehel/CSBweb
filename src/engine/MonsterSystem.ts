@@ -464,8 +464,8 @@ export class MonsterSystem {
    * Nothing here touches the group's other AI timers when its `ITEM16` did not
    * change: the AI caller re-aims only the timer it is processing (`Monster.cpp:1715`,
    * `:2109`, `:2444`, `:2912`), and a DSA's cell move re-aims the rest itself
-   * (`MoveObject.cpp:539-571`, `DsaSystem.findCellDestination`). Nor does it touch the
-   * `ITEM16`'s `uByte10`/`uByte11` — only `AttachItem16ToMonster` sets them
+   * (`MoveObject.cpp:539-571`, `findCellDestination` in `dsa/ops/move.ts`). Nor does it
+   * touch the `ITEM16`'s `uByte10`/`uByte11` — only `AttachItem16ToMonster` sets them
    * (`CSBCode.cpp:6147-6149`), and a frightened group heads back there
    * (`Monster.cpp:2277-2281`) — or its `ubPrevX`/`ubPrevY`, which the AI caller sets.
    *
