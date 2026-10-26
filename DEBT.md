@@ -410,37 +410,49 @@ against each other, and the file formats.
 
 ### E27 ⏳ `DsaSystem.ts` is one 5,000-line class
 
-`DsaSystem.ts` (4,976 lines) holds the interpreter, seventeen filter sites, a port of
-`MoveObject` for `&MOVE`, and `executeAmpersand`, a single function of 1,231 lines
-(`:2003`). In `execute` (`:1544-2000`, 457 lines):
+`DsaSystem.ts` (4,770 lines) holds the interpreter, seventeen filter sites, a port of
+`MoveObject` for `&MOVE`, and `executeAmpersand`, a single function of 1,247 lines
+(`:1796`). In `executeRun` (`:1324-1793`, 470 lines):
 
 - seventeen `isMaxState(...)` tests, sixteen of which can never fire, since only QUESTION's
   MAXSTATE of 2 fits its field (`doc/CSBWIN_DSA_REFERENCE.md`, `tools/checks/dsa-census.ts`),
   and with them all six `readSignedWord` calls;
-- `program[pc++] ?? 0` forty times and `wordsRemaining--` thirty-eight, though
+- `program[pc++] ?? 0` thirty-six times and `wordsRemaining--` thirty-eight, though
   `wordsRemaining` is always `program.length - pc`;
 - `ExecutionPacket`'s `program`, `pc`, `wordsRemaining`, `nextState`, `transferState` and
-  `transferCol` set (`:1492-1499`) and copied into every GOSUB's packet, and read by
-  nothing.
+  `transferCol` set (`processTimer6Internal`, `:1257-1273`) and copied into every GOSUB's
+  packet, and read by nothing.
 
-Five doc comments sit over the wrong function (`:147` over `CursorFilterType`;
-`:3276-3279` over `examineCell`, not `noFilter`; `:3609-3615` over `getObjectField`, not
-`isCarried`; `:4087-4094` over `globalText`, not `setGlobalText` and `isValidObjectId`),
-and seven filter sites have none (`processMissileEncounterFilter`,
-`processAdjustSkillsFilter`, `processSpellFilter`, `processTimer5`, `6` and `7`). A spell's
-parameters are marshalled field by field both ways (`:1380-1412`, and again in
-`MagicSystem.ts:142-157`), where every other block has a codec.
+Three doc comments sit over the wrong function (`:3070-3073` over `examineCell`, not
+`noFilter`; `:3403-3409` over `getObjectField`, not `isCarried`; `:3882-3889` over
+`globalText`, not `setGlobalText`, and `:3881` over it too, not `isValidObjectId`), and
+seven filter sites have none (`processMissileEncounterFilter`, `processAdjustSkillsFilter`,
+`processSpellFilter`, `processTimer5`, `6` and `7`). A spell's parameters are marshalled
+field by field both ways (`processSpellFilter`, `:1139-1182`, and again in
+`MagicSystem.ts:142-157`), where every other block has a codec in `filterParameters.ts`.
 
-Paying it, in steps, into `src/engine/dsa/`, beside `DsaTypes.ts`: `DsaMachine.ts`, the
-stack, the bank, `execute` over a `ProgramCursor` (`word()`, `nextState(word, shift, bits,
-maxState, signed)`) and the state look-ups; `DsaFilters.ts`, one `runFilter(esl, words,
-options)` the sites call with their codecs, the spell's included; `ops/` by domain (stack
-and arithmetic, objects, `&MOVE`, characters, monsters, the dungeon, text, messages), with
-`executeAmpersand` a dispatch over them; `DsaSystem.ts` the façade on `ctx.systems.dsa`.
-Each command's body keeps CSBWin's order and names. Two tools change with it:
-`tools/checks/dsa-census.ts:37-48` reads the ported operations from the text of
-`executeAmpersand` (an exported table instead), and `tools/checks/dsa-delete.ts:121` replaces
-`executeAmpersand` on the instance.
+Paying it, into `src/engine/dsa/` beside `DsaTypes.ts`. Each command's body keeps CSBWin's
+order and names, and each step is proven by every tool's whole output, byte-identical. The
+steps, one commit each:
+
+1. ⏳ **The machine's data and its decoding.** `dsa/DsaMachine.ts` takes `DsaStack`,
+   `DsaBank`, `ExecutionPacket` cut to the fields read, and a `ProgramCursor` over a
+   program (`word()`, `skip()`, `relState(word, shift, bits, maxState, signed)`), which
+   `executeRun` decodes through: one `IsMaxState` test, no `?? 0`, no `wordsRemaining`.
+   `execute` stays a method of `DsaSystem` until step 3. The three misplaced doc comments
+   go over their functions.
+2. ⏳ **The filters.** `dsa/DsaFilters.ts`: one `runFilter(esl, words, options)` the
+   seventeen sites call with their codecs; the spell's codec joins `filterParameters.ts`,
+   and `MagicSystem.dsaCastSpell` reads through it. The seven sites get their doc comments.
+3. ⏳ **The operations,** one domain per commit: stack and arithmetic, text and messages,
+   objects, `&MOVE` (with its `MoveObject` port and `DsaMoveError`), characters, monsters,
+   the dungeon. Each goes to `dsa/ops/<domain>.ts`, and `executeAmpersand` becomes a
+   dispatch over an exported table of them, which `tools/checks/dsa-census.ts:36-48` reads
+   instead of `executeAmpersand`'s text; `tools/checks/dsa-delete.ts:120` wraps the
+   dispatch instead of the method. With the last domain, `execute` and `executeRun` move
+   to `DsaMachine.ts`.
+4. ⏳ **The façade.** `DsaSystem.ts` keeps what `ctx.systems.dsa` answers (the filter
+   entry points, the timers, the globals, the parameters) and nothing else.
 
 ### E28 ⏳ The bytecode interpreter decodes through switches and maps built per call
 
