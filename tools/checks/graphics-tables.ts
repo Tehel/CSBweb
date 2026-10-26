@@ -341,8 +341,10 @@ function regions22e(t: GraphicsTables): Region[] {
   put('floorColorMapMedium', 'MediumColorMapping', bytes(o.floorColorMapMedium));
   put('floorColorMapFar', 'FarColorMapping', bytes(o.floorColorMapFar));
   put('doorSwitchRectIndex', 'Byte4124', bytes(o.doorSwitchRectIndex));
-  put('doorOrnamentRectSetIndex', 'Byte4122', bytes(o.doorOrnamentRectSetIndex));
-  put('floorDecorationRectSetIndex', 'Byte4110', bytes(o.floorDecorationRectSetIndex));
+  put('doorOrnamentRectSetIndex', 'Byte4122', bytes(o.doorOrnamentRectSetIndex), 0,
+    '(UI8)(d.Byte4122[D7W]), D7W a byte, Code390e.cpp:282');
+  put('floorDecorationRectSetIndex', 'Byte4110', bytes(o.floorDecorationRectSetIndex), 0,
+    '(UI8)(d.Byte4110[D7W]), D7W a byte, Code390e.cpp:270');
   put('wallDecorationRectSetIndex', 'Byte4100', bytes(o.wallDecorationRectSetIndex));
   put('fountainDecorationIndex', 'Word4040', word(o.fountainDecorationIndex));
   put('alcoveDecorationIndices', 'Byte4038', bytes(o.alcoveDecorationIndices));

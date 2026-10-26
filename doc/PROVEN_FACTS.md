@@ -434,11 +434,12 @@ its comment, sits at `7246 - address`. So a field's offset in the item is `7246`
 `Data.h` address: `wallRectangles` (`Byte3074`) at 4172, `Word2530` the last four bytes.
 
 Every data set's `0x22e` is 4720 bytes, and every table the port reads from it writes
-back over its bytes at that offset (`tools/checks/graphics-tables.ts`). Six of those reads
+back over its bytes at that offset (`tools/checks/graphics-tables.ts`). Eight of those reads
 run past their own field, each as CSBWin's does: `Word7246` (`Code51a4.cpp:143`),
-`Byte5070` (`CSBCode.cpp:4073`), `Byte5094` and `Byte5076` (`:4142`, `:4164`), and
+`Byte5070` (`CSBCode.cpp:4073`), `Byte5094` and `Byte5076` (`:4142`, `:4164`),
 `uByte2542` and `SeeThruWallsRect + 4` as whole `RectPos`es (`Viewport.cpp:2587`,
-`:2406`). The only bytes of the item no table reads are `Word4012`'s, which CSBWin sets
+`:2406`), and `Byte4122` and `Byte4110` at a level's decoration number, a byte
+(`Code390e.cpp:282`, `:270`), so 256 bytes each. The only bytes of the item no table reads are `Word4012`'s, which CSBWin sets
 at run time (`d.Word4012 = 3217`, `CSBCode.cpp:7585`).
 
 ## Item `0x22f` is laid out exactly as `Data.h` declares its span
@@ -4929,6 +4930,11 @@ shatters. Evidence: `tools/checks/player-attacks.ts` case 8.
   level. The member that sidesteps before a melee then takes its new corner only
   `if (d.MonsterDamageResult != 1)` (`Monster.cpp:3980`): a missile that killed some of the
   group but not all leaves the corners as the encounter left them.
+- `objX, objY` is the group's square, which is not always the missile's: the second cell of
+  `CheckMoveFromMissile` passes the square the group leaves with the missile's in the
+  square it steps into (`:2766-2773`, `:2791-2806`). So a lone monster stepping from the
+  corner nearest a missile just across the boundary meets it, whichever of the two timers
+  runs first (`tools/checks/missile-crossing.ts`).
 - The victim is `OrdinalOfMonsterAtPosition(group, objectPos)` (`:1996-1997`) — the member
   in the corner the missile reached. An ordinal of 0 returns 0, and the missile flies on,
   unless the group is `drawAsSize4()`, when member 1 is hit (`:1998-2002`).

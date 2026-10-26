@@ -126,8 +126,8 @@ In payoff order: the first row is the next item.
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | C177 | An Atari-era save loads with its possessions, timers and hand unconverted | M | ⏳ |
 | C173 | The DSA's `&ADD` and `&DEL` on a square bypass `MoveObject` | M | ⏳ |
-| C184 | A decoration number past its table's end has no position set | S | ⏳ |
 | C185 | A missile spell flies along the Spell Filter's facing, not the champion's | S | ⏳ |
+| C186 | A decoration's position set past its rectangles' table is not drawn | S | ⏳ |
 | F15 | Tools that read the wall clock, and a runner with no timeout | S | ⏳ |
 | F16 | A tool can pass having checked less than it says | S | ⏳ |
 | F18 | One `tsconfig` for the browser, the tools and the server | S | ⏳ |
@@ -153,7 +153,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C186 · D22 · E42 · F22 · G31 · P13 · R17 · U13 · W8 · X16. An ID recorded and paid in one commit has no
+Next free IDs: C187 · D22 · E42 · F22 · G31 · P13 · R17 · U13 · W8 · X16. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -790,21 +790,6 @@ Paying it: both through the world `MoveObject` (`objectMover()`, as `findCellSou
 `findCellDestination` do), then `setPos`; a tool with a pit, a teleporter, the party's
 square, and a monster group added on the party's level.
 
-### C184 ⏳ A decoration number past its table's end has no position set
-
-A level loads its floor and door decorations' slots with a position set read at the
-decoration's number from `d.Byte4110[10]` and `d.Byte4122[12]`
-(`doc/CSBwin-src/Code390e.cpp:263-284`). A number past the table's end reads on in CSBWin:
-`d.Byte4122` is followed by `d.Byte4110`, and `d.Byte4110` by `d.Byte4100[60]`, the wall
-decorations' sets (`doc/CSBwin-src/Data.h:1185-1187`). The port's tables are cut to their
-length (`floorDecorationRectSetIndex`, `doorOrnamentRectSetIndex`,
-`src/data/tables/ObjectTables.ts`), so such a slot has no set, -1, and its decoration is
-not drawn (`src/renderer/ViewportRenderer.ts`, which cites this ID). No dungeon the port
-plays is known to number one past ten floor or twelve door decorations.
-
-Paying it: the set read on through the bytes that follow, as they lie in item `0x22e`, once
-that layout is shown to be `d`'s; and a check with a level whose TOC names one.
-
 ### C185 ⏳ A missile spell flies along the Spell Filter's facing, not the champion's
 
 `CastSpell` takes the party's facing, or the Spell Filter's when it gives one, and gives up
@@ -821,6 +806,26 @@ start repeat `characterThrowsSpell` and `launchObject` (`adjustSpellMissileRange
 Paying it: the missile case calls `characterThrowsSpell(casterIdx, spellObjectId(missileType),
 range, 0)`, as CSBWin does, and the two copies go; a check with a Spell Filter that turns the
 facing.
+
+### C186 ⏳ A decoration's position set past its rectangles' table is not drawn
+
+A floor decoration is drawn in `d.floorDecorDesc[set][relativeCell]`
+(`doc/CSBwin-src/CSBCode.cpp:3957`), and a door ornament in `d.Byte5070 + 18*set` and
+`d.Byte5058[18*set]` (`:4073`, `:4087`), whose `ASSERT(D4W < 4)` (`:4086`) a release
+build compiles out (`CSBTypes.h:103-108`). A set past `floorDecorDesc`'s three or
+`Byte5070`'s four reads on through `d`: `floorDecorDesc[3]` is `wallDecorationPosition`
+(`Data.h:1167-1175`). The port's tables are cut to their sets
+(`floorDecorationDescSets`, `doorOrnamentRectSets`, `src/data/tables/ObjectTables.ts`), so
+such a decoration is not drawn (`DrawFloorDecorations`,
+`src/renderer/bytecode/DrawDecorations.ts`; `TAG004b26`, `src/renderer/bytecode/DrawDoor.ts`).
+The set is read at the decoration's number on past `Byte4110` and `Byte4122` into
+`Byte4100`, whose values reach 7 in `dm-atari`'s `graphics.dat`: floor decoration 69 has
+set 7 (`tools/checks/door-ornaments.ts`). No dungeon the port plays is known to name one.
+
+Paying it: each read at the set's offset in `d`, through item `0x22e` while it lies there
+(the item ends at `d.Word2530`, `doc/PROVEN_FACTS.md` → "Item `0x22e` is laid out exactly
+as `Data.h` declares its span"), and what lies past it decided; a check with a level that
+names floor decoration 69.
 
 ### C150 ⏸️ Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops
 

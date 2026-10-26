@@ -272,8 +272,7 @@ export class ViewportRenderer {
     const doorDecorationTOC = map?.doorDecorationTOC ?? [];
     for (let i = 0; i < doorDecorationTOC.length; i++) {
       const decoration = doorDecorationTOC[i]!;
-      // An entry past `d.Byte4122`'s twelve has no set: its ornament is not drawn (DEBT.md C184).
-      doorOrnaments[i] = [303 + decoration, this.objectTables.doorOrnamentRectSetIndex[decoration] ?? -1];
+      doorOrnaments[i] = [303 + decoration, this.objectTables.doorOrnamentRectSetIndex[decoration]!];
     }
 
     // `d.LoadedFloorDecorations[i] = { 247 + 6 * FloorDecorationTOC[i], Byte4110[FloorDecorationTOC[i]] }`
@@ -282,8 +281,7 @@ export class ViewportRenderer {
     const floorDecorationTOC = map?.floorDecorationTOC ?? [];
     for (let i = 0; i < floorDecorationTOC.length; i++) {
       const decoration = floorDecorationTOC[i]!;
-      // An entry past `d.Byte4110`'s ten has no set: its decoration is not drawn (DEBT.md C184).
-      loadedFloorDecorations[i] = [247 + 6 * decoration, this.objectTables.floorDecorationRectSetIndex[decoration] ?? -1];
+      loadedFloorDecorations[i] = [247 + 6 * decoration, this.objectTables.floorDecorationRectSetIndex[decoration]!];
     }
 
     // `d.DoorTOC[2] = d.DoorCharacteristics[doorType0Index/doorType1Index]`

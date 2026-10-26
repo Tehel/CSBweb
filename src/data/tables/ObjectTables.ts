@@ -182,13 +182,23 @@ export interface ObjectTables {
    * (`Data.h:1164-1165`); `Byte5058[18*set]`, the source size of a shrink, is set's F1 entry.
    */
   doorOrnamentRectSets: DecorationDesc[][];
-  doorOrnamentRectSetIndex: Uint8Array; // d.Byte4122[12], a door ornament's position set
+  /**
+   * `d.Byte4122[12]`, a door ornament's position set, at the ornament's number. A level's
+   * `DoorDecorationTOC` entry is a byte, and `Code390e.cpp:282` reads the set at it on past
+   * the twelve, through `Byte4110` and `Byte4100` (`Data.h:1185-1187`): 256 bytes of item
+   * `0x22e` from `Byte4122`, so every number has the set CSBWin reads.
+   */
+  doorOrnamentRectSetIndex: Uint8Array;
   doorOrnamentColorMapF3: Uint8Array; // d.Byte4172[16]
   doorOrnamentColorMapF2: Uint8Array; // d.Byte4188[16]
 
   // Floor decorations (DrawFloorDecorations, CSBCode.cpp:3845+)
   floorDecorationDescSets: DecorationDesc[][]; // d.floorDecorDesc[3][9]
-  floorDecorationRectSetIndex: Uint8Array; // d.Byte4110[10]
+  /**
+   * `d.Byte4110[10]`, a floor decoration's position set, read on past the ten as
+   * `doorOrnamentRectSetIndex` is (`Code390e.cpp:270`): 256 bytes from `Byte4110`.
+   */
+  floorDecorationRectSetIndex: Uint8Array;
   relativeCellGraphicIncrement: Uint8Array; // d.RelativeCellGraphicIncrement[10]
   floorColorMapMedium: Uint8Array; // d.MediumColorMapping[16]
   floorColorMapFar: Uint8Array; // d.FarColorMapping[16]
@@ -872,14 +882,11 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const doorSwitchSourceDescSets = readDecorationDescSets(raw22e, doorSwitchSourceDescOffset, doorSwitchSetCount, 4);
   // Four sets: `TAG004b26` asserts the set is below 4 (`CSBCode.cpp:4086`).
   const doorOrnamentRectSets = readDecorationDescSets(raw22e, doorOrnamentRectOffset, 4, 3);
-  const doorOrnamentRectSetIndex = raw22e.slice(doorOrnamentRectSetIndexOffset, doorOrnamentRectSetIndexOffset + 12);
+  const doorOrnamentRectSetIndex = raw22e.slice(doorOrnamentRectSetIndexOffset, doorOrnamentRectSetIndexOffset + 256);
   const doorOrnamentColorMapF3 = raw22e.slice(doorOrnamentColorMapF3Offset, doorOrnamentColorMapF3Offset + 16);
   const doorOrnamentColorMapF2 = raw22e.slice(doorOrnamentColorMapF2Offset, doorOrnamentColorMapF2Offset + 16);
   const floorDecorationDescSets = readDecorationDescSets(raw22e, floorDecorationDescOffset, 3, 9, 'floorDecorDesc[3][9]');
-  const floorDecorationRectSetIndex = raw22e.slice(
-    floorDecorationRectSetIndexOffset,
-    floorDecorationRectSetIndexOffset + 10
-  );
+  const floorDecorationRectSetIndex = raw22e.slice(floorDecorationRectSetIndexOffset, floorDecorationRectSetIndexOffset + 256);
   const relativeCellGraphicIncrement = raw22e.slice(
     relativeCellGraphicIncrementOffset,
     relativeCellGraphicIncrementOffset + 10

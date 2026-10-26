@@ -124,8 +124,8 @@ function TAG004b26(draw: ViewportDraw, door: IndexedBitmap, ornament: number, ne
   const slot = draw.context.doorOrnaments?.[ornament - 1];
   if (!tables || !getGraphic || !slot) return;
   const [graphicNum, set] = slot;
-  // A custom data set's ornament can name a set past `d.Byte4122`'s four, which CSBWin
-  // reads on past its table: the ornament is not drawn.
+  // A set past `d.Byte5070`'s four, which CSBWin reads on past its table, is not drawn
+  // (DEBT.md C186).
   const rect = tables.doorOrnamentRectSets[set]?.[nearness];
   const graphic = getGraphic(graphicNum);
   if (!rect || !graphic) return;
