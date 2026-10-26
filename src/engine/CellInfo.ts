@@ -287,14 +287,16 @@ export class CellInfo {
     if (!map || at.x < 0 || at.y < 0 || at.x >= map.descriptor.width || at.y >= map.descriptor.height) return [];
     const flag = map.cellFlags[at.x]![at.y]!;
     const room = getRoomType(flag);
-    const out: InfoLine[] = [{ text: `(${at.x},${at.y}) ${squareWords(flag)}`, indent: 0 }];
+    const objects = [...this.chain(dungeon.findFirstObject(new Position(at.x, at.y, at.map)))];
+    const rotator = room === RoomType.TELEPORTER && objects.some((rn) => this.sendsHome(at, rn));
+    const words = rotator ? squareWords(flag).replace('Teleporter', 'Rotator') : squareWords(flag);
+    const out: InfoLine[] = [{ text: `(${at.x},${at.y}) ${words}`, indent: 0 }];
     const party = this.source.party;
     if (party && party.position.z === at.map && party.position.x === at.x && party.position.y === at.y) {
       out.push({ text: 'The party is here', indent: 0 });
     }
 
     this.leads(at, flag, out);
-    const objects = [...this.chain(dungeon.findFirstObject(new Position(at.x, at.y, at.map)))];
     for (const rn of objects) {
       const category = dungeon.rnMaps.dbType(rn);
       if (category === DBType.DOOR) this.door(rn, out);
@@ -346,8 +348,8 @@ export class CellInfo {
   /**
    * A teleporter's destination, what it takes and how it turns them (`DB1`,
    * `src/data/dungeonTypes.ts`): to a facing when absolute, else by quarter turns
-   * clockwise (`MoveObject`, `doc/CSBwin-src/Code11f52.cpp:3002-3012`). One sending to
-   * its own square only turns.
+   * clockwise (`MoveObject`, `doc/CSBwin-src/Code11f52.cpp:3002-3012`). A rotator only
+   * turns.
    */
   private teleporter(at: CellRef, rn: ObjectID, out: InfoLine[]): void {
     const t = this.source.dungeon.getRecord(rn) as TeleporterRecord | null;
@@ -355,7 +357,7 @@ export class CellInfo {
     const scope = SCOPES[t.scope & 3];
     const rotation = t.rotation & 3;
     const link = { map: t.destMap, x: t.destX, y: t.destY };
-    if (link.map === at.map && link.x === at.x && link.y === at.y) {
+    if (this.sendsHome(at, rn)) {
       const text = t.absoluteRotation ? `Turns ${scope} to face ${SIDES[rotation]}`
         : rotation ? `Turns ${scope} ${TURNS[rotation]}` : `Leaves ${scope} as they are`;
       out.push({ text, indent: 0 });
@@ -363,6 +365,14 @@ export class CellInfo {
     }
     const turn = t.absoluteRotation ? `, facing ${SIDES[rotation]}` : rotation ? `, turned ${TURNS[rotation]}` : '';
     out.push({ text: `Sends ${scope} to ${this.place(link)}${turn}`, indent: 0, link });
+  }
+
+  /** `rn` is a teleporter sending to `at`, its own square: a rotator, which only turns. */
+  private sendsHome(at: CellRef, rn: ObjectID): boolean {
+    const { dungeon } = this.source;
+    if (dungeon.rnMaps.dbType(rn) !== DBType.TELEPORTER) return false;
+    const t = dungeon.getRecord(rn) as TeleporterRecord | null;
+    return !!t && t.destMap === at.map && t.destX === at.x && t.destY === at.y;
   }
 
   private actuator(at: CellRef, rn: ObjectID, room: number, out: InfoLine[]): void {

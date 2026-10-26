@@ -9,8 +9,8 @@
  *    at the party's square as the party's.
  * 3. **Where squares lead**: a teleporter's destination, and the teleporter among what
  *    arrives there; stairs and a pit's destination, `IncrementLevel`'s
- *    (`doc/CSBwin-src/CSBCode.cpp:4774`). A teleporter's turn, and one sending to its own
- *    square on level 3 only turning: right at (3,4), left at (5,0), to face south at (5,4)
+ *    (`doc/CSBwin-src/CSBCode.cpp:4774`). A teleporter's turn, and a rotator, one sending
+ *    to its own square, on level 3 only turning: right at (3,4), left at (5,0), to face south at (5,4)
  *    (`doc/CSBwin-src/Code11f52.cpp:3002-3012`).
  * 4. **A held pad, normally closed**: (25,3) closes the pit at (24,5) while pressed
  *    (`PressurePadOrAlcove`, `doc/CSBwin-src/Code11f52.cpp:3878-3895`).
@@ -93,6 +93,7 @@ function main(): void {
   check(!!line(describe(1, 30, 1), 'L2 (30,3)', { map: 1, x: 30, y: 3 }), '(30,1) names the teleporter at (30,3) among its arrivals');
   check(!!line(describe(1, 31, 1), 'Sends everything to L2 (29,4), facing E', { map: 1, x: 29, y: 4 }), 'the teleporter at (31,1) sends everything to (29,4), facing east');
   const right = describe(2, 3, 4);
+  check(right[0]?.text === '(3,4) Rotator, on, invisible', 'the teleporter at (3,4) of level 3, to its own square, is a rotator');
   check(!!line(right, 'Turns everything right') && !line(right, 'Sends') && !line(right, 'Teleporters to here'),
     'the teleporter at (3,4) of level 3, to its own square, only turns everything right, and is no arrival of its own');
   check(!!line(describe(2, 5, 0), 'Turns everything left'), 'the one at (5,0) turns everything left');
