@@ -7,39 +7,26 @@
  */
 
 import { BinaryFile, Endianness } from '../core/BinaryFile';
-import { Direction, DBType, OBJECT_ID_NULL, Position } from '../core/types';
+import { Direction, DBType, Position } from '../core/types';
 import type { ui8, ui16, ui32, ObjectID, CellFlag } from '../core/types';
 import type {
     DungeonData,
     DungeonHeader,
     MapDescriptor,
     MapData,
-    Databases,
-    DoorRecord,
-    TeleporterRecord,
-    TextRecord,
-    ActuatorRecord,
-    CreatureRecord,
-    WeaponRecord,
-    ClothingRecord,
-    ScrollRecord,
-    PotionRecord,
-    ContainerRecord,
-    MiscRecord,
-    MissileRecord,
-    CloudRecord,
-    DatabaseRecord
+    Database,
+    Databases
 } from './dungeonTypes';
+import { DATABASE_CODECS, type DatabaseCodec, type RecordOf } from './DatabaseCodecs';
 import { ExpandData } from '../core/compression';
 import { readU16BE, readU32BE } from '../core/bytes';
 import { EXPOOL_RECORD_SIZE, specialLocationsFromExpool } from './CsbwinExpool';
 import { readExtendedFeatures, readGameInfo } from './CsbwinExtendedFeatures';
 import { CheckCelltypes, ExtendPortraits, convertOriginalDungeon } from './CsbwinDungeonConversions';
 import { rnMapsOf } from './CsbwinObjectIndex';
-import { databaseRecords } from './dungeonTypes';
 import type { CsbwinObjectIndex } from './CsbwinObjectIndex';
 import { DUNGEON_HEADER_SIZE } from '../core/constants';
-import { computeDungeonImageLayout, dbEntrySize } from './DungeonImageLayout';
+import { computeDungeonImageLayout } from './DungeonImageLayout';
 
 /**
  * Dungeon.dat loader class
@@ -472,30 +459,11 @@ export class DungeonLoader {
     }
 
     /**
-     * Read one object reference: the object list, each record's link, a chest's
-     * contents, a monster's possessions, a missile's flying object. A `dungeon.dat`'s is
-     * packed until `convertObjectReferences` numbers it; a save's is a slot already.
+     * Read one object reference of the object list. A `dungeon.dat`'s is packed until
+     * `convertObjectReferences` numbers it; a save's is a slot already.
      */
     private readRN(): ObjectID {
         return this.file.readU16() as ObjectID;
-    }
-
-    /**
-     * A second RN inside a record that may be free — a monster's possessions, a chest's
-     * contents, a missile's flying object, a scroll's text.
-     *
-     * CSBWin marks a record deleted by writing `RNnul` over its link and frees the
-     * indirect slot that named it in the same breath (`DeleteDBEntry`,
-     * `doc/CSBwin-src/data.cpp:995-1017`); everything else in the record is left as it
-     * was. So in a save a free record routinely still holds a reference to a slot that
-     * has since been freed or reused. CSBWin never looks: a free record is reached only
-     * by the allocator, which clears it before handing it out. A free record's other RNs
-     * are read as `RNnul`, which is what the record means.
-     */
-    private readRNOfRecord(link: ObjectID): ObjectID {
-        const raw = this.file.readU16();
-        if (this.options.objectIndex && link === OBJECT_ID_NULL) return OBJECT_ID_NULL;
-        return raw as ObjectID;
     }
 
     /**
@@ -577,364 +545,33 @@ export class DungeonLoader {
     }
 
     /**
-     * Parse all databases
+     * The thirteen databases the port carries records for, each read through its codec
+     * (`src/data/DatabaseCodecs.ts`).
      */
     private parseDatabases(offsets: number[], counts: ui16[]): Databases {
         return {
-            doors: this.parseDoorDatabase(offsets[DBType.DOOR]!, counts[DBType.DOOR]!),
-            teleporters: this.parseTeleporterDatabase(offsets[DBType.TELEPORTER]!, counts[DBType.TELEPORTER]!),
-            texts: this.parseTextDatabase(offsets[DBType.TEXT]!, counts[DBType.TEXT]!),
-            actuators: this.parseActuatorDatabase(offsets[DBType.ACTUATOR]!, counts[DBType.ACTUATOR]!),
-            creatures: this.parseCreatureDatabase(offsets[DBType.CREATURE]!, counts[DBType.CREATURE]!),
-            weapons: this.parseWeaponDatabase(offsets[DBType.WEAPON]!, counts[DBType.WEAPON]!),
-            clothing: this.parseClothingDatabase(offsets[DBType.CLOTHING]!, counts[DBType.CLOTHING]!),
-            scrolls: this.parseScrollDatabase(offsets[DBType.SCROLL]!, counts[DBType.SCROLL]!),
-            potions: this.parsePotionDatabase(offsets[DBType.POTION]!, counts[DBType.POTION]!),
-            containers: this.parseContainerDatabase(offsets[DBType.CHEST]!, counts[DBType.CHEST]!),
-            misc: this.parseMiscDatabase(offsets[DBType.MISC]!, counts[DBType.MISC]!),
-            missiles: this.parseMissileDatabase(offsets[DBType.MISSILE]!, counts[DBType.MISSILE]!),
-            clouds: this.parseCloudDatabase(offsets[DBType.CLOUD]!, counts[DBType.CLOUD]!)
+            doors: this.parseDatabase(DBType.DOOR, offsets, counts),
+            teleporters: this.parseDatabase(DBType.TELEPORTER, offsets, counts),
+            texts: this.parseDatabase(DBType.TEXT, offsets, counts),
+            actuators: this.parseDatabase(DBType.ACTUATOR, offsets, counts),
+            creatures: this.parseDatabase(DBType.CREATURE, offsets, counts),
+            weapons: this.parseDatabase(DBType.WEAPON, offsets, counts),
+            clothing: this.parseDatabase(DBType.CLOTHING, offsets, counts),
+            scrolls: this.parseDatabase(DBType.SCROLL, offsets, counts),
+            potions: this.parseDatabase(DBType.POTION, offsets, counts),
+            containers: this.parseDatabase(DBType.CHEST, offsets, counts),
+            misc: this.parseDatabase(DBType.MISC, offsets, counts),
+            missiles: this.parseDatabase(DBType.MISSILE, offsets, counts),
+            clouds: this.parseDatabase(DBType.CLOUD, offsets, counts)
         };
     }
 
-    /**
-     * `count` records of database `db` as `DATABASES::Enlarge` clears them
-     * (`doc/CSBwin-src/data.cpp:865-876`): every byte 0 and the link `RNnul`, read
-     * through the database's own parser as a save's are, in the record shape
-     * `bigActuators` and `newScrolls` give. So a cleared record is what a save of it
-     * gives back: its other RNs are `RNnul` (`readRNOfRecord`).
-     */
-    clearedRecords(db: DBType, count: number, shape: { bigActuators?: boolean; newScrolls?: boolean }): DatabaseRecord[] {
-        const objectIndex = { length: 0, typeMap: new Uint8Array(0), indexMap: new Uint16Array(0) };
-        this.options = { bigActuators: shape.bigActuators, newScrolls: shape.newScrolls, objectIndex };
-        const size = dbEntrySize(db, this.options);
-        const bytes = new Uint8Array(count * size);
-        for (let i = 0; i < count; i++) bytes.fill(0xff, i * size, i * size + 2);
-        this.file.loadFromArray(bytes);
-        const counts = new Array<ui16>(16).fill(0);
-        counts[db] = count;
-        return [...databaseRecords(this.parseDatabases(new Array<number>(16).fill(0), counts), db)];
-    }
-
-    // Database parsers (to be continued in next message due to length)
-
-    private parseDoorDatabase(offset: number, count: ui16) {
-        this.file.seek(offset);
-        const records: DoorRecord[] = [];
-
-        for (let i = 0; i < count; i++) {
-            const nextObject = this.readRN();
-            const attributes = this.file.readU16();
-
-            records.push({
-                nextObject,
-                destructibleByChop: (attributes & 0x100) !== 0,
-                destructibleByFireball: (attributes & 0x80) !== 0,
-                hasButton: (attributes & 0x40) !== 0,
-                vertical: (attributes & 0x20) !== 0,
-                ornateNumber: (attributes >> 1) & 0xF,
-                doorType: attributes & 0x1,
-                word2Bits9_15: (attributes >> 9) & 0x7f
-            });
-        }
-
-        return { records, count };
-    }
-
-    private parseTeleporterDatabase(offset: number, count: ui16) {
-        this.file.seek(offset);
-        const records: TeleporterRecord[] = [];
-
-        for (let i = 0; i < count; i++) {
-            const nextObject = this.readRN();
-            const attributes = this.file.readU16();
-            const destination = this.file.readU16();
-
-            records.push({
-                nextObject,
-                sound: (attributes & 0x8000) !== 0,
-                scope: (attributes >> 13) & 0x3,
-                absoluteRotation: (attributes & 0x1000) !== 0,
-                rotation: (attributes >> 10) & 0x3,
-                destY: (attributes >> 5) & 0x1F,
-                destX: attributes & 0x1F,
-                destMap: (destination >> 8) & 0xFF,
-                word4Low: destination & 0xff
-            });
-        }
-
-        return { records, count };
-    }
-
-    private parseTextDatabase(offset: number, count: ui16) {
-        this.file.seek(offset);
-        const records: TextRecord[] = [];
-
-        for (let i = 0; i < count; i++) {
-            const nextObject = this.readRN();
-            const textRef = this.file.readU16();
-
-            records.push({
-                nextObject,
-                textOffset: (textRef >> 3) & 0x1FFF,
-                visible: (textRef & 0x1) !== 0,
-                word2Bits1_2: (textRef >> 1) & 0x3
-            });
-        }
-
-        return { records, count };
-    }
-
-    private parseActuatorDatabase(offset: number, count: ui16) {
-        this.file.seek(offset);
-        const records: ActuatorRecord[] = [];
-
-        for (let i = 0; i < count; i++) {
-            const nextObject = this.readRN();
-            const word2 = this.file.readU16();
-            const word4 = this.file.readU16();
-            const word6 = this.file.readU16();
-            const word8 = this.options.bigActuators ? this.file.readU16() : undefined;
-
-            records.push({
-                nextObject,
-                word2,
-                word4,
-                word6,
-                word8
-            });
-        }
-
-        return { records, count };
-    }
-
-    private parseCreatureDatabase(offset: number, count: ui16) {
-        this.file.seek(offset);
-        const records: CreatureRecord[] = [];
-
-        for (let i = 0; i < count; i++) {
-            const nextObject = this.readRN();
-            const possession = this.readRNOfRecord(nextObject);
-            const uByte4 = this.file.readU8();
-            const groupIndex = this.file.readU8();
-            const hp = [
-                this.file.readU16(),
-                this.file.readU16(),
-                this.file.readU16(),
-                this.file.readU16()
-            ];
-            const word14 = this.file.readU16();
-
-            records.push({
-                nextObject,
-                possession,
-                // DB4::monsterType() masks to 5 bits; the top three are the alternate
-                // graphic selector (doc/CSBwin-src/CSB.h:1116-1119).
-                creatureType: uByte4 & 0x1f,
-                alternateGraphics: (uByte4 >> 5) & 0x7,
-                groupIndex,
-                hp,
-                fear: word14 & 0xf,
-                numMonM1: (word14 >> 5) & 0x3,
-                facing: (word14 >> 8) & 0x3,
-                important: (word14 & 0x400) !== 0,
-                invisible: (word14 & 0x800) !== 0,
-                drawAsSize4: (word14 & 0x1000) !== 0,
-                unique: (word14 & 0x2000) !== 0,
-                poisoned: (word14 & 0x4000) !== 0,
-                word14Bit4: (word14 >> 4) & 1,
-                word14Bit7: (word14 >> 7) & 1,
-                word14Bit15: (word14 >> 15) & 1
-            });
-        }
-
-        return { records, count };
-    }
-
-    private parseWeaponDatabase(offset: number, count: ui16) {
-        this.file.seek(offset);
-        const records: WeaponRecord[] = [];
-
-        for (let i = 0; i < count; i++) {
-            const nextObject = this.readRN();
-            const attributes = this.file.readU16();
-
-            records.push({
-                nextObject,
-                broken: (attributes & 0x4000) !== 0,
-                charges: (attributes >> 10) & 0xF,
-                litTorch: (attributes & 0x8000) !== 0,
-                poisoned: (attributes & 0x200) !== 0,
-                cursed: (attributes & 0x100) !== 0,
-                important: (attributes & 0x80) !== 0,
-                weaponType: attributes & 0x7F
-            });
-        }
-
-        return { records, count };
-    }
-
-    private parseClothingDatabase(offset: number, count: ui16) {
-        this.file.seek(offset);
-        const records: ClothingRecord[] = [];
-
-        for (let i = 0; i < count; i++) {
-            const nextObject = this.readRN();
-            const attributes = this.file.readU16();
-
-            records.push({
-                nextObject,
-                broken: (attributes & 0x2000) !== 0,
-                charges: (attributes >> 9) & 0xF,
-                cursed: (attributes & 0x100) !== 0,
-                important: (attributes & 0x80) !== 0,
-                clothingType: attributes & 0x7F,
-                word2Bits14_15: (attributes >> 14) & 0x3
-            });
-        }
-
-        return { records, count };
-    }
-
-    private parseScrollDatabase(offset: number, count: ui16) {
-        this.file.seek(offset);
-        const records: ScrollRecord[] = [];
-
-        for (let i = 0; i < count; i++) {
-            const nextObject = this.readRN();
-            if (this.options.newScrolls) {
-                // `DB7` (`doc/CSBwin-src/CSB.h:1198-1219`): link, then an RN to the text
-                // record, then a word whose bit 0 is "open". The RN's record index is
-                // exactly what the old 10-bit field held, so storing that keeps every
-                // reader of `textReference` unchanged.
-                const textRn = this.readRNOfRecord(nextObject);
-                const flags = this.file.readU16();
-                const index = this.options.objectIndex;
-                records.push({
-                    nextObject,
-                    open: (flags & 0x1) !== 0,
-                    textReference: index && textRn < index.length ? index.indexMap[textRn]! : textRn & 0x3FF,
-                    textObject: textRn,
-                    word4Bits1_15: (flags >> 1) & 0x7fff
-                });
-                continue;
-            }
-            const attributes = this.file.readU16();
-
-            records.push({
-                nextObject,
-                open: ((attributes >> 10) & 0x3F) === 0,
-                textReference: attributes & 0x3FF,
-                word2Bits10_15: (attributes >> 10) & 0x3F
-            });
-        }
-
-        return { records, count };
-    }
-
-    private parsePotionDatabase(offset: number, count: ui16) {
-        this.file.seek(offset);
-        const records: PotionRecord[] = [];
-
-        for (let i = 0; i < count; i++) {
-            const nextObject = this.readRN();
-            const attributes = this.file.readU16();
-
-            records.push({
-                nextObject,
-                important: (attributes & 0x8000) !== 0,
-                potionType: (attributes >> 8) & 0x7F,
-                power: attributes & 0xFF
-            });
-        }
-
-        return { records, count };
-    }
-
-    private parseContainerDatabase(offset: number, count: ui16) {
-        this.file.seek(offset);
-        const records: ContainerRecord[] = [];
-
-        for (let i = 0; i < count; i++) {
-            const nextObject = this.readRN();
-            const containedObject = this.readRNOfRecord(nextObject);
-            const word4 = this.file.readU16();
-            // `DB9::m_uByte6[2]` — the two bytes that close the record. Zero in every file
-            // here, but no more derivable than `FILL2`.
-            const uByte6 = [this.file.readU8(), this.file.readU8()];
-
-            records.push({
-                nextObject,
-                containedObject,
-                containerType: (word4 >> 1) & 0x3,
-                word4,
-                uByte6
-            });
-        }
-
-        return { records, count };
-    }
-
-    private parseMiscDatabase(offset: number, count: ui16) {
-        this.file.seek(offset);
-        const records: MiscRecord[] = [];
-
-        for (let i = 0; i < count; i++) {
-            const nextObject = this.readRN();
-            const attributes = this.file.readU16();
-
-            records.push({
-                nextObject,
-                specialState: (attributes >> 14) & 0x3,
-                important: (attributes & 0x80) !== 0,
-                miscType: attributes & 0x7F,
-                cursed: (attributes & 0x100) !== 0,
-                subType: (attributes >> 9) & 0x1F
-            });
-        }
-
-        return { records, count };
-    }
-
-    private parseMissileDatabase(offset: number, count: ui16) {
-        this.file.seek(offset);
-        const records: MissileRecord[] = [];
-
-        for (let i = 0; i < count; i++) {
-            const nextObject = this.readRN();
-            const projectileObject = this.readRNOfRecord(nextObject);
-            const rangeRemaining = this.file.readU8();
-            const damageRemaining = this.file.readU8();
-            const timerIndex = this.file.readU16();
-
-            records.push({
-                nextObject,
-                projectileObject,
-                rangeRemaining,
-                damageRemaining,
-                timerIndex
-            });
-        }
-
-        return { records, count };
-    }
-
-    private parseCloudDatabase(offset: number, count: ui16) {
-        this.file.seek(offset);
-        const records: CloudRecord[] = [];
-
-        for (let i = 0; i < count; i++) {
-            const nextObject = this.readRN();
-            const attributes = this.file.readU16();
-
-            records.push({
-                nextObject,
-                value: (attributes >> 8) & 0xFF,
-                cloudType: attributes & 0x7F,
-                bit7: (attributes & 0x80) !== 0
-            });
-        }
-
+    private parseDatabase<D extends keyof RecordOf>(db: D, offsets: number[], counts: ui16[]): Database<RecordOf[D]> {
+        const codec: DatabaseCodec<RecordOf[D]> = DATABASE_CODECS[db];
+        const count = counts[db]!;
+        this.file.seek(offsets[db]!);
+        const records: RecordOf[D][] = [];
+        for (let i = 0; i < count; i++) records.push(codec.read(this.file, this.options));
         return { records, count };
     }
 

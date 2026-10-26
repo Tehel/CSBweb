@@ -27,7 +27,7 @@
  * one and fail on the other. And `dungeon.dat` stores **packed** RNs, which a world read
  * without its conversions keeps, so its blocks 10 and 13 are its own words too.
  *
- * What writing it found, all of it in the record parsers rather than in the writer: the
+ * What writing it found, all of it in the record readers rather than in the writer: the
  * door's `word2` bits 9-15, the teleporter's low `word4` byte, the text record's `word2`
  * bits 1-2, the creature's `word14` bits 4 and 15, the clothing item's `word2` bits
  * 14-15, both scroll forms' leftover bits, the chest's whole `word4` and its two trailing
@@ -397,7 +397,7 @@ function compareObjectList(s: Subject, mine: Uint8Array): void {
  * named it, but leaves the rest of the record alone (`doc/CSBwin-src/data.cpp:995-1017`),
  * so a deleted record routinely still points its possession or contents chain at a slot
  * that has since been freed or reused.
- * `DungeonLoader.readRNOfRecord` reads those and drops them, because resolving one is
+ * `readRNOfRecord` (`src/data/DatabaseCodecs.ts`) reads those and drops them, because resolving one is
  * meaningless and refusing one would make a perfectly good save unreadable, so the writer
  * has nothing to put back but `RNnul`. CSBWin never looks at them: a free record is
  * reached only by the allocator, which clears it before handing it out. The same

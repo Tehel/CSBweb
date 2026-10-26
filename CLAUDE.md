@@ -159,8 +159,9 @@ core/       BinaryFile (big-endian cursor), bytes (free byte reads), compression
             and possessions), Die (what CSBWin's `die` throws)
 data/       DataSets (the manifest's sets), LocalDataSets (a player's own, a record of the
             store's), DataSetFiles (a set's files read by name, from its folder or its record),
-            DungeonLoader, DungeonFileWriter (a `dungeon.dat` written, with its Extended
-            Features block), GraphicsLoader, CSBGraphicsLoader, CSBGraphicsWriter (a
+            DungeonLoader, DatabaseCodecs (each database's records, read and written),
+            DungeonFileWriter (a `dungeon.dat` written, with its Extended Features block),
+            GraphicsLoader, CSBGraphicsLoader, CSBGraphicsWriter (a
             `CSBgraphics.dat` written: overlays, overlay palettes, wall decorations),
             SaveGameLoader, HeroExtractor, HintOracleLoader (CSB's `hcsb.hct`),
             SwooshLoader (the Atari disk's `swoosh.img`), UtilityPortraits (the CSB utility disk's faces, RISE's NEW FACE)

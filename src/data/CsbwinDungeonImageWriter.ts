@@ -31,21 +31,16 @@ import { writeU16BE, writeU32LE } from '../core/bytes';
 import { EXPOOL_RECORD_SIZE } from './CsbwinExpool';
 import { levelCellOffsets } from './DungeonLoader';
 import { dbEntrySize, type DatabaseShape } from './DungeonImageLayout';
-import { DBType, OBJECT_ID_NULL } from '../core/types';
-import type {
-    ActuatorRecord, ClothingRecord, CloudRecord, ContainerRecord, CreatureRecord, DatabaseRecord,
-    DoorRecord, DungeonData, DungeonHeader, MapData, MapDescriptor, MiscRecord,
-    MissileRecord, PotionRecord, ScrollRecord, TeleporterRecord, TextRecord, WeaponRecord,
-} from './dungeonTypes';
+import { DBType } from '../core/types';
+import type { DungeonData, DungeonHeader, MapData, MapDescriptor } from './dungeonTypes';
 import { databaseOf } from './dungeonTypes';
+import { databaseCodec } from './DatabaseCodecs';
 
 /** `sizeof(DUNGEONDATINDEX)` — six words plus `dbSizes[16]`. */
 export const DUNGEON_IMAGE_HEADER_SIZE = 44;
 
 /** `sizeof(LEVELDESC)`. */
 export const LEVEL_DESCRIPTOR_SIZE = 16;
-
-const bit = (b: boolean | undefined): number => (b ? 1 : 0);
 
 /**
  * Block 7 — `DUNGEONDATINDEX` (`doc/CSBwin-src/CSB.h:2120-2145`), 22 big-endian words.
@@ -270,14 +265,10 @@ type DatabaseWriteOptions = Pick<DatabaseShape, 'bigActuators' | 'newScrolls'>;
  * Block 13 — all sixteen databases, back to back, in `DBType` order
  * (`doc/CSBwin-src/SaveGame.cpp:1297-1313`).
  *
- * This is the inverse of `DungeonLoader`'s thirteen record parsers, field for field and
- * bit for bit against the `DBn` classes in `doc/CSBwin-src/CSB.h:821-1348`. Every bit is
- * carried on the record, those the game never reads too — the door's `word2` bits 9-15,
- * the chest's whole `word4` and its two trailing bytes, the misc item's `cursed` and
- * `subType`, the new scroll's uninitialised `word4` debris — and named in
- * `src/data/dungeonTypes.ts`.
+ * Each record goes out through its database's codec (`src/data/DatabaseCodecs.ts`), the
+ * inverse of the one `DungeonLoader` reads it with.
  *
- * Three of the sixteen have no record parser:
+ * Three of the sixteen have no codec:
  *
  * - **11, `EXPOOL`.** Written from `dungeon.expool`, the blocks the world holds. The key
  *   of each champion bones record is the bones' RN (`src/data/CsbwinExpool.ts`). The DSA
@@ -298,7 +289,7 @@ function buildDatabases(
     return buf;
 }
 
-/** One database's records. Exported so a tool can compare them a section at a time. */
+/** One database's records. */
 function buildDatabase(
     dungeon: DungeonData,
     db: number,
@@ -325,7 +316,8 @@ function buildDatabase(
     }
 
     const database = databaseOf(dungeon.databases, db as DBType);
-    if (!database) throw new Error(`database ${db} has no records in this port`);
+    const codec = databaseCodec(db as DBType);
+    if (!database || !codec) throw new Error(`database ${db} has no records in this port`);
     const records = database.records;
     if (records.length !== declared) {
         throw new Error(
@@ -334,174 +326,8 @@ function buildDatabase(
     }
 
     const buf = new Uint8Array(declared * size);
-    for (let i = 0; i < declared; i++) {
-        writeRecord(buf, i * size, db, records[i]!, options);
-    }
+    for (let i = 0; i < declared; i++) codec.write(buf, i * size, records[i]!, options);
     return buf;
-}
-
-/**
- * One record, at `at`. Each branch is the exact inverse of the matching
- * `DungeonLoader.parse*Database` and of the `DBn` bitfield comments in `CSB.h`.
- *
- * A **free** record's secondary RN — a creature's possessions, a chest's contents, a
- * missile's flying object, a scroll's text — cannot be reproduced, and deliberately so:
- * `DeleteDBEntry` writes `RNnul` over the link and frees the indirect slot but leaves the
- * rest of the record alone (`doc/CSBwin-src/data.cpp:995-1017`), so a free record
- * routinely still points at a slot that has since been freed. `readRNOfRecord` reads
- * those and drops them, which is the only reading that does not make a perfectly good
- * save unreadable, and this writes `RNnul` back where the file holds the stale slot.
- * `tools/checks/dungeon-image-blocks.ts` exempts exactly those words, by name.
- */
-function writeRecord(
-    buf: Uint8Array,
-    at: number,
-    db: number,
-    record: DatabaseRecord,
-    options: DatabaseWriteOptions,
-): void {
-    const link = (record as { nextObject: number }).nextObject;
-    writeU16BE(buf, at, link & 0xffff);
-
-    switch (db) {
-        case DBType.DOOR: {
-            const r = record as DoorRecord;
-            // `DB0::word2` (`doc/CSBwin-src/CSB.h:825-848`).
-            writeU16BE(buf, at + 2,
-                ((r.word2Bits9_15 ?? 0) << 9) | (bit(r.destructibleByChop) << 8) |
-                (bit(r.destructibleByFireball) << 7) | (bit(r.hasButton) << 6) |
-                (bit(r.vertical) << 5) | ((r.ornateNumber & 0xf) << 1) | (r.doorType & 1));
-            return;
-        }
-        case DBType.TELEPORTER: {
-            const r = record as TeleporterRecord;
-            // `DB1::word2` and `word4` (`doc/CSBwin-src/CSB.h:852-898`).
-            writeU16BE(buf, at + 2,
-                (bit(r.sound) << 15) | ((r.scope & 3) << 13) | (bit(r.absoluteRotation) << 12) |
-                ((r.rotation & 3) << 10) | ((r.destY & 0x1f) << 5) | (r.destX & 0x1f));
-            writeU16BE(buf, at + 4, ((r.destMap & 0xff) << 8) | (r.word4Low ?? 0));
-            return;
-        }
-        case DBType.TEXT: {
-            const r = record as TextRecord;
-            // `DB2::word2` — `index()` is bits 3-15, `show()` bit 0
-            // (`doc/CSBwin-src/CSB.h:991-1005`).
-            writeU16BE(buf, at + 2,
-                ((r.textOffset & 0x1fff) << 3) | ((r.word2Bits1_2 ?? 0) << 1) | bit(r.visible));
-            return;
-        }
-        case DBType.ACTUATOR: {
-            const r = record as ActuatorRecord;
-            // `DB3` keeps all four words raw here; every accessor is a bitfield of them.
-            writeU16BE(buf, at + 2, r.word2 & 0xffff);
-            writeU16BE(buf, at + 4, r.word4 & 0xffff);
-            writeU16BE(buf, at + 6, r.word6 & 0xffff);
-            if (options.bigActuators) writeU16BE(buf, at + 8, (r.word8 ?? 0) & 0xffff);
-            return;
-        }
-        case DBType.CREATURE: {
-            const r = record as CreatureRecord;
-            // `DB4` (`doc/CSBwin-src/CSB.h:1078-1142`).
-            writeU16BE(buf, at + 2, writtenSecondary(r.possession, link));
-            buf[at + 4] = ((r.alternateGraphics & 7) << 5) | (r.creatureType & 0x1f);
-            buf[at + 5] = r.groupIndex & 0xff;
-            for (let h = 0; h < 4; h++) writeU16BE(buf, at + 6 + h * 2, (r.hp[h] ?? 0) & 0xffff);
-            writeU16BE(buf, at + 14,
-                ((r.word14Bit15 ?? 0) << 15) | (bit(r.poisoned) << 14) | (bit(r.unique) << 13) |
-                (bit(r.drawAsSize4) << 12) | (bit(r.invisible) << 11) | (bit(r.important) << 10) |
-                ((r.facing & 3) << 8) | ((r.word14Bit7 ?? 0) << 7) | ((r.numMonM1 & 3) << 5) |
-                ((r.word14Bit4 ?? 0) << 4) | (r.fear & 0xf));
-            return;
-        }
-        case DBType.WEAPON: {
-            const r = record as WeaponRecord;
-            // `DB5::word2` (`doc/CSBwin-src/CSB.h:1144-1177`).
-            writeU16BE(buf, at + 2,
-                (bit(r.litTorch) << 15) | (bit(r.broken) << 14) | ((r.charges & 0xf) << 10) |
-                (bit(r.poisoned) << 9) | (bit(r.cursed) << 8) | (bit(r.important) << 7) |
-                (r.weaponType & 0x7f));
-            return;
-        }
-        case DBType.CLOTHING: {
-            const r = record as ClothingRecord;
-            // `DB6::word2` (`doc/CSBwin-src/CSB.h:1179-1195`).
-            writeU16BE(buf, at + 2,
-                ((r.word2Bits14_15 ?? 0) << 14) | (bit(r.broken) << 13) | ((r.charges & 0xf) << 9) |
-                (bit(r.cursed) << 8) | (bit(r.important) << 7) | (r.clothingType & 0x7f));
-            return;
-        }
-        case DBType.SCROLL: {
-            const r = record as ScrollRecord;
-            if (options.newScrolls) {
-                // `DB7` in its six-byte form: link, an RN to the text record, then a word
-                // whose bit 0 is `open` (`doc/CSBwin-src/CSB.h:1198-1219`). The text RN
-                // is a secondary reference and follows the free-record rule above.
-                const text = r.textObject;
-                if (text === undefined) throw new Error('a four-byte scroll cannot be written as a six-byte one');
-                writeU16BE(buf, at + 2, writtenSecondary(text, link));
-                writeU16BE(buf, at + 4, ((r.word4Bits1_15 ?? 0) << 1) | bit(r.open));
-                return;
-            }
-            // The four-byte form: bits 0-9 a text index, 10-15 the `b10_15()` the new
-            // form's `open` was derived from.
-            writeU16BE(buf, at + 2,
-                ((r.word2Bits10_15 ?? (r.open ? 0 : 1)) << 10) | (r.textReference & 0x3ff));
-            return;
-        }
-        case DBType.POTION: {
-            const r = record as PotionRecord;
-            // `DB8::word2` (`doc/CSBwin-src/CSB.h:1221-1237`).
-            writeU16BE(buf, at + 2,
-                (bit(r.important) << 15) | ((r.potionType & 0x7f) << 8) | (r.power & 0xff));
-            return;
-        }
-        case DBType.CHEST: {
-            const r = record as ContainerRecord;
-            // `DB9` (`doc/CSBwin-src/CSB.h:1239-1253`): link, contents, `m_word4`,
-            // `m_uByte6[2]`. `containerType` is bits 1-2 of `m_word4`; the rest of that
-            // word is carried, because it is not zero and CSBWin names none of it.
-            writeU16BE(buf, at + 2, writtenSecondary(r.containedObject, link));
-            writeU16BE(buf, at + 4, (r.word4 ?? ((r.containerType & 3) << 1)) & 0xffff);
-            buf[at + 6] = (r.uByte6?.[0] ?? 0) & 0xff;
-            buf[at + 7] = (r.uByte6?.[1] ?? 0) & 0xff;
-            return;
-        }
-        case DBType.MISC: {
-            const r = record as MiscRecord;
-            // `DB10::word2` (`doc/CSBwin-src/CSB.h:1268-1308`).
-            writeU16BE(buf, at + 2,
-                ((r.specialState & 3) << 14) | ((r.subType ?? 0) << 9) | (bit(r.cursed) << 8) |
-                (bit(r.important) << 7) | (r.miscType & 0x7f));
-            return;
-        }
-        case DBType.MISSILE: {
-            const r = record as MissileRecord;
-            // `DB14` (`doc/CSBwin-src/CSB.h:1320-1331`).
-            writeU16BE(buf, at + 2, writtenSecondary(r.projectileObject, link));
-            buf[at + 4] = r.rangeRemaining & 0xff;
-            buf[at + 5] = r.damageRemaining & 0xff;
-            writeU16BE(buf, at + 6, r.timerIndex & 0xffff);
-            return;
-        }
-        case DBType.CLOUD: {
-            const r = record as CloudRecord;
-            // `DB15::word2` (`doc/CSBwin-src/CSB.h:1333-1348`).
-            writeU16BE(buf, at + 2,
-                ((r.value & 0xff) << 8) | (bit(r.bit7) << 7) | (r.cloudType & 0x7f));
-            return;
-        }
-        default:
-            throw new Error(`database ${db} has no record writer`);
-    }
-}
-
-/**
- * A record's second RN. `RNnul` when the record is free, for the reason `writeRecord`
- * gives — the reader dropped whatever the file held there.
- */
-function writtenSecondary(rn: number, link: number): number {
-    if (link === OBJECT_ID_NULL) return OBJECT_ID_NULL;
-    return rn & 0xffff;
 }
 
 /** Every section of the image, in file order. Blocks 7-14. */

@@ -339,7 +339,7 @@ Strikes Back's two.
 `loadCsbwinWorld` in `src/data/CsbwinDungeonImage.ts`
 reads a genuine save into a real `DungeonData` — header, level descriptors, column
 index, object list, indirect text, all sixteen databases and the cell flags. It does
-not reimplement the record parsers: the image *is* `dungeon.dat`'s structure, so it
+not reimplement the records' codecs: the image *is* `dungeon.dat`'s structure, so it
 hands the byte range to `DungeonLoader` with a `DungeonImageOptions` describing the
 three differences (big actuators, new scrolls, indirect text) that the Extended
 Features block declares.

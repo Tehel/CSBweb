@@ -11,7 +11,7 @@
  *
  * Every RN goes back out as the slot it was read as, with the file's own object indirect
  * index, so the RN words come back as they were. It is not a whole-file byte comparison:
- * the reader reads a free record's second RN as `RNnul` (`DungeonLoader.readRNOfRecord`),
+ * the reader reads a free record's second RN as `RNnul` (`readRNOfRecord`, `src/data/DatabaseCodecs.ts`),
  * 136 words of `csbgame-early-1hero.dat`, and the closing checksum follows them.
  * `tools/checks/dungeon-image-blocks.ts` and
  * `tools/checks/save-blocks-vs-file.ts` make the byte-for-byte argument block by block;

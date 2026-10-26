@@ -413,19 +413,18 @@ What a save is passes through `ExtendedFeaturesBlock`, `readExtendedFeatures`'s 
 - **`Chaos` reads and writes the file again**: `Chaos.readGame` (`src/engine/Chaos.ts:102`)
   walks blocks 1 to 6 with its own hash and checksum offsets, and `TAG000fc4` (`:327`)
   writes the scramble and the checksum again.
-- **The records' codecs are inverses kept by hand**: thirteen `parse*Database` methods in
-  `DungeonLoader` read them, and `CsbwinDungeonImageWriter.writeRecord`'s switch of fourteen
-  `record as XRecord` casts writes them (`:370-510`); `DatabaseRecord` is a union with no
-  discriminant.
 - A load installs the world, then applies a snapshot of that same world over it
   (`src/engine/CsbwinSaveGame.ts:350`), where a new game's read applies none (`ReadState`'s
   optional `snapshot`).
 
-Paying it, in steps: a codec per database type, `{ size, read, write }` in a `DBType`-keyed
-table; one pure `SaveFile` codec with required fields (each block's bytes and its parsed
-view), shared by the loader, the writer, `Chaos`, `legacyRows` and `CsbwinSaveInfo`;
-`toSaveFile(game)` and `fromSaveFile(game, file)` on the engine's side, and
-`RuntimeSaveState` out of the save path. C178 is the kind of asymmetry it removes.
+Paying it, in steps. The records are done: each database has its codec, `{ read, write }`
+in the `DBType`-keyed `DATABASE_CODECS` (`src/data/DatabaseCodecs.ts`), which
+`DungeonLoader`, the image writer and `clearedRecords` share, a record's size being
+`dbEntrySize`, CSBWin's table. What is left: one pure `SaveFile` codec with required fields
+(each block's bytes and its parsed view), shared by the loader, the writer, `Chaos`,
+`legacyRows` and `CsbwinSaveInfo`; then `toSaveFile(game)` and `fromSaveFile(game, file)`
+on the engine's side, and `RuntimeSaveState` out of the save path. C178 is the kind of
+asymmetry it removes.
 
 ---
 

@@ -34,7 +34,7 @@ import { DecodeText, SubstituteCharacterNames, type TextSubstitution } from '../
 import { Expool } from '../data/CsbwinExpool';
 import { SkinCache } from './SkinCache';
 import { groupFacingsByte } from './monsterPosition';
-import { DungeonLoader } from '../data/DungeonLoader';
+import { clearedRecords } from '../data/DatabaseCodecs';
 import type { DungeonSnapshot } from './DungeonSnapshot';
 import { applyDungeonSnapshot, captureDungeonSnapshot } from './DungeonSnapshot';
 import type { RnMaps } from '../core/RnMaps';
@@ -516,7 +516,7 @@ export class DungeonState {
             const database = databaseOf(this.data.databases, db as DBType);
             if (spares === 0) continue;
             if (database === undefined) throw new Error(`Byte7302 gives database ${db} ${spares} spare records`);
-            database.records.push(...new DungeonLoader().clearedRecords(db as DBType, spares, this.data));
+            database.records.push(...clearedRecords(db as DBType, spares, this.data));
             database.count = database.records.length & 0xffff;
             this.data.header.objectCounts[db] = database.count;
         }
@@ -538,7 +538,7 @@ export class DungeonState {
         if (records.length >= dbMax(dbType)) return -1;
         const iNew = records.length;
         const newSize = iNew + 100;
-        records.push(...new DungeonLoader().clearedRecords(dbType, 100, this.data));
+        records.push(...clearedRecords(dbType, 100, this.data));
         database.count = newSize & 0xffff;
         this.data.header.objectCounts[dbType] = newSize & 0xffff;
         records[iNew]!.nextObject = OBJECT_ID_EOF;
