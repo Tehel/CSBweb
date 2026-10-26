@@ -64,6 +64,7 @@ import { FEED_PARAMETER_WORDS, feedParametersFromWords, feedParametersToWords, t
 import { ATTACK_PARAMETER_WORDS, attackParametersFromWords, attackParametersToWords, type AttackParameters } from './filterParameters';
 import { DELETE_MONSTER_PARAMETER_WORDS, deleteMonsterParametersFromWords, deleteMonsterParametersToWords, type DeleteMonsterParameters } from './filterParameters';
 import { PARTY_MOVE_DATA_WORDS, partyMoveDataFromWords, partyMoveDataToWords, type PartyMoveData } from './filterParameters';
+import { DsaBank, ProgramCursor, type ExecutionPacket } from './dsa/DsaMachine';
 import { CursorFilterType, DsaVars, DsaVarType, StkOp, ViewingFilterSite, type CursorFilterPacket, type PartyAttackFilter, type ViewingFilterOptions, type ViewingFilterResult } from './dsa/DsaTypes';
 
 enum DsaCommand {
@@ -184,182 +185,6 @@ interface ViewingFilterContext {
 }
 
 /**
- * `STACK` (`doc/CSBwin-src/DSA.cpp:370-424`): 100 values, and `die` on an overflow
- * (`0xdcd6`), an underflow (`0xdcd7`), a pick or a poke past the bottom (`0xdcdb`) and a
- * roll past it (`0xdcda`). `fail` is that `die`, `underflow` asking for its "DSA stack
- * underflow" message; the overflow's has none.
- */
-class DsaStack {
-  private stack: number[] = [];
-
-  constructor(private readonly fail: (errorNum: number, underflow: boolean) => never) {}
-
-  clear(): void {
-    this.stack.length = 0;
-  }
-
-  push(value: number): void {
-    if (this.stack.length > 99) this.fail(0xdcd6, false);
-    this.stack.push(value | 0);
-  }
-
-  pop(): number {
-    if (this.stack.length < 1) this.fail(0xdcd7, true);
-    return this.stack.pop()!;
-  }
-
-  /** The `ui32` index's `i+1`, which wraps as the C's does. */
-  private reach(index: number): number {
-    return ((index >>> 0) + 1) >>> 0;
-  }
-
-  pick(index: number): void {
-    if (this.stack.length < this.reach(index)) this.fail(0xdcdb, true);
-    this.push(this.stack[this.stack.length - 1 - (index >>> 0)] ?? 0);
-  }
-
-  poke(index: number): void {
-    const value = this.pop();
-    const i = index >>> 0;
-    if (this.stack.length < i) this.fail(0xdcdb, true);
-    // `stack[stacklen-i] = v`: 0 writes the slot above the top, which holds nothing.
-    if (i > 0) this.stack[this.stack.length - i] = value;
-  }
-
-  roll(index: number): void {
-    if (this.stack.length < this.reach(index)) this.fail(0xdcda, true);
-    const start = this.stack.length - 1 - (index >>> 0);
-    const value = this.stack[start];
-    for (let i = start; i < this.stack.length - 1; i++) {
-      this.stack[i] = this.stack[i + 1] ?? 0;
-    }
-    this.stack[this.stack.length - 1] = value ?? 0;
-  }
-
-  minusRoll(index: number): void {
-    if (this.stack.length < this.reach(index)) this.fail(0xdcda, true);
-    const end = this.stack.length - 1;
-    const start = end - (index >>> 0);
-    const value = this.stack[end];
-    for (let i = end; i > start; i--) {
-      this.stack[i] = this.stack[i - 1] ?? 0;
-    }
-    this.stack[start] = value ?? 0;
-  }
-}
-
-class DsaBank {
-  readonly stack: DsaStack;
-  forceState = -1;
-  mostRecentInterestingObjectID = -1;
-  filter = false;
-  indirectActionDelay = -1;
-  /**
-   * `m_objectDeleteList` (`doc/CSBwin-src/DSA.cpp:133`) — what `&DEL` has condemned,
-   * chained through the records' own links, freed only once the run is over.
-   */
-  objectDeleteList: ObjectID = OBJECT_ID_EOF;
-  /**
-   * `numText` and `textStrings` (`doc/CSBwin-src/DSA.cpp:127-128`): the run's ten texts,
-   * which `&TEXT@` and `&CHARNAME@` set, none until the first is.
-   */
-  private texts: Array<string | null> | null = null;
-
-  /** `trace` says what CSBWin's `NoValue` asks in its message box; `fail` is the stack's `die`. */
-  constructor(
-    public vars: DsaVars,
-    private readonly trace: (line: string) => void,
-    fail: (errorNum: number, underflow: boolean) => never,
-  ) {
-    this.stack = new DsaStack(fail);
-  }
-
-  /** `DSADBANK::SetText` (`doc/CSBwin-src/DSA.cpp:195-206`): an index past 9 sets nothing. */
-  setText(text: string, index: number): void {
-    if (index > 9) return;
-    this.texts ??= new Array<string | null>(10).fill(null);
-    this.texts[index] = text;
-  }
-
-  /**
-   * `DSADBANK::GetText` (`doc/CSBwin-src/DSA.cpp:208-213`): "" for a text never set. An
-   * index past 9 reads past CSBWin's array once any text is set; here it reads "".
-   */
-  getText(index: number): string {
-    if (!this.texts) return '';
-    return this.texts[index >>> 0] ?? '';
-  }
-
-  /**
-   * `DSADBANK::Var(i)` (`doc/CSBwin-src/DSA.cpp:142`): a variable not well defined, never
-   * set or past a short `&PARAM@`, is zeroed by the read (`NoValue`).
-   */
-  getVar(index: number): number {
-    if (index < 0 || index >= this.vars.values.length) return 0;
-    if (this.vars.definedFlags[index] !== DsaVarType.WellDefined) {
-      this.noValue(index);
-      return 0;
-    }
-    return this.vars.values[index] ?? 0;
-  }
-
-  /**
-   * `DSADBANK::NoValue` (`doc/CSBwin-src/DSA.cpp:228-239`): the variable is zeroed, and
-   * the message box CSBWin raises, until its player answers "yes" to suppress it, is a
-   * trace each time.
-   */
-  private noValue(index: number): void {
-    this.vars.values[index] = 0;
-    this.trace(`DSA variable[${index}] used without having been assigned a value.`);
-  }
-
-  setVar(index: number, value: number): void {
-    if (index < 0 || index >= this.vars.values.length) return;
-    this.vars.values[index] = value | 0;
-    this.vars.definedFlags[index] = DsaVarType.WellDefined;
-  }
-
-  /**
-   * `DSADBANK::SetVarBit` (`doc/CSBwin-src/DSA.cpp:144`): a variable not well defined is
-   * zeroed (`NoValue`) before the bit goes in, and is still not well defined after.
-   * `&CELL@`, its one caller, has set the variable to 0 first.
-   */
-  setVarBit(index: number, bitmask: number): void {
-    if (index < 0 || index >= this.vars.values.length) return;
-    if (this.vars.definedFlags[index] !== DsaVarType.WellDefined) this.noValue(index);
-    this.vars.values[index] = (this.vars.values[index] ?? 0) | bitmask;
-  }
-
-  setVarState(index: number, state: DsaVarType): void {
-    if (index < 0 || index >= this.vars.definedFlags.length) return;
-    this.vars.definedFlags[index] = state;
-  }
-
-  getVarState(index: number): DsaVarType {
-    if (index < 0 || index >= this.vars.definedFlags.length) return DsaVarType.Undefined;
-    return this.vars.definedFlags[index] as DsaVarType;
-  }
-}
-
-interface ExecutionPacket {
-  program: Uint16Array;
-  pc: number;
-  wordsRemaining: number;
-  curState: number;
-  column: number;
-  nextState: number;
-  transferState: number;
-  transferCol: number;
-  locrMaster: LocationRel;
-  locrSlave: LocationRel;
-  rnMaster: ObjectID;
-  rnSlave: ObjectID;
-  master: DsaDefinition;
-  slave: DsaDefinition;
-  subroutineLevel: number;
-}
-
-/**
  * The timer a filter site hands `ProcessDSAFilter`: the filter's square on its level, with
  * function and position 0 (`doc/CSBwin-src/CSBCode.cpp:8788-8794`, `Sound.cpp:729-732`).
  */
@@ -391,25 +216,6 @@ interface MonsterMoveFilterLocation {
   maxDistance: number;
   partyLevelOnly: number;
   filterObj: ObjectID;
-}
-
-function signExtend(value: number, bits: number): number {
-  const sign = 1 << (bits - 1);
-  return (value & (sign - 1)) - (value & sign);
-}
-
-/**
- * `IsMaxState` (`doc/CSBwin-src/Data.h:1904-2399`): every command compares its
- * relative-state field with `-MAXSTATE`. For all but `QUESTION`, whose `MAXSTATE` is 2,
- * that value is out of the signed field's range, so no other command reads the word.
- */
-function isMaxState(relState: number, maxState: number): boolean {
-  return relState === -maxState;
-}
-
-function readSignedWord(word: number): number {
-  const value = word & 0xffff;
-  return value & 0x8000 ? value - 0x10000 : value;
 }
 
 /** `bitCounts` (`doc/CSBwin-src/DSA.cpp:46`): the set bits of a nibble. */
@@ -1255,14 +1061,8 @@ export class DsaSystem {
     bank.stack.clear();
     bank.filter = filter;
     const finalState = this.execute({
-      program: new Uint16Array(),
-      pc: 0,
-      wordsRemaining: 0,
       curState: currentState,
       column: msgType,
-      nextState: currentState,
-      transferState: -1,
-      transferCol: -1,
       locrMaster: master.locr,
       locrSlave,
       rnMaster: master.rn,
@@ -1338,36 +1138,24 @@ export class DsaSystem {
         if (finalState === -1) finalState = curState;
         return finalState;
       }
-      let pc = 0;
-      let wordsRemaining = program.length;
+      const cursor = new ProgramCursor(program);
       let transferState = -1;
       let transferCol = -1;
       let nextState = curState;
 
-      while (wordsRemaining > 0) {
-        const word = program[pc++] ?? 0;
-        wordsRemaining--;
+      while (cursor.remaining > 0) {
+        const word = cursor.word();
         const opcode = word & 0x3f;
         switch (opcode) {
           case DsaCommand.NOOP: {
-            let relState = signExtend((word >> 6) & 0x3ff, 10);
-            if (isMaxState(relState, -512)) {
-              const next = program[pc++] ?? 0;
-              wordsRemaining--;
-              relState = next;
-            }
+            const relState = cursor.relState(word, 6, 10, -512);
             nextState = curState + relState;
             break;
           }
           case DsaCommand.MESSAGE:
           case DsaCommand.MESSAGE32:
           case DsaCommand.DESSAGE32: {
-            let relState = signExtend((word >> 12) & 0xf, 4);
-            if (isMaxState(relState, -8)) {
-              const next = program[pc++] ?? 0;
-              wordsRemaining--;
-              relState = next;
-            }
+            const relState = cursor.relState(word, 12, 4, -8);
             nextState = curState + relState;
             const msgType = (word >> 6) & 0x3;
             const delayType = (word >> 8) & 0x3;
@@ -1377,15 +1165,9 @@ export class DsaSystem {
             if (delayType === 1) delay = masterRec ? getActuatorParameterA(masterRec) : 0;
             else if (delayType === 2) delay = masterRec ? getActuatorParameterB(masterRec) : 0;
             else if (delayType === 3) {
-              const next = program[pc++] ?? 0;
-              wordsRemaining--;
-              delay = next;
+              delay = cursor.word();
             }
-            const target = this.getTarget(targetType, opcode !== DsaCommand.MESSAGE, () => {
-              const value = program[pc++] ?? 0;
-              wordsRemaining--;
-              return value;
-            }, bank, exPkt.rnMaster);
+            const target = this.getTarget(targetType, opcode !== DsaCommand.MESSAGE, cursor, bank, exPkt.rnMaster);
             if (msgType !== MessageType.NULL && target) {
               const action = msgType - 1;
               const morD = opcode === DsaCommand.DESSAGE32 ? 'D' : 'M';
@@ -1395,46 +1177,26 @@ export class DsaSystem {
           }
           case DsaCommand.COPYTELEPORTER:
           case DsaCommand.COPYTELEPORTER32: {
-            let relState = signExtend((word >> 10) & 0x3f, 6);
-            if (isMaxState(relState, -32)) {
-              const next = program[pc++] ?? 0;
-              wordsRemaining--;
-              relState = next;
-            }
+            const relState = cursor.relState(word, 10, 6, -32);
             nextState = curState + relState;
             const targetFrom = (word >> 6) & 0x3;
             const targetTo = (word >> 8) & 0x3;
-            const locSrc = this.getTarget(targetFrom, opcode === DsaCommand.COPYTELEPORTER32, () => {
-              const value = program[pc++] ?? 0;
-              wordsRemaining--;
-              return value;
-            }, bank, exPkt.rnMaster);
-            const locDst = this.getTarget(targetTo, opcode === DsaCommand.COPYTELEPORTER32, () => {
-              const value = program[pc++] ?? 0;
-              wordsRemaining--;
-              return value;
-            }, bank, exPkt.rnMaster);
+            const locSrc = this.getTarget(targetFrom, opcode === DsaCommand.COPYTELEPORTER32, cursor, bank, exPkt.rnMaster);
+            const locDst = this.getTarget(targetTo, opcode === DsaCommand.COPYTELEPORTER32, cursor, bank, exPkt.rnMaster);
             if (locSrc && locDst) this.copyTeleporter(locSrc, locDst);
             break;
           }
           case DsaCommand.GOSUB: {
-            let relState = signExtend((word >> 13) & 0x7, 3);
-            if (isMaxState(relState, -4)) {
-              const next = program[pc++] ?? 0;
-              wordsRemaining--;
-              relState = next;
-            }
+            const relState = cursor.relState(word, 13, 3, -4);
             nextState = curState + relState;
             let row = (word >> 6) & 0x3f;
             const colFlag = (word >> 12) & 0x1;
             if (row === 63) {
-              row = program[pc++] ?? 0;
-              wordsRemaining--;
+              row = cursor.word();
             }
             let col = 0;
             if (colFlag !== 0) {
-              col = program[pc++] ?? 0;
-              wordsRemaining--;
+              col = cursor.word();
             }
             const subPacket: ExecutionPacket = {
               ...exPkt,
@@ -1447,34 +1209,22 @@ export class DsaSystem {
             break;
           }
           case DsaCommand.JUMP: {
-            let relState = signExtend((word >> 13) & 0x7, 3);
-            if (isMaxState(relState, -4)) {
-              const next = program[pc++] ?? 0;
-              wordsRemaining--;
-              relState = next;
-            }
+            const relState = cursor.relState(word, 13, 3, -4);
             nextState = curState + relState;
             let row = (word >> 6) & 0x3f;
             const colFlag = (word >> 12) & 0x1;
             if (row === 63) {
-              row = program[pc++] ?? 0;
-              wordsRemaining--;
+              row = cursor.word();
             }
             transferState = row;
             transferCol = 0;
             if (colFlag !== 0) {
-              transferCol = program[pc++] ?? 0;
-              wordsRemaining--;
+              transferCol = cursor.word();
             }
             break;
           }
           case DsaCommand.QUESTION: {
-            let relState = signExtend((word >> 6) & 0xf, 4);
-            if (isMaxState(relState, 2)) {
-              const next = program[pc++] ?? 0;
-              wordsRemaining--;
-              relState = next;
-            }
+            const relState = cursor.relState(word, 6, 4, 2);
             nextState = curState + relState;
             const ifColumn = (word >> 10) & 0x1;
             const ifCmd = (word >> 11) & 0x3;
@@ -1488,38 +1238,30 @@ export class DsaSystem {
             if (cond) {
               cmd = ifCmd;
               if (cmd !== 0) {
-                addr = program[pc++] ?? 0;
-                wordsRemaining--;
+                addr = cursor.word();
               }
               if (ifColumn !== 0) {
-                col = program[pc++] ?? 0;
-                wordsRemaining--;
+                col = cursor.word();
               }
               if (elseCmd !== 0) {
-                pc++;
-                wordsRemaining--;
+                cursor.skip();
               }
               if (elseColumn !== 0) {
-                pc++;
-                wordsRemaining--;
+                cursor.skip();
               }
             } else {
               if (ifCmd !== 0) {
-                pc++;
-                wordsRemaining--;
+                cursor.skip();
               }
               if (ifColumn !== 0) {
-                pc++;
-                wordsRemaining--;
+                cursor.skip();
               }
               cmd = elseCmd;
               if (cmd !== 0) {
-                addr = program[pc++] ?? 0;
-                wordsRemaining--;
+                addr = cursor.word();
               }
               if (elseColumn !== 0) {
-                col = program[pc++] ?? 0;
-                wordsRemaining--;
+                col = cursor.word();
               }
             }
             if (cmd === 1) {
@@ -1538,22 +1280,16 @@ export class DsaSystem {
             break;
           }
           case DsaCommand.CASE: {
-            let relState = signExtend((word >> 6) & 0x3ff, 10);
-            if (isMaxState(relState, -512)) {
-              const next = program[pc++] ?? 0;
-              wordsRemaining--;
-              relState = next;
-            }
+            const relState = cursor.relState(word, 6, 10, -512);
             nextState = curState + relState;
             const value = bank.stack.pop();
-            const numCase = program[pc++] ?? 0;
-            wordsRemaining--;
+            const numCase = cursor.word();
             // `EX_CASE`'s binary search over the cases, in unsigned order
             // (`doc/CSBwin-src/DSA.cpp:1005-1031`): on an unsorted table, or a value given
             // twice, it finds what the search finds, not the first.
             const key = value >>> 0;
-            const word32 = (at: number): number => (((program[at + 1] ?? 0) << 16) | (program[at] ?? 0)) >>> 0;
-            let base = pc;
+            const word32 = (at: number): number => ((cursor.at(at + 1) << 16) | cursor.at(at)) >>> 0;
+            let base = cursor.position;
             for (let n = numCase; n > 0;) {
               const m = n >> 1;
               const at = base + 4 * m;
@@ -1571,17 +1307,11 @@ export class DsaSystem {
                 n -= m + 1;
               }
             }
-            pc += 4 * numCase;
-            wordsRemaining = program.length - pc;
+            cursor.skip(4 * numCase);
             break;
           }
           case DsaCommand.EQUAL: {
-            let relState = signExtend((word >> 6) & 0x3ff, 10);
-            if (isMaxState(relState, -512)) {
-              const next = program[pc++] ?? 0;
-              wordsRemaining--;
-              relState = next;
-            }
+            const relState = cursor.relState(word, 6, 10, -512);
             const v1 = bank.stack.pop();
             const v2 = bank.stack.pop();
             bank.stack.push(v1 === v2 ? 1 : 0);
@@ -1589,30 +1319,20 @@ export class DsaSystem {
             break;
           }
           case DsaCommand.LOAD: {
-            let relState = signExtend((word >> 11) & 0x1f, 5);
-            if (isMaxState(relState, -16)) {
-              const next = program[pc++] ?? 0;
-              wordsRemaining--;
-              relState = readSignedWord(next);
-            }
+            const relState = cursor.relState(word, 11, 5, -16, true);
             nextState = curState + relState;
             const where = (word >> 6) & 0x1f;
             // `m_PC` is a `ui16 *` (`doc/CSBwin-src/DSA.cpp:251`): LOAD_INTEGER pushes the
             // word unsigned (`:1100-1107`).
             if (where === 26) {
-              const next = program[pc++] ?? 0;
-              wordsRemaining--;
-              bank.stack.push(next);
+              bank.stack.push(cursor.word());
             } else if (where === 27) {
-              const next = program[pc++] ?? 0;
-              wordsRemaining--;
-              bank.stack.push(next);
+              bank.stack.push(cursor.word());
             } else if (where === 28) {
               bank.stack.push(locationRelToInteger(exPkt.locrMaster));
             } else if (where === 30) {
-              const lo = program[pc++] ?? 0;
-              const hi = program[pc++] ?? 0;
-              wordsRemaining -= 2;
+              const lo = cursor.word();
+              const hi = cursor.word();
               bank.stack.push((hi << 16) | lo);
             } else if (where <= 25) {
               const value = this.loadParameter(where, exPkt.rnMaster);
@@ -1628,46 +1348,26 @@ export class DsaSystem {
             const where = (word >> 6) & 0x1f;
             if (where > 25) break;
             this.storeParameter(where, exPkt.rnMaster, bank.stack.pop());
-            let relState = signExtend((word >> 11) & 0x1f, 5);
-            if (isMaxState(relState, -16)) {
-              const next = program[pc++] ?? 0;
-              wordsRemaining--;
-              relState = next;
-            }
+            const relState = cursor.relState(word, 11, 5, -16);
             nextState = curState + relState;
             break;
           }
           case DsaCommand.VARIABLESTORE: {
-            let relState = signExtend((word >> 13) & 0x7, 3);
-            if (isMaxState(relState, -4)) {
-              const next = program[pc++] ?? 0;
-              wordsRemaining--;
-              relState = readSignedWord(next);
-            }
+            const relState = cursor.relState(word, 13, 3, -4, true);
             nextState = curState + relState;
             const index = (word >> 6) & 0x7f;
             bank.setVar(index, bank.stack.pop());
             break;
           }
           case DsaCommand.VARIABLEFETCH: {
-            let relState = signExtend((word >> 13) & 0x7, 3);
-            if (isMaxState(relState, -4)) {
-              const next = program[pc++] ?? 0;
-              wordsRemaining--;
-              relState = readSignedWord(next);
-            }
+            const relState = cursor.relState(word, 13, 3, -4, true);
             nextState = curState + relState;
             const index = (word >> 6) & 0x7f;
             bank.stack.push(bank.getVar(index));
             break;
           }
           case DsaCommand.GLOBALSTORE: {
-            let relState = signExtend((word >> 13) & 0x7, 3);
-            if (isMaxState(relState, -4)) {
-              const next = program[pc++] ?? 0;
-              wordsRemaining--;
-              relState = readSignedWord(next);
-            }
+            const relState = cursor.relState(word, 13, 3, -4, true);
             nextState = curState + relState;
             const index = (word >> 6) & 0x7f;
             const value = bank.stack.pop();
@@ -1680,12 +1380,7 @@ export class DsaSystem {
             break;
           }
           case DsaCommand.GLOBALFETCH: {
-            let relState = signExtend((word >> 13) & 0x7, 3);
-            if (isMaxState(relState, -4)) {
-              const next = program[pc++] ?? 0;
-              wordsRemaining--;
-              relState = readSignedWord(next);
-            }
+            const relState = cursor.relState(word, 13, 3, -4, true);
             nextState = curState + relState;
             const index = (word >> 6) & 0x7f;
             // Past the last variable, "Gloal fetch from non-existent variable" pushes
@@ -1696,12 +1391,7 @@ export class DsaSystem {
             break;
           }
           case DsaCommand.FETCH: {
-            let relState = signExtend((word >> 6) & 0x3ff, 10);
-            if (isMaxState(relState, -512)) {
-              const next = program[pc++] ?? 0;
-              wordsRemaining--;
-              relState = next;
-            }
+            const relState = cursor.relState(word, 6, 10, -512);
             nextState = curState + relState;
             const objMask = bank.stack.pop();
             const posMask = bank.stack.pop();
@@ -1731,12 +1421,7 @@ export class DsaSystem {
           }
           case DsaCommand.AMPERSAND:
           case DsaCommand.AMPERSAND2: {
-            let relState = signExtend((word >> 13) & 0x7, 3);
-            if (isMaxState(relState, -4)) {
-              const next = program[pc++] ?? 0;
-              wordsRemaining--;
-              relState = next;
-            }
+            const relState = cursor.relState(word, 13, 3, -4);
             nextState = curState + relState;
             const subcode = ((word >> 6) & 0x7f) + (opcode === DsaCommand.AMPERSAND2 ? 128 : 0);
             const jump = this.executeAmpersand(subcode, bank, exPkt);
@@ -1755,16 +1440,9 @@ export class DsaSystem {
             this.overrideP = true;
             this.overridePos = value;
             if (value === 7) {
-              const next = program[pc++] ?? 0;
-              wordsRemaining--;
-              this.overridePos = next & 0xff;
+              this.overridePos = cursor.word() & 0xff;
             }
-            let relState = signExtend((word >> 12) & 0xf, 4);
-            if (isMaxState(relState, -8)) {
-              const next = program[pc++] ?? 0;
-              wordsRemaining--;
-              relState = next;
-            }
+            const relState = cursor.relState(word, 12, 4, -8);
             nextState = curState + relState;
             break;
           }
@@ -3068,10 +2746,6 @@ export class DsaSystem {
   }
 
   /**
-   * `NOFILTER` (`doc/CSBwin-src/DSA.cpp:458-463`): an operation that changes the dungeon,
-   * run from a filter, warns the dungeon's author.
-   */
-  /**
    * `ExamineCell` (`doc/CSBwin-src/DSA.cpp:2211-2321`), `&THISCELL` and `&NEIGHBORS`:
    * a result bit for each cell from `first` to `last` (0 to 3 the four neighbours, north
    * first and clockwise; 4 the cell itself) that has one of the mask's bits of what it is
@@ -3178,6 +2852,10 @@ export class DsaSystem {
     }
   }
 
+  /**
+   * `NOFILTER` (`doc/CSBwin-src/DSA.cpp:458-463`): an operation that changes the dungeon,
+   * run from a filter, warns the dungeon's author.
+   */
   private noFilter(bank: DsaBank): void {
     if (bank.filter) this.ctx.host.trace('Filter Modifying Dungeon');
   }
@@ -3401,13 +3079,6 @@ export class DsaSystem {
   }
 
   /**
-   * `EX_IsCarried` (`doc/CSBwin-src/DSA.cpp:1614-1642`). An object ID asks where that
-   * object is: `256 * chIdx` plus its slot, 255 for the hand, or -1. A negative one is a
-   * basic object type, -1 for type 0, and asks how many such objects are carried. A chest
-   * is searched, and so is what it holds. Champion 4 is the hand's owner, 5 every
-   * champion.
-   */
-  /**
    * `&CURSE@`, `&BROKEN@`, `&POISONED@`, `&CHARGES@` and `&SUBTYPE@`
    * (`doc/CSBwin-src/DSA.cpp:3412-3440`, `:3459-3484`, `:3512-3537`, `:3565-3596`,
    * `:3630-3652`): the field of the object at slot `objIndex`, 0 for an invalid slot or a
@@ -3506,6 +3177,13 @@ export class DsaSystem {
     if (pCH) character.adjustStatsForItemCarried(pCH, loc, +1, obj);
   }
 
+  /**
+   * `EX_IsCarried` (`doc/CSBwin-src/DSA.cpp:1614-1642`). An object ID asks where that
+   * object is: `256 * chIdx` plus its slot, 255 for the hand, or -1. A negative one is a
+   * basic object type, -1 for type 0, and asks how many such objects are carried. A chest
+   * is searched, and so is what it holds. Champion 4 is the hand's owner, 5 every
+   * champion.
+   */
   private isCarried(bank: DsaBank): void {
     const party = this.ctx.party.state;
     const objid = bank.stack.pop();
@@ -3662,7 +3340,7 @@ export class DsaSystem {
   private getTarget(
     targetType: number,
     thirtyTwo: boolean,
-    readWord: () => number,
+    cursor: ProgramCursor,
     bank: DsaBank,
     rnMaster: ObjectID,
   ): LocationRel | null {
@@ -3679,9 +3357,9 @@ export class DsaSystem {
         break;
       }
       case TargetType.ABS: {
-        target = readWord();
+        target = cursor.word();
         if (thirtyTwo) {
-          target |= (readWord() << 16) >>> 0;
+          target |= (cursor.word() << 16) >>> 0;
         }
         break;
       }
@@ -3879,14 +3557,6 @@ export class DsaSystem {
     }
   }
 
-  /** `RN::checkIndirectIndex(i)` (`doc/CSBwin-src/data.cpp:530-535`): a slot of the maps. */
-  /**
-   * `SetGlobalText` (`doc/CSBwin-src/CSBCode.cpp:5360-5372`): the text, at most 99 bytes
-   * and its zero, as the `EXPOOL` record `(EDT_GlobalText << 24) | index`, four bytes to a
-   * longword in memory order. The record is `(len + 4) / 4` longwords; CSBWin fills the
-   * bytes past the zero from an uninitialised buffer, the port with zeros. A new record
-   * goes in front of the old, which stays in the pool.
-   */
   /**
    * `(char *)pRecord` of the `EXPOOL`'s global text `index`, as the action name filter reads
    * it (`doc/CSBwin-src/CSBCode.cpp:8807-8815`): its bytes, in memory order, up to the first
@@ -3898,6 +3568,13 @@ export class DsaSystem {
     return String.fromCharCode(...globalTextBytes(record));
   }
 
+  /**
+   * `SetGlobalText` (`doc/CSBwin-src/CSBCode.cpp:5360-5372`): the text, at most 99 bytes
+   * and its zero, as the `EXPOOL` record `(EDT_GlobalText << 24) | index`, four bytes to a
+   * longword in memory order. The record is `(len + 4) / 4` longwords; CSBWin fills the
+   * bytes past the zero from an uninitialised buffer, the port with zeros. A new record
+   * goes in front of the old, which stays in the pool.
+   */
   private setGlobalText(text: string, index: number): void {
     const len = Math.min(text.length, 99);
     const record = new Array<number>(Math.floor((len + 4) / 4)).fill(0);
@@ -3905,6 +3582,7 @@ export class DsaSystem {
     this.dungeon.writeExpoolRecord(globalTextKey(index), record);
   }
 
+  /** `RN::checkIndirectIndex(i)` (`doc/CSBwin-src/data.cpp:530-535`): a slot of the maps. */
   private isValidObjectId(objectId: number): objectId is ObjectID {
     return objectId >= 0 && this.dungeon.rnMaps.checkIndirectIndex(objectId);
   }

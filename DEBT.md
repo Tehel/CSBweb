@@ -410,37 +410,23 @@ against each other, and the file formats.
 
 ### E27 ⏳ `DsaSystem.ts` is one 5,000-line class
 
-`DsaSystem.ts` (4,770 lines) holds the interpreter, seventeen filter sites, a port of
-`MoveObject` for `&MOVE`, and `executeAmpersand`, a single function of 1,247 lines
-(`:1796`). In `executeRun` (`:1324-1793`, 470 lines):
+`DsaSystem.ts` (4,448 lines) holds the interpreter, seventeen filter sites, a port of
+`MoveObject` for `&MOVE`, and `executeAmpersand`, a single function of 1,246 lines
+(`:1474`). The machine's data and its decoding are already apart, in
+`src/engine/dsa/DsaMachine.ts`: the stack, the bank, the execution packet and the
+`ProgramCursor` that `executeRun` (`:1124`) reads its programs through.
 
-- seventeen `isMaxState(...)` tests, sixteen of which can never fire, since only QUESTION's
-  MAXSTATE of 2 fits its field (`doc/CSBWIN_DSA_REFERENCE.md`, `tools/checks/dsa-census.ts`),
-  and with them all six `readSignedWord` calls;
-- `program[pc++] ?? 0` thirty-six times and `wordsRemaining--` thirty-eight, though
-  `wordsRemaining` is always `program.length - pc`;
-- `ExecutionPacket`'s `program`, `pc`, `wordsRemaining`, `nextState`, `transferState` and
-  `transferCol` set (`processTimer6Internal`, `:1257-1273`) and copied into every GOSUB's
-  packet, and read by nothing.
-
-Three doc comments sit over the wrong function (`:3070-3073` over `examineCell`, not
-`noFilter`; `:3403-3409` over `getObjectField`, not `isCarried`; `:3882-3889` over
-`globalText`, not `setGlobalText`, and `:3881` over it too, not `isValidObjectId`), and
-seven filter sites have none (`processMissileEncounterFilter`, `processAdjustSkillsFilter`,
-`processSpellFilter`, `processTimer5`, `6` and `7`). A spell's parameters are marshalled
-field by field both ways (`processSpellFilter`, `:1139-1182`, and again in
-`MagicSystem.ts:142-157`), where every other block has a codec in `filterParameters.ts`.
+Seven filter sites have no doc comment (`processMissileEncounterFilter`,
+`processAdjustSkillsFilter`, `processSpellFilter`, `processTimer5`, `6` and `7`). A
+spell's parameters are marshalled field by field both ways (`processSpellFilter`,
+`:945-988`, and again in `MagicSystem.ts:142-157`), where every other block has a codec
+in `filterParameters.ts`.
 
 Paying it, into `src/engine/dsa/` beside `DsaTypes.ts`. Each command's body keeps CSBWin's
 order and names, and each step is proven by every tool's whole output, byte-identical. The
 steps, one commit each:
 
-1. ⏳ **The machine's data and its decoding.** `dsa/DsaMachine.ts` takes `DsaStack`,
-   `DsaBank`, `ExecutionPacket` cut to the fields read, and a `ProgramCursor` over a
-   program (`word()`, `skip()`, `relState(word, shift, bits, maxState, signed)`), which
-   `executeRun` decodes through: one `IsMaxState` test, no `?? 0`, no `wordsRemaining`.
-   `execute` stays a method of `DsaSystem` until step 3. The three misplaced doc comments
-   go over their functions.
+1. ✅ **The machine's data and its decoding**, in `dsa/DsaMachine.ts`.
 2. ⏳ **The filters.** `dsa/DsaFilters.ts`: one `runFilter(esl, words, options)` the
    seventeen sites call with their codecs; the spell's codec joins `filterParameters.ts`,
    and `MagicSystem.dsaCastSpell` reads through it. The seven sites get their doc comments.
@@ -728,11 +714,11 @@ after the chains; a fixture whose champions carry something.
 `&DEL` takes an object off its square with `MoveObject(thisObj, x, y, -1, 0)` and `&ADD`
 puts its copy on one with `MoveObject(newObj, -1, 0, x, y)`
 (`doc/CSBwin-src/DSA.cpp:1702`, `:2057`). The port does both by hand
-(`src/engine/DsaSystem.ts:2044-2053`, `:2080-2089`): `removeObjectFromCell` then
+(`src/engine/DsaSystem.ts:1520-1521`, `:1558-1560`): `removeObjectFromCell` then
 `triggerObjectMove`; `setPos`, `triggerObjectMove`, then `addObjectToCell`. What that loses:
 
 - no pit or teleporter on the square is resolved (`WorldMove.resolveCellEffects`, which
-  `&MOVE` already uses, `:4416`, `:4609-4624`);
+  `&MOVE` already reaches through `WorldMove.moveObject`, `objectMover`, `:4134-4140`);
 - `unchangedRoom` is always false, where `MoveObject` passes whether the party stands there
   (`Code11f52.cpp:3314-3328`, `:3458-3473`), so floor actuators of types 1 and 2 fire under
   the party where CSBWin's do not;

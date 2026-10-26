@@ -127,7 +127,7 @@ const PAGE = `
     <div class="welcome-columns">
       <div>
         <h2 class="px">Faithful to the tick</h2>
-        <p>The rules are Paul R. Stevens' CSBWin, ported from its source and checked against it: the timers, the monsters, the spells and the odd corners all match the Atari ST original. Everything around them, from the browser to the touch screen, is new.</p>
+        <p>The rules are Paul R. Stevens' CSBWin, ported from its source and checked against it: the timers, the monsters, the spells and the odd corners all match the Atari ST original.</p>
       </div>
       <div>
         <h2 class="px">Your saves, both ways</h2>
