@@ -12,7 +12,7 @@ can't show what you need, extend it.
 ```bash
 npx tsx tools/peek-dungeon.ts levels                  # one line per map
 npx tsx tools/peek-dungeon.ts map 11                  # ASCII map + teleporters, stairs, pits, monsters, items
-npx tsx tools/peek-dungeon.ts cell 11 18 1            # neighbourhood, flag byte decoded, the object chain
+npx tsx tools/peek-dungeon.ts cell 11 18 1            # neighbourhood, flag byte decoded, the object chain, the map's info
 npx tsx tools/peek-dungeon.ts cell 11 18 1 6          # …with a radius-6 neighbourhood
 npx tsx tools/peek-dungeon.ts find "dragon"           # items, monsters (and what they carry), texts
 npx tsx tools/peek-dungeon.ts dump 11                 # every object of every square: actuators, texts, doors too

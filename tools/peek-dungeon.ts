@@ -16,7 +16,8 @@
  *   levels                one line per map: level, size, offset, monster types allowed
  *   map <m>               the map drawn in ASCII, then its teleporters, stairs, monsters, items
  *   cell <m> <x> <y> [r]  the square's neighbourhood (radius r, default 3), its flag byte
- *                         decoded, every object on it, and (from a save) its timers
+ *                         decoded, every object on it, the map dialog's info of it
+ *                         (`src/engine/CellInfo.ts`), and (from a save) its timers
  *   find <text>           every item, monster or text whose name or words contain <text>
  *   dump <m>              every object on every square of the map, actuators, texts and
  *                         doors included, with each square's flag byte decoded
@@ -40,6 +41,7 @@ import type {
   MiscRecord, MissileRecord, PotionRecord, ScrollRecord, TeleporterRecord, TextRecord, TimerRecord, WeaponRecord,
 } from '../src/data/dungeonTypes';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
+import { CellInfo, actuatorTrigger, describeFlag } from '../src/engine/CellInfo';
 import { DungeonState } from '../src/engine/DungeonState';
 import { MonsterType } from '../src/engine/monsterTypes';
 import { NameIndex } from '../src/engine/objectIndex';
@@ -114,10 +116,19 @@ function loadWorld(path: string): World {
 class Namer {
   private readonly objectNames: string[];
   private readonly tables: ReturnType<typeof gameTablesOf>;
+  /** The square's info, as the map dialog shows it; the party's possessions are not read. */
+  readonly info: CellInfo;
 
   constructor(private readonly world: World, graphics: GraphicsLoader) {
     this.tables = gameTablesOf(graphics);
     this.objectNames = graphicsTablesOf(graphics).objects.objectNames;
+    const p = world.party;
+    this.info = new CellInfo({
+      dungeon: world.dungeon,
+      tables: this.tables,
+      objectNames: this.objectNames,
+      party: { position: new Position(p.x, p.y, p.level), facing: p.facing, champions: [], objectInHand: OBJECT_ID_NULL },
+    });
   }
 
   /** An item's name as the game prints it (`NameIndex`), or null for a non-item. */
@@ -178,38 +189,6 @@ const SCOPE = ['items', 'monsters', 'items+party', 'everything'];
 const ACTION = { [ActuatorAction.SET]: 'set', [ActuatorAction.CLEAR]: 'clear', [ActuatorAction.TOGGLE]: 'toggle', [ActuatorAction.CONSTPRESSURE]: 'hold' };
 
 /**
- * The object an actuator compares its `value` with, as `GetBasicObjectType` of that
- * object, or null for a type whose value is something else. The same type means different
- * things on a floor and in a wall: a pad is judged by `PressurePadOrAlcove`
- * (`doc/CSBwin-src/Code11f52.cpp:3820-3839`), a wall by `TouchWall` when clicked
- * (`doc/CSBwin-src/Mouse.cpp:379-481`) and by `PressurePadOrAlcove` when something is put
- * in its alcove (`doc/CSBwin-src/Code11f52.cpp:3861-3873`). A normally closed actuator
- * fires on the opposite outcome.
- */
-function actuatorNeeds(a: ActuatorRecord, room: number | undefined, names: Namer): string | null {
-  const name = names.objectType(getActuatorValue(a));
-  if (room === RoomType.OPEN) {
-    switch (getActuatorType(a)) {
-      case 4: return `needs ${name} put on the pad`;
-      case 8: return `needs the party to carry ${name}`;
-      default: return null;
-    }
-  }
-  if (room === RoomType.STONE) {
-    switch (getActuatorType(a)) {
-      case 2: return `clicked with anything in hand; if an alcove, needs ${name} put in it`;
-      case 3: return `clicked with ${name}, which stays in hand; if an alcove, needs anything but ${name} put in it`;
-      case 4: case 11: return `clicked with ${name}, which it takes`;
-      case 17: return `clicked with ${name}, which it takes, then gone`;
-      case 13: return `holds ${name}`;
-      case 16: return `swaps ${name} in hand for the first object here`;
-      default: return null;
-    }
-  }
-  return null;
-}
-
-/**
  * One object in words, with what it holds indented below it. `room` is the room type of
  * the square it lies on, which an actuator's meaning depends on.
  */
@@ -241,7 +220,7 @@ function describe(world: World, names: Namer, rn: ObjectID, indent: string, out:
       const words = `word2=${hex(a.word2)} word4=${hex(a.word4)} word6=${hex(a.word6)}${a.word8 !== undefined ? ` word8=${hex(a.word8)}` : ''}`;
       const flags = [isActuatorOnceOnly(a) && 'once', isActuatorAudible(a) && 'audible', isActuatorNormallyClosed(a) && 'normally closed']
         .filter(Boolean).join(' ');
-      const needs = actuatorNeeds(a, room, names);
+      const needs = room === undefined ? null : actuatorTrigger(a, room, (objNI) => names.objectType(objNI))?.words ?? null;
       const effect = isActuatorLocalActionOnly(a)
         ? `local action ${getActuatorLocalActionType(a)}`
         : `${ACTION[getActuatorAction(a)]} (${getActuatorTargetX(a)},${getActuatorTargetY(a)}) corner ${getActuatorTargetPos(a)} after ${getActuatorDelay(a)}`;
@@ -300,29 +279,6 @@ function describe(world: World, names: Namer, rn: ObjectID, indent: string, out:
 }
 
 /* ------------------------------------------------------------------ squares ------- */
-
-/**
- * The flag byte's attribute bits, as `CSBTypes.h` documents them per room type
- * (`doc/CSBwin-src/CSBTypes.h:182-214`); open floor's bit 3 is the random floor
- * decoration (`doc/CSBWIN_DECORATIONS_REFERENCE.md`).
- */
-function describeFlag(flag: number): string {
-  const type = (flag >> 5) & 7;
-  const a = flag & 0xf;
-  const bits = (pairs: [number, string][]): string => pairs.filter(([b]) => a & b).map(([, s]) => s).join(', ') || 'none';
-  const room = RoomType[type] ?? `type ${type}`;
-  const objects = flag & 0x10 ? ', has objects' : '';
-  switch (type) {
-    case RoomType.STONE: return `${room}${objects}; random decoration on ${bits([[1, 'W'], [2, 'S'], [4, 'E'], [8, 'N']])}`;
-    case RoomType.OPEN: return `${room}${objects}; ${a & 8 ? 'random floor decoration allowed' : 'no random floor decoration'}`;
-    case RoomType.PIT: return `${room}${objects}; ${a & 8 ? 'open' : 'closed'}${a & 1 ? ', false' : ''}${a & 4 ? ', obscure' : ''}`;
-    case RoomType.STAIRS: return `${room}${objects}; ${a & 4 ? 'up' : 'down'}, ${a & 8 ? 'N/S' : 'E/W'}`;
-    case RoomType.DOOR: return `${room}${objects}; state ${a & 7} (${['open', 'almost open', 'half open', 'almost closed', 'closed', 'bashed'][a & 7] ?? '?'}), ${a & 8 ? 'N/S' : 'E/W'}`;
-    case RoomType.TELEPORTER: return `${room}${objects}; ${a & 8 ? 'active' : 'inactive'}, ${a & 4 ? 'visible' : 'invisible'}`;
-    case RoomType.FALSEWALL: return `${room}${objects}; ${a & 4 ? 'open' : 'closed'}${a & 1 ? ', imaginary' : ''}`;
-    default: return `${room}${objects}; attributes ${a.toString(2).padStart(4, '0')}`;
-  }
-}
 
 function flagAt(world: World, m: number, x: number, y: number): number {
   return (world.data.maps[m]!.cellFlags[x]?.[y] ?? 0) as number;
@@ -429,21 +385,11 @@ function cmdCell(world: World, names: Namer, m: number, x: number, y: number, ra
   const lines: string[] = [];
   for (const rn of squareObjects(world, m, x, y)) describe(world, names, rn, '  ', lines, (flag >> 5) & 7);
   console.log(lines.length ? `objects:\n${lines.join('\n')}` : 'objects: none');
-  // `QueueSwitchAction` sends a remote actuator's action to its target on the level it
-  // is on (`doc/ACTUATORS.md` §4). Some types reuse word6 for other things (a
-  // generator's disable time, a launcher's energy), so a match is a lead to check
-  // against the type, not a certainty.
-  const aimed: string[] = [];
-  for (let ay = 0; ay < d.height; ay++) for (let ax = 0; ax < d.width; ax++) {
-    for (const rn of squareObjects(world, m, ax, ay)) {
-      if (world.dungeon.rnMaps.dbType(rn) !== DBType.ACTUATOR) continue;
-      const a = recordOf(world.data, rn) as ActuatorRecord | null;
-      if (!a || isActuatorLocalActionOnly(a) || getActuatorTargetX(a) !== x || getActuatorTargetY(a) !== y) continue;
-      const room = (flagAt(world, m, ax, ay) >> 5) & 7;
-      describe(world, names, rn, `  from (${ax},${ay}) ${RoomType[room]} `, aimed, room);
-    }
+  // What the map dialog shows of the square (`src/engine/CellInfo.ts`).
+  console.log('the map\'s info:');
+  for (const line of names.info.describe({ map: m, x, y })) {
+    console.log(`  ${'  '.repeat(line.indent)}${line.text}${line.link ? `  -> map ${line.link.map} (${line.link.x},${line.link.y})` : ''}`);
   }
-  console.log(aimed.length ? `actuators on this map aimed here:\n${aimed.join('\n')}` : 'actuators on this map aimed here: none');
   if (world.fromSave) {
     // Timers are not addressed uniformly: this lists the ones whose uByte6/uByte7 are
     // this square, which is how door, actuator and monster timers name theirs. A

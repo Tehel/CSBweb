@@ -126,6 +126,7 @@ const CHECKS = [
   { tool: 'dsa-move.ts' },
   { tool: 'dsa-delete.ts' },
   { tool: 'dsa-census.ts' },
+  { tool: 'map-cell-info.ts' },
   { tool: 'dsa-decoder.ts' },
   { tool: 'dsa-characters.ts' },
   { tool: 'dsa-objects.ts' },
