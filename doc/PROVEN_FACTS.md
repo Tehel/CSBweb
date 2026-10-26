@@ -7105,7 +7105,7 @@ of one body part, which `DamageCharacter` averages over the parts a blow could l
 6. `if (d.PartySleeping) D7W >>= 1` (`:2487-2490`);
 7. `ApplyLimits(0, D7W >> 1, 100)` (`:2491`).
 
-`armourStrength` (`src/engine/MonsterAttack.ts`) is its port, and
+`armourStrength` (`src/engine/ChampionDamage.ts`) is its port, and
 `tools/checks/character-damage.ts` replays the draws from the seed for a whole part, a
 wounded one, a sleeping party, and both.
 

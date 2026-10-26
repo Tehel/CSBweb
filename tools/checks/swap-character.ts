@@ -161,9 +161,9 @@ const [SONJA, GOTHMOG] = [0x1cc, 0x211];
   const { g, game } = run(swap(3, -1, 0), (game) => {
     game.ctx.host.tag011366 = (chIdx) => redrawn.push(chIdx);
     game.ctx.party.state.pendingDamage[3] = 10;
-    game.systems.monsterAttack.displayCharacterDamage();
+    game.systems.championDamage.displayCharacterDamage();
     timer = game.ctx.party.state.champions[3]!.timerIndex;
-    game.systems.monsterAttack.poisonCharacter(3, 20);
+    game.systems.championDamage.poisonCharacter(3, 20);
   });
   const gone = inWings(game, 0x18d);
   console.log(`5. WUUF with the damage shown (timer ${timer}) and poisoned leaves: ${g[0]}, record timer ${gone?.timerIndex}, poison ${gone?.poisonCount}`);
@@ -175,7 +175,7 @@ const [SONJA, GOTHMOG] = [0x1cc, 0x211];
   try {
     run(swap(1, -1, 0), (game) => {
       game.ctx.party.state.pendingDamage[3] = 10;
-      game.systems.monsterAttack.displayCharacterDamage();
+      game.systems.championDamage.displayCharacterDamage();
     });
   } catch (error) {
     died = (error as Error).message;

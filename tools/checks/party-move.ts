@@ -295,7 +295,7 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
   // its `DisplayCharacterDamage` kills there (doc/CSBwin-src/CSBCode.cpp:625-667).
   check(game.ctx.party.state.champions[0]!.attributes.health !== 0, 'the fall itself does not kill: the damage is pending');
   game.loadNewPartyLevel();
-  game.systems.monsterAttack.displayCharacterDamage();
+  game.systems.championDamage.displayCharacterDamage();
   const bonesBelow = game.ctx.dungeon.findFirstObject(below) !== OBJECT_ID_EOF;
   const bonesAbove = game.ctx.dungeon.findFirstObject(from) !== OBJECT_ID_EOF;
   console.log(`8. a champion at 1 HP falls: alive ${game.ctx.party.state.champions[0]!.attributes.health !== 0}, `

@@ -443,12 +443,6 @@ against each other, and the file formats.
 
 ### E26 ⏳ Systems named after CSBWin's files, not what they do
 
-- **`MonsterAttack` is mostly the champions' health.** Of thirty calls into
-  `systems.monsterAttack` from twelve files, one is `monsterAttacks`; the rest are
-  `adjustStamina` (8), `damageAllCharacters` (4), `damageCharacter`, `poisonCharacter`,
-  `killCharacter`, `curePoison`, `tag011366`, `displayCharacterDamage`, `isCharacterLucky`
-  and `quickness`, from `Feeding`, `MovementSystem`, `PeriodicUpdates`, `SwapCharacter`,
-  `DsaSystem`…
 - **`AttackSystem` holds the end of the game**, `_FusionSequence` and the credits' script,
   about 200 lines, and `applyMagicShield`, which `MagicSystem` calls.
 - **`MoveObject` is in two halves.** `WorldMove.ts:174-202` and `MonsterSystem.ts:552-560`,
@@ -456,9 +450,9 @@ against each other, and the file formats.
   levitation test is written twice (`WorldMove.isMonsterLevitating`,
   `MonsterSystem.ts:549`).
 
-Paying it: a `ChampionDamage` system for `Character.cpp`'s damage, death, poison, armour
-and luck; `Fusion.ts` for the end; one `MoveObject`, the monster's half calling the shared
-parts.
+Paying it, in steps: `Fusion.ts` for the end; then one `MoveObject`, the monster's half
+calling the shared parts. The champions' damage, death, poison, armour and luck are
+`ChampionDamage` already, out of `MonsterAttack`.
 
 ### E27 ⏳ `DsaSystem.ts` is one 5,000-line class
 

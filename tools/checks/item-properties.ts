@@ -532,7 +532,7 @@ console.log('\n=== 5. every garment type ===');
       const champion = testChampion(0);
       champion.possessions[0] = inHand;
       game.setRandomSeed(0x2468ace);
-      return game.ctx.systems.monsterAttack.armourStrength(champion, 2, false);
+      return game.ctx.systems.championDamage.armourStrength(champion, 2, false);
     };
     const shield = armourWith(rn) !== armourWith(OBJECT_ID_NULL);
     if (shield) shields++;

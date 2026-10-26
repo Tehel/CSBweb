@@ -197,7 +197,7 @@ export class TimerSystem {
         break;
       // `case TT_12: TAG011366(timeEnt.timerUByte5()); break;` (doc/CSBwin-src/CSBCode.cpp:6536).
       case TimerFunction.TT_12:
-        this.ctx.systems.monsterAttack.tag011366(timer.uByte5 & 0xff);
+        this.ctx.systems.championDamage.tag011366(timer.uByte5 & 0xff);
         break;
       case TimerFunction.TT_24:
         this.processExpireObject(timer);
@@ -417,7 +417,7 @@ export class TimerSystem {
     const champ = this.ctx.party.state.champions[chIdx];
     if (!champ) return;
     champ.poisonCount = Math.max(0, champ.poisonCount - 1);
-    this.ctx.systems.monsterAttack.poisonCharacter(chIdx, sw(timer.timerWord6));
+    this.ctx.systems.championDamage.poisonCharacter(chIdx, sw(timer.timerWord6));
   }
 
   /**
@@ -759,7 +759,7 @@ export class TimerSystem {
       if (this.isPartyAt(target) && doorState !== 0) {
         if (this.ctx.party.state.champions.length > 0) {
           setDoorState(map, x, y, 0);
-          const hurt = this.ctx.systems.monsterAttack.damageAllCharacters(5, 4, 2);
+          const hurt = this.ctx.systems.championDamage.damageAllCharacters(5, 4, 2);
           if (hurt !== 0) this.ctx.sounds.queueSound(SOUND_DOOR_OPENING, x, y, 1, timer.level);
         }
         this.timers.addTimer(timer);
@@ -1684,7 +1684,7 @@ export class TimerSystem {
 
       case RN_POISON_CLOUD: {
         if (partyHere) {
-          this.ctx.systems.monsterAttack.damageAllCharacters(damage, 0, 0);
+          this.ctx.systems.championDamage.damageAllCharacters(damage, 0, 0);
         } else if (monster) {
           const poison = this.ctx.systems.monsterDamage.determinePoisonDamage(monsterType, damage);
           if (poison !== 0) {

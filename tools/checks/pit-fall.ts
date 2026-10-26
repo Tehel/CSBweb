@@ -46,7 +46,7 @@ function fall(g: Game, pit: Position): Position {
   // The next tick: the level below loaded, then `DisplayCharacterDamage` takes the fall
   // off the HP (doc/CSBwin-src/CSBCode.cpp:625-667).
   g.loadNewPartyLevel();
-  g.systems.monsterAttack.displayCharacterDamage();
+  g.systems.championDamage.displayCharacterDamage();
   return g.ctx.party.state.position;
 }
 
@@ -150,7 +150,7 @@ function main(): void {
     const champ = g.ctx.party.state.champions[0]!;
     const maxLoad = g.systems.characterStats.maxLoad(champ);
     const before = champ.attributes.stamina;
-    g.systems.monsterAttack.adjustStamina(0, Math.trunc(((25 * Math.trunc(maxLoad / 2)) & 0xffff) / maxLoad) + 1);
+    g.systems.championDamage.adjustStamina(0, Math.trunc(((25 * Math.trunc(maxLoad / 2)) & 0xffff) / maxLoad) + 1);
     const paid = before - champ.attributes.stamina;
     console.log(`a champion at half MaxLoad (${maxLoad}) would pay ${paid} stamina`);
     check(paid === 13, `half-loaded costs 13 stamina (got ${paid})`);

@@ -526,7 +526,7 @@ export class MissileEncounter {
   }): void {
     // No `d.LastMonsterAttackTime` here: only `MonsterAttacks` sets it
     // (`doc/CSBwin-src/Monster.cpp:986`), and this port does so in `MonsterAttack`.
-    const dealt = this.ctx.systems.monsterAttack.damageCharacter(
+    const dealt = this.ctx.systems.championDamage.damageCharacter(
       options.chIdx,
       options.damage | 0,
       MISSILE_WOUND_MASK,
@@ -535,7 +535,7 @@ export class MissileEncounter {
     if (dealt === 0) return;
     // `STRandomBool()` — a poisoned missile infects only half the time.
     if ((options.poisonStrength | 0) !== 0 && this.random.bool() !== 0) {
-      this.ctx.systems.monsterAttack.poisonCharacter(options.chIdx, options.poisonStrength | 0);
+      this.ctx.systems.championDamage.poisonCharacter(options.chIdx, options.poisonStrength | 0);
     }
   }
 
@@ -707,7 +707,7 @@ export class MissileEncounter {
 
     const party = this.ctx.party.state;
     if (position.z === party.position.z && objX === party.position.x && objY === party.position.y) {
-      this.ctx.systems.monsterAttack.damageAllCharacters(damage, 63, 1);
+      this.ctx.systems.championDamage.damageAllCharacters(damage, 63, 1);
       return;
     }
 

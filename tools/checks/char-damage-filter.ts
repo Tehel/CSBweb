@@ -1,7 +1,7 @@
 /**
  * The character death filter (`doc/CSBwin-src/Character.cpp:2540-2594`) and the damage
  * filter (`:2834-2898`), which `KillCharacter` and `DamageCharacter` run, each through
- * `MonsterAttack` with two DSAs on its square, against a genuine save (`csbgame7.dat`).
+ * `ChampionDamage` with two DSAs on its square, against a genuine save (`csbgame7.dat`).
  *
  * 1. **A dungeon with no filter deals the damage worked out.**
  * 2. **Only the first DSA at the damage filter's location runs** (`break`, `:2893`), on
@@ -50,7 +50,7 @@ const KIND = 3;
 function hit(game: Game): { dealt: number; pending: number } {
   const party = game.ctx.party.state;
   const before = party.pendingDamage[CHAMPION]!;
-  const dealt = game.systems.monsterAttack.damageCharacter(CHAMPION, DAMAGE, MASK, KIND);
+  const dealt = game.systems.championDamage.damageCharacter(CHAMPION, DAMAGE, MASK, KIND);
   return { dealt, pending: party.pendingDamage[CHAMPION]! - before };
 }
 
@@ -91,7 +91,7 @@ for (const [value, expected] of [[-5, -5], [0x10003, 3]] as const) {
   dsa.setParameters(1, [333]);
   const champ = game.ctx.party.state.champions[VICTIM]!;
   const health = champ.attributes.health;
-  game.systems.monsterAttack.killCharacter(VICTIM);
+  game.systems.championDamage.killCharacter(VICTIM);
   const g = dsa.getGlobalVariables();
   console.log(`5. the first DSA saw [${g.slice(0, 2).join(', ')}] and HP ${g[2]} (of ${health}); the second ${g[30] === UNSET ? 'did not run' : `saw [${g.slice(30, 32).join(', ')}]`}; HP after ${champ.attributes.health}`);
   check(health > 0 && g.slice(0, 3).join() === [1, VICTIM, health].join(), 'a count of 1, the champion, whose HP are not yet 0');

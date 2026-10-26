@@ -120,6 +120,6 @@ export const TICK_DUE = VBL_PER_TICK;
 export function processTimersAt(game: Game, time: number): boolean {
   game.ctx.state.tickCount = time;
   const won = game.systems.timer.processTimers();
-  game.systems.monsterAttack.displayCharacterDamage();
+  game.systems.championDamage.displayCharacterDamage();
   return won;
 }

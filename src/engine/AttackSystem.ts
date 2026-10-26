@@ -330,7 +330,7 @@ export class AttackSystem {
     const monster = this.ctx.dungeon.getCreatureRecord(monsterRn);
     if (!monster) return 0;
 
-    const order = this.ctx.systems.monsterAttack.determineAttackOrder(attackX, attackY, partyX, partyY, charPos);
+    const order = this.ctx.systems.championDamage.determineAttackOrder(attackX, attackY, partyX, partyY, charPos);
     for (const pos of order) {
       const ordinal = ordinalOfMonsterAtPosition(this.ctx.dungeon, this.ctx.tables.monsterDesc, monster, pos);
       if (ordinal !== 0) return ordinal;
@@ -369,7 +369,7 @@ export class AttackSystem {
     const phys = params.attdep.physicalAttack;
 
     if (phys.staminaAdjust !== 0) {
-      this.ctx.systems.monsterAttack.adjustStamina(params.charIdx, phys.staminaAdjust);
+      this.ctx.systems.championDamage.adjustStamina(params.charIdx, phys.staminaAdjust);
     }
     if (phys.skillAdjust !== 0) {
       adjustSkillsOnPartyLevel(this.ctx, params.charIdx, params.skillNumber, phys.skillAdjust, AdjustSkillsWhy.PhysicalAttack);
@@ -458,14 +458,14 @@ export class AttackSystem {
 
     // --- Did it connect? Quickness against the monster's dexterity, then two
     //     independent second chances: a flat 1-in-4, then Luck.
-    const quickness = this.ctx.systems.monsterAttack.quickness(champ);
+    const quickness = this.ctx.systems.championDamage.quickness(champ);
     let required = sw(random.below(32) + desc.dexterity12 + difficulty - 16);
     let luckyHit = false;
     this.trace(`character's quickenss = ${quickness}`);
     this.trace(`required quickness = ${required}`);
     if (quickness <= required) {
       luckyHit = random.zeroTo3() === 0;
-      if (!luckyHit && !this.ctx.systems.monsterAttack.isCharacterLucky(champ, 75 - p7)) {
+      if (!luckyHit && !this.ctx.systems.championDamage.isCharacterLucky(champ, 75 - p7)) {
         this.trace('Attack failed.  Quickness too small. Luck(1/4) failed.  Return 0');
         phys.staminaAdjust = 2 + random.bool();
         this.physicalAttackFilter(filter, params);
@@ -1506,7 +1506,7 @@ export class AttackSystem {
       this.ctx.systems.magic.disableCharacterAction(params.charIdx, params.disableTime);
     }
     if (params.staminaCost !== 0) {
-      this.ctx.systems.monsterAttack.adjustStamina(params.charIdx, params.staminaCost);
+      this.ctx.systems.championDamage.adjustStamina(params.charIdx, params.staminaCost);
     }
     if (params.experienceGained !== 0) {
       adjustSkillsOnPartyLevel(this.ctx, params.charIdx, params.skillNumber, params.experienceGained, AdjustSkillsWhy.Attack);

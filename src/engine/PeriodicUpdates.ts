@@ -134,7 +134,7 @@ export function tenSecondUpdate(ctx: GameContext): void {
                 if (sleeping) manaAdjust *= 2;
                 manaAdjust += 1;
                 const staminaAdjust = manaAdjust * Math.max(7, 16 - magicMastery);
-                ctx.systems.monsterAttack.adjustStamina(chIdx, staminaAdjust);
+                ctx.systems.championDamage.adjustStamina(chIdx, staminaAdjust);
                 const deltaMana = Math.min(manaAdjust, maxMana - mana);
                 attrs.mana = mana + deltaMana;
             }
@@ -187,7 +187,7 @@ export function tenSecondUpdate(ctx: GameContext): void {
             if (d6 === 0) break;
         } while ((attrs.stamina | 0) < (attrs.maxStamina | 0) + d4);
 
-        ctx.systems.monsterAttack.adjustStamina(chIdx, d4);
+        ctx.systems.championDamage.adjustStamina(chIdx, d4);
         if (champ.food < -1024) champ.food = -1024;
         if (champ.water < -1024) champ.water = -1024;
 

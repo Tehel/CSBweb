@@ -178,6 +178,7 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
             MissileEncounter (a missile meeting something, and the clouds and door
             blows it sets off),
             ActuatorSystem, DsaSystem, MagicSystem, CharacterSystem, AttackSystem,
+            ChampionDamage (what a blow does to a champion: damage, death, poison, armour, luck),
             AttackMenu (the attack menu's `d.`: closed, named, and its panel's tick),
             MouseSystem (Mouse.cpp's engine half), HallOfChampions, the Monster* systems,
             MouseQueue and LoopState (the loop's `d.` state, at `ctx.mouseQueue` /

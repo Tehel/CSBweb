@@ -29,6 +29,7 @@ import {
 import { MonsterPerception } from './MonsterPerception';
 import { MonsterDamage } from './MonsterDamage';
 import { MonsterAI } from './MonsterAI';
+import { ChampionDamage } from './ChampionDamage';
 import { MonsterAttack } from './MonsterAttack';
 import { tag01b29a } from './AttackMenu';
 import { AttackSystem } from './AttackSystem';
@@ -202,6 +203,7 @@ export class Game implements MainLoop {
             monsterDamage: new MonsterDamage(ctx),
             monsterPerception: new MonsterPerception(ctx),
             monsterAttack: new MonsterAttack(ctx),
+            championDamage: new ChampionDamage(ctx),
             monsterAI: new MonsterAI(ctx),
             characterStats: new CharacterStats(ctx),
             attack: new AttackSystem(ctx),
@@ -628,7 +630,7 @@ export class Game implements MainLoop {
         // `StartQueuedSound(); DisplayCharacterDamage();` (doc/CSBwin-src/CSBCode.cpp:666-667):
         // what `DamageCharacter` dealt since the last tick comes off the HP, and a champion
         // it kills can lose the game just below.
-        this.ctx.systems.monsterAttack.displayCharacterDamage();
+        this.ctx.systems.championDamage.displayCharacterDamage();
         // `tag000730`: `if (d.GameIsLost == 0) { d.Time++; … goto tag000698; } RETURN;`
         // (doc/CSBwin-src/CSBCode.cpp:668-788). With nobody left alive the rest of the tick
         // does not run, and `MainLoop` returns to `_StartCSB`, which shows the credits

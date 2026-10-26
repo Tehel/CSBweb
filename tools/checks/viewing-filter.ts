@@ -397,7 +397,7 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
   drawInventoryScreen(theUi);
   check(theUi.ctx.interface.displayResurrectChestOrScroll === 0, 'with the hand empty, the panel is food and water');
   handleMouseButton(theUi, 71, 0, 0);
-  step('poison with the eye held and food and water shown', () => game.systems.monsterAttack.poisonCharacter(1, 1), -1);
+  step('poison with the eye held and food and water shown', () => game.systems.championDamage.poisonCharacter(1, 1), -1);
   handleMouseUnclick(theUi);
   step('the scroll back into the open inventory\'s weapon hand', () => character.addCharacterPossession(1, scroll, 1), scroll);
 
@@ -552,7 +552,7 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
     drawInventoryScreen(theUi);
     handleMouseButton(theUi, button, 0, 0);
     const held = theUi.ctx.interface.pressingEye || theUi.ctx.interface.pressingMouth;
-    game.systems.monsterAttack.killCharacter(chIdx);
+    game.systems.championDamage.killCharacter(chIdx);
     const released = !theUi.ctx.interface.pressingEye && !theUi.ctx.interface.pressingMouth;
     const closed = party.selectedCharacterIndex === -1;
     const shown = pointerDrawn() && theUi.word23118 === 0;

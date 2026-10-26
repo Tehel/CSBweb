@@ -309,7 +309,7 @@ see `doc/PROVEN_FACTS.md` for that, for which monsters throw what, for the two
 independent chances to avoid a blow, for the many-stage damage formula, and for how
 wounds accumulate.
 
-The champion side is `MonsterDamagesCharacter` (`:4531`) → `DamageCharacter`
+The champion side, `src/engine/ChampionDamage.ts`, is `MonsterDamagesCharacter` (`:4531`) → `DamageCharacter`
 (`doc/CSBwin-src/Character.cpp:2708`), which only adds to `d.PendingDamage`; the tick's
 `DisplayCharacterDamage` (`doc/CSBwin-src/CSBCode.cpp:7143`) takes it off the HP and calls
 `KillCharacter` (`Character.cpp:2531`) (`doc/PROVEN_FACTS.md` → "`DamageCharacter` only

@@ -70,8 +70,8 @@ function main(): void {
     const game = withParty(1);
     const champ = game.ctx.party.state.champions[0]!;
     champ.attributes.stamina = stamina;
-    game.systems.monsterAttack.adjustStamina(0, decrement);
-    game.systems.monsterAttack.displayCharacterDamage();
+    game.systems.championDamage.adjustStamina(0, decrement);
+    game.systems.championDamage.displayCharacterDamage();
     const after = { stamina: champ.attributes.stamina, health: champ.attributes.health };
     console.log([stamina, decrement, after.stamina, after.health, note].join('\t'));
     return after;
@@ -97,7 +97,7 @@ function main(): void {
   {
     const game = withParty(1);
     game.ctx.party.state.champions[0]!.attributes.stamina = 40;
-    game.systems.monsterAttack.adjustStamina(-1, 20);
+    game.systems.championDamage.adjustStamina(-1, 20);
     check(game.ctx.party.state.champions[0]!.attributes.stamina === 40, 'chIdx -1 is a no-op');
   }
 
@@ -113,8 +113,8 @@ function main(): void {
 
   // Strength 200: the first dose is Larger(1, 200/64) = 3, and 199 ticks are left.
   game.ctx.state.tickCount = 0;
-  game.systems.monsterAttack.poisonCharacter(0, 200);
-  game.systems.monsterAttack.displayCharacterDamage();
+  game.systems.championDamage.poisonCharacter(0, 200);
+  game.systems.championDamage.displayCharacterDamage();
   console.log([0, victim.poisonCount, victim.attributes.health, poisonTimersFor(game, 0), 'poisoned, strength 200'].join('\t'));
 
   check(victim.attributes.health === startHealth - 3, `the first dose was 3 (got ${startHealth - victim.attributes.health})`);
@@ -139,7 +139,7 @@ function main(): void {
   check(victim.attributes.health === startHealth - 9, 'a third dose landed 36 ticks after the second');
 
   // CurePoison cancels the chain outright.
-  game.systems.monsterAttack.curePoison(0);
+  game.systems.championDamage.curePoison(0);
   console.log([72, victim.poisonCount, victim.attributes.health, poisonTimersFor(game, 0), 'CurePoison'].join('\t'));
   check(poisonTimersFor(game, 0) === 0, 'CurePoison deleted the pending TT_75');
   check(victim.poisonCount === 0, 'CurePoison cleared the count');
@@ -153,8 +153,8 @@ function main(): void {
   {
     const g = withParty(1);
     const ch = g.ctx.party.state.champions[0]!;
-    g.systems.monsterAttack.poisonCharacter(0, 1);
-    g.systems.monsterAttack.displayCharacterDamage();
+    g.systems.championDamage.poisonCharacter(0, 1);
+    g.systems.championDamage.displayCharacterDamage();
     check(ch.attributes.health === 199, 'a one-tick dose still deals the minimum 1 damage');
     check(poisonTimersFor(g, 0) === 0, 'a one-tick dose arms no timer');
     check(ch.poisonCount === 0, 'and leaves the champion unpoisoned');
@@ -165,8 +165,8 @@ function main(): void {
     const g = withParty(2);
     g.ctx.party.state.potentialChampionIndex = 1;
     const ch = g.ctx.party.state.champions[1]!;
-    g.systems.monsterAttack.poisonCharacter(1, 200);
-    g.systems.monsterAttack.displayCharacterDamage();
+    g.systems.championDamage.poisonCharacter(1, 200);
+    g.systems.championDamage.displayCharacterDamage();
     check(ch.attributes.health === 200, 'an unconfirmed champion cannot be poisoned');
     check(poisonTimersFor(g, 1) === 0, 'and no timer is armed for them');
   }
@@ -184,7 +184,7 @@ function main(): void {
     selectMagicCaster(party, 1);
     check(party.cursorOwner === 1 && party.magicCasterIndex === 1, 'champion 1 holds both');
 
-    g.systems.monsterAttack.killCharacter(1);
+    g.systems.championDamage.killCharacter(1);
     console.log(['champion 1 of 3 dies', party.cursorOwner, party.magicCasterIndex, String(party.gameIsLost)].join('\t'));
     check(party.cursorOwner === 0, `the cursor moved to the first living champion (got ${party.cursorOwner})`);
     check(party.magicCasterIndex === 0, `the magic tab moved with it (got ${party.magicCasterIndex})`);
@@ -197,7 +197,7 @@ function main(): void {
     const party = g.ctx.party.state;
     setHandOwner(g.ctx, 2);
     selectMagicCaster(party, 2);
-    g.systems.monsterAttack.killCharacter(0);
+    g.systems.championDamage.killCharacter(0);
     console.log(['a bystander dies', party.cursorOwner, party.magicCasterIndex, String(party.gameIsLost)].join('\t'));
     check(party.cursorOwner === 2, 'a death elsewhere leaves the cursor alone');
     check(party.magicCasterIndex === 2, 'and leaves the magic tab alone');
@@ -208,7 +208,7 @@ function main(): void {
     const party = g.ctx.party.state;
     setHandOwner(g.ctx, 0);
     selectMagicCaster(party, 0);
-    g.systems.monsterAttack.killCharacter(0);
+    g.systems.championDamage.killCharacter(0);
     console.log(['the last champion dies', party.cursorOwner, party.magicCasterIndex, String(party.gameIsLost)].join('\t'));
     check(party.gameIsLost, 'the last death sets gameIsLost');
     check(party.cursorOwner === -1, 'and drops the cursor');
@@ -220,7 +220,7 @@ function main(): void {
     const party = g.ctx.party.state;
     party.potentialChampionIndex = 1;
     setHandOwner(g.ctx, 0);
-    g.systems.monsterAttack.killCharacter(0);
+    g.systems.championDamage.killCharacter(0);
     console.log(['only a mirror champion left', party.cursorOwner, party.magicCasterIndex, String(party.gameIsLost)].join('\t'));
     check(party.gameIsLost, 'a champion still in a mirror does not keep the game alive');
   }
@@ -228,9 +228,9 @@ function main(): void {
   {
     // A poisoned champion's timers must not outlive them.
     const g = withParty(2);
-    g.systems.monsterAttack.poisonCharacter(0, 200);
+    g.systems.championDamage.poisonCharacter(0, 200);
     check(poisonTimersFor(g, 0) === 1, 'the victim is poisoned before dying');
-    g.systems.monsterAttack.killCharacter(0);
+    g.systems.championDamage.killCharacter(0);
     check(poisonTimersFor(g, 0) === 0, 'KillCharacter cures the poison it leaves behind');
   }
 

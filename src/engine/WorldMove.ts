@@ -490,10 +490,10 @@ export class WorldMove {
         const load = this.ctx.systems.characterStats.characterLoad(champ);
         // `(25 * load) & 0xffff` first — CSBWin does the multiply in a word.
         const cost = Math.trunc(((25 * load) & 0xffff) / maxLoad) + 1;
-        this.ctx.systems.monsterAttack.adjustStamina(chIdx, cost);
+        this.ctx.systems.championDamage.adjustStamina(chIdx, cost);
       }
     } else {
-      const hurt = this.ctx.systems.monsterAttack.damageAllCharacters(20, 48, 2);
+      const hurt = this.ctx.systems.championDamage.damageAllCharacters(20, 48, 2);
       if (hurt !== 0) {
         this.ctx.sounds.queueSound(6, party.position.x, party.position.y, 0, party.position.z);
       }

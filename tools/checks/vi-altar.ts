@@ -212,7 +212,7 @@ function main(): void {
 
     const victim = 1;
     const maxHpBefore = g.ctx.party.state.champions[victim]!.attributes.maxHealth;
-    g.systems.monsterAttack.killCharacter(victim);
+    g.systems.championDamage.killCharacter(victim);
 
     const bones = bonesAt(g, cell);
     console.log(`HERO${victim} died, leaving ${bones.length} bones object(s) at (${cell.x},${cell.y}) level ${cell.z}`);
@@ -293,7 +293,7 @@ function main(): void {
     // as a champion index.
     const victim = 1;
     g.ctx.party.state.champions[victim]!.fingerprint = 0;
-    g.systems.monsterAttack.killCharacter(victim);
+    g.systems.championDamage.killCharacter(victim);
     const bones = bonesAt(g, cell);
     const rn = bones[0];
     const record = rn === undefined ? null : g.ctx.dungeon.copyChampionBonesRecord(rn);
@@ -318,7 +318,7 @@ function main(): void {
     const cell = findOpenCell(g);
     g.ctx.party.state.position = cell;
     g.systems.monsters.loadPartyLevel(cell.z);
-    g.systems.monsterAttack.killCharacter(target);
+    g.systems.championDamage.killCharacter(target);
     // Clear away the bones the death itself left, so only the authored ones are here.
     for (const rn of bonesAt(g, cell)) {
       g.ctx.dungeon.removeObjectFromCell(cell, rn);
@@ -374,8 +374,8 @@ function main(): void {
     const cell = findOpenCell(g);
     g.ctx.party.state.position = cell;
     g.systems.monsters.loadPartyLevel(cell.z);
-    g.systems.monsterAttack.killCharacter(victim);
-    g.systems.monsterAttack.killCharacter(2);
+    g.systems.championDamage.killCharacter(victim);
+    g.systems.championDamage.killCharacter(2);
     const rn = bonesAt(g, cell).find(
       (b) => g.ctx.dungeon.copyChampionBonesRecord(b) === g.ctx.party.state.champions[victim]!.fingerprint,
     );
@@ -413,7 +413,7 @@ function main(): void {
     const cell = findOpenCell(g);
     g.ctx.party.state.position = cell;
     g.systems.monsters.loadPartyLevel(cell.z);
-    g.systems.monsterAttack.killCharacter(target);
+    g.systems.championDamage.killCharacter(target);
 
     // While the champion lies dead, a living one takes their corner. CSBWin allows
     // this precisely because `CharacterAtPosition` ignores the dead.
@@ -457,7 +457,7 @@ function main(): void {
       g.ctx.party.state.position = altar.party;
       g.ctx.party.state.facing = altar.facing as Champion['facing'] & number;
       g.systems.monsters.loadPartyLevel(altar.party.z);
-      g.systems.monsterAttack.killCharacter(victim);
+      g.systems.championDamage.killCharacter(victim);
 
       const bones = bonesAt(g, altar.party)[0];
       if (bones === undefined) {
@@ -524,7 +524,7 @@ function main(): void {
       g.ctx.party.state.position = altar.party;
       g.ctx.party.state.facing = altar.facing as Champion['facing'] & number;
       g.systems.monsters.loadPartyLevel(altar.party.z);
-      g.systems.monsterAttack.killCharacter(1);
+      g.systems.championDamage.killCharacter(1);
 
       // `if (value != 0)` — bones whose value is 0 are scenery, not anybody's remains
       // (`doc/CSBwin-src/Code11f52.cpp:79`, `doc/CSBwin-src/CSB.h:1261-1267`). The
@@ -561,7 +561,7 @@ function main(): void {
       // A save of the game before the death holds no bones record, and its load takes
       // away the one a game it is loaded into has.
       const noDeath = buildSaveFile(g);
-      g.systems.monsterAttack.killCharacter(victim);
+      g.systems.championDamage.killCharacter(victim);
       const bones = bonesAt(g, altar.party)[0];
       const fingerprint = g.ctx.party.state.champions[victim]!.fingerprint;
       const file = buildSaveFile(g);
@@ -606,7 +606,7 @@ function main(): void {
         for (const [name, load] of routes) {
           // A game with a death of its own, whose record the loaded world does not have.
           const { game: next } = makeGame();
-          next.systems.monsterAttack.killCharacter(0);
+          next.systems.championDamage.killCharacter(0);
           load(next);
           const bonesRecords = (): number =>
             new Expool(next.ctx.dungeon.getData()).keys().filter((key) => key >>> 24 === EDT_CHAMPION_BONES).length;
@@ -653,7 +653,7 @@ function main(): void {
       g.ctx.party.state.position = altar.party;
       g.ctx.party.state.facing = altar.facing as Champion['facing'] & number;
       g.systems.monsters.loadPartyLevel(altar.party.z);
-      g.systems.monsterAttack.killCharacter(1);
+      g.systems.championDamage.killCharacter(1);
       const left = g.ctx.party.state.champions[1]!;
       if (!dead) left.attributes.health = 50;
       const record = new Uint8Array(CHARDESC_SIZE);

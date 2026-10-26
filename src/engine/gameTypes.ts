@@ -92,7 +92,7 @@ export interface Champion {
     /**
      * `CHARDESC.timerIndex` — the timer that erases the damage readout over the
      * champion's name or portrait (`doc/CSBwin-src/CSBCode.cpp:7231-7261`), a `TT_12`,
-     * or -1. `MonsterAttack.displayCharacterDamage` arms it, `tag011366` clears it.
+     * or -1. `ChampionDamage.displayCharacterDamage` arms it, `tag011366` clears it.
      */
     timerIndex: i16;
     /** `CHARDESC.talents` — a `ui32` `AddCharacter` zeroes (`Character.cpp:511`). */

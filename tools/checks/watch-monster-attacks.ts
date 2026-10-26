@@ -98,16 +98,16 @@ async function main(): Promise<void> {
   let bigMask = 0;
   for (let i = 0; i < 200; i++) {
     probe.wounds = 0;
-    game.systems.monsterAttack.damageCharacter(probeIdx, 300, 0x3f, 3);
-    game.systems.monsterAttack.displayCharacterDamage();
+    game.systems.championDamage.damageCharacter(probeIdx, 300, 0x3f, 3);
+    game.systems.championDamage.displayCharacterDamage();
     if (probe.wounds !== 0) bigWounds++;
     bigMask |= probe.wounds;
   }
   let smallWounds = 0;
   for (let i = 0; i < 200; i++) {
     probe.wounds = 0;
-    game.systems.monsterAttack.damageCharacter(probeIdx, 6, 0x3f, 3);
-    game.systems.monsterAttack.displayCharacterDamage();
+    game.systems.championDamage.damageCharacter(probeIdx, 6, 0x3f, 3);
+    game.systems.championDamage.displayCharacterDamage();
     if (probe.wounds !== 0) smallWounds++;
   }
   console.log('');
@@ -127,7 +127,7 @@ async function main(): Promise<void> {
   const measure = (): number => {
     armoured.attributes.health = 1000000;
     let total = 0;
-    for (let i = 0; i < 400; i++) total += game.systems.monsterAttack.damageCharacter(armIdx, 100, 0x3f, 3);
+    for (let i = 0; i < 400; i++) total += game.systems.championDamage.damageCharacter(armIdx, 100, 0x3f, 3);
     return total;
   };
   const bare = measure();

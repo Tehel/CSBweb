@@ -90,7 +90,7 @@ async function main(): Promise<void> {
 
   const tick = (): void => {
     game.systems.timer.processTimers();
-    game.systems.monsterAttack.displayCharacterDamage();
+    game.systems.championDamage.displayCharacterDamage();
     game.ctx.state.tickCount++;
   };
 

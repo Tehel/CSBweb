@@ -2613,7 +2613,7 @@ export class DsaSystem {
         this.noFilter(bank);
         if (charIdx >= this.ctx.party.state.champions.length) break;
         if (charIdx < 0) break;
-        this.ctx.systems.monsterAttack.poisonCharacter(charIdx, val);
+        this.ctx.systems.championDamage.poisonCharacter(charIdx, val);
         break;
       }
       case StkOp.WHO_HAS_TALENT: {

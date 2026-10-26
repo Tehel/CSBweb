@@ -418,7 +418,7 @@ function playFromDungeonDat(): Game {
   game.systems.mouse.throwObjectFromCursor(0);
   advance(game, 2);
   take(1);
-  game.systems.monsterAttack.damageCharacter(0, 200, 0x3f, 4);
+  game.systems.championDamage.damageCharacter(0, 200, 0x3f, 4);
   party.selectedCharacterIndex = 1;
   return game;
 }

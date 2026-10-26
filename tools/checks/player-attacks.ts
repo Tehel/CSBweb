@@ -186,7 +186,7 @@ async function main(): Promise<void> {
       console.log([
         label,
         masteryOf(game, 0, g230.skillNumber[AttackType.atk_SWING]! & 0xff),
-        game.systems.monsterAttack.quickness(champ),
+        game.systems.championDamage.quickness(champ),
         hits, total, hardest,
       ].join('\t'));
     }

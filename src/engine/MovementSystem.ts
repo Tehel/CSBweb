@@ -416,7 +416,7 @@ export class MovementSystem {
     private chargeStamina(staminaAdjustment: readonly number[]): void {
         const champions = this.party.state.champions;
         for (let charIdx = 0; charIdx < champions.length; charIdx++) {
-            this.ctx.systems.monsterAttack.adjustStamina(charIdx, staminaAdjustment[charIdx]!);
+            this.ctx.systems.championDamage.adjustStamina(charIdx, staminaAdjustment[charIdx]!);
         }
     }
 
@@ -442,11 +442,11 @@ export class MovementSystem {
         let k = 0;
         if (this.party.state.champions.length !== 0) {
             const direction = relDirection + ((this.party.state.facing & 3) + 2);
-            const local8 = this.ctx.systems.monsterAttack.getCharacterToDamage(newPosition.x, newPosition.y, direction & 3);
-            k = sw(this.ctx.systems.monsterAttack.damageCharacter(local8, 1, 24, 2));
-            const local10 = this.ctx.systems.monsterAttack.getCharacterToDamage(newPosition.x, newPosition.y, (direction + 1) & 3);
+            const local8 = this.ctx.systems.championDamage.getCharacterToDamage(newPosition.x, newPosition.y, direction & 3);
+            k = sw(this.ctx.systems.championDamage.damageCharacter(local8, 1, 24, 2));
+            const local10 = this.ctx.systems.championDamage.getCharacterToDamage(newPosition.x, newPosition.y, (direction + 1) & 3);
             const local30 = local10 & 0xffff;
-            if (local8 !== local30) k |= this.ctx.systems.monsterAttack.damageCharacter(local10, 1, 24, 2);
+            if (local8 !== local30) k |= this.ctx.systems.championDamage.damageCharacter(local10, 1, 24, 2);
             if (k !== 0) this.ctx.sounds.queueSound(18, this.party.state.position.x, this.party.state.position.y, 0, this.party.state.position.z);
         }
         return {

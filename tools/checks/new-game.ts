@@ -197,8 +197,8 @@ function main(): void {
   check(!loaded.canRestartFromSavegame(), 'until a new game is read into it');
   console.log('');
 
-  played.systems.monsterAttack.killCharacter(0);
-  played.systems.monsterAttack.killCharacter(1);
+  played.systems.championDamage.killCharacter(0);
+  played.systems.championDamage.killCharacter(1);
   runFrames(played, 4);
 
   console.log('=== the game that was played ===');

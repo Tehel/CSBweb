@@ -214,7 +214,7 @@ export class MouseSystem {
     const party = this.ctx.party.state;
 
     this.ctx.sounds.queueSound(16, party.position.x, party.position.y, 1, party.position.z);
-    this.ctx.systems.monsterAttack.adjustStamina(chIdx, this.throwStaminaCost(obj));
+    this.ctx.systems.championDamage.adjustStamina(chIdx, this.throwStaminaCost(obj));
     // A negative disable time means "use the default", which is 4 ticks.
     const disableTime = overrides && overrides.disableTime >= 0 ? overrides.disableTime : 4;
     this.ctx.systems.magic.disableCharacterAction(chIdx, disableTime);

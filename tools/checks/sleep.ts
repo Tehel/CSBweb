@@ -203,10 +203,10 @@ async function main(): Promise<void> {
   console.log('=== WakeUp by a blow ===');
   {
     game.systems.mouse.sleep();
-    game.systems.monsterAttack.damageCharacter(0, 40, 0, 0);
+    game.systems.championDamage.damageCharacter(0, 40, 0, 0);
     check(game.isPartySleeping(), 'DamageCharacter with P4 == 0 does not wake (Character.cpp:2814 is on the armour branch)');
     const hp = party.champions[0]!.attributes.health;
-    game.systems.monsterAttack.damageCharacter(0, 40, 1, 2);
+    game.systems.championDamage.damageCharacter(0, 40, 1, 2);
     console.log(`P4 == 2: health ${hp} -> ${party.champions[0]!.attributes.health}, sleeping=${game.isPartySleeping()}`);
     check(!game.isPartySleeping(), 'DamageCharacter with P4 == 2 (a pit, a cloud) wakes');
   }

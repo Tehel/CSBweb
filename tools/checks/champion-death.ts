@@ -289,8 +289,8 @@ function main(): void {
     g.ctx.party.state.position = cell;
     g.systems.monsters.loadPartyLevel(cell.z);
     armChampion(g, 0);
-    g.systems.monsterAttack.damageCharacter(0, 999, 0, 0);
-    g.systems.monsterAttack.displayCharacterDamage();
+    g.systems.championDamage.damageCharacter(0, 999, 0, 0);
+    g.systems.championDamage.displayCharacterDamage();
     report('DamageCharacter', aftermath(g, cell, 0, true));
   }
 
@@ -303,8 +303,8 @@ function main(): void {
     armChampion(g, 0);
     // Stamina 12, so a 100-point cost overshoots by 88 and `DamageCharacter` takes 44
     // — more than the 20 hit points the champion has.
-    g.systems.monsterAttack.adjustStamina(0, 100);
-    g.systems.monsterAttack.displayCharacterDamage();
+    g.systems.championDamage.adjustStamina(0, 100);
+    g.systems.championDamage.displayCharacterDamage();
     check(g.ctx.party.state.champions[0]!.attributes.stamina === 0, 'exhaustion: stamina bottoms out at 0');
     report('AdjustStamina', aftermath(g, cell, 0, true));
   }
@@ -336,7 +336,7 @@ function main(): void {
       g.systems.magic.launchThrownMissile(RN_FIREBALL, launch, 0, 1 /* east */, 255, 255, 0, g.ctx.state.tickCount);
       for (let i = 0; i < 6 && alive(); i++) {
         g.systems.timer.processTimers();
-        g.systems.monsterAttack.displayCharacterDamage();
+        g.systems.championDamage.displayCharacterDamage();
         g.ctx.state.tickCount++;
       }
       console.log([shots, before, champ.attributes.health, alive()].join('\t'));
@@ -361,8 +361,8 @@ function main(): void {
     g.systems.monsters.loadPartyLevel(cell.z);
     g.ctx.party.state.cursorOwner = 0;
     g.ctx.party.state.magicCasterIndex = 0;
-    g.systems.monsterAttack.adjustStamina(0, 100);
-    g.systems.monsterAttack.displayCharacterDamage();
+    g.systems.championDamage.adjustStamina(0, 100);
+    g.systems.championDamage.displayCharacterDamage();
     const party = g.ctx.party.state;
     console.log(['', 'value'].join('\t'));
     console.log(['cursorOwner', party.cursorOwner].join('\t'));
@@ -434,7 +434,7 @@ function main(): void {
     g.systems.monsters.loadPartyLevel(cell.z);
     const recruit = g.ctx.party.state.champions[1]!;
     g.ctx.party.state.potentialChampionIndex = 1;
-    const r = g.systems.monsterAttack.damageCharacter(1, 999, 0, 0);
+    const r = g.systems.championDamage.damageCharacter(1, 999, 0, 0);
     console.log(`recruit: returned ${r}, health ${recruit.attributes.health}`);
     check(recruit.attributes.health === 20,
       'a recruit still in the mirror cannot be hurt');
@@ -443,14 +443,14 @@ function main(): void {
 
     const hero = g.ctx.party.state.champions[0]!;
     g.gameWon = true;
-    const w = g.systems.monsterAttack.damageCharacter(0, 999, 0, 0);
+    const w = g.systems.championDamage.damageCharacter(0, 999, 0, 0);
     console.log(`game won: returned ${w}, health ${hero.attributes.health}`);
     check(hero.attributes.health === 20, 'once the game is won nobody can be hurt');
     check(w === 1, 'and DamageCharacter returns d.Word11694, 1');
     g.gameWon = false;
 
-    const big = g.systems.monsterAttack.damageCharacter(0, 0x10000 + 5, 0, 0);
-    g.systems.monsterAttack.displayCharacterDamage();
+    const big = g.systems.championDamage.damageCharacter(0, 0x10000 + 5, 0, 0);
+    g.systems.championDamage.displayCharacterDamage();
     console.log(`damage 0x10005: returned ${big}, health ${hero.attributes.health}`);
     check(big === 5 && hero.attributes.health === 15, 'the blow is cut to 16 bits first: 0x10005 is 5');
   }
@@ -485,8 +485,8 @@ function main(): void {
       champ.possessions[slot] = rn;
       slotOf.set(rn, slot);
     }
-    g.systems.monsterAttack.damageCharacter(0, 999, 0, 0);
-    g.systems.monsterAttack.displayCharacterDamage();
+    g.systems.championDamage.damageCharacter(0, 999, 0, 0);
+    g.systems.championDamage.displayCharacterDamage();
     const dropped = chainAt(g, cell).filter((rn) => slotOf.has(rn));
     const got = dropped.map((rn) => slotOf.get(rn)!);
     const want = dropOrder.filter((slot) => armed.includes(slot));
@@ -504,8 +504,8 @@ function main(): void {
       g2.systems.monsters.loadPartyLevel(pit.z);
       const rn = newDagger(g2);
       g2.ctx.party.state.champions[0]!.possessions[1] = rn;
-      g2.systems.monsterAttack.damageCharacter(0, 999, 0, 0);
-      g2.systems.monsterAttack.displayCharacterDamage();
+      g2.systems.championDamage.damageCharacter(0, 999, 0, 0);
+      g2.systems.championDamage.displayCharacterDamage();
       const at = whereIs(g2, rn);
       console.log(`dying over the open pit at (${pit.x},${pit.y}) level ${pit.z}: the dagger is at `
         + (at.map((p) => `(${p.x},${p.y}) level ${p.z}`).join(' ') || 'nowhere'));
@@ -565,9 +565,9 @@ function main(): void {
     a.possessions[10] = illumulet;
     g.ctx.party.state.champions[1]!.possessions[10] = symal;
 
-    g.systems.monsterAttack.damageCharacter(0, 999, 0, 0);
-    g.systems.monsterAttack.damageCharacter(1, 999, 0, 0);
-    g.systems.monsterAttack.displayCharacterDamage();
+    g.systems.championDamage.damageCharacter(0, 999, 0, 0);
+    g.systems.championDamage.damageCharacter(1, 999, 0, 0);
+    g.systems.championDamage.displayCharacterDamage();
     const d = g.ctx.dungeon;
     console.log(`brightness ${before + step} -> ${g.ctx.party.state.brightness}; torch lit ${d.getWeaponRecord(torch)?.litTorch}; `
       + `scroll open ${d.getScrollRecord(scroll)?.open}; Illumulet value ${d.getMiscRecord(illumulet)?.specialState}; `
@@ -593,7 +593,7 @@ function main(): void {
     if (!cell) { fail('no open cell with an open neighbour'); finish(); return; }
     g.ctx.party.state.position = cell;
     g.systems.monsters.loadPartyLevel(cell.z);
-    standIn(g.systems.timer, 'processTimers', () => { g.systems.monsterAttack.damageCharacter(0, 999, 0, 0); return false; });
+    standIn(g.systems.timer, 'processTimers', () => { g.systems.championDamage.damageCharacter(0, 999, 0, 0); return false; });
     const drawn: string[] = [];
     g.onTick(() => drawn.push(`gameIsLost ${g.ctx.party.state.gameIsLost}, main loop returned ${g.mainLoopHasReturned()}`));
     g.gameTick();

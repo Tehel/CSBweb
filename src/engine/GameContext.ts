@@ -37,6 +37,7 @@ import type { ActuatorSystem } from './ActuatorSystem';
 import type { AttackSystem } from './AttackSystem';
 import type { CharacterStats } from './CharacterStats';
 import type { DsaSystem } from './DsaSystem';
+import type { ChampionDamage } from './ChampionDamage';
 import type { CharacterSystem } from './CharacterSystem';
 import type { HallOfChampions } from './HallOfChampions';
 import type { MagicSystem } from './MagicSystem';
@@ -68,6 +69,7 @@ export interface GameSystems {
   monsterDamage: MonsterDamage;
   monsterPerception: MonsterPerception;
   monsterAttack: MonsterAttack;
+  championDamage: ChampionDamage;
   monsterAI: MonsterAI;
   characterStats: CharacterStats;
   attack: AttackSystem;

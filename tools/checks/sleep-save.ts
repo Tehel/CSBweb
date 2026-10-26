@@ -216,7 +216,7 @@ function checkWhoAsks(): void {
 
   handleMouseButton(ui, 145, 0, 0);
   ui.sleepSaveNeeded = false;
-  // What a blow on a sleeping party calls (`MonsterAttack`, `Monster.cpp:4544`,
+  // What a blow on a sleeping party calls (`MonsterAttack` and `ChampionDamage`, `Monster.cpp:4544`,
   // `Character.cpp:2816`), outside the interface.
   wakeUp(s.game.ctx);
   console.log(`  a blow's WakeUp: sleeping ${party.sleeping}, Sleepsave asked ${ui.sleepSaveNeeded}`);

@@ -15,7 +15,7 @@ import { newGame, stockDungeon, stockGraphics } from '../lib/game';
 const SEED = 0x1234;
 const game = newGame(stockDungeon(), stockGraphics());
 const party = game.ctx.party.state;
-const attack = game.systems.monsterAttack;
+const attack = game.systems.championDamage;
 const { x, y } = party.position;
 
 // The order a blow from the square to the north, side 0, walks the corners in.

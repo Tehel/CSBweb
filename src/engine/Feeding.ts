@@ -239,10 +239,10 @@ export function applyFeedParameters(
   adjustCurrentAttribute(stats[AttributeIndex.AntiFire], fp.antiFireAdjust);
 
   // `CurePoison` (`doc/CSBwin-src/Character.cpp:3012`).
-  if (fp.antiVenin) ctx.systems.monsterAttack.curePoison(chIdx);
+  if (fp.antiVenin) ctx.systems.championDamage.curePoison(chIdx);
   // `AdjustStamina` (`doc/CSBwin-src/Code11f52.cpp:4451`), negated: `staminaAdjust` is a
   // gain, `AdjustStamina` takes a cost.
-  ctx.systems.monsterAttack.adjustStamina(chIdx, -fp.staminaAdjust);
+  ctx.systems.championDamage.adjustStamina(chIdx, -fp.staminaAdjust);
 
   if (fp.shieldStrengthAdjust !== 0) {
     // `shieldStrengthAdjust` is a `ui32` (`:3970`), so the sum `:4383` tests is unsigned and
@@ -266,7 +266,7 @@ export function applyFeedParameters(
     champ.attributes.mana = limit(0, (champ.attributes.mana | 0) + fp.manaAdjust, MAX_MANA);
     if ((champ.attributes.health | 0) + fp.hitpointAdjust <= 0) {
       // `KillCharacter` (`doc/CSBwin-src/Character.cpp:2531`).
-      ctx.systems.monsterAttack.killCharacter(chIdx);
+      ctx.systems.championDamage.killCharacter(chIdx);
     } else {
       champ.attributes.health = (champ.attributes.health | 0) + fp.hitpointAdjust;
       // `STRandom()` — the whole 16-bit word, which the wound heal masks with.

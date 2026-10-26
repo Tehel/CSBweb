@@ -160,7 +160,7 @@ function removeCharacter(ctx: GameContext, chIdx: number): void {
   champion.incantation = [];
   champion.facing = party.facing;
   champion.maxRecentDamage = 0;
-  if (champion.poisonCount) ctx.systems.monsterAttack.curePoison(chIdx);
+  if (champion.poisonCount) ctx.systems.championDamage.curePoison(chIdx);
   let livingChar: number;
   for (livingChar = 0; livingChar < party.champions.length; livingChar++) {
     // Find a living party member.
@@ -178,7 +178,7 @@ function expireDamageTimer(ctx: GameContext, chIdx: number): void {
   const champion = ctx.party.state.champions[chIdx]!;
   if (champion.timerIndex === -1) return;
   ctx.timers.deleteTimer(champion.timerIndex);
-  ctx.systems.monsterAttack.tag011366(chIdx);
+  ctx.systems.championDamage.tag011366(chIdx);
 }
 
 /**
