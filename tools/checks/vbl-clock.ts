@@ -16,19 +16,21 @@
  * - The page paces VBLs from the wall clock (`Game.gameLoop`): a call runs as many as the
  *   time since the last holds, up to a second's worth, so a timer held to one call a
  *   second, as a background tab's is, keeps the game at its pace, and a longer gap is not
- *   made up.
+ *   made up. The tool's games run on a clock it moves itself (`GameHost.clock`), so none
+ *   of this waits on, or is upset by, the machine's load.
  *
  * Run: `npm test -- --only=vbl-clock.ts`
  */
 import type { Game } from '../../src/engine/Game';
 import { freeze, thaw, VBL_PER_TICK, type LoopScript } from '../../src/engine/LoopState';
 import { wakeUp } from '../../src/engine/MouseSystem';
+import { ManualClock } from '../lib/clock';
 import { newGame, stockGraphics, stockDungeon } from '../lib/game';
 import { check, finish } from '../lib/check';
 
-function freshGame(): { game: Game; ticks: () => number; vbls: () => number } {
+function freshGame(clock = new ManualClock()): { game: Game; ticks: () => number; vbls: () => number } {
   const data = stockDungeon();
-  const game = newGame(data, stockGraphics());
+  const game = newGame(data, stockGraphics(), { clock });
   game.setRandomSeed(0x12345678);
   let ticks = 0;
   let vbls = 0;
@@ -125,54 +127,35 @@ function checkTheFirstTick(): void {
 function checkThePace(): void {
   console.log('');
   console.log('=== the page paces VBLs from the wall clock (Game.gameLoop) ===');
-  let now = 1_000_000;
-  let pending: { fn: () => void; delay: number } | null = null;
-  const realNow = Date.now;
-  const realSetTimeout = globalThis.setTimeout;
-  const realClearTimeout = globalThis.clearTimeout;
-  Date.now = () => now;
-  (globalThis as { setTimeout: unknown }).setTimeout = (fn: () => void, delay: number) => {
-    pending = { fn, delay };
-    return 1;
+  const clock = new ManualClock();
+  const { game, ticks, vbls } = freshGame(clock);
+  /** `ms` on, whole milliseconds as `Date.now` gives them, then the timer's call: the VBLs and ticks it ran, and the delay it asked for next. */
+  const call = (ms: number): { vbls: number; ticks: number; delay: number } => {
+    const [v, t] = [vbls(), ticks()];
+    clock.advance(ms);
+    return { vbls: vbls() - v, ticks: ticks() - t, delay: clock.pending!.ms };
   };
-  (globalThis as { clearTimeout: unknown }).clearTimeout = () => { pending = null; };
-  try {
-    const { game, ticks, vbls } = freshGame();
-    /** `ms` on, whole milliseconds as `Date.now` gives them, then the timer's call: the VBLs and ticks it ran, and the delay it asked for next. */
-    const call = (ms: number): { vbls: number; ticks: number; delay: number } => {
-      now += ms;
-      const [v, t] = [vbls(), ticks()];
-      const next = pending!;
-      pending = null;
-      next.fn();
-      return { vbls: vbls() - v, ticks: ticks() - t, delay: pending!.delay };
-    };
-    game.start();
-    check(pending !== null && vbls() === 0 && ticks() === 0, 'start runs no VBL, and asks for a call');
+  game.start();
+  check(clock.pending !== null && vbls() === 0 && ticks() === 0, 'start runs no VBL, and asks for a call');
 
-    const steady = [5, 30, 16, 17, 1, 40, 12, 20, 25, 2].map(call);
-    const steadyVbls = steady.reduce((sum, c) => sum + c.vbls, 0);
-    console.log(`calls 1..40 ms apart, 168 ms in all: VBLs ${steady.map((c) => c.vbls).join(' ')} (${steadyVbls})`);
-    check(steadyVbls === 10, 'a timer that fires early or late runs the VBLs the time holds: 168 ms is 10');
-    check(steady.every((c) => c.delay >= 0 && c.delay <= 1000 / 60), 'and asks to be called when the next one is due');
+  const steady = [5, 30, 16, 17, 1, 40, 12, 20, 25, 2].map(call);
+  const steadyVbls = steady.reduce((sum, c) => sum + c.vbls, 0);
+  console.log(`calls 1..40 ms apart, 168 ms in all: VBLs ${steady.map((c) => c.vbls).join(' ')} (${steadyVbls})`);
+  check(steadyVbls === 10, 'a timer that fires early or late runs the VBLs the time holds: 168 ms is 10');
+  check(steady.every((c) => c.delay >= 0 && c.delay <= 1000 / 60), 'and asks to be called when the next one is due');
 
-    const second = call(1000);
-    console.log(`a call a second later (a background tab): ${second.vbls} VBLs, ${second.ticks} ticks`);
-    check(second.vbls === 60 && second.ticks === 4, 'a call a second after the last runs 60 VBLs, 4 ticks');
+  const second = call(1000);
+  console.log(`a call a second later (a background tab): ${second.vbls} VBLs, ${second.ticks} ticks`);
+  check(second.vbls === 60 && second.ticks === 4, 'a call a second after the last runs 60 VBLs, 4 ticks');
 
-    const gap = call(10_000);
-    const next = call(17);
-    console.log(`a call 10 s later: ${gap.vbls} VBLs; the next, a VBL on: ${next.vbls}`);
-    check(gap.vbls === 60, 'a longer gap runs a second of VBLs, no more');
-    check(next.vbls === 1, 'and the rest is not made up afterwards');
+  const gap = call(10_000);
+  const next = call(17);
+  console.log(`a call 10 s later: ${gap.vbls} VBLs; the next, a VBL on: ${next.vbls}`);
+  check(gap.vbls === 60, 'a longer gap runs a second of VBLs, no more');
+  check(next.vbls === 1, 'and the rest is not made up afterwards');
 
-    game.stop();
-    check(pending === null, 'stop cancels the call');
-  } finally {
-    Date.now = realNow;
-    globalThis.setTimeout = realSetTimeout;
-    globalThis.clearTimeout = realClearTimeout;
-  }
+  game.stop();
+  check(clock.pending === null, 'stop cancels the call');
 }
 
 checkTheCount();

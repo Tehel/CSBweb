@@ -226,7 +226,26 @@ export interface GameHost {
    * nothing swallows it.
    */
   die(error: unknown): void;
+  /**
+   * The wall clock `Game.gameLoop` paces the VBLs by. Left out, the browser's; a tool gives
+   * one it moves itself.
+   */
+  clock: LoopClock;
 }
+
+/** The time in milliseconds, and a call after a delay, cancelled by its handle. */
+export interface LoopClock {
+  now(): number;
+  setTimeout(call: () => void, ms: number): unknown;
+  clearTimeout(handle: unknown): void;
+}
+
+/** The browser's clock, Node's in a tool. */
+const WALL_CLOCK: LoopClock = {
+  now: () => Date.now(),
+  setTimeout: (call, ms) => setTimeout(call, ms),
+  clearTimeout: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+};
 
 /**
  * `host`, with a null object for every member it leaves out or leaves `undefined` (a
@@ -269,5 +288,6 @@ export function createGameHost(host: Partial<GameHost> = {}): GameHost {
     drawCharacterState: host.drawCharacterState ?? (() => {}),
     portraitOf: host.portraitOf ?? (() => undefined),
     die: host.die ?? ((error) => { throw error; }),
+    clock: host.clock ?? WALL_CLOCK,
   };
 }

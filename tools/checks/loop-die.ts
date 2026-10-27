@@ -10,6 +10,7 @@
  */
 
 import { createGameHost } from '../../src/engine/GameHost';
+import { ManualClock } from '../lib/clock';
 import { newGame, stockGraphics, stockDungeon } from '../lib/game';
 import { standIn } from '../lib/standIn';
 
@@ -20,29 +21,30 @@ function check(ok: boolean, what: string): void {
 }
 
 const data = stockDungeon();
-const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 /** A game whose `failOn`-th frame throws; how many frames ran, and what `die` received. */
-async function run(failOn: number): Promise<{ frames: number; died: unknown[]; thrown: Error }> {
+function run(failOn: number): { frames: number; died: unknown[]; thrown: Error; called: boolean } {
   const died: unknown[] = [];
-  const game = newGame(data, stockGraphics(), { die: (error) => died.push(error) });
+  const clock = new ManualClock();
+  const game = newGame(data, stockGraphics(), { die: (error) => died.push(error), clock });
   const thrown = new Error(`die(45) on frame ${failOn}`);
   let frames = 0;
   standIn(game, 'runFrame', () => {
     if (++frames === failOn) throw thrown;
   });
   game.start();
-  // The frames up to the throw, then 150 ms more: a loop that went on would run nine.
-  await wait(1000 / 60 * failOn + 150);
+  // A VBL's time per call, up to the throw, then nine more: a loop that went on would run them.
+  for (let n = 0; n < failOn + 9; n++) clock.advance(17);
+  const called = clock.pending !== null;
   game.stop();
-  return { frames, died, thrown };
+  return { frames, died, thrown, called };
 }
 
-async function main(): Promise<void> {
+function main(): void {
   for (const failOn of [1, 3]) {
-    const { frames, died, thrown } = await run(failOn);
+    const { frames, died, thrown, called } = run(failOn);
     console.log(`frame ${failOn} throws: ${frames} frames ran, die called ${died.length} time(s)`);
-    check(frames === failOn, `frame ${failOn}: no frame runs after the one that threw`);
+    check(frames === failOn && !called, `frame ${failOn}: no frame runs after the one that threw, and no call is asked for`);
     check(died.length === 1 && died[0] === thrown, `frame ${failOn}: the host's die receives the error, once`);
   }
 
@@ -62,4 +64,4 @@ async function main(): Promise<void> {
   console.log('\nall checks passed');
 }
 
-void main();
+main();

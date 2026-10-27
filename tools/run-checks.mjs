@@ -437,15 +437,43 @@ function record(name, r, ms, show) {
   if (!ok) failed++;
 }
 
+// A job that has not finished in five minutes, ten times the slowest tool's time, fails
+// with its output so far: one left with a handle open would otherwise hang the whole run.
+// Each job leads a process group of its own, so the kill takes tsx's node child with it,
+// and so does an interrupted run.
+const JOB_TIMEOUT_MS = 300_000;
+const groups = new Set();
+const killGroup = (pid) => {
+  try {
+    process.kill(-pid, 'SIGKILL');
+  } catch {
+    // Already gone.
+  }
+};
+process.on('SIGINT', () => {
+  for (const pid of groups) killGroup(pid);
+  process.exit(130);
+});
+
 function runAsync(cmd, args) {
   return new Promise((done) => {
     const started = Date.now();
-    const child = spawn(cmd, args, { cwd: ROOT });
+    const child = spawn(cmd, args, { cwd: ROOT, detached: true });
+    groups.add(child.pid);
     const chunks = [];
+    const finish = (result) => {
+      clearTimeout(timer);
+      groups.delete(child.pid);
+      done({ ...result, out: Buffer.concat(chunks).toString('utf8'), ms: Date.now() - started });
+    };
+    const timer = setTimeout(() => {
+      killGroup(child.pid);
+      finish({ status: null, error: new Error(`timed out after ${JOB_TIMEOUT_MS / 1000} s, its output so far below`) });
+    }, JOB_TIMEOUT_MS);
     child.stdout.on('data', (c) => chunks.push(c));
     child.stderr.on('data', (c) => chunks.push(c));
-    child.on('error', (error) => done({ status: null, error, out: '', ms: Date.now() - started }));
-    child.on('close', (status) => done({ status, out: Buffer.concat(chunks).toString('utf8'), ms: Date.now() - started }));
+    child.on('error', (error) => finish({ status: null, error }));
+    child.on('close', (status) => finish({ status }));
   });
 }
 

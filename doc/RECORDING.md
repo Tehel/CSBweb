@@ -121,8 +121,9 @@ What holds:
 - **Drawing has its own stream**, `viewportRandom`, as CSBWin's `DrawViewport` does
   (`src/renderer/bytecode/ViewportDrawState.ts:24-33`); nothing under `src/renderer` or `src/ui` draws from
   the game's.
-- **The engine reads no clock**: under `src/engine` and `src/core`, `Date.now()` serves
-  only the loop's pacing (`src/engine/Game.ts:490-509`) and a save's date
+- **The engine reads no clock**: under `src/engine` and `src/core`, the loop is paced by
+  the host's clock (`GameHost.clock`, `src/engine/Game.ts:482-508`), and `Date.now()` serves
+  only a save's date
   (`src/engine/GameSaves.ts`), and `Math.random()` only the seed. Its arithmetic is
   integer; the one `Math.sin` builds MD5's constants (`src/core/md5.ts:14`).
 - **Input reaches the engine through CSBWin's one mouse queue** (`src/engine/MouseQueue.ts`),

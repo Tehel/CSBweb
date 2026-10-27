@@ -116,7 +116,6 @@ In payoff order: the first row is the next item.
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
 | C188 | A new timer's unused bytes are 0, where CSBWin's are 0xcd | M | ⏳ |
-| F15 | Tools that read the wall clock, and a runner with no timeout | S | ⏳ |
 | F16 | A tool can pass having checked less than it says | S | ⏳ |
 | F18 | One `tsconfig` for the browser, the tools and the server | S | ⏳ |
 | F19 | The tools' screen draws without the game's state, rules and CSB graphics | S | ⏳ |
@@ -534,26 +533,6 @@ in CSBWin 20230608, and if the game goes on there, ports what that binary draws.
 ## F — Verification debt
 
 New verification debt goes here; it can be taken anywhere ("Priority", point 5).
-
-### F15 ⏳ Tools that read the wall clock, and a runner with no timeout
-
-- `tools/checks/vbl-clock.ts`'s "MainLoop opens with a tick" check can fail under load and
-  pass alone (it failed once in a full `npm test`, sixteen tools at a time). `Game.start`
-  sets `vblClockStart = Date.now()` and calls `gameLoop()` at once, which reads
-  `Date.now()` again (`src/engine/Game.ts:238`, `:489`), so a stall of 17 ms between
-  the two runs a VBL inside `start` and spends the opening tick. The tool pins `Date.now`
-  for its pacing section (`:129-173`) and not for this one.
-- `tools/checks/loop-die.ts` waits `1000 / 60 * failOn + 150` real milliseconds, then checks
-  the frames counted (`:23`, `:36`): the same kind, not yet seen to fail.
-- `tools/checks/stats.ts` times the statistics' answers over 200,000 events and checks the
-  slowest is under 400 ms (`:439`). Alone it takes about 120 ms; in a full `npm test` it has
-  taken 365 ms, near enough the bound to fail some day.
-- `runAsync` waits for each tool's `close` with no limit (`tools/run-checks.mjs:365-375`), so
-  a tool left with a handle open hangs the whole suite.
-
-Paying it: the two loop tools on a pinned clock, or the engine's clock taken from `GameHost`, which
-would retire the patching of globals; a timeout per tool, reported as a failure with the
-output so far; `stats.ts` given a bound that load does not reach, or its timing printed and not checked.
 
 ### F16 ⏳ A tool can pass having checked less than it says
 

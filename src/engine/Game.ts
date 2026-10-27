@@ -143,7 +143,7 @@ export class Game implements MainLoop {
     /** The wall-clock time `gameLoop` counts VBLs from, and the VBLs it has run since. */
     private vblClockStart = 0;
     private vblsPaced = 0;
-    private loopTimer: ReturnType<typeof setTimeout> | null = null;
+    private loopTimer: unknown = null;
     /** `MainLoop` has returned, on the tick of a lost game (see `gameTick`), or won. */
     private mainLoopReturned = false;
     /** An error has ended the game (`die`): it never runs again, and nothing saves it. */
@@ -236,7 +236,7 @@ export class Game implements MainLoop {
             this.ctx.systems.worldMove.moveParty(-1, 0, x, y);
         }
         this.running = true;
-        this.vblClockStart = Date.now();
+        this.vblClockStart = this.ctx.host.clock.now();
         this.vblsPaced = 0;
         // `_MainLoop` goes straight to `tag000698`, the top of a tick
         // (doc/CSBwin-src/CSBCode.cpp:596-611): the first thing a started game does is
@@ -255,7 +255,7 @@ export class Game implements MainLoop {
         this.running = false;
 
         if (this.loopTimer !== null) {
-            clearTimeout(this.loopTimer);
+            this.ctx.host.clock.clearTimeout(this.loopTimer);
             this.loopTimer = null;
         }
     }
@@ -469,7 +469,7 @@ export class Game implements MainLoop {
      * strip's scroll and a script's `VBLDelay`, so a timer that fires late or seldom slows
      * the game down and never puts one clock out of step with another.
      *
-     * Paced with `setTimeout` rather than `requestAnimationFrame`. CSBWin's VBL timer
+     * Paced with `setTimeout` (`GameHost.clock`'s) rather than `requestAnimationFrame`. CSBWin's VBL timer
      * keeps advancing `d.Time` — and with it the teleporter/energy shimmer's
      * `GraphicRandom` counter, the party's food and water, every monster timer —
      * whether or not the window has focus; `requestAnimationFrame` callbacks are
@@ -484,7 +484,8 @@ export class Game implements MainLoop {
             return;
         }
 
-        const now = Date.now();
+        const clock = this.ctx.host.clock;
+        const now = clock.now();
         let due = Math.floor((now - this.vblClockStart) * VBL_FREQUENCY / 1000) - this.vblsPaced;
         if (due > MAX_VBLS_PER_CALL) {
             due = MAX_VBLS_PER_CALL;
@@ -503,7 +504,7 @@ export class Game implements MainLoop {
         if (!this.running) return;
 
         const nextVbl = this.vblClockStart + (this.vblsPaced + 1) * 1000 / VBL_FREQUENCY;
-        this.loopTimer = setTimeout(this.gameLoop, Math.max(0, nextVbl - Date.now()));
+        this.loopTimer = clock.setTimeout(this.gameLoop, Math.max(0, nextVbl - clock.now()));
     };
 
     /**
