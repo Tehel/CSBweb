@@ -22,6 +22,10 @@
  * 6. **The adjust-skills filter's answer** (`doc/CSBwin-src/Magic.cpp:255-327`): it may
  *    give up to 0xfffff, of which the skill takes `(UI16)`, the low word; and it runs for a
  *    gain of 0, as a failed cast's `w4 >> diff` may be.
+ * 7. **Each adjust-skills DSA is handed the one before's answer masked** (`:307-309`):
+ *    `chIdx & 3`, `skillNumber % 20`, `experience & 0xfffff`, and the caller's `why`,
+ *    never read back. C's `%` keeps the sign, so a filter's skill -1 fails
+ *    `skillNumber >= 4`, and the basic skill gains nothing (`:335`).
  *
  * Run: `npm test -- --only=dsa-parameters.ts`
  */
@@ -32,7 +36,7 @@ import { AttackType } from '../../src/engine/monsterTypes';
 import { TimerFunction, type TimerEntry } from '../../src/engine/TimerQueue';
 import { AdjustSkillsWhy, adjustSkills } from '../../src/engine/skills';
 import { adjustSkillsOnPartyLevel } from '../../src/engine/rules';
-import { globalStore, int, op, report, run, varFetch, varStore } from '../lib/dsa';
+import { globalStore, int, op, report, run, varFetch, varStore, withFilterDsas } from '../lib/dsa';
 import { check, finish } from '../lib/check';
 import { standInOf } from '../lib/standIn';
 
@@ -81,6 +85,33 @@ const ADJUST_SKILLS_FILTER_KEY = (3 << 24) | 6;
   const ran = zero.game.systems.dsa.getGlobalVariables()[3];
   console.log(`   a gain of 0: the filter ${ran === 9 ? 'runs' : 'does not run'}`);
   check(ran === 9, 'a gain of 0 runs the filter');
+}
+
+/* ------------------------------- 7. two adjust-skills DSAs -------------------- */
+{
+  const ESL_ADJUSTSKILLSFILTER = 6;
+  const answer = (words: number[]): number[] => [
+    ...words.flatMap((w, i) => [...int(w), varStore(i)]), ...int(words.length), ...int(0), op(StkOp.PARAM_STORE),
+  ];
+  const game = withFilterDsas(ESL_ADJUSTSKILLSFILTER, [
+    answer([5, 25, 0x123456, 77]),
+    [...int(4), ...int(10), op(StkOp.PARAM_FETCH), ...report(10, 4)],
+  ]);
+  adjustSkills(game.ctx, 0, 0, 1, AdjustSkillsWhy.CastSpell1, 0);
+  const g = game.systems.dsa.getGlobalVariables();
+  console.log(`7. the first DSA answers 5, 25, 0x123456, 77; the second is handed ${g[0]}, ${g[1]}, 0x${g[2]!.toString(16)}, ${g[3]}`);
+  check(g[0] === 1 && g[1] === 5 && g[2] === 0x23456, 'the second DSA is handed the first three words masked');
+  check(g[3] === AdjustSkillsWhy.CastSpell1, "and the caller's why");
+
+  const negative = withFilterDsas(ESL_ADJUSTSKILLSFILTER, [answer([0, -1, 100])]);
+  const skills = negative.ctx.party.state.champions[0]!.skills;
+  const basic = skills[0]!.experience;
+  const swing = skills[4]!.experience;
+  adjustSkills(negative.ctx, 0, 4, 1, AdjustSkillsWhy.Unknown, 0);
+  console.log(`   a filter answering skill -1 for skill 4: skill 4 gains ${skills[4]!.experience - swing}, `
+    + `the basic skill ${skills[0]!.experience - basic}`);
+  check(skills[4]!.experience - swing === 100 && skills[0]!.experience === basic,
+    'skill -1 stays -1: the skill taken before the filter gains, the basic skill nothing');
 }
 
 /* ------------------------------- 2. the party attack's parameters -------------- */

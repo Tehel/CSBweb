@@ -242,16 +242,16 @@ export function adjustSkills(
     why,
   });
   if (filtered) {
-    chIdx = filtered.chIdx & 0x3;
-    skillNumber = ((filtered.skillNumber % TOTAL_SKILLS) + TOTAL_SKILLS) % TOTAL_SKILLS;
-    adjustedExp = filtered.experience & 0xfffff;
+    chIdx = filtered.chIdx;
+    skillNumber = filtered.skillNumber;
+    adjustedExp = filtered.experience;
   }
 
   if (adjustedExp === 0) {
     return { chIdx, skillNumber, experienceApplied: 0, leveledUp: false };
   }
 
-  // `psA3->experience += (UI16)(experience)` (`Magic.cpp:327`, `:337`): the filter may
+  // `psA3->experience += (UI16)(experience)` (`Magic.cpp:321`, `:337`): the filter may
   // give up to 0xfffff, of which the skill takes the low word.
   skillEntry.experience = limitSkillExperience(skillEntry.experience + (adjustedExp & 0xffff));
   if (skillEntry.tempAdjust < 32000) {

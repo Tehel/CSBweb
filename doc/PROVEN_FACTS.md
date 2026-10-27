@@ -4525,11 +4525,14 @@ Covered by `tools/checks/missile-draw.ts`.
 
 ## `AdjustSkills` takes the low word of the filter's answer, and runs it for a gain of 0
 
-The Adjust Skills Filter's answer is `pDSAparameters[1+2] & 0xfffff`
-(`doc/CSBwin-src/Magic.cpp:316-318`), and the skill and its class take
-`(UI16)(experience)` of it (`:327`, `:337`). The only `return` for a gain of 0 comes after
-the filter (`:322`), so a gain of 0, as a failed cast's `w4 >> diff` may be, still runs it.
-Covered by `tools/checks/dsa-parameters.ts`.
+After each Adjust Skills Filter DSA, `AdjustSkills` takes back `pDSAparameters[1+0] & 3`,
+`pDSAparameters[1+1] % 20` and `pDSAparameters[1+2] & 0xfffff`
+(`doc/CSBwin-src/Magic.cpp:307-309`), which the next DSA is handed with the caller's
+`why`, never read back (`:300-303`). C's `%` keeps the sign: a filter's skill -1 stays -1,
+fails `skillNumber >= 4`, and the basic skill gains nothing (`:335`). The skill and its
+class take `(UI16)(experience)` of the answer (`:321`, `:337`). The only `return` for a
+gain of 0 comes after the filter (`:318`), so a gain of 0, as a failed cast's `w4 >> diff`
+may be, still runs it. Covered by `tools/checks/dsa-parameters.ts`.
 
 ## The DSA stops where CSBWin's does
 

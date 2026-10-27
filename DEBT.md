@@ -116,7 +116,6 @@ In payoff order: the first row is the next item.
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
 | C186 | A decoration's position set past its rectangles' table is not drawn | S | ⏳ |
-| C187 | The adjust skills filter hands each DSA the one before's words unmasked, and its `why` | S | ⏳ |
 | C188 | A new timer's unused bytes are 0, where CSBWin's are 0xcd | S | ⏳ |
 | C189 | A distant monster is shrunk again at every frame, where CSBWin keeps it across levels | S | ⏳ |
 | F15 | Tools that read the wall clock, and a runner with no timeout | S | ⏳ |
@@ -515,24 +514,6 @@ Paying it: each read at the set's offset in `d`, through item `0x22e` while it l
 (the item ends at `d.Word2530`, `doc/PROVEN_FACTS.md` → "Item `0x22e` is laid out exactly
 as `Data.h` declares its span"), and what lies past it decided; a check with a level that
 names floor decoration 69.
-
-### C187 ⏳ The adjust skills filter hands each DSA the one before's words unmasked, and its `why`
-
-`AdjustSkills` runs every DSA at `ESL_ADJUSTSKILLSFILTER`'s location on its locals
-(`doc/CSBwin-src/Magic.cpp:256-316`), and after each takes back `chIdx & 3`,
-`skillNumber % 20` and `experience & 0xfffff` (`:307-309`), which the next DSA is handed;
-`why` is never read back, so every DSA is handed the caller's. The port's
-`processAdjustSkillsFilter` (`src/engine/dsa/DsaFilters.ts`) reads back the four words
-unmasked, `why` among them, and hands them on so; `adjustSkills`
-(`src/engine/skills.ts:244-248`) masks the three once, after the last DSA. With one DSA
-the two agree, but for `skillNumber`'s sign: C's `%` keeps it, so a filter's -1 stays -1,
-fails `skillNumber >= 4` and gives the basic skill nothing (`Magic.cpp:335`), where the
-port's wrap makes it 19, which does. No dungeon the port plays is known to have two
-adjust-skills DSAs, nor one that answers a negative skill.
-
-Paying it: the three masks, `%` as C's, in the codec's `fromWords`, `why` not read back,
-and `adjustSkills` taking the masked values as they are; a check with two DSAs at the
-location, the first changing all four words, and one answering skill -1.
 
 ### C188 ⏳ A new timer's unused bytes are 0, where CSBWin's are 0xcd
 

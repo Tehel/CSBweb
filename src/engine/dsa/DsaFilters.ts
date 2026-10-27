@@ -669,10 +669,10 @@ export class DsaFilters {
    * at `ESL_ADJUSTSKILLSFILTER`'s location in turn, on the parameters of the function's
    * one `NEWDSAPARAMETERS` (`:199`), which they share, a count of 9 and the champion's
    * index, the skill, the experience, why, and the five `adjustSkillsParameters` that
-   * `&SETADJUSTSKILLSPARAMETERS!` set (`:300-305`). Back come the first four words, which the
-   * next DSA is handed; the first three, masked by the caller, are what the skill then
-   * takes. Null when no DSA stands there. C187: CSBWin hands each DSA the first three
-   * masked, and its own `why`.
+   * `&SETADJUSTSKILLSPARAMETERS!` set (`:300-305`). After each, the first three words come
+   * back masked (`:307-309`), and the next DSA is handed them and the caller's `why`, which
+   * is never read back; the last three are what the skill then takes. `%` keeps the sign,
+   * as C's does: a filter's skill -1 stays -1. Null when no DSA stands there.
    */
   processAdjustSkillsFilter(options: {
     chIdx: number;
@@ -683,7 +683,7 @@ export class DsaFilters {
     let chIdx = options.chIdx | 0;
     let skillNumber = options.skillNumber | 0;
     let experience = options.experience | 0;
-    let why = options.why | 0;
+    const why = options.why | 0;
     const adjustSkillsParameters = this.machine.adjustSkillsParameters();
 
     const found = this.runFilter(Esl.ADJUST_SKILLS_FILTER, {
@@ -700,10 +700,9 @@ export class DsaFilters {
         adjustSkillsParameters[4] ?? 0,
       ],
       fromWords: (word) => {
-        chIdx = word(0);
-        skillNumber = word(1);
-        experience = word(2);
-        why = word(3);
+        chIdx = word(0) & 3;
+        skillNumber = (word(1) % 20) | 0;
+        experience = word(2) & 0xfffff;
       },
     }, { newParameters: 'site' });
 
