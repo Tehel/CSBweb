@@ -35,6 +35,7 @@
  * gave the record if it lies in a chain.
  */
 import { RnMaps } from '../core/RnMaps';
+import { readU16LE } from '../core/bytes';
 import { databaseRecords, type Databases } from './dungeonTypes';
 
 export interface CsbwinObjectIndex {
@@ -92,7 +93,7 @@ export function readObjectIndirectIndex(
 
     const indexMap = new Uint16Array(dataMapLength);
     for (let i = 0; i < dataMapLength; i++) {
-        indexMap[i] = (indexBytes[i * 2] ?? 0) | ((indexBytes[i * 2 + 1] ?? 0) << 8);
+        indexMap[i] = readU16LE(indexBytes, i * 2);
     }
 
     return { length: dataMapLength, typeMap, indexMap };

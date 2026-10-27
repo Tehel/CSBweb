@@ -36,7 +36,8 @@ import { readFileSync } from 'node:fs';
 
 import { readU16LE, readU32LE } from '../../src/core/bytes';
 import { BackgroundLib, type BackgroundPointer } from '../../src/data/BackgroundLib';
-import { CSBGraphicsLoader, CSBGraphicType, decodePlanar } from '../../src/data/CSBGraphicsLoader';
+import { CSBGraphicsLoader, CSBGraphicType } from '../../src/data/CSBGraphicsLoader';
+import { decodePlanar } from '../../src/core/planar';
 import { ApplyBackground, ApplyDecoration, ViewportBMP } from '../../src/renderer/bytecode/ApplyBackground';
 import { BytecodeInterpreter } from '../../src/renderer/bytecode/BytecodeInterpreter';
 import { Opcode } from '../../src/renderer/bytecode/Opcodes';

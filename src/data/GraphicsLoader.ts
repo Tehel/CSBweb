@@ -5,7 +5,7 @@
  * Reference: CSBWin Graphics.cpp; doc/GRAPHICS_MAPPINGS.md
  */
 
-import { BinaryFile, Endianness } from '../core/BinaryFile';
+import { ByteCursor } from '../core/bytes';
 import { decompressGraphics } from '../core/compression';
 import { decodeIMG, ImageFormat, type DecodedImage } from '../core/imageDecoder';
 import type { ui16 } from '../core/types';
@@ -39,7 +39,7 @@ export const MAX_GRAPHICS_ITEMS = 1000;
  * Implements caching to avoid re-decompressing images.
  */
 export class GraphicsLoader {
-    private file: BinaryFile;
+    private file = new ByteCursor(new Uint8Array(0));
     private data: GraphicsData | null = null;
     private imageCache: Map<ui16, DecodedImage>;
     /**
@@ -49,23 +49,14 @@ export class GraphicsLoader {
     private fileSignature: FileSignature | null = null;
 
     constructor() {
-        this.file = new BinaryFile(Endianness.BIG_ENDIAN); // Atari ST format
         this.imageCache = new Map();
-    }
-
-    /**
-     * Load graphics from URL
-     */
-    async load(url: string): Promise<GraphicsData> {
-        await this.file.load(url);
-        return this.parse();
     }
 
     /**
      * Load graphics from Uint8Array
      */
     loadFromArray(data: Uint8Array): GraphicsData {
-        this.file.loadFromArray(data);
+        this.file = new ByteCursor(data);
         return this.parse();
     }
 
@@ -80,7 +71,7 @@ export class GraphicsLoader {
         if (itemCount === 0 || itemCount > MAX_GRAPHICS_ITEMS) {
             throw new Error(`Invalid graphics file: item count = ${itemCount}`);
         }
-        this.fileSignature = Signature(this.file.read(0, this.file.length()));
+        this.fileSignature = Signature(this.file.bytes);
 
         // Read compressed sizes (itemCount words)
         const compressedSizes: ui16[] = [];

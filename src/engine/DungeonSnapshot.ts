@@ -37,6 +37,7 @@
  *   changes in play, but `dsaIndex` goes in whole, since it is the save's.
  */
 import type { ui8, ui16, ui32, ObjectID } from '../core/types';
+import { readU16BE, writeU16BE } from '../core/bytes';
 import type { DungeonData, DatabaseRecord, Databases, DsaDefinition, DsaIndex } from '../data/dungeonTypes';
 
 /**
@@ -211,18 +212,14 @@ function decodeBytes(encoded: string): Uint8Array {
 /** Words as big-endian bytes, so a 1749-word text array costs 4.7 KB rather than 12. */
 function encodeWords(words: ArrayLike<ui16>): string {
     const bytes = new Uint8Array(words.length * 2);
-    for (let i = 0; i < words.length; i++) {
-        const word = words[i]!;
-        bytes[i * 2] = (word >> 8) & 0xff;
-        bytes[i * 2 + 1] = word & 0xff;
-    }
+    for (let i = 0; i < words.length; i++) writeU16BE(bytes, i * 2, words[i]!);
     return encodeBytes(bytes);
 }
 
 function decodeWords(encoded: string): ui16[] {
     const bytes = decodeBytes(encoded);
     const words: ui16[] = [];
-    for (let i = 0; i + 1 < bytes.length; i += 2) words.push((bytes[i]! << 8) | bytes[i + 1]!);
+    for (let i = 0; i + 1 < bytes.length; i += 2) words.push(readU16BE(bytes, i));
     return words;
 }
 

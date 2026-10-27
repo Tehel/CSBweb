@@ -9,6 +9,7 @@
 
 import type { Tuple, ui32 } from '../core/types';
 import { readU16LE, readU32LE } from '../core/bytes';
+import { decodePlanar } from '../core/planar';
 import { MAX_EXPANDED_SIZE } from '../core/compression';
 import { Die } from '../core/Die';
 import { Signature, type FileSignature } from './FileSignature';
@@ -269,29 +270,6 @@ class OvlDecode {
       this.a = this.b >>> 0;
     }
   }
-}
-
-/**
- * A graphic as CSBWin keeps one in memory, the Atari's: each line in groups of 16 pixels,
- * each group four big-endian words, one per bitplane, the first pixel the high bit.
- */
-export function decodePlanar(data: Uint8Array, width: number, height: number): Uint8Array {
-  const groups = (width + 15) >> 4;
-  const out = new Uint8Array(width * height);
-  for (let y = 0; y < height; y++) {
-    for (let group = 0; group < groups; group++) {
-      const at = (y * groups + group) * 8;
-      for (let bit = 0; bit < 16 && group * 16 + bit < width; bit++) {
-        let colour = 0;
-        for (let plane = 0; plane < 4; plane++) {
-          const word = ((data[at + plane * 2] ?? 0) << 8) | (data[at + plane * 2 + 1] ?? 0);
-          colour |= ((word >> (15 - bit)) & 1) << plane;
-        }
-        out[y * width + group * 16 + bit] = colour;
-      }
-    }
-  }
-  return out;
 }
 
 /** `GetErrorPortrait` (`doc/CSBwin-src/Bitmaps.cpp:526-536`). */
@@ -568,13 +546,12 @@ export class CSBGraphicsLoader {
     if (end > this.data.length) return null;
 
     const compressed = this.data.subarray(start, end);
-    const view = new DataView(compressed.buffer, compressed.byteOffset, compressed.byteLength);
     let wordOffset = 0;
     const getCodeword = () => {
       const off = wordOffset * 4;
       wordOffset++;
-      if (off + 4 > view.byteLength) return 0;
-      return view.getUint32(off, true) >>> 0;
+      if (off + 4 > compressed.length) return 0;
+      return readU32LE(compressed, off);
     };
 
     const decoder = new OvlDecode(getCodeword);

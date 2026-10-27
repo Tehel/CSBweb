@@ -17,7 +17,7 @@
  * its blocks (`src/data/CsbwinExpool.ts`), and 12 and 13, which `CSB.h` marks
  * `//Not used`, empty in every file here.
  */
-import { readU8, readU16BE, writeU16BE } from '../core/bytes';
+import { ByteCursor, writeU16BE } from '../core/bytes';
 import { DBType, OBJECT_ID_NULL } from '../core/types';
 import type { ObjectID } from '../core/types';
 import type { CsbwinObjectIndex } from './CsbwinObjectIndex';
@@ -475,15 +475,6 @@ export function clearedRecords(db: DBType, count: number, shape: DatabaseShape):
     bytes[0] = 0xff;
     bytes[1] = 0xff;
     const records: DatabaseRecord[] = [];
-    for (let i = 0; i < count; i++) records.push(codec.read(bytesReader(bytes), recordShape));
+    for (let i = 0; i < count; i++) records.push(codec.read(new ByteCursor(bytes), recordShape));
     return records;
-}
-
-/** A reader over `bytes`, from its first. */
-function bytesReader(bytes: Uint8Array): RecordReader {
-    let at = 0;
-    return {
-        readU8: () => readU8(bytes, at++),
-        readU16: () => { const value = readU16BE(bytes, at); at += 2; return value; },
-    };
 }

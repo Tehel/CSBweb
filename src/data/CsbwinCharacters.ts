@@ -31,8 +31,9 @@ import type { Attribute, Attributes } from '../engine/attributes';
 import { OBJECT_ID_NULL, type i8, type i16, type ui8, type ObjectID } from '../core/types';
 import { CHARDESC_SIZE, decodeCharField, encodeCharField } from './CsbwinSaveInfo';
 import {
-  readI16BE, readI32BE, readI8, readU16BE, readU16LE, readU32LE, readU8, writeU16LE, writeU32LE,
+  readI16BE, readI32BE, readI8, readU16BE, readU16LE, readU32LE, readU8, writeU16BE, writeU16LE, writeU32BE, writeU32LE,
 } from '../core/bytes';
+import { decodePlanar, encodePlanarGroup } from '../core/planar';
 
 /** The seven `ATTRIBUTE` triples start here, three bytes each, `FILL91` after them. */
 const ATTRIBUTES_OFFSET = 70;
@@ -127,28 +128,8 @@ function readPossessions(block: Uint8Array, base: number): ObjectID[] {
  */
 function readPortrait(block: Uint8Array, base: number): ui8[] | undefined {
   const at = base + PORTRAIT_OFFSET;
-  const pixels: ui8[] = new Array(PORTRAIT_WIDTH * PORTRAIT_HEIGHT).fill(0);
-  let any = false;
-  for (let y = 0; y < PORTRAIT_HEIGHT; y++) {
-    for (let group = 0; group * 16 < PORTRAIT_WIDTH; group++) {
-      const word = at + y * PORTRAIT_BYTES_PER_LINE + group * 8;
-      const planes = [
-        readU16BE(block, word),
-        readU16BE(block, word + 2),
-        readU16BE(block, word + 4),
-        readU16BE(block, word + 6),
-      ];
-      for (let bit = 0; bit < 16; bit++) {
-        let colour = 0;
-        for (let plane = 0; plane < 4; plane++) {
-          colour |= ((planes[plane]! >> (15 - bit)) & 1) << plane;
-        }
-        if (colour !== 0) any = true;
-        pixels[y * PORTRAIT_WIDTH + group * 16 + bit] = colour;
-      }
-    }
-  }
-  return any ? pixels : undefined;
+  const pixels = Array.from(decodePlanar(block.subarray(at, at + PORTRAIT_BYTES_PER_LINE * PORTRAIT_HEIGHT), PORTRAIT_WIDTH, PORTRAIT_HEIGHT));
+  return pixels.some((colour) => colour !== 0) ? pixels : undefined;
 }
 
 /** The live part of `incantation`: everything before the terminating zero. */
@@ -306,17 +287,6 @@ export function readCsbwinParty(
  * The write side. Every function below is the exact inverse of the one above it.
  * =========================================================================== */
 
-const setU16BE = (b: Uint8Array, o: number, v: number): void => {
-  b[o] = (v >> 8) & 0xff;
-  b[o + 1] = v & 0xff;
-};
-const setU32BE = (b: Uint8Array, o: number, v: number): void => {
-  b[o] = (v >>> 24) & 0xff;
-  b[o + 1] = (v >>> 16) & 0xff;
-  b[o + 2] = (v >>> 8) & 0xff;
-  b[o + 3] = v & 0xff;
-};
-
 /**
  * Pack 32x29 palette indices back into the four interleaved bitplanes `CHARDESC` holds.
  *
@@ -331,15 +301,7 @@ export function writePortrait(block: Uint8Array, base: number, pixels?: ui8[]): 
   const at = base + PORTRAIT_OFFSET;
   for (let y = 0; y < PORTRAIT_HEIGHT; y++) {
     for (let group = 0; group * 16 < PORTRAIT_WIDTH; group++) {
-      const planes = [0, 0, 0, 0];
-      for (let bit = 0; bit < 16; bit++) {
-        const colour = pixels[y * PORTRAIT_WIDTH + group * 16 + bit] ?? 0;
-        for (let plane = 0; plane < 4; plane++) {
-          planes[plane]! |= ((colour >> plane) & 1) << (15 - bit);
-        }
-      }
-      const word = at + y * PORTRAIT_BYTES_PER_LINE + group * 8;
-      for (let plane = 0; plane < 4; plane++) setU16BE(block, word + plane * 2, planes[plane]!);
+      encodePlanarGroup(pixels, y * PORTRAIT_WIDTH + group * 16, block, at + y * PORTRAIT_BYTES_PER_LINE + group * 8);
     }
   }
 }
@@ -414,19 +376,19 @@ export function writeCsbwinCharacter(
   block[base + 40] = champion.damageFromDirection & 0xff;
   block[base + 41] = champion.maxRecentDamage & 0xff;
   block[base + 42] = champion.poisonCount & 0xff;
-  setU16BE(block, base + 44, champion.busyTimerIndex);
-  setU16BE(block, base + 46, champion.timerIndex);
-  setU16BE(block, base + 48, champion.charFlags);
-  setU16BE(block, base + 50, champion.wounds);
-  setU16BE(block, base + 52, champion.attributes.health);
-  setU16BE(block, base + 54, champion.attributes.maxHealth);
-  setU16BE(block, base + 56, champion.attributes.stamina);
-  setU16BE(block, base + 58, champion.attributes.maxStamina);
-  setU16BE(block, base + 60, champion.attributes.mana);
-  setU16BE(block, base + 62, champion.attributes.maxMana);
-  setU16BE(block, base + 64, champion.attackStatModifier);
-  setU16BE(block, base + 66, champion.food);
-  setU16BE(block, base + 68, champion.water);
+  writeU16BE(block, base + 44, champion.busyTimerIndex);
+  writeU16BE(block, base + 46, champion.timerIndex);
+  writeU16BE(block, base + 48, champion.charFlags);
+  writeU16BE(block, base + 50, champion.wounds);
+  writeU16BE(block, base + 52, champion.attributes.health);
+  writeU16BE(block, base + 54, champion.attributes.maxHealth);
+  writeU16BE(block, base + 56, champion.attributes.stamina);
+  writeU16BE(block, base + 58, champion.attributes.maxStamina);
+  writeU16BE(block, base + 60, champion.attributes.mana);
+  writeU16BE(block, base + 62, champion.attributes.maxMana);
+  writeU16BE(block, base + 64, champion.attackStatModifier);
+  writeU16BE(block, base + 66, champion.food);
+  writeU16BE(block, base + 68, champion.water);
 
   for (let i = 0; i < 7; i++) {
     const at = base + ATTRIBUTES_OFFSET + i * 3;
@@ -438,19 +400,19 @@ export function writeCsbwinCharacter(
 
   for (let i = 0; i < 20; i++) {
     const at = base + SKILLS_OFFSET + i * SKILL_SIZE;
-    setU16BE(block, at, champion.skills[i]?.tempAdjust ?? 0);
-    setU32BE(block, at + 2, champion.skills[i]?.experience ?? 0);
+    writeU16BE(block, at, champion.skills[i]?.tempAdjust ?? 0);
+    writeU32BE(block, at + 2, champion.skills[i]?.experience ?? 0);
   }
 
   for (let i = 0; i < 30; i++) {
     // An empty slot is `RNnul`, which is what every empty slot holds in every
     // committed save.
     const rn = getChampionPossession(champion, i);
-    setU16BE(block, base + POSSESSIONS_OFFSET + i * 2, rn);
+    writeU16BE(block, base + POSSESSIONS_OFFSET + i * 2, rn);
   }
 
-  setU16BE(block, base + 272, options.load?.(champion) ?? champion.load);
-  setU16BE(block, base + 274, champion.shieldStrength);
+  writeU16BE(block, base + 272, options.load?.(champion) ?? champion.load);
+  writeU16BE(block, base + 274, champion.shieldStrength);
   // Little-endian: `swapCharacter` stops at `shieldStrength`.
   writeU32LE(block, base + 276, champion.talents);
   writeU16LE(block, base + 280, champion.fingerprint);
@@ -462,17 +424,17 @@ export function writeCsbwinCharacter(
 
 /** The 128 bytes after the four `CHARDESC`s. The inverse of `readCsbwinPartyTail`. */
 export function writeCsbwinPartyTail(block: Uint8Array, tail: CsbwinPartyTail): void {
-  setU16BE(block, TAIL + 0, tail.brightness);
+  writeU16BE(block, TAIL + 0, tail.brightness);
   block[TAIL + 2] = tail.seeThruWalls & 0xff;
   block[TAIL + 3] = tail.magicFootprintsActive & 0xff;
-  setU16BE(block, TAIL + 4, tail.partyShield);
-  setU16BE(block, TAIL + 6, tail.fireShield);
-  setU16BE(block, TAIL + 8, tail.spellShield);
+  writeU16BE(block, TAIL + 4, tail.partyShield);
+  writeU16BE(block, TAIL + 6, tail.fireShield);
+  writeU16BE(block, TAIL + 8, tail.spellShield);
   block[TAIL + 10] = tail.numFootprintEnt & 0xff;
   block[TAIL + 11] = tail.freezeLifeTimer & 0xff;
   block[TAIL + 12] = tail.indexOfFirstMagicFootprint & 0xff;
   block[TAIL + 13] = tail.indexOfLastMagicFootprint & 0xff;
-  for (let i = 0; i < 24; i++) setU16BE(block, TAIL + 14 + i * 2, tail.footprints[i] ?? 0);
+  for (let i = 0; i < 24; i++) writeU16BE(block, TAIL + 14 + i * 2, tail.footprints[i] ?? 0);
   for (let i = 0; i < 24; i++) block[TAIL + 62 + i] = (tail.footprintAges[i] ?? 0) & 0xff;
   block[TAIL + 86] = tail.invisible & 0xff;
   // `Byte13195[41]` at 87..127 closes the block and is zero in every committed save.

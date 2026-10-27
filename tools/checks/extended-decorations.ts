@@ -35,7 +35,8 @@
  */
 import { readFileSync } from 'node:fs';
 
-import { CSBGraphicsLoader, CSBGraphicType, decodePlanar, type IndexedBitmap } from '../../src/data/CSBGraphicsLoader';
+import { CSBGraphicsLoader, CSBGraphicType, type IndexedBitmap } from '../../src/data/CSBGraphicsLoader';
+import { decodePlanar } from '../../src/core/planar';
 import { DungeonLoader } from '../../src/data/DungeonLoader';
 import { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import { DrawWallDecoration } from '../../src/renderer/bytecode/DrawDecorations';

@@ -6,7 +6,6 @@
  * Reference: doc/DUNGEON_DAT_FORMAT.md
  */
 
-import { BinaryFile, Endianness } from '../core/BinaryFile';
 import { Direction, DBType, Position } from '../core/types';
 import type { ui8, ui16, ui32, ObjectID, CellFlag } from '../core/types';
 import type {
@@ -19,7 +18,7 @@ import type {
 } from './dungeonTypes';
 import { DATABASE_CODECS, type DatabaseCodec, type RecordOf } from './DatabaseCodecs';
 import { ExpandData } from '../core/compression';
-import { readU16BE, readU32BE } from '../core/bytes';
+import { ByteCursor, readU16BE, readU32BE, readU32LE } from '../core/bytes';
 import { EXPOOL_RECORD_SIZE, specialLocationsFromExpool } from './CsbwinExpool';
 import { readExtendedFeatures, readGameInfo } from './CsbwinExtendedFeatures';
 import { CheckCelltypes, ExtendPortraits, convertOriginalDungeon } from './CsbwinDungeonConversions';
@@ -137,21 +136,9 @@ export function emptyDungeonData(): DungeonData {
 }
 
 export class DungeonLoader {
-    private file: BinaryFile;
+    private file = new ByteCursor(new Uint8Array(0));
     private data: DungeonData | null = null;
     private options: DungeonImageOptions = {};
-
-    constructor() {
-        this.file = new BinaryFile(Endianness.BIG_ENDIAN); // Atari ST format
-    }
-
-    /**
-     * Load a `dungeon.dat` from URL, through `loadDungeonDat`.
-     */
-    async load(url: string): Promise<DungeonData> {
-        await this.file.load(url);
-        return this.loadDungeonDat(this.file.read(0, this.file.length()));
-    }
 
     /**
      * A new game's `dungeon.dat`, as `ReadDatabases` opens it when the game is not a
@@ -212,7 +199,7 @@ export class DungeonLoader {
      */
     loadFromArray(data: Uint8Array, options: DungeonImageOptions = {}): DungeonData {
         this.options = options;
-        this.file.loadFromArray(data);
+        this.file = new ByteCursor(data);
         return this.parse();
     }
 
@@ -430,7 +417,7 @@ export class DungeonLoader {
      * fails the same reads, without handing a damaged image to them.
      */
     private compareChecksum(end: number): void {
-        const bytes = this.file.read(0, this.file.length());
+        const bytes = this.file.bytes;
         if (end + 2 > bytes.length) return;
         let sum = 0;
         for (let i = 0; i < end; i++) sum = (sum + bytes[i]!) & 0xffff;
@@ -442,7 +429,7 @@ export class DungeonLoader {
      * options give its records. An image whose sections run past its end does not read.
      */
     private calculateOffsets() {
-        const layout = computeDungeonImageLayout(this.file.read(0, this.file.length()), 0, {
+        const layout = computeDungeonImageLayout(this.file.bytes, 0, {
             indirectText: this.options.indirectText ?? false,
             bigActuators: this.options.bigActuators,
             newScrolls: this.options.newScrolls,
@@ -530,12 +517,14 @@ export class DungeonLoader {
         indirectTextIndex: ui32[];
         compressedText: ui16[];
     } {
+        const sizeAt = offset + count * 4;
+        const bytes = this.file.bytes;
+        if (offset < 0 || sizeAt + 4 > bytes.length) throw new Error(`indirect text index out of range at ${offset}`);
         const indirectTextIndex: ui32[] = [];
         for (let i = 0; i < count; i++) {
-            indirectTextIndex.push(this.file.peekU32LE(offset + i * 4));
+            indirectTextIndex.push(readU32LE(bytes, offset + i * 4));
         }
-        const sizeAt = offset + count * 4;
-        const sizeOfCompressedText = this.file.peekU32LE(sizeAt);
+        const sizeOfCompressedText = readU32LE(bytes, sizeAt);
         const compressedText: ui16[] = [];
         this.file.seek(sizeAt + 4);
         for (let i = 0; i < sizeOfCompressedText; i++) {

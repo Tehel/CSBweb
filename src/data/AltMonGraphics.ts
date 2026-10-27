@@ -10,7 +10,8 @@
  */
 import { readU16LE, readU32LE, readU8 } from '../core/bytes';
 import { Die } from '../core/Die';
-import { CSBGraphicType, decodePlanar, type CSBGraphicsLoader, type IndexedBitmap } from './CSBGraphicsLoader';
+import { CSBGraphicType, type CSBGraphicsLoader, type IndexedBitmap } from './CSBGraphicsLoader';
+import { decodePlanar } from '../core/planar';
 import { altMonGraphicsKey, Expool, type ExpoolDatabase } from './CsbwinExpool';
 import type { CreatureRecord } from './dungeonTypes';
 import type { MonsterDesc } from './tables/MonsterDesc';

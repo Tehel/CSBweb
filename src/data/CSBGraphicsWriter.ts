@@ -12,6 +12,7 @@
  * The sections follow the headers, each the `OVLDECODE` code words of its bytes.
  */
 import { CSBGRAPHICS_SENTINEL, CSBGraphicType, type DecorationDesc, type IndexedBitmap } from './CSBGraphicsLoader';
+import { encodePlanarGroup } from '../core/planar';
 
 export interface CSBGraphicSection {
   type: CSBGraphicType;
@@ -269,21 +270,13 @@ export function wallDecorationSection(desc: readonly DecorationDesc[], side: Ind
 export function encodePlanar(bitmap: IndexedBitmap): Uint8Array {
   const { width, height, pixels } = bitmap;
   if (width % 16 !== 0) throw new Error(`a bitplane bitmap is a multiple of 16 wide, not ${width}`);
+  const colour = pixels.subarray(0, width * height).find((c) => c > 15);
+  if (colour !== undefined) throw new Error(`a bitplane bitmap has colours 0-15, not ${colour}`);
   const groups = width / 16;
   const out = new Uint8Array(groups * 8 * height);
   for (let y = 0; y < height; y++) {
     for (let group = 0; group < groups; group++) {
-      const at = (y * groups + group) * 8;
-      for (let plane = 0; plane < 4; plane++) {
-        let word = 0;
-        for (let bit = 0; bit < 16; bit++) {
-          const colour = pixels[y * width + group * 16 + bit]!;
-          if (colour > 15) throw new Error(`a bitplane bitmap has colours 0-15, not ${colour}`);
-          word |= ((colour >> plane) & 1) << (15 - bit);
-        }
-        out[at + plane * 2] = word >> 8;
-        out[at + plane * 2 + 1] = word & 0xff;
-      }
+      encodePlanarGroup(pixels, y * width + group * 16, out, (y * groups + group) * 8);
     }
   }
   return out;

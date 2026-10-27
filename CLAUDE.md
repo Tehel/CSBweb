@@ -152,7 +152,7 @@ item or monster is, read from `dungeon.dat` or a save. The `peek-dungeon` skill 
 
 ```
 audio/      SoundManager (the samples, played through Web Audio) and soundsIndex
-core/       BinaryFile (big-endian cursor), bytes (free byte reads), compression
+core/       bytes (byte reads and writes, and a big-endian cursor), compression
             (LZW/RLE/SND), imageDecoder (IMG1/IMG2), md5, png (a paletted PNG, written),
             types, RnMaps (what an RN names: RN::dbType, pos, idx), intCast (sw, div,
             ApplyLimits), objectNameIndex (OBJNI_* constants), charDesc (CHARDESC's flags

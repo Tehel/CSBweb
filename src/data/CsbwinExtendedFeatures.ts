@@ -270,13 +270,11 @@ class RcsReader {
     }
 
     readU16(): number {
-        const b = this.readBytes(2);
-        return (b[0] ?? 0) | ((b[1] ?? 0) << 8);
+        return readU16LE(this.readBytes(2), 0);
     }
 
     readU32(): number {
-        const b = this.readBytes(4);
-        return ((b[0] ?? 0) | ((b[1] ?? 0) << 8) | ((b[2] ?? 0) << 16) | ((b[3] ?? 0) << 24)) >>> 0;
+        return readU32LE(this.readBytes(4), 0);
     }
 }
 
@@ -297,11 +295,7 @@ function decodeCString(bytes: Uint8Array): string {
 
 function readU16Array(bytes: Uint8Array, count: number): number[] {
     const out: number[] = new Array(count);
-    let off = 0;
-    for (let i = 0; i < count; i++) {
-        out[i] = (bytes[off] ?? 0) | ((bytes[off + 1] ?? 0) << 8);
-        off += 2;
-    }
+    for (let i = 0; i < count; i++) out[i] = readU16LE(bytes, i * 2);
     return out;
 }
 

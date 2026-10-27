@@ -114,7 +114,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E32 | Four ways to read bytes, and eight graphics caches | M | ⏳ |
+| E32 | Eight graphics caches | M | ⏳ step 2 of 2 |
 | E33 | What a frame costs | S | ⏳ |
 | E30 | One presenter and one input router | M | ⏳ |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
@@ -447,29 +447,24 @@ own: the canvas, `drawViewport`, `refreshOverlay`, `handleMouseButton`'s deferre
 the Hint Oracle's open and close, `syncParty`, `setUIMode`, `initializePlayState` and the
 pointer's state.
 
-### E32 ⏳ Four ways to read bytes, and eight graphics caches
+### E32 ⏳ Eight graphics caches
 
-- **Bytes** are read through `BinaryFile`, `core/bytes`, `DataView` (`UITables`,
-  `CSBGraphicsLoader`) and inline shifts. Only `DungeonLoader` and `GraphicsLoader` use
-  `BinaryFile`, both big-endian: its little-endian mode, `RemoteBinaryFile`,
-  `readI8`/`readI16`/`readI32`, `peek`, `eof`, `remaining`, `tell`, `setEndianness` and
-  `DungeonLoader.load(url)` are unused, and `peekU32LE` exists because the mode is.
-  `CsbwinCharacters.setU16BE`/`setU32BE` (`:309-317`) repeat `writeU16BE`/`writeU32BE`;
-  `readI16Array` is in both `ObjectTables` and `UITables`; a planar decode is written three
-  times (`CSBGraphicsLoader.decodePlanar`, `CsbwinCharacters.readPortrait`/`writePortrait`,
-  `ApplyBackground`).
-- **Graphics** are cached in eight places with lifetimes of their own, one of them a
+Split in two. Step 1, the bytes, stands: they are read through `core/bytes`, whose
+`ByteCursor` walks the two files read front to back (`DungeonLoader`, `GraphicsLoader`),
+and the Atari's bitplanes through `core/planar`. Step 2 is the graphics:
+
+- Graphics are cached in eight places with lifetimes of their own, one of them a
   `Map<string, IndexedBitmap>` of four key spaces (`obj:`, `derived:`, `doorOrnament:`…)
   that builds a string at every look-up, and `catch { return null; }` turns every decode
   failure into "nothing drawn" (`src/renderer/ViewportGraphics.ts:22-37`).
   `GraphicsLoader.getImage` caches by index alone and ignores its `format`
-  (`src/data/GraphicsLoader.ts:148-155`), so `getPortraitSheet`'s IMG2 fallback
+  (`src/data/GraphicsLoader.ts:141-148`), so `getPortraitSheet`'s IMG2 fallback
   (`src/renderer/ui/Character.ts:597`) gets the IMG1 decode back and is dead. `toU8` is
   written three times (`ViewportGraphics.ts:78`, `:108`, `:141`).
 
-Paying it: `core/bytes` and a small cursor, the rest deleted; one typed graphics store with
-numeric keys, derived graphics under CSBWin's derived numbers, decode failures traced; the
-loader's cache keyed by format, or the parameter dropped with the dead fallback.
+Paying it: one typed graphics store with numeric keys, derived graphics under CSBWin's
+derived numbers, decode failures traced; the loader's cache keyed by format, or the
+parameter dropped with the dead fallback.
 
 ### E33 ⏳ What a frame costs
 
@@ -611,10 +606,10 @@ For a file with no Extended Features block (`ExtendedFeaturesVersion == '@'`), C
 converts the cells' chains, then the timers' objects (`ConvertTimers`), the champions'
 thirty slots (`ConvertCharacters`) and the object in hand, each through
 `ConvertListOfObjects` (`doc/CSBwin-src/SaveGame.cpp:2927-2974`). The port converts the
-chains only (`convertOriginalDungeon`, `src/data/DungeonLoader.ts:296-303`), on the ground
+chains only (`convertOriginalDungeon`, `src/data/DungeonLoader.ts:266-275`), on the ground
 that a `dungeon.dat` holds no timer, champion or object in hand; a block-less save takes
 the same path and holds all three, and `readPossessions` reads the slots as slot numbers
-already (`src/data/CsbwinCharacters.ts:86-100`). The port imports a DM save from the Atari
+already (`src/data/CsbwinCharacters.ts:87-109`). The port imports a DM save from the Atari
 (`buildBlock1State`'s `Byte22596 == 1` branch; its signature matches DM's): a weapon in a
 champion's hand, packed `0x1403`, loads as slot `0x1403`, past the 2097 slots, and is gone.
 `tools/checks/atari-saves.ts`'s two files have champions who carry nothing.

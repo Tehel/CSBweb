@@ -1,7 +1,7 @@
 import type { GraphicsLoader } from '../GraphicsLoader';
 import type { MonsterDesc } from './MonsterDesc';
 import type { RectPos } from './UITables';
-import { readI16BE, readI8, readU16BE } from '../../core/bytes';
+import { readI16BE, readI16BEArray, readI8, readU16BE } from '../../core/bytes';
 
 interface GraphicClass {
   objectGraphicIndex: number; // i8
@@ -545,7 +545,7 @@ function readWeaponDesc22f(raw: Uint8Array): WeaponDesc[] {
       uByte1: raw[base + 1] ?? 0,
       uByte2: raw[base + 2] ?? 0,
       uByte3: raw[base + 3] ?? 0,
-      word4: (((raw[base + 4] ?? 0) << 8) | (raw[base + 5] ?? 0)) << 16 >> 16,
+      word4: readI16BE(raw, base + 4),
     });
   }
   return out;
@@ -680,9 +680,7 @@ function readUByte9672_22f(raw: Uint8Array): Uint8Array {
 function readI16Array(raw: Uint8Array, off: number, count: number): Int16Array {
   const end = off + count * 2;
   if (off < 0 || end > raw.length) throw new Error('graphics.dat item 0x22e too small for i16 array');
-  const out = new Int16Array(count);
-  for (let i = 0; i < count; i++) out[i] = readI16BE(raw, off + i * 2);
-  return out;
+  return Int16Array.from(readI16BEArray(raw, off, count));
 }
 
 function computeOffsetFromWall(wallRectanglesOffset: number, absField: number): number {

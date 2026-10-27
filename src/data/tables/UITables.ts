@@ -2,6 +2,8 @@ import type { GraphicsLoader } from '../GraphicsLoader';
 import type { IndexedBitmap } from '../CSBGraphicsLoader';
 import type { SpellDefinition } from '../spellTypes';
 import type { Tuple } from '../../core/types';
+import { readI16BE, readI16BEArray, readI32BE, readU16BE, readU32BE } from '../../core/bytes';
+import { decodePlanar } from '../../core/planar';
 
 export interface Rect {
   x1: number;
@@ -234,22 +236,7 @@ export interface UITables {
  */
 export function decodeCursorBitmap(raw: Uint8Array): IndexedBitmap | null {
   if (!raw || raw.length < 128) return null;
-  const pixels = new Uint8Array(16 * 16);
-  for (let row = 0; row < 16; row++) {
-    const base = row * 8;
-    const p0 = ((raw[base] ?? 0) << 8) | (raw[base + 1] ?? 0);
-    const p1 = ((raw[base + 2] ?? 0) << 8) | (raw[base + 3] ?? 0);
-    const p2 = ((raw[base + 4] ?? 0) << 8) | (raw[base + 5] ?? 0);
-    const p3 = ((raw[base + 6] ?? 0) << 8) | (raw[base + 7] ?? 0);
-    for (let col = 0; col < 16; col++) {
-      const bit = 15 - col;
-      pixels[row * 16 + col] =
-        (((p0 >> bit) & 1) |
-          (((p1 >> bit) & 1) << 1) |
-          (((p2 >> bit) & 1) << 2) |
-          (((p3 >> bit) & 1) << 3)) & 0x0f;
-    }
-  }
+  const pixels = decodePlanar(raw.subarray(0, 128), 16, 16);
   return { width: 16, height: 16, pixels };
 }
 
@@ -263,49 +250,48 @@ function requireSize(raw: Uint8Array, off: number, size: number, label: string):
   }
 }
 
-function makeView(raw: Uint8Array): DataView {
-  return new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
+/** The item's `size` bytes from `off`, which a read past the item's end throws for. */
+function need(raw: Uint8Array, off: number, size: number): void {
+  if (off < 0 || off + size > raw.length) {
+    throw new RangeError(`UI table read of ${size} bytes at ${off} exceeds graphic size ${raw.length}`);
+  }
 }
 
-function readWordRect(view: DataView, off: number, name: string = '?'): WordRect {
+function readWordRect(raw: Uint8Array, off: number, name: string = '?'): WordRect {
+  need(raw, off, 8);
   return {
-    x1: view.getInt16(off + 0, false),
-    x2: view.getInt16(off + 2, false),
-    y1: view.getInt16(off + 4, false),
-    y2: view.getInt16(off + 6, false),
+    x1: readI16BE(raw, off + 0),
+    x2: readI16BE(raw, off + 2),
+    y1: readI16BE(raw, off + 4),
+    y2: readI16BE(raw, off + 6),
     name,
   };
 }
 
-function readWordRectArray<N extends number>(view: DataView, off: number, count: N, basename: string = '?'): Tuple<WordRect, N> {
+function readWordRectArray<N extends number>(raw: Uint8Array, off: number, count: N, basename: string = '?'): Tuple<WordRect, N> {
   const out: WordRect[] = [];
   for (let i = 0; i < count; i++) {
-    out.push(readWordRect(view, off + i * 8, `${basename}-${i}`));
+    out.push(readWordRect(raw, off + i * 8, `${basename}-${i}`));
   }
   return out as Tuple<WordRect, N>;
 }
 
-function readI16Array(view: DataView, off: number, count: number): number[] {
+function readI16Array(raw: Uint8Array, off: number, count: number): number[] {
+  need(raw, off, count * 2);
+  return readI16BEArray(raw, off, count);
+}
+
+function readU16Array(raw: Uint8Array, off: number, count: number): number[] {
+  need(raw, off, count * 2);
   const out: number[] = [];
-  for (let i = 0; i < count; i++) {
-    out.push(view.getInt16(off + i * 2, false));
-  }
+  for (let i = 0; i < count; i++) out.push(readU16BE(raw, off + i * 2));
   return out;
 }
 
-function readU16Array(view: DataView, off: number, count: number): number[] {
+function readI32Array(raw: Uint8Array, off: number, count: number): number[] {
+  need(raw, off, count * 4);
   const out: number[] = [];
-  for (let i = 0; i < count; i++) {
-    out.push(view.getUint16(off + i * 2, false));
-  }
-  return out;
-}
-
-function readI32Array(view: DataView, off: number, count: number): number[] {
-  const out: number[] = [];
-  for (let i = 0; i < count; i++) {
-    out.push(view.getInt32(off + i * 4, false));
-  }
+  for (let i = 0; i < count; i++) out.push(readI32BE(raw, off + i * 4));
   return out;
 }
 
@@ -313,27 +299,30 @@ function readI32Array(view: DataView, off: number, count: number): number[] {
  * `count` `KeyXlate` slots, `{ui16 mouse; ui16 keyscan;}` (`doc/CSBwin-src/CSB.h:1382-1386`),
  * up to the terminating `mouse == 0`, which `TAG0196da` stops at (`CSBCode.cpp:8533`).
  */
-function readKeyXlate(view: DataView, off: number, count: number): KeyXlate[] {
+function readKeyXlate(raw: Uint8Array, off: number, count: number): KeyXlate[] {
   const keys: KeyXlate[] = [];
   for (let i = 0; i < count; i++) {
-    const mouse = view.getUint16(off + i * 4, false);
+    need(raw, off + i * 4, 2);
+    const mouse = readU16BE(raw, off + i * 4);
     if (mouse === 0) break;
-    keys.push({ mouse, keyscan: view.getUint16(off + i * 4 + 2, false) });
+    need(raw, off + i * 4 + 2, 2);
+    keys.push({ mouse, keyscan: readU16BE(raw, off + i * 4 + 2) });
   }
   return keys;
 }
 
-function readButtons(view: DataView, off: number, count: number, basename: string): UIButton[] {
+function readButtons(raw: Uint8Array, off: number, count: number, basename: string): UIButton[] {
   const out: UIButton[] = [];
   for (let i = 0; i < count; i++) {
     const base = off + i * 12;
+    need(raw, base, 12);
     out.push({
-      word0: view.getInt16(base + 0, false),
-      x1: view.getInt16(base + 2, false),
-      x2: view.getInt16(base + 4, false),
-      y1: view.getInt16(base + 6, false),
-      y2: view.getInt16(base + 8, false),
-      button: view.getInt16(base + 10, false),
+      word0: readI16BE(raw, base + 0),
+      x1: readI16BE(raw, base + 2),
+      x2: readI16BE(raw, base + 4),
+      y1: readI16BE(raw, base + 6),
+      y2: readI16BE(raw, base + 8),
+      button: readI16BE(raw, base + 10),
       name: `${basename}.${i}`,
     });
   }
@@ -341,49 +330,50 @@ function readButtons(view: DataView, off: number, count: number, basename: strin
 }
 
 /** `count` rectangles of four big-endian words, `x1, x2, y1, y2`. */
-function readWordRects(view: DataView, off: number, count: number, name: string): WordRect[] {
+function readWordRects(raw: Uint8Array, off: number, count: number, name: string): WordRect[] {
   const out: WordRect[] = [];
   for (let i = 0; i < count; i++) {
     const base = off + i * 8;
+    need(raw, base, 8);
     out.push({
-      x1: view.getUint16(base + 0, false),
-      x2: view.getUint16(base + 2, false),
-      y1: view.getUint16(base + 4, false),
-      y2: view.getUint16(base + 6, false),
+      x1: readU16BE(raw, base + 0),
+      x2: readU16BE(raw, base + 2),
+      y1: readU16BE(raw, base + 4),
+      y2: readU16BE(raw, base + 6),
       name: `${name}-${i}`,
     });
   }
   return out;
 }
 
-function readIconDisplay(view: DataView, off: number, count: number): IconDisplay[] {
+function readIconDisplay(raw: Uint8Array, off: number, count: number): IconDisplay[] {
   const out: IconDisplay[] = [];
   for (let i = 0; i < count; i++) {
     const base = off + i * 6;
+    need(raw, base, 6);
     out.push({
-      pixelX: view.getInt16(base + 0, false),
-      pixelY: view.getInt16(base + 2, false),
-      objectType: view.getInt16(base + 4, false),
+      pixelX: readI16BE(raw, base + 0),
+      pixelY: readI16BE(raw, base + 2),
+      objectType: readI16BE(raw, base + 4),
     });
   }
   return out;
 }
 
 function parseGraphic230(raw: Uint8Array): UITables['graphic230'] {
-  const view = makeView(raw);
   let off = 0;
 
   // Word20242[4] (word rect). CSBWin loads graphic 0x230 at d.Byte20244+2.
   requireSize(raw, off, 8, '0x230 Word20242');
   // magic caster selection tabs zone
-  const word20242 = readWordRect(view, off, 'caster selection'); off += 8;
+  const word20242 = readWordRect(raw, off, 'caster selection'); off += 8;
 
   requireSize(raw, off, 5 * 8, '0x230 wRectPos20234..20202');
-  const wRectPos20234 = readWordRect(view, off); off += 8;
-  const wRectPos20226 = readWordRect(view, off); off += 8;
-  const wRectPos20218 = readWordRect(view, off); off += 8;
-  const wRectPos20210 = readWordRect(view, off); off += 8;
-  const wRectPos20202 = readWordRect(view, off); off += 8;
+  const wRectPos20234 = readWordRect(raw, off); off += 8;
+  const wRectPos20226 = readWordRect(raw, off); off += 8;
+  const wRectPos20218 = readWordRect(raw, off); off += 8;
+  const wRectPos20210 = readWordRect(raw, off); off += 8;
+  const wRectPos20202 = readWordRect(raw, off); off += 8;
 
   requireSize(raw, off, 16, '0x230 Byte20194');
   const shrinkColorMap = Array.from(raw.slice(off, off + 16));
@@ -435,10 +425,10 @@ function parseGraphic230(raw: Uint8Array): UITables['graphic230'] {
   const spells: SpellDefinition[] = [];
   let spellOff = spellTableOffset;
   for (let i = 0; i < 25; i++) {
-    const spellId = view.getUint32(spellOff, false);
+    const spellId = readU32BE(raw, spellOff);
     const skillRequired = raw[spellOff + 4] ?? 0;
     const byte5 = raw[spellOff + 5] ?? 0;
-    const word6 = view.getUint16(spellOff + 6, false);
+    const word6 = readU16BE(raw, spellOff + 6);
     spells.push({
       spellId: spellId >>> 0,
       skillRequired,
@@ -501,31 +491,30 @@ function readNulSeparatedNames(raw: Uint8Array): string[] {
 }
 
 function parseGraphic231(raw: Uint8Array): UITables['graphic231'] {
-  const view = makeView(raw);
   let off = 0;
 
   // CSBWin loads graphic 0x231 at d.Byte18938+2 (Byte18938 is not part of the graphic).
-  const buttons18936 = readButtons(view, off, 5, 'btn18936'); off += 5 * 12;
-  const buttons18876 = readButtons(view, off, 4, 'btn18876'); off += 4 * 12;
-  const buttons18828 = readButtons(view, off, 3, 'btn18828'); off += 3 * 12;
-  const buttons18792 = readButtons(view, off, 2, 'btn18792'); off += 2 * 12;
-  const buttons18768 = readButtons(view, off, 5, 'btn18768'); off += 5 * 12;
-  const buttons18708 = readButtons(view, off, 4, 'btn18708'); off += 4 * 12;
-  const buttons18660 = readButtons(view, off, 3, 'btn18660'); off += 3 * 12;
-  const buttons18624 = readButtons(view, off, 2, 'btn18624'); off += 2 * 12;
+  const buttons18936 = readButtons(raw, off, 5, 'btn18936'); off += 5 * 12;
+  const buttons18876 = readButtons(raw, off, 4, 'btn18876'); off += 4 * 12;
+  const buttons18828 = readButtons(raw, off, 3, 'btn18828'); off += 3 * 12;
+  const buttons18792 = readButtons(raw, off, 2, 'btn18792'); off += 2 * 12;
+  const buttons18768 = readButtons(raw, off, 5, 'btn18768'); off += 5 * 12;
+  const buttons18708 = readButtons(raw, off, 4, 'btn18708'); off += 4 * 12;
+  const buttons18660 = readButtons(raw, off, 3, 'btn18660'); off += 3 * 12;
+  const buttons18624 = readButtons(raw, off, 2, 'btn18624'); off += 2 * 12;
 
   requireSize(raw, off, 4 * 8, '0x231 Byte18600..Byte18576');
-  const rect18600 = readWordRect(view, off, 'rect18600'); off += 8;
-  const rect18592 = readWordRect(view, off, 'rect18592'); off += 8;
-  const rect18584 = readWordRect(view, off, 'rect18584'); off += 8;
-  const rect18576 = readWordRect(view, off, 'rect18576'); off += 8;
+  const rect18600 = readWordRect(raw, off, 'rect18600'); off += 8;
+  const rect18592 = readWordRect(raw, off, 'rect18592'); off += 8;
+  const rect18584 = readWordRect(raw, off, 'rect18584'); off += 8;
+  const rect18576 = readWordRect(raw, off, 'rect18576'); off += 8;
 
   requireSize(raw, off, 2 * 4 * 2, '0x231 Word18568, Word18560');
-  const word18568 = readI16Array(view, off, 4); off += 4 * 2;
-  const word18560 = readI16Array(view, off, 4); off += 4 * 2;
-  const word18552 = readWordRects(view, off, 7, 'word18552'); off += 7 * 8;
+  const word18568 = readI16Array(raw, off, 4); off += 4 * 2;
+  const word18560 = readI16Array(raw, off, 4); off += 4 * 2;
+  const word18552 = readWordRects(raw, off, 7, 'word18552'); off += 7 * 8;
 
-  const moveButtons = readWordRects(view, off, 4, 'moveBtn'); off += 4 * 8;
+  const moveButtons = readWordRects(raw, off, 4, 'moveBtn'); off += 4 * 8;
 
   // DropAreas[16], Byte18448[8], Byte18440[12], Byte18428[7], Byte18400[28]
   requireSize(raw, off, 16, '0x231 DropAreas');
@@ -542,41 +531,41 @@ function parseGraphic231(raw: Uint8Array): UITables['graphic231'] {
   off += 16;
   requireSize(raw, off, 8 + 12 + 28 + 28, '0x231 Byte18448..Byte18400');
   const keys = {
-    byte18448: readKeyXlate(view, off, 2), // off += 8
-    byte18440: readKeyXlate(view, off + 8, 3), // off += 12
-    byte18428: readKeyXlate(view, off + 20, 7), // off += 28
-    byte18400: readKeyXlate(view, off + 48, 7), // off += 28
+    byte18448: readKeyXlate(raw, off, 2), // off += 8
+    byte18440: readKeyXlate(raw, off + 8, 3), // off += 12
+    byte18428: readKeyXlate(raw, off + 20, 7), // off += 28
+    byte18400: readKeyXlate(raw, off + 48, 7), // off += 28
   };
   off += 8 + 12 + 28 + 28;
 
   // 0: resurect (160)
   // 1: reincarnate (161)
-  const buttons18372 = readButtons(view, off, 4, 'btn18372'); off += 4 * 12;
-  const buttons18324 = readButtons(view, off, 9, 'btn18324'); off += 9 * 12;
+  const buttons18372 = readButtons(raw, off, 4, 'btn18372'); off += 4 * 12;
+  const buttons18324 = readButtons(raw, off, 9, 'btn18324'); off += 9 * 12;
   // 0-3: party blocks name (16-19)
   // 4-11: party hands (20-27)
-  const buttons18216 = readButtons(view, off, 13, 'btn18216'); off += 13 * 12;
+  const buttons18216 = readButtons(raw, off, 13, 'btn18216'); off += 13 * 12;
   // 0-5: runes (101-106), 6: cast (108), 7: back (107) 
-  const buttons18060 = readButtons(view, off, 9, 'btn18060'); off += 9 * 12;
-  const buttons17952 = readButtons(view, off, 5, 'btn17952'); off += 5 * 12;
-  const buttons17892 = readButtons(view, off, 5, 'btn17892'); off += 5 * 12;
-  const buttons17832 = readButtons(view, off, 3, 'btn17832'); off += 3 * 12;
-  const buttons17796 = readButtons(view, off, 3, 'btn17796'); off += 3 * 12;
+  const buttons18060 = readButtons(raw, off, 9, 'btn18060'); off += 9 * 12;
+  const buttons17952 = readButtons(raw, off, 5, 'btn17952'); off += 5 * 12;
+  const buttons17892 = readButtons(raw, off, 5, 'btn17892'); off += 5 * 12;
+  const buttons17832 = readButtons(raw, off, 3, 'btn17832'); off += 3 * 12;
+  const buttons17796 = readButtons(raw, off, 3, 'btn17796'); off += 3 * 12;
   // keyboard ?
-  const buttons17760 = readButtons(view, off, 38, 'btn17760'); off += 38 * 12;
+  const buttons17760 = readButtons(raw, off, 38, 'btn17760'); off += 38 * 12;
   // 0-5: direction arrows (1-6), 6-9 ??
   // 7: everything below partyw (83)
-  const buttons17304 = readButtons(view, off, 9, 'btn17304'); off += 9 * 12;
+  const buttons17304 = readButtons(raw, off, 9, 'btn17304'); off += 9 * 12;
   // 0-3: party blocks left (12-15)
   // 4-7: party disposition (125-128)
   // 8-11: party blocks complete (7-10)
   // 12: complete magic block (100),
   // 18: "enter" (200)
   // 19: "resume" (201)
-  const buttons17196 = readButtons(view, off, 20, 'btn17196'); off += 20 * 12;
+  const buttons17196 = readButtons(raw, off, 20, 'btn17196'); off += 20 * 12;
   // 0: credits (202)
-  const buttons16956 = readButtons(view, off, 2, 'btn16956'); off += 2 * 12;
-  const buttons16932 = off + 4 * 12 <= raw.length ? readButtons(view, off, 4, 'buttons16932') : [];
+  const buttons16956 = readButtons(raw, off, 2, 'btn16956'); off += 2 * 12;
+  const buttons16932 = off + 4 * 12 <= raw.length ? readButtons(raw, off, 4, 'buttons16932') : [];
 
   return {
     rect18600,
@@ -616,7 +605,6 @@ function parseGraphic231(raw: Uint8Array): UITables['graphic231'] {
 }
 
 function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
-  const view = makeView(raw);
   let off = 0;
 
   // Byte1830[2], printed as a C string, so up to its terminator.
@@ -625,18 +613,19 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
   for (let i = off; i < raw.length && raw[i] !== 0; i++) byte1830 += String.fromCharCode(raw[i]!);
   off += 2;
 
-  const long1828 = readI32Array(view, off, 4); off += 4 * 4;
-  const long1812 = readI32Array(view, off, 4); off += 4 * 4;
+  const long1828 = readI32Array(raw, off, 4); off += 4 * 4;
+  const long1812 = readI32Array(raw, off, 4); off += 4 * 4;
 
-  const wRectPos1796 = readWordRect(view, off); off += 8;
-  const wRectPos1788 = readWordRect(view, off); off += 8;
-  const wRectPos1780 = readWordRect(view, off); off += 8;
+  const wRectPos1796 = readWordRect(raw, off); off += 8;
+  const wRectPos1788 = readWordRect(raw, off); off += 8;
+  const wRectPos1780 = readWordRect(raw, off); off += 8;
 
   // SOUND[22] (8 bytes each), Byte1596[8], Word1588
   const sound1772: SoundTableEntry[] = [];
   for (let i = 0; i < 22; i++) {
+    need(raw, off, 2);
     sound1772.push({
-      word0: view.getInt16(off + 0, false),
+      word0: readI16BE(raw, off),
       byte2: raw[off + 2] ?? 0,
       byte3: raw[off + 3] ?? 0,
       byte4: raw[off + 4] ?? 0,
@@ -650,19 +639,19 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
   off += 2;
 
   // DropOrder[30], Word1526[4][3], Word1502[4][6]
-  const dropOrder = readI16Array(view, off, 30); off += 30 * 2;
+  const dropOrder = readI16Array(raw, off, 30); off += 30 * 2;
   const word1526: number[][] = [];
   for (let i = 0; i < 4; i++) {
-    word1526.push(readI16Array(view, off + i * 3 * 2, 3));
+    word1526.push(readI16Array(raw, off + i * 3 * 2, 3));
   }
   off += 4 * 3 * 2;
   const word1502: number[][] = [];
   for (let i = 0; i < 4; i++) {
-    word1502.push(readI16Array(view, off + i * 6 * 2, 6));
+    word1502.push(readI16Array(raw, off + i * 6 * 2, 6));
   }
   off += 4 * 6 * 2;
 
-  const wRectPos1454 = readWordRectArray(view, off, 4); off += 4 * 8;
+  const wRectPos1454 = readWordRectArray(raw, off, 4); off += 4 * 8;
 
   /**
    * `d.SpecialChars[6]` (`doc/CSBwin-src/Data.h:1437`) — comma, period, semi-colon,
@@ -686,8 +675,8 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
    */
   const byte1412 = Array.from(raw.slice(off, off + 6)); off += 6;
 
-  const word1406 = readWordRect(view, off); off += 8;
-  const word1398 = readWordRect(view, off); off += 8;
+  const word1406 = readWordRect(raw, off); off += 8;
+  const word1398 = readWordRect(raw, off); off += 8;
   const byte1390 = Array.from(raw.slice(off, off + 4)); off += 4;
   const byte1386 = Array.from(raw.slice(off, off + 4)); off += 4;
 
@@ -696,34 +685,34 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
   const cursorHand = raw.slice(off, off + 128); off += 128;
   const cursorArrow = raw.slice(off, off + 128); off += 128;
 
-  const byte1094 = readWordRect(view, off); off += 8;
+  const byte1094 = readWordRect(raw, off); off += 8;
 
   // PaletteBrightness[6], Word1074[16], CarryLocation[38]
-  const paletteBrightness = readI16Array(view, off, 6); off += 6 * 2;
-  const word1074 = readI16Array(view, off, 16); off += 16 * 2;
-  const carryLocation = readI16Array(view, off, 38);
+  const paletteBrightness = readI16Array(raw, off, 6); off += 6 * 2;
+  const word1074 = readI16Array(raw, off, 16); off += 16 * 2;
+  const carryLocation = readI16Array(raw, off, 38);
   off += 38 * 2;
 
-  const wRectPos966 = readWordRect(view, off); off += 8;
-  const wRectPos958 = readWordRect(view, off); off += 8;
-  const wRectPos950 = readWordRect(view, off); off += 8;
-  const wRectPos942 = readWordRect(view, off); off += 8;
-  const wRectPos934 = readWordRect(view, off); off += 8;
-  const wRectPos926 = readWordRect(view, off); off += 8;
+  const wRectPos966 = readWordRect(raw, off); off += 8;
+  const wRectPos958 = readWordRect(raw, off); off += 8;
+  const wRectPos950 = readWordRect(raw, off); off += 8;
+  const wRectPos942 = readWordRect(raw, off); off += 8;
+  const wRectPos934 = readWordRect(raw, off); off += 8;
+  const wRectPos926 = readWordRect(raw, off); off += 8;
 
   // Unused918
   off += 2;
 
-  const iconDisplay = readIconDisplay(view, off, 46); off += 46 * 6;
+  const iconDisplay = readIconDisplay(raw, off, 46); off += 46 * 6;
 
   // Byte640[16] (torch charge to frame mapping)
   const byte640 = Array.from(raw.slice(off, off + 16)); off += 16;
 
-  const wRectPos624 = readWordRect(view, off); off += 8;
+  const wRectPos624 = readWordRect(raw, off); off += 8;
   // FILL(616,612) length 4
   off += 4;
 
-  const word612 = readI16Array(view, off, 7); off += 7 * 2;
+  const word612 = readI16Array(raw, off, 7); off += 7 * 2;
 
   // FILL(598,590) length 8, then two tables the monster attack code needs.
   off += 8;
@@ -746,18 +735,18 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
   // Palette552[6], Palette360, Palette328, DefaultGraphicList[70], IdentityColorMap[16]
   const palette552: number[][] = [];
   for (let i = 0; i < 6; i++) {
-    palette552.push(readU16Array(view, off + i * 32, 16));
+    palette552.push(readU16Array(raw, off + i * 32, 16));
   }
   off += 6 * 32;
-  const palette360 = readU16Array(view, off, 16); off += 32;
-  const palette328 = readU16Array(view, off, 16); off += 32;
-  const defaultGraphicList = readU16Array(view, off, 70); off += 70 * 2;
+  const palette360 = readU16Array(raw, off, 16); off += 32;
+  const palette328 = readU16Array(raw, off, 16); off += 32;
+  const defaultGraphicList = readU16Array(raw, off, 70); off += 70 * 2;
   const identityColorMap = Array.from(raw.slice(off, off + 16)); off += 16;
 
   // `Word140` down to `Word12`, in the file's own order. The names are the original
   // Atari offsets and they run *downward* through the item, which is why an array read
   // forward indexes them in reverse (`doc/CSBwin-src/Data.h:1490-1502`).
-  const wordRects = readWordRectArray(view, off, 17);
+  const wordRects = readWordRectArray(raw, off, 17);
   // The title animation and the prison door (`doc/CSBWIN_TITLE_SCREEN_REFERENCE.md`).
   // The end of the game (`_ShowCredits`, `doc/CSBwin-src/Code1f9e6.cpp:66`).
   const word140 = wordRects[0];

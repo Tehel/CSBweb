@@ -17,6 +17,7 @@
  * its viewport.
  */
 import { readU16LE, readU32LE } from '../../core/bytes';
+import { decodePlanarGroup, encodePlanarGroup } from '../../core/planar';
 import type { BackgroundPointer } from '../../data/BackgroundLib';
 import type { PaletteIndexViewportBuffer } from '../csbwin/CanvasBlitter';
 
@@ -54,15 +55,7 @@ export class ViewportBMP {
     for (let line = 0; line < LINES; line++) {
       if (this.written[line] !== 0) {
         for (let group = 0; group < 14; group++) {
-          const at = line * LINE_BYTES + group * 8;
-          for (let bit = 0; bit < 16; bit++) {
-            let colour = 0;
-            for (let plane = 0; plane < 4; plane++) {
-              const word = (this.bytes[at + 2 * plane]! << 8) | this.bytes[at + 2 * plane + 1]!;
-              colour |= ((word >> (15 - bit)) & 1) << plane;
-            }
-            pixels[line * width + group * 16 + bit] = colour;
-          }
+          decodePlanarGroup(this.bytes, line * LINE_BYTES + group * 8, pixels, line * width + group * 16);
         }
       }
       this.loaded[line] = 0;
@@ -73,15 +66,7 @@ export class ViewportBMP {
   private load(line: number): void {
     const { pixels, width } = this.viewport;
     for (let group = 0; group < 14; group++) {
-      const at = line * LINE_BYTES + group * 8;
-      for (let plane = 0; plane < 4; plane++) {
-        let word = 0;
-        for (let bit = 0; bit < 16; bit++) {
-          word |= (((pixels[line * width + group * 16 + bit] ?? 0) >> plane) & 1) << (15 - bit);
-        }
-        this.bytes[at + 2 * plane] = word >> 8;
-        this.bytes[at + 2 * plane + 1] = word & 0xff;
-      }
+      encodePlanarGroup(pixels, line * width + group * 16, this.bytes, line * LINE_BYTES + group * 8);
     }
     this.loaded[line] = 1;
   }
