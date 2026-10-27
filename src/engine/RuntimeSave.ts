@@ -191,14 +191,16 @@ export function startRuntimeState(ctx: GameContext): void {
 /**
  * Which byte pair of `TIMER` holds an object reference, by timer function.
  *
- * `ConvertTimers` (`doc/CSBwin-src/SaveGame.cpp:2239-2262`): 48 and 49 — the missile
- * in flight — keep it in bytes 6-7, and 24, 25, 60 and 61 in bytes 8-9. Every other
- * function reads both pairs as plain numbers.
+ * `timerObj6()` and `timerObj8()` (`doc/CSBwin-src/CSB.h:2083-2102`), by the functions
+ * their `ASSERT`s allow: 48 and 49 — the missile in flight — keep it in bytes 6-7, and
+ * 24, 25, 60, 61, 13 (the Vi altar's bones) and 65 (the generator) in bytes 8-9. Every
+ * other function reads both pairs as plain numbers.
  */
 function objectBytesOf(timerFunction: number): 6 | 8 | null {
     if (timerFunction === 48 || timerFunction === 49) return 6;
     if (timerFunction === 24 || timerFunction === 25 ||
-        timerFunction === 60 || timerFunction === 61) return 8;
+        timerFunction === 60 || timerFunction === 61 ||
+        timerFunction === 13 || timerFunction === 65) return 8;
     return null;
 }
 
@@ -214,7 +216,7 @@ function objectBytesOf(timerFunction: number): 6 | 8 | null {
  *
  * Two rules, each with a source:
  *
- * - The **object** goes into the pair `ConvertTimers` names for that function.
+ * - The **object** goes into the pair `objectBytesOf` names for that function.
  *   `MagicSystem.launchMissile` puts the RN on `TimerEntry.object` and the launch
  *   x,y in the bytes, so a missile written from its bytes alone would lose its object.
  * - For 48 and 49, **bytes 8-9 are `timerWord8`** — the packed
@@ -288,7 +290,7 @@ function timerEntriesOf(records: TimerRecord[], order: number[]): TimerEntry[] {
         const record = records[index];
         if (!record) continue;
         // The inverse of `collapseTimerBytes`: an object-carrying timer's RN comes
-        // back off the byte pair `ConvertTimers` names and onto `TimerEntry.object`,
+        // back off the byte pair `objectBytesOf` names and onto `TimerEntry.object`,
         // which is where every handler in this port looks for it
         // (`processMissileTimer`, `processTT_25`, `onMonsterAbeyance`). Without this
         // a restored missile has no object and vanishes on its next tick.

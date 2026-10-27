@@ -115,7 +115,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C193 | A Vi altar's and a generator's timer lose their object across a save | S | ⏳ |
 | F18 | One `tsconfig` for the browser, the tools and the server | S | ⏳ |
 | F19 | The tools' screen draws without the game's state, rules and CSB graphics | S | ⏳ |
 | F17 | The frame pipeline and the runner are untyped | M | ⏳ |
@@ -490,24 +489,6 @@ seen to band.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
-
-### C193 ⏳ A Vi altar's and a generator's timer lose their object across a save
-
-CSBWin keeps the object of a `TT_ViAltar` (13), the bones, and of a
-`TT_ReactivateGenerator` (65), the generator, in bytes 8-9, as it does a cloud's and a
-waiting monster's (`timerObj8()`, `doc/CSBwin-src/CSB.h:2083-2092`; set at
-`Mouse.cpp:926` and `Timer.cpp:1821`). The port's `objectBytesOf`
-(`src/engine/RuntimeSave.ts`) names bytes 8-9 for 24, 25, 60 and 61 alone, from
-`ConvertTimers` (`SaveGame.cpp:2239-2262`), which converts an old save's RNs and has no
-case for 13 or 65. So `collapseTimerBytes` writes a Vi altar's bytes 8-9 as the 0
-`queueViAltarTimer` sets and a generator's as 0xcd, not their RN, and a read gives both
-timers no `object`. A game saved during a resurrection's five ticks, or read from
-CSBWin's save of one, comes back with a `processViAltar` that returns at once, the bones
-`RNeof`; a generator's timer reactivates the square's first type-0 actuator, which is its
-own only when it is the first.
-
-Paying it: 13 and 65 in `objectBytesOf`'s bytes-8 case, `queueViAltarTimer`'s two zeroed
-bytes gone, and a check of each timer made, saved, read back and fired on its object.
 
 ### C150 ⏸️ Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops
 

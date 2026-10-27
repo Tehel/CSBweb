@@ -56,6 +56,8 @@ import { loadCsbwinWorld } from '../../src/data/CsbwinDungeonImage';
 import { EXPOOL_RECORD_SIZE, Expool } from '../../src/data/CsbwinExpool';
 import { applyCsbwinSave } from '../../src/engine/CsbwinSaveGame';
 import { buildSaveFile } from '../../src/engine/SaveGameFile';
+import { readSaveFile } from '../../src/data/SaveFile';
+import { TimerFunction } from '../../src/engine/TimerQueue';
 import { newGame, stockDungeon, stockGraphics } from '../lib/game';
 import { newUIState } from '../lib/ui';
 import { check, fail, finish } from '../lib/check';
@@ -303,6 +305,43 @@ function main(): void {
       g.systems.timer.scheduleViAltar(rn, cell, g.ctx.dungeon.rnMaps.pos(rn) & 0x3, g.ctx.state.tickCount);
       runTicks(g, 7);
       check(g.ctx.party.state.champions[victim]!.attributes.health !== 0, 'and the altar raises the champion');
+    }
+  }
+
+  // The timer keeps the bones in bytes 8-9 (`timerObj8()`, doc/CSBwin-src/CSB.h:2083-2092,
+  // set at `Mouse.cpp:926`), so a game saved between the cloud and the resurrection
+  // finishes it once read back.
+  console.log('');
+  console.log('=== saved between the cloud and the resurrection ===');
+  {
+    const { game: g } = makeGame();
+    const cell = findOpenCell(g);
+    g.ctx.party.state.position = cell;
+    g.systems.monsters.loadPartyLevel(cell.z);
+    const victim = 1;
+    g.systems.championDamage.killCharacter(victim);
+    const rn = bonesAt(g, cell)[0];
+    if (rn === undefined) {
+      fail('the death should leave bones');
+    } else {
+      g.systems.timer.scheduleViAltar(rn, cell, g.ctx.dungeon.rnMaps.pos(rn) & 0x3, g.ctx.state.tickCount);
+      runTicks(g, 1);
+      check(cloudsAt(g, cell) === 1, 'state 2 has put its cloud over the bones');
+      const file = buildSaveFile(g);
+      const saved = readSaveFile(file);
+      const slot = saved.timerQueue.find((i) => saved.timers[i]?.function === TimerFunction.TT_VI_ALTAR);
+      const t = slot === undefined ? undefined : saved.timers[slot];
+      const word8 = t === undefined ? -1 : (t.uByte8 << 8) | t.uByte9;
+      console.log(`the file's TT_VI_ALTAR: state ${(t?.uByte5 ?? 0) & 3}, bytes 8-9 ${word8.toString(16)}, the bones ${rn.toString(16)}`);
+      check(word8 === rn, "the file's timer holds the bones in bytes 8-9");
+
+      const { game: next } = makeGame();
+      applyCsbwinSave(next, file);
+      runTicks(next, 6);
+      const alive = next.ctx.party.state.champions[victim]!.attributes.health !== 0;
+      console.log(`read back and six ticks on: HERO${victim} alive ${alive}, bones left ${bonesAt(next, cell).length}`);
+      check(bonesAt(next, cell).length === 0, 'the loaded game consumes the bones');
+      check(alive, 'and brings the champion back');
     }
   }
 

@@ -1074,7 +1074,7 @@ export class TimerSystem {
     state: number,
     time: number,
   ): void {
-    const entry = this.timers.createTimer({
+    this.timers.createTimer({
       function: TimerFunction.TT_VI_ALTAR,
       uByte5: this.packViAltarByte(posInCell, state),
       uByte6: location.x,
@@ -1083,8 +1083,6 @@ export class TimerSystem {
       level: location.z,
       object: bones,
     });
-    entry.uByte8 = 0;
-    entry.uByte9 = 0;
   }
 
   private packViAltarByte(pos: number, state: number): number {

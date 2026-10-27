@@ -3578,6 +3578,17 @@ random stream advances, and `NextMonsterUpdateTime` (`doc/CSBwin-src/CSBCode.cpp
 re-rolls each group member's `singleMonsterStatus` walk offsets — so a monster's sprite
 can sit a pixel further over after a load. CSBWin does all three.
 
+## A timer's object is in bytes 6-7 for a missile, 8-9 for six functions
+
+`TIMER` reads a pair of its bytes as an `RN` through `timerObj6()` and `timerObj8()`,
+whose `ASSERT`s name the functions that keep one there (`doc/CSBwin-src/CSB.h:2083-2102`):
+48 and 49, the missile in flight, in bytes 6-7; 24, 25, 60, 61, 13 (`TT_ViAltar`, the
+bones, set at `Mouse.cpp:926`) and 65 (`TT_ReactivateGenerator`, the generator, set at
+`Timer.cpp:1821`) in bytes 8-9. `ConvertTimers` (`SaveGame.cpp:2239-2262`), which
+renumbers an old save's RNs, has no case for 13 or 65, so it is not the list.
+`src/engine/RuntimeSave.ts`'s `objectBytesOf` is; `tools/checks/vi-altar.ts` and
+`tools/checks/timer-bytes.ts` save each of the two and read it back.
+
 ## `TIMER.unused13` is 0xcd in a slot that has been used, 0 in one that has not
 
 The three bytes that round `TIMER` up to sixteen are declared padding — `ui8 unused13[3];
