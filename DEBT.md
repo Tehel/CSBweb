@@ -114,7 +114,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E29 | `GameScreen` is a façade for the boot | S | ⏳ |
 | E31 | Late wiring with silent defaults, and long parameter lists | M | ⏳ |
 | E32 | Four ways to read bytes, and eight graphics caches | M | ⏳ |
 | E33 | What a frame costs | S | ⏳ |
@@ -414,45 +413,13 @@ gather or split CSBWin's functions as the code's concerns ask. What still follow
 the behaviour, the names of ported functions, which keep the two codebases greppable
 against each other, and the file formats.
 
-### E29 ⏳ `GameScreen` is a façade for the boot
-
-`GameScreen` (492 lines) is the canvas, the pointer's state, and a façade over the UI,
-its `ScreenComposer` and the boot (`getScreenBuffer`, `doMenu`, `setBootFrameRenderer`):
-about 40 of its methods are one- or two-line forwarders. Four tools hand `GameInput` a
-stub cast `as unknown as GameScreen` (`tools/checks/settings-dialog.ts`, `map-dialog.ts`,
-`champion-dialog.ts`, `dev-level.ts`); they stand in for the input's forwarders alone, so
-they go with E30's router, not here.
-
-The step left, a commit that changes no behaviour (every tool's whole output, and
-`npm test -- --frames`):
-
-- **The boot's façade** (S). `BootSequence` and `EndOfGame` reach the composer and `ui/`
-  directly (`getScreenBuffer`, `getFontData`, `getBitmap`, `presentScreen`, `doMenu`,
-  `menuButtonList`, `drawMenuPress`, `drawDialogOnly`, `getUITables`,
-  `championPortrait`); the screen's forwarders for them go.
-
-The input's forwarders (`handleDialogKey`, `openMap`, `searchMouseButtons`, …) stay on the
-screen: they are E30's, whose one input router is where they go. What is left on
-`GameScreen` then is what has logic of its own: `drawViewport`, `refreshOverlay`,
-`handleMouseButton`'s deferred flags, the Hint Oracle's open and close, `syncParty`,
-`setUIMode`, `initializePlayState` and the pointer's state.
-
-Where it stands: the page's hooks are spread once (`ScreenHooks` is `UIHooks` less the
-composer's own two); the composer and the tools build the interface and its viewport
-through one factory (`createScreenUI`, `src/renderer/ScreenUI.ts`); the engine's host,
-the page's and the tools' alike, draws on the interface through `hostDrawing`
-(`src/renderer/ui/HostDrawing.ts`); and `ScreenComposer` (`src/renderer/ScreenComposer.ts`)
-composes each frame without the DOM, the screen's buffer, the compose order, the palettes,
-the overlay and the left-handed layout, into an `RgbaImage` that `GameScreen` puts on the
-canvas. The step above is left.
-
 ### E30 ⏳ One presenter and one input router
 
 The screen is drawn by clocks that do not know each other: the engine's `setTimeout` VBL
 loop, and `requestAnimationFrame` loops for the chewing mouth
 (`src/renderer/ui/Feeding.ts:228-249`), a menu button's press (`playMenuPress`,
 `src/renderer/ui/Menu.ts:414-426`), the
-intro's VBL (`BootSequence.ts:193-203`) and the CRT (`src/lib/crt.ts:232-249`).
+intro's VBL (`BootSequence.ts:221-235`) and the CRT (`src/lib/crt.ts:232-249`).
 
 - `renderLastFrame`, which the chew, the menus and Reincarnate draw through, skips
   `refreshScreen`'s `syncParty` and its `mainLoopHasReturned()` test
@@ -463,13 +430,22 @@ intro's VBL (`BootSequence.ts:193-203`) and the CRT (`src/lib/crt.ts:232-249`).
   second.
 - The rAF scheduler is written twice (`Feeding.ts:230-233`, with `as unknown as number`, and
   `playMenuPress`), and a menu's press runs on two clocks
-  (`BootSequence.ts:507-510` passes made-up times).
+  (`BootSequence.ts:568-571` passes made-up times).
 - Input has two stacks, `GameInput` on `document` and the intro's `IntroHost` on `window`.
+
+- About twenty-five of `GameScreen`'s forty methods only forward the input into `ui/`
+  (`handleDialogKey`, `openMap`, `searchMouseButtons`, …), and four tools hand `GameInput`
+  a stub of them cast `as unknown as GameScreen` (`tools/checks/settings-dialog.ts`,
+  `map-dialog.ts`, `champion-dialog.ts`, `dev-level.ts`), which hides a method missing from
+  the stub from `tsc`.
 
 Paying it: one rAF presenter with a dirty flag that the VBL and the animations set, the CRT
 drawing only after a present; one input router, with a focus policy once the page has
-controls again, calling `ui/` itself where `GameScreen` forwards the input today (E29), so
-the four dialog tools' stubs of the screen (E29) go with it.
+controls again, calling `ui/` itself where `GameScreen` forwards the input today, so the
+stubs go with the forwarders. What is left on `GameScreen` then is what has logic of its
+own: the canvas, `drawViewport`, `refreshOverlay`, `handleMouseButton`'s deferred flags,
+the Hint Oracle's open and close, `syncParty`, `setUIMode`, `initializePlayState` and the
+pointer's state.
 
 ### E31 ⏳ Late wiring with silent defaults, and long parameter lists
 

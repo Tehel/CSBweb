@@ -8,6 +8,7 @@ import type { Game } from '../../engine/Game';
 import { determineMastery } from '../../engine/skills';
 import type { ScrollingText } from '../csbwin/ScrollingText';
 import type { GameScreen } from '../GameScreen';
+import { getChampionPortrait } from '../ui/Character';
 import { runShowCredits, type BootSequenceDeps } from './BootSequence';
 import { SOUND_DYING, type WonChampion } from './ShowCredits';
 
@@ -38,7 +39,7 @@ export async function showEndOfGame(deps: EndOfGameDeps, word11694: boolean): Pr
     champions: word11694 ? wonChampions(game, screen) : [],
     // `_StartCSB` turns palette switching off before a lost game's credits
     // (doc/CSBwin-src/CSBCode.cpp:11558); `MainLoop`'s won game leaves it as it was.
-    palette11946: word11694 ? screen.palette11946() : null,
+    palette11946: word11694 ? screen.composer.palette11946() : null,
   });
   if (end === 'terminate') return;
   messages.restart();
@@ -55,7 +56,7 @@ function wonChampions(game: Game, screen: GameScreen): WonChampion[] {
     title: champion.title,
     // `*(name + 9)`: the title's second byte, its raw field's where there is one.
     titleByte1: champion.titleField?.[1] ?? (champion.title.length > 1 ? champion.title.charCodeAt(1) : 0),
-    portrait: screen.championPortrait(champion),
+    portrait: getChampionPortrait(screen.ui, champion),
     masteries: [0, 1, 2, 3].map((skill) => determineMastery(champion, skill | 0xc000, { partySleeping })),
   }));
 }

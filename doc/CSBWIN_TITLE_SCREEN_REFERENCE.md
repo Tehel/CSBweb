@@ -505,8 +505,8 @@ icon. It calls `SelectSaveGame(_9_, 1, 1, 1)` (`:1688`), against the disk icon's
 | `disableSaves` | not consulted | short-circuits to `"SAVES ARE DISABLED"` |
 
 This port reaches the same place through `openSaveMenu(ui, 'loadOnly')` — the same unbounded
-list as the disk icon, with no SAVE button — drawn on a cleared screen by
-`GameScreen.drawDialogOnly`, the cursor over every redraw of it. Cancelling puts the entrance back up, as the retry
+list as the disk icon, with no SAVE button — drawn alone on a cleared screen by
+the boot's `openLoadMenu`, the cursor over every redraw of it. Cancelling puts the entrance back up, as the retry
 loop does. A save that fails its read closes the chooser and goes to `tag01efee`: "SAVED
 GAME DAMAGED!", then the entrance after a lost game, or the title at the boot, where CSBWin
 ends (`doc/PROVEN_FACTS.md` → "A failed read ends at `tag01efee`"). The four fixed slots, the recency letters and this port's other divergences from

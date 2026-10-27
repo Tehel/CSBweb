@@ -7,7 +7,7 @@
 //
 // What it captures is the **320x200 screen as CSBWin draws it**, not a screenshot of the
 // page, nor even the canvas's colours: the palette-index buffer the canvas was last given,
-// and the palette each pixel went through (`GameScreen.presentedFrame`,
+// and the palette each pixel went through (`ScreenComposer.presentedFrame`,
 // `src/renderer/csbwin/PresentedFrame.ts`), written as `tools/lib/frames.mjs` says. A
 // renderer that draws a slot holding the same colour as the right one fails, and a change
 // to how an Atari colour is shown on the canvas alone fails nothing. The page around the
@@ -110,7 +110,7 @@ const CAPTURE_CANVAS = `(() => {
 // The screen as last presented, and the canvas's colour for each of its codes, with the
 // first pixel whose colour is not its code's.
 const CAPTURE_FRAME = `(() => {
-  const frame = window.__probe.screen.presentedFrame();
+  const frame = window.__probe.screen.composer.presentedFrame();
   const c = document.getElementById('game-canvas');
   const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
   const colours = {};

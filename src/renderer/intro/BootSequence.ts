@@ -34,8 +34,9 @@ import { canvasPoint } from '../../lib/crt';
 import type { MessageSink } from '../../engine/GameHost';
 import type { SavedGameRead } from '../../engine/GameSaves';
 import type { GameScreen } from '../GameScreen';
+import type { UIState } from '../ui/UIState';
 import { decodeCursorBitmap, type UIButton } from '../../data/tables/UITables';
-import { MENU_PRESS_PHASE_MS, menuButtonRect, menuHitTest } from '../ui/Menu';
+import { MENU_PRESS_PHASE_MS, doMenu, drawMenuPress, menuButtonList, menuButtonRect, menuHitTest, type MenuPress } from '../ui/Menu';
 import { HintOracleScreen, type HintSquare } from './HintOracle';
 import { fadeToPalette, PALETTE_11914, withCursor, type IntroEvent, type IntroHost } from './IntroHost';
 import { MISSING_PRISON_DOOR_BUTTONS, showPrisonDoor, type PrisonDoorChoice } from './PrisonDoor';
@@ -112,8 +113,9 @@ type HostDeps = Pick<BootSequenceDeps, 'canvas' | 'gameScreen' | 'playSound'>;
 /** `palette` is the shifter's colour registers as the host finds them. */
 function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHost {
   const { canvas, gameScreen } = deps;
-  const screen = gameScreen.getScreenBuffer();
-  const uiTables = gameScreen.getUITables();
+  const { composer, ui } = gameScreen;
+  const screen = composer.screen;
+  const uiTables = ui.uiTables;
   const globalPalette = [...palette];
 
   let queue: IntroEvent[] = [];
@@ -208,11 +210,11 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
   const host: IntroHost = {
     screen,
     uiTables,
-    font: gameScreen.getFontData(),
+    font: ui.fontData,
     globalPalette,
-    getGraphic: (graphicNum) => gameScreen.getBitmap(graphicNum),
+    getGraphic: (graphicNum) => composer.getBitmap(graphicNum),
     present: () => {
-      const paint = (): void => gameScreen.presentScreen(globalPalette, host.palette11946 ?? null);
+      const paint = (): void => composer.presentScreen(globalPalette, host.palette11946 ?? null);
       if (!cursorVisible) paint();
       else withCursor(screen, arrow, pointerX, pointerY, paint);
     },
@@ -304,6 +306,7 @@ async function openLoadMenu(
   mode: 'loadOnly' | 'rise' = 'loadOnly',
 ): Promise<SavedGameRead> {
   const { gameScreen } = deps;
+  const { composer, ui } = gameScreen;
 
   await fadeToPalette(host, PALETTE_11914);
   host.screen.pixels.fill(0);
@@ -317,7 +320,11 @@ async function openLoadMenu(
   // `STHideCursor` (`SaveGame.cpp:1687-1689`), as the VBL handler draws it over each frame.
   const draw = (): void => {
     if (gameScreen.isSaveMenuOpen()) {
-      gameScreen.drawDialogOnly();
+      // The dialog alone, drawn into the cleared screen: `_ReadEntireGame` reaches the
+      // chooser through `SelectSaveGame(_9_, 1, 1, 1)` (`doc/CSBwin-src/SaveGame.cpp:1688`),
+      // whose leading 1 is `_DoMenu`'s `FadeOldScreen` / `ClearOldScreen` pair
+      // (`doc/CSBwin-src/Menu.cpp:285-291`), which `drawSaveMenu` does for either menu.
+      ui.dialog?.draw(ui);
       shown = host.screen.pixels.slice();
       host.present();
       return;
@@ -326,7 +333,7 @@ async function openLoadMenu(
     host.present();
     chooserClosed();
   };
-  gameScreen.setBootFrameRenderer(draw);
+  composer.setBootFrameRenderer(draw);
   // Forget a load made in play before the game was lost: only this chooser's read counts.
   deps.consumeSavedGameRead();
   gameScreen.openSaveMenu(mode);
@@ -341,7 +348,7 @@ async function openLoadMenu(
     draw();
   }
 
-  gameScreen.setBootFrameRenderer(null);
+  composer.setBootFrameRenderer(null);
   host.setCursorVisible(false);         // `STHideCursor(HC33)` (`SaveGame.cpp:1689`)
   return deps.consumeSavedGameRead();
 }
@@ -357,7 +364,7 @@ async function readSavedGame(
   partyHasDied: boolean,
 ): Promise<boolean> {
   const read = await openLoadMenu(host, deps);
-  if (read === 'damaged') await tag01efee(host, deps.gameScreen, partyHasDied);
+  if (read === 'damaged') await tag01efee(host, menuScreen(deps.gameScreen.ui), partyHasDied);
   return read === 'loaded';
 }
 
@@ -373,8 +380,8 @@ async function readNewAdventure(
   partyHasDied: boolean,
 ): Promise<boolean> {
   const read = await openLoadMenu(host, deps, 'rise');
-  if (read === 'damaged') await tag01efee(host, deps.gameScreen, partyHasDied);
-  else if (typeof read === 'object') await utilityRefusal(host, deps.gameScreen, read.refused);
+  if (read === 'damaged') await tag01efee(host, menuScreen(deps.gameScreen.ui), partyHasDied);
+  else if (typeof read === 'object') await utilityRefusal(host, menuScreen(deps.gameScreen.ui), read.refused);
   return read === 'loaded';
 }
 
@@ -473,8 +480,27 @@ function palette11978(host: IntroHost): readonly number[] {
 
 /* ------------------------------------------------------------- the hand-off ---- */
 
-/** What the boot's menus draw through: `GameScreen`'s share of `ui/Menu.ts`. */
-export type MenuScreen = Pick<GameScreen, 'doMenu' | 'menuButtonList' | 'drawMenuPress'>;
+/**
+ * What the boot's menus draw through: `ui/Menu.ts`'s share, over the interface's screen
+ * (`menuScreen`). A tool gives its own, which logs what `_DoMenu` was given.
+ */
+export interface MenuScreen {
+  /** `_DoMenu`'s drawing into the screen. */
+  doMenu(title1: string | null, title2: string | null, options: string[], centred: boolean): void;
+  /** `d.pButn18970[set][count-1]`, the button list `_WaitForMenuSelect` puts up. */
+  menuButtonList(count: number, centred: boolean): UIButton[];
+  /** One pass of `_WaitForMenuSelect`'s press animation, the one `nowMs` falls in. */
+  drawMenuPress(press: MenuPress, nowMs: number): void;
+}
+
+/** The boot's menus over the interface `ui`, drawing into its screen. */
+function menuScreen(ui: UIState): MenuScreen {
+  return {
+    doMenu: (title1, title2, options, centred) => doMenu(ui, title1, title2, options, centred),
+    menuButtonList: (count, centred) => menuButtonList(ui, count, centred),
+    drawMenuPress: (press, nowMs) => drawMenuPress(ui, press, nowMs),
+  };
+}
 
 /**
  * `_TAG021028`'s screen when the game was loaded (`doc/CSBwin-src/CSBCode.cpp:10617-10661`):
@@ -505,14 +531,14 @@ export async function tag021028(host: IntroHost, choice: PrisonDoorChoice): Prom
  */
 async function doMenuCentred(
   host: IntroHost,
-  gameScreen: MenuScreen,
+  menus: MenuScreen,
   title1: string | null,
   title2: string | null,
   options: string[],
 ): Promise<void> {
   await fadeToPalette(host, PALETTE_11914);   // `:285-288`
   host.screen.pixels.fill(0);                 // `:289-292`
-  gameScreen.doMenu(title1, title2, options, true);
+  menus.doMenu(title1, title2, options, true);
   await fadeToPalette(host, palette11978(host)); // `:473-476`
 }
 
@@ -526,8 +552,8 @@ async function doMenuCentred(
  * The press paints its two passes into the screen, the second over the first, and puts
  * back what it covered (`:100-180`).
  */
-async function waitForMenuSelect(host: IntroHost, gameScreen: MenuScreen, numButton: number): Promise<number> {
-  const buttons = gameScreen.menuButtonList(numButton, true);
+async function waitForMenuSelect(host: IntroHost, menus: MenuScreen, numButton: number): Promise<number> {
+  const buttons = menus.menuButtonList(numButton, true);
   let choice = 0;
   while (choice === 0) {
     const event = await host.nextEvent();
@@ -539,10 +565,10 @@ async function waitForMenuSelect(host: IntroHost, gameScreen: MenuScreen, numBut
     host.setCursorVisible(false);       // `STHideCursor(HC41)` (`:107`)
     const saved = host.screen.pixels.slice();
     await host.vbl(1);
-    gameScreen.drawMenuPress(press, 0);
+    menus.drawMenuPress(press, 0);
     host.present();
     await host.vbl(5);
-    gameScreen.drawMenuPress(press, MENU_PRESS_PHASE_MS);
+    menus.drawMenuPress(press, MENU_PRESS_PHASE_MS);
     host.present();
     await host.vbl(5);
     host.screen.pixels.set(saved);
@@ -634,7 +660,7 @@ export type EndOfGame = PrisonDoorChoice | 'terminate';
  * `d.Palette552[0]` (`CSBCode.cpp:10747`).
  */
 export async function runShowCredits(deps: Omit<BootSequenceDeps, 'skip' | 'title'>, hooks: ShowCreditsHooks): Promise<EndOfGame> {
-  const uiTables = deps.gameScreen.getUITables();
+  const uiTables = deps.gameScreen.ui.uiTables;
   const palette11978 = uiTables.graphic232.palette552[0] ?? PALETTE_11914;
   const { host, detach } = createIntroHost(deps, palette11978);
   if ((await showCredits(host, hooks)) === 'terminate') return 'terminate';
@@ -710,7 +736,7 @@ export async function runHintOracle(
   deps: HostDeps, files: HintOracleFiles, square: HintSquare, hintKey: Uint8Array | undefined,
 ): Promise<void> {
   const hints = readHintOracle(files.hct, hintKey);
-  const uiTables = deps.gameScreen.getUITables();
+  const uiTables = deps.gameScreen.ui.uiTables;
   const { host, detach } = createIntroHost(deps, uiTables.graphic232.palette552[0] ?? PALETTE_11914);
   try {
     const oracle = new HintOracleScreen(host, hints, files.dat, square);

@@ -1,5 +1,5 @@
 /**
- * A golden frame on disk: the screen as `GameScreen.presentedFrame` hands it over
+ * A golden frame on disk: the screen as `ScreenComposer.presentedFrame` hands it over
  * (`src/renderer/csbwin/PresentedFrame.ts`), written by `probe-frames.mjs` and read by
  * `compare-frames.mjs`.
  *

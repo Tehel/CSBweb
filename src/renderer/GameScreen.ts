@@ -11,16 +11,12 @@
  * `ScreenHooks`, the way `GameHost` gathers what the engine asks of the page.
  */
 
-import type { Champion } from '../engine/gameTypes';
 import type { IndexedBitmap } from './csbwin/CanvasBlitter';
-import type { PresentedFrameCapture } from './csbwin/PresentedFrame';
-import type { UIButton, UITables } from '../data/tables/UITables';
-import type { FontData } from './csbwin/TextRenderer';
 import { SCREEN_WIDTH, SCREEN_HEIGHT } from './ViewportGraphics';
 import { Position } from '../core/types';
 import type { ViewportRenderer } from './ViewportRenderer';
 import { ScreenComposer, type ScreenComposerDeps, type ScreenHooks } from './ScreenComposer';
-import { initializePlayState, UIMode, type ScreenIndexBuffer, type UIState } from './ui/UIState';
+import { initializePlayState, UIMode, type UIState } from './ui/UIState';
 import {
   marchingOrderPointerMoved,
   handleMouseButton,
@@ -52,10 +48,8 @@ import { isDialogOpen, type DialogPoint } from './ui/Dialog';
 import { openSettingsDialog } from './ui/SettingsDialog';
 import { openMapDialog } from './ui/MapDialog';
 import { championBarsAt, openChampionDialog } from './ui/ChampionDialog';
-import { doMenu, drawMenuPress, menuButtonList, type MenuPress } from './ui/Menu';
 import type { SaveEntry } from '../data/saves';
 import type { ImportedFile } from '../engine/GameSaves';
-import { getChampionPortrait } from './ui/Character';
 
 export class GameScreen {
   /**
@@ -63,7 +57,8 @@ export class GameScreen {
    * (`ui/HostDrawing.ts`).
    */
   readonly ui: UIState;
-  private readonly composer: ScreenComposer;
+  /** The frames composed, which the pre-game screens draw through too (`BootSequence.ts`). */
+  readonly composer: ScreenComposer;
   private readonly viewport: ViewportRenderer;
   /** The pointer has moved since the cursor was last drawn (`takeCursorMoved`). */
   private cursorMoved = false;
@@ -84,10 +79,6 @@ export class GameScreen {
     this.viewport = this.composer.viewport;
     this.ui = this.composer.ui;
     updateButtonLists(this.ui);
-  }
-
-  getUITables(): UITables {
-    return this.ui.uiTables;
   }
 
   /**
@@ -286,11 +277,6 @@ export class GameScreen {
     return saveMenuDrop(this.ui, file);
   }
 
-  /** `CHARDESC.portrait`, as the status box draws it; the won screen draws it too. */
-  championPortrait(champion: Champion): IndexedBitmap | null {
-    return getChampionPortrait(this.ui, champion);
-  }
-
   /** Before a compose: the game's party, which may be another game's since the last. */
   syncParty(): void {
     // Another party is another game, loaded or begun, which CSBWin draws afresh: nothing
@@ -404,59 +390,13 @@ export class GameScreen {
     return this.ui.partyState.seeThruWalls !== 0;
   }
 
-  /**
-   * The screen the canvas was last given, as palette indices and the palettes they were
-   * shown through: the golden frames (`tools/probe-frames.mjs`).
-   */
-  presentedFrame(): PresentedFrameCapture {
-    return this.composer.presentedFrame();
-  }
-
-  /** `d.Palette11946` if `d.DynamicPaletteSwitching` is on (`ScreenComposer.palette11946`). */
-  palette11946(): number[] | null {
-    return this.composer.palette11946();
-  }
-
   /* ------------------------------------------------ the pre-game screens ---- */
-
-  /** The 320x200 screen the intro modules draw into (`d.LogicalScreenBase`). */
-  getScreenBuffer(): ScreenIndexBuffer {
-    return this.composer.screen;
-  }
-
-  /** The font, graphic 0x22d, for the pre-game screens' `TextOutToScreen`. */
-  getFontData(): FontData {
-    return this.ui.fontData;
-  }
-
-  /** `ReadAndExpandGraphic(n, …)`. Throws rather than return a blank screen. */
-  getBitmap(graphicNum: number): IndexedBitmap {
-    return this.composer.getBitmap(graphicNum);
-  }
-
-  /** Push the screen buffer to the canvas through an explicit palette. */
-  presentScreen(palette: number[], palette11946: number[] | null = null): void {
-    this.composer.presentScreen(palette, palette11946);
-  }
 
   /** The entrance's view through the doorway: `ViewportRenderer.renderPrisonInterior`. */
   renderPrisonInterior(): IndexedBitmap {
     const { view, picking } = this.viewport.renderPrisonInterior(this.seeThroughWalls());
     this.ui.picking = picking;
     return view;
-  }
-
-  /**
-   * The dialog alone, for the entrance's "Resume": drawn into the screen, which the
-   * entrance's host presents with its cursor on it.
-   *
-   * `_ReadEntireGame` reaches the chooser through `SelectSaveGame(_9_, 1, 1, 1)`
-   * (`doc/CSBwin-src/SaveGame.cpp:1688`), whose leading 1 is `_DoMenu`'s `FadeOldScreen` /
-   * `ClearOldScreen` pair (`doc/CSBwin-src/Menu.cpp:285-291`): the screen under the chooser
-   * is cleared, which `drawSaveMenu` does for either menu.
-   */
-  drawDialogOnly(): void {
-    this.ui.dialog?.draw(this.ui);
   }
 
   /**
@@ -468,25 +408,5 @@ export class GameScreen {
     if (!this.ui.dialog?.pointer(this.ui, point)) return false;
     this.composer.renderLastFrame();
     return true;
-  }
-
-  /** `_DoMenu`'s drawing into the screen (`ui/Menu.ts`), for a menu a pre-game screen raises. */
-  doMenu(title1: string | null, title2: string | null, options: string[], centred: boolean): void {
-    doMenu(this.ui, title1, title2, options, centred);
-  }
-
-  /** `d.pButn18970[set][count-1]`, the button list `_WaitForMenuSelect` puts up. */
-  menuButtonList(count: number, centred: boolean): UIButton[] {
-    return menuButtonList(this.ui, count, centred);
-  }
-
-  /** One pass of `_WaitForMenuSelect`'s press animation, the one `nowMs` falls in. */
-  drawMenuPress(press: MenuPress, nowMs: number): void {
-    drawMenuPress(this.ui, press, nowMs);
-  }
-
-  /** The pre-game screen's redraw (`ScreenComposer.setBootFrameRenderer`). */
-  setBootFrameRenderer(render: (() => void) | null): void {
-    this.composer.setBootFrameRenderer(render);
   }
 }

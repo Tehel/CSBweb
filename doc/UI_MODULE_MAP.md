@@ -64,7 +64,7 @@ A function that turns out not to need the state does not take it — the pure he
 screens run before there is a party, a level or a main loop and they talk to the Atari
 hardware directly — the logical screen base, the shifter's colour registers, the VBL counter,
 the sound chip — and to nothing else. `IntroHost.ts` is that hardware as an interface;
-`intro/BootSequence.ts` builds it over `GameScreen`. Spec:
+`intro/BootSequence.ts` builds it over `GameScreen`'s composer. Spec:
 `doc/CSBWIN_TITLE_SCREEN_REFERENCE.md`.
 
 | Module | CSBWin counterpart | Holds |
@@ -84,7 +84,9 @@ hooks out as one object at construction (`ScreenHooks`, as `GameHost` is the eng
 indices to RGBA through the UI palette and the light level's viewport palette, into an
 image of `ImageData`'s shape (`RgbaImage`), which it hands to its `ScreenOutput`;
 `presentScreen()` does the same for a pre-game screen's frame through the palette it is
-given.
+given. The pre-game screens draw through the composer and `ui/` directly
+(`intro/BootSequence.ts`): its screen buffer, its graphics, `presentScreen` and
+`setBootFrameRenderer`, the interface's font and tables, and `ui/Menu.ts`'s menus.
 
 `src/renderer/GameScreen.ts` is the screen on the page. It owns the canvas, puts each
 frame its composer hands over on it, and keeps the pointer's state. It
