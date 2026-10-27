@@ -8,13 +8,11 @@ import {
   type ObjectID,
 } from '../../../core/types';
 import { DescIndex } from '../../objectIndex';
-import type { MonsterSystem } from '../../MonsterSystem';
 import { forgetThrownWeapon } from '../../ThrownWeapons';
 import { TimerFunction } from '../../TimerQueue';
-import type { WorldMove } from '../../WorldMove';
 import { CursorFilterType, StkOp } from '../DsaTypes';
 import type { DsaOperation, DsaOperationMachine } from '../DsaOperations';
-import { choosePositionFromMask, detachedGroupIndex } from './objects';
+import { choosePositionFromMask, detachedGroupIndex, objectMover } from './objects';
 
 /** `ERRORCODES` (`doc/CSBwin-src/MoveObject.cpp:92-127`): a source's, then a destination's. */
 const enum DsaMoveError {
@@ -509,20 +507,6 @@ function findCellDestination(
     }
   }
   return DsaMoveError.DER_OK;
-}
-
-/**
- * The two halves of CSBWin's low-level `MoveObject` (`doc/CSBwin-src/Code11f52.cpp:2831`)
- * a DSA cell move goes through: `WorldMove.moveObject`, and its monster branch,
- * `MonsterSystem.moveMonster`.
- */
-function objectMover(machine: DsaOperationMachine): { moveObject: WorldMove['moveObject']; moveMonster: MonsterSystem['moveMonster'] } {
-  const { worldMove, monsters } = machine.ctx.systems;
-  return {
-    moveObject: (object, oldX, oldY, newX, newY, level) => worldMove.moveObject(object, oldX, oldY, newX, newY, level),
-    moveMonster: (monster, oldX, oldY, newX, newY, level, cornerAfter) =>
-      monsters.moveMonster(monster, oldX, oldY, newX, newY, level, cornerAfter),
-  };
 }
 
 function findChestDestination(machine: DsaOperationMachine, dstLoc: number, dstDepth: number, object: ObjectID, doit: boolean): number {

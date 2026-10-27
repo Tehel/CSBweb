@@ -116,11 +116,12 @@ export class MonsterSystem {
   /**
    * `EnsureItem16Available` (`doc/CSBwin-src/Monster.cpp:83`) — grow by 50 when
    * fewer than five slots remain, but only while the loaded level is the party's,
-   * and never past 240.
+   * and never past 240. `loadedLevel` is CSBWin's `d.LoadedLevel` where the caller
+   * knows it (a DSA's, the timer's level); else the party's level as loaded.
    */
-  ensureItem16Available(): void {
+  ensureItem16Available(loadedLevel: number | null = this.loadedLevel): void {
     const pool = this.pool;
-    if (this.item16QueLen >= pool.length - 5 && this.isPartyLevelLoaded()) {
+    if (this.item16QueLen >= pool.length - 5 && this.isPartyLevelLoaded(loadedLevel)) {
       if (pool.length < ITEM16_SOFT_MAX) {
         for (let i = 0; i < ITEM16_GROWTH; i++) pool.push(makeFreeItem16());
       }
@@ -128,12 +129,12 @@ export class MonsterSystem {
   }
 
   /** True when the pool is too full to take another group, as `CreateMonster` tests. */
-  isItem16PoolFull(): boolean {
-    return this.item16QueLen >= this.pool.length - 5 && this.isPartyLevelLoaded();
+  isItem16PoolFull(loadedLevel: number | null = this.loadedLevel): boolean {
+    return this.item16QueLen >= this.pool.length - 5 && this.isPartyLevelLoaded(loadedLevel);
   }
 
-  private isPartyLevelLoaded(): boolean {
-    return this.loadedLevel !== null && this.loadedLevel === (this.ctx.party.state.position.z | 0);
+  private isPartyLevelLoaded(loadedLevel: number | null): boolean {
+    return loadedLevel !== null && loadedLevel === (this.ctx.party.state.position.z | 0);
   }
 
   /**

@@ -4557,6 +4557,20 @@ group leaves the other whole. `&COPY` of an actuator is `memcpy(((ui8 *)pDst)+2,
 ((ui8 *)pSrc)+2, sizeof(*pSrc)-2)` (`:4717`): every word past the link, a big actuator's
 `word8` (`CSB.h:1025`) with them. Covered by `tools/checks/dsa-objects.ts`.
 
+## The DSA's `&ADD` and `&DEL` on a square are `MoveObject`'s
+
+`&DEL` lifts an actuator, a misc object, a potion, a weapon or clothing off its square
+with `MoveObject(thisObj, x, y, -1, 0)`, and `&ADD` sets its copy down with
+`MoveObject(newObj, -1, 0, x, y)` and then `newObj.pos(p)`, each between a
+`LoadLevel(locr.l)` and a `LoadLevel(oldLevel)` (`doc/CSBwin-src/DSA.cpp:1700-1704`,
+`:2055-2059`). So a copy falls down an open pit and is carried on by a teleporter, the
+pads under the party see `unchangedRoom` true (`Code11f52.cpp:3314-3328`, `:3458-3473`),
+a group added on the party's level gets an ITEM16 and its first AI timers (`:3410`,
+`:3439`), and the copy lies in corner `p` wherever the move took it. `CopyItem` copies no
+group while `d.ITEM16QueLen >= d.MaxITEM16-5` and `d.LoadedLevel`, the level of the timer
+or filter that ran the DSA, is the party's (`DSA.cpp:1866-1868`); `&OBJECTID` then reads
+`RNeof`. Covered by `tools/checks/dsa-add-delete.ts`.
+
 ## The sound filter hands a sound to the dungeon's DSAs, a silent one included
 
 `QueueSound` calls `SoundFilter(soundNum, LOCAL_12, &soundLocr)` once it has the volume,

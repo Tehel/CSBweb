@@ -115,11 +115,12 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C173 | The DSA's `&ADD` and `&DEL` on a square bypass `MoveObject` | M | ⏳ |
 | C186 | A decoration's position set past its rectangles' table is not drawn | S | ⏳ |
 | C187 | The adjust skills filter hands each DSA the one before's words unmasked, and its `why` | S | ⏳ |
 | C188 | A new timer's unused bytes are 0, where CSBWin's are 0xcd | S | ⏳ |
 | C189 | A distant monster is shrunk again at every frame, where CSBWin keeps it across levels | S | ⏳ |
+| C191 | `CreateMonster`'s full ITEM16 pool refuses a group off the party's level | S | ⏳ |
+| C192 | `&MOVE` sets an object's corner before `MoveObject`, where CSBWin sets it after | S | ⏳ |
 | F15 | Tools that read the wall clock, and a runner with no timeout | S | ⏳ |
 | F16 | A tool can pass having checked less than it says | S | ⏳ |
 | F18 | One `tsconfig` for the browser, the tools and the server | S | ⏳ |
@@ -145,7 +146,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C191 · D22 · E42 · F22 · G31 · P13 · R17 · U13 · W8 · X18. An ID recorded and paid in one commit has no
+Next free IDs: C193 · D22 · E42 · F22 · G31 · P13 · R17 · U13 · W8 · X18. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -497,32 +498,6 @@ seen to band.
 
 A divergence found along the way goes here, with the next free ID.
 
-### C173 ⏳ The DSA's `&ADD` and `&DEL` on a square bypass `MoveObject`
-
-`&DEL` takes an object off its square with `MoveObject(thisObj, x, y, -1, 0)` and `&ADD`
-puts its copy on one with `MoveObject(newObj, -1, 0, x, y)`
-(`doc/CSBwin-src/DSA.cpp:1702`, `:2057`). The port does both by hand
-(`src/engine/dsa/ops/objects.ts:541-542`, `:564-566`): `removeObjectFromCell` then
-`triggerObjectMove`; `setPos`, `triggerObjectMove`, then `addObjectToCell`. What that loses:
-
-- no pit or teleporter on the square is resolved (`WorldMove.resolveCellEffects`, which
-  `&MOVE` already reaches through `WorldMove.moveObject`, `objectMover`, `src/engine/dsa/ops/move.ts:519-526`);
-- `unchangedRoom` is always false, where `MoveObject` passes whether the party stands there
-  (`Code11f52.cpp:3314-3328`, `:3458-3473`), so floor actuators of types 1 and 2 fire under
-  the party where CSBWin's do not;
-- the pads run before the object is in the cell, with the copy's new corner already set;
-- a monster group added on the party's level gets neither `AttachItem16ToMonster` nor
-  `StartMonsterMovementTimers` (`Code11f52.cpp:3410`, `:3439`) and stands inert;
-- `CopyItem`'s refusal when `d.ITEM16QueLen >= d.MaxITEM16 - 5` on the party's level
-  (`DSA.cpp:1867`) is missing.
-
-Conflux has some 32 `&ADD`, 42 indirect `&ADD`, 26 `&DEL` and 42 indirect `&DEL` sites;
-which of them meet a pit, a teleporter, the party's square or a monster is not traced.
-
-Paying it: both through the world `MoveObject` (`objectMover()`, as `findCellSource` and
-`findCellDestination` do, in `src/engine/dsa/ops/move.ts`), then `setPos`; a tool with a pit, a teleporter, the party's
-square, and a monster group added on the party's level.
-
 ### C186 ⏳ A decoration's position set past its rectangles' table is not drawn
 
 A floor decoration is drawn in `d.floorDecorDesc[set][relativeCell]`
@@ -599,6 +574,35 @@ Paying it: the shrunk picture kept in the `GraphicsStore` under
 `pI12.word2 + graphicNumFBSAE`, the non-alternate's `graphicNumFBSAE` starting at
 `word2` as CSBWin's does; a check that draws a monster far on one level, then on a
 level whose scheme for its colour differs, and finds the first level's colours.
+
+### C191 ⏳ `CreateMonster`'s full ITEM16 pool refuses a group off the party's level
+
+`CreateMonster` calls `EnsureItem16Available` and returns `RNnul` while
+`d.ITEM16QueLen >= d.MaxITEM16-5 && d.LoadedLevel == d.partyLevel`
+(`doc/CSBwin-src/Monster.cpp:111-136`, `:83-100`); its whole body reads `d.LoadedLevel`,
+the level its caller loaded, which the port passes as `options.level`. The port's
+`createMonster` asks `ensureItem16Available()` and `isItem16PoolFull()` with no level
+(`src/engine/MonsterSystem.ts:769-770`), so they read the party's level as loaded, and a
+generator off the party's level is refused too while the pool is full. Reaching it takes
+235 groups with an ITEM16 on the party's level.
+
+Paying it: both calls given `options.level`, as `CopyItem` gives them the DSA's level
+(`src/engine/dsa/ops/objects.ts`); a check that fills the pool and makes a group on
+another level.
+
+### C192 ⏳ `&MOVE` sets an object's corner before `MoveObject`, where CSBWin sets it after
+
+`FindCellDestination` calls `MoveObject(object, -1, 0, x, y)` and then `object.pos(p)`
+(`doc/CSBwin-src/MoveObject.cpp:531-538`), so the object lies in corner `p` wherever the
+move took it. The port sets `p` first (`findCellDestination`,
+`src/engine/dsa/ops/move.ts:437`), and `WorldMove.moveObject` then sets the corner the
+move resolved (`resolveCellEffects`): an object `&MOVE`d onto stairs, which turn it
+(`Code11f52.cpp:3159-3165`), ends in the turned corner, not `p`. The re-linking after the
+move (`:470-473`) is dead, the ID being the same object before and after `setPos`.
+
+Paying it: `setPos(object, p)` after `moveObject`, as `&ADD` does
+(`src/engine/dsa/ops/objects.ts`), the dead branch removed; a check that `&MOVE`s an
+object onto stairs.
 
 ### C150 ⏸️ Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops
 

@@ -14,6 +14,8 @@ import { getActuatorType, isActuatorAudible, isActuatorOnceOnly } from '../../..
 import type { CreatureRecord } from '../../../data/dungeonTypes';
 import { monsterHorizontalSize, type MonsterDesc } from '../../../data/tables/MonsterDesc';
 import type { Champion } from '../../gameTypes';
+import type { MonsterSystem } from '../../MonsterSystem';
+import type { WorldMove } from '../../WorldMove';
 import { GetBasicObjectType } from '../../objectIndex';
 import { CursorFilterType, StkOp } from '../DsaTypes';
 import type { DsaBank } from '../DsaMachine';
@@ -135,7 +137,27 @@ export function detachedGroupIndex(monsterDesc: ArrayLike<MonsterDesc>, monster:
   return desc && monsterHorizontalSize(desc) === 2 ? 0xff : 0xd8;
 }
 
-function copyItem(machine: DsaOperationMachine, objectId: number): ObjectID | null {
+/**
+ * The two halves of CSBWin's low-level `MoveObject` (`doc/CSBwin-src/Code11f52.cpp:2831`)
+ * a DSA cell move, `&ADD` and `&DEL` go through: `WorldMove.moveObject`, and its monster
+ * branch, `MonsterSystem.moveMonster`.
+ */
+export function objectMover(machine: DsaOperationMachine): { moveObject: WorldMove['moveObject']; moveMonster: MonsterSystem['moveMonster'] } {
+  const { worldMove, monsters } = machine.ctx.systems;
+  return {
+    moveObject: (object, oldX, oldY, newX, newY, level) => worldMove.moveObject(object, oldX, oldY, newX, newY, level),
+    moveMonster: (monster, oldX, oldY, newX, newY, level, cornerAfter) =>
+      monsters.moveMonster(monster, oldX, oldY, newX, newY, level, cornerAfter),
+  };
+}
+
+/**
+ * `CopyItem` (`doc/CSBwin-src/DSA.cpp:1761-1946`): a copy of the record, from a free entry
+ * of its database, or null. A monster group is not copied while the ITEM16 pool is full
+ * and `loadedLevel`, the level the DSA runs on (`d.LoadedLevel`, the timer's), is the
+ * party's (`:1866-1868`).
+ */
+function copyItem(machine: DsaOperationMachine, objectId: number, loadedLevel: number): ObjectID | null {
   const { ctx } = machine;
   const dungeon = ctx.dungeon;
   if (!machine.isValidObjectId(objectId)) return null;
@@ -173,9 +195,12 @@ function copyItem(machine: DsaOperationMachine, objectId: number): ObjectID | nu
       return placed(dungeon.findEmptyDBEntry('potions', { ...rec, nextObject: OBJECT_ID_EOF }, true));
     }
     case DBType.CREATURE: {
+      const monsters = ctx.systems.monsters;
+      monsters.ensureItem16Available(loadedLevel);
+      if (monsters.isItem16PoolFull(loadedLevel)) return null;
       const rec = data.databases.creatures.records[index];
       if (!rec) return null;
-      const copiedPossessions = copyItemList(machine, rec.possession);
+      const copiedPossessions = copyItemList(machine, rec.possession, loadedLevel);
       // The copy must not inherit the original's ITEM16 slot. CSBWin parks it at
       // 0xd8, or 0xff for a monster that fills the whole cell, so that every
       // `groupIndex() < d.MaxITEM16` test reads it as unattached
@@ -195,12 +220,12 @@ function copyItem(machine: DsaOperationMachine, objectId: number): ObjectID | nu
   }
 }
 
-function copyItemList(machine: DsaOperationMachine, head: ObjectID): ObjectID {
+function copyItemList(machine: DsaOperationMachine, head: ObjectID, loadedLevel: number): ObjectID {
   const dungeon = machine.ctx.dungeon;
   let result = OBJECT_ID_EOF;
   let last = OBJECT_ID_EOF;
   for (let rn = head; rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL; rn = dungeon.getDBRecordLink(rn)) {
-    const copied = copyItem(machine, rn);
+    const copied = copyItem(machine, rn, loadedLevel);
     if (copied === null) return OBJECT_ID_EOF;
     if (result === OBJECT_ID_EOF) {
       result = copied;
@@ -538,14 +563,14 @@ export const objectOperations: ReadonlyMap<StkOp, DsaOperation> = new Map<StkOp,
       if (!machine.isValidObjectId(objId) || !rnEquals(rn, objId)) continue;
       const { category } = dungeon.rnMaps.decode(rn);
       if (!canDeleteFromCell(category)) break;
-      dungeon.removeObjectFromCell(pos, rn);
-      ctx.systems.actuators.triggerObjectMove(pos, rn, false, false, ctx.party.state.facing);
+      // `MoveObject(thisObj, x, y, -1, 0)` on the square's level (`DSA.cpp:1700-1704`).
+      objectMover(machine).moveObject(rn, pos.x, pos.y, -1, 0, pos.z);
       deleteLinkedScrollText(machine, rn, bank);
       deleteObject(machine, bank, rn);
       break;
     }
   }],
-  [StkOp.ADD, (bank, _exPkt, machine) => {
+  [StkOp.ADD, (bank, exPkt, machine) => {
     const { ctx } = machine;
     const dungeon = ctx.dungeon;
     const objId = bank.stack.pop();
@@ -554,16 +579,22 @@ export const objectOperations: ReadonlyMap<StkOp, DsaOperation> = new Map<StkOp,
     bank.noFilter();
     if (!canAddToLocation(machine, location)) return;
     if (!machine.isValidObjectId(objId)) return;
-    const cloned = copyItem(machine, objId);
+    const cloned = copyItem(machine, objId, exPkt.locrSlave.l);
     bank.mostRecentInterestingObjectID = cloned ?? OBJECT_ID_EOF;
     if (cloned === null) return;
     if (location >= 0) {
       const locr = locationRelFromInteger(location);
       if (!dungeon.isValidLocation(locr)) return;
       const pos = choosePositionFromMask(ctx.random, posMask);
-      const placed = dungeon.rnMaps.setPos(cloned, pos);
-      ctx.systems.actuators.triggerObjectMove(new Position(locr.x, locr.y, locr.l), placed, true, false, ctx.party.state.facing);
-      dungeon.addObjectToCell(new Position(locr.x, locr.y, locr.l), placed);
+      // `MoveObject(newObj, -1, 0, x, y)` on the square's level, then `newObj.pos(p)`
+      // (`DSA.cpp:2055-2059`): the pads see the copy's corner, and it lies in corner `p`.
+      const mover = objectMover(machine);
+      if (dungeon.rnMaps.dbType(cloned) === DBType.CREATURE) {
+        mover.moveMonster(cloned, -1, 0, locr.x, locr.y, locr.l, pos);
+      } else {
+        mover.moveObject(cloned, -1, 0, locr.x, locr.y, locr.l);
+        dungeon.rnMaps.setPos(cloned, pos);
+      }
     } else if (location === -1) {
       const party = ctx.party.state;
       if (!party) return;

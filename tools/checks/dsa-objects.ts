@@ -126,7 +126,9 @@ check(dungeon.getWeaponRecord(weapon)?.charges === 14 && dungeon.getPotionRecord
 
 {
   const records = base.ctx.dungeon.getData().databases;
-  const creature = records.creatures.records.findIndex((r) => r.nextObject !== OBJECT_ID_NULL && r.hp.length > 0);
+  // A group the party's level allows: `MoveObject` deletes one set down where its type may not live.
+  const creature = records.creatures.records.findIndex((r) => r.nextObject !== OBJECT_ID_NULL && r.hp.length > 0
+    && base.ctx.dungeon.monsterAllowedOnLevel(r.creatureType, base.ctx.party.state.position.z));
   const group = base.ctx.dungeon.rnMaps.rn(DBType.CREATURE, creature);
   const added = run((_game, at) => [...int(0), ...int(locationRelToInteger({ l: at.z, x: at.x, y: at.y, p: 0 })), ...int(group), op(StkOp.ADD)]);
   const copy = added.game.ctx.dungeon.getCreatureRecord(added.game.ctx.dungeon.findFirstMonster(added.at));

@@ -125,6 +125,7 @@ const CHECKS = [
   { tool: 'local-action.ts' },
   { tool: 'does-party-have.ts' },
   { tool: 'dsa-move.ts' },
+  { tool: 'dsa-add-delete.ts' },
   { tool: 'dsa-delete.ts' },
   { tool: 'dsa-census.ts' },
   { tool: 'map-cell-info.ts' },
