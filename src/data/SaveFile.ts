@@ -621,7 +621,7 @@ export function encodeTimers(records: readonly TimerRecord[], timerSize: 10 | 12
       // Allocate` memsets a new slot to 0 (`doc/CSBwin-src/Timer.cpp:678-683`), but
       // `SetTimer` then fills the slot with `memcpy(A0, A1, sizeof(TIMER))` from a
       // stack `TIMER` whose constructor sets every trailing byte to **0xcd**
-      // (`doc/CSBwin-src/CSB.h:1868-1879`, `Timer.cpp:1132`). So a slot that has ever
+      // (`doc/CSBwin-src/CSB.h:1868-1879`, `Timer.cpp:1133`). So a slot that has ever
       // held a timer carries 0xcd there and one that never has carries 0 — measured on
       // all eight committed saves, with no third value.
       //

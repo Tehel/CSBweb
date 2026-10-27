@@ -122,6 +122,7 @@ In payoff order: the first row is the next item.
 | C173 | The DSA's `&ADD` and `&DEL` on a square bypass `MoveObject` | M | ⏳ |
 | C186 | A decoration's position set past its rectangles' table is not drawn | S | ⏳ |
 | C187 | The adjust skills filter hands each DSA the one before's words unmasked, and its `why` | S | ⏳ |
+| C188 | A new timer's unused bytes are 0, where CSBWin's are 0xcd | S | ⏳ |
 | F15 | Tools that read the wall clock, and a runner with no timeout | S | ⏳ |
 | F16 | A tool can pass having checked less than it says | S | ⏳ |
 | F18 | One `tsconfig` for the browser, the tools and the server | S | ⏳ |
@@ -149,7 +150,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C188 · D22 · E42 · F22 · G31 · P13 · R17 · U13 · W8 · X18. An ID recorded and paid in one commit has no
+Next free IDs: C189 · D22 · E42 · F22 · G31 · P13 · R17 · U13 · W8 · X18. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -685,6 +686,22 @@ adjust-skills DSAs, nor one that answers a negative skill.
 Paying it: the three masks, `%` as C's, in the codec's `fromWords`, `why` not read back,
 and `adjustSkills` taking the masked values as they are; a check with two DSAs at the
 location, the first changing all four words, and one answering skill -1.
+
+### C188 ⏳ A new timer's unused bytes are 0, where CSBWin's are 0xcd
+
+CSBWin fills a timer on the stack, whose constructor sets bytes 5 to 9, the sequence, the
+level and the padding to 0xcd (`doc/CSBwin-src/CSB.h:1868-1879`), sets the fields that
+timer uses and copies it into its slot (`SetTimer`, `Timer.cpp:1133`): a byte it does not
+use stays 0xcd. `PoisonCharacter`'s `TT_75` sets byte 5, the time, the level and
+`timerWord6`, bytes 6-7 (`CSB.h:2104-2107`), and leaves bytes 8 and 9
+(`doc/CSBwin-src/CSBCode.cpp:7287-7294`). The port's `TimerQueue.createTimer` gives every
+byte left out 0, so a save of the port's carries 0 there where CSBWin's carries 0xcd.
+Nothing reads those bytes, in either program; a timer read from a save keeps what the
+file holds.
+
+Paying it: which bytes each of CSBWin's `SetTimer` callers leaves, read caller by caller,
+and `createTimer` giving a byte left out 0xcd only if every one of them does; a check of a
+port-made `TT_75` written by `buildSaveFile`, against the bytes CSBWin's constructor leaves.
 
 ### C150 ⏸️ Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops
 

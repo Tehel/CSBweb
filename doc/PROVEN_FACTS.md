@@ -3561,8 +3561,9 @@ Two places put bytes there:
 - `SetTimer` fills a slot with `memcpy(A0, A1, sizeof(TIMER))` (`:1133`) from the
   caller's `TIMER`, whose constructor assigns **0xcd** to `m_timerSequence`, the five
   `m_timerUByteN`, `m_timerLevel` and all three of `unused13`
-  (`doc/CSBwin-src/CSB.h:1868-1879`). Every other one of those is overwritten before the
-  copy; `unused13` is not.
+  (`doc/CSBwin-src/CSB.h:1868-1879`). A caller sets the fields its timer uses before the
+  copy, and `unused13` never; a byte its timer does not use stays 0xcd too, such as bytes
+  8 and 9 of `PoisonCharacter`'s `TT_75` (`doc/CSBwin-src/CSBCode.cpp:7287-7294`).
 
 So the field is a high-water mark of slot allocation: 0xcd below the highest slot the
 game has ever taken, 0 above it. Measured on the eight committed saves, which all carry
