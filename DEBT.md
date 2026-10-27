@@ -127,7 +127,7 @@ In payoff order: the first row is the next item.
 | F15 | Tools that read the wall clock, and a runner with no timeout | S | ⏳ |
 | F16 | A tool can pass having checked less than it says | S | ⏳ |
 | F18 | One `tsconfig` for the browser, the tools and the server | S | ⏳ |
-| F19 | The tools' screen is wired by hand, and has drifted | S | ⏳ with E29 |
+| F19 | The tools' screen draws without the game's state, rules and CSB graphics | S | ⏳ |
 | F17 | The frame pipeline and the runner are untyped | M | ⏳ |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
@@ -419,31 +419,25 @@ against each other, and the file formats.
 `GameScreen` (919 lines, 71 methods, about 50 of them one- or two-line forwarders into
 `ui/`) is the canvas's output (`putImageData`), the order of the compose, the palettes'
 choice, and a façade over the UI and the boot (`getScreenBuffer`, `doMenu`,
-`setBootFrameRenderer`). It needs an `HTMLCanvasElement`, so no tool can build one,
-`tools/lib/ui.ts` copies its wiring (F19), and four dialog tools hand `GameInput` a stub
-cast `as unknown as GameScreen`.
+`setBootFrameRenderer`). It needs an `HTMLCanvasElement`, so no tool can build one: four
+dialog tools hand `GameInput` a stub cast `as unknown as GameScreen`.
 
 The steps left, each a commit that changes no behaviour (every tool's whole output, and
 `npm test -- --frames`):
 
-1. **One factory for the viewport and the interface** (S). One function in
-   `src/renderer/` builds the `ViewportRenderer`, the graphic cache and the `UIState` from
-   the screen's deps and hooks; `GameScreen` and `tools/lib/ui.ts` both call it. The tools
-   still pass no `gameState`, `rules` or `csbGraphicsLoader`, so no output moves: passing
-   them is F19, a commit of its own.
-2. **A `ScreenComposer` without the DOM** (M). The screen's index buffer, the interface
+1. **A `ScreenComposer` without the DOM** (M). The screen's index buffer, the interface
    palette, the overlay table, `PresentedFrame`, the left-handed layout,
    `presentViewport`'s order, `presentScreen`, `renderLastFrame` and the boot's frame
    renderer, writing into an RGBA buffer of `ImageData`'s shape; `GameScreen` keeps the
    canvas and puts each composed frame on it. The dialog tools' stubs become a screen
    over a real composer where they need one.
-3. **The host's drawing written once** (S). `GameHost`'s drawing half
+2. **The host's drawing written once** (S). `GameHost`'s drawing half
    (`showHideInventory`, `tag02076e`, `tag0207cc`, `savedGameRead`, `tag01b1c0`,
    `drawLegalAttackTypes`, `flashAttackDamage`, `attackFlashHeld`, `releaseEyeOrMouth`,
    `displayCharacterDamage`, `tag011366`, `drawCharacterState`, `portraitOf`) is one
    function over a `UIState` calling `ui/` directly, which `main.ts` and `tools/lib/ui.ts`
    both use; the screen's forwarders for them go.
-4. **The boot's façade** (S). `BootSequence` and `EndOfGame` reach the composer and `ui/`
+3. **The boot's façade** (S). `BootSequence` and `EndOfGame` reach the composer and `ui/`
    directly (`getScreenBuffer`, `getFontData`, `getBitmap`, `doMenu`, `menuButtonList`,
    `drawMenuPress`, `drawDialogOnly`, `getUITables`, `championPortrait`); the screen's
    forwarders for them go.
@@ -455,7 +449,8 @@ screen: they are E30's, whose one input router is where they go. What is left on
 `setUIMode`, `initializePlayState` and the pointer's state.
 
 Where it stands: the page's hooks are spread once (`GameScreenHooks` is `UIHooks` less the
-screen's own two); the four steps above are left.
+screen's own two), and the screen and the tools build the interface and its viewport through
+one factory (`createScreenUI`, `src/renderer/ScreenUI.ts`); the three steps above are left.
 
 ### E30 ⏳ One presenter and one input router
 
@@ -831,16 +826,17 @@ Paying it: the server on `module` and `moduleResolution` `"nodenext"`, an ES `li
 Node's types; `src/` without Node's; `checks/server` running the server from a scratch
 folder laid out as the image is.
 
-### F19 ⏳ The tools' screen is wired by hand, and has drifted
+### F19 ⏳ The tools' screen draws without the game's state, rules and CSB graphics
 
-`tools/lib/ui.ts:23-36` builds the `ViewportRenderer` as `GameScreen`'s constructor does
-(`src/renderer/GameScreen.ts:182-197`), without `gameState`, `rules` and
-`csbGraphicsLoader`. So a view a tool draws has `invisibleMonsters` and
-`drawAsSize4Monsters` off whatever the dungeon says, no `d.Time` for the magic footprints,
-and no CSB graphics.
+`tools/lib/ui.ts`'s `newUIState` builds the interface and its viewport through the
+screen's own factory (`createScreenUI`, `src/renderer/ScreenUI.ts`), but passes it no
+`gameState`, `rules` or `csbGraphicsLoader`, which `GameScreen` passes. So a view a tool
+draws has `invisibleMonsters` and `drawAsSize4Monsters` off whatever the dungeon says, no
+`d.Time` for the magic footprints, and no CSB graphics.
 
-Paying it: one factory for both (E29's step 1); the tools whose output then changes checked against
-what the page draws.
+Paying it: the factory takes the state and the rules from `ctx` itself, and the tools pass
+their CSB graphics where they have them; the tools whose output then changes checked
+against what the page draws.
 
 ### F21 ⏳ 3D2D1D's walkthrough is not replayed through `Game`
 

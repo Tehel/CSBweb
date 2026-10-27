@@ -32,7 +32,7 @@ import { die } from '../engine/Die';
 import type { GraphicsTables } from '../data/tables/GraphicsTables';
 import type { UIButton, UITables } from '../data/tables/UITables';
 import { flashedButton } from '../engine/LoopState';
-import { loadFontData, type FontData } from './csbwin/TextRenderer';
+import type { FontData } from './csbwin/TextRenderer';
 import { ImageFormat } from '../core/imageDecoder';
 import {
   VIEWPORT_WIDTH,
@@ -44,9 +44,10 @@ import {
   getCachedGraphicBitmap,
 } from './ViewportGraphics';
 import { Position } from '../core/types';
-import { ViewportRenderer } from './ViewportRenderer';
+import type { ViewportRenderer } from './ViewportRenderer';
+import { createScreenUI } from './ScreenUI';
 import { LEFT_HANDED_VIEWPORT, leftHandedLayout, leftHandedX, makeLeftHanded, rightHandedX, type LeftHandedLayout } from './LeftHanded';
-import { createUIState, initializePlayState, savedGameRead, UIMode, type ScreenIndexBuffer, type UIHooks, type UIState } from './ui/UIState';
+import { initializePlayState, savedGameRead, UIMode, type ScreenIndexBuffer, type UIHooks, type UIState } from './ui/UIState';
 import { drawStaticUIFrame } from './ui/Draw';
 import {
   drawCursorItem,
@@ -169,41 +170,25 @@ export class GameScreen {
     this.screenCtx = screenCtx;
     this.screenImageData = screenCtx.createImageData(SCREEN_WIDTH, SCREEN_HEIGHT);
 
-    const palette552 = deps.tables.ui.graphic232.palette552;
-    const graphicCache = new Map<string, IndexedBitmap>();
-    this.viewport = new ViewportRenderer({
-      graphicsLoader,
-      dungeonState: deps.ctx.dungeon,
-      footprints: deps.ctx.footprints,
-      gameState: deps.ctx.state,
-      rules: deps.ctx.rules,
-      csbGraphicsLoader: deps.csbGraphicsLoader,
-      viewportTables: deps.tables.viewport,
-      objectTables: deps.tables.objects,
-      palette552,
-      graphicCache,
-      getGraphicBitmap: (graphicNum) => this.getGraphicBitmap(graphicNum),
-      trace: (line) => deps.ctx.host.trace(line),
-    });
-    this.uiPalette = palette552[0]!.slice();
+    this.uiPalette = deps.tables.ui.graphic232.palette552[0]!.slice();
     this.screen = createPaletteIndexViewportBuffer(SCREEN_WIDTH, SCREEN_HEIGHT, 0);
 
-    const ui = createUIState({
+    const { ui, viewport } = createScreenUI({
       graphicsLoader,
+      tables: deps.tables,
       ctx: deps.ctx,
-      viewport: this.viewport.buffer,
-      csbGraphics: deps.csbGraphicsLoader,
-      screenIndexBuffer: this.screen,
-      uiTables: deps.tables.ui,
-      objectTables: this.viewport.objectTables,
-      fontData: loadFontData(graphicsLoader),
-      graphicCache,
+      screen: this.screen,
+      csbGraphicsLoader: deps.csbGraphicsLoader,
+      gameState: deps.ctx.state,
+      rules: deps.ctx.rules,
+      hintOracle: deps.hintOracle,
+      trace: (line) => deps.ctx.host.trace(line),
     }, {
       ...hooks,
       getGraphicBitmap: (graphicNum, format) => this.getGraphicBitmap(graphicNum, format),
       renderLastFrame: () => this.renderLastFrame(),
     });
-    ui.hintOracle = deps.hintOracle ?? null;
+    this.viewport = viewport;
     this.ui = ui;
     updateButtonLists(ui);
   }

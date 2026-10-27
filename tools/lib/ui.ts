@@ -1,9 +1,10 @@
 /**
- * How a tool builds the interface's state: whole, as `GameScreen` builds it.
+ * How a tool builds the interface's state: whole, through `GameScreen`'s own factory
+ * (`createScreenUI`).
  *
- * `newUIState` hands `createUIState` the game's tables and font from `graphics`, a blank
- * 320x200 screen, and the viewport of a `ViewportRenderer` over `ctx` that has drawn no
- * view yet, with the empty picking the screen has before its first frame. A tool replaces
+ * `newUIState` hands it the game's tables from `graphics`, a blank 320x200 screen, and
+ * no game state, design options or CSB graphics for the viewport (F19), which has drawn
+ * no view yet, with the empty picking the screen has before its first frame. A tool replaces
  * the screen, the viewport or the picking afterwards to draw into a buffer of its own or
  * to stage a view. The hooks do nothing unless the tool passes its
  * own; the save/load screen lists no save, and `onReadSave`, `onMakeNewAdventure`,
@@ -21,8 +22,7 @@
 import type { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import type { GameContext } from '../../src/engine/GameContext';
 import { NO_FULLSCREEN } from '../../src/lib/fullscreen';
-import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../../src/renderer/csbwin/CanvasBlitter';
-import { loadFontData } from '../../src/renderer/csbwin/TextRenderer';
+import { createPaletteIndexViewportBuffer } from '../../src/renderer/csbwin/CanvasBlitter';
 import { Settings } from '../../src/settings/Settings';
 import {
   attackFlashHeld, drawLegalAttackTypesDrawing, flashAttackDamageDrawing, tag01b1c0Drawing,
@@ -30,35 +30,20 @@ import {
 import {
   releaseEyeOrMouthDrawing, showHideInventoryDrawing, tag02076eDrawing, tag0207ccDrawing,
 } from '../../src/renderer/ui/Mouse';
-import { createUIState, savedGameRead as savedGameReadOnScreen, type UIHooks, type UIState } from '../../src/renderer/ui/UIState';
+import { savedGameRead as savedGameReadOnScreen, type UIHooks, type UIState } from '../../src/renderer/ui/UIState';
+import { createScreenUI } from '../../src/renderer/ScreenUI';
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../../src/renderer/ViewportGraphics';
-import { ViewportRenderer } from '../../src/renderer/ViewportRenderer';
 import { graphicsTablesOf } from './game';
 
 export function newUIState(graphics: GraphicsLoader, ctx: GameContext, hooks: Partial<UIHooks> = {}): UIState {
   const tables = graphicsTablesOf(graphics);
   const getGraphicBitmap = hooks.getGraphicBitmap ?? (() => null);
-  const graphicCache = new Map<string, IndexedBitmap>();
-  const viewport = new ViewportRenderer({
+  const { ui } = createScreenUI({
     graphicsLoader: graphics,
-    dungeonState: ctx.dungeon,
-    footprints: ctx.footprints,
-    viewportTables: tables.viewport,
-    objectTables: tables.objects,
-    palette552: tables.ui.graphic232.palette552,
-    graphicCache,
-    getGraphicBitmap: (graphicNum) => getGraphicBitmap(graphicNum),
-    trace: (line) => console.log(line),
-  });
-  const ui = createUIState({
-    graphicsLoader: graphics,
+    tables,
     ctx,
-    viewport: viewport.buffer,
-    screenIndexBuffer: createPaletteIndexViewportBuffer(SCREEN_WIDTH, SCREEN_HEIGHT, 0),
-    uiTables: tables.ui,
-    objectTables: tables.objects,
-    fontData: loadFontData(graphics),
-    graphicCache,
+    screen: createPaletteIndexViewportBuffer(SCREEN_WIDTH, SCREEN_HEIGHT, 0),
+    trace: (line) => console.log(line),
   }, {
     renderLastFrame: () => {},
     onReincarnated: () => {},
