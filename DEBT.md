@@ -116,7 +116,7 @@ In payoff order: the first row is the next item.
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
 | C186 | A decoration's position set past its rectangles' table is not drawn | S | ⏳ |
-| C188 | A new timer's unused bytes are 0, where CSBWin's are 0xcd | S | ⏳ |
+| C188 | A new timer's unused bytes are 0, where CSBWin's are 0xcd | M | ⏳ |
 | C189 | A distant monster is shrunk again at every frame, where CSBWin keeps it across levels | S | ⏳ |
 | F15 | Tools that read the wall clock, and a runner with no timeout | S | ⏳ |
 | F16 | A tool can pass having checked less than it says | S | ⏳ |
@@ -527,7 +527,8 @@ byte left out 0, so a save of the port's carries 0 there where CSBWin's carries 
 Nothing reads those bytes, in either program; a timer read from a save keeps what the
 file holds.
 
-Paying it: which bytes each of CSBWin's `SetTimer` callers leaves, read caller by caller,
+Paying it: which bytes each of CSBWin's `SetTimer` callers leaves, read caller by caller
+(47 calls, in eleven files, against the port's 37 `createTimer` and `addTimer` callers),
 and `createTimer` giving a byte left out 0xcd only if every one of them does; a check of a
 port-made `TT_75` written by `buildSaveFile`, against the bytes CSBWin's constructor leaves.
 
