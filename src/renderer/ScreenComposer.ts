@@ -113,8 +113,6 @@ export class ScreenComposer {
       ctx: deps.ctx,
       screen: this.screen,
       csbGraphicsLoader: deps.csbGraphicsLoader,
-      gameState: deps.ctx.state,
-      rules: deps.ctx.rules,
       hintOracle: deps.hintOracle,
       trace: (line) => deps.ctx.host.trace(line),
     }, {

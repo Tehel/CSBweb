@@ -3,8 +3,10 @@
  * (`createScreenUI`).
  *
  * `newUIState` hands it the game's tables from `graphics`, a blank 320x200 screen, and
- * no game state, design options or CSB graphics for the viewport (F19), which has drawn
- * no view yet, with the empty picking the screen has before its first frame. A tool replaces
+ * no CSB graphics; the viewport draws by `ctx`'s state and rules, as the page's does, and
+ * has drawn no view yet, with the empty picking the screen has before its first frame. A
+ * tool with a `CSBgraphics.dat` sets `ui.csbGraphics` (`checks/portraits.ts`); one that
+ * draws a skin builds a `ViewportRenderer` of its own (`checks/skin-programs.ts`). A tool replaces
  * the screen, the viewport or the picking afterwards to draw into a buffer of its own or
  * to stage a view. The hooks do nothing unless the tool passes its
  * own; the save/load screen lists no save, and `onReadSave`, `onMakeNewAdventure`,

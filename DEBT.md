@@ -115,7 +115,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| F19 | The tools' screen draws without the game's state, rules and CSB graphics | S | ⏳ |
 | F17 | The frame pipeline and the runner are untyped | M | ⏳ |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
@@ -527,18 +526,6 @@ The root `tsconfig.json` includes `src` and `tools` and checks no `.mjs`: `run-c
 Paying it: the scripts as `.ts` (Node runs them since 22.18, as it runs the server), under
 `tsc` with `vite.config.mts`; one PNG module; `buildParty` a typed function the probe
 serialises.
-
-### F19 ⏳ The tools' screen draws without the game's state, rules and CSB graphics
-
-`tools/lib/ui.ts`'s `newUIState` builds the interface and its viewport through the
-screen's own factory (`createScreenUI`, `src/renderer/ScreenUI.ts`), but passes it no
-`gameState`, `rules` or `csbGraphicsLoader`, which `GameScreen` passes. So a view a tool
-draws has `invisibleMonsters` and `drawAsSize4Monsters` off whatever the dungeon says, no
-`d.Time` for the magic footprints, and no CSB graphics.
-
-Paying it: the factory takes the state and the rules from `ctx` itself, and the tools pass
-their CSB graphics where they have them; the tools whose output then changes checked
-against what the page draws.
 
 ### F21 ⏳ 3D2D1D's walkthrough is not replayed through `Game`
 
