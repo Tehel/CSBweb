@@ -3873,7 +3873,7 @@ async function checkUpgrade(): Promise<void> {
     `from version ${ROWS_UPGRADED_VERSION} on, none: a file imported since is left as it is (doc/SAVES.md)`);
 
   // Then every row's file goes to a store of its own (`splitSaveRecord`), the IndexedDB
-  // half of which `tools/probe-frames.mjs` checks in a browser.
+  // half of which `tools/probe-frames.ts` checks in a browser.
   const upgraded = upgradeStoredRows(later, 2, STOCK_DATA_SET.id, drawFrom(SEED));
   const split = upgraded.map(splitSaveRecord);
   console.log(`  split: ${split.map(({ entry, file }) => `${entry.id} (${Object.keys(entry).join(' ')}), ${file.id} ${file.bytes.byteLength} bytes`).join('; ')}`);

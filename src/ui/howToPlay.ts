@@ -17,8 +17,8 @@
  *
  * The sheet prints on one landscape A4 page (`@media print`, `welcomePage.css`), and the
  * dialog offers it made: a PDF and a PNG for each preset and each layout of the labels,
- * which `tools/gen-help-sheet.mjs` writes from this page into `src/assets/how-to-play/`,
- * with the text of each sheet in `sheets.json` there, which `tools/probe-frames.mjs`
+ * which `tools/gen-help-sheet.ts` writes from this page into `src/assets/how-to-play/`,
+ * with the text of each sheet in `sheets.json` there, which `tools/probe-frames.ts`
  * holds the page's sheet to, so a sheet changed without its files made again fails.
  */
 import type { Settings } from '../settings/Settings';

@@ -1,11 +1,13 @@
 {
-  // The tools, as Node runs them through tsx: Node 24's library and types beside the DOM's,
-  // which the page's modules they stand up name. Not held to `noUncheckedIndexedAccess`.
+  // The tools, as Node runs them, through tsx or, for the drivers and the runner, types
+  // stripped: Node 24's library and types beside the DOM's, which the page's modules they
+  // stand up name, and the page's Vite declarations, for the probe handle's type
+  // (`src/main.ts`, `lib/buildParty.ts`). Not held to `noUncheckedIndexedAccess`.
   "extends": "../tsconfig.json",
   "compilerOptions": {
     "lib": ["ES2024", "DOM", "DOM.Iterable"],
     "types": ["node"],
     "noUncheckedIndexedAccess": false
   },
-  "include": ["."]
+  "include": [".", "../src/vite-env.d.ts"]
 }

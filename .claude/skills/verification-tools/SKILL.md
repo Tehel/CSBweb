@@ -35,7 +35,7 @@ a change works is `tsc` passing, there is no evidence.
    they are already up), so there is nothing to set up. Always run it for a renderer
    or UI change.
 
-A tool is in the suite because it is listed in `tools/run-checks.mjs`. **Add yours to
+A tool is in the suite because it is listed in `tools/run-checks.ts`. **Add yours to
 that list**, with the arguments the assertions were written for — several tools take a
 level, and the wrong level activates no monsters and quietly checks nothing.
 
@@ -62,7 +62,7 @@ line that overwrote two earlier failures. A tool that cannot fail is not evidenc
 ## Shape
 
 Every tool lives in `tools/checks/`, named for what it checks, and runs with
-`npm test -- --only=<name>.ts [args]` once it is listed in `run-checks.mjs`: the runner
+`npm test -- --only=<name>.ts [args]` once it is listed in `run-checks.ts`: the runner
 checks the types first, prints the tool's whole output, and hands it the arguments. An
 `--only` that is a tool's whole name picks that tool alone, so `room-text.ts` is not also
 `open-room-text.ts`. `npx tsx tools/checks/<name>.ts` runs a tool with type errors in it,
@@ -202,7 +202,7 @@ unseeded run is not a test, and it spoils the refactor check below (`DEBT.md` F4
 
 **A refactor is proven by diffing every tool's whole output, not only the verdicts.**
 Before a behaviour-neutral change, capture `npx tsx tools/checks/<t>.ts` for every tool in
-`run-checks.mjs` into a scratch directory; after it, capture again and `cmp` file by file.
+`run-checks.ts` into a scratch directory; after it, capture again and `cmp` file by file.
 A passing check can hide a changed number the check does not look at. Run a differing
 tool twice on the old tree (a `git worktree` of `HEAD` in the scratchpad, with
 `node_modules` and `tools/fixtures/gamefiles` symlinked in) to tell a real change from a tool that
@@ -225,7 +225,7 @@ take the freed object's slot, so read an RN's index when it is handed out, not a
 When the RNs themselves move in a refactor, diff a dump that decodes every RN through
 its world (each chain, record, possession and timer object) instead of the raw output.
 
-**Never perturb `Math.random` at construction time.** `tools/probe-frames.mjs`
+**Never perturb `Math.random` at construction time.** `tools/probe-frames.ts`
 overrides `Math.random` to make the golden frames reproducible; anything that draws
 from it during setup shifts every frame. `CsbRandom` seeds lazily for exactly this
 reason — keep it that way.

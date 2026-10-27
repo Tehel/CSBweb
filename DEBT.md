@@ -115,7 +115,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| F17 | The frame pipeline and the runner are untyped | M | ⏳ |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | E40 | The statistics page's heat map | M | ⏸️ |
@@ -188,7 +187,7 @@ those saves in one transaction (`BrowserDataSetStore.remove`). Its PUBLISH, enab
 the form shows the record as stored, sends it to the server (below), and the page then
 asks `api/data-sets` again.
 `tools/checks/local-data-set.ts` proves the check, the record and the census,
-`tools/probe-frames.mjs` drives the form, adding, editing, publishing and deleting a set.
+`tools/probe-frames.ts` drives the form, adding, editing, publishing and deleting a set.
 
 The server lists the site's sets from its store (`server/dataSets.ts`, `doc/DEPLOYMENT.md`
 → "The game files and the manifest"): each row approved or pending, with its owner's
@@ -222,7 +221,7 @@ edit as a form (`server/edit.ts`), and a change of files writes the set a new fo
 it too, replaying the changes made since it started over the store it makes at each
 request, and has one moderator, `DEV_MODERATOR_PLAYER_ID` (`vite.config.mts`), whom
 `tools/check-image.sh` makes the image's too. `tools/checks/server.ts` asserts every action,
-edit and refusal, and `tools/probe-frames.mjs` moderates and edits the set it publishes,
+edit and refusal, and `tools/probe-frames.ts` moderates and edits the set it publishes,
 from the tiles, as that moderator and as its owner.
 
 A published set's files can be taken away: the book on its tile offers them as one zip,
@@ -233,7 +232,7 @@ drive and removes one
 (`server/documents.ts`, `doc/DEPLOYMENT.md` → "A set's documents"). The store lists them in
 `data_set_documents`, and each change writes the set a new folder, as an edit of its files
 does. `tools/checks/server.ts` asserts each change and refusal, `tools/checks/data-set-archive.ts`
-the archive of every set, and `tools/probe-frames.mjs` downloads the archive, adds and
+the archive of every set, and `tools/probe-frames.ts` downloads the archive, adds and
 removes documents from the book, as the moderator, and reads them as the owner.
 
 The `<id>` is a folder's name (`LOCAL_ID_PATTERN`: lowercase letters, digits, `.`, `-` and
@@ -411,7 +410,7 @@ map, as designed with the author:
   none of the game's code (`tools/checks/build.ts`): the reader of a `dungeon.dat` it needs
   must stay out of the game's chunk, or the bound there be raised knowingly.
 
-Paying it: the heat map, checked in `tools/probe-frames.mjs`'s statistics block (a level
+Paying it: the heat map, checked in `tools/probe-frames.ts`'s statistics block (a level
 opens its map) and by a screenshot over the dev server's fortnight.
 
 ### E22 ⏸️ Fullscreen filled by a fraction
@@ -464,7 +463,7 @@ above all, and 4:3 on a screen of 1080 lines.
    size set inline on one canvas, or a class changed on one (`createCrtEffect` copies the
    class once), leaves the effect off the game canvas while the pointer, read from the
    game canvas's own rect (`canvasPoint`), stays right: a picture off its clicks.
-4. **The probe.** `tools/probe-frames.mjs` pins the whole multiple, centred, at 16:10 on a
+4. **The probe.** `tools/probe-frames.ts` pins the whole multiple, centred, at 16:10 on a
    1920x1080 and a 1366x768 screen, and at 4:3 on the 1366x768 one. A fill adds the same checks at a fraction:
    the effect's canvas over the game canvas exactly, and the pointer read through the
    curve.
@@ -512,20 +511,6 @@ in CSBWin 20230608, and if the game goes on there, ports what that binary draws.
 ## F — Verification debt
 
 New verification debt goes here; it can be taken anywhere ("Priority", point 5).
-
-### F17 ⏳ The frame pipeline and the runner are untyped
-
-The root `tsconfig.json` includes `src` and `tools` and checks no `.mjs`: `run-checks.mjs`,
-`probe-frames.mjs`, `probe-ui.mjs`, `compare-frames.mjs`, `lib/frames.mjs`, `lib/png.mjs` and
-`lib/buildParty.mjs`, 1,648 lines without `@ts-check`, nor `vite.config.mts`.
-`lib/buildParty.mjs:14-33` sends the page a string that calls the engine by name
-(`game.systems.hallOfChampions.resurrectReincarnateCancel(160)`,
-`game.systems.mouse.handleWallClick()`), so renaming either passes `npm test` and breaks only
-`--frames`. `lib/png.mjs` repeats `lib/png.ts`, because the drivers are plain Node scripts.
-
-Paying it: the scripts as `.ts` (Node runs them since 22.18, as it runs the server), under
-`tsc` with `vite.config.mts`; one PNG module; `buildParty` a typed function the probe
-serialises.
 
 ### F21 ⏳ 3D2D1D's walkthrough is not replayed through `Game`
 
@@ -889,7 +874,7 @@ Recorded so that nobody "fixes" them.
   (`src/renderer/csbwin/OverlayScreen.ts`), so while one is up the viewport and the panels
   show the same Atari colour up to 6 a channel apart. `tools/checks/overlay-screen.ts` prints
   both. To revisit when frames are compared with CSBWin's ("Priority", postponed):
-  the golden frames hold palette slots, not colours (`tools/lib/frames.mjs`), so RGB555
+  the golden frames hold palette slots, not colours (`tools/lib/frames.ts`), so RGB555
   on every screen would move none of them.
 - 🚫 **An object in hand keeps its colours over the dungeon view** (X4). CSBWin draws the
   cursor rows from screen row 29 down as the object's colour-4 silhouette while the view
@@ -1094,7 +1079,7 @@ Recorded so that nobody "fixes" them.
   animation from `graphics.dat`; the entrance is then the first screen.
 - 🚫 **`?intro=0` skips the whole intro**: the logo, the title animation and the
   entrance. This is a developer affordance with no CSBWin counterpart, kept deliberately:
-  most of the golden frames boot through it, and so does `tools/probe-ui.mjs --boot`.
+  most of the golden frames boot through it, and so does `tools/probe-ui.ts --boot`.
 - 🚫 **The `d.Word11750` countdown** in `TenSecondUpdate` is not ported. It is a
   cursor-redraw counter set only by `CSBCode.cpp:969-975`, which has no counterpart here, so
   the branch is dead (`src/engine/PeriodicUpdates.ts:91`).
@@ -1208,7 +1193,7 @@ Recorded so that nobody "fixes" them.
   left click that no list takes, in a box, is searched as the box's right click
   (`searchMouseButtons`, `src/renderer/ui/Mouse.ts`), on every platform. Nothing is drawn.
   Asleep or frozen the primary list has no 7-10, and the bars stay dead.
-  `tools/probe-frames.mjs` checks that a click opens and closes an inventory.
+  `tools/probe-frames.ts` checks that a click opens and closes an inventory.
 - 🚫 **DONE on the Hint Oracle's title list closes it.** CSBWin's goes back to the load
   screen (`w_4 = 1`, `doc/CSBwin-src/Hint.cpp:7375-7388`), whose floppy prompts and save
   chooser only lead to a square, and the port's Oracle has the party's

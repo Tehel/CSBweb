@@ -534,7 +534,7 @@ An unknown dungeon played from its save is `DEBT.md` G22.
 `tools/checks/save-menu.ts` drives `GameSaves` and the dialog over a store in memory; its
 sections are named below. Node has no IndexedDB, so no tool runs `BrowserSaveStore`
 itself: neither the IndexedDB half of the upgrades (`upgradeRows`) nor
-`BrowserSaveStore.markUsed`, nor `BrowserDataSetStore`. `tools/probe-frames.mjs` checks
+`BrowserSaveStore.markUsed`, nor `BrowserDataSetStore`. `tools/probe-frames.ts` checks
 in a browser the store held by another tab, both ways; the upgrade from version 5, a
 row's file moved to `saveFiles` byte for byte; a list reading no file, an import and a
 DELETE writing and deleting a row and its file together, and a local data set deleted

@@ -8,11 +8,11 @@
 // What it captures is the **320x200 screen as CSBWin draws it**, not a screenshot of the
 // page, nor even the canvas's colours: the palette-index buffer the canvas was last given,
 // and the palette each pixel went through (`ScreenComposer.presentedFrame`,
-// `src/renderer/csbwin/PresentedFrame.ts`), written as `tools/lib/frames.mjs` says. A
+// `src/renderer/csbwin/PresentedFrame.ts`), written as `tools/lib/frames.ts` says. A
 // renderer that draws a slot holding the same colour as the right one fails, and a change
 // to how an Atari colour is shown on the canvas alone fails nothing. The page around the
 // canvas is DOM debug chrome, drawn with the host's fonts and widget theme, and enters into
-// nothing. `compare-frames.mjs` then compares what the frames hold, so the PNG encoder does
+// nothing. `compare-frames.ts` then compares what the frames hold, so the PNG encoder does
 // not enter into it either. Each frame is checked against the canvas as it is taken: every
 // pixel of one code showed the same colour there, which is the colour the file keeps to be
 // looked at.
@@ -46,8 +46,8 @@
 //   npm run dev &
 //   google-chrome --headless=new --remote-debugging-port=9222 \
 //     --window-size=1600,1000 http://localhost:9000/ &
-//   node tools/probe-frames.mjs tools/frames        # refresh the committed baseline
-//   node tools/probe-frames.mjs /tmp/now            # then diff /tmp/now against it
+//   node tools/probe-frames.ts tools/frames        # refresh the committed baseline
+//   node tools/probe-frames.ts /tmp/now            # then diff /tmp/now against it
 //
 // CDP_PORT overrides the DevTools port (default 9222), and APP_URL the page (the dev
 // server on DEV_PORT, 9000), which must have `window.__probe`: the dev server's, or a
@@ -58,8 +58,8 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { BUILD_PARTY } from './lib/buildParty.mjs';
-import { encodeFrame } from './lib/frames.mjs';
+import { BUILD_PARTY } from './lib/buildParty.ts';
+import { encodeFrame } from './lib/frames.ts';
 
 const PORT = Number(process.env.CDP_PORT ?? 9222);
 const DEV_PORT = Number(process.env.DEV_PORT ?? 9000);
@@ -67,31 +67,33 @@ const DEV_PORT = Number(process.env.DEV_PORT ?? 9000);
 // (`check-frames.sh --url`).
 const APP = process.env.APP_URL ?? `http://localhost:${DEV_PORT}/`;
 const res = await fetch(`http://127.0.0.1:${PORT}/json/list`);
-const page = (await res.json()).find(t => t.type === 'page');
+const page = (await res.json()).find((t: { type: string }) => t.type === 'page');
 const ws = new WebSocket(page.webSocketDebuggerUrl);
 let id = 0;
-const pending = new Map();
-const logs = [];
-const downloads = [];
+const pending = new Map<number, (message: any) => void>();
+const logs: string[] = [];
+const downloads: string[] = [];
 // What answers a request `Fetch.enable` paused, while a block stands in for the server.
-let onPaused = null;
+let onPaused: ((params: { requestId: string; request: { url: string; method: string } }) => unknown) | null = null;
 // What the next `Page.loadEventFired` resolves (`navigate`).
-let onLoaded = null;
+let onLoaded: (() => void) | null = null;
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
   if (m.method === 'Page.loadEventFired') onLoaded?.();
   if (m.method === 'Browser.downloadWillBegin') downloads.push(m.params.suggestedFilename);
   if (m.method === 'Fetch.requestPaused') onPaused?.(m.params);
-  if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); }
+  if (m.id && pending.has(m.id)) { pending.get(m.id)!(m); pending.delete(m.id); }
   if (m.method === 'Runtime.consoleAPICalled' && ['error','warning'].includes(m.params.type))
-    logs.push(m.params.type + ': ' + m.params.args.map(a => a.value ?? a.description).join(' '));
+    logs.push(m.params.type + ': ' + m.params.args.map((a: { value?: unknown; description?: string }) => a.value ?? a.description).join(' '));
   if (m.method === 'Runtime.exceptionThrown')
     logs.push('EXCEPTION: ' + (m.params.exceptionDetails.exception?.description ?? m.params.exceptionDetails.text));
 };
-await new Promise(r => ws.onopen = r);
-const send = (method, params = {}) => new Promise(r => { const n = ++id; pending.set(n, r); ws.send(JSON.stringify({ id: n, method, params })); });
+await new Promise(r => { ws.onopen = r; });
+// A protocol command's answer, the protocol's JSON.
+const send = (method: string, params: object = {}) => new Promise<any>(r => { const n = ++id; pending.set(n, r); ws.send(JSON.stringify({ id: n, method, params })); });
 
-const evaluate = async (expr) => {
+// What the page's `expr` comes to, as JSON gives it back: typed where it is used.
+const evaluate = async (expr: string): Promise<any> => {
   const r = await send('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true });
   if (r.result?.exceptionDetails) throw new Error(JSON.stringify(r.result.exceptionDetails));
   return r.result?.result?.value;
@@ -126,44 +128,44 @@ const CAPTURE_FRAME = `(() => {
 
 const canvasPixels = async () => (await evaluate(CAPTURE_CANVAS)).data;
 /** Writes the frame, and returns the canvas's pixels for the checks made on the spot. */
-const shot = async (name) => {
+const shot = async (name: string) => {
   const { frame, colours, stray } = await evaluate(CAPTURE_FRAME);
   if (stray) check(false, `${name}: code ${stray.code} shows ${stray.was} on the canvas, and ${stray.rgb} at (${stray.x},${stray.y})`);
   writeFileSync(`${process.argv[2]}/${name}.png`, encodeFrame(frame, colours));
   console.log('  wrote', name + '.png', `(${frame.width}x${frame.height})`);
   return canvasPixels();
 };
-const failures = [];
-const check = (ok, what) => { console.log(`  ${ok ? 'ok  ' : 'FAIL'}  ${what}`); if (!ok) failures.push(what); };
+const failures: string[] = [];
+const check = (ok: boolean, what: string) => { console.log(`  ${ok ? 'ok  ' : 'FAIL'}  ${what}`); if (!ok) failures.push(what); };
 // The CRT effect is a WebGL canvas, `#crt-canvas` (`createCrtEffect`, `src/lib/crt.ts`):
 // absent where Chrome gives no WebGL context. Nothing about the effect can
 // be checked then, and that fails the run rather than pass it unseen.
 const crtEffect = () => evaluate(`(()=>{const gl=document.getElementById('crt-canvas');
   return !gl ? 'unavailable' : getComputedStyle(gl).display === 'none' ? 'off' : 'on';})()`);
 // A named key's `code` is its `key`; the bindings match the code, the save menu the key.
-const key = (k) => evaluate(`document.dispatchEvent(new KeyboardEvent('keydown',{key:${JSON.stringify(k)},code:${JSON.stringify(k)},bubbles:true})),1`);
+const key = (k: string) => evaluate(`document.dispatchEvent(new KeyboardEvent('keydown',{key:${JSON.stringify(k)},code:${JSON.stringify(k)},bubbles:true})),1`);
 // Whether the game takes a notch of the wheel over the canvas, rather than leave it to the
 // page: a save menu's list does, the disk menu's and the entrance's chooser's, and nothing
 // else. That it scrolls the list is `tools/checks/save-menu.ts`'s to show.
 const wheelTaken = () => evaluate(`(()=>{const e=new WheelEvent('wheel',{deltaY:100,cancelable:true,bubbles:true});
   document.getElementById('game-canvas').dispatchEvent(e); return e.defaultPrevented;})()`);
 // button: 0 = left (DM mask 2), 2 = right (DM mask 1)
-const canvasClick = (x, y, button = 0) => evaluate(`(()=>{const c=document.getElementById('game-canvas');const r=c.getBoundingClientRect();
+const canvasClick = (x: number, y: number, button = 0) => evaluate(`(()=>{const c=document.getElementById('game-canvas');const r=c.getBoundingClientRect();
   const sx=r.left+${x}*r.width/320, sy=r.top+${y}*r.height/200;
   for (const t of ['pointerdown','pointerup']) c.dispatchEvent(new PointerEvent(t,{isPrimary:true,pointerType:'mouse',clientX:sx,clientY:sy,button:${button},buttons:${button===2?2:1},bubbles:true}));
   return 1;})()`);
 // A click as a player makes it: CDP's own mouse events at a point of the page, which the
 // browser hit-tests, where `canvasClick` hands its events to the game canvas whatever lies
 // over it.
-const realClick = async (x, y) => {
+const realClick = async (x: number, y: number) => {
   const p = await evaluate(`(()=>{const r=document.getElementById('game-canvas').getBoundingClientRect();
     return {x:r.left+(${x}+0.5)*r.width/320, y:r.top+(${y}+0.5)*r.height/200};})()`);
   for (const type of ['mousePressed', 'mouseReleased'])
     await send('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: 1 });
 };
-const wait = (ms) => new Promise(r => setTimeout(r, ms));
+const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
 // `expr` true on the page, polled; a run that never sees it fails rather than hangs.
-const until = async (expr, what, ms = 30000) => {
+const until = async (expr: string, what: string, ms = 30000) => {
   for (const end = Date.now() + ms; ; await wait(50)) {
     if (await evaluate(expr).catch(() => false)) return;
     if (Date.now() > end) throw new Error(`timed out waiting for ${what}`);
@@ -172,15 +174,15 @@ const until = async (expr, what, ms = 30000) => {
 // `url` loaded, then `ready` true on it. A change of the fragment alone loads nothing,
 // and Chrome then names no loader.
 // `act` leaves the page: the next one loaded, then `ready` true on it.
-const leave = async (act, ready) => {
-  const loaded = new Promise(r => onLoaded = r);
+const leave = async (act: () => Promise<unknown>, ready: string) => {
+  const loaded = new Promise<void>(r => { onLoaded = r; });
   await act();
   await loaded;
   onLoaded = null;
   await until(ready, 'the page it leads to');
 };
-const navigate = async (url, ready) => {
-  const loaded = new Promise(r => onLoaded = r);
+const navigate = async (url: string, ready: string) => {
+  const loaded = new Promise<void>(r => { onLoaded = r; });
   const { result } = await send('Page.navigate', { url });
   if (result?.loaderId) await loaded;
   onLoaded = null;
@@ -223,7 +225,7 @@ const ENTRANCE = `(p => p?.intro.waiting === true && !p.screen.ui.saveMenu?.pres
 const VBL_PER_TICK = 15;
 const TICK = VBL_PER_TICK + 1;
 const SHOWN = 2;
-const vbls = (n) => evaluate(`(async()=>{const g=window.__probe.game;
+const vbls = (n: number) => evaluate(`(async()=>{const g=window.__probe.game;
   if (g.__vbls === undefined) { g.__vbls = 0; const own = g.runFrame; g.runFrame = function () { this.__vbls++; return own.call(this); }; }
   const end = g.__vbls + ${n}, give = Date.now() + 10000;
   while (g.__vbls < end) {
@@ -281,7 +283,7 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
   }
   // The save/load screen lists IndexedDB, so a frame of it would otherwise carry
   // whatever the last probe session saved. Both drivers of this script run Chrome on a
-  // throwaway profile (probe-ui.mjs and check-frames.sh both pass --user-data-dir), so
+  // throwaway profile (probe-ui.ts and check-frames.sh both pass --user-data-dir), so
   // there is no real save to lose here.
   // A page opened with \`keepsaves\` keeps the store, so a game saved on one page can be
   // resumed from the entrance of the next.
@@ -360,7 +362,7 @@ check(byPosition === 'towers-of-chaos,conflux-3.5,add', 'the fan-made dungeons w
 // adventure screen. The entrance gets frames of its own at the end.
 await navigate(`${APP}?intro=0&dungeon=dm-atari`, GAME);
 console.log('state: booted');            await shot('01-boot');
-// The four champions, from the Hall of Champions mirrors (`tools/lib/buildParty.mjs`).
+// The four champions, from the Hall of Champions mirrors (`tools/lib/buildParty.ts`).
 await evaluate(BUILD_PARTY).then(names => console.log('  party:', names));
 await vbls(TICK);
 console.log('state: party built');       await shot('02-party');
@@ -373,14 +375,14 @@ const inventory = await shot('03-inventory');
 // curve, so a point of the tube is the screen pixel it shows: the middle stays where it is,
 // and a point towards a corner shows a pixel nearer the corner, the picture being shrunk
 // into the glass. Without the effect, the pointer is the plain scaling.
-const hoverAt = (u, v) => evaluate(`(()=>{const c=document.getElementById('game-canvas');const r=c.getBoundingClientRect();
+const hoverAt = (u: number, v: number) => evaluate(`(()=>{const c=document.getElementById('game-canvas');const r=c.getBoundingClientRect();
   c.dispatchEvent(new PointerEvent('pointermove',{isPrimary:true,pointerType:'mouse',clientX:r.left+${u}*r.width,clientY:r.top+${v}*r.height,bubbles:true}));
   const p=window.__probe.screen.ui.hoverPoint; return p ? p.x+','+p.y : 'none';})()`);
 // DISPLAY's SCANLINES (236,86) and SCREEN CURVE (236,107), in the settings dialog: Esc
 // opens it, the tab is DISPLAY (120,45), and Esc closes it again over the inventory.
-const SCANLINES = [236, 86];
-const CURVE = [236, 107];
-const toggleCrt = async ([x, y]) => {
+const SCANLINES: [number, number] = [236, 86];
+const CURVE: [number, number] = [236, 107];
+const toggleCrt = async ([x, y]: [number, number]) => {
   await key('Escape'); await vbls(SHOWN);
   await canvasClick(120, 45, 0); await vbls(SHOWN);
   await canvasClick(x, y, 0); await vbls(SHOWN);
@@ -419,7 +421,7 @@ check(await hoverAt(0.002, 0.002) === '0,0', 'the curve on: a point of the tube\
 // A lost WebGL context hides the tube and the game canvas shows through, flat, so the
 // pointer is read flat until the context is restored. The extension is kept from before
 // the loss, after which the context gives none.
-const loseContext = (how) => evaluate(`(()=>{window.__loseContext??=document.getElementById('crt-canvas').getContext('webgl').getExtension('WEBGL_lose_context');
+const loseContext = (how: 'loseContext' | 'restoreContext') => evaluate(`(()=>{window.__loseContext??=document.getElementById('crt-canvas').getContext('webgl').getExtension('WEBGL_lose_context');
   window.__loseContext.${how}();return 1;})()`);
 await loseContext('loseContext'); await wait(300);
 check(await hoverAt(0.1, 0.1) === '32,20', 'the WebGL context lost: the pointer is the plain scaling');
@@ -439,7 +441,7 @@ await evaluate(`document.getElementById('game-canvas').dispatchEvent(new Pointer
 // It used to click (15,15) — the same point as the right-click above, which is button id
 // 12, champion 0's *party block* in the top bar, not the inventory grid at all. Nothing
 // moved on screen and 04 came out identical to 03, so the frame proved nothing beyond
-// what 03 already proved. `compare-frames.mjs` now refuses a baseline with two identical
+// what 03 already proved. `compare-frames.ts` now refuses a baseline with two identical
 // frames, which is what makes that mistake visible instead of silent.
 await canvasClick(41, 66, 0);  await vbls(TICK);
 console.log('state: inventory+select');  await shot('04-inventory-sel');
@@ -523,7 +525,7 @@ const welcome = () => evaluate(`(()=>{const q=(s)=>[...document.querySelectorAll
     gameFiles: performance.getEntriesByType('resource').map(e=>e.name).filter(n=>/\.dat$/i.test(n)).length };})()`);
 // The element scrolled into view first, should the page have grown under it.
 // Then the page settled, unless the click leaves it.
-const clickOn = async (selector, leaves = false) => {
+const clickOn = async (selector: string, leaves = false) => {
   const p = await evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});e.scrollIntoView({block:'nearest'});const r=e.getBoundingClientRect();
     return {x:r.left+r.width/2, y:r.top+r.height/2};})()`);
   for (const type of ['mousePressed', 'mouseReleased'])
@@ -582,7 +584,7 @@ check(atWelcome.last === 'pick add +Add my own', 'the fan-made dungeons end with
 // dialog, the moves, attacks and runes keyed as the player's settings have them, the 24
 // runes the font's (U+E060 to U+E077, `gen-font.ts`). Its chooser's ARROWS makes the
 // settings the ARROWS preset, stored, the sheet shown anew; CSBWIN KEYS puts them back.
-// Its links to print are the sheets `tools/gen-help-sheet.mjs` made for the preset shown,
+// Its links to print are the sheets `tools/gen-help-sheet.ts` made for the preset shown,
 // which are there, and the sheet is the text that tool recorded (`sheets.json`): a sheet
 // changed without its files made again fails here. CLOSE takes the fragment off, and the
 // page's button opens it again. Then the default set, dm-atari-1.2, is selected.
@@ -678,12 +680,12 @@ const form = () => evaluate(`(()=>{const d=document.querySelector('dialog.add-se
     official: (c=>c.closest('label').checkVisibility()?(c.checked?'on':'off'):'hidden')(d.querySelector('[name=official]')),
     removable: [...d.querySelectorAll('.add-set-checklist li')].filter(li=>!li.querySelector('.add-set-remove').hidden).map(li=>li.dataset.about).join(),
     height: d.getBoundingClientRect().height };})()`);
-const inForm = (body) => evaluate(`(async()=>{const d=document.querySelector('dialog.add-set');${body};return 1;})()`);
-const typeIn = (name, value) => inForm(`const i=d.querySelector('[name=${name}]');i.value=${JSON.stringify(value)};i.dispatchEvent(new Event('input'))`);
-const dropIn = (files) => inForm(`const dt=new DataTransfer();
+const inForm = (body: string) => evaluate(`(async()=>{const d=document.querySelector('dialog.add-set');${body};return 1;})()`);
+const typeIn = (name: string, value: string) => inForm(`const i=d.querySelector('[name=${name}]');i.value=${JSON.stringify(value)};i.dispatchEvent(new Event('input'))`);
+const dropIn = (files: [path: string, name: string][]) => inForm(`const dt=new DataTransfer();
   for(const [path,name] of ${JSON.stringify(files)}){const b=await (await fetch(path)).blob(); dt.items.add(new File([b],name,{type:b.type}));}
   d.querySelector('.add-set-drop').dispatchEvent(new DragEvent('drop',{dataTransfer:dt,bubbles:true,cancelable:true}))`);
-const removeIn = (about) => inForm(`d.querySelector('.add-set-checklist li[data-about="${about}"] .add-set-remove').click()`);
+const removeIn = (about: string) => inForm(`d.querySelector('.add-set-checklist li[data-about="${about}"] .add-set-remove').click()`);
 await clickOn('.pick.add');
 const opened = await form();
 console.log('  form:', JSON.stringify(opened));
@@ -762,7 +764,7 @@ const stored = await evaluate(`(async()=>{const r = await new Promise((resolve, 
 const afterAdd = await welcome();
 console.log('  stored:', JSON.stringify(stored));
 check(await form() === null && stored?.name === 'My Own Dungeon' && stored.baseSet === 'dm-atari'
-  && stored.dmRules && stored.asTitle === true && stored.files === 'dungeon.dat,thumbnail' && stored.levels === 14 && stored.sizes.every((size) => size > 0),
+  && stored.dmRules && stored.asTitle === true && stored.files === 'dungeon.dat,thumbnail' && stored.levels === 14 && stored.sizes.every((size: number) => size > 0),
   'CONFIRM stores the record: its name, DM\'s graphics, its thumbnail as the title, its two files and its dungeon\'s signature, and closes the form');
 check(stored?.thumbnail === 'image/png' && stored.sameThumbnail,
   'the thumbnail drawn from DM\'s graphics is the site\'s DM thumbnail, pixel for pixel');
@@ -777,7 +779,7 @@ check(afterAdd.tiles.includes(`local:${MINE}!`) && new RegExp(`dungeon=local%3A$
 // save stays. DELETE asks first, counting the save; CANCEL keeps the set, and DELETE
 // removes the record and its save, its row and its file, so that the pages below see the
 // one save.
-const saveDatabase = (body) => evaluate(`(async()=>{${body.before ?? ''}
+const saveDatabase = (body: { before?: string; write: string }) => evaluate(`(async()=>{${body.before ?? ''}
   return new Promise((resolve, reject) => { const open = indexedDB.open('csbweb-saves');
     open.onerror = () => reject(open.error);
     open.onsuccess = () => { const db = open.result, tx = db.transaction(['saves', 'saveFiles', 'dataSets'], 'readwrite');
@@ -822,8 +824,8 @@ const pen = await evaluate(`(()=>{const pens=[...document.querySelectorAll('.pic
 check(pen.count === 1 && pen.of === `local:${MINE}` && pen.label === 'Edit My Own Dungeon' && pen.corner,
   "only a local set's tile has the pen, over its picture's top right corner");
 console.log('  tile heights by row:', pen.rows);
-check(pen.rows.split(',').every((row) => !row.includes('/')), "a local set's tile is as tall as the others on its row");
-check(pen.names.split('|').every((name) => name.endsWith(name.startsWith('local:') ? ' rgb(0, 216, 216)' : ' rgb(252, 252, 252)')),
+check(pen.rows.split(',').every((row: string) => !row.includes('/')), "a local set's tile is as tall as the others on its row");
+check(pen.names.split('|').every((name: string) => name.endsWith(name.startsWith('local:') ? ' rgb(0, 216, 216)' : ' rgb(252, 252, 252)')),
   "a local set's name is in cyan, palette entry 4, the others' in white");
 await clickOn('.pick-edit');
 const editing = await form();
@@ -839,7 +841,7 @@ await settled();
 const edited = await readStore();
 const afterEdit = await welcome();
 check(await form() === null && edited.name === 'My Edited Dungeon' && edited.createdAt === stored.createdAt
-  && edited.saves === ['probe-local-save', decodeURIComponent(saveId)].sort().join() && edited.files === edited.saves
+  && edited.saves === ['probe-local-save', decodeURIComponent(saveId!)].sort().join() && edited.files === edited.saves
   && afterEdit.tiles.includes(`local:${MINE}*!`),
   'CONFIRM stores the edited record over the old, when it was added kept, its save kept, and the page shows it selected');
 // PUBLISH, beside DELETE on the pen's form, offers the stored set to the site
@@ -871,7 +873,7 @@ const afterPublish = await welcome();
 const publishedTile = await evaluate(`(t=>t&&{ colour: getComputedStyle(t.querySelector('.pick-name')).color, name: t.querySelector('.pick-name').textContent })(document.querySelector('.pick[data-set="${MINE}"]'))`);
 const publishedRecord = await readStore();
 console.log('  published:', JSON.stringify({ tiles: afterPublish.tiles, tile: publishedTile }));
-const tilesOf = (page) => page.tiles.split(',');
+const tilesOf = (page: { tiles: string }) => page.tiles.split(',');
 check(await form() === null && tilesOf(afterPublish).includes(`${MINE}!`) && tilesOf(afterPublish).includes(`local:${MINE}*`)
   && publishedTile?.colour === 'rgb(252, 0, 0)' && publishedTile.name === 'My Edited Dungeon'
   && afterPublish.pictures.every(Boolean) && publishedRecord.name === 'My Edited Dungeon' && publishedRecord.saves === edited.saves,
@@ -894,7 +896,9 @@ check(triangles.tiles > 2 && triangles.wrong.length === 0 && !triangles.add,
   'every tile, a local set\'s too, has the triangle first, a link to its set without a save, labelled with its name; "+ Add my own" has none');
 const owner = await evaluate(`localStorage.getItem('csbweb_player_v1')`);
 console.log('  to its owner:', JSON.stringify(owned));
-const manifestRows = JSON.parse(readFileSync(new URL('data-sets.json', import.meta.url), 'utf8')).dataSets;
+/** A set of `tools/data-sets.json`, the manifest the probe reads. */
+interface ManifestRow { id: string; name: string; hidden?: boolean; status?: string }
+const manifestRows: ManifestRow[] = JSON.parse(readFileSync(new URL('data-sets.json', import.meta.url), 'utf8')).dataSets;
 check(owned[MINE] === 'pick-documents:Documents of My Edited Dungeon,pick-reject:Withdraw My Edited Dungeon' && owned[`local:${MINE}`] === 'pick-edit:Edit My Edited Dungeon'
   && Object.entries(owned).every(([set, controls]) => set === MINE || set.startsWith('local:')
     || controls === `pick-documents:Documents of ${manifestRows.find((row) => row.id === set)?.name}`),
@@ -936,9 +940,9 @@ await inForm(`d.querySelector('.add-set-delete').click()`);
 await evaluate(`document.querySelector('#delete-set-confirm').click()`);
 await settled();
 const deleted = { dialog: await confirmation(), form: await form(), store: await readStore(), page: await welcome() };
-check(deleted.dialog === null && deleted.form === null && deleted.store.name === null && deleted.store.saves === decodeURIComponent(saveId)
+check(deleted.dialog === null && deleted.form === null && deleted.store.name === null && deleted.store.saves === decodeURIComponent(saveId!)
   && deleted.store.files === deleted.store.saves
-  && tilesOf(deleted.page).filter((tile) => tile !== MINE).join() === atWelcome.tiles && tilesOf(deleted.page).includes(MINE),
+  && tilesOf(deleted.page).filter((tile: string) => tile !== MINE).join() === atWelcome.tiles && tilesOf(deleted.page).includes(MINE),
   'its DELETE removes the record and every save filed under its id, and the page shows the sets without it, the published one kept');
 // The moderation (`server/moderate.ts`), from the tiles, as the dev server's moderator
 // (`DEV_MODERATOR_PLAYER_ID`, `vite.config.mts`; the image's in `tools/check-image.sh`), the
@@ -950,13 +954,13 @@ check(deleted.dialog === null && deleted.form === null && deleted.store.name ===
 // control on the approved set, withdraws a second set of theirs, published by hand: the
 // cross asks first, and CANCEL keeps it.
 const MODERATOR = '00000000-0000-4000-8000-000000000001';
-const asPlayer = async (player) => {
+const asPlayer = async (player: string) => {
   await evaluate(`localStorage.setItem('csbweb_player_v1', ${JSON.stringify(player)}),1`);
   await navigate(`${APP}?dungeon=nowhere&keepsaves&keepsettings`, WELCOME);
 };
 const mineOf = async () => ({ ...(await evaluate(`(t=>({ colour: getComputedStyle(t.querySelector('.pick-name')).color, selected: t.getAttribute('aria-pressed') }))(document.querySelector('.pick[data-set="${MINE}"]'))`)),
   controls: (await controlsOf())[MINE] });
-const onMine = (control) => clickOn(`.pick-cell:has(.pick[data-set="${MINE}"]) .${control}`);
+const onMine = (control: string) => clickOn(`.pick-cell:has(.pick[data-set="${MINE}"]) .${control}`);
 await asPlayer(MODERATOR);
 const moderating = await controlsOf();
 console.log('  to a moderator:', JSON.stringify(moderating));
@@ -979,7 +983,7 @@ await clickOn('.welcome-moderation');
 const switchedBack = { switch: await moderationSwitch(), controls: await controlsOf() };
 console.log("  the moderator's switch:", JSON.stringify({ switchedOn, off: switchedOff.switch, reloaded: offReloaded.switch, back: switchedBack.switch }));
 const asAPlayer = Object.keys(moderating).filter((set) => set !== MINE && !manifestRows.find((row) => row.id === set)?.hidden);
-const playerControls = (controls) => Object.keys(controls).join() === asAPlayer.join() && Object.entries(controls).every(([set, controls]) => set.startsWith('local:')
+const playerControls = (controls: Record<string, string>) => Object.keys(controls).join() === asAPlayer.join() && Object.entries(controls).every(([set, controls]) => set.startsWith('local:')
   || controls === `pick-documents:Documents of ${manifestRows.find((row) => row.id === set)?.name}`);
 check(switchedOn?.checked === 'true' && switchedOn.text === 'Moderator on' && switchedOn.corner === '12,12'
   && switchedOff.switch?.checked === 'false' && switchedOff.switch.text === 'Moderator off' && playerControls(switchedOff.controls)
@@ -1057,7 +1061,7 @@ const documentsDialog = () => evaluate(`(d=>d&&{ open: d.open, title: d.querySel
     return pack ? pack.textContent+'|'+li.querySelector('.documents-size').textContent : a ? [a.textContent, a.getAttribute('href'), a.target || (a.hasAttribute('download') ? 'download' : ''), li.querySelector('.documents-size').textContent,
       li.querySelector('.documents-remove')?.getAttribute('aria-label') ?? ''].join('|') : li.textContent;}),
   add: !!d.querySelector('#documents-add'), status: d.querySelector('.documents-status').textContent })(document.querySelector('dialog.documents'))`);
-const chooseDocument = (name, text) => evaluate(`(()=>{const input=document.querySelector('#documents-file'), t=new DataTransfer();
+const chooseDocument = (name: string, text: string) => evaluate(`(()=>{const input=document.querySelector('#documents-file'), t=new DataTransfer();
   t.items.add(new File([${JSON.stringify(text)}], ${JSON.stringify(name)})); input.files=t.files; input.dispatchEvent(new Event('change')); return 1;})()`);
 await onMine('pick-documents');
 const noDocument = await documentsDialog();
@@ -1110,7 +1114,7 @@ await clickOn(`.pick-cell:has(.pick[data-set="${SECOND}"]) .pick-reject`);
 const askedWithdraw = await rejectDialog();
 await evaluate(`document.querySelector('#reject-set-cancel').click()`);
 await settled();
-const setsOf = (page) => tilesOf(page).map((tile) => tile.replace(/[*!]+$/, ''));
+const setsOf = (page: { tiles: string }) => tilesOf(page).map((tile) => tile.replace(/[*!]+$/, ''));
 const keptPending = { dialog: await rejectDialog(), tiles: setsOf(await welcome()) };
 await clickOn(`.pick-cell:has(.pick[data-set="${SECOND}"]) .pick-reject`);
 await evaluate(`document.querySelector('#reject-set-confirm').click()`);
@@ -1165,7 +1169,7 @@ const statsPage = () => evaluate(`(async()=>{const q=(s,r=document)=>[...r.query
 const statsFirst = await statsPage();
 console.log('state: statistics page');
 console.log('  ', JSON.stringify(statsFirst));
-const statsMatch = (page) => page.band === page.expectedBand && page.picks === page.expectedPicks && page.name === page.expectedName
+const statsMatch = (page: Record<string, unknown>) => page.band === page.expectedBand && page.picks === page.expectedPicks && page.name === page.expectedName
   && page.figures === page.expectedFigures && page.wins === page.expectedWins && page.solos === page.expectedSolos
   && page.reincarnated === page.expectedReincarnated && page.levels === page.expectedLevels && page.champions === page.expectedChampions;
 check(statsLink === 'stats' && statsFirst.gameCode.length === 0 && statsFirst.weeks > 0,
@@ -1193,7 +1197,7 @@ check(statsLast.selected === lastSet && statsMatch(statsLast), `?set=${lastSet},
 // pending and 3d2d1d, a hidden set, pending too: every set is listed, the hidden ones
 // included, a pending one's name red, palette entry 8, a hidden one's purple, red winning,
 // and the others' white. A local set's cyan is checked above.
-const moderated = JSON.parse(readFileSync(new URL('data-sets.json', import.meta.url), 'utf8'));
+const moderated: { moderator?: boolean; dataSets: ManifestRow[] } = JSON.parse(readFileSync(new URL('data-sets.json', import.meta.url), 'utf8'));
 moderated.moderator = true;
 for (const set of moderated.dataSets) if (set.id === 'kids-dungeon' || set.id === '3d2d1d') set.status = 'pending';
 onPaused = ({ requestId }) => send('Fetch.fulfillRequest', { requestId, responseCode: 200,
@@ -1206,7 +1210,7 @@ onPaused = null;
 const states = await evaluate(`Object.fromEntries([...document.querySelectorAll('.pick[data-set]')]
   .map(t=>[t.dataset.set, getComputedStyle(t.querySelector('.pick-name')).color]))`);
 console.log('  to a moderator:', JSON.stringify(states));
-const colourOf = (set) => set.status === 'pending' ? 'rgb(252, 0, 0)' : set.hidden ? 'rgb(216, 0, 216)' : 'rgb(252, 252, 252)';
+const colourOf = (set: ManifestRow) => set.status === 'pending' ? 'rgb(252, 0, 0)' : set.hidden ? 'rgb(216, 0, 216)' : 'rgb(252, 252, 252)';
 check(Object.keys(states).sort().join() === moderated.dataSets.map((set) => set.id).sort().join()
   && moderated.dataSets.every((set) => states[set.id] === colourOf(set)),
   "to a moderator, every set is listed, the hidden ones too, a pending set's name red, a hidden one's purple, red winning, the others' white");
@@ -1286,7 +1290,7 @@ console.log('state: game loaded');       const loaded = await shot('12-game-load
 // title and no entrance, so the screen is the one the entrance's LOAD showed of it, its
 // party the four the welcome page's box named. A row the store does not hold leaves the
 // entrance instead, without the title.
-const continued = async (search, ready) => {
+const continued = async (search: string, ready: string) => {
   await navigate(`${APP}${search}`, ready);
   await leaveCanvas(); if (ready === GAME) await vbls(SHOWN);
   return evaluate(`(()=>{const p=window.__probe; return p ? p.game.ctx.party.state.champions.map(c=>c.name.trim()).join(' · ') : null;})()`);
@@ -1323,7 +1327,7 @@ console.log('state: crack switch');      await shot('09-crack-switch');
 // ornament 7 at full size, the black double door, over the grid that is its door type.
 // Then level 4 door 60 at (4,25), two squares east of (2,25): a wooden door whose lock
 // plate, ornament 5 in position set 2, is shrunk to its F2 size through `d.Byte4188`.
-const FACE = (x, y, z, facing) => `(()=>{
+const FACE = (x: number, y: number, z: number, facing: number) => `(()=>{
   const { game, renderView } = window.__probe;
   const party = game.ctx.party.state;
   party.position.x = ${x}; party.position.y = ${y}; party.position.z = ${z};
@@ -1365,7 +1369,7 @@ check(await selected() === -1, 'and a second one closes it');
 // screen's: pointer events as it presses and lifts, and its mouse events only after the
 // lift (`bindCanvasEvents`, `src/ui/events.ts`). So the eye (12-27 x 46-61) is held while
 // the finger is down, and a tap is one click.
-const touch = async (type, x, y) => {
+const touch = async (type: string, x: number, y: number) => {
   const p = await evaluate(`(()=>{const r=document.getElementById('game-canvas').getBoundingClientRect();
     return {x:r.left+(${x}+0.5)*r.width/320, y:r.top+(${y}+0.5)*r.height/200};})()`);
   await send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x: p.x, y: p.y }] });
@@ -1391,7 +1395,7 @@ await send('Emulation.setTouchEmulationEnabled', { enabled: false });
 // pointer captured (`bindCanvasEvents`), so the release is its, and the eye is let go. A
 // move names the button held, or Chrome takes it for a move with none, which ends the
 // capture.
-const realMouse = async (type, x, y) => {
+const realMouse = async (type: string, x: number, y: number) => {
   const p = await evaluate(`(()=>{const r=document.getElementById('game-canvas').getBoundingClientRect();
     return {x:r.left+(${x}+0.5)*r.width/320, y:r.top+(${y}+0.5)*r.height/200};})()`);
   await send('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: 'left',
@@ -1428,7 +1432,7 @@ console.log('state: CSB inventory');
 const csbInventory = await shot('15-csb-inventory');
 // A real click on the Hint Oracle, and the Oracle waiting for a button again: its click
 // taken, two of its VBLs on, and whatever it set off drawn.
-const oracleAt = async (x, y) => {
+const oracleAt = async (x: number, y: number) => {
   const from = await evaluate(`window.__probe.intro.vbls`);
   await realClick(x, y);
   await until(`(i => i.vbls >= ${from} + 2 && i.oracle?.waiting === true)(window.__probe.intro)`, 'the Hint Oracle waiting for a button');
@@ -1482,7 +1486,7 @@ await navigate(`${APP}?intro=0&keepsaves&dungeon=dm-atari`, GAME);
 const settingsUp = () => evaluate(`window.__probe.screen.ui.settingsDialog !== null`);
 const settingsValues = () => evaluate(`window.__probe.screen.ui.settings.values`);
 const ticks = () => evaluate(`window.__probe.game.ctx.state.tickCount`);
-const pointerAt = (x, y) => evaluate(`(()=>{const c=document.getElementById('game-canvas');const r=c.getBoundingClientRect();
+const pointerAt = (x: number, y: number) => evaluate(`(()=>{const c=document.getElementById('game-canvas');const r=c.getBoundingClientRect();
   c.dispatchEvent(new PointerEvent('pointermove',{isPrimary:true,pointerType:'mouse',clientX:r.left+(${x}+0.5)*r.width/320,clientY:r.top+(${y}+0.5)*r.height/200,bubbles:true}));return 1;})()`);
 await key('Escape'); await vbls(SHOWN);
 check(await settingsUp(), 'Esc opens the settings in play');
@@ -1509,7 +1513,7 @@ console.log('state: settings, SOUND');   await shot('23-settings-sound');
 // canvas, right of it: the canvas has the pointer captured, so the moves off it come at
 // its edge, and the knob goes to the track's right end; the release is the canvas's too,
 // and a move after it drags nothing.
-const cdpMouse = async (type, x, y) => {
+const cdpMouse = async (type: string, x: number, y: number) => {
   const p = await evaluate(`(()=>{const r=document.getElementById('game-canvas').getBoundingClientRect();
     return {x:r.left+(${x}+0.5)*r.width/320, y:r.top+(${y}+0.5)*r.height/200};})()`);
   await send('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: 'left',
@@ -1685,7 +1689,7 @@ console.log('  files apart:', JSON.stringify(filesApart));
 check(filesApart.listedBytes === false && filesApart.read === stagedV5,
   'a listed save carries no file, and a read gives its file back');
 check(filesApart.imported === 'stored' && filesApart.afterImport?.rows === 'probe-import.dat,probe-v5.dat'
-  && filesApart.afterImport.files.split(',').map((f) => f.split(':')[0]).join() === 'probe-import.dat,probe-v5.dat'
+  && filesApart.afterImport.files.split(',').map((f: string) => f.split(':')[0]).join() === 'probe-import.dat,probe-v5.dat'
   && filesApart.afterDelete?.rows === 'probe-v5.dat' && filesApart.afterDelete.files === stagedV5,
   'an import writes a row and its file, and a DELETE deletes both');
 
@@ -1761,7 +1765,7 @@ const screenLayout = () => evaluate(`(()=>{const g=document.getElementById('game
   return {element:document.fullscreenElement?.id??null,w:innerWidth,h:innerHeight,ratio:devicePixelRatio,
     game:[g.left,g.top,g.width,g.height],tube:[r.left,r.top,r.width,r.height],drawn:[t.width,t.height],
     tab:window.__probe.screen.ui.settingsDialog?.tab??null};})()`);
-const realKey = async (code) => {
+const realKey = async (code: string) => {
   for (const type of ['rawKeyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: code, code, windowsVirtualKeyCode: 27 });
 };
 await key('Escape'); await vbls(SHOWN);
@@ -1774,7 +1778,7 @@ check((await screenLayout()).element === null, 'and a second tap leaves it');
 await send('Emulation.setTouchEmulationEnabled', { enabled: false });
 await canvasClick(236, 86, 0); await vbls(SHOWN);
 await canvasClick(236, 107, 0); await vbls(SHOWN);
-const screenSize = (width, height) => send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
+const screenSize = (width: number, height: number) => send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
 await screenSize(1920, 1080); await wait(300);
 await cdpMouse('mousePressed', 85, 65); await cdpMouse('mouseReleased', 85, 65); await wait(800);
 check((await screenLayout()).element === 'game', 'a mouse\'s press on FULLSCREEN, the CRT effect on, puts #game in fullscreen');
@@ -1787,7 +1791,7 @@ for (const [width, height, expected] of [[1920, 1080, 5], [1366, 768, 3]]) {
     `${width}x${height}: the game canvas is ${expected} times 320x200, the most that fit`);
   check(Math.abs(full.game[0] - (full.w - full.game[2]) / 2) <= 0.5 && Math.abs(full.game[1] - (full.h - full.game[3]) / 2) <= 0.5,
     'centred');
-  check(full.tube.every((v, i) => Math.abs(v - full.game[i]) < 0.01), 'the effect\'s canvas covers it exactly');
+  check(full.tube.every((v: number, i: number) => Math.abs(v - full.game[i]) < 0.01), 'the effect\'s canvas covers it exactly');
   check(full.drawn[0] === Math.round(full.game[2] * full.ratio) && full.drawn[1] === Math.round(full.game[3] * full.ratio),
     'and is drawn at its size');
 }
@@ -1798,7 +1802,7 @@ await canvasClick(236, 65, 0); await wait(500);
   const scale = Math.floor(Math.min(full.w * full.ratio / 320, full.h * full.ratio / 240));
   console.log(`state: fullscreen at 4:3, the screen ${full.game.join(',')}`);
   check(scale === 3 && full.game[2] === 320 * scale / full.ratio && full.game[3] === 240 * scale / full.ratio
-    && Math.abs(full.game[1] - (full.h - full.game[3]) / 2) <= 0.5 && full.tube.every((v, i) => Math.abs(v - full.game[i]) < 0.01),
+    && Math.abs(full.game[1] - (full.h - full.game[3]) / 2) <= 0.5 && full.tube.every((v: number, i: number) => Math.abs(v - full.game[i]) < 0.01),
     `at 4:3, the game canvas is 3 times 320x240, centred, the effect over it`);
 }
 check(await hoverAt(0.5, 0.5) === '160,100', 'at 4:3, the tube\'s middle is the screen\'s');
@@ -1815,7 +1819,7 @@ check(await settingsUp(), 'and a second opens them');
 await canvasClick(120, 45, 0); await vbls(SHOWN);
 await cdpMouse('mousePressed', 85, 65); await cdpMouse('mouseReleased', 85, 65); await wait(800);
 const windowed = await screenLayout();
-check(windowed.element === null && windowed.game[2] === 960 && windowed.game[3] === 600 && windowed.tube.every((v, i) => v === windowed.game[i]),
+check(windowed.element === null && windowed.game[2] === 960 && windowed.game[3] === 600 && windowed.tube.every((v: number, i: number) => v === windowed.game[i]),
   'FULLSCREEN again leaves it: the canvas and the effect\'s at 960x600');
 
 // The installed game's window (`src/assets/manifest.webmanifest`): `#game` fills it, the
@@ -1833,7 +1837,7 @@ await wait(800);
   console.log(`state: <html> in fullscreen, ${app.w}x${app.h}, the screen ${app.game.join(',')}`);
   check(app.element === '' && installed[0] && !installed[1], 'with <html> in fullscreen, display-mode: fullscreen matches, and the page is not the installed game');
   check(app.game[2] === 1600 && app.game[3] === 1000 && Math.abs(app.game[0] - 160) <= 0.5 && Math.abs(app.game[1] - 40) <= 0.5
-    && app.tube.every((v, i) => Math.abs(v - app.game[i]) < 0.01),
+    && app.tube.every((v: number, i: number) => Math.abs(v - app.game[i]) < 0.01),
     'the installed game\'s window: the screen 5 times 320x200 in 1920x1080, centred, the effect over it');
 }
 await evaluate(`document.exitFullscreen().then(() => 1)`); await wait(500);

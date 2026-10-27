@@ -228,5 +228,5 @@ one at zero, the latest 52 at most.
 
 What is left of it is the heat map (`DEBT.md` E40). The dev server answers `api/stats`
 over the scripted fortnight of `tools/checks/stats.ts` (`tools/lib/statsFortnight.ts`), so
-that the page has something to show; `tools/probe-frames.mjs` checks the page against what
+that the page has something to show; `tools/probe-frames.ts` checks the page against what
 `api/stats` answers, whatever the store holds.

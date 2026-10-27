@@ -5,7 +5,8 @@
 //
 //   1. `tsc --noEmit`            — the real build gate; `vite build` proves nothing.
 //                                  Four projects: the page's, the tools', utils/'
-//                                  and the server's (tsconfig.json, and each folder's).
+//                                  and the server's (tsconfig.json, and each folder's),
+//                                  vite.config.mts in the server's.
 //   2. every asserting tools/checks/*.ts — the regression suite for what the frames
 //                                  cannot see.
 //   3. `tools/check-frames.sh`   — the golden frames, only with `--frames` (it needs a
@@ -40,7 +41,13 @@ const TSC = resolve(ROOT, 'node_modules/.bin/tsc');
 // Tools that assert, in tools/checks/ unless `dir` says otherwise. `args` pins the scenario
 // the assertions were written for — several tools take a level, and the wrong level
 // activates no monsters and checks nothing.
-const CHECKS = [
+/** A tool to run: its file, its folder if not tools/checks/, and the arguments it is run with. */
+interface Tool {
+  tool: string;
+  dir?: string;
+  args?: string[];
+}
+const CHECKS: Tool[] = [
   { tool: 'object-name-index.ts' },
   { tool: 'object-index.ts' },
   { tool: 'monster-tables.ts' },
@@ -409,7 +416,7 @@ const CHECKS = [
 // Tools with no assertions: they exist to be read, not to pass. They are still run,
 // because a loader or table change that throws should not wait to be noticed by hand.
 // Only a crash fails them.
-const SMOKE = [
+const SMOKE: Tool[] = [
   { tool: 'defined-items.ts' },
   { tool: 'level-items.ts' },
   { tool: 'object-definitions.ts' },
@@ -423,12 +430,27 @@ const jobsArg = argv.find((a) => a.startsWith('--jobs='))?.slice('--jobs='.lengt
 const jobs = jobsArg ? Math.max(1, Number.parseInt(jobsArg, 10) || 1) : availableParallelism();
 const toolArgs = argv.filter((a) => a !== '--frames' && !a.startsWith('--only=') && !a.startsWith('--jobs='));
 
-const results = [];
+/** A finished job: its exit status, the error that kept it from one, and its output. */
+interface JobResult {
+  status: number | null;
+  error?: Error;
+  out: string;
+  ms: number;
+}
+/** A job: a command, and when its output prints (`record`). */
+interface Job {
+  name: string;
+  cmd: string;
+  args: string[];
+  show?: 'always' | 'failure';
+}
+
+const results: { name: string; ok: boolean; out: string; ms: number; shown: boolean }[] = [];
 let failed = 0;
 
 // `show` prints a job's output under its line rather than after the run: 'always', or
 // 'failure' (a type error is learnt before the tools' results, not ~150 s later).
-function record(name, r, ms, show) {
+function record(name: string, r: Omit<JobResult, 'ms'>, ms: number, show?: Job['show']) {
   const ok = r.status === 0 && !r.error;
   console.log(`  ${name.padEnd(34)}${ok ? 'ok  ' : 'FAIL'}  ${String(ms).padStart(6)} ms`);
   const out = (r.error ? `${r.error}\n` : '') + r.out;
@@ -443,8 +465,8 @@ function record(name, r, ms, show) {
 // Each job leads a process group of its own, so the kill takes tsx's node child with it,
 // and so does an interrupted run.
 const JOB_TIMEOUT_MS = 300_000;
-const groups = new Set();
-const killGroup = (pid) => {
+const groups = new Set<number>();
+const killGroup = (pid: number) => {
   try {
     process.kill(-pid, 'SIGKILL');
   } catch {
@@ -456,19 +478,20 @@ process.on('SIGINT', () => {
   process.exit(130);
 });
 
-function runAsync(cmd, args) {
-  return new Promise((done) => {
+function runAsync(cmd: string, args: string[]) {
+  return new Promise<JobResult>((done) => {
     const started = Date.now();
     const child = spawn(cmd, args, { cwd: ROOT, detached: true });
-    groups.add(child.pid);
-    const chunks = [];
-    const finish = (result) => {
+    const pid = child.pid!;
+    groups.add(pid);
+    const chunks: Buffer[] = [];
+    const finish = (result: Omit<JobResult, 'out' | 'ms'>) => {
       clearTimeout(timer);
-      groups.delete(child.pid);
+      groups.delete(pid);
       done({ ...result, out: Buffer.concat(chunks).toString('utf8'), ms: Date.now() - started });
     };
     const timer = setTimeout(() => {
-      killGroup(child.pid);
+      killGroup(pid);
       finish({ status: null, error: new Error(`timed out after ${JOB_TIMEOUT_MS / 1000} s, its output so far below`) });
     }, JOB_TIMEOUT_MS);
     child.stdout.on('data', (c) => chunks.push(c));
@@ -486,7 +509,7 @@ if (!existsSync(TSX)) {
 // An `--only` that is a tool's whole name picks that tool alone: `room-text.ts` is also the
 // end of `open-room-text.ts`.
 const names = new Set([...CHECKS, ...SMOKE].map(({ tool }) => tool));
-const wanted = ({ tool }) => !only || only.some((o) => (names.has(o) ? tool === o : tool.includes(o)));
+const wanted = ({ tool }: Tool) => !only || only.some((o) => (names.has(o) ? tool === o : tool.includes(o)));
 const checks = CHECKS.filter(wanted);
 const smoke = SMOKE.filter(wanted);
 const single = only && checks.length + smoke.length === 1;
@@ -494,20 +517,20 @@ if (toolArgs.length && !single) {
   console.error(`${toolArgs.join(' ')}: a tool's arguments need --only to pick out one tool.`);
   process.exit(1);
 }
-const tool = ({ tool, dir = 'tools/checks', args = [] }) => ({
+const tool = ({ tool, dir = 'tools/checks', args = [] }: Tool): Job => ({
   name: tool,
   cmd: TSX,
   args: [resolve(ROOT, dir, tool), ...(toolArgs.length ? toolArgs : args)],
   show: single ? 'always' : undefined,
 });
-const sections = [
+const sections: [string, Job[]][] = [
   ['types', [
     // The page as the browser runs it, held to noUncheckedIndexedAccess.
     { name: 'tsc --noEmit', cmd: TSC, args: ['--noEmit'], show: 'failure' },
     // The tools and utils/ on Node's types.
     { name: 'tsc --noEmit -p tools', cmd: TSC, args: ['--noEmit', '-p', 'tools'], show: 'failure' },
     { name: 'tsc --noEmit -p utils', cmd: TSC, args: ['--noEmit', '-p', 'utils'], show: 'failure' },
-    // The server as Node runs it: Node's resolution, erasable syntax only.
+    // The server as Node runs it, and vite.config.mts, the dev server's: Node's resolution, erasable syntax only.
     { name: 'tsc --noEmit -p server', cmd: TSC, args: ['--noEmit', '-p', 'server'], show: 'failure' },
   ]],
   ['checks', checks.map(tool)],
@@ -517,7 +540,7 @@ const sections = [
 // Every job starts as soon as a worker is free; each result prints once the jobs listed
 // before it have printed, so the output reads in the lists' order whatever finished first.
 const started = Date.now();
-const pending = sections.flatMap(([, list]) => list).map((job) => ({ job, result: null }));
+const pending: { job: Job; result: JobResult | null }[] = sections.flatMap(([, list]) => list).map((job) => ({ job, result: null }));
 let next = 0;
 let printed = 0;
 let section = 0;
@@ -530,7 +553,7 @@ function flush() {
       sectionEnd += list.length;
     }
     const { job, result } = pending[printed++];
-    record(job.name, result, result.ms, job.show);
+    record(job.name, result!, result!.ms, job.show);
   }
 }
 async function worker() {

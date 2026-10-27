@@ -690,6 +690,6 @@ inventory open (`GameScreen.palette11946`). `tools/checks/show-credits.ts` check
 ## Skipping it
 
 `?intro=0` skips the FTL logo, the title animation and the entrance entirely and boots straight
-into a fresh dungeon (`DEBT.md` H). The page's Debug setting does not. `tools/probe-frames.mjs` passes
+into a fresh dungeon (`DEBT.md` H). The page's Debug setting does not. `tools/probe-frames.ts` passes
 the query parameter for its first six frames and then loads the app again without it for the
 entrance and the credits.

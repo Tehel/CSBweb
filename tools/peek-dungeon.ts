@@ -2,9 +2,9 @@
  * Look inside a dungeon: a level as an ASCII map, one square with everything on it, or a
  * search for an item, a monster or a text across every level.
  *
- * Like `probe-ui.mjs`, this is **not evidence** and asserts nothing: it is how to find
+ * Like `probe-ui.ts`, this is **not evidence** and asserts nothing: it is how to find
  * out what the data holds ("what is on (18,1) of map 11?") before reasoning about
- * behaviour. It is not in `tools/run-checks.mjs`. The `peek-dungeon` skill has the uses.
+ * behaviour. It is not in `tools/run-checks.ts`. The `peek-dungeon` skill has the uses.
  *
  * The source is a `dungeon.dat` (plain or compressed), a CSBWin save, the port's or a
  * genuine one, or a `.dmweb.json` an earlier build wrote, whose world is read from its

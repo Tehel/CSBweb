@@ -1,11 +1,11 @@
 ---
 name: dialog-layout-moves-probe-clicks
-description: Changing a dialog's geometry, or reordering a settings tab, breaks probe-frames.mjs's hard-coded canvas clicks, some far from the dialog's own block; a failed probe leaves no frames to look at
+description: Changing a dialog's geometry, or reordering a settings tab, breaks probe-frames.ts's hard-coded canvas clicks, some far from the dialog's own block; a failed probe leaves no frames to look at
 metadata:
   type: project
 ---
 
-`tools/probe-frames.mjs` drives the settings, champion and save dialogs by hard-coded
+`tools/probe-frames.ts` drives the settings, champion and save dialogs by hard-coded
 canvas coordinates (`canvasClick`, `cdpMouse`, `touch`, `realClick`, `pointerAt`), some
 of them in the fullscreen/CRT section far below the dialog's own block (`toggleCrt`, the
 FULLSCREEN taps).
@@ -24,7 +24,7 @@ recompute each from the new rectangles. Check that the point falls in the contro
 (`tabButtons`) takes the whole tab above its page.
 
 When the probe fails, `check-frames.sh` deletes its temporary folder: there is no frame
-to look at. Reproduce the step with `tools/probe-ui.mjs`, minding that its Chrome gives
+to look at. Reproduce the step with `tools/probe-ui.ts`, minding that its Chrome gives
 a keyboard layout and the frames probe's does not ([[probe-frames-storage-flags]]).
 
 **Why:** moving the settings dialog's content six rows up broke eleven clicks across

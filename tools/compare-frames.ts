@@ -1,10 +1,10 @@
 // Compare a freshly captured set of golden frames against the committed baseline.
 //
-//   node tools/compare-frames.mjs tools/frames /tmp/now
+//   node tools/compare-frames.ts tools/frames /tmp/now
 //
 // It decodes both sides and compares what each pixel showed, never bytes: the palette and
 // the slot it was drawn in and the Atari word there, or the overlay's colour
-// (`tools/lib/frames.mjs`). A byte compare of two PNGs would be a test of the encoder that
+// (`tools/lib/frames.ts`). A byte compare of two PNGs would be a test of the encoder that
 // wrote them, and a compare of colours would let a slot pass for another of the same colour.
 //
 // When a frame does differ it prints the damage in a form you can act on: how many pixels,
@@ -14,11 +14,11 @@
 // is the top 28 rows, the message area sits below y 169.
 import { readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { decodeFrame } from './lib/frames.mjs';
+import { decodeFrame, type DecodedFrame } from './lib/frames.ts';
 
 const [baseDir, curDir] = process.argv.slice(2);
 if (!baseDir || !curDir) {
-  console.error('usage: node tools/compare-frames.mjs <baseline-dir> <current-dir>');
+  console.error('usage: node tools/compare-frames.ts <baseline-dir> <current-dir>');
   process.exit(2);
 }
 
@@ -39,12 +39,12 @@ for (const name of names) {
     continue;
   }
 
-  let a, b;
+  let a: DecodedFrame, b: DecodedFrame;
   try {
     a = decodeFrame(basePath);
     b = decodeFrame(curPath);
   } catch (e) {
-    console.log(`  UNREADABLE  ${name}  ${e.message}`);
+    console.log(`  UNREADABLE  ${name}  ${(e as Error).message}`);
     failed++;
     continue;
   }
@@ -58,7 +58,7 @@ for (const name of names) {
 
   let differing = 0, wordOnly = 0;
   let minX = a.width, minY = a.height, maxX = -1, maxY = -1;
-  let first = null;
+  let first: { x: number; y: number; base: string; cur: string } | null = null;
   for (let n = 0; n < a.width * a.height; n++) {
     const va = a.values[n], vb = b.values[n];
     if (va === vb) continue;
@@ -82,7 +82,8 @@ for (const name of names) {
   console.log(`  DIFF  ${name}  ${differing}/${total} px (${(100 * differing / total).toFixed(2)}%)  ${curPath}`);
   console.log(`        drawn in another slot ${differing - wordOnly}, the same slot holding another word ${wordOnly}`);
   console.log(`        bounding box x ${minX}-${maxX}  y ${minY}-${maxY}`);
-  console.log(`        first at x=${first.x} y=${first.y}: baseline ${first.base} -> capture ${first.cur}`);
+  const { x, y, base, cur } = first!;
+  console.log(`        first at x=${x} y=${y}: baseline ${base} -> capture ${cur}`);
 }
 
 console.log(failed === 0
@@ -94,7 +95,7 @@ console.log(failed === 0
 // `04-inventory-sel` sat for months — it clicked the party block instead of an inventory
 // slot, and was byte-identical to `03-inventory` the whole time. Checked against the
 // baseline, not the capture, because it is a property of what we committed.
-const loaded = new Map();
+const loaded = new Map<string, DecodedFrame>();
 for (const name of names) {
   try { loaded.set(name, decodeFrame(join(baseDir, name))); } catch { /* already reported */ }
 }

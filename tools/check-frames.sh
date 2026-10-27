@@ -5,7 +5,7 @@
 # palettes they were shown through. The comparison decodes both sides and compares what
 # each pixel showed. Neither end depends on the host's fonts, widget theme, window size,
 # GPU or PNG encoder, so a baseline captured on one machine is checkable on another, nor
-# on how an Atari colour is shown on the canvas. See the header of tools/probe-frames.mjs.
+# on how an Atari colour is shown on the canvas. See the header of tools/probe-frames.ts.
 #
 # This used to require two daemons started by hand — `npm run dev` on :9000 and a
 # headless Chrome on :9222 — which meant it was never actually run before a commit.
@@ -115,17 +115,17 @@ fi
 
 # --- probe and compare ---------------------------------------------------------------
 if [ "$update" = 1 ]; then
-  node "$root/tools/probe-frames.mjs" "$root/tools/frames" || exit 1
+  node "$root/tools/probe-frames.ts" "$root/tools/frames" || exit 1
   echo '--- baseline updated; review with: git diff --stat tools/frames ---'
   exit 0
 fi
 
 out="$(mktemp -d)"
-node "$root/tools/probe-frames.mjs" "$out" || { rm -rf "$out"; exit 1; }
+node "$root/tools/probe-frames.ts" "$out" || { rm -rf "$out"; exit 1; }
 echo "--- frame comparison ---"
 # What the pixels showed, not bytes: `cmp` here used to make this a test of Chrome's PNG
 # encoder, which is why the same rendering on another machine failed on every frame.
-node "$root/tools/compare-frames.mjs" "$root/tools/frames" "$out"
+node "$root/tools/compare-frames.ts" "$root/tools/frames" "$out"
 rc=$?
 [ "$rc" = 0 ] && rm -rf "$out"
 exit $rc

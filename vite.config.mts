@@ -32,7 +32,7 @@ function buildId(): string {
 /**
  * The dev server's one moderator, so that the welcome page's tick, cross and eye can be
  * tried: whoever's `localStorage` keeps this as their `playerId` (`src/ui/gameEvents.ts`).
- * `tools/probe-frames.mjs` is that player, and `tools/check-image.sh` gives the image the
+ * `tools/probe-frames.ts` is that player, and `tools/check-image.sh` gives the image the
  * same id in `MODERATOR_PLAYER_IDS`.
  */
 const DEV_MODERATOR_PLAYER_ID = '00000000-0000-4000-8000-000000000001';
@@ -154,7 +154,8 @@ function dataSetsRoute(): Plugin {
         if (req.method !== 'POST' || !sqlite) {
           res.statusCode = req.method !== 'POST' ? 405 : 501;
           if (req.method !== 'POST') res.setHeader('Allow', 'POST');
-          return res.end();
+          res.end();
+          return;
         }
         const db = new sqlite.DatabaseSync(':memory:');
         try {

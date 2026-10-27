@@ -6,7 +6,7 @@ metadata:
 ---
 
 `bash tools/check-frames.sh` compares the frames the baseline `tools/frames/` already
-has. A new `shot('NN-name')` in `tools/probe-frames.mjs` is written to a temporary
+has. A new `shot('NN-name')` in `tools/probe-frames.ts` is written to a temporary
 folder that the script deletes, and the comparison still says "all 20 frames match".
 
 To add frames: run `bash tools/check-frames.sh` once to see every existing frame

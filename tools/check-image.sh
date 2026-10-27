@@ -38,7 +38,7 @@ trap cleanup EXIT
 echo "building csbweb:probe"
 docker build -q --build-arg CSBWEB_BUILD=check --build-arg CSBWEB_PROBE=1 -t csbweb:probe "$root" >/dev/null || exit 1
 # The moderator is the dev server's own (`DEV_MODERATOR_PLAYER_ID`, `vite.config.mts`),
-# whom `probe-frames.mjs` plays to moderate the set it publishes.
+# whom `probe-frames.ts` plays to moderate the set it publishes.
 (cd "$root" && npx tsx tools/fill-data-sets.ts "$stats/stats.db") || exit 1
 # With the limits `docker-compose.yaml` sets, so that the frames, and the probe's publish,
 # run as the deployed container does.

@@ -36,7 +36,7 @@ import { dataSetNamed } from '../lib/dataSets.ts';
 
 const ROOT = resolve(import.meta.dirname, '../..');
 const PAGE_TYPES = new Set(['.html', '.js', '.css', '.ico', '.jpg', '.png', '.ttf', '.woff2', '.img', '.wav', '.webmanifest']);
-/** HOW TO PLAY's sheets to print (`tools/gen-help-sheet.mjs`), the page's only PDFs, as Vite names them. */
+/** HOW TO PLAY's sheets to print (`tools/gen-help-sheet.ts`), the page's only PDFs, as Vite names them. */
 const PRINTED_SHEET = /^assets\/(csbwin|keypad|arrows)-(qwerty|azerty)-[\w-]+\.pdf$/;
 /** The statistics page, Vite's second entry (`vite.config.mts`), and a bound on the script it loads. */
 const STATS_PAGE = 'stats.html';

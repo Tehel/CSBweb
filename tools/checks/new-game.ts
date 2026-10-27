@@ -237,7 +237,7 @@ function main(): void {
 
   // The page's boot: a `Game` over the empty world, `d.Initialize()`'s, which draws
   // nothing from the stream, and `dungeon.dat` read into it after ENTER. With the host's
-  // `rand()` pinned, as `tools/probe-frames.mjs` pins it, its first draw is the one a
+  // `rand()` pinned, as `tools/probe-frames.ts` pins it, its first draw is the one a
   // `Game` built straight over the file takes.
   console.log('');
   console.log('=== the boot: the empty world, then dungeon.dat ===');

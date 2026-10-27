@@ -13,7 +13,7 @@ from the site or the Wayback Machine's copy, checks the archive's SHA-256 and wr
 are mapped by script and unreviewed).
 
 The port followed `CSBwin_SRC_20160923.zip` before it, from its first commit to Debt C157's:
-those commits fetch it with their own `npm run fetch-csbwin-src` (`tools/fetch-csbwin-src.mjs`,
+those commits fetch it with their own `npm run fetch-csbwin-src` (`tools/fetch-csbwin-src.ts`,
 pinned to that archive). Their citations of `SaveGame.cpp`, `RC4.cpp` and `CSBCode.cpp` name
 the lines of a reformatted copy no commit keeps, up to 193 lines off the archive's. It is
 "Version 15.9", a side branch of

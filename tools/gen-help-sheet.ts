@@ -2,12 +2,12 @@
  * Write the welcome page's HOW TO PLAY sheets to print (`src/ui/howToPlay.ts`): for each
  * key preset and each layout of the labels, `src/assets/how-to-play/<preset>-<layout>.pdf`,
  * one landscape A4 page, and `.png`, the same page at 192 pixels to the inch; and
- * `sheets.json` there, the text of each sheet, which `tools/probe-frames.mjs` holds the
+ * `sheets.json` there, the text of each sheet, which `tools/probe-frames.ts` holds the
  * page's sheet to.
  *
  * Each sheet is the page itself, the dialog opened at `#how-to-play` under its print
  * stylesheet (`welcomePage.css`), with the settings a player of that preset and that layout
- * has, and the browser's keyboard layout hidden, as `probe-frames.mjs` hides it, so the
+ * has, and the browser's keyboard layout hidden, as `probe-frames.ts` hides it, so the
  * labels are the layout's and not this machine's. The PDF is Chrome's `Page.printToPDF`;
  * the PNG is the print layout captured at the PDF page's size, inside the same margins.
  * Each sheet has a tab of its own: after a print, headless Chrome's tab answers no capture
@@ -15,7 +15,7 @@
  *
  * It starts its own dev server and headless Chrome, on ports of its own, and stops them.
  *
- *   node tools/gen-help-sheet.mjs
+ *   node tools/gen-help-sheet.ts
  */
 import { spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -35,8 +35,8 @@ const LAYOUTS = ['qwerty', 'azerty'];
 const PAGE = { width: 1123, height: 794 };
 const MARGIN = Math.round(8 / 25.4 * 96);
 
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const up = async (url) => { try { return (await fetch(url)).ok; } catch { return false; } };
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const up = async (url: string) => { try { return (await fetch(url)).ok; } catch { return false; } };
 
 /** A new tab, its protocol's `send` and `evaluate`, and `close`. */
 async function openTab() {
@@ -44,12 +44,13 @@ async function openTab() {
   const ws = new WebSocket(target.webSocketDebuggerUrl);
   await new Promise((resolve) => { ws.onopen = resolve; });
   let id = 0;
-  const pending = new Map();
+  const pending = new Map<number, (message: any) => void>();
   ws.onmessage = (event) => {
     const message = JSON.parse(event.data);
-    if (message.id && pending.has(message.id)) { pending.get(message.id)(message); pending.delete(message.id); }
+    if (message.id && pending.has(message.id)) { pending.get(message.id)!(message); pending.delete(message.id); }
   };
-  const send = (method, params = {}) => new Promise((resolve, reject) => {
+  /** A protocol command's result, the protocol's JSON. */
+  const send = (method: string, params: object = {}) => new Promise<any>((resolve, reject) => {
     const n = ++id;
     const timer = setTimeout(() => reject(new Error(`${method}: no answer in 30 s`)), 30000);
     pending.set(n, (message) => {
@@ -59,7 +60,7 @@ async function openTab() {
     });
     ws.send(JSON.stringify({ id: n, method, params }));
   });
-  const evaluate = async (expression) => {
+  const evaluate = async (expression: string) => {
     const result = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
     if (result.exceptionDetails) throw new Error(JSON.stringify(result.exceptionDetails));
     return result.result.value;
@@ -72,7 +73,7 @@ async function openTab() {
 }
 
 /** The sheet of `preset` labelled in `layout`, written as `<name>.png` and `<name>.pdf`; its text. */
-async function writeSheet(preset, layout) {
+async function writeSheet(preset: string, layout: string): Promise<string> {
   const name = `${preset}-${layout}`;
   const { send, evaluate, close } = await openTab();
   try {
@@ -124,7 +125,7 @@ try {
   for (let i = 0; i < 60 && !(await up(APP)); i++) await wait(500);
   for (let i = 0; i < 60 && !(await up(`${CDP}/json/version`)); i++) await wait(250);
   mkdirSync(OUT, { recursive: true });
-  const sheets = {};
+  const sheets: Record<string, string> = {};
   for (const preset of PRESETS) {
     for (const layout of LAYOUTS) sheets[`${preset}-${layout}`] = await writeSheet(preset, layout);
   }
@@ -132,7 +133,7 @@ try {
   console.log(`${Object.keys(sheets).length} sheets in ${OUT}`);
 } finally {
   // Both stopped, then Chrome's profile removed, once Chrome has let go of it.
-  for (const child of [vite, chrome]) try { process.kill(-child.pid); } catch { /* gone */ }
+  for (const child of [vite, chrome]) try { process.kill(-child.pid!); } catch { /* gone */ }
   await Promise.race([chromeExited, wait(5000)]);
   rmSync(profile, { recursive: true, force: true, maxRetries: 5 });
 }

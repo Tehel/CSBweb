@@ -7,7 +7,7 @@
  * is stone (`doc/CSBWIN_HINT_ORACLE_REFERENCE.md`).
  *
  * Like `peek-dungeon.ts`, this is **not evidence** and asserts nothing, so it is not in
- * `tools/run-checks.mjs`; `tools/checks/hint-oracle.ts` checks the same decoding.
+ * `tools/run-checks.ts`; `tools/checks/hint-oracle.ts` checks the same decoding.
  *
  * Run: `npx tsx tools/extract-oracle.ts [hcsb.hct] [out.json]`
  * (default: `tools/fixtures/gamefiles/csb/hcsb.hct` into `tools/fixtures/gamefiles/csb-oracle-hints.json`)

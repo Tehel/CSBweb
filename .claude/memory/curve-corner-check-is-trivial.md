@@ -5,7 +5,7 @@ metadata:
   type: project
 ---
 
-In `tools/probe-frames.mjs`, `hoverAt(0.002, 0.002) === '0,0'` ("a point of the tube's
+In `tools/probe-frames.ts`, `hoverAt(0.002, 0.002) === '0,0'` ("a point of the tube's
 black corner is the screen's corner") holds with the curve off as well: the plain
 scaling floors 0.002 x 320 to 0. It proves nothing about `canvasPoint`'s warp. The check
 that does is `hoverAt(0.1, 0.1)`: `'32,20'` flat, nearer the corner curved.

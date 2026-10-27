@@ -9,10 +9,10 @@
 // It starts a dev server and a headless Chrome if they are not already up, and leaves them
 // running, so the second probe of a session costs one call instead of five.
 //
-//   node tools/probe-ui.mjs 'game.ctx.party.champions[0].name'
-//   node tools/probe-ui.mjs --boot --shot /tmp/panel.png
-//   node tools/probe-ui.mjs --click 15,15,right --shot /tmp/inv.png 'screen.ui.uiMode'
-//   node tools/probe-ui.mjs --stop
+//   node tools/probe-ui.ts 'game.ctx.party.champions[0].name'
+//   node tools/probe-ui.ts --boot --shot /tmp/panel.png
+//   node tools/probe-ui.ts --click 15,15,right --shot /tmp/inv.png 'screen.ui.uiMode'
+//   node tools/probe-ui.ts --stop
 //
 // Actions run in the order given; the bare argument is the expression, evaluated last with
 // `game`, `screen` and `renderView` in scope and printed as JSON.
@@ -23,16 +23,16 @@ import { writeFileSync } from 'node:fs';
 import { spawn, execSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { BUILD_PARTY } from './lib/buildParty.mjs';
+import { BUILD_PARTY } from './lib/buildParty.ts';
 
 const CDP = Number(process.env.CDP_PORT ?? 9222);
 const APP = Number(process.env.DEV_PORT ?? 9000);
-const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** The `KeyboardEvent.code` of `key` on a US keyboard: the game's bindings match codes. */
-const usCode = (key) => /^[a-z]$/i.test(key) ? `Key${key.toUpperCase()}`
+const usCode = (key: string) => /^[a-z]$/i.test(key) ? `Key${key.toUpperCase()}`
   : /^[0-9]$/.test(key) ? `Digit${key}`
-  : ({ ' ': 'Space', '`': 'Backquote', '~': 'Backquote', ',': 'Comma', '.': 'Period' })[key] ?? key;
-const up = async (port, path = '/') => {
+  : ({ ' ': 'Space', '`': 'Backquote', '~': 'Backquote', ',': 'Comma', '.': 'Period' } as Record<string, string>)[key] ?? key;
+const up = async (port: number, path = '/') => {
   try {
     const c = new AbortController();
     const t = setTimeout(() => c.abort(), 800);
@@ -53,7 +53,7 @@ if (argv.includes('--stop')) {
 if (argv.includes('--help') || argv.length === 0) {
   console.log(`probe-ui — drive the running app and read its live state.
 
-  node tools/probe-ui.mjs [actions...] ['expression']
+  node tools/probe-ui.ts [actions...] ['expression']
 
 Actions, applied in the order given:
   --boot              load ?intro=0 with a cleared localStorage and a seeded
@@ -67,7 +67,7 @@ Actions, applied in the order given:
   --stop              kill the dev server and chrome, then exit
 
 The bare argument is evaluated last with game, screen and renderView in scope, and
-printed as JSON:  node tools/probe-ui.mjs 'game.ctx.party.champions.map(c => c.name)'
+printed as JSON:  node tools/probe-ui.ts 'game.ctx.party.champions.map(c => c.name)'
 
 Ports: DEV_PORT (9000), CDP_PORT (9222). Both daemons are started if absent and left up.`);
   process.exit(0);
@@ -95,25 +95,26 @@ if (!(await up(CDP, '/json/version'))) {
 }
 
 // --- CDP ---------------------------------------------------------------------
-const page = (await (await fetch(`http://127.0.0.1:${CDP}/json/list`)).json()).find((t) => t.type === 'page');
+const page = (await (await fetch(`http://127.0.0.1:${CDP}/json/list`)).json()).find((t: { type: string }) => t.type === 'page');
 if (!page) throw new Error('no page target; try --stop and run again');
 const ws = new WebSocket(page.webSocketDebuggerUrl);
 let id = 0;
-const pending = new Map();
-const logs = [];
+const pending = new Map<number, (message: any) => void>();
+const logs: string[] = [];
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
-  if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); }
+  if (m.id && pending.has(m.id)) { pending.get(m.id)!(m); pending.delete(m.id); }
   if (m.method === 'Runtime.consoleAPICalled' && ['error', 'warning'].includes(m.params.type))
-    logs.push(`${m.params.type}: ${m.params.args.map((a) => a.value ?? a.description).join(' ')}`);
+    logs.push(`${m.params.type}: ${m.params.args.map((a: { value?: unknown; description?: string }) => a.value ?? a.description).join(' ')}`);
   if (m.method === 'Runtime.exceptionThrown')
     logs.push(`EXCEPTION: ${m.params.exceptionDetails.exception?.description ?? m.params.exceptionDetails.text}`);
 };
 await new Promise((r) => { ws.onopen = r; });
-const send = (method, params = {}) => new Promise((r) => {
+/** A protocol command's answer, the protocol's JSON. */
+const send = (method: string, params: object = {}) => new Promise<any>((r) => {
   const n = ++id; pending.set(n, r); ws.send(JSON.stringify({ id: n, method, params }));
 });
-const evaluate = async (expr) => {
+const evaluate = async (expr: string) => {
   const r = await send('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true });
   const bad = r.result?.exceptionDetails;
   if (bad) throw new Error(bad.exception?.description ?? bad.text ?? JSON.stringify(bad));
@@ -122,7 +123,7 @@ const evaluate = async (expr) => {
 await send('Runtime.enable');
 await send('Page.enable');
 
-const probed = (expr) => `(() => { const p = window.__probe;
+const probed = (expr: string) => `(() => { const p = window.__probe;
   if (!p) throw new Error('window.__probe missing — is this the dev server? try --boot');
   const { game, screen, renderView } = p;
   return JSON.parse(JSON.stringify((${expr}) ?? null, (k, v) =>
@@ -149,7 +150,7 @@ const boot = async () => {
   console.error('party:', await evaluate(BUILD_PARTY));
   await wait(600);
 };
-const click = async (spec) => {
+const click = async (spec: string) => {
   const [x, y, btn] = spec.split(',');
   const b = btn === 'right' ? 2 : 0;
   await evaluate(`(()=>{const c=document.getElementById('game-canvas');const r=c.getBoundingClientRect();
@@ -160,7 +161,7 @@ const click = async (spec) => {
   await wait(400);
 };
 
-let expr = null;
+let expr: string | null = null;
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
   if (a === '--boot') await boot();

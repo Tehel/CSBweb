@@ -87,7 +87,7 @@ The last several bug-fix commits shipped exactly these five things. Treat it as 
 
 1. **`src/`** — the fix.
 2. **`tools/checks/*.ts`** — new or extended, asserting the thing that was broken.
-3. **`tools/run-checks.mjs`** — one line, `{ tool: '<name>.ts' },`, if the tool is new.
+3. **`tools/run-checks.ts`** — one line, `{ tool: '<name>.ts' },`, if the tool is new.
    A tool nobody runs is not a regression test.
 4. **`doc/PROVEN_FACTS.md`** — the CSBWin fact you had to establish, with its
    `doc/CSBwin-src/<File>.cpp:<line>` citation. Only what you are certain of.

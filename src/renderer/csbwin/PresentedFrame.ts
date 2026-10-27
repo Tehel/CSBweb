@@ -1,7 +1,7 @@
 /**
  * The last screen presented, as CSBWin draws it rather than as the canvas shows it: the
  * palette-index buffer, and what each pixel went through to reach the canvas. The golden
- * frames are this (`tools/probe-frames.mjs`), so they test the drawing and the palettes
+ * frames are this (`tools/probe-frames.ts`), so they test the drawing and the palettes
  * it is shown through, and not the conversion of an Atari colour to the canvas's
  * (`atariIntensity`, `CanvasBlitter.ts`; `DEBT.md` H).
  *

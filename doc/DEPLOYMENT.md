@@ -98,7 +98,7 @@ that every folder holds the files its flags promise. The dev server answers
 `api/data-sets` as the server does (`vite.config.mts`), from it, read at each request, and
 from the sets published and moderated since it started, the published ones written in a
 scratch folder that goes when it stops. Its one moderator is the `playerId`
-`DEV_MODERATOR_PLAYER_ID` holds, which `tools/probe-frames.mjs` plays.
+`DEV_MODERATOR_PLAYER_ID` holds, which `tools/probe-frames.ts` plays.
 `npx tsx tools/fill-data-sets.ts` fills `npm start`'s empty store (`stats/stats.db`) from
 it, and `tools/check-image.sh` the image's throwaway one. Which sets the deployed site
 offers is the author's choice, written in its table by hand (below).
@@ -516,7 +516,7 @@ Every answer, the API's and every error's included, carries the same headers
 
 `tools/check-image.sh` proves the page runs under the policy: the frames are the built
 page's, served by the server with its headers, and the probe fails on anything the policy
-refuses (`tools/probe-frames.mjs`). The dev server sets none: Vite's own page runs inline
+refuses (`tools/probe-frames.ts`). The dev server sets none: Vite's own page runs inline
 scripts.
 
 **At start-up** it opens the store (making it, and its folder, when missing), checks

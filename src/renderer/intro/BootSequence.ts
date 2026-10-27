@@ -101,7 +101,7 @@ interface AttachedHost {
 }
 
 /**
- * The pre-game screens as the probes read them (`tools/probe-frames.mjs`, through
+ * The pre-game screens as the probes read them (`tools/probe-frames.ts`, through
  * `window.__probe.intro`): the VBLs the host has waited, whether a screen waits for a click
  * or a key (`nextEvent`), and the Hint Oracle while it is up, whose wait for a button is
  * its own (`HintOracleScreen.waiting`). Nothing of the game reads it.

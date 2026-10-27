@@ -35,7 +35,7 @@ export class CsbRandom {
    * seeds at initialisation from the host `rand()`, and nothing observable depends
    * on when the seed is chosen — but drawing it eagerly would consume a
    * `Math.random()` value at construction, which perturbs anything else sharing
-   * that generator (`tools/probe-frames.mjs` overrides `Math.random` to make the
+   * that generator (`tools/probe-frames.ts` overrides `Math.random` to make the
    * golden frames reproducible, and would shift by one).
    */
   constructor(seed?: number) {

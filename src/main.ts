@@ -458,6 +458,20 @@ interface Built {
     playInput: () => void;
 }
 
+/**
+ * The probes' handle, `window.__probe`: what `tools/probe-ui.ts` and `tools/probe-frames.ts`
+ * drive the live app through over CDP. `presetHeroes`: the heroes behind the dungeon's
+ * mirrors, for `tools/lib/buildParty.ts`. `intro`: the pre-game screens' VBLs and waits
+ * (`introProbe`).
+ */
+function probeHandle(built: Built, sound: SoundManager) {
+    const presetHeroes = () => extractPresetHeroes(built.game.ctx.dungeon.getData(), built.game.ctx.tables.textDecode, built.game.ctx.tables);
+    return { game: built.game, screen: built.screen, sound, saves: built.saves, renderView, refreshScreen, presetHeroes, applySaveBytes, intro: introProbe };
+}
+
+/** `window.__probe` (`probeHandle`), whose type the probes' page-side functions are checked against. */
+export type Probe = ReturnType<typeof probeHandle>;
+
 /** What the boot and the end of the game share: the canvas, the screen, the sound and the game's read. */
 function introDeps({ game, screen, saves, events, input }: Built, sound: SoundManager): Omit<BootSequenceDeps, 'skip' | 'title'> {
     return {
@@ -482,7 +496,7 @@ function createCrt(): void {
  *
  * The FTL logo comes first (`loadSwooshFiles`). With the startup animations off, neither
  * it nor the title is shown, and the entrance is. `?intro=0` skips all of it, for the
- * golden-frame probe and `tools/probe-ui.mjs`.
+ * golden-frame probe and `tools/probe-ui.ts`.
  *
  * The welcome page's CONTINUE opens the page with `?save=<row id>` (`src/ui/welcomePage.ts`),
  * and that save is read straight into play (`continueSave`), with neither the title nor
@@ -692,20 +706,14 @@ async function init() {
         // heard through the sound, and at every change.
         settings.subscribe((values) => applySettings(built, sound, values));
         console.log('✓ Game engine and screen constructed');
-        // The probes' handle. `tools/probe-ui.mjs` and `tools/probe-frames.mjs` drive the
-        // live app through this over CDP — see the `probe-app` skill. Module scope is
+        // The probes' handle (`probeHandle`) — see the `probe-app` skill. Module scope is
         // invisible to the DevTools protocol, so a bug that only shows on screen is
         // otherwise unreachable without hand-patching this file.
         //
         // Guarded on a build-time flag, which no player can turn on: `__CSBWEB_PROBE__` is
         // the dev server's, and a build's only with `CSBWEB_PROBE=1` (`vite.config.mts`),
         // so the handle cannot reach a deployed bundle.
-        if (__CSBWEB_PROBE__) {
-            // `presetHeroes`: the heroes behind the dungeon's mirrors, for `tools/lib/buildParty.mjs`.
-            // `intro`: the pre-game screens' VBLs and waits (`introProbe`).
-            const presetHeroes = () => extractPresetHeroes(built.game.ctx.dungeon.getData(), built.game.ctx.tables.textDecode, built.game.ctx.tables);
-            (window as unknown as Record<string, unknown>).__probe = { game, screen, sound, saves: built.saves, renderView, refreshScreen, presetHeroes, applySaveBytes, intro: introProbe };
-        }
+        if (__CSBWEB_PROBE__) (window as unknown as Record<string, unknown>).__probe = probeHandle(built, sound);
         // Before the intro: the entrance's chooser takes a dropped save as the disk menu does.
         bindSaveDrop(built.screen.ui);
         await runIntro(built, sound);

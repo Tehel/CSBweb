@@ -6,14 +6,14 @@ description: Look at the running CSBweb app and read its live state — take a s
 # Probing the running app
 
 `tools/checks/*.ts` stand the engine up without the UI, so they cannot see anything that goes
-wrong *on screen*. `tools/probe-ui.mjs` drives the real page over the Chrome DevTools
+wrong *on screen*. `tools/probe-ui.ts` drives the real page over the Chrome DevTools
 Protocol instead, through the `window.__probe` handle `src/main.ts` exposes.
 
 ```bash
-node tools/probe-ui.mjs 'game.ctx.party.state.champions.map(c => c && c.name)'
-node tools/probe-ui.mjs --boot --shot /tmp/boot.png
-node tools/probe-ui.mjs --click 15,15,right --shot /tmp/inv.png 'screen.ui.uiMode'
-node tools/probe-ui.mjs --stop
+node tools/probe-ui.ts 'game.ctx.party.state.champions.map(c => c && c.name)'
+node tools/probe-ui.ts --boot --shot /tmp/boot.png
+node tools/probe-ui.ts --click 15,15,right --shot /tmp/inv.png 'screen.ui.uiMode'
+node tools/probe-ui.ts --stop
 ```
 
 Actions run in the order given; the bare argument is evaluated last, with `game`,
@@ -39,8 +39,8 @@ The engine's API is not what you would guess — champions are at
 `game.ctx.party.state.champions`, not `game.ctx.party.champions`. Don't guess twice; ask:
 
 ```bash
-node tools/probe-ui.mjs 'Object.keys(game)'
-node tools/probe-ui.mjs 'Object.keys(game.ctx.party.state)'
+node tools/probe-ui.ts 'Object.keys(game)'
+node tools/probe-ui.ts 'Object.keys(game.ctx.party.state)'
 ```
 
 The expression is serialised with `JSON.stringify`, so `Map`s are converted and `bigint`s
@@ -64,11 +64,13 @@ only by a screenshot has no regression test.
 
 ## The handle
 
-`src/main.ts` creates `window.__probe` under `__CSBWEB_PROBE__`, a build-time constant
+`src/main.ts` creates `window.__probe` (`probeHandle`, its type `Probe`) under `__CSBWEB_PROBE__`, a build-time constant
 (`vite.config.mts`), so no player's setting can reach it. The constant is true on the
 dev server, and in a build only with `CSBWEB_PROBE=1`, which `tools/check-image.sh` gives
 the image it checks the golden frames against. A deployed bundle has no handle
-(`tools/checks/build.ts` asserts it).
+(`tools/checks/build.ts` asserts it). Page-side code a tool keeps should be a function
+typed against `Probe` and sent as its source, as `tools/lib/buildParty.ts` is: `tsc` then
+catches a rename in the engine that a string would hide until `--frames`.
 
 Leaving a probe browser running does not disturb `tools/check-frames.sh` — it reloads and
 re-seeds the page itself. Verified: `npm test -- --frames` passes 34/34 with one up.

@@ -1,11 +1,11 @@
 ---
 name: probe-gotchas
-description: Two traps when driving the live app with probe-ui.mjs — Position is a class mutated in place, and picking rects are viewport-relative while button lists are screen coordinates
+description: Two traps when driving the live app with probe-ui.ts — Position is a class mutated in place, and picking rects are viewport-relative while button lists are screen coordinates
 metadata:
   type: project
 ---
 
-Two gotchas when poking live state through `tools/probe-ui.mjs` (the `probe-app` skill):
+Two gotchas when poking live state through `tools/probe-ui.ts` (the `probe-app` skill):
 
 - **`party.position` is a `Position` class instance** (`src/core/types.ts`) with
   `.north`/`.east`/… accessors. `p.position = {...p.position, x, y}` fails silently —

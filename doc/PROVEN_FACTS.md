@@ -6580,7 +6580,7 @@ it to `TAG000bb0`, which takes the cursor off the screen (`:957-958`, `:967`, `:
 So the cursor moves once a VBL at most. The port's `GameInput.mouseMove` records the
 pointer and draws nothing, and the page's frame, a VBL's, composes the screen when the
 pointer has moved (`GameScreen.takeCursorMoved`, `wire` in `src/main.ts`).
-`tools/probe-frames.mjs` checks that fifty moves between two VBLs paint nothing
+`tools/probe-frames.ts` checks that fifty moves between two VBLs paint nothing
 themselves, and that the next VBL's frame has the cursor where the pointer last was.
 
 ## The key tables: CSBWin's own keys

@@ -72,8 +72,11 @@ keeps what it has, and nothing new goes in.
 Vanilla TypeScript (strict, `noUnusedLocals`/`noUnusedParameters`, and `src/` and
 `server/` under `noUncheckedIndexedAccess`) + Vite. No framework. Each project is checked
 on its runtime's types: the page (`tsconfig.json`, the DOM's), the tools and `utils/`
-(their folder's, Node's beside them) and the server (`server/`, Node's alone, on Node's
-resolution).
+(their folder's, Node's beside them) and the server with `vite.config.mts` (`server/`,
+Node's alone, on Node's resolution). The runner and the CDP drivers (`run-checks.ts`,
+`probe-frames.ts`, `probe-ui.ts`, …) are `.ts` that Node runs itself, so their imports
+name their `.ts`, and the page-side function a probe sends (`tools/lib/buildParty.ts`) is
+checked against the probe handle's type (`Probe`, `src/main.ts`).
 One Node, 24, everywhere: `.nvmrc`, `engines`, `@types/node` and the image's, pinned
 (`doc/DEPLOYMENT.md` → "The image and the stack").
 A single 320×200 `<canvas>` is the whole screen, CSS-scaled to 960×600 with
@@ -102,14 +105,14 @@ nothing. The project once sat with a broken `tsc` for months, and a genuine runt
 was hiding among the type errors.
 
 There is still **no test framework** (`PLAN.md` → "The evidence") — `npm test` is a runner
-(`tools/run-checks.mjs`) over two standing forms of evidence, and both must pass:
+(`tools/run-checks.ts`) over two standing forms of evidence, and both must pass:
 
 - `tools/check-frames.sh` compares thirty-one live screen states against `tools/frames/` — the
   cheapest way to prove a renderer or UI change kept every pixel. It starts its own dev
   server and headless Chrome, so it needs no setup. It is
   out of the default run only because it costs a browser and ~80s. Run it before any renderer or UI commit. A frame is
   the 320x200 screen as CSBWin draws it, its palette slots and the palettes they were shown
-  through (`tools/lib/frames.mjs`), not the canvas's colours: a slot drawn for another of
+  through (`tools/lib/frames.ts`), not the canvas's colours: a slot drawn for another of
   the same colour fails, and a baseline captured on one machine is checkable on another. The probe also asserts on the spot what
   no frame shows: the CRT effect, drawing only what is presented, and its pointer while WebGL is lost, which needs a Chrome that gives WebGL, the wheel
   and the keys reaching a save menu, at the entrance as in play, a move of the pointer
@@ -131,7 +134,7 @@ There is still **no test framework** (`PLAN.md` → "The evidence") — `npm tes
   happened, and assert invariants. Each is named for what it checks; a `watch-` tool runs
   the clock and reports what emerged over time. **They are the regression suite for
   everything the frames cannot see** — tables, AI, damage, timers, movement. `npm test`
-  runs every tool **listed** in `tools/run-checks.mjs` — there is no discovery, so a new
+  runs every tool **listed** in `tools/run-checks.ts` — there is no discovery, so a new
   tool is not evidence until it is added there. Run one on its own with
   `npm test -- --only=<name>.ts [args]`, which checks the types first and prints the
   tool's whole output; `npx tsx` strips the types without checking them. A tool builds
@@ -143,7 +146,7 @@ When porting behaviour that is invisible on screen, write the tool in the same c
 The `verification-tools` skill in `.claude/skills/` has the pattern, the gotchas, and
 the "canary" technique for proving an extracted table sits at the right offset.
 
-`tools/probe-ui.mjs` is the third thing, and it is **not** evidence: it drives the running
+`tools/probe-ui.ts` is the third thing, and it is **not** evidence: it drives the running
 app over CDP to read live state, click the canvas and take screenshots, for bugs that only
 show up on screen. Use it to find out what is wrong, then prove it in a `tools/checks/*.ts`. The
 `playtest-bug` and `probe-app` skills cover the debugging loop those two serve.
@@ -296,7 +299,7 @@ are the expensive thing, not hard questions. So:
   peeks at the same file: every peek re-sends the whole conversation.
 - **Consult `doc/CSBWIN_SYMBOL_INDEX.tsv` before grepping `doc/CSBwin-src/`.** One
   `grep -P '^SummarizeRoomInfo\t'` replaces a grep of 120k lines plus the two peeks that
-  usually follow it. Regenerate with `node tools/gen-csbwin-index.mjs` if the tree changes.
+  usually follow it. Regenerate with `node tools/gen-csbwin-index.ts` if the tree changes.
 - **Delegate open-ended C++ searches to an `Explore` subagent** — "where does CSBWin decide
   a missile has hit?" — and keep the ten greps and their output out of the main context.
   This is a deliberate exception to the default of not spawning agents. Do it for *search*,

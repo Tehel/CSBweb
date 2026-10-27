@@ -3,7 +3,7 @@
  *
  * Every verification tool used to hand-roll its own three-line `check()` and its own
  * verdict line, and three of them ended up with no assertions at all — they printed
- * `PROBLEMS: …` and still exited 0, so `tools/run-checks.mjs` would have called them
+ * `PROBLEMS: …` and still exited 0, so `tools/run-checks.ts` would have called them
  * green. `finish()` fixes that from one place: it owns the exit code, and it treats a
  * run that made **no** checks as a failure, because a tool that cannot fail is not
  * evidence of anything.

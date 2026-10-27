@@ -35,7 +35,7 @@
  *
  * `--check` writes nothing: it asserts that the file holds the bytes this tool would
  * write. That the browser draws the file as the game's font, pixel for pixel, is
- * `tools/probe-frames.mjs`'s check, which reads the characters to expect from `--rows`:
+ * `tools/probe-frames.ts`'s check, which reads the characters to expect from `--rows`:
  * `[[codePoint, [six row bytes]], …]`.
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';

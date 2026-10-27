@@ -242,7 +242,7 @@ export class ScreenComposer {
 
   /**
    * The screen last shown, as palette indices and the palettes they were shown through:
-   * the golden frames (`tools/probe-frames.mjs`).
+   * the golden frames (`tools/probe-frames.ts`).
    */
   presentedFrame(): PresentedFrameCapture {
     return this.presented.capture(this.output.image.data);

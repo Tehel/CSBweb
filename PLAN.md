@@ -89,7 +89,7 @@ against CSBWin's own screenshots, and the extras (X). No dungeon the port plays 
   TO PLAY, also at `#how-to-play`, is the newcomer's sheet (`src/ui/howToPlay.ts`): the keys as the player's settings
   have them, with a chooser of the presets' moves, the runes in the game's font with the manual's names, the first
   steps and the mouse, and a PDF and a PNG of it to print, for each preset and each label layout, which
-  `tools/gen-help-sheet.mjs` makes (the frames' probe fails a sheet changed without them made again). The map dialog's teleport, a press held on a square of any level (`Game.devTeleport`), is behind `?dev`, and so is a move down or up a level whatever is there (`Game.devChangeLevel`). The page has no log of its
+  `tools/gen-help-sheet.ts` makes (the frames' probe fails a sheet changed without them made again). The map dialog's teleport, a press held on a square of any level (`Game.devTeleport`), is behind `?dev`, and so is a move down or up a level whatever is there (`Game.devChangeLevel`). The page has no log of its
   own: what it reports goes to the console, a move's position at debug level, what F5,
   F9 or the Sleepsave did at info level.
 
@@ -97,16 +97,16 @@ against CSBWin's own screenshots, and the extras (X). No dungeon the port plays 
 - Everything in `DEBT.md`: the technical debt, the known divergences from CSBWin, and the
   unported CSBWin features (tier G).
 
-**The evidence.** `npm test` runs `tsc` and every tool listed in `tools/run-checks.mjs`;
+**The evidence.** `npm test` runs `tsc` and every tool listed in `tools/run-checks.ts`;
 `npm test -- --frames` adds the golden frames. There is still no test *framework*:
 
-1. **Golden frames.** `tools/probe-frames.mjs` and `tools/check-frames.sh` drive the real
+1. **Golden frames.** `tools/probe-frames.ts` and `tools/check-frames.sh` drive the real
    app over the DevTools Protocol and compare the screen states in `tools/frames/`. The
    probe reads the 320x200 screen back as its palette slots and the palettes they were
-   shown through, and `tools/compare-frames.mjs` compares those, so nothing depends on the
+   shown through, and `tools/compare-frames.ts` compares those, so nothing depends on the
    host machine or on how an Atari colour is shown on the canvas. It also fails a baseline that holds two identical
    frames, so a frame that can no longer fail is caught.
-2. **Verification tools.** `tools/run-checks.mjs` is the one list of them; don't copy it
+2. **Verification tools.** `tools/run-checks.ts` is the one list of them; don't copy it
    anywhere. They load the real game files, drive the real engine with a fixed RNG seed,
    print a human-readable table and assert invariants through `tools/lib/check.ts`, whose
    `finish()` also fails a run that made no checks. They are the regression suite for

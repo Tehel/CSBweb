@@ -1,7 +1,8 @@
 {
   // The server as Node 24 runs it, types stripped: Node's module resolution, so that an
   // import names its `.ts`, Node's types and not the DOM's, only erasable syntax, and
-  // type-only imports marked as such. `npm test` checks it beside the page and the tools.
+  // type-only imports marked as such. `npm test` checks it beside the page and the tools,
+  // and `vite.config.mts` with it, the dev server that serves the same modules.
   "extends": "../tsconfig.json",
   "compilerOptions": {
     "target": "ES2024",
@@ -12,5 +13,5 @@
     "erasableSyntaxOnly": true,
     "verbatimModuleSyntax": true
   },
-  "include": ["."]
+  "include": [".", "../vite.config.mts"]
 }

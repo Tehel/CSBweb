@@ -3,9 +3,12 @@
  * page draws for a player's own set and `tools/gen-thumbnails.ts` for the site's. Eight
  * bits a pixel, no filter, one `IDAT`. The compression is the caller's: the page's is
  * `CompressionStream`, a tool's `zlib`, and either is the zlib stream PNG wants.
+ *
+ * Its import names its `.ts`, as Node resolves it: the golden-frame probe runs it through
+ * `tools/lib/png.ts` with no bundler.
  */
 
-import { crc32 } from './crc32';
+import { crc32 } from './crc32.ts';
 
 /** The PNG file's signature. */
 const SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
@@ -31,9 +34,11 @@ export function indexedPngRows(width: number, height: number, indices: Uint8Arra
 
 /**
  * The PNG of a `width`x`height` image over `palette`'s `[r, g, b]`, whose rows,
- * `indexedPngRows`, `compressed` holds as a zlib stream.
+ * `indexedPngRows`, `compressed` holds as a zlib stream, and each of `text`'s entries a
+ * `tEXt` chunk, Latin-1.
  */
-export function indexedPng(width: number, height: number, palette: readonly (readonly number[])[], compressed: Uint8Array): Uint8Array<ArrayBuffer> {
+export function indexedPng(width: number, height: number, palette: readonly (readonly number[])[], compressed: Uint8Array,
+    text: Readonly<Record<string, string>> = {}): Uint8Array<ArrayBuffer> {
     if (palette.length === 0 || palette.length > 256) throw new Error(`a palette of ${palette.length} colours`);
     const ihdr = new Uint8Array(13);
     const view = new DataView(ihdr.buffer);
@@ -45,6 +50,7 @@ export function indexedPng(width: number, height: number, palette: readonly (rea
         Uint8Array.from(SIGNATURE),
         chunk('IHDR', ihdr),
         chunk('PLTE', Uint8Array.from(palette.flat())),
+        ...Object.entries(text).map(([keyword, value]) => chunk('tEXt', Uint8Array.from(`${keyword}\0${value}`, (c) => c.charCodeAt(0) & 0xff))),
         chunk('IDAT', compressed),
         chunk('IEND', new Uint8Array(0)),
     ];
