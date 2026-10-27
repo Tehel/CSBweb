@@ -46,7 +46,7 @@ import {
 import { Position } from '../core/types';
 import { ViewportRenderer } from './ViewportRenderer';
 import { LEFT_HANDED_VIEWPORT, leftHandedLayout, leftHandedX, makeLeftHanded, rightHandedX, type LeftHandedLayout } from './LeftHanded';
-import { createUIState, initializePlayState, savedGameRead, UIMode, type ScreenIndexBuffer, type UIState } from './ui/UIState';
+import { createUIState, initializePlayState, savedGameRead, UIMode, type ScreenIndexBuffer, type UIHooks, type UIState } from './ui/UIState';
 import { drawStaticUIFrame } from './ui/Draw';
 import {
   drawCursorItem,
@@ -97,32 +97,10 @@ import { drawHintOracleButton, type HintOracleFiles } from './ui/HintOracleButto
 import { displayFrozenScreen, displaySleepScreen, drawMessageLines, shadeRectIndex } from './ui/Draw';
 
 /**
- * What the interface asks of the page. Each is one of `UIState`'s hooks out, documented
- * there. The engine the interface reaches through `ui.ctx`.
+ * What the interface asks of the page: `UIState`'s hooks out, documented there, but the
+ * screen's own two. The engine the interface reaches through `ui.ctx`.
  */
-export type GameScreenHooks = Pick<UIState,
-  | 'onReincarnated'
-  | 'onListSaves'
-  | 'onListEverySave'
-  | 'onReadSave'
-  | 'onMakeNewAdventure'
-  | 'onHasNewFaces'
-  | 'onSaveGame'
-  | 'isPrison'
-  | 'onExportSave'
-  | 'onDeleteSave'
-  | 'onImportSave'
-  | 'onRestoreSave'
-  | 'onRestoreFailed'
-  | 'onOpenHintOracle'
-  | 'onSleepSave'
-  | 'onExit'
-  | 'settings'
-  | 'isCrtAvailable'
-  | 'fullscreen'
-  | 'keyboardLayout'
-  | 'onTeleport'
->;
+export type GameScreenHooks = Omit<UIHooks, 'getGraphicBitmap' | 'renderLastFrame'>;
 
 /** What the screen reads: the graphics, and the game it shows. */
 interface GameScreenDeps {
@@ -221,29 +199,9 @@ export class GameScreen {
       fontData: loadFontData(graphicsLoader),
       graphicCache,
     }, {
+      ...hooks,
       getGraphicBitmap: (graphicNum, format) => this.getGraphicBitmap(graphicNum, format),
       renderLastFrame: () => this.renderLastFrame(),
-      onReincarnated: hooks.onReincarnated,
-      onListSaves: hooks.onListSaves,
-      onListEverySave: hooks.onListEverySave,
-      onReadSave: hooks.onReadSave,
-      onMakeNewAdventure: hooks.onMakeNewAdventure,
-      onHasNewFaces: hooks.onHasNewFaces,
-      onSaveGame: hooks.onSaveGame,
-      isPrison: hooks.isPrison,
-      onExportSave: hooks.onExportSave,
-      onDeleteSave: hooks.onDeleteSave,
-      onImportSave: hooks.onImportSave,
-      onRestoreSave: hooks.onRestoreSave,
-      onRestoreFailed: hooks.onRestoreFailed,
-      onOpenHintOracle: hooks.onOpenHintOracle,
-      onSleepSave: hooks.onSleepSave,
-      onExit: hooks.onExit,
-      settings: hooks.settings,
-      isCrtAvailable: hooks.isCrtAvailable,
-      fullscreen: hooks.fullscreen,
-      keyboardLayout: hooks.keyboardLayout,
-      onTeleport: hooks.onTeleport,
     });
     ui.hintOracle = deps.hintOracle ?? null;
     this.ui = ui;
