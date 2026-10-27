@@ -431,9 +431,9 @@ opens the same one, load-only.
   there is no "NEW SAVE" (`savesDisabled`, `src/renderer/ui/SaveMenu.ts`).
 - **The same dialog at the entrance and in play**: the chooser takes the clicks, the
   wheel and the keys the disk menu takes, less SAVE and the question. The wheel and the
-  keys reach the list in play and at the entrance, whose chooser is up before the
-  page's own listeners are bound (`createIntroHost`,
-  `src/renderer/intro/BootSequence.ts`).
+  keys reach the list in play and at the entrance, whose chooser is up before play has
+  the input: the entrance's host holds it then (`createIntroHost`,
+  `src/renderer/intro/BootSequence.ts`, through `GameInput.take`).
 - **No "GAME LOADED, READY TO PLAY."**, nor its "ASCII DUMP" (`DEBT.md` G14): a
   loaded game is played at once. It is CSBWin's `_TAG021028` menu
   (`doc/CSBwin-src/CSBCode.cpp:10617-10661`), so its absence is an entry of

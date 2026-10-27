@@ -29,6 +29,7 @@ import { createCrtEffect, type CrtEffect } from './lib/crt';
 import { Presenter } from './renderer/Presenter';
 import { NO_FULLSCREEN, createFullscreen, type PageFullscreen } from './lib/fullscreen';
 import { GameScreen } from './renderer/GameScreen';
+import { NO_INPUT, type GameInput } from './renderer/GameInput';
 import { hostDrawing } from './renderer/ui/HostDrawing';
 import { bindSaveDrop, bindUIEvents, showFatalMessage, showWelcomePage, welcomePageQuery } from './ui';
 import { ScrollingText } from './renderer/csbwin/ScrollingText';
@@ -304,7 +305,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
             // The adventure's animations end with it: a chew draws nothing over the credits.
             presenter.cancel();
             events.ended(word11694);
-            if (screen) showEndOfGame({ ...introDeps({ game, screen, saves, messages, events }, sound), game, messages }, word11694).catch(reportError);
+            if (screen) showEndOfGame({ ...introDeps({ game, screen, saves, messages, events, input, playInput }, sound), game, messages }, word11694).catch(reportError);
         },
         // A script's tick, `_ProcessTimersViewportAndSound`, draws the viewport itself.
         drawViewport: () => renderView(),
@@ -420,13 +421,29 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
                 screen?.closeHintOracle();
             };
             if (!screen || !files.hintOracle) return close();
-            const deps = { canvas: gameCanvasEl, gameScreen: screen, playSound };
+            const deps = { input, gameScreen: screen, playSound };
             void openHintOracle(deps, files.hintOracle, square, game.ctx.dungeon.getData().hintKey, messages)
                 .then((error) => { if (error !== null) console.error('Hint Oracle:', error); })
                 .finally(close);
         },
     }, presenter, () => crtController?.presented());
-    return { game, screen, saves, messages, events };
+
+    // The page's input, one path for the pre-game screens and play: nobody's while the page
+    // loads, a pre-game screen's while one has the canvas, and play's once `wire` releases it.
+    const input = bindUIEvents({
+        screen,
+        game,
+        refreshScreen,
+        onQuickSave: () => { void saves.quickSave(); },
+        onQuickLoad: () => { void saves.quickLoad(); },
+        // On a page opened with `?dev`, the move down and up keys go a level down and up
+        // whatever is there; the game then sends no statistics (`GameEvents.teleported`).
+        onDevLevel: new URLSearchParams(window.location.search).has('dev') ? (delta) => {
+            if (game.devChangeLevel(delta)) events.teleported();
+        } : null,
+    });
+    const playInput = input.take(NO_INPUT);
+    return { game, screen, saves, messages, events, input, playInput };
 }
 
 /** What `construct` builds, which the boot, the play and the end of the game share. */
@@ -436,12 +453,15 @@ interface Built {
     saves: GameSaves;
     messages: ScrollingText;
     events: GameEvents;
+    input: GameInput;
+    /** Hands the input, held by nobody while the page loads, to play. */
+    playInput: () => void;
 }
 
 /** What the boot and the end of the game share: the canvas, the screen, the sound and the game's read. */
-function introDeps({ game, screen, saves, events }: Built, sound: SoundManager): Omit<BootSequenceDeps, 'skip' | 'title'> {
+function introDeps({ game, screen, saves, events, input }: Built, sound: SoundManager): Omit<BootSequenceDeps, 'skip' | 'title'> {
     return {
-        canvas: gameCanvasEl,
+        input,
         gameScreen: screen,
         playSound: (soundId, rateIdx) => sound.playSound(soundId, rateIdx),
         consumeSavedGameRead: () => saves.consumeSavedGameRead(),
@@ -457,8 +477,8 @@ function createCrt(): void {
 
 /**
  * The title animation and the dungeon entrance, before anything is playable
- * (`src/renderer/intro/BootSequence.ts`). It runs before `wire` so the adventure
- * screen's own canvas handlers cannot see the entrance's clicks.
+ * (`src/renderer/intro/BootSequence.ts`). It runs before `wire`, so the adventure has no
+ * input yet: the boot's screens hold it while they have the canvas.
  *
  * The FTL logo comes first (`loadSwooshFiles`). With the startup animations off, neither
  * it nor the title is shown, and the entrance is. `?intro=0` skips all of it, for the
@@ -508,19 +528,8 @@ async function continueSave({ saves, events }: Built, id: string): Promise<boole
 }
 
 /** The page's side of play: its input, and a redraw per move and per tick. */
-function wire({ game, screen, saves, messages, events }: Built): void {
-    bindUIEvents({
-        screen,
-        game,
-        refreshScreen,
-        onQuickSave: () => { void saves.quickSave(); },
-        onQuickLoad: () => { void saves.quickLoad(); },
-        // On a page opened with `?dev`, the move down and up keys go a level down and up
-        // whatever is there; the game then sends no statistics (`GameEvents.teleported`).
-        onDevLevel: new URLSearchParams(window.location.search).has('dev') ? (delta) => {
-            if (game.devChangeLevel(delta)) events.teleported();
-        } : null,
-    });
+function wire({ game, screen, messages, events, playInput }: Built): void {
+    playInput();
 
     game.onMove((success) => {
         if (success) console.debug(game.getPositionInfo() || 'Moved');

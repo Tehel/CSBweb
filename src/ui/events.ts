@@ -33,8 +33,7 @@ function bindCanvasEvents(canvas: HTMLCanvasElement | null, input: GameInput): v
     canvas.addEventListener('pointerdown', (e) => {
         if (!e.isPrimary) return;
         const { x, y } = getEventPosition(canvas, e);
-        if (e.pointerType !== 'mouse') input.mouseMove(x, y);
-        input.mouseDown(x, y, e.button);
+        input.mouseDown(x, y, e.button, e.pointerType !== 'mouse');
         // A synthetic event's pointer is none the browser tracks, and capturing it throws.
         if (e.isTrusted) canvas.setPointerCapture(e.pointerId);
     });
@@ -60,8 +59,11 @@ function bindCanvasEvents(canvas: HTMLCanvasElement | null, input: GameInput): v
     });
 }
 
-/** The page's listeners, on the game canvas and the document, handing over to the game's input path. */
-export function bindUIEvents(host: GameInputHost): void {
+/**
+ * The page's listeners, on the game canvas and the document, handing over to the game's
+ * input path, which they return: the pre-game screens' as play's (`GameInput.take`).
+ */
+export function bindUIEvents(host: GameInputHost): GameInput {
     const input = new GameInput(host);
     const gameCanvasEl = document.getElementById('game-canvas') as HTMLCanvasElement | null;
     bindCanvasEvents(gameCanvasEl, input);
@@ -75,4 +77,5 @@ export function bindUIEvents(host: GameInputHost): void {
             if (input.keyDown(e)) e.preventDefault();
         });
     }
+    return input;
 }

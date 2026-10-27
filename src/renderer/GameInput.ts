@@ -2,7 +2,11 @@
  * The game's input path: where a pointer event or a key goes once the page has read it.
  *
  * The page's listeners (`src/ui/events.ts`) hand over a point of the canvas and a button,
- * or a key press, and nothing else of the DOM. The point is made CSBWin's screen's first,
+ * or a key press, and nothing else of the DOM. While an owner holds the input (`take`) it
+ * has all of it: a pre-game screen's host while it has the canvas
+ * (`src/renderer/intro/BootSequence.ts`), the title and the entrance, the credits and the
+ * Hint Oracle, or nobody while the page loads (`NO_INPUT`). Otherwise it is the
+ * adventure's. The point is made CSBWin's screen's first,
  * which it is but on the left-handed screen (`GameScreen.screenPoint`). From here a click is the dialog's
  * (`src/renderer/ui/Dialog.ts`), a modal screen's, or a button searched in the
  * interface's lists and queued on the game's one mouse queue; a key is the dialog's, a
@@ -53,6 +57,33 @@ export interface GameInputHost {
 }
 
 /**
+ * What holds the input whole while it has it (`GameInput.take`): every event is its own,
+ * and none the adventure's. Its points are the canvas's, as the page reads them, never
+ * moved for the left-handed screen, which only play has.
+ */
+export interface InputOwner {
+  mouseMove(canvasX: number, canvasY: number): void;
+  /** A button pressed: `button` is `MouseEvent.button`'s number. */
+  mouseDown(canvasX: number, canvasY: number, button: number): void;
+  mouseUp(): void;
+  mouseLeave(): void;
+  /** Says whether it took the wheel. */
+  wheel(deltaY: number): boolean;
+  /** Says whether it took the key, the browser then doing nothing with it. */
+  keyDown(press: KeyPress): boolean;
+}
+
+/** The owner that takes nothing: the page's while it loads, before the boot's screens or play have the canvas. */
+export const NO_INPUT: InputOwner = {
+  mouseMove: () => {},
+  mouseDown: () => {},
+  mouseUp: () => {},
+  mouseLeave: () => {},
+  wheel: () => false,
+  keyDown: () => false,
+};
+
+/**
  * A key pressed, as a `KeyboardEvent` has it: `key` is the character it types, which the
  * text screens read, and `code` the physical key, which every binding matches
  * (`src/renderer/ui/Keyboard.ts`).
@@ -76,8 +107,23 @@ export class GameInput {
   private messagePress: ReturnType<typeof setTimeout> | null = null;
   /** The press on a champion's stat bars held back (`holdBarsPress`), or `null`. */
   private barsPress: { x: number; y: number; chIdx: number; timer: ReturnType<typeof setTimeout> } | null = null;
+  /** What holds the input whole (`take`), or `null`: the adventure has it. */
+  private owner: InputOwner | null = null;
 
   constructor(private readonly host: GameInputHost) {}
+
+  /**
+   * Give `owner` every event until the returned release, which gives the input back to
+   * whoever had it before: the page takes it first while it loads, and a pre-game screen
+   * over that, or over play.
+   */
+  take(owner: InputOwner): () => void {
+    const previous = this.owner;
+    this.owner = owner;
+    return () => {
+      this.owner = previous;
+    };
+  }
 
   private get ui(): UIState {
     return this.host.screen.ui;
@@ -94,9 +140,9 @@ export class GameInput {
   }
 
   /**
-   * The Hint Oracle is up: it reads the canvas through a host of its own
-   * (`runHintOracle`, `src/renderer/intro/BootSequence.ts`), and the adventure's handlers
-   * neither act nor draw until it closes.
+   * The Hint Oracle is up: it reads the canvas through a host of its own, which holds the
+   * input (`runHintOracle`, `src/renderer/intro/BootSequence.ts`), and the adventure's
+   * handlers neither act nor draw until it closes, its held presses' timers included.
    */
   private oracleUp(): boolean {
     return this.ui.hintOracleUp;
@@ -126,6 +172,10 @@ export class GameInput {
    * to show any.
    */
   mouseMove(canvasX: number, canvasY: number): void {
+    if (this.owner) {
+      this.owner.mouseMove(canvasX, canvasY);
+      return;
+    }
     if (this.ended() || this.oracleUp()) return;
     const { x, y } = this.host.screen.screenPoint(canvasX, canvasY);
     this.host.screen.setHoverPoint({ x, y });
@@ -134,8 +184,16 @@ export class GameInput {
     if (this.barsPress !== null && championBarsAt(this.ui, x, y) !== this.barsPress.chIdx) this.queueBarsPress();
   }
 
-  /** A button pressed: `button` is `MouseEvent.button`'s number. */
-  mouseDown(canvasX: number, canvasY: number, button: number): void {
+  /**
+   * A button pressed: `button` is `MouseEvent.button`'s number. `touch`, a finger's or a
+   * stylus's, is first seen as it presses, so in play the press puts the cursor where it is.
+   */
+  mouseDown(canvasX: number, canvasY: number, button: number, touch = false): void {
+    if (this.owner) {
+      this.owner.mouseDown(canvasX, canvasY, button);
+      return;
+    }
+    if (touch) this.mouseMove(canvasX, canvasY);
     if (this.ended() || this.oracleUp()) return;
     const { x, y } = this.host.screen.screenPoint(canvasX, canvasY);
     const { game } = this.host;
@@ -259,6 +317,10 @@ export class GameInput {
     this.dragging = false;
     this.releaseMessagePress();
     this.queueBarsPress();
+    if (this.owner) {
+      this.owner.mouseUp();
+      return;
+    }
     if (this.ended() || this.oracleUp()) return;
     if (isDialogOpen(this.ui)) {
       if (dragged) this.ui.dialog?.release?.(this.ui);
@@ -269,6 +331,7 @@ export class GameInput {
 
   /** The wheel, which only a dialog takes. Says whether it took it. */
   wheel(deltaY: number): boolean {
+    if (this.owner) return this.owner.wheel(deltaY);
     if (this.ended() || !isDialogOpen(this.ui)) return false;
     this.host.screen.handleDialogWheel(deltaY);
     return true;
@@ -278,12 +341,17 @@ export class GameInput {
   mouseLeave(): void {
     this.releaseMessagePress();
     this.queueBarsPress();
+    if (this.owner) {
+      this.owner.mouseLeave();
+      return;
+    }
     if (this.ended() || this.oracleUp()) return;
     this.host.screen.setHoverPoint(null);
   }
 
   /** A key pressed. Says whether the game took it. */
   keyDown(press: KeyPress): boolean {
+    if (this.owner) return this.owner.keyDown(press);
     const { game } = this.host;
     const { key, code } = press;
     // `_ShowCredits` has emptied `d.pKeyXlate1` and `d.pKeyXlate2`

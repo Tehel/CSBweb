@@ -30,9 +30,9 @@ import type { Swoosh } from '../../data/SwooshLoader';
 import { readHintOracle } from '../../data/HintOracleLoader';
 import type { HintOracleFiles } from '../ui/HintOracleButton';
 import { Die } from '../../core/Die';
-import { canvasPoint } from '../../lib/crt';
 import type { MessageSink } from '../../engine/GameHost';
 import type { SavedGameRead } from '../../engine/GameSaves';
+import type { GameInput, InputOwner } from '../GameInput';
 import type { GameScreen } from '../GameScreen';
 import type { UIState } from '../ui/UIState';
 import { isDialogOpen } from '../ui/Dialog';
@@ -52,7 +52,8 @@ import type { TitleFrame } from './TitleThumbnail';
 const VBL_MS = 1000 / 60;
 
 export interface BootSequenceDeps {
-  canvas: HTMLCanvasElement;
+  /** The page's input (`src/ui/events.ts`), which a host holds while its screens have the canvas. */
+  input: Pick<GameInput, 'take'>;
   gameScreen: GameScreen;
   /** `StartSound` — see `timerDataToRateIndex` for where the rate index comes from. */
   playSound?: (soundId: number, rateIdx?: number) => void;
@@ -110,11 +111,15 @@ export const introProbe: { vbls: number; waiting: boolean; oracle: { readonly wa
 };
 
 /** What a host needs from the page: `BootSequenceDeps` without the boot's own decisions. */
-type HostDeps = Pick<BootSequenceDeps, 'canvas' | 'gameScreen' | 'playSound'>;
+type HostDeps = Pick<BootSequenceDeps, 'input' | 'gameScreen' | 'playSound'>;
 
-/** `palette` is the shifter's colour registers as the host finds them. */
-function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHost {
-  const { canvas, gameScreen } = deps;
+/**
+ * `palette` is the shifter's colour registers as the host finds them. The host holds the
+ * page's input until it is detached (`GameInput.take`). Its screens take a key a dialog
+ * of theirs reads from the browser, or every key but a browser shortcut where `ownsKeys`.
+ */
+function createIntroHost(deps: HostDeps, palette: readonly number[], ownsKeys = false): AttachedHost {
+  const { gameScreen } = deps;
   const { composer, ui } = gameScreen;
   const screen = composer.screen;
   const uiTables = ui.uiTables;
@@ -144,70 +149,57 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
     }
   };
 
-  // CSBWin's mask: 2 = left, 1 = right (`doc/CSBwin-src/CSB.h:1662-1670`).
-  // Through the CRT effect's curve where it is on (`canvasPoint`), as in play.
-  const pointAt = (e: MouseEvent): { x: number; y: number } => canvasPoint(canvas, e);
-  // Pointer events, as in play (`bindCanvasEvents`, `src/ui/events.ts`): only the primary
-  // pointer, and a finger's lift is not the pointer leaving.
-  const onMouseDown = (e: PointerEvent): void => {
-    if (!e.isPrimary) return;
-    const { x, y } = pointAt(e);
-    pointerX = x;
-    pointerY = y;
-    const buttons = e.button === 2 ? 1 : e.button === 0 ? 2 : 0;
-    if (buttons === 0) return;
-    mouseSwitches = buttons;
-    push({ kind: 'click', x, y, buttons });
+  // The page's points of the canvas, as play has them (`src/ui/events.ts`): through the CRT
+  // effect's curve where it is on, only the primary pointer's, and a finger's lift is not
+  // the pointer leaving.
+  const owner: InputOwner = {
+    mouseDown: (x, y, button) => {
+      pointerX = x;
+      pointerY = y;
+      // CSBWin's mask: 2 = left, 1 = right (`doc/CSBwin-src/CSB.h:1662-1670`).
+      const buttons = button === 2 ? 1 : button === 0 ? 2 : 0;
+      if (buttons === 0) return;
+      mouseSwitches = buttons;
+      push({ kind: 'click', x, y, buttons });
+    },
+    mouseUp: () => {
+      mouseSwitches = 0;
+    },
+    // The screens between animations are static, so nothing would repaint and the arrow
+    // would sit where it was drawn. CSBWin has the VBL handler for this; here the move is
+    // the repaint.
+    mouseMove: (x, y) => {
+      if (x === pointerX && y === pointerY) return;
+      pointerX = x;
+      pointerY = y;
+      // The chooser's import hint follows the pointer; a redraw for it presents the screen.
+      if (isDialogOpen(ui) && gameScreen.moveDialogPointer({ x, y })) return;
+      if (cursorVisible) host.present();
+    },
+    mouseLeave: () => {
+      pointerX = -100;
+      pointerY = -100;
+      if (isDialogOpen(ui) && gameScreen.moveDialogPointer(null)) return;
+      if (cursorVisible) host.present();
+    },
+    // The wheel is the chooser's list's, as it is the disk menu's in play
+    // (`GameInput.wheel`), and no other pre-game screen's. It is no event of the queue,
+    // where a screen waiting for a click or a key would take it for one.
+    wheel: (deltaY) => {
+      if (!isDialogOpen(ui)) return false;
+      gameScreen.handleDialogWheel(deltaY);
+      return true;
+    },
+    // The chooser's keys are its own, as the disk menu's are in play: an arrow moves its
+    // selection, and does not scroll the page as well.
+    keyDown: (press) => {
+      const key = press.ctrlKey || press.metaKey || press.altKey ? '' : press.key;
+      const taken = key !== '' && (ownsKeys || isDialogOpen(ui));
+      push({ kind: 'key', x: 0, y: 0, buttons: 0, key, code: key ? press.code : '' });
+      return taken;
+    },
   };
-  const onMouseUp = (e: PointerEvent): void => {
-    if (!e.isPrimary) return;
-    mouseSwitches = 0;
-  };
-  // The screens between animations are static, so nothing would repaint and the arrow
-  // would sit where it was drawn. CSBWin has the VBL handler for this; here the move is
-  // the repaint.
-  const onMouseMove = (e: PointerEvent): void => {
-    if (!e.isPrimary) return;
-    const { x, y } = pointAt(e);
-    if (x === pointerX && y === pointerY) return;
-    pointerX = x;
-    pointerY = y;
-    // The chooser's import hint follows the pointer; a redraw for it presents the screen.
-    if (isDialogOpen(ui) && gameScreen.moveDialogPointer({ x, y })) return;
-    if (cursorVisible) host.present();
-  };
-  const onMouseLeave = (e: PointerEvent): void => {
-    if (!e.isPrimary || e.pointerType !== 'mouse') return;
-    pointerX = -100;
-    pointerY = -100;
-    if (isDialogOpen(ui) && gameScreen.moveDialogPointer(null)) return;
-    if (cursorVisible) host.present();
-  };
-  const onContextMenu = (e: Event): void => e.preventDefault();
-  const onKeyDown = (e: KeyboardEvent): void => {
-    const key = e.ctrlKey || e.metaKey || e.altKey ? '' : e.key;
-    // The chooser's keys are its own, as the disk menu's are in play: an arrow moves
-    // its selection, and does not scroll the page as well.
-    if (key && isDialogOpen(ui)) e.preventDefault();
-    push({ kind: 'key', x: 0, y: 0, buttons: 0, key, code: key ? e.code : '' });
-  };
-  // The wheel is the chooser's list's, as it is the disk menu's in play
-  // (`GameInput.wheel`), and no other pre-game screen's. It is no event of the queue,
-  // where a screen waiting for a click or a key would take it for one.
-  const onWheel = (e: WheelEvent): void => {
-    if (!isDialogOpen(ui)) return;
-    gameScreen.handleDialogWheel(e.deltaY);
-    e.preventDefault();
-  };
-
-  canvas.addEventListener('pointerdown', onMouseDown);
-  window.addEventListener('pointerup', onMouseUp);
-  window.addEventListener('pointercancel', onMouseUp);
-  canvas.addEventListener('pointermove', onMouseMove);
-  canvas.addEventListener('pointerleave', onMouseLeave);
-  canvas.addEventListener('contextmenu', onContextMenu);
-  canvas.addEventListener('wheel', onWheel, { passive: false });
-  window.addEventListener('keydown', onKeyDown);
+  const release = deps.input.take(owner);
 
   const host: IntroHost = {
     screen,
@@ -265,14 +257,7 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
   return {
     host,
     detach: () => {
-      canvas.removeEventListener('pointerdown', onMouseDown);
-      window.removeEventListener('pointerup', onMouseUp);
-      window.removeEventListener('pointercancel', onMouseUp);
-      canvas.removeEventListener('pointermove', onMouseMove);
-      canvas.removeEventListener('pointerleave', onMouseLeave);
-      canvas.removeEventListener('contextmenu', onContextMenu);
-      canvas.removeEventListener('wheel', onWheel);
-      window.removeEventListener('keydown', onKeyDown);
+      release();
       queue = [];
       waiting = null;
       introProbe.waiting = false;
@@ -737,7 +722,9 @@ export async function runHintOracle(
 ): Promise<void> {
   const hints = readHintOracle(files.hct, hintKey);
   const uiTables = deps.gameScreen.ui.uiTables;
-  const { host, detach } = createIntroHost(deps, uiTables.graphic232.palette552[0] ?? PALETTE_11914);
+  // The Oracle takes no key (`doc/CSBWIN_HINT_ORACLE_REFERENCE.md` → "Waiting for a
+  // button"), and the browser does nothing with one but a shortcut.
+  const { host, detach } = createIntroHost(deps, uiTables.graphic232.palette552[0] ?? PALETTE_11914, true);
   try {
     const oracle = new HintOracleScreen(host, hints, files.dat, square);
     introProbe.oracle = oracle;

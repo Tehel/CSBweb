@@ -115,7 +115,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E30 | One presenter and one input router | L | ⏳ |
 | C177 | An Atari-era save loads with its possessions, timers and hand unconverted | M | ⏳ |
 | C173 | The DSA's `&ADD` and `&DEL` on a square bypass `MoveObject` | M | ⏳ |
 | C186 | A decoration's position set past its rectangles' table is not drawn | S | ⏳ |
@@ -409,26 +408,6 @@ The structure need no longer follow CSBWin's files (the author's decision): a mo
 gather or split CSBWin's functions as the code's concerns ask. What still follows CSBWin is
 the behaviour, the names of ported functions, which keep the two codebases greppable
 against each other, and the file formats.
-
-### E30 ⏳ One presenter and one input router
-
-The screen has two clocks: the engine's `setTimeout` VBL loop, which composes the tick's
-and the VBL's frames and every input's redraw at once, where CSBWin's VBL and handlers
-draw; and the page's one animation clock, `Presenter` (`src/renderer/Presenter.ts`), a
-frame at each of the display's while something asks. The chew, a menu button's press and
-the pre-game screens' VBLs run on it, the chew and the press composed through
-`refreshScreen`'s guards (`GameScreen.animationFrame`), and the CRT effect draws in its
-frames, after the canvas (`drawAfter`); `initializePlayState` and the game's end cancel
-the animations under way (`tools/checks/presenter.ts`). Input in play has one router,
-`GameInput` (`src/renderer/GameInput.ts`), which calls the `ui/` modules itself and asks of
-the screen only an `InputScreen` (its `ui`, the pointer, a button's deferred flags, the
-wheel), so the tools that drive it give a typed one. What is left: the pre-game screens'
-input has a stack of its own, `IntroHost`'s listeners on `window` (`BootSequence.ts`).
-
-Paying it, in one step left, a commit:
-
-1. **The intro's input through the router.** `IntroHost`'s listeners on `window` go
-   through `GameInput`, with a focus policy once the page has controls again.
 
 ### E40 ⏳ The statistics page's heat map
 

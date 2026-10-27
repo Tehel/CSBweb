@@ -1855,8 +1855,9 @@ console.log('state: eye on a weapon');   await shot('30-eye-weapon');
 await realMouse('mouseReleased', 19, 53); await vbls(SHOWN);
 
 // The CRT effect's input surface. The effect's canvas is shown over the game canvas, and
-// the pre-game and end-of-game screens listen on the game canvas alone (`createIntroHost`,
-// `src/renderer/intro/BootSequence.ts`), so it must let a click through. Boot with the
+// the page listens on the game canvas alone, the pre-game and end-of-game screens' input
+// included (`createIntroHost`, `src/renderer/intro/BootSequence.ts`), so it must let a
+// click through. Boot with the
 // effect in the saved settings: the intro is drawn through it, and a real click on the
 // entrance's scroll brings up the credits, as the click for frame 08 did. The record's one
 // `crt`, from before the scanlines and the curve were apart, is both.

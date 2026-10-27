@@ -74,7 +74,7 @@ the sound chip — and to nothing else. `IntroHost.ts` is that hardware as an in
 | `intro/TitleSequence.ts` | `CSBCode.cpp:9308` (`_DisplayChaosStrikesBack`) | The title animation and `ShrinkBLT`'s 16.16 fixed point |
 | `intro/PrisonDoor.ts` | `CSBCode.cpp:9577` / `:9667` / `:9485` / `:9753` | The dungeon entrance, its three buttons, the 31-frame door animation and the credits scroll |
 | `intro/PrisonLevel.ts` | `CSBCode.cpp:9678-9698` | The synthetic 5×5 level behind the doors, as a `DungeonState` the real viewport renderer can read |
-| `intro/BootSequence.ts` | `CSBCode.cpp:11573` (`_AskWhatToDo`) | The input queue, the VBL clock and the order the screens run in |
+| `intro/BootSequence.ts` | `CSBCode.cpp:11573` (`_AskWhatToDo`) | The input queue, which holds the page's input while a screen has the canvas, the VBL clock and the order the screens run in |
 
 ## `GameScreen`, `ScreenComposer` and `ViewportRenderer`
 
