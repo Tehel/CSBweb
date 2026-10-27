@@ -32,19 +32,26 @@ import {
   type SaveFile,
 } from '../../src/data/SaveFile';
 
-export const SAVE_DIR = 'tools/fixtures';
+/** `tools/fixtures`, wherever the tool is run from. */
+export const SAVE_DIR = resolve(import.meta.dirname, '../fixtures');
 
 function isSaveFile(name: string): boolean {
   // `:Zone.Identifier` and friends are NTFS alternate-data-stream droppings, not saves.
   return name.toLowerCase().endsWith('.dat') && !name.includes(':');
 }
 
-/** The saves of `target`, a directory or one file, as absolute paths in name order. */
+/**
+ * The saves of `target`, a directory or one file, as absolute paths in name order. A path
+ * that is not there, or a directory with no save, throws: a tool that loops over the saves
+ * would otherwise pass having read none.
+ */
 export function collectSaves(target: string): string[] {
   const path = resolve(target);
-  if (!existsSync(path)) return [];
+  if (!existsSync(path)) throw new Error(`no file or directory ${path}`);
   if (statSync(path).isDirectory()) {
-    return readdirSync(path).filter(isSaveFile).sort().map((n) => join(path, n));
+    const saves = readdirSync(path).filter(isSaveFile).sort().map((n) => join(path, n));
+    if (saves.length === 0) throw new Error(`no save in ${path}`);
+    return saves;
   }
   return [path];
 }

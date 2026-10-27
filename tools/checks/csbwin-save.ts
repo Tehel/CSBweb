@@ -52,19 +52,12 @@ const DB_NAMES = ['door', 'telep', 'text', 'actuator', 'creature', 'weapon', 'cl
  * Chaos Strikes Back's own files, read beside DM's by default: Atari-era saves with no
  * Extended Features block (`tools/checks/atari-saves.ts`).
  */
-const CSB_SAVES = ['mini.dat', 'csbgame2.dat'].map((n) => `tools/fixtures/gamefiles/csb/${n}`);
+const CSB_SAVES = ['mini.dat', 'csbgame2.dat'].map((n) => `${SAVE_DIR}/gamefiles/csb/${n}`);
 
 function main(): void {
   const saves = process.argv[2]
     ? collectSaves(process.argv[2])
     : [...genuineSaves(), ...CSB_SAVES.flatMap(collectSaves)];
-  if (saves.length === 0) {
-    // The fixtures are committed, so this should not happen; if someone strips the
-    // game files it must say so rather than pass silently on nothing.
-    check(false, `no save files found in ${process.argv[2] ?? SAVE_DIR}`);
-    finish();
-    return;
-  }
   /** file name -> the party roster read out of its character block. */
   const rosters = new Map<string, string>();
   /** file name -> the object ids of its in-flight missiles. */

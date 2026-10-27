@@ -54,7 +54,7 @@ import { DBType, OBJECT_ID_NULL } from '../../src/core/types';
 import type { DungeonData } from '../../src/data/dungeonTypes';
 import { check, fail, finish } from '../lib/check';
 import { STOCK_DIR, stockDungeon } from '../lib/game';
-import { SAVE_DIR, genuineSaves } from '../lib/saves';
+import { genuineSaves } from '../lib/saves';
 
 const DUNGEON = `${STOCK_DIR}/dungeon.dat`;
 
@@ -336,11 +336,6 @@ function checkTheGate(saves: Map<string, DungeonData>, converted: DungeonData): 
 
 function main(): void {
   const files = genuineSaves(process.argv[2]);
-  if (files.length === 0) {
-    console.error(`no save files under ${process.argv[2] ?? SAVE_DIR}`);
-    process.exitCode = 1;
-    return;
-  }
 
   const raw = readRaw();
   const converted = readConverted();

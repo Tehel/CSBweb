@@ -33,7 +33,7 @@ import type { Champion } from '../../src/engine/gameTypes';
 import { monsterInvincible, monsterNonMaterial } from '../../src/data/tables/MonsterDesc';
 import { determineMastery } from '../../src/engine/skills';
 import { graphicsTablesOf, newGame, stockDungeon, stockGraphics } from '../lib/game';
-import { check, finish } from '../lib/check';
+import { check, fail, finish } from '../lib/check';
 import { testChampion } from '../lib/champion';
 
 /** `weapon_Sword` (`doc/CSBwin-src/Objects.h:51`). */
@@ -121,7 +121,7 @@ async function main(): Promise<void> {
 
     const monsterRn = game.ctx.dungeon.findFirstMonster(new Position(3, 1, level));
     if (monsterRn === OBJECT_ID_EOF) {
-      console.log('(no monster at (3,1) on level 3 — skipping)');
+      fail('no monster at (3,1) on level 3');
     } else {
       const monster = game.ctx.dungeon.getCreatureRecord(monsterRn)!;
       const render = game.ctx.dungeon.getMonsterRenderState(monster);
@@ -168,7 +168,7 @@ async function main(): Promise<void> {
 
       const monsterRn = game.ctx.dungeon.findFirstMonster(new Position(3, 1, level));
       const monster = monsterRn === OBJECT_ID_EOF ? null : game.ctx.dungeon.getCreatureRecord(monsterRn);
-      if (!monster) { console.log('(no monster at (3,1) — skipping)'); break; }
+      if (!monster) { fail('no monster at (3,1)'); break; }
 
       let hits = 0;
       let total = 0;
@@ -269,7 +269,7 @@ async function main(): Promise<void> {
     const monsterRn = game.ctx.dungeon.findFirstMonster(new Position(3, 1, level));
     const monster = monsterRn === OBJECT_ID_EOF ? null : game.ctx.dungeon.getCreatureRecord(monsterRn);
     if (!monster) {
-      console.log('(no monster to convert — skipping)');
+      fail('no monster at (3,1) to convert');
     } else {
       // Turn the neighbour into a non-material type in place, which is the only way to
       // get one adjacent to the party without hunting the whole dungeon for a Black
@@ -302,7 +302,7 @@ async function main(): Promise<void> {
     const monsterRn = game.ctx.dungeon.findFirstMonster(new Position(3, 1, level));
     const monster = monsterRn === OBJECT_ID_EOF ? null : game.ctx.dungeon.getCreatureRecord(monsterRn);
     if (!monster) {
-      console.log('(no monster at (3,1) — skipping)');
+      fail('no monster at (3,1)');
     } else {
       const desc = objectTables.monsterDesc[monster.creatureType]!;
       const bravery = (desc.word16 >> 4) & 15;

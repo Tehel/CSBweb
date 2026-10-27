@@ -10,15 +10,10 @@
  */
 
 import { createGameHost } from '../../src/engine/GameHost';
+import { check, finish } from '../lib/check';
 import { ManualClock } from '../lib/clock';
 import { newGame, stockGraphics, stockDungeon } from '../lib/game';
 import { standIn } from '../lib/standIn';
-
-let failures = 0;
-function check(ok: boolean, what: string): void {
-  console.log(`${ok ? 'ok  ' : 'FAIL'}  ${what}`);
-  if (!ok) failures++;
-}
 
 const data = stockDungeon();
 
@@ -57,11 +52,7 @@ function main(): void {
   }
   check(rethrown, 'a host without die throws the error again');
 
-  if (failures > 0) {
-    console.log(`\n${failures} check(s) failed`);
-    process.exit(1);
-  }
-  console.log('\nall checks passed');
+  finish();
 }
 
 main();

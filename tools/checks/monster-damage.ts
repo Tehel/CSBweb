@@ -27,7 +27,7 @@ import type { DsaFilters } from '../../src/engine/dsa/DsaFilters';
 import { MonsterType, StateOfFear } from '../../src/engine/monsterTypes';
 import type { PartyState } from '../../src/engine/gameTypes';
 import { graphicsTablesOf, newContext, stockDungeon, stockGraphics } from '../lib/game';
-import { check, finish } from '../lib/check';
+import { check, fail, finish } from '../lib/check';
 import { standInOf } from '../lib/standIn';
 
 function objectsInCell(dungeon: DungeonState, pos: Position): string[] {
@@ -157,7 +157,7 @@ async function main(): Promise<void> {
       'outside fear state 6 the per-member timers must be untouched');
     console.log('');
   } else {
-    console.log('Case 1 skipped: no group of 3+ on this level\n');
+    fail('case 1: no group of 3+ on this level');
   }
 
   // ---- Case 2: kill a whole group ----------------------------------------

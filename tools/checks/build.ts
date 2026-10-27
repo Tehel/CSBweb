@@ -31,6 +31,7 @@ import { join, relative, resolve } from 'node:path';
 import { CHECK_MODULE, loadPageReaders } from '../../server/app.ts';
 import type { DataSetDraft, DataSetFolder } from '../../server/publish.ts';
 import { checkLocalDataSet, readDungeonWalls } from '../../src/engine/LocalDataSetCheck.ts';
+import { check, finish } from '../lib/check.ts';
 import { dataSetNamed } from '../lib/dataSets.ts';
 
 const ROOT = resolve(import.meta.dirname, '../..');
@@ -45,12 +46,6 @@ const STATS_PAGE_BYTES = 32 * 1024;
 const WEB_MANIFEST = 'manifest.webmanifest';
 /** The FTL logo, the page's own asset (`src/main.ts`, `loadSwooshFiles`). */
 const SWOOSH_IMAGE = 'src/assets/swoosh.img';
-
-let failures = 0;
-function check(ok: boolean, what: string): void {
-    console.log(`  ${ok ? 'ok  ' : 'FAIL'}  ${what}`);
-    if (!ok) failures++;
-}
 
 /** `vite build` with `args`, into `outDir`, as `npm run build` runs it. */
 function viteBuild(outDir: string, args: string[]): void {
@@ -177,8 +172,8 @@ async function main(): Promise<void> {
         rmSync(outDir, { recursive: true, force: true });
     }
 
-    console.log(failures ? `\n${failures} check(s) FAILED` : '\nAll checks passed');
-    process.exit(failures ? 1 : 0);
+    finish();
+    process.exit();
 }
 
 main().catch((err) => {

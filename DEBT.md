@@ -116,7 +116,6 @@ In payoff order: the first row is the next item.
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
 | C188 | A new timer's unused bytes are 0, where CSBWin's are 0xcd | M | ⏳ |
-| F16 | A tool can pass having checked less than it says | S | ⏳ |
 | F18 | One `tsconfig` for the browser, the tools and the server | S | ⏳ |
 | F19 | The tools' screen draws without the game's state, rules and CSB graphics | S | ⏳ |
 | F17 | The frame pipeline and the runner are untyped | M | ⏳ |
@@ -533,23 +532,6 @@ in CSBWin 20230608, and if the game goes on there, ports what that binary draws.
 ## F — Verification debt
 
 New verification debt goes here; it can be taken anywhere ("Priority", point 5).
-
-### F16 ⏳ A tool can pass having checked less than it says
-
-- A scenario that is not found is logged and skipped: `checks/missile-drop.ts:220`, `:227`,
-  `:255`, `:261`, `:295`, `:301`; `checks/player-attacks.ts:124`, `:171`, `:272`, `:305`;
-  `checks/monster-damage.ts:152`; one in `checks/ten-second-update.ts`. `finish()` fails only a
-  run with no check at all.
-- `collectSaves` returns `[]` for a folder that is not there (`tools/lib/saves.ts:31-33`),
-  its path resolved from the working directory, and eight tools loop over it without
-  asking for a single save (`checks/dsa-save`, `checks/file-signatures`, `checks/expool`,
-  `checks/dm-rules`, `checks/extend-portraits`, `checks/timer-heap`, `checks/save-menu`,
-  `checks/check-monsters`).
-- `checks/server.ts:43`, `checks/build.ts:24` and `checks/loop-die.ts:17` write their own
-  `check()` and skip `finish()`'s guard, which `tools/lib/check.ts` exists to give.
-
-Paying it: the skips become failures; the saves' folder resolved from `import.meta.dirname`,
-a missing one an error; the three tools on `lib/check`.
 
 ### F17 ⏳ The frame pipeline and the runner are untyped
 

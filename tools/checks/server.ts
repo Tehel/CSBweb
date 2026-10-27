@@ -121,15 +121,10 @@ import { localDataSet } from '../../src/data/LocalDataSets.ts';
 import { checkLocalDataSet, readDungeonWalls } from '../../src/engine/LocalDataSetCheck.ts';
 import { parsePublishedDungeons } from '../../src/data/DungeonSignature.ts';
 import { indexedPng, indexedPngRows } from '../../src/core/png.ts';
+import { check, finish as verdict } from '../lib/check.ts';
 import { dataSetNamed, GAMEFILES_DIR, MANIFEST_FILE } from '../lib/dataSets.ts';
 
 const ROOT = resolve(import.meta.dirname, '../..');
-
-let failures = 0;
-function check(ok: boolean, what: string): void {
-    console.log(`  ${ok ? 'ok  ' : 'FAIL'}  ${what}`);
-    if (!ok) failures++;
-}
 
 interface Answer {
     status: number;
@@ -1413,8 +1408,9 @@ async function main(): Promise<void> {
         rmSync(scratch, { recursive: true, force: true });
     }
 
-    console.log(failures ? `\n${failures} check(s) FAILED` : '\nAll checks passed');
-    process.exit(failures ? 1 : 0);
+    verdict();
+    // A handle the server's modules left open must not keep the tool alive.
+    process.exit();
 }
 
 main().catch((err) => {

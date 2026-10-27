@@ -54,7 +54,7 @@ import { SoundQueue } from '../../src/engine/SoundQueue';
 import type { Champion } from '../../src/engine/gameTypes';
 import { processTimersAt, stockGame } from '../lib/game';
 import { standIn } from '../lib/standIn';
-import { check, finish } from '../lib/check';
+import { check, fail, finish } from '../lib/check';
 import { testChampion } from '../lib/champion';
 
 function champion(i: number, name: string): Champion {
@@ -217,14 +217,14 @@ function main(): void {
     const game = makeGame();
     const teleporter = findItemTeleporter(game);
     if (!teleporter) {
-      console.log('No active, item-capable teleporter with a throwable approach found — skipping.');
+      fail('no active, item-capable teleporter with a throwable approach found');
     } else {
       console.log(`=== throwing onto the teleporter at level ${teleporter.at.z} (${teleporter.at.x},${teleporter.at.y}) -> ` +
         `level ${teleporter.dest.z} (${teleporter.dest.x},${teleporter.dest.y}) ===`);
 
       const item = findFloorItem(game, [teleporter.at]);
       if (!item) {
-        console.log('No spare floor item found — skipping.');
+        fail('no spare floor item found');
       } else {
         console.log(`item ${item.rn.toString(16)} lifted from level ${item.at.z} (${item.at.x},${item.at.y})`);
         game.ctx.dungeon.removeObjectFromCell(item.at, item.rn);
@@ -252,13 +252,13 @@ function main(): void {
     const game = makeGame();
     const plate = findFloorActuator(game);
     if (!plate) {
-      console.log('No floor actuator with a throwable approach found — skipping.');
+      fail('no floor actuator with a throwable approach found');
     } else {
       console.log(`=== throwing onto the actuator at level ${plate.z} (${plate.x},${plate.y}) ===`);
 
       const item = findFloorItem(game, [plate]);
       if (!item) {
-        console.log('No spare floor item found — skipping.');
+        fail('no spare floor item found');
       } else {
         console.log(`item ${item.rn.toString(16)} lifted from level ${item.at.z} (${item.at.x},${item.at.y})`);
         game.ctx.dungeon.removeObjectFromCell(item.at, item.rn);
@@ -292,13 +292,13 @@ function main(): void {
     const game = makeGame();
     const door = findClosedDoor(game);
     if (!door) {
-      console.log('No closed door with a throwable approach found — skipping.');
+      fail('no closed door with a throwable approach found');
     } else {
       console.log(`=== throwing onto the closed door at level ${door.at.z} (${door.at.x},${door.at.y}) ===`);
 
       const item = findFloorItem(game, [door.at, door.south]);
       if (!item) {
-        console.log('No spare floor item found — skipping.');
+        fail('no spare floor item found');
       } else {
         console.log(`item ${item.rn.toString(16)} lifted from level ${item.at.z} (${item.at.x},${item.at.y})`);
         game.ctx.dungeon.removeObjectFromCell(item.at, item.rn);
