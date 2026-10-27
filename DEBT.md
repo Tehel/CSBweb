@@ -747,8 +747,8 @@ New verification debt goes here; it can be taken anywhere ("Priority", point 5).
 - `tools/checks/loop-die.ts` waits `1000 / 60 * failOn + 150` real milliseconds, then checks
   the frames counted (`:23`, `:36`): the same kind, not yet seen to fail.
 - `tools/checks/stats.ts` times the statistics' answers over 200,000 events and checks the
-  slowest is under 250 ms (`:439`). Alone it takes about 120 ms; in a full `npm test` it can take
-  251 ms, and so fail.
+  slowest is under 400 ms (`:439`). Alone it takes about 120 ms; in a full `npm test` it has
+  taken 365 ms, near enough the bound to fail some day.
 - `runAsync` waits for each tool's `close` with no limit (`tools/run-checks.mjs:365-375`), so
   a tool left with a handle open hangs the whole suite.
 
