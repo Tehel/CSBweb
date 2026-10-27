@@ -13,24 +13,18 @@
  * no fullscreen. The map
  * dialog moves no party, as on a page opened without `?dev`, and EXIT leaves for nothing.
  *
- * The game's host draws on it what `ShowHideInventory`, `TAG02076e`, `TAG0207cc`, a read
- * in play, the attack menu's `TAG01b1c0`, `DrawLegalAttackTypes` and `FlashAttackDamage`,
- * and `KillCharacter`'s release of the eye draw, and asks it whether the damage's flash
- * holds, as `main.ts` wires `GameScreen`, after whatever the tool's own host does there:
- * the engine does their `d.` work, and a click on the screen goes through it.
+ * The game's host draws on it what the page's does (`ui/HostDrawing.ts`), after whatever
+ * the tool's own host does there, and asks it whether the damage's flash holds and for a
+ * portrait the tool's host does not give: the engine does their `d.` work, and a click on
+ * the screen goes through it.
  */
 import type { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import type { GameContext } from '../../src/engine/GameContext';
 import { NO_FULLSCREEN } from '../../src/lib/fullscreen';
 import { createPaletteIndexViewportBuffer } from '../../src/renderer/csbwin/CanvasBlitter';
 import { Settings } from '../../src/settings/Settings';
-import {
-  attackFlashHeld, drawLegalAttackTypesDrawing, flashAttackDamageDrawing, tag01b1c0Drawing,
-} from '../../src/renderer/ui/Attack';
-import {
-  releaseEyeOrMouthDrawing, showHideInventoryDrawing, tag02076eDrawing, tag0207ccDrawing,
-} from '../../src/renderer/ui/Mouse';
-import { savedGameRead as savedGameReadOnScreen, type UIHooks, type UIState } from '../../src/renderer/ui/UIState';
+import { hostDrawing } from '../../src/renderer/ui/HostDrawing';
+import type { UIHooks, UIState } from '../../src/renderer/ui/UIState';
 import { createScreenUI } from '../../src/renderer/ScreenUI';
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../../src/renderer/ViewportGraphics';
 import { graphicsTablesOf } from './game';
@@ -70,17 +64,23 @@ export function newUIState(graphics: GraphicsLoader, ctx: GameContext, hooks: Pa
     ...hooks,
     getGraphicBitmap,
   });
+  // The tool's own host first, then the drawing over it, as the page's engine does its
+  // `d.` work before its host draws.
   const host = ctx.host;
-  const { showHideInventory, tag02076e, tag0207cc, savedGameRead } = host;
-  const { tag01b1c0, drawLegalAttackTypes, flashAttackDamage, attackFlashHeld: flashHeld, releaseEyeOrMouth } = host;
-  host.showHideInventory = (chIdx) => { showHideInventory(chIdx); showHideInventoryDrawing(ui); };
-  host.tag02076e = () => { tag02076e(); tag02076eDrawing(ui); };
-  host.tag0207cc = () => { tag0207cc(); tag0207ccDrawing(ui); };
-  host.savedGameRead = () => { savedGameRead(); savedGameReadOnScreen(ui); };
-  host.tag01b1c0 = (chIdx) => { tag01b1c0(chIdx); tag01b1c0Drawing(ui, chIdx); };
-  host.drawLegalAttackTypes = (options) => { drawLegalAttackTypes(options); drawLegalAttackTypesDrawing(ui, options); };
-  host.flashAttackDamage = (damage) => { flashAttackDamage(damage); flashAttackDamageDrawing(ui, damage); };
-  host.attackFlashHeld = () => flashHeld() || attackFlashHeld(ui);
-  host.releaseEyeOrMouth = (eye) => { releaseEyeOrMouth(eye); releaseEyeOrMouthDrawing(ui, eye); };
+  const own = { ...host };
+  const drawing = hostDrawing(() => ui);
+  host.showHideInventory = (chIdx) => { own.showHideInventory(chIdx); drawing.showHideInventory(chIdx); };
+  host.releaseEyeOrMouth = (eye) => { own.releaseEyeOrMouth(eye); drawing.releaseEyeOrMouth(eye); };
+  host.tag02076e = () => { own.tag02076e(); drawing.tag02076e(); };
+  host.tag0207cc = () => { own.tag0207cc(); drawing.tag0207cc(); };
+  host.savedGameRead = () => { own.savedGameRead(); drawing.savedGameRead(); };
+  host.tag01b1c0 = (chIdx) => { own.tag01b1c0(chIdx); drawing.tag01b1c0(chIdx); };
+  host.drawLegalAttackTypes = (options) => { own.drawLegalAttackTypes(options); drawing.drawLegalAttackTypes(options); };
+  host.flashAttackDamage = (damage) => { own.flashAttackDamage(damage); drawing.flashAttackDamage(damage); };
+  host.attackFlashHeld = () => own.attackFlashHeld() || drawing.attackFlashHeld();
+  host.displayCharacterDamage = (chIdx, damage) => { own.displayCharacterDamage(chIdx, damage); drawing.displayCharacterDamage(chIdx, damage); };
+  host.tag011366 = (chIdx) => { own.tag011366(chIdx); drawing.tag011366(chIdx); };
+  host.drawCharacterState = (chIdx, charFlags) => { own.drawCharacterState(chIdx, charFlags); drawing.drawCharacterState(chIdx, charFlags); };
+  host.portraitOf = (champion) => own.portraitOf(champion) ?? drawing.portraitOf(champion);
   return ui;
 }

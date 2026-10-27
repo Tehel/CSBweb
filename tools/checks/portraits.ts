@@ -184,7 +184,7 @@ function main(): void {
 
   // And the save writer's side of the same path. `CHARDESC` holds bitplanes, so a
   // champion created in play — who carries the index — has their portrait resolved
-  // here and packed by `writePortrait`; `ViewportRenderer.portraitPixelsFor` is this
+  // here and packed by `writePortrait`; `HostDrawing.portraitOf` is this
   // lookup plus an `Array.from`. Pack the pixels and read them back.
   const packed = new Uint8Array(CHARDESC_SIZE);
   writePortrait(packed, 0, cell ? Array.from(cell.pixels) : undefined);

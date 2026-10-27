@@ -16,7 +16,6 @@ import type { Champion } from '../engine/gameTypes';
 import type { CSBGraphicsLoader } from '../data/CSBGraphicsLoader';
 import type { ScrollingText } from './csbwin/ScrollingText';
 import type { GameContext } from '../engine/GameContext';
-import type { AttackOptions } from '../engine/GameHost';
 import type { IndexedBitmap } from './csbwin/CanvasBlitter';
 import {
   clearIndex,
@@ -47,7 +46,7 @@ import { Position } from '../core/types';
 import type { ViewportRenderer } from './ViewportRenderer';
 import { createScreenUI } from './ScreenUI';
 import { LEFT_HANDED_VIEWPORT, leftHandedLayout, leftHandedX, makeLeftHanded, rightHandedX, type LeftHandedLayout } from './LeftHanded';
-import { initializePlayState, savedGameRead, UIMode, type ScreenIndexBuffer, type UIHooks, type UIState } from './ui/UIState';
+import { initializePlayState, UIMode, type ScreenIndexBuffer, type UIHooks, type UIState } from './ui/UIState';
 import { drawStaticUIFrame } from './ui/Draw';
 import {
   drawCursorItem,
@@ -55,19 +54,14 @@ import {
   handleMouseButton,
   closeHintOracle,
   handleMouseUnclick,
-  releaseEyeOrMouthDrawing,
   openHintOracle,
   searchMouseButtons,
   syncInventoryButtons,
-  showHideInventoryDrawing,
-  tag02076eDrawing,
-  tag0207ccDrawing,
+  setUIMode,
   updateButtonLists,
 } from './ui/Mouse';
 import { drawSpellControls, drawSpellPanel } from './ui/MagicPanel';
-import {
-  attackFlashHeld, drawAttackPanel, drawLegalAttackTypesDrawing, flashAttackDamageDrawing, tag01b1c0Drawing,
-} from './ui/Attack';
+import { drawAttackPanel } from './ui/Attack';
 import { handleUIKey, tableKeyButton } from './ui/Keyboard';
 import {
   drawReincarnateScreen,
@@ -92,8 +86,8 @@ import { championBarsAt, openChampionDialog } from './ui/ChampionDialog';
 import { doMenu, drawMenuPress, menuButtonList, type MenuPress } from './ui/Menu';
 import type { SaveEntry } from '../data/saves';
 import type { ImportedFile } from '../engine/GameSaves';
-import { drawCharacterStateEyePanel, drawInventoryBackground, drawInventoryScreen } from './ui/Inventory';
-import { drawCharacterState, drawHeldObjectName, drawPartyStatus, getChampionPortrait } from './ui/Character';
+import { drawInventoryBackground, drawInventoryScreen } from './ui/Inventory';
+import { drawHeldObjectName, drawPartyStatus, getChampionPortrait } from './ui/Character';
 import { drawHintOracleButton, type HintOracleFiles } from './ui/HintOracleButton';
 import { displayFrozenScreen, displaySleepScreen, drawMessageLines, shadeRectIndex } from './ui/Draw';
 
@@ -133,8 +127,11 @@ const VIEWPORT_SPAN = {
 } as const;
 
 export class GameScreen {
-  /** Everything the UI modules share. See `ui/UIState.ts`. */
-  private readonly ui: UIState;
+  /**
+   * Everything the UI modules share. See `ui/UIState.ts`. The engine's host draws on it
+   * (`ui/HostDrawing.ts`).
+   */
+  readonly ui: UIState;
   private readonly viewport: ViewportRenderer;
   private readonly screenCtx: CanvasRenderingContext2D;
   private readonly screenImageData: ImageData; // RGBA staging for present
@@ -249,53 +246,6 @@ export class GameScreen {
   /** `ReIncarnate(pcA3)` (`doc/CSBwin-src/CSBCode.cpp:6797`) — open the screen. */
   openReincarnateScreen(chIdx: number): void {
     openReincarnateScreen(this.ui, chIdx);
-  }
-
-  /** `TAG01b1c0`'s drawing (`doc/CSBwin-src/Character.cpp:4904`) — the host's `tag01b1c0`. */
-  tag01b1c0(chIdx: number): void {
-    tag01b1c0Drawing(this.ui, chIdx);
-  }
-
-  /** `DrawLegalAttackTypes`'s drawing (`doc/CSBwin-src/CSBCode.cpp:8823`) — the host's `drawLegalAttackTypes`. */
-  drawLegalAttackTypes(options: AttackOptions | null): void {
-    drawLegalAttackTypesDrawing(this.ui, options);
-  }
-
-  /** `FlashAttackDamage`'s drawing (`doc/CSBwin-src/Attack.cpp:949`) — the host's `flashAttackDamage`. */
-  flashAttackDamage(damage: number): void {
-    flashAttackDamageDrawing(this.ui, damage);
-  }
-
-  /** Whether the damage's flash holds the buttons back — the host's `attackFlashHeld`. */
-  attackFlashHeld(): boolean {
-    return attackFlashHeld(this.ui);
-  }
-
-
-  /** `ShowHideInventory`'s drawing (`doc/CSBwin-src/CSBCode.cpp:7478`) — the host's `showHideInventory`. */
-  showHideInventory(): void {
-    showHideInventoryDrawing(this.ui);
-  }
-
-  /** `KillCharacter`'s release of the eye or the mouth, its drawing — the host's `releaseEyeOrMouth`. */
-  releaseEyeOrMouth(eye: boolean): void {
-    releaseEyeOrMouthDrawing(this.ui, eye);
-  }
-
-  /** `TAG02076e`'s drawing (`doc/CSBwin-src/Character.cpp:5133`) — the host's `tag02076e`. */
-  tag02076e(): void {
-    tag02076eDrawing(this.ui);
-  }
-
-  /** `TAG0207cc`'s drawing (`doc/CSBwin-src/CSBCode.cpp:10058`) — the host's `tag0207cc`. */
-  tag0207cc(): void {
-    tag0207ccDrawing(this.ui);
-  }
-
-  /** A saved game read in play — the host's `savedGameRead`: the read party is awake. */
-  savedGameRead(): void {
-    savedGameRead(this.ui);
-    this.setUIMode(UIMode.Adventure);
   }
 
   /**
@@ -456,20 +406,6 @@ export class GameScreen {
     return getChampionPortrait(this.ui, champion);
   }
 
-  /**
-   * `AddCharacter`'s portrait blit, deferred to save time.
-   *
-   * CSBWin copies a cell of basic graphic 26 into the character record the moment a
-   * champion joins (`doc/CSBwin-src/Character.cpp:487-496`), so `CHARDESC` always holds
-   * pixels. This engine holds no graphics, so a champion it created carries the cell
-   * *index* instead and the pixels are resolved here — the save writer asks for them
-   * when it packs block 4.
-   */
-  portraitPixelsFor(champion: Champion): number[] | undefined {
-    const bitmap = getChampionPortrait(this.ui, champion);
-    return bitmap ? Array.from(bitmap.pixels) : undefined;
-  }
-
   /** Before a compose: the game's party, which may be another game's since the last. */
   syncParty(): void {
     // Another party is another game, loaded or begun, which CSBWin draws afresh: nothing
@@ -530,26 +466,6 @@ export class GameScreen {
     this.presentViewport();
   }
 
-  /** `DisplayCharacterDamage`'s blit — the host's `displayCharacterDamage`. */
-  displayCharacterDamage(chIdx: number, damage: number): void {
-    const inventoryOpen = this.ui.partyState.selectedCharacterIndex === chIdx;
-    this.ui.characterDamage[chIdx] = { damage, inventoryOpen };
-  }
-
-  /** `TAG011366`'s redraw — the host's `tag011366`: the damage shown is drawn over. */
-  tag011366(chIdx: number): void {
-    this.ui.characterDamage[chIdx] = null;
-  }
-
-  /**
-   * `DrawCharacterState`'s redraw of the name or the box, and of the open inventory's eye
-   * panel — the host's `drawCharacterState`.
-   */
-  drawCharacterState(chIdx: number, charFlags: number): void {
-    drawCharacterState(this.ui, chIdx, charFlags);
-    drawCharacterStateEyePanel(this.ui, chIdx, charFlags);
-  }
-
   /**
    * `TAG0196da`'s table half: the button the current key tables bind `code`, a
    * `KeyboardEvent.code`, to, or 0 — and 0 for F1-F4, the port's caster keys
@@ -560,9 +476,7 @@ export class GameScreen {
   }
 
   setUIMode(mode: UIMode): void {
-    this.ui.uiMode = mode;
-    updateButtonLists(this.ui);
-    syncInventoryButtons(this.ui);
+    setUIMode(this.ui, mode);
   }
 
   /**

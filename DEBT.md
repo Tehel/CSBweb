@@ -416,7 +416,7 @@ against each other, and the file formats.
 
 ### E29 ⏳ `GameScreen` is the canvas, the compose order, the palettes and a façade
 
-`GameScreen` (919 lines, 71 methods, about 50 of them one- or two-line forwarders into
+`GameScreen` (776 lines, 62 methods, about 40 of them one- or two-line forwarders into
 `ui/`) is the canvas's output (`putImageData`), the order of the compose, the palettes'
 choice, and a façade over the UI and the boot (`getScreenBuffer`, `doMenu`,
 `setBootFrameRenderer`). It needs an `HTMLCanvasElement`, so no tool can build one: four
@@ -431,13 +431,7 @@ The steps left, each a commit that changes no behaviour (every tool's whole outp
    renderer, writing into an RGBA buffer of `ImageData`'s shape; `GameScreen` keeps the
    canvas and puts each composed frame on it. The dialog tools' stubs become a screen
    over a real composer where they need one.
-2. **The host's drawing written once** (S). `GameHost`'s drawing half
-   (`showHideInventory`, `tag02076e`, `tag0207cc`, `savedGameRead`, `tag01b1c0`,
-   `drawLegalAttackTypes`, `flashAttackDamage`, `attackFlashHeld`, `releaseEyeOrMouth`,
-   `displayCharacterDamage`, `tag011366`, `drawCharacterState`, `portraitOf`) is one
-   function over a `UIState` calling `ui/` directly, which `main.ts` and `tools/lib/ui.ts`
-   both use; the screen's forwarders for them go.
-3. **The boot's façade** (S). `BootSequence` and `EndOfGame` reach the composer and `ui/`
+2. **The boot's façade** (S). `BootSequence` and `EndOfGame` reach the composer and `ui/`
    directly (`getScreenBuffer`, `getFontData`, `getBitmap`, `doMenu`, `menuButtonList`,
    `drawMenuPress`, `drawDialogOnly`, `getUITables`, `championPortrait`); the screen's
    forwarders for them go.
@@ -449,8 +443,10 @@ screen: they are E30's, whose one input router is where they go. What is left on
 `setUIMode`, `initializePlayState` and the pointer's state.
 
 Where it stands: the page's hooks are spread once (`GameScreenHooks` is `UIHooks` less the
-screen's own two), and the screen and the tools build the interface and its viewport through
-one factory (`createScreenUI`, `src/renderer/ScreenUI.ts`); the three steps above are left.
+screen's own two); the screen and the tools build the interface and its viewport through
+one factory (`createScreenUI`, `src/renderer/ScreenUI.ts`); and the engine's host, the
+page's and the tools' alike, draws on the interface through `hostDrawing`
+(`src/renderer/ui/HostDrawing.ts`). The two steps above are left.
 
 ### E30 ⏳ One presenter and one input router
 

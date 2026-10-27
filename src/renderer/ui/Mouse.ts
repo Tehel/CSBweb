@@ -457,6 +457,13 @@ export function handleClothingClick(ui: UIState, button: number): void {
   }
 }
 
+/** The interface's mode set, and the button lists and key tables it puts up. */
+export function setUIMode(ui: UIState, mode: UIMode): void {
+  ui.uiMode = mode;
+  updateButtonLists(ui);
+  syncInventoryButtons(ui);
+}
+
 /**
  * The button lists and key tables of the mode: asleep `Buttons17796` and `Byte18440`
  * (`doc/CSBwin-src/Mouse.cpp:1837-1840`), frozen `Buttons17832` and `Byte18448`

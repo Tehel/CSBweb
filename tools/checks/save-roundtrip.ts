@@ -243,7 +243,7 @@ const plain = (game: Game): RuntimeSaveState => JSON.parse(JSON.stringify(game.g
 
 /**
  * The portrait the test's `portraitOf` resolves for a champion the engine created, who
- * carries a graphic-26 index: in the page it is `GameScreen.portraitPixelsFor`.
+ * carries a graphic-26 index: in the page it is `HostDrawing.portraitOf`.
  */
 const resolvedPortrait = (graphic: number): number[] =>
   Array.from({ length: PORTRAIT_PIXELS }, (_, pixel) => (pixel + graphic) & 15);

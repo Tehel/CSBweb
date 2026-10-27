@@ -28,6 +28,7 @@ import swooshSoundUrl from './assets/swoosh.wav?url';
 import { createCrtEffect, type CrtEffect } from './lib/crt';
 import { NO_FULLSCREEN, createFullscreen, type PageFullscreen } from './lib/fullscreen';
 import { GameScreen } from './renderer/GameScreen';
+import { hostDrawing } from './renderer/ui/HostDrawing';
 import { bindSaveDrop, bindUIEvents, showFatalMessage, showWelcomePage, welcomePageQuery } from './ui';
 import { ScrollingText } from './renderer/csbwin/ScrollingText';
 import { UIMode } from './renderer/ui/UIState';
@@ -256,6 +257,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     // The screen is built second, over the engine's dungeon, so the engine→UI notices
     // reach it through this variable.
     let screen: GameScreen | null = null;
+    const drawing = hostDrawing(() => screen?.ui ?? null);
     // Over an empty world, as `d.Initialize()` leaves CSBWin's: the boot reads the game.
     const game = new Game(emptyDungeonData(), tables, {
         messages,
@@ -273,19 +275,10 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // (`doc/CSBwin-src/CSBCode.cpp:6797` around `Code13ea4.cpp:20`); the
         // screen hands its answer to `HallOfChampions.reincarnateNamed`.
         openReincarnateScreen: (chIdx) => screen?.openReincarnateScreen(chIdx),
-        // What the attack menu's `TAG01b1c0`, `DrawLegalAttackTypes` and `TAG01b29a`'s
-        // flash draw, and the flash timed by the wall clock.
-        tag01b1c0: (chIdx) => screen?.tag01b1c0(chIdx),
-        drawLegalAttackTypes: (options) => screen?.drawLegalAttackTypes(options),
-        flashAttackDamage: (damage) => screen?.flashAttackDamage(damage),
-        attackFlashHeld: () => screen?.attackFlashHeld() ?? false,
-        releaseEyeOrMouth: (eye) => screen?.releaseEyeOrMouth(eye),
-        // What `ShowHideInventory`, `TAG02076e` and `TAG0207cc` draw.
-        showHideInventory: () => screen?.showHideInventory(),
-        tag02076e: () => screen?.tag02076e(),
-        tag0207cc: () => screen?.tag0207cc(),
-        // A save read in play: the screen leaves the old world for the one read.
-        savedGameRead: () => screen?.savedGameRead(),
+        // What the attack menu, `ShowHideInventory`, `TAG02076e`, `TAG0207cc`, a save read
+        // in play, `KillCharacter` and the damage shown draw, and a champion's portrait
+        // pixels, which only the screen holds.
+        ...drawing,
         // The prison's fourth champion asks whether the adventure begins, and every
         // champion is reported.
         championJoined: (joined) => {
@@ -304,12 +297,6 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         drawViewport: () => renderView(),
         // The main loop's tick paints what `TAG01b29a` drew after its `DrawViewport`.
         paint: () => refreshScreen(),
-        // `DisplayCharacterDamage`'s splat and figure, and `TAG011366` drawing over them.
-        displayCharacterDamage: (chIdx, damage) => screen?.displayCharacterDamage(chIdx, damage),
-        tag011366: (chIdx) => screen?.tag011366(chIdx),
-        drawCharacterState: (chIdx, charFlags) => screen?.drawCharacterState(chIdx, charFlags),
-        // A champion sent to the wings by `&SWAPCHARACTER` takes their portrait's pixels.
-        portraitOf: (champion) => screen?.portraitPixelsFor(champion),
     });
 
     // `CSBgraphics.dat` opens at its first section read, against what the game read names.
@@ -330,7 +317,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     const saves = new GameSaves(game, dataSet, setFiles, saveStore, {
         // A save packs a `CHARDESC`, and that needs graphic 26 for the champions who
         // carry only a portrait index.
-        portraitOf: (champion) => screen?.portraitPixelsFor(champion),
+        portraitOf: drawing.portraitOf,
         askBeginAdventure: (source) => screen?.askBeginAdventure(source),
     }, logSave, storeRandom, publishedDungeons);
 
