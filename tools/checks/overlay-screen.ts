@@ -26,12 +26,11 @@ import { CSBGraphicsLoader, CSBGraphicType } from '../../src/data/CSBGraphicsLoa
 import { readU32LE } from '../../src/core/bytes';
 import { Overlay, OVERLAY_HEIGHT, OVERLAY_WIDTH } from '../../src/engine/Overlay';
 import { identityOverlayPalette } from '../../src/engine/OverlayPalette';
-import { updateImageDataFromIndex } from '../../src/renderer/csbwin/CanvasBlitter';
+import { updateImageDataFromIndex, type RgbaImage } from '../../src/renderer/csbwin/CanvasBlitter';
 import {
   CreateOverlayTable, OVERLAY_TABLE_SIZE, overlayDrawsNothing, UpdateViewportArea, widen5,
 } from '../../src/renderer/csbwin/OverlayScreen';
 import { check, finish } from '../lib/check';
-import { standInOf } from '../lib/standIn';
 
 const csbGraphics = new CSBGraphicsLoader();
 csbGraphics.loadFromArray(new Uint8Array(readFileSync('tools/fixtures/gamefiles/csbgraphics/CSBgraphics.dat')));
@@ -62,7 +61,7 @@ console.log('1. The straight branch');
   const overlay = newOverlay();
   const wrong = palettes.filter((p) => !tableFor(overlay, p, false).subarray(0, 16).every((v, i) => v === straight(p[i]!)));
   check(wrong.length === 0, 'without useOverlay, each intensity is five bits (i << 2) | (i >> 1)');
-  const image = standInOf<ImageData>({ data: new Uint8ClampedArray(8 * 4), width: 8, height: 1 });
+  const image: RgbaImage = { data: new Uint8ClampedArray(8 * 4), width: 8, height: 1 };
   updateImageDataFromIndex(image, { width: 8, height: 1, pixels: Uint8Array.from([0, 1, 2, 3, 4, 5, 6, 7]) }, [0, 0x111, 0x222, 0x333, 0x444, 0x555, 0x666, 0x777]);
   console.log(`  RGB555 widened:     ${Array.from({ length: 8 }, (_, i) => widen5(five(i))).join(' ')}`);
   console.log(`  canvas intensities: ${Array.from({ length: 8 }, (_, i) => image.data[4 * i]!).join(' ')}`);

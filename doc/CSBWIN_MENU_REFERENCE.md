@@ -293,7 +293,7 @@ frozen game, the Hint Oracle around its own, and the sleep click before the engi
 `GameHost`'s `tag02076e` and `tag0207cc` for the drawing, `tag02076eDrawing` and
 `tag0207ccDrawing` in `src/renderer/ui/Mouse.ts`. The redraws are the frame's:
 `tag02076eDrawing` sets `UIState.shadedByTag02076e` and `tag0207ccDrawing` clears it, and
-while it is set `GameScreen.presentViewport` shades the three areas. The arrow is
+while it is set `ScreenComposer.presentViewport` shades the three areas. The arrow is
 `UIState.arrowCursorShape`, which `tag02076eDrawing` sets and `tag002572` clears
 (`tag0207ccDrawing`, `handleClothingClick` and the feeding call it); while it is set
 `drawCursorItem` draws the arrow. Over any dialog (`UIState.dialog`), the settings, the

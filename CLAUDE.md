@@ -204,6 +204,8 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
             (the one DescIndex / GetBasicObjectType / NameIndex)
 renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens),
             ScreenUI (the interface and its viewport, built together: the screen's and the tools'),
+            ScreenComposer (the screen composed without the DOM: the panels' order and the
+            palettes, into an RGBA image the screen puts on the canvas),
             GameInput (where a click or a key goes once the page has read it),
             LeftHanded (the left-handed screen: CSBWin's regions moved, a click moved back),
             ViewportRenderer (the dungeon view only), DrawViewport, ViewportGraphics

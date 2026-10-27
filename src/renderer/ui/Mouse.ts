@@ -205,7 +205,7 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
     // pixel x 0, y 198 of the adventure list `Buttons17196`. `d.ClockRunning = 0`,
     // `gameFrozen = true` and `DiscardAllInput()` are the engine's; `TAG02076e`, the
     // lists and key tables saved and replaced by `Buttons17832` and `Byte18448`, and
-    // "GAME FROZEN" in the viewport (`GameScreen.presentViewport`) are the screen's.
+    // "GAME FROZEN" in the viewport (`ScreenComposer.presentViewport`) are the screen's.
     freeze(ui.ctx);
     tag02076e(ui.ctx);
     ui.modeBeforeFreeze = ui.uiMode;
@@ -355,7 +355,7 @@ export function showHideInventoryDrawing(ui: UIState): void {
  * `TAG02076e`'s drawing (`doc/CSBwin-src/Character.cpp:5151-5158`), the host's
  * `tag02076e`, once the engine has repacked the open chest (`tag02076e`,
  * `src/engine/ShowHideInventory.ts`): `shadedByTag02076e`, which
- * `GameScreen.presentViewport` reads for the three shaded areas, and `arrowCursorShape`,
+ * `ScreenComposer.presentViewport` reads for the three shaded areas, and `arrowCursorShape`,
  * which `drawCursorItem` reads for the arrow cursor of `SetCursorShape(0)`.
  */
 export function tag02076eDrawing(ui: UIState): void {

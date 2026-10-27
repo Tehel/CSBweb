@@ -1,5 +1,5 @@
 /**
- * The interface and the viewport it shows, built together: the one wiring `GameScreen` and
+ * The interface and the viewport it shows, built together: the one wiring `ScreenComposer` and
  * the tools' `newUIState` (`tools/lib/ui.ts`) share.
  *
  * The `ViewportRenderer` draws the dungeon view over the game's dungeon and the party's

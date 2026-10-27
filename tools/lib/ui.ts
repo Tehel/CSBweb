@@ -1,5 +1,5 @@
 /**
- * How a tool builds the interface's state: whole, through `GameScreen`'s own factory
+ * How a tool builds the interface's state: whole, through the screen's own factory
  * (`createScreenUI`).
  *
  * `newUIState` hands it the game's tables from `graphics`, a blank 320x200 screen, and

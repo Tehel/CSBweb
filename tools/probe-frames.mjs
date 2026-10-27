@@ -451,10 +451,10 @@ check(await wheelTaken(), 'the disk menu takes the wheel, for its list');
 // composed, and a paint for each move kept the browser from showing any. The pointer
 // leaves again, so that no later frame holds a cursor.
 const moves = await evaluate(`(async()=>{const {screen}=window.__probe;const c=document.getElementById('game-canvas');const r=c.getBoundingClientRect();
-  let paints=0; const own=screen.presentViewport; screen.presentViewport=function(){paints++; return own.call(this);};
+  const g=c.getContext('2d'); let paints=0; const own=g.putImageData; g.putImageData=function(...a){paints++; return own.apply(this,a);};
   for (let i=0;i<50;i++) c.dispatchEvent(new PointerEvent('pointermove',{isPrimary:true,pointerType:'mouse',clientX:r.left+(100.5+i)*r.width/320,clientY:r.top+100.5*r.height/200,bubbles:true}));
   const during=paints; await new Promise(r=>setTimeout(r,200));
-  const at=screen.ui.hoverPoint; delete screen.presentViewport;
+  const at=screen.ui.hoverPoint; delete g.putImageData;
   c.dispatchEvent(new PointerEvent('pointerleave',{isPrimary:true,pointerType:'mouse'})); await new Promise(r=>setTimeout(r,200));
   return {during, after:paints, at, left:screen.ui.hoverPoint===null};})()`);
 console.log('  fifty moves of the pointer:', JSON.stringify(moves));

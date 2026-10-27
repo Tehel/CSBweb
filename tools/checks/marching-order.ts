@@ -182,7 +182,7 @@ async function main(): Promise<void> {
   // ---- The top view has a square for a living champion only: the dead champion 1 and
   //      the empty fourth box have none (`Character.cpp:1313`, `:2669-2672`), so the dead
   //      champion does not paint over champion 0, who shares their square. The screen is
-  //      cleared first, as `GameScreen.presentViewport` does.
+  //      cleared first, as `ScreenComposer.presentViewport` does.
   screen.pixels.fill(0);
   drawPartyStatus(ui);
   const byte1386 = g232.byte1386;

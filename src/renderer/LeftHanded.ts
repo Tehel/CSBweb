@@ -20,7 +20,7 @@
  *
  * Nothing is drawn differently: CSBWin's code draws its screen where it always does, and
  * the screen composed, the pieces are moved, pixel for pixel, before the cursor goes on
- * and the colours are converted (`GameScreen.presentViewport`). A point of the canvas is
+ * and the colours are converted (`ScreenComposer.presentViewport`). A point of the canvas is
  * moved back the other way before the interface sees it (`GameScreen.screenPoint`), so
  * every button list, the viewport's picking and the cursor's zones read CSBWin's screen.
  * A gap's clicks are CSBWin's too: the top view's left squares reach into its gap from

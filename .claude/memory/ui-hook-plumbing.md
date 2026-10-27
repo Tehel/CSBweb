@@ -9,8 +9,8 @@ A new hook or source the interface reads from the page (`UIState.settings`,
 `isCrtAvailable`, `onExportSave`, …) is plumbed through four places, in this order:
 
 1. the field on `UIState` (`src/renderer/ui/UIState.ts`), documented there;
-2. the `UIHooks` Pick at the foot of `UIState.ts` (`GameScreenHooks` is it, less the
-   screen's own two, and the `GameScreen` constructor spreads it whole);
+2. the `UIHooks` Pick at the foot of `UIState.ts` (`ScreenHooks`, `ScreenComposer.ts`, is
+   it, less the composer's own two, and the `ScreenComposer` constructor spreads it whole);
 3. the hooks object `construct()` in `src/main.ts` passes to `new GameScreen`;
 4. the default in `tools/lib/ui.ts` (`newUIState`), and a line of its header.
 

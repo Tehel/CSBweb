@@ -58,7 +58,7 @@ export interface LoopFlags {
   /**
    * `d.Word11776`, which each inversion toggles: whether `flashButn` stands inverted.
    * CSBWin inverts its screen memory once; the port composes its screen afresh for every
-   * frame, so `GameScreen` applies the inversion (`vblFlashButn`) after composing, for as
+   * frame, so `ScreenComposer` applies the inversion (`vblFlashButn`) after composing, for as
    * long as this is set.
    */
   word11776: boolean;
@@ -66,7 +66,7 @@ export interface LoopFlags {
   flashChanged: boolean;
   /**
    * `videoMode` (a global of `data.cpp`), which the viewport is drawn through the overlay
-   * in only when it is `VM_ADVENTURE` (`GameScreen.isAdventureVideoMode`). It is set where
+   * in only when it is `VM_ADVENTURE` (`ScreenComposer.isAdventureVideoMode`). It is set where
    * CSBWin sets it: an inventory shown or hidden (`ShowHideInventory`,
    * doc/CSBwin-src/CSBCode.cpp:7512, `:7546`), `TAG0207cc` (`:10081`), `WakeUp` (`:7121`),
    * the freeze and the thaw (`Mouse.cpp:1874`, `:1903`), sleep (`:1842`) and a menu

@@ -248,7 +248,7 @@ async function loadTitlePicture(): Promise<TitleFrame | null> {
 
 /**
  * The engine and the screen, each handed what it asks of the other: the engine its
- * `GameHost`, the screen its `GameScreenHooks`. Both are handed the one message area,
+ * `GameHost`, the screen its `ScreenHooks`. Both are handed the one message area,
  * which the engine writes and the screen draws.
  */
 function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: GameTables, sound: SoundManager): Built {

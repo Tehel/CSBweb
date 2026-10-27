@@ -114,7 +114,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E29 | `GameScreen` is the canvas, the compose order, the palettes and a façade | L | ⏳ |
+| E29 | `GameScreen` is a façade for the boot | S | ⏳ |
 | E31 | Late wiring with silent defaults, and long parameter lists | M | ⏳ |
 | E32 | Four ways to read bytes, and eight graphics caches | M | ⏳ |
 | E33 | What a frame costs | S | ⏳ |
@@ -414,27 +414,22 @@ gather or split CSBWin's functions as the code's concerns ask. What still follow
 the behaviour, the names of ported functions, which keep the two codebases greppable
 against each other, and the file formats.
 
-### E29 ⏳ `GameScreen` is the canvas, the compose order, the palettes and a façade
+### E29 ⏳ `GameScreen` is a façade for the boot
 
-`GameScreen` (776 lines, 62 methods, about 40 of them one- or two-line forwarders into
-`ui/`) is the canvas's output (`putImageData`), the order of the compose, the palettes'
-choice, and a façade over the UI and the boot (`getScreenBuffer`, `doMenu`,
-`setBootFrameRenderer`). It needs an `HTMLCanvasElement`, so no tool can build one: four
-dialog tools hand `GameInput` a stub cast `as unknown as GameScreen`.
+`GameScreen` (492 lines) is the canvas, the pointer's state, and a façade over the UI,
+its `ScreenComposer` and the boot (`getScreenBuffer`, `doMenu`, `setBootFrameRenderer`):
+about 40 of its methods are one- or two-line forwarders. Four tools hand `GameInput` a
+stub cast `as unknown as GameScreen` (`tools/checks/settings-dialog.ts`, `map-dialog.ts`,
+`champion-dialog.ts`, `dev-level.ts`); they stand in for the input's forwarders alone, so
+they go with E30's router, not here.
 
-The steps left, each a commit that changes no behaviour (every tool's whole output, and
+The step left, a commit that changes no behaviour (every tool's whole output, and
 `npm test -- --frames`):
 
-1. **A `ScreenComposer` without the DOM** (M). The screen's index buffer, the interface
-   palette, the overlay table, `PresentedFrame`, the left-handed layout,
-   `presentViewport`'s order, `presentScreen`, `renderLastFrame` and the boot's frame
-   renderer, writing into an RGBA buffer of `ImageData`'s shape; `GameScreen` keeps the
-   canvas and puts each composed frame on it. The dialog tools' stubs become a screen
-   over a real composer where they need one.
-2. **The boot's façade** (S). `BootSequence` and `EndOfGame` reach the composer and `ui/`
-   directly (`getScreenBuffer`, `getFontData`, `getBitmap`, `doMenu`, `menuButtonList`,
-   `drawMenuPress`, `drawDialogOnly`, `getUITables`, `championPortrait`); the screen's
-   forwarders for them go.
+- **The boot's façade** (S). `BootSequence` and `EndOfGame` reach the composer and `ui/`
+  directly (`getScreenBuffer`, `getFontData`, `getBitmap`, `presentScreen`, `doMenu`,
+  `menuButtonList`, `drawMenuPress`, `drawDialogOnly`, `getUITables`,
+  `championPortrait`); the screen's forwarders for them go.
 
 The input's forwarders (`handleDialogKey`, `openMap`, `searchMouseButtons`, …) stay on the
 screen: they are E30's, whose one input router is where they go. What is left on
@@ -442,11 +437,14 @@ screen: they are E30's, whose one input router is where they go. What is left on
 `handleMouseButton`'s deferred flags, the Hint Oracle's open and close, `syncParty`,
 `setUIMode`, `initializePlayState` and the pointer's state.
 
-Where it stands: the page's hooks are spread once (`GameScreenHooks` is `UIHooks` less the
-screen's own two); the screen and the tools build the interface and its viewport through
-one factory (`createScreenUI`, `src/renderer/ScreenUI.ts`); and the engine's host, the
-page's and the tools' alike, draws on the interface through `hostDrawing`
-(`src/renderer/ui/HostDrawing.ts`). The two steps above are left.
+Where it stands: the page's hooks are spread once (`ScreenHooks` is `UIHooks` less the
+composer's own two); the composer and the tools build the interface and its viewport
+through one factory (`createScreenUI`, `src/renderer/ScreenUI.ts`); the engine's host,
+the page's and the tools' alike, draws on the interface through `hostDrawing`
+(`src/renderer/ui/HostDrawing.ts`); and `ScreenComposer` (`src/renderer/ScreenComposer.ts`)
+composes each frame without the DOM, the screen's buffer, the compose order, the palettes,
+the overlay and the left-handed layout, into an `RgbaImage` that `GameScreen` puts on the
+canvas. The step above is left.
 
 ### E30 ⏳ One presenter and one input router
 
@@ -457,8 +455,8 @@ loop, and `requestAnimationFrame` loops for the chewing mouth
 intro's VBL (`BootSequence.ts:193-203`) and the CRT (`src/lib/crt.ts:232-249`).
 
 - `renderLastFrame`, which the chew, the menus and Reincarnate draw through, skips
-  `refreshScreen`'s `setPartyState` and its `mainLoopHasReturned()` test
-  (`GameScreen.ts:818-824`, `src/main.ts:114-118`), so a chew still running when the game ends
+  `refreshScreen`'s `syncParty` and its `mainLoopHasReturned()` test
+  (`ScreenComposer.ts:311-317`, `src/main.ts:121-125`), so a chew still running when the game ends
   draws the adventure over the credits' wait; `initializePlayState` cancels neither loop.
 - The CRT uploads the canvas and runs its shader at device pixels at every display frame,
   changed or not: about 2.3 million pixels a frame at a device ratio of 2, up to 120 times a
@@ -470,7 +468,8 @@ intro's VBL (`BootSequence.ts:193-203`) and the CRT (`src/lib/crt.ts:232-249`).
 
 Paying it: one rAF presenter with a dirty flag that the VBL and the animations set, the CRT
 drawing only after a present; one input router, with a focus policy once the page has
-controls again, calling `ui/` itself where `GameScreen` forwards the input today (E29).
+controls again, calling `ui/` itself where `GameScreen` forwards the input today (E29), so
+the four dialog tools' stubs of the screen (E29) go with it.
 
 ### E31 ⏳ Late wiring with silent defaults, and long parameter lists
 
@@ -521,7 +520,7 @@ loader's cache keyed by format, or the parameter dropped with the dead fallback.
   where a 16-entry `Uint32` table a palette, written through a `Uint32Array` view, takes
   0.14 ms (`updateImageDataFromIndex*`, `src/renderer/csbwin/CanvasBlitter.ts:416-490`). It
   always takes the two-palette path while adventuring: `viewportPalette !== uiPalette`
-  compares two separate copies (`GameScreen.ts:743-746`). Its body is written three times
+  compares two separate copies (`ScreenComposer.ts:229-232`). Its body is written three times
   in `CanvasBlitter`, and the cursor's footprint loop twice (`reconvertThroughPalette`,
   `PresentedFrame.capture`).
 - **Every monster turn allocates** an `MmRecord` and with it a `DsaVars` of two 100-entry
@@ -1203,7 +1202,7 @@ Recorded so that nobody "fixes" them.
   is shown (`doc/PROVEN_FACTS.md` → "An object in hand is a colour-4 silhouette over the
   dungeon view"). The port draws the icon itself and shows those pixels through the
   interface palette, so neither the light nor the level's monster colours reach it
-  (`drawCursorItem`, `src/renderer/ui/Mouse.ts`, and `GameScreen.presentViewport`). The
+  (`drawCursorItem`, `src/renderer/ui/Mouse.ts`, and `ScreenComposer.presentViewport`). The
   arrow over the right-hand panel and the message area is kept. It is
   `UIState.colouredObjectCursor`, on by default. It becomes one of the player's settings
   (`src/settings/Settings.ts`) once a tab of the settings dialog carries it; `tools/checks/object-cursor.ts` checks it both ways.

@@ -27,6 +27,7 @@ import {
   reconvertThroughPalette,
   updateImageDataFromIndexWithViewportPalette,
   type IndexedBitmap,
+  type RgbaImage,
 } from '../../src/renderer/csbwin/CanvasBlitter';
 import { type UIState } from '../../src/renderer/ui/UIState';
 import { objectIconBitmap } from '../../src/renderer/ui/Draw';
@@ -35,7 +36,6 @@ import { check, finish } from '../lib/check';
 import { newGame, stockDungeon, stockGraphics } from '../lib/game';
 import { newUIState } from '../lib/ui';
 import * as mouse from '../../src/renderer/ui/Mouse';
-import { standInOf } from '../lib/standIn';
 import { closeDialog } from '../../src/renderer/ui/Dialog';
 import { openSettingsDialog } from '../../src/renderer/ui/SettingsDialog';
 import { openMapDialog } from '../../src/renderer/ui/MapDialog';
@@ -180,7 +180,7 @@ async function main(): Promise<void> {
   viewportPalette[9] = ui.objectTables.specialColors[0].paletteEntries[0];
   check(viewportPalette[9] !== uiPalette[9], 'the test palette should change colour 9');
   const rgb = (c: number): number[] => [((c >> 8) & 7) * 36, ((c >> 4) & 7) * 36, (c & 7) * 36];
-  const image = standInOf<ImageData>({ width: 320, height: 200, data: new Uint8ClampedArray(320 * 200 * 4) });
+  const image: RgbaImage = { width: 320, height: 200, data: new Uint8ClampedArray(320 * 200 * 4) };
   const viewportRect = { x1: 0, y1: 33, x2: 223, y2: 168 };
   const colour9Rgb = (): { ui: number; viewport: number } => {
     const counts = { ui: 0, viewport: 0 };

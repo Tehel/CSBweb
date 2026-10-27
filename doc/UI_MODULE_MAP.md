@@ -8,7 +8,7 @@ each other.
 
 `src/renderer/ui/UIState.ts` — CSBWin keeps this in globals that `Mouse.cpp`, `CSBUI.cpp`,
 `Character.cpp` and `Magic.cpp` all reach into. Here it is one object that
-`GameScreen` owns and every UI function takes as its first argument. `createUIState`
+`ScreenComposer` owns and every UI function takes as its first argument. `createUIState`
 builds it whole, from its data sources and every hook, so none of them is ever missing:
 
 - **data sources**: `graphicsLoader`, `ctx` (the game's `GameContext`, CSBWin's `d.`:
@@ -21,7 +21,7 @@ builds it whole, from its data sources and every hook, so none of them is ever m
   and the attack menu (`attackingCharacterOrdinal`, `possibleAttackTypes`, …), are the
   context's, `ctx.interface` (`src/engine/InterfaceState.ts`)
 - **bitmap caches**: `graphicCache`, cursor bitmaps, the portrait sheet
-- **hooks out to the page** (`GameScreenHooks`): the save menu's three (`onSaveGame`,
+- **hooks out to the page** (`ScreenHooks`): the save menu's three (`onSaveGame`,
   `onRestoreSave`, `onRestoreFailed`, which the page points at `GameSaves`), and `onReincarnated`, the page's
   redraw once the name-entry screen is answered. Everything the interface does to the
   game it does as CSBWin's does to `d.`, through `ctx`: the systems (casting, attacking,
@@ -75,12 +75,19 @@ the sound chip — and to nothing else. `IntroHost.ts` is that hardware as an in
 | `intro/PrisonLevel.ts` | `CSBCode.cpp:9678-9698` | The synthetic 5×5 level behind the doors, as a `DungeonState` the real viewport renderer can read |
 | `intro/BootSequence.ts` | `CSBCode.cpp:11573` (`_AskWhatToDo`) | The input queue, the VBL clock and the order the screens run in |
 
-## `GameScreen` and `ViewportRenderer`
+## `GameScreen`, `ScreenComposer` and `ViewportRenderer`
 
-`src/renderer/GameScreen.ts` is the screen. It owns the canvas and the `UIState`, and takes
-the interface's hooks out as one object at construction (`GameScreenHooks`, as `GameHost` is
-the engine's). `presentViewport()` composites every panel over the viewport and converts the
-palette indices to RGBA through the UI palette and the light level's viewport palette. It
+`src/renderer/ScreenComposer.ts` is the screen composed, without the DOM. It owns the
+`UIState`, the viewport and the screen's palette-index buffer, and takes the interface's
+hooks out as one object at construction (`ScreenHooks`, as `GameHost` is the engine's).
+`presentViewport()` composites every panel over the viewport and converts the palette
+indices to RGBA through the UI palette and the light level's viewport palette, into an
+image of `ImageData`'s shape (`RgbaImage`), which it hands to its `ScreenOutput`;
+`presentScreen()` does the same for a pre-game screen's frame through the palette it is
+given.
+
+`src/renderer/GameScreen.ts` is the screen on the page. It owns the canvas, puts each
+frame its composer hands over on it, and keeps the pointer's state. It
 also hosts the save menu and the Reincarnate screen. Its public methods —
 `searchMouseButtons`, `handleMouseButton`, `translateKey`, `handleUIKey`, … — are thin
 wrappers, because the input path and `main.ts` call the screen, not the UI modules. Most

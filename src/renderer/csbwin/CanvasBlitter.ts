@@ -15,6 +15,16 @@ import type { Rect, RectPos } from '../../data/tables/UITables';
 /** The one bitmap record, declared with the loaders that make it; the blitters' readers import it from here. */
 export type { IndexedBitmap };
 
+/**
+ * An RGBA image, `ImageData`'s shape without the DOM: what the conversion writes, which the
+ * page's canvas takes as `ImageData` and a tool holds as a plain buffer.
+ */
+export interface RgbaImage {
+  readonly width: number;
+  readonly height: number;
+  readonly data: Uint8ClampedArray;
+}
+
 export interface PaletteIndexViewportBuffer {
   width: number;
   height: number;
@@ -396,7 +406,7 @@ function groupPixel(bitmap: IndexedBitmap, group: number, i: number): number {
 const atariIntensity = Uint8Array.from({ length: 8 }, (_, i) => i * 36);
 
 export function updateImageDataFromIndex(
-  imageData: ImageData,
+  imageData: RgbaImage,
   src: PaletteIndexViewportBuffer,
   palette: number[]
 ): void {
@@ -407,7 +417,7 @@ export function updateImageDataFromIndex(
     throw new Error(`Index buffer size mismatch: expected ${pixelCount}, got ${inPx.length}`);
   }
   if (imageData.width !== src.width || imageData.height !== src.height) {
-    throw new Error('ImageData dimensions do not match index buffer');
+    throw new Error('Image dimensions do not match index buffer');
   }
 
   for (let i = 0; i < pixelCount; i++) {
@@ -427,7 +437,7 @@ export function updateImageDataFromIndex(
 }
 
 export function updateImageDataFromIndexWithViewportPalette(
-  imageData: ImageData,
+  imageData: RgbaImage,
   src: PaletteIndexViewportBuffer,
   viewportRect: Rect,
   viewportPalette: number[],
@@ -440,7 +450,7 @@ export function updateImageDataFromIndexWithViewportPalette(
     throw new Error(`Index buffer size mismatch: expected ${pixelCount}, got ${inPx.length}`);
   }
   if (imageData.width !== src.width || imageData.height !== src.height) {
-    throw new Error('ImageData dimensions do not match index buffer');
+    throw new Error('Image dimensions do not match index buffer');
   }
 
   const x1 = clampInt(viewportRect.x1, 0, src.width - 1);
@@ -477,7 +487,7 @@ export function updateImageDataFromIndexWithViewportPalette(
  * the palette it was drawn for rather than the viewport's.
  */
 export function reconvertThroughPalette(
-  imageData: ImageData,
+  imageData: RgbaImage,
   src: PaletteIndexViewportBuffer,
   footprint: { x: number; y: number; bitmap: IndexedBitmap },
   transparentColor: number,

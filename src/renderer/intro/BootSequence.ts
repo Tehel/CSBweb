@@ -697,7 +697,7 @@ export async function openHintOracle(
  * again.
  *
  * The colour registers are the interface's, as the open inventory shows the screen
- * through them (`GameScreen.presentViewport`), so the Oracle's first fade starts from the
+ * through them (`ScreenComposer.presentViewport`), so the Oracle's first fade starts from the
  * screen as it was. CSBWin's Oracle shows the system's pointer throughout
  * (`doc/CSBWIN_HINT_ORACLE_REFERENCE.md` → "Leaving"); the page's canvas hides it, so the
  * arrow stands in for it.
