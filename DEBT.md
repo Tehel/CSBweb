@@ -119,7 +119,6 @@ In payoff order: the first row is the next item.
 | C187 | The adjust skills filter hands each DSA the one before's words unmasked, and its `why` | S | ⏳ |
 | C188 | A new timer's unused bytes are 0, where CSBWin's are 0xcd | S | ⏳ |
 | C189 | A distant monster is shrunk again at every frame, where CSBWin keeps it across levels | S | ⏳ |
-| C191 | `CreateMonster`'s full ITEM16 pool refuses a group off the party's level | S | ⏳ |
 | C192 | `&MOVE` sets an object's corner before `MoveObject`, where CSBWin sets it after | S | ⏳ |
 | F15 | Tools that read the wall clock, and a runner with no timeout | S | ⏳ |
 | F16 | A tool can pass having checked less than it says | S | ⏳ |
@@ -574,21 +573,6 @@ Paying it: the shrunk picture kept in the `GraphicsStore` under
 `pI12.word2 + graphicNumFBSAE`, the non-alternate's `graphicNumFBSAE` starting at
 `word2` as CSBWin's does; a check that draws a monster far on one level, then on a
 level whose scheme for its colour differs, and finds the first level's colours.
-
-### C191 ⏳ `CreateMonster`'s full ITEM16 pool refuses a group off the party's level
-
-`CreateMonster` calls `EnsureItem16Available` and returns `RNnul` while
-`d.ITEM16QueLen >= d.MaxITEM16-5 && d.LoadedLevel == d.partyLevel`
-(`doc/CSBwin-src/Monster.cpp:111-136`, `:83-100`); its whole body reads `d.LoadedLevel`,
-the level its caller loaded, which the port passes as `options.level`. The port's
-`createMonster` asks `ensureItem16Available()` and `isItem16PoolFull()` with no level
-(`src/engine/MonsterSystem.ts:769-770`), so they read the party's level as loaded, and a
-generator off the party's level is refused too while the pool is full. Reaching it takes
-235 groups with an ITEM16 on the party's level.
-
-Paying it: both calls given `options.level`, as `CopyItem` gives them the DSA's level
-(`src/engine/dsa/ops/objects.ts`); a check that fills the pool and makes a group on
-another level.
 
 ### C192 ⏳ `&MOVE` sets an object's corner before `MoveObject`, where CSBWin sets it after
 

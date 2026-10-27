@@ -24,6 +24,9 @@
  *     its own sound when it is audible (`Timer.cpp:1797-1800`).
  *  7. A step waits `D4W = sw(timePerMove/2 - w_54)` (`Monster.cpp:2104`), an `i16`
  *     division: a Skeleton's 7 halves to 3, so at `w_54` 3 it moves, and at 2 it waits 1.
+ *  8. `CreateMonster` refuses a group while the ITEM16 pool is full only when the level
+ *     it loaded is the party's (`Monster.cpp:83-100`, `:136-142`): a generator off the
+ *     party's level still makes its group.
  *
  * The squares are real open squares of `dungeon.dat`; the teleporters are real teleporter
  * records moved onto them and re-aimed, and the pit is a real one.
@@ -284,6 +287,29 @@ async function main(): Promise<void> {
       `at 2 ${atTwo.bool36 ? 'moves' : `waits ${atTwo.timePerMove}`}`);
     check(atThree.bool36 && moves.length === 1, 'half of 7 is 3: at w_54 3 the group moves');
     check(!atTwo.bool36 && atTwo.timePerMove === 1 && atTwo.sinceLastUpdate === -1, 'at w_54 2 it waits 1, a whole tick');
+  }
+
+  /* ------------------- 8. CreateMonster with the ITEM16 pool full ---- */
+  {
+    const game = await makeGame();
+    const z = levelWith(game, (l) => typeOn(game, l) >= 0);
+    const there = levelWith(game, (l) => l !== z && typeOn(game, l) >= 0);
+    const at = opens(game, there)[0]!;
+    const here = opens(game, z)[0]!;
+    partyOn(game, z, [here]);
+    (game.systems.monsters as unknown as { item16QueLen: number }).item16QueLen = 1000;
+    const create = (p: Position): void => {
+      game.systems.monsters.createMonster({
+        value: typeOn(game, p.z), hitPointMultiplier: 1, numMonM1: 0, facing: 0,
+        mapX: p.x, mapY: p.y, level: p.z, invisible: false, drawAsSize4: false,
+      });
+    };
+    create(at);
+    create(here);
+    console.log(`8. the ITEM16 pool full, the party on L${z}: a group made at (${at.x},${at.y}) L${there} ${anyGroupAt(game, at)}, `
+      + `at (${here.x},${here.y}) L${z} ${anyGroupAt(game, here)}`);
+    check(anyGroupAt(game, at), "a group is made off the party's level");
+    check(!anyGroupAt(game, here), "none on the party's level");
   }
 
   finish();

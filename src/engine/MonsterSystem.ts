@@ -766,8 +766,9 @@ export class MonsterSystem {
 
     if (!this.dungeon.monsterAllowedOnLevel(monsterType, options.level)) return null;
 
-    this.ensureItem16Available();
-    if (this.isItem16PoolFull()) return null;
+    // CSBWin's body reads `d.LoadedLevel`, the level its caller loaded: the group's.
+    this.ensureItem16Available(options.level);
+    if (this.isItem16PoolFull(options.level)) return null;
 
     const desc = this.ctx.tables.monsterDesc[monsterType];
     if (!desc) return null;

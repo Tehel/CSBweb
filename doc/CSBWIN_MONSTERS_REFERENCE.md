@@ -178,7 +178,10 @@ note this is a different cap from `AttachItem16ToMonster`'s 1050.
 
 `CreateMonster` (`doc/CSBwin-src/Monster.cpp:111`) takes `value` (monster type in
 bits 0-4, alternate graphic in bits 5-6), a hit-point multiplier, `numMonM1`, facing
-and a map square. It clamps `numMonM1` to 1 for a size-1 monster and to 0 for a
+and a map square of `d.LoadedLevel`, the level its caller loaded. It returns `RNnul`
+while the ITEM16 pool is full and that level is the party's (`:136-142`); a generator
+off the party's level makes its group whatever the pool
+(`tools/checks/monster-move-code.ts`). It clamps `numMonM1` to 1 for a size-1 monster and to 0 for a
 size-2 one, both with a message box. HP per member is
 `baseHealth09 * hitPointMultiplier + Random(baseHealth09/4 + 1)`. Positions are
 assigned from a random start (`STRandom0_3()`), advancing by 2 rather than 1 for a
