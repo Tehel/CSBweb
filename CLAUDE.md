@@ -108,7 +108,7 @@ There is still **no test framework** (`PLAN.md` → "The evidence") — `npm tes
   the 320x200 screen as CSBWin draws it, its palette slots and the palettes they were shown
   through (`tools/lib/frames.mjs`), not the canvas's colours: a slot drawn for another of
   the same colour fails, and a baseline captured on one machine is checkable on another. The probe also asserts on the spot what
-  no frame shows: the CRT effect and its pointer while WebGL is lost, which needs a Chrome that gives WebGL, the wheel
+  no frame shows: the CRT effect, drawing only what is presented, and its pointer while WebGL is lost, which needs a Chrome that gives WebGL, the wheel
   and the keys reaching a save menu, at the entrance as in play, a move of the pointer
   painting nothing until the VBL's frame, the download its EXPORT starts, a delete failed when its transaction aborts, a file
   dropped on it, a finger on a touch screen: a tap one click and the sound unlocked by it, the eye held while it

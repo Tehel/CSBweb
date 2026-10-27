@@ -146,9 +146,11 @@ export interface CrtEffect {
     isAvailable: () => boolean;
     /** The scanlines and the curve each on or off: the effect is shown with either. */
     set: (scanlines: boolean, curve: boolean) => void;
+    /** The game canvas holds a new frame: the tube shows it from the next display frame. */
+    presented: () => void;
 }
 
-const UNAVAILABLE: CrtEffect = { isAvailable: () => false, set: () => {} };
+const UNAVAILABLE: CrtEffect = { isAvailable: () => false, set: () => {}, presented: () => {} };
 
 interface Pipeline {
     texture: WebGLTexture;
@@ -227,10 +229,11 @@ export function createCrtEffect(canvas: HTMLCanvasElement): CrtEffect {
     let lost = false;
     let frame: number | null = null;
 
-    // Every frame the page shows: the game canvas is painted by the VBL, the intro and the
-    // modal screens, and whatever painted it is on the tube by the next frame.
+    // A frame drawn on the tube once the game canvas has a new one (`presented`), or the
+    // tube a new size, at the next display frame: several presents before it are one draw,
+    // and a screen at rest costs nothing.
     const draw = (): void => {
-        frame = requestAnimationFrame(draw);
+        frame = null;
         if (lost) return;
         const width = Math.max(1, Math.round(tube.clientWidth * devicePixelRatio));
         const height = Math.max(1, Math.round(tube.clientHeight * devicePixelRatio));
@@ -247,6 +250,19 @@ export function createCrtEffect(canvas: HTMLCanvasElement): CrtEffect {
         gl.uniform1i(pipeline.curve, curve ? 1 : 0);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     };
+    const request = (): void => {
+        if (frame === null && (scanlines || curve) && !lost) frame = requestAnimationFrame(draw);
+    };
+
+    // The tube's size in device pixels, which a move to a screen of another density
+    // changes without its size in CSS pixels; where the browser does not report that,
+    // its size in CSS pixels.
+    const resized = new ResizeObserver(request);
+    try {
+        resized.observe(tube, { box: 'device-pixel-content-box' });
+    } catch {
+        resized.observe(tube);
+    }
 
     // A lost context is waited out, the game canvas showing through and the pointer read
     // flat, as it shows; a restored one is built again.
@@ -266,22 +282,23 @@ export function createCrtEffect(canvas: HTMLCanvasElement): CrtEffect {
         lost = false;
         tube.style.visibility = '';
         curvedCanvas = curve ? canvas : null;
+        request();
     });
 
     return {
         isAvailable: () => true,
         set: (nextScanlines: boolean, nextCurve: boolean) => {
-            const wasOn = scanlines || curve;
             scanlines = nextScanlines;
             curve = nextCurve;
             const on = scanlines || curve;
             tube.style.display = on ? '' : 'none';
             curvedCanvas = curve && !lost ? canvas : null;
-            if (on && !wasOn) draw();
-            else if (!on && frame !== null) {
+            if (on) request();
+            else if (frame !== null) {
                 cancelAnimationFrame(frame);
                 frame = null;
             }
         },
+        presented: request,
     };
 }

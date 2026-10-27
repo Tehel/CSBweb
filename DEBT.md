@@ -417,16 +417,16 @@ against each other, and the file formats.
 The screen is drawn by clocks that do not know each other: the engine's `setTimeout` VBL
 loop, and `requestAnimationFrame` loops for the chewing mouth
 (`src/renderer/ui/Feeding.ts:228-249`), a menu button's press (`playMenuPress`,
-`src/renderer/ui/Menu.ts:414-426`), the
-intro's VBL (`BootSequence.ts:221-235`) and the CRT (`src/lib/crt.ts:232-249`).
+`src/renderer/ui/Menu.ts:414-426`) and the
+intro's VBL (`BootSequence.ts:221-235`). The CRT effect alone follows the screen: told
+of every frame the screen puts on the canvas (`GameScreen`'s `presented`), it draws it at
+the next display frame, or the tube at a new size (`createCrtEffect`, `src/lib/crt.ts`),
+and `tools/probe-frames.mjs` counts its draws against the presents.
 
 - `renderLastFrame`, which the chew, the menus and Reincarnate draw through, skips
   `refreshScreen`'s `syncParty` and its `mainLoopHasReturned()` test
   (`ScreenComposer.ts:311-317`, `src/main.ts:121-125`), so a chew still running when the game ends
   draws the adventure over the credits' wait; `initializePlayState` cancels neither loop.
-- The CRT uploads the canvas and runs its shader at device pixels at every display frame,
-  changed or not: about 2.3 million pixels a frame at a device ratio of 2, up to 120 times a
-  second.
 - The rAF scheduler is written twice (`Feeding.ts:230-233`, with `as unknown as number`, and
   `playMenuPress`), and a menu's press runs on two clocks
   (`BootSequence.ts:568-571` passes made-up times).
@@ -438,23 +438,20 @@ intro's VBL (`BootSequence.ts:221-235`) and the CRT (`src/lib/crt.ts:232-249`).
   `map-dialog.ts`, `champion-dialog.ts`, `dev-level.ts`), which hides a method missing from
   the stub from `tsc`.
 
-Paying it, in four steps, a commit each:
+Paying it, in three steps left, a commit each:
 
-1. **The CRT draws after a present.** The screen tells the effect of every frame it puts
-   on the canvas, and the effect draws it at the next display frame, or the tube at a new
-   size; `tools/probe-frames.mjs` counts its draws against the presents.
-2. **One animation clock.** One rAF presenter with a dirty flag, which the chew, the menu
+1. **One animation clock.** One rAF presenter with a dirty flag, which the chew, the menu
    press in play (`playMenuPress`) and the intro's (`waitForMenuSelect`) ask for frames,
    on the one clock, drawing through `refreshScreen`'s guards (`syncParty`,
    `mainLoopHasReturned`); `initializePlayState` and the game's end cancel what is under
    way. The VBL's frame and the input's refreshes set the flag too, and the CRT draws in
-   the presenter's frame, after the canvas.
-3. **One input router.** `GameInput` calls `ui/` itself where `GameScreen` forwards the
+   the presenter's frame, after the canvas, where `presented` tells it now.
+2. **One input router.** `GameInput` calls `ui/` itself where `GameScreen` forwards the
    input today, so the forwarders go, and the four stubs with them. What is left on
    `GameScreen` then is what has logic of its own: the canvas, `drawViewport`,
    `refreshOverlay`, `handleMouseButton`'s deferred flags, the Hint Oracle's open and
    close, `syncParty`, `setUIMode`, `initializePlayState` and the pointer's state.
-4. **The intro's input through it.** `IntroHost`'s listeners on `window` go through the
+3. **The intro's input through it.** `IntroHost`'s listeners on `window` go through the
    router, with a focus policy once the page has controls again.
 
 ### E39 ⏳ The About and Credits pages

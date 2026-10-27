@@ -412,7 +412,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
                 .then((error) => { if (error !== null) console.error('Hint Oracle:', error); })
                 .finally(close);
         },
-    });
+    }, () => crtController?.presented());
     return { game, screen, saves, messages, events };
 }
 

@@ -395,6 +395,21 @@ check(crtInPlay === 'on', 'DISPLAY\'s SCANLINES turns the effect on');
 check(await canvasPixels() === inventory, 'CRT effect on: the game canvas keeps its pixels');
 const tubeSize = await evaluate(`(()=>{const t=document.getElementById('crt-canvas');return t.width+'x'+t.height;})()`);
 check(tubeSize === '960x600', `the effect is drawn at the size it is shown, 960x600 (${tubeSize})`);
+// The effect draws a frame only once the game canvas has a new one, or the tube a new
+// size (`createCrtEffect`): the tube's draws counted against the canvas's presents, for
+// a second over the inventory, where little changes, and then a move of the pointer,
+// which the VBL's frame presents. One draw may be pending from before the count.
+await evaluate(`(()=>{const gl=document.getElementById('crt-canvas').getContext('webgl');
+  const ctx=document.getElementById('game-canvas').getContext('2d');const n={draws:0,presents:0};window.__crtCount=n;
+  const draw=gl.drawArrays,put=ctx.putImageData;window.__crtUncount=()=>{gl.drawArrays=draw;ctx.putImageData=put;};
+  gl.drawArrays=function(...a){n.draws++;return draw.apply(this,a);};
+  ctx.putImageData=function(...a){n.presents++;return put.apply(this,a);};return 1;})()`);
+await wait(1000);
+const crtIdle = await evaluate(`({...window.__crtCount})`);
+check(crtIdle.draws <= crtIdle.presents + 1, `at rest, the effect draws only what is presented (${crtIdle.draws} draws, ${crtIdle.presents} presents)`);
+await hoverAt(0.3, 0.3); await vbls(SHOWN);
+const crtMoved = await evaluate(`(()=>{const n={...window.__crtCount};window.__crtUncount();return n;})()`);
+check(crtMoved.presents > crtIdle.presents && crtMoved.draws > crtIdle.draws, `a present is drawn (${crtMoved.draws} draws, ${crtMoved.presents} presents)`);
 check(await hoverAt(0.1, 0.1) === '32,20', 'the scanlines alone: the pointer is the plain scaling');
 await toggleCrt(CURVE);
 check(await hoverAt(0.5, 0.5) === '160,100', 'the curve on: the tube\'s middle is the screen\'s');

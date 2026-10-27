@@ -65,7 +65,8 @@ export class GameScreen {
   /** The wheel has changed the dialog since it was last drawn (`takeWheelTurned`). */
   private wheelTurned = false;
 
-  constructor(canvas: HTMLCanvasElement, deps: ScreenComposerDeps, hooks: ScreenHooks) {
+  /** `presented` is told of every frame put on the canvas, once it is (the CRT effect's, `src/lib/crt.ts`). */
+  constructor(canvas: HTMLCanvasElement, deps: ScreenComposerDeps, hooks: ScreenHooks, presented: () => void) {
     const screenCtx = canvas.getContext('2d');
     if (!screenCtx) throw new Error('Failed to create screen 2D context');
     const image = screenCtx.createImageData(SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -74,6 +75,7 @@ export class GameScreen {
       show: (withCursor) => {
         if (withCursor) this.cursorMoved = false;
         screenCtx.putImageData(image, 0, 0);
+        presented();
       },
     }, deps, hooks);
     this.viewport = this.composer.viewport;
