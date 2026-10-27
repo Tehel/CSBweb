@@ -331,7 +331,8 @@ function regions22e(t: GraphicsTables): Region[] {
     doorSwitchRuns(o.doorSwitchSourceDescSets) ? 'd.Byte5076 + 24*D4W, CSBCode.cpp:4164' : undefined);
   put('doorOrnamentRectSets', 'Byte5070', o.doorOrnamentRectSets.flat().flatMap(decoration), 0,
     '(aReg)d.Byte5070 + 18*D4W + 6*D6W, CSBCode.cpp:4073');
-  put('floorDecorationDescSets', 'floorDecorDesc', o.floorDecorationDescSets.flat().flatMap(decoration));
+  put('floorDecorationDescSets', 'floorDecorDesc', o.floorDecorationDescSets.flat().flatMap(decoration), 0,
+    'd.floorDecorDesc[d.LoadedFloorDecorations[graphicIndex][1]][relativeCell], CSBCode.cpp:3957');
   put('wallDecorationRectSets', 'wallDecorationPosition', o.wallDecorationRectSets.flat().flatMap(decoration));
   put('wallTextPlaqueY2', 'Byte4212', bytes(o.wallTextPlaqueY2));
   put('wallTextLineY2', 'Byte4196', bytes(o.wallTextLineY2));

@@ -20,11 +20,16 @@
  * ten, reads its set on through the bytes that follow (`Code390e.cpp:270`, `:282`):
  * `Byte4110`, then `Byte4100` (`Data.h:1185-1187`). A level that names door ornaments 12
  * and 22 and floor decorations 10 and 69 loads `Byte4110[0]`'s set, `Byte4100[0]`'s,
- * `Byte4100[0]`'s and `Byte4100[59]`'s into its slots.
+ * `Byte4100[0]`'s and `Byte4100[59]`'s into its slots. The sets' rectangles are read on
+ * too, to item 0x22e's end (`CSBCode.cpp:3957`, `:4073`): floor set 7 is
+ * `wallDecorationPosition`'s bytes, and a floor decoration in it is drawn there.
  *
  * Run: `npm test -- --only=door-ornaments.ts`
  */
 import { OBJECT_ID_EOF, Position, RoomType } from '../../src/core/types';
+import type { DecorationDesc } from '../../src/data/tables/ObjectTables';
+import { DungeonState, NO_GAME } from '../../src/engine/DungeonState';
+import { PartyFootprints } from '../../src/engine/PartyFootprints';
 import { check, finish } from '../lib/check';
 import { ViewportRenderer } from '../../src/renderer/ViewportRenderer';
 import { graphicsTablesOf, newGame, stockGraphics, stockDungeon, graphicsStoreOf } from '../lib/game';
@@ -37,7 +42,7 @@ function main(): void {
   const sets = tables.doorOrnamentRectSets;
 
   console.log('Byte5070 / Byte5058: x1 x2 y1 y2 widthBytes height');
-  sets.forEach((set, s) =>
+  sets.slice(0, 4).forEach((set, s) =>
     set.forEach((r, n) => console.log(`  set ${s} ${NEARNESS[n]}: ${r.x1} ${r.x2} ${r.y1} ${r.y2} ${r.widthBytes} ${r.height}`))
   );
   console.log(`Byte4122: ${Array.from(tables.doorOrnamentRectSetIndex.subarray(0, 12)).join(' ')}`);
@@ -115,6 +120,68 @@ function main(): void {
     'door ornaments 12 and 22 take Byte4110[0] and Byte4100[0] as their sets');
   check(floors[0]![0] === 307 && floors[0]![1] === byte4100[0] && floors[1]![0] === 661 && floors[1]![1] === byte4100[59],
     'floor decorations 10 and 69 take Byte4100[0] and Byte4100[59] as their sets');
+
+  // Their sets are read on past the tables, to item 0x22e's end (`CSBCode.cpp:3957`, `:4073`).
+  const floorSets = tables.floorDecorationDescSets;
+  const wallSets = tables.wallDecorationRectSets;
+  const raw = graphics.getRawGraphic(0x22e);
+  const same = (a: DecorationDesc | undefined, b: DecorationDesc | undefined): boolean =>
+    !!a && !!b && JSON.stringify(a) === JSON.stringify(b);
+  console.log(`read on: ${floorSets.length} floor sets (the last of ${floorSets.at(-1)!.length}), ${sets.length} door ornament sets, item 0x22e ${raw.length} bytes`);
+  // floorDecorDesc[7][0] is 54 * 7 = 378 bytes on, 216 into wallDecorationPosition: [2][10].
+  check(byte4100[59] === 7 && same(floorSets[7]![0], wallSets[2]![10]),
+    'canary: floorDecorDesc[7][0] is wallDecorationPosition[2][10], the bytes CSBWin reads on into');
+  // Byte5070 + 18*4 is floorDecorDesc[0][0] (Data.h:1164-1167).
+  check(same(sets[4]![0], floorSets[0]![0]), 'canary: Byte5070\'s set 4 starts at floorDecorDesc');
+  check(floorSets.at(-1)!.length < 9 && sets.at(-1)!.length === 3, 'the floor\'s last set stops at the item\'s end, the doors\' last whole set before it');
+
+  // A floor decoration in set 7 is drawn. Floor decoration 69's own graphics, 661 on, are
+  // past the file's last, so slot 15, which a magic print draws, is given set 7 and door
+  // graphic 108, opaque where set 7's rectangle crops it, for the cell ahead (7).
+  const data2 = stockDungeon();
+  const dungeon2 = new DungeonState(data2, NO_GAME);
+  const map = dungeon2.getMap(0)!;
+  const isOpen = (x: number, y: number): boolean => y >= 0 && (map.cellFlags[x]![y]! >> 5) === RoomType.OPEN;
+  let at: Position | null = null;
+  for (let x = 0; x < map.descriptor.width && !at; x++) {
+    for (let y = 1; y < map.descriptor.height && !at; y++) if (isOpen(x, y) && isOpen(x, y - 1)) at = new Position(x, y, 0);
+  }
+  if (!at) throw new Error('level 0 has no open cell with an open cell north of it');
+  const footprints = new PartyFootprints();
+  const floorRenderer = new ViewportRenderer({
+    graphicsLoader: graphics,
+    dungeonState: dungeon2,
+    viewportTables: all.viewport,
+    objectTables: tables,
+    palette552: all.ui.graphic232.palette552,
+    graphics: graphicStore,
+    getGraphicBitmap: (graphicNum) => graphicStore.basicGraphic(graphicNum),
+    trace: (line) => console.log(line),
+    footprints,
+  });
+  floorRenderer.context.loadedFloorDecorations![15] = [108 - tables.relativeCellGraphicIncrement[7]!, 7];
+  const frame = (): Uint8Array => {
+    floorRenderer.selectLevel(0);
+    floorRenderer.draw(at!, 0, false, false);
+    return floorRenderer.buffer.pixels.slice();
+  };
+  const without = frame();
+  footprints.markMagicFootprints(4);
+  footprints.recordPartyMove(100, 0, at.x, at.y - 1, true);
+  footprints.recordPartyMove(105, 0, at.x, at.y, true);
+  const withPrint = frame();
+  const rect = floorSets[7]![7]!;
+  let changed = 0;
+  let outside = 0;
+  for (let i = 0; i < without.length; i++) {
+    if (without[i] === withPrint[i]) continue;
+    changed++;
+    const x = i % floorRenderer.buffer.width;
+    const y = Math.floor(i / floorRenderer.buffer.width);
+    if (x < rect.x1 || x > rect.x2 || y < rect.y1 || y > rect.y2) outside++;
+  }
+  console.log(`a print in set 7 on (${at.x},${at.y - 1}): ${changed} pixels changed, ${outside} outside ${rect.x1}-${rect.x2}, ${rect.y1}-${rect.y2}`);
+  check(changed > 0 && outside === 0, 'a floor decoration in set 7 is drawn, inside floorDecorDesc[7]\'s rectangle for the cell');
 }
 
 main();

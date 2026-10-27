@@ -434,12 +434,17 @@ its comment, sits at `7246 - address`. So a field's offset in the item is `7246`
 `Data.h` address: `wallRectangles` (`Byte3074`) at 4172, `Word2530` the last four bytes.
 
 Every data set's `0x22e` is 4720 bytes, and every table the port reads from it writes
-back over its bytes at that offset (`tools/checks/graphics-tables.ts`). Eight of those reads
+back over its bytes at that offset (`tools/checks/graphics-tables.ts`). Nine of those reads
 run past their own field, each as CSBWin's does: `Word7246` (`Code51a4.cpp:143`),
-`Byte5070` (`CSBCode.cpp:4073`), `Byte5094` and `Byte5076` (`:4142`, `:4164`),
+`Byte5094` and `Byte5076` (`CSBCode.cpp:4142`, `:4164`),
 `uByte2542` and `SeeThruWallsRect + 4` as whole `RectPos`es (`Viewport.cpp:2587`,
-`:2406`), and `Byte4122` and `Byte4110` at a level's decoration number, a byte
-(`Code390e.cpp:282`, `:270`), so 256 bytes each. The only bytes of the item no table reads are `Word4012`'s, which CSBWin sets
+`:2406`), `Byte4122` and `Byte4110` at a level's decoration number, a byte
+(`Code390e.cpp:282`, `:270`), so 256 bytes each, and the decoration rectangles at the
+set those give, which reach 255 in every data set: `Byte5070 + 18*set`
+(`CSBCode.cpp:4073`), whose `ASSERT(D4W < 4)` (`:4086`) a release build compiles out
+(`CSBTypes.h:103-108`), and `floorDecorDesc[set]` (`:3957`). Those two are read to the
+item's end, 141 whole sets of ornament rectangles and 45 sets and seven cells of floor
+ones (`tools/checks/door-ornaments.ts`); a set past it reads CSBWin's own variables. The only bytes of the item no table reads are `Word4012`'s, which CSBWin sets
 at run time (`d.Word4012 = 3217`, `CSBCode.cpp:7585`).
 
 ## Item `0x22f` is laid out exactly as `Data.h` declares its span

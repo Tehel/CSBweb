@@ -115,7 +115,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C186 | A decoration's position set past its rectangles' table is not drawn | S | ⏳ |
 | C188 | A new timer's unused bytes are 0, where CSBWin's are 0xcd | M | ⏳ |
 | C189 | A distant monster is shrunk again at every frame, where CSBWin keeps it across levels | S | ⏳ |
 | F15 | Tools that read the wall clock, and a runner with no timeout | S | ⏳ |
@@ -494,26 +493,6 @@ seen to band.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
-
-### C186 ⏳ A decoration's position set past its rectangles' table is not drawn
-
-A floor decoration is drawn in `d.floorDecorDesc[set][relativeCell]`
-(`doc/CSBwin-src/CSBCode.cpp:3957`), and a door ornament in `d.Byte5070 + 18*set` and
-`d.Byte5058[18*set]` (`:4073`, `:4087`), whose `ASSERT(D4W < 4)` (`:4086`) a release
-build compiles out (`CSBTypes.h:103-108`). A set past `floorDecorDesc`'s three or
-`Byte5070`'s four reads on through `d`: `floorDecorDesc[3]` is `wallDecorationPosition`
-(`Data.h:1167-1175`). The port's tables are cut to their sets
-(`floorDecorationDescSets`, `doorOrnamentRectSets`, `src/data/tables/ObjectTables.ts`), so
-such a decoration is not drawn (`DrawFloorDecorations`,
-`src/renderer/bytecode/DrawDecorations.ts`; `TAG004b26`, `src/renderer/bytecode/DrawDoor.ts`).
-The set is read at the decoration's number on past `Byte4110` and `Byte4122` into
-`Byte4100`, whose values reach 7 in `dm-atari`'s `graphics.dat`: floor decoration 69 has
-set 7 (`tools/checks/door-ornaments.ts`). No dungeon the port plays is known to name one.
-
-Paying it: each read at the set's offset in `d`, through item `0x22e` while it lies there
-(the item ends at `d.Word2530`, `doc/PROVEN_FACTS.md` → "Item `0x22e` is laid out exactly
-as `Data.h` declares its span"), and what lies past it decided; a check with a level that
-names floor decoration 69.
 
 ### C188 ⏳ A new timer's unused bytes are 0, where CSBWin's are 0xcd
 
@@ -1270,6 +1249,14 @@ Recorded so that nobody "fixes" them.
   for the rest (`drawWallText`, `src/renderer/bytecode/DrawDecorations.ts`). No wall text
   in the data here has such a code: `doc/PROVEN_FACTS.md` → "A wall text's glyph is read
   from graphic 120 with no check of its code".
+- 🚫 **A decoration's position set past item `0x22e` is not drawn.** A floor decoration's
+  and a door ornament's set is a byte read on past `Byte4110` and `Byte4122`, and reaches
+  255; CSBWin reads the set's rectangles on through `d` (`CSBCode.cpp:3957`, `:4073`), and
+  past the item, from decoration 99 on the floor and ornament 111 on a door in DM's
+  `graphics.dat`, into its own variables. The port reads the rectangles to the item's end
+  (`floorDecorationDescSets`, `doorOrnamentRectSets`, `src/data/tables/ObjectTables.ts`)
+  and draws nothing past it: `doc/PROVEN_FACTS.md` → "Item `0x22e` is laid out exactly as
+  `Data.h` declares its span". No dungeon here names a decoration past DM's tables.
 - 🚫 **A record read through a slot `DeleteDBEntry` has freed.** Such an RN names no record,
   and CSBWin reads one anyway in two places. `MakeMoreRoomInDB` hands back the freed slot
   of the group or missile it threw out, and `FindEmptyDB<n>Entry` reads past the databases

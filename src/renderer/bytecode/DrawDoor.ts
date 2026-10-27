@@ -119,16 +119,16 @@ function TAG004b26(draw: ViewportDraw, door: IndexedBitmap, ornament: number, ne
   const slot = draw.context.doorOrnaments[ornament - 1];
   if (!slot) return;
   const [graphicNum, set] = slot;
-  // A set past `d.Byte5070`'s four, which CSBWin reads on past its table, is not drawn
-  // (DEBT.md C186).
-  const rect = tables.doorOrnamentRectSets[set]?.[nearness];
+  // A set past item 0x22e's end is not drawn (DEBT.md H).
+  const rects = tables.doorOrnamentRectSets[set];
+  const rect = rects?.[nearness];
+  const size = rects?.[2]; // `Byte5058[18*set]`
   const graphic = getGraphic(graphicNum);
-  if (!rect || !graphic) return;
+  if (!rect || !size || !graphic) return;
 
   let ornamentBitmap = graphic;
   if (nearness !== 2) {
     ornamentBitmap = draw.context.graphics.derivedGraphic(2 * (ornament - 1) + 68 + nearness, () => {
-      const size = tables.doorOrnamentRectSets[set]![2]!; // `Byte5058[18*set]`
       const colorMap = nearness === 0 ? tables.doorOrnamentColorMapF3 : tables.doorOrnamentColorMapF2;
       const cropped = cropBitmap(graphic, 2 * size.widthBytes, size.height);
       return shrinkBlt(cropped, cropped.width, cropped.height, rect.x2 - rect.x1 + 1, rect.height, colorMap);

@@ -178,8 +178,11 @@ export interface ObjectTables {
   /**
    * `d.Byte5070[18*set + 6*nearness]`: where an ornament goes on the door's bitmap, per
    * position set and nearness (0 F3, 1 F2, 2 F1). `Byte5070[12]` is declared short, and
-   * `TAG004b26` reads its four 18-byte sets on into `Byte5058[60]`, which follows it
+   * `TAG004b26` reads its sets on into `Byte5058[60]`, which follows it
    * (`Data.h:1164-1165`); `Byte5058[18*set]`, the source size of a shrink, is set's F1 entry.
+   * Its `ASSERT(D4W < 4)` is compiled out of a release build (`CSBTypes.h:103-108`), and a set's
+   * byte reaches 255 (`doorOrnamentRectSetIndex`), so every whole set up to the item's end
+   * is read, on through `floorDecorDesc` and the fields after it.
    */
   doorOrnamentRectSets: DecorationDesc[][];
   /**
@@ -193,7 +196,13 @@ export interface ObjectTables {
   doorOrnamentColorMapF2: Uint8Array; // d.Byte4188[16]
 
   // Floor decorations (DrawFloorDecorations, CSBCode.cpp:3845+)
-  floorDecorationDescSets: DecorationDesc[][]; // d.floorDecorDesc[3][9]
+  /**
+   * `d.floorDecorDesc[set][relativeCell]` (`CSBCode.cpp:3957`), declared `[3][9]`. A set's
+   * byte reaches 255 (`floorDecorationRectSetIndex`), and CSBWin reads on past the three,
+   * through `wallDecorationPosition` and the fields after it, so every set up to the item's
+   * end is read, the last one only as far as the item goes.
+   */
+  floorDecorationDescSets: DecorationDesc[][];
   /**
    * `d.Byte4110[10]`, a floor decoration's position set, read on past the ten as
    * `doorOrnamentRectSetIndex` is (`Code390e.cpp:270`): 256 bytes from `Byte4110`.
@@ -693,6 +702,18 @@ export function readWallDecorationRectSetIndex(raw22e: Uint8Array, wallRectangle
   return raw22e.slice(off, off + 60);
 }
 
+/**
+ * The 6-byte decoration descriptors from `off` to the end of `raw`, `entries` a set:
+ * every whole set, and the descriptors of a last one that fit, when `partial`.
+ */
+function readDecorationDescSetsToEnd(raw: Uint8Array, off: number, entries: number, partial: boolean): DecorationDesc[][] {
+  const descs = Math.floor((raw.length - off) / 6);
+  const sets = partial ? Math.ceil(descs / entries) : Math.floor(descs / entries);
+  const out = readDecorationDescSets(raw, off, Math.floor(descs / entries), entries);
+  if (sets > out.length) out.push(readDecorationDescSets(raw, off + out.length * entries * 6, 1, descs % entries)[0]!);
+  return out;
+}
+
 /** `sets` x `entries` 6-byte decoration descriptors (`x1 x2 y1 y2 widthBytes height`) at `off`. */
 function readDecorationDescSets(
   raw: Uint8Array,
@@ -878,12 +899,12 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   }
   const doorSwitchRectSets = readDecorationDescSets(raw22e, doorSwitchRectOffset, doorSwitchSetCount, 4);
   const doorSwitchSourceDescSets = readDecorationDescSets(raw22e, doorSwitchSourceDescOffset, doorSwitchSetCount, 4);
-  // Four sets: `TAG004b26` asserts the set is below 4 (`CSBCode.cpp:4086`).
-  const doorOrnamentRectSets = readDecorationDescSets(raw22e, doorOrnamentRectOffset, 4, 3);
+  // Whole sets only: an ornament needs its set's F1 entry at every nearness.
+  const doorOrnamentRectSets = readDecorationDescSetsToEnd(raw22e, doorOrnamentRectOffset, 3, false);
   const doorOrnamentRectSetIndex = raw22e.slice(doorOrnamentRectSetIndexOffset, doorOrnamentRectSetIndexOffset + 256);
   const doorOrnamentColorMapF3 = raw22e.slice(doorOrnamentColorMapF3Offset, doorOrnamentColorMapF3Offset + 16);
   const doorOrnamentColorMapF2 = raw22e.slice(doorOrnamentColorMapF2Offset, doorOrnamentColorMapF2Offset + 16);
-  const floorDecorationDescSets = readDecorationDescSets(raw22e, floorDecorationDescOffset, 3, 9, 'floorDecorDesc[3][9]');
+  const floorDecorationDescSets = readDecorationDescSetsToEnd(raw22e, floorDecorationDescOffset, 9, true);
   const floorDecorationRectSetIndex = raw22e.slice(floorDecorationRectSetIndexOffset, floorDecorationRectSetIndexOffset + 256);
   const relativeCellGraphicIncrement = raw22e.slice(
     relativeCellGraphicIncrementOffset,

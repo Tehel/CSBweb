@@ -467,8 +467,7 @@ export function DrawFloorDecorations(draw: ViewportDraw, graphicOrdinal: number,
     if (relativeCell < 0 || relativeCell >= tables.floorDecorationDescSets[0]!.length) return;
 
     const [baseGraphic, rectSetIndex] = slot;
-    // A set past `d.floorDecorDesc`'s three, which CSBWin reads on past its table, is not
-    // drawn (DEBT.md C186).
+    // A set past item 0x22e's end is not drawn (DEBT.md H).
     const rectSet = tables.floorDecorationDescSets[rectSetIndex];
     const desc = rectSet?.[relativeCell];
     if (!desc) return;
