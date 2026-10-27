@@ -120,10 +120,10 @@ In payoff order: the first row is the next item.
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
 | A1 | The Amiga 2.2 disk fetched, ReDMCSB beside CSBWin as the Amiga's reference | M | ⏳ |
-| A2 | `dm-amiga`: `dm-atari`'s `graphics.dat` with the Amiga's sounds and tables appended | M | ⏳ |
+| A2 | `dm-amiga`: `dm-atari`'s `graphics.dat` with the Amiga's credits, font and names, its sounds and tables appended | M | ⏳ |
 | A3 | The Amiga's 8-bit sounds decoded and played at their Paula rate | S | ⏳ |
 | A4 | The Amiga's sound path: stereo volume by position, two voices | M | ⏳ |
-| A5 | Footsteps: a moving group's sound, `F0514_MOVE_GetSound` | M | ⏳ |
+| A5 | Footsteps, `F0514_MOVE_GetSound`, and the war cry | M | ⏳ |
 | A6 | The rest of A22E's own code, classed | S | ⏳ |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
@@ -177,8 +177,19 @@ in modules (`KAOS.FTL`, …); it is not the base. Its `Dungeon.DAT` is 2.2's byt
 `dm-atari`'s, decompressed, 529 are the same. Items 533-555 are the same sounds recorded
 again, 8-bit, a word then the samples (533: `0x0372`, 882, in 886 bytes); 563-574 are twelve
 sounds the Atari does not have; 558-562 (`0x22e`-`0x232`, the viewport's rectangles, the
-creatures' table, the sound table, …) are empty, their tables being in `dm`; 5, 21, 120,
-396, 556 and 557 (the font) differ.
+creatures' table, the sound table, …) are empty, their tables being in `dm`. Six differ,
+and four of them are what a player sees of the Amiga:
+
+- **5, the credits**, whose last two lines read "Wayne Holder ~ producer" on the Atari and
+  "Phil Mercurio ~ Amiga director" on the Amiga.
+- **557, the font** (`0x22d`), 16 of its 768 bytes: characters 12, 16, 20 and 29 retouched,
+  and 120, empty on the Atari, drawn.
+- **556, the objects' names**: the Atari's "ANTIVEN POTIO…" is the Amiga's "BRO POTIO…",
+  and the Amiga has a "MA POTIO…" (the bytes compared, the slots each sits in not yet).
+- **396**, a 64x7 picture, redrawn.
+
+The other two are not: 120 decodes to the same pixels, encoded otherwise, and 21 is not a
+picture (its header reads 16x23 where the Atari's reads 16x12), still to identify.
 
 **The sound table** is `G0060_as_Graphic562_Sounds[34]` (`DATA.C:478-523`,
 `M513_SOUND_COUNT` 34 for A22E, `DEFS.H:56`), `SOUND_DATA` (`DEFS.H:36-46`): `GraphicIndex`,
@@ -195,9 +206,13 @@ the lords, nothing at all while the party rests (`M513_SOUND_COUNT + 1`). A grou
 where it arrives (`MOVESENS.C:846-850`), and a couatl when its picture flips
 (`GROUP.C:273-279`). The creatures' attack sounds grow from 8 to 11
 (`G0244_auc_Graphic559_CreatureAttackSounds`, `DUNGEON.C:500-516`), and some creatures'
-`AttackSoundOrdinal` changes with them (`DUNGEON.C:449-488`, the "Atari ST:" comments). The horn
-and the war cry have their entries, but no caller was found in ReDMCSB's sources: A5
-looks again.
+`AttackSoundOrdinal` changes with them (`DUNGEON.C:449-488`, the "Atari ST:" comments).
+
+**The war cry and the horn** have their entries, 28 and 25, but ReDMCSB's WIP holds no
+action code to play them: `F0407_MENUS_IsActionPerformed` is only named
+(`GAMELOOP.C:124`), and none of F0401-F0410 is defined in any of its sources. The war cry
+has a sound in play, the author's own memory of the PC version, which came from the
+Amiga's. The horn's is unknown.
 
 **Volume and stereo.** A22E's `F0064_SOUND_RequestPlay_CPSD` (`SOUND.C:1476`) does not
 use `LoudDistance` and `SoftDistance`. `F0505_SOUND_GetVolume` (`SOUND.C:1871-1919`) turns the
@@ -218,7 +233,9 @@ Decisions taken with the author:
   item appended.** Its sounds 533-555 stay the Atari's 4-bit ones, which CSBWin's
   `SNDexpand` reads, so the set stays a folder CSBWin plays; the port plays the appended
   ones. Re-encoding the Amiga's in 4 bits in their place would lose what they are for.
-  The images are the Atari's; the six that differ are left out.
+- **Whatever makes the set recognisable as the Amiga's comes with it.** The Amiga's
+  credits (5), font (557), objects' names (556) and picture 396 replace the Atari's in
+  place: they are in the formats CSBWin reads, so the folder still plays in CSBWin.
 
 ### A1 ⏳ The Amiga 2.2 disk fetched, ReDMCSB beside CSBWin as the Amiga's reference
 
@@ -233,10 +250,12 @@ Decisions taken with the author:
   `dm`'s tables, each proven by a canary.
 - `CLAUDE.md` and H record ReDMCSB's A22E as the reference for what only the Amiga does.
 
-### A2 ⏳ `dm-amiga`: `dm-atari`'s `graphics.dat` with the Amiga's sounds and tables appended
+### A2 ⏳ `dm-amiga`: `dm-atari`'s `graphics.dat` with the Amiga's credits, font and names, its sounds and tables appended
 
 - A step of `fetch-gamefiles` (as `thumbnails` is) writes `dm-amiga/graphics.dat`:
-  `dm-atari`'s 563 items, then the Amiga's sounds 533-555 and 563-574, then one item of
+  `dm-atari`'s 563 items, the Amiga's 5, 396, 556 and 557 in their place (556 only once
+  its names are proven to fall in the same slots: the strings, not just the bytes,
+  compared), then the Amiga's sounds 533-555 and 563-574, then one item of
   tables read from `dm`: the 34 `SOUND_DATA`, their `GraphicIndex` moved to the appended
   items; the 25x25 volume grid; the 11 creature attack sounds and the creatures'
   `AttackSoundOrdinal`. The item's layout is the port's, written down in
@@ -263,14 +282,19 @@ For a set with the table item, `QueueSound` (`src/engine/SoundQueue.ts`) answers
 sounds. The delayed sounds (`TT_20`) are CSBWin's as they are. A check reads the left and
 right volumes for a source at each facing.
 
-### A5 ⏳ Footsteps: a moving group's sound, `F0514_MOVE_GetSound`
+### A5 ⏳ Footsteps, `F0514_MOVE_GetSound`, and the war cry
 
 `F0514_MOVE_GetSound`, its A22E branch, called where a group arrives on its square (the
 port's group move, `src/engine/WorldMove.ts`) and at a couatl's flip; the three new attack
-sounds through the Amiga's ordinals. The horn and the war cry: ReDMCSB read again for a
-caller, and ported if 2.2 plays them. `tools/checks/watch-amiga-footsteps.ts` runs the
+sounds through the Amiga's ordinals. `tools/checks/watch-amiga-footsteps.ts` runs the
 clock and lists the sounds requested as a group comes towards the party, and none while it
 rests.
+
+The war cry plays sound 28 and the horn sound 25, if 2.2 plays it. ReDMCSB has no action
+code (above), so both are settled in `dm` itself: the 68000 code that requests
+`F0064_SOUND_RequestPlay_CPSD` with 28 sits in the action switch, with the horn's case beside
+it. The call's square and mode are copied from there, never guessed. If the horn plays
+nothing in 2.2, that is recorded and it stays silent.
 
 ### A6 ⏳ The rest of A22E's own code, classed
 
@@ -278,8 +302,14 @@ rests.
 `TIMELINE.C`, `FLOPPY.C`, `DIALOG.C`, `SOUND.C`, `MOVESENS.C`, `DUNGEON.C`, `INPUT.C`,
 `CHAMDRAW.C`, `GROUP.C`, `CLIKMENU.C`, `TEXT.C`, … Each one a player can see or hear is
 classed as carried by A2-A5, left (an H entry) or the machine's alone: among them the
-wall bump's sound mode (`CLIKMENU.C:307`), the highlight box (`CLIKMENU.C:57-60`) and the
-font (item 557).
+wall bump's sound mode (`CLIKMENU.C:307`) and the highlight box (`CLIKMENU.C:57-60`).
+Two more of the Amiga's own looks are weighed here, with the author:
+
+- **The palettes.** The Amiga's have 4 bits a channel where the Atari's have 3
+  (`DATA.C:210-231`, each with the Atari's in a comment). The darker dungeon palettes black
+  out slots 9 and 10.
+- **The FTL logo.** The Amiga's is `swoosh`, a program of its own (a hunk executable), not
+  the Atari's `swoosh.img`.
 
 ---
 
