@@ -31,7 +31,11 @@ golden frame. What waits on the author for it is C150. Its `dungeon.dat` is enci
 skins are drawn (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Skins in the data sets"). Every DSA operation CSBWin has is ported, not only Conflux's share
 (`tools/checks/dsa-census.ts`), and a dungeon with DSAs saves (`tools/checks/dsa-save.ts`).
 
-**First, at the author's request: P — players' own data sets.** A player adds a dungeon
+**First, at the author's request: A — the Amiga version.** A `dm-amiga` set: Dungeon
+Master with the Amiga 2.2's re-recorded sounds, the monsters heard moving as they
+approach, in stereo, and the Amiga's dungeon. Its rows head the index.
+
+**Then, at the author's request: P — players' own data sets.** A player adds a dungeon
 from their own files to the welcome page, plays it, edits it, deletes it and publishes it,
 and the moderators approve, hide, show and edit what is published; what is left is P11, to
 design with the author. They are not CSBWin features but the page's, and come before
@@ -115,6 +119,12 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
+| A1 | The Amiga 2.2 disk fetched, ReDMCSB beside CSBWin as the Amiga's reference | M | ⏳ |
+| A2 | `dm-amiga`: `dm-atari`'s `graphics.dat` with the Amiga's sounds and tables appended | M | ⏳ |
+| A3 | The Amiga's 8-bit sounds decoded and played at their Paula rate | S | ⏳ |
+| A4 | The Amiga's sound path: stereo volume by position, two voices | M | ⏳ |
+| A5 | Footsteps: a moving group's sound, `F0514_MOVE_GetSound` | M | ⏳ |
+| A6 | The rest of A22E's own code, classed | S | ⏳ |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | E40 | The statistics page's heat map | M | ⏸️ |
@@ -135,8 +145,141 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C194 · D22 · E42 · F22 · G31 · P13 · R17 · U13 · W8 · X18. An ID recorded and paid in one commit has no
+Next free IDs: A7 · C194 · D22 · E42 · F22 · G31 · P13 · R17 · U13 · W8 · X18. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
+
+---
+
+## A — The Amiga version
+
+At the author's request: a `dm-amiga` set, "Dungeon Master Amiga", that plays the Amiga
+release's sounds where the Atari plays its own, adds the sounds the Atari never had, chief
+among them a monster group heard moving, by position and in stereo, and plays the Amiga's
+dungeon. Everything else is the port as it is, CSBWin's engine under DM's rules.
+
+**The reference.** CSBWin has none of this, so for what only the Amiga does, ReDMCSB
+(`http://dmweb.free.fr/Stuff/ReDMCSB_WIP20210206.7z`, the reverse-engineered source of
+every DM and CSB release, `Toolchains/Common/Source/`) is the reference, its branch for
+**A22E**, "Dungeon Master for Amiga 2.2 English". A `MEDIA*` macro names the releases its
+code is built for; one that holds `A22E` and not `S21E` (CSB for Atari ST 2.1) is the
+Amiga's own. Everything CSBWin does still follows CSBWin. A1 writes the exception down.
+
+**The release.** `../DMweb-extra/archive/DungeonMaster Amiga/` is the 2.2 English disk, file
+for file: `dm`, `graphics.dat` and `Dungeon.dat` hash the same as those on
+`Floppy Disks ADF/Dungeon Master for Amiga v2.2 (English) Original (Not working).adf` in
+`http://dmweb.free.fr/files/Game,Dungeon_Master,Amiga,Software.7z`, and `dm` holds `V2.2`.
+The ADF is an OFS image whose files read whole, the copy protection notwithstanding. 3.6,
+in the same archive, has another `graphics.dat` format (`0x8001`, 749 items) and an engine
+in modules (`KAOS.FTL`, …); it is not the base. Its `Dungeon.DAT` is 2.2's byte for byte.
+`DungeonB.dat` is the Kids dungeon, already a set.
+
+**Its `graphics.dat`** has 575 items, each stored as is (compressed size = size). Against
+`dm-atari`'s, decompressed, 529 are the same. Items 533-555 are the same sounds recorded
+again, 8-bit, a word then the samples (533: `0x0372`, 882, in 886 bytes); 563-574 are twelve
+sounds the Atari does not have; 558-562 (`0x22e`-`0x232`, the viewport's rectangles, the
+creatures' table, the sound table, …) are empty, their tables being in `dm`; 5, 21, 120,
+396, 556 and 557 (the font) differ.
+
+**The sound table** is `G0060_as_Graphic562_Sounds[34]` (`DATA.C:478-523`,
+`M513_SOUND_COUNT` 34 for A22E, `DEFS.H:56`), `SOUND_DATA` (`DEFS.H:36-46`): `GraphicIndex`,
+a byte, `Period`, `Priority`, a byte, `LoudDistance`, `SoftDistance`. In `dm` it starts at
+file offset 5494, `{ 533, 0, 112, 11, 0, 3, 6 }`; entry 22 names item 563, entry 33 item
+574. Entries 0-21 are the Atari's ordinals; 22, 23, 24, 26, 27, 32 and 33 are the movement
+sounds (`DEFS.H:87-98`), 25 the horn, 28 the war cry, 29-31 the attacks of the rock, the
+water elemental and the couatl. The Amiga plays an entry at Paula period `72800 / Period`
+(`SOUND.C:1107`), so 112 is 650, 5457 Hz on a PAL machine.
+
+**Footsteps.** `F0514_MOVE_GetSound` (`MOVESENS.C:911-1000`, its A22E branch) gives a
+creature type's movement sound: none to the ghost, the eye, the black flame, the zytaz and
+the lords, nothing at all while the party rests (`M513_SOUND_COUNT + 1`). A group plays it
+where it arrives (`MOVESENS.C:846-850`), and a couatl when its picture flips
+(`GROUP.C:273-279`). The creatures' attack sounds grow from 8 to 11
+(`G0244_auc_Graphic559_CreatureAttackSounds`, `DUNGEON.C:500-516`), and some creatures'
+`AttackSoundOrdinal` changes with them (`DUNGEON.C:449-488`, the "Atari ST:" comments). The horn
+and the war cry have their entries, but no caller was found in ReDMCSB's sources: A5
+looks again.
+
+**Volume and stereo.** A22E's `F0064_SOUND_RequestPlay_CPSD` (`SOUND.C:1476`) does not
+use `LoudDistance` and `SoftDistance`. `F0505_SOUND_GetVolume` (`SOUND.C:1871-1919`) turns the
+source's square, relative to the party and its facing, into a row and a column of
+`G1028_aauc_DistanceToSoundVolume[25][25]` (`SOUND.C:55`), one read for the right channel
+and its mirror for the left, and nothing beyond 12 squares either way is heard. Two voices
+play; a third sound takes the quieter's (`F0502_SOUND_CompareVolumes`, `SOUND.C:227`, `:1060-1090`),
+and a sound requested for the next VBL waits as one of two pending sounds (`SOUND.C:1656-1712`).
+
+**The dungeon** is the Amiga `Dungeon.dat` as it is: compressed, the Atari 1.2 image but
+for actuator 565 on map 7 (level 8), and a checksum (`doc/PROVEN_FACTS.md` → "A PC
+`dungeon.dat` is the Atari image, little-endian", which calls it the 2.0 disk's).
+
+Decisions taken with the author:
+
+- **2.2 English is the base**, not 3.6.
+- **The set's `graphics.dat` is `dm-atari`'s, with the Amiga's 34 sounds and one table
+  item appended.** Its sounds 533-555 stay the Atari's 4-bit ones, which CSBWin's
+  `SNDexpand` reads, so the set stays a folder CSBWin plays; the port plays the appended
+  ones. Re-encoding the Amiga's in 4 bits in their place would lose what they are for.
+  The images are the Atari's; the six that differ are left out.
+
+### A1 ⏳ The Amiga 2.2 disk fetched, ReDMCSB beside CSBWin as the Amiga's reference
+
+- `npm run fetch-gamefiles` downloads `Game,Dungeon_Master,Amiga,Software.7z` and reads the
+  2.2 English ADF with a new `tools/lib/adf.ts` (OFS: the root block at 880, hash tables,
+  data blocks), as `tools/lib/stx.ts` reads a Pasti image; `dm`, `graphics.dat` and
+  `Dungeon.dat` are pinned by hash. The 2.0 disk's `Dungeon.dat` is compared on the way, to
+  correct `PROVEN_FACTS.md`'s "the Amiga 2.0 disk" to the releases it holds for.
+- `npm run fetch-redmcsb-src` fills `doc/ReDMCSB-src/`, git-ignored, as
+  `fetch-csbwin-src` fills `doc/CSBwin-src/`, with its sources and `Documentation/`.
+- `doc/AMIGA_DISK_REFERENCE.md`: the files, the comparison of the items, the offsets of
+  `dm`'s tables, each proven by a canary.
+- `CLAUDE.md` and H record ReDMCSB's A22E as the reference for what only the Amiga does.
+
+### A2 ⏳ `dm-amiga`: `dm-atari`'s `graphics.dat` with the Amiga's sounds and tables appended
+
+- A step of `fetch-gamefiles` (as `thumbnails` is) writes `dm-amiga/graphics.dat`:
+  `dm-atari`'s 563 items, then the Amiga's sounds 533-555 and 563-574, then one item of
+  tables read from `dm`: the 34 `SOUND_DATA`, their `GraphicIndex` moved to the appended
+  items; the 25x25 volume grid; the 11 creature attack sounds and the creatures'
+  `AttackSoundOrdinal`. The item's layout is the port's, written down in
+  `doc/AMIGA_DISK_REFERENCE.md`; its offsets in `dm` are proven by canaries
+  (`tools/checks/amiga-graphics.ts`).
+- `dm-amiga/dungeon.dat` is the Amiga `Dungeon.dat`.
+- `tools/data-sets.json`: `dm-amiga`, "Dungeon Master Amiga", `dmRules`, `official`, its
+  thumbnail.
+- H: the set's `graphics.dat` is built, as `dm-atari`'s is CSBWin's with three items from
+  the 1.2 disk.
+
+### A3 ⏳ The Amiga's 8-bit sounds decoded and played at their Paula rate
+
+The reader beside `SNDexpand` (`src/core/compression.ts`), the header word checked against
+every item's length; the rate PAL `3546895 / trunc(72800 / Period)` Hz.
+`SoundManager` plays a set's Amiga sound for an ordinal when the set carries the table
+item. The Atari rates (H, "Audio sample rates") do not change. The check decodes all 34.
+
+### A4 ⏳ The Amiga's sound path: stereo volume by position, two voices
+
+For a set with the table item, `QueueSound` (`src/engine/SoundQueue.ts`) answers as A22E's
+`F0064_SOUND_RequestPlay_CPSD`: `F0505_SOUND_GetVolume`'s left and right (two gains, Paula's
+0-64), the 12 squares, the two voices and `F0502_SOUND_CompareVolumes`, the two pending
+sounds. The delayed sounds (`TT_20`) are CSBWin's as they are. A check reads the left and
+right volumes for a source at each facing.
+
+### A5 ⏳ Footsteps: a moving group's sound, `F0514_MOVE_GetSound`
+
+`F0514_MOVE_GetSound`, its A22E branch, called where a group arrives on its square (the
+port's group move, `src/engine/WorldMove.ts`) and at a couatl's flip; the three new attack
+sounds through the Amiga's ordinals. The horn and the war cry: ReDMCSB read again for a
+caller, and ported if 2.2 plays them. `tools/checks/watch-amiga-footsteps.ts` runs the
+clock and lists the sounds requested as a group comes towards the party, and none while it
+rests.
+
+### A6 ⏳ The rest of A22E's own code, classed
+
+64 `MEDIA*` macros hold A22E and not S21E, in `DUNVIEW.C`, `MEMORY.C`, `DATA.C`,
+`TIMELINE.C`, `FLOPPY.C`, `DIALOG.C`, `SOUND.C`, `MOVESENS.C`, `DUNGEON.C`, `INPUT.C`,
+`CHAMDRAW.C`, `GROUP.C`, `CLIKMENU.C`, `TEXT.C`, … Each one a player can see or hear is
+classed as carried by A2-A5, left (an H entry) or the machine's alone: among them the
+wall bump's sound mode (`CLIKMENU.C:307`), the highlight box (`CLIKMENU.C:57-60`) and the
+font (item 557).
 
 ---
 
