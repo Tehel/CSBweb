@@ -424,13 +424,19 @@ export class TimerQueue {
    */
   deleteMonsterMovementTimers(mapX: number, mapY: number, level: number, trace?: (line: string) => void): void {
     trace?.(`      MAI Delete all Monster Timers at (${mapX},${mapY})`);
-    for (const timer of this.searchOrder()) {
-      if (timer.level !== (level & 0xff)) continue;
-      if (timer.function < TimerFunction.TT_FIRST_MONSTER_AI) continue;
-      if (timer.function > TimerFunction.TT_LAST_MONSTER_AI) continue;
-      if (timer.uByte6 !== (mapX & 0xff)) continue;
-      if (timer.uByte7 !== (mapY & 0xff)) continue;
-      this.deleteTimer(timer.index);
+    const matches = (timer: TimerEntry): boolean =>
+      timer.level === (level & 0xff)
+      && timer.function >= TimerFunction.TT_FIRST_MONSTER_AI
+      && timer.function <= TimerFunction.TT_LAST_MONSTER_AI
+      && timer.uByte6 === (mapX & 0xff)
+      && timer.uByte7 === (mapY & 0xff);
+    // The walk reads the queue itself up to the first timer it deletes, and the snapshot
+    // `searchOrder` would have given from there on: the entries not walked yet.
+    let first = this.queue.length - 1;
+    while (first >= 0 && !matches(this.queue[first]!)) first--;
+    if (first < 0) return;
+    for (const timer of this.queue.slice(0, first + 1).reverse()) {
+      if (matches(timer)) this.deleteTimer(timer.index);
     }
   }
 

@@ -10,7 +10,7 @@
  * through an overlay, the RGB555 pixel `UpdateScreenArea` wrote there (`OverlayScreen.ts`),
  * CSBWin's own colour.
  */
-import type { IndexedBitmap } from './CanvasBlitter';
+import { forEachFootprintPixel, type IndexedBitmap } from './CanvasBlitter';
 
 /** A frame as the golden frames store it. */
 export interface PresentedFrameCapture {
@@ -114,18 +114,10 @@ export class PresentedFrame {
         }
       }
     }
-    const f = this.footprint;
-    if (f) {
-      for (let row = 0; row < f.bitmap.height; row++) {
-        const sy = f.y + row;
-        if (sy < 0 || sy >= height) continue;
-        for (let col = 0; col < f.bitmap.width; col++) {
-          const sx = f.x + col;
-          if (sx < 0 || sx >= width) continue;
-          if ((f.bitmap.pixels[row * f.bitmap.width + col]! & 0x0f) === this.footprintClear) continue;
-          codes[sy * width + sx] = pixels[sy * width + sx]! & 0x0f;
-        }
-      }
+    if (this.footprint) {
+      forEachFootprintPixel(this.footprint, this.footprintClear, width, height, (i) => {
+        codes[i] = pixels[i]! & 0x0f;
+      });
     }
     return {
       width,

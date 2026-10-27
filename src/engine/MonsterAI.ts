@@ -233,7 +233,7 @@ export class MonsterAI {
 
     const monsterRn = this.dungeon.findFirstMonster(new Position(mapX, mapY, level));
 
-    this.trace(
+    if (this.ctx.host.tracing) this.trace(
       `MonsterAI [0x${(monsterRn === OBJECT_ID_EOF ? 0xffff : monsterRn).toString(16).padStart(4, '0')}] ` +
         `${String(level).padStart(2, '0')}(${mapX},${mapY})@${this.ctx.state.tickCount} ` +
         `Perform Initial Checks-timeFunc=${TimerFunction[timerFunction] ?? timerFunction}, ` +
@@ -268,7 +268,7 @@ export class MonsterAI {
     const indexOfLastMonster = monster.numMonM1 & 0x3;
     const horizSize = monsterHorizontalSize(desc);
 
-    this.trace(
+    if (this.ctx.host.tracing) this.trace(
       `      MAI Passed. Invincible=${invincible ? 1 : 0} fearFactor=${fearFactor} ` +
         `w_54=${checks.sinceLastUpdate} indexOfLastMonster=${indexOfLastMonster} horizSize=${horizSize}`,
     );
@@ -339,7 +339,7 @@ export class MonsterAI {
         // CSBWin names the flag for the other branch (`doc/CSBwin-src/Monster.cpp:3427`).
         c.mmr.setflg(MonsterEvents.TT29to41_fear5or6);
         this.trace('      MAI timeFunc 31.  FearFactor not 5 or 6. So Delete all timers and set fear to 6.');
-        this.timers.deleteMonsterMovementTimers(c.mapX, c.mapY, c.level, (line) => this.trace(line));
+        this.timers.deleteMonsterMovementTimers(c.mapX, c.mapY, c.level, this.movementTimersTrace());
         this.maybeDelTimersFear6TurnIndividuals(
           c.monster, c.slot, c.slotIndex, frame.timer, c.timeUntilAlternateUpdate,
           c.timerFunction, c.mapX, c.mapY, c.level, c.desc,
@@ -363,7 +363,7 @@ export class MonsterAI {
       const fearIs2or3 = fearFactor === StateOfFear.StateOfFear2 || fearFactor === StateOfFear.StateOfFear3;
       if (fearIs2or3 || this.random.zeroTo3() !== 0) {
         const seen = this.blocked(c, -1);
-        this.trace(`      MAI timeFunc 31. FearFactor 2 or 3 or random. Block=${seen}`);
+        if (this.ctx.host.tracing) this.trace(`      MAI timeFunc 31. FearFactor 2 or 3 or random. Block=${seen}`);
         if (seen === 0) {
           frame.bool36 = false;
           c.fearFactorIs6 = false;
@@ -436,10 +436,10 @@ export class MonsterAI {
       return;
     }
     frame.timer.function = flipped;
-    this.trace(`      MAI timeFunc<37. Set New timerFunction to ${TimerFunction[flipped] ?? flipped}`);
+    if (this.ctx.host.tracing) this.trace(`      MAI timeFunc<37. Set New timerFunction to ${TimerFunction[flipped] ?? flipped}`);
 
     const seen = this.blocked(c, -1);
-    this.trace(`      MAI timeFunc<37.  Blocked=${seen}`);
+    if (this.ctx.host.tracing) this.trace(`      MAI timeFunc<37.  Blocked=${seen}`);
     if (seen !== 0) {
       c.mmr.setflg(MonsterEvents.TT29to41_blocked);
       if (fearFactor !== StateOfFear.StateOfFear6 && fearFactor !== StateOfFear.StateOfFear5) {
@@ -497,7 +497,7 @@ export class MonsterAI {
     if (c.xDistance > 3 || c.yDistance > 3) {
       c.mmr.setflg(MonsterEvents.TT29to41_w30w32GretaterThan3);
       frame.i60 = this.ctx.state.tickCount + monsterDelayFromMoveToAttack(c.desc);
-      this.trace(
+      if (this.ctx.host.tracing) this.trace(
         `      MAI fearFactor != 6.  Distance to party > 3.  mt->word20 = ${c.desc.word20}`,
       );
       this.setMonsterTimer(frame.timer, frame.i60, c.timeUntilAlternateUpdate, true);
@@ -740,7 +740,7 @@ export class MonsterAI {
     }
 
     const seen = this.blocked(c, -1);
-    this.trace(`      MAI fearFactor is 0, 2, or 3.  attackDistance=${seen}`);
+    if (this.ctx.host.tracing) this.trace(`      MAI fearFactor is 0, 2, or 3.  attackDistance=${seen}`);
     if (seen !== 0) {
       if (seen <= monsterWord14_12_15(c.desc) && (c.xDistance === 0 || c.yDistance === 0)) {
         this.maybeDelTimersFear6TurnIndividuals(
@@ -782,7 +782,7 @@ export class MonsterAI {
       primaryDirectionToParty: this.scratch.primaryDirectionToParty,
       secondaryDirectionToParty: this.scratch.secondaryDirectionToParty,
     });
-    this.trace(`      MAI fearFactor is 0. Preferred Direction=${smelled.direction}`);
+    if (this.ctx.host.tracing) this.trace(`      MAI fearFactor is 0. Preferred Direction=${smelled.direction}`);
     if (smelled.direction !== 0) {
       frame.secondaryDirection = smelled.secondary;
       this.tryPreferredDirectionThenOthers(frame, c, smelled.direction - 1, false);
@@ -1393,14 +1393,14 @@ export class MonsterAI {
       const probe = this.ctx.systems.monsterPerception.possibleMove(
         monsterRn, desc, level, mapX, mapY, direction, false, this.scratch,
       );
-      this.trace(
+      if (this.ctx.host.tracing) this.trace(
         `      MAI Not on party level. PossibleMove(Random()=${direction}) returned ${probe.possible}.`,
       );
       if (probe.possible) {
         const newX = mapX + (this.ctx.tables.deltaX[direction] ?? 0);
         const newY = mapY + (this.ctx.tables.deltaY[direction] ?? 0);
         const moved = this.ctx.systems.monsters.moveMonster(monsterRn, mapX, mapY, newX, newY, level, undefined, mmr);
-        this.trace(`      MAI MoveObject to (${newX},${newY}) returned ${moved.code}`);
+        if (this.ctx.host.tracing) this.trace(`      MAI MoveObject to (${newX},${newY}) returned ${moved.code}`);
         if (moved.code !== 0) {
           mmr.setflg(MonsterEvents.IC29to41_randomMoveSucceeded);
           this.trace('      MAI Skip monster AI because MoveObject non-zero');
@@ -1481,7 +1481,7 @@ export class MonsterAI {
         ? 1
         : Math.max(1, Math.trunc((timePerMove + 2) / 4) - sinceLastUpdate);
     timer.time = (timer.time + delay) >>> 0;
-    this.trace(`      MAI Change negative timer function to type ${timer.function}`);
+    if (this.ctx.host.tracing) this.trace(`      MAI Change negative timer function to type ${timer.function}`);
     this.timers.addTimer(timer);
     mmr.setflg(MonsterEvents.IC29to41_doNothing);
     return blank();
@@ -1645,7 +1645,7 @@ export class MonsterAI {
     mmr: MmRecord,
   ): void {
     if (timerFunction === TimerFunction.TT_M2) {
-      this.timers.deleteMonsterMovementTimers(mapX, mapY, level, (line) => this.trace(line));
+      this.timers.deleteMonsterMovementTimers(mapX, mapY, level, this.movementTimersTrace());
     }
     const party = this.ctx.party.state;
     slot.uByte6 = party.position.x & 0xff;
@@ -1731,6 +1731,11 @@ export class MonsterAI {
 
   private trace(line: string): void {
     this.ctx.host.trace(line);
+  }
+
+  /** `deleteMonsterMovementTimers`'s trace, none while nothing traces. */
+  private movementTimersTrace(): ((line: string) => void) | undefined {
+    return this.ctx.host.tracing ? (line) => this.trace(line) : undefined;
   }
 }
 

@@ -76,8 +76,12 @@ export class MmRecord {
   /** The filter's timer, which the pre-move filter makes and the post-move filter reuses. */
   timer: TimerEntry | null = null;
   objMonster: ObjectID = OBJECT_ID_NULL;
-  /** The DSA variables both filters share. */
-  readonly dsaVars = new DsaVars();
+  private vars: DsaVars | null = null;
+
+  /** The DSA variables both filters share, made when the first of them runs. */
+  get dsaVars(): DsaVars {
+    return (this.vars ??= new DsaVars());
+  }
 
   setflg(f: MonsterEvents): void {
     this.flgs[f >>> 5] = (this.flgs[f >>> 5]! | (1 << (f & 31))) >>> 0;

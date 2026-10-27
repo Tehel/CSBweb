@@ -405,35 +405,50 @@ function groupPixel(bitmap: IndexedBitmap, group: number, i: number): number {
  */
 const atariIntensity = Uint8Array.from({ length: 8 }, (_, i) => i * 36);
 
+/**
+ * `palette`'s sixteen slots as the canvas's RGBA pixels, a `Uint32` each in the platform's
+ * byte order, black for a slot it does not have: what a conversion looks a pixel up in.
+ */
+function rgbaLookup(palette: readonly number[]): Uint32Array {
+  const bytes = new Uint8Array(64);
+  for (let slot = 0; slot < 16; slot++) {
+    const color = palette[slot] ?? 0;
+    bytes[4 * slot] = atariIntensity[(color >> 8) & 0x7]!;
+    bytes[4 * slot + 1] = atariIntensity[(color >> 4) & 0x7]!;
+    bytes[4 * slot + 2] = atariIntensity[color & 0x7]!;
+    bytes[4 * slot + 3] = 255;
+  }
+  return new Uint32Array(bytes.buffer);
+}
+
+/** `image`'s pixels, a `Uint32` each, as `rgbaLookup` gives them. */
+function rgbaPixels(image: RgbaImage): Uint32Array {
+  const { data } = image;
+  return new Uint32Array(data.buffer, data.byteOffset, data.length >> 2);
+}
+
+function checkConversionSizes(imageData: RgbaImage, src: PaletteIndexViewportBuffer): void {
+  const pixelCount = src.width * src.height;
+  if (src.pixels.length !== pixelCount) {
+    throw new Error(`Index buffer size mismatch: expected ${pixelCount}, got ${src.pixels.length}`);
+  }
+  if (imageData.width !== src.width || imageData.height !== src.height) {
+    throw new Error('Image dimensions do not match index buffer');
+  }
+}
+
+/** Pixels `from` to `to - 1` of `inPx`, converted into `out` through `lookup`. */
+function convertRun(out: Uint32Array, inPx: Uint8Array, from: number, to: number, lookup: Uint32Array): void {
+  for (let i = from; i < to; i++) out[i] = lookup[inPx[i]! & 0x0f]!;
+}
+
 export function updateImageDataFromIndex(
   imageData: RgbaImage,
   src: PaletteIndexViewportBuffer,
   palette: number[]
 ): void {
-  const out = imageData.data;
-  const inPx = src.pixels;
-  const pixelCount = src.width * src.height;
-  if (inPx.length !== pixelCount) {
-    throw new Error(`Index buffer size mismatch: expected ${pixelCount}, got ${inPx.length}`);
-  }
-  if (imageData.width !== src.width || imageData.height !== src.height) {
-    throw new Error('Image dimensions do not match index buffer');
-  }
-
-  for (let i = 0; i < pixelCount; i++) {
-    const colorIndex = inPx[i]! & 0x0f;
-    const color = palette[colorIndex] ?? 0;
-
-    const r = atariIntensity[(color >> 8) & 0x7]!;
-    const g = atariIntensity[(color >> 4) & 0x7]!;
-    const b = atariIntensity[color & 0x7]!;
-
-    const o = i * 4;
-    out[o + 0] = r;
-    out[o + 1] = g;
-    out[o + 2] = b;
-    out[o + 3] = 255;
-  }
+  checkConversionSizes(imageData, src);
+  convertRun(rgbaPixels(imageData), src.pixels, 0, src.width * src.height, rgbaLookup(palette));
 }
 
 export function updateImageDataFromIndexWithViewportPalette(
@@ -443,15 +458,11 @@ export function updateImageDataFromIndexWithViewportPalette(
   viewportPalette: number[],
   uiPalette: number[]
 ): void {
-  const out = imageData.data;
+  checkConversionSizes(imageData, src);
+  const out = rgbaPixels(imageData);
   const inPx = src.pixels;
-  const pixelCount = src.width * src.height;
-  if (inPx.length !== pixelCount) {
-    throw new Error(`Index buffer size mismatch: expected ${pixelCount}, got ${inPx.length}`);
-  }
-  if (imageData.width !== src.width || imageData.height !== src.height) {
-    throw new Error('Image dimensions do not match index buffer');
-  }
+  const ui = rgbaLookup(uiPalette);
+  const viewport = rgbaLookup(viewportPalette);
 
   const x1 = clampInt(viewportRect.x1, 0, src.width - 1);
   const y1 = clampInt(viewportRect.y1, 0, src.height - 1);
@@ -460,23 +471,38 @@ export function updateImageDataFromIndexWithViewportPalette(
 
   for (let y = 0; y < src.height; y++) {
     const row = y * src.width;
-    const inViewportY = y >= y1 && y <= y2;
-    for (let x = 0; x < src.width; x++) {
-      const idx = row + x;
-      const colorIndex = inPx[idx]! & 0x0f;
-      const useViewportPalette = inViewportY && x >= x1 && x <= x2;
-      const palette = useViewportPalette ? viewportPalette : uiPalette;
-      const color = palette[colorIndex] ?? 0;
+    const end = row + src.width;
+    if (y < y1 || y > y2 || x1 > x2) {
+      convertRun(out, inPx, row, end, ui);
+      continue;
+    }
+    convertRun(out, inPx, row, row + x1, ui);
+    convertRun(out, inPx, row + x1, row + x2 + 1, viewport);
+    convertRun(out, inPx, row + x2 + 1, end, ui);
+  }
+}
 
-      const r = atariIntensity[(color >> 8) & 0x7]!;
-      const g = atariIntensity[(color >> 4) & 0x7]!;
-      const b = atariIntensity[color & 0x7]!;
-
-      const o = idx * 4;
-      out[o + 0] = r;
-      out[o + 1] = g;
-      out[o + 2] = b;
-      out[o + 3] = 255;
+/**
+ * The pixels, as offsets into a `width` x `height` screen, that `bitmap` covers at (`x`,
+ * `y`) where it is not colour `transparentColor`, each handed to `each`: where a cursor
+ * drawn over the viewport is shown through the palette it was drawn for.
+ */
+export function forEachFootprintPixel(
+  footprint: { x: number; y: number; bitmap: IndexedBitmap },
+  transparentColor: number,
+  width: number,
+  height: number,
+  each: (index: number) => void,
+): void {
+  const { x, y, bitmap } = footprint;
+  for (let row = 0; row < bitmap.height; row++) {
+    const sy = y + row;
+    if (sy < 0 || sy >= height) continue;
+    for (let col = 0; col < bitmap.width; col++) {
+      const sx = x + col;
+      if (sx < 0 || sx >= width) continue;
+      if ((bitmap.pixels[row * bitmap.width + col]! & 0x0f) === transparentColor) continue;
+      each(sy * width + sx);
     }
   }
 }
@@ -493,22 +519,9 @@ export function reconvertThroughPalette(
   transparentColor: number,
   palette: number[]
 ): void {
-  const out = imageData.data;
-  const { x, y, bitmap } = footprint;
-  for (let row = 0; row < bitmap.height; row++) {
-    const sy = y + row;
-    if (sy < 0 || sy >= src.height) continue;
-    for (let col = 0; col < bitmap.width; col++) {
-      const sx = x + col;
-      if (sx < 0 || sx >= src.width) continue;
-      if ((bitmap.pixels[row * bitmap.width + col]! & 0x0f) === transparentColor) continue;
-      const idx = sy * src.width + sx;
-      const color = palette[src.pixels[idx]! & 0x0f] ?? 0;
-      const o = idx * 4;
-      out[o + 0] = atariIntensity[(color >> 8) & 0x7]!;
-      out[o + 1] = atariIntensity[(color >> 4) & 0x7]!;
-      out[o + 2] = atariIntensity[color & 0x7]!;
-      out[o + 3] = 255;
-    }
-  }
+  const out = rgbaPixels(imageData);
+  const lookup = rgbaLookup(palette);
+  forEachFootprintPixel(footprint, transparentColor, src.width, src.height, (i) => {
+    out[i] = lookup[src.pixels[i]! & 0x0f]!;
+  });
 }

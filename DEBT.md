@@ -114,7 +114,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E33 | What a frame costs | S | ⏳ |
 | E30 | One presenter and one input router | M | ⏳ |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | C177 | An Atari-era save loads with its possessions, timers and hand unconverted | M | ⏳ |
@@ -122,6 +121,7 @@ In payoff order: the first row is the next item.
 | C186 | A decoration's position set past its rectangles' table is not drawn | S | ⏳ |
 | C187 | The adjust skills filter hands each DSA the one before's words unmasked, and its `why` | S | ⏳ |
 | C188 | A new timer's unused bytes are 0, where CSBWin's are 0xcd | S | ⏳ |
+| C189 | A distant monster is shrunk again at every frame, where CSBWin keeps it across levels | S | ⏳ |
 | F15 | Tools that read the wall clock, and a runner with no timeout | S | ⏳ |
 | F16 | A tool can pass having checked less than it says | S | ⏳ |
 | F18 | One `tsconfig` for the browser, the tools and the server | S | ⏳ |
@@ -149,7 +149,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C189 · D22 · E42 · F22 · G31 · P13 · R17 · U13 · W8 · X18. An ID recorded and paid in one commit has no
+Next free IDs: C190 · D22 · E42 · F22 · G31 · P13 · R17 · U13 · W8 · X18. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -446,32 +446,6 @@ own: the canvas, `drawViewport`, `refreshOverlay`, `handleMouseButton`'s deferre
 the Hint Oracle's open and close, `syncParty`, `setUIMode`, `initializePlayState` and the
 pointer's state.
 
-### E33 ⏳ What a frame costs
-
-- **The palette-to-RGBA conversion is most of a compose**: 0.76 ms of `refreshOverlay`'s,
-  where a 16-entry `Uint32` table a palette, written through a `Uint32Array` view, takes
-  0.14 ms (`updateImageDataFromIndex*`, `src/renderer/csbwin/CanvasBlitter.ts:416-490`). It
-  always takes the two-palette path while adventuring: `viewportPalette !== uiPalette`
-  compares two separate copies (`ScreenComposer.ts:229-232`). Its body is written three times
-  in `CanvasBlitter`, and the cursor's footprint loop twice (`reconvertThroughPalette`,
-  `PresentedFrame.capture`).
-- **Every monster turn allocates** an `MmRecord` and with it a `DsaVars` of two 100-entry
-  arrays, in a dungeon without a filter DSA as in one with; every DSA run a `DsaBank`, a
-  `DsaStack` and a `DsaVars`; `newDsaParameters` an `Int32Array(101)`.
-- About 35 trace strings in `MonsterAI` and 30 in `AttackSystem` are built whether anything
-  traces or not.
-- `searchOrder()` copies and reverses the timer queue at every
-  `deleteMonsterMovementTimers`.
-- A monster farther than the first row is shrunk again at every frame
-  (`drawMonsterAt`, `src/renderer/bytecode/DrawRoomObjects.ts`), where CSBWin keeps it as
-  derived graphic `ITEM12_word2 + graphicNumFBSAE` (`doc/CSBwin-src/Code51a4.cpp:583`,
-  `:823-840`); only an alternate monster's is kept, in `AltMonCache`.
-
-Paying it: the look-up tables built once a present and shared by the three conversions;
-`DsaVars` allocated on first use; the traces behind a test or a closure; the distant monster
-kept in the `GraphicsStore` under its derived number. The frames record
-palette codes, so none moves.
-
 ### E39 ⏳ The About and Credits pages
 
 The welcome page's footer (`src/ui/welcomePage.ts`) links to ABOUT and CREDITS, two pages to be designed with
@@ -682,6 +656,29 @@ file holds.
 Paying it: which bytes each of CSBWin's `SetTimer` callers leaves, read caller by caller,
 and `createTimer` giving a byte left out 0xcd only if every one of them does; a check of a
 port-made `TT_75` written by `buildSaveFile`, against the bytes CSBWin's constructor leaves.
+
+### C189 ⏳ A distant monster is shrunk again at every frame, where CSBWin keeps it across levels
+
+`DrawMonster` keeps a monster farther than the first row as derived graphic
+`ITEM12_word2 + graphicNumFBSAE`, shrunk through the distance's colour map
+(`d.Byte6628` or `d.Byte6612`) only when `AllocateDerivedGraphic` finds it absent
+(`doc/CSBwin-src/Code51a4.cpp:583`, `:823-840`). `ReadGraphicsForLevel` sets colours 9
+and 10 of both maps from the level's monsters at every level read (`ModifyPalettes`,
+`Code390e.cpp:323-344`, `CSBCode.cpp:2895-2911`), and deletes every derived graphic only
+at the first read (`LoadNeededGraphics`, `Code222ea.cpp:217-222`, behind `d.Word7254`,
+`Code390e.cpp:43`, `:345-371`, `:380`). So in CSBWin a monster shrunk on one level, seen far
+on another whose colour 9 or 10 has another scheme, keeps the first level's colours;
+the schemes' distance entries differ (word 6 of each of `graphics.dat`'s `specialColors`:
+90, 0, 100, 50, 120). The port shrinks it at every frame (`drawMonsterAt`,
+`src/renderer/bytecode/DrawRoomObjects.ts`), through the present level's maps, which
+also costs the shrink at every frame; only an alternate monster's is kept, in
+`AltMonCache`. Whether a dungeon the port plays reaches the difference is not traced,
+nor whether CSBWin's graphics cache can free a derived graphic first (`Code222ea.cpp:97`).
+
+Paying it: the shrunk picture kept in the `GraphicsStore` under
+`pI12.word2 + graphicNumFBSAE`, the non-alternate's `graphicNumFBSAE` starting at
+`word2` as CSBWin's does; a check that draws a monster far on one level, then on a
+level whose scheme for its colour differs, and finds the first level's colours.
 
 ### C150 ⏸️ Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops
 

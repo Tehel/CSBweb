@@ -376,7 +376,7 @@ export class AttackSystem {
       true,
       false,
     );
-    this.trace(`w_2 = DamageMonster() --> ${phys.monsterDamage}`);
+    if (this.ctx.host.tracing) this.trace(`w_2 = DamageMonster() --> ${phys.monsterDamage}`);
     if (result !== MonsterDamageResult.NO_MONSTER_DIED) {
       // Deliberately deferred to the end of `_Attack`: activating the group here would
       // re-enter the Monster Move Filter while the Party Attack Filter is still live.
@@ -408,7 +408,7 @@ export class AttackSystem {
     const champ = getPartyChampion(this.ctx.party.state, params.charIdx);
     const phys = params.attdep.physicalAttack;
 
-    this.trace(
+    if (this.ctx.host.tracing) this.trace(
       `Entering DeterminePhysicalAttackDamage(char=${params.charIdx},monster,P7=${p7},P8=${p8},` +
         `skillNumber=${params.skillNumber})`,
     );
@@ -450,8 +450,8 @@ export class AttackSystem {
     const quickness = this.ctx.systems.championDamage.quickness(champ);
     let required = sw(random.below(32) + desc.dexterity12 + difficulty - 16);
     let luckyHit = false;
-    this.trace(`character's quickenss = ${quickness}`);
-    this.trace(`required quickness = ${required}`);
+    if (this.ctx.host.tracing) this.trace(`character's quickenss = ${quickness}`);
+    if (this.ctx.host.tracing) this.trace(`required quickness = ${required}`);
     if (quickness <= required) {
       luckyHit = random.zeroTo3() === 0;
       if (!luckyHit && !this.ctx.systems.championDamage.isCharacterLucky(champ, 75 - p7)) {
@@ -461,7 +461,7 @@ export class AttackSystem {
         return 0;
       }
     }
-    this.trace(
+    if (this.ctx.host.tracing) this.trace(
       `Attack was successful because ${
         quickness > required ? "Character's quickness is great enough" : luckyHit ? 'Lucky Hit (1 chance in 4)' : 'IsCharacterLucky returned true'
       }`,
@@ -473,7 +473,7 @@ export class AttackSystem {
     );
     let d7 = sw(throwingDistance);
     let d6 = 0;
-    this.trace(`D7W = Throwing distance=${d7}`);
+    if (this.ctx.host.tracing) this.trace(`D7W = Throwing distance=${d7}`);
 
     if (throwingDistance !== 0) {
       d7 = sw(d7 + random.below(div(d7, 2) + 1));
@@ -484,14 +484,14 @@ export class AttackSystem {
       else if (weaponNI === OBJNI_EXECUTIONER) d4 = sw(d4 - div(d4, 8));
       d7 = sw(d7 + random.below(32) - d4);
       d6 = d7;
-      this.trace(`D7W = ${d7}, D4W = ${d4}, D6W = ${d6}`);
+      if (this.ctx.host.tracing) this.trace(`D7W = ${d7}, D4W = ${d4}, D6W = ${d6}`);
     }
 
     // --- The fallback roll, taken when the first came out at or below 1. Without it a
     //     champion who cannot out-roll the monster's defence could never hurt it.
     if (throwingDistance === 0 || d6 <= 1) {
       d7 = random.zeroTo3();
-      this.trace(`Attack may fail.  D7W = random(4) = ${d7}`);
+      if (this.ctx.host.tracing) this.trace(`Attack may fail.  D7W = random(4) = ${d7}`);
       if (d7 === 0) {
         this.trace('Attack failed because we were not Lucky (D7W==0)');
         phys.staminaAdjust = 2 + random.bool();
@@ -531,7 +531,7 @@ export class AttackSystem {
     const mastery = sw(masteryOf(this.ctx, champ, params.skillNumber));
     if (sw(random.below(64)) < mastery) {
       d7 += 10;
-      this.trace(`Add 10 to D7W because Mastery(${params.skillNumber})=${mastery} --> ${d7}`);
+      if (this.ctx.host.tracing) this.trace(`Add 10 to D7W because Mastery(${params.skillNumber})=${mastery} --> ${d7}`);
     }
     if (d7 < 0) d7 = 0;
 
@@ -541,7 +541,7 @@ export class AttackSystem {
     phys.skillAdjust = sw(div(d7 * monsterWord16_8_11(desc), 16) + 3);
     phys.staminaAdjust = 4 + random.zeroTo3();
     this.physicalAttackFilter(filter, params);
-    this.trace(`PhysicalAttack returning D7W = ${phys.monsterDamage}`);
+    if (this.ctx.host.tracing) this.trace(`PhysicalAttack returning D7W = ${phys.monsterDamage}`);
     return phys.monsterDamage;
   }
 
@@ -552,7 +552,7 @@ export class AttackSystem {
     const champ = getPartyChampion(this.ctx.party.state, params.charIdx);
     const phys = params.attdep.physicalAttack;
 
-    this.trace(`Enter AttackWithPhysicalForce (attackType=${params.attackType}, skillNumber=${params.skillNumber})`);
+    if (this.ctx.host.tracing) this.trace(`Enter AttackWithPhysicalForce (attackType=${params.attackType}, skillNumber=${params.skillNumber})`);
     this.ctx.sounds.queueSound(16, party.position.x, party.position.y, 1, party.position.z);
 
     if (this.monsterUnderAttack === OBJECT_ID_EOF) {
@@ -603,8 +603,8 @@ export class AttackSystem {
 
     const p7 = (tables.byte20002[params.attackType] ?? 0) & 0xff;
     const p8 = (tables.byte19958[params.attackType] ?? 0) & 0xff;
-    this.trace(`D6W=Byte20002[attackType=${params.attackType}]=${p7}`);
-    this.trace(`D7W=Byte19958[attackType=${params.attackType}]=${p8}`);
+    if (this.ctx.host.tracing) this.trace(`D6W=Byte20002[attackType=${params.attackType}]=${p7}`);
+    if (this.ctx.host.tracing) this.trace(`D7W=Byte19958[attackType=${params.attackType}]=${p8}`);
 
     const weaponNI = this.nameIndexOf(champ ? getChampionPossession(champ, 1) : OBJECT_ID_NULL);
     const vorpalOrDisrupt = weaponNI === OBJNI_VORPAL_BLADE || params.attackType === AttackType.atk_DISRUPT;
@@ -654,7 +654,7 @@ export class AttackSystem {
     const desc = monster ? this.descFor(monster.creatureType) : null;
     wc.effectiveMastery = sw(random.below(wc.mastery));
     wc.requiredMastery = desc ? monsterBravery(desc) : 15;
-    this.trace(`effectiveMastery = ${wc.effectiveMastery}, requiredMastery = ${wc.requiredMastery}`);
+    if (this.ctx.host.tracing) this.trace(`effectiveMastery = ${wc.effectiveMastery}, requiredMastery = ${wc.requiredMastery}`);
 
     this.callAttackFilter(filter, params, 1);
 
@@ -837,7 +837,7 @@ export class AttackSystem {
 
     const tables = this.ctx.tables;
     const attackName = tables.attackNames[initialAttackType] ?? String(initialAttackType);
-    this.trace(
+    if (this.ctx.host.tracing) this.trace(
       `${pChar.name} attacks from ${party.position.z}(${party.position.x},${party.position.y})` +
         ` to ${party.position.z}(${params.attackX},${params.attackY}); attack type = ` +
         `${initialAttackType} = ${attackName}`,
@@ -858,7 +858,7 @@ export class AttackSystem {
     params.staminaCost = ((tables.byte20046[initialAttackType] ?? 0) & 0xff) + this.ctx.random.bool();
     params.experienceGained = (tables.experienceForAttacking[initialAttackType] ?? 0) & 0xff;
     params.activateMonster = 0;
-    this.trace(`Skill number required = ${params.skillNumber}, staminaCost = ${params.staminaCost}, experienceGained = ${params.experienceGained}`);
+    if (this.ctx.host.tracing) this.trace(`Skill number required = ${params.skillNumber}, staminaCost = ${params.staminaCost}, experienceGained = ${params.experienceGained}`);
 
     const cellFlag = this.ctx.dungeon.getCellFlag(new Position(params.attackX, params.attackY, party.position.z));
     let successfulAttack = 1;

@@ -75,6 +75,12 @@ export interface GameHost {
   /** Dev-only trace, CSBWin's `AITraceActive` / `AttackTraceActive` output. */
   trace(line: string): void;
   /**
+   * Whether `trace` goes anywhere: CSBWin's `AITraceActive` and `AttackTraceActive`, which
+   * a line is tested against before it is built. `createGameHost` sets it when the host
+   * gives a `trace`.
+   */
+  tracing: boolean;
+  /**
    * The message area, CSBWin's `PrintLinefeed()` / `QuePrintLines(color, text)`
    * (`doc/CSBWIN_MESSAGES_REFERENCE.md`).
    */
@@ -231,6 +237,7 @@ export function createGameHost(host: Partial<GameHost> = {}): GameHost {
     playSound: host.playSound ?? (() => {}),
     playCustomSound: host.playCustomSound ?? (() => {}),
     trace: host.trace ?? (() => {}),
+    tracing: host.tracing ?? host.trace !== undefined,
     messages: host.messages ?? {
       printLinefeed: () => {},
       quePrintLines: () => {},
