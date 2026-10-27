@@ -20,7 +20,6 @@ import { Direction, Position } from '../../src/core/types';
 import { Party } from '../../src/engine/Party';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../../src/engine/AddCharacter';
 import { createPaletteIndexViewportBuffer } from '../../src/renderer/csbwin/CanvasBlitter';
-import { getCachedGraphicBitmap } from '../../src/renderer/ViewportGraphics';
 import { executeAttack, prepareAttack, takeAttackOption } from '../../src/renderer/ui/Attack';
 import { tag01b1c0 } from '../../src/engine/AttackMenu';
 import { drawTopBarHandIcons } from '../../src/renderer/ui/Character';
@@ -29,7 +28,7 @@ import { drawInventoryScreen, getInventorySlotRect } from '../../src/renderer/ui
 import { type UIState } from '../../src/renderer/ui/UIState';
 import type { Rect } from '../../src/data/tables/UITables';
 import { check, finish } from '../lib/check';
-import { gameTablesOf, newGame, presetHeroesOf, stockDungeon, stockGraphics } from '../lib/game';
+import { gameTablesOf, newGame, presetHeroesOf, stockDungeon, stockGraphics, graphicsStoreOf } from '../lib/game';
 import { newUIState } from '../lib/ui';
 
 const BOXES = [33, 34, 35];
@@ -46,10 +45,10 @@ async function main(): Promise<void> {
     party.addChampion(createChampionFromPreset(heroes[i], i, assignPresetHeroPossessions(heroes[i].inventory, gameTablesOf(graphics))));
   }
 
-  const cache = new Map();
+  const store = graphicsStoreOf(graphics);
   const game = newGame(data, graphics);
   const ui: UIState = newUIState(graphics, game.ctx, {
-    getGraphicBitmap: (n, format) => getCachedGraphicBitmap(graphics, cache, n, format),
+    getGraphicBitmap: (n) => store.basicGraphic(n),
   });
   ui.ctx.party.state = party.state;
   const iconSlots = ui.uiTables.graphic232.iconDisplay;

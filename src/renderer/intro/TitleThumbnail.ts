@@ -21,7 +21,8 @@ import type { GraphicsLoader } from '../../data/GraphicsLoader';
 import { extractGraphicsTables } from '../../data/tables/GraphicsTables';
 import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../csbwin/CanvasBlitter';
 import { loadFontData } from '../csbwin/TextRenderer';
-import { SCREEN_HEIGHT, SCREEN_WIDTH, getCachedGraphicBitmap } from '../ViewportGraphics';
+import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../ViewportGraphics';
+import { GraphicsStore } from '../GraphicsStore';
 import { PALETTE_11914, type IntroHost } from './IntroHost';
 import { displayChaosStrikesBack } from './TitleSequence';
 
@@ -35,7 +36,8 @@ export interface TitleFrame {
 /** The title's last frame, played from `graphics`. Throws where an item it draws does not decode. */
 export async function lastTitleFrame(graphics: GraphicsLoader): Promise<TitleFrame> {
     const uiTables = extractGraphicsTables(graphics).ui;
-    const cache = new Map<string, IndexedBitmap>();
+    // A graphic that does not decode throws below, which says which.
+    const store = new GraphicsStore(graphics, () => {});
     const unused = (): never => { throw new Error('the title asked for what only the entrance uses'); };
     const host: IntroHost = {
         screen: createPaletteIndexViewportBuffer(SCREEN_WIDTH, SCREEN_HEIGHT, 0),
@@ -45,7 +47,7 @@ export async function lastTitleFrame(graphics: GraphicsLoader): Promise<TitleFra
         // fade sets all sixteen, so the last frame does not depend on them.
         globalPalette: [...(uiTables.graphic232.palette552[0] ?? PALETTE_11914)],
         getGraphic(graphicNum: number): IndexedBitmap {
-            const bitmap = getCachedGraphicBitmap(graphics, cache, graphicNum);
+            const bitmap = store.basicGraphic(graphicNum);
             if (!bitmap) throw new Error(`graphics.dat item ${graphicNum} did not decode`);
             return bitmap;
         },

@@ -71,10 +71,10 @@ import {
   resolveObjectNameIndex, wrapItemDescriptionLine, type ItemDescriptionLine,
 } from '../../src/renderer/ui/Objects';
 import type { UIState } from '../../src/renderer/ui/UIState';
-import { SCREEN_WIDTH, VIEWPORT_X, VIEWPORT_Y, getCachedGraphicBitmap } from '../../src/renderer/ViewportGraphics';
+import { SCREEN_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../../src/renderer/ViewportGraphics';
 import { check, finish } from '../lib/check';
 import { globalStore, int, op, varFetch, withFilterDsas } from '../lib/dsa';
-import { stockGame, stockGraphics } from '../lib/game';
+import { stockGame, stockGraphics, graphicsStoreOf } from '../lib/game';
 import { newUIState } from '../lib/ui';
 import { testChampion } from '../lib/champion';
 
@@ -84,9 +84,9 @@ const TEXT_X = 108;
 
 function uiFor(game: Game): UIState {
   const graphics = stockGraphics();
-  const cache = new Map();
+  const store = graphicsStoreOf(graphics);
   const ui = newUIState(graphics, game.ctx, {
-    getGraphicBitmap: (n, format) => getCachedGraphicBitmap(graphics, cache, n, format),
+    getGraphicBitmap: (n) => store.basicGraphic(n),
   });
   return ui;
 }

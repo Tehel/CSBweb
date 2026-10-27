@@ -167,7 +167,7 @@ async function main(): Promise<void> {
     const w = gc.widthBytes * 2;
     const viewportIndexBuffer = createPaletteIndexViewportBuffer(224, 136, 0);
     const context = viewportContextOf({
-      viewportIndexBuffer, objectTables: tables, dungeonState: view, graphicCache: new Map(),
+      viewportIndexBuffer, objectTables: tables, dungeonState: view,
       getGraphicBitmap: () => ({ width: w, height: gc.height, pixels: Uint8Array.from({ length: w * gc.height }, (_, i) => (i % w < w / 2 ? 5 : 6)) }),
     });
     const vp = tables.viewportPosition[0]![9]![location]!;

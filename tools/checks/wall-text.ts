@@ -41,11 +41,10 @@ import { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import { drawWallText } from '../../src/renderer/bytecode/DrawDecorations';
 import { ViewportDraw } from '../../src/renderer/bytecode/ViewportDraw';
 import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../../src/renderer/csbwin/CanvasBlitter';
-import { getCachedGraphicBitmap } from '../../src/renderer/ViewportGraphics';
 import type { MapData, TextRecord } from '../../src/data/dungeonTypes';
 import type { DungeonState } from '../../src/engine/DungeonState';
 import { check, finish } from '../lib/check';
-import { graphicsTablesOf, newGame } from '../lib/game';
+import { graphicsTablesOf, newGame, graphicsStoreOf } from '../lib/game';
 import { standInOf } from '../lib/standIn';
 import { viewportContextOf } from '../lib/viewportContext';
 
@@ -89,8 +88,8 @@ for (const set of ['dm-atari', 'dm-atari-1.3-fr']) {
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve(`tools/fixtures/gamefiles/${set}/graphics.dat`))));
   const dungeon = newGame(data, graphics).ctx.dungeon;
   const tables = graphicsTablesOf(graphics).objects;
-  const cache = new Map<string, IndexedBitmap>();
-  const getGraphicBitmap = (n: number): IndexedBitmap | null => getCachedGraphicBitmap(graphics, cache, n);
+  const store = graphicsStoreOf(graphics);
+  const getGraphicBitmap = (n: number): IndexedBitmap | null => store.basicGraphic(n);
 
   // 1. The font.
   const font = getGraphicBitmap(120)!;

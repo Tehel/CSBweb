@@ -49,13 +49,11 @@ import {
 } from '../../src/renderer/bytecode/BytecodeInterpreter';
 import { Opcode } from '../../src/renderer/bytecode/Opcodes';
 import { GraphicRoomType, type SummarizeRoomData } from '../../src/renderer/bytecode/Types';
-import type { IndexedBitmap } from '../../src/renderer/csbwin/CanvasBlitter';
 import { cellNames, relativeX, relativeY, skinProgramStart } from '../../src/renderer/DrawViewport';
 import { RelativeXY } from '../../src/engine/RelativeXY';
-import { getCachedGraphicBitmap } from '../../src/renderer/ViewportGraphics';
 import { ViewportRenderer } from '../../src/renderer/ViewportRenderer';
 import { check, finish } from '../lib/check';
-import { graphicsTablesOf, newGame } from '../lib/game';
+import { graphicsTablesOf, newGame, graphicsStoreOf } from '../lib/game';
 import { viewportContextOf } from '../lib/viewportContext';
 
 const all = process.argv.includes('--all');
@@ -262,15 +260,15 @@ function views(): void {
     const game = newGame(data, graphics);
     const dungeon = game.ctx.dungeon;
     const tables = graphicsTablesOf(graphics);
-    const graphicCache = new Map<string, IndexedBitmap>();
+    const graphicStore = graphicsStoreOf(graphics);
     const renderer = new ViewportRenderer({
       graphicsLoader: graphics,
       dungeonState: dungeon,
       viewportTables: tables.viewport,
       objectTables: tables.objects,
       palette552: tables.ui.graphic232.palette552,
-      graphicCache,
-      getGraphicBitmap: (graphicNum) => getCachedGraphicBitmap(graphics, graphicCache, graphicNum),
+      graphics: graphicStore,
+      getGraphicBitmap: (graphicNum) => graphicStore.basicGraphic(graphicNum),
       trace: (line) => console.log(line),
       csbGraphicsLoader: csb,
     });

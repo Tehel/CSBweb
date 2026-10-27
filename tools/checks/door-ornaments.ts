@@ -26,10 +26,8 @@
  */
 import { OBJECT_ID_EOF, Position, RoomType } from '../../src/core/types';
 import { check, finish } from '../lib/check';
-import type { IndexedBitmap } from '../../src/renderer/csbwin/CanvasBlitter';
-import { getCachedGraphicBitmap } from '../../src/renderer/ViewportGraphics';
 import { ViewportRenderer } from '../../src/renderer/ViewportRenderer';
-import { graphicsTablesOf, newGame, stockGraphics, stockDungeon } from '../lib/game';
+import { graphicsTablesOf, newGame, stockGraphics, stockDungeon, graphicsStoreOf } from '../lib/game';
 
 const NEARNESS = ['F3', 'F2', 'F1'];
 
@@ -93,7 +91,7 @@ function main(): void {
   // Numbers past the tables' ends, on level 0.
   data.maps[0]!.doorDecorationTOC = [12, 22];
   data.maps[0]!.floorDecorationTOC = [10, 69];
-  const graphicCache = new Map<string, IndexedBitmap>();
+  const graphicStore = graphicsStoreOf(graphics);
   const all = graphicsTablesOf(graphics);
   const renderer = new ViewportRenderer({
     graphicsLoader: graphics,
@@ -101,8 +99,8 @@ function main(): void {
     viewportTables: all.viewport,
     objectTables: tables,
     palette552: all.ui.graphic232.palette552,
-    graphicCache,
-    getGraphicBitmap: (graphicNum) => getCachedGraphicBitmap(graphics, graphicCache, graphicNum),
+    graphics: graphicStore,
+    getGraphicBitmap: (graphicNum) => graphicStore.basicGraphic(graphicNum),
     trace: (line) => console.log(line),
   });
   renderer.selectLevel(0);

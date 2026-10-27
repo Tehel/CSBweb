@@ -7,34 +7,7 @@
  */
 
 import { GraphicsLoader } from '../data/GraphicsLoader';
-import { ImageFormat } from '../core/imageDecoder';
 import { mirrorBitmap, type IndexedBitmap } from './csbwin/CanvasBlitter';
-
-/**
- * Graphic `graphicNum` as palette indices, decoded once and kept in `cache`: the screen's
- * graphics cache, which the viewport's interpreter and the interface share. `null` for a
- * negative number or a graphic that does not decode.
- */
-export function getCachedGraphicBitmap(
-  graphicsLoader: GraphicsLoader,
-  cache: Map<string, IndexedBitmap>,
-  graphicNum: number,
-  format: ImageFormat = ImageFormat.IMG1,
-): IndexedBitmap | null {
-  if (graphicNum < 0) return null;
-  const key = `${graphicNum}-${format}`;
-  const cached = cache.get(key);
-  if (cached) return cached;
-  try {
-    const decoded = graphicsLoader.getImage(graphicNum, format);
-    const pixels = decoded.pixels instanceof Uint8Array ? decoded.pixels : Uint8Array.from(decoded.pixels as ArrayLike<number>);
-    const bmp: IndexedBitmap = { width: decoded.width, height: decoded.height, pixels };
-    cache.set(key, bmp);
-    return bmp;
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Wall bitmap dimensions
@@ -73,18 +46,13 @@ export function initializeWallBitmapsIndexed(
   const firstWallGraphic = 77 + 13 * wallSet;
   const wallBitmaps: IndexedBitmap[] = [];
 
-  const toU8 = (pixels: unknown): Uint8Array => {
-    if (pixels instanceof Uint8Array) return pixels;
-    return Uint8Array.from(pixels as ArrayLike<number>);
-  };
-
   for (let i = 0; i < 6; i++) {
     const graphicIndex = firstWallGraphic + 7 + i; // 84-89 for set 0
-    const decodedImage = graphicsLoader.getImage(graphicIndex, ImageFormat.IMG1);
+    const decodedImage = graphicsLoader.getImage(graphicIndex);
     wallBitmaps.push({
       width: decodedImage.width,
       height: decodedImage.height,
-      pixels: toU8(decodedImage.pixels),
+      pixels: decodedImage.pixels,
     });
   }
 
@@ -103,21 +71,16 @@ export function initializeDoorBitmapsIndexed(
   wallSet: number = 0
 ): IndexedBitmap[] {
   const firstWallGraphic = 77 + 13 * wallSet;
-  const toU8 = (pixels: unknown): Uint8Array => {
-    if (pixels instanceof Uint8Array) return pixels;
-    return Uint8Array.from(pixels as ArrayLike<number>);
-  };
-
   const doorBitmaps: IndexedBitmap[] = new Array(8);
 
   // Load door bitmaps into slots [1..7] (graphics 77..83 for wallSet 0)
   for (let i = 0; i < 7; i++) {
     const graphicIndex = firstWallGraphic + i;
-    const decodedImage = graphicsLoader.getImage(graphicIndex, ImageFormat.IMG1);
+    const decodedImage = graphicsLoader.getImage(graphicIndex);
     doorBitmaps[i + 1] = {
       width: decodedImage.width,
       height: decodedImage.height,
-      pixels: toU8(decodedImage.pixels),
+      pixels: decodedImage.pixels,
     };
   }
 
@@ -136,16 +99,11 @@ export function initializeFloorCeilingIndexed(
   graphicsLoader: GraphicsLoader,
   backgroundGraphicSet: number
 ): { floor: IndexedBitmap; ceiling: IndexedBitmap } {
-  const toU8 = (pixels: unknown): Uint8Array => {
-    if (pixels instanceof Uint8Array) return pixels;
-    return Uint8Array.from(pixels as ArrayLike<number>);
-  };
-
-  const floorImage = graphicsLoader.getImage(backgroundGraphicSet * 2 + 75, ImageFormat.IMG1);
-  const ceilingImage = graphicsLoader.getImage(backgroundGraphicSet * 2 + 76, ImageFormat.IMG1);
+  const floorImage = graphicsLoader.getImage(backgroundGraphicSet * 2 + 75);
+  const ceilingImage = graphicsLoader.getImage(backgroundGraphicSet * 2 + 76);
 
   return {
-    floor: { width: floorImage.width, height: floorImage.height, pixels: toU8(floorImage.pixels) },
-    ceiling: { width: ceilingImage.width, height: ceilingImage.height, pixels: toU8(ceilingImage.pixels) },
+    floor: { width: floorImage.width, height: floorImage.height, pixels: floorImage.pixels },
+    ceiling: { width: ceilingImage.width, height: ceilingImage.height, pixels: ceilingImage.pixels },
   };
 }

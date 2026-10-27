@@ -28,6 +28,7 @@ import type { MonsterDesignOptions } from '../../engine/monsterTypes';
 import type { ObjectTables } from '../../data/tables/ObjectTables';
 import type { RectPos } from '../../data/tables/UITables';
 import type { CSBGraphicsLoader } from '../../data/CSBGraphicsLoader';
+import type { GraphicsStore } from '../GraphicsStore';
 import type { BackgroundLib } from '../../data/BackgroundLib';
 import { OBJECT_ID_EOF, Position, RoomType, getRoomType } from '../../core/types';
 
@@ -83,7 +84,8 @@ export interface InterpreterContext {
 
   /** CSBWin `GetBasicGraphicAddress(n)`, which `GraphicToViewport` draws with. */
   getGraphicBitmap: (graphicNum: number) => IndexedBitmap | null;
-  graphicCache: Map<string, IndexedBitmap>;
+  /** The basic graphics, and the derived graphics the drawing makes from them. */
+  graphics: GraphicsStore;
 
   // CSBWin object rendering tables (graphics.dat 0x22e + 0x22f)
   objectTables: ObjectTables;

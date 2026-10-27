@@ -24,10 +24,9 @@ import { globalTextKey } from '../../src/data/CsbwinExpool';
 import { drawAttackPanel, prepareAttack } from '../../src/renderer/ui/Attack';
 import { createPaletteIndexViewportBuffer } from '../../src/renderer/csbwin/CanvasBlitter';
 import type { UIState } from '../../src/renderer/ui/UIState';
-import { getCachedGraphicBitmap } from '../../src/renderer/ViewportGraphics';
 import { UNSET, freshGame, globalStore, int, op, varFetch, varStore, withFilterDsas } from '../lib/dsa';
 import { check, finish } from '../lib/check';
-import { stockGraphics } from '../lib/game';
+import { stockGraphics, graphicsStoreOf } from '../lib/game';
 import { newUIState } from '../lib/ui';
 
 /** `ESL_ACTIONNAMEFILTER` (`doc/CSBwin-src/CSB.h:1548`). */
@@ -48,12 +47,12 @@ const setParam = (index: number, value: number): number[] => [
 ];
 
 const graphics = stockGraphics();
-const cache = new Map();
+const store = graphicsStoreOf(graphics);
 
 /** The interface over `game`, its party the save's. */
 function uiOf(game: Game): UIState {
   const ui = newUIState(graphics, game.ctx, {
-    getGraphicBitmap: (n, format) => getCachedGraphicBitmap(graphics, cache, n, format),
+    getGraphicBitmap: (n) => store.basicGraphic(n),
   });
   return ui;
 }

@@ -14,6 +14,7 @@ import {
 import {
   bltShapeToViewportIndex,
   IDENTITY_COLOR_MAP,
+  mirrorBitmap,
   shrinkBlt,
   tag008c98,
   type IndexedBitmap,
@@ -316,8 +317,7 @@ function drawSingleObject(
   const src = getGraphic(graphicNum);
   if (!src) return { nextSmallOffset: currentSmallOffset };
 
-  const scaled = getDerivedObjectBitmap(draw, tables, graphicNum, src, gc, distanceFromUs, mirror);
-  if (!scaled) return { nextSmallOffset: currentSmallOffset };
+  const scaled = getDerivedObjectBitmap(draw, tables, src, gc, distanceFromUs, mirror, local34);
 
   const widthBytes =
     distanceFromUs === 0
@@ -1002,18 +1002,13 @@ function TAG005088(
     const base = getGraphic(type + 348);
     return base ? { base, halfWidth, height } : null;
   }
-  // The derived graphic's number, `14*type + P2/2 + 436`, keys our cache.
-  const key = `derived:${14 * type + Math.trunc(p2 / 2) + 436}`;
-  const cache = draw.context.graphicCache;
-  let base = cache.get(key) ?? null;
-  if (!base) {
+  const base = draw.context.graphics.derivedGraphic(14 * type + Math.trunc(p2 / 2) + 436, () => {
     const src = getGraphic(Math.min(type, 2) + 348);
     if (!src) return null;
     const colorMap = type === 3 ? tables.cloudColorMap : IDENTITY_COLOR_MAP;
-    base = shrinkBlt(src, src.width, src.height, 2 * halfWidth, height, colorMap);
-    cache.set(key, base);
-  }
-  return { base, halfWidth, height };
+    return shrinkBlt(src, src.width, src.height, 2 * halfWidth, height, colorMap);
+  });
+  return base ? { base, halfWidth, height } : null;
 }
 
 /**
@@ -1054,32 +1049,32 @@ function drawCloudUnderParty(
   tag008c98(src, draw.context.viewportIndexBuffer, null, tables.cloudUnderPartyRect, P6, P7, 112, 138, 0, 0); // d.Word2530
 }
 
+/**
+ * The object's picture at `distanceFromUs` (`doc/CSBwin-src/Code51a4.cpp:1833-1903`): its
+ * graphic at 0, and farther derived graphic `104 + uByte1`, one more at distance 1, two
+ * more mirrored or four more as an alcove's second picture (`LOCAL_34`), shrunk through
+ * `d.Byte5744` at 1 and `d.Byte5728` at 2. The classes' `uByte1` leave room for each other's
+ * (`tools/checks/derived-graphics.ts`).
+ */
 function getDerivedObjectBitmap(
   draw: ViewportDraw,
   tables: ObjectTables,
-  graphicNum: number,
   src: IndexedBitmap,
   gc: ObjectTables['graphicClasses'][number],
   distanceFromUs: number,
-  mirror: boolean
-): IndexedBitmap | null {
-  const cache = draw.context.graphicCache;
-  const key = `obj:${graphicNum}:${distanceFromUs}:${mirror ? 1 : 0}`;
-  const cached = cache.get(key);
-  if (cached) return cached;
-
-  let out: IndexedBitmap;
-  if (distanceFromUs === 0) {
-    out = mirror ? draw.getMirroredBitmap(src) : src;
-  } else {
+  mirror: boolean,
+  local34: boolean
+): IndexedBitmap {
+  if (distanceFromUs === 0) return mirror ? draw.getMirroredBitmap(src) : src;
+  let derivedNum = gc.uByte1 + 104;
+  if (distanceFromUs === 1) derivedNum++;
+  if (mirror) derivedNum += 2;
+  else if (local34) derivedNum += 4;
+  return draw.context.graphics.derivedGraphic(derivedNum, () => {
     const dstWidthBytes = distanceFromUs === 1 ? ((gc.widthBytes * 20 + 10) >> 5) : ((gc.widthBytes * 16 + 8) >> 5);
     const dstHeight = distanceFromUs === 1 ? ((gc.height * 20 + 10) >> 5) : ((gc.height * 16 + 8) >> 5);
-    const dstWidth = dstWidthBytes * 2;
     const colorMap = distanceFromUs === 1 ? tables.colorMapMedium : tables.colorMapFar;
-    const scaled = shrinkBlt(src, src.width, src.height, dstWidth, dstHeight, colorMap);
-    out = mirror ? draw.getMirroredBitmap(scaled) : scaled;
-  }
-
-  cache.set(key, out);
-  return out;
+    const scaled = shrinkBlt(src, src.width, src.height, dstWidthBytes * 2, dstHeight, colorMap);
+    return mirror ? mirrorBitmap(scaled) : scaled;
+  });
 }

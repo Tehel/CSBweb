@@ -34,12 +34,10 @@ import { OBJECT_ID_EOF, Position, RoomType } from '../../src/core/types';
 import { DungeonState, NO_GAME, extendedCellFlagsKey } from '../../src/engine/DungeonState';
 import { PartyFootprints } from '../../src/engine/PartyFootprints';
 import { GraphicRoomType, type SummarizeRoomData } from '../../src/renderer/bytecode/Types';
-import type { IndexedBitmap } from '../../src/renderer/csbwin/CanvasBlitter';
 import { summarizeRoomInfoCsbwin } from '../../src/renderer/csbwin/SummarizeRoomInfo';
-import { getCachedGraphicBitmap } from '../../src/renderer/ViewportGraphics';
 import { ViewportRenderer } from '../../src/renderer/ViewportRenderer';
 import { check, finish } from '../lib/check';
-import { graphicsTablesOf, stockGraphics, stockDungeon } from '../lib/game';
+import { graphicsTablesOf, stockGraphics, stockDungeon, graphicsStoreOf } from '../lib/game';
 
 function main(): void {
   const data = stockDungeon();
@@ -188,15 +186,15 @@ function drawing(): void {
   if (!at) throw new Error('level 0 has no open cell with an open cell north of it');
 
   const footprints = new PartyFootprints();
-  const graphicCache = new Map<string, IndexedBitmap>();
+  const graphicStore = graphicsStoreOf(graphics);
   const renderer = new ViewportRenderer({
     graphicsLoader: graphics,
     dungeonState: dungeon,
     viewportTables: tables.viewport,
     objectTables: tables.objects,
     palette552: tables.ui.graphic232.palette552,
-    graphicCache,
-    getGraphicBitmap: (graphicNum) => getCachedGraphicBitmap(graphics, graphicCache, graphicNum),
+    graphics: graphicStore,
+    getGraphicBitmap: (graphicNum) => graphicStore.basicGraphic(graphicNum),
     trace: (line) => console.log(line),
     footprints,
   });

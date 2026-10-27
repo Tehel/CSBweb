@@ -53,7 +53,6 @@ import { resolve } from 'node:path';
 import { atariToRGB, OBJECT_ID_EOF, Position, RoomType } from '../../src/core/types';
 import { BytecodeInterpreter } from '../../src/renderer/bytecode/BytecodeInterpreter';
 import { GraphicRoomType, ViewRoomType, type SummarizeRoomData } from '../../src/renderer/bytecode/Types';
-import type { IndexedBitmap } from '../../src/renderer/csbwin/CanvasBlitter';
 import {
   cellNames,
   getBytecodeProgram,
@@ -62,10 +61,9 @@ import {
   roomTypeNames,
 } from '../../src/renderer/DrawViewport';
 import { RelativeXY, type DirectionTables } from '../../src/engine/RelativeXY';
-import { getCachedGraphicBitmap } from '../../src/renderer/ViewportGraphics';
 import { ViewportRenderer } from '../../src/renderer/ViewportRenderer';
 import { check, fail, finish } from '../lib/check';
-import { graphicsTablesOf, newGame, stockGraphics, stockDungeon } from '../lib/game';
+import { graphicsTablesOf, newGame, stockGraphics, stockDungeon, graphicsStoreOf } from '../lib/game';
 import { writeIndexedPng } from '../lib/png';
 
 const BASELINE = resolve('tools/reference/render-probe.tsv');
@@ -108,7 +106,7 @@ function main(): void {
   const game = newGame(data, graphics);
   const dungeon = game.ctx.dungeon;
 
-  const graphicCache = new Map<string, IndexedBitmap>();
+  const graphicStore = graphicsStoreOf(graphics);
   const tables = graphicsTablesOf(graphics);
   const renderer = new ViewportRenderer({
     graphicsLoader: graphics,
@@ -116,8 +114,8 @@ function main(): void {
     viewportTables: tables.viewport,
     objectTables: tables.objects,
     palette552: tables.ui.graphic232.palette552,
-    graphicCache,
-    getGraphicBitmap: (graphicNum) => getCachedGraphicBitmap(graphics, graphicCache, graphicNum),
+    graphics: graphicStore,
+    getGraphicBitmap: (graphicNum) => graphicStore.basicGraphic(graphicNum),
     trace: (line) => console.log(line),
   });
 

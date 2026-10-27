@@ -44,7 +44,6 @@ import { Game } from '../../src/engine/Game';
 import { DUNGEON_DATA_SOURCES, type FieldSource } from '../../src/engine/DungeonSnapshot';
 import { PORTRAIT_HEIGHT, PORTRAIT_WIDTH, writeCsbwinCharacter } from '../../src/data/CsbwinCharacters';
 import { CHARDESC_SIZE } from '../../src/data/CsbwinSaveInfo';
-import { ImageFormat } from '../../src/core/imageDecoder';
 import { stockGame, stockGraphics } from '../lib/game';
 import { check, finish } from '../lib/check';
 import { genuineSaves } from '../lib/saves';
@@ -108,7 +107,7 @@ function loadWorld(): Game {
  * (`doc/CSBwin-src/Character.cpp:487-496`), which is this grid.
  */
 function portraitCells(): number[][] {
-  const sheet = stockGraphics().getImage(26, ImageFormat.IMG1);
+  const sheet = stockGraphics().getImage(26);
   const cols = Math.floor(sheet.width / PORTRAIT_WIDTH);
   const rows = Math.floor(sheet.height / PORTRAIT_HEIGHT);
   const cells: number[][] = [];

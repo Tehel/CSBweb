@@ -36,7 +36,6 @@ import { attributeCurrent, attributeMaximum, attributeMinimum } from '../../src/
 import { summarizeRoomInfoCsbwin } from '../../src/renderer/csbwin/SummarizeRoomInfo';
 import type { SummarizeRoomData } from '../../src/renderer/bytecode/Types';
 import { attackButtonRect, drawAttackButton } from '../../src/renderer/ui/Attack';
-import { ImageFormat } from '../../src/core/imageDecoder';
 import { graphicsTablesOf, newGame, presetHeroesOfGame, stockDungeon, stockGraphics } from '../lib/game';
 import { newUIState } from '../lib/ui';
 import { drawCursorItem, handleClothingClick } from '../../src/renderer/ui/Mouse';
@@ -698,7 +697,7 @@ function portraitSection(): void {
   // Graphic 26 is the portrait sheet. CSBWin addresses it with `(charID & 7) << 5` and
   // `29 * (charID >> 3)`, which is only equivalent to a 2-D cell index if the sheet is
   // exactly 8 cells wide.
-  const sheet = graphics.getImage(26, ImageFormat.IMG1);
+  const sheet = graphics.getImage(26);
   if (!sheet) {
     fail('graphic 26 (the portrait sheet) did not decode');
     return;

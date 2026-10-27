@@ -127,25 +127,12 @@ function TAG004b26(draw: ViewportDraw, door: IndexedBitmap, ornament: number, ne
 
   let ornamentBitmap = graphic;
   if (nearness !== 2) {
-    const cache = draw.context.graphicCache;
-    const key = `doorOrnament:${graphicNum}:${set}:${nearness}`;
-    const cached = cache.get(key);
-    if (cached) {
-      ornamentBitmap = cached;
-    } else {
+    ornamentBitmap = draw.context.graphics.derivedGraphic(2 * (ornament - 1) + 68 + nearness, () => {
       const size = tables.doorOrnamentRectSets[set]![2]!; // `Byte5058[18*set]`
       const colorMap = nearness === 0 ? tables.doorOrnamentColorMapF3 : tables.doorOrnamentColorMapF2;
       const cropped = cropBitmap(graphic, 2 * size.widthBytes, size.height);
-      ornamentBitmap = shrinkBlt(
-        cropped,
-        cropped.width,
-        cropped.height,
-        rect.x2 - rect.x1 + 1,
-        rect.height,
-        colorMap
-      );
-      cache.set(key, ornamentBitmap);
-    }
+      return shrinkBlt(cropped, cropped.width, cropped.height, rect.x2 - rect.x1 + 1, rect.height, colorMap);
+    });
   }
 
   tag0088b2Index(ornamentBitmap, door, { x1: rect.x1, y1: rect.y1, x2: rect.x2, y2: rect.y2 }, 9);

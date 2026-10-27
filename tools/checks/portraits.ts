@@ -34,7 +34,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { ImageFormat } from '../../src/core/imageDecoder';
 import { Direction, Position } from '../../src/core/types';
 import { CSBGraphicsLoader, ERROR_PORTRAIT, getExternalPortraitAddress } from '../../src/data/CSBGraphicsLoader';
 import { loadCsbwinWorld } from '../../src/data/CsbwinDungeonImage';
@@ -49,11 +48,11 @@ import { buildCsbwinRuntimeState } from '../../src/engine/CsbwinSaveGame';
 import { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import { Party } from '../../src/engine/Party';
 import type { Champion } from '../../src/engine/gameTypes';
-import { IndexedBitmap, createPaletteIndexViewportBuffer } from '../../src/renderer/csbwin/CanvasBlitter';
+import { createPaletteIndexViewportBuffer } from '../../src/renderer/csbwin/CanvasBlitter';
 import { drawPartyStatus, getPortraitBitmap } from '../../src/renderer/ui/Character';
 import { type UIState } from '../../src/renderer/ui/UIState';
 import { check, finish } from '../lib/check';
-import { newGame, stockDungeon, stockGraphics } from '../lib/game';
+import { newGame, stockDungeon, stockGraphics, graphicsStoreOf } from '../lib/game';
 import { newUIState } from '../lib/ui';
 
 const DEFAULT_SAVE = 'tools/fixtures/csbgame7.dat';
@@ -95,28 +94,10 @@ function main(): void {
   const graphics = stockGraphics();
   const data = stockDungeon();
 
-  const cache = new Map<string, IndexedBitmap>();
+  const store = graphicsStoreOf(graphics);
   const ui: UIState = newUIState(graphics, newGame(data, graphics).ctx, {
-    // The real one, off `graphics.dat`: the fallback path has to find graphic 26.
-    getGraphicBitmap: (graphicNum: number, format: ImageFormat = ImageFormat.IMG1) => {
-      const key = `${graphicNum}-${format}`;
-      const hit = cache.get(key);
-      if (hit) return hit;
-      try {
-        const decoded = graphics.getImage(graphicNum, format);
-        const bmp: IndexedBitmap = {
-          width: decoded.width,
-          height: decoded.height,
-          pixels: decoded.pixels instanceof Uint8Array
-            ? decoded.pixels
-            : Uint8Array.from(decoded.pixels as ArrayLike<number>),
-        };
-        cache.set(key, bmp);
-        return bmp;
-      } catch {
-        return null;
-      }
-    },
+    // The real one, off `graphics.dat`: the portraits are cells of graphic 26.
+    getGraphicBitmap: (graphicNum) => store.basicGraphic(graphicNum),
   });
 
   /** Draw the whole status bar with `chIdx`'s inventory open, and hand back the screen. */
@@ -263,7 +244,7 @@ function main(): void {
 function graphicsSheetCells(graphicsPath: string): string[] {
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve(graphicsPath))));
-  const sheet = graphics.getImage(26, ImageFormat.IMG1);
+  const sheet = graphics.getImage(26);
   const cells: string[] = [];
   for (let cell = 0; cell < 24; cell++) {
     const pixels: number[] = [];

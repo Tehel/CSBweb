@@ -33,10 +33,9 @@ import { AttributeIndex, attributeCurrent, makeAddCharacterAttributes } from '..
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../../src/engine/AddCharacter';
 import { CHARFLAG_CURSOR, CHARFLAG_PORTRAIT_CHANGED } from '../../src/core/charDesc';
 import { createPaletteIndexViewportBuffer } from '../../src/renderer/csbwin/CanvasBlitter';
-import { getCachedGraphicBitmap } from '../../src/renderer/ViewportGraphics';
 import { drawCharacterState, drawPartyStatus } from '../../src/renderer/ui/Character';
 import { type UIState } from '../../src/renderer/ui/UIState';
-import { gameTablesOf, newGame, presetHeroesOf, processTimersAt, stockDungeon, stockGraphics } from '../lib/game';
+import { gameTablesOf, newGame, presetHeroesOf, processTimersAt, stockDungeon, stockGraphics, graphicsStoreOf } from '../lib/game';
 import { newUIState } from '../lib/ui';
 import { standIn } from '../lib/standIn';
 import { check, finish } from '../lib/check';
@@ -393,12 +392,12 @@ console.log('=== drawPartyStatus ===');
   for (let i = 0; i < 2; i++) {
     party.addChampion(createChampionFromPreset(heroes[i]!, i, assignPresetHeroPossessions(heroes[i]!.inventory, gameTablesOf(graphics))));
   }
-  const cache = new Map();
+  const store = graphicsStoreOf(graphics);
   // The host's `drawCharacterState` is the screen's, as `main.ts` wires it.
   const ui: UIState = newUIState(graphics, newGame(data!, graphics, {
     drawCharacterState: (chIdx, charFlags) => drawCharacterState(ui, chIdx, charFlags),
   }).ctx, {
-    getGraphicBitmap: (n, format) => getCachedGraphicBitmap(graphics, cache, n, format),
+    getGraphicBitmap: (n) => store.basicGraphic(n),
   });
   ui.ctx.party.state = party.state;
 

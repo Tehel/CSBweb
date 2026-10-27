@@ -7,7 +7,6 @@
  * (`CharacterSystem.addCharacterPossession` / `removeCharacterPossession`).
  */
 import { isAlive } from '../../engine/rules';
-import { ImageFormat } from '../../core/imageDecoder';
 import { OBJECT_ID_NULL, ObjectID } from '../../core/types';
 import { getExternalPortraitAddress } from '../../data/CSBGraphicsLoader';
 import { PORTRAIT_HEIGHT, PORTRAIT_WIDTH } from '../../data/CsbwinCharacters';
@@ -592,18 +591,9 @@ export function getPortraitBitmap(ui: UIState, portraitIndex: number): IndexedBi
 
 function getPortraitSheet(ui: UIState): IndexedBitmap | null {
   if (ui.portraitSheet !== undefined) return ui.portraitSheet;
-  const img1 = ui.getGraphicBitmap(26, ImageFormat.IMG1);
-  if (img1 && img1.width >= PORTRAIT_WIDTH && img1.height >= PORTRAIT_HEIGHT) {
-    ui.portraitSheet = img1;
-    return img1;
-  }
-  const img2 = ui.getGraphicBitmap(26, ImageFormat.IMG2);
-  if (img2 && img2.width >= PORTRAIT_WIDTH && img2.height >= PORTRAIT_HEIGHT) {
-    ui.portraitSheet = img2;
-    return img2;
-  }
-  ui.portraitSheet = null;
-  return null;
+  const sheet = ui.getGraphicBitmap(26);
+  ui.portraitSheet = sheet && sheet.width >= PORTRAIT_WIDTH && sheet.height >= PORTRAIT_HEIGHT ? sheet : null;
+  return ui.portraitSheet;
 }
 
 export function drawTopBarHandIcons(ui: UIState): void {

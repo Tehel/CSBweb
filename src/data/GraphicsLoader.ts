@@ -7,7 +7,7 @@
 
 import { ByteCursor } from '../core/bytes';
 import { decompressGraphics } from '../core/compression';
-import { decodeIMG, ImageFormat, type DecodedImage } from '../core/imageDecoder';
+import { decodeIMG, type DecodedImage } from '../core/imageDecoder';
 import type { ui16 } from '../core/types';
 import { Signature, type FileSignature } from './FileSignature';
 
@@ -132,16 +132,11 @@ export class GraphicsLoader {
         return rawData;
     }
 
-    /**
-     * Get decoded image for a graphic
-     *
-     * @param index - Graphic index
-     * @param format - Image format (IMG1 or IMG2), defaults to IMG1
-     */
-    getImage(index: ui16, format: ImageFormat = ImageFormat.IMG1): DecodedImage {
+    /** Graphic `index`, decoded once (`ExpandGraphic`'s IMG1, the Atari's byte order). */
+    getImage(index: ui16): DecodedImage {
         let image = this.imageCache.get(index)
         if (!image) {
-            image = decodeIMG(this.getRawGraphic(index), format);
+            image = decodeIMG(this.getRawGraphic(index));
             this.imageCache.set(index, image);
         }
         return image;

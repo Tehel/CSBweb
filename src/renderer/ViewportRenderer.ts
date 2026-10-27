@@ -27,6 +27,7 @@ import type { InterpreterContext } from './bytecode/BytecodeInterpreter';
 import { ViewportDrawState } from './bytecode/ViewportDrawState';
 import { emptyViewportPicking, type ViewportPicking } from './bytecode/Types';
 import type { IndexedBitmap, PaletteIndexViewportBuffer } from './csbwin/CanvasBlitter';
+import type { GraphicsStore } from './GraphicsStore';
 import { createPaletteIndexViewportBuffer, cropBitmap, mirrorBitmap, tag0088b2Index } from './csbwin/CanvasBlitter';
 import type { ViewportTables } from '../data/tables/ViewportTables';
 import type { ObjectTables } from '../data/tables/ObjectTables';
@@ -71,8 +72,8 @@ interface ViewportRendererDeps {
   objectTables: ObjectTables;
   /** `graphic232.palette552`: the viewport's palettes, one per light level. */
   palette552: number[][];
-  /** The screen's graphics cache, which the interpreter shares with the interface. */
-  graphicCache: Map<string, IndexedBitmap>;
+  /** The screen's graphics, which the interpreter shares with the interface. */
+  graphics: GraphicsStore;
   getGraphicBitmap: (graphicNum: number) => IndexedBitmap | null;
   /** Where a diagnostic of the drawing goes, `GameHost.trace`. */
   trace: (line: string) => void;
@@ -139,7 +140,7 @@ export class ViewportRenderer {
       wallGraphicSet: 0,
       backgroundGraphicSet: 0,
       getGraphicBitmap: deps.getGraphicBitmap,
-      graphicCache: deps.graphicCache,
+      graphics: deps.graphics,
       objectTables: this.objectTables,
       csbGraphics: deps.csbGraphicsLoader,
       altMonCache: new AltMonCache(),
@@ -291,9 +292,17 @@ export class ViewportRenderer {
     // (`doc/CSBwin-src/Code390e.cpp:275-284`).
     const doorOrnaments = this.context.doorOrnaments;
     const doorDecorationTOC = map?.doorDecorationTOC ?? [];
+    // Each slot's two derived graphics, `68 + 2*i` and the next, go with it (`:286-299`),
+    // when it changes: the same ornament makes the same pictures again.
     for (let i = 0; i < doorDecorationTOC.length; i++) {
       const decoration = doorDecorationTOC[i]!;
-      doorOrnaments[i] = [303 + decoration, this.objectTables.doorOrnamentRectSetIndex[decoration]!];
+      const graphicNum = 303 + decoration;
+      const set = this.objectTables.doorOrnamentRectSetIndex[decoration]!;
+      const slot = doorOrnaments[i];
+      if (slot?.[0] === graphicNum && slot[1] === set) continue;
+      doorOrnaments[i] = [graphicNum, set];
+      this.context.graphics.deleteDerivedGraphic(68 + 2 * i);
+      this.context.graphics.deleteDerivedGraphic(69 + 2 * i);
     }
 
     // `d.LoadedFloorDecorations[i] = { 247 + 6 * FloorDecorationTOC[i], Byte4110[FloorDecorationTOC[i]] }`

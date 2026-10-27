@@ -106,6 +106,7 @@ const CHECKS = [
   { tool: 'zokathra-wall.ts' },
   { tool: 'hidden-alcove.ts' },
   { tool: 'door-ornaments.ts' },
+  { tool: 'derived-graphics.ts' },
   { tool: 'status-boxes.ts' },
   { tool: 'hand-boxes.ts' },
   { tool: 'mastery-panel.ts' },

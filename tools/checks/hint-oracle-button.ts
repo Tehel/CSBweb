@@ -31,15 +31,13 @@ import { applyCsbwinSave } from '../../src/engine/CsbwinSaveGame';
 import { MovementAction } from '../../src/engine/gameTypes';
 import type { IntroEvent } from '../../src/renderer/intro/IntroHost';
 import { HINT_BUTTON, HintOracleScreen, hintButtonRect, type HintOracleHost, type HintSquare } from '../../src/renderer/intro/HintOracle';
-import type { IndexedBitmap } from '../../src/renderer/csbwin/CanvasBlitter';
 import { closeBoxRect, drawHintOracleButton, HINT_ORACLE_BUTTON, type HintOracleFiles } from '../../src/renderer/ui/HintOracleButton';
 import { closeHintOracle, openHintOracle } from '../../src/renderer/ui/Mouse';
 import { drawInventoryBackground } from '../../src/renderer/ui/Inventory';
 import { handleMouseButton, handleMouseUnclick, searchMouseButtons, updateButtonLists } from '../../src/renderer/ui/Mouse';
 import type { UIState } from '../../src/renderer/ui/UIState';
-import { getCachedGraphicBitmap } from '../../src/renderer/ViewportGraphics';
 import { check, finish } from '../lib/check';
-import { newGame, runVbl, TICK_DUE } from '../lib/game';
+import { newGame, runVbl, TICK_DUE, graphicsStoreOf } from '../lib/game';
 import { rigTeleporter } from '../lib/teleporter';
 import { newUIState } from '../lib/ui';
 
@@ -68,9 +66,9 @@ function setup(withOracle: boolean): Setup {
   const game = newGame(new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync(`${CSB}/dungeon.dat`))), graphics);
   applyCsbwinSave(game, new Uint8Array(readFileSync(`${CSB}/csbgame2.dat`)));
   const opened: HintSquare[] = [];
-  const cache = new Map<string, IndexedBitmap>();
+  const store = graphicsStoreOf(graphics);
   const ui = newUIState(graphics, game.ctx, {
-    getGraphicBitmap: (n) => getCachedGraphicBitmap(graphics, cache, n),
+    getGraphicBitmap: (n) => store.basicGraphic(n),
     onOpenHintOracle: (square) => opened.push(square),
   });
   if (withOracle) ui.hintOracle = files;

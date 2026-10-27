@@ -25,15 +25,14 @@ import { DrawTeleporter, GraphicRandom } from '../../src/renderer/bytecode/DrawD
 import { ViewportDrawState } from '../../src/renderer/bytecode/ViewportDrawState';
 import { ViewportDraw } from '../../src/renderer/bytecode/ViewportDraw';
 import { createPaletteIndexViewportBuffer, mirrorBitmap, type IndexedBitmap } from '../../src/renderer/csbwin/CanvasBlitter';
-import { getCachedGraphicBitmap } from '../../src/renderer/ViewportGraphics';
 import { check, finish } from '../lib/check';
-import { graphicsTablesOf, stockGraphics } from '../lib/game';
+import { graphicsTablesOf, stockGraphics, graphicsStoreOf } from '../lib/game';
 import { viewportContextOf } from '../lib/viewportContext';
 
 const graphics = stockGraphics();
 const viewportTables = graphicsTablesOf(graphics).viewport;
-const cache = new Map<string, IndexedBitmap>();
-const graphic = (n: number): IndexedBitmap | null => getCachedGraphicBitmap(graphics, cache, n);
+const store = graphicsStoreOf(graphics);
+const graphic = (n: number): IndexedBitmap | null => store.basicGraphic(n);
 
 const BACKGROUND = 5; // in no teleporter graphic, and neither 0 nor 10
 const SEEDS = [1, 12345, 0x2468ace, 0x9e3779b9, 0xdeadbeef, 7, 0x10000, 0xffffffff];

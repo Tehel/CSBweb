@@ -77,14 +77,14 @@ import { StkOp, ViewingFilterSite, type ViewingFilterResult } from '../../src/en
 import type { Game } from '../../src/engine/Game';
 import { UNSET, freshGame, globalStore, int, op, varFetch, varStore, withFilterDsas } from '../lib/dsa';
 import { check, finish } from '../lib/check';
-import { gameTablesOf, stockGraphics } from '../lib/game';
+import { gameTablesOf, stockGraphics, graphicsStoreOf } from '../lib/game';
 import { newUIState } from '../lib/ui';
 import { drawCursorItem, handleMouseButton, handleMouseUnclick } from '../../src/renderer/ui/Mouse';
 import { showHideInventory } from '../../src/engine/ShowHideInventory';
 import { drawCharacterStateEyePanel, drawInventoryScreen, getInventorySlotRect } from '../../src/renderer/ui/Inventory';
 import { drawObjectIcon } from '../../src/renderer/ui/Draw';
 import { drawHeldObjectName } from '../../src/renderer/ui/Character';
-import { VIEWPORT_X, VIEWPORT_Y, getCachedGraphicBitmap } from '../../src/renderer/ViewportGraphics';
+import { VIEWPORT_X, VIEWPORT_Y } from '../../src/renderer/ViewportGraphics';
 import type { UIState } from '../../src/renderer/ui/UIState';
 import { OBJNI_OPEN_SCROLL, OBJNI_SCROLL } from '../../src/core/objectNameIndex';
 import { tenSecondUpdate } from '../../src/engine/PeriodicUpdates';
@@ -355,9 +355,9 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
   });
   const party = game.ctx.party.state;
   const graphics = stockGraphics();
-  const cache = new Map();
+  const store = graphicsStoreOf(graphics);
   const theUi = newUIState(graphics, game.ctx, {
-    getGraphicBitmap: (n, format) => getCachedGraphicBitmap(graphics, cache, n, format),
+    getGraphicBitmap: (n) => store.basicGraphic(n),
   });
   ui = theUi;
   party.selectedCharacterIndex = -1;
@@ -428,9 +428,9 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
   });
   const party = game.ctx.party.state;
   const graphics = stockGraphics();
-  const cache = new Map();
+  const store = graphicsStoreOf(graphics);
   const theUi = newUIState(graphics, game.ctx, {
-    getGraphicBitmap: (n, format) => getCachedGraphicBitmap(graphics, cache, n, format),
+    getGraphicBitmap: (n) => store.basicGraphic(n),
   });
   ui = theUi;
   party.selectedCharacterIndex = -1;
@@ -507,9 +507,9 @@ const hex = (n: number): string => `0x${(n >>> 0).toString(16)}`;
   });
   const party = game.ctx.party.state;
   const graphics = stockGraphics();
-  const cache = new Map();
+  const store = graphicsStoreOf(graphics);
   const theUi = newUIState(graphics, game.ctx, {
-    getGraphicBitmap: (n, format) => getCachedGraphicBitmap(graphics, cache, n, format),
+    getGraphicBitmap: (n) => store.basicGraphic(n),
   });
   ui = theUi;
   party.selectedCharacterIndex = -1;

@@ -21,13 +21,12 @@ import { Direction, Position } from '../../src/core/types';
 import { Party } from '../../src/engine/Party';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../../src/engine/AddCharacter';
 import { createPaletteIndexViewportBuffer } from '../../src/renderer/csbwin/CanvasBlitter';
-import { getCachedGraphicBitmap } from '../../src/renderer/ViewportGraphics';
 import { tag01b1c0, tag01b29a } from '../../src/engine/AttackMenu';
 import { drawAttackPanel, executeAttack, FLASH_MS, prepareAttack, takeAttackOption } from '../../src/renderer/ui/Attack';
 import { VBL_PER_TICK } from '../../src/engine/LoopState';
 import { type UIState } from '../../src/renderer/ui/UIState';
 import { check, finish } from '../lib/check';
-import { gameTablesOf, newGame, presetHeroesOf, stockDungeon, stockGraphics } from '../lib/game';
+import { gameTablesOf, newGame, presetHeroesOf, stockDungeon, stockGraphics, graphicsStoreOf } from '../lib/game';
 import { newUIState } from '../lib/ui';
 import { standIn } from '../lib/standIn';
 
@@ -43,10 +42,10 @@ async function main(): Promise<void> {
     party.addChampion(createChampionFromPreset(heroes[i], i, assignPresetHeroPossessions(heroes[i].inventory, gameTablesOf(graphics))));
   }
 
-  const cache = new Map();
+  const store = graphicsStoreOf(graphics);
   const game = newGame(data, graphics);
   const ui: UIState = newUIState(graphics, game.ctx, {
-    getGraphicBitmap: (n, format) => getCachedGraphicBitmap(graphics, cache, n, format),
+    getGraphicBitmap: (n) => store.basicGraphic(n),
   });
   ui.ctx.party.state = party.state;
   let damageToDisplay = 0;

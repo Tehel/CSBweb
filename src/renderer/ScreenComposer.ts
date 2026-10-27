@@ -22,7 +22,6 @@ import { PresentedFrame, type PresentedFrameCapture } from './csbwin/PresentedFr
 import { CreateOverlayTable, OVERLAY_TABLE_SIZE, overlayDrawsNothing, UpdateViewportArea } from './csbwin/OverlayScreen';
 import { die } from '../engine/Die';
 import { flashedButton } from '../engine/LoopState';
-import { ImageFormat } from '../core/imageDecoder';
 import {
   VIEWPORT_WIDTH,
   VIEWPORT_HEIGHT,
@@ -30,7 +29,6 @@ import {
   SCREEN_HEIGHT,
   VIEWPORT_X,
   VIEWPORT_Y,
-  getCachedGraphicBitmap,
 } from './ViewportGraphics';
 import type { ViewportRenderer } from './ViewportRenderer';
 import { createScreenUI, type ScreenUIDeps } from './ScreenUI';
@@ -121,7 +119,7 @@ export class ScreenComposer {
       trace: (line) => deps.ctx.host.trace(line),
     }, {
       ...hooks,
-      getGraphicBitmap: (graphicNum, format) => this.getGraphicBitmap(graphicNum, format),
+      getGraphicBitmap: (graphicNum) => this.ui.graphics.basicGraphic(graphicNum),
       renderLastFrame: () => this.renderLastFrame(),
     });
     this.viewport = viewport;
@@ -152,13 +150,9 @@ export class ScreenComposer {
     this.viewportDrawn = true;
   }
 
-  private getGraphicBitmap(graphicNum: number, format: ImageFormat = ImageFormat.IMG1): IndexedBitmap | null {
-    return getCachedGraphicBitmap(this.ui.graphicsLoader, this.ui.graphicCache, graphicNum, format);
-  }
-
   /** `ReadAndExpandGraphic(n, …)`. Throws rather than return a blank screen. */
   getBitmap(graphicNum: number): IndexedBitmap {
-    const bitmap = this.getGraphicBitmap(graphicNum);
+    const bitmap = this.ui.graphics.basicGraphic(graphicNum);
     if (!bitmap) throw new Error(`graphics.dat item ${graphicNum} did not decode`);
     return bitmap;
   }

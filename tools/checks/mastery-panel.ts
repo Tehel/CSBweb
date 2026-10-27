@@ -65,8 +65,7 @@ import { MASTERY_LABELS, drawAttributePanel } from '../../src/renderer/ui/Charac
 import { drawInventoryScreen, drawObjectInfoPanel, tag0189d4 } from '../../src/renderer/ui/Inventory';
 import { getObjectDisplayName, getObjectName, resolveObjectNameIndex } from '../../src/renderer/ui/Objects';
 import { OBJNI_EMPTY_FLASK, OBJNI_WATER_FLASK } from '../../src/core/objectNameIndex';
-import { getCachedGraphicBitmap } from '../../src/renderer/ViewportGraphics';
-import { gameTablesOf, newGame, presetHeroesOf, stockDungeon, stockGraphics } from '../lib/game';
+import { gameTablesOf, newGame, presetHeroesOf, stockDungeon, stockGraphics, graphicsStoreOf } from '../lib/game';
 import { newUIState } from '../lib/ui';
 import { check, finish } from '../lib/check';
 import { NO_EXTRAS } from '../../src/engine/GameContext';
@@ -290,8 +289,8 @@ async function main(): Promise<void> {
   // (`doc/CSBwin-src/CSBCode.cpp:7458`). So this needs the whole inventory drawn, with
   // graphic 40 really there to cover the panel.
   console.log('=== the eye held over a candidate\'s Resurrect menu ===');
-  const cache = new Map();
-  ui.getGraphicBitmap = (n, format) => getCachedGraphicBitmap(graphics, cache, n, format);
+  const store = graphicsStoreOf(graphics);
+  ui.getGraphicBitmap = (n) => store.basicGraphic(n);
   setRoleExperience(0, experienceForMastery(4));
   const candidateLine = `${MASTERY_LABELS[4]} ${ROLES[0]}`;
   function renderInventory(): Uint8Array {

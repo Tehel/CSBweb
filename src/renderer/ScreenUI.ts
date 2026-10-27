@@ -13,7 +13,7 @@ import type { GraphicsTables } from '../data/tables/GraphicsTables';
 import type { GameContext } from '../engine/GameContext';
 import type { GameState } from '../engine/gameTypes';
 import type { MonsterDesignOptions } from '../engine/monsterTypes';
-import type { IndexedBitmap } from './csbwin/CanvasBlitter';
+import { GraphicsStore } from './GraphicsStore';
 import { loadFontData } from './csbwin/TextRenderer';
 import { ViewportRenderer } from './ViewportRenderer';
 import { createUIState, type ScreenIndexBuffer, type UIHooks, type UIState } from './ui/UIState';
@@ -41,7 +41,7 @@ export interface ScreenUIDeps {
 
 export function createScreenUI(deps: ScreenUIDeps, hooks: UIHooks): { ui: UIState; viewport: ViewportRenderer } {
   const { graphicsLoader, tables, ctx } = deps;
-  const graphicCache = new Map<string, IndexedBitmap>();
+  const graphics = new GraphicsStore(graphicsLoader, deps.trace);
   const viewport = new ViewportRenderer({
     graphicsLoader,
     dungeonState: ctx.dungeon,
@@ -52,7 +52,7 @@ export function createScreenUI(deps: ScreenUIDeps, hooks: UIHooks): { ui: UIStat
     viewportTables: tables.viewport,
     objectTables: tables.objects,
     palette552: tables.ui.graphic232.palette552,
-    graphicCache,
+    graphics,
     getGraphicBitmap: (graphicNum) => hooks.getGraphicBitmap(graphicNum),
     trace: deps.trace,
   });
@@ -65,7 +65,7 @@ export function createScreenUI(deps: ScreenUIDeps, hooks: UIHooks): { ui: UIStat
     uiTables: tables.ui,
     objectTables: viewport.objectTables,
     fontData: loadFontData(graphicsLoader),
-    graphicCache,
+    graphics,
   }, hooks);
   ui.hintOracle = deps.hintOracle ?? null;
   return { ui, viewport };

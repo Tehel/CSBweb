@@ -20,7 +20,8 @@ builds it whole, from its data sources and every hook, so none of them is ever m
   modal). The `d.` fields the engine reads too, the held eye and mouth, the open chest
   and the attack menu (`attackingCharacterOrdinal`, `possibleAttackTypes`, …), are the
   context's, `ctx.interface` (`src/engine/InterfaceState.ts`)
-- **bitmap caches**: `graphicCache`, cursor bitmaps, the portrait sheet
+- **graphics**: `graphics`, the `GraphicsStore` the interface shares with the viewport
+  (`src/renderer/GraphicsStore.ts`), cursor bitmaps, the portrait sheet
 - **hooks out to the page** (`ScreenHooks`): the save menu's three (`onSaveGame`,
   `onRestoreSave`, `onRestoreFailed`, which the page points at `GameSaves`), and `onReincarnated`, the page's
   redraw once the name-entry screen is answered. Everything the interface does to the

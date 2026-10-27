@@ -14,11 +14,11 @@ import { createInterfaceState } from '../../engine/InterfaceState';
 import type { PartyState } from '../../engine/gameTypes';
 import { emptyViewportPicking, type ViewportPicking } from '../bytecode/Types';
 import type { CSBGraphicsLoader } from '../../data/CSBGraphicsLoader';
+import type { GraphicsStore } from '../GraphicsStore';
 import type { IndexedBitmap, PaletteIndexViewportBuffer, createPaletteIndexViewportBuffer } from '../csbwin/CanvasBlitter';
 import type { KeyXlate, UIButton, UITables } from '../../data/tables/UITables';
 import type { ObjectTables } from '../../data/tables/ObjectTables';
 import type { FontData } from '../csbwin/TextRenderer';
-import type { ImageFormat } from '../../core/imageDecoder';
 import type { ObjectID } from '../../core/types';
 import type { ItemDescriptionLine } from './Objects';
 import type { HintSquare } from '../intro/HintOracle';
@@ -243,7 +243,8 @@ export interface UIState {
   keyXlate1: KeyXlate[] | null;        // graphic231 -> Byte18428
 
   /* ---- bitmap caches ---- */
-  graphicCache: Map<string, IndexedBitmap>;
+  /** The screen's graphics, which the interface shares with the viewport. */
+  graphics: GraphicsStore;
   cursorArrowBitmap: IndexedBitmap | null;
   cursorHandBitmap: IndexedBitmap | null;
   portraitSheet: IndexedBitmap | null | undefined;
@@ -355,7 +356,7 @@ export interface UIState {
   readonly onTeleport: ((map: number, x: number, y: number) => void) | null;
 
   /* ---- back into the renderer ---- */
-  getGraphicBitmap(graphicNum: number, format?: ImageFormat): IndexedBitmap | null;
+  getGraphicBitmap(graphicNum: number): IndexedBitmap | null;
   /** Re-blit the last rendered frame; used by animations that run off the game clock. */
   renderLastFrame(): void;
 }
@@ -426,7 +427,7 @@ export function savedGameRead(ui: UIState): void {
 /** What the interface reads, all of it there before the first frame. */
 type UISources = Pick<UIState,
   | 'graphicsLoader' | 'ctx' | 'viewport' | 'csbGraphics' | 'screenIndexBuffer' | 'uiTables' | 'objectTables'
-  | 'fontData' | 'graphicCache'>;
+  | 'fontData' | 'graphics'>;
 
 /** What the interface asks of the screen and of the page. */
 export type UIHooks = Pick<UIState,

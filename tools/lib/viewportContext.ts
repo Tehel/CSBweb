@@ -1,7 +1,7 @@
 /**
  * A drawing's context for a tool that draws without a `ViewportRenderer`: `members`, and for
  * everything else what a drawing reads as nothing there. No bitmap, rectangle, ornament or
- * floor decoration, no graphic (`getGraphicBitmap` answers `null`), an empty cache, an empty
+ * floor decoration, no graphic (`getGraphicBitmap` answers `null`), an empty store, an empty
  * background library and monster cache, nothing summarised, a new picking, a new drawing
  * state, and a viewport of colour 0. The tables and the dungeon are stand-ins holding
  * nothing, so a drawing that reaches one the tool did not give throws rather than draw
@@ -13,6 +13,8 @@ import { emptyViewportPicking } from '../../src/renderer/bytecode/Types';
 import { ViewportDrawState } from '../../src/renderer/bytecode/ViewportDrawState';
 import { createPaletteIndexViewportBuffer } from '../../src/renderer/csbwin/CanvasBlitter';
 import { AltMonCache } from '../../src/data/AltMonGraphics';
+import { GraphicsLoader } from '../../src/data/GraphicsLoader';
+import { GraphicsStore } from '../../src/renderer/GraphicsStore';
 import { BackgroundLib } from '../../src/data/BackgroundLib';
 import type { DungeonState } from '../../src/engine/DungeonState';
 import type { ObjectTables } from '../../src/data/tables/ObjectTables';
@@ -45,7 +47,7 @@ export function viewportContextOf(members: Partial<InterpreterContext>): Interpr
     wallGraphicSet: 0,
     backgroundGraphicSet: 0,
     getGraphicBitmap: () => null,
-    graphicCache: new Map(),
+    graphics: new GraphicsStore(new GraphicsLoader(), (line) => console.log(line)),
     objectTables: standInOf<ObjectTables>({}),
     altMonCache: new AltMonCache(),
     backgroundLib: new BackgroundLib(undefined),

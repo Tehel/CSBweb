@@ -32,13 +32,11 @@ import type { RulesOptions } from '../../src/engine/GameContext';
 import { MonsterType } from '../../src/engine/monsterTypes';
 import { applySaveBytes, buildSaveFile } from '../../src/engine/SaveGameFile';
 import { DrawSize4Index } from '../../src/renderer/bytecode/DrawRoomObjects';
-import type { IndexedBitmap } from '../../src/renderer/csbwin/CanvasBlitter';
-import { getCachedGraphicBitmap } from '../../src/renderer/ViewportGraphics';
 import { ViewportRenderer } from '../../src/renderer/ViewportRenderer';
 import { check, fail, finish } from '../lib/check';
 import { standIn, wrapMember } from '../lib/standIn';
 import { createMonsterAt } from '../lib/createMonster';
-import { graphicsTablesOf, stockGame, stockGraphics } from '../lib/game';
+import { graphicsTablesOf, stockGame, stockGraphics, graphicsStoreOf } from '../lib/game';
 
 const CONFLUX = 'tools/fixtures/gamefiles/conflux-3.5-b8/dungeon.dat';
 const graphics = stockGraphics();
@@ -205,7 +203,7 @@ function main(): void {
     const tables = graphicsTablesOf(graphics);
     type View = { hash: string; minX: number; maxX: number };
     const view = (game: Game, empty?: Uint8Array): { view: View; pixels: Uint8Array } => {
-      const graphicCache = new Map<string, IndexedBitmap>();
+      const graphicStore = graphicsStoreOf(graphics);
       const renderer = new ViewportRenderer({
         graphicsLoader: graphics,
         dungeonState: game.ctx.dungeon,
@@ -214,8 +212,8 @@ function main(): void {
         viewportTables: tables.viewport,
         objectTables: tables.objects,
         palette552: tables.ui.graphic232.palette552,
-        graphicCache,
-        getGraphicBitmap: (n) => getCachedGraphicBitmap(graphics, graphicCache, n),
+        graphics: graphicStore,
+        getGraphicBitmap: (n) => graphicStore.basicGraphic(n),
         trace: (line) => console.log(line),
       });
       renderer.selectLevel(arena.party.z);

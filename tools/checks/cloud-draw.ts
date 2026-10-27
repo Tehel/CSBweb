@@ -56,11 +56,10 @@ import { DrawClouds, DrawRoomObjects } from '../../src/renderer/bytecode/DrawRoo
 import { ViewportDraw } from '../../src/renderer/bytecode/ViewportDraw';
 import { ViewportDrawState } from '../../src/renderer/bytecode/ViewportDrawState';
 import { createPaletteIndexViewportBuffer, shrinkBlt, type IndexedBitmap } from '../../src/renderer/csbwin/CanvasBlitter';
-import { getCachedGraphicBitmap } from '../../src/renderer/ViewportGraphics';
 import { ViewportRenderer } from '../../src/renderer/ViewportRenderer';
 import type { DungeonState } from '../../src/engine/DungeonState';
 import { check, finish } from '../lib/check';
-import { graphicsTablesOf, newGame, stockDungeon, stockGraphics } from '../lib/game';
+import { graphicsTablesOf, newGame, stockDungeon, stockGraphics, graphicsStoreOf } from '../lib/game';
 import { RnMaps } from '../../src/core/RnMaps';
 import { standInOf } from '../lib/standIn';
 import { viewportContextOf } from '../lib/viewportContext';
@@ -525,7 +524,7 @@ check([0, 1, 2].every((c) => realTables.cloudPositions7042[2 * c + 1] === 47) &&
     game.ctx.party.state.position = at;
     game.ctx.party.state.facing = 0;
     game.loadNewPartyLevel();
-    const graphicCache = new Map<string, IndexedBitmap>();
+    const graphicStore = graphicsStoreOf(graphics);
     const tables = graphicsTablesOf(graphics);
     const renderer = new ViewportRenderer({
       graphicsLoader: graphics,
@@ -533,8 +532,8 @@ check([0, 1, 2].every((c) => realTables.cloudPositions7042[2 * c + 1] === 47) &&
       viewportTables: tables.viewport,
       objectTables: tables.objects,
       palette552: tables.ui.graphic232.palette552,
-      graphicCache,
-      getGraphicBitmap: (graphicNum) => getCachedGraphicBitmap(graphics, graphicCache, graphicNum),
+      graphics: graphicStore,
+      getGraphicBitmap: (graphicNum) => graphicStore.basicGraphic(graphicNum),
       trace: (line) => console.log(line),
     });
     const frame = (viewportSeed: number, graphicSeed: number): Uint8Array => {

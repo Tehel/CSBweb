@@ -114,7 +114,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E32 | Eight graphics caches | M | ⏳ step 2 of 2 |
 | E33 | What a frame costs | S | ⏳ |
 | E30 | One presenter and one input router | M | ⏳ |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
@@ -447,25 +446,6 @@ own: the canvas, `drawViewport`, `refreshOverlay`, `handleMouseButton`'s deferre
 the Hint Oracle's open and close, `syncParty`, `setUIMode`, `initializePlayState` and the
 pointer's state.
 
-### E32 ⏳ Eight graphics caches
-
-Split in two. Step 1, the bytes, stands: they are read through `core/bytes`, whose
-`ByteCursor` walks the two files read front to back (`DungeonLoader`, `GraphicsLoader`),
-and the Atari's bitplanes through `core/planar`. Step 2 is the graphics:
-
-- Graphics are cached in eight places with lifetimes of their own, one of them a
-  `Map<string, IndexedBitmap>` of four key spaces (`obj:`, `derived:`, `doorOrnament:`…)
-  that builds a string at every look-up, and `catch { return null; }` turns every decode
-  failure into "nothing drawn" (`src/renderer/ViewportGraphics.ts:22-37`).
-  `GraphicsLoader.getImage` caches by index alone and ignores its `format`
-  (`src/data/GraphicsLoader.ts:141-148`), so `getPortraitSheet`'s IMG2 fallback
-  (`src/renderer/ui/Character.ts:597`) gets the IMG1 decode back and is dead. `toU8` is
-  written three times (`ViewportGraphics.ts:78`, `:108`, `:141`).
-
-Paying it: one typed graphics store with numeric keys, derived graphics under CSBWin's
-derived numbers, decode failures traced; the loader's cache keyed by format, or the
-parameter dropped with the dead fallback.
-
 ### E33 ⏳ What a frame costs
 
 - **The palette-to-RGBA conversion is most of a compose**: 0.76 ms of `refreshOverlay`'s,
@@ -482,9 +462,14 @@ parameter dropped with the dead fallback.
   traces or not.
 - `searchOrder()` copies and reverses the timer queue at every
   `deleteMonsterMovementTimers`.
+- A monster farther than the first row is shrunk again at every frame
+  (`drawMonsterAt`, `src/renderer/bytecode/DrawRoomObjects.ts`), where CSBWin keeps it as
+  derived graphic `ITEM12_word2 + graphicNumFBSAE` (`doc/CSBwin-src/Code51a4.cpp:583`,
+  `:823-840`); only an alternate monster's is kept, in `AltMonCache`.
 
 Paying it: the look-up tables built once a present and shared by the three conversions;
-`DsaVars` allocated on first use; the traces behind a test or a closure. The frames record
+`DsaVars` allocated on first use; the traces behind a test or a closure; the distant monster
+kept in the `GraphicsStore` under its derived number. The frames record
 palette codes, so none moves.
 
 ### E39 ⏳ The About and Credits pages

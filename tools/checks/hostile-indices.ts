@@ -76,7 +76,6 @@ function thrown(run: () => unknown): Error | null {
       objectTables,
       doorOrnaments: [ornament],
       doorTOC: [0, 0],
-      graphicCache: new Map(),
       getGraphicBitmap: () => door,
       dungeonState: standInOf<DungeonState>({
         getDoorRecordByIndex: () => standInOf<DoorRecord>({ doorType: 0, vertical: false, ornateNumber: 1 }),

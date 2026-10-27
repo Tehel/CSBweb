@@ -208,7 +208,9 @@ renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens
             palettes, into an RGBA image the screen puts on the canvas),
             GameInput (where a click or a key goes once the page has read it),
             LeftHanded (the left-handed screen: CSBWin's regions moved, a click moved back),
-            ViewportRenderer (the dungeon view only), DrawViewport, ViewportGraphics
+            ViewportRenderer (the dungeon view only), DrawViewport, ViewportGraphics,
+            GraphicsStore (the graphics the viewport and the interface share, basic and
+            derived under CSBWin's numbers)
   bytecode/ BytecodeInterpreter, ViewportDraw (what the drawing shares with it),
             ViewportDrawState (what it keeps from frame to frame: the stacks and the
             two random streams), DrawDecorations and DrawDoor (CSBCode.cpp's drawing), DrawRoomObjects

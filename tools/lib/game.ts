@@ -19,6 +19,7 @@ import { createGameHost, type GameHost } from '../../src/engine/GameHost';
 import { buildGameTables, type GameTables } from '../../src/engine/GameTables';
 import { VBL_PER_TICK } from '../../src/engine/LoopState';
 import { extractGraphicsTables, type GraphicsTables } from '../../src/data/tables/GraphicsTables';
+import { GraphicsStore } from '../../src/renderer/GraphicsStore';
 
 const extracted = new WeakMap<GraphicsLoader, GraphicsTables>();
 const built = new WeakMap<GraphicsLoader, GameTables>();
@@ -47,6 +48,11 @@ export function stockDungeon(): DungeonData {
 /** `newGame` over a fresh `stockDungeon()` and `stockGraphics()`. */
 export function stockGame(host?: Partial<GameHost>): Game {
   return newGame(stockDungeon(), stockGraphics(), host);
+}
+
+/** A new `GraphicsStore` over `graphics`, the tool's own, which prints a graphic that does not decode. */
+export function graphicsStoreOf(graphics: GraphicsLoader): GraphicsStore {
+  return new GraphicsStore(graphics, (line) => console.log(line));
 }
 
 /** `extractGraphicsTables(graphics)`, remembered per loader. */

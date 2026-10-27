@@ -37,11 +37,9 @@ import {
 } from '../../src/data/CustomBitmap';
 import { DungeonLoader } from '../../src/data/DungeonLoader';
 import { GraphicsLoader } from '../../src/data/GraphicsLoader';
-import type { IndexedBitmap } from '../../src/renderer/csbwin/CanvasBlitter';
-import { getCachedGraphicBitmap } from '../../src/renderer/ViewportGraphics';
 import { ViewportRenderer } from '../../src/renderer/ViewportRenderer';
 import { check, finish } from '../lib/check';
-import { graphicsTablesOf, newGame } from '../lib/game';
+import { graphicsTablesOf, newGame, graphicsStoreOf } from '../lib/game';
 
 const SETS = [
   { name: 'Conflux 3.5', dir: 'conflux-3.5-b8' },
@@ -295,15 +293,15 @@ function views(): void {
     csb.loadFromArray(new Uint8Array(readFileSync(`${base}/CSBgraphics.dat`)));
     const game = newGame(data, graphics);
     const tables = graphicsTablesOf(graphics);
-    const graphicCache = new Map<string, IndexedBitmap>();
+    const graphicStore = graphicsStoreOf(graphics);
     const renderer = new ViewportRenderer({
       graphicsLoader: graphics,
       dungeonState: game.ctx.dungeon,
       viewportTables: tables.viewport,
       objectTables: tables.objects,
       palette552: tables.ui.graphic232.palette552,
-      graphicCache,
-      getGraphicBitmap: (graphicNum) => getCachedGraphicBitmap(graphics, graphicCache, graphicNum),
+      graphics: graphicStore,
+      getGraphicBitmap: (graphicNum) => graphicStore.basicGraphic(graphicNum),
       trace: (line) => console.log(line),
       csbGraphicsLoader: csb,
     });
