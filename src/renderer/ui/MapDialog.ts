@@ -10,7 +10,8 @@
  * - **The title line**: `<` and `>`, the level before and after, dim at the first and the
  *   last; between them, on a panel, the level's number, LEVEL 1 the dungeon's first, as
  *   the player counts them (the map's descriptor counts from 0), and the square under the
- *   pointer, `(x,y)`; at the right, CLOSE.
+ *   pointer, `(x,y)`; then the marks' toggles, G, M and I, at most one pressed; at the
+ *   right, CLOSE.
  * - **The map**, on a panel at the left, as wide as the level needs: a square a cell, at
  *   the largest whole size that fits (`mapLayout`), a column and a row of black between two
  *   cells. A cell's colour is its room type's (`ROOM_COLORS`), in the UI palette: stone,
@@ -19,7 +20,11 @@
  *   targets count them: the first, the last, and every 2nd, 5th or 10th between that has
  *   room. On the party's level its square holds a triangle, lit, its tip the way it faces.
  *   The square under the pointer has a grey outline, the square shown beside the map a
- *   white one, and the squares its info names on this level (links) an orange one.
+ *   white one, and the squares its info names on this level (links) an orange one. With
+ *   a toggle pressed, the squares it marks hold a lit cross (`CellInfo.marked`): G a
+ *   monster generator, M a group of monsters, I an item. A click on a toggle presses it
+ *   and lets the others go, or lets it go; the mark is kept across levels, and across a
+ *   closing for the page's life.
  * - **The info**, on a panel at the right, down to the plate's foot: the square's info
  *   (`src/engine/CellInfo.ts`), a list that scrolls, its lines cut to the panel's width.
  *   A line naming a square is a link, white, lit under the pointer: a click on it shows
@@ -44,7 +49,7 @@
 import type { Rect, UIButton } from '../../data/tables/UITables';
 import type { MapData } from '../../data/dungeonTypes';
 import { RoomType, getRoomType } from '../../core/types';
-import { CellInfo, type CellRef } from '../../engine/CellInfo';
+import { CellInfo, type CellMark, type CellRef } from '../../engine/CellInfo';
 import { MESSAGE_LONG_PRESS_MS } from '../GameInput';
 import { fillRectIndex } from '../csbwin/CanvasBlitter';
 import { foldToFont } from '../csbwin/TextRenderer';
@@ -67,6 +72,7 @@ import {
   drawPanel,
   drawPlate,
   drawText,
+  framesAcross,
   listButtons,
   listIn,
   listInner,
@@ -83,12 +89,19 @@ const DIALOG: Rect = { x1: 0, y1: 0, x2: 319, y2: 199 };
 const TITLE_Y1 = 10;
 const TITLE_Y2 = TITLE_Y1 + LOW_BUTTON_HEIGHT - 1;
 export const CLOSE_FRAME: Rect = { x1: 250, y1: TITLE_Y1, x2: 309, y2: TITLE_Y2 };
-/** The level before: a low button holding one character. */
-export const PREV_FRAME: Rect = { x1: 10, y1: TITLE_Y1, x2: 33, y2: TITLE_Y2 };
-/** The level after, ten pixels short of CLOSE, as graphic 0's frames are apart. */
-export const NEXT_FRAME: Rect = { x1: CLOSE_FRAME.x1 - 10 - 23, y1: TITLE_Y1, x2: CLOSE_FRAME.x1 - 10, y2: TITLE_Y2 };
+/** A low button holding one character: its label's cell and seven columns a side. */
+const SMALL_WIDTH = 20;
+/** The columns between two frames of the title line, and between two of the marks'. */
+const TITLE_GAP = 6;
+const MARK_GAP = 2;
+/** The marks' three toggles, G, M and I, side by side left of CLOSE. */
+export const MARK_FRAMES = framesAcross(
+  { x1: CLOSE_FRAME.x1 - TITLE_GAP - 3 * SMALL_WIDTH - 2 * MARK_GAP, y1: TITLE_Y1, x2: CLOSE_FRAME.x1 - TITLE_GAP - 1, y2: TITLE_Y2 }, 3, MARK_GAP);
+/** The level before, at the left, and the level after, left of the marks. */
+export const PREV_FRAME: Rect = { x1: 10, y1: TITLE_Y1, x2: 10 + SMALL_WIDTH - 1, y2: TITLE_Y2 };
+export const NEXT_FRAME: Rect = { x1: MARK_FRAMES[0].x1 - TITLE_GAP - SMALL_WIDTH, y1: TITLE_Y1, x2: MARK_FRAMES[0].x1 - TITLE_GAP - 1, y2: TITLE_Y2 };
 /** The level's number and the square under the pointer, on a panel between `<` and `>`. */
-export const TITLE_PANEL: Rect = { x1: PREV_FRAME.x2 + 10, y1: TITLE_Y1, x2: NEXT_FRAME.x1 - 10, y2: TITLE_Y2 };
+export const TITLE_PANEL: Rect = { x1: PREV_FRAME.x2 + TITLE_GAP + 1, y1: TITLE_Y1, x2: NEXT_FRAME.x1 - TITLE_GAP - 1, y2: TITLE_Y2 };
 /** The map's panel and the info's: six rows of the plate under the title line, down to the plate's frame. */
 const BODY_Y1 = TITLE_Y2 + 7;
 const BODY_Y2 = 189;
@@ -173,6 +186,11 @@ export const RELATED_COLOR = MENU_OPTION_COLOR;
 export const LINK_COLOR = SELECTED_COLOR;
 
 export const CLOSE_LABEL = 'CLOSE';
+/** The marks, in their toggles' order, and their labels. */
+export const MARKS = ['generator', 'monster', 'item'] as const satisfies readonly CellMark[];
+export const MARK_LABELS = ['G', 'M', 'I'] as const;
+/** A marked square's cross: lit, as its toggle's label is pressed. */
+export const MARK_COLOR = LIT_COLOR;
 
 /** The title: the level's number, counted from 1. */
 export function mapTitle(map: MapData): string {
@@ -204,6 +222,8 @@ export interface MapDialogState {
   wheelDelta: number;
   /** The dungeon described, made at the opening, while the clock is held. */
   info: CellInfo;
+  /** What the map marks, or `null` (`UIState.mapDialogMark`). */
+  mark: CellMark | null;
   /** The `?dev` press held on a square, its timer, or `null`. */
   press: { at: CellRef; timer: ReturnType<typeof setTimeout> } | null;
 }
@@ -234,6 +254,7 @@ export function openMapDialog(ui: UIState): boolean {
     scrollTop: 0,
     wheelDelta: 0,
     info: new CellInfo({ dungeon: ui.ctx.dungeon, tables: ui.ctx.tables, objectNames: ui.objectTables.objectNames, party }),
+    mark: ui.mapDialogMark,
     press: null,
   };
   selectSquare(ui, { map: party.position.z, x: party.position.x, y: party.position.y });
@@ -243,6 +264,7 @@ export function openMapDialog(ui: UIState): boolean {
 export function closeMapDialog(ui: UIState): void {
   if (!ui.mapDialog) return;
   releasePress(ui);
+  ui.mapDialogMark = ui.mapDialog.mark;
   ui.mapDialog = null;
   closeDialog(ui);
 }
@@ -308,14 +330,17 @@ const BTN_PREV = 2;
 const BTN_NEXT = 3;
 const BTN_UP = 4;
 const BTN_DOWN = 5;
+/** The marks' toggles, in `MARKS`' order. */
+const BTN_MARK0 = 6;
 const BTN_ROW0 = 16;
 
-/** The dialog's button list, in the form of CSBWin's: CLOSE, `<`, `>`, then the info's arrows and rows. */
+/** The dialog's button list, in the form of CSBWin's: CLOSE, `<`, `>`, the marks, then the info's arrows and rows. */
 function mapDialogButtons(ui: UIState, state: MapDialogState): UIButton[] {
   const buttons = [
     buttonOf(CLOSE_FRAME, BTN_CLOSE, 'map.close'),
     buttonOf(PREV_FRAME, BTN_PREV, 'map.prev'),
     buttonOf(NEXT_FRAME, BTN_NEXT, 'map.next'),
+    ...MARK_FRAMES.map((frame, i) => buttonOf(frame, BTN_MARK0 + i, `map.${MARKS[i]}`)),
   ];
   const map = shownMap(ui, state);
   if (map) buttons.push(...listButtons(infoList(map), state.rows.length, state.scrollTop, { up: BTN_UP, down: BTN_DOWN, row0: BTN_ROW0 }, 'map.info'));
@@ -367,6 +392,7 @@ export function drawMapDialog(ui: UIState): void {
   const cell = hoveredCell(ui, state);
   const title = buttonLabelAt(TITLE_PANEL);
   drawCentredText(ui, `${mapTitle(map)}${cell ? `  (${cell.x},${cell.y})` : ''}`, title.x, title.y, MENU_TITLE1_COLOR);
+  MARK_FRAMES.forEach((frame, i) => drawButton(ui, frame, MARK_LABELS[i]!, state.mark === MARKS[i] ? 'pressed' : look(BTN_MARK0 + i)));
   drawButton(ui, CLOSE_FRAME, CLOSE_LABEL, look(BTN_CLOSE));
 
   const layout = layoutOf(map);
@@ -406,6 +432,14 @@ function drawCells(ui: UIState, state: MapDialogState, map: MapData, layout: Map
       fillRectIndex(buf, cellSquare(layout, x, y), ROOM_COLORS[getRoomType(map.cellFlags[x]![y]!)] ?? OTHER_ROOM_COLOR);
     }
   }
+  if (state.mark) {
+    const marked = state.info.marked(state.map, state.mark);
+    for (let x = 0; x < width; x++) {
+      for (let y = 0; y < height; y++) {
+        if (marked.has(x * 32 + y)) drawMark(ui, cellSquare(layout, x, y));
+      }
+    }
+  }
   const party = ui.ctx.party.state;
   if (party.position.z === state.map && party.position.x < width && party.position.y < height) {
     drawPartyTriangle(ui, cellSquare(layout, party.position.x, party.position.y), party.facing);
@@ -416,6 +450,23 @@ function drawCells(ui: UIState, state: MapDialogState, map: MapData, layout: Map
   }
   if (hovered) drawOutline(ui, layout, hovered, HOVER_COLOR);
   if (state.selected && state.selected.map === state.map) drawOutline(ui, layout, state.selected, SELECTED_COLOR);
+}
+
+/**
+ * A marked square's mark: a cross of `MARK_COLOR`, its bars a fifth of the square thick, at
+ * least a pixel, and as many pixels short of each edge as there are fifths beyond the
+ * first. The square's own colour shows in its corners: on a square of 3, a cross of five
+ * pixels.
+ */
+function drawMark(ui: UIState, square: Rect): void {
+  const size = square.x2 - square.x1 + 1;
+  let bar = Math.max(1, Math.round(size / 5));
+  if ((size - bar) & 1) bar++;
+  const inset = (size - bar) >> 1;
+  const margin = Math.max(0, Math.round(size / 5) - 1);
+  const buf = ui.screenIndexBuffer;
+  fillRectIndex(buf, { x1: square.x1 + margin, y1: square.y1 + inset, x2: square.x2 - margin, y2: square.y2 - inset }, MARK_COLOR);
+  fillRectIndex(buf, { x1: square.x1 + inset, y1: square.y1 + margin, x2: square.x2 - inset, y2: square.y2 - margin }, MARK_COLOR);
 }
 
 /** A square's outline, a pixel around its colour, in the black between the cells. */
@@ -475,6 +526,9 @@ export function mapDialogClick(ui: UIState, x: number, y: number, buttons: numbe
       state.map += delta;
       selectSquare(ui, null);
     }
+  } else if (button >= BTN_MARK0 && button < BTN_MARK0 + MARKS.length) {
+    const mark = MARKS[button - BTN_MARK0]!;
+    state.mark = state.mark === mark ? null : mark;
   } else if ((button === BTN_UP || button === BTN_DOWN) && map) {
     state.scrollTop = clampScrollTop(infoList(map), state.rows.length, state.scrollTop + (button === BTN_UP ? -1 : 1));
   } else if (button >= BTN_ROW0) {

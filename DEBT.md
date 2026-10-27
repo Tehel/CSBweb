@@ -327,7 +327,8 @@ setting is a button holding its name, two a line; the dialog has five lines
 The map dialog (`src/renderer/ui/MapDialog.ts`) is the second: with GAME's MAP VIEW on,
 the MAP key, which no preset binds, or a long press on the message area opens it. It
 draws a level whole, the party's first, its columns and rows numbered, `<` and `>`
-for the others; beside it, a square's info (`src/engine/CellInfo.ts`): what it is, where
+for the others, and G, M or I marks the squares with a monster generator, monsters or an
+item; beside it, a square's info (`src/engine/CellInfo.ts`): what it is, where
 it leads, what lies on it, what its actuators need and act on, what acts on it, and where
 the objects its locks need are, each square it names a link. A click on a square shows
 it; a page opened with `?dev` moves the party by a press held on one. A DSA's program

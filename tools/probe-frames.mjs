@@ -26,7 +26,7 @@
 // EXPORT starts, a file dropped on it, a finger held on the eye, a mouse released off
 // the canvas, the settings dialog opened, held, changed and read back, its EXIT asking
 // first and leading to the welcome page, the map dialog
-// opened by a long press, but not with MAP VIEW off, its next level and a square shown, the champion dialog opened by a
+// opened by a long press, but not with MAP VIEW off, its next level, a square and its items shown, the champion dialog opened by a
 // long press on the bars, where a tap opens the inventory, and fullscreen, entered by a
 // tap and a click, the screen and the effect sized and placed in it, at 16:10 and at 4:3,
 // in it and out of it, and in the installed app's window, the save store held by another tab, and the welcome
@@ -1674,13 +1674,15 @@ check(await mapUp(), 'and the release leaves it up');
 await leaveCanvas(); await vbls(SHOWN);
 console.log('state: map');               await shot('25-map');
 // `>` shows the next level, CSB's level 6 (map 5, 31x30, cells of 4 pixels from (27,48)),
-// and a click on its square (17,9) shows its lock, the onyx keys its links. A frame of it
-// with the pointer on (20,12), whose numbers the title shows.
+// and a click on its square (17,9) shows its lock, the onyx keys its links, and I marks the
+// items. A frame of it with the pointer on (20,12), whose numbers the title shows.
 const mapShown = () => evaluate(`JSON.stringify([window.__probe.screen.ui.mapDialog.map, window.__probe.screen.ui.mapDialog.selected])`);
-await canvasClick(228, 20); await vbls(SHOWN);
+await canvasClick(163, 20); await vbls(SHOWN);
 check(await mapShown() === '[5,null]', '`>` shows the next level, no square shown');
 await canvasClick(96, 85); await vbls(SHOWN);
 check(await mapShown() === '[5,{"map":5,"x":17,"y":9}]', 'a click on (17,9) shows it');
+await canvasClick(233, 20); await vbls(SHOWN);
+check(await evaluate(`window.__probe.screen.ui.mapDialog.mark`) === 'item', 'I marks the items');
 await pointerAt(108, 97); await vbls(SHOWN);
 console.log('state: map, level 6');      await shot('31-map-level');
 await canvasClick(160, 100, 2); await vbls(SHOWN);

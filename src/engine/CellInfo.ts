@@ -68,6 +68,12 @@ export interface CellInfoSource {
   readonly party: CellInfoParty | null;
 }
 
+/**
+ * What the map dialog can mark on a level: the squares with a monster generator, with a
+ * group of monsters, or with an item, as their info lists them.
+ */
+export type CellMark = 'generator' | 'monster' | 'item';
+
 /** A wall's four sides, by the actuator's corner: the side the party faces it from. */
 const SIDES = ['N', 'E', 'S', 'W'] as const;
 
@@ -272,6 +278,7 @@ export class CellInfo {
   private readonly senders = new Map<number, Map<number, Sender[]>>();
   private places: Map<number, Place[]> | null = null;
   private arrivals: Map<string, CellRef[]> | null = null;
+  private readonly marks = new Map<string, Set<number>>();
 
   constructor(private readonly source: CellInfoSource) {}
 
@@ -314,6 +321,39 @@ export class CellInfo {
     this.actedOnBy(at, out);
     this.arrivedFrom(at, out);
     return out;
+  }
+
+  /**
+   * The squares of `map` that hold what `mark` names, by `x * 32 + y`: a generator, the
+   * floor actuator `actuatorTrigger` calls one; a group of monsters; an item, what `thing`
+   * names, on a floor or in a wall's alcove, a chest with what it holds, but not an item a
+   * monster carries, nor a champion's in the wall of the mirror that holds them.
+   */
+  marked(map: number, mark: CellMark): ReadonlySet<number> {
+    const key = `${map},${mark}`;
+    let cells = this.marks.get(key);
+    if (cells) return cells;
+    cells = new Set();
+    this.marks.set(key, cells);
+    const { dungeon } = this.source;
+    const level = dungeon.getMap(map);
+    if (!level) return cells;
+    const actuatorType = (rn: ObjectID): number | null => {
+      const a = dungeon.rnMaps.dbType(rn) === DBType.ACTUATOR ? dungeon.getActuatorRecord(rn) : null;
+      return a ? getActuatorType(a) : null;
+    };
+    for (let x = 0; x < level.descriptor.width; x++) {
+      for (let y = 0; y < level.descriptor.height; y++) {
+        const room = getRoomType(level.cellFlags[x]![y]!);
+        const objects = [...this.chain(dungeon.findFirstObject(new Position(x, y, map)))];
+        const holds = mark === 'generator' ? room === RoomType.OPEN && objects.some((rn) => actuatorType(rn) === 6)
+          : mark === 'monster' ? objects.some((rn) => dungeon.rnMaps.dbType(rn) === DBType.CREATURE)
+          : !(room === RoomType.STONE && objects.some((rn) => actuatorType(rn) === 127))
+            && objects.some((rn) => dungeon.rnMaps.dbType(rn) !== DBType.CREATURE && this.itemName(rn) !== null);
+        if (holds) cells.add(x * 32 + y);
+      }
+    }
+    return cells;
   }
 
   /* -------------------------------------------------------------- the sections ---- */

@@ -2,7 +2,7 @@
  * The map dialog (`src/renderer/ui/MapDialog.ts`): everything about it the golden frame
  * cannot see.
  *
- * 1. **The layout**: CLOSE, `<`, `>` and the title inside the plate's interior, none over
+ * 1. **The layout**: CLOSE, `<`, `>`, G, M, I and the title inside the plate's interior, none over
  *    another; for every map size from 1x1 to 32x32, the map's panel and the info's side by
  *    side, the cells inside the map's panel at the largest whole cell that fits, and the
  *    info at least 21 characters wide; the axes' numbers the first and the last, each with
@@ -10,12 +10,15 @@
  * 2. **The drawing**, on every level of the default dungeon: every cell its room type's
  *    colour, a column and a row of black between two; the party's triangle on its square,
  *    its tip the way the party faces, its base the square's width; the square shown
- *    outlined in white, a square its info names in orange.
+ *    outlined in white, a square its info names in orange. Each mark on exactly the
+ *    squares whose info lists what it names, a mirror's champion no item; its cross lit,
+ *    the square's colour in its corners.
  * 3. **The dialog**: shut with MAP VIEW off, and over another dialog; open on the party's
  *    square, the clock held; Esc, the MAP key, CLOSE and a right click close it; a click
  *    on a square shows it and moves no one; a click on a link shows its square, on its
  *    level; `<` and `>` change the level, dim at the ends; the wheel and the arrows scroll
- *    the info. With `?dev`'s hook, a press held on a square asks for it, on its level or
+ *    the info; G, M and I press one mark at a time, a second click lets it go, and the
+ *    mark is kept across levels and a closing. With `?dev`'s hook, a press held on a square asks for it, on its level or
  *    another, which closes the dialog; let go before, or moved off the square, it asks
  *    for nothing.
  * 4. **Opening it**, through `GameInput`: the MAP key, unbound in every preset; a press on
@@ -33,7 +36,7 @@ import type { GameScreen } from '../../src/renderer/GameScreen';
 import { isDialogOpen } from '../../src/renderer/ui/Dialog';
 import { KEY_PRESETS, setKeyBindings, tableKeyButton } from '../../src/renderer/ui/Keyboard';
 import {
-  CLOSE_FRAME, MAX_GRID_WIDTH, NEXT_FRAME, OTHER_ROOM_COLOR, PARTY_COLOR, PREV_FRAME, RELATED_COLOR, ROOM_COLORS, SELECTED_COLOR,
+  CLOSE_FRAME, MARKS, MARK_COLOR, MARK_FRAMES, MARK_LABELS, MAX_GRID_WIDTH, NEXT_FRAME, OTHER_ROOM_COLOR, PARTY_COLOR, PREV_FRAME, RELATED_COLOR, ROOM_COLORS, SELECTED_COLOR,
   TITLE_PANEL, axisLabels, cellSquare, closeMapDialog, drawMapDialog, mapDialogClick, mapDialogPointer, mapDialogWheel,
   mapLayout, mapTitle, openMapDialog, wrap,
 } from '../../src/renderer/ui/MapDialog';
@@ -65,7 +68,8 @@ const interior: Rect = { x1: 10, y1: 10, x2: 309, y2: 189 };
 
 console.log('=== 1. the layout ===');
 {
-  const frames: Array<[string, Rect]> = [['CLOSE', CLOSE_FRAME], ['<', PREV_FRAME], ['>', NEXT_FRAME], ['title', TITLE_PANEL]];
+  const frames: Array<[string, Rect]> = [['CLOSE', CLOSE_FRAME], ['<', PREV_FRAME], ['>', NEXT_FRAME], ['title', TITLE_PANEL],
+    ...MARK_FRAMES.map((f, i): [string, Rect] => [MARK_LABELS[i]!, f])];
   check(frames.every(([, f]) => inside(f, interior)), 'every frame of the title line inside the plate\'s interior');
   const clashes = frames.flatMap(([a, fa], i) => frames.slice(i + 1).filter(([, fb]) => overlap(fa, fb)).map(([b]) => `${a}/${b}`));
   check(clashes.length === 0, `no frame over another${clashes.length ? `: ${clashes.join(', ')}` : ''}`);
@@ -182,6 +186,51 @@ console.log('\n=== 2. the drawing ===');
   };
   check(ring(3, 4, SELECTED_COLOR) && ring(4, 5, RELATED_COLOR), 'the square shown outlined in white, the door its lock opens in orange');
   closeMapDialog(ui);
+
+  // The marks: on every level, a square is marked exactly when its info lists what the mark names.
+  const info = (() => { openMapDialog(ui); const i = ui.mapDialog!.info; closeMapDialog(ui); return i; })();
+  const listed: Record<(typeof MARKS)[number], (lines: string[], things: string[]) => boolean> = {
+    generator: (lines) => lines.some((l) => l.startsWith('Generator:')),
+    monster: (_, things) => things.some((t) => /^\d+ x /.test(t)),
+    item: (lines, things) => !lines.some((l) => l.includes('Champion mirror')) && things.some((t) => !/^\d+ x /.test(t)),
+  };
+  const counts = MARKS.map(() => 0);
+  const disagree: string[] = [];
+  maps.forEach((map, z) => {
+    for (let x = 0; x < map.descriptor.width; x++) {
+      for (let y = 0; y < map.descriptor.height; y++) {
+        const lines = info.describe({ map: z, x, y });
+        const on = lines.findIndex((l) => l.text === 'On it:');
+        const things = on < 0 ? [] : lines.slice(on + 1).filter((l) => l.indent === 1 && !l.link).map((l) => l.text);
+        MARKS.forEach((mark, i) => {
+          const marked = info.marked(z, mark).has(x * 32 + y);
+          if (marked) counts[i]++;
+          if (marked !== listed[mark](lines.map((l) => l.text), things)) disagree.push(`${mark} level ${z} (${x},${y})`);
+        });
+      }
+    }
+  });
+  check(disagree.length === 0 && counts.every((n) => n > 0),
+    `each mark on exactly the squares whose info lists it (${MARKS.map((m, i) => `${counts[i]} ${m}s`).join(', ')})${disagree.length ? `: not ${disagree.slice(0, 5).join(', ')}` : ''}`);
+  const mirrors = maps.flatMap((map, z) => Array.from({ length: map.descriptor.width * map.descriptor.height }, (_, n) => ({ map: z, x: Math.floor(n / map.descriptor.height), y: n % map.descriptor.height })))
+    .filter((at) => info.describe(at).some((l) => l.text.includes('Champion mirror')));
+  check(mirrors.length > 0 && mirrors.every((at) => !info.marked(at.map, 'item').has(at.x * 32 + at.y)),
+    `no mirror marked for the items of the champion it holds (${mirrors.length} mirrors)`);
+
+  // A cross on a square of 3: its five pixels lit, the corners the room's colour.
+  party.position.z = 1;
+  openMapDialog(ui);
+  ui.mapDialog!.mark = 'monster';
+  ui.mapDialog!.selected = null; ui.mapDialog!.rows = [];
+  drawMapDialog(ui);
+  const first = [...info.marked(1, 'monster')][0]!;
+  const cs = cellSquare(l1, Math.floor(first / 32), first % 32);
+  const room = ROOM_COLORS[getRoomType(maps[1].cellFlags[Math.floor(first / 32)][first % 32])];
+  const cross = [[1, 0], [0, 1], [1, 1], [2, 1], [1, 2]].every(([dx, dy]) => at(cs.x1 + dx, cs.y1 + dy) === MARK_COLOR);
+  const corners = [[0, 0], [2, 0], [0, 2], [2, 2]].every(([dx, dy]) => at(cs.x1 + dx, cs.y1 + dy) === room);
+  check(cs.x2 - cs.x1 === 2 && cross && corners, 'on a square of 3, the cross\'s five pixels lit, its corners the room\'s colour');
+  closeMapDialog(ui);
+  ui.mapDialogMark = null;
 }
 
 console.log('\n=== 3. the dialog ===');
@@ -254,6 +303,23 @@ console.log('\n=== 3. the dialog ===');
   check(state.map === maps.length - 1, '`>` stops at the last level');
   for (let i = 0; i < 20; i++) mapDialogClick(ui, prev.x, prev.y, 2);
   check(state.map === 0, '`<` stops at the first');
+
+  // The marks' toggles.
+  const toggle = MARK_FRAMES.map((f) => centre(buttonRect(f)));
+  check(state.mark === null, 'it first opens marking nothing');
+  mapDialogClick(ui, toggle[0]!.x, toggle[0]!.y, 2);
+  check(state.mark === 'generator', 'G marks the generators');
+  mapDialogClick(ui, toggle[1]!.x, toggle[1]!.y, 2);
+  check(state.mark === 'monster', 'M marks the monsters, and lets G go');
+  mapDialogClick(ui, toggle[1]!.x, toggle[1]!.y, 2);
+  check(state.mark === null, 'M again lets it go');
+  mapDialogClick(ui, toggle[2]!.x, toggle[2]!.y, 2);
+  mapDialogClick(ui, next.x, next.y, 2);
+  check(state.mark === 'item', 'I marks the items, kept on the next level');
+  closeMapDialog(ui);
+  openMapDialog(ui);
+  check(ui.mapDialog!.mark === 'item', 'and kept across a closing');
+  ui.mapDialog!.mark = null;
   closeMapDialog(ui);
 
   // `?dev`'s long press.
