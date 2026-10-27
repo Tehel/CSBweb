@@ -416,17 +416,51 @@ against each other, and the file formats.
 
 ### E29 ⏳ `GameScreen` is the canvas, the compose order, the palettes and a façade
 
-`GameScreen` (839 lines, 71 methods, 51 of them one- or two-line forwarders into `ui/`) is
-the canvas's output (`putImageData`), the order of the compose, the palettes' choice, and a
-façade over the UI and the boot (`getScreenBuffer`, `doMenu`, `setBootFrameRenderer`). It needs an `HTMLCanvasElement`, so no tool can
-build one, and `tools/lib/ui.ts` copies its wiring (F19). Each page hook is named four
-times: in `UIState`, `UIHooks`, `GameScreenHooks` and the constructor's copy
-(`GameScreen.ts:100-122`, `:196-229`, `UIState.ts:424-427`).
+`GameScreen` (919 lines, 71 methods, about 50 of them one- or two-line forwarders into
+`ui/`) is the canvas's output (`putImageData`), the order of the compose, the palettes'
+choice, and a façade over the UI and the boot (`getScreenBuffer`, `doMenu`,
+`setBootFrameRenderer`). It needs an `HTMLCanvasElement`, so no tool can build one,
+`tools/lib/ui.ts` copies its wiring (F19), and four dialog tools hand `GameInput` a stub
+cast `as unknown as GameScreen`. Each page hook is named four times: in `UIState`,
+`UIHooks`, `GameScreenHooks` and the constructor's copy (`GameScreen.ts:103-125`,
+`:226-246`, `UIState.ts:432-435`).
 
-Paying it: a `ScreenComposer` without the DOM (the screen's index buffer, the palettes,
-`PresentedFrame`, `presentViewport`'s order) and a thin canvas presenter; one factory for the
-`ViewportRenderer` and the `UIState`, which the tools use too; `main.ts`'s host calling
-`ui/` directly; the hooks spread once.
+The split, each step a commit that changes no behaviour (every tool's whole output, and
+`npm test -- --frames`):
+
+1. **The hooks spread once** (S). `GameScreenHooks` is `UIHooks` without the screen's own
+   two (`getGraphicBitmap`, `renderLastFrame`), and the constructor spreads it, so a new
+   hook is named in `UIState`, `UIHooks`, `main.ts` and `tools/lib/ui.ts` only
+   (`.claude/memory/ui-hook-plumbing.md` follows).
+2. **One factory for the viewport and the interface** (S). One function in
+   `src/renderer/` builds the `ViewportRenderer`, the graphic cache and the `UIState` from
+   the screen's deps and hooks; `GameScreen` and `tools/lib/ui.ts` both call it. The tools
+   still pass no `gameState`, `rules` or `csbGraphicsLoader`, so no output moves: passing
+   them is F19, a commit of its own.
+3. **A `ScreenComposer` without the DOM** (M). The screen's index buffer, the interface
+   palette, the overlay table, `PresentedFrame`, the left-handed layout,
+   `presentViewport`'s order, `presentScreen`, `renderLastFrame` and the boot's frame
+   renderer, writing into an RGBA buffer of `ImageData`'s shape; `GameScreen` keeps the
+   canvas and puts each composed frame on it. The dialog tools' stubs become a screen
+   over a real composer where they need one.
+4. **The host's drawing written once** (S). `GameHost`'s drawing half
+   (`showHideInventory`, `tag02076e`, `tag0207cc`, `savedGameRead`, `tag01b1c0`,
+   `drawLegalAttackTypes`, `flashAttackDamage`, `attackFlashHeld`, `releaseEyeOrMouth`,
+   `displayCharacterDamage`, `tag011366`, `drawCharacterState`, `portraitOf`) is one
+   function over a `UIState` calling `ui/` directly, which `main.ts` and `tools/lib/ui.ts`
+   both use; the screen's forwarders for them go.
+5. **The boot's façade** (S). `BootSequence` and `EndOfGame` reach the composer and `ui/`
+   directly (`getScreenBuffer`, `getFontData`, `getBitmap`, `doMenu`, `menuButtonList`,
+   `drawMenuPress`, `drawDialogOnly`, `getUITables`, `championPortrait`); the screen's
+   forwarders for them go.
+
+The input's forwarders (`handleDialogKey`, `openMap`, `searchMouseButtons`, …) stay on the
+screen: they are E30's, whose one input router is where they go. What is left on
+`GameScreen` then is what has logic of its own: `drawViewport`, `refreshOverlay`,
+`handleMouseButton`'s deferred flags, the Hint Oracle's open and close, `syncParty`,
+`setUIMode`, `initializePlayState` and the pointer's state.
+
+Where it stands: no step is done.
 
 ### E30 ⏳ One presenter and one input router
 
@@ -450,7 +484,7 @@ intro's VBL (`BootSequence.ts:193-203`) and the CRT (`src/lib/crt.ts:232-249`).
 
 Paying it: one rAF presenter with a dirty flag that the VBL and the animations set, the CRT
 drawing only after a present; one input router, with a focus policy once the page has
-controls again.
+controls again, calling `ui/` itself where `GameScreen` forwards the input today (E29).
 
 ### E31 ⏳ Late wiring with silent defaults, and long parameter lists
 
@@ -810,7 +844,7 @@ folder laid out as the image is.
 `drawAsSize4Monsters` off whatever the dungeon says, no `d.Time` for the magic footprints,
 and no CSB graphics.
 
-Paying it: one factory for both (E29); the tools whose output then changes checked against
+Paying it: one factory for both (E29's step 2); the tools whose output then changes checked against
 what the page draws.
 
 ### F21 ⏳ 3D2D1D's walkthrough is not replayed through `Game`
