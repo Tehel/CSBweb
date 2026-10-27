@@ -114,7 +114,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E30 | One presenter and one input router | M | ⏳ |
+| E30 | One presenter and one input router | L | ⏳ |
 | E39 | The About and Credits pages | M | ⏳ to design with the author |
 | C177 | An Atari-era save loads with its possessions, timers and hand unconverted | M | ⏳ |
 | C173 | The DSA's `&ADD` and `&DEL` on a square bypass `MoveObject` | M | ⏳ |
@@ -438,13 +438,24 @@ intro's VBL (`BootSequence.ts:221-235`) and the CRT (`src/lib/crt.ts:232-249`).
   `map-dialog.ts`, `champion-dialog.ts`, `dev-level.ts`), which hides a method missing from
   the stub from `tsc`.
 
-Paying it: one rAF presenter with a dirty flag that the VBL and the animations set, the CRT
-drawing only after a present; one input router, with a focus policy once the page has
-controls again, calling `ui/` itself where `GameScreen` forwards the input today, so the
-stubs go with the forwarders. What is left on `GameScreen` then is what has logic of its
-own: the canvas, `drawViewport`, `refreshOverlay`, `handleMouseButton`'s deferred flags,
-the Hint Oracle's open and close, `syncParty`, `setUIMode`, `initializePlayState` and the
-pointer's state.
+Paying it, in four steps, a commit each:
+
+1. **The CRT draws after a present.** The screen tells the effect of every frame it puts
+   on the canvas, and the effect draws it at the next display frame, or the tube at a new
+   size; `tools/probe-frames.mjs` counts its draws against the presents.
+2. **One animation clock.** One rAF presenter with a dirty flag, which the chew, the menu
+   press in play (`playMenuPress`) and the intro's (`waitForMenuSelect`) ask for frames,
+   on the one clock, drawing through `refreshScreen`'s guards (`syncParty`,
+   `mainLoopHasReturned`); `initializePlayState` and the game's end cancel what is under
+   way. The VBL's frame and the input's refreshes set the flag too, and the CRT draws in
+   the presenter's frame, after the canvas.
+3. **One input router.** `GameInput` calls `ui/` itself where `GameScreen` forwards the
+   input today, so the forwarders go, and the four stubs with them. What is left on
+   `GameScreen` then is what has logic of its own: the canvas, `drawViewport`,
+   `refreshOverlay`, `handleMouseButton`'s deferred flags, the Hint Oracle's open and
+   close, `syncParty`, `setUIMode`, `initializePlayState` and the pointer's state.
+4. **The intro's input through it.** `IntroHost`'s listeners on `window` go through the
+   router, with a focus policy once the page has controls again.
 
 ### E39 ⏳ The About and Credits pages
 
