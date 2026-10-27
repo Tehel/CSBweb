@@ -376,7 +376,7 @@
   game allows: what earns experience, what only looks like it does, and the multipliers
   that matter more than either.</p>
   <p class="provenance">Read from Paul R. Stevens' CSBWin C++ source · Numbers computed
-  from the Atari graphics.dat and dungeon.dat · Two observations from play, marked as such</p>
+  from the Atari graphics.dat and dungeon.dat · Three observations from play, marked as such</p>
 </header>
 
 <p class="lede">The short version: <strong>the weight of what you throw earns nothing, and
@@ -465,6 +465,28 @@ a champion gets.</p>
     <p>Next to a monster that keeps attacking, every sub-skill earns double. Fighter and
     Ninja skills also lose their ×½, so they earn ×4. Only the monster's own attack counts;
     a missile arriving from elsewhere does not.</p>
+  </li>
+  <li>
+    <h3>Train on a Black Flame, on level 13</h3>
+    <p>The best monster for it. A Black Flame never moves, and it is immaterial: no sword,
+    kick or club can hurt it. A blow at it still counts as a hit, not a miss, so it earns
+    <strong>full</strong> experience, and the flame is never used up. Its own attack keeps
+    the ×2 on, and level 13 gives ×6: <strong>the highest multipliers, with no
+    limit</strong>.</p>
+    <p>Two of level 13's flames stand alone in a corridor, far from the others. Each
+    appears when the party steps on the square just east of it, and the party trains from
+    there, facing west: the flame at x7,y1 from x8,y1, along the top of the level, and the
+    flame at x2,y18 from x3,y18, in the bottom-left corner.</p>
+    <p>Its blow is fire, which a fire shield takes off. Two priests casting FUL BRO NETA,
+    at MON if they can, keep the damage at little or nothing. <em>(From play.)</em> Only
+    the two champions in front can reach the flame, so put the fighter and the ninja
+    there and the priests behind. Leave the Dispell spell out of it.</p>
+    <p><strong>With the Vorpal Blade, it trains the Wizard too.</strong> The Vorpal Blade
+    is the one blade that hurts the flame. Its DISRUPT trains Air, a Wizard skill, with no
+    mana, and against anything that isn't immaterial it is a miss. A blow that hurts also
+    earns a second gain, which grows with the damage. In the end the flame dies, but the
+    one at x2,y18 comes back fast. Its generator rests 704 ticks (about three minutes)
+    against 2,816 for the one at x7,y1. Then step off the pad and back on.</p>
   </li>
 </ol>
 
@@ -632,7 +654,8 @@ level 2 earns 276.</p>
   <p>Sources: <code>AdjustSkills</code> (Magic.cpp), <code>_Attack</code> and
   <code>AttackWithPhysicalForce</code> (Attack.cpp), <code>HitDoor</code> (Code11f52.cpp),
   <code>ThrowByCharacter</code> (Mouse.cpp), <code>CastSpell</code> (Magic.cpp),
-  <code>TAG01b990</code> (CSBCode.cpp). The attack, spell, rune and weapon tables come from
+  <code>TAG01b990</code> (CSBCode.cpp), <code>MonsterAttacks</code> (Monster.cpp),
+  <code>DamageCharacter</code> (Character.cpp). The attack, spell, rune and weapon tables come from
   graphics.dat item 0x230 and 0x22f; the level multipliers from dungeon.dat.</p>
   <p>Line-by-line citations are in <code>doc/TRAINING.md</code>.</p>
 </footer>

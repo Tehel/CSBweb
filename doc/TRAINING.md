@@ -5,8 +5,9 @@ A player's guide to grinding mastery levels in Dungeon Master, worked out from C
 The companion page `doc/training.html` says the same thing in a form nicer to read.
 
 Everything below is either read from the C++ or computed from the game's own tables, with the
-citation next to it. The two practical observations from play (spells exploding on the party
-when cast at an adjacent wall, and the two long staircases) are marked as such.
+citation next to it. The three practical observations from play (spells exploding on the party
+when cast at an adjacent wall, the two long staircases, and a fire shield against the Black
+Flame) are marked as such.
 
 Levels are numbered from 1, the Hall of Champions level. A "tick" is one game tick, `d.Time`.
 
@@ -104,6 +105,64 @@ comes back depends on Wisdom alone. Each point costs 14 stamina, even for a mast
 
 Next to a monster that keeps attacking, every sub-skill earns double. For Fighter and Ninja
 skills it also lifts the ×½, so they earn ×4.
+
+### Train on a Black Flame, on level 13
+
+The Black Flame (monster type 11, graphics `0x22f`) is the best monster for it:
+
+- **It never moves**: its `timePerMove` is 255 (see `doc/PROVEN_FACTS.md`, "`movementTicks06
+  == 255` means the monster never moves").
+- **It is non-material** (`word2` bit 6), so `DeterminePhysicalAttackDamage` skips both the
+  hit check and the damage unless the weapon is the Vorpal Blade or the attack is DISRUPT
+  (`doc/CSBwin-src/Attack.cpp:594`, `:1151`). No physical blow hurts it, so the target is
+  never used up.
+- **A blow at it is a hit, not a miss.** Once a monster is in the square and reachable,
+  `AttackWithPhysicalForce` returns 1 whatever the damage (`doc/CSBwin-src/Attack.cpp:1183`),
+  so `_Attack` does not halve the experience or the busy time. Only the front rank can
+  reach: a back-rank champion behind a front one gets "CAN'T REACH", a 0, and half
+  (`:1109`).
+- **Its attack keeps the ×2 on.** It attacks through `MonsterAttacks`, which sets
+  `d.LastMonsterAttackTime` (`doc/CSBwin-src/Monster.cpp:986`). Level 13 adds ×6.
+- **Its blow is fire.** `DamageCharacter` gets `mtDesc.uByte22[2]`
+  (`doc/CSBwin-src/Monster.cpp:4594`), which is 1 for the Black Flame, and for that type
+  takes `d.FireShield` off the blow (`doc/CSBwin-src/Character.cpp:2780`).
+
+Two of level 13's flames stand alone in a corridor, far from the others. Each is a generator
+(actuator type 6, value 11) that a pad on the square just east of it sets off when the party
+steps on it, so the party trains from the pad, facing west:
+
+| Flame | Pad | Where |
+|---|---|---|
+| x7,y1 | x8,y1 | the corridor along the top of the level |
+| x2,y18 | x3,y18 | the bottom-left corner |
+
+Coordinates are the port's map-preview grid (`tools/peek-dungeon.ts map 12`).
+
+From play: with two priests casting FUL BRO NETA (at MON when they can) beside it, the
+flame's blows do little or no damage, and the fighter and the ninja in front can train on it
+without limit. The Dispell spell hurts it (`doc/PROVEN_FACTS.md`, "Dispell … damages
+non-material monsters only"), so leave it out.
+
+#### With the Vorpal Blade
+
+The Vorpal Blade is the one blade that hurts the flame, and that makes it a Wizard trainer:
+
+- **DISRUPT trains Air** (skill 17, a Wizard sub-skill): 10 experience, 9 ticks busy,
+  graphics `0x230` attack 24. It costs stamina, not mana. Against a material monster it is
+  a miss (`doc/CSBwin-src/Attack.cpp:1118`), so the immaterial monsters are its only
+  targets.
+- **A blow that hurts earns a second gain.** On the damaging path,
+  `DeterminePhysicalAttackDamage` sets `skillAdjust = damage × word16 bits 8-11 / 16 + 3`
+  (`doc/CSBwin-src/Attack.cpp:887`), which `PhysicalAttackFilter` passes to `AdjustSkills`
+  for the attack's own skill (`:498`), so the multipliers apply to it too. The Black
+  Flame's bits 8-11 are 5. The immaterial branch, without the Vorpal Blade, sets none
+  (`:909-930`).
+- **The flame dies, and its generator brings it back.** A generator that has fired rests
+  for its disable time, then `TT_ReactivateGenerator` turns it back on
+  (`doc/CSBwin-src/Timer.cpp:1806-1820`), and the pad fires it again when the party steps
+  back on. x2,y18's generator rests **704 ticks**, x7,y1's 2,816, so x2,y18 is the one for
+  this. A new flame's health uses the level's multiplier, 6, when the generator gives none
+  (`:1782`).
 
 ### Things that do not help
 
