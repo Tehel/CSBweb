@@ -2643,6 +2643,19 @@ declares 0. Chaos Strikes Back ships its saves in that Atari-era form: `mini.dat
 final word. 8763 is also the extent of the eleven levels' cell flags and tables as their
 descriptors place them. Covered by `tools/checks/atari-saves.ts`.
 
+**Such a save names objects beside its image as packed RNs, numbered after its chains.**
+For `ExtendedFeaturesVersion == '@'`, `ReadDatabases` numbers every square's chain, then
+the live timers' objects (`ConvertTimers`), then each champion's thirty `possessions`
+(`ConvertCharacters`), then `d.objectInHand` when it is not `RNnul`
+(`doc/CSBwin-src/SaveGame.cpp:2927-2975`), and `convertScrolls` takes the slots after
+them (`:2981-2985`). `ConvertTimers` walks the queue from its last entry to its first
+(`TIMER_SEARCH`, `Data.h:1621-1624`; `CreateSearchList`, `Timer.cpp:1209-1215`;
+`FindNextTimer`, `:2924-2935`): 24, 25, 60 and 61 name their object in bytes 8-9, 48 and 49
+in bytes 6-7, a duplicate allowed for those two alone (`SaveGame.cpp:2239-2262`).
+`tools/checks/atari-saves.ts` takes three objects off their chains in `csbgame2.dat`, a
+group into a `TT_60` timer, an item into an action hand and one into the hand, and finds
+each named, in that order of slots, between the chains' and the scrolls' texts'.
+
 Two independent confirmations beyond the closure sum: a 48-byte window lifted from
 `dungeon.dat`'s map-data section is found in an early save exactly at the computed cell
 flag offset, and its door database appears exactly at the computed database offset.

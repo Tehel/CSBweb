@@ -28,8 +28,9 @@
  */
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, RoomType } from '../core/types';
 import type { ObjectID, ui16, ui32 } from '../core/types';
+import { sw } from '../core/intCast';
 import { getActuatorType } from './actuatorHelpers';
-import { databaseRecords, type DungeonData } from './dungeonTypes';
+import { databaseRecords, type DungeonData, type TimerRecord } from './dungeonTypes';
 
 /** Which of the three shapes a world is in. `true` means "already converted". */
 interface DungeonImageShape {
@@ -185,20 +186,28 @@ export function convertScrolls(data: DungeonData): void {
  * CSBWin's own order.
  *
  * The order is not cosmetic: the object references are numbered after the text
- * conversion (`:2927-2959`, after `:2860`) and before `convertScrolls` (`:2983`), whose
+ * conversion (`:2927-2974`, after `:2860`) and before `convertScrolls` (`:2983`), whose
  * `AllocateIndirectIndex` takes the slots after theirs; and `convertScrolls` runs after
  * `ConvertToIndirectText`, so the text record index a scroll's new RN names is the
- * post-conversion one.
+ * post-conversion one. A save with no Extended Features block names objects beside its
+ * image too (`held`), numbered after the chains, in the same order.
  */
-export function convertOriginalDungeon(data: DungeonData, shape: Partial<DungeonImageShape>): void {
+export function convertOriginalDungeon(
+    data: DungeonData,
+    shape: Partial<DungeonImageShape>,
+    held?: HeldObjects,
+): void {
     if (!shape.bigActuators) MakeBigActuators(data);
     if (!shape.indirectText) ConvertToIndirectText(data);
-    if (!shape.indirectObjects) convertObjectReferences(data);
+    if (!shape.indirectObjects) {
+        convertObjectReferences(data);
+        if (held) convertHeldObjects(data, held);
+    }
     if (!shape.newScrolls) convertScrolls(data);
 }
 
 /**
- * `ConvertListOfObjects` (`doc/CSBwin-src/SaveGame.cpp:2128-2230`): number one chain's
+ * `ConvertListOfObjects` (`doc/CSBwin-src/SaveGame.cpp:2128-2237`): number one chain's
  * packed RNs into slots, and the chains its chests, monsters and missiles hold.
  *
  * `at` reads and writes the word that holds the chain's first RN. A reference to a record
@@ -207,11 +216,7 @@ export function convertOriginalDungeon(data: DungeonData, shape: Partial<Dungeon
  * once: a second reference to it, which only a missile's flying object may be
  * (`duplicateOK`), takes the slot already made, corner and all.
  */
-export function ConvertListOfObjects(
-    data: DungeonData,
-    at: { get(): ObjectID; set(rn: ObjectID): void },
-    duplicateOK: boolean,
-): void {
+export function ConvertListOfObjects(data: DungeonData, at: RNField, duplicateOK: boolean): void {
     let pRN = at;
     while (pRN.get() !== OBJECT_ID_EOF) {
         const packed = pRN.get();
@@ -243,15 +248,20 @@ export function ConvertListOfObjects(
     }
 }
 
-function field<K extends string>(record: { [key in K]?: ObjectID }, key: K): { get(): ObjectID; set(rn: ObjectID): void } {
+/** Where an RN is read and written: a chain's head, a link, a timer's bytes, a slot. */
+export interface RNField {
+    get(): ObjectID;
+    set(rn: ObjectID): void;
+}
+
+function field<K extends string>(record: { [key in K]?: ObjectID }, key: K): RNField {
     return { get: () => record[key] as ObjectID, set: (rn) => { record[key] = rn; } };
 }
 
 /**
  * The object references of an original dungeon, numbered into slots: every cell's chain
- * in level, column and row order (`doc/CSBwin-src/SaveGame.cpp:2927-2957`). CSBWin goes
- * on to the timers and the champions' possessions (`:2958-2959`) and the object in hand
- * (`:2966-2974`), which a `dungeon.dat` does not hold.
+ * in level, column and row order (`doc/CSBwin-src/SaveGame.cpp:2927-2957`). What a save
+ * names beside its image follows (`convertHeldObjects`).
  */
 export function convertObjectReferences(data: DungeonData): void {
     for (let level = 0; level < data.maps.length; level++) {
@@ -269,6 +279,99 @@ export function convertObjectReferences(data: DungeonData): void {
                 }, false);
                 column++;
             }
+        }
+    }
+}
+
+/**
+ * What a file with no Extended Features block names beside its image, as packed RNs:
+ * the timer table and its queue, each champion's thirty `possessions` (`d.NumCharacter`
+ * of them) and `d.objectInHand`. A `dungeon.dat` names none; an Atari-era save names all
+ * three.
+ */
+export interface HeldObjects {
+    timers: TimerRecord[];
+    timerQueue: readonly number[];
+    possessions: RNField[][];
+    objectInHand: RNField;
+}
+
+/**
+ * `ConvertTimers`, `ConvertCharacters` and the object in hand, in that order, after the
+ * chains (`doc/CSBwin-src/SaveGame.cpp:2958-2975`). Each goes through
+ * `ConvertListOfObjects`, so what it holds is numbered with it: a chest's contents, a
+ * group's possessions.
+ *
+ * `SetPossession(j, temp, true)` (`:2278`) runs the equip filter when the EXPOOL holds an
+ * `ESL_EQUIPFILTER` location (`Character.cpp:2922-2945`); an Atari-era file has no EXPOOL
+ * record, so it runs nothing.
+ */
+export function convertHeldObjects(data: DungeonData, held: HeldObjects): void {
+    ConvertTimers(data, held.timers, held.timerQueue);
+    ConvertCharacters(data, held.possessions);
+    // `if (d.objectInHand != RNnul)` (`:2965-2975`), after the `RememberToPutObjectInHand`
+    // check, which only a read that dies fails.
+    if (held.objectInHand.get() !== OBJECT_ID_NULL) ConvertListOfObjects(data, held.objectInHand, false);
+}
+
+/**
+ * `ConvertTimers` (`doc/CSBwin-src/SaveGame.cpp:2239-2262`): the live timers that carry
+ * an object, in `TIMER_SEARCH`'s order, the queue copied and walked from its last entry
+ * to its first (`GameTimers::CreateSearchList`, `Timer.cpp:1209-1215`; `FindNextTimer`,
+ * `:2924-2935`). 24 and 25, a cloud's, and 60 and 61, a group arriving, hold it in bytes
+ * 8-9; 48 and 49, a missile in flight, in bytes 6-7, a duplicate allowed: the missile is
+ * in its square's chain, numbered already.
+ */
+export function ConvertTimers(data: DungeonData, timers: TimerRecord[], timerQueue: readonly number[]): void {
+    for (let index = timerQueue.length - 1; index >= 0; index--) {
+        const timer = timers[timerQueue[index]!];
+        if (!timer) continue;
+        switch (timer.function) {
+            case 24:
+            case 25:
+            case 60:
+            case 61: ConvertListOfObjects(data, timerObj8(timer), false); break;
+            case 48:
+            case 49: ConvertListOfObjects(data, timerObj6(timer), true); break;
+        }
+    }
+}
+
+/** `pTimerObj6()` (`doc/CSBwin-src/CSB.h:2103`): the RN in bytes 6-7, both its readings kept. */
+function timerObj6(timer: TimerRecord): RNField {
+    return {
+        get: () => (timer.timerWord6 & 0xffff) as ObjectID,
+        set: (rn) => {
+            timer.timerWord6 = sw(rn);
+            timer.uByte6 = (rn >> 8) & 0xff;
+            timer.uByte7 = rn & 0xff;
+        },
+    };
+}
+
+/** `pTimerObj8()` (`doc/CSBwin-src/CSB.h:2116`): the RN in bytes 8-9, both its readings kept. */
+function timerObj8(timer: TimerRecord): RNField {
+    return {
+        get: () => (timer.timerWord8 & 0xffff) as ObjectID,
+        set: (rn) => {
+            timer.timerWord8 = rn & 0xffff;
+            timer.uByte8 = (rn >> 8) & 0xff;
+            timer.uByte9 = rn & 0xff;
+        },
+    };
+}
+
+/**
+ * `ConvertCharacters` (`doc/CSBwin-src/SaveGame.cpp:2265-2282`): every slot that is not
+ * `RNnul`, of every champion, through a copy, as CSBWin's `temp`.
+ */
+export function ConvertCharacters(data: DungeonData, possessions: RNField[][]): void {
+    for (const slots of possessions) {
+        for (const slot of slots) {
+            if (slot.get() === OBJECT_ID_NULL) continue;
+            let temp = slot.get();
+            ConvertListOfObjects(data, { get: () => temp, set: (rn) => { temp = rn; } }, false);
+            slot.set(temp);
         }
     }
 }

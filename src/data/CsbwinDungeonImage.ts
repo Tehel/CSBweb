@@ -12,9 +12,11 @@
  * save's Extended Features block declares. Those differences, and the evidence for
  * them, are in `doc/PROVEN_FACTS.md` → "The dungeon image layout in a save file".
  */
+import { possessionFields } from './CsbwinCharacters';
 import { DungeonLoader } from './DungeonLoader';
 import { readSaveFile, type SaveFile } from './SaveFile';
 import type { DungeonData } from './dungeonTypes';
+import type { ObjectID } from '../core/types';
 
 export interface CsbwinWorld {
     dungeon: DungeonData;
@@ -33,7 +35,11 @@ export function loadCsbwinWorld(file: Uint8Array): CsbwinWorld {
     return readCsbwinWorld(readSaveFile(file));
 }
 
-/** The dungeon image of a save `readSaveFile` read, through `DungeonLoader`. */
+/**
+ * The dungeon image of a save `readSaveFile` read, through `DungeonLoader`. A file with
+ * no Extended Features block has its timers, champions' slots and hand numbered in
+ * `save` itself, so a `SaveFile` is read into a world once.
+ */
 export function readCsbwinWorld(save: SaveFile): CsbwinWorld {
     // An enciphered save is read deciphered, the image as its blocks (`readExtendedFeatures`).
     const bytes = save.extended.data;
@@ -65,6 +71,18 @@ export function readCsbwinWorld(save: SaveFile): CsbwinWorld {
         // Every RN in a save's image is a slot number in the object indirect index, not
         // the packed RN `dungeon.dat` stores — see `src/data/CsbwinObjectIndex.ts`.
         objectIndex,
+        // A file with no block names objects beside its image as packed RNs, which the
+        // read numbers in the save's own blocks, as CSBWin converts `d.` in place
+        // (`doc/CSBwin-src/SaveGame.cpp:2958-2975`).
+        held: objectIndex ? undefined : {
+            timers: save.timers,
+            timerQueue: save.timerQueue,
+            possessions: possessionFields(save.blocks.characters, save.block2.numCharacter),
+            objectInHand: {
+                get: () => (save.block2.objectInHand & 0xffff) as ObjectID,
+                set: (rn) => { save.block2.objectInHand = rn; },
+            },
+        },
     });
 
     return { dungeon, save };

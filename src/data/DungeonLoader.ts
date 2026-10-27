@@ -21,7 +21,7 @@ import { ExpandData } from '../core/compression';
 import { ByteCursor, readU16BE, readU32BE, readU32LE } from '../core/bytes';
 import { EXPOOL_RECORD_SIZE, specialLocationsFromExpool } from './CsbwinExpool';
 import { readExtendedFeatures, readGameInfo } from './CsbwinExtendedFeatures';
-import { CheckCelltypes, ExtendPortraits, convertOriginalDungeon } from './CsbwinDungeonConversions';
+import { CheckCelltypes, ExtendPortraits, convertOriginalDungeon, type HeldObjects } from './CsbwinDungeonConversions';
 import { rnMapsOf } from './CsbwinObjectIndex';
 import type { CsbwinObjectIndex } from './CsbwinObjectIndex';
 import { DUNGEON_HEADER_SIZE } from '../core/constants';
@@ -79,6 +79,11 @@ export interface DungeonImageOptions {
      * keeps the index as its `RnMaps`.
      */
     objectIndex?: CsbwinObjectIndex;
+    /**
+     * What a save with no Extended Features block names beside its image, packed as the
+     * image is: numbered after its chains (`convertHeldObjects`).
+     */
+    held?: HeldObjects;
 }
 
 /**
@@ -272,7 +277,7 @@ export class DungeonLoader {
                 indirectText: data.indirectText,
                 newScrolls: data.newScrolls,
                 indirectObjects: this.options.objectIndex !== undefined,
-            });
+            }, this.options.held);
             // Not part of `ReadDatabases`: `_ReadEntireGame` runs these once the whole
             // file is read (`doc/CSBwin-src/SaveGame.cpp:2028-2030`), a save's as a new
             // game's. The `CheckMonsters` between them needs the tables, so `Game` and

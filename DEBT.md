@@ -115,7 +115,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C177 | An Atari-era save loads with its possessions, timers and hand unconverted | M | ⏳ |
+| C190 | An Atari-era save with a cloud, a fluxcage or a missile in flight, as CSBWin converts it | S | ⏳ waits on the author |
 | C173 | The DSA's `&ADD` and `&DEL` on a square bypass `MoveObject` | M | ⏳ |
 | C186 | A decoration's position set past its rectangles' table is not drawn | S | ⏳ |
 | C187 | The adjust skills filter hands each DSA the one before's words unmasked, and its `why` | S | ⏳ |
@@ -146,7 +146,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C190 · D22 · E42 · F22 · G31 · P13 · R17 · U13 · W8 · X18. An ID recorded and paid in one commit has no
+Next free IDs: C191 · D22 · E42 · F22 · G31 · P13 · R17 · U13 · W8 · X18. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -498,23 +498,33 @@ seen to band.
 
 A divergence found along the way goes here, with the next free ID.
 
-### C177 ⏳ An Atari-era save loads with its possessions, timers and hand unconverted
+### C190 ⏳ An Atari-era save with a cloud, a fluxcage or a missile in flight, as CSBWin converts it
 
-For a file with no Extended Features block (`ExtendedFeaturesVersion == '@'`), CSBWin
-converts the cells' chains, then the timers' objects (`ConvertTimers`), the champions'
-thirty slots (`ConvertCharacters`) and the object in hand, each through
-`ConvertListOfObjects` (`doc/CSBwin-src/SaveGame.cpp:2927-2974`). The port converts the
-chains only (`convertOriginalDungeon`, `src/data/DungeonLoader.ts:266-275`), on the ground
-that a `dungeon.dat` holds no timer, champion or object in hand; a block-less save takes
-the same path and holds all three, and `readPossessions` reads the slots as slot numbers
-already (`src/data/CsbwinCharacters.ts:87-109`). The port imports a DM save from the Atari
-(`buildBlock1State`'s `Byte22596 == 1` branch; its signature matches DM's): a weapon in a
-champion's hand, packed `0x1403`, loads as slot `0x1403`, past the 2097 slots, and is gone.
-`tools/checks/atari-saves.ts`'s two files have champions who carry nothing.
+Waits on the author: CSBWin's own behaviour, which the port follows, and a candidate for H.
 
-Paying it: for a file without `objectIndex`, `ConvertListOfObjects` over the timers that
-carry an object, each champion's thirty slots and the object in hand, in CSBWin's order
-after the chains; a fixture whose champions carry something.
+A file with no Extended Features block has the objects its timers name numbered after its
+chains, through `ConvertListOfObjects` (`ConvertTimers`,
+`doc/CSBwin-src/SaveGame.cpp:2239-2262`; `src/data/CsbwinDungeonConversions.ts`). Two of
+its three cases name an object that is in a square's chain, numbered already:
+
+- **A cloud or a fluxcage** (`TT_25`, `TT_24`): the cloud is a DB15 record in the square
+  beside its timer (`CreateFluxcage`, `doc/CSBwin-src/Code11f52.cpp:1550`;
+  `src/engine/MissileEncounter.ts`), and `ConvertTimers` passes `DuplicateOK` false, so
+  the read finds it and dies, "Duplicated Object" (`:2167-2168`). The port throws, and
+  the import fails.
+- **A missile in flight** (`TT_Missile0`, `TT_Missile`), `DuplicateOK` true: the missile
+  takes its slot, and the loop goes on to its link (`:2235`), already a slot, which it
+  reads as a packed RN. Unless the missile is its chain's last, the link becomes another
+  record's slot, or `RNeof` when the number is past the doors (`:2148-2156`), and the
+  rest of the square's chain is lost.
+
+Neither Atari-era file the port holds has such a timer: `mini.dat` and `csbgame2.dat`
+are CSB's starting party (`tools/checks/atari-saves.ts`), and no DM save of the Atari is
+among the fixtures.
+
+The options: keep CSBWin's behaviour (delete this entry), or an H divergence in
+`ConvertListOfObjects`: a duplicate takes the slot made and ends the walk, its chain
+numbered with it, and a timer's object takes it even where CSBWin passes false.
 
 ### C173 ⏳ The DSA's `&ADD` and `&DEL` on a square bypass `MoveObject`
 

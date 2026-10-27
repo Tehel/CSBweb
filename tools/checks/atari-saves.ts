@@ -23,6 +23,14 @@
  *   (`tables.monsterDesc` and the rest are CSB's own here, through item 0x231's long
  *   form, whose place `tools/checks/data-sets.ts` proves.)
  *
+ * Then a party that carries something, which neither file has: `csbgame2.dat` with three
+ * objects taken off the end of their chains (a link set to `RNeof`, the image's checksum
+ * made again), a group put in a `TT_60` timer, an item in the first champion's action
+ * hand and one in the hand, all three packed as the file's RNs are. Such a file's read
+ * numbers them after the chains, the timer first, then the champions, then the hand,
+ * and before the scrolls' texts (`convertHeldObjects`, `doc/CSBwin-src/SaveGame.cpp:2958-2983`),
+ * so in the running game each names its own record, in that order of slots.
+ *
  * And the control: a save CSBWin wrote carries its own size in the block, which the
  * fallback must not replace.
  *
@@ -31,12 +39,13 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { readU16BE } from '../../src/core/bytes';
-import { OBJECT_ID_EOF, OBJECT_ID_NULL } from '../../src/core/types';
+import { readU16BE, writeU16BE } from '../../src/core/bytes';
+import { OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../../src/core/types';
 import { loadCsbwinWorld } from '../../src/data/CsbwinDungeonImage';
 import { cellFlagArraySize } from '../../src/data/CsbwinDungeonImageWriter';
-import { applyCsbwinSave } from '../../src/engine/CsbwinSaveGame';
-import type { DungeonData } from '../../src/data/dungeonTypes';
+import { DungeonLoader } from '../../src/data/DungeonLoader';
+import { applyCsbwinSave, fromSaveFile } from '../../src/engine/CsbwinSaveGame';
+import { databaseRecords, type DungeonData } from '../../src/data/dungeonTypes';
 import { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import { readSaveFile } from '../../src/data/SaveFile';
 import { newGame, stockDungeon } from '../lib/game';
@@ -149,6 +158,100 @@ for (const name of ATARI_SAVES) {
   console.log(`  clock ${start} -> ${game.getTickCount()}, ${ran} ticks` +
     (party.gameIsLost ? ', the game lost' : ''));
   check(ran > 100 && game.getTickCount() === start + completed, `${name}: the clock ran with the ticks`);
+}
+
+// A party that carries something, from `csbgame2.dat`.
+{
+  const save = readSaveFile(new Uint8Array(readFileSync(resolve(CSB, 'csbgame2.dat'))));
+  const data = save.extended.data;
+  const layout = save.imageLayout!;
+  const packed = new DungeonLoader().loadFromArray(data.subarray(save.imageOffset), {
+    noConvert: true, cellFlagArraySize: save.cellFlagArraySize,
+  });
+  const recordOf = (rn: number) => databaseRecords(packed.databases, (rn >> 10) & 15)[rn & 0x3ff] as { nextObject: number };
+  // Every chain's head with its square, as `convertObjectReferences` walks them.
+  const chains: { level: number; x: number; y: number; rns: number[] }[] = [];
+  packed.maps.forEach((map, level) => {
+    for (let x = 0; x < map.descriptor.width; x++) {
+      let column = packed.columnIndex[packed.levelIndex[level]! + x]!;
+      for (let y = 0; y < map.descriptor.height; y++) {
+        if ((map.cellFlags[x]![y]! & 0x10) === 0) continue;
+        const rns: number[] = [];
+        for (let rn = packed.objectList[column++]! as number; rn !== OBJECT_ID_EOF; rn = recordOf(rn).nextObject) rns.push(rn);
+        chains.push({ level, x, y, rns });
+      }
+    }
+  });
+  // The last object of a chain of two or more, of one of `dbs`, taken off it.
+  const taken = new Set<number>();
+  const take = (dbs: number[]) => {
+    const chain = chains.find((c) => c.rns.length >= 2 && dbs.includes((c.rns.at(-1)! >> 10) & 15) && !taken.has(c.rns.at(-1)!))!;
+    const rn = chain.rns.at(-1)!;
+    const before = chain.rns.at(-2)!;
+    const db = (before >> 10) & 15;
+    writeU16BE(data, layout.databases[db]! + (before & 0x3ff) * layout.recordSizes[db]!, OBJECT_ID_EOF);
+    taken.add(rn);
+    return { ...chain, rn };
+  };
+  const group = take([4]);
+  const carried = take([5, 6, 8, 10]);
+  const held = take([5, 6, 8, 10]);
+  const end = layout.cellFlags + save.cellFlagArraySize;
+  let sum = 0;
+  for (let i = save.imageOffset; i < end; i++) sum = (sum + data[i]!) & 0xffff;
+  writeU16BE(data, end, sum);
+
+  const free = save.timers.findIndex((t, i) => t.function === 0 && !save.timerQueue.includes(i));
+  Object.assign(save.timers[free]!, {
+    time: save.block2.time + 0x100000, level: group.level, function: 60,
+    uByte6: group.x, uByte7: group.y, uByte8: group.rn >> 8, uByte9: group.rn & 0xff,
+    timerWord6: (group.x << 8) | group.y, timerWord8: group.rn,
+  });
+  save.timerQueue.push(free);
+  save.block2.numTimer++;
+  const ACTION_HAND = 1;
+  writeU16BE(save.blocks.characters, 212 + ACTION_HAND * 2, carried.rn);
+  save.block2.objectInHand = held.rn;
+  const name = (rn: number) => `${DB_OF_CATEGORY[(rn >> 10) & 15]} ${rn & 0x3ff}`;
+  console.log(`\n=== csbgame2.dat, carrying: timer ${free} TT_60 with ${name(group.rn)} at ${group.level}(${group.x},${group.y}), ` +
+    `action hand ${name(carried.rn)}, hand ${name(held.rn)} ===`);
+  check(packed.header.objectCounts[11] === 0, 'csbgame2.dat: no EXPOOL record, so no equip filter runs at the read');
+
+  const game = newGame(stockDungeon(), csbGraphics);
+  try {
+    fromSaveFile(game, save);
+  } catch (error) {
+    check(false, `csbgame2.dat, carrying: the game should take the save — ${(error as Error).message}`);
+    finish();
+  }
+  const { rnMaps, databases } = game.ctx.dungeon.getData();
+  const names = (slot: ObjectID | undefined, rn: number) => slot !== undefined && slot !== OBJECT_ID_NULL
+    && rnMaps.dbType(slot) === ((rn >> 10) & 15) && rnMaps.idx(slot) === (rn & 0x3ff);
+  const party = game.ctx.party.state;
+  const timer = game.ctx.timers.getTimers().find((t) => t.index === free);
+  const slots = { group: timer?.object, carried: party.champions[0]!.possessions[ACTION_HAND], held: party.objectInHand };
+  const textSlots = databases.scrolls.records.flatMap((r) => r.textObject === undefined ? [] : [r.textObject as number]);
+  let chainMax = 0;
+  for (const head of game.ctx.dungeon.getData().objectList) {
+    for (let id = head; id !== OBJECT_ID_EOF && id !== OBJECT_ID_NULL; id = databaseRecords(databases, rnMaps.dbType(id))[rnMaps.idx(id)]!.nextObject) {
+      chainMax = Math.max(chainMax, id);
+    }
+  }
+  console.log(`  slots: chains up to ${chainMax}, timer ${slots.group}, action hand ${slots.carried}, hand ${slots.held}, ` +
+    `scrolls' texts from ${Math.min(...textSlots)}`);
+  check(names(slots.group, group.rn), 'csbgame2.dat, carrying: the TT_60 timer names its group');
+  check(names(slots.carried, carried.rn), 'csbgame2.dat, carrying: the action hand names its item');
+  check(names(slots.held, held.rn), 'csbgame2.dat, carrying: the hand names its item');
+  check(chainMax < slots.group! && slots.group! < slots.carried && slots.carried < slots.held
+      && slots.held < Math.min(...textSlots),
+    'csbgame2.dat, carrying: numbered after the chains, the timer, the champions, the hand, then the scrolls\' texts');
+  let ran = 0;
+  try {
+    for (; ran < TICKS && !party.gameIsLost; ran++) game.gameTick();
+  } catch (error) {
+    check(false, `csbgame2.dat, carrying: the game should run — ${(error as Error).message}`);
+  }
+  console.log(`  ran ${ran} ticks${party.gameIsLost ? ', the game lost' : ''}`);
 }
 
 // The control: the block's own size stands.

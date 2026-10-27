@@ -34,6 +34,7 @@ import {
   readI16BE, readI32BE, readI8, readU16BE, readU16LE, readU32LE, readU8, writeU16BE, writeU16LE, writeU32BE, writeU32LE,
 } from '../core/bytes';
 import { decodePlanar, encodePlanarGroup } from '../core/planar';
+import type { RNField } from './CsbwinDungeonConversions';
 
 /** The seven `ATTRIBUTE` triples start here, three bytes each, `FILL91` after them. */
 const ATTRIBUTES_OFFSET = 70;
@@ -87,11 +88,10 @@ function readSkills(block: Uint8Array, base: number): Skill[] {
 /**
  * The thirty `RN possessions[30]` slots.
  *
- * Every one of them is an **indirect-index slot number**, not a packed RN:
- * `ConvertCharacters` rewrites all thirty through `ConvertListOfObjects` the moment an
- * original dungeon is read (`doc/CSBwin-src/SaveGame.cpp:2258-2276`), so from then on
- * that is what a champion carries, as in this port. Read as packed RNs, the slots would
- * be categories 0 and 1 with indices far past those databases.
+ * Every one of them is an **indirect-index slot number**, not a packed RN: a CSBWin
+ * save writes them so, and a file with no Extended Features block, whose slots are
+ * packed, has had `ConvertCharacters` rewrite them in the block as its image was read
+ * (`possessionFields`, `readCsbwinWorld`).
  */
 function readPossessions(block: Uint8Array, base: number): ObjectID[] {
   const slots: ObjectID[] = [];
@@ -106,6 +106,20 @@ function readPossessions(block: Uint8Array, base: number): ObjectID[] {
     slots.push(rn as ObjectID);
   }
   return slots;
+}
+
+/**
+ * The thirty slots of each of the first `numCharacter` champions, read and written in
+ * the block: what `ConvertCharacters` numbers in a file with no Extended Features block.
+ */
+export function possessionFields(block: Uint8Array, numCharacter: number): RNField[][] {
+  return Array.from({ length: numCharacter }, (_, champion) => Array.from({ length: 30 }, (_, slot) => {
+    const at = champion * CHARDESC_SIZE + POSSESSIONS_OFFSET + slot * 2;
+    return {
+      get: () => readU16BE(block, at) as ObjectID,
+      set: (rn: ObjectID) => writeU16BE(block, at, rn),
+    };
+  }));
 }
 
 /**
