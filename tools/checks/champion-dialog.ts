@@ -29,15 +29,14 @@ import type { Rect } from '../../src/data/tables/UITables';
 import type { Game } from '../../src/engine/Game';
 import { applySaveBytes } from '../../src/engine/SaveGameFile';
 import { determineMastery, ensureSkills } from '../../src/engine/skills';
-import { BARS_LONG_PRESS_MS, GameInput, type KeyPress } from '../../src/renderer/GameInput';
-import type { GameScreen } from '../../src/renderer/GameScreen';
+import { GameInput, type KeyPress } from '../../src/renderer/GameInput';
 import {
   BAR_X1, BAR_X2, CLOSE_FRAME, COLUMN_WIDTH, LABEL_CHARS, LABEL_X, PAGE, PARTY_SIZE, TABLE_LINES, TABLE_PANEL, TABS, TAB_FRAMES,
   VALUE_CHARS, barFill, barRect, championBarsAt, columnRight, championDialogClick, championDialogPointer, closeChampionDialog, columnX,
   drawChampionDialog, lineY, openChampionDialog, skillProgress,
 } from '../../src/renderer/ui/ChampionDialog';
-import { isDialogOpen } from '../../src/renderer/ui/Dialog';
-import { KEY_PRESETS, setKeyBindings, tableKeyButton } from '../../src/renderer/ui/Keyboard';
+import { BARS_LONG_PRESS_MS, isDialogOpen } from '../../src/renderer/ui/Dialog';
+import { KEY_PRESETS, setKeyBindings } from '../../src/renderer/ui/Keyboard';
 import { MENU_GRAPHIC, MENU_OPTION_COLOR, MENU_PANEL_COLOR } from '../../src/renderer/ui/Menu';
 import { searchMouseButtons, updateButtonLists } from '../../src/renderer/ui/Mouse';
 import { openSettingsDialog } from '../../src/renderer/ui/SettingsDialog';
@@ -247,22 +246,12 @@ console.log('\n=== 4. opening it ===');
       isFrozen: () => false,
     } as unknown as Game,
     screen: {
-      isDialogOpen: () => isDialogOpen(ui),
-      screenPoint: (x: number, y: number) => ({ x, y }),
-      openSettings: () => openSettingsDialog(ui),
-      openMap: () => false,
-      openChampions: (marked: number | null = null) => openChampionDialog(ui, marked),
-      championBarsAt: (x: number, y: number) => championBarsAt(ui, x, y),
-      handleDialogClick: (x: number, y: number, b: number) => ui.dialog?.click(ui, x, y, b),
-      handleDialogKey: (key: string, code: string) => ui.dialog?.key(ui, key, code),
-      handleDialogRelease: () => {},
-      isReincarnateScreenOpen: () => false,
-      searchMouseButtons: (x: number, y: number, b: number) => searchMouseButtons(ui, x, y, b),
-      translateKey: (code: string) => tableKeyButton(ui, code),
-      handleUIKey: () => false,
-      isHintOracleUp: () => false,
+      get ui() { return ui; },
+      screenPoint: (x, y) => ({ x, y }),
       setHoverPoint: () => {},
-    } as unknown as GameScreen,
+      handleMouseButton: () => {},
+      handleDialogWheel: () => {},
+    },
     refreshScreen: () => {},
     onQuickSave: () => {},
     onQuickLoad: () => {},

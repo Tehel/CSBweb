@@ -31,17 +31,16 @@
 import { getRoomType } from '../../src/core/types';
 import type { Rect } from '../../src/data/tables/UITables';
 import type { Game } from '../../src/engine/Game';
-import { GameInput, MESSAGE_LONG_PRESS_MS, type KeyPress } from '../../src/renderer/GameInput';
-import type { GameScreen } from '../../src/renderer/GameScreen';
-import { isDialogOpen } from '../../src/renderer/ui/Dialog';
-import { KEY_PRESETS, setKeyBindings, tableKeyButton } from '../../src/renderer/ui/Keyboard';
+import { GameInput, type InputScreen, type KeyPress } from '../../src/renderer/GameInput';
+import { MESSAGE_LONG_PRESS_MS, isDialogOpen } from '../../src/renderer/ui/Dialog';
+import { KEY_PRESETS, setKeyBindings } from '../../src/renderer/ui/Keyboard';
 import {
   CLOSE_FRAME, MARKS, MARK_COLOR, MARK_FRAMES, MARK_LABELS, MAX_GRID_WIDTH, NEXT_FRAME, OTHER_ROOM_COLOR, PARTY_COLOR, PREV_FRAME, RELATED_COLOR, ROOM_COLORS, SELECTED_COLOR,
   TITLE_PANEL, axisLabels, cellSquare, closeMapDialog, drawMapDialog, mapDialogClick, mapDialogPointer, mapDialogWheel,
   mapLayout, mapTitle, openMapDialog, wrap,
 } from '../../src/renderer/ui/MapDialog';
 import { MENU_GRAPHIC } from '../../src/renderer/ui/Menu';
-import { searchMouseButtons, updateButtonLists } from '../../src/renderer/ui/Mouse';
+import { updateButtonLists } from '../../src/renderer/ui/Mouse';
 import { openSettingsDialog } from '../../src/renderer/ui/SettingsDialog';
 import { UIMode, type UIState } from '../../src/renderer/ui/UIState';
 import { CHAR_WIDTH, LINE_STEP, buttonRect, listIn, listInner, listRowRect, listTextX } from '../../src/renderer/ui/Widgets';
@@ -362,23 +361,14 @@ console.log('\n=== 4. opening it ===');
   ui.uiMode = UIMode.Adventure;
   updateButtonLists(ui);
   const events: string[] = [];
-  const screen = {
-    isDialogOpen: () => isDialogOpen(ui),
-    screenPoint: (x: number, y: number) => ({ x, y }),
-    openSettings: () => openSettingsDialog(ui),
-    openMap: () => openMapDialog(ui),
-    // CHAMPION VIEW is off: no press is held back (`tools/checks/champion-dialog.ts`).
-    championBarsAt: () => -1,
-    handleDialogClick: (x: number, y: number, b: number) => ui.dialog?.click(ui, x, y, b),
-    handleDialogKey: (key: string, code: string) => ui.dialog?.key(ui, key, code),
-    handleDialogRelease: () => {},
-    isReincarnateScreenOpen: () => false,
-    searchMouseButtons: (x: number, y: number, b: number) => searchMouseButtons(ui, x, y, b),
-    translateKey: (code: string) => tableKeyButton(ui, code),
-    handleUIKey: () => false,
-    isHintOracleUp: () => false,
+  // CHAMPION VIEW is off: no press is held back (`tools/checks/champion-dialog.ts`).
+  const screen: InputScreen = {
+    get ui() { return ui; },
+    screenPoint: (x, y) => ({ x, y }),
     setHoverPoint: () => {},
-  } as unknown as GameScreen;
+    handleMouseButton: () => {},
+    handleDialogWheel: () => {},
+  };
   const fakeGame = {
     mainLoopHasReturned: () => false,
     isDead: () => false,

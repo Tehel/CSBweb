@@ -41,11 +41,11 @@
 import { emptyDungeonData } from '../../src/data/DungeonLoader';
 import type { Rect } from '../../src/data/tables/UITables';
 import type { Game } from '../../src/engine/Game';
-import { GameInput, MESSAGE_DOUBLE_CLICK_MS, type KeyPress } from '../../src/renderer/GameInput';
-import type { GameScreen } from '../../src/renderer/GameScreen';
+import { GameInput, type InputScreen, type KeyPress } from '../../src/renderer/GameInput';
 import { MESSAGE_AREA } from '../../src/renderer/csbwin/ScrollingText';
-import { isDialogOpen } from '../../src/renderer/ui/Dialog';
-import { DEFAULT_KEY_BINDINGS, keyAction, tableKeyButton } from '../../src/renderer/ui/Keyboard';
+import { MESSAGE_DOUBLE_CLICK_MS, isDialogOpen } from '../../src/renderer/ui/Dialog';
+import { openReincarnateScreen } from '../../src/renderer/ui/ReIncarnate';
+import { DEFAULT_KEY_BINDINGS, keyAction } from '../../src/renderer/ui/Keyboard';
 import { MENU_GRAPHIC, MENU_PRESS_PHASE_MS, menuButtonList } from '../../src/renderer/ui/Menu';
 import { searchMouseButtons, syncInventoryButtons, updateButtonLists } from '../../src/renderer/ui/Mouse';
 import {
@@ -478,26 +478,15 @@ console.log('\n=== 5. opening it ===');
 
   const ui = freshUI();
   const queued: Array<{ x: number; y: number }> = [];
-  let reincarnate = false;
-  const screen = {
-    isDialogOpen: () => isDialogOpen(ui),
-    screenPoint: (x: number, y: number) => ({ x, y }),
-    openSettings: () => openSettingsDialog(ui),
-    // MAP VIEW is off: a press held on the message area opens nothing (`tools/checks/map-dialog.ts`).
-    openMap: () => false,
-    // CHAMPION VIEW is off too: no press is held back (`tools/checks/champion-dialog.ts`).
-    championBarsAt: () => -1,
-    handleDialogClick: (x: number, y: number, b: number) => ui.dialog?.click(ui, x, y, b),
-    handleDialogKey: (key: string, code: string) => ui.dialog?.key(ui, key, code),
-    isReincarnateScreenOpen: () => reincarnate,
-    handleReincarnateKey: () => {},
-    handleReincarnateClick: () => {},
-    searchMouseButtons: (x: number, y: number, b: number) => searchMouseButtons(ui, x, y, b),
-    translateKey: (code: string) => tableKeyButton(ui, code),
-    handleUIKey: () => false,
-    isHintOracleUp: () => false,
+  // MAP VIEW and CHAMPION VIEW are off: a press held on the message area opens nothing
+  // (`tools/checks/map-dialog.ts`), and none on the bars is held back (`tools/checks/champion-dialog.ts`).
+  const screen: InputScreen = {
+    ui,
+    screenPoint: (x, y) => ({ x, y }),
     setHoverPoint: () => {},
-  } as unknown as GameScreen;
+    handleMouseButton: () => {},
+    handleDialogWheel: () => {},
+  };
   const tableButtons: number[] = [];
   const game = {
     mainLoopHasReturned: () => false,
@@ -521,10 +510,10 @@ console.log('\n=== 5. opening it ===');
   input.keyDown(press('Escape'));
   check(input.keyDown({ ...press('Escape'), repeat: true }) && isDialogOpen(ui), 'nor close it');
   input.keyDown(press('Escape'));
-  reincarnate = true;
+  openReincarnateScreen(ui, 0);
   input.keyDown(press('Escape'));
   check(!isDialogOpen(ui), 'over the Reincarnate screen, Esc does not open it');
-  reincarnate = false;
+  ui.reincarnate = null;
 
   mode(UIMode.Adventure);
   tableButtons.length = 0;

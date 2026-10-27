@@ -1413,7 +1413,7 @@ const oracleAt = async (x, y) => {
   await until(`(i => i.vbls >= ${from} + 2 && i.oracle?.waiting === true)(window.__probe.intro)`, 'the Hint Oracle waiting for a button');
 };
 await oracleAt(214, 40);
-check(await evaluate(`window.__probe.screen.isHintOracleUp()`), 'a real click on the close box opens the Hint Oracle');
+check(await evaluate(`window.__probe.screen.ui.hintOracleUp`), 'a real click on the close box opens the Hint Oracle');
 await oracleAt(160, 36);
 await leaveCanvas();
 console.log('state: hint page');         await shot('16-hint-oracle-page');
@@ -1422,7 +1422,7 @@ console.log('state: hint page');         await shot('16-hint-oracle-page');
 await oracleAt(255, 185);
 await realClick(255, 185); await until(`window.__probe.intro.oracle === null`, 'the Hint Oracle closed'); await vbls(TICK);
 await leaveCanvas(); await vbls(SHOWN);
-check(!(await evaluate(`window.__probe.screen.isHintOracleUp()`)) && (await canvasPixels()) === csbInventory,
+check(!(await evaluate(`window.__probe.screen.ui.hintOracleUp`)) && (await canvasPixels()) === csbInventory,
   'DONE on the page and then on the list closes the Oracle, back to frame 15');
 
 // Conflux 3.5 at its start: level 0, (13,24) facing north, no champion. Nearly every view

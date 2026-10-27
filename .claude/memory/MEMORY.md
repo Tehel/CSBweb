@@ -24,7 +24,6 @@ One line per memory in this directory. Committed with the project; never shared.
 - [Text changes, no tests](text-changes-no-tests.md) — Markdown docs and welcome-page copy need no `npm test` nor frames; the gate is for code
 - [Dialog layout moves probe clicks](dialog-layout-moves-probe-clicks.md) — a dialog's new geometry, or a settings tab reordered (buttons at x 85/236, y 65/86/107), breaks `probe-frames.mjs`'s hard-coded clicks, some in the CRT section; a failed probe leaves no frames, reproduce in `probe-ui`
 - [Screen regions](screen-regions.md) — five regions placed by CSBWin's code; gaps x 224-232 and 274-280 are not always black (Conflux's flame); `PROVEN_FACTS.md` and `LeftHanded.ts` hold the detail
-- [GameScreen stubs in tools](gamescreen-stubs-in-tools.md) — three dialog tools cast a stub `as unknown as GameScreen`: a new method `GameInput` calls passes `tsc` and crashes them; add it to each stub
 - [CRT invisible to frames](crt-invisible-to-frames.md) — frames read palette slots, never `#crt-canvas`; see the shader with `probe-ui --shot` after `settings.update`
 - [Curve corner check is trivial](curve-corner-check-is-trivial.md) — `hoverAt(0.002,0.002)==='0,0'` passes flat too; `(0.1,0.1)` proves the curve
 - [Settings dialog reopens last tab](settings-dialog-reopens-last-tab.md) — GAME only on a page's first open; then its last tab and KEYS scroll: a step reopening it clicks its tab

@@ -90,19 +90,21 @@ given. The pre-game screens draw through the composer and `ui/` directly
 `setBootFrameRenderer`, the interface's font and tables, and `ui/Menu.ts`'s menus.
 
 `src/renderer/GameScreen.ts` is the screen on the page. It owns the canvas, puts each
-frame its composer hands over on it, and keeps the pointer's state. It
-also hosts the save menu and the Reincarnate screen. Its public methods —
-`searchMouseButtons`, `handleMouseButton`, `translateKey`, `handleUIKey`, … — are thin
-wrappers, because the input path and `main.ts` call the screen, not the UI modules. Most
-delegate and do nothing else; `handleMouseButton` also opens what the click asked for (the
-save menu, the Hint Oracle, the sleep's save), and `initializePlayState` empties the
-viewport's caches before a new game.
+frame its composer hands over on it, and keeps the pointer's state. Its methods are the
+ones with work of their own: `handleMouseButton` opens what a button handled asked for
+(the save menu, the Hint Oracle, the sleep's save), `drawViewport` and `refreshOverlay`
+compose, `syncParty` and `initializePlayState` set the screen's state for a game, the
+latter emptying the viewport's caches first. Nothing calls it to reach a UI module: the
+input path, the pre-game screens and `main.ts` call the `ui/` modules on its `ui`.
 
 `src/renderer/GameInput.ts` is the input path. The page's listeners (`src/ui/events.ts`)
 hand it a screen point and a mouse button, or a key and its modifiers, and nothing else of
-the DOM; it routes them to a modal screen, to the game's mouse queue, to the panel keys or
-to the port's own keys, and hands the game the screen's dispatcher for the queued buttons
-(`install`). Nothing under `src/renderer/` imports `src/ui/`.
+the DOM; it routes them to a dialog, a modal screen, the game's mouse queue, the panel
+keys or the port's own keys, calling the `ui/` modules itself, and hands the game the
+interface's dispatcher for the queued buttons (`install`). What it asks of the screen is
+an `InputScreen`: its `ui`, and the pointer, a button's deferred flags and the wheel,
+which the screen keeps. A tool that drives it gives one of those, typed, with a real
+`UIState`. Nothing under `src/renderer/` imports `src/ui/`.
 
 `src/renderer/ViewportRenderer.ts` is the dungeon view and only that: the interpreter
 context and its tables, the wall / floor-ceiling / mirrored-bitmap caches, the viewport

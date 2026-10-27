@@ -3,9 +3,10 @@
  *
  * Its `ScreenComposer` holds the interface's state (`ui/UIState.ts`) and composes each
  * frame, the viewport that `ViewportRenderer` draws with every panel around it, into an
- * RGBA image; the screen puts that image on the canvas. It hosts the two modal screens
- * (the save menu and Reincarnate). The page reaches the interface only through it: the
- * mouse and key entry points below, whose work is in the `ui/` modules.
+ * RGBA image; the screen puts that image on the canvas. The input acts on that state
+ * through the `ui/` modules (`GameInput`); what the screen keeps of its own is the
+ * pointer's place, the flags a button handled raises for after it, the Hint Oracle's
+ * opening and closing, and the viewport's drawing.
  *
  * What the interface asks of the engine comes in whole at construction, as
  * `ScreenHooks`, the way `GameHost` gathers what the engine asks of the page.
@@ -22,35 +23,13 @@ import {
   marchingOrderPointerMoved,
   handleMouseButton,
   closeHintOracle,
-  handleMouseUnclick,
   openHintOracle,
-  searchMouseButtons,
   syncInventoryButtons,
   setUIMode,
   updateButtonLists,
 } from './ui/Mouse';
-import { handleUIKey, tableKeyButton } from './ui/Keyboard';
-import {
-  isReincarnateScreenOpen,
-  openReincarnateScreen,
-  reincarnateClick,
-  reincarnateKey,
-} from './ui/ReIncarnate';
-import {
-  askBeginAdventure,
-  closeSaveMenu,
-  isSaveMenuOpen,
-  openSaveMenu,
-  saveMenuDrop,
-  saveMenuTakesDrops,
-  type SaveMenuMode,
-} from './ui/SaveMenu';
-import { isDialogOpen, type DialogPoint } from './ui/Dialog';
-import { openSettingsDialog } from './ui/SettingsDialog';
-import { openMapDialog } from './ui/MapDialog';
-import { championBarsAt, openChampionDialog } from './ui/ChampionDialog';
-import type { SaveEntry } from '../data/saves';
-import type { ImportedFile } from '../engine/GameSaves';
+import { openSaveMenu } from './ui/SaveMenu';
+import type { DialogPoint } from './ui/Dialog';
 
 export class GameScreen {
   /**
@@ -103,48 +82,6 @@ export class GameScreen {
     return this.composer.screenPoint(x, y);
   }
 
-  /* Mouse entry points for the host page; the work is in `ui/Mouse.ts`. */
-
-  /** The button a click hits, 0 for none: `Game.handleMouseEvents`' translation of a queued click. */
-  searchMouseButtons(x: number, y: number, buttons: number): number {
-    return searchMouseButtons(this.ui, x, y, buttons);
-  }
-
-  /**
-   * A click on the Reincarnate name-entry screen. That screen reads the mouse itself and
-   * does its own geometry (`doc/CSBwin-src/Code13ea4.cpp:118-224`) — it never consults a
-   * button list, and while it is up nothing else may act on a click.
-   */
-  handleReincarnateClick(x: number, y: number): void {
-    reincarnateClick(this.ui, x, y);
-  }
-
-  /**
-   * Offer a key to the Reincarnate name-entry screen. Returns whether it took it —
-   * while that screen is up it takes everything, which is what makes it modal
-   * (`keyboardMode = 2`, `doc/CSBwin-src/Code13ea4.cpp:40`).
-   */
-  handleReincarnateKey(key: string): boolean {
-    return reincarnateKey(this.ui, key);
-  }
-
-  isReincarnateScreenOpen(): boolean {
-    return isReincarnateScreenOpen(this.ui);
-  }
-
-  /** `ReIncarnate(pcA3)` (`doc/CSBwin-src/CSBCode.cpp:6797`) — open the screen. */
-  openReincarnateScreen(chIdx: number): void {
-    openReincarnateScreen(this.ui, chIdx);
-  }
-
-  /**
-   * Offer a key to the interface's own bindings (`src/renderer/ui/Keyboard.ts`).
-   * Returns whether it was claimed. The modal screens must be offered the key first.
-   */
-  handleUIKey(code: string): boolean {
-    return handleUIKey(this.ui, code);
-  }
-
   /**
    * A button `Game.handleMouseEvents` took off the mouse queue and does not handle itself.
    * `DiskMenuNeeded` is raised by the disk icon's handler and acted on by whoever called
@@ -187,107 +124,9 @@ export class GameScreen {
     this.composer.presentViewport();
   }
 
-  isHintOracleUp(): boolean {
-    return this.ui.hintOracleUp;
-  }
-
-  /** The button-up, `0x0add` (`doc/CSBwin-src/Mouse.cpp:1662-1688`). */
-  handleMouseUnclick(): void {
-    handleMouseUnclick(this.ui);
-  }
-
-  /* The dialog over the game; the slot is `ui/Dialog.ts`. */
-
-  isDialogOpen(): boolean {
-    return isDialogOpen(this.ui);
-  }
-
-  /**
-   * A click while a dialog is up, taken **straight from the DOM event** rather than
-   * through the mouse queue. That is CSBWin's modality: `_WaitForMenuSelect` replaces
-   * every button list while it runs.
-   */
-  handleDialogClick(x: number, y: number, buttons: number): void {
-    this.ui.dialog?.click(this.ui, x, y, buttons);
-  }
-
-  handleDialogKey(key: string, code: string): void {
-    this.ui.dialog?.key(this.ui, key, code);
-  }
-
   /** The wheel, while a dialog is up. Nothing is drawn here: the VBL's frame draws what it changed (`takeWheelTurned`). */
   handleDialogWheel(deltaY: number): void {
     if (this.ui.dialog?.wheel(this.ui, deltaY)) this.wheelTurned = true;
-  }
-
-  /** The pointer moved with the button of the dialog's click held (`Dialog.drag`). */
-  handleDialogDrag(x: number, y: number): void {
-    this.ui.dialog?.drag?.(this.ui, x, y);
-  }
-
-  /** The button of the dialog's click released (`Dialog.release`). */
-  handleDialogRelease(): void {
-    this.ui.dialog?.release?.(this.ui);
-  }
-
-  /** The settings dialog (`ui/SettingsDialog.ts`): Esc, or a double click on the message area. */
-  openSettings(): void {
-    openSettingsDialog(this.ui);
-  }
-
-  /**
-   * The map dialog (`ui/MapDialog.ts`): its key, or a long press on the message area. Says
-   * whether it opened, which it does only with MAP VIEW on and no dialog up.
-   */
-  openMap(): boolean {
-    return openMapDialog(this.ui);
-  }
-
-  /**
-   * The champion dialog (`ui/ChampionDialog.ts`): its key, or a long press on a champion's
-   * stat bars, which marks `marked`'s column. Says whether it opened, which it does only
-   * with CHAMPION VIEW on and no dialog up.
-   */
-  openChampions(marked: number | null = null): boolean {
-    return openChampionDialog(this.ui, marked);
-  }
-
-  /**
-   * The champion whose stat bars a left press at `(x, y)` is on, where CHAMPION VIEW holds
-   * it back for the long press that opens the champion dialog (`GameInput`). Else -1.
-   */
-  championBarsAt(x: number, y: number): number {
-    return championBarsAt(this.ui, x, y);
-  }
-
-  /* The save/load screen; the work is in `ui/SaveMenu.ts`. */
-
-  isSaveMenuOpen(): boolean {
-    return isSaveMenuOpen(this.ui);
-  }
-
-  /** `loadOnly` is what a title screen wants: the same list with no SAVE button. */
-  openSaveMenu(mode: SaveMenuMode = 'full'): void {
-    openSaveMenu(this.ui, mode);
-  }
-
-  closeSaveMenu(): void {
-    closeSaveMenu(this.ui);
-  }
-
-  /** The prison's "BEGIN THE ADVENTURE?" (`GameSavesScreen.askBeginAdventure`). */
-  askBeginAdventure(source: SaveEntry | null): void {
-    askBeginAdventure(this.ui, source);
-  }
-
-  /** Whether a file dropped on the page now is the save screen's import: not in RISE's. */
-  takesSaveDrops(): boolean {
-    return saveMenuTakesDrops(this.ui);
-  }
-
-  /** A file dropped on the page while the save screen is up: its import. Says whether it was taken. */
-  handleSaveMenuDrop(file: ImportedFile): boolean {
-    return saveMenuDrop(this.ui, file);
   }
 
   /** Before a compose: the game's party, which may be another game's since the last. */
@@ -350,15 +189,6 @@ export class GameScreen {
     this.composer.presentViewport();
   }
 
-  /**
-   * `TAG0196da`'s table half: the button the current key tables bind `code`, a
-   * `KeyboardEvent.code`, to, or 0 — and 0 for F1-F4, the port's caster keys
-   * (`tableKeyButton`).
-   */
-  translateKey(code: string): number {
-    return tableKeyButton(this.ui, code);
-  }
-
   setUIMode(mode: UIMode): void {
     setUIMode(this.ui, mode);
   }
@@ -388,10 +218,6 @@ export class GameScreen {
     if (this.composer.renderBootFrame() || mainLoopHasReturned) return;
     this.syncParty();
     this.composer.renderAdventureFrame();
-  }
-
-  isInventoryOpen(): boolean {
-    return this.ui.partyState.selectedCharacterIndex >= 0;
   }
 
   /**

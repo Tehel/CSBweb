@@ -17,9 +17,7 @@
  */
 import { Position, RoomType } from '../../src/core/types';
 import type { Game } from '../../src/engine/Game';
-import { GameInput, type KeyPress } from '../../src/renderer/GameInput';
-import type { GameScreen } from '../../src/renderer/GameScreen';
-import { tableKeyButton } from '../../src/renderer/ui/Keyboard';
+import { GameInput, type InputScreen, type KeyPress } from '../../src/renderer/GameInput';
 import { check, finish } from '../lib/check';
 import { testChampion } from '../lib/champion';
 import { newGame, runVbl, stockDungeon, stockGraphics, TICK_DUE } from '../lib/game';
@@ -93,13 +91,13 @@ function keys(): void {
   const game = newGame(stockDungeon(), stockGraphics());
   game.systems.hallOfChampions.addChampion(testChampion(0));
   const ui = newUIState(stockGraphics(), game.ctx);
-  const screen = {
-    isDialogOpen: () => false,
-    isReincarnateScreenOpen: () => false,
-    isHintOracleUp: () => false,
-    translateKey: (code: string) => tableKeyButton(ui, code),
-    handleUIKey: () => false,
-  } as unknown as GameScreen;
+  const screen: InputScreen = {
+    ui,
+    screenPoint: (x, y) => ({ x, y }),
+    setHoverPoint: () => {},
+    handleMouseButton: () => {},
+    handleDialogWheel: () => {},
+  };
   const press = (code: string): KeyPress => ({ key: code, code, ctrlKey: false, metaKey: false, altKey: false });
   const buttons: number[] = [];
   const enqueue = game.enqueueKeyButton.bind(game);

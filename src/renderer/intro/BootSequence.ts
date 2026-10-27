@@ -35,6 +35,8 @@ import type { MessageSink } from '../../engine/GameHost';
 import type { SavedGameRead } from '../../engine/GameSaves';
 import type { GameScreen } from '../GameScreen';
 import type { UIState } from '../ui/UIState';
+import { isDialogOpen } from '../ui/Dialog';
+import { isSaveMenuOpen, openSaveMenu } from '../ui/SaveMenu';
 import { decodeCursorBitmap, type UIButton } from '../../data/tables/UITables';
 import { MENU_PRESS_PHASE_MS, doMenu, drawMenuPress, menuButtonList, menuButtonRect, menuHitTest, type MenuPress } from '../ui/Menu';
 import { HintOracleScreen, type HintSquare } from './HintOracle';
@@ -171,14 +173,14 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
     pointerX = x;
     pointerY = y;
     // The chooser's import hint follows the pointer; a redraw for it presents the screen.
-    if (gameScreen.isDialogOpen() && gameScreen.moveDialogPointer({ x, y })) return;
+    if (isDialogOpen(ui) && gameScreen.moveDialogPointer({ x, y })) return;
     if (cursorVisible) host.present();
   };
   const onMouseLeave = (e: PointerEvent): void => {
     if (!e.isPrimary || e.pointerType !== 'mouse') return;
     pointerX = -100;
     pointerY = -100;
-    if (gameScreen.isDialogOpen() && gameScreen.moveDialogPointer(null)) return;
+    if (isDialogOpen(ui) && gameScreen.moveDialogPointer(null)) return;
     if (cursorVisible) host.present();
   };
   const onContextMenu = (e: Event): void => e.preventDefault();
@@ -186,14 +188,14 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
     const key = e.ctrlKey || e.metaKey || e.altKey ? '' : e.key;
     // The chooser's keys are its own, as the disk menu's are in play: an arrow moves
     // its selection, and does not scroll the page as well.
-    if (key && gameScreen.isDialogOpen()) e.preventDefault();
+    if (key && isDialogOpen(ui)) e.preventDefault();
     push({ kind: 'key', x: 0, y: 0, buttons: 0, key, code: key ? e.code : '' });
   };
   // The wheel is the chooser's list's, as it is the disk menu's in play
   // (`GameInput.wheel`), and no other pre-game screen's. It is no event of the queue,
   // where a screen waiting for a click or a key would take it for one.
   const onWheel = (e: WheelEvent): void => {
-    if (!gameScreen.isDialogOpen()) return;
+    if (!isDialogOpen(ui)) return;
     gameScreen.handleDialogWheel(e.deltaY);
     e.preventDefault();
   };
@@ -317,7 +319,7 @@ async function openLoadMenu(
   // Every redraw is presented with the cursor on it, which stays up from `STShowCursor` to
   // `STHideCursor` (`SaveGame.cpp:1687-1689`), as the VBL handler draws it over each frame.
   const draw = (): void => {
-    if (gameScreen.isSaveMenuOpen()) {
+    if (isSaveMenuOpen(ui)) {
       // The dialog alone, drawn into the cleared screen: `_ReadEntireGame` reaches the
       // chooser through `SelectSaveGame(_9_, 1, 1, 1)` (`doc/CSBwin-src/SaveGame.cpp:1688`),
       // whose leading 1 is `_DoMenu`'s `FadeOldScreen` / `ClearOldScreen` pair
@@ -334,15 +336,15 @@ async function openLoadMenu(
   composer.setBootFrameRenderer(draw);
   // Forget a load made in play before the game was lost: only this chooser's read counts.
   deps.consumeSavedGameRead();
-  gameScreen.openSaveMenu(mode);
+  openSaveMenu(ui, mode);
   draw();
   await fadeToPalette(host, palette11978(host));
 
-  while (gameScreen.isSaveMenuOpen()) {
+  while (isSaveMenuOpen(ui)) {
     const event = await Promise.race([host.nextEvent(), closed]);
     if (!event) break;
-    if (event.kind === 'click') gameScreen.handleDialogClick(event.x, event.y, event.buttons);
-    else if (event.key) gameScreen.handleDialogKey(event.key, event.code ?? '');
+    if (event.kind === 'click') ui.dialog?.click(ui, event.x, event.y, event.buttons);
+    else if (event.key) ui.dialog?.key(ui, event.key, event.code ?? '');
     draw();
   }
 

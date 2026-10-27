@@ -22,8 +22,7 @@ import { applyCsbwinSave } from '../../src/engine/CsbwinSaveGame';
 import type { Game } from '../../src/engine/Game';
 import type { MessageSink } from '../../src/engine/GameHost';
 import { GameSaves } from '../../src/engine/GameSaves';
-import { GameInput, type KeyPress } from '../../src/renderer/GameInput';
-import type { GameScreen } from '../../src/renderer/GameScreen';
+import { GameInput, type InputScreen, type KeyPress } from '../../src/renderer/GameInput';
 import { STOCK_DATA_SET, diskFiles } from '../lib/dataSets';
 import { check, finish } from '../lib/check';
 import { newGame } from '../lib/game';
@@ -106,7 +105,7 @@ function checkInput(): void {
   console.log('=== the input ===');
   const { game } = stage();
   /** A screen nothing may touch: any read of it throws. */
-  const screen = new Proxy({}, { get: (_target, name) => { throw new Error(`the screen's ${String(name)} touched`); } }) as GameScreen;
+  const screen = new Proxy({}, { get: (_target, name) => { throw new Error(`the screen's ${String(name)} touched`); } }) as InputScreen;
   const asked: string[] = [];
   const input = new GameInput({
     game, screen, refreshScreen: () => { asked.push('refresh'); },

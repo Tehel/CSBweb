@@ -281,7 +281,7 @@ export const SAVE_MENU_IMPORT_HINT = 'DROP .DAT TO IMPORT';
 export const SAVE_MENU_DOUBLE_CLICK_MS = 500;
 /**
  * How long a press on a save's row is held for EXPORT to become DELETE, in milliseconds:
- * as long as the long presses on the message area and the stat bars (`GameInput`).
+ * as long as the long presses on the message area and the stat bars (`MESSAGE_LONG_PRESS_MS`, `Dialog.ts`).
  */
 export const SAVE_MENU_LONG_PRESS_MS = 500;
 

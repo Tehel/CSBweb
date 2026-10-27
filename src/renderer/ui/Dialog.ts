@@ -19,6 +19,13 @@ import type { UIState } from './UIState';
 /** A point of the screen, or `null` for the pointer off the canvas. */
 export type DialogPoint = { x: number; y: number } | null;
 
+/** How soon after a click on the message area a second one opens the settings, in milliseconds (`GameInput`). */
+export const MESSAGE_DOUBLE_CLICK_MS = 500;
+/** How long a press on the message area is held to open the map, in milliseconds (`GameInput`). */
+export const MESSAGE_LONG_PRESS_MS = 500;
+/** How long a press on a champion's stat bars is held to open the champions: as long. */
+export const BARS_LONG_PRESS_MS = MESSAGE_LONG_PRESS_MS;
+
 export interface Dialog {
   /**
    * Shown through the interface's palette whole, the viewport's lines too, which the

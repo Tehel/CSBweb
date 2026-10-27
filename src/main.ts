@@ -33,6 +33,8 @@ import { hostDrawing } from './renderer/ui/HostDrawing';
 import { bindSaveDrop, bindUIEvents, showFatalMessage, showWelcomePage, welcomePageQuery } from './ui';
 import { ScrollingText } from './renderer/csbwin/ScrollingText';
 import { UIMode } from './renderer/ui/UIState';
+import { openReincarnateScreen } from './renderer/ui/ReIncarnate';
+import { askBeginAdventure } from './renderer/ui/SaveMenu';
 import { introProbe, openHintOracle, runBootSequence, type BootSequenceDeps } from './renderer/intro/BootSequence';
 import { reduceTitlePicture } from './renderer/intro/TitlePicture';
 import type { TitleFrame } from './renderer/intro/TitleThumbnail';
@@ -283,7 +285,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // The first half of Reincarnate: the engine raises the name-entry screen
         // (`doc/CSBwin-src/CSBCode.cpp:6797` around `Code13ea4.cpp:20`); the
         // screen hands its answer to `HallOfChampions.reincarnateNamed`.
-        openReincarnateScreen: (chIdx) => screen?.openReincarnateScreen(chIdx),
+        openReincarnateScreen: (chIdx) => { if (screen) openReincarnateScreen(screen.ui, chIdx); },
         // What the attack menu, `ShowHideInventory`, `TAG02076e`, `TAG0207cc`, a save read
         // in play, `KillCharacter` and the damage shown draw, and a champion's portrait
         // pixels, which only the screen holds.
@@ -329,7 +331,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // A save packs a `CHARDESC`, and that needs graphic 26 for the champions who
         // carry only a portrait index.
         portraitOf: drawing.portraitOf,
-        askBeginAdventure: (source) => screen?.askBeginAdventure(source),
+        askBeginAdventure: (source) => { if (screen) askBeginAdventure(screen.ui, source); },
     }, logSave, storeRandom, publishedDungeons);
 
     // The statistics' events: sent by a production build only, and shown on the console
@@ -696,7 +698,7 @@ async function init() {
             (window as unknown as Record<string, unknown>).__probe = { game, screen, sound, saves: built.saves, renderView, refreshScreen, presetHeroes, applySaveBytes, intro: introProbe };
         }
         // Before the intro: the entrance's chooser takes a dropped save as the disk menu does.
-        bindSaveDrop(built.screen);
+        bindSaveDrop(built.screen.ui);
         await runIntro(built, sound);
         wire(built);
         start(built.game);

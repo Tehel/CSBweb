@@ -421,24 +421,16 @@ frame at each of the display's while something asks. The chew, a menu button's p
 the pre-game screens' VBLs run on it, the chew and the press composed through
 `refreshScreen`'s guards (`GameScreen.animationFrame`), and the CRT effect draws in its
 frames, after the canvas (`drawAfter`); `initializePlayState` and the game's end cancel
-the animations under way (`tools/checks/presenter.ts`). What is left:
+the animations under way (`tools/checks/presenter.ts`). Input in play has one router,
+`GameInput` (`src/renderer/GameInput.ts`), which calls the `ui/` modules itself and asks of
+the screen only an `InputScreen` (its `ui`, the pointer, a button's deferred flags, the
+wheel), so the tools that drive it give a typed one. What is left: the pre-game screens'
+input has a stack of its own, `IntroHost`'s listeners on `window` (`BootSequence.ts`).
 
-- Input has two stacks, `GameInput` on `document` and the intro's `IntroHost` on `window`.
-- About twenty-five of `GameScreen`'s forty methods only forward the input into `ui/`
-  (`handleDialogKey`, `openMap`, `searchMouseButtons`, …), and four tools hand `GameInput`
-  a stub of them cast `as unknown as GameScreen` (`tools/checks/settings-dialog.ts`,
-  `map-dialog.ts`, `champion-dialog.ts`, `dev-level.ts`), which hides a method missing from
-  the stub from `tsc`.
+Paying it, in one step left, a commit:
 
-Paying it, in two steps left, a commit each:
-
-1. **One input router.** `GameInput` calls `ui/` itself where `GameScreen` forwards the
-   input today, so the forwarders go, and the four stubs with them. What is left on
-   `GameScreen` then is what has logic of its own: the canvas, `drawViewport`,
-   `refreshOverlay`, `handleMouseButton`'s deferred flags, the Hint Oracle's open and
-   close, `syncParty`, `setUIMode`, `initializePlayState` and the pointer's state.
-2. **The intro's input through it.** `IntroHost`'s listeners on `window` go through the
-   router, with a focus policy once the page has controls again.
+1. **The intro's input through the router.** `IntroHost`'s listeners on `window` go
+   through `GameInput`, with a focus policy once the page has controls again.
 
 ### E39 ⏳ The About and Credits pages
 

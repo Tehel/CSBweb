@@ -9,25 +9,26 @@
  * its own over the game's, and a file that misses its target would otherwise be opened by
  * the browser in the game's place. So a file dropped with no dialog up is swallowed.
  */
-import type { GameScreen } from '../renderer/GameScreen';
+import { saveMenuDrop, saveMenuTakesDrops } from '../renderer/ui/SaveMenu';
+import type { UIState } from '../renderer/ui/UIState';
 
 function carriesFiles(event: DragEvent): boolean {
     return event.dataTransfer?.types.includes('Files') ?? false;
 }
 
-export function bindSaveDrop(screen: GameScreen): void {
+export function bindSaveDrop(ui: UIState): void {
     window.addEventListener('dragover', (event) => {
         if (!carriesFiles(event)) return;
         event.preventDefault();
-        if (event.dataTransfer) event.dataTransfer.dropEffect = screen.takesSaveDrops() ? 'copy' : 'none';
+        if (event.dataTransfer) event.dataTransfer.dropEffect = saveMenuTakesDrops(ui) ? 'copy' : 'none';
     });
     window.addEventListener('drop', (event) => {
         if (!carriesFiles(event)) return;
         event.preventDefault();
         const file = event.dataTransfer?.files[0];
-        if (!file || !screen.takesSaveDrops()) return;
+        if (!file || !saveMenuTakesDrops(ui)) return;
         void file.arrayBuffer().then((buffer) => {
-            screen.handleSaveMenuDrop({ name: file.name, bytes: new Uint8Array(buffer), modifiedAt: file.lastModified });
+            saveMenuDrop(ui, { name: file.name, bytes: new Uint8Array(buffer), modifiedAt: file.lastModified });
         });
     });
 }

@@ -17,20 +17,26 @@
 import type { Game } from '../engine/Game';
 import type { GameScreen } from './GameScreen';
 import { MESSAGE_AREA } from './csbwin/ScrollingText';
-import { keyAction, portKeyAction } from './ui/Keyboard';
-import { nowMs } from './ui/UIState';
+import { handleUIKey, keyAction, portKeyAction, tableKeyButton } from './ui/Keyboard';
+import { handleMouseUnclick, searchMouseButtons } from './ui/Mouse';
+import { isReincarnateScreenOpen, reincarnateClick, reincarnateKey } from './ui/ReIncarnate';
+import { BARS_LONG_PRESS_MS, MESSAGE_DOUBLE_CLICK_MS, MESSAGE_LONG_PRESS_MS, isDialogOpen } from './ui/Dialog';
+import { openSettingsDialog } from './ui/SettingsDialog';
+import { openMapDialog } from './ui/MapDialog';
+import { championBarsAt, openChampionDialog } from './ui/ChampionDialog';
+import { nowMs, type UIState } from './ui/UIState';
 
-/** How soon after a click on the message area a second one opens the settings, in milliseconds. */
-export const MESSAGE_DOUBLE_CLICK_MS = 500;
-/** How long a press on the message area is held to open the map, in milliseconds. */
-export const MESSAGE_LONG_PRESS_MS = 500;
-/** How long a press on a champion's stat bars is held to open the champions: as long. */
-export const BARS_LONG_PRESS_MS = MESSAGE_LONG_PRESS_MS;
+/**
+ * What the input path asks of the screen: its interface's state, which the input acts on
+ * through the `ui/` modules, and what the screen keeps of its own, the pointer's place,
+ * the deferred flags of a button handled and the wheel's change to a dialog.
+ */
+export type InputScreen = Pick<GameScreen, 'ui' | 'screenPoint' | 'setHoverPoint' | 'handleMouseButton' | 'handleDialogWheel'>;
 
 /** What the input path asks of the page. */
 export interface GameInputHost {
   readonly game: Game;
-  readonly screen: GameScreen;
+  readonly screen: InputScreen;
   /**
    * Compose the screen again after an input that changed it. Never a `DrawViewport`: the
    * view is the tick's, and an input that changes it brings the tick on (`d.clockTick = 1`).
@@ -73,6 +79,10 @@ export class GameInput {
 
   constructor(private readonly host: GameInputHost) {}
 
+  private get ui(): UIState {
+    return this.host.screen.ui;
+  }
+
   /**
    * Once `MainLoop` has returned, `_ShowCredits` has emptied every button list and key
    * table (`doc/CSBwin-src/Code1f9e6.cpp:116-121`) and owns the screen: the adventure's
@@ -89,20 +99,20 @@ export class GameInput {
    * neither act nor draw until it closes.
    */
   private oracleUp(): boolean {
-    return this.host.screen.isHintOracleUp();
+    return this.ui.hintOracleUp;
   }
 
   /** Hand the game the interface's dispatcher for the buttons it does not handle itself. */
   install(): void {
     const host = this.host;
     host.game.setMouseEventHandlers({
-      translate: (x, y, buttons) => host.screen.searchMouseButtons(x, y, buttons),
+      translate: (x, y, buttons) => searchMouseButtons(this.ui, x, y, buttons),
       button: (num, x, y) => {
         host.screen.handleMouseButton(num, x, y);
         host.refreshScreen();
       },
       unclick: () => {
-        host.screen.handleMouseUnclick();
+        handleMouseUnclick(this.ui);
         host.refreshScreen();
       },
     });
@@ -119,34 +129,38 @@ export class GameInput {
     if (this.ended() || this.oracleUp()) return;
     const { x, y } = this.host.screen.screenPoint(canvasX, canvasY);
     this.host.screen.setHoverPoint({ x, y });
-    if (this.dragging) this.host.screen.handleDialogDrag(x, y);
+    if (this.dragging) this.ui.dialog?.drag?.(this.ui, x, y);
     if (this.messagePress !== null && !inMessageArea(x, y)) this.releaseMessagePress();
-    if (this.barsPress !== null && this.host.screen.championBarsAt(x, y) !== this.barsPress.chIdx) this.queueBarsPress();
+    if (this.barsPress !== null && championBarsAt(this.ui, x, y) !== this.barsPress.chIdx) this.queueBarsPress();
   }
 
   /** A button pressed: `button` is `MouseEvent.button`'s number. */
   mouseDown(canvasX: number, canvasY: number, button: number): void {
     if (this.ended() || this.oracleUp()) return;
     const { x, y } = this.host.screen.screenPoint(canvasX, canvasY);
-    const { game, screen } = this.host;
+    const { game } = this.host;
+    const ui = this.ui;
     const buttonMask = button === 2 ? 1 : button === 0 ? 2 : 0;
     // A dialog is modal, the way `_WaitForMenuSelect` is modal: it replaces every
     // button list while it runs, so nothing else may see the click
     // (`doc/CSBWIN_MENU_REFERENCE.md`).
-    if (buttonMask !== 0 && screen.isDialogOpen()) {
+    if (buttonMask !== 0 && isDialogOpen(ui)) {
       this.dragging = true;
-      screen.handleDialogClick(x, y, buttonMask);
+      ui.dialog?.click(ui, x, y, buttonMask);
       this.host.refreshScreen();
       return;
     }
     if (buttonMask === 0) return;
-    if (screen.isReincarnateScreenOpen()) {
-      screen.handleReincarnateClick(x, y);
+    // The Reincarnate name-entry screen reads the mouse itself and does its own geometry
+    // (`doc/CSBwin-src/Code13ea4.cpp:118-224`): it never consults a button list, and while
+    // it is up nothing else may act on a click.
+    if (isReincarnateScreenOpen(ui)) {
+      reincarnateClick(ui, x, y);
       this.host.refreshScreen();
       return;
     }
     if (buttonMask === 2) {
-      const chIdx = screen.championBarsAt(x, y);
+      const chIdx = championBarsAt(ui, x, y);
       if (chIdx >= 0) {
         this.messageClickMs = null;
         this.holdBarsPress(x, y, chIdx);
@@ -154,7 +168,7 @@ export class GameInput {
       }
       const free = this.messageAreaFree(x, y);
       if (this.messageAreaDoubleClick(free)) {
-        screen.openSettings();
+        openSettingsDialog(ui);
         this.host.refreshScreen();
         return;
       }
@@ -176,7 +190,7 @@ export class GameInput {
    * game's first click thaws it, as CSBWin's does, and opens nothing.
    */
   private messageAreaFree(x: number, y: number): boolean {
-    return inMessageArea(x, y) && this.host.screen.searchMouseButtons(x, y, 2) === 0;
+    return inMessageArea(x, y) && searchMouseButtons(this.ui, x, y, 2) === 0;
   }
 
   /** Whether a free left click on the message area (`free`) is the second of a double click there. */
@@ -200,7 +214,7 @@ export class GameInput {
     this.releaseMessagePress();
     this.messagePress = setTimeout(() => {
       this.messagePress = null;
-      if (this.ended() || this.oracleUp() || !this.host.screen.openMap()) return;
+      if (this.ended() || this.oracleUp() || !openMapDialog(this.ui)) return;
       this.messageClickMs = null;
       this.host.game.onMouseUnClick();
       this.host.refreshScreen();
@@ -225,8 +239,8 @@ export class GameInput {
     const timer = setTimeout(() => {
       this.barsPress = null;
       if (this.ended() || this.oracleUp()) return;
-      if (this.host.screen.openChampions(chIdx)) this.host.refreshScreen();
-      else if (!this.host.screen.isDialogOpen()) this.host.game.onMouseClick(x, y, 2);
+      if (openChampionDialog(this.ui, chIdx)) this.host.refreshScreen();
+      else if (!isDialogOpen(this.ui)) this.host.game.onMouseClick(x, y, 2);
     }, BARS_LONG_PRESS_MS);
     this.barsPress = { x, y, chIdx, timer };
   }
@@ -246,8 +260,8 @@ export class GameInput {
     this.releaseMessagePress();
     this.queueBarsPress();
     if (this.ended() || this.oracleUp()) return;
-    if (this.host.screen.isDialogOpen()) {
-      if (dragged) this.host.screen.handleDialogRelease();
+    if (isDialogOpen(this.ui)) {
+      if (dragged) this.ui.dialog?.release?.(this.ui);
       return;
     }
     this.host.game.onMouseUnClick();
@@ -255,7 +269,7 @@ export class GameInput {
 
   /** The wheel, which only a dialog takes. Says whether it took it. */
   wheel(deltaY: number): boolean {
-    if (this.ended() || !this.host.screen.isDialogOpen()) return false;
+    if (this.ended() || !isDialogOpen(this.ui)) return false;
     this.host.screen.handleDialogWheel(deltaY);
     return true;
   }
@@ -270,7 +284,7 @@ export class GameInput {
 
   /** A key pressed. Says whether the game took it. */
   keyDown(press: KeyPress): boolean {
-    const { game, screen } = this.host;
+    const { game } = this.host;
     const { key, code } = press;
     // `_ShowCredits` has emptied `d.pKeyXlate1` and `d.pKeyXlate2`
     // (`doc/CSBwin-src/Code1f9e6.cpp:120-121`): no key is the adventure's any more.
@@ -279,6 +293,7 @@ export class GameInput {
     // The Oracle takes no key (`doc/CSBWIN_HINT_ORACLE_REFERENCE.md` → "Waiting for a
     // button"), and the adventure gets none while it is up; a browser shortcut keeps its.
     if (this.oracleUp()) return !modified;
+    const ui = this.ui;
     // Esc held down opens and closes nothing: in fullscreen, where the page locks it, it
     // is how the player leaves (`src/lib/fullscreen.ts`).
     if (code === 'Escape' && press.repeat === true) return !modified;
@@ -290,15 +305,15 @@ export class GameInput {
     // A dialog takes the keyboard whole, for the reason the Reincarnate screen
     // does: 'S' would otherwise open an attack menu while the player scrolled the
     // save menu's list.
-    if (screen.isDialogOpen()) {
+    if (isDialogOpen(ui)) {
       if (modified) return false;
-      screen.handleDialogKey(key, code);
+      ui.dialog?.key(ui, key, code);
       this.host.refreshScreen();
       return true;
     }
-    if (screen.isReincarnateScreenOpen()) {
+    if (isReincarnateScreenOpen(ui)) {
       if (modified) return false;
-      screen.handleReincarnateKey(key);
+      reincarnateKey(ui, key);
       this.host.refreshScreen();
       return true;
     }
@@ -309,7 +324,7 @@ export class GameInput {
     // Esc is the settings', in play, asleep and frozen too: the freeze CSBWin's tables
     // bind it to is Pause's (`DEFAULT_KEY_BINDINGS`, `DEBT.md` H).
     if (code === 'Escape') {
-      screen.openSettings();
+      openSettingsDialog(ui);
       this.host.refreshScreen();
       return true;
     }
@@ -326,7 +341,8 @@ export class GameInput {
     // `Byte18440` binds Return and Esc, and frozen `Byte18448` Esc alone
     // (doc/CSBwin-src/Mouse.cpp:1839-1840, :1893-1894). A bound key is queued as its
     // button, like a click.
-    const button = screen.translateKey(code);
+    // F1-F4, the port's caster keys, are 0 there (`tableKeyButton`).
+    const button = tableKeyButton(ui, code);
     if (button !== 0) {
       game.enqueueKeyButton(button);
       return true;
@@ -335,7 +351,7 @@ export class GameInput {
     // included.
     if (game.isPartySleeping() || game.isFrozen()) return true;
     // Then the panel keys, which claim theirs whatever the game state, and F5 and F9.
-    if (screen.handleUIKey(code)) {
+    if (handleUIKey(ui, code)) {
       this.host.refreshScreen();
       return true;
     }
@@ -345,7 +361,7 @@ export class GameInput {
       this.host.onQuickSave();
     } else if (action === 'quickLoad') {
       this.host.onQuickLoad();
-    } else if (action === 'map' ? screen.openMap() : screen.openChampions()) {
+    } else if (action === 'map' ? openMapDialog(ui) : openChampionDialog(ui)) {
       this.host.refreshScreen();
     }
     return true;
