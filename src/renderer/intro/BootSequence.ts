@@ -221,17 +221,15 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
     vbl: (count) =>
       new Promise<void>((resolve) => {
         // Wall-clock rather than one resolve per animation frame: a 120 Hz display would
-        // otherwise run every animation here at double speed.
+        // otherwise run every animation here at double speed. The frames are the page's
+        // animation clock's (`Presenter.frames`).
         const deadline = performance.now() + count * VBL_MS;
-        const tick = (): void => {
-          if (performance.now() < deadline) {
-            requestAnimationFrame(tick);
-            return;
-          }
+        gameScreen.presenter.frames(() => {
+          if (performance.now() < deadline) return true;
           introProbe.vbls += count;
           resolve();
-        };
-        requestAnimationFrame(tick);
+          return false;
+        });
       }),
     startSound: (graphicNum, rateIdx) => deps.playSound?.(graphicNum, rateIdx),
     drawPrisonInterior: () => gameScreen.renderPrisonInterior(),

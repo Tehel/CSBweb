@@ -208,7 +208,13 @@ function startMouthChewAnimation(ui: UIState): void {
   const frameMs = (1000 * 8) / 60;
   ui.mouthChewStartMs = now;
   ui.mouthChewEndMs = now + frameMs * 4;
-  ensureMouthChewLoop(ui);
+  // A frame at each of the display's until the chew is over, and one more without the
+  // mouth; a chew begun again before then takes over (`Presenter.animate`).
+  ui.animate(() => {
+    if (ui.mouthChewStartMs !== now) return false;
+    if (nowMs() >= ui.mouthChewEndMs) ui.mouthChewStartMs = null;
+    return true;
+  });
 }
 
 export function drawMouthChewAnimation(ui: UIState): void {
@@ -223,28 +229,4 @@ export function drawMouthChewAnimation(ui: UIState): void {
   const x = VIEWPORT_X + mouthRect.x1 + 1;
   const y = VIEWPORT_Y + mouthRect.y1 + 1;
   drawObjectIconAt(ui, x, y, icon, ui.uiTables.graphic232.word612, -1);
-}
-
-function ensureMouthChewLoop(ui: UIState): void {
-  if (ui.mouthChewFrameHandle !== null) return;
-  const schedule = (cb: (time: number) => void): number => {
-    if (typeof requestAnimationFrame === 'function') return requestAnimationFrame(cb);
-    return setTimeout(() => cb(nowMs()), 16) as unknown as number;
-  };
-  const tick = () => {
-    if (ui.mouthChewStartMs === null) {
-      ui.mouthChewFrameHandle = null;
-      return;
-    }
-    const now = nowMs();
-    if (now >= ui.mouthChewEndMs) {
-      ui.mouthChewStartMs = null;
-      ui.mouthChewFrameHandle = null;
-      ui.renderLastFrame();
-      return;
-    }
-    ui.renderLastFrame();
-    ui.mouthChewFrameHandle = schedule(tick);
-  };
-  ui.mouthChewFrameHandle = schedule(tick);
 }

@@ -1146,8 +1146,8 @@ function armDelete(ui: UIState, state: SaveMenuState): void {
 /**
  * `_WaitForMenuSelect` flashes the chosen button for two five-VBL passes and only
  * *then* returns the choice (`doc/CSBwin-src/Menu.cpp:100-180`), so the action happens
- * after the animation here too. The game clock is stopped, so the frames come from
- * `requestAnimationFrame` rather than from the tick.
+ * after the animation here too. The game clock is stopped, so the frames come from the
+ * page's animation clock (`playMenuPress`) rather than from the tick.
  */
 function beginPress(ui: UIState, state: SaveMenuState, buttons: UIButton[], buttonId: number, then: () => void): void {
   const rect = menuButtonRect(buttons, buttonId);

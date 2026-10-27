@@ -10,7 +10,8 @@
  * own; the save/load screen lists no save, and `onReadSave`, `onMakeNewAdventure`,
  * `onSaveGame`, `onExportSave`, `onDeleteSave` and `onImportSave` throw, as there is no store and no world to serialize.
  * The settings are the defaults, kept nowhere, the CRT effect can be shown, and there is
- * no fullscreen. The map
+ * no fullscreen. The interface's animations run on a clock of their own, a frame every
+ * 16 ms. The map
  * dialog moves no party, as on a page opened without `?dev`, and EXIT leaves for nothing.
  *
  * The game's host draws on it what the page's does (`ui/HostDrawing.ts`), after whatever
@@ -26,12 +27,15 @@ import { Settings } from '../../src/settings/Settings';
 import { hostDrawing } from '../../src/renderer/ui/HostDrawing';
 import type { UIHooks, UIState } from '../../src/renderer/ui/UIState';
 import { createScreenUI } from '../../src/renderer/ScreenUI';
+import { Presenter } from '../../src/renderer/Presenter';
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../../src/renderer/ViewportGraphics';
 import { graphicsTablesOf } from './game';
 
 export function newUIState(graphics: GraphicsLoader, ctx: GameContext, hooks: Partial<UIHooks> = {}): UIState {
   const tables = graphicsTablesOf(graphics);
   const getGraphicBitmap = hooks.getGraphicBitmap ?? (() => null);
+  // The page's animation clock, at a frame every 16 ms, composing through `renderLastFrame`.
+  const presenter = new Presenter(() => ui.renderLastFrame());
   const { ui } = createScreenUI({
     graphicsLoader: graphics,
     tables,
@@ -40,6 +44,7 @@ export function newUIState(graphics: GraphicsLoader, ctx: GameContext, hooks: Pa
     trace: (line) => console.log(line),
   }, {
     renderLastFrame: () => {},
+    animate: (step) => presenter.animate(step),
     onReincarnated: () => {},
     onListSaves: async () => [],
     onListEverySave: async () => [],

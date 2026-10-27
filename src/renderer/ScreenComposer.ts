@@ -303,10 +303,19 @@ export class ScreenComposer {
    * does not hold the screen. The interface's `renderLastFrame`.
    */
   renderLastFrame(): void {
-    if (this.bootFrameRenderer) {
-      this.bootFrameRenderer();
-      return;
-    }
+    if (this.renderBootFrame()) return;
+    this.renderAdventureFrame();
+  }
+
+  /** The pre-game screen's frame composed again, if one is up (`setBootFrameRenderer`). Says whether it was. */
+  renderBootFrame(): boolean {
+    if (!this.bootFrameRenderer) return false;
+    this.bootFrameRenderer();
+    return true;
+  }
+
+  /** The adventure's frame composed again, once there is one and the Hint Oracle does not hold the screen. */
+  renderAdventureFrame(): void {
     if (this.viewportDrawn && !this.ui.hintOracleUp) this.presentViewport();
   }
 

@@ -207,6 +207,8 @@ renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens
             ScreenComposer (the screen composed without the DOM: the panels' order and the
             palettes, into an RGBA image the screen puts on the canvas),
             GameInput (where a click or a key goes once the page has read it),
+            Presenter (the page's one animation clock: the chew, a menu's press, the
+            pre-game screens' VBLs, and the CRT effect after the canvas),
             LeftHanded (the left-handed screen: CSBWin's regions moved, a click moved back),
             ViewportRenderer (the dungeon view only), DrawViewport, ViewportGraphics,
             GraphicsStore (the graphics the viewport and the interface share, basic and

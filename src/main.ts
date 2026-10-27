@@ -26,6 +26,7 @@ import { loadSwoosh, type Swoosh } from './data/SwooshLoader';
 import swooshImageUrl from './assets/swoosh.img?url&no-inline';
 import swooshSoundUrl from './assets/swoosh.wav?url';
 import { createCrtEffect, type CrtEffect } from './lib/crt';
+import { Presenter } from './renderer/Presenter';
 import { NO_FULLSCREEN, createFullscreen, type PageFullscreen } from './lib/fullscreen';
 import { GameScreen } from './renderer/GameScreen';
 import { hostDrawing } from './renderer/ui/HostDrawing';
@@ -50,6 +51,14 @@ console.log('Dungeon Master Web - Initializing...');
 let game: Game | null = null;
 let screen: GameScreen | null = null;
 let crtController: CrtEffect | null = null;
+/**
+ * The page's one animation clock (`src/renderer/Presenter.ts`): the interface's
+ * animations, composed again through `refreshScreen`'s guards, the pre-game screens' VBLs,
+ * and the CRT effect.
+ */
+const presenter = new Presenter(() => {
+    if (game && screen) screen.animationFrame(game.mainLoopHasReturned());
+});
 
 /** The folder of the games, relative to the page as every fetch is. */
 const GAMEFILES_DIR = 'gamefiles';
@@ -290,6 +299,8 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // A frame threw: CSBWin's `die`, the loop stopped.
         die: reportError,
         showCredits: (word11694) => {
+            // The adventure's animations end with it: a chew draws nothing over the credits.
+            presenter.cancel();
             events.ended(word11694);
             if (screen) showEndOfGame({ ...introDeps({ game, screen, saves, messages, events }, sound), game, messages }, word11694).catch(reportError);
         },
@@ -412,7 +423,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
                 .then((error) => { if (error !== null) console.error('Hint Oracle:', error); })
                 .finally(close);
         },
-    }, () => crtController?.presented());
+    }, presenter, () => crtController?.presented());
     return { game, screen, saves, messages, events };
 }
 
@@ -439,7 +450,7 @@ function introDeps({ game, screen, saves, events }: Built, sound: SoundManager):
 
 /** The optional CRT effect over the canvas (`src/lib/crt.ts`). Without WebGL, the settings' SCANLINES and SCREEN CURVE are inert. */
 function createCrt(): void {
-    crtController = createCrtEffect(gameCanvasEl);
+    crtController = createCrtEffect(gameCanvasEl, presenter);
 }
 
 /**

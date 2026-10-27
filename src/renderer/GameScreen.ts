@@ -16,6 +16,7 @@ import { SCREEN_WIDTH, SCREEN_HEIGHT } from './ViewportGraphics';
 import { Position } from '../core/types';
 import type { ViewportRenderer } from './ViewportRenderer';
 import { ScreenComposer, type ScreenComposerDeps, type ScreenHooks } from './ScreenComposer';
+import type { Presenter } from './Presenter';
 import { initializePlayState, UIMode, type UIState } from './ui/UIState';
 import {
   marchingOrderPointerMoved,
@@ -65,8 +66,18 @@ export class GameScreen {
   /** The wheel has changed the dialog since it was last drawn (`takeWheelTurned`). */
   private wheelTurned = false;
 
-  /** `presented` is told of every frame put on the canvas, once it is (the CRT effect's, `src/lib/crt.ts`). */
-  constructor(canvas: HTMLCanvasElement, deps: ScreenComposerDeps, hooks: ScreenHooks, presented: () => void) {
+  /**
+   * `presenter` is the page's animation clock, which the interface's animations run on
+   * (`ScreenHooks.animate`), and the pre-game screens' VBLs. `presented` is told of every
+   * frame put on the canvas, once it is (the CRT effect's, `src/lib/crt.ts`).
+   */
+  constructor(
+    canvas: HTMLCanvasElement,
+    deps: ScreenComposerDeps,
+    hooks: Omit<ScreenHooks, 'animate'>,
+    readonly presenter: Presenter,
+    presented: () => void,
+  ) {
     const screenCtx = canvas.getContext('2d');
     if (!screenCtx) throw new Error('Failed to create screen 2D context');
     const image = screenCtx.createImageData(SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -77,7 +88,7 @@ export class GameScreen {
         screenCtx.putImageData(image, 0, 0);
         presented();
       },
-    }, deps, hooks);
+    }, deps, { ...hooks, animate: (step) => presenter.animate(step) });
     this.viewport = this.composer.viewport;
     this.ui = this.composer.ui;
     updateButtonLists(this.ui);
@@ -354,7 +365,8 @@ export class GameScreen {
 
   /**
    * A game set up again after a lost one (`doc/CSBwin-src/Code1f9e6.cpp:309-318`): the
-   * screen's state as a new game has it, and the adventure's button lists and key tables.
+   * screen's state as a new game has it, and the adventure's button lists and key tables,
+   * with no animation of the lost game left to draw.
    */
   initializePlayState(): void {
     // `Cleanup(false)`'s `backgroundLib.Cleanup` and `CleanupAltMonCache`, before the game
@@ -362,8 +374,20 @@ export class GameScreen {
     // The first game starts with the screen's own, empty.
     this.viewport.context.backgroundLib.Cleanup();
     this.viewport.context.altMonCache.CleanupAltMonCache();
+    this.presenter.cancel();
     initializePlayState(this.ui);
     this.setUIMode(UIMode.Adventure);
+  }
+
+  /**
+   * An animation's frame (`Presenter.animate`): the pre-game screen's while one is up,
+   * else the adventure's through `refreshScreen`'s guards, while `MainLoop` runs and over
+   * the game's party.
+   */
+  animationFrame(mainLoopHasReturned: boolean): void {
+    if (this.composer.renderBootFrame() || mainLoopHasReturned) return;
+    this.syncParty();
+    this.composer.renderAdventureFrame();
   }
 
   isInventoryOpen(): boolean {

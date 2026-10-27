@@ -16,6 +16,8 @@
  * left and right's sharpened blend.
  */
 
+import type { Presenter } from '../renderer/Presenter';
+
 /** How far the tube bends: the curve's strength across, and down. */
 const CURVE_X = 1 / 32;
 const CURVE_Y = 1 / 24;
@@ -203,10 +205,11 @@ function buildPipeline(gl: WebGLRenderingContext): Pipeline {
 }
 
 /**
- * The effect over `canvas`, off until `set` turns on the scanlines or the curve. Without
- * WebGL it is unavailable, and `set` does nothing.
+ * The effect over `canvas`, off until `set` turns on the scanlines or the curve, drawn on
+ * the page's animation clock (`presenter`). Without WebGL it is unavailable, and `set`
+ * does nothing.
  */
-export function createCrtEffect(canvas: HTMLCanvasElement): CrtEffect {
+export function createCrtEffect(canvas: HTMLCanvasElement, presenter: Presenter): CrtEffect {
     const parent = canvas.parentNode;
     if (!parent) return UNAVAILABLE;
     const tube = document.createElement('canvas');
@@ -227,14 +230,12 @@ export function createCrtEffect(canvas: HTMLCanvasElement): CrtEffect {
     let scanlines = false;
     let curve = false;
     let lost = false;
-    let frame: number | null = null;
 
     // A frame drawn on the tube once the game canvas has a new one (`presented`), or the
-    // tube a new size, at the next display frame: several presents before it are one draw,
-    // and a screen at rest costs nothing.
+    // tube a new size, at the page's next frame, after the canvas (`Presenter.drawAfter`):
+    // several presents before it are one draw, and a screen at rest costs nothing.
     const draw = (): void => {
-        frame = null;
-        if (lost) return;
+        if (lost || !(scanlines || curve)) return;
         const width = Math.max(1, Math.round(tube.clientWidth * devicePixelRatio));
         const height = Math.max(1, Math.round(tube.clientHeight * devicePixelRatio));
         if (tube.width !== width || tube.height !== height) {
@@ -251,7 +252,7 @@ export function createCrtEffect(canvas: HTMLCanvasElement): CrtEffect {
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     };
     const request = (): void => {
-        if (frame === null && (scanlines || curve) && !lost) frame = requestAnimationFrame(draw);
+        if ((scanlines || curve) && !lost) presenter.drawAfter(draw);
     };
 
     // The tube's size in device pixels, which a move to a screen of another density
@@ -294,10 +295,6 @@ export function createCrtEffect(canvas: HTMLCanvasElement): CrtEffect {
             tube.style.display = on ? '' : 'none';
             curvedCanvas = curve && !lost ? canvas : null;
             if (on) request();
-            else if (frame !== null) {
-                cancelAnimationFrame(frame);
-                frame = null;
-            }
         },
         presented: request,
     };

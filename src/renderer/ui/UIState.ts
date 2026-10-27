@@ -33,6 +33,7 @@ import type { Settings } from '../../settings/Settings';
 import type { Fullscreen } from '../../lib/fullscreen';
 import type { Dialog } from './Dialog';
 import type { KeyboardLayoutMap } from './KeyLabels';
+import type { FrameStep } from '../Presenter';
 
 export enum UIMode {
   Adventure = 'adventure',
@@ -235,7 +236,6 @@ export interface UIState {
   openChestIconIndex: number | null;
   mouthChewStartMs: number | null;
   mouthChewEndMs: number;
-  mouthChewFrameHandle: number | null;
   primaryButtons: UIButton[] | null;   // graphic231 -> buttons17196
   secondaryButtons: UIButton[] | null; // graphic231 -> buttons17304
   /** `d.pKeyXlate2` / `d.pKeyXlate1`, the key tables `TAG0196da` searches, in that order. */
@@ -359,6 +359,11 @@ export interface UIState {
   getGraphicBitmap(graphicNum: number): IndexedBitmap | null;
   /** Re-blit the last rendered frame; used by animations that run off the game clock. */
   renderLastFrame(): void;
+  /**
+   * `step` at every frame of the page's animation clock until it returns false, the
+   * screen composed again after it while it returns true (`Presenter.animate`).
+   */
+  animate(step: FrameStep): void;
 }
 
 /** The fields of `UIState` that a game in play sets, and a restart clears. */
@@ -431,7 +436,7 @@ type UISources = Pick<UIState,
 
 /** What the interface asks of the screen and of the page. */
 export type UIHooks = Pick<UIState,
-  | 'getGraphicBitmap' | 'renderLastFrame'
+  | 'getGraphicBitmap' | 'renderLastFrame' | 'animate'
   | 'onReincarnated' | 'onListSaves' | 'onListEverySave' | 'onReadSave' | 'onMakeNewAdventure' | 'onHasNewFaces' | 'onSaveGame' | 'isPrison' | 'onExportSave' | 'onDeleteSave' | 'onImportSave' | 'onRestoreSave' | 'onRestoreFailed' | 'onOpenHintOracle' | 'onSleepSave' | 'onExit'
   | 'settings' | 'isCrtAvailable' | 'fullscreen' | 'keyboardLayout' | 'onTeleport'>;
 
@@ -454,7 +459,6 @@ export function createUIState(sources: UISources, hooks: UIHooks): UIState {
     hoverPoint: null,
     mouthChewStartMs: null,
     mouthChewEndMs: 0,
-    mouthChewFrameHandle: null,
     primaryButtons: null,
     secondaryButtons: null,
     keyXlate2: null,

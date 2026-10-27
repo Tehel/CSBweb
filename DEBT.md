@@ -414,44 +414,30 @@ against each other, and the file formats.
 
 ### E30 ⏳ One presenter and one input router
 
-The screen is drawn by clocks that do not know each other: the engine's `setTimeout` VBL
-loop, and `requestAnimationFrame` loops for the chewing mouth
-(`src/renderer/ui/Feeding.ts:228-249`), a menu button's press (`playMenuPress`,
-`src/renderer/ui/Menu.ts:414-426`) and the
-intro's VBL (`BootSequence.ts:221-235`). The CRT effect alone follows the screen: told
-of every frame the screen puts on the canvas (`GameScreen`'s `presented`), it draws it at
-the next display frame, or the tube at a new size (`createCrtEffect`, `src/lib/crt.ts`),
-and `tools/probe-frames.mjs` counts its draws against the presents.
+The screen has two clocks: the engine's `setTimeout` VBL loop, which composes the tick's
+and the VBL's frames and every input's redraw at once, where CSBWin's VBL and handlers
+draw; and the page's one animation clock, `Presenter` (`src/renderer/Presenter.ts`), a
+frame at each of the display's while something asks. The chew, a menu button's press and
+the pre-game screens' VBLs run on it, the chew and the press composed through
+`refreshScreen`'s guards (`GameScreen.animationFrame`), and the CRT effect draws in its
+frames, after the canvas (`drawAfter`); `initializePlayState` and the game's end cancel
+the animations under way (`tools/checks/presenter.ts`). What is left:
 
-- `renderLastFrame`, which the chew, the menus and Reincarnate draw through, skips
-  `refreshScreen`'s `syncParty` and its `mainLoopHasReturned()` test
-  (`ScreenComposer.ts:311-317`, `src/main.ts:121-125`), so a chew still running when the game ends
-  draws the adventure over the credits' wait; `initializePlayState` cancels neither loop.
-- The rAF scheduler is written twice (`Feeding.ts:230-233`, with `as unknown as number`, and
-  `playMenuPress`), and a menu's press runs on two clocks
-  (`BootSequence.ts:568-571` passes made-up times).
 - Input has two stacks, `GameInput` on `document` and the intro's `IntroHost` on `window`.
-
 - About twenty-five of `GameScreen`'s forty methods only forward the input into `ui/`
   (`handleDialogKey`, `openMap`, `searchMouseButtons`, …), and four tools hand `GameInput`
   a stub of them cast `as unknown as GameScreen` (`tools/checks/settings-dialog.ts`,
   `map-dialog.ts`, `champion-dialog.ts`, `dev-level.ts`), which hides a method missing from
   the stub from `tsc`.
 
-Paying it, in three steps left, a commit each:
+Paying it, in two steps left, a commit each:
 
-1. **One animation clock.** One rAF presenter with a dirty flag, which the chew, the menu
-   press in play (`playMenuPress`) and the intro's (`waitForMenuSelect`) ask for frames,
-   on the one clock, drawing through `refreshScreen`'s guards (`syncParty`,
-   `mainLoopHasReturned`); `initializePlayState` and the game's end cancel what is under
-   way. The VBL's frame and the input's refreshes set the flag too, and the CRT draws in
-   the presenter's frame, after the canvas, where `presented` tells it now.
-2. **One input router.** `GameInput` calls `ui/` itself where `GameScreen` forwards the
+1. **One input router.** `GameInput` calls `ui/` itself where `GameScreen` forwards the
    input today, so the forwarders go, and the four stubs with them. What is left on
    `GameScreen` then is what has logic of its own: the canvas, `drawViewport`,
    `refreshOverlay`, `handleMouseButton`'s deferred flags, the Hint Oracle's open and
    close, `syncParty`, `setUIMode`, `initializePlayState` and the pointer's state.
-3. **The intro's input through it.** `IntroHost`'s listeners on `window` go through the
+2. **The intro's input through it.** `IntroHost`'s listeners on `window` go through the
    router, with a focus policy once the page has controls again.
 
 ### E39 ⏳ The About and Credits pages
@@ -1324,8 +1310,8 @@ Recorded so that nobody "fixes" them.
   `waitForButtonFlashScript`): `_MagicSelection`, and through it `CastMagic`'s call, and
   `_FusionSequence`. That leaves `TAG02076e`, which comes in a pass after the one that
   flashed, when the next VBL has already put the rectangle back.
-- 🚫 **The intro and the end screen run on wall-clock time** through
-  `requestAnimationFrame`, not on a VBL counter shared with the game loop. Nothing else
+- 🚫 **The intro and the end screen run on wall-clock time** through the page's
+  animation clock (`Presenter.frames`), not on a VBL counter shared with the game loop. Nothing else
   runs while they play (the end screen starts once the loop has stopped), so there is
   nothing for them to drift against. If a boot-time animation ever has to agree with `d.Time`,
   this is the place that would have to change.

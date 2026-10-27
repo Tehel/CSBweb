@@ -408,19 +408,14 @@ export function menuPressFinished(press: MenuPress, nowMs: number): boolean {
 /**
  * Play `press` out, then `then`: `_WaitForMenuSelect` returns its choice only once the
  * button has flashed (`Menu.cpp:100-180`). The clock is held under a dialog, so the
- * frames are the page's own. `isLive` says whether the press is still the one up: once
+ * frames are the page's animation clock's (`Presenter.animate`). `isLive` says whether the press is still the one up: once
  * its menu is gone, nothing more is drawn and `then` never runs.
  */
 export function playMenuPress(ui: UIState, press: MenuPress, isLive: () => boolean, then: () => void): void {
-  const frame = (): void => {
-    if (!isLive()) return;
-    if (menuPressFinished(press, nowMs())) {
-      then();
-      return;
-    }
-    ui.renderLastFrame();
-    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(frame);
-    else setTimeout(frame, 16);
-  };
-  frame();
+  ui.animate(() => {
+    if (!isLive()) return false;
+    if (!menuPressFinished(press, nowMs())) return true;
+    then();
+    return false;
+  });
 }

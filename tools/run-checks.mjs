@@ -394,6 +394,8 @@ const CHECKS = [
   { tool: 'render-probe.ts' },
   // Level 2 has an Ant Man with a free open neighbour to be bumped into.
   { tool: 'button-flash.ts' },
+  // The page's animation clock, and the chew on it.
+  { tool: 'presenter.ts' },
   { tool: 'mouse-queue.ts' },
   { tool: 'party-collision.ts', args: ['2'] },
   // Level 2's door at (0,25) is up-down, which is the mode that exercises VerticalSize.
