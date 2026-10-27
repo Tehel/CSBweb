@@ -212,22 +212,19 @@ function objectBytesOf(timerFunction: number): 6 | 8 | null {
  * that has no byte at all — convenient in the engine, and three things where the
  * file has one. So the collapse has to happen somewhere, and this is the boundary.
  *
- * Three rules, each with a source:
+ * Two rules, each with a source:
  *
  * - The **object** goes into the pair `ConvertTimers` names for that function.
  *   `MagicSystem.launchMissile` puts the RN on `TimerEntry.object` and the launch
  *   x,y in the bytes, so a missile written from its bytes alone would lose its object.
  * - For 48 and 49, **bytes 8-9 are `timerWord8`** — the packed
  *   `[x:5][y:5][direction:2][decay:4]` `processMissileTimer` reads back. Those two
- *   bytes are passed as `pos` and `action`, which a missile timer leaves at zero,
- *   so they have to come from the word instead. Measured in
+ *   bytes are the word's when the missile is launched, but its flight rewrites the
+ *   word alone, so they come from the word. Measured in
  *   `csbgame-flying-sword.dat`: function 49, bytes 6-7 = 0x079a (the object's slot)
  *   and bytes 8-9 = 0xa909 (the packed word).
- * - Where a **count** lives in `timerWord6` and nothing lives in the bytes — the
- *   magic shield and poison timers, which `MagicSystem.queueUtilityTimer` creates with
- *   x = y = 0 — the count is written into them. The two representations can only
- *   ever conflict when one is zero, because no creator sets both; the guard says
- *   exactly that rather than assuming it.
+ *
+ * A word a timer is made with is in its bytes already (`newTimerEntry`).
  */
 function collapseTimerBytes(record: TimerRecord, object: number | undefined): TimerRecord {
     const at = objectBytesOf(record.function);
@@ -243,11 +240,6 @@ function collapseTimerBytes(record: TimerRecord, object: number | undefined): Ti
     if (at === 6) {
         record.uByte8 = (record.timerWord8 >> 8) & 0xff;
         record.uByte9 = record.timerWord8 & 0xff;
-    }
-    const word6 = record.timerWord6 & 0xffff;
-    if (at === null && word6 !== 0 && record.uByte6 === 0 && record.uByte7 === 0) {
-        record.uByte6 = (word6 >> 8) & 0xff;
-        record.uByte7 = word6 & 0xff;
     }
     return record;
 }

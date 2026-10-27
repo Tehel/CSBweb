@@ -193,6 +193,7 @@ const CHECKS = [
   { tool: 'delete-duplicate-timers.ts' },
   { tool: 'timer-sequence.ts' },
   { tool: 'timer-heap.ts' },
+  { tool: 'timer-bytes.ts' },
   { tool: 'throwing.ts' },
   { tool: 'clouds.ts' },
   { tool: 'player-attacks.ts' },

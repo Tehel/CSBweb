@@ -3596,6 +3596,9 @@ Two places put bytes there:
   (`doc/CSBwin-src/CSB.h:1868-1879`). A caller sets the fields its timer uses before the
   copy, and `unused13` never; a byte its timer does not use stays 0xcd too, such as bytes
   8 and 9 of `PoisonCharacter`'s `TT_75` (`doc/CSBwin-src/CSBCode.cpp:7287-7294`).
+  A 0 is there only where the caller writes one, as `CreateTimer` does in byte 5
+  (`doc/CSBwin-src/Mouse.cpp:185-203`). The port's `newTimerEntry` builds a timer the
+  same way, and `tools/checks/timer-bytes.ts` holds its makers' saved bytes to CSBWin's.
 
 So the field is a high-water mark of slot allocation: 0xcd below the highest slot the
 game has ever taken, 0 above it. Measured on the eight committed saves, which all carry

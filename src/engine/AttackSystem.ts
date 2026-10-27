@@ -1051,7 +1051,7 @@ export class AttackSystem {
         const duration = sw(this.ctx.random.below(masteryOf(this.ctx, pChar, params.skillNumber) + 8) + 5);
         // `d.SeeThruWalls++` plus the `TT_73` timer (`doc/CSBwin-src/Attack.cpp:2018`).
         this.ctx.party.state.seeThruWalls = sb(this.ctx.party.state.seeThruWalls + 1);
-        this.ctx.systems.magic.queueUtilityTimer(TimerFunction.TT_73, duration, 0);
+        this.ctx.systems.magic.queueUtilityTimer(TimerFunction.TT_73, duration);
         params.dataType = AttackDataType.ADT_Window;
         this.callAttackFilter(filter, params, 1);
         this.decrementChargesRemaining(params.charIdx);

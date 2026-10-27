@@ -65,6 +65,7 @@ export class MagicSystem {
     const timerWord8 = encodeMissileTimerWord8(launchX, launchY, direction, decayRate);
     const entry = this.timers.createTimer({
       function: functionType,
+      uByte5: 0,
       uByte6: launchX,
       uByte7: launchY,
       time: (startTime + 1) >>> 0,
@@ -316,12 +317,12 @@ export class MagicSystem {
             this.ctx.party.state.seeThruWalls = sb(this.ctx.party.state.seeThruWalls + 1);
             d6 = Math.trunc(d6 / 2);
             const duration = d6 * d6;
-            this.queueUtilityTimer(TimerFunction.TT_73, duration, 0);
+            this.queueUtilityTimer(TimerFunction.TT_73, duration);
             break;
           }
           case 3: {
             this.ctx.party.state.invisible = sb(this.ctx.party.state.invisible + 1);
-            this.queueUtilityTimer(TimerFunction.TT_71, d6, 0);
+            this.queueUtilityTimer(TimerFunction.TT_71, d6);
             break;
           }
           case 4: {
@@ -339,7 +340,7 @@ export class MagicSystem {
             this.ctx.party.state.magicFootprintsActive = sb(this.ctx.party.state.magicFootprintsActive + 1);
             this.ctx.footprints.markMagicFootprints(spellPower);
             const duration = d6 * d6;
-            this.queueUtilityTimer(TimerFunction.TT_79, duration, 0);
+            this.queueUtilityTimer(TimerFunction.TT_79, duration);
             break;
           }
           case 7: {
@@ -470,10 +471,11 @@ export class MagicSystem {
     return raised;
   }
 
-  queueUtilityTimer(functionType: number, duration: number, timerWord6: number): void {
+  queueUtilityTimer(functionType: number, duration: number, timerWord6?: number): void {
     const party = this.ctx.party.state;
     this.timers.createTimer({
       function: functionType,
+      uByte5: 0,
       time: (this.ctx.state.tickCount + Math.max(0, duration | 0)) >>> 0,
       level: party.position.z,
       timerWord6,
@@ -519,7 +521,7 @@ export class MagicSystem {
       champion.charFlags |= CHARFLAG_ATTACK_DISABLE;
     }
     const entry = this.timers.createTimer({
-      function: TimerFunction.TT_11, uByte5: chIdx, time: targetTime, level: party.position.z,
+      function: TimerFunction.TT_11, uByte5: chIdx, uByte6: 0, time: targetTime, level: party.position.z,
     });
     champion.busyTimerIndex = entry.index;
   }

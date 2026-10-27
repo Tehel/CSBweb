@@ -344,6 +344,7 @@ export class MonsterSystem {
       uByte5,
       uByte6: mapX,
       uByte7: mapY,
+      uByte8: 0,
       time: (this.ctx.state.tickCount + 1) >>> 0,
       level,
     });
@@ -662,6 +663,7 @@ export class MonsterSystem {
     }
     this.timers.createTimer({
       function: tt,
+      uByte5: 0,
       uByte6: destination.x,
       uByte7: destination.y,
       time: (this.ctx.state.tickCount + 5) >>> 0,

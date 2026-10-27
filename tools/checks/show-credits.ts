@@ -600,9 +600,11 @@ function checkCsbWin(): void {
   const due = game.ctx.state.tickCount;
   const otherPos = (game.ctx.dungeon.rnMaps.pos(rn) + 1) & 3;
   game.ctx.timers.createTimer({
-    function: TimerFunction.TT_STONEROOM, uByte6: x, uByte7: y, uByte8: otherPos, time: due, level: z,
+    function: TimerFunction.TT_STONEROOM, uByte5: 0, uByte6: x, uByte7: y, uByte8: otherPos, uByte9: 0, time: due, level: z,
   });
-  game.ctx.timers.createTimer({ function: TimerFunction.TT_OPENROOM, time: due, level: z });
+  game.ctx.timers.createTimer({
+    function: TimerFunction.TT_OPENROOM, uByte5: 0, uByte6: 0, uByte7: 0, uByte8: 0, uByte9: 0, time: due, level: z,
+  });
   game.savedGameRead(false);
   console.log(`actuator ${rn.toString(16)} at (${x},${y}) level ${z}, position ${game.ctx.dungeon.rnMaps.pos(rn)}; the timer's ${otherPos}`);
 

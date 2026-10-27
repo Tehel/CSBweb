@@ -315,8 +315,10 @@ export class MissileEncounter {
           if (door.hasButton) {
             this.timers.createTimer({
               function: TimerFunction.TT_DOOR,
+              uByte5: 0,
               uByte6: objX,
               uByte7: objY,
+              uByte8: 0,
               uByte9: ActuatorAction.TOGGLE,
               time: (this.ctx.state.tickCount + 1) >>> 0,
               level: position.z,
@@ -652,6 +654,7 @@ export class MissileEncounter {
     }
     this.timers.createTimer({
       function: TimerFunction.TT_24,
+      uByte5: 0,
       uByte6: position.x,
       uByte7: position.y,
       time: (startTime + 100) >>> 0,
@@ -691,6 +694,7 @@ export class MissileEncounter {
     const delay = projectile === RN_FFE4 ? 5 : 1;
     this.timers.createTimer({
       function: TimerFunction.TT_25,
+      uByte5: 0,
       uByte6: position.x,
       uByte7: position.y,
       time: (this.ctx.state.tickCount + delay) >>> 0,

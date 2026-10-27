@@ -347,8 +347,10 @@ export class MouseSystem {
     this.ctx.sounds.queueSound(1, pos.x, pos.y, 1, pos.z);
     this.ctx.timers.createTimer({
       function: TimerFunction.TT_DOOR,
+      uByte5: 0,
       uByte6: target.x,
       uByte7: target.y,
+      uByte8: 0,
       uByte9: ActuatorAction.TOGGLE,
       time: this.ctx.state.tickCount + 1,
       level: target.z,

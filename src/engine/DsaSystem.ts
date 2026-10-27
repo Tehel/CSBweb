@@ -419,6 +419,7 @@ export class DsaSystem {
       }
       this.timers.createTimer({
         function: mapping,
+        uByte5: 0,
         uByte6: targetX,
         uByte7: targetY,
         uByte8: targetPos,
@@ -431,6 +432,7 @@ export class DsaSystem {
 
     this.timers.createTimer({
       function: TimerFunction.TT_DESSAGE,
+      uByte5: 0,
       uByte6: targetX,
       uByte7: targetY,
       uByte8: targetPos,

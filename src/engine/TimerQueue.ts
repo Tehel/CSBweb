@@ -119,6 +119,46 @@ export type NewTimer = Pick<TimerEntry, 'function' | 'time' | 'level'>
   & Partial<Pick<TimerEntry, 'uByte5' | 'uByte6' | 'uByte7' | 'uByte8' | 'uByte9' | 'timerWord8' | 'timerWord6' | 'object'>>;
 
 /**
+ * What a byte of a new `TIMER` holds until its maker sets it: the constructor fills
+ * bytes 5 to 9 with 0xcd (`doc/CSBwin-src/CSB.h:1868-1879`), and every caller of
+ * `SetTimer` that does not queue a copy of a timer fills one on the stack.
+ */
+const UNSET_TIMER_BYTE = 0xcd;
+
+/**
+ * A `TIMER` as a caller of `SetTimer` fills one, by its fields (`timer.Function`,
+ * `timer.timerUByte6`, …), not yet queued. A byte left out is 0xcd, as CSBWin's
+ * constructor leaves it, so a caller sets every byte its CSBWin site sets, a 0 included.
+ * The two words are bytes 6-7 and 8-9 read as one (`timerWord6()`, `timerWord8()`,
+ * `doc/CSBwin-src/CSB.h:2104-2113`): a word given sets the bytes it covers that are not
+ * given. A word left out is 0, the reading the timer does not use, which a save does not
+ * write (`collapseTimerBytes`).
+ */
+export function newTimerEntry(timer: NewTimer): TimerEntry {
+  const word6 = timer.timerWord6;
+  const word8 = timer.timerWord8;
+  const uByte6 = (timer.uByte6 ?? (word6 !== undefined ? word6 >> 8 : UNSET_TIMER_BYTE)) & 0xff;
+  const uByte7 = (timer.uByte7 ?? (word6 !== undefined ? word6 : UNSET_TIMER_BYTE)) & 0xff;
+  const uByte8 = (timer.uByte8 ?? (word8 !== undefined ? word8 >> 8 : UNSET_TIMER_BYTE)) & 0xff;
+  const uByte9 = (timer.uByte9 ?? (word8 !== undefined ? word8 : UNSET_TIMER_BYTE)) & 0xff;
+  return {
+    index: -1, // assigned by addTimer, which is the one place indices are minted
+    time: timer.time >>> 0,
+    level: timer.level & 0xff,
+    function: timer.function & 0xff,
+    uByte5: (timer.uByte5 ?? UNSET_TIMER_BYTE) & 0xff,
+    uByte6,
+    uByte7,
+    uByte8,
+    uByte9,
+    sequence: 0, // stamped by addTimer, if it is queued at all
+    timerWord8: (word8 ?? 0) & 0xffff,
+    timerWord6: sw(word6 ?? 0),
+    object: timer.object,
+  };
+}
+
+/**
  * The timer index a missile's record holds while `MissileTimer` moves it
  * (`pDBMissile->timerIndex(0xffff)`, `doc/CSBwin-src/Timer.cpp:224-226`), which
  * `getTimer` answers with `missileFilterTimer`.
@@ -194,26 +234,9 @@ export class TimerQueue {
     return entry;
   }
 
-  /**
-   * A `TIMER` filled as a caller of `SetTimer` fills one, by its fields (`timer.Function`,
-   * `timer.timerUByte6`, …), and queued (`addTimer`). A byte or word left out is 0.
-   */
+  /** A `TIMER` filled as a caller of `SetTimer` fills one (`newTimerEntry`), and queued (`addTimer`). */
   createTimer(timer: NewTimer): TimerEntry {
-    return this.addTimer({
-      index: -1, // assigned by addTimer, which is the one place indices are minted
-      time: timer.time >>> 0,
-      level: timer.level & 0xff,
-      function: timer.function & 0xff,
-      uByte5: (timer.uByte5 ?? 0) & 0xff,
-      uByte6: (timer.uByte6 ?? 0) & 0xff,
-      uByte7: (timer.uByte7 ?? 0) & 0xff,
-      uByte8: (timer.uByte8 ?? 0) & 0xff,
-      uByte9: (timer.uByte9 ?? 0) & 0xff,
-      sequence: 0, // stamped by addTimer, if it is queued at all
-      timerWord8: (timer.timerWord8 ?? 0) & 0xffff,
-      timerWord6: sw(timer.timerWord6 ?? 0),
-      object: timer.object,
-    });
+    return this.addTimer(newTimerEntry(timer));
   }
 
   /**

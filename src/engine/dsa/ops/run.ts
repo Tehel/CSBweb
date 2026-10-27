@@ -77,6 +77,8 @@ function indirect(
     uByte5: machine.nextParameterMessageSequence(),
     uByte6: indirectLocr.x,
     uByte7: indirectLocr.y,
+    uByte8: 0,
+    uByte9: 0,
     time: actionTime,
     level: indirectLocr.l,
   });

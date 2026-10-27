@@ -535,6 +535,7 @@ export class ActuatorSystem {
 
     this.timers.createTimer({
       function: timerFunction,
+      uByte5: 0,
       uByte6: targetX,
       uByte7: targetY,
       uByte8: targetPos,

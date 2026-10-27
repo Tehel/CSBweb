@@ -25,7 +25,7 @@ import type { CreatureRecord, Item16Record } from '../data/dungeonTypes';
 import { SMS_ATTACKING } from '../data/dungeonTypes';
 import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
-import { TimerFunction, type TimerEntry, type TimerQueue } from './TimerQueue';
+import { newTimerEntry, TimerFunction, type TimerEntry, type TimerQueue } from './TimerQueue';
 import { StateOfFear } from './monsterTypes';
 import { MonsterDamageResult } from './MonsterDamage';
 import {
@@ -1706,6 +1706,10 @@ export class MonsterAI {
 
   /* -------------------------------------------------------------- internals ---- */
 
+  /**
+   * `timer_70`, `ProcessTimers29to41`'s own `TIMER` (`doc/CSBwin-src/Monster.cpp:3260`),
+   * as `InitialChecks` fills it (`:2826-2833`): byte 9 is left as the constructor sets it.
+   */
   private makeTimer(
     mapX: number,
     mapY: number,
@@ -1713,20 +1717,15 @@ export class MonsterAI {
     functionType: number,
     timeUntilAlternateUpdate: number,
   ): TimerEntry {
-    return {
-      index: -1,
-      time: this.ctx.state.tickCount >>> 0,
-      level: level & 0xff,
+    return newTimerEntry({
+      time: this.ctx.state.tickCount,
+      level,
       function: functionType,
       uByte5: 0,
-      uByte6: mapX & 0xff,
-      uByte7: mapY & 0xff,
-      uByte8: timeUntilAlternateUpdate & 0xff,
-      uByte9: 0,
-      sequence: 0,
-      timerWord8: 0,
-      timerWord6: 0,
-    };
+      uByte6: mapX,
+      uByte7: mapY,
+      uByte8: timeUntilAlternateUpdate,
+    });
   }
 
   private trace(line: string): void {

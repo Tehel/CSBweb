@@ -115,7 +115,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C188 | A new timer's unused bytes are 0, where CSBWin's are 0xcd | M | ⏳ |
+| C193 | A Vi altar's and a generator's timer lose their object across a save | S | ⏳ |
 | F18 | One `tsconfig` for the browser, the tools and the server | S | ⏳ |
 | F19 | The tools' screen draws without the game's state, rules and CSB graphics | S | ⏳ |
 | F17 | The frame pipeline and the runner are untyped | M | ⏳ |
@@ -139,7 +139,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C193 · D22 · E42 · F22 · G31 · P13 · R17 · U13 · W8 · X18. An ID recorded and paid in one commit has no
+Next free IDs: C194 · D22 · E42 · F22 · G31 · P13 · R17 · U13 · W8 · X18. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -491,22 +491,23 @@ seen to band.
 
 A divergence found along the way goes here, with the next free ID.
 
-### C188 ⏳ A new timer's unused bytes are 0, where CSBWin's are 0xcd
+### C193 ⏳ A Vi altar's and a generator's timer lose their object across a save
 
-CSBWin fills a timer on the stack, whose constructor sets bytes 5 to 9, the sequence, the
-level and the padding to 0xcd (`doc/CSBwin-src/CSB.h:1868-1879`), sets the fields that
-timer uses and copies it into its slot (`SetTimer`, `Timer.cpp:1133`): a byte it does not
-use stays 0xcd. `PoisonCharacter`'s `TT_75` sets byte 5, the time, the level and
-`timerWord6`, bytes 6-7 (`CSB.h:2104-2107`), and leaves bytes 8 and 9
-(`doc/CSBwin-src/CSBCode.cpp:7287-7294`). The port's `TimerQueue.createTimer` gives every
-byte left out 0, so a save of the port's carries 0 there where CSBWin's carries 0xcd.
-Nothing reads those bytes, in either program; a timer read from a save keeps what the
-file holds.
+CSBWin keeps the object of a `TT_ViAltar` (13), the bones, and of a
+`TT_ReactivateGenerator` (65), the generator, in bytes 8-9, as it does a cloud's and a
+waiting monster's (`timerObj8()`, `doc/CSBwin-src/CSB.h:2083-2092`; set at
+`Mouse.cpp:926` and `Timer.cpp:1821`). The port's `objectBytesOf`
+(`src/engine/RuntimeSave.ts`) names bytes 8-9 for 24, 25, 60 and 61 alone, from
+`ConvertTimers` (`SaveGame.cpp:2239-2262`), which converts an old save's RNs and has no
+case for 13 or 65. So `collapseTimerBytes` writes a Vi altar's bytes 8-9 as the 0
+`queueViAltarTimer` sets and a generator's as 0xcd, not their RN, and a read gives both
+timers no `object`. A game saved during a resurrection's five ticks, or read from
+CSBWin's save of one, comes back with a `processViAltar` that returns at once, the bones
+`RNeof`; a generator's timer reactivates the square's first type-0 actuator, which is its
+own only when it is the first.
 
-Paying it: which bytes each of CSBWin's `SetTimer` callers leaves, read caller by caller
-(47 calls, in eleven files, against the port's 37 `createTimer` and `addTimer` callers),
-and `createTimer` giving a byte left out 0xcd only if every one of them does; a check of a
-port-made `TT_75` written by `buildSaveFile`, against the bytes CSBWin's constructor leaves.
+Paying it: 13 and 65 in `objectBytesOf`'s bytes-8 case, `queueViAltarTimer`'s two zeroed
+bytes gone, and a check of each timer made, saved, read back and fired on its object.
 
 ### C150 ⏸️ Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops
 

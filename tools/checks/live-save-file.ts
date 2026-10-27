@@ -242,7 +242,14 @@ function compareGames(label: string, before: Game, after: Game, monsters: boolea
   // sparse and the queue is what fires. `sequence` is excluded for the reason
   // `checks/save-roundtrip.ts` excludes it: `processMonstersOnLevel` re-creates every
   // monster movement timer on load, and CSBWin stamps a new timer with a new sequence.
-  const strip = (t: { sequence?: number }) => { const { sequence, ...rest } = t; void sequence; return rest; };
+  // And the two words, compared on their bytes, which are the file's, as
+  // `checks/save-roundtrip.ts` does: a live timer carries the reading its maker set, and
+  // a loaded one both.
+  const strip = (t: { sequence?: number; timerWord6?: number; timerWord8?: number }) => {
+    const { sequence, timerWord6, timerWord8, ...rest } = t;
+    void sequence; void timerWord6; void timerWord8;
+    return rest;
+  };
   const beforeTimers = before.getRuntimeSaveState().dungeon;
   const afterTimers = after.getRuntimeSaveState().dungeon;
   check(same(beforeTimers.timerQueue, afterTimers.timerQueue), `${label}: the timer queue order`);

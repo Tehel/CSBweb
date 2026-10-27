@@ -289,7 +289,7 @@ export class TimerSystem {
   queueBrightnessTimer(deltaSteps: number, time: number): void {
     const party = this.ctx.party.state;
     this.timers.createTimer({
-      function: TimerFunction.TT_LIGHT, time: time >>> 0, level: party.position.z, timerWord6: deltaSteps,
+      function: TimerFunction.TT_LIGHT, uByte5: 0, time: time >>> 0, level: party.position.z, timerWord6: deltaSteps,
     });
   }
 
@@ -326,6 +326,7 @@ export class TimerSystem {
       const nextSteps = negative ? -newSteps : newSteps;
       this.timers.createTimer({
         function: TimerFunction.TT_LIGHT,
+        uByte5: 0,
         time: (timer.time + 4) >>> 0,
         level: party.position.z,
         timerWord6: nextSteps,
@@ -1075,13 +1076,13 @@ export class TimerSystem {
   ): void {
     const entry = this.timers.createTimer({
       function: TimerFunction.TT_VI_ALTAR,
+      uByte5: this.packViAltarByte(posInCell, state),
       uByte6: location.x,
       uByte7: location.y,
       time: time >>> 0,
       level: location.z,
       object: bones,
     });
-    entry.uByte5 = this.packViAltarByte(posInCell, state);
     entry.uByte8 = 0;
     entry.uByte9 = 0;
   }
@@ -1219,6 +1220,7 @@ export class TimerSystem {
         const actionTime = (timer.time + disableTime) >>> 0;
         this.timers.createTimer({
           function: TimerFunction.TT_REACTIVATE_GENERATOR,
+          uByte5: 0,
           uByte6: target.x,
           uByte7: target.y,
           time: actionTime,
@@ -1677,16 +1679,8 @@ export class TimerSystem {
     }
 
     if (reschedule) {
-      this.timers.createTimer({
-        function: TimerFunction.TT_25,
-        uByte6: x,
-        uByte7: y,
-        uByte8: timer.uByte8,
-        uByte9: timer.uByte9,
-        time: (timer.time + 1) >>> 0,
-        level: timer.level,
-        object: cloudRn,
-      });
+      // The fired timer, copied whole and a tick later (`doc/CSBwin-src/Timer.cpp:604-610`).
+      this.timers.addTimer({ ...timer, time: (timer.time + 1) >>> 0 });
       return;
     }
 
