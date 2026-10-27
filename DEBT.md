@@ -119,7 +119,6 @@ In payoff order: the first row is the next item.
 | C187 | The adjust skills filter hands each DSA the one before's words unmasked, and its `why` | S | ⏳ |
 | C188 | A new timer's unused bytes are 0, where CSBWin's are 0xcd | S | ⏳ |
 | C189 | A distant monster is shrunk again at every frame, where CSBWin keeps it across levels | S | ⏳ |
-| C192 | `&MOVE` sets an object's corner before `MoveObject`, where CSBWin sets it after | S | ⏳ |
 | F15 | Tools that read the wall clock, and a runner with no timeout | S | ⏳ |
 | F16 | A tool can pass having checked less than it says | S | ⏳ |
 | F18 | One `tsconfig` for the browser, the tools and the server | S | ⏳ |
@@ -573,20 +572,6 @@ Paying it: the shrunk picture kept in the `GraphicsStore` under
 `pI12.word2 + graphicNumFBSAE`, the non-alternate's `graphicNumFBSAE` starting at
 `word2` as CSBWin's does; a check that draws a monster far on one level, then on a
 level whose scheme for its colour differs, and finds the first level's colours.
-
-### C192 ⏳ `&MOVE` sets an object's corner before `MoveObject`, where CSBWin sets it after
-
-`FindCellDestination` calls `MoveObject(object, -1, 0, x, y)` and then `object.pos(p)`
-(`doc/CSBwin-src/MoveObject.cpp:531-538`), so the object lies in corner `p` wherever the
-move took it. The port sets `p` first (`findCellDestination`,
-`src/engine/dsa/ops/move.ts:437`), and `WorldMove.moveObject` then sets the corner the
-move resolved (`resolveCellEffects`): an object `&MOVE`d onto stairs, which turn it
-(`Code11f52.cpp:3159-3165`), ends in the turned corner, not `p`. The re-linking after the
-move (`:470-473`) is dead, the ID being the same object before and after `setPos`.
-
-Paying it: `setPos(object, p)` after `moveObject`, as `&ADD` does
-(`src/engine/dsa/ops/objects.ts`), the dead branch removed; a check that `&MOVE`s an
-object onto stairs.
 
 ### C150 ⏸️ Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops
 

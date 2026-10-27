@@ -13,8 +13,8 @@
  *     `RN::pos` writes the corner beside the record (`CSBTypes.h:342-347`), so the group
  *     lies at the exit in the turned corner, and the ID it came with still lifts it:
  *     `RN ==` ignores the corner (`:355-362`).
- *  4. A DSA that moves a group onto the stairs gives it the DSA's corner after the move,
- *     whatever the stairs made of it (`MoveObject(object, -1, 0, x, y)`, then
+ *  4. A DSA that moves a group or an item onto the stairs gives it the DSA's corner after
+ *     the move, whatever the stairs made of it (`MoveObject(object, -1, 0, x, y)`, then
  *     `object.pos(p)`, `MoveObject.cpp:537-538`).
  *  5. The party is not moved by the arm (`:3146`).
  *  6. The party's own step into the stairs (`TraverseStairway`, `CSBCode.cpp:7862-7868`)
@@ -212,6 +212,26 @@ function main(): void {
       + `(the stairs alone: ${turned})`);
     check(error === 0 && there !== OBJECT_ID_EOF && game.ctx.dungeon.rnMaps.pos(there) === p,
       "the DSA's corner, set after the move, overrides the stairs' turn");
+  }
+  {
+    const game = makeGame();
+    const stairs = findStairs(game, true, (s) => s.beside !== null);
+    const beside = stairs.beside!;
+    const corner = (stairs.dir + 2 + 2) & 3;
+    const rn = takeWeapon(game, corner);
+    game.ctx.dungeon.addObjectToCell(beside, rn);
+    const turned = turnedCorner(corner, stairs.dir);
+    const p = (turned + 2) & 3;
+    const error = moveObjectDsa(
+      game.systems.dsa.operationMachine,
+      1, 1 << DBType.WEAPON, 0xf, locationRelToInteger({ l: beside.z, x: beside.x, y: beside.y, p: 0 }), 0,
+      1, 0, 1 << p, locationRelToInteger({ l: stairs.at.z, x: stairs.at.x, y: stairs.at.y, p: 0 }), 0,
+    );
+    const there = findWeapon(game, stairs.exit, game.ctx.dungeon.rnMaps.idx(rn));
+    console.log(`   and an item, from corner ${corner}, in corner ${p}: error ${error}, at the exit ${there !== null}, `
+      + `corner ${there !== null ? game.ctx.dungeon.rnMaps.pos(there) : '-'} (the stairs alone: ${turned})`);
+    check(error === 0 && there !== null && game.ctx.dungeon.rnMaps.pos(there) === p,
+      "the item's too");
   }
 
   /* ------------------------------------------------------ 5. the party is not moved ---- */

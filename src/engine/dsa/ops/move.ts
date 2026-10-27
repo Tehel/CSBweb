@@ -410,10 +410,8 @@ function checkObjectToCursor(machine: DsaOperationMachine, object: ObjectID, doi
  * and the new level (`:574-596`).
  *
  * CSBWin sets the cloud timer's corner from `d.NewPos` and then `object.pos(p)`
- * overwrites it, because the corner lives in the indirect-index table rather than in
- * the `RN` (`CSBTypes.h:342-347`). Here the corner is part of the ID, so both timers
- * are handed the placed ID outright — the one `ProcessTT_25` and the missile's
- * removal will look for.
+ * overwrites it: the timer names the same `RN`, whose corner lives in the
+ * indirect-index table (`CSBTypes.h:342-347`), as `RnMaps` keeps it.
  */
 function findCellDestination(
   machine: DsaOperationMachine,
@@ -434,7 +432,6 @@ function findCellDestination(
   const pos = choosePositionFromMask(machine.ctx.random, dstPosMsk, locr.p & 3);
   if (doit) {
     const decoded = machine.ctx.dungeon.rnMaps.decode(object);
-    const placed = machine.ctx.dungeon.rnMaps.setPos(object, pos);
     const partyLevel = machine.ctx.party.state.position.z;
     const srcLocr = srcType === 1 ? locationRelFromInteger(srcLoc) : null;
     const sameLevelMonsterMove = decoded.category === DBType.CREATURE
@@ -452,25 +449,21 @@ function findCellDestination(
       if (timer) {
         timer.uByte6 = locr.x & 0xff;
         timer.uByte7 = locr.y & 0xff;
-        timer.object = placed;
+        timer.object = object;
         timer.level = locr.l & 0xff;
       }
     }
     const mover = objectMover(machine);
     if (!sameLevelMonsterMove) {
       machine.ctx.dungeon.setDBRecordLink(object, OBJECT_ID_EOF);
+      // `MoveObject(object, -1, 0, x, y)` and then `object.pos(p)` (`:531-538`): the
+      // pads see the corner the object came with, and it lies in corner `p` wherever
+      // the move took it, whatever the stairs made of it.
       if (decoded.category === DBType.CREATURE) {
-        // `object.pos(p)` rewrites the indirect index, so the monster's corner is `p`
-        // wherever it ends up, whatever the stairs made of it.
         mover.moveMonster(object, -1, 0, locr.x, locr.y, locr.l, pos);
       } else {
-        // `MoveObject(object, -1, 0, x, y)` and then `object.pos(p)` (`:531-538`): the
-        // pads see the corner the object came with, and it lies in corner `p`.
-        const result = mover.moveObject(object, -1, 0, locr.x, locr.y, locr.l);
-        if (result.placed !== null && result.position && result.placed !== placed) {
-          machine.ctx.dungeon.removeObjectFromCell(result.position, result.placed);
-          machine.ctx.dungeon.addObjectToCell(result.position, placed);
-        }
+        mover.moveObject(object, -1, 0, locr.x, locr.y, locr.l);
+        machine.ctx.dungeon.rnMaps.setPos(object, pos);
       }
     } else if (srcLocr) {
       // `MoveObject(object, srcX, srcY, x, y)`, and when it returns 0 — the group
@@ -492,7 +485,7 @@ function findCellDestination(
       }
     }
     if (decoded.category === DBType.MISSILE) {
-      const missile = machine.ctx.dungeon.getMissileRecord(placed);
+      const missile = machine.ctx.dungeon.getMissileRecord(object);
       const timer = missile ? machine.ctx.timers.getTimer(missile.timerIndex) : null;
       if (timer) {
         timer.timerWord8 = (timer.timerWord8 & 0xffe0) | (locr.x & 31);
@@ -500,7 +493,7 @@ function findCellDestination(
         timer.level = locr.l & 0xff;
         // The port's missile timer also carries the ID and the square, which CSBWin's
         // `timerObj6` does through the indirect index (see `updateMissileTimerEntry`).
-        timer.object = placed;
+        timer.object = object;
         timer.uByte6 = locr.x & 0xff;
         timer.uByte7 = locr.y & 0xff;
       }

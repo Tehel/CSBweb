@@ -5671,12 +5671,14 @@ Evidence: `tools/checks/dsa-move.ts`.
   destination are the same.
 - A teleporter turns an item's corner only when `oldX != -1` (`:3035-3041`), so a DSA
   drop keeps the corner it came with through the loop and the pads, and `object.pos(p)`
-  sets the final one afterwards.
+  sets the final one afterwards, over the stairs' turn too (`Code11f52.cpp:3159-3165`,
+  `tools/checks/stairs-move.ts` section 4).
 - A **monster** is not lifted when the destination is a cell, and the source and
   destination are both on the party's level (`MoveObject.cpp:203-220`). Instead
   `MoveObject(object, srcX, srcY, x, y)` moves it square to square, keeping its `ITEM16`,
   and when that returns 0 every monster-AI timer (`TT_FIRST_MONSTER_AI`..`TT_LAST_MONSTER_AI`)
-  on the old square is pointed at the new one (`:539-571`). Otherwise its `groupIndex` is
+  on the old square is pointed at the new one (`:539-571`); no `object.pos(p)` follows,
+  so it keeps its corner. Otherwise its `groupIndex` is
   set to `0xd8`, or `0xff` for a monster whose `horizontalSize` is 2 (`:504-521`), before
   `MoveObject(-1, 0, x, y)`, whose monster branch attaches an `ITEM16` and starts the AI
   timers if it lands on the party's level (`Code11f52.cpp:3398-3440`). A monster lifted
