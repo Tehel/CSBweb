@@ -21,7 +21,6 @@
  */
 import { CsbRandom } from '../../src/core/random';
 import { Position, RoomType } from '../../src/core/types';
-import { DungeonState } from '../../src/engine/DungeonState';
 import { MonsterSystem } from '../../src/engine/MonsterSystem';
 import {
   MonsterPerception,
@@ -110,16 +109,16 @@ async function main(): Promise<void> {
   const graphics = stockGraphics();
   const objectTables = graphicsTablesOf(graphics).objects;
 
-  const dungeon = new DungeonState(data);
+  const random = new CsbRandom(0x12345678);
+  const timers = new TimerQueue();
+  const footprints = new PartyFootprints();
+  const ctx = newContext(data, graphics, { timers, random, footprints });
+  const dungeon = ctx.dungeon;
   const level = Number(process.argv[2] ?? 2);
   const map = dungeon.getMap(level);
   if (!map) throw new Error(`no level ${level}`);
 
   const party = standInOf<PartyState>({ position: new Position(0, 0, level), champions: [], brightness: 0 });
-  const random = new CsbRandom(0x12345678);
-  const timers = new TimerQueue();
-  const footprints = new PartyFootprints();
-  const ctx = newContext(data, graphics, { dungeon, timers, random, footprints });
   ctx.party.state = party;
   const monsters = new MonsterSystem(ctx);
   monsters.loadPartyLevel(level);

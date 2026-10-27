@@ -30,7 +30,7 @@ import { OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../../src/core
 import type { ActuatorRecord } from '../../src/data/dungeonTypes';
 import { DungeonLoader } from '../../src/data/DungeonLoader';
 import { CellInfo, actuatorHasTarget, type CellRef, type InfoLine } from '../../src/engine/CellInfo';
-import { DungeonState } from '../../src/engine/DungeonState';
+import { DungeonState, NO_GAME } from '../../src/engine/DungeonState';
 import { nameIndexOf } from '../../src/engine/GameContext';
 import { check, finish } from '../lib/check';
 import { gameTablesOf, graphicsTablesOf, stockGame, stockGraphics } from '../lib/game';
@@ -120,7 +120,7 @@ function main(): void {
 
   // 7. A DSA.
   const conflux = new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync(resolve(CONFLUX))));
-  const dsa = new CellInfo({ dungeon: new DungeonState(conflux), tables: gameTablesOf(stockGraphics()), objectNames, party: null });
+  const dsa = new CellInfo({ dungeon: new DungeonState(conflux, NO_GAME), tables: gameTablesOf(stockGraphics()), objectNames, party: null });
   const at = { map: 1, x: 4, y: 0 };
   const lines = dsa.describe(at);
   show(at, lines);

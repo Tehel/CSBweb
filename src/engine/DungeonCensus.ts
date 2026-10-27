@@ -21,7 +21,7 @@
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';
 import type { ContainerRecord, CreatureRecord, DungeonData } from '../data/dungeonTypes';
 import { StkOp } from './dsa/DsaTypes';
-import { DungeonState } from './DungeonState';
+import { DungeonState, NO_GAME } from './DungeonState';
 
 /** The `STKOP` values that are no `case` of `EX_AMPERSAND`'s switch, nor `I_Indirect`. */
 export const NOT_OPERATIONS: ReadonlySet<number> = new Set<number>([StkOp.NOOP, StkOp.TWO_DUP, StkOp.I_FILTERED_CAST]);
@@ -61,7 +61,7 @@ export interface DungeonCensus {
 
 /** `data` counted; it is read and never changed. */
 export function dungeonCensus(data: DungeonData): DungeonCensus {
-  const dungeon = new DungeonState(data);
+  const dungeon = new DungeonState(data, NO_GAME);
   const items = Object.fromEntries(ITEM_KINDS.map((kind) => [kind, 0])) as Record<ItemKind, number>;
   const types = new Set<number>();
   let groups = 0;

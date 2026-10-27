@@ -13,7 +13,7 @@
  */
 import { OBJECT_ID_EOF, Position } from '../../src/core/types';
 import type { ObjectID } from '../../src/core/types';
-import { DungeonState } from '../../src/engine/DungeonState';
+import { DungeonState, NO_GAME } from '../../src/engine/DungeonState';
 import { check, finish } from '../lib/check';
 import { stockDungeon } from '../lib/game';
 
@@ -21,7 +21,7 @@ const hex = (rn: number): string => rn.toString(16).padStart(4, '0');
 
 function main(): void {
   const data = stockDungeon();
-  const dungeon = new DungeonState(data);
+  const dungeon = new DungeonState(data, NO_GAME);
 
   const chainOf = (p: Position): ObjectID[] => {
     const out: ObjectID[] = [];

@@ -28,7 +28,7 @@
 import { DBType, OBJECT_ID_EOF, type ObjectID } from '../../src/core/types';
 import { RN_FIREBALL, RN_LIGHTNING } from '../../src/core/spellRn';
 import type { MissileRecord } from '../../src/data/dungeonTypes';
-import { DungeonState } from '../../src/engine/DungeonState';
+import { DungeonState, NO_GAME } from '../../src/engine/DungeonState';
 import { GetBasicObjectType } from '../../src/engine/objectIndex';
 import { drawMissilesAtPosition, GetGraphicClass } from '../../src/renderer/bytecode/DrawRoomObjects';
 import { ViewportDraw } from '../../src/renderer/bytecode/ViewportDraw';
@@ -40,7 +40,7 @@ import { graphicsTablesOf, stockGraphics, stockDungeon } from '../lib/game';
 
 async function main(): Promise<void> {
   const data = stockDungeon();
-  const dungeon = new DungeonState(data);
+  const dungeon = new DungeonState(data, NO_GAME);
   const graphics = stockGraphics();
   const tables = graphicsTablesOf(graphics).objects;
 

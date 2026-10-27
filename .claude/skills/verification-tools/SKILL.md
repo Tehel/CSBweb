@@ -153,12 +153,14 @@ them again.
 **Build a `Game` through `tools/lib/game.ts`.** `newGame(data, graphics, options?)`
 gives the game every table in `GameTables` — built as `main.ts` builds it, from the one
 `extractGraphicsTables` of that `graphics.dat` — and `newContext(data, graphics, parts?)` gives a `GameContext` for a tool that
-stands one subsystem up without a `Game` (pass your own `dungeon`, `party`, `timers` or
-seeded `random` in `parts`; set `ctx.state.tickCount` for the clock). Subsystems call
-each other through `ctx.systems` (`DEBT.md` E1c), which such a context leaves empty: fill
-what the path under test reaches, with the real system or a stand-in
+stands one subsystem up without a `Game` (pass your own `party`, `timers` or seeded
+`random` in `parts`, and read the dungeon off `ctx.dungeon`, whose hooks are the
+context's; set `ctx.state.tickCount` for the clock). Subsystems call each other through
+`ctx.systems`, which such a context holds only as the tool fills it: pass the systems in
+`newContext`'s last argument or assign them after, the real system or a stand-in
 (`ctx.systems.missileEncounter = standInOf<MissileEncounter>({ createDeathCloud: () => { clouds++; } })`,
-`checks/monster-damage.ts`). A missing one fails loudly on `undefined`, never silently.
+`checks/monster-damage.ts`). Asking for one the tool has not given throws, naming it.
+A `DungeonState` built outside any context is `new DungeonState(data, NO_GAME)`.
 Any partial value is `standInOf<T>({ … })`'s (`tools/lib/standIn.ts`): a record, a
 drawing context, a dungeon with the three members a draw reaches. `tsc` checks each
 member given against `T`'s; an `as unknown as` checks nothing, and a renamed member then

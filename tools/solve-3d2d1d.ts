@@ -44,7 +44,7 @@ import {
 } from '../src/data/actuatorHelpers';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import type { ActuatorRecord, DungeonData, TeleporterRecord } from '../src/data/dungeonTypes';
-import { DungeonState } from '../src/engine/DungeonState';
+import { DungeonState, NO_GAME } from '../src/engine/DungeonState';
 
 const DIR = 'tools/fixtures/gamefiles/3D2D1D';
 const data: DungeonData = new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync(resolve(DIR, 'dungeon.dat'))));
@@ -69,7 +69,7 @@ interface World {
 const key = (l: number, x: number, y: number): string => `${l},${x},${y}`;
 
 function loadWorld(): World {
-  const dungeon = new DungeonState(data);
+  const dungeon = new DungeonState(data, NO_GAME);
   const world: World = { flags: [], teleporters: new Map(), actuators: new Map(), monsters: new Set() };
   for (let l = 0; l < NLEV; l++) {
     world.flags.push([]);

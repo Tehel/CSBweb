@@ -41,18 +41,13 @@ export class SoundQueue {
   csbGraphics: Pick<CSBGraphicsLoader, 'readSection'> | null = null;
 
   /**
-   * `SoundFilter(ordinal, highVolume, soundLocr)`, with the location as level, x and y:
-   * `DsaFilters.soundFilter` once `Game` has one, 0 when a DSA took the sound. Until then,
-   * and in a tool's context with no DSA system, 1, as for a dungeon with no filter.
-   */
-  soundFilter: (ordinal: number, highVolume: number, level: number, x: number, y: number) => number = () => 1;
-
-  /**
    * @param sound1772 `d.sound1772` — the sound table from `graphics.dat` item `0x232`.
    * @param host where a sample goes (`GameHost.playSound`), and a sound of
    *   `CSBgraphics.dat` (`playCustomSound`), and `ReadSound`'s complaints (`trace`).
    * @param state `state.tickCount` is `d.Time`, the clock a delayed sound is due by.
    * @param timers where a delayed sound's `TT_20` goes.
+   * @param soundFilter `SoundFilter(ordinal, highVolume, soundLocr)`, with the location as
+   *   level, x and y (`DsaFilters.soundFilter`): 0 when a DSA took the sound.
    */
   constructor(
     private readonly party: Party,
@@ -60,6 +55,7 @@ export class SoundQueue {
     private readonly host: Pick<GameHost, 'playSound' | 'playCustomSound' | 'trace'>,
     private readonly state: Pick<GameState, 'tickCount'>,
     private readonly timers: TimerQueue,
+    private readonly soundFilter: (ordinal: number, highVolume: number, level: number, x: number, y: number) => number,
   ) {}
 
   /**
@@ -83,10 +79,17 @@ export class SoundQueue {
       // `doc/CSBwin-src/CSBCode.cpp:1861-1877`: due at `d.Time + deltaTime - 1`, the
       // entry's `byte4` in `timerUByte5`, the ordinal in `timerWord8` (bytes 8-9).
       const time = (this.state.tickCount + (deltaTime & 0xffff) - 1) >>> 0;
-      this.timers.createTimerWithUByte5(
-        TimerFunction.TT_20, mapX, mapY, (ordinal >> 8) & 0xff, ordinal & 0xff, time, level,
-        entry.byte4, undefined, ordinal,
-      );
+      this.timers.createTimer({
+        function: TimerFunction.TT_20,
+        uByte5: entry.byte4,
+        uByte6: mapX,
+        uByte7: mapY,
+        uByte8: (ordinal >> 8) & 0xff,
+        uByte9: ordinal & 0xff,
+        time,
+        level,
+        timerWord8: ordinal,
+      });
       return;
     }
 

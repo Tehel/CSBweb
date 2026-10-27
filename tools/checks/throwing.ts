@@ -27,7 +27,6 @@
 import { CsbRandom } from '../../src/core/random';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../../src/core/types';
 import { CharacterStats } from '../../src/engine/CharacterStats';
-import { DungeonState } from '../../src/engine/DungeonState';
 import type { Champion } from '../../src/engine/gameTypes';
 import { makeAddCharacterAttributes } from '../../src/engine/attributes';
 import { AttackType } from '../../src/engine/monsterTypes';
@@ -57,8 +56,9 @@ async function main(): Promise<void> {
   const graphics = stockGraphics();
   const objectTables = graphicsTablesOf(graphics).objects;
 
-  const dungeon = new DungeonState(data);
-  const stats = new CharacterStats(newContext(data, graphics, { dungeon, random: new CsbRandom(0x12345678) }));
+  const statsContext = newContext(data, graphics, { random: new CsbRandom(0x12345678) });
+  const dungeon = statsContext.dungeon;
+  const stats = new CharacterStats(statsContext);
 
   /** Make a weapon record of the given type and return its object id. */
   const makeWeapon = (weaponType: number): ObjectID => {

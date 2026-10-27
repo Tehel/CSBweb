@@ -143,7 +143,7 @@ console.log('3. &GLOBALTEXT!');
   check(rec !== null && rec.length === Math.floor((name.length + 4) / 4), 'the record is (len + 4) / 4 longwords, at the index taken as a word');
   check(String.fromCharCode(...bytes.slice(0, name.length)) === name && bytes[name.length] === 0,
     'its bytes are the name and a zero, the first in the low byte');
-  check(game.ctx.dungeon.textSubstitution!.globalText(0x7b)?.join() === rec?.join(), 'DecodeText\'s .R.AAHL reads it');
+  check(game.ctx.dungeon.hooks.textSubstitution!.globalText(0x7b)?.join() === rec?.join(), 'DecodeText\'s .R.AAHL reads it');
   check(game.ctx.dungeon.locateExpoolRecord(key(0x100))?.join() === '0', 'a text never set is one longword, 0');
 }
 

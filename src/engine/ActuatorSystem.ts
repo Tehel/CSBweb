@@ -533,7 +533,15 @@ export class ActuatorSystem {
       return;
     }
 
-    this.timers.createTimer(timerFunction, targetX, targetY, targetPos, action, actionTime, source.z);
+    this.timers.createTimer({
+      function: timerFunction,
+      uByte6: targetX,
+      uByte7: targetY,
+      uByte8: targetPos,
+      uByte9: action,
+      time: actionTime,
+      level: source.z,
+    });
   }
 
   private scanObjectMoveContext(

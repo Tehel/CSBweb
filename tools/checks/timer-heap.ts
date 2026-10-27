@@ -150,7 +150,9 @@ function checkByHand(): void {
   // uByte5 0. The arrays after each step are worked by hand from `SetTimer`'s append and
   // `AdjustTimerQueue`, and from `DeleteTimer`'s move of the last entry into the hole.
   const q = new TimerQueue();
-  const add = (name: number, time: number) => q.createTimer(TimerFunction.TT_11, name, 0, 0, 0, time, 0).index;
+  const add = (name: number, time: number) => q.createTimer({
+    function: TimerFunction.TT_11, uByte6: name, time, level: 0,
+  }).index;
   const slotOf = new Map<number, number>();
   const steps: Array<[string, () => void, string]> = [
     ['add 50@5', () => { slotOf.set(50, add(50, 5)); }, '50'],
@@ -174,9 +176,9 @@ function checkByHand(): void {
   // A renumbered AI timer is re-sorted in place, `TIMER_SEARCH::AdjustTimerPriority`:
   // at the same time the higher function comes first.
   const r = new TimerQueue();
-  const a = r.createTimer(TimerFunction.TT_MONSTER_A0, 1, 0, 0, 0, 7, 0).index;
-  r.createTimer(TimerFunction.TT_MONSTER_A1, 2, 0, 0, 0, 7, 0);
-  r.createTimer(TimerFunction.TT_MONSTER_A2, 3, 0, 0, 0, 7, 0);
+  const a = r.createTimer({ function: TimerFunction.TT_MONSTER_A0, uByte6: 1, time: 7, level: 0 }).index;
+  r.createTimer({ function: TimerFunction.TT_MONSTER_A1, uByte6: 2, time: 7, level: 0 });
+  r.createTimer({ function: TimerFunction.TT_MONSTER_A2, uByte6: 3, time: 7, level: 0 });
   check(slots(r) === '3,1,2', `A2 first, then A0, then A1: [${slots(r)}]`);
   r.getTimer(a)!.function = TimerFunction.TT_MONSTER_A3;
   r.reprioritizeTimer(a);
@@ -206,7 +208,14 @@ function checkRandom(): void {
     const pick = rand(10);
     if (pick < 5 || live.length === 0) {
       const fn = FUNCTIONS[rand(FUNCTIONS.length)];
-      q.createTimerWithUByte5(fn, rand(32), rand(32), 0, 0, 127290 + rand(40), rand(4), rand(4));
+      q.createTimer({
+        function: fn,
+        uByte5: rand(4),
+        uByte6: rand(32),
+        uByte7: rand(32),
+        time: 127290 + rand(40),
+        level: rand(4),
+      });
       counts.add++;
     } else if (pick < 7) {
       q.deleteTimer(live[rand(live.length)].index);
@@ -273,7 +282,9 @@ function checkTableSize(files: string[]): void {
 
   const q = new TimerQueue();
   q.allocate(20);
-  const add = (t: number): number => q.createTimer(TimerFunction.TT_11, 0, 0, 0, 0, 1000 + t, 0).index;
+  const add = (t: number): number => q.createTimer({
+    function: TimerFunction.TT_11, time: 1000 + t, level: 0,
+  }).index;
   const slots: number[] = [];
   for (let t = 0; t < 15; t++) slots.push(add(t));
   q.deleteTimer(3);

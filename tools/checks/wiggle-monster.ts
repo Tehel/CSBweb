@@ -100,7 +100,14 @@ function wiggle(z: number, type: number, to: (game: Game, at: Position) => Posit
     return real(position, object, place, unchangedRoom, facing);
   });
   // At tick 0: the group's first AI timer is due at tick 1, and must not move it first.
-  game.ctx.timers.createTimer(TimerFunction.TT_TELEPORTER, at.x, at.y, 0, ActuatorAction.SET, 0, z);
+  game.ctx.timers.createTimer({
+    function: TimerFunction.TT_TELEPORTER,
+    uByte6: at.x,
+    uByte7: at.y,
+    uByte9: ActuatorAction.SET,
+    time: 0,
+    level: z,
+  });
   processTimersAt(game, 0);
   return { game, at, dest, rn, record, slot, calls, timersBefore };
 }

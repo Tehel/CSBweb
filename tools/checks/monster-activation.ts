@@ -9,7 +9,6 @@
  * Run: `npm test -- --only=monster-activation.ts [level]`  (default: level 3)
  */
 import { Position } from '../../src/core/types';
-import { DungeonState } from '../../src/engine/DungeonState';
 import { MonsterSystem } from '../../src/engine/MonsterSystem';
 import { TimerQueue, TimerFunction } from '../../src/engine/TimerQueue';
 import { CsbRandom } from '../../src/core/random';
@@ -24,16 +23,16 @@ async function main(): Promise<void> {
   const graphics = stockGraphics();
   const objectTables = graphicsTablesOf(graphics).objects;
 
-  const dungeon = new DungeonState(data);
+  const timers = new TimerQueue();
+  // A fixed seed: the point is a repeatable listing, not a realistic game.
+  const ctx = newContext(data, graphics, { timers, random: new CsbRandom(0x12345678) });
+  const dungeon = ctx.dungeon;
   const start = dungeon.getStartPosition();
   // Default to level 3, not the party's starting level: level 0 has no creatures at all,
   // so the no-argument run used to activate nothing and check nothing.
   const level = process.argv[2] !== undefined ? Number(process.argv[2]) : 3;
 
   const party = standInOf<PartyState>({ position: new Position(start.x, start.y, level), champions: [], brightness: 0 });
-  const timers = new TimerQueue();
-  // A fixed seed: the point is a repeatable listing, not a realistic game.
-  const ctx = newContext(data, graphics, { dungeon, timers, random: new CsbRandom(0x12345678) });
   ctx.party.state = party;
   const monsters = new MonsterSystem(ctx);
 

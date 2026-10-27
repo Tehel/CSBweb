@@ -14,8 +14,8 @@ import type { DungeonData } from '../../src/data/dungeonTypes';
 import { extractPresetHeroes, type PresetHero } from '../../src/data/HeroExtractor';
 import { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import { Game } from '../../src/engine/Game';
-import { createGameContext, type GameContext } from '../../src/engine/GameContext';
-import type { GameHost } from '../../src/engine/GameHost';
+import { createGameContext, type GameContext, type GameSystems } from '../../src/engine/GameContext';
+import { createGameHost, type GameHost } from '../../src/engine/GameHost';
 import { buildGameTables, type GameTables } from '../../src/engine/GameTables';
 import { VBL_PER_TICK } from '../../src/engine/LoopState';
 import { extractGraphicsTables, type GraphicsTables } from '../../src/data/tables/GraphicsTables';
@@ -87,13 +87,33 @@ export function newGame(data: DungeonData, graphics: GraphicsLoader, host?: Part
 
 /**
  * A `GameContext` over `data` with every table from `graphics`, for a tool that stands a
- * subsystem up without a whole `Game`. `parts` replaces members, so the tool can keep its
- * own party, dungeon or seeded random. (The replaced members are not rewired: the sound
- * queue keeps following the context's own party.) No read installs its world, so the timer
- * queue keeps `deleteDuplicateTimers`' default, `true`, whatever the world's `EXPOOL` says.
+ * subsystem up without a whole `Game`. `parts` replaces members in place, so the tool can
+ * keep its own party, timers or seeded random, and the dungeon's hooks read them. (The
+ * sound queue is not rewired: it keeps following the context's own party and timers.)
+ * `systems` are the systems the tool has built, or assigns to `ctx.systems` later; asking
+ * the context for any other throws. No read installs its world, so the timer queue keeps
+ * `deleteDuplicateTimers`' default, `true`, whatever the world's `EXPOOL` says.
  */
-export function newContext(data: DungeonData, graphics: GraphicsLoader, parts: Partial<GameContext> = {}): GameContext {
-  return { ...createGameContext(data, gameTablesOf(graphics)), ...parts };
+export function newContext(
+  data: DungeonData,
+  graphics: GraphicsLoader,
+  parts: Partial<Omit<GameContext, 'dungeon' | 'systems'>> = {},
+  systems: Partial<GameSystems> = {},
+): GameContext {
+  const ctx = createGameContext(data, gameTablesOf(graphics), createGameHost(), () => onlySystems(systems));
+  return Object.assign(ctx, parts);
+}
+
+/** `systems` as the whole of `GameSystems`, a system missing from it an error when asked for. */
+function onlySystems(systems: Partial<GameSystems>): GameSystems {
+  return new Proxy(systems, {
+    get(target, name, receiver) {
+      if (typeof name === 'string' && !(name in target)) {
+        throw new Error(`newContext: this tool's context has no ${name} system`);
+      }
+      return Reflect.get(target, name, receiver);
+    },
+  }) as GameSystems;
 }
 
 /**

@@ -30,7 +30,7 @@ import { altMonGraphicsKey, Expool, type ExpoolDatabase } from '../../src/data/C
 import { DungeonLoader } from '../../src/data/DungeonLoader';
 import type { DungeonData } from '../../src/data/dungeonTypes';
 import { monsterHasAttackGraphic, monsterHasBackGraphic, monsterHasSideGraphic } from '../../src/data/tables/MonsterDesc';
-import { DungeonState } from '../../src/engine/DungeonState';
+import { DungeonState, NO_GAME } from '../../src/engine/DungeonState';
 import { check, finish } from '../lib/check';
 
 const CONFLUX = 'tools/fixtures/gamefiles/conflux-3.5-b8';
@@ -174,7 +174,7 @@ function cache(conflux: DungeonData, loader: CSBGraphicsLoader): void {
 
 function census(conflux: DungeonData, loader: CSBGraphicsLoader): void {
   console.log('=== Conflux\'s groups ===');
-  const dungeon = new DungeonState(conflux);
+  const dungeon = new DungeonState(conflux, NO_GAME);
   let groups = 0;
   let alternate = 0;
   let found = 0;

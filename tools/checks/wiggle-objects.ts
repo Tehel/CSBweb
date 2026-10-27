@@ -113,7 +113,9 @@ function switchOn(game: Game, at: Position, tt: TimerFunction, stand: () => void
   const map = game.ctx.dungeon.getMap(at.z)!;
   map.cellFlags[at.x]![at.y]! &= ~0x08;
   stand();
-  game.ctx.timers.createTimer(tt, at.x, at.y, 0, ActuatorAction.SET, 1, at.z);
+  game.ctx.timers.createTimer({
+    function: tt, uByte6: at.x, uByte7: at.y, uByte9: ActuatorAction.SET, time: 1, level: at.z,
+  });
   processTimersAt(game, 1);
 }
 

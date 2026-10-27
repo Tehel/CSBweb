@@ -114,7 +114,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E31 | Late wiring with silent defaults, and long parameter lists | M | ⏳ |
 | E32 | Four ways to read bytes, and eight graphics caches | M | ⏳ |
 | E33 | What a frame costs | S | ⏳ |
 | E30 | One presenter and one input router | M | ⏳ |
@@ -447,25 +446,6 @@ own: the canvas, `drawViewport`, `refreshOverlay`, `handleMouseButton`'s deferre
 the Hint Oracle's open and close, `syncParty`, `setUIMode`, `initializePlayState` and the
 pointer's state.
 
-### E31 ⏳ Late wiring with silent defaults, and long parameter lists
-
-- `Game`'s constructor wires callbacks into objects built before it:
-  `DungeonState.makeMoreRoomInDB`, `textSubstitution` and `timerWord8Lookup`
-  (`DungeonState.ts:71`, `:76`, `:120`; `Game.ts:185-193`), and `SoundQueue.soundFilter`
-  (`= () => 1`, `SoundQueue.ts:48`); `TimerSystem`'s constructor writes into `ctx.dungeon`
-  (`:96`). A bare `createGameContext` gets, silently, a full database that refuses records,
-  untranslated texts and no sound filter, and `systems: {} as GameSystems`
-  (`GameContext.ts:363`) types every system as present.
-- `TimerQueue.createTimer` takes ten positional parameters and `createTimerWithUByte5`, its
-  near copy, eleven (`TimerQueue.ts:200-259`), at 26 call sites
-  (`createTimer(TT_LIGHT, 0, 0, 0, 0, time >>> 0, z, undefined, 0, deltaSteps)`,
-  `TimerSystem.ts:290`). `WorldMove.resolveCellEffects` takes nine, with
-  `objectType = -1` meaning the party (`WorldMove.ts:277-287`).
-
-Paying it: the callbacks as constructor dependencies, with a tool builder that fails on a
-missing one (or `GameSystems` partial for a bare context); named constructors per timer
-family or an options object; a `PARTY_OBJECT_TYPE` constant.
-
 ### E32 ⏳ Four ways to read bytes, and eight graphics caches
 
 - **Bytes** are read through `BinaryFile`, `core/bytes`, `DataView` (`UITables`,
@@ -736,7 +716,7 @@ New verification debt goes here; it can be taken anywhere ("Priority", point 5).
 - `tools/checks/vbl-clock.ts`'s "MainLoop opens with a tick" check can fail under load and
   pass alone (it failed once in a full `npm test`, sixteen tools at a time). `Game.start`
   sets `vblClockStart = Date.now()` and calls `gameLoop()` at once, which reads
-  `Date.now()` again (`src/engine/Game.ts:249`, `:500`), so a stall of 17 ms between
+  `Date.now()` again (`src/engine/Game.ts:238`, `:489`), so a stall of 17 ms between
   the two runs a VBL inside `start` and spends the opening tick. The tool pins `Date.now`
   for its pacing section (`:129-173`) and not for this one.
 - `tools/checks/loop-die.ts` waits `1000 / 60 * failOn + 150` real milliseconds, then checks
@@ -897,7 +877,7 @@ CSBWin records a game as the mouse-queue entries it takes, each with its tick an
 needs, where the port stands against it, and what sharing recordings would take.
 
 The port has neither. It keeps only the recorder's count, `totalMoveCount`, which a save
-stores (`Game.recordFileRecord`, `src/engine/Game.ts:1001`), and `extraTicks` is always on
+stores (`Game.recordFileRecord`, `src/engine/Game.ts:990`), and `extraTicks` is always on
 (`src/engine/MovementSystem.ts:115-116`). Conflux 3.5's `AutoRecord` (`doc/RECORDING.md`)
 asks for a recorder the port does not have.
 

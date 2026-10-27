@@ -8,7 +8,7 @@
 
 import type { DungeonData } from '../data/dungeonTypes';
 import { DungeonLoader } from '../data/DungeonLoader';
-import { globalTextKey, readDeleteDuplicateTimers, readDisableSaves, readGlobalVariables } from '../data/CsbwinExpool';
+import { readDeleteDuplicateTimers, readDisableSaves, readGlobalVariables } from '../data/CsbwinExpool';
 import { Die } from '../core/Die';
 import { die } from './Die';
 import { readGame } from './ReadGame';
@@ -39,7 +39,6 @@ import { MouseSystem } from './MouseSystem';
 import { HallOfChampions } from './HallOfChampions';
 import { MOUSE_UNCLICK, UNTRANSLATED_CLICK, type MouseQueueEntry } from './MouseQueue';
 import { createGravityState, createLoopFlags, flashButton, vblFlashButton, vblInterrupt, waitForButtonFlash, type LoopScript, type MainLoop } from './LoopState';
-import { makeMoreRoomInDB } from './MakeMoreRoomInDB';
 import { smartDiscard } from './SmartDiscard';
 import { isNinetySecondTick, isTenSecondTick, ninetySecondUpdate, tenSecondUpdate } from './PeriodicUpdates';
 import { DsaSystem } from './DsaSystem';
@@ -182,18 +181,7 @@ export class Game implements MainLoop {
      * does nothing.
      */
     constructor(dungeonData: DungeonData, tables: GameTables, host: Partial<GameHost> = {}) {
-        const ctx = createGameContext(dungeonData, tables, createGameHost(host));
-        this.ctx = ctx;
-        ctx.dungeon.makeMoreRoomInDB = (db) => makeMoreRoomInDB(ctx, db);
-        ctx.sounds.soundFilter = (ordinal, highVolume, level, x, y) =>
-            ctx.systems.dsa.filters.soundFilter(ordinal, highVolume, level, x, y);
-        ctx.dungeon.textSubstitution = {
-            handChar: () => ctx.party.state.cursorOwner,
-            characterName: (index) => ctx.party.state.champions[index]?.name ?? null,
-            globalText: (index) => ctx.dungeon.locateExpoolRecord(globalTextKey(index)),
-            globalVariable: (index) => ctx.systems.dsa.getGlobalVariable(index),
-        };
-        Object.assign(ctx.systems, {
+        const ctx = createGameContext(dungeonData, tables, createGameHost(host), (ctx) => ({
             actuators: new ActuatorSystem(ctx),
             dsa: new DsaSystem(ctx),
             timer: new TimerSystem(ctx),
@@ -213,7 +201,8 @@ export class Game implements MainLoop {
             mouse: new MouseSystem(ctx),
             hallOfChampions: new HallOfChampions(ctx),
             mainLoop: this,
-        } satisfies GameSystems);
+        }));
+        this.ctx = ctx;
         this.systems = ctx.systems;
         // A game built over a world takes it as a read does, `deleteDuplicateTimers` with it.
         this.installWorld(dungeonData);

@@ -60,8 +60,8 @@ function mapTimersAfterTwo(game: Game): number {
   const isPit = (fn: number): boolean => fn === TimerFunction.TT_PIT;
   const before = timers.getTimers().filter((t) => isPit(t.function)).length;
   const time = game.ctx.state.tickCount + delay++;
-  timers.createTimer(TimerFunction.TT_PIT, 3, 4, 0, 0, time, 1);
-  timers.createTimer(TimerFunction.TT_PIT, 3, 4, 0, 1, time, 1);
+  timers.createTimer({ function: TimerFunction.TT_PIT, uByte6: 3, uByte7: 4, time, level: 1 });
+  timers.createTimer({ function: TimerFunction.TT_PIT, uByte6: 3, uByte7: 4, uByte9: 1, time, level: 1 });
   return timers.getTimers().filter((t) => isPit(t.function)).length - before;
 }
 

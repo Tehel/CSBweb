@@ -32,14 +32,14 @@ const LEVEL = 0;
 /** Queue and delete throwaway timers until the counter reads `sequence`. */
 function advanceTo(q: TimerQueue, sequence: number): void {
   while (q.getNextSequence() !== sequence) {
-    const filler = q.createTimer(TimerFunction.TT_LIGHT, 0, 0, 0, 0, 1, LEVEL);
+    const filler = q.createTimer({ function: TimerFunction.TT_LIGHT, time: 1, level: LEVEL });
     q.deleteTimer(filler.index);
   }
 }
 
 /** A timer due on `DUE`, told apart from its peers by `uByte6`. */
 function label(q: TimerQueue, name: number): number {
-  return q.createTimer(TimerFunction.TT_LIGHT, name, 0, 0, 0, DUE, LEVEL).sequence;
+  return q.createTimer({ function: TimerFunction.TT_LIGHT, uByte6: name, time: DUE, level: LEVEL }).sequence;
 }
 
 /** The labelled timers in their firing order, `timerLess`'s, with their stamps. */
@@ -82,11 +82,15 @@ function wrap(q: TimerQueue): number[] {
 // 2. A duplicate that SetTimer drops returns before the repack (Timer.cpp:1011-1125).
 {
   const q = new TimerQueue();
-  q.createTimer(TimerFunction.TT_DOOR_STEP, 3, 3, 0, 0, DUE, LEVEL); // stamp 0
+  q.createTimer({
+    function: TimerFunction.TT_DOOR_STEP, uByte6: 3, uByte7: 3, time: DUE, level: LEVEL,
+  }); // stamp 0
   advanceTo(q, 1000);
   label(q, 1);
   advanceTo(q, 0xffff);
-  q.createTimer(TimerFunction.TT_DOOR_STEP, 3, 3, 0, 1, DUE, LEVEL); // clashes, dropped
+  q.createTimer({
+    function: TimerFunction.TT_DOOR_STEP, uByte6: 3, uByte7: 3, uByte9: 1, time: DUE, level: LEVEL,
+  }); // clashes, dropped
   check(q.getNextSequence() === 0xffff && labelled(q).includes('1@1000'),
     `2: a dropped duplicate neither repacks nor consumes 0xffff (next ${q.getNextSequence()}; ${labelled(q)})`);
 }

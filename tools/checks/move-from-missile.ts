@@ -179,7 +179,9 @@ const show = (label: string, c: FilterCall | undefined): void =>
     indexInside = record.timerIndex;
     // A timer queued by the filter takes the lowest free slot, the one the fireball's
     // timer left.
-    squatter = tq.createTimer(TimerFunction.TT_DOOR, 0, 0, 0, 0, game.ctx.state.tickCount + 1000, party.z).index;
+    squatter = tq.createTimer({
+      function: TimerFunction.TT_DOOR, time: game.ctx.state.tickCount + 1000, level: party.z,
+    }).index;
     game.systems.missileEncounter.checkPartyMoveFromMissile(party, null);
   };
   calls.length = 0;

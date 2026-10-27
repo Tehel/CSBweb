@@ -31,7 +31,7 @@
  * Run: `npm test -- --only=footprint-decoration.ts`
  */
 import { OBJECT_ID_EOF, Position, RoomType } from '../../src/core/types';
-import { DungeonState, extendedCellFlagsKey } from '../../src/engine/DungeonState';
+import { DungeonState, NO_GAME, extendedCellFlagsKey } from '../../src/engine/DungeonState';
 import { PartyFootprints } from '../../src/engine/PartyFootprints';
 import { GraphicRoomType, type SummarizeRoomData } from '../../src/renderer/bytecode/Types';
 import type { IndexedBitmap } from '../../src/renderer/csbwin/CanvasBlitter';
@@ -43,7 +43,7 @@ import { graphicsTablesOf, stockGraphics, stockDungeon } from '../lib/game';
 
 function main(): void {
   const data = stockDungeon();
-  const dungeon = new DungeonState(data);
+  const dungeon = new DungeonState(data, NO_GAME);
   const map = dungeon.getMap(0);
   if (!map) throw new Error('no level 0');
 
@@ -176,7 +176,7 @@ function drawing(): void {
 
   // A fresh level 0: the scenarios above turned one of its cells into a false wall.
   const data = stockDungeon();
-  const dungeon = new DungeonState(data);
+  const dungeon = new DungeonState(data, NO_GAME);
   const map = dungeon.getMap(0)!;
   const isOpen = (x: number, y: number): boolean => y >= 0 && (map.cellFlags[x]![y]! >> 5) === RoomType.OPEN;
   let at: Position | null = null;

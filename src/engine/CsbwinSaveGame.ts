@@ -64,7 +64,7 @@ import { readCsbwinParty, readCsbwinPartyTail } from '../data/CsbwinCharacters';
 import { CHARDESC_SIZE } from '../data/CsbwinSaveInfo';
 import { readSaveFile, type Block2, type SaveFile } from '../data/SaveFile';
 import { CheckMonsters } from './CheckMonsters';
-import { DungeonState } from './DungeonState';
+import { DungeonState, NO_GAME } from './DungeonState';
 import type { Game } from './Game';
 import { identityOverlayPalette } from './OverlayPalette';
 import { readGame } from './ReadGame';
@@ -312,7 +312,7 @@ export function fromSaveFile(game: Game, file: SaveFile): CsbwinWorld {
         state: () => {
             // `_ReadEntireGame`'s `CheckMonsters` (doc/CSBwin-src/SaveGame.cpp:2029), before
             // `reloadAfterSaveGame` detaches the save's `ITEM16`s (`src/engine/CheckMonsters.ts`).
-            CheckMonsters(new DungeonState(world.dungeon), game.ctx.tables.monsterDesc, (line) => game.ctx.host.trace(line));
+            CheckMonsters(new DungeonState(world.dungeon, NO_GAME), game.ctx.tables.monsterDesc, (line) => game.ctx.host.trace(line));
             clearFreeMissiles(world);
             // The image holds none of these seven: the save carries them beside it.
             Object.assign(world.dungeon, {

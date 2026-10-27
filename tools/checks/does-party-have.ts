@@ -14,7 +14,6 @@ import { getActuatorType } from '../../src/data/actuatorHelpers';
 import { ActuatorSystem } from '../../src/engine/ActuatorSystem';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../../src/engine/AddCharacter';
 import type { AddCharacterTables } from '../../src/engine/AddCharacter';
-import { DungeonState } from '../../src/engine/DungeonState';
 import { GetBasicObjectType } from '../../src/engine/objectIndex';
 import { Party } from '../../src/engine/Party';
 import { graphicsTablesOf, newContext, presetHeroesOf, stockDungeon, stockGraphics } from '../lib/game';
@@ -34,18 +33,18 @@ async function main(): Promise<void> {
   const heroes = presetHeroesOf(data, graphics);
   if (heroes.length < 2) throw new Error('dungeon.dat carries fewer than two preset heroes');
 
-  const dungeon = new DungeonState(data);
+  const party = new Party(new Position(1, 1, 0), Direction.NORTH);
+  const ctx = newContext(data, graphics, { party, random: new CsbRandom(0x1234) });
+  const dungeon = ctx.dungeon;
   const basic = (rn: ObjectID): number => GetBasicObjectType(dungeon, objectTables.objDescObjectType, rn);
 
   // For the record: how many type-8 sensors the shipped dungeon has.
   const type8 = data.databases.actuators.records.filter((rec) => getActuatorType(rec) === 8).length;
   console.log(`dungeon.dat has ${type8} type-8 (party-has) actuator(s)`);
 
-  const party = new Party(new Position(1, 1, 0), Direction.NORTH);
   for (let i = 0; i < 2; i++) {
     party.addChampion(createChampionFromPreset(heroes[i], i, assignPresetHeroPossessions(heroes[i].inventory, addTables)));
   }
-  const ctx = newContext(data, graphics, { dungeon, party, random: new CsbRandom(0x1234) });
   ctx.state.tickCount = 1000;
   const actuators = new ActuatorSystem(ctx);
   const has = (value: number): boolean => actuators.doesPartyHave(value);

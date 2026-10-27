@@ -313,7 +313,14 @@ export class MissileEncounter {
         // is spent either way.
         if (doorState !== 5 && projectile === RN_ZO_SPELL) {
           if (door.hasButton) {
-            this.timers.createTimer(TimerFunction.TT_DOOR, objX, objY, 0, ActuatorAction.TOGGLE, (this.ctx.state.tickCount + 1) >>> 0, position.z);
+            this.timers.createTimer({
+              function: TimerFunction.TT_DOOR,
+              uByte6: objX,
+              uByte7: objY,
+              uByte9: ActuatorAction.TOGGLE,
+              time: (this.ctx.state.tickCount + 1) >>> 0,
+              level: position.z,
+            });
           }
           break;
         }
@@ -643,16 +650,14 @@ export class MissileEncounter {
       this.dungeon.deleteDBEntry(rn);
       return null;
     }
-    this.timers.createTimer(
-      TimerFunction.TT_24,
-      position.x,
-      position.y,
-      0,
-      0,
-      (startTime + 100) >>> 0,
-      position.z,
-      rn,
-    );
+    this.timers.createTimer({
+      function: TimerFunction.TT_24,
+      uByte6: position.x,
+      uByte7: position.y,
+      time: (startTime + 100) >>> 0,
+      level: position.z,
+      object: rn,
+    });
     return rn;
   }
 
@@ -684,16 +689,14 @@ export class MissileEncounter {
 
     // The Vi altar's cloud gets 5 ticks before its first turn; everything else 1.
     const delay = projectile === RN_FFE4 ? 5 : 1;
-    this.timers.createTimer(
-      TimerFunction.TT_25,
-      position.x,
-      position.y,
-      0,
-      0,
-      (this.ctx.state.tickCount + delay) >>> 0,
-      position.z,
-      rn,
-    );
+    this.timers.createTimer({
+      function: TimerFunction.TT_25,
+      uByte6: position.x,
+      uByte7: position.y,
+      time: (this.ctx.state.tickCount + delay) >>> 0,
+      level: position.z,
+      object: rn,
+    });
 
     if (projectile !== RN_LIGHTNING && projectile !== RN_FIREBALL) return;
 
@@ -766,7 +769,13 @@ export class MissileEncounter {
     // Bottom three bits 4 means a closed door; 5 is the shattered state.
     if ((cellFlag & 7) !== 4) return false;
     if (delay !== 0) {
-      this.timers.createTimer(TimerFunction.TT_BASH_DOOR, position.x, position.y, 0, 0, (this.ctx.state.tickCount + delay) >>> 0, position.z);
+      this.timers.createTimer({
+        function: TimerFunction.TT_BASH_DOOR,
+        uByte6: position.x,
+        uByte7: position.y,
+        time: (this.ctx.state.tickCount + delay) >>> 0,
+        level: position.z,
+      });
     } else {
       setDoorState(map, position.x, position.y, 5);
     }

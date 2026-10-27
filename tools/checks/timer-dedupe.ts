@@ -24,8 +24,10 @@ const Y = 7;
 
 function queue(fn: number, action: number, pos = 0, x = X, time = T): { q: TimerQueue; first: TimerEntry } {
   const q = new TimerQueue();
-  q.createTimer(TimerFunction.TT_MISSILE, 0, 0, 0, 0, 99, 0); // a bystander in slot 0
-  const first = q.createTimer(fn, x, Y, pos, action, time, LEVEL);
+  q.createTimer({ function: TimerFunction.TT_MISSILE, time: 99, level: 0 }); // a bystander in slot 0
+  const first = q.createTimer({
+    function: fn, uByte6: x, uByte7: Y, uByte8: pos, uByte9: action, time, level: LEVEL,
+  });
   return { q, first };
 }
 
@@ -41,7 +43,9 @@ function survivors(q: TimerQueue): TimerEntry[] {
 // new uByte9, and SetTimer hands it back (Timer.cpp:1022-1036).
 {
   const { q, first } = queue(TimerFunction.TT_PIT, 0);
-  const got = q.createTimer(TimerFunction.TT_TELEPORTER, X, Y, 0, 1, T, LEVEL);
+  const got = q.createTimer({
+    function: TimerFunction.TT_TELEPORTER, uByte6: X, uByte7: Y, uByte9: 1, time: T, level: LEVEL,
+  });
   const s = survivors(q);
   console.log(`1. map meets map: ${describe(q)}`);
   check(s.length === 1, `1: one map timer left (${s.length})`);
@@ -54,8 +58,18 @@ function survivors(q: TimerQueue): TimerEntry[] {
 // 1b. …but a TT_STONEROOM only clashes on the same uByte8, and another time never does.
 {
   const { q } = queue(TimerFunction.TT_STONEROOM, 0, 1);
-  q.createTimer(TimerFunction.TT_STONEROOM, X, Y, 2, 1, T, LEVEL);
-  q.createTimer(TimerFunction.TT_STONEROOM, X, Y, 1, 1, T + 1, LEVEL);
+  q.createTimer({
+    function: TimerFunction.TT_STONEROOM, uByte6: X, uByte7: Y, uByte8: 2, uByte9: 1, time: T, level: LEVEL,
+  });
+  q.createTimer({
+    function: TimerFunction.TT_STONEROOM,
+    uByte6: X,
+    uByte7: Y,
+    uByte8: 1,
+    uByte9: 1,
+    time: T + 1,
+    level: LEVEL,
+  });
   check(survivors(q).length === 3, `1b: other corners and other times coexist (${survivors(q).length})`);
 }
 
@@ -63,7 +77,7 @@ function survivors(q: TimerQueue): TimerEntry[] {
 // 2 is flipped from the old one's (Timer.cpp:1038-1051).
 {
   const { q } = queue(TimerFunction.TT_DOOR_STEP, 1);
-  q.createTimer(TimerFunction.TT_DOOR, X, Y, 0, 2, T, LEVEL);
+  q.createTimer({ function: TimerFunction.TT_DOOR, uByte6: X, uByte7: Y, uByte9: 2, time: T, level: LEVEL });
   const s = survivors(q);
   console.log(`2. map meets TT_1: ${describe(q)}`);
   check(s.length === 1 && s[0]?.function === TimerFunction.TT_DOOR, `2: only the new TT_DOOR is left (${describe(q)})`);
@@ -74,7 +88,9 @@ function survivors(q: TimerQueue): TimerEntry[] {
 // 1 - new, and the TT_1 is dropped (Timer.cpp:1073-1085).
 {
   const { q, first } = queue(TimerFunction.TT_DOOR, 2);
-  const got = q.createTimer(TimerFunction.TT_DOOR_STEP, X, Y, 0, 1, T, LEVEL);
+  const got = q.createTimer({
+    function: TimerFunction.TT_DOOR_STEP, uByte6: X, uByte7: Y, uByte9: 1, time: T, level: LEVEL,
+  });
   const s = survivors(q);
   console.log(`3. TT_1 meets TT_DOOR(2): ${describe(q)}`);
   check(s.length === 1 && s[0]?.function === TimerFunction.TT_DOOR, `3: the TT_DOOR is kept, the TT_1 dropped (${describe(q)})`);
@@ -86,7 +102,9 @@ function survivors(q: TimerQueue): TimerEntry[] {
 // 3b. …and a TT_DOOR whose uByte9 is not 2 is left exactly as it was.
 {
   const { q } = queue(TimerFunction.TT_DOOR, 0);
-  q.createTimer(TimerFunction.TT_DOOR_STEP, X, Y, 0, 1, T, LEVEL);
+  q.createTimer({
+    function: TimerFunction.TT_DOOR_STEP, uByte6: X, uByte7: Y, uByte9: 1, time: T, level: LEVEL,
+  });
   const s = survivors(q);
   check(s.length === 1 && s[0]?.function === TimerFunction.TT_DOOR && s[0]?.uByte9 === 0,
     `3b: the TT_DOOR is unchanged and the TT_1 dropped (${describe(q)})`);
@@ -95,7 +113,9 @@ function survivors(q: TimerQueue): TimerEntry[] {
 // 4. A TT_1 meets a TT_1: the old one takes the new uByte9 and stays (Timer.cpp:1087-1092).
 {
   const { q, first } = queue(TimerFunction.TT_DOOR_STEP, 0);
-  q.createTimer(TimerFunction.TT_DOOR_STEP, X, Y, 0, 1, T, LEVEL);
+  q.createTimer({
+    function: TimerFunction.TT_DOOR_STEP, uByte6: X, uByte7: Y, uByte9: 1, time: T, level: LEVEL,
+  });
   const s = survivors(q);
   console.log(`4. TT_1 meets TT_1: ${describe(q)}`);
   check(s.length === 1 && s[0]?.index === first.index && s[0]?.uByte9 === 1,
@@ -105,7 +125,9 @@ function survivors(q: TimerQueue): TimerEntry[] {
 // 5. A different square is no clash at all.
 {
   const { q } = queue(TimerFunction.TT_DOOR, 2, 0, X + 1);
-  q.createTimer(TimerFunction.TT_DOOR_STEP, X, Y, 0, 1, T, LEVEL);
+  q.createTimer({
+    function: TimerFunction.TT_DOOR_STEP, uByte6: X, uByte7: Y, uByte9: 1, time: T, level: LEVEL,
+  });
   check(survivors(q).length === 2, `5: another square does not clash (${describe(q)})`);
 }
 
@@ -115,7 +137,9 @@ function survivors(q: TimerQueue): TimerEntry[] {
 {
   const { q } = queue(TimerFunction.TT_DOOR, 0);
   const before = q.getNextSequence();
-  q.createTimer(TimerFunction.TT_DOOR_STEP, X, Y, 0, 1, T, LEVEL); // dropped: clashes with the TT_DOOR
+  q.createTimer({
+    function: TimerFunction.TT_DOOR_STEP, uByte6: X, uByte7: Y, uByte9: 1, time: T, level: LEVEL,
+  }); // dropped: clashes with the TT_DOOR
   check(q.getNextSequence() === before, `6: a dropped duplicate consumes no sequence number (${before} -> ${q.getNextSequence()})`);
   const template = { ...q.getTimers()[0]!, index: -1, function: TimerFunction.TT_29, time: 50, sequence: 0 };
   const a = q.addTimer(template);

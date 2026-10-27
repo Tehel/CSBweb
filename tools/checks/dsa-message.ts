@@ -110,7 +110,7 @@ for (const room of ['open', 'stone'] as const) {
   /* ----------------------------- 3. any other room timer ------------------------------ */
   const now = game.ctx.state.tickCount;
   const fn = room === 'stone' ? TimerFunction.TT_STONEROOM : TimerFunction.TT_OPENROOM;
-  game.ctx.timers.createTimer(fn, at.x, at.y, 0, 0, now, at.z);
+  game.ctx.timers.createTimer({ function: fn, uByte6: at.x, uByte7: at.y, time: now, level: at.z });
   tick(game);
   const other = game.systems.dsa.getGlobalVariables();
   console.log(`3. after a ${room === 'stone' ? 'TT_STONEROOM' : 'TT_OPENROOM'} timer, the DSA saw a count of ${other[0]}`);

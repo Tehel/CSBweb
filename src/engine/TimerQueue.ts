@@ -114,6 +114,10 @@ export interface TimerEntry {
   object?: ObjectID;
 }
 
+/** What `createTimer` is given: the function, the time and the level, and any other field set. */
+export type NewTimer = Pick<TimerEntry, 'function' | 'time' | 'level'>
+  & Partial<Pick<TimerEntry, 'uByte5' | 'uByte6' | 'uByte7' | 'uByte8' | 'uByte9' | 'timerWord8' | 'timerWord6' | 'object'>>;
+
 /**
  * The timer index a missile's record holds while `MissileTimer` moves it
  * (`pDBMissile->timerIndex(0xffff)`, `doc/CSBwin-src/Timer.cpp:224-226`), which
@@ -190,65 +194,26 @@ export class TimerQueue {
     return entry;
   }
 
-  createTimer(
-    functionType: number,
-    x: number,
-    y: number,
-    pos: number,
-    action: number,
-    time: number,
-    level: number,
-    object?: ObjectID,
-    timerWord8 = 0,
-    timerWord6 = 0,
-  ): TimerEntry {
-    const entry: TimerEntry = {
+  /**
+   * A `TIMER` filled as a caller of `SetTimer` fills one, by its fields (`timer.Function`,
+   * `timer.timerUByte6`, …), and queued (`addTimer`). A byte or word left out is 0.
+   */
+  createTimer(timer: NewTimer): TimerEntry {
+    return this.addTimer({
       index: -1, // assigned by addTimer, which is the one place indices are minted
-      time: time >>> 0,
-      level: level & 0xff,
-      function: functionType & 0xff,
-      uByte5: 0,
-      uByte6: x & 0xff,
-      uByte7: y & 0xff,
-      uByte8: pos & 0xff,
-      uByte9: action & 0xff,
+      time: timer.time >>> 0,
+      level: timer.level & 0xff,
+      function: timer.function & 0xff,
+      uByte5: (timer.uByte5 ?? 0) & 0xff,
+      uByte6: (timer.uByte6 ?? 0) & 0xff,
+      uByte7: (timer.uByte7 ?? 0) & 0xff,
+      uByte8: (timer.uByte8 ?? 0) & 0xff,
+      uByte9: (timer.uByte9 ?? 0) & 0xff,
       sequence: 0, // stamped by addTimer, if it is queued at all
-      timerWord8: timerWord8 & 0xffff,
-      timerWord6: sw(timerWord6),
-      object,
-    };
-    return this.addTimer(entry);
-  }
-
-  createTimerWithUByte5(
-    functionType: number,
-    x: number,
-    y: number,
-    pos: number,
-    action: number,
-    time: number,
-    level: number,
-    uByte5: number,
-    object?: ObjectID,
-    timerWord8 = 0,
-    timerWord6 = 0,
-  ): TimerEntry {
-    const entry: TimerEntry = {
-      index: -1, // assigned by addTimer
-      time: time >>> 0,
-      level: level & 0xff,
-      function: functionType & 0xff,
-      uByte5: uByte5 & 0xff,
-      uByte6: x & 0xff,
-      uByte7: y & 0xff,
-      uByte8: pos & 0xff,
-      uByte9: action & 0xff,
-      sequence: 0, // stamped by addTimer, if it is queued at all
-      timerWord8: timerWord8 & 0xffff,
-      timerWord6: sw(timerWord6),
-      object,
-    };
-    return this.addTimer(entry);
+      timerWord8: (timer.timerWord8 ?? 0) & 0xffff,
+      timerWord6: sw(timer.timerWord6 ?? 0),
+      object: timer.object,
+    });
   }
 
   /**

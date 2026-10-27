@@ -61,27 +61,48 @@ export function dbMax(dbNum: DBType): number {
     return dbNum === DBType.CLOUD ? 768 : dbNum === DBType.ACTUATOR ? 16000 : 8000;
 }
 
+/** What a dungeon asks of the game it is played in, given when it is built. */
+export interface DungeonHooks {
+    /**
+     * `MakeMoreRoomInDB` (`engine/MakeMoreRoomInDB`), which needs the systems: the RN of
+     * a record freed in `db`, or `RNnul`.
+     */
+    makeMoreRoomInDB(db: DBType): ObjectID;
+    /**
+     * What `DecodeText`'s `SubstituteCharacterNames` reads of the game; `null`, a text is
+     * decoded as it stands.
+     */
+    readonly textSubstitution: TextSubstitution | null;
+    /** Word 8 of timer `index` in the live queue (`TimerQueue.getTimerWord8`). */
+    timerWord8(index: number): ui16 | null;
+}
+
+/**
+ * The hooks of a dungeon only read, outside any game, as the census and the tools read
+ * one: its texts as they stand, no timer queue, and no game to make room in.
+ */
+export const NO_GAME: DungeonHooks = {
+    makeMoreRoomInDB: () => {
+        throw new Error('MakeMoreRoomInDB: a dungeon outside a game has no room to make');
+    },
+    textSubstitution: null,
+    timerWord8: () => null,
+};
+
 export class DungeonState {
     private data: DungeonData;
 
-    /**
-     * `MakeMoreRoomInDB`, which `Game` supplies because it needs the systems
-     * (`engine/MakeMoreRoomInDB`). Without it a full database refuses the record.
-     */
-    makeMoreRoomInDB: ((db: DBType) => ObjectID) | null = null;
-    /**
-     * What `DecodeText`'s `SubstituteCharacterNames` reads of the game, which `Game`
-     * supplies. Without it a text is decoded as it stands.
-     */
-    textSubstitution: TextSubstitution | null = null;
-    private timerWord8Lookup?: (index: number) => ui16 | null;
     /**
      * `skinCache`, new with every world taken and every state restored, where CSBWin's
      * `Cleanup` empties it before a game is read (`src/engine/SkinCache.ts`).
      */
     skinCache: SkinCache;
 
-    constructor(data: DungeonData) {
+    /**
+     * `data` is the world; `hooks` what it asks of the game it is played in: the
+     * context's (`createGameContext`), or `NO_GAME` for a dungeon only read.
+     */
+    constructor(data: DungeonData, readonly hooks: DungeonHooks) {
         this.data = data;
         this.skinCache = new SkinCache(data);
     }
@@ -114,10 +135,6 @@ export class DungeonState {
 
     getSpellFilterLocation(): number {
         return this.data.spellFilterLocation ?? 0;
-    }
-
-    setTimerWord8Lookup(getWord8: (index: number) => ui16 | null): void {
-        this.timerWord8Lookup = getWord8;
     }
 
     /**
@@ -493,7 +510,7 @@ export class DungeonState {
             result = this.rnMaps.assignIndexEntry(emptyIndexEntry, dbType, emptyDBEntry, important);
         }
         if (result === OBJECT_ID_NULL) {
-            result = this.makeMoreRoomInDB?.(dbType) ?? OBJECT_ID_NULL;
+            result = this.hooks.makeMoreRoomInDB(dbType);
             if (result === OBJECT_ID_NULL) return OBJECT_ID_NULL;
             database.records[this.rnMaps.idx(result)] = record;
             return result;
@@ -737,7 +754,7 @@ export class DungeonState {
      * timer queued, so the renderer never asks for one.
      */
     getTimerWord8(index: number): ui16 | null {
-        return this.timerWord8Lookup?.(index) ?? null;
+        return this.hooks.timerWord8(index);
     }
 
     /**
@@ -814,8 +831,9 @@ export class DungeonState {
     ): { text: Uint8Array; ok: boolean } | null {
         const text = DecodeText(this.data, record, typeOfText, max, tables);
         if (!text) return null;
-        if (!this.textSubstitution) return { text, ok: true };
-        return SubstituteCharacterNames(text, max, typeOfText === 0, this.textSubstitution);
+        const substitution = this.hooks.textSubstitution;
+        if (!substitution) return { text, ok: true };
+        return SubstituteCharacterNames(text, max, typeOfText === 0, substitution);
     }
 
     decodeTextString(record: TextRecord, typeOfText: number, tables: TextDecodeTables, max = 990): string | null {

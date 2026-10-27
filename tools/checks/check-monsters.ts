@@ -27,7 +27,7 @@ import { applyCsbwinSave } from '../../src/engine/CsbwinSaveGame';
 import { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import type { CreatureRecord, DungeonData } from '../../src/data/dungeonTypes';
 import { CheckMonsters } from '../../src/engine/CheckMonsters';
-import { DungeonState } from '../../src/engine/DungeonState';
+import { DungeonState, NO_GAME } from '../../src/engine/DungeonState';
 import { monsterHorizontalSize } from '../../src/data/tables/MonsterDesc';
 import { check, finish } from '../lib/check';
 import { gameTablesOf, newGame, stockDungeon, stockGame, stockGraphics } from '../lib/game';
@@ -69,7 +69,7 @@ function measure(label: string, data: DungeonData, attached: ReadonlySet<number>
   const records = data.databases.creatures.records;
   const before = records.map((r) => JSON.stringify(r));
   const beforeFields = records.map(fields);
-  CheckMonsters(new DungeonState(data), monsterDesc, (line) => console.warn(line));
+  CheckMonsters(new DungeonState(data, NO_GAME), monsterDesc, (line) => console.warn(line));
   const changed = new Map<number, [Fields, Fields]>();
   records.forEach((r, i) => {
     if (JSON.stringify(r) === before[i]) return;
@@ -191,7 +191,7 @@ function checkBuilt(label: string, records: CreatureRecord[], indices: number[],
 
 {
   const { data, indices, carriedIndex } = builtWorld();
-  CheckMonsters(new DungeonState(data), monsterDesc, (line) => console.warn(line));
+  CheckMonsters(new DungeonState(data, NO_GAME), monsterDesc, (line) => console.warn(line));
   checkBuilt('CheckMonsters', data.databases.creatures.records, indices, carriedIndex);
 }
 {

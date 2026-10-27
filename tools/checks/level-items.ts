@@ -3,7 +3,7 @@ import { DescIndexOfRecord } from '../../src/engine/objectIndex';
 import { resolve } from 'node:path';
 import { DungeonLoader } from '../../src/data/DungeonLoader';
 import { GraphicsLoader } from '../../src/data/GraphicsLoader';
-import { DungeonState } from '../../src/engine/DungeonState';
+import { DungeonState, NO_GAME } from '../../src/engine/DungeonState';
 import { DBType, OBJECT_ID_EOF } from '../../src/core/types';
 import { Position } from '../../src/core/types';
 import type { ObjectID } from '../../src/core/types';
@@ -222,7 +222,7 @@ function main(): void {
   const names = parseObjectNames(rawNames);
   const objDescObjectType = parseObjDescObjectType(raw22f);
 
-  const state = new DungeonState(data);
+  const state = new DungeonState(data, NO_GAME);
   const mapIndex = options.map;
   const map = data.maps[mapIndex];
 

@@ -122,12 +122,12 @@ What holds:
   (`src/renderer/bytecode/ViewportDrawState.ts:24-33`); nothing under `src/renderer` or `src/ui` draws from
   the game's.
 - **The engine reads no clock**: under `src/engine` and `src/core`, `Date.now()` serves
-  only the loop's pacing (`src/engine/Game.ts:501-520`) and a save's date
+  only the loop's pacing (`src/engine/Game.ts:490-509`) and a save's date
   (`src/engine/GameSaves.ts`), and `Math.random()` only the seed. Its arithmetic is
   integer; the one `Math.sin` builds MD5's constants (`src/core/md5.ts:14`).
 - **Input reaches the engine through CSBWin's one mouse queue** (`src/engine/MouseQueue.ts`),
   and the port already counts `totalMoveCount` where CSBWin records
-  (`Game.recordFileRecord`, `src/engine/Game.ts:1002`).
+  (`Game.recordFileRecord`, `src/engine/Game.ts:991`).
 
 What breaks determinism:
 

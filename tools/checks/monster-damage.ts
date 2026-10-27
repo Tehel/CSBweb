@@ -45,13 +45,13 @@ async function main(): Promise<void> {
   const graphics = stockGraphics();
   const objectTables = graphicsTablesOf(graphics).objects;
 
-  const dungeon = new DungeonState(data);
   const level = Number(process.argv[2] ?? 3);
   const party = standInOf<PartyState>({ position: new Position(0, 0, level), champions: [], brightness: 0 });
   const timers = new TimerQueue();
   const random = new CsbRandom(0xc0ffee);
   const time = 100;
-  const ctx = newContext(data, graphics, { dungeon, timers, random });
+  const ctx = newContext(data, graphics, { timers, random });
+  const dungeon = ctx.dungeon;
   ctx.party.state = party;
   ctx.state.tickCount = time;
 
@@ -93,7 +93,9 @@ async function main(): Promise<void> {
     for (let i = 0; i < 4; i++) multi.slot.singleMonsterStatus[i] = 0xa0 + i;
     // Queue a per-member B timer for each, so renumbering is observable.
     for (let i = 0; i <= (rec.numMonM1 & 3); i++) {
-      timers.createTimer(TimerFunction.TT_MONSTER_B0 + i, mx, my, 0, 0, time + 10 + i, level);
+      timers.createTimer({
+        function: TimerFunction.TT_MONSTER_B0 + i, uByte6: mx, uByte7: my, time: time + 10 + i, level,
+      });
     }
     // Per-member timers only exist while the group is in fear state 6 — that is the
     // state `MaybeDelTimers_Fear6_TurnIndividuals` creates them in — and CSBWin gates
@@ -139,7 +141,9 @@ async function main(): Promise<void> {
       if (t.uByte6 === mx2 && t.uByte7 === my2) timers.deleteTimer(t.index);
     }
     for (let i = 0; i <= (rec.numMonM1 & 3); i++) {
-      timers.createTimer(TimerFunction.TT_MONSTER_B0 + i, mx2, my2, 0, 0, time + 10 + i, level);
+      timers.createTimer({
+        function: TimerFunction.TT_MONSTER_B0 + i, uByte6: mx2, uByte7: my2, time: time + 10 + i, level,
+      });
     }
     rec.fear = StateOfFear.StateOfFear0;
     for (let i = 0; i <= (rec.numMonM1 & 3); i++) rec.hp[i] = 100 + i * 10;

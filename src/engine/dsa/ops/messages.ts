@@ -92,10 +92,16 @@ export const messageOperations: ReadonlyMap<StkOp, DsaOperation> = new Map<StkOp
       override.p = false;
     }
     const actionTime = (ctx.state.tickCount + delay) >>> 0;
-    const timer = ctx.timers.createTimerWithUByte5(
-      TimerFunction.TT_PARAMETER_MESSAGE, target.x, target.y, target.p, msgType, actionTime, target.l,
-      machine.nextParameterMessageSequence(),
-    );
+    const timer = ctx.timers.createTimer({
+      function: TimerFunction.TT_PARAMETER_MESSAGE,
+      uByte5: machine.nextParameterMessageSequence(),
+      uByte6: target.x,
+      uByte7: target.y,
+      uByte8: target.p,
+      uByte9: msgType,
+      time: actionTime,
+      level: target.l,
+    });
     ctx.dungeon.writeExpoolRecord(messageParametersKey(timer.index), Array.from(machine.parameters().subarray(1, 1 + numParam)));
   }],
   [StkOp.SOUND, (bank, _exPkt, { ctx }) => {

@@ -63,7 +63,15 @@ export class MagicSystem {
     if (!this.dungeon.addObjectToCell(new Position(launchX, launchY, level), rn)) return false;
     const functionType = missileDelay ? TimerFunction.TT_MISSILE : TimerFunction.TT_MISSILE0;
     const timerWord8 = encodeMissileTimerWord8(launchX, launchY, direction, decayRate);
-    const entry = this.timers.createTimer(functionType, launchX, launchY, 0, 0, (startTime + 1) >>> 0, level, rn, timerWord8);
+    const entry = this.timers.createTimer({
+      function: functionType,
+      uByte6: launchX,
+      uByte7: launchY,
+      time: (startTime + 1) >>> 0,
+      level,
+      object: rn,
+      timerWord8,
+    });
     const missile = this.dungeon.getMissileRecord(rn);
     if (missile) missile.timerIndex = entry.index & 0xffff;
     return true;
@@ -464,18 +472,12 @@ export class MagicSystem {
 
   queueUtilityTimer(functionType: number, duration: number, timerWord6: number): void {
     const party = this.ctx.party.state;
-    this.timers.createTimer(
-      functionType,
-      0,
-      0,
-      0,
-      0,
-      (this.ctx.state.tickCount + Math.max(0, duration | 0)) >>> 0,
-      party.position.z,
-      undefined,
-      0,
+    this.timers.createTimer({
+      function: functionType,
+      time: (this.ctx.state.tickCount + Math.max(0, duration | 0)) >>> 0,
+      level: party.position.z,
       timerWord6,
-    );
+    });
   }
 
   private createMiscObject(miscType: number): ObjectID | null {
@@ -516,16 +518,9 @@ export class MagicSystem {
       // does every frame.
       champion.charFlags |= CHARFLAG_ATTACK_DISABLE;
     }
-    const entry = this.timers.createTimerWithUByte5(
-      TimerFunction.TT_11,
-      0,
-      0,
-      0,
-      0,
-      targetTime,
-      party.position.z,
-      chIdx,
-    );
+    const entry = this.timers.createTimer({
+      function: TimerFunction.TT_11, uByte5: chIdx, time: targetTime, level: party.position.z,
+    });
     champion.busyTimerIndex = entry.index;
   }
 

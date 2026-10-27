@@ -72,10 +72,14 @@ function indirect(
     actionTime += bank.indirectActionDelay;
     bank.indirectActionDelay = -1;
   }
-  const timer = ctx.timers.createTimerWithUByte5(
-    TimerFunction.TT_PARAMETER_MESSAGE, indirectLocr.x, indirectLocr.y, 0, 0, actionTime, indirectLocr.l,
-    machine.nextParameterMessageSequence(),
-  );
+  const timer = ctx.timers.createTimer({
+    function: TimerFunction.TT_PARAMETER_MESSAGE,
+    uByte5: machine.nextParameterMessageSequence(),
+    uByte6: indirectLocr.x,
+    uByte7: indirectLocr.y,
+    time: actionTime,
+    level: indirectLocr.l,
+  });
   ctx.dungeon.writeExpoolRecord(messageParametersKey(timer.index), record);
 }
 

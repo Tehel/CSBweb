@@ -42,7 +42,7 @@ import type {
 } from '../src/data/dungeonTypes';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { CellInfo, actuatorTrigger, describeFlag } from '../src/engine/CellInfo';
-import { DungeonState } from '../src/engine/DungeonState';
+import { DungeonState, NO_GAME } from '../src/engine/DungeonState';
 import { MonsterType } from '../src/engine/monsterTypes';
 import { NameIndex } from '../src/engine/objectIndex';
 import { decodeBase64ToBytes } from '../src/data/saves/legacyRows';
@@ -92,7 +92,7 @@ function loadWorld(path: string): World {
     const queue = world.save.timerQueue;
     return {
       data: world.dungeon,
-      dungeon: new DungeonState(world.dungeon),
+      dungeon: new DungeonState(world.dungeon, NO_GAME),
       party: { x: b2?.partyX ?? -1, y: b2?.partyY ?? -1, level: b2?.partyLevel ?? -1, facing: b2?.partyFacing ?? 0 },
       fromSave: true,
       timers: queue.map((i) => timers[i]).filter((t): t is TimerRecord => t !== undefined),
@@ -103,7 +103,7 @@ function loadWorld(path: string): World {
   const start = data.header.startPosition;
   return {
     data,
-    dungeon: new DungeonState(data),
+    dungeon: new DungeonState(data, NO_GAME),
     party: { x: start.x, y: start.y, level: start.z, facing: data.header.facing },
     fromSave: false,
     timers: [],

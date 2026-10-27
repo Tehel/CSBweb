@@ -575,7 +575,9 @@ function main(): void {
     const firstMax = q.getMaxTimers();
     let t = 0;
     while (q.getMaxTimers() === firstMax) {
-      q.createTimer(TimerFunction.TT_11, 0, 0, 0, 0, filled.ctx.state.tickCount + 1000 + t++, 0);
+      q.createTimer({
+        function: TimerFunction.TT_11, time: filled.ctx.state.tickCount + 1000 + t++, level: 0,
+      });
     }
     // The timer that found the table within five of full took slot `firstMax`, and left
     // the five below it empty.

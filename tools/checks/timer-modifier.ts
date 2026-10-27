@@ -42,7 +42,9 @@ function tick(game: Game): void {
 
 /** A timer to the test square, due now, run at the next tick. */
 function send(game: Game, at: Position, fn: TimerFunction, action: number): void {
-  game.ctx.timers.createTimer(fn, at.x, at.y, 0, action, game.ctx.state.tickCount, at.z);
+  game.ctx.timers.createTimer({
+    function: fn, uByte6: at.x, uByte7: at.y, uByte9: action, time: game.ctx.state.tickCount, level: at.z,
+  });
   tick(game);
 }
 

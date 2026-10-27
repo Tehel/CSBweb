@@ -417,11 +417,27 @@ export class DsaSystem {
         this.ctx.host.trace(`Illegal DSA timer target (${targetX},${targetY}) L${level}`);
         return;
       }
-      this.timers.createTimer(mapping, targetX, targetY, targetPos, tmrAct, actionTime, level);
+      this.timers.createTimer({
+        function: mapping,
+        uByte6: targetX,
+        uByte7: targetY,
+        uByte8: targetPos,
+        uByte9: tmrAct,
+        time: actionTime,
+        level,
+      });
       return;
     }
 
-    this.timers.createTimer(TimerFunction.TT_DESSAGE, targetX, targetY, targetPos, tmrAct, actionTime, level);
+    this.timers.createTimer({
+      function: TimerFunction.TT_DESSAGE,
+      uByte6: targetX,
+      uByte7: targetY,
+      uByte8: targetPos,
+      uByte9: tmrAct,
+      time: actionTime,
+      level,
+    });
   }
 
   private findFirstDsaActuator(position: Position): ObjectID {

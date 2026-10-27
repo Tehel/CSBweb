@@ -9,7 +9,7 @@
  * `systems` holds the subsystems themselves, so that they call each other directly, as
  * CSBWin's functions do; `host` holds the calls that leave the engine (`GameHost`).
  */
-import { readOverlayPalette } from '../data/CsbwinExpool';
+import { globalTextKey, readOverlayPalette } from '../data/CsbwinExpool';
 import { noExpectedSignatures, type ExpectedSignatures } from '../data/CsbwinExtendedFeatures';
 import { noRuntimeFileSignatures, type RuntimeFileSignatures } from '../data/FileSignature';
 import type { DungeonData } from '../data/dungeonTypes';
@@ -17,9 +17,9 @@ import { DBType, type ObjectID } from '../core/types';
 import { sw } from '../core/intCast';
 import { CsbRandom } from '../core/random';
 import { CheckMonsters } from './CheckMonsters';
-import { DungeonState } from './DungeonState';
+import { DungeonState, NO_GAME } from './DungeonState';
 import type { Block1State, GameState } from './gameTypes';
-import { createGameHost, type GameHost } from './GameHost';
+import type { GameHost } from './GameHost';
 import type { GameTables } from './GameTables';
 import { NameIndex } from './objectIndex';
 import { Party } from './Party';
@@ -29,6 +29,7 @@ import { createLoopFlags, type LoopFlags, type MainLoop } from './LoopState';
 import { createInterfaceState, type InterfaceState } from './InterfaceState';
 import { Overlay } from './Overlay';
 import { identityOverlayPalette } from './OverlayPalette';
+import { makeMoreRoomInDB } from './MakeMoreRoomInDB';
 import { createSmartDiscardState, type SmartDiscardState } from './SmartDiscard';
 import { SoundQueue } from './SoundQueue';
 import { TimerQueue } from './TimerQueue';
@@ -171,7 +172,7 @@ export interface GameContext {
   readonly thrownWeapons: ThrownWeaponTags;
   /** What only the host can do: play a sample, trace, tell the UI something. */
   readonly host: GameHost;
-  /** The subsystems, filled by `Game` as it builds them. */
+  /** The subsystems, built over the context by `createGameContext`'s `buildSystems`. */
   readonly systems: GameSystems;
 }
 
@@ -305,7 +306,7 @@ export function newGameState(
   random: CsbRandom,
   trace: (line: string) => void,
 ): NewGameState {
-  const dungeon = new DungeonState(dungeonData);
+  const dungeon = new DungeonState(dungeonData, NO_GAME);
   dungeon.addNewGameSpares(tables.byte7302);
   CheckMonsters(dungeon, tables.monsterDesc, trace);
   return {
@@ -318,18 +319,30 @@ export function newGameState(
 
 /**
  * The context for a new game over `dungeonData` (`newGameState`): the party at the
- * dungeon's start, the clock at 0, an empty timer queue, and `host` (a null host by
- * default).
+ * dungeon's start, the clock at 0, an empty timer queue, and `host`. Its dungeon and its
+ * sound queue ask the game what they need through it (`DungeonHooks`, `SoundFilter`),
+ * and `buildSystems` builds the systems over it, the last thing before it is returned:
+ * no system reads another while it is built.
  */
 export function createGameContext(
   dungeonData: DungeonData,
   tables: GameTables,
-  host: GameHost = createGameHost(),
+  host: GameHost,
+  buildSystems: (ctx: GameContext) => GameSystems,
 ): GameContext {
   const random = new CsbRandom();
   const { party, block1, timers, overlayPalette } =
     newGameState(dungeonData, tables, random, (line) => host.trace(line));
-  const dungeon = new DungeonState(dungeonData);
+  const dungeon = new DungeonState(dungeonData, {
+    makeMoreRoomInDB: (db) => makeMoreRoomInDB(ctx, db),
+    textSubstitution: {
+      handChar: () => ctx.party.state.cursorOwner,
+      characterName: (index) => ctx.party.state.champions[index]?.name ?? null,
+      globalText: (index) => ctx.dungeon.locateExpoolRecord(globalTextKey(index)),
+      globalVariable: (index) => ctx.systems.dsa.getGlobalVariable(index),
+    },
+    timerWord8: (index) => ctx.timers.getTimerWord8(index),
+  });
   const state: GameState = {
     paused: false,
     tickCount: 0,
@@ -338,7 +351,7 @@ export function createGameContext(
     currentPalette: 0,
     block1,
   };
-  return {
+  const ctx: GameContext = {
     dungeon,
     party,
     state,
@@ -348,7 +361,8 @@ export function createGameContext(
     mouseQueue: new MouseQueue(),
     loop: createLoopFlags(),
     interface: createInterfaceState(),
-    sounds: new SoundQueue(party, tables.sound1772, host, state, timers),
+    sounds: new SoundQueue(party, tables.sound1772, host, state, timers,
+      (ordinal, highVolume, level, x, y) => ctx.systems.dsa.filters.soundFilter(ordinal, highVolume, level, x, y)),
     smartDiscard: createSmartDiscardState(),
     levelCleared: new Uint8Array(16),
     rules: {
@@ -364,9 +378,10 @@ export function createGameContext(
     extras: NO_EXTRAS,
     thrownWeapons: new Map(),
     host,
-    // Empty until `Game` fills it; a tool that stands one subsystem up fills what it needs.
-    systems: {} as GameSystems,
+    systems: null as unknown as GameSystems,
   };
+  (ctx as { systems: GameSystems }).systems = buildSystems(ctx);
+  return ctx;
 }
 
 /**

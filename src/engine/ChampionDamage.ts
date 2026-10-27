@@ -214,9 +214,9 @@ export class ChampionDamage {
       const time = (this.ctx.state.tickCount + 5) >>> 0;
       const existing = champ.timerIndex === -1 ? null : this.ctx.timers.getTimer(champ.timerIndex);
       if (existing === null) {
-        const entry = this.ctx.timers.createTimerWithUByte5(
-          TimerFunction.TT_12, 0, 0, 0, 0, time, party.position.z, chIdx,
-        );
+        const entry = this.ctx.timers.createTimer({
+          function: TimerFunction.TT_12, uByte5: chIdx, time, level: party.position.z,
+        });
         champ.timerIndex = entry.index;
       } else {
         existing.time = time;

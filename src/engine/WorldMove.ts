@@ -46,6 +46,31 @@ interface MonsterMove {
   mmr: MmRecord | undefined;
 }
 
+/**
+ * `objectDBTypeD4` when `MoveObject` moves the party, its object `RNnul`
+ * (`doc/CSBwin-src/Code11f52.cpp:2872-2877`).
+ */
+const PARTY_OBJECT_TYPE = -1;
+
+/** What `resolveCellEffects` takes through the teleporters, pits and stairs. */
+interface CellEffectsMove {
+  /** `objectDBTypeD4`: the object's database, or `PARTY_OBJECT_TYPE`. */
+  objectType: number;
+  /** The object's corner. */
+  objectPos: number;
+  facing: number;
+  /** A missile's direction, from its timer's word 8. */
+  missileDir?: number;
+  /** False for what levitates: a pit does not take it. */
+  allowFall: boolean;
+  /** The group, when a monster is moved. */
+  monster?: MonsterMove;
+  /** A teleporter taken first, whatever the square holds. */
+  pretendTeleporter?: TeleporterRecord;
+  /** `MoveObject`'s `oldX`: -1 keeps an item's corner through a teleporter (`:3035-3041`). */
+  oldX?: number;
+}
+
 export class WorldMove {
   private readonly dungeon: DungeonState;
   private readonly timers: TimerQueue;
@@ -89,9 +114,9 @@ export class WorldMove {
     if (newX >= 0) {
       const oldFacing = party.facing; // `LOCAL_8`
       party.position = new Position(newX, newY, level);
-      const landed = this.resolveCellEffects(
-        party.position, -1, 0, party.facing, undefined, true, undefined, pretendTeleporter,
-      ).position;
+      const landed = this.resolveCellEffects(party.position, {
+        objectType: PARTY_OBJECT_TYPE, objectPos: 0, facing: party.facing, allowFall: true, pretendTeleporter,
+      }).position;
       unchangedRoom = landed.z === level && landed.x === oldX && landed.y === oldY;
       if (unchangedRoom) {
         if (party.facing === oldFacing) return;
@@ -182,9 +207,9 @@ export class WorldMove {
         const word8 = missile ? this.timers.getTimerWord8(missile.timerIndex) : null;
         if (word8 !== null) missileDir = decodeMissileTimerWord8(word8).dir;
       }
-      const result = this.resolveCellEffects(
-        new Position(newX, newY, level), type, decoded.position, party.facing, missileDir, !levitated, undefined, undefined, oldX,
-      );
+      const result = this.resolveCellEffects(new Position(newX, newY, level), {
+        objectType: type, objectPos: decoded.position, facing: party.facing, missileDir, allowFall: !levitated, oldX,
+      });
       destination = result.position;
       newDir = result.missileDir;
       const corner = result.objectPos & 0x3;
@@ -256,15 +281,13 @@ export class WorldMove {
     const facing = rec?.facing ?? 0;
     const partyLevel = this.ctx.party.state.position.z;
     const item16Attached = destination.z === partyLevel && oldX >= 0;
-    const result = this.resolveCellEffects(
-      destination,
-      DBType.CREATURE,
-      decoded.position & 0x3,
+    const result = this.resolveCellEffects(destination, {
+      objectType: DBType.CREATURE,
+      objectPos: decoded.position & 0x3,
       facing,
-      undefined,
-      canFall,
-      rec ? { record: rec, oldX, oldY, attachedLevel: destination.z, noItem16: !item16Attached, mmr } : undefined,
-    );
+      allowFall: canFall,
+      monster: rec ? { record: rec, oldX, oldY, attachedLevel: destination.z, noItem16: !item16Attached, mmr } : undefined,
+    });
     return {
       position: result.position,
       code: result.teleportCode,
@@ -274,18 +297,7 @@ export class WorldMove {
     };
   }
 
-  private resolveCellEffects(
-    start: Position,
-    objectType: number,
-    objectPos: number,
-    facing: number,
-    missileDir: number | undefined,
-    allowFall: boolean,
-    monster?: MonsterMove,
-    pretendTeleporter?: TeleporterRecord,
-    /** `MoveObject`'s `oldX`: -1 keeps an item's corner through a teleporter (`:3035-3041`). */
-    oldX?: number,
-  ): {
+  private resolveCellEffects(start: Position, move: CellEffectsMove): {
     position: Position;
     objectPos: number;
     facing: number;
@@ -297,6 +309,7 @@ export class WorldMove {
     /** `LOCAL_18`: a pit fall killed the whole group. */
     groupDied: boolean;
   } {
+    const { objectType, objectPos, facing, missileDir, allowFall, monster, pretendTeleporter, oldX } = move;
     let position = new Position(start.x, start.y, start.z);
     let curFacing = facing & 0x3;
     let curPos = objectPos & 0x3;
@@ -312,7 +325,7 @@ export class WorldMove {
     for (let step = 0; step < 1000; step++) {
       const teleporter = forcedTeleporter ?? this.getActiveTeleporterAt(position);
       if (forcedTeleporter) forcedTeleporter = null;
-      const canTeleport = objectType < 0 || objectType >= DBType.CREATURE;
+      const canTeleport = objectType === PARTY_OBJECT_TYPE || objectType >= DBType.CREATURE;
       if (teleporter && canTeleport && this.teleporterAllowsObject(teleporter, objectType)) {
         const destination = this.getTeleporterDestination(teleporter);
         if (!destination) break;
@@ -320,7 +333,7 @@ export class WorldMove {
         const rotation = teleporter.rotation & 0x3;
         const prev = position;
 
-        if (objectType === -1) {
+        if (objectType === PARTY_OBJECT_TYPE) {
           curFacing = teleporter.absoluteRotation ? rotation : (curFacing + rotation) & 0x3;
           teleportAudible = teleporter.sound;
         } else if (objectType === DBType.MISSILE) {
@@ -352,7 +365,7 @@ export class WorldMove {
         moved = true;
         // `d.partyX = newX; d.partyY = newY;`, the buzz at the party's new square, and
         // `SetPartyFacing` at every jump (`:2993-3012`).
-        if (objectType === -1) {
+        if (objectType === PARTY_OBJECT_TYPE) {
           this.ctx.party.state.position = position;
           if (teleporter.sound) this.ctx.sounds.queueSound(SOUND_TELEPORT, position.x, position.y, 0, position.z);
           this.ctx.party.setFacing(curFacing);
@@ -370,10 +383,10 @@ export class WorldMove {
         moved = true;
         // `d.partyX = newX; d.partyY = newY;` (`:3088-3091`), so a champion the fall kills
         // drops what they carry where the party landed.
-        if (objectType === -1) this.ctx.party.state.position = position;
+        if (objectType === PARTY_OBJECT_TYPE) this.ctx.party.state.position = position;
         // The fall hurts (`doc/CSBwin-src/Code11f52.cpp:3088-3141`). A group is hurt
         // at `oldX, oldY`, where it is still linked: nothing has moved in the database yet.
-        if (objectType === -1) this.partyFallsIntoPit();
+        if (objectType === PARTY_OBJECT_TYPE) this.partyFallsIntoPit();
         else if (objectType === DBType.CREATURE && monster) {
           const hurt = this.monsterFallsIntoPit(monster);
           groupDied = hurt === MonsterDamageResult.ALL_MONSTERS_DIED;
@@ -447,7 +460,7 @@ export class WorldMove {
 
   private teleporterAllowsObject(teleporter: TeleporterRecord, objectType: number): boolean {
     const scope = teleporter.scope & 0x3;
-    if (objectType === -1) return scope === 2 || scope === 3;
+    if (objectType === PARTY_OBJECT_TYPE) return scope === 2 || scope === 3;
     if (objectType === DBType.CREATURE) return scope === 1 || scope === 3;
     return scope === 0 || scope === 2 || scope === 3;
   }

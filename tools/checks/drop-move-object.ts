@@ -226,7 +226,13 @@ function main(): void {
     const actuators = game.systems.actuators;
     let padTimer = -1;
     wrapMember(actuators, 'triggerObjectMove', (real) => (position, object, place, unchangedRoom, facing) => {
-      padTimer = queue.createTimer(TimerFunction.TT_DOOR, position.x, position.y, 0, 0, game.ctx.state.tickCount, position.z).index;
+      padTimer = queue.createTimer({
+        function: TimerFunction.TT_DOOR,
+        uByte6: position.x,
+        uByte7: position.y,
+        time: game.ctx.state.tickCount,
+        level: position.z,
+      }).index;
       return real(position, object, place, unchangedRoom, facing);
     });
     const queued = (): boolean => padTimer >= 0 && queue.getTimers().some((t) => t.index === padTimer);
@@ -243,7 +249,13 @@ function main(): void {
     game.ctx.systems.mouse.triggerObjectMove(dest, lying, false, false, 0);
     const afterPickUp = queued();
 
-    padTimer = queue.createTimer(TimerFunction.TT_DOOR, party.x, party.y, 0, 0, game.ctx.state.tickCount, party.z).index;
+    padTimer = queue.createTimer({
+      function: TimerFunction.TT_DOOR,
+      uByte6: party.x,
+      uByte7: party.y,
+      time: game.ctx.state.tickCount,
+      level: party.z,
+    }).index;
     const turned = game.ctx.systems.movement.moveParty(MovementAction.TURN_RIGHT).success;
     const afterTurn = queued();
 

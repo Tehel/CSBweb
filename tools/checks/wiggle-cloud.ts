@@ -110,7 +110,14 @@ function main(): void {
   check(born !== null, 'the cloud stands on the switched-off teleporter');
   if (born === null) { finish(); return; }
   const index = game.ctx.dungeon.rnMaps.idx(born);
-  game.ctx.timers.createTimer(TimerFunction.TT_TELEPORTER, at.x, at.y, 0, ActuatorAction.SET, 1, at.z);
+  game.ctx.timers.createTimer({
+    function: TimerFunction.TT_TELEPORTER,
+    uByte6: at.x,
+    uByte7: at.y,
+    uByte9: ActuatorAction.SET,
+    time: 1,
+    level: at.z,
+  });
 
   processTimersAt(game, 1);
   check((map.cellFlags[at.x]![at.y]! & 0x08) !== 0, 'the teleporter switched on');

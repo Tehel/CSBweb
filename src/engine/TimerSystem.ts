@@ -93,7 +93,6 @@ export class TimerSystem {
     this.dungeon = ctx.dungeon;
     this.timers = ctx.timers;
     this.random = ctx.random;
-    this.dungeon.setTimerWord8Lookup((index) => this.timers.getTimerWord8(index));
   }
 
   /**
@@ -289,18 +288,9 @@ export class TimerSystem {
 
   queueBrightnessTimer(deltaSteps: number, time: number): void {
     const party = this.ctx.party.state;
-    this.timers.createTimer(
-      TimerFunction.TT_LIGHT,
-      0,
-      0,
-      0,
-      0,
-      time >>> 0,
-      party.position.z,
-      undefined,
-      0,
-      deltaSteps,
-    );
+    this.timers.createTimer({
+      function: TimerFunction.TT_LIGHT, time: time >>> 0, level: party.position.z, timerWord6: deltaSteps,
+    });
   }
 
   applyBrightnessSteps(steps: number, sign: number): void {
@@ -334,18 +324,12 @@ export class TimerSystem {
 
     if (newSteps !== 0) {
       const nextSteps = negative ? -newSteps : newSteps;
-      this.timers.createTimer(
-        TimerFunction.TT_LIGHT,
-        0,
-        0,
-        0,
-        0,
-        (timer.time + 4) >>> 0,
-        party.position.z,
-        undefined,
-        0,
-        nextSteps,
-      );
+      this.timers.createTimer({
+        function: TimerFunction.TT_LIGHT,
+        time: (timer.time + 4) >>> 0,
+        level: party.position.z,
+        timerWord6: nextSteps,
+      });
     }
   }
 
@@ -390,19 +374,13 @@ export class TimerSystem {
    * `shieldDuration` ticks from now, carrying the amount to take back.
    */
   scheduleChampionShieldExpiry(chIdx: number, amount: number, duration: number, level: number): void {
-    this.timers.createTimerWithUByte5(
-      TimerFunction.TT_72,
-      0,
-      0,
-      0,
-      0,
-      (this.ctx.state.tickCount + duration) >>> 0,
+    this.timers.createTimer({
+      function: TimerFunction.TT_72,
+      uByte5: chIdx & 0xff,
+      time: (this.ctx.state.tickCount + duration) >>> 0,
       level,
-      chIdx & 0xff,
-      undefined,
-      0,
-      amount,
-    );
+      timerWord6: amount,
+    });
   }
 
   /**
@@ -426,21 +404,15 @@ export class TimerSystem {
    * ticks still to come.
    */
   schedulePoison(chIdx: number, remaining: number, level: number): void {
-    // `createTimerWithUByte5` queues the entry itself — adding it again would put two
+    // `createTimer` queues the entry itself — adding it again would put two
     // copies in, and both would fire in the same pass.
-    this.timers.createTimerWithUByte5(
-      TimerFunction.TT_75,
-      0,
-      0,
-      0,
-      0,
-      (this.ctx.state.tickCount + 36) >>> 0,
+    this.timers.createTimer({
+      function: TimerFunction.TT_75,
+      uByte5: chIdx & 0xff,
+      time: (this.ctx.state.tickCount + 36) >>> 0,
       level,
-      chIdx & 0xff,
-      undefined,
-      0,
-      remaining,
-    );
+      timerWord6: remaining,
+    });
   }
 
   /**
@@ -1101,16 +1073,14 @@ export class TimerSystem {
     state: number,
     time: number,
   ): void {
-    const entry = this.timers.createTimer(
-      TimerFunction.TT_VI_ALTAR,
-      location.x,
-      location.y,
-      0,
-      0,
-      time >>> 0,
-      location.z,
-      bones,
-    );
+    const entry = this.timers.createTimer({
+      function: TimerFunction.TT_VI_ALTAR,
+      uByte6: location.x,
+      uByte7: location.y,
+      time: time >>> 0,
+      level: location.z,
+      object: bones,
+    });
     entry.uByte5 = this.packViAltarByte(posInCell, state);
     entry.uByte8 = 0;
     entry.uByte9 = 0;
@@ -1247,16 +1217,14 @@ export class TimerSystem {
           disableTime = 64 * (disableTime - 126);
         }
         const actionTime = (timer.time + disableTime) >>> 0;
-        this.timers.createTimer(
-          TimerFunction.TT_REACTIVATE_GENERATOR,
-          target.x,
-          target.y,
-          0,
-          0,
-          actionTime,
-          target.z,
-          rn,
-        );
+        this.timers.createTimer({
+          function: TimerFunction.TT_REACTIVATE_GENERATOR,
+          uByte6: target.x,
+          uByte7: target.y,
+          time: actionTime,
+          level: target.z,
+          object: rn,
+        });
       }
     }
   }
@@ -1709,16 +1677,16 @@ export class TimerSystem {
     }
 
     if (reschedule) {
-      this.timers.createTimer(
-        TimerFunction.TT_25,
-        x,
-        y,
-        timer.uByte8,
-        timer.uByte9,
-        (timer.time + 1) >>> 0,
-        timer.level,
-        cloudRn,
-      );
+      this.timers.createTimer({
+        function: TimerFunction.TT_25,
+        uByte6: x,
+        uByte7: y,
+        uByte8: timer.uByte8,
+        uByte9: timer.uByte9,
+        time: (timer.time + 1) >>> 0,
+        level: timer.level,
+        object: cloudRn,
+      });
       return;
     }
 

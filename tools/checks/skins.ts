@@ -32,7 +32,7 @@ import type { DungeonData } from '../../src/data/dungeonTypes';
 import { DungeonLoader } from '../../src/data/DungeonLoader';
 import { applyCsbwinSave } from '../../src/engine/CsbwinSaveGame';
 import { StkOp } from '../../src/engine/dsa/DsaTypes';
-import { DungeonState } from '../../src/engine/DungeonState';
+import { DungeonState, NO_GAME } from '../../src/engine/DungeonState';
 import { buildSaveFile } from '../../src/engine/SaveGameFile';
 import { SkinCache } from '../../src/engine/SkinCache';
 import { freshGame, int, op, run } from '../lib/dsa';
@@ -75,7 +75,7 @@ for (const [name, path, expected] of [
 ] as const) {
   const data = load(path);
   const expool = new Expool(data);
-  const dungeon = new DungeonState(data);
+  const dungeon = new DungeonState(data, NO_GAME);
   const isRock = (level: number, x: number, y: number): boolean =>
     ((dungeon.getCellFlag(new Position(x, y, level)) >> 5) & 7) === RoomType.STONE;
   const keys = [...new Set(expool.keys().filter((key) => key >>> 24 === EDT_SKINS && (key & 0x800000) === 0))];

@@ -338,16 +338,14 @@ export class MonsterSystem {
     // happened for real in the prison when the last champion starved
     // (doc/CSBwin-src/CSBCode.cpp:6064-6070).
 
-    this.timers.createTimerWithUByte5(
-      TimerFunction.TT_MONSTER_BGROUP,
-      mapX,
-      mapY,
-      0, // timerUByte8
-      0, // timerUByte9
-      (this.ctx.state.tickCount + 1) >>> 0,
-      level,
+    this.timers.createTimer({
+      function: TimerFunction.TT_MONSTER_BGROUP,
       uByte5,
-    );
+      uByte6: mapX,
+      uByte7: mapY,
+      time: (this.ctx.state.tickCount + 1) >>> 0,
+      level,
+    });
   }
 
   /**
@@ -661,16 +659,14 @@ export class MonsterSystem {
         return;
       }
     }
-    this.timers.createTimer(
-      tt,
-      destination.x,
-      destination.y,
-      0,
-      0,
-      (this.ctx.state.tickCount + 5) >>> 0,
-      destination.z,
-      monsterRn,
-    );
+    this.timers.createTimer({
+      function: tt,
+      uByte6: destination.x,
+      uByte7: destination.y,
+      time: (this.ctx.state.tickCount + 5) >>> 0,
+      level: destination.z,
+      object: monsterRn,
+    });
   }
 
   /**

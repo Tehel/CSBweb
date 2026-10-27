@@ -26,7 +26,7 @@ import * as OBJNI from '../../src/core/objectNameIndex';
 import { RN_FFE4, RN_FIREBALL } from '../../src/core/spellRn';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../../src/core/types';
 import type { DatabaseRecord, Databases } from '../../src/data/dungeonTypes';
-import { DungeonState } from '../../src/engine/DungeonState';
+import { DungeonState, NO_GAME } from '../../src/engine/DungeonState';
 import {
   DescIndex,
   DescIndexOfRecord,
@@ -57,7 +57,7 @@ const OBJECT_DBS = new Set([
 
 async function main(): Promise<void> {
   const data = stockDungeon();
-  const dungeon = new DungeonState(data);
+  const dungeon = new DungeonState(data, NO_GAME);
   const graphics = stockGraphics();
   const objectTables = graphicsTablesOf(graphics).objects;
   const uiTables = graphicsTablesOf(graphics).ui;
