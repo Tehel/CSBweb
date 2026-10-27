@@ -437,6 +437,15 @@ body.welcome {
 .add-set .btn { min-width: 0; width: 162px; padding: 0; font: inherit; }
 .add-set .btn.px { font-family: 'DM Screen', monospace; font-size: 24px; line-height: 24px; }
 
+/* ABOUT (`src/ui/about.ts`): its questions, each a title over its answer, as HOW TO PLAY's
+   sections are. */
+.about { width: min(820px, calc(100vw - 32px)); }
+.about-question { display: flex; flex-direction: column; gap: 9px; padding: 9px 12px 12px; border: 3px solid #1d1d30; }
+.about-question h3 { margin: 0; color: var(--p11); }
+.about-question p { margin: 0; font-size: 17px; line-height: 1.5; color: #bdbac8; }
+.about-question a { color: var(--p13); }
+.about-question a:hover { color: var(--p11); }
+
 /* HOW TO PLAY (`src/ui/howToPlay.ts`): the chooser of the moves' keys, then the sheet, its
    sections on a grid. A key is a cap in the game's font, a rune its glyph in the same font
    over its name. */

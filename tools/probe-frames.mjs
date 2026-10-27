@@ -34,7 +34,7 @@
 // straight into play, its form adding, editing, publishing and deleting a player's own set, the
 // tiles' controls moderating a published one, the book listing its documents, a moderator adding
 // and removing them, and each tile's name in its set's state's colour,
-// to a moderator, the statistics page its footer links to, and, against a page whose server sends a content security policy
+// to a moderator, its ABOUT, the statistics page its footer links to, and, against a page whose server sends a content security policy
 // (`check-image.sh`), nothing it refuses. See `check` below.
 // A failure there exits 1.
 //
@@ -625,6 +625,27 @@ await clickOn('#welcome-help');
 const reopened = await howToPlay();
 check(reopened?.open === true && reopened.hash === '#how-to-play', 'the page\'s HOW TO PLAY opens it');
 await clickOn('#how-close');
+// ABOUT (`src/ui/about.ts`): the page opened at `#about` shows its dialog, its questions
+// each a title over its answer, the statistics' linking to the statistics page and naming
+// the setting that sends none. CLOSE takes the fragment off, and the footer's ABOUT, a
+// link to `#about`, opens it again.
+const about = () => evaluate(`(()=>{const d=document.querySelector('dialog.about');
+  return d && { open: d.open, hash: location.hash,
+    questions: [...d.querySelectorAll('.about-question h3')].map(h=>h.textContent),
+    statistics: [...d.querySelectorAll('.about-question')].filter(q=>q.querySelector('a[href="stats"]')).map(q=>q.querySelector('h3').textContent+(/SEND STATISTICS/.test(q.textContent)?'+':'')).join() };})()`);
+await navigate(`${APP}?dungeon=nowhere&keepsaves#about`, WELCOME);
+const aboutShown = await about();
+console.log('  about:', JSON.stringify(aboutShown));
+check(aboutShown?.open === true && aboutShown.hash === '#about' && aboutShown.questions.length === 7
+  && aboutShown.statistics === 'What are the statistics?+',
+  'the page at #about opens ABOUT, its seven questions, the statistics\' linking to the statistics page and naming SEND STATISTICS');
+await clickOn('#about-close');
+check(await evaluate(`!document.querySelector('dialog.about') && location.hash === '' && /dungeon=nowhere/.test(location.search)`),
+  'CLOSE closes it, and takes #about off the address');
+await clickOn('.welcome-footer nav a[href="#about"]');
+const aboutAgain = await about();
+check(aboutAgain?.open === true && aboutAgain.hash === '#about', 'the footer\'s ABOUT opens it');
+await clickOn('#about-close');
 await clickOn('.pick[data-set="dm-atari-1.2"]');
 // The form that adds a set (`src/ui/addDataSetForm.ts`), which "+ Add my own" opens: its
 // checklist, a row each for the name, the id and the six files, crossed where needed and

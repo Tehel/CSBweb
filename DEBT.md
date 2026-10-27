@@ -20,8 +20,9 @@ a tablet, and Theron's Quest played to its end. The site around them is
 deployed: the welcome page (`src/ui/welcomePage.ts`), a player's own data sets, the
 server (`doc/DEPLOYMENT.md`). The work now is this list, in the index's order, and after
 it cleaning the repository up to publish it as open source. Tiers D and E hold what the
-code needs to be a base others can read and build on. Of the page's redesign, the
-interface in the canvas (U) and the welcome page are in, and E39 is what is left.
+code needs to be a base others can read and build on. The page's redesign is in: the
+interface in the canvas (U), and the welcome page with its HOW TO PLAY, its ABOUT
+(`src/ui/about.ts`) and its credits.
 
 **Conflux 3.5** (`tools/fixtures/gamefiles/conflux-3.5-b8/`) is the third dungeon, a data set
 (`conflux-3.5`) whose first ticks play (`tools/checks/watch-conflux-start.ts`) and whose start is a
@@ -115,7 +116,6 @@ In payoff order: the first row is the next item.
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
 | E30 | One presenter and one input router | L | ⏳ |
-| E39 | The About and Credits pages | M | ⏳ to design with the author |
 | C177 | An Atari-era save loads with its possessions, timers and hand unconverted | M | ⏳ |
 | C173 | The DSA's `&ADD` and `&DEL` on a square bypass `MoveObject` | M | ⏳ |
 | C186 | A decoration's position set past its rectangles' table is not drawn | S | ⏳ |
@@ -141,10 +141,8 @@ In payoff order: the first row is the next item.
 | E22 | Fullscreen filled by a fraction | M | ⏸️ waits on the author |
 | H | Deliberate divergences | — | 🚫 |
 
-The rows above G29 are the active list. `E39` waits for the author's design: a session
-that reaches it first asks the author, and takes the next active row meanwhile. A
-new row takes its tier's place above it. The F rows are independent of the rest
-("Priority", point 5), so they can be taken anywhere.
+The rows above E40 are the active list. A new row takes its tier's place above it. The F
+rows are independent of the rest ("Priority", point 5), so they can be taken anywhere.
 The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
@@ -405,7 +403,7 @@ New state-representation debt goes here, and jumps the queue.
 
 New architecture debt goes here, and jumps the queue. Every E item is a refactor: the rules
 of "How to work this list", point 3, apply, byte-identical tool output included. What the
-page redesign adds is the exception: E39's pages, and E22's fill.
+page redesign adds is the exception: E40's heat map, and E22's fill.
 
 The structure need no longer follow CSBWin's files (the author's decision): a module may
 gather or split CSBWin's functions as the code's concerns ask. What still follows CSBWin is
@@ -432,29 +430,6 @@ Paying it, in one step left, a commit:
 1. **The intro's input through the router.** `IntroHost`'s listeners on `window` go
    through `GameInput`, with a focus policy once the page has controls again.
 
-### E39 ⏳ The About and Credits pages
-
-The welcome page's footer (`src/ui/welcomePage.ts`) links to ABOUT and CREDITS, two pages to be designed with
-the author before any code. What they are to hold:
-
-- **ABOUT, with a FAQ.** Among its answers is one paragraph on the statistics the server
-  collects (`doc/STATISTICS.md`), and why:
-  - to check that the game is actually played;
-  - a leaderboard of the preferred champions;
-  - where parties die most often.
-
-  It is clear about what is anonymous and what is not (`doc/STATISTICS.md` →
-  "Pseudonymous"): no player's name, no IP address and no browser profiling in the
-  statistics, and champions going by the names they carry, which a player can type; but
-  a random id, drawn in the browser and used only for counting players, links one
-  player's games, so the statistics are pseudonymous. It says how to reset the id
-  (clearing the site's data) and how to send none (SEND STATISTICS), and that the web
-  server's access log keeps every request's address, as any site's does, against which
-  the statistics keep their times to 10 s.
-- **The public statistics** are a page of their own, `/stats` (`doc/STATISTICS.md` → "The page"); ABOUT links to it.
-- **CREDITS** is a block of the welcome page (`#credits`). It does not name the data sets'
-  authors yet.
-
 ### E40 ⏳ The statistics page's heat map
 
 The statistics page is built (`doc/STATISTICS.md` → "The page"), all but a level's heat
@@ -468,8 +443,7 @@ map, as designed with the author:
   must stay out of the game's chunk, or the bound there be raised knowingly.
 
 Paying it: the heat map, checked in `tools/probe-frames.mjs`'s statistics block (a level
-opens its map) and by a screenshot over the dev server's fortnight. E39's ABOUT then links
-to the page.
+opens its map) and by a screenshot over the dev server's fortnight.
 
 ### E22 ⏸️ Fullscreen filled by a fraction
 

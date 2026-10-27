@@ -91,6 +91,7 @@ import {
 } from '../data/DataSets';
 import { localDataSet, type LocalDataSetFile, type LocalDataSetRecord } from '../data/LocalDataSets';
 import { openAddDataSetForm, openPublishedSetForm, type EditedPublishedSet } from './addDataSetForm';
+import { ABOUT_HASH, openAbout } from './about';
 import { HOW_TO_PLAY_HASH, openHowToPlay, type HowToPlayHost } from './howToPlay';
 import { playerId } from './gameEvents';
 import {
@@ -122,7 +123,7 @@ const PAGE = `
     <p class="welcome-sets-lead">Custom dungeons built by the community, played on the same engine.</p>
     <div class="welcome-grid" role="group" aria-labelledby="welcome-custom-title"></div>
   </section>
-  <section class="welcome-about" id="about">
+  <section class="welcome-about">
     <p class="welcome-lead">The 1987 dungeon, rebuilt from CSBWin's source. There is nothing to install: open the page and go down the stairs.</p>
     <div class="welcome-columns">
       <div>
@@ -167,7 +168,7 @@ const PAGE = `
   <footer class="welcome-footer">
     <p>Dungeon Master © 1987 and Chaos Strikes Back © 1989 FTL Games, Software Heaven, Inc. Their names, pictures, sounds and data files belong to their rights holders, and are served here only to be played. The other dungeons belong to their authors. The game's engine is ported from CSBWin by Paul R. Stevens. CSBweb is a free, non-commercial fan project, not affiliated with or endorsed by any of them. Rights holders: write to csbweb[at]looten.net, and whatever you ask is taken down.</p>
     <nav class="px px2" aria-label="Footer">
-      <a aria-disabled="true" href="#about">About</a>
+      <a href="#about">About</a>
       <a href="stats">Stats</a>
       <a href="https://github.com/Tehel/CSBweb" target="_blank">Source</a>
     </nav>
@@ -217,7 +218,8 @@ const DONE: Record<ModerationAction, string> = { approve: 'approved', reject: 'r
  * `manifest` and of `localSets`, and the saves of `store`, the set `select` names selected,
  * where it names one. `loadManifest` asks the server for the manifest again, once a set is
  * published or moderated. HOW TO PLAY opens its dialog on `help` (`src/ui/howToPlay.ts`),
- * as the page does where its address ends in `#how-to-play`.
+ * as the page does where its address ends in `#how-to-play`, and the footer's ABOUT its own
+ * (`src/ui/about.ts`) where it ends in `#about`.
  */
 export async function showWelcomePage(
     body: HTMLElement,
@@ -391,13 +393,16 @@ export async function showWelcomePage(
         ]));
     }
     update();
-    // The address at `#how-to-play` opens HOW TO PLAY, as the page is shown and as the
-    // fragment changes on it. One handler, the last page's: the page is shown anew often.
-    const helpAsked = () => {
-        if (window.location.hash === HOW_TO_PLAY_HASH && !document.querySelector('dialog.how-to-play')) openHowToPlay(help);
+    // The address at `#how-to-play` opens HOW TO PLAY, and at `#about` ABOUT, as the page is
+    // shown and as the fragment changes on it. One handler, the last page's: the page is
+    // shown anew often.
+    const dialogAsked = () => {
+        const { hash } = window.location;
+        if (hash === HOW_TO_PLAY_HASH && !document.querySelector('dialog.how-to-play')) openHowToPlay(help);
+        if (hash === ABOUT_HASH && !document.querySelector('dialog.about')) openAbout();
     };
-    window.onhashchange = helpAsked;
-    helpAsked();
+    window.onhashchange = dialogAsked;
+    dialogAsked();
 }
 
 /** Whether the moderator's switch is on: on but where it was turned off, or `localStorage` cannot be read. */

@@ -3,8 +3,8 @@
 The deployed game counts games: games started, won and lost, the time played in them, the
 parties that played them, and where parties die (`doc/DEPLOYMENT.md` for where it runs).
 They serve three questions: whether the game is actually played, which champions players
-prefer, and where parties die most often. The statistics page shows them ("The page", below), and the FAQ
-that explains them to players is to be designed (E39).
+prefer, and where parties die most often. The statistics page shows them ("The page", below), and the
+welcome page's ABOUT (`src/ui/about.ts`) explains them to players, in this document's terms.
 
 ## Pseudonymous
 
