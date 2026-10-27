@@ -29,7 +29,7 @@
 import '../ui/welcomePage.css';
 import './statsPage.css';
 import logoUrl from '../assets/csbweb-logo.jpg';
-import type { SetStats, StatsSummary, Win } from '../../server/stats';
+import type { SetStats, StatsSummary, Win } from '../../server/answers';
 
 /** The server's statistics (`server/app.ts`). */
 const STATS_ROUTE = 'api/stats';

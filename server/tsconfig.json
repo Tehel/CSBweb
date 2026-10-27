@@ -1,8 +1,14 @@
 {
-  // The server as Node 24 runs it, types stripped: only erasable syntax, and type-only
-  // imports marked as such. `npm test` checks it beside the root project.
+  // The server as Node 24 runs it, types stripped: Node's module resolution, so that an
+  // import names its `.ts`, Node's types and not the DOM's, only erasable syntax, and
+  // type-only imports marked as such. `npm test` checks it beside the page and the tools.
   "extends": "../tsconfig.json",
   "compilerOptions": {
+    "target": "ES2024",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["ES2024"],
+    "types": ["node"],
     "erasableSyntaxOnly": true,
     "verbatimModuleSyntax": true
   },

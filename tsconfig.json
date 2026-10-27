@@ -1,11 +1,20 @@
 {
+  // The page, `src/`, as the browser runs it: the DOM's types and none of Node's, so that a
+  // Node global in the page's code fails here. The tools (`tools/tsconfig.json`) and the
+  // server (`server/tsconfig.json`) extend it; `npm test` checks all three.
+  //
+  // `noUncheckedIndexedAccess` holds the page and the server, not the tools: an index reads
+  // as possibly `undefined`, so each `x[i]!` is an index the code has proved, and says so. Where a damaged or short
+  // file can send a read past its end, the read says what it gets instead, 0, as
+  // `src/core/bytes.ts`'s do; a table of a fixed length is a `Tuple` (`src/core/types.ts`)
+  // once its reader has checked the length, and a constant index into it needs no `!`.
   "compilerOptions": {
     "target": "ES2020",
     "useDefineForClassFields": true,
     "module": "ESNext",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
-    "types": ["node"],
+    "types": [],
 
     /* Bundler mode */
     "moduleResolution": "bundler",
@@ -20,7 +29,8 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitReturns": true,
-    "noImplicitOverride": true
+    "noImplicitOverride": true,
+    "noUncheckedIndexedAccess": true
   },
-  "include": ["src", "tools", "utils"]
+  "include": ["src"]
 }

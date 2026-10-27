@@ -45,6 +45,7 @@ import { pipeline } from 'node:stream';
 import { pathToFileURL } from 'node:url';
 
 import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, PLAYER_ID_HEADER } from '../src/data/DataSets.ts';
+import type { StatsSet } from './answers.ts';
 import { manifestText, samePlayerId, wallsText, type DataSetStore, type DataSetViewer, type Moderator } from './dataSets.ts';
 import { addDocument, removeDocument } from './documents.ts';
 import { editDataSet } from './edit.ts';
@@ -52,7 +53,7 @@ import { addressBucket, checkEvent, isPlayerId, MAX_EVENT_BYTES, type EventRules
 import { MAX_MODERATION_BYTES, moderateDataSet, type ModerationAnswer } from './moderate.ts';
 import type { Notify } from './notify.ts';
 import { MAX_PUBLISH_BYTES, publishDataSet, type CheckDataSet, type PublishAnswer, type ReadDungeonWalls } from './publish.ts';
-import { AnswerCache, LEVELS, STATS_CACHE_MS, type StatsSet, type StatsStore } from './stats.ts';
+import { AnswerCache, LEVELS, STATS_CACHE_MS, type StatsStore } from './stats.ts';
 
 export interface ServerOptions {
     /** The built page: `index.html` and `assets/`. */

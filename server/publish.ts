@@ -172,9 +172,10 @@ export function readSetForm(form: FormData, edit: boolean): SetForm | PublishAns
     for (const file of LOCAL_DATA_SET_FILES) {
         const values = form.getAll(file);
         if (values.length === 0) continue;
-        if (values.length !== 1 || typeof values[0] === 'string') return refuse(400, `The form's '${file}' is not one file.`);
-        if (values[0].size > MAX_PUBLISHED_FILE_BYTES) return refuse(413, `${file} is larger than ${MAX_PUBLISHED_FILE_BYTES / (1024 * 1024)} MiB.`);
-        files[file] = values[0];
+        const [value] = values;
+        if (values.length !== 1 || value === undefined || typeof value === 'string') return refuse(400, `The form's '${file}' is not one file.`);
+        if (value.size > MAX_PUBLISHED_FILE_BYTES) return refuse(413, `${file} is larger than ${MAX_PUBLISHED_FILE_BYTES / (1024 * 1024)} MiB.`);
+        files[file] = value;
     }
     const remove = form.getAll(EDIT_REMOVE_FIELD);
     for (const file of remove) {

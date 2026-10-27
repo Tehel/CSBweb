@@ -115,7 +115,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| F18 | One `tsconfig` for the browser, the tools and the server | S | ⏳ |
 | F19 | The tools' screen draws without the game's state, rules and CSB graphics | S | ⏳ |
 | F17 | The frame pipeline and the runner are untyped | M | ⏳ |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
@@ -528,21 +527,6 @@ The root `tsconfig.json` includes `src` and `tools` and checks no `.mjs`: `run-c
 Paying it: the scripts as `.ts` (Node runs them since 22.18, as it runs the server), under
 `tsc` with `vite.config.mts`; one PNG module; `buildParty` a typed function the probe
 serialises.
-
-### F18 ⏳ One `tsconfig` for the browser, the tools and the server
-
-`server/tsconfig.json` extends the root's, so the server is checked with
-`moduleResolution: "bundler"` and the DOM's types: a server file that imports `./lib`
-without its extension, or reads `document`, passes `tsc` and fails in Node with
-`ERR_MODULE_NOT_FOUND`. The other way, `src/` is checked with Node's types
-(`"types": ["node"]`), so a Node global in browser code passes. The image copies only
-`src/data/DataSets.ts` of `src/` (`Dockerfile:29`), while `checks/server` runs the server
-from the whole checkout, so an import added to `DataSets.ts` passes `npm test` and
-crash-loops the container; only the optional `tools/check-image.sh` would see it.
-
-Paying it: the server on `module` and `moduleResolution` `"nodenext"`, an ES `lib` and
-Node's types; `src/` without Node's; `checks/server` running the server from a scratch
-folder laid out as the image is.
 
 ### F19 ⏳ The tools' screen draws without the game's state, rules and CSB graphics
 

@@ -81,7 +81,9 @@
  *     offers them, as the page parses them; and `fillWalls`, which reads those of the
  *     rows that keep none from their folders, says a `dungeon.dat` that does not read and
  *     reads none twice;
- *   - `server.ts` itself, as Node runs it: a bad mount, a store it cannot open, a page's
+ *   - `server.ts` itself, as Node runs it in the image: from a folder holding what the
+ *     `Dockerfile`'s runtime stage copies of the checkout and nothing else, so that a
+ *     module the image lacks fails here as it would there; a bad mount, a store it cannot open, a page's
  *     check that is not built, or an entry of `MODERATOR_PLAYER_IDS` that is not a `playerId` exits 1
  *     before it listens; on a new store, it listens with no set; a list of two, one with an alias, spaces around the comma and the `=`, makes both moderators; and SIGTERM stops a listening server with 0, its
  *     store filled by `tools/fill-data-sets.ts`, which then leaves it as it is, and its WAL
@@ -99,11 +101,11 @@
  * Usage: npm test -- --only=server.ts
  */
 import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { request, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { deflateSync } from 'node:zlib';
 
@@ -1186,12 +1188,30 @@ function checkAddedColumns(): void {
     db.close();
 }
 
-/** A script of `server/` run as Node runs it: on its own types where this Node strips them, through tsx otherwise. */
-function startEntry(env: Record<string, string>, script = 'server.ts'): ChildProcess {
-    const strips = (process.features as { typescript?: unknown }).typescript;
-    const args = strips ? [] : ['--import', 'tsx'];
-    return spawn(process.execPath, [...args, join(ROOT, 'server', script)], {
-        cwd: ROOT, env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'],
+/**
+ * The image's `/app` laid out under `scratch`: what each `COPY` of the `Dockerfile`'s
+ * runtime stage takes from the checkout, the build's `dist/` aside (`DIST_DIR` names the
+ * scratch build). Throws on a `COPY` it does not read, rather than lay out less.
+ */
+function imageApp(scratch: string): string {
+    const lines = readFileSync(join(ROOT, 'Dockerfile'), 'utf8').split('\n');
+    const app = join(scratch, 'app');
+    for (const line of lines.slice(lines.findLastIndex((l) => /^FROM\s/.test(l)))) {
+        if (!/^COPY\s/.test(line) || /^COPY\s+--from=/.test(line)) continue;
+        const operands = line.trim().split(/\s+/).slice(1);
+        if (operands.length !== 2 || operands.some((o) => o.startsWith('--'))) throw new Error(`Dockerfile: a COPY this check does not read: ${line}`);
+        const [from, to] = operands as [string, string];
+        const source = join(ROOT, from);
+        const into = to.endsWith('/') && statSync(source).isFile() ? join(app, to, basename(from)) : join(app, to);
+        cpSync(source, into, { recursive: true });
+    }
+    return app;
+}
+
+/** A script of the image's `server/` run as the image runs it, from its `/app`, by this Node, which strips the types. */
+function startEntry(app: string, env: Record<string, string>, script = 'server.ts'): ChildProcess {
+    return spawn(process.execPath, [join(app, 'server', script)], {
+        cwd: app, env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'],
     });
 }
 
@@ -1227,20 +1247,22 @@ interface Backup {
 
 async function checkEntry(scratch: string, options: ServerOptions): Promise<void> {
     console.log('\nserver.ts:');
+    const app = imageApp(scratch);
+    console.log(`  the image's /app: ${readdirSync(app, { recursive: true }).map(String).sort().join(', ')}`);
     const statsDb = join(scratch, 'stats', 'stats.db');
-    const badMount = await finish(startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: join(scratch, 'nowhere'), STATS_DB: statsDb }));
+    const badMount = await finish(startEntry(app, { PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: join(scratch, 'nowhere'), STATS_DB: statsDb }));
     console.log(`  bad mount: exit ${badMount.code}, ${firstLine(badMount.out).split(scratch).join('<scratch>')}`);
     check(badMount.code === 1 && badMount.out.includes('Not starting:'), 'a bad mount exits 1 before it listens');
-    const badStore = await finish(startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, STATS_DB: options.distDir }));
+    const badStore = await finish(startEntry(app, { PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, STATS_DB: options.distDir }));
     console.log(`  bad store: exit ${badStore.code}, ${firstLine(badStore.out).replace(scratch, '<scratch>')}`);
     check(badStore.code === 1 && badStore.out.includes('Not starting:'), 'a store it cannot open exits 1 before it listens');
     const noCheck = join(scratch, 'dist-without-check');
     mkdirSync(noCheck);
     writeFileSync(join(noCheck, 'index.html'), '<!doctype html><title>page</title>');
-    const unbuilt = await finish(startEntry({ PORT: '0', DIST_DIR: noCheck, GAMEFILES_DIR: options.gamefilesDir, STATS_DB: join(scratch, 'unbuilt', 'stats.db') }));
+    const unbuilt = await finish(startEntry(app, { PORT: '0', DIST_DIR: noCheck, GAMEFILES_DIR: options.gamefilesDir, STATS_DB: join(scratch, 'unbuilt', 'stats.db') }));
     console.log(`  no check built: exit ${unbuilt.code}, ${firstLine(unbuilt.out).split(scratch).join('<scratch>').replace(/ \(.*\)/, ' (…)')}`);
     check(unbuilt.code === 1 && unbuilt.out.includes(`${CHECK_MODULE} does not load`), 'a page\'s check that is not built exits 1 before it listens');
-    const badModerator = await finish(startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, STATS_DB: join(scratch, 'moderator', 'stats.db'), MODERATOR_PLAYER_IDS: `${MODERATORS[0]},the-moderator` }));
+    const badModerator = await finish(startEntry(app, { PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, STATS_DB: join(scratch, 'moderator', 'stats.db'), MODERATOR_PLAYER_IDS: `${MODERATORS[0]},the-moderator` }));
     console.log(`  bad moderator: exit ${badModerator.code}, ${firstLine(badModerator.out)}`);
     check(badModerator.code === 1 && badModerator.out.includes('MODERATOR_PLAYER_IDS holds an entry that is not a playerId') && !existsSync(join(scratch, 'moderator')),
         'a MODERATOR_PLAYER_IDS entry that is not a playerId exits 1 before it opens the store');
@@ -1249,7 +1271,7 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
     let emptyLine = '';
     let emptyAnswer = '';
     let noFiles = 0;
-    const fresh = startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, STATS_DB: join(scratch, 'fresh', 'stats.db'), FILES_DIR: join(scratch, 'nowhere') });
+    const fresh = startEntry(app, { PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, STATS_DB: join(scratch, 'fresh', 'stats.db'), FILES_DIR: join(scratch, 'nowhere') });
     const freshEnded = await finish(fresh, (line) => {
         const listening = /^Listening on port (\d+)/.exec(line);
         if (!listening) return;
@@ -1283,7 +1305,7 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
     let again: { code: number | null; out: string } | null = null;
     let noFolder: { code: number | null; out: string } | null = null;
     let moderated = '';
-    const child = startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, STATS_DB: statsDb,
+    const child = startEntry(app, { PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, STATS_DB: statsDb,
         MODERATOR_PLAYER_IDS: ` ${MODERATORS[0]} = Alice , ${MODERATORS[1]} ` });
     const ended = finish(child, (line) => {
         const listening = /^Listening on port (\d+)/.exec(line);
@@ -1305,7 +1327,7 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
             const store = openStore(statsDb);
             store.prepare("INSERT INTO data_sets (id, name, dir, position, status, owner) VALUES ('b', 'B', 'set-b', 1, 'pending', ?)").run(PLAYER);
             store.close();
-            const run = await finish(startEntry({ STATS_DB: statsDb, GAMEFILES_DIR: options.gamefilesDir }, 'backup.ts'));
+            const run = await finish(startEntry(app, { STATS_DB: statsDb, GAMEFILES_DIR: options.gamefilesDir }, 'backup.ts'));
             const target = /"target":"([^"]+)"/.exec(run.out)?.[1];
             let events = -1;
             let sets = -1;
@@ -1316,8 +1338,8 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
                 copy.close();
             }
             backedUp = { code: run.code, out: run.out, events, sets, answering: (await ask(port, '/api/health')).status === 200 };
-            again = await finish(startEntry({ STATS_DB: statsDb, GAMEFILES_DIR: options.gamefilesDir }, 'backup.ts'));
-            noFolder = await finish(startEntry({ STATS_DB: statsDb, GAMEFILES_DIR: join(scratch, 'nowhere'), BACKUP_DIR: join(scratch, 'backups-elsewhere') }, 'backup.ts'));
+            again = await finish(startEntry(app, { STATS_DB: statsDb, GAMEFILES_DIR: options.gamefilesDir }, 'backup.ts'));
+            noFolder = await finish(startEntry(app, { STATS_DB: statsDb, GAMEFILES_DIR: join(scratch, 'nowhere'), BACKUP_DIR: join(scratch, 'backups-elsewhere') }, 'backup.ts'));
         })().finally(() => child.kill('SIGTERM'));
     });
     const { code, out } = await ended;
@@ -1344,7 +1366,7 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
     const second = again as { code: number | null; out: string } | null;
     console.log(`  backup.ts again: ${shown(second)}`);
     check(second?.code === 0 && second.out.includes('"copied":[],"kept":2'), 'the next backup keeps those copies rather than copying them again');
-    const noStore = await finish(startEntry({ STATS_DB: join(scratch, 'nowhere', 'stats.db') }, 'backup.ts'));
+    const noStore = await finish(startEntry(app, { STATS_DB: join(scratch, 'nowhere', 'stats.db') }, 'backup.ts'));
     check(noStore.code === 1 && noStore.out.includes('backup_failed'), 'backup.ts on a store that is not there exits 1');
     const missing = noFolder as { code: number | null; out: string } | null;
     check(missing?.code === 1 && missing.out.includes('backup_failed') && !existsSync(join(scratch, 'backups-elsewhere', 'gamefiles', 'set-b')),
@@ -1354,7 +1376,7 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
     check(out.includes('(a, from the data_sets table);'), 'it serves the sets of the table the tool filled');
 
     let restartLine = '';
-    const restart = startEntry({ PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, STATS_DB: statsDb });
+    const restart = startEntry(app, { PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, STATS_DB: statsDb });
     const restarted = await finish(restart, (line) => {
         if (!line.startsWith('Listening on port')) return;
         restartLine = line.split(scratch).join('<scratch>').replace(/port \d+/, 'port <n>');

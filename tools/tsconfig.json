@@ -1,0 +1,11 @@
+{
+  // The tools, as Node runs them through tsx: Node 24's library and types beside the DOM's,
+  // which the page's modules they stand up name. Not held to `noUncheckedIndexedAccess`.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "noUncheckedIndexedAccess": false
+  },
+  "include": ["."]
+}

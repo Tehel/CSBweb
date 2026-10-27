@@ -459,8 +459,9 @@ The build is named by `CSBWEB_BUILD` where it is given (the image's build stage 
 
 `server/server.ts`, on `node:http` and `node:sqlite`, with no dependency. Node 24 runs it as
 it is, stripping the types, so it uses only erasable syntax, marks its type-only imports
-and names its imports with `.ts`. `server/tsconfig.json` holds it to that, and `npm test`
-runs `tsc` on it beside the root project. The package is an ES module
+and names its imports with `.ts`. `server/tsconfig.json` holds it to that, on Node's module
+resolution and Node's types, without the DOM's, and `npm test` runs `tsc` on it beside the
+page's project and the tools'. The package is an ES module
 (`"type": "module"`), so that Node runs `server.ts` and the page's `DataSets.ts`, whose
 routes and limits the server imports from `../src/data/`. `npm start` runs it locally, on the project's Node (below).
 
@@ -524,7 +525,9 @@ sets name exist, which may be none; then it loads the server's module (`loadChec
 the container rather than the player's boot. On SIGTERM it stops listening, lets the
 requests in flight finish (5 s at most), closes the store, which checkpoints the WAL into
 the file, and exits with 0. It logs to stdout. `tools/checks/server.ts` asserts all of it,
-`server.ts` run as its own process included.
+`server.ts` run as its own process included, from a folder laid out as the image's `/app`
+from the runtime stage's `COPY` lines (below), so that a module the server reaches and the
+image does not copy fails there too.
 
 ## The image and the stack
 
@@ -532,8 +535,8 @@ the file, and exits with 0. It logs to stdout. `tools/checks/server.ts` asserts 
 of its multi-platform index, so that a rebuild takes the same bytes:
 
 - **The build stage** runs `npm ci && npm run build`, `tsc` included. Its context is an
-  allowlist (`.dockerignore`): the page's sources, `server/`, the tools' `.ts` that `tsc`
-  checks beside them, and the package and build files. No game file, no `.git` and no
+  allowlist (`.dockerignore`): the page's sources, `server/`, the tools' `.ts`, which
+  `vite.config.mts` imports, and the package and build files. No game file, no `.git` and no
   `.env` can reach it, so the commit comes in as the build argument `CSBWEB_BUILD`.
 - **The runtime stage** has no `node_modules`: `package.json` (for `"type": "module"`),
   `server/`, `src/data/DataSets.ts` and the built `dist/`, the server's module in it. It runs as `USER node`, uid

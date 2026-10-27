@@ -8,6 +8,8 @@
  */
 import { isIPv6 } from 'node:net';
 
+import type { CheckedChampion } from './answers.ts';
+
 /** The largest body `api/event` reads. */
 export const MAX_EVENT_BYTES = 4096;
 
@@ -42,15 +44,6 @@ const MASTERIES = 4;
 /** Bounds that hold any game, not CSBWin's: they only keep nonsense out. */
 const MAX_MASTERY = 63;
 const MAX_COORDINATE = 255;
-
-export interface CheckedChampion {
-    name: string;
-    id: number | null;
-    reincarnated?: true;
-    /** A reincarnated champion's mirror name, which the statistics count them by. */
-    hero?: string;
-    masteries?: number[];
-}
 
 /** An event as it is stored: the page's fields, the payload rebuilt from what was checked. */
 export interface CheckedEvent {

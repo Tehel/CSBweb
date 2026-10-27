@@ -4,8 +4,8 @@
 // project's evidence. It runs the three gates CLAUDE.md calls non-negotiable:
 //
 //   1. `tsc --noEmit`            — the real build gate; `vite build` proves nothing.
-//                                  With it, the server's and the modules held to
-//                                  noUncheckedIndexedAccess (tsc-indexed-access.mjs).
+//                                  Four projects: the page's, the tools', utils/'
+//                                  and the server's (tsconfig.json, and each folder's).
 //   2. every asserting tools/checks/*.ts — the regression suite for what the frames
 //                                  cannot see.
 //   3. `tools/check-frames.sh`   — the golden frames, only with `--frames` (it needs a
@@ -502,11 +502,13 @@ const tool = ({ tool, dir = 'tools/checks', args = [] }) => ({
 });
 const sections = [
   ['types', [
+    // The page as the browser runs it, held to noUncheckedIndexedAccess.
     { name: 'tsc --noEmit', cmd: TSC, args: ['--noEmit'], show: 'failure' },
-    // The server as Node strips it: erasable syntax only (server/tsconfig.json).
+    // The tools and utils/ on Node's types.
+    { name: 'tsc --noEmit -p tools', cmd: TSC, args: ['--noEmit', '-p', 'tools'], show: 'failure' },
+    { name: 'tsc --noEmit -p utils', cmd: TSC, args: ['--noEmit', '-p', 'utils'], show: 'failure' },
+    // The server as Node runs it: Node's resolution, erasable syntax only.
     { name: 'tsc --noEmit -p server', cmd: TSC, args: ['--noEmit', '-p', 'server'], show: 'failure' },
-    // src/ held to noUncheckedIndexedAccess.
-    { name: 'tsc-indexed-access.mjs', cmd: process.execPath, args: [resolve(ROOT, 'tools/tsc-indexed-access.mjs')], show: 'failure' },
   ]],
   ['checks', checks.map(tool)],
   ['smoke (crash only)', smoke.map(tool)],

@@ -1,0 +1,5 @@
+{
+  // The instance's scripts, as the tools are (`tools/tsconfig.json`).
+  "extends": "../tools/tsconfig.json",
+  "include": ["."]
+}

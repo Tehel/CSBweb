@@ -43,7 +43,8 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 import { addressBucket, checkEvent, RateLimit, type CheckedEvent, type EventRules } from '../../server/events.ts';
-import { AnswerCache, DEATH_SQUARES, MAX_EVENTS, StatsStore, TIME_GRAIN, type LevelStats, type SetStats, type StatsSet, type StatsSummary } from '../../server/stats.ts';
+import type { LevelStats, SetStats, StatsSet, StatsSummary } from '../../server/answers.ts';
+import { AnswerCache, DEATH_SQUARES, MAX_EVENTS, StatsStore, TIME_GRAIN } from '../../server/stats.ts';
 import { openStore } from '../../server/store.ts';
 import { check, finish } from '../lib/check';
 import { ch, day, event, FORTNIGHT, P1, P2, P3, P4, session, winner, won } from '../lib/statsFortnight';
