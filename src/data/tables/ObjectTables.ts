@@ -1,5 +1,10 @@
 import type { GraphicsLoader } from '../GraphicsLoader';
-import type { MonsterDesc } from './MonsterDesc';
+import {
+  monsterHasAttackGraphic,
+  monsterHasBackGraphic,
+  monsterHasSideGraphic,
+  type MonsterDesc,
+} from './MonsterDesc';
 import type { RectPos } from './UITables';
 import { readI16BE, readI16BEArray, readI8, readU16BE } from '../../core/bytes';
 
@@ -43,6 +48,7 @@ export interface DecorationDesc {
 
 export interface MonsterGraphicDesc {
   word0: number;
+  /** `ITEM12_word2`: 0 in the file, the type's first derived graphic once set at load. */
   word2: number;
   frontRearByteWidth: number;
   frontRearHeight: number;
@@ -844,6 +850,16 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const specialColors = readSpecialColors22e(raw22e, specialColorsOffset);
   const missileGraphics = readMissileGraphics22e(raw22e, struct5688Offset);
   const monsterDesc = readMonsterDesc22f(raw22f);
+  // `ITEM12_word2`, numbered from 0x1ef by the derived graphics each type sizes: a far and
+  // a medium front view, the same for a side, back and attack view it has, and three for
+  // each of `Nibble0()` (`ReadTablesFromGraphicsFile`, `doc/CSBwin-src/CSBCode.cpp:10491-10565`).
+  let derivedNum = 0x1ef;
+  monsterGraphics.forEach((graphic, type) => {
+    const desc = monsterDesc[type]!;
+    graphic.word2 = derivedNum;
+    derivedNum += 2 + (monsterHasSideGraphic(desc) ? 2 : 0) + (monsterHasBackGraphic(desc) ? 2 : 0)
+      + (monsterHasAttackGraphic(desc) ? 2 : 0) + 3 * (desc.word4 & 3);
+  });
   const doorCharacteristics = readDoorCharacteristics22f(raw22f);
   const monsterDroppings = readMonsterDroppings22f(raw22f);
   // Byte10340[4] is at the very start of the graphic (ABS_22F_START itself).

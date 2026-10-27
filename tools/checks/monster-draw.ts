@@ -38,6 +38,7 @@ import { standIn, wrapMember, standInOf } from '../lib/standIn';
 import { viewportContextOf } from '../lib/viewportContext';
 import { graphicsTablesOf, stockGraphics } from '../lib/game';
 import { RnMaps } from '../../src/core/RnMaps';
+import { GraphicsStore } from '../../src/renderer/GraphicsStore';
 
 const graphics = stockGraphics();
 const tables = graphicsTablesOf(graphics).objects;
@@ -220,5 +221,57 @@ for (const [type, name] of [[RAT, 'rat'], [WORM, 'worm']] as const) {
     }
   }
 }
+
+// 8. A monster beyond the first row is shrunk once, into derived graphic `ITEM12_word2` +
+// `graphicNumFBSAE` (`:581-583`, `:823-840`), through the distance's colour map, and kept:
+// seen again on a level whose scheme maps its colour otherwise, it keeps the first one's.
+// The fake graphic is all colour 9, the one a level's scheme sets.
+const COLOUR = 9;
+function farColour(store: GraphicsStore, far: Uint8Array): number | null {
+  const record = standInOf<CreatureRecord>({ creatureType: RAT, numMonM1: 0 });
+  let first: number | null = null;
+  const context = viewportContextOf({
+    viewportIndexBuffer: createPaletteIndexViewportBuffer(224, 136, 0),
+    objectTables: tables,
+    graphics: store,
+    monsterColorMapFar: far,
+    getGraphicBitmap: (n: number) => {
+      const img = graphics.getImage(n);
+      return { width: img.width, height: img.height, pixels: new Uint8Array(img.width * img.height).fill(COLOUR) };
+    },
+    dungeonState: standInOf<DungeonState>({
+      rnMaps,
+      getData: () => NO_POOL,
+      getDBRecordLink: () => OBJECT_ID_EOF,
+      getCreatureRecord: () => record,
+      getMonsterRenderState: () => ({ positions: 255, facings: 0xaa, statuses: new Uint8Array([0, 0, 0, 0]) }),
+    }),
+  });
+  const draw = new ViewportDraw(context);
+  standIn(draw, 'blitShapeToViewportIndexWithTransparent', (src) => { first = src.pixels[0]; });
+  DrawRoomObjects(draw, monsterRn, 0, 0, 0, 0, ORDER_3421);
+  return first;
+}
+console.log('\na far monster\'s shrunk picture (Code51a4.cpp:581-583, :823-840; CSBCode.cpp:10491-10565):');
+const word2s = tables.monsterGraphics.map((g) => g.word2);
+const sized = (type: number): number => {
+  const d = tables.monsterDesc[type]!;
+  return 2 + ((d.word4 & 8) ? 2 : 0) + ((d.word4 & 0x10) ? 2 : 0) + ((d.word4 & 0x20) ? 2 : 0) + 3 * (d.word4 & 3);
+};
+console.log(`  ITEM12_word2: ${word2s.join(' ')}`);
+check(word2s[0] === 0x1ef && word2s.every((w, type) => type === 0 || w === word2s[type - 1]! + sized(type - 1)),
+  'ITEM12_word2 numbers each type\'s derived graphics from 0x1ef, one after another');
+const levelA = tables.monsterColorMapFar.slice();
+const levelB = tables.monsterColorMapFar.slice();
+levelB[COLOUR] = levelA[COLOUR] === 0 ? 10 : 0;
+const kept = new GraphicsStore(graphics, (line) => console.log(line));
+const onA = farColour(kept, levelA);
+const onBAfterA = farColour(kept, levelB);
+const onBAlone = farColour(new GraphicsStore(graphics, (line) => console.log(line)), levelB);
+console.log(`  colour ${COLOUR} in F3: ${onA} on the first level, ${onBAfterA} on a second whose scheme maps it to ${mapColorValue(levelB, COLOUR)}, ${onBAlone} there first`);
+check(onA === mapColorValue(levelA, COLOUR) && onBAlone === mapColorValue(levelB, COLOUR) && onA !== onBAlone,
+  'a far monster is shrunk through the level\'s far colour map');
+check(onBAfterA === onA, 'and keeps the first level\'s colours on the second');
+check(kept.derivedGraphic(word2s[RAT]!, () => null) !== null, `the rat's far front view is derived graphic ${word2s[RAT]}, its ITEM12_word2`);
 
 finish();

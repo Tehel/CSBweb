@@ -275,7 +275,7 @@ function regions22e(t: GraphicsTables): Region[] {
   const v = t.viewport;
   const o = t.objects;
   const out: Region[] = [];
-  const put = (table: string, field: string, b: number[], at = 0, runsOn?: string) =>
+  const put = (table: string, field: string, b: (number | null)[], at = 0, runsOn?: string) =>
     out.push({ table, field, at, bytes: b, runsOn });
 
   put('teleporterRectangles', 'teleporterRectangles', v.teleporterRectangles.flatMap(rect8));
@@ -307,8 +307,9 @@ function regions22e(t: GraphicsTables): Region[] {
   put('monsterColorMapFar', 'Byte6612', bytes(o.monsterColorMapFar));
   put('specialColors', 'specialColors', o.specialColors.flatMap((s) =>
     [...words(s.paletteEntries), s.monsterColorMapMedium, s.monsterColorMapFar]));
+  // `ITEM12_word2` is set at load (`CSBCode.cpp:10497`), over the file's word.
   put('monsterGraphics', 'Item6414', o.monsterGraphics.flatMap((m) => [
-    ...word(m.word0), ...word(m.word2), m.frontRearByteWidth, m.frontRearHeight,
+    ...word(m.word0), null, null, m.frontRearByteWidth, m.frontRearHeight,
     m.sideByteWidth, m.sideHeight, m.attackByteWidth, m.attackHeight, m.uByte10, m.uByte11,
   ]));
   put('viewportPosition', 'viewportPosition', o.viewportPosition.flat(2).flatMap((p) => [p.x, p.y]));

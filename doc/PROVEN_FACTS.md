@@ -444,8 +444,15 @@ set those give, which reach 255 in every data set: `Byte5070 + 18*set`
 (`CSBCode.cpp:4073`), whose `ASSERT(D4W < 4)` (`:4086`) a release build compiles out
 (`CSBTypes.h:103-108`), and `floorDecorDesc[set]` (`:3957`). Those two are read to the
 item's end, 141 whole sets of ornament rectangles and 45 sets and seven cells of floor
-ones (`tools/checks/door-ornaments.ts`); a set past it reads CSBWin's own variables. The only bytes of the item no table reads are `Word4012`'s, which CSBWin sets
-at run time (`d.Word4012 = 3217`, `CSBCode.cpp:7585`).
+ones (`tools/checks/door-ornaments.ts`); a set past it reads CSBWin's own variables. The only bytes of the item no table reads are those CSBWin sets itself: `Word4012`'s
+at run time (`d.Word4012 = 3217`, `CSBCode.cpp:7585`), and each monster's `ITEM12_word2`
+at load, 0 in every file, which `ReadTablesFromGraphicsFile` numbers from 0x1ef by the
+derived graphics each type sizes (`CSBCode.cpp:10491-10565`): a far and a medium picture
+of each view it has, and three for each of `Nibble0()`. A monster beyond the first row is
+shrunk into derived graphic `ITEM12_word2` plus its view's offset and kept
+(`Code51a4.cpp:581-583`, `:823-840`), and a level read deletes the derived graphics only
+the first time (`Code222ea.cpp:217-222`, `Code390e.cpp:43`), so a monster first seen far
+on one level keeps that level's colours 9 and 10 on the next (`tools/checks/monster-draw.ts`).
 
 ## Item `0x22f` is laid out exactly as `Data.h` declares its span
 

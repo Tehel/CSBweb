@@ -585,10 +585,10 @@ function drawMonsterAt(
   const hasAttack = monsterHasAttackGraphic(mtDesc);
 
   // The alternate numbers its pictures from 0, the section's own, and its derived ones
-  // (`graphicNumFBSAE`) from 0 in its slot of the cache. The first `DrawMonster` keeps no
-  // derived graphic in the port, so only the alternate counts them.
+  // (`graphicNumFBSAE`) from 0 in its slot of the cache; the others from `ITEM12_word0`
+  // and `ITEM12_word2` (`doc/CSBwin-src/Code51a4.cpp:581-583`).
   let graphicNum0 = pAlternateGraphic ? 0 : 446 + (pI12.word0 | 0);
-  let graphicNumFBSAE = 0;
+  let graphicNumFBSAE = pAlternateGraphic ? 0 : pI12.word2 | 0;
   let showBackView = false;
   let showAttackView = false;
   let frontViewMirror = false;
@@ -691,7 +691,11 @@ function drawMonsterAt(
       }
       src = altMonCache.GetAlternateDerivedGraphicAddress(monster, graphicNumFBSAE)!;
     } else {
-      src = shrinkBlt(base, base.width, base.height, Math.max(1, dstByteWidth * 2), Math.max(1, dstHeight), distancePalette);
+      // Kept as derived graphic `graphicNumFBSAE` once shrunk, through the colour map of
+      // the level it was first seen on (`:823-840`): a level read deletes the derived
+      // graphics only the first time (`Code222ea.cpp:217-222`, `Code390e.cpp:43`).
+      src = draw.context.graphics.derivedGraphic(graphicNumFBSAE, () =>
+        shrinkBlt(base, base.width, base.height, Math.max(1, dstByteWidth * 2), Math.max(1, dstHeight), distancePalette));
     }
     // The last term can never hold, since `frontViewMirror` needs
     // `NonAttackingMirrorOK()`: a front view is not mirrored beyond the first row

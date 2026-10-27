@@ -116,7 +116,6 @@ In payoff order: the first row is the next item.
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
 | C188 | A new timer's unused bytes are 0, where CSBWin's are 0xcd | M | ⏳ |
-| C189 | A distant monster is shrunk again at every frame, where CSBWin keeps it across levels | S | ⏳ |
 | F15 | Tools that read the wall clock, and a runner with no timeout | S | ⏳ |
 | F16 | A tool can pass having checked less than it says | S | ⏳ |
 | F18 | One `tsconfig` for the browser, the tools and the server | S | ⏳ |
@@ -510,29 +509,6 @@ Paying it: which bytes each of CSBWin's `SetTimer` callers leaves, read caller b
 (47 calls, in eleven files, against the port's 37 `createTimer` and `addTimer` callers),
 and `createTimer` giving a byte left out 0xcd only if every one of them does; a check of a
 port-made `TT_75` written by `buildSaveFile`, against the bytes CSBWin's constructor leaves.
-
-### C189 ⏳ A distant monster is shrunk again at every frame, where CSBWin keeps it across levels
-
-`DrawMonster` keeps a monster farther than the first row as derived graphic
-`ITEM12_word2 + graphicNumFBSAE`, shrunk through the distance's colour map
-(`d.Byte6628` or `d.Byte6612`) only when `AllocateDerivedGraphic` finds it absent
-(`doc/CSBwin-src/Code51a4.cpp:583`, `:823-840`). `ReadGraphicsForLevel` sets colours 9
-and 10 of both maps from the level's monsters at every level read (`ModifyPalettes`,
-`Code390e.cpp:323-344`, `CSBCode.cpp:2895-2911`), and deletes every derived graphic only
-at the first read (`LoadNeededGraphics`, `Code222ea.cpp:217-222`, behind `d.Word7254`,
-`Code390e.cpp:43`, `:345-371`, `:380`). So in CSBWin a monster shrunk on one level, seen far
-on another whose colour 9 or 10 has another scheme, keeps the first level's colours;
-the schemes' distance entries differ (word 6 of each of `graphics.dat`'s `specialColors`:
-90, 0, 100, 50, 120). The port shrinks it at every frame (`drawMonsterAt`,
-`src/renderer/bytecode/DrawRoomObjects.ts`), through the present level's maps, which
-also costs the shrink at every frame; only an alternate monster's is kept, in
-`AltMonCache`. Whether a dungeon the port plays reaches the difference is not traced,
-nor whether CSBWin's graphics cache can free a derived graphic first (`Code222ea.cpp:97`).
-
-Paying it: the shrunk picture kept in the `GraphicsStore` under
-`pI12.word2 + graphicNumFBSAE`, the non-alternate's `graphicNumFBSAE` starting at
-`word2` as CSBWin's does; a check that draws a monster far on one level, then on a
-level whose scheme for its colour differs, and finds the first level's colours.
 
 ### C150 ⏸️ Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops
 
