@@ -115,7 +115,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C190 | An Atari-era save with a cloud, a fluxcage or a missile in flight, as CSBWin converts it | S | ⏳ waits on the author |
 | C173 | The DSA's `&ADD` and `&DEL` on a square bypass `MoveObject` | M | ⏳ |
 | C186 | A decoration's position set past its rectangles' table is not drawn | S | ⏳ |
 | C187 | The adjust skills filter hands each DSA the one before's words unmasked, and its `why` | S | ⏳ |
@@ -497,34 +496,6 @@ seen to band.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
-
-### C190 ⏳ An Atari-era save with a cloud, a fluxcage or a missile in flight, as CSBWin converts it
-
-Waits on the author: CSBWin's own behaviour, which the port follows, and a candidate for H.
-
-A file with no Extended Features block has the objects its timers name numbered after its
-chains, through `ConvertListOfObjects` (`ConvertTimers`,
-`doc/CSBwin-src/SaveGame.cpp:2239-2262`; `src/data/CsbwinDungeonConversions.ts`). Two of
-its three cases name an object that is in a square's chain, numbered already:
-
-- **A cloud or a fluxcage** (`TT_25`, `TT_24`): the cloud is a DB15 record in the square
-  beside its timer (`CreateFluxcage`, `doc/CSBwin-src/Code11f52.cpp:1550`;
-  `src/engine/MissileEncounter.ts`), and `ConvertTimers` passes `DuplicateOK` false, so
-  the read finds it and dies, "Duplicated Object" (`:2167-2168`). The port throws, and
-  the import fails.
-- **A missile in flight** (`TT_Missile0`, `TT_Missile`), `DuplicateOK` true: the missile
-  takes its slot, and the loop goes on to its link (`:2235`), already a slot, which it
-  reads as a packed RN. Unless the missile is its chain's last, the link becomes another
-  record's slot, or `RNeof` when the number is past the doors (`:2148-2156`), and the
-  rest of the square's chain is lost.
-
-Neither Atari-era file the port holds has such a timer: `mini.dat` and `csbgame2.dat`
-are CSB's starting party (`tools/checks/atari-saves.ts`), and no DM save of the Atari is
-among the fixtures.
-
-The options: keep CSBWin's behaviour (delete this entry), or an H divergence in
-`ConvertListOfObjects`: a duplicate takes the slot made and ends the walk, its chain
-numbered with it, and a timer's object takes it even where CSBWin passes false.
 
 ### C173 ⏳ The DSA's `&ADD` and `&DEL` on a square bypass `MoveObject`
 

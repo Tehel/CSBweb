@@ -2652,6 +2652,13 @@ them (`:2981-2985`). `ConvertTimers` walks the queue from its last entry to its 
 (`TIMER_SEARCH`, `Data.h:1621-1624`; `CreateSearchList`, `Timer.cpp:1209-1215`;
 `FindNextTimer`, `:2924-2935`): 24, 25, 60 and 61 name their object in bytes 8-9, 48 and 49
 in bytes 6-7, a duplicate allowed for those two alone (`SaveGame.cpp:2239-2262`).
+The port keeps what follows. A cloud's or a fluxcage's timer (24, 25) names a DB15 record
+already numbered in its square's chain (the fluxcage's: `CreateFluxcage`,
+`Code11f52.cpp:1550`), so the read
+dies, "Duplicated Object" (`SaveGame.cpp:2167-2168`), and the port's import fails. A
+missile's (48, 49) takes the slot its chain gave it, and the walk goes on to the missile's
+link, a slot already, which it reads as a packed RN (`:2235`, `:2142-2156`), so the rest of
+that square's chain is renumbered wrongly or cut at `RNeof`.
 `tools/checks/atari-saves.ts` takes three objects off their chains in `csbgame2.dat`, a
 group into a `TT_60` timer, an item into an action hand and one into the hand, and finds
 each named, in that order of slots, between the chains' and the scrolls' texts'.
