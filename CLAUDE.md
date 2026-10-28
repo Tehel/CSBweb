@@ -184,7 +184,8 @@ data/       DataSets (the manifest's sets), LocalDataSets (a player's own, a rec
             beside what a list needs), BrowserSaveStore (IndexedDB, the one store),
             legacyRows (the store's upgrade from its first version), downloadSaveFile
             (the save menu's EXPORT), BrowserDataSetStore (the player's own data sets, in
-            the same database)
+            the same database), RecordingStore and BrowserRecordingStore (the recordings,
+            in it too: a row each and its parts)
   tables/   Runtime table extraction from graphics.dat: ObjectTables, UITables,
             ViewportTables, MonsterDesc, AmigaSoundTables (the `dm-amiga` set's table
             item, and the volumes A22E reads from it), and GraphicsTables (all of them,
@@ -203,7 +204,7 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
             MouseQueue and LoopState (the loop's `d.` state, at `ctx.mouseQueue` /
             `ctx.loop`), InputBoundary (the one door the page changes the game through, at
             `Game.input`, and the VBLs counted), Recorder (the game logged at that door from
-            the read it began at), PeriodicUpdates (the ninety- and ten-second updates), LightLevel
+            the read it began at), RecordingWriter (the recordings written to the store as they grow), PeriodicUpdates (the ninety- and ten-second updates), LightLevel
             (`SelectPaletteForLightLevel`: `d.CurrentPalette`), OpenChest (the open
             chest, opened and repacked at CSBWin's events, never by drawing),
             ShowHideInventory (the inventory shown and hidden, and `TAG02076e` and

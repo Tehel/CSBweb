@@ -3,7 +3,11 @@
  * database: one record each, its files as Blobs, keyed by its `local:<id>`.
  */
 import type { LocalDataSetRecord } from '../LocalDataSets';
-import { DATA_SETS_STORE, SAVES_STORE, SAVE_FILES_STORE, askToPersist, idbDone, idbGet, idbGetAll, idbPut, openSaveDatabase } from './idb';
+import {
+    DATA_SETS_STORE, RECORDINGS_STORE, RECORDING_PARTS_STORE, SAVES_STORE, SAVE_FILES_STORE,
+    askToPersist, idbDone, idbGet, idbGetAll, idbPut, openSaveDatabase, recordingPartsOf,
+} from './idb';
+import type { RecordingEntry } from './RecordingStore';
 import type { DrawPlaythrough, StoredSaveEntry } from './SaveStore';
 
 /** A record as the store may hold it: one stored before `thumbnailAsTitle` or `official` has none, for `false`. */
@@ -40,11 +44,13 @@ export class BrowserDataSetStore {
     }
 
     /**
-     * The set `id` names and every save filed under it, its row and its file, in one
-     * transaction: all of them, or none.
+     * The set `id` names, every save filed under it, its row and its file, and every
+     * recording played on it, its row and its parts, in one transaction: all of them, or
+     * none.
      */
     async remove(id: string): Promise<void> {
-        const tx = (await this.db()).transaction([DATA_SETS_STORE, SAVES_STORE, SAVE_FILES_STORE], 'readwrite');
+        const tx = (await this.db()).transaction(
+            [DATA_SETS_STORE, SAVES_STORE, SAVE_FILES_STORE, RECORDINGS_STORE, RECORDING_PARTS_STORE], 'readwrite');
         const done = idbDone(tx);
         tx.objectStore(DATA_SETS_STORE).delete(id);
         const files = tx.objectStore(SAVE_FILES_STORE);
@@ -56,6 +62,18 @@ export class BrowserDataSetStore {
             if (entry.dataSet === id) {
                 row.delete();
                 files.delete(entry.id);
+            }
+            row.continue();
+        };
+        const parts = tx.objectStore(RECORDING_PARTS_STORE);
+        const recordings = tx.objectStore(RECORDINGS_STORE).openCursor();
+        recordings.onsuccess = () => {
+            const row = recordings.result;
+            if (!row) return;
+            const entry = row.value as RecordingEntry;
+            if (entry.dataSet === id) {
+                row.delete();
+                parts.delete(recordingPartsOf(entry.id));
             }
             row.continue();
         };

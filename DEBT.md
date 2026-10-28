@@ -664,7 +664,7 @@ needs, where the port stands against it, and the port's own recorder.
 The port has neither of CSBWin's. It keeps the recorder's count, `totalMoveCount`, which a
 save stores (`Game.recordFileRecord`, `src/engine/Game.ts`), and `extraTicks` is always on
 (`src/engine/MovementSystem.ts:115-116`). Conflux 3.5's `AutoRecord` (`doc/RECORDING.md`)
-asks for a recorder, and the port records every game anyway.
+asks for a recorder, and the port records every game anyway, and keeps it.
 
 **The port's recorder is its own** (`doc/RECORDING.md` → "The port's recorder"): it logs
 the input boundary's changes (`src/engine/InputBoundary.ts`), each with the count of VBLs
@@ -684,10 +684,13 @@ Paying it, in steps:
 1. The recorder: done. `Recorder` (`src/engine/Recorder.ts`) holds a `Recording`, begun by
    each of `GameSaves`'s reads and ended by the next: its build and data set, its start (a
    new game's stream and `d.RandomGameID`, or a save's file), its rules and extras, and the
-   boundary's changes. The page keeps the one begun last, in memory only. Playing one back
-   is the tool's (`Page.replay` in `tools/checks/replay.ts`), from the recording alone.
-2. The store: recordings beside the saves in IndexedDB (`src/data/saves/BrowserSaveStore.ts`),
-   written as they grow, since most end with the page closed, not with a read.
+   boundary's changes. Playing one back is the tool's (`Page.replay` in
+   `tools/checks/replay.ts`), from the recording alone.
+2. The store: done. The recordings beside the saves in IndexedDB, a row and parts each
+   (`src/data/saves/RecordingStore.ts`, `BrowserRecordingStore`), written as they grow by
+   `RecordingWriter` (`src/engine/RecordingWriter.ts`), every five seconds and as the page
+   is hidden (`doc/RECORDING.md` → "The port's recorder"). The replay plays what the store
+   holds.
 3. The player: the boundary fed from a recording (`InputBoundary.apply`, before the
    VBL each change was logged at), the page's live input ignored but its own controls,
    every tick it plays drawn, at the wall clock's pace or faster. The boundary logs the
@@ -695,7 +698,11 @@ Paying it, in steps:
    its icon) holds the clock, and the logged `pause` lets it run, but the player takes the
    dialog down itself.
 4. Where a player starts, stops and plays one, to design with the author. Sharing
-   (`doc/RECORDING.md` → "Shared recordings") comes after.
+   (`doc/RECORDING.md` → "Shared recordings") comes after. With it, how many the store
+   keeps: `RECORDINGS_KEPT`, 20 recordings, the latest begun, across every set, is a bound
+   chosen so the store does not grow while nothing plays them. A playthrough played over
+   many sessions is many recordings, one from each read, so a list may want them joined,
+   and the bound counted in playthroughs or bytes instead.
 
 ### Postponed
 

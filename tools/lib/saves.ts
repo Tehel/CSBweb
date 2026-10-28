@@ -13,13 +13,18 @@
  *   for (const path of genuineSaves()) …
  *   readFileSync(savePath('csbgame4-door-opening.dat'))
  *
- * And `memoryStore`, a save store in memory, for a tool that runs the page's saves, and
+ * And `memoryStore`, a save store in memory, for a tool that runs the page's saves,
+ * `memoryRecordingStore`, a recording store in memory, for one that runs its recordings, and
  * `rewriteSaveFile`, a file read and written again through the port's own codecs.
  */
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import { sortSaveEntries, type SaveEntry, type SaveStore } from '../../src/data/saves/SaveStore';
+import {
+  assembleRecording, sortRecordingEntries,
+  type RecordingEntry, type RecordingPart, type RecordingStore,
+} from '../../src/data/saves/RecordingStore';
 import { buildExtendedFeaturesPrefix } from '../../src/data/CsbwinExtendedFeatures';
 import type { CsbwinObjectIndex } from '../../src/data/CsbwinObjectIndex';
 import {
@@ -159,4 +164,41 @@ export function memoryStore(
       entries.delete(id);
     },
   };
+}
+
+/**
+ * A recording store in memory, which keeps a clone of what it is given, as IndexedDB
+ * does, so a value that does not clone fails here too. `writes` counts the writes, and a
+ * store made to `fail` while `fail.now` holds rejects them.
+ */
+export function memoryRecordingStore(fail: { now: boolean } = { now: false }): RecordingStore & {
+  entries: Map<string, RecordingEntry>;
+  parts: Map<string, RecordingPart[]>;
+  writes: number;
+} {
+  const entries = new Map<string, RecordingEntry>();
+  const parts = new Map<string, RecordingPart[]>();
+  const store = {
+    entries,
+    parts,
+    writes: 0,
+    list: async () => sortRecordingEntries([...entries.values()].map((entry) => structuredClone(entry))),
+    read: async (id: string) => {
+      const entry = entries.get(id);
+      if (!entry) throw new Error(`no recording ${id}`);
+      return assembleRecording(structuredClone(entry), structuredClone(parts.get(id) ?? []));
+    },
+    write: async (entry: RecordingEntry, written: readonly RecordingPart[]) => {
+      store.writes++;
+      if (fail.now) throw new Error('the store is full');
+      const held = (parts.get(entry.id) ?? []).filter((part) => !written.some((w) => w.seq === part.seq));
+      parts.set(entry.id, [...held, ...structuredClone(written)]);
+      entries.set(entry.id, structuredClone(entry));
+    },
+    remove: async (id: string) => {
+      entries.delete(id);
+      parts.delete(id);
+    },
+  };
+  return store;
 }

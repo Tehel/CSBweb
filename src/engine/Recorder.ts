@@ -14,6 +14,8 @@
  *
  * A recording is played back by the same start: the game read from it, its rules and
  * extras set, the game begun, and each change applied before the VBL it was logged at.
+ *
+ * The page writes each recording to its store as it grows (`RecordingWriter`).
  */
 import type { Extras, RulesOptions } from './GameContext';
 import type { Game } from './Game';
@@ -65,14 +67,24 @@ interface Running {
 
 export class Recorder {
     private current: Running | null = null;
+    private beginListener: ((previous: Recording | null) => void) | null = null;
 
     /** Records `game`'s boundary, the only listener it has, for `build` playing `dataSet`. */
     constructor(private readonly game: Game, private readonly build: string, private readonly dataSet: string) {
         game.input.listen((change, vbl) => this.told(change, vbl));
     }
 
+    /**
+     * Told at each `begin`, before the recording begins, the one it replaces as it stands
+     * (`null` at the first): the store's writer (`RecordingWriter`), which finishes it.
+     */
+    onBegin(listener: (previous: Recording | null) => void): void {
+        this.beginListener = listener;
+    }
+
     /** A read has made the game `start`: the recording begins. */
     begin(start: RecordingStart): void {
+        this.beginListener?.(this.recording);
         const { ctx } = this.game;
         this.current = {
             recording: { build: this.build, dataSet: this.dataSet, start, rules: { ...ctx.rules }, extras: { ...ctx.extras } },

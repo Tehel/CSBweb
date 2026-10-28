@@ -778,12 +778,13 @@ check(afterAdd.tiles.includes(`local:${MINE}!`) && new RegExp(`dungeon=local%3A$
 // A new name confirmed is stored over the record, which keeps when it was added, and its
 // save stays. DELETE asks first, counting the save; CANCEL keeps the set, and DELETE
 // removes the record and its save, its row and its file, so that the pages below see the
-// one save.
+// one save. A recording played on the set, its row and its two parts, goes with it.
 const saveDatabase = (body: { before?: string; write: string }) => evaluate(`(async()=>{${body.before ?? ''}
   return new Promise((resolve, reject) => { const open = indexedDB.open('csbweb-saves');
     open.onerror = () => reject(open.error);
-    open.onsuccess = () => { const db = open.result, tx = db.transaction(['saves', 'saveFiles', 'dataSets'], 'readwrite');
+    open.onsuccess = () => { const db = open.result, tx = db.transaction(['saves', 'saveFiles', 'dataSets', 'recordings', 'recordingParts'], 'readwrite');
       const saves = tx.objectStore('saves'), files = tx.objectStore('saveFiles'), dataSets = tx.objectStore('dataSets');
+      const recordings = tx.objectStore('recordings'), parts = tx.objectStore('recordingParts');
       ${body.write}
       tx.oncomplete = () => { db.close(); resolve(true); }; tx.onerror = () => reject(tx.error); }; });})()`);
 await saveDatabase({
@@ -791,7 +792,11 @@ await saveDatabase({
     all.onsuccess = () => { const row = all.result[0];
       saves.put({ ...row, id: 'probe-local-save', dataSet: 'local:${MINE}', savedAt: row.savedAt - 1, usedAt: (row.usedAt ?? row.savedAt) - 1 });
       const file = files.get(row.id);
-      file.onsuccess = () => files.put({ ...file.result, id: 'probe-local-save' }); };`,
+      file.onsuccess = () => files.put({ ...file.result, id: 'probe-local-save' }); };
+    recordings.put({ id: 'probe-local-recording', dataSet: 'local:${MINE}', build: 'probe', playthrough: 7, recordedAt: 1, writtenAt: 1,
+      vbls: 10, ended: false, changes: 1, parts: 2 });
+    parts.put({ id: 'probe-local-recording', seq: 0, start: { kind: 'new', random: 1, randomGameID: 7 }, rules: {}, extras: {} });
+    parts.put({ id: 'probe-local-recording', seq: 1, changes: [{ change: { kind: 'forceDMRules' }, vbl: 0, time: 0, random: 1 }] });`,
 });
 await navigate(`${APP}?dungeon=nowhere&keepsaves`, WELCOME);
 const withLocal = await welcome();
@@ -810,10 +815,13 @@ check((await welcome()).play === atLocal.play && (await form())?.open === true, 
 await inForm(`d.querySelector('#add-set-cancel').click()`);
 const readStore = () => evaluate(`new Promise((resolve, reject) => { const open = indexedDB.open('csbweb-saves');
   open.onerror = () => reject(open.error);
-  open.onsuccess = () => { const tx = open.result.transaction(['saves', 'saveFiles', 'dataSets']);
+  open.onsuccess = () => { const tx = open.result.transaction(['saves', 'saveFiles', 'dataSets', 'recordings', 'recordingParts']);
     const set = tx.objectStore('dataSets').get('local:${MINE}'), saves = tx.objectStore('saves').getAllKeys(), files = tx.objectStore('saveFiles').getAllKeys();
-    tx.oncomplete = () => { open.result.close(); resolve({ name: set.result?.name ?? null, createdAt: set.result?.createdAt ?? null,
-      saves: saves.result.sort().join(), files: files.result.sort().join() }); }; }; })`);
+    const recordings = tx.objectStore('recordings').getAll(), parts = tx.objectStore('recordingParts').getAllKeys();
+    tx.oncomplete = () => { open.result.close(); const mine = recordings.result.filter((r) => r.dataSet === 'local:${MINE}').map((r) => r.id);
+      resolve({ name: set.result?.name ?? null, createdAt: set.result?.createdAt ?? null,
+      saves: saves.result.sort().join(), files: files.result.sort().join(),
+      recordings: mine.join(), parts: parts.result.filter((k) => mine.includes(k[0])).length }); }; }; })`);
 const pen = await evaluate(`(()=>{const pens=[...document.querySelectorAll('.pick-edit')], p=pens[0], a=p.getBoundingClientRect();
   const b=p.closest('.pick-cell').querySelector('.pick[data-set] .pick-picture').getBoundingClientRect();
   return { count: pens.length, of: p.closest('.pick-cell').querySelector('.pick').dataset.set, label: p.getAttribute('aria-label'),
@@ -934,16 +942,17 @@ await evaluate(`document.querySelector('#delete-set-cancel').click()`);
 await settled();
 const keptSet = { dialog: await confirmation(), form: await form(), store: await readStore() };
 check(asked?.open === true && asked.title === 'Delete My Edited Dungeon?' && /^Its saved game is deleted with it\. .*EXPORT/.test(asked.text)
-  && keptSet.dialog === null && keptSet.form?.open === true && keptSet.store.name === 'My Edited Dungeon' && keptSet.store.saves === edited.saves,
-  "DELETE asks first, counting the set's save and naming EXPORT; CANCEL keeps the set and its save");
+  && keptSet.dialog === null && keptSet.form?.open === true && keptSet.store.name === 'My Edited Dungeon' && keptSet.store.saves === edited.saves
+  && keptSet.store.recordings === 'probe-local-recording' && keptSet.store.parts === 2,
+  "DELETE asks first, counting the set's save and naming EXPORT; CANCEL keeps the set, its save and its recording");
 await inForm(`d.querySelector('.add-set-delete').click()`);
 await evaluate(`document.querySelector('#delete-set-confirm').click()`);
 await settled();
 const deleted = { dialog: await confirmation(), form: await form(), store: await readStore(), page: await welcome() };
 check(deleted.dialog === null && deleted.form === null && deleted.store.name === null && deleted.store.saves === decodeURIComponent(saveId!)
-  && deleted.store.files === deleted.store.saves
+  && deleted.store.files === deleted.store.saves && deleted.store.recordings === '' && deleted.store.parts === 0
   && tilesOf(deleted.page).filter((tile: string) => tile !== MINE).join() === atWelcome.tiles && tilesOf(deleted.page).includes(MINE),
-  'its DELETE removes the record and every save filed under its id, and the page shows the sets without it, the published one kept');
+  'its DELETE removes the record, every save filed under its id and every recording played on it, and the page shows the sets without it, the published one kept');
 // The moderation (`server/moderate.ts`), from the tiles, as the dev server's moderator
 // (`DEV_MODERATOR_PLAYER_ID`, `vite.config.mts`; the image's in `tools/check-image.sh`), the
 // page reloaded with their `playerId` kept. Every published set has the book first, then the
@@ -1655,7 +1664,7 @@ const rawSaves = `new Promise((resolve, reject) => { const o = indexedDB.open('c
   o.onsuccess = () => { const db = o.result, tx = db.transaction(['saves', 'saveFiles']);
     const rows = tx.objectStore('saves').getAll(), files = tx.objectStore('saveFiles').getAll();
     const sum = (b) => new Uint8Array(b).reduce((a, x) => (a * 31 + x) >>> 0, 0);
-    tx.oncomplete = () => { db.close(); resolve({ version: db.version,
+    tx.oncomplete = () => { db.close(); resolve({ version: db.version, stores: [...db.objectStoreNames].sort().join(),
       rows: rows.result.map((r) => r.id + ('bytes' in r ? '+bytes' : '')).sort().join(),
       files: files.result.map((f) => f.id + ':' + f.bytes.byteLength + ':' + sum(f.bytes)).sort().join() }); }; }; })`;
 await navigate(`${APP}package.json?keepsaves`, LOADED);
@@ -1673,8 +1682,9 @@ const stagedV5 = await evaluate(`(async()=>{
 await navigate(`${APP}?dungeon=nowhere&keepsaves`, WELCOME);
 const upgradedV5 = await evaluate(rawSaves);
 console.log('  version 5 upgraded:', JSON.stringify(upgradedV5));
-check(upgradedV5.version === 6 && upgradedV5.rows === 'probe-v5.dat' && upgradedV5.files === stagedV5,
+check(upgradedV5.version === 7 && upgradedV5.rows === 'probe-v5.dat' && upgradedV5.files === stagedV5,
   "the upgrade to version 6 keeps a row without its file, and its file byte for byte in saveFiles under the row's id");
+check(upgradedV5.stores === 'dataSets,recordingParts,recordings,saveFiles,saves', `and to version 7 adds the recordings' two stores (${upgradedV5.stores})`);
 await navigate(`${APP}?intro=0&dungeon=csb&keepsaves`, GAME);
 const filesApart = await evaluate(`(async()=>{ const { saves } = window.__probe;
   const listed = await saves.list(), entry = listed.find((e) => e.id === 'probe-v5.dat');
@@ -1692,6 +1702,26 @@ check(filesApart.imported === 'stored' && filesApart.afterImport?.rows === 'prob
   && filesApart.afterImport.files.split(',').map((f: string) => f.split(':')[0]).join() === 'probe-import.dat,probe-v5.dat'
   && filesApart.afterDelete?.rows === 'probe-v5.dat' && filesApart.afterDelete.files === stagedV5,
   'an import writes a row and its file, and a DELETE deletes both');
+
+// The game's recording in the store (`BrowserRecordingStore`, `RecordingWriter`): a write
+// puts its row and its parts, and a read puts them back together as the recorder has it.
+// A second write, after a click, adds a part of its changes alone.
+const recordingWritten = await evaluate(`(async()=>{ const { recorder, recordings, recordingStore } = window.__probe;
+  const summary = (r) => r && JSON.stringify({ ...r, start: r.start.kind, vbls: 0 });
+  await recordings.flush();
+  const entry = (await recordingStore.list()).find((e) => e.dataSet === 'csb' && !e.ended);
+  if (!entry) return { entries: (await recordingStore.list()).length };
+  const first = await recordingStore.read(entry.id);
+  window.__probe.game.input.apply({ kind: 'unclick' });
+  await recordings.flush();
+  const second = await recordingStore.read(entry.id), live = recorder.recording;
+  const rows = (await recordingStore.list()).find((e) => e.id === entry.id);
+  return { parts: entry.parts, partsAfter: rows.parts, changes: first.changes.length, changesAfter: second.changes.length,
+    same: summary(second) === summary(live), start: second.start.kind, kinds: second.changes.map((c) => c.change.kind).join() }; })()`);
+console.log('  recording written:', JSON.stringify(recordingWritten));
+check(recordingWritten.parts === 2 && recordingWritten.start === 'new' && recordingWritten.changes >= 1
+  && recordingWritten.partsAfter === 3 && recordingWritten.changesAfter === recordingWritten.changes + 1 && recordingWritten.same,
+  "the game's recording is written to the store, its head and its changes, and a write after a click adds a part, read back as the recorder has it");
 
 // The map dialog (`src/renderer/ui/MapDialog.ts`), over CSB's `csbgame2.dat`, its party
 // where the save left it: a press held on the message area opens it, with MAP VIEW on

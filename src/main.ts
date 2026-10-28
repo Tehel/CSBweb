@@ -13,7 +13,7 @@ import { parsePublishedDungeons, type KnownDungeon } from './data/DungeonSignatu
 import { isLocalDataSetId, localDataSet, recordFiles } from './data/LocalDataSets';
 import { emptyDungeonData } from './data/DungeonLoader';
 import { GraphicsLoader } from './data/GraphicsLoader';
-import { BrowserDataSetStore, BrowserSaveStore, downloadSaveFile, type DrawPlaythrough, type OpenedSave } from './data/saves';
+import { BrowserDataSetStore, BrowserRecordingStore, BrowserSaveStore, downloadSaveFile, type DrawPlaythrough, type OpenedSave } from './data/saves';
 import { UTILITY_PORTRAITS_FILE, readUtilityPortraits, type UtilityPortraits } from './data/UtilityPortraits';
 import { Game } from './engine/Game';
 import { buildGameTables, type GameTables } from './engine/GameTables';
@@ -43,6 +43,7 @@ import { Die } from './core/Die';
 import { csbGraphicsOpener } from './engine/FileSignatures';
 import type { PrisonDoorChoice } from './renderer/intro/PrisonDoor';
 import { Recorder } from './engine/Recorder';
+import { RecordingWriter } from './engine/RecordingWriter';
 import { applySaveBytes } from './engine/SaveGameFile';
 import { Settings, applyToGame, type SettingsValues } from './settings/Settings';
 import type { KeyboardLayoutMap } from './renderer/ui/KeyLabels';
@@ -65,6 +66,8 @@ const presenter = new Presenter(() => {
 
 /** The folder of the games, relative to the page as every fetch is. */
 const GAMEFILES_DIR = 'gamefiles';
+/** How often the running recording is written to the store (`RecordingWriter`), in milliseconds. */
+const RECORDING_WRITE_MS = 5000;
 /**
  * The game this page plays, chosen from the manifest before anything else is loaded
  * (`?dungeon=<id>`, `chooseDataSet`).
@@ -306,7 +309,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
             // The adventure's animations end with it: a chew draws nothing over the credits.
             presenter.cancel();
             events.ended(word11694);
-            if (screen) showEndOfGame({ ...introDeps({ game, screen, saves, messages, events, input, playInput }, sound), game, messages }, word11694).catch(reportError);
+            if (screen) showEndOfGame({ ...introDeps({ game, screen, saves, events, input }, sound), game, messages }, word11694).catch(reportError);
         },
         // A script's tick, `_ProcessTimersViewportAndSound`, draws the viewport itself.
         drawViewport: () => renderView(),
@@ -331,6 +334,17 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     const saveStore = new BrowserSaveStore((rows) => drawPlaythrough(storeRandom, rows));
     // Each read begins a recording of the game from it, which the next read ends.
     const recorder = new Recorder(game, __CSBWEB_BUILD__, dataSet.id);
+    // Written to the store as it grows: every few seconds, and as the page is hidden, the
+    // way most games end. A write that fails is written again at the next.
+    const recordingStore = new BrowserRecordingStore((rows) => drawPlaythrough(storeRandom, rows));
+    const recordings = new RecordingWriter(recorder, recordingStore, {
+        now: () => Date.now(),
+        newId: () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
+    });
+    const writeRecording = (): void => { recordings.flush().catch(() => {}); };
+    setInterval(writeRecording, RECORDING_WRITE_MS);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') writeRecording(); });
+    window.addEventListener('pagehide', writeRecording);
     const saves = new GameSaves(game, dataSet, setFiles, saveStore, {
         // A save packs a `CHARDESC`, and that needs graphic 26 for the champions who
         // carry only a portrait index.
@@ -443,7 +457,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         } : null,
     });
     const playInput = input.take(NO_INPUT);
-    return { game, screen, saves, messages, events, input, playInput };
+    return { game, screen, saves, recorder, recordings, recordingStore, messages, events, input, playInput };
 }
 
 /** What `construct` builds, which the boot, the play and the end of the game share. */
@@ -451,6 +465,9 @@ interface Built {
     game: Game;
     screen: GameScreen;
     saves: GameSaves;
+    recorder: Recorder;
+    recordings: RecordingWriter;
+    recordingStore: BrowserRecordingStore;
     messages: ScrollingText;
     events: GameEvents;
     input: GameInput;
@@ -466,14 +483,15 @@ interface Built {
  */
 function probeHandle(built: Built, sound: SoundManager) {
     const presetHeroes = () => extractPresetHeroes(built.game.ctx.dungeon.getData(), built.game.ctx.tables.textDecode, built.game.ctx.tables);
-    return { game: built.game, screen: built.screen, sound, saves: built.saves, renderView, refreshScreen, presetHeroes, applySaveBytes, intro: introProbe };
+    return { game: built.game, screen: built.screen, sound, saves: built.saves,
+        recorder: built.recorder, recordings: built.recordings, recordingStore: built.recordingStore, renderView, refreshScreen, presetHeroes, applySaveBytes, intro: introProbe };
 }
 
 /** `window.__probe` (`probeHandle`), whose type the probes' page-side functions are checked against. */
 export type Probe = ReturnType<typeof probeHandle>;
 
 /** What the boot and the end of the game share: the canvas, the screen, the sound and the game's read. */
-function introDeps({ game, screen, saves, events, input }: Built, sound: SoundManager): Omit<BootSequenceDeps, 'skip' | 'title'> {
+function introDeps({ game, screen, saves, events, input }: Pick<Built, 'game' | 'screen' | 'saves' | 'events' | 'input'>, sound: SoundManager): Omit<BootSequenceDeps, 'skip' | 'title'> {
     return {
         input,
         gameScreen: screen,

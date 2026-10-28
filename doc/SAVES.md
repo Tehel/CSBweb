@@ -55,7 +55,9 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   Version 5 adds an object store to the database, `dataSets`, the player's own data sets
   (`src/data/LocalDataSets.ts`, `BrowserDataSetStore`), and changes no row. To version 6,
   each row's file goes to `saveFiles`, under the row's id, and the row is kept without
-  it (`splitSaveRecord`); a store at version 6 is not read at all. The steps after version 2's
+  it (`splitSaveRecord`); a store at version 6 is not read at all. Version 7 adds two
+  object stores, `recordings` and `recordingParts`, the game's recordings
+  (`doc/RECORDING.md` → "The port's recorder"), and changes no row. The steps after version 2's
   keep a row they cannot read as it is: the store is a save's only copy, and a reader
   made stricter must not delete it.
   Nothing else in `src/` reads JSON. A
@@ -538,7 +540,7 @@ itself: neither the IndexedDB half of the upgrades (`upgradeRows`) nor
 in a browser the store held by another tab, both ways; the upgrade from version 5, a
 row's file moved to `saveFiles` byte for byte; a list reading no file, an import and a
 DELETE writing and deleting a row and its file together, and a local data set deleted
-with its saves' rows and files.
+with its saves' rows and files and its recordings.
 
 - **RISE**: `tools/checks/rise.ts` (the row a new adventure is stored as, again, and a
   refusal; the chooser's `rise` mode over every set's saves, its LOAD and a refusal, and

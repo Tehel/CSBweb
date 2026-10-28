@@ -10,6 +10,7 @@ import type { DrawPlaythrough, StoredSaveRecord } from './SaveStore';
 
 const DB_NAME = 'csbweb-saves';
 /**
+ * 7: two stores more, `RECORDINGS_STORE` and `RECORDING_PARTS_STORE`, the recordings.
  * 6: the saves' files in a store of their own, `SAVE_FILES_STORE`, apart from their rows.
  * 5: a second store, `DATA_SETS_STORE`, the player's own data sets. 4: no row's file
  * holds 0 in all four of `GAMEBLOCK1`'s `Byte22598`, `Byte22596`, `Word22594` and
@@ -18,7 +19,7 @@ const DB_NAME = 'csbweb-saves';
  * a CSBWin file, which may name no playthrough. 1 had neither the three fields nor that
  * rule, and a second store for a directory handle.
  */
-const DB_VERSION = 6;
+const DB_VERSION = 7;
 
 /** The saves' rows, one `SaveEntry` each, keyed by `id`: what a list reads. */
 export const SAVES_STORE = 'saves';
@@ -28,6 +29,12 @@ export const SAVE_FILES_STORE = 'saveFiles';
 export const DATA_SETS_STORE = 'dataSets';
 /** The version that added `DATA_SETS_STORE`. */
 const DATA_SETS_VERSION = 5;
+/** The recordings' rows, one `RecordingEntry` each, keyed by `id` (`BrowserRecordingStore`). */
+export const RECORDINGS_STORE = 'recordings';
+/** The recordings' parts, one `RecordingPart` each, keyed by its row's `id` and its `seq`. */
+export const RECORDING_PARTS_STORE = 'recordingParts';
+/** The version that added `RECORDINGS_STORE` and `RECORDING_PARTS_STORE`. */
+const RECORDINGS_VERSION = 7;
 /** Version 1's other store. */
 const HANDLES_STORE = 'handles';
 
@@ -111,6 +118,10 @@ export function openSaveDatabase(draw: DrawPlaythrough): Promise<IDBDatabase> {
             if (event.oldVersion < DATA_SETS_VERSION && !db.objectStoreNames.contains(DATA_SETS_STORE)) {
                 db.createObjectStore(DATA_SETS_STORE, { keyPath: 'id' });
             }
+            if (event.oldVersion < RECORDINGS_VERSION) {
+                db.createObjectStore(RECORDINGS_STORE, { keyPath: 'id' });
+                db.createObjectStore(RECORDING_PARTS_STORE, { keyPath: ['id', 'seq'] });
+            }
         };
         request.onblocked = () => {
             blocked = true;
@@ -170,6 +181,11 @@ export function idbGet<T>(db: IDBDatabase, store: string, key: IDBValidKey): Pro
 
 export function idbGetAll<T>(db: IDBDatabase, store: string): Promise<T[]> {
     return promisify<T[]>(db.transaction(store, 'readonly').objectStore(store).getAll());
+}
+
+/** The parts of recording `id`, every `seq` of it (`RECORDING_PARTS_STORE`'s key). */
+export function recordingPartsOf(id: string): IDBKeyRange {
+    return IDBKeyRange.bound([id, 0], [id, Infinity]);
 }
 
 export async function idbPut(db: IDBDatabase, store: string, value: unknown): Promise<void> {

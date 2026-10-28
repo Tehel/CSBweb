@@ -1,8 +1,8 @@
 # Recording a game and playing it back
 
 CSBWin can record a game as the list of inputs it took and play that list back. The port
-records every game in memory, and plays a recording back only in a tool so far (`DEBT.md`
-G29). This document holds what CSBWin does, what a replay needs, where the port stands
+records every game and keeps the latest in the browser's store, and plays a recording back
+only in a tool so far (`DEBT.md` G29). This document holds what CSBWin does, what a replay needs, where the port stands
 against those needs, the port's own recorder, and what sharing recordings would take.
 
 **Recordings follow the engine.** Any change to what the engine does at a tick makes a
@@ -182,6 +182,15 @@ asserts every change recorded at the same VBL with the same `d.Time` and
   `Game.readNewGame`, which the replay's own read seeds anew, and the two are set over
   it), or the save's file; and the rules and the extras.
 - **A read ends a recording**, and F9's begins the next from the save it reads.
+- **The store holds a recording as it grows**: the replay plays the recording as the
+  recorded page's store holds it, written every five seconds of its clock, over a store in
+  memory that clones what it is given as IndexedDB does. Before its last write it holds
+  the changes so far, what a page closed then leaves; a write that fails writes nothing
+  and the next writes it all; the recording F9 replaced is finished, ended, at the next
+  write; and past `RECORDINGS_KEPT` the earliest go, their parts with them.
+  `tools/probe-frames.ts` checks the IndexedDB half in a browser: a write of the game's
+  recording read back as the recorder has it, a part added by a write after a click, the
+  upgrade to version 7, and a data set's DELETE taking its recordings.
 
 What is not verified:
 
@@ -200,8 +209,8 @@ the boundary where the page changes the game (`src/engine/InputBoundary.ts`), ea
 with the number of VBLs run before it, and the player applies each before the same VBL.
 
 `Recorder` (`src/engine/Recorder.ts`) is the boundary's listener. The page has one
-(`src/main.ts`), which keeps the recording begun last in memory: the store is to come
-(`DEBT.md` G29). A `Recording` is:
+(`src/main.ts`), and writes what it records to the store as it grows (below). A
+`Recording` is:
 
 - the build that made it (`__CSBWEB_BUILD__`) and its data set's id;
 - its start: a new game's stream and `d.RandomGameID`, or a save's file;
@@ -216,6 +225,26 @@ its playthrough is drawn (`newGameRead`), a save's once it is read (`read`), the
 LOAD, F9, CONTINUE and RISE's adventure among them. The read itself is told at the boundary
 (`readGame`), which ends the recording before. The boot then forces DM rules where the
 dungeon asks, a change of the boundary's, the recording's first.
+
+**The store** holds the recordings beside the saves, in the same IndexedDB database
+(`doc/SAVES.md`), from version 7: a row each in `recordings` (`RecordingEntry`,
+`src/data/saves/RecordingStore.ts`: its set, build, playthrough, when it began and was
+last written, its VBLs, its changes and parts, whether a read has ended it), and its parts
+in `recordingParts`, keyed by the row's id and a `seq`. Part 0 is the head, the start, the
+rules and the extras; each part after it the changes recorded since the one before, so a
+write adds only what is new. A row and the parts it gains are written in one transaction,
+and a row never names a part the store has not (`assembleRecording` refuses one that
+does).
+
+Most games end with the page closed, not with a read, so `RecordingWriter`
+(`src/engine/RecordingWriter.ts`) writes the running recording while it runs: every five
+seconds (`RECORDING_WRITE_MS`, `src/main.ts`) and as the page is hidden, the row whenever
+its VBLs have moved and a part whenever it has new changes. A write that fails is written
+again at the next. A recording a read has replaced is finished, ended, at the next write.
+Nothing is written of a recording before its first change, and its first write removes,
+past `RECORDINGS_KEPT` (20), the recordings begun earliest. Deleting a player's own data
+set deletes the recordings played on it (`BrowserDataSetStore.remove`). The clock and the
+ids are the page's: the engine reads neither.
 
 A recording is played back by its start: the game read from it, a new one's stream and
 playthrough set over the read's, the rules and the extras set, the game begun, and each
@@ -244,8 +273,7 @@ state. A port-only recorder does not need this compatibility.
 
 Not decided; what sharing would take:
 
-- **Storage**: 33 bytes an entry, kept in IndexedDB beside the saves
-  (`src/data/saves/BrowserSaveStore.ts`) while recording, and sent to the server to share.
+- **Storage**: the store's recordings (above), sent to the server to share.
 - **A starting point the viewer has**: a new game of a published data set, or the starting
   save uploaded with the recording. A player's own unpublished set cannot be shared this
   way.

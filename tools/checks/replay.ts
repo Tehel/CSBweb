@@ -11,7 +11,9 @@
  * page does, the extras set first, and is played as a player plays it: pointer events and
  * keys handed to `GameInput` between uneven wakes of the loop, the screen composed after
  * each input, at every VBL that asks, and at every frame of a menu's press. The replayed
- * page is a fresh one fed the recording alone: its start read, its rules and extras set,
+ * page is a fresh one fed the recording alone, as the recorded page's store holds it
+ * (`RecordingWriter` over a store in memory, written every five seconds of the clock as
+ * the page writes it): its start read, its rules and extras set,
  * each change applied before its VBL, VBLs run one by one, and the screen drawn only at
  * the tick's `DrawViewport`, which a click in the viewport is resolved through. A dialog
  * that a played VBL opened (the disk menu, from its icon) the replay takes down itself,
@@ -30,6 +32,11 @@
  *    from the game's stream, and changes nothing the game reads.
  * 3. The two games' final saves are byte-identical.
  * 4. A read ends a recording, and F9's begins the next from the save it reads.
+ * 5. The store holds a recording as it grows: before its last write, what the page had
+ *    written when it was closed, the changes so far; after it, the whole recording, which
+ *    the replay plays. A write that fails is written again at the next. The recording a
+ *    read replaced is finished, ended, at the next write, and past `RECORDINGS_KEPT` the
+ *    earliest begun are removed.
  *
  * Run: `npm test -- --only=replay.ts`
  */
@@ -37,12 +44,13 @@ import { readFileSync } from 'node:fs';
 
 import { CsbRandom } from '../../src/core/random';
 import { emptyDungeonData } from '../../src/data/DungeonLoader';
-import { readSaveFileFields, type SaveEntry } from '../../src/data/saves';
+import { RECORDINGS_KEPT, readSaveFileFields, type SaveEntry } from '../../src/data/saves';
 import { Game } from '../../src/engine/Game';
 import { NO_EXTRAS } from '../../src/engine/GameContext';
 import { GameSaves } from '../../src/engine/GameSaves';
 import { applyExtras } from '../../src/engine/InputBoundary';
 import { Recorder, type Recording } from '../../src/engine/Recorder';
+import { RecordingWriter } from '../../src/engine/RecordingWriter';
 import { applySaveBytes, buildSaveFile } from '../../src/engine/SaveGameFile';
 import { NO_FULLSCREEN } from '../../src/lib/fullscreen';
 import { GameInput, type KeyPress } from '../../src/renderer/GameInput';
@@ -60,7 +68,7 @@ import { check, finish } from '../lib/check';
 import { ManualClock } from '../lib/clock';
 import { STOCK_DATA_SET, diskFiles } from '../lib/dataSets';
 import { STOCK_DIR, gameTablesOf, graphicsTablesOf, stockGraphics } from '../lib/game';
-import { memoryStore, savePath } from '../lib/saves';
+import { memoryRecordingStore, memoryStore, savePath } from '../lib/saves';
 
 /** Where a recorded game starts: a new game of the stock set, or a save's file read. */
 type Start = 'new' | Uint8Array;
@@ -72,6 +80,9 @@ const NEW_GAME_SEED = 0x2b5a1c07;
 const START_EXTRAS = { ...NO_EXTRAS, drinkAtFountain: true, showItemProperties: true };
 
 const DUNGEON = new Uint8Array(readFileSync(`${STOCK_DIR}/dungeon.dat`));
+
+/** How often the page writes the running recording (`RECORDING_WRITE_MS`, `src/main.ts`). */
+const RECORDING_WRITE_MS = 5000;
 
 /** Let what the page awaits settle: the store's promises, and the timers of a menu's press. */
 const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -88,6 +99,12 @@ class Page {
   readonly saves: GameSaves;
   readonly settings = new Settings(null);
   readonly recorder: Recorder;
+  /** Whether the recording store refuses its writes. */
+  readonly storeFull = { now: false };
+  readonly recordingStore = memoryRecordingStore(this.storeFull);
+  readonly recordings: RecordingWriter;
+  /** The clock's time the running recording was last written at. */
+  private writtenAt = this.clock.time;
   /** The screens composed: the tick's views, and the rest. */
   views = 0;
   composed = 0;
@@ -118,6 +135,11 @@ class Page {
       paint: () => { if (this.recorded) this.refreshScreen(); },
     });
     this.recorder = new Recorder(game, 'replay', STOCK_DATA_SET.id);
+    let ids = 0;
+    this.recordings = new RecordingWriter(this.recorder, this.recordingStore, {
+      now: () => this.clock.time,
+      newId: () => `recording-${++ids}`,
+    });
     saves = new GameSaves(game, STOCK_DATA_SET, diskFiles(STOCK_DATA_SET), this.store, {
       portraitOf: drawing.portraitOf,
       askBeginAdventure: () => { throw new Error('no prison in this dungeon'); },
@@ -234,6 +256,13 @@ class Page {
     return page;
   }
 
+  /** The running recording written, as the page writes it every `RECORDING_WRITE_MS`. */
+  writeOnTime(): void {
+    if (this.clock.time - this.writtenAt < RECORDING_WRITE_MS) return;
+    this.writtenAt = this.clock.time;
+    void this.recordings.flush().catch(() => {});
+  }
+
   /** What the recorder has of the game. */
   get recording(): Recording {
     return this.recorder.recording!;
@@ -284,6 +313,7 @@ class Player {
   /** One wake of the loop after `ms`: the VBLs the wall clock has let pass. */
   private wake(ms: number): void {
     this.page.clock.advance(ms);
+    this.page.writeOnTime();
   }
 
   /** About `ms` of play, in wakes of 1 to 70 ms. */
@@ -461,6 +491,61 @@ function firstDifference(a: Uint8Array, b: Uint8Array): number {
   return a.length !== b.length ? Math.min(a.length, b.length) : a.findIndex((byte, n) => byte !== b[n]);
 }
 
+/** Whether two recordings are the same, their start's file byte for byte. */
+function sameRecording(a: Recording, b: Recording): boolean {
+  const bytes = (r: Recording) => (r.start.kind === 'save' ? r.start.bytes : null);
+  const [fileA, fileB] = [bytes(a), bytes(b)];
+  if ((fileA === null) !== (fileB === null) || (fileA && fileB && firstDifference(fileA, fileB) >= 0)) return false;
+  const rest = (r: Recording) => JSON.stringify({ ...r, start: r.start.kind === 'save' ? 'save' : r.start });
+  return rest(a) === rest(b);
+}
+
+/**
+ * What `page`'s store holds as the page is closed before its last write, then once it is
+ * written, after a write that fails: the recording that is replayed.
+ */
+async function stored(page: Page): Promise<Recording> {
+  const recording = page.recording;
+  const store = page.recordingStore;
+  await settle();
+  const [entry, ...others] = await store.list();
+  if (!entry) throw new Error('the store holds no recording');
+  const closed = await store.read(entry.id);
+  const held = closed.changes.length;
+  check(others.length === 0 && held > 1 && held < recording.changes.length && !closed.ended && closed.vbls < recording.vbls
+    && sameRecording(closed, { ...recording, changes: recording.changes.slice(0, held), vbls: closed.vbls, ended: false }),
+    `the store holds the recording as it grows: closed now, its first ${held} changes of ${recording.changes.length}, ${closed.vbls} VBLs (${store.writes} writes, ${entry.parts} parts)`);
+  page.storeFull.now = true;
+  const failed = await page.recordings.flush().then(() => false, () => true);
+  page.storeFull.now = false;
+  check(failed && (await store.read(entry.id)).changes.length === held, 'a write that fails writes nothing');
+  await page.recordings.flush();
+  const written = await store.read(entry.id);
+  check(sameRecording(written, recording), `and the next writes the whole of it (${written.changes.length} changes, ${written.vbls} VBLs)`);
+  return written;
+}
+
+/** F9 has replaced `page`'s recording: it is finished at the next write, and past `RECORDINGS_KEPT` the earliest go. */
+async function replaced(page: Page, recording: Recording): Promise<void> {
+  const store = page.recordingStore;
+  await page.recordings.flush();
+  const [entry, ...others] = await store.list();
+  const finished = entry && await store.read(entry.id);
+  check(others.length === 0 && finished?.ended === true && sameRecording(finished, { ...recording, ended: true }),
+    `the next write finishes the recording F9 replaced, ended (${finished?.vbls} VBLs), and holds nothing of the next before its first change`);
+  const first = entry!.id;
+  const start = page.recording.start;
+  for (let n = 0; n <= RECORDINGS_KEPT; n++) {
+    page.recorder.begin(start);
+    page.game.input.apply({ kind: 'unclick' });
+    await page.recordings.flush();
+  }
+  const kept = await store.list();
+  check(kept.length === RECORDINGS_KEPT && !kept.some((e) => e.id === first) && kept[0]!.recordedAt >= kept[kept.length - 1]!.recordedAt
+    && store.parts.size === RECORDINGS_KEPT,
+    `past ${RECORDINGS_KEPT} recordings, the earliest begun are removed, their parts with them`);
+}
+
 /** `start` played by `script` and recorded, then the recording played back in a fresh page. */
 async function replay(name: string, start: Start, script: (player: Player) => Promise<void>): Promise<void> {
   console.log(`\n=== ${name} ===`);
@@ -490,7 +575,7 @@ async function replay(name: string, start: Start, script: (player: Player) => Pr
     check(kinds.has(kind), `the game takes the boundary's ${kind}`);
   }
 
-  const played = Page.replay(recording);
+  const played = Page.replay(await stored(recorded));
   const { game } = played;
   for (const entry of changes) {
     while (game.input.vbls < entry.vbl) game.runFrame();
@@ -528,6 +613,7 @@ async function replay(name: string, start: Start, script: (player: Player) => Pr
   const next = recorded.recording;
   check(next.start.kind === 'save' && !next.ended && next.changes.length === 0 && next.vbls === 0,
     'and F9\'s read begins the next, from the save it read');
+  await replaced(recorded, recording);
 }
 
 await replay('a new game', 'new', newGameScript);
