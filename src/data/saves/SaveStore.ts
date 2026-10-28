@@ -11,6 +11,7 @@
  */
 import { csbwinSaveInfoOf, readCsbwinSaveInfo, type CsbwinSaveInfo } from '../CsbwinSaveInfo';
 import type { SaveFile } from '../SaveFile';
+import type { RecordingPoint } from '../../engine/Recorder';
 
 /** One row of the list: what a save is listed by, without its bytes. */
 export interface SaveEntry {
@@ -57,6 +58,13 @@ export interface SaveEntry {
      * `src/engine/GameSaves.ts`). Nothing reads it yet.
      */
     unofficial: boolean;
+    /**
+     * The recording the save was made in, and its point there as its file was made
+     * (`Recorder.point`): a read of it begins a branch of that recording
+     * (`doc/RECORDING.md` → "The tree"). `null` for a save made in no recording: one
+     * imported, a new adventure, or one made before rows held it.
+     */
+    recording: RecordingPoint | null;
 }
 
 /** A row and its CSBWin file, as the store's earlier versions held them in one (`legacyRows.ts`). */
@@ -66,10 +74,10 @@ export interface SaveRecord extends SaveEntry {
 
 /**
  * A row as a store may hold it: one written before rows held `usedAt`, `playTime`,
- * `unofficial` or `sleep` has none of them.
+ * `unofficial`, `sleep` or `recording` has none of them.
  */
-export type StoredSaveEntry = Omit<SaveEntry, 'usedAt' | 'playTime' | 'unofficial' | 'sleep'>
-    & { usedAt?: number; playTime?: number; unofficial?: boolean; sleep?: boolean };
+export type StoredSaveEntry = Omit<SaveEntry, 'usedAt' | 'playTime' | 'unofficial' | 'sleep' | 'recording'>
+    & { usedAt?: number; playTime?: number; unofficial?: boolean; sleep?: boolean; recording?: RecordingPoint | null };
 
 /** A row and its file in one, as a store before the files had their own held it. */
 export type StoredSaveRecord = StoredSaveEntry & { bytes: ArrayBuffer };
@@ -88,7 +96,8 @@ export interface SaveFileRecord {
  * none, and counts as last used when it was saved; one written before they held
  * `playTime` counts no time played; one written before they held `unofficial` is of its
  * data set's own dungeon, since no file came in from outside then; one written before
- * they held `sleep` is no Sleepsave, since no build wrote one then.
+ * they held `sleep` is no Sleepsave, since no build wrote one then; one written before
+ * they held `recording` was made in no recording the store links.
  */
 export function saveEntryOf(record: StoredSaveEntry): SaveEntry {
     return {
@@ -104,6 +113,7 @@ export function saveEntryOf(record: StoredSaveEntry): SaveEntry {
         level: record.level,
         champions: record.champions,
         unofficial: record.unofficial ?? false,
+        recording: record.recording ?? null,
     };
 }
 

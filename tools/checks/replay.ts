@@ -37,6 +37,14 @@
  *    the replay plays. A write that fails is written again at the next. The recording a
  *    read replaced is finished, ended, at the next write, and past `RECORDINGS_KEPT` the
  *    earliest begun are removed.
+ * 6. The recordings make a tree: F5's save and the disk menu's name the recording and
+ *    their point in it, before their tail; F9's read of the disk menu's save begins a
+ *    branch of the recording at that point, with what the read left beside the file
+ *    (`CarriedState`). The branch, played on with a save in it, replays from its own
+ *    start alone, and from its root through the join: the root replayed up to the point
+ *    makes the very file the branch read, and the branch read over it, what the read left
+ *    set, plays out as recorded. The join needs that state: without it, the final saves
+ *    differ.
  *
  * Run: `npm test -- --only=replay.ts`
  */
@@ -49,7 +57,7 @@ import { Game } from '../../src/engine/Game';
 import { NO_EXTRAS } from '../../src/engine/GameContext';
 import { GameSaves } from '../../src/engine/GameSaves';
 import { applyExtras } from '../../src/engine/InputBoundary';
-import { Recorder, type Recording } from '../../src/engine/Recorder';
+import { Recorder, setCarriedState, type Recording } from '../../src/engine/Recorder';
 import { RecordingWriter } from '../../src/engine/RecordingWriter';
 import { applySaveBytes, buildSaveFile } from '../../src/engine/SaveGameFile';
 import { NO_FULLSCREEN } from '../../src/lib/fullscreen';
@@ -134,12 +142,9 @@ class Page {
       drawViewport: () => this.renderView(),
       paint: () => { if (this.recorded) this.refreshScreen(); },
     });
-    this.recorder = new Recorder(game, 'replay', STOCK_DATA_SET.id);
     let ids = 0;
-    this.recordings = new RecordingWriter(this.recorder, this.recordingStore, {
-      now: () => this.clock.time,
-      newId: () => `recording-${++ids}`,
-    });
+    this.recorder = new Recorder(game, 'replay', STOCK_DATA_SET.id, () => `recording-${++ids}`);
+    this.recordings = new RecordingWriter(this.recorder, this.recordingStore, { now: () => this.clock.time });
     saves = new GameSaves(game, STOCK_DATA_SET, diskFiles(STOCK_DATA_SET), this.store, {
       portraitOf: drawing.portraitOf,
       askBeginAdventure: () => { throw new Error('no prison in this dungeon'); },
@@ -221,7 +226,7 @@ class Page {
     } else {
       const entry: SaveEntry = {
         id: 'start.dat', name: 'start.dat', dataSet: STOCK_DATA_SET.id, quick: false, sleep: false,
-        savedAt: 1000, usedAt: 1000, playTime: 1234, unofficial: false, ...readSaveFileFields(start)!,
+        savedAt: 1000, usedAt: 1000, playTime: 1234, unofficial: false, recording: null, ...readSaveFileFields(start)!,
       };
       await page.store.write(entry, start);
       saves.read(await saves.open(entry));
@@ -233,9 +238,9 @@ class Page {
 
   /**
    * A fresh page at `recording`'s start, from the recording alone: the new game's world
-   * read and its stream and playthrough set, or the save read; the rules and the extras
-   * set; its own recorder begun there, and the loop. The boot's DM rules are the
-   * recording's first change.
+   * read and its stream and playthrough set, or the save read and what its read left
+   * beside the file set; the rules and the extras set; its own recorder begun there, and
+   * the loop. The boot's DM rules are a root's first change.
    */
   static replay(recording: Recording): Page {
     const page = new Page(false);
@@ -246,14 +251,52 @@ class Page {
       game.readDungeonDat(DUNGEON);
       ctx.random.setSeed(start.random);
       ctx.state.block1.randomGameID = start.randomGameID;
+      page.begin(recording);
     } else {
-      applySaveBytes(game, start.bytes);
+      page.join(recording);
     }
-    Object.assign(ctx.rules, recording.rules);
-    applyExtras(ctx, recording.extras);
-    page.recorder.begin(start);
     game.start(true);
     return page;
+  }
+
+  /**
+   * `branch` read over the game this page plays, as its join is played: its save read,
+   * what the recorded read left beside the file set, its rules and its extras; the disk
+   * menu a played VBL opened taken down where the read let the clock run; its own
+   * recorder begun there.
+   */
+  join(branch: Recording): void {
+    const { start } = branch;
+    if (start.kind !== 'save') throw new Error('a branch starts from a save');
+    applySaveBytes(this.game, start.bytes);
+    if (start.carried) setCarriedState(this.game, start.carried);
+    if (!this.game.ctx.state.paused && this.ui.saveMenu) this.takeDownDialog();
+    this.begin(branch);
+  }
+
+  /** `recording`'s rules and extras set, and this page's recorder begun at its start. */
+  private begin(recording: Recording): void {
+    const { ctx } = this.game;
+    Object.assign(ctx.rules, recording.rules);
+    applyExtras(ctx, recording.extras);
+    this.recorder.begin(recording.start, recording.parent);
+  }
+
+  /**
+   * `recording`'s changes applied to this page's game, each before the VBL it was logged
+   * at, counted from the recording this page's recorder began at its start or its join;
+   * then its VBLs run, up to `until` where the join of a branch is.
+   */
+  async play(recording: Recording, until: { changes: number; vbls: number } = { changes: recording.changes.length, vbls: recording.vbls }): Promise<void> {
+    const { game } = this;
+    const vbls = () => this.recorder.point()!.vbls;
+    for (const entry of recording.changes.slice(0, until.changes)) {
+      while (vbls() < entry.vbl) game.runFrame();
+      if (entry.change.kind === 'pause' && !entry.change.paused && this.ui.saveMenu) this.takeDownDialog();
+      game.input.apply(entry.change);
+      await settle();
+    }
+    while (vbls() < until.vbls) game.runFrame();
   }
 
   /** The running recording written, as the page writes it every `RECORDING_WRITE_MS`. */
@@ -375,6 +418,21 @@ class Player {
     this.key('F5');
     await settle();
     check(this.page.store.files.size === before + 1, 'F5 writes a save with the clock running');
+    await this.savedAtItsPoint(true);
+  }
+
+  /**
+   * The save just made was made in the running recording, at the point its file was
+   * made: the changes recorded before it, its tail (`saveWritten`) the next, and the
+   * VBLs at that.
+   */
+  private async savedAtItsPoint(quick: boolean): Promise<void> {
+    const recording = this.page.recording;
+    const row = (await this.page.saves.list()).find((entry) => entry.quick === quick)!;
+    const point = row.recording;
+    const tail = point && recording.changes[point.changes];
+    check(point?.recording === recording.id && tail?.change.kind === 'saveWritten' && tail.vbl === point.vbls,
+      `its row names the recording and its point there, before its tail (${point?.changes} changes, ${point?.vbls} VBLs)`);
   }
 
   /**
@@ -401,6 +459,7 @@ class Player {
     }
     this.play(200);
     check(this.page.writes === before + 1, 'and its SAVE writes a save with the clock stopped');
+    await this.savedAtItsPoint(false);
     this.key('Escape', 'Escape');
     check(this.page.ui.saveMenu === null && !this.page.game.ctx.state.paused, 'Esc closes the menu and lets the clock run');
     this.key('Digit7', '7');
@@ -525,7 +584,7 @@ async function stored(page: Page): Promise<Recording> {
   return written;
 }
 
-/** F9 has replaced `page`'s recording: it is finished at the next write, and past `RECORDINGS_KEPT` the earliest go. */
+/** F9 has replaced `page`'s recording: it is finished at the next write. */
 async function replaced(page: Page, recording: Recording): Promise<void> {
   const store = page.recordingStore;
   await page.recordings.flush();
@@ -533,7 +592,12 @@ async function replaced(page: Page, recording: Recording): Promise<void> {
   const finished = entry && await store.read(entry.id);
   check(others.length === 0 && finished?.ended === true && sameRecording(finished, { ...recording, ended: true }),
     `the next write finishes the recording F9 replaced, ended (${finished?.vbls} VBLs), and holds nothing of the next before its first change`);
-  const first = entry!.id;
+}
+
+/** Past `RECORDINGS_KEPT`, the recordings begun earliest are removed. */
+async function keptRecordings(page: Page): Promise<void> {
+  const store = page.recordingStore;
+  const first = (await store.list()).at(-1)!.id;
   const start = page.recording.start;
   for (let n = 0; n <= RECORDINGS_KEPT; n++) {
     page.recorder.begin(start);
@@ -577,15 +641,36 @@ async function replay(name: string, start: Start, script: (player: Player) => Pr
 
   const played = Page.replay(await stored(recorded));
   const { game } = played;
-  for (const entry of changes) {
-    while (game.input.vbls < entry.vbl) game.runFrame();
-    if (entry.change.kind === 'pause' && !entry.change.paused && played.ui.saveMenu) played.takeDownDialog();
-    game.input.apply(entry.change);
-    await settle();
-  }
-  while (played.recording.vbls < recording.vbls) game.runFrame();
-
+  await played.play(recording);
   console.log(`  composed: recorded ${recorded.views} views and ${recorded.composed} screens more, replayed ${played.views} and ${played.composed}`);
+  sameGame(recorded, played, recording, 'every change is replayed at its VBL');
+
+  // A read ends the replay's recording, and F9's begins the recorded page's next.
+  applySaveBytes(game, recorded.saveFile());
+  const at = played.recording.vbls;
+  game.runFrame();
+  game.input.apply({ kind: 'unclick' });
+  const ended = played.recording;
+  check(ended.ended && ended.vbls === at && ended.changes.length === changes.length,
+    `a read ends a recording: no VBL nor change after it is recorded (${ended.vbls} VBLs)`);
+  const menuSave = (await recorded.saves.list()).find((row) => row.playthrough === recorded.game.ctx.state.block1.randomGameID)!;
+  recorded.input.keyDown({ key: '', code: 'F9', ctrlKey: false, metaKey: false, altKey: false });
+  await settle();
+  const next = recorded.recording;
+  check(next.start.kind === 'save' && !next.ended && next.changes.length === 0 && next.vbls === 0
+    && firstDifference(next.start.bytes, await recorded.store.read(menuSave.id)) < 0,
+    'and F9\'s read begins the next, from the save it read, the disk menu\'s');
+  check(JSON.stringify(next.parent) === JSON.stringify(menuSave.recording) && next.start.kind === 'save' && next.start.carried?.paused === false
+    && menuSave.recording!.recording === recording.id,
+    `a branch of the recording, at the point the save names (${JSON.stringify(next.parent)}), the clock running as the read left it`);
+  await replaced(recorded, recording);
+  await branch(recorded);
+  await keptRecordings(recorded);
+}
+
+/** `played` has replayed `recording`, which `recorded` played: the same changes at the same VBLs, and the same game. */
+function sameGame(recorded: Page, played: Page, recording: Recording, what: string): void {
+  const { changes } = recording;
   const replayed = played.recording;
   const parted = replayed.changes.findIndex((entry, n) => {
     const was = changes[n];
@@ -596,24 +681,47 @@ async function replay(name: string, start: Start, script: (player: Player) => Pr
     console.log(`  replayed: ${JSON.stringify(replayed.changes[parted])}`);
   }
   check(parted < 0 && replayed.changes.length === changes.length && replayed.vbls === recording.vbls,
-    `every change is replayed at its VBL, with d.Time and d.RandomNumber as recorded (${replayed.changes.length} of ${changes.length})`);
+    `${what}, with d.Time and d.RandomNumber as recorded (${replayed.changes.length} of ${changes.length})`);
   const differ = firstDifference(recorded.saveFile(), played.saveFile());
   check(differ < 0, `and the two final saves are byte-identical (${recorded.saveFile().length} bytes${differ < 0 ? '' : `, first difference at ${differ}`})`);
+}
 
-  // A read ends the replay's recording, and F9's begins the recorded page's next.
-  applySaveBytes(game, recorded.saveFile());
-  const at = played.recording.vbls;
-  game.runFrame();
-  game.input.apply({ kind: 'unclick' });
-  const ended = played.recording;
-  check(ended.ended && ended.vbls === at && ended.changes.length === changes.length,
-    `a read ends a recording: no VBL nor change after it is recorded (${ended.vbls} VBLs)`);
-  recorded.input.keyDown({ key: '', code: 'F9', ctrlKey: false, metaKey: false, altKey: false });
-  await settle();
-  const next = recorded.recording;
-  check(next.start.kind === 'save' && !next.ended && next.changes.length === 0 && next.vbls === 0,
-    'and F9\'s read begins the next, from the save it read');
-  await replaced(recorded, recording);
+/**
+ * The branch F9 began, played on with a save in it, then replayed from the store twice:
+ * from its own start alone, and from its root through the join, where the root replayed
+ * up to the point makes the very file the branch read.
+ */
+async function branch(recorded: Page): Promise<void> {
+  const player = new Player(recorded);
+  player.play(600);
+  player.wander();
+  player.key('KeyW');
+  player.play(1500);
+  await player.quickSave();
+  player.key('KeyE');
+  player.play(1200);
+  const recording = recorded.recording;
+  await recorded.recordings.flush();
+  const store = recorded.recordingStore;
+  const written = await store.read(recording.id);
+  check(sameRecording(written, recording) && written.parent !== null,
+    `the store holds the branch, its parent with it (${written.changes.length} changes, ${written.vbls} VBLs)`);
+
+  const alone = Page.replay(written);
+  await alone.play(written);
+  sameGame(recorded, alone, written, 'the branch replayed from its own start alone');
+
+  const parent = written.parent!;
+  const root = await store.read(parent.recording);
+  check(root.parent === null && root.ended, 'its parent is the root, ended');
+  const path = Page.replay(root);
+  await path.play(root, parent);
+  const start = written.start.kind === 'save' ? written.start.bytes : new Uint8Array(0);
+  const differ = firstDifference(path.saveFile(), start);
+  check(differ < 0, `the root replayed up to the point makes the file the branch read (${differ < 0 ? 'byte-identical' : `first difference at ${differ}`})`);
+  path.join(written);
+  await path.play(written);
+  sameGame(recorded, path, written, 'and the branch replayed from its root through the join');
 }
 
 await replay('a new game', 'new', newGameScript);

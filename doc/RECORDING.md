@@ -182,6 +182,11 @@ asserts every change recorded at the same VBL with the same `d.Time` and
   `Game.readNewGame`, which the replay's own read seeds anew, and the two are set over
   it), or the save's file; and the rules and the extras.
 - **A read ends a recording**, and F9's begins the next from the save it reads.
+- **The recordings make a tree** (below): a save names the recording and its point
+  there; F9's read of it begins a branch of that point, which replays from its own start
+  alone, and from its root through the join, where the root replayed up to the point
+  makes the very file the branch read. Left out at the join, what the read left beside
+  the file (`CarriedState`) makes the final saves differ.
 - **The store holds a recording as it grows**: the replay plays the recording as the
   recorded page's store holds it, written every five seconds of its clock, over a store in
   memory that clones what it is given as IndexedDB does. Before its last write it holds
@@ -201,6 +206,10 @@ What is not verified:
   saves in it replays as CSBWin's would.
 - **That the boundary has every door**: the tool proves the doors it plays, not that
   nothing else of the page changes the game between two VBLs.
+- **That `CarriedState` is all a read leaves**: the clock's hold and the loop's flags are
+  what the read in `ReadGame.ts` does not set and the game reads on; the tool joins a
+  branch F9 read with the clock running at a point the disk menu's SAVE held it, not a
+  branch the disk menu's LOAD read.
 
 ## The port's recorder
 
@@ -247,8 +256,43 @@ set deletes the recordings played on it (`BrowserDataSetStore.remove`). The cloc
 ids are the page's: the engine reads neither.
 
 A recording is played back by its start: the game read from it, a new one's stream and
-playthrough set over the read's, the rules and the extras set, the game begun, and each
-change applied before the VBL it was logged at.
+playthrough set over the read's, or a save's `CarriedState` set over its read (below),
+the rules and the extras set, the game begun, and each change applied before the VBL it
+was logged at.
+
+### The tree
+
+A save made in a recording knows its place there, and a load of it carries the
+recording on from there, as a branch (`DEBT.md` G29, step 3):
+
+- **The link.** A save's row names the recording it was made in and its point there,
+  as its file was made (`SaveEntry.recording`, `Recorder.point`): the recording's id,
+  the changes recorded before it and the VBLs run. The changes past the point begin with
+  the save's tail (`saveWritten`). The file stays CSBWin's.
+- **A branch.** A read of a linked save begins a recording that names that point as its
+  parent (`Recording.parent`). The read is not transparent, so the branch begins at it,
+  from its own start: the save's file, and what the read left of the game that the file
+  does not hold (`CarriedState`, `src/engine/Recorder.ts`): the clock a dialog holds and
+  the main loop's flags, the VBLs into the tick and the video mode among them. A read
+  under the disk menu's LOAD leaves the menu's held clock, F9's the running game's; at
+  the save's point, the clock and the loop were as the save left them. A read of a save
+  no link names (one imported, CSBWin's, a new adventure, one made before the link)
+  begins a root, from its file.
+- **A recording's history** is the path from its root to it. A branch plays from its own
+  start alone, or as its path: the root's start, then each parent up to the point its
+  child joins, the child's read and its `CarriedState` set over it, and on. At each join,
+  the parent replayed up to the point makes the very file the child read, a drift
+  detector of its own.
+- **The store** keeps the parent in the row and the head (`RecordingEntry.parent`,
+  `RecordingHead.parent`). `RecordingWriter` writes a branch as one only where the store
+  holds its parent up to its point: a save whose recording a closed page never wrote that
+  far is read as a root. It writes the recordings a read replaced before the one
+  running, so a parent the page played is in the store before its branch.
+
+Not yet: pruning what no save and no running game reaches, which replaces
+`RECORDINGS_KEPT` (`DEBT.md` G29, step 3b). Until then a branch's root can be among the
+earliest recordings `RECORDINGS_KEPT` removes, and the branch then plays only from its
+own start.
 
 CSBWin's player can align an entry only with a tick, `d.Time`, so whatever the game counts
 in VBLs within a tick (the held-step test, the eye held, the attack menu's tick) must come

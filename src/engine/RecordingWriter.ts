@@ -9,19 +9,24 @@
  * recording's first, so what this leaves out is a read straight over another. Its first
  * write removes, past `RECORDINGS_KEPT`, the recordings begun earliest.
  *
- * The clock and the ids are the page's (`RecordingWriterDeps`): the engine reads neither.
+ * A branch is written as one only where the store holds its parent up to the point it
+ * names: a save whose recording was never written, or not that far (a page closed before
+ * its write), is read as a root, which plays from its own start alone. The recordings
+ * replaced are written before the one running, so a parent this page played is in the
+ * store before its branch's first write.
+ *
+ * The clock is the page's (`RecordingWriterDeps`), and so are the ids (`Recorder`): the
+ * engine reads neither.
  */
 import {
     RECORDINGS_KEPT, readSaveFileFields,
     type RecordingEntry, type RecordingPart, type RecordingStore,
 } from '../data/saves';
-import type { Recorder, Recording, RecordingStart } from './Recorder';
+import type { Recorder, Recording, RecordingPoint, RecordingStart } from './Recorder';
 
 export interface RecordingWriterDeps {
     /** Milliseconds since the epoch. */
     now(): number;
-    /** A row's key, which no other recording of the store has. */
-    newId(): string;
 }
 
 /** What the store has of a recording. */
@@ -30,6 +35,8 @@ interface Written {
     readonly recordedAt: number;
     /** Read from its start at its first write. */
     playthrough: number | null;
+    /** Its parent as written at its first write (`parentHeld`). */
+    parent: RecordingPoint | null;
     /** Its changes written. */
     changes: number;
     /** Its parts written: 0 before its first write. */
@@ -54,7 +61,10 @@ export class RecordingWriter {
     constructor(private readonly recorder: Recorder, private readonly store: RecordingStore, private readonly deps: RecordingWriterDeps) {
         recorder.onBegin((previous) => {
             if (this.current && previous) this.finishing.push({ written: this.current, recording: previous });
-            this.current = { id: deps.newId(), recordedAt: deps.now(), playthrough: null, changes: 0, parts: 0, vbls: 0, ended: false };
+            this.current = {
+                id: recorder.recording!.id, recordedAt: deps.now(), playthrough: null, parent: null,
+                changes: 0, parts: 0, vbls: 0, ended: false,
+            };
         });
     }
 
@@ -88,14 +98,15 @@ export class RecordingWriter {
         const parts: RecordingPart[] = [];
         if (first) {
             // A view onto a larger buffer would be cloned whole.
-            const start = recording.start.kind === 'save' ? { kind: 'save' as const, bytes: recording.start.bytes.slice() } : recording.start;
-            parts.push({ id, seq: 0, start, rules: recording.rules, extras: recording.extras });
+            const start = recording.start.kind === 'save' ? { ...recording.start, bytes: recording.start.bytes.slice() } : recording.start;
+            written.parent = await this.parentHeld(recording.parent);
+            parts.push({ id, seq: 0, start, parent: written.parent, rules: recording.rules, extras: recording.extras });
         }
         let seq = Math.max(written.parts, 1);
         if (changes.length > written.changes) parts.push({ id, seq: seq++, changes: changes.slice(written.changes) });
         const playthrough = written.playthrough ??= playthroughOf(recording.start);
         const entry: RecordingEntry = {
-            id, dataSet: recording.dataSet, build: recording.build, playthrough,
+            id, dataSet: recording.dataSet, build: recording.build, parent: written.parent, playthrough,
             recordedAt: written.recordedAt, writtenAt: this.deps.now(),
             vbls, ended, changes: changes.length, parts: seq,
         };
@@ -105,6 +116,13 @@ export class RecordingWriter {
         written.vbls = vbls;
         written.ended = ended;
         if (first) await this.prune();
+    }
+
+    /** `parent`, where the store holds its recording up to it; `null` otherwise. */
+    private async parentHeld(parent: RecordingPoint | null): Promise<RecordingPoint | null> {
+        if (!parent) return null;
+        const held = (await this.store.list()).find((entry) => entry.id === parent.recording);
+        return held && held.changes >= parent.changes && held.vbls >= parent.vbls ? parent : null;
     }
 
     /** The recordings past `RECORDINGS_KEPT`, the earliest begun, removed. */

@@ -67,7 +67,7 @@ function stage(store = memoryStore(), dataSet = STOCK_DATA_SET) {
 function entry(over: Partial<SaveEntry>): SaveEntry {
   return {
     id: 'x', name: 'x', dataSet: STOCK_DATA_SET.id, playthrough: 7, quick: false, sleep: false,
-    savedAt: 0, usedAt: 0, playTime: 0, level: 0, champions: [], unofficial: false, ...over,
+    savedAt: 0, usedAt: 0, playTime: 0, level: 0, champions: [], unofficial: false, recording: null, ...over,
   };
 }
 

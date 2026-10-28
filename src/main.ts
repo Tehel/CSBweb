@@ -333,13 +333,13 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     const storeRandom = new CsbRandom();
     const saveStore = new BrowserSaveStore((rows) => drawPlaythrough(storeRandom, rows));
     // Each read begins a recording of the game from it, which the next read ends.
-    const recorder = new Recorder(game, __CSBWEB_BUILD__, dataSet.id);
+    const recorder = new Recorder(game, __CSBWEB_BUILD__, dataSet.id,
+        () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
     // Written to the store as it grows: every few seconds, and as the page is hidden, the
     // way most games end. A write that fails is written again at the next.
     const recordingStore = new BrowserRecordingStore((rows) => drawPlaythrough(storeRandom, rows));
     const recordings = new RecordingWriter(recorder, recordingStore, {
         now: () => Date.now(),
-        newId: () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
     });
     const writeRecording = (): void => { recordings.flush().catch(() => {}); };
     setInterval(writeRecording, RECORDING_WRITE_MS);

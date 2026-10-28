@@ -43,7 +43,7 @@ import { repackChest, showChestContents } from './OpenChest';
 import { UtilityDiskMessages, UtilityError, makeNewAdventure } from './Chaos';
 import type { Game } from './Game';
 import { drawRandomGameID } from './GameContext';
-import type { Recorder } from './Recorder';
+import { carriedStateOf, type Recorder } from './Recorder';
 import { SaveFileError, applySaveBytes, buildSaveFile } from './SaveGameFile';
 import type { Champion } from './gameTypes';
 
@@ -326,6 +326,7 @@ export class GameSaves {
         const bytes = buildSaveFile(this.game, {
             portraitOf: (champion) => this.screen.portraitOf(champion),
         });
+        const point = this.recorder?.point() ?? null;
         if (openChest !== null) showChestContents(this.game.ctx, openChest);
         const savedAt = Date.now();
         const playTime = this.game.playTime();
@@ -341,7 +342,7 @@ export class GameSaves {
         const entry: SaveEntry = {
             id, name, dataSet: this.dataSet.id, quick: target === 'quick', sleep: target === 'sleep',
             savedAt, usedAt: savedAt, playTime,
-            unofficial: this.unofficial, ...fields,
+            unofficial: this.unofficial, recording: point, ...fields,
         };
         await this.store.write(entry, bytes);
         if (clock === 'stopped') this.game.saveWritten();
@@ -371,11 +372,13 @@ export class GameSaves {
      * (`SaveEntry.unofficial`).
      *
      * A save read begins a recording from its file (`Recorder`), as a new game's
-     * playthrough drawn begins one from its stream (`newGameRead`).
+     * playthrough drawn begins one from its stream (`newGameRead`), and from what the
+     * read left beside the file (`CarriedState`). A save made in a recording begins a
+     * branch of it, at the point the row names (`SaveEntry.recording`).
      */
     read(save: OpenedSave): void {
         applySaveBytes(this.game, save.bytes);
-        this.recorder?.begin({ kind: 'save', bytes: save.bytes });
+        this.recorder?.begin({ kind: 'save', bytes: save.bytes, carried: carriedStateOf(this.game) }, save.entry.recording);
         this.game.setPlayTime(save.entry.playTime);
         this.unofficial = save.entry.unofficial;
         this.lastRead = 'loaded';
@@ -450,7 +453,7 @@ export class GameSaves {
         const entry: SaveEntry = {
             id: name, name, dataSet: this.dataSet.id, quick: false, sleep: false,
             savedAt: file.modifiedAt ?? now, usedAt: now, playTime: 0,
-            unofficial: check.kind === 'different', ...fields,
+            unofficial: check.kind === 'different', recording: null, ...fields,
         };
         let { bytes } = file;
         if (entry.playthrough === 0) {
@@ -529,7 +532,7 @@ export class GameSaves {
         const now = Date.now();
         const entry: SaveEntry = {
             id: name, name, dataSet: this.dataSet.id, quick: false, sleep: false,
-            savedAt: now, usedAt: now, playTime: 0, unofficial: false, ...fields,
+            savedAt: now, usedAt: now, playTime: 0, unofficial: false, recording: null, ...fields,
         };
         await this.store.write(entry, bytes);
         return { entry, bytes };

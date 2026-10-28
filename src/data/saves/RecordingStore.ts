@@ -12,7 +12,7 @@
  * store in memory.
  */
 import type { Extras, RulesOptions } from '../../engine/GameContext';
-import type { RecordedChange, Recording, RecordingStart } from '../../engine/Recorder';
+import type { RecordedChange, Recording, RecordingPoint, RecordingStart } from '../../engine/Recorder';
 
 /** One row: a recording as a list shows it, without its start or its changes. */
 export interface RecordingEntry {
@@ -22,6 +22,11 @@ export interface RecordingEntry {
     readonly dataSet: string;
     /** The build that made it (`Recording.build`). */
     readonly build: string;
+    /**
+     * The point it branches from (`Recording.parent`), `null` for a root, and for one the
+     * store's version 7 wrote before the tree, which has none.
+     */
+    readonly parent?: RecordingPoint | null;
     /** The playthrough it plays (`SaveEntry.playthrough`): its start's `d.RandomGameID`. */
     readonly playthrough: number;
     /** Milliseconds since the epoch: when it began. */
@@ -43,6 +48,8 @@ export interface RecordingHead {
     readonly id: string;
     readonly seq: 0;
     readonly start: RecordingStart;
+    /** As the row's (`RecordingEntry.parent`). */
+    readonly parent?: RecordingPoint | null;
     readonly rules: RulesOptions;
     readonly extras: Extras;
 }
@@ -86,9 +93,11 @@ export function assembleRecording(entry: RecordingEntry, parts: readonly Recordi
     const changes = sorted.slice(1).flatMap((part) => (part as RecordingChanges).changes);
     if (changes.length !== entry.changes) throw new Error('RECORDING DAMAGED');
     return {
+        id: entry.id,
         build: entry.build,
         dataSet: entry.dataSet,
         start: head.start,
+        parent: head.parent ?? null,
         rules: head.rules,
         extras: head.extras,
         changes,

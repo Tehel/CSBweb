@@ -692,31 +692,30 @@ Paying it, in steps:
    `RecordingWriter` (`src/engine/RecordingWriter.ts`), every five seconds and as the page
    is hidden (`doc/RECORDING.md` → "The port's recorder"). The replay plays what the store
    holds.
-3. The tree, decided with the author. A save made in a recorded game knows its place in
-   the recording, and a load of it carries the recording on from there, as a branch:
-   - **The link.** A save's row (`SaveEntry`, the port's own: the file stays CSBWin's)
-     holds the recording it was made in and its point there: the changes recorded before
-     its `saveWritten`, and the VBLs.
-   - **A branch.** A load of a linked save begins a recording of its parent, its point and
-     its own changes from the read on. The read is not transparent (it empties the mouse
-     queue, among the rest), so the branch begins at it, and a recording's history is the
-     path from its root to it. A load of a save no link names (one imported, CSBWin's, one
-     made before this step, one whose recording is gone) begins a root from the file, as
-     now.
-   - **Pruning.** What no save and no running game reaches is removed: a branch's changes
-     past the last point a save or a branch names, when no game plays it. So at a load,
-     what the game played since the save its branch last reached; at a save deleted or
-     written over (F5's, the Sleepsave, a SAVE over a row), what it alone reached. It
-     replaces `RECORDINGS_KEPT`, and the recordings step 2 wrote, which no save links,
-     go at the first prune.
-   - **Open, decided in the step:** whether a branch's start holds the save's file, about
-     60 KB a load, or the player makes it again, by saving at the parent's point (the
-     replayed game's save is byte-identical to the recorded one's, `tools/checks/replay.ts`).
-     Made again, nothing is stored twice, but a build that changes what a save writes
-     breaks the join; that build makes older recordings drift anyway.
-   - **Evidence:** `tools/checks/replay.ts` saves, plays on, loads and plays a branch, then
-     replays it from its root through the join, and prunes at a load, a delete and a save
-     written over.
+3. The tree, decided with the author (`doc/RECORDING.md` → "The tree"). A save made in a
+   recorded game knows its place in the recording, and a load of it carries the
+   recording on from there, as a branch. In two halves:
+   - **3a, the link and the branch: done.** A save's row names its recording and its
+     point (`SaveEntry.recording`, `Recorder.point`); a read of it begins a branch that
+     names the point (`Recording.parent`, kept in the row and the head), from the save's
+     file and what the read left beside it (`CarriedState`), which the join sets over
+     its read; `RecordingWriter` writes a branch as one only where the store holds its
+     parent up to the point. Decided in the step: a branch's start holds the save's
+     file, about 60 KB a load, rather than being made again at the parent's point. A
+     branch then plays alone, whatever later builds write, and at each join the file the
+     parent makes is checked against it. `tools/checks/replay.ts` saves, plays on, loads
+     with F9 and plays a branch, then replays it alone and from its root through the
+     join.
+   - **3b, pruning.** What no save and no running game reaches is removed: a branch's
+     changes past the last point a save or a branch names, when no game plays it, and a
+     recording no save nor branch names at all. So at a load, what the game played since
+     the save its branch last reached; at a save deleted or written over (F5's, the
+     Sleepsave, a SAVE over a row), what it alone reached, up its path. It replaces
+     `RECORDINGS_KEPT`, which can now remove a branch's root, and the recordings step 2
+     wrote, which no save links, go at the first prune. A recording cut short is
+     rewritten in the store: its last part kept cut, the parts after it removed, its row
+     ended at the point. **Evidence:** `tools/checks/replay.ts` prunes at a load, a
+     delete and a save written over, and the branch still replays through its join.
 4. The player: the boundary fed from a recording (`InputBoundary.apply`, before the
    VBL each change was logged at), the page's live input ignored but its own controls,
    every tick it plays drawn, at the wall clock's pace or faster. No dialog opens while

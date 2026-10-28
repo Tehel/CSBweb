@@ -33,8 +33,9 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   one key, written and deleted in one transaction: a list reads the rows alone, and a
   file is read only to be loaded or exported. The level, the champions' names and the
   playthrough (below) are read from the file's own blocks when the row is written; the
-  data set, the date, when the save was last used, the play time and whether it is F5's
-  or the Sleepsave are the row's own. Nothing is JSON, and no row holds anything a `.dat` could not be
+  data set, the date, when the save was last used, the play time, whether it is F5's
+  or the Sleepsave, and the recording it was made in with its point there
+  (`SaveEntry.recording`, `doc/RECORDING.md` → "The tree") are the row's own. Nothing is JSON, and no row holds anything a `.dat` could not be
   listed without.
 - **The store upgrades its older rows** (`src/data/saves/legacyRows.ts`, run once by
   `idb.ts`). To version 2, it keeps of each older row the CSBWin file alone, out of its
