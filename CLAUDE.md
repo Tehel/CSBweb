@@ -18,9 +18,12 @@ right thing instead. "Obviously" is earned: cite both readings, and rule out a m
 helper first (`.claude/memory/memmove-source-first.md`). Each such fix is a deliberate
 divergence, listed under `DEBT.md` H with its proof.
 
-CSBWin ports the Atari ST release. For what only the Amiga release does (its sounds, a
-group heard moving, stereo), the reference is ReDMCSB's A22E branch, `doc/ReDMCSB-src/`
-(`doc/AMIGA_DISK_REFERENCE.md`); for everything CSBWin has, CSBWin still wins.
+The goal is the Atari ST program; CSBWin, which ports it, is the proxy for it. ReDMCSB
+(`doc/ReDMCSB-src/`) is a reconstruction faithful to the Atari binaries, so where its Atari
+branch and CSBWin behave differently, ReDMCSB wins, and the difference is listed under
+`DEBT.md` H with both citations. For what only the Amiga release does (its sounds, a group
+heard moving, stereo), the reference is ReDMCSB's A22E branch
+(`doc/AMIGA_DISK_REFERENCE.md`).
 
 Corollaries:
 
@@ -51,7 +54,7 @@ Corollaries:
 | `doc/DEPLOYMENT.md` | The deployed game: the server, the image, the VPS, deploying and backups. `doc/SETUP.md`: a new instance, step by step. `doc/STATISTICS.md`: what it counts. |
 | `doc/CSBWIN_SYMBOL_INDEX.tsv` | Every CSBWin symbol → `File.cpp:line`. Grep this before grepping the tree. |
 | `doc/CSBwin-src/` | The C++ reference (not ours, git-ignored, fetched by `npm run fetch-csbwin-src`): `CSBwin_SRC_20230608`, CSBWin's last source and the build the author plays. |
-| `doc/ReDMCSB-src/` | The Amiga's reference (not ours, git-ignored, fetched by `npm run fetch-redmcsb-src`): ReDMCSB's C source, for what only the Amiga release does. |
+| `doc/ReDMCSB-src/` | The Atari's and the Amiga's reference (not ours, git-ignored, fetched by `npm run fetch-redmcsb-src`): ReDMCSB's C source, which wins where it and CSBWin behave differently, and the reference for what only the Amiga release does. |
 | `.claude/memory/` | Anything worth remembering across sessions: one fact per file, indexed one line each in `MEMORY.md`, imported above. Committed with the project, not Claude Code's own memory directory under `~/.claude/projects/`, which depends on where the checkout lives. |
 | `.claude/skills/` | The project's skills. |
 
@@ -98,7 +101,7 @@ npm test               # the gate: tsc + every asserting tool  (~75s, a worker p
 npm test -- --only=dsa,save  # tsc + the tools whose name holds any of these
 npm test -- --frames   # …and the golden frames               (~80s more)
 npm run fetch-csbwin-src  # doc/CSBwin-src/, the C++ reference (needs 7z)
-npm run fetch-redmcsb-src # doc/ReDMCSB-src/, the Amiga's reference (needs 7z)
+npm run fetch-redmcsb-src # doc/ReDMCSB-src/, ReDMCSB, the Atari's and the Amiga's (needs 7z)
 npm run fetch-gamefiles   # tools/fixtures/gamefiles/, the data sets the tests and the dev server read (needs 7z)
 npm start              # the deployed server, server/, over dist/
 bash tools/check-image.sh  # the golden frames against the Docker image (Docker, ~4 min)
