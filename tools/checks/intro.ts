@@ -19,7 +19,8 @@
  * 4. **The door-slide arithmetic.** Thirty-one frames of two rectangles walking in
  *    opposite directions, with a sub-word shift carried in a separate buffer index. Off by
  *    one and the doors stop a few pixels short, or the left half vanishes early. A frame
- *    lasts CSBWin's 100 ms, or A22E's 60 in the `dm-amiga` set, the rattle every third.
+ *    lasts CSBWin's 100 ms, the rattle every third; in the `dm-amiga` set, DM Amiga 3.6's
+ *    2-pixel steps 40 ms apart, the rattle every 0.8 s.
  * 5. **`ShrinkBLT`'s fixed point.** Which source column each of the 48 destination columns
  *    lands on, at eighteen different scales.
  * 6. **The Timer-A mapping.** The two sound pitches the doors use are the argument CSBWin
@@ -65,6 +66,7 @@ import {
   drawPrisonDoor,
   loadAssets,
   openPrisonDoors,
+  openPrisonDoorsA36M,
 } from '../../src/renderer/intro/PrisonDoor';
 import {
   ZOOM_CENTRE_HEIGHT,
@@ -382,23 +384,50 @@ async function checkDoors(graphics: GraphicsLoader, ui: UITables): Promise<void>
   check(regionMatches(host, entrance, panelLeft, SCREEN_WIDTH - 1, buttons2Y(ui), SCREEN_HEIGHT - 1),
     'nor did the scroll at the bottom of the panel column');
 
-  // A frame's wait, and the rattle every third: CSBWin's six blanks at 60 Hz (`:9550`), and
-  // in the `dm-amiga` set A22E's three of a PAL Amiga's 50 Hz (ReDMCSB `ENTRANCE.C:233-240`).
+  // A frame's wait, and the rattle every third: CSBWin's six blanks at 60 Hz (`:9550`).
   const { vbl, startSound } = host;
-  for (const [amiga, frameMs] of [[false, 100], [true, 60]] as const) {
+  const record = () => {
     const waits: number[] = [];
     const rattles: number[] = [];
+    let frames = 0;
     host.vbl = (count) => { waits.push(count); return Promise.resolve(); };
-    host.startSound = () => { rattles.push(waits.length + 1); };
-    await openPrisonDoors(host, assets, amiga);
-    const ms = waits.map((count) => Math.round((count * 1000) / 60));
-    console.log(`${amiga ? 'A22E' : 'CSBWin'}: ${waits.length} frames of ${ms[0]} ms, the rattle at frames ${rattles.join(' ')}`);
-    check(waits.length === DOOR_STEPS && ms.every((m) => m === frameMs),
-      `${amiga ? 'with amiga, A22E\'s' : 'CSBWin\'s'} ${DOOR_STEPS} frames last ${frameMs} ms each`);
-    check(rattles.join(' ') === '1 4 7 10 13 16 19 22 25 28 31', 'and the rattle starts at every third, from the first');
+    host.startSound = () => { rattles.push(frames + 1); };
+    host.present = () => { frames++; };
+    return { waits, rattles, frames: () => frames };
+  };
+  const csbwin = record();
+  await openPrisonDoors(host, assets);
+  const csbwinMs = csbwin.waits.map((count) => Math.round((count * 1000) / 60));
+  console.log(`CSBWin: ${csbwin.frames()} frames, ${csbwinMs[0]} ms before each, the rattle at frames ${csbwin.rattles.join(' ')}`);
+  check(csbwin.frames() === DOOR_STEPS && csbwinMs.length === DOOR_STEPS && csbwinMs.every((m) => m === 100),
+    `CSBWin's ${DOOR_STEPS} frames each wait 100 ms`);
+  check(csbwin.rattles.join(' ') === '1 4 7 10 13 16 19 22 25 28 31', 'and the rattle starts at every third, from the first');
+
+  // DM Amiga 3.6's, in the `dm-amiga` set (ReDMCSB `ENTRANCE.C:306-358`): 2 pixels a step,
+  // the first at once and each next two PAL blanks later, 40 ms, until neither half is
+  // left, and the rattle every forty blanks.
+  const a36m = record();
+  await openPrisonDoorsA36M(host, assets);
+  const steps = Math.ceil(Math.max(g.word68.x2 - g.word68.x1 + 1, g.word76.x2 - g.word76.x1 + 1) / 2);
+  const a36mMs = a36m.waits.map((count) => Math.round((count * 1000) / 60));
+  console.log(`A36M: ${a36m.frames()} frames, ${a36mMs[0]} ms between, ${a36mMs.reduce((x, y) => x + y, 0)} ms in all, the rattle at frames ${a36m.rattles.join(' ')}`);
+  check(a36m.frames() === steps && a36mMs.length === steps - 1 && a36mMs.every((m) => m === 40),
+    `A36M's ${steps} frames of 2 pixels, 40 ms apart`);
+  // Step k checks the count before its wait, at blank 2(k - 2): 0, 40, 80, … at steps 1, 22, 42, ….
+  const rattleSteps = [1];
+  while (rattleSteps.at(-1)! + 20 <= steps) rattleSteps.push(rattleSteps.length * 20 + 2);
+  check(a36m.rattles.join(' ') === rattleSteps.join(' '), 'and the rattle starts at the first step and every forty blanks, 0.8 s');
+  let a36mClear = true;
+  for (let y = INTERIOR_SCREEN_Y + 10; y < INTERIOR_SCREEN_Y + 130; y += 7) {
+    for (let x = 0; x <= g.word76.x2; x += 3) {
+      if (x >= VIEWPORT_WIDTH && x <= g.word76.x2) continue;
+      if (pixel(host, x, y) !== INTERIOR_MARKER) a36mClear = false;
+    }
   }
+  check(a36mClear, 'and the whole viewport is corridor when it ends');
   host.vbl = vbl;
   host.startSound = startSound;
+  host.present = () => {};
 }
 
 /* ------------------------------------------------------------ 5. ShrinkBLT ---- */

@@ -64,12 +64,14 @@ export const INTERIOR_VISIBLE_WIDTH = 232;
 export const DOOR_STEPS = 31;
 /** `for (i=0; i<6; i++) { CheckSoundQueue(); wvbl(_1_); }` (`:9550`). */
 const DOOR_STEP_VBLS = 6;
-/**
- * A22E's step, in the `dm-amiga` set: `F0580_ENTRANCE_DrawDoorAnimationStep` and three
- * vertical blanks of a PAL Amiga, 50 Hz (ReDMCSB `ENTRANCE.C:233-240`), 60 ms, in the
- * host's 60 Hz ones. Its rattle plays every third step as CSBWin's does (`:152-160`).
- */
-const AMIGA_DOOR_STEP_VBLS = (3 * 60) / 50;
+/** A36M's step, in the `dm-amiga` set: each half moves `G2349_` = 2 pixels (ReDMCSB `COORD.C:1818-1819`). */
+const A36M_DOOR_STEP = 2;
+/** `L3367_l_ = … + 2` (`ENTRANCE.C:356-357`): two blanks of a PAL Amiga, 50 Hz, a step. */
+const A36M_STEP_BLANKS = 2;
+/** `L3366_l_ = … + 40` (`ENTRANCE.C:328`): the rattle every forty blanks. */
+const A36M_RATTLE_BLANKS = 40;
+/** A PAL Amiga's blank, in the host's 60 Hz ones. */
+const PAL_BLANK_VBLS = 60 / 50;
 /** `VBLDelay(_3_, 20)` between the latch click and the doors moving (`:9659`). */
 const LATCH_TO_DOORS_VBLS = 20;
 
@@ -280,9 +282,8 @@ async function showCreditsScroll(host: IntroHost, assets: PrisonDoorAssets): Pro
  * Each frame is composed in a 256-pixel-wide working buffer: the pristine interior, then
  * the live viewport over it, then the two door halves, then 232 columns of it are copied
  * to the screen at row 30. The right-hand stone panel with the buttons is never touched.
- * With `amiga`, a frame lasts A22E's 60 ms (`AMIGA_DOOR_STEP_VBLS`).
  */
-export async function openPrisonDoors(host: IntroHost, assets: PrisonDoorAssets, amiga = false): Promise<void> {
+export async function openPrisonDoors(host: IntroHost, assets: PrisonDoorAssets): Promise<void> {
   const rects = host.uiTables.graphic232;
   const work = createIndexedBitmap(INTERIOR_WIDTH, INTERIOR_HEIGHT);
 
@@ -313,8 +314,65 @@ export async function openPrisonDoors(host: IntroHost, assets: PrisonDoorAssets,
     tag0088b2Index(assets.slots[(step & 3) + 4]!, work, { ...rightRect, srcX: (step & 3) * 4, srcY: 0, srcStride: DOOR_SLOT_WIDTH }, -1);
     rightRect.x1 += 4;
 
-    await host.vbl(amiga ? AMIGA_DOOR_STEP_VBLS : DOOR_STEP_VBLS);
+    await host.vbl(DOOR_STEP_VBLS);
 
+    tag0088b2Index(work, host.screen, {
+      x1: 0,
+      x2: INTERIOR_VISIBLE_WIDTH - 1,
+      y1: INTERIOR_SCREEN_Y,
+      y2: INTERIOR_SCREEN_Y + INTERIOR_HEIGHT - 1,
+      srcX: 0,
+      srcY: 0,
+      srcStride: INTERIOR_WIDTH,
+    }, -1);
+    host.present();
+  }
+}
+
+/**
+ * The doors of DM Amiga 3.6, A36M, in the `dm-amiga` set (ReDMCSB `ENTRANCE.C:306-358`):
+ * each half moves 2 pixels a step, a step every two PAL blanks, 40 ms, until neither is
+ * left, and the rattle, `C03_SOUND_DOOR_RATTLE_ENTRANCE`, starts at the first step and
+ * then every forty blanks, 0.8 s. Its door rectangles are the 3.x graphics' zones 430
+ * and 431, which the set does not have: the halves are CSBWin's, in its rectangles
+ * (`openPrisonDoors`), the left one shown from `2k` pixels in at step `k`, the right one
+ * from its edge. A36M draws its first step at once and waits for each next one
+ * (`while (G0317_i_WaitForInputVerticalBlankCount < L3367_l_)`, `:353`).
+ */
+export async function openPrisonDoorsA36M(host: IntroHost, assets: PrisonDoorAssets): Promise<void> {
+  const rects = host.uiTables.graphic232;
+  const work = createIndexedBitmap(INTERIOR_WIDTH, INTERIOR_HEIGHT);
+  const leftRect = { ...rects.word68 };
+  const rightRect = { ...rects.word76 };
+  // `G0317_i_WaitForInputVerticalBlankCount` from the loop's start, and `L3366_l_`.
+  let blanks = 0;
+  let nextRattle = 0;
+  let shift = 0;
+
+  for (let step = 1; leftRect.x2 >= leftRect.x1 || rightRect.x2 >= rightRect.x1; step++) {
+    shift += A36M_DOOR_STEP;
+    if (blanks >= nextRattle) {
+      nextRattle = blanks + A36M_RATTLE_BLANKS;
+      host.startSound(GRAPHIC_SOUND_DOORS, timerDataToRateIndex(TIMER_DATA_DOORS));
+    }
+
+    work.pixels.set(assets.interior.pixels);
+    if (assets.viewport) {
+      tag0088b2Index(assets.viewport, work, { ...rects.word60, srcX: 0, srcY: 0, srcStride: assets.viewport.width }, -1);
+    }
+    leftRect.x2 -= A36M_DOOR_STEP;
+    if (leftRect.x2 >= leftRect.x1) {
+      tag0088b2Index(assets.slots[0]!, work, { ...leftRect, srcX: shift, srcY: 0, srcStride: DOOR_SLOT_WIDTH }, -1);
+    }
+    rightRect.x1 += A36M_DOOR_STEP;
+    if (rightRect.x2 >= rightRect.x1) {
+      tag0088b2Index(assets.slots[4]!, work, { ...rightRect, srcX: 0, srcY: 0, srcStride: DOOR_SLOT_WIDTH }, -1);
+    }
+
+    if (step > 1) {
+      await host.vbl(A36M_STEP_BLANKS * PAL_BLANK_VBLS);
+      blanks += A36M_STEP_BLANKS;
+    }
     tag0088b2Index(work, host.screen, {
       x1: 0,
       x2: INTERIOR_VISIBLE_WIDTH - 1,
@@ -384,7 +442,7 @@ export async function showPrisonDoor(
   // RISE goes on as RESUME does: it ends in a save read, through the doors still shut.
   const choice: PrisonDoorChoice = gameState === GAMESTATE_RESUME_SAVED_GAME ? 'resume'
     : gameState === GAMESTATE_RISE ? 'rise' : 'enter';
-  if (choice === 'enter') await openPrisonDoors(host, assets, amiga);
+  if (choice === 'enter') await (amiga ? openPrisonDoorsA36M(host, assets) : openPrisonDoors(host, assets));
 
   // `_GameSetup`'s `for (;;) { ReadEntireGame(); if (i16Result == 1) break; TAG01f746(); }`
   // (`:10758-10765`): `dungeon.dat` or the chosen save. A read that fails, or a load

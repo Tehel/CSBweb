@@ -11,13 +11,15 @@ import type { SoundTableEntry } from '../data/tables/UITables';
 const CUSTOM_SOUND_RATE = 11025;
 
 /**
- * The `Period` A22E plays the entrance's door rattle at, `F0060_SOUND_Play_CPSX(C02_SOUND_DOOR_RATTLE,
- * 145, 0x4040)` (ReDMCSB `ENTRANCE.C:160`): the Atari's second rate variant
- * (`timerDataToRateIndex`), the Atari's 145 too.
+ * The `Period` DM Amiga 3.6 plays the entrance's door rattle at, its own entry,
+ * `C03_SOUND_DOOR_RATTLE_ENTRANCE`, `{ 673, 0, 79, … }` (ReDMCSB `DATA.C:1271-1272`), 3851 Hz:
+ * the Atari's second rate variant (`timerDataToRateIndex`), which only the entrance plays.
+ * A22E's 145 (`ENTRANCE.C:160`), the Atari's slower rate, plays faster on the Amiga, 7065.5 Hz
+ * (`doc/AMIGA_DISK_REFERENCE.md` → "The sounds, played").
  */
-const AMIGA_ENTRANCE_DOOR_PERIOD = 145;
+const AMIGA_ENTRANCE_DOOR_PERIOD = 79;
 
-/** Both channels at Paula's full volume, the `0x4040` of A22E's direct `F0060_SOUND_Play_CPSX` (`ENTRANCE.C:160`). */
+/** Both channels at Paula's full volume, the `0x4040` of A22E's direct `F0060_SOUND_Play_CPSX` (`ENTRANCE.C:160`), and A36M's `G3077_s_EntranceSoundVolume` (`SOUND.C:36`). */
 const AMIGA_FULL_VOLUME: SoundVolume = { left: 64, right: 64 };
 /** CSBWin's quiet sound, a DSA's `&SOUND` at volume 0, 18 times quieter (`doc/CSBwin-src/Sound.cpp:668`), on both channels. */
 const AMIGA_QUIET_VOLUME: SoundVolume = { left: 64 / 18, right: 64 / 18 };

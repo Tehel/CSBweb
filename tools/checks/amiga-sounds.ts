@@ -8,7 +8,8 @@
  *   `SOUND.C:1433-1446`), and the word, which it never reads, is 2 to 4 less than the
  *   item's length in all 34;
  * - a sound plays at PAL `3546895 / trunc(72800 / Period)` Hz (`SOUND.C:1107`): 112 at
- *   5456.8, 138 at 6730.4, 150 at 7313.2, and the entrance door's 145 at 7065.5
+ *   5456.8, 138 at 6730.4, 150 at 7313.2, A22E's entrance door's 145 at 7065.5, and DM
+ *   Amiga 3.6's, 79, at 3851.1 (`DATA.C:1271-1272`), which the set's entrance plays
  *   (`ENTRANCE.C:160`);
  * - the Atari's 21 SND items each map, through the 22 ordinals the two tables share, to
  *   the built item holding the Amiga's recording of it, at its entry's period: 112 for all
@@ -69,7 +70,8 @@ function main(): void {
   check(samplesFit, 'each decodes to its length less 2 samples, its bytes from the third, signed');
 
   check(hz(amigaSoundRate(112)) === '5456.8' && hz(amigaSoundRate(138)) === '6730.4' && hz(amigaSoundRate(150)) === '7313.2'
-    && hz(amigaSoundRate(145)) === '7065.5', 'the periods 112, 138, 150 and 145 play at 5456.8, 6730.4, 7313.2 and 7065.5 Hz');
+    && hz(amigaSoundRate(145)) === '7065.5' && hz(amigaSoundRate(79)) === '3851.1',
+    'the periods 112, 138, 150, 145 and 79 play at 5456.8, 6730.4, 7313.2, 7065.5 and 3851.1 Hz');
 
   // The Atari's items, mapped.
   const byItem = amigaSoundsByAtariItem(tables.sound1772, amiga);
@@ -99,8 +101,8 @@ function main(): void {
   manager.playSound(SoundIndex.DOOR, 1);
   const door = context.started.at(-1)!;
   const doorSamples = graphics.getRawGraphic(byItem.get(SoundIndex.DOOR)!.graphicIndex).length - 2;
-  check(door.length === Math.floor((doorSamples / amigaSoundRate(145)) * contextRate),
-    'dm-amiga\'s entrance door, the second variant, plays the Amiga\'s rattle at 7065.5 Hz');
+  check(door.length === Math.floor((doorSamples / amigaSoundRate(79)) * contextRate),
+    'dm-amiga\'s entrance door, the second variant, plays the Amiga\'s rattle at DM Amiga 3.6\'s 3851.1 Hz');
 
   const stock = stockGraphics();
   const atariManager = new SoundManager(stock);

@@ -205,26 +205,33 @@ counts its period in, 3546895 Hz, a sound plays at `3546895 / trunc(72800 / Peri
 | --- | --- | --- | --- |
 | 112 | 650 | 5456.8 | 0-17, 19-21, 31 |
 | 138 | 527 | 6730.4 | 18, the wall bump; 22-30, 32 |
-| 145 | 502 | 7065.5 | the entrance's door rattle, sound 2 (`ENTRANCE.C:160`) |
+| 145 | 502 | 7065.5 | A22E's entrance's door rattle, sound 2 (`ENTRANCE.C:160`) |
+| 79 | 921 | 3851.1 | A36M's, `C03_SOUND_DOOR_RATTLE_ENTRANCE` (`DATA.C:1271-1272`), the set's |
 | 150 | 485 | 7313.2 | 33 |
 
 A larger `Period` plays faster on the Amiga, where on the Atari, a timer's count, it plays
 slower: the entrance's rattle is the Atari's 4237 Hz and the Amiga's 7065.5. The entrance
 plays its switch, sound 1, at 112 (`ENTRANCE.C:919`).
 
-The entrance's doors open faster on the Amiga. A22E draws a step and waits three vertical
-blanks of a PAL machine, 60 ms (`ENTRANCE.C:233-240`), where CSBWin waits six of its 60 Hz
-ones, 100 ms (`doc/CSBwin-src/CSBCode.cpp:9550`): the doors open in 1.86 s, not 3.1. The
-rattle, every third step in both (`ENTRANCE.C:152-160`), so starts every 180 ms, and plays
-321 ms, so two play at once on the two voices. For a set with the table item the port opens
-the doors on A22E's timing (`openPrisonDoors`, `src/renderer/intro/PrisonDoor.ts`;
-`tools/checks/intro.ts`).
+DM Amiga 3.6, A36M, plays the entrance's rattle as its own entry,
+`C03_SOUND_DOOR_RATTLE_ENTRANCE`, the door rattle at `Period` 79 (`DATA.C:1271-1272`), 3851.1
+Hz, below the in-game door as on the Atari. Its doors move 2 pixels a step (`G2349_`,
+`COORD.C:1818-1819`), a step every two blanks, 40 ms (`ENTRANCE.C:353-357`), and it starts
+the rattle at the first step and then every forty blanks, 0.8 s (`:327-341`), so each plays
+to its end, 589 ms. A longplay of the Amiga release on an emulator shows exactly that
+(World of Longplays, `https://www.youtube.com/watch?v=-VSVaJOemEU`, 33 s in): the Amiga's
+rattle at 3860 Hz (its waveform correlated 0.79 with the recording at that rate), four
+of them 0.80 s apart, and a door that moves every 40 ms frame for 2.3 s. The
+`dm-amiga` set's entrance is A36M's, at the author's choice
+(`openPrisonDoorsA36M`, `src/renderer/intro/PrisonDoor.ts`; `tools/checks/intro.ts`): its
+door rectangles, the 3.x graphics' zones 430 and 431, are CSBWin's, and the rattle is the
+door's second rate variant at 79 (`src/audio/SoundManager.ts`).
 
 The Atari's 22 ordinals are the Amiga's first 22, each naming the item that holds the
 Amiga's recording of the Atari's sound, at the Atari's `Period` but for 18's. So the port
 plays, for each Atari SND item, the Amiga sound its ordinals name
 (`amigaSoundsByAtariItem`, `src/data/tables/AmigaSoundTables.ts`), and for the entrance's
-second rate the rattle at 145 (`src/audio/SoundManager.ts`). `tools/checks/amiga-sounds.ts`
+second rate the rattle at A36M's 79 (`src/audio/SoundManager.ts`). `tools/checks/amiga-sounds.ts`
 decodes the 34 and plays them through `SoundManager`.
 
 ## The sounds, heard

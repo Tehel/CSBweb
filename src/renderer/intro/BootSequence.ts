@@ -73,7 +73,7 @@ export interface BootSequenceDeps {
    * has a `mini.dat` to make a new adventure in.
    */
   rise: boolean;
-  /** Whether the set is the Amiga's, its `graphics.dat` carrying the table item: the entrance's doors open on A22E's timing. */
+  /** Whether the set is the Amiga's, its `graphics.dat` carrying the table item: the entrance's doors open as DM Amiga 3.6's (`openPrisonDoorsA36M`). */
   amiga: boolean;
   /**
    * The FTL logo to show before the title, with its sound, when `swoosh.img` is served.
