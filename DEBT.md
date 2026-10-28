@@ -123,7 +123,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| A8 | The Amiga's ending explosions and its dialogs' "V2.2" | S | ⏳ |
 | A10 | The scents compared with a square, as every release but the Atari's | S | ⏳ |
 | E42 | The attack menu's damage flash timed in VBLs, not milliseconds | S | ⏳ |
 | E43 | One input boundary: every change the page makes to the game, logged with its VBL | M | ⏳ |
@@ -215,22 +214,10 @@ Decisions taken with the author:
 
 **A22E's own code is classed** (`doc/AMIGA_DISK_REFERENCE.md` → "A22E's own code,
 classed"): the machine's alone, the Atari's tables moved into `dm`, the compiler's layout,
-carried by the sound path or in the set's items `0x22e` and `0x232`, left as CSBWin does
-(H), or still to carry, which is A8 and A10.
+carried by the sound path, in the code or in the set's items `0x22e` and `0x232`, left as CSBWin does
+(H), or still to carry, which is A10.
 The disk's bonus dungeon, `DungeonB.dat`, the Amiga's own Kids dungeon, is not taken (the
 author).
-
-### A8 ⏳ The Amiga's ending explosions and its dialogs' "V2.2"
-
-Two things A22E's code does that CSBWin has no counterpart for, both seen, for a set with
-the table item only:
-
-- After the ending's last message, six non-material harm explosions on Lord Chaos's
-  square, at 55, 95, 135, 175, 215 and 255, each followed by a step of the fuse sequence, then
-  the delay both have (`doc/ReDMCSB-src/ENDGAME.C:953-958`), in `_FusionSequence`
-  (`src/engine/Fusion.ts`).
-- "V2.2" where `_DoMenu` stamps "V2.0" (`doc/ReDMCSB-src/DIALOG.C:711`,
-  `src/renderer/ui/Menu.ts`).
 
 ### A10 ⏳ The scents compared with a square, as every release but the Atari's
 

@@ -220,6 +220,28 @@ function pixelAt(ui: UIState, x: number, y: number): number {
   return buf.pixels[y * buf.width + x];
 }
 
+/**
+ * The version `_DoMenu` stamps at x 192, y 7 of the dialog: "V2.0" (`Menu.cpp:272`), and on
+ * a set with the Amiga's tables "V2.2", which A22E's dialogs print (ReDMCSB `DIALOG.C:711`).
+ * Each stamp is the one that drawing the text again over it leaves unchanged.
+ */
+function checkVersionStamp(graphics: GraphicsLoader): void {
+  const amiga = new GraphicsLoader();
+  amiga.loadFromArray(new Uint8Array(readFileSync(resolve('tools/fixtures/gamefiles/dm-amiga/graphics.dat'))));
+  for (const [name, set, version, other] of [['dm-atari', graphics, 'V2.0', 'V2.2'], ['dm-amiga', amiga, 'V2.2', 'V2.0']] as const) {
+    const ui = makeDrawingUI(set);
+    doMenu(ui, null, null, [], false);
+    const screen = ui.screenIndexBuffer!;
+    const stamped = Uint8Array.from(screen.pixels);
+    const unchangedBy = (text: string): boolean => {
+      screen.pixels.set(stamped);
+      drawTextLineIndex(screen, ui.fontData, 0xc0 + VIEWPORT_X, 7 + VIEWPORT_Y, 2, 1, text);
+      return screen.pixels.every((p, i) => p === stamped[i]);
+    };
+    check(unchangedBy(version) && !unchangedBy(other), `${name}'s dialog is stamped "${version}"`);
+  }
+}
+
 /* ------------------------------------------------------- 1. the table offsets ---- */
 
 /**
@@ -3889,6 +3911,7 @@ async function main(): Promise<void> {
   const graphics = loadGraphics();
   checkButtonTables(graphics);
   checkLayout(graphics);
+  checkVersionStamp(graphics);
   checkSplitLongLine();
   checkListLogic();
   await checkSaveFile();

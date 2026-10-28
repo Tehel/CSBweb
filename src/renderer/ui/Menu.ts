@@ -172,7 +172,7 @@ function copyMenuRegion(
 
 /**
  * Blit graphic 0 and stamp `"V2.0"` — the first two statements of `_DoMenu`
- * (`Menu.cpp:268-280`). Split out because the save screen wants the bitmap without
+ * (`Menu.cpp:268-280`), `"V2.2"` with the Amiga's tables. Split out because the save screen wants the bitmap without
  * any of the four option layouts.
  */
 function drawMenuBitmap(ui: UIState, centred: boolean): void {
@@ -196,8 +196,10 @@ function drawMenuBitmap(ui: UIState, centred: boolean): void {
     -1,
   );
   if (ui.fontData) {
-    // `TextOut_OneLine(d.pViewportBMP, 112, 0xc0, 7, 2, 1, "V2.0", …)` (`Menu.cpp:272`).
-    drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, 0xc0 + ox, 7 + oy, 2, 1, 'V2.0');
+    // `TextOut_OneLine(d.pViewportBMP, 112, 0xc0, 7, 2, 1, "V2.0", …)` (`Menu.cpp:272`);
+    // the Amiga 2.2's "V2.2" at the same place (ReDMCSB `DIALOG.C:711`, `MEDIA455`).
+    const version = ui.ctx.tables.amigaSounds ? 'V2.2' : 'V2.0';
+    drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, 0xc0 + ox, 7 + oy, 2, 1, version);
   }
 }
 

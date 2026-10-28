@@ -89,7 +89,9 @@ lower row. The layouts patch it:
 All four rectangles are **(from data)**, `graphics.dat` item 0x231, already extracted as
 `graphic231.rect18576` … `rect18600` (`src/data/tables/UITables.ts`).
 
-`_DoMenu` also stamps `"V2.0"` at (192,7), fg 2 on bg 1 (`Menu.cpp:272-280`).
+`_DoMenu` also stamps `"V2.0"` at (192,7), fg 2 on bg 1 (`Menu.cpp:272-280`); a set with
+the Amiga's tables stamps A22E's `"V2.2"` there (`doc/AMIGA_DISK_REFERENCE.md` → "A22E's own
+code, classed").
 
 
 ## Text metrics

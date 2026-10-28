@@ -168,7 +168,8 @@ export function fusion(ctx: GameContext, attackX: number, attackY: number): void
  * the Grey Lord in his place, every other monster on the level deleted, the texts of
  * cell (0, 0) whose first letters run on from "A", in that order and each for 780 VBLs,
  * "THE END.", and after `VBLDelay(600)` the credits, with `d.CanRestartFromSavegame`
- * cleared. Each step shows through `_ProcessTimersViewportAndSound`, which also runs the
+ * cleared. With the Amiga's tables, six more dispells on him come between the last text
+ * and "THE END.". Each step shows through `_ProcessTimersViewportAndSound`, which also runs the
  * timers. An open inventory is hidden first, and once the Grey Lord stands there
  * `d.Word1868` takes the shimmer off the Fluxcages still around him. The waits after a
  * text and after "THE END." run the strip's clock, which CSBWin's do not
@@ -274,6 +275,16 @@ function* fusionSequence(ctx: GameContext): LoopScript {
       yield* vblDelayPlacingText(ctx, 780);
       letter++;
       break;
+    }
+  }
+  // The Amiga 2.2's six non-material harm explosions after the last message, each followed
+  // by a step of the fuse sequence (ReDMCSB `ENDGAME.C:953-958`, `MEDIA439`), the step as
+  // CSBWin's dispells take it above. Only a set with the Amiga's tables has them.
+  if (ctx.tables.amigaSounds) {
+    for (let size = 55; size <= 255; size += 40) {
+      encounter.createCloud(RN_DISPELL_MISSILE, size, w4, w6, at, 255);
+      yield* mainLoop.processTimersViewportAndSound();
+      yield ms2vbl(TEST_DELAY);
     }
   }
   messages.printLines(0, ctx.tables.byte1830, ctx.state.tickCount);

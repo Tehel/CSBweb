@@ -359,18 +359,20 @@ does not run them.
   CANCEL at `COMMAND.C:236-238`, smaller than the Atari's, and a champion's name, which
   opens the inventory on a left click, from x 43, 112, 181 and 250 where CSB's start a
   pixel further right (`COMMAND.C:92-95`).
-- **Still to carry** (`DEBT.md` A8 and A10):
+- **Carried in the code, for a set with the table item**: the ending's six explosions,
+  which A22E sets off after its last message, a non-material harm explosion on Lord
+  Chaos's square at 55, 95, 135, 175, 215 and 255, each followed by a step of the fuse
+  sequence (`ENDGAME.C:953-958`), before "THE END." and the delay (`_FusionSequence`,
+  `src/engine/Fusion.ts`; `tools/checks/fusion.ts`); and "V2.2", which every dialog prints
+  at x 192, y 7, where CSB 2.1 prints "V2.1" and CSBWin "V2.0" (`DIALOG.C:711`;
+  `src/renderer/ui/Menu.ts`, `tools/checks/save-menu.ts`).
+- **Still to carry** (`DEBT.md` A10):
   - the scents compared with a square, which every release but the Atari's does
     (`MEDIA353`, the IIGS's and the Amiga's; `MEDIA529`, the later ports'), and CSB on the
     Atari, 2.0 and 2.1, does not: `F0317_CHAMPION_AddScentStrength` changes only a scent
     on the square it is given (`CHAMPION.C:1505`), and the ten-second decay spares the
     scent on the party's square (`CHAMPION.C:2316`), where the Atari's comparisons are
-    thrown away and every scent changes;
-  - the ending's six explosions: after its last message, A22E sets off a non-material
-    harm explosion on Lord Chaos's square at 55, 95, 135, 175, 215 and 255, each followed by a
-    step of the fuse sequence (`ENDGAME.C:953-958`);
-  - "V2.2", which every dialog prints at x 192, y 7, where CSB 2.1 prints "V2.1" and
-    CSBWin "V2.0" (`DIALOG.C:711`);
+    thrown away and every scent changes.
 
 **The bonus dungeon.** A21E and A22E load `DungeonB.dat`, the disk's Kids dungeon, in
 place of `Dungeon.dat` when Alt is held as the game starts (`STARTUP2.C:1329-1331`,

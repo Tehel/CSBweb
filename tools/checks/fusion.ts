@@ -30,13 +30,21 @@
  *    one that has scrolled and whose rows have timed out (`d.PrintRow` 3): every text is
  *    whole on the strip within three scrolls and stays until the next is printed, and
  *    "THE END." is there when the credits come, which is the port's own
- *    (`DEBT.md` H, "The ending's speech is shown whole").
+ *    (`DEBT.md` H, "The ending's speech is shown whole"). A last run on `dm-amiga`'s
+ *    `graphics.dat`, which has the Amiga's tables, sees A22E's six non-material harm
+ *    explosions, 55 to 255, between the last text and "THE END.", each a view and 31 VBLs
+ *    (ReDMCSB `ENDGAME.C:953-958`).
  * 7. **A wall next door** blocks the square two away in that direction, open as it is.
  *
  * Run: `npm test -- --only=fusion.ts`
  */
 import { DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../../src/core/types';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { CsbRandom } from '../../src/core/random';
+import { RN_DISPELL_MISSILE, RN_FIREBALL } from '../../src/core/spellRn';
+import { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import { CloudType } from '../../src/engine/cloudTypes';
 import { isCellFluxcage } from '../../src/engine/Fusion';
 import type { Game } from '../../src/engine/Game';
@@ -86,6 +94,8 @@ interface Arena {
   frames: number;
   /** The random seed right after `atk_FUSE`'s dispell cloud: where `_Fusion`'s shuffle starts. */
   seedAfterCloud: number | null;
+  /** `CreateCloud` as it was called: the projectile and the size. */
+  clouds: Array<{ rn: number; size: number }>;
 }
 
 function setRoom(game: Game, x: number, y: number, roomType: RoomType): void {
@@ -124,11 +134,11 @@ function scrolledStrip(): ScrollingText {
   return strip;
 }
 
-function arena(withLordChaos: boolean, strip: ScrollingText | null = null): Arena {
+function arena(withLordChaos: boolean, strip: ScrollingText | null = null, graphics = stockGraphics()): Arena {
   const data = stockDungeon();
   const hooks = { credits: [] as boolean[], drawn: (): void => {} };
   const sink: MessageSink = strip ?? createGameHost().messages;
-  const game = newGame(data, stockGraphics(), {
+  const game = newGame(data, graphics, {
     showCredits: (word11694) => hooks.credits.push(word11694),
     drawCharacterState: (chIdx, charFlags) => {
       if ((charFlags & CHARFLAG_PORTRAIT_CHANGED) !== 0) a.portraits.push({ chIdx, views: a.views });
@@ -168,11 +178,12 @@ function arena(withLordChaos: boolean, strip: ScrollingText | null = null): Aren
   game.loadNewPartyLevel();
   if (withLordChaos) placeMonster(game, MonsterType.mon_LordChaos, CX, CY);
   const a: Arena = {
-    game, seedAfterCloud: null, credits: hooks.credits, inventory: [], portraits: [], printed: [], views: 0, drawn: hooks.drawn, frames: 0,
+    game, seedAfterCloud: null, clouds: [], credits: hooks.credits, inventory: [], portraits: [], printed: [], views: 0, drawn: hooks.drawn, frames: 0,
   };
   const encounter = game.ctx.systems.missileEncounter;
   wrapMember(encounter, 'createCloud', (createCloud) => (...args) => {
     createCloud(...args);
+    a.clouds.push({ rn: args[0], size: args[1] });
     a.seedAfterCloud = game.ctx.random.getSeed();
   });
   return a;
@@ -307,9 +318,10 @@ function checkOverAMonster(): void {
  * (`Attack.cpp:2282-2390`): Lord Chaos through the six fireballs, `mon_25` through the six
  * dispells, the flicker (for `D6W` 3, 2 and 1, four types each shown `D6W - 1` times,
  * `mon_25` on odd `D7w`), `mon_25` for the last fireball and dispell, then the Grey Lord,
- * through the deletions and one view for each text of cell (0, 0) printed.
+ * through the deletions and one view for each text of cell (0, 0) printed, and with the
+ * Amiga's tables one for each of the six explosions after them.
  */
-function expectedTypes(texts: number): number[] {
+function expectedTypes(texts: number, amiga: boolean): number[] {
   const types: number[] = [];
   const lc = MonsterType.mon_LordChaos;
   const m25 = MonsterType.mon_25;
@@ -321,7 +333,7 @@ function expectedTypes(texts: number): number[] {
     }
   }
   types.push(m25, m25, m25);
-  for (let n = 0; n < 3 + texts; n++) types.push(MonsterType.mon_GreyLord);
+  for (let n = 0; n < 3 + texts + (amiga ? AMIGA_EXPLOSIONS : 0); n++) types.push(MonsterType.mon_GreyLord);
   return types;
 }
 
@@ -329,6 +341,10 @@ function expectedTypes(texts: number): number[] {
 const SEQUENCE_VBLS = 6 * 31 + 31 + 6 * 31 + (4 * 2 + 4 * 1) * 31 + 25 + 50 + 50 + 31 + 31 + 31 + 600;
 /** Each text's `VBLDelay(780)` (`Attack.cpp:2417`). */
 const TEXT_VBLS = 780;
+/** The Amiga 2.2's explosions after the last text (ReDMCSB `ENDGAME.C:953-958`), each a view and `testdelay`'s 31 VBLs. */
+const AMIGA_EXPLOSIONS = 6;
+const AMIGA_EXPLOSION_VBLS = AMIGA_EXPLOSIONS * 31;
+const AMIGA_GRAPHICS = 'tools/fixtures/gamefiles/dm-amiga/graphics.dat';
 /**
  * The texts on cell (0, 0) of level 12, chained D, C, B, A, as `DecodeText(…, 0x8001)` gives
  * them: a linefeed, the letter, the text. "THANK YOU MY FRIENDS." holds two spaces.
@@ -340,13 +356,19 @@ const ENDING_TEXTS: Record<string, { idx: number; text: string }> = {
   D: { idx: 0x77, text: 'YOUR NAMES WILL BE RECORDED IN THE GREAT HALL AND REMEMBERED BY THE FUTURE GENERATIONS YOU HAVE MADE POSSIBLE.' },
 };
 
-function checkBoxedIn(inventoryOpen: boolean, withoutB = false, stripState: 'fresh' | 'scrolled' | null = null): void {
+function checkBoxedIn(inventoryOpen: boolean, withoutB = false, stripState: 'fresh' | 'scrolled' | null = null, amiga = false): void {
   console.log('');
   console.log('=== 6. boxed in: toast (Attack.cpp:213), and _FusionSequence (:2222) to the credits,'
     + ` ${inventoryOpen ? 'the inventory open' : 'no inventory open'}${withoutB ? ', the "B" text taken off cell (0, 0)' : ''}`
-    + `${stripState === null ? '' : `, onto a strip that has ${stripState === 'fresh' ? 'printed nothing' : 'scrolled, its rows timed out'}`} ===`);
+    + `${stripState === null ? '' : `, onto a strip that has ${stripState === 'fresh' ? 'printed nothing' : 'scrolled, its rows timed out'}`}`
+    + `${amiga ? ', on dm-amiga\'s graphics.dat' : ''} ===`);
   const strip = stripState === null ? null : stripState === 'fresh' ? new ScrollingText(LINEFEED) : scrolledStrip();
-  const a = arena(true, strip);
+  let graphics = stockGraphics();
+  if (amiga) {
+    graphics = new GraphicsLoader();
+    graphics.loadFromArray(new Uint8Array(readFileSync(resolve(AMIGA_GRAPHICS))));
+  }
+  const a = arena(true, strip, graphics);
   const game = a.game;
   if (withoutB) game.ctx.dungeon.removeObjectFromCell(new Position(0, 0, LEVEL), game.ctx.dungeon.rnMaps.rn(DBType.TEXT, ENDING_TEXTS.B!.idx));
   const letters = withoutB ? ['A'] : ['A', 'B', 'C', 'D'];
@@ -404,7 +426,8 @@ function checkBoxedIn(inventoryOpen: boolean, withoutB = false, stripState: 'fre
     : 'with no inventory open, ShowHideInventory is not called');
 
   let creditsAt = 0;
-  const wantCredits = SEQUENCE_VBLS + letters.length * TEXT_VBLS;
+  const explosionVbls = amiga ? AMIGA_EXPLOSION_VBLS : 0;
+  const wantCredits = SEQUENCE_VBLS + letters.length * TEXT_VBLS + explosionVbls;
   /** What the strip shows after each VBL, by its number. */
   const strips: string[] = [''];
   for (let n = 1; n <= wantCredits + 20; n++) {
@@ -413,15 +436,24 @@ function checkBoxedIn(inventoryOpen: boolean, withoutB = false, stripState: 'fre
     strips.push(shown(strip));
     if (a.credits.length > 0 && creditsAt === 0) creditsAt = n;
   }
-  const want = expectedTypes(letters.length);
+  const want = expectedTypes(letters.length, amiga);
   console.log(`  types ${types.join(' ')}`);
   console.log(`  credits ${creditsAt} VBLs after the attack (expected ${wantCredits}); asked ${JSON.stringify(a.credits)}; ticks ${game.ctx.state.tickCount - tick}`);
   console.log(`  sound 17 ${sounds.filter((n) => n === 17).length} times; monsters on the level ${monstersOnLevel(game)} (other than him before: ${others})`);
   check(types.join() === want.join(), `${want.length} views, each with the type the sequence gives him then`);
   console.log(`  d.Word1868 ${word1868.map((w) => (w ? 1 : 0)).join('')}`);
-  const unset = want.length - 2 - letters.length;
+  const unset = want.length - 2 - letters.length - (amiga ? AMIGA_EXPLOSIONS : 0);
   check(word1868.length === want.length && word1868.every((w, i) => w === (i >= unset)),
     'd.Word1868 is set for the views after the Grey Lord\'s first, and the texts\' (Attack.cpp:2366-2371)');
+  const clouds = a.clouds.map(({ rn, size }) => `${rn === RN_FIREBALL ? 'fireball' : rn === RN_DISPELL_MISSILE ? 'dispell' : rn.toString(16)} ${size}`);
+  console.log(`  clouds ${clouds.join(', ')}`);
+  const wantClouds = ['dispell 255', // `_Fusion`'s own (Attack.cpp:158)
+    ...[55, 95, 135, 175, 215, 255].map((size) => `fireball ${size}`), ...[55, 95, 135, 175, 215, 255].map((size) => `dispell ${size}`),
+    'fireball 255', 'dispell 255',
+    ...(amiga ? [55, 95, 135, 175, 215, 255].map((size) => `dispell ${size}`) : [])];
+  check(clouds.join() === wantClouds.join(), amiga
+    ? 'the Amiga\'s six non-material harm explosions, 55 to 255, follow the last text (ENDGAME.C:953-958)'
+    : 'six fireballs, six dispells, a last fireball and dispell, and nothing after the texts (Attack.cpp:158, :2309-2362)');
   check(game.ctx.state.tickCount - tick === want.length, 'each view is a turn of the clock');
   check(sounds.filter((n) => n === 17).length === 13, 'sound 17 once before the dispells and once for each of the twelve flickers');
   check(others > 0 && monstersOnLevel(game) === 1 && greyLordAt(game, CX, CY), 'every other monster on the level is deleted');
@@ -437,9 +469,11 @@ function checkBoxedIn(inventoryOpen: boolean, withoutB = false, stripState: 'fre
       : 'the four texts in the order of their letters, each letter a linefeed, then "THE END." between linefeeds (Attack.cpp:2400-2428)');
   const frames = a.printed.map((p) => p.frame);
   const endAt = frames[letters.length]!;
-  check(frames.slice(0, letters.length).every((f, i) => frames[i + 1]! - f === TEXT_VBLS)
+  check(frames.slice(0, letters.length).every((f, i) => frames[i + 1]! - f === TEXT_VBLS + (i === letters.length - 1 ? explosionVbls : 0))
     && frames.slice(letters.length).every((f) => f === endAt),
-  'each text stays 780 VBLs before the next line, and the three of "THE END." come together');
+  amiga
+    ? 'each text stays 780 VBLs before the next line, the last 780 and the explosions\' before "THE END.", whose three come together'
+    : 'each text stays 780 VBLs before the next line, and the three of "THE END." come together');
   check(creditsAt === wantCredits && creditsAt - endAt === 600, 'ShowCredits(1) after the VBLs the sequence waits, 600 of them after "THE END."');
   check(a.credits.join() === 'true', 'once, with d.Word11694 set');
   check(!game.canRestartFromSavegame() && game.mainLoopHasReturned(), 'd.CanRestartFromSavegame is cleared, and MainLoop is over');
@@ -524,6 +558,7 @@ function main(): void {
   checkBoxedIn(false, true);
   checkBoxedIn(false, false, 'fresh');
   checkBoxedIn(false, false, 'scrolled');
+  checkBoxedIn(false, false, null, true);
   checkWall();
   finish();
 }
