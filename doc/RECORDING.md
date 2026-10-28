@@ -271,7 +271,9 @@ state. A port-only recorder does not need this compatibility.
 
 ## Shared recordings
 
-Not decided; what sharing would take:
+What is decided, and the steps, are `DEBT.md` G31's: a package of a recording's path and
+its metadata, kept and served by the server, listed in the dialog the book opens on a
+set's tile. What sharing takes:
 
 - **Storage**: the store's recordings (above), sent to the server to share.
 - **A starting point the viewer has**: a new game of a published data set, or the starting

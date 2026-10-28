@@ -38,7 +38,7 @@ they approach, in stereo, and the Amiga's dungeon.
 **First, at the author's request: G29 — recording a game and playing it back.** It rests
 on the game being a function of its start, its VBLs and the changes its input boundary
 logs at them (`src/engine/InputBoundary.ts`), which `tools/checks/replay.ts` proves. Its
-row heads the index.
+row heads the index, and G31, sharing the recordings, follows it.
 
 **Then, at the author's request: P — players' own data sets.** A player adds a dungeon
 from their own files to the welcome page, plays it, edits it, deletes it and publishes it,
@@ -125,6 +125,7 @@ In payoff order: the first row is the next item.
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
 | G29 | Recording a game and playing it back | L | ⏳ |
+| G31 | Recordings shared: the set's dialog, a package, the server | L | ⏳ to design with the author |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
 | C194 | A DSA's wall graphic counts as a real decoration, so it hides no text | S | ⏳ |
 | C195 | Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space | S | ⏳ to decide with the author |
@@ -147,7 +148,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: A11 · C196 · D22 · E44 · F24 · G31 · P13 · R17 · U13 · W8 · X19. An ID recorded and paid in one commit has no
+Next free IDs: A11 · C196 · D22 · E44 · F24 · G32 · P13 · R17 · U13 · W8 · X19. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -691,7 +692,32 @@ Paying it, in steps:
    `RecordingWriter` (`src/engine/RecordingWriter.ts`), every five seconds and as the page
    is hidden (`doc/RECORDING.md` → "The port's recorder"). The replay plays what the store
    holds.
-3. The player: the boundary fed from a recording (`InputBoundary.apply`, before the
+3. The tree, decided with the author. A save made in a recorded game knows its place in
+   the recording, and a load of it carries the recording on from there, as a branch:
+   - **The link.** A save's row (`SaveEntry`, the port's own: the file stays CSBWin's)
+     holds the recording it was made in and its point there: the changes recorded before
+     its `saveWritten`, and the VBLs.
+   - **A branch.** A load of a linked save begins a recording of its parent, its point and
+     its own changes from the read on. The read is not transparent (it empties the mouse
+     queue, among the rest), so the branch begins at it, and a recording's history is the
+     path from its root to it. A load of a save no link names (one imported, CSBWin's, one
+     made before this step, one whose recording is gone) begins a root from the file, as
+     now.
+   - **Pruning.** What no save and no running game reaches is removed: a branch's changes
+     past the last point a save or a branch names, when no game plays it. So at a load,
+     what the game played since the save its branch last reached; at a save deleted or
+     written over (F5's, the Sleepsave, a SAVE over a row), what it alone reached. It
+     replaces `RECORDINGS_KEPT`, and the recordings step 2 wrote, which no save links,
+     go at the first prune.
+   - **Open, decided in the step:** whether a branch's start holds the save's file, about
+     60 KB a load, or the player makes it again, by saving at the parent's point (the
+     replayed game's save is byte-identical to the recorded one's, `tools/checks/replay.ts`).
+     Made again, nothing is stored twice, but a build that changes what a save writes
+     breaks the join; that build makes older recordings drift anyway.
+   - **Evidence:** `tools/checks/replay.ts` saves, plays on, loads and plays a branch, then
+     replays it from its root through the join, and prunes at a load, a delete and a save
+     written over.
+4. The player: the boundary fed from a recording (`InputBoundary.apply`, before the
    VBL each change was logged at), the page's live input ignored but its own controls,
    every tick it plays drawn, at the wall clock's pace or faster. No dialog opens while
    it plays:
@@ -710,12 +736,51 @@ Paying it, in steps:
      menu waits on, `src/engine/AttackMenu.ts`), moves the message strip on, raises the
      due tick and runs the mouse queue's pass, and under the disk menu CSBWin's VBL
      handler runs. Played at once, they leave the game as the recorded one.
-4. Where a player starts, stops and plays one, to design with the author. Sharing
-   (`doc/RECORDING.md` → "Shared recordings") comes after. With it, how many the store
-   keeps: `RECORDINGS_KEPT`, 20 recordings, the latest begun, across every set, is a bound
-   chosen so the store does not grow while nothing plays them. A playthrough played over
-   many sessions is many recordings, one from each read, so a list may want them joined,
-   and the bound counted in playthroughs or bytes instead.
+   - A branch is played as its path: the root's start, then each parent up to the point
+     its child joins, the child's read, and on.
+
+Where a player chooses one to play, stops it and shares it is G31's.
+
+### G31 ⏳ Recordings shared: the set's dialog, a package, the server
+
+At the author's request, after G29's player: not CSBWin's, the site's. A recording leaves
+the browser for the server, which keeps, lists and serves it, and another player plays it.
+What sharing needs is in `doc/RECORDING.md` → "Shared recordings".
+
+Decided with the author:
+
+- **The package**: one file, the deliverable the server keeps and serves. It holds a
+  recording's path, root to the branch shared (G29, step 3), its root's save when it
+  starts from one, and its metadata: its data set's id, when it began and ended, the time
+  played in it (`Game.playTime`), where it starts (a new game, or the save's level and
+  champions), its author, its title and its description.
+- **The place**: the dialog the book opens on a set's tile (`showDocuments`,
+  `src/ui/welcomePage.ts`), which lists the set's documents. It also lists the set's
+  recordings, the browser's and the server's; one is selected, its metadata shown, and
+  UPLOAD or DOWNLOAD offered by where it is. UPLOAD asks a title, which it needs, and an
+  author and a description, which it does not.
+
+**The author is a name, never the `playerId`.** The `playerId` is what the server knows a
+player by: the sets they own, and a moderator's rights (`X-Player-Id`, `server/app.ts`;
+`doc/DEPLOYMENT.md`, which a notification never sends it in). A package names its author
+by the name the player gives, or by nobody, and the server keeps its uploader's
+`playerId` apart, as a set's `owner` is kept, if a withdrawal needs it.
+
+Paying it, in steps:
+
+1. The design, with the author, written here before any code: the dialog (its lists, the
+   selection, the upload's form, where PLAY is and where a player stops one), the
+   package's format, the server's API and limits (size, rate, the W tier's rules), and
+   these questions: whether a recording is moderated before it is listed, as a set is
+   (`server/moderate.ts`); whether its uploader can withdraw it; a recording of a set the
+   site does not publish, which a viewer has no `dungeon.dat` for; one made by an older
+   build, which drifts (`doc/RECORDING.md` → "Recordings follow the engine"); and what a
+   downloaded recording becomes in the browser.
+2. The package, written and read: a tool writes one, reads it back, and replays it.
+3. The server: storing, listing and serving them, with its checks in
+   `tools/checks/server.ts`.
+4. The dialog: the browser's and the server's recordings of the set, the selection and its
+   metadata, UPLOAD and DOWNLOAD, checked in `tools/probe-frames.ts`'s welcome page block.
 
 ### Postponed
 
