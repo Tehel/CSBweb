@@ -32,7 +32,7 @@
  */
 import { readFileSync } from 'node:fs';
 
-import { RoomType } from '../../src/core/types';
+import { Position, RoomType } from '../../src/core/types';
 import { readCsbwinPartyTail } from '../../src/data/CsbwinCharacters';
 import { applyCsbwinSave } from '../../src/engine/CsbwinSaveGame';
 import { readSaveFile } from '../../src/data/SaveFile';
@@ -151,7 +151,7 @@ function ring(): void {
   const before = held();
   let calls = 0;
   while (trail.getCount() === 24 && calls < 100) {
-    trail.ageFootprints();
+    trail.ageFootprints(new Position(0, 0, 3));
     calls++;
   }
   console.log(`ring: ${calls} ten-second updates drop the oldest print, count=${trail.getCount()}`);

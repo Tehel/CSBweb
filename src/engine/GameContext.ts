@@ -356,7 +356,7 @@ export function createGameContext(
     party,
     state,
     random,
-    footprints: new PartyFootprints(),
+    footprints: new PartyFootprints(tables.amigaSounds !== null),
     timers,
     mouseQueue: new MouseQueue(),
     loop: createLoopFlags(),

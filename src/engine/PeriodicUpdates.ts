@@ -104,7 +104,7 @@ export function tenSecondUpdate(ctx: GameContext): void {
     const sleeping = party.sleeping;
     if (party.champions.length === 0) return;
 
-    ctx.footprints.ageFootprints();
+    ctx.footprints.ageFootprints(party.position);
 
     const random112 = (time & 0x40)
         | ((time & 0x80) >> 2)

@@ -20,12 +20,25 @@
  * debug trace" (`doc/CSBwin-src/Code11f52.cpp:4382-4384`). It is ported anyway,
  * errors and all, because it is what writes the age bytes that the smelling check
  * then reads — and it is the only thing that writes them.
+ *
+ * With the Amiga's tables, the trail is A22E's (`doc/AMIGA_DISK_REFERENCE.md` → "A22E's own
+ * code, classed"): `F0317_CHAMPION_AddScentStrength` changes only the strengths of the
+ * prints on the square it is given, and the ten-second decay spares the print on the
+ * party's square, where the Atari, and so CSBWin, throws both comparisons away.
  */
+
+import type { Position } from '../core/types';
 
 /** `d.PartyFootprints` and `d.Byte13220` are both 24 entries (`Data.h:796`). */
 const MAX_FOOTPRINT_ENTRIES = 24;
 
 export class PartyFootprints {
+  /**
+   * @param byLocation the Amiga's trail, whose comparisons count: a game with the Amiga's
+   *   tables (`GameTables.amigaSounds`).
+   */
+  constructor(private readonly byLocation = false) {}
+
   /** `d.PartyFootprints[24]` — packed `[level:6][y:5][x:5]`. */
   private prints: number[] = [];
 
@@ -101,6 +114,10 @@ export class PartyFootprints {
    * then the *departed* square's age is written by `addFootprintEntry` (unless the trail
    * is empty), then the count grows, then the *new* square is stored, and finally
    * `addFootprintEntry` is called again with the sentinel `0x8018`.
+   *
+   * `oldX`, `oldY` is the square left, -1 for a party placed from nowhere, which only the
+   * Amiga's trail reads. Both its calls compare on `level`, the map the party arrives on,
+   * which is A22E's current map then (ReDMCSB `MOVESENS.C:574`, `:643`, `:772`).
    */
   recordPartyMove(
     time: number,
@@ -108,6 +125,8 @@ export class PartyFootprints {
     newX: number,
     newY: number,
     magicFootprintsActive: boolean,
+    oldX = -1,
+    oldY = -1,
   ): void {
     // CSBWin's `for (D6W=d.NumFootprintEnt; D6W>=24; D6W--) DeleteFootprintEntry(0);`
     // leaves D6W as the index the new print goes into.
@@ -117,15 +136,15 @@ export class PartyFootprints {
       index--;
     }
     if (index !== 0) {
-      this.addFootprintEntry((time - this.lastPartyMoveTime) & 0xffff);
+      this.addFootprintEntry(oldX, oldY, level, (time - this.lastPartyMoveTime) & 0xffff);
     }
     this.lastPartyMoveTime = time;
     this.count++;
     if (magicFootprintsActive) this.indexOfLastMagic = this.count;
 
-    this.prints[index] = (((level & 0x3f) << 10) | ((newY & 0x1f) << 5) | (newX & 0x1f)) & 0xffff;
+    this.prints[index] = packLocation(level, newX, newY);
     this.ages[index] = 0;
-    this.addFootprintEntry(0x8018);
+    this.addFootprintEntry(newX, newY, level, 0x8018);
   }
 
   /**
@@ -155,9 +174,13 @@ export class PartyFootprints {
    * is already there: set means `max(existing, deltaTime)`, clear means
    * `min(80, deltaTime + existing)`. Every subsequent entry is overwritten with the
    * result, which is the part of this that Stevens calls hogwash — the whole tail
-   * ends up holding one value.
+   * ends up holding one value. The square is unused (`newX`, `newY` commented out).
    */
-  private addFootprintEntry(deltaTime: number): void {
+  private addFootprintEntry(mapX: number, mapY: number, level: number, deltaTime: number): void {
+    if (this.byLocation) {
+      this.addScentStrength(mapX, mapY, level, deltaTime);
+      return;
+    }
     let index = this.count;
     if (index === 0) return;
     const negative = (deltaTime & 0x8000) !== 0;
@@ -173,6 +196,33 @@ export class PartyFootprints {
     }
   }
 
+  /**
+   * A22E's `F0317_CHAMPION_AddScentStrength(mapX, mapY, cycleCount)` (ReDMCSB
+   * `CHAMPION.C:1472-1525`; `dm`'s hunk 17 at 0x3066), the Amiga's `AddFootprintEntry`:
+   * the same walk, but a strength changes only where the print is the square's, on the
+   * current map. Its pointer walks the prints up from the oldest while its index walks
+   * the strengths down from the newest, so it compares print `k` and writes strength
+   * `N-1-k`, strength 0 included (`dm`: the index tested before it is decremented, and
+   * the loop left at 0). The first strength written sets the value every later one takes.
+   */
+  private addScentStrength(mapX: number, mapY: number, level: number, cycleCount: number): void {
+    let index = this.count;
+    if (index === 0) return;
+    const merge = (cycleCount & 0x8000) !== 0;
+    let cycles = cycleCount & 0x7fff;
+    const location = packLocation(level, mapX, mapY);
+    let cycleCountDefined = false;
+    for (let k = 0; index-- !== 0; k++) {
+      if (this.prints[k] !== location) continue;
+      if (!cycleCountDefined) {
+        cycleCountDefined = true;
+        const strength = this.ages[index] ?? 0;
+        cycles = merge ? Math.max(strength, cycles) : Math.min(80, strength + cycles);
+      }
+      this.ages[index] = cycles & 0xff;
+    }
+  }
+
   /** `d.LastPartyMoveTime` — `TenSecondUpdate` reads it to eat more when idle. */
   getLastPartyMoveTime(): number {
     return this.lastPartyMoveTime;
@@ -183,8 +233,28 @@ export class PartyFootprints {
    * every age byte but the newest ticks one step toward zero, and the moment the
    * *oldest* one reaches zero it is dropped. (CSBWin's `SearchWordNE` call in the
    * loop is commented out — "This does nothing that I can see".)
+   *
+   * The Amiga's (ReDMCSB `CHAMPION.C:2311-2330`; `dm`'s hunk 17 at 0x3c60) spares the print
+   * on the party's square, `party`, and after dropping the oldest goes on with the new
+   * oldest, where CSBWin's stops.
    */
-  ageFootprints(): void {
+  ageFootprints(party: Position): void {
+    if (this.byLocation) {
+      const location = packLocation(party.z, party.x, party.y);
+      let i = 0;
+      while (i < this.count - 1) {
+        if (this.prints[i] !== location) {
+          const strength = Math.max(0, (this.ages[i] ?? 0) - 1);
+          this.ages[i] = strength;
+          if (strength === 0 && i === 0) {
+            this.deleteFootprintEntry(0);
+            continue;
+          }
+        }
+        i++;
+      }
+      return;
+    }
     for (let i = 0; i < this.count - 1; i++) {
       const age = Math.max(0, (this.ages[i] ?? 0) - 1);
       this.ages[i] = age;
@@ -233,6 +303,11 @@ export class PartyFootprints {
     this.indexOfFirstMagic = snapshot.indexOfFirstMagic;
     this.indexOfLastMagic = snapshot.indexOfLastMagic;
   }
+}
+
+/** A print's `[level:6][y:5][x:5]`, A22E's `SCENT.Location` (`MOVESENS.C:778-780`). */
+function packLocation(level: number, mapX: number, mapY: number): number {
+  return (((level & 0x3f) << 10) | ((mapY & 0x1f) << 5) | (mapX & 0x1f)) & 0xffff;
 }
 
 /** `PartyFootprints.capture()`'s payload. */

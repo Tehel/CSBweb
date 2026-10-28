@@ -31,13 +31,13 @@ golden frame. What waits on the author for it is C150. Its `dungeon.dat` is enci
 skins are drawn (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Skins in the data sets"). Every DSA operation CSBWin has is ported, not only Conflux's share
 (`tools/checks/dsa-census.ts`), and a dungeon with DSAs saves (`tools/checks/dsa-save.ts`).
 
-**First, at the author's request: A — the Amiga version.** A `dm-amiga` set: Dungeon
-Master with the Amiga 2.2's re-recorded sounds, the monsters heard moving as they
-approach, in stereo, and the Amiga's dungeon. Its rows head the index.
+**A — the Amiga version**, at the author's request, has no open item: the `dm-amiga` set
+plays Dungeon Master with the Amiga 2.2's re-recorded sounds, the monsters heard moving as
+they approach, in stereo, and the Amiga's dungeon.
 
-**Then, at the author's request: G29 — recording a game and playing it back.** Its three
+**First, at the author's request: G29 — recording a game and playing it back.** Its three
 prerequisites come first, in order: E42 and E43 make the game a function of its start, its
-VBLs and the inputs logged at them, and F22 proves it. Their rows follow A's.
+VBLs and the inputs logged at them, and F22 proves it. Their rows head the index.
 
 **Then, at the author's request: P — players' own data sets.** A player adds a dungeon
 from their own files to the welcome page, plays it, edits it, deletes it and publishes it,
@@ -123,12 +123,12 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| A10 | The scents compared with a square, as every release but the Atari's | S | ⏳ |
 | E42 | The attack menu's damage flash timed in VBLs, not milliseconds | S | ⏳ |
 | E43 | One input boundary: every change the page makes to the game, logged with its VBL | M | ⏳ |
 | F22 | `tools/checks/replay.ts`: a game logged at the boundary plays back the same | M | ⏳ |
 | G29 | Recording a game and playing it back | L | ⏳ after E42, E43, F22 |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
+| F23 | CSBWin's scent loops against the Atari's program | S | ⏳ |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | E40 | The statistics page's heat map | M | ⏸️ |
 | C150 | Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops | S | ⏸️ waits on the author |
@@ -147,7 +147,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: A11 · C194 · D22 · E44 · F23 · G31 · P13 · R17 · U13 · W8 · X18. An ID recorded and paid in one commit has no
+Next free IDs: A11 · C194 · D22 · E44 · F24 · G31 · P13 · R17 · U13 · W8 · X18. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -214,34 +214,10 @@ Decisions taken with the author:
 
 **A22E's own code is classed** (`doc/AMIGA_DISK_REFERENCE.md` → "A22E's own code,
 classed"): the machine's alone, the Atari's tables moved into `dm`, the compiler's layout,
-carried by the sound path, in the code or in the set's items `0x22e` and `0x232`, left as CSBWin does
-(H), or still to carry, which is A10.
+carried by the sound path, in the code or in the set's items `0x22e` and `0x232`, or left
+as CSBWin does (H). No item of A is open.
 The disk's bonus dungeon, `DungeonB.dat`, the Amiga's own Kids dungeon, is not taken (the
 author).
-
-### A10 ⏳ The scents compared with a square, as every release but the Atari's
-
-At the author's request, for a set with the table item: the scents as A22E keeps them,
-which every release but the Atari's does (the IIGS's and the Amiga's, `MEDIA353`; the
-later ports', `MEDIA529`), and CSB on the Atari, 2.0 and 2.1, does not, so it follows the
-set and not an engine version. The Atari, and CSBWin, throw both comparisons away
-(`doc/CSBwin-src/Code11f52.cpp:4383-4410`, whose x and y go unused;
-`doc/CSBwin-src/Code17818.cpp:181-195`, its `SearchWordNE` commented out), and
-`src/engine/PartyFootprints.ts` ports that. A22E:
-
-- `F0317_CHAMPION_AddScentStrength(x, y, cycles)` (`doc/ReDMCSB-src/CHAMPION.C:1472-1525`),
-  called with the square the party leaves and the square it enters
-  (`MOVESENS.C:772`, `:783`), changes a strength only where the scent's location
-  (x, y and the current map) is the square's. Its pointer walks the scents up from 0 while
-  its index walks the strengths down from the newest (`:1497-1507`), so it compares scent
-  `k` and writes strength `N-1-k`: the port does the same.
-- The ten-second decay (`CHAMPION.C:2311-2330`) spares the scent at the party's square.
-
-First settle the loops' bound: CSBWin's `while (index-- != 1)` never writes strength 0,
-ReDMCSB's `while (L0954_i_ScentIndex--)`, in every release, does; read the Atari's code
-before calling either a slip (`.claude/memory/memmove-source-first.md`). A
-`tools/checks/` tool walks a party on `dm-atari` and on `dm-amiga` and shows the
-strengths part. The H entry on the Amiga set then names it.
 
 The Amiga's FTL logo (`swoosh`, a program of its own) is not taken: it plays and looks as
 the Atari's does (the author).
@@ -690,6 +666,20 @@ dialogs do, so the tool also proves that nothing the page draws takes from the g
 stream (`doc/RECORDING.md` → "What is not verified"). Size M; a divergence it finds is an
 item of its own.
 
+### F23 ⏳ CSBWin's scent loops against the Atari's program
+
+CSBWin's `AddFootprintEntry` walks the strengths `while (index-- != 1)`
+(`doc/CSBwin-src/Code11f52.cpp:4394`), so it never writes strength 0, and its ten-second
+decay stops at the first print it drops (`break`, `doc/CSBwin-src/Code17818.cpp:194`).
+ReDMCSB's code, shared by every release the Atari's included, writes strength 0
+(`while (L0954_i_ScentIndex--)`, `doc/ReDMCSB-src/CHAMPION.C:1501`) and goes on after a
+drop (`continue`, `:2323-2324`), and so does the Amiga's `dm`, read in its binary (hunk 17
+at 0x3066 and 0x3c60, `doc/AMIGA_DISK_REFERENCE.md` → "A22E's own code, classed").
+`dm-amiga` plays A22E's; `dm-atari` plays CSBWin's. Whether CSBWin's two loops are slips of
+its translation, which `dm-atari` would then correct (H), is read in the Atari CSB
+program's own code, which no fixture holds (`fetch-gamefiles` takes CSB's data files
+only); until then CSBWin stands. `tools/checks/amiga-scents.ts` shows both trails.
+
 ### F21 ⏳ 3D2D1D's walkthrough is not replayed through `Game`
 
 `doc/3D2D1D_WALKTHROUGH.md` is a full route through 3D2D1D, computed by
@@ -999,8 +989,10 @@ Recorded so that nobody "fixes" them.
   `doc/AMIGA_DISK_REFERENCE.md` → "The reference: ReDMCSB, A22E"), and its tables are read
   from the Amiga's `dm`. Its colours are shown at the Atari's 3 bits a channel, which
   loses none of them: each of `dm`'s channels is twice an Atari intensity, or 15 for 7.
-  Everything CSBWin has, the Amiga set does as CSBWin does,
-  where A22E does it otherwise too: the couatl's picture is CSBWin's aspect, the click
+  Everything CSBWin has, the Amiga set does as CSBWin does, where A22E does it otherwise
+  too, but four things the author asked for: the wall bump asked for on the square bumped
+  into, the scents compared with a square, the ending's six explosions after its last
+  message and the dialogs' "V2.2". Kept as CSBWin has them: the couatl's picture is CSBWin's aspect, the click
   areas are the Atari's (A22E's RESURRECT, REINCARNATE and
   CANCEL are smaller, and its names open the inventory a pixel further left). An object
   held over the viewport keeps its colours, as A22E's pointer, a hardware sprite, shows

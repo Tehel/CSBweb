@@ -72,9 +72,9 @@ function makeGame(): { game: Game; log: string[] } {
     log.push(`fall at ${at(party.position)}`);
     fall();
   });
-  wrapMember(game.ctx.footprints, 'recordPartyMove', (record) => (time, level, x, y, magic) => {
+  wrapMember(game.ctx.footprints, 'recordPartyMove', (record) => (time, level, x, y, magic, oldX, oldY) => {
     log.push(`footprint ${at(new Position(x, y, level))}`);
-    record(time, level, x, y, magic);
+    record(time, level, x, y, magic, oldX, oldY);
   });
   wrapMember(game.ctx.systems.actuators, 'triggerObjectMove', (pads) => (position, object, place, unchangedRoom, facing) => {
     if (object === OBJECT_ID_NULL) log.push(`${place ? 'place' : 'remove'} ${at(position)} ${unchangedRoom ? 'same' : 'moved'}`);

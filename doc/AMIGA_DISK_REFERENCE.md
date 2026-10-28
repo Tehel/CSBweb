@@ -365,14 +365,22 @@ does not run them.
   sequence (`ENDGAME.C:953-958`), before "THE END." and the delay (`_FusionSequence`,
   `src/engine/Fusion.ts`; `tools/checks/fusion.ts`); and "V2.2", which every dialog prints
   at x 192, y 7, where CSB 2.1 prints "V2.1" and CSBWin "V2.0" (`DIALOG.C:711`;
-  `src/renderer/ui/Menu.ts`, `tools/checks/save-menu.ts`).
-- **Still to carry** (`DEBT.md` A10):
-  - the scents compared with a square, which every release but the Atari's does
-    (`MEDIA353`, the IIGS's and the Amiga's; `MEDIA529`, the later ports'), and CSB on the
-    Atari, 2.0 and 2.1, does not: `F0317_CHAMPION_AddScentStrength` changes only a scent
-    on the square it is given (`CHAMPION.C:1505`), and the ten-second decay spares the
-    scent on the party's square (`CHAMPION.C:2316`), where the Atari's comparisons are
-    thrown away and every scent changes.
+  `src/renderer/ui/Menu.ts`, `tools/checks/save-menu.ts`); and the scents compared with a
+  square, which every release but the Atari's does (`MEDIA353`, the IIGS's and the
+  Amiga's; `MEDIA529`, the later ports'), and CSB on the Atari, 2.0 and 2.1, does not:
+  `F0317_CHAMPION_AddScentStrength`, called with the square the party leaves and the
+  square it enters (`MOVESENS.C:772`, `:783`), on the map it arrives on, changes only the
+  strength of a scent on that square (`CHAMPION.C:1505`), and the ten-second decay spares
+  the scent on the party's square (`CHAMPION.C:2316`), where the Atari's comparisons are
+  thrown away and every scent changes (`src/engine/PartyFootprints.ts`,
+  `tools/checks/amiga-scents.ts`). `dm` has it as ReDMCSB writes it. `F0317` is hunk 17 at
+  0x3066: its scent pointer walks up from the oldest while its index, tested before it is
+  decremented, walks the strengths down from the newest to 0, so it compares scent `k` and
+  writes strength `N-1-k`, strength 0 included, and the first strength it changes sets the
+  value every later one takes. The decay is hunk 17 at 0x3c60: it compares each scent but
+  the newest with the party's square and map, and after deleting scent 0 branches back to
+  its test at the same index, `continue`. CSBWin never writes strength 0 and stops after
+  the deletion (`DEBT.md` F23).
 
 **The bonus dungeon.** A21E and A22E load `DungeonB.dat`, the disk's Kids dungeon, in
 place of `Dungeon.dat` when Alt is held as the game starts (`STARTUP2.C:1329-1331`,

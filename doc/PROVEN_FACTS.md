@@ -1084,6 +1084,10 @@ It is nonetheless the only writer of `d.Byte13220`, the age bytes that
 `GetBestMonsterFacingP1` reads to decide whether a footprint is fresh enough to follow
 (`doc/CSBwin-src/Monster.cpp:617-620`). Its loop overwrites every entry it walks past with one
 value, and never reaches entry 0 (`while (index-- != 1)`, `:4394`). It is ported as written.
+ReDMCSB's code for every release writes entry 0, and the Amiga's `dm` does: whether the
+Atari's does is open (`DEBT.md` F23). A set with the Amiga's tables plays A22E's
+`F0317_CHAMPION_AddScentStrength` instead (`doc/AMIGA_DISK_REFERENCE.md` → "A22E's own code,
+classed").
 
 ## A full trail is the last 24 squares walked: `MemMove` takes its source first
 

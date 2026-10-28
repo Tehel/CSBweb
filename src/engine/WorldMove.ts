@@ -122,7 +122,7 @@ export class WorldMove {
         if (party.facing === oldFacing) return;
       } else if (party.champions.length !== 0) {
         this.ctx.footprints.recordPartyMove(
-          this.ctx.state.tickCount, landed.z, landed.x, landed.y, party.magicFootprintsActive !== 0,
+          this.ctx.state.tickCount, landed.z, landed.x, landed.y, party.magicFootprintsActive !== 0, oldX, oldY,
         );
       }
     }
