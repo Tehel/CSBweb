@@ -89,7 +89,7 @@ export interface KnownDungeon {
 export const KNOWN_DUNGEONS: readonly KnownDungeon[] = [
     {
         name: 'Dungeon Master',
-        dataSets: ['dm-atari', 'dm-windows', 'dm-atari-1.1', 'dm-atari-1.2', 'dm-atari-1.2-de', 'dm-atari-1.3-fr'],
+        dataSets: ['dm-atari', 'dm-windows', 'dm-atari-1.1', 'dm-atari-1.2', 'dm-atari-1.2-de', 'dm-atari-1.3-fr', 'dm-amiga'],
         signature: [
             '167ec1080a5ce33a678ad38ba810d9723c25a12d6380443ad24aab877a2c6507',
             '2601fa2a50a662417b081aa47633a2c99379316f745c3454b7c51e855ac07559',

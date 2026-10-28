@@ -7,6 +7,7 @@
     { "id": "dm-atari-1.2", "name": "Dungeon Master ST 1.2", "dmRules": true, "official": true },
     { "id": "dm-atari-1.2-de", "name": "Dungeon Master ST 1.2 German", "dmRules": true, "official": true },
     { "id": "dm-atari-1.3-fr", "name": "Dungeon Master ST 1.3 French", "dmRules": true, "official": true },
+    { "id": "dm-amiga", "name": "Dungeon Master Amiga", "dmRules": true, "official": true },
     { "id": "kids-dungeon", "name": "Kids dungeon 24", "dir": "kids-dungeon-24", "dmRules": true, "official": true },
     { "id": "csb", "name": "Chaos Strikes Back", "miniDat": true, "hintOracle": true, "official": true },
     { "id": "dm-atari", "name": "Dungeon Master", "dmRules": true, "hidden": true, "official": true },

@@ -109,7 +109,7 @@ the initializer of ReDMCSB's A22E branch, byte for byte (`tools/checks/amiga-dis
 ## `graphics.dat`
 
 The Amiga 2.2 `graphics.dat` is a source, not a file the port plays: the `dm-amiga`
-set's is `dm-atari`'s with what it needs of the Amiga's taken in (`DEBT.md` A2). It has
+set's is `dm-atari`'s with what it needs of the Amiga's taken in (below). It has
 575 items, each stored as is (compressed size = decompressed size). Against `dm-atari`'s
 563, decompressed, 529 are the same, and these differ:
 
@@ -122,15 +122,44 @@ set's is `dm-atari`'s with what it needs of the Amiga's taken in (`DEBT.md` A2).
 - **533-555, the sounds**, recorded again in 8 bits. Each begins with a word 2 to 4
   less than the item's length (533: 0x0372, 882, in an item of 886 bytes), but 538 and
   548, 78 bytes each, which begin with 16.
-- **556, the objects' names** (1847 bytes to 1852): the Atari's "ANTIVEN POTIO…" is the
-  Amiga's "BRO POTIO…", and the Amiga has a "MA POTIO…". Which slots each name sits in has
-  not been compared.
+- **556, the objects' names** (1847 bytes to 1852): the same 199 names in the same slots
+  but two, slot 158's "ANTIVEN POTION", the Amiga's "BRO POTION", and slot 159's "MON
+  POTION", the Amiga's "MA POTION".
 - **557, the font** (768 bytes in both), 16 bytes changed: characters 12, 16, 20 and 29
   retouched, and 120, empty on the Atari, drawn.
 - **558-562** (`0x22e`-`0x232`: the viewport's rectangles, the creatures' table, the sound
   table, …) are empty: the Amiga's tables are in `dm`.
 
-Items 563-574 are the twelve sounds the Atari does not have, named by sounds 22-33.
+Items 563-574 are the twelve sounds the Atari does not have, named by sounds 22-33. No
+sound names 538 or 548.
+
+## The `dm-amiga` set's `graphics.dat`
+
+The `dm-amiga` set (`tools/data-sets.json`) plays the Amiga's `Dungeon.dat` as it is, and
+a `graphics.dat` of the port's making, which `npm run fetch-gamefiles` builds by running
+`tools/checks/amiga-graphics.ts --write`. The tool proves every line of this section, and
+plays a new game on the set. The file holds 599 items:
+
+| Items | What |
+| --- | --- |
+| 0-562 | `dm-atari`'s, stored as there, but for 5, 396, 556 and 557, the Amiga's in their place, stored as is |
+| 563-585 | the Amiga's 533-555, its 8-bit recordings of the Atari's sounds, in that order |
+| 586-597 | the Amiga's 563-574, its own sounds |
+| 598 | the table item, below |
+
+Items 0-562 keep the Atari's sounds, 4-bit, and its tables, so the folder is one CSBWin
+plays: CSBWin reads as many items as the file's first word counts
+(`doc/CSBwin-src/Graphics.cpp:1944-2010`) and only those its tables name, and it reads an
+item whose two sizes are equal as stored (`Graphics.cpp:2648-2651`).
+
+The table item, 935 bytes, is the port's layout, four of `dm`'s tables end to end:
+
+| Offset | Bytes | Table |
+| --- | --- | --- |
+| 0 | 272 | `G0060_as_Graphic562_Sounds[34]`, each `GraphicIndex` moved to the item above that holds the sound |
+| 272 | 625 | `G1028_aauc_DistanceToSoundVolume[25][25]` |
+| 897 | 11 | `G0244_auc_Graphic559_CreatureAttackSounds[11]` |
+| 908 | 27 | the 27 creatures' `AttackSoundOrdinal`, `CREATURE_INFO`'s second byte |
 
 ## `Dungeon.dat`
 

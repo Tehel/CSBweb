@@ -119,7 +119,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| A2 | `dm-amiga`: `dm-atari`'s `graphics.dat` with the Amiga's credits, font and names, its sounds and tables appended | M | ⏳ |
 | A3 | The Amiga's 8-bit sounds decoded and played at their Paula rate | S | ⏳ |
 | A4 | The Amiga's sound path: stereo volume by position, two voices | M | ⏳ |
 | A5 | Footsteps, `F0514_MOVE_GetSound`, and the war cry | M | ⏳ |
@@ -161,10 +160,17 @@ Amiga does, the reference is ReDMCSB's branch for **A22E**, "Dungeon Master for 
 English", in `doc/ReDMCSB-src/` (`npm run fetch-redmcsb-src`); everything CSBWin does
 still follows CSBWin (H). The 2.2 English disk's `dm`, `graphics.dat` and `Dungeon.dat` are
 `tools/fixtures/gamefiles/amiga-2.2/` (`npm run fetch-gamefiles`). The doc lists how its
-`graphics.dat` differs from `dm-atari`'s, four items of which are what a player sees of the
-Amiga: 5, the credits; 557, the font; 556, the objects' names; and 396, a picture. And it
-gives where `dm`'s tables are, which `tools/lib/amigaDm.ts` reads and
-`tools/checks/amiga-disk.ts` proves against ReDMCSB's source.
+`graphics.dat` differs from `dm-atari`'s, and gives where `dm`'s tables are, which
+`tools/lib/amigaDm.ts` reads and `tools/checks/amiga-disk.ts` proves against ReDMCSB's
+source.
+
+**The set** is `dm-amiga`, "Dungeon Master Amiga", in `tools/data-sets.json`: the Amiga's
+`Dungeon.dat`, and a `graphics.dat` that a step of `fetch-gamefiles` builds,
+`tools/checks/amiga-graphics.ts --write`, which proves it and plays a new game on it. It is
+`dm-atari`'s with the Amiga's credits (5), picture 396, objects' names (556) and font (557)
+in their place, then its 35 sounds and the port's table item, 598, appended
+(`doc/AMIGA_DISK_REFERENCE.md` → "The `dm-amiga` set's `graphics.dat`"). Nothing reads the
+appended items yet: the set plays the Atari's sounds until A3.
 
 **The sound table** is `G0060_as_Graphic562_Sounds[34]` (`doc/ReDMCSB-src/DATA.C:1165-1201`),
 at `dm:data+3738`. Entries 0-21 are the Atari's ordinals; 22, 23, 24, 26, 27, 32 and 33 are
@@ -201,34 +207,13 @@ for actuator 565 on map 7 (level 8), and a checksum (`doc/PROVEN_FACTS.md` → "
 Decisions taken with the author:
 
 - **2.2 English is the base**, not 3.6.
-- **The set's `graphics.dat` is `dm-atari`'s, with the Amiga's 34 sounds and one table
-  item appended.** Its sounds 533-555 stay the Atari's 4-bit ones, which CSBWin's
+- **The set's `graphics.dat` is `dm-atari`'s, with the Amiga's 35 sound items and one
+  table item appended.** Its sounds 533-555 stay the Atari's 4-bit ones, which CSBWin's
   `SNDexpand` reads, so the set stays a folder CSBWin plays; the port plays the appended
   ones. Re-encoding the Amiga's in 4 bits in their place would lose what they are for.
 - **Whatever makes the set recognisable as the Amiga's comes with it.** The Amiga's
   credits (5), font (557), objects' names (556) and picture 396 replace the Atari's in
   place: they are in the formats CSBWin reads, so the folder still plays in CSBWin.
-
-### A2 ⏳ `dm-amiga`: `dm-atari`'s `graphics.dat` with the Amiga's credits, font and names, its sounds and tables appended
-
-- A step of `fetch-gamefiles` (as `thumbnails` is) writes `dm-amiga/graphics.dat`:
-  `dm-atari`'s 563 items, the Amiga's 5, 396, 556 and 557 in their place (556 only once
-  its names are proven to fall in the same slots: the strings, not just the bytes,
-  compared), then the Amiga's sounds 533-555 and 563-574, then one item of
-  tables read from `dm`: the 34 `SOUND_DATA`, their `GraphicIndex` moved to the appended
-  items; the 25x25 volume grid; the 11 creature attack sounds and the creatures'
-  `AttackSoundOrdinal`, each read through `tools/lib/amigaDm.ts`. The item's layout is
-  the port's, written down in `doc/AMIGA_DISK_REFERENCE.md`. `tools/checks/amiga-graphics.ts`
-  proves the file the step writes, and what it is made from: the Amiga's 575 items each
-  stored as is, and against `dm-atari`'s 563, decompressed, 529 the same and 5, 21, 120,
-  396 and 533-562 differing (`doc/AMIGA_DISK_REFERENCE.md` → "`graphics.dat`"), 558-562
-  empty, and every item the 34 sounds name holding something. The Amiga's `graphics.dat`
-  is read only by the step and that check.
-- `dm-amiga/dungeon.dat` is `amiga-2.2/Dungeon.dat`.
-- `tools/data-sets.json`: `dm-amiga`, "Dungeon Master Amiga", `dmRules`, `official`, its
-  thumbnail.
-- H: the set's `graphics.dat` is built, as `dm-atari`'s is CSBWin's with three items from
-  the 1.2 disk.
 
 ### A3 ⏳ The Amiga's 8-bit sounds decoded and played at their Paula rate
 
@@ -273,11 +258,11 @@ nothing in 2.2, that is recorded and it stays silent.
 64 `MEDIA*` macros hold A22E and not S21E, in `DUNVIEW.C`, `MEMORY.C`, `DATA.C`,
 `TIMELINE.C`, `FLOPPY.C`, `DIALOG.C`, `SOUND.C`, `MOVESENS.C`, `DUNGEON.C`, `INPUT.C`,
 `CHAMDRAW.C`, `GROUP.C`, `CLIKMENU.C`, `TEXT.C`, … Each one a player can see or hear is
-classed as carried by A2-A5, left (an H entry) or the machine's alone: among them the
+classed as carried by the set's `graphics.dat` or A3-A5, left (an H entry) or the machine's alone: among them the
 wall bump's sound mode (`CLIKMENU.C:307`) and the highlight box (`CLIKMENU.C:57-60`).
 **The palettes, if they come easily** (the author: wanted, of little value). The Amiga's
 have 4 bits a channel where the Atari's have 3, and the darker dungeon palettes black out
-slots 9 and 10. They live in `dm`, so they are read from there, into A2's table item: the
+slots 9 and 10. They live in `dm`, so they are read from there, into the set's table item: the
 dungeon view's six are at `dm:data+2848` (`doc/AMIGA_DISK_REFERENCE.md`), the credits',
 the entrance's and the screen's not yet located. Where the port's palettes come from (the
 `0x232` item, at the Atari's 3 bits) decides how cheap that is; if it is not cheap, they
@@ -1275,6 +1260,12 @@ Recorded so that nobody "fixes" them.
   keeps it low on the wall, as in the original. `dm-windows/` keeps
   CSBWin's file as it ships. `doc/PROVEN_FACTS.md` → "`dm-atari/graphics.dat` is CSBWin's
   with three items from the 1.2 disk"; `tools/checks/dm-atari-graphics.ts` builds and checks it.
+- 🚫 **`dm-amiga/graphics.dat` is built, as `dm-atari`'s is.** It is `dm-atari`'s with the
+  Amiga 2.2's credits, picture 396, objects' names and font in their place, and the Amiga's
+  sounds and a table item of the port's appended after item 562, where CSBWin reads
+  nothing; its sounds 533-555 stay the Atari's, so CSBWin plays the folder.
+  `doc/AMIGA_DISK_REFERENCE.md` → "The `dm-amiga` set's `graphics.dat`";
+  `tools/checks/amiga-graphics.ts` builds and checks it.
 - 🚫 **The see-through door edge's last row.** `StdDrawSeeThruDoorEdge` reads graphic 41
   from pixel 128, so its last row runs 32 pixels past the graphic's end, into whatever
   CSBWin's memory holds there. `tag0088b2Explicit` (`src/renderer/csbwin/CanvasBlitter.ts`)

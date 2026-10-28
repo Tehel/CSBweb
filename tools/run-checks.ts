@@ -111,6 +111,7 @@ const CHECKS: Tool[] = [
   { tool: 'crack-switch.ts' },
   { tool: 'dm-atari-graphics.ts' },
   { tool: 'amiga-disk.ts' },
+  { tool: 'amiga-graphics.ts' },
   { tool: 'zokathra-wall.ts' },
   { tool: 'hidden-alcove.ts' },
   { tool: 'door-ornaments.ts' },

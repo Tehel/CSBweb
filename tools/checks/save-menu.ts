@@ -3213,7 +3213,7 @@ async function checkImport(graphics: GraphicsLoader): Promise<void> {
       await withPublished(dataSetNamed('csb')).importSave({ name: 'CSBGAME7.DAT', bytes: genuine }),
     ];
     console.log(`  with two sets published, the modified save looked for elsewhere, the unknown one and a save of Dungeon Master, in csb: ${named.map(refusal).join('; ')}`);
-    check(named.map(refusal).join('; ') === 'other (Wuuf; sets wuuf); other (Boris\'s keep; sets boris-keep); other (Dungeon Master; sets dm-atari dm-windows dm-atari-1.1 dm-atari-1.2 dm-atari-1.2-de dm-atari-1.3-fr)'
+    check(named.map(refusal).join('; ') === 'other (Wuuf; sets wuuf); other (Boris\'s keep; sets boris-keep); other (Dungeon Master; sets dm-atari dm-windows dm-atari-1.1 dm-atari-1.2 dm-atari-1.2-de dm-atari-1.3-fr dm-amiga)'
       && askedFor === 3, 'LOOK FOR A BETTER MATCH and the other sets name a published set, askedFor for at each import that goes on to them, and Dungeon Master is still the catalogue\'s');
     const inKeep = await withPublished({ ...STOCK_DATA_SET, id: 'boris-keep', name: 'Boris\'s keep' }).importSave({ name: 'unknown.dat', bytes: unknown }, 'elsewhere');
     console.log(`  the unknown save looked for elsewhere, in Boris's keep: ${refusal(inKeep)}`);
@@ -3286,7 +3286,7 @@ async function checkImport(graphics: GraphicsLoader): Promise<void> {
       await localSaves.importSave({ name: 'unknown.dat', bytes: unknown }, 'anyway'),
     ];
     console.log(`  in it, a modified save, the same looked for elsewhere, a save of Chaos Strikes Back and an unknown one: ${asks.map(refusal).join('; ')}`);
-    check(asks.map(refusal).join('; ') === 'different; other (Dungeon Master; sets dm-atari dm-windows dm-atari-1.1 dm-atari-1.2 dm-atari-1.2-de dm-atari-1.3-fr); '
+    check(asks.map(refusal).join('; ') === 'different; other (Dungeon Master; sets dm-atari dm-windows dm-atari-1.1 dm-atari-1.2 dm-atari-1.2-de dm-atari-1.3-fr dm-amiga); '
       + 'other (Chaos Strikes Back; sets csb); unknown' && (await localSaves.list()).length === 1,
       'in it, the same rules as in any set: a wall moved asks, and looked for elsewhere is Dungeon Master\'s; another shape is another set\'s; '
       + 'nothing is refused for being a local set\'s, and nothing stored unasked');

@@ -300,9 +300,9 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
 ` });
 // The welcome page (`src/ui/welcomePage.ts`) of a store with no save: the manifest's
 // default set, dm-atari-1.2, is selected, so PLAY opens it, and every tile is dimmed, in
-// the manifest's order: the six Atari disks of Dungeon Master, its Kid's dungeon and CSB,
+// the manifest's order: the six Atari disks of Dungeon Master, its Amiga set, its Kid's dungeon and CSB,
 // then the fan-made dungeons. The page with a save is checked further down.
-const OFFICIAL = ['dm-atari-1.0a', 'dm-atari-1.0b', 'dm-atari-1.1', 'dm-atari-1.2', 'dm-atari-1.2-de', 'dm-atari-1.3-fr', 'kids-dungeon', 'csb'];
+const OFFICIAL = ['dm-atari-1.0a', 'dm-atari-1.0b', 'dm-atari-1.1', 'dm-atari-1.2', 'dm-atari-1.2-de', 'dm-atari-1.3-fr', 'dm-amiga', 'kids-dungeon', 'csb'];
 await navigate(`${APP}?dungeon=nowhere`, WELCOME);
 const firstVisit = await evaluate(`({tiles: [...document.querySelectorAll('.pick[data-set]')].map(t=>t.dataset.set+(t.classList.contains('dim')?'':'*')+(t.getAttribute('aria-pressed')==='true'?'!':'')).join(','),
   play: document.getElementById('welcome-play').getAttribute('href'),

@@ -30,9 +30,9 @@ import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { decompressGraphics } from '../../src/core/compression';
 import { ImageFormat, decodeIMG } from '../../src/core/imageDecoder';
 import { check, finish } from '../lib/check';
+import { type Items, expand, readItems, writeItems } from '../lib/graphicsDat';
 
 const CSBWIN = 'tools/fixtures/gamefiles/dm-windows/graphics.dat';
 const ST_1_2 = 'tools/fixtures/gamefiles/dm-atari-1.2/graphics.dat';
@@ -52,32 +52,6 @@ const DONATED: { item: number; name: string; bytes?: number[]; pixels?: number[]
 /** Crack Switch (Out)'s front view, `121 + 2 * 50 + 1`. */
 const CRACK_OUT_FRONT = 222;
 
-interface Items { count: number; compressed: number[]; decompressed: number[]; data: Uint8Array[] }
-
-function readItems(bytes: Uint8Array): Items {
-  const u16 = (o: number) => (bytes[o] << 8) | bytes[o + 1];
-  const count = u16(0);
-  const compressed = Array.from({ length: count }, (_, i) => u16(2 + 2 * i));
-  const decompressed = Array.from({ length: count }, (_, i) => u16(2 + 2 * count + 2 * i));
-  const data: Uint8Array[] = [];
-  let at = 2 + 4 * count;
-  for (const size of compressed) { data.push(bytes.subarray(at, at + size)); at += size; }
-  if (at !== bytes.length) throw new Error(`graphics.dat: items end at ${at}, the file at ${bytes.length}`);
-  return { count, compressed, decompressed, data };
-}
-
-function writeItems(items: Items): Uint8Array {
-  const total = 2 + 4 * items.count + items.data.reduce((n, d) => n + d.length, 0);
-  const out = new Uint8Array(total);
-  const put16 = (o: number, v: number) => { out[o] = v >> 8; out[o + 1] = v & 0xff; };
-  put16(0, items.count);
-  items.data.forEach((d, i) => { put16(2 + 2 * i, d.length); put16(2 + 2 * items.count + 2 * i, items.decompressed[i]); });
-  let at = 2 + 4 * items.count;
-  for (const d of items.data) { out.set(d, at); at += d.length; }
-  return out;
-}
-
-const expand = (items: Items, i: number) => decompressGraphics(items.data[i], items.compressed[i], items.decompressed[i]);
 const md5 = (b: Uint8Array) => createHash('md5').update(b).digest('hex');
 
 function main(): void {

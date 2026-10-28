@@ -14,7 +14,8 @@
  *   (`tools/lib/stx.ts`), and the CSB 2.1 utility disk's portraits;
  * - the Amiga 2.2 English disk of DM, as dmweb.free.fr keeps it: its program, `graphics.dat`
  *   and `Dungeon.dat`, read from its ADF (`tools/lib/adf.ts`) into `amiga-2.2/`, a folder
- *   that is not a set, which only the tools read (`doc/AMIGA_DISK_REFERENCE.md`);
+ *   that is not a set, which only the tools read (`doc/AMIGA_DISK_REFERENCE.md`), and
+ *   `dm-amiga`'s dungeon;
  * - CSBWin's DM and CSB packages and 3D2D1D, from Paul R. Stevens' site: `dm-windows`, the
  *   `graphics.dat` the Kids dungeon plays, `csb`'s files, and `3D2D1D`;
  * - his `CSBgraphics.dat`, the designers' library no set plays, a file of its own on his site:
@@ -22,10 +23,12 @@
  * - Conflux 3.5 beta 8 (his site, or the OneDrive), The Towers of Chaos 3.3 and the Kids
  *   dungeon 24 (the OneDrive).
  *
- * Three steps make the rest, each by its own tool, in this order: `dm-atari`'s
+ * Four steps make the rest, each by its own tool, in this order: `dm-atari`'s
  * `graphics.dat`, CSBWin's with three items of 1.2's (`tools/checks/dm-atari-graphics.ts
- * --write`); `csb`'s `utility-portraits.dat`, from the utility disk
- * (`tools/gen-utility-portraits.ts`); and every set's thumbnail (`tools/gen-thumbnails.ts`).
+ * --write`); `dm-amiga`'s, `dm-atari`'s with the Amiga's credits, font, names and sounds
+ * (`tools/checks/amiga-graphics.ts --write`); `csb`'s `utility-portraits.dat`, from the
+ * utility disk (`tools/gen-utility-portraits.ts`); and every set's thumbnail
+ * (`tools/gen-thumbnails.ts`).
  *
  * `7z` (or `7zz`, `7za`), which must be on the PATH, unpacks the archives. Nothing
  * extracted is run: the packages hold Windows programs, which are not read.
@@ -163,6 +166,9 @@ const FILES: Record<string, [sha256: string, origin: Origin]> = {
   'dm-atari/dungeon.dat': ['a26f0edc4fb13e3d38551d91ad7c24f517257cfc689affe72d657f4e423853b2', { archive: 'dmAtari', path: `${DM_STX} v1.1 (English).stx`, disk: 'DUNGEON.DAT' }],
   'dm-atari/graphics.dat': ['b5f238d299207b11107881ffa113c362685362c00c9c109116fe872ce6531ac5', { step: 'dmAtariGraphics' }],
   'dm-atari/dm-atari-thumbnail.png': ['0449c5fd626d79618ac0f21a0a30ee992a56b6e890aee184c86579aa095b8ae1', { step: 'thumbnails' }],
+  'dm-amiga/dungeon.dat': ['f89f51bdecf95a5f9b9b4f70afb6381bdd2b7f6b571379ab33118d4a8b3d5c8b', { archive: 'dmAmiga', path: DM_AMIGA_ADF, disk: 'Dungeon.dat' }],
+  'dm-amiga/graphics.dat': ['6909479a6d71a97aeecc732e9118ef54cff4311e4ab31fbe72d5398c02dc4332', { step: 'dmAmigaGraphics' }],
+  'dm-amiga/dm-amiga-thumbnail.png': ['0449c5fd626d79618ac0f21a0a30ee992a56b6e890aee184c86579aa095b8ae1', { step: 'thumbnails' }],
   'dm-atari-1.0a/dungeon.dat': ['f388d156d2533abb90efb1235194d9d4f90e041193d8190e6a1efab809acf681', { archive: 'dmAtari', path: `${DM_STX} v1.0 (English) 1987-12-08.stx`, disk: 'DUNGEON.DAT' }],
   'dm-atari-1.0a/graphics.dat': ['e0daae7b956c10ae94c097e5294c6eb5fce5b3280bd1e29d96f2c2a51d5a863f', { archive: 'dmAtari', path: `${DM_STX} v1.0 (English) 1987-12-08.stx`, disk: 'GRAPHICS.DAT' }],
   'dm-atari-1.0a/dm-atari-1.0a-thumbnail.png': ['0449c5fd626d79618ac0f21a0a30ee992a56b6e890aee184c86579aa095b8ae1', { step: 'thumbnails' }],
@@ -200,6 +206,7 @@ const FILES: Record<string, [sha256: string, origin: Origin]> = {
  */
 const STEPS = {
   dmAtariGraphics: (): string[] => ['tools/checks/dm-atari-graphics.ts', '--write'],
+  dmAmigaGraphics: (): string[] => ['tools/checks/amiga-graphics.ts', '--write'],
   utilityPortraits: (): string[] => ['tools/gen-utility-portraits.ts', unpacked('csbAtari', CSB_UTILITY_STX)],
   thumbnails: (paths: string[]): string[] => ['tools/gen-thumbnails.ts',
     ...DATA_SETS.filter((set) => paths.some((path) => resolve(TREE, path) === resolve(thumbnailPath(set)))).map((set) => set.id)],
