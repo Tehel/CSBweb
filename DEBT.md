@@ -139,6 +139,7 @@ In payoff order: the first row is the next item.
 | X10 | The cells the party has seen, kept across a save for an automap | M | ⏸️ |
 | X16 | The map's info follows a DSA's program to the squares it names | M | ⏸️ |
 | X17 | The map's info names a Hall of Champions mirror's champion | S | ⏸️ |
+| X18 | The scents compared with a square on every set: the Atari's bug fixed | S | ⏸️ waits on the author |
 | E22 | Fullscreen filled by a fraction | M | ⏸️ waits on the author |
 | H | Deliberate divergences | — | 🚫 |
 
@@ -148,7 +149,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: A11 · C196 · D22 · E44 · F24 · G31 · P13 · R17 · U13 · W8 · X18. An ID recorded and paid in one commit has no
+Next free IDs: A11 · C196 · D22 · E44 · F24 · G31 · P13 · R17 · U13 · W8 · X19. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -990,6 +991,60 @@ encoded attributes and skills (`AZIZI JOHARI F AADNADACAAAH…`).
   (`src/engine/AddCharacter.ts`, `HeroExtractor`), cited there.
 - **The check**: `tools/checks/map-cell-info.ts` on a mirror of DM's Hall of Champions
   and the square before it.
+
+### X18 ⏸️ The scents compared with a square on every set: the Atari's bug fixed
+
+Not decided: whether the port should be faithful to the Atari's implementation, as it is
+now, or to what FTL meant, as its later releases are. The author decides; until then
+nothing changes.
+
+**The Atari's bug.** Every Atari program, DM 1.0 to 1.3 and, by ReDMCSB, CSB 2.0 and 2.1,
+compares each scent with the square and throws the result away, in
+`F0317_CHAMPION_AddScentStrength` and in the ten-second decay (ReDMCSB's `MEDIA007`,
+`BUG0_00`, `doc/ReDMCSB-src/CHAMPION.C:1497-1507`, `:2311-2330`;
+`doc/ATARI_ST_DISK_REFERENCE.md` → "The scents in the program"). `dm-atari` and every set
+but `dm-amiga` play it (`src/engine/PartyFootprints.ts`). What it does in play:
+
+- **Every strength is 24 after every move.** A move calls `F0317` twice
+  (`MOVESENS.C:772`, `:783`): first with the time spent on the square left, which sets the
+  whole trail to `min(80, strength + time)`, then with `0x8018`, whose first strength is the
+  new print's, 0, so the whole trail becomes `max(0, 24)`. The time the party spent
+  anywhere is lost; the first call does nothing that lasts.
+- **The decay lowers every print but the newest by one**, the party's square too. After
+  24 decays without a move the oldest reaches 0 and is dropped, and since the rest reach
+  0 in the same update, the trail falls to the newest print at once.
+- **What a monster smells** (`GetBestMonsterFacingP1`, `doc/CSBwin-src/Monster.cpp:613-625`,
+  `src/engine/MonsterPerception.ts`): out of direct reach, on a square of the trail, it
+  follows the trail when `Random(0..3) + strength > 30 - 2 * smellingDistance`, the
+  strength of its own square's print. With every strength 24 just after a move, a nose of
+  1 never follows, 2 follows one time in four, 3 three in four, 4 and more always; each
+  decay since the last move takes one from the strength, whatever the square.
+
+**What the later releases do.** The IIGS's and the Amiga's (`MEDIA353`) compare the
+location, the later ports' (`MEDIA529`) the whole scent word, which is the same thing:
+`F0317` changes only the strengths of the prints on the square it is given, and the
+decay spares the print on the party's square. `dm-amiga` plays it (`byLocation`,
+`GameContext.ts`: `tables.amigaSounds !== null`; `doc/AMIGA_DISK_REFERENCE.md` → "A22E's
+own code, classed"). It is not what FTL meant either: its pointer walks the prints up from
+the oldest while its index walks the strengths down from the newest, so it compares print
+`k` and writes strength `N-1-k`. A print's strength is its own only at the trail's middle;
+`tools/checks/amiga-scents.ts`'s walk S0, S1, S2, S1 leaves `24 0 24 0`, S1's two prints
+at 0 and the others at 24.
+
+**The choices**, each S:
+
+1. **Leave it**: every set plays its own release's code, the Atari's bug on the Atari's
+   sets. Nothing to do but delete this item.
+2. **The later releases' code on every set**: `byLocation` true for all. Faithful to an
+   FTL implementation, mirror included. Either a deliberate divergence (H), or an extra
+   (X), a setting off by default under the rules above.
+3. **What FTL meant**: print `k`'s strength written at `k`, the time spent on each square
+   kept. No release does it, so it is the port's own invention, and goes in as an extra if
+   at all.
+
+A save holds the strengths and not the rule, so a save read under another rule plays on.
+The check: `amiga-scents.ts` for the strengths, and a monster with a nose of 2 or 3 left
+on a trail the party walked slowly, followed or not as the rule says.
 
 ---
 
