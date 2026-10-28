@@ -22,13 +22,12 @@
  *
  * ⚠️ One deliberate divergence: CSBWin's `_FlashAttackDamage` ends in `VBLDelay(15)`, a
  * quarter-second in which the whole game is stopped, and the next tick, due by then,
- * draws the buttons over it. A browser cannot block the frame loop, so the flash is timed
- * instead — `attackFlashUntilMs`, which `attackFlashHeld` reads for the host — and
- * `tag01b29a` brings the buttons back no sooner than it runs out; the game keeps running
- * underneath, as it already does for the feeding
- * animation. The author's decision is a longer flash, `FLASH_MS`, for the text to be
- * read (`DEBT.md` H). The figure stays up after the flash, as CSBWin's does, until
- * `DrawLegalAttackTypes` draws over it.
+ * draws the buttons over it. A browser cannot block the frame loop, so the flash is
+ * counted instead, in the engine's VBLs (`ATTACK_FLASH_VBLS`, `src/engine/AttackMenu.ts`),
+ * and `tag01b29a` brings the buttons back no sooner than it runs out; the game keeps
+ * running underneath, as it already does for the feeding animation. The author's decision
+ * is a longer flash, for the text to be read (`DEBT.md` H). The figure stays up after the
+ * flash, as CSBWin's does, until `DrawLegalAttackTypes` draws over it.
  */
 import { OBJNI_SPECIAL_C } from '../../core/objectNameIndex';
 import { DBType, OBJECT_ID_NULL } from '../../core/types';
@@ -45,14 +44,7 @@ import { Rect } from '../../data/tables/UITables';
 import { drawObjectIconMask, shadeRectIndex } from './Draw';
 import { searchButtonList } from './HitTest';
 import { getAttackClass, getBaseObjectNameIndex } from './Objects';
-import { nowMs, UIState } from './UIState';
-
-/**
- * How long the flash holds the buttons back. CSBWin's is `VBLDelay(15)`, a quarter of a
- * second; the author's choice is 400 ms, over one tick of 15 VBLs and under two, so the
- * damage is up for two ticks whatever the jitter of the wall clock against the VBLs.
- */
-export const FLASH_MS = 400;
+import { UIState } from './UIState';
 
 /** `DrawAttackButton`'s rectangle for champion `chIdx` (`Character.cpp:4837`). */
 export function attackButtonRect(chIdx: number): Rect {
@@ -161,7 +153,6 @@ export function prepareAttack(ui: UIState, chIdx: number): void {
 export function drawLegalAttackTypesDrawing(ui: UIState, options: AttackOptions | null): void {
   ui.closedAttackMenuOrdinal = 0;
   ui.attackFlashValue = 0;
-  ui.attackFlashUntilMs = 0;
   if (!options) return;
   ui.attackOptionCount = options.count;
   for (let i = 0; i < 3; i++) ui.attackOptionNames[i] = options.names[i]!;
@@ -260,18 +251,12 @@ export function handleAttackAreaClick(ui: UIState, x: number, y: number): void {
 
 /**
  * `FlashAttackDamage`'s drawing (`doc/CSBwin-src/Attack.cpp:949`), the host's
- * `flashAttackDamage`, from the engine's `tag01b29a`: the figure up, and the buttons held
- * back for `FLASH_MS` (`attackFlashHeld`).
+ * `flashAttackDamage`, from the engine's `tag01b29a`, which holds the buttons back for
+ * the flash's VBLs (`ATTACK_FLASH_VBLS`): the figure up.
  */
 export function flashAttackDamageDrawing(ui: UIState, damage: number): void {
   ui.attackFlashValue = damage;
-  ui.attackFlashUntilMs = nowMs() + FLASH_MS;
   ui.closedAttackMenuOrdinal = 0;
-}
-
-/** Whether the flash still holds the buttons back: the host's `attackFlashHeld`. */
-export function attackFlashHeld(ui: UIState): boolean {
-  return ui.attackFlashUntilMs > nowMs();
 }
 
 /**

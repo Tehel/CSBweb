@@ -12,6 +12,14 @@ import type { AttackOptions } from './GameHost';
 import { ATTACK_TYPE_NONE } from './monsterTypes';
 
 /**
+ * How long the damage's flash holds the buttons back, in VBLs. CSBWin's is `VBLDelay(15)`,
+ * a tick, in which the whole game stops (`doc/CSBwin-src/Attack.cpp:1039`); the port's
+ * game runs on under it, and the author's choice is 24 VBLs, 400 ms, over one tick and
+ * under two, so the damage is up for two ticks (`DEBT.md` H).
+ */
+export const ATTACK_FLASH_VBLS = 24;
+
+/**
  * `TAG01b1c0` (`doc/CSBwin-src/Character.cpp:4904-4922`): the menu closed, and the panel
  * owed a redraw on the next tick. Its `DrawCharacterState` of the attacker's hands is the
  * screen's (`GameHost.tag01b1c0`), which leaves the menu on the panel until `TAG01b29a`
@@ -28,12 +36,14 @@ export function tag01b1c0(ctx: GameContext): void {
 /**
  * `DrawLegalAttackTypes` (`doc/CSBwin-src/CSBCode.cpp:8823-8899`): the panel drawn as
  * `d.Word20252` and the ordinal say (`GameHost.drawLegalAttackTypes`), the option list
- * named first, and `d.Word20250 = 0`.
+ * named first, and `d.Word20250 = 0`. Drawn over the damage, by a key that opens a menu
+ * under the flash, it ends the flash too.
  */
 export function drawLegalAttackTypes(ctx: GameContext): void {
   const face = ctx.interface;
   ctx.host.drawLegalAttackTypes(face.word20252 === 0 && face.attackingCharacterOrdinal !== 0 ? nameAttackOptions(ctx) : null);
   face.word20250 = 0;
+  face.attackFlashVbls = 0;
 }
 
 /**
@@ -114,11 +124,12 @@ export function tag01b29a(ctx: GameContext): void {
   if (face.word20250 === 0) return;
 
   if (face.attackingCharacterOrdinal === 0) {
-    // The flash is timed, where CSBWin's `VBLDelay(15)` stops the game (`DEBT.md` H): the
-    // panel stays owed its redraw until the screen's flash has run its course.
-    if (ctx.host.attackFlashHeld()) return;
+    // The flash is counted in VBLs, where CSBWin's `VBLDelay(15)` stops the game (`DEBT.md`
+    // H): the panel stays owed its redraw until the flash has run its course.
+    if (face.attackFlashVbls !== 0) return;
     const damage = ctx.systems.attack.consumeAttackDamageToDisplay();
     if (damage !== 0) {
+      face.attackFlashVbls = ATTACK_FLASH_VBLS;
       ctx.host.flashAttackDamage(damage);
       return;
     }

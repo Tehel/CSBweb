@@ -21,8 +21,8 @@ import { Direction, Position } from '../../src/core/types';
 import { Party } from '../../src/engine/Party';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../../src/engine/AddCharacter';
 import { createPaletteIndexViewportBuffer } from '../../src/renderer/csbwin/CanvasBlitter';
-import { tag01b1c0, tag01b29a } from '../../src/engine/AttackMenu';
-import { drawAttackPanel, executeAttack, FLASH_MS, prepareAttack, takeAttackOption } from '../../src/renderer/ui/Attack';
+import { ATTACK_FLASH_VBLS, tag01b1c0, tag01b29a } from '../../src/engine/AttackMenu';
+import { drawAttackPanel, executeAttack, prepareAttack, takeAttackOption } from '../../src/renderer/ui/Attack';
 import { VBL_PER_TICK } from '../../src/engine/LoopState';
 import { type UIState } from '../../src/renderer/ui/UIState';
 import { check, finish } from '../lib/check';
@@ -103,13 +103,21 @@ async function main(): Promise<void> {
   const damage = render('the tick: the damage');
   check(damage !== menu && damage !== buttons, "the tick's FlashAttackDamage draws the damage over it");
   // The author's flash (DEBT.md H): over one tick and under two, where CSBWin's
-  // VBLDelay(15) is one. The next tick, a tick's milliseconds on, leaves the damage up.
-  const tickMs = (VBL_PER_TICK * 1000) / 60;
-  check(FLASH_MS > tickMs && FLASH_MS < 2 * tickMs, `the flash, ${FLASH_MS} ms, is over one tick and under two`);
-  ui.attackFlashUntilMs -= tickMs;
+  // VBLDelay(15) is one. The next tick, a tick's VBLs on, leaves the damage up.
+  check(ATTACK_FLASH_VBLS > VBL_PER_TICK && ATTACK_FLASH_VBLS < 2 * VBL_PER_TICK,
+    `the flash, ${ATTACK_FLASH_VBLS} VBLs, is over one tick and under two`);
+  check(ui.ctx.interface.attackFlashVbls === ATTACK_FLASH_VBLS, 'the flash holds the buttons back for its VBLs');
+  // A tick's VBLs, the clock stopped so that only this tool's `TAG01b29a` runs: each runs
+  // the flash down, whatever the wall clock.
+  const clockRunning = game.ctx.loop.clockRunning;
+  game.ctx.loop.clockRunning = false;
+  for (let n = 0; n < VBL_PER_TICK; n++) game.runFrame();
+  game.ctx.loop.clockRunning = clockRunning;
+  check(ui.ctx.interface.attackFlashVbls === ATTACK_FLASH_VBLS - VBL_PER_TICK,
+    `a tick's ${VBL_PER_TICK} VBLs leave ${ATTACK_FLASH_VBLS - VBL_PER_TICK} of the flash, not ${ui.ctx.interface.attackFlashVbls}`);
   tag01b29a(ui.ctx);
   check(render('a tick on') === damage, 'the first tick after the flash leaves the damage up');
-  ui.attackFlashUntilMs = 0;
+  ui.ctx.interface.attackFlashVbls = 0;
   check(render('the flash over, before the tick') === damage,
     'the damage stays up after its VBLDelay(15) (Attack.cpp:1039)');
   tag01b29a(ui.ctx);

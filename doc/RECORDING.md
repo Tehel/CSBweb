@@ -8,7 +8,7 @@ recordings would take.
 **Recordings follow the engine.** Any change to what the engine does at a tick makes a
 recording made before it play out differently. A recording carries the build that made it,
 and its `d.RandomNumber` values show the first entry where a later build parts from it. The
-work that comes before the recorder is `DEBT.md` E42, E43 and F22, from "The port against
+work that comes before the recorder is `DEBT.md` E43 and F22, from "The port against
 those needs" below.
 
 ## CSBWin's recorder
@@ -133,18 +133,15 @@ What holds:
 - **Clicks and keys reach the engine through CSBWin's one mouse queue**
   (`src/engine/MouseQueue.ts`), a long press's click too, queued from a `setTimeout`. The
   port counts `totalMoveCount` where CSBWin records (`Game.recordFileRecord`,
-  `src/engine/Game.ts:1003`).
-- The page's other wall-clock uses (`nowMs`, `src/renderer/ui/UIState.ts:506`), a menu
-  button's press and the mouth's chew, only draw, a menu's under a stopped clock.
+  `src/engine/Game.ts:1009`).
+- **The attack menu's damage flash is counted in VBLs**, the engine's
+  (`ATTACK_FLASH_VBLS`, `src/engine/AttackMenu.ts`), where CSBWin's `VBLDelay(15)` stops
+  the game (`DEBT.md` H).
+- The page's wall-clock uses (`nowMs`, `src/renderer/ui/UIState.ts`), a menu button's
+  press and the mouth's chew, only draw, a menu's under a stopped clock.
 
 What breaks determinism:
 
-- **The attack menu's damage flash is timed on the wall clock** (`DEBT.md` E42). The
-  panel's tick does nothing while `host.attackFlashHeld()`
-  (`src/engine/AttackMenu.ts:117-119`), which is `FLASH_MS` (400 ms) of `performance.now()`
-  (`src/renderer/ui/Attack.ts:266-275`), where CSBWin's `VBLDelay(15)` stops the game
-  (`DEBT.md` H). Whether the attack options are back at a given tick, and so what a click
-  on them does, depends on real time.
 - **The page changes the game outside the queue**, at the moment its events come (`DEBT.md`
   E43): the panel keys, the save menu and the Reincarnate screen; `ctx.state.paused`, which
   the dialogs, the save menu and the Hint Oracle set, and under which a tick that comes due

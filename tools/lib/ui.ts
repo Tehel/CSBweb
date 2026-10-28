@@ -84,7 +84,6 @@ export function newUIState(graphics: GraphicsLoader, ctx: GameContext, hooks: Pa
   host.tag01b1c0 = (chIdx) => { own.tag01b1c0(chIdx); drawing.tag01b1c0(chIdx); };
   host.drawLegalAttackTypes = (options) => { own.drawLegalAttackTypes(options); drawing.drawLegalAttackTypes(options); };
   host.flashAttackDamage = (damage) => { own.flashAttackDamage(damage); drawing.flashAttackDamage(damage); };
-  host.attackFlashHeld = () => own.attackFlashHeld() || drawing.attackFlashHeld();
   host.displayCharacterDamage = (chIdx, damage) => { own.displayCharacterDamage(chIdx, damage); drawing.displayCharacterDamage(chIdx, damage); };
   host.tag011366 = (chIdx) => { own.tag011366(chIdx); drawing.tag011366(chIdx); };
   host.drawCharacterState = (chIdx, charFlags) => { own.drawCharacterState(chIdx, charFlags); drawing.drawCharacterState(chIdx, charFlags); };

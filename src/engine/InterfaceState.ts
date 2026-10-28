@@ -3,8 +3,8 @@
  * open inventory's eye panel shows, the open chest, and the attack menu. CSBWin keeps them
  * in `d` beside the rest of the game; they live on the context (`ctx.interface`), as the
  * loop's flags do (`LoopState.ts`), so the engine and the screen read the same ones. None
- * is saved, in CSBWin or here. What only the screen draws from (bitmaps, the chew's and
- * the flash's times, the option names drawn) stays in `UIState`.
+ * is saved, in CSBWin or here. What only the screen draws from (bitmaps, the chew's time,
+ * the option names drawn) stays in `UIState`.
  */
 import { OBJECT_ID_NULL, type ObjectID } from '../core/types';
 
@@ -45,6 +45,12 @@ export interface InterfaceState {
   word20250: number;
   /** `d.Word20252` — 1 shows the four attack buttons, 0 the option list. */
   word20252: number;
+  /**
+   * The port's own: the VBLs left of the damage's flash, which `TAG01b29a` sets and
+   * `Game.runFrame` runs down, and while which it leaves the panel owed its redraw, where
+   * CSBWin's `VBLDelay(15)` stops the game (`DEBT.md` H, `ATTACK_FLASH_VBLS`).
+   */
+  attackFlashVbls: number;
 }
 
 /** Eight empty chest slots, each `RNnul`. */
@@ -70,5 +76,6 @@ export function createInterfaceState(): InterfaceState {
     word20248: 0,
     word20250: 0,
     word20252: 1,
+    attackFlashVbls: 0,
   };
 }

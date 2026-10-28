@@ -8,7 +8,7 @@
  */
 
 import type { GameHost } from '../../engine/GameHost';
-import { attackFlashHeld, drawLegalAttackTypesDrawing, flashAttackDamageDrawing, tag01b1c0Drawing } from './Attack';
+import { drawLegalAttackTypesDrawing, flashAttackDamageDrawing, tag01b1c0Drawing } from './Attack';
 import { getChampionPortrait, drawCharacterState } from './Character';
 import { drawCharacterStateEyePanel } from './Inventory';
 import { releaseEyeOrMouthDrawing, setUIMode, showHideInventoryDrawing, tag02076eDrawing, tag0207ccDrawing } from './Mouse';
@@ -16,7 +16,7 @@ import { savedGameRead, UIMode, type UIState } from './UIState';
 
 export type HostDrawing = Pick<GameHost,
   | 'showHideInventory' | 'releaseEyeOrMouth' | 'tag02076e' | 'tag0207cc' | 'savedGameRead'
-  | 'tag01b1c0' | 'drawLegalAttackTypes' | 'flashAttackDamage' | 'attackFlashHeld'
+  | 'tag01b1c0' | 'drawLegalAttackTypes' | 'flashAttackDamage'
   | 'displayCharacterDamage' | 'tag011366' | 'drawCharacterState' | 'portraitOf'>;
 
 export function hostDrawing(current: () => UIState | null): HostDrawing {
@@ -37,10 +37,6 @@ export function hostDrawing(current: () => UIState | null): HostDrawing {
     tag01b1c0: (chIdx) => on((ui) => tag01b1c0Drawing(ui, chIdx)),
     drawLegalAttackTypes: (options) => on((ui) => drawLegalAttackTypesDrawing(ui, options)),
     flashAttackDamage: (damage) => on((ui) => flashAttackDamageDrawing(ui, damage)),
-    attackFlashHeld: () => {
-      const ui = current();
-      return ui ? attackFlashHeld(ui) : false;
-    },
     displayCharacterDamage: (chIdx, damage) => on((ui) => {
       const inventoryOpen = ui.partyState.selectedCharacterIndex === chIdx;
       ui.characterDamage[chIdx] = { damage, inventoryOpen };

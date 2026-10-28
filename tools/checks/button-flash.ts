@@ -65,14 +65,13 @@ async function main(): Promise<void> {
 
   const level = Number(process.argv[2] ?? 1);
   // The tick's `TAG01b29a` and the paint after it, as the host sees them: `TAG01b29a`
-  // asks whether the damage's flash holds once it has a champion and a redraw owed. The
+  // draws the buttons once it has a champion, a redraw owed and no damage to flash. The
   // host's `drawViewport` is a script's tick's: the main loop's tick draws its viewport
   // once, through `onTick`, and its paint is no second `DrawViewport`.
   const hostLog: string[] = [];
   const game = newGame(data, graphics, {
-    attackFlashHeld: () => {
+    drawLegalAttackTypes: () => {
       hostLog.push(`TAG01b29a d.Time ${game.ctx.state.tickCount} freezeLifeTimer ${game.ctx.party.state.freezeLifeTimer}`);
-      return false;
     },
     drawViewport: () => hostLog.push('a script tick\'s DrawViewport'),
     paint: () => hostLog.push('paint'),

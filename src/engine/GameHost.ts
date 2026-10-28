@@ -129,13 +129,6 @@ export interface GameHost {
    */
   flashAttackDamage(damage: number): void;
   /**
-   * Whether the screen's flash of the damage still holds the buttons back, which
-   * `TAG01b29a` asks before it services `d.Word20250`: the port times the flash by the
-   * wall clock where CSBWin's `VBLDelay(15)` stops the game (`DEBT.md` H). Left out, it
-   * holds nothing.
-   */
-  attackFlashHeld(): boolean;
-  /**
    * `ShowHideInventory(chIdx)` (`doc/CSBwin-src/CSBCode.cpp:7478`), 4 to hide, its drawing,
    * once the engine has shown or hidden the inventory (`showHideInventory`,
    * `ShowHideInventory.ts`): the secondary button list, and `TAG0189d4`'s description of
@@ -282,7 +275,6 @@ export function createGameHost(host: Partial<GameHost> = {}): GameHost {
     tag01b1c0: host.tag01b1c0 ?? (() => {}),
     drawLegalAttackTypes: host.drawLegalAttackTypes ?? (() => {}),
     flashAttackDamage: host.flashAttackDamage ?? (() => {}),
-    attackFlashHeld: host.attackFlashHeld ?? (() => false),
     showHideInventory: host.showHideInventory ?? (() => {}),
     releaseEyeOrMouth: host.releaseEyeOrMouth ?? (() => {}),
     tag02076e: host.tag02076e ?? (() => {}),

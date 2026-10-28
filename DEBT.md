@@ -35,9 +35,9 @@ skins are drawn (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Skins in the data sets
 plays Dungeon Master with the Amiga 2.2's re-recorded sounds, the monsters heard moving as
 they approach, in stereo, and the Amiga's dungeon.
 
-**First, at the author's request: G29 — recording a game and playing it back.** Its three
-prerequisites come first, in order: E42 and E43 make the game a function of its start, its
-VBLs and the inputs logged at them, and F22 proves it. Their rows head the index.
+**First, at the author's request: G29 — recording a game and playing it back.** Its two
+prerequisites come first, in order: E43 makes the game a function of its start, its VBLs
+and the inputs logged at them, and F22 proves it. Their rows head the index.
 
 **Then, at the author's request: P — players' own data sets.** A player adds a dungeon
 from their own files to the welcome page, plays it, edits it, deletes it and publishes it,
@@ -123,10 +123,9 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E42 | The attack menu's damage flash timed in VBLs, not milliseconds | S | ⏳ |
 | E43 | One input boundary: every change the page makes to the game, logged with its VBL | M | ⏳ |
 | F22 | `tools/checks/replay.ts`: a game logged at the boundary plays back the same | M | ⏳ |
-| G29 | Recording a game and playing it back | L | ⏳ after E42, E43, F22 |
+| G29 | Recording a game and playing it back | L | ⏳ after E43, F22 |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
 | C194 | A DSA's wall graphic counts as a real decoration, so it hides no text | S | ⏳ |
 | C195 | Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space | S | ⏳ to decide with the author |
@@ -496,23 +495,6 @@ gather or split CSBWin's functions as the code's concerns ask. What still follow
 the behaviour, the names of ported functions, which keep the two codebases greppable
 against each other, and the file formats.
 
-### E42 ⏳ The attack menu's damage flash timed in VBLs, not milliseconds
-
-The engine waits on the page's wall clock in one place: the attack panel's tick does
-nothing while `host.attackFlashHeld()` (`src/engine/AttackMenu.ts:117-119`), which is
-`FLASH_MS` of `performance.now()` (`flashAttackDamageDrawing` and `attackFlashHeld`,
-`src/renderer/ui/Attack.ts:266-275`). So whether the attack options are back at a given
-tick, and what a click on them does, depends on real time, and a replay of the same inputs
-is not sure to agree (G29). It is the only value `GameHost` returns that the engine acts
-on, beside the portrait a save writes (`portraitOf`).
-
-Paying it: the flash held for a count of VBLs that `Game.runFrame` runs down, the engine's
-state rather than the page's: 24, `FLASH_MS` at `VBL_FREQUENCY`, so H's "`_FlashAttackDamage`
-does not stop the game" keeps its length and states it in VBLs. The flash's drawing stays
-the page's. `tools/checks/attack-panel.ts` and the tools' host (`attackFlashHeld`,
-`tools/lib/ui.ts:87`) count VBLs then. A tool steps VBLs faster than the wall clock, so
-the one output that may move is a flash's length in a tool's ticks. Size S.
-
 ### E43 ⏳ One input boundary: every change the page makes to the game, logged with its VBL
 
 The game runs one VBL at a time (`Game.runFrame`), and the wall clock only decides how many
@@ -520,7 +502,7 @@ run at each wake (`gameLoop`, `src/engine/Game.ts:488-508`). Between two VBLs th
 changes the game through many doors, each at the moment its event comes:
 
 - the mouse queue: `Game.onMouseClick`, `onMouseUnClick` and `enqueueKeyButton`
-  (`src/engine/Game.ts:810-830`), from `src/renderer/GameInput.ts`, a long press's click
+  (`src/engine/Game.ts:816-836`), from `src/renderer/GameInput.ts`, a long press's click
   among them (its `setTimeout`);
 - the panel keys, which call the handlers a click reaches (`handleUIKey`,
   `src/renderer/ui/Keyboard.ts`), and the two modal screens, the save menu and the
@@ -532,7 +514,7 @@ changes the game through many doors, each at the moment its event comes:
   VBL after;
 - the settings, which set `ctx.extras` and the mouse queue's length at any change
   (`applyToGame`, `src/settings/Settings.ts:158-162`);
-- a save's tail, `Game.saveWritten` (`:1069`), which re-attaches the monsters and runs
+- a save's tail, `Game.saveWritten` (`:1075`), which re-attaches the monsters and runs
   `SmartDiscard`: with the clock stopped, once the store's write is awaited (`GameSaves.save`,
   `src/engine/GameSaves.ts:337`);
 - a read, F9's or the menu's, and `?dev`'s level keys (`Game.devChangeLevel`).
@@ -727,7 +709,7 @@ CSBWin records a game as the mouse-queue entries it takes, each with its tick an
 needs, where the port stands against it, and the port's own recorder.
 
 The port has neither. It keeps only the recorder's count, `totalMoveCount`, which a save
-stores (`Game.recordFileRecord`, `src/engine/Game.ts:1003`), and `extraTicks` is always on
+stores (`Game.recordFileRecord`, `src/engine/Game.ts:1009`), and `extraTicks` is always on
 (`src/engine/MovementSystem.ts:115-116`). Conflux 3.5's `AutoRecord` (`doc/RECORDING.md`)
 asks for a recorder the port does not have.
 
@@ -738,7 +720,7 @@ and playback needs no `extraTicks` off. `d.Time` and `d.RandomNumber` go with ev
 so a replay stops at the first that drifts. Playing CSBWin's own recordings back, which
 needs the port's draws to follow CSBWin's draw for draw, is not part of it.
 
-It comes after E42, E43 and F22. A change to what the engine does makes older recordings
+It comes after E43 and F22. A change to what the engine does makes older recordings
 drift: each carries the build that made it, and the drift detector shows where it parts.
 
 Paying it, in steps:
@@ -1200,12 +1182,14 @@ Recorded so that nobody "fixes" them.
 - 🚫 **`_FlashAttackDamage` does not stop the game, and lasts two ticks.** CSBWin's ends in
   `VBLDelay(15)`, which halts everything for a quarter of a second, and the tick due by
   then draws the buttons over the damage (`doc/CSBwin-src/Attack.cpp:1039`,
-  `CSBCode.cpp:8950-8958`). The port shows the flash as a timed overlay while the game
-  keeps running, as it already does for the feeding animation. The author's decision is
-  400 ms (`FLASH_MS`, `src/renderer/ui/Attack.ts`), over one tick and under two, so the
-  text can be read: the damage is up for two ticks, half a second, where CSBWin's is up
-  for one. The keys still open an attack menu over it. `tools/checks/attack-panel.ts`
-  checks that the first tick after the flash leaves it up.
+  `CSBCode.cpp:8950-8958`). The port holds the panel's redraw back while the game keeps
+  running, as it already does for the feeding animation. The author's decision is 24
+  VBLs, 400 ms (`ATTACK_FLASH_VBLS`, `src/engine/AttackMenu.ts`), over one tick and under
+  two, so the text can be read: the damage is up for two ticks, half a second, where
+  CSBWin's is up for one. The count is the engine's, run down by every VBL
+  (`Game.runFrame`), so a replay of the same inputs holds it alike. The keys still open
+  an attack menu over it, which ends the flash. `tools/checks/attack-panel.ts` checks that
+  the first tick after the flash leaves it up.
 - 🚫 **Three inputs bypass the mouse queue:** the save menu and the Reincarnate screen,
   which are modal, and the panel keys in `src/renderer/ui/Keyboard.ts`, whose module
   comment gives the reason. So none of them reaches `totalMoveCount`: CSBWin's save menu

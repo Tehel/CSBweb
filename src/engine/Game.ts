@@ -527,6 +527,9 @@ export class Game implements MainLoop {
         this.ctx.host.messages.vblInterrupt();
         vblFlashButton(this.ctx.loop);
         vblInterrupt(this.ctx);
+        // The port's own: the attack panel's flash runs down on every VBL, as CSBWin's
+        // `VBLDelay(15)` would have let them pass (`ATTACK_FLASH_VBLS`, `DEBT.md` H).
+        if (this.ctx.interface.attackFlashVbls !== 0) this.ctx.interface.attackFlashVbls--;
         if (this.script !== null) {
             // A script's `VBLDelay` (`wvbl`, doc/CSBwin-src/CSBCode.cpp:1147-1157): the VBLs
             // go by, and the loop makes no pass. The last one resumes the script, up to its

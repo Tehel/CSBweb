@@ -223,9 +223,8 @@ export interface UIState {
    * `DrawLegalAttackTypes` or `FlashAttackDamage`, which set it back to 0.
    */
   closedAttackMenuOrdinal: number;
-  /** The damage figure on the panel (0 for none), and when its flash ends. See `ui/Attack.ts`. */
+  /** The damage figure on the panel (0 for none). See `ui/Attack.ts`. */
   attackFlashValue: number;
-  attackFlashUntilMs: number;
   /**
    * The damage `DisplayCharacterDamage` blitted into each champion's box
    * (`doc/CSBwin-src/CSBCode.cpp:7180-7230`), still on CSBWin's screen, or null: the HP
@@ -370,7 +369,7 @@ export interface UIState {
 type PlayState = Pick<UIState,
   | 'uiMode' | 'modeBeforeFreeze' | 'shadedByTag02076e' | 'arrowCursorShape' | 'reincarnate' | 'diskMenuNeeded' | 'hintOracleNeeded' | 'sleepSaveNeeded'
   | 'describedObject' | 'weaponHandScroll' | 'word23144' | 'word23118' | 'pointer23178' | 'pointer23182'
-  | 'attackOptionCount' | 'attackOptionNames' | 'closedAttackMenuOrdinal' | 'attackFlashValue' | 'attackFlashUntilMs'
+  | 'attackOptionCount' | 'attackOptionNames' | 'closedAttackMenuOrdinal' | 'attackFlashValue'
   | 'characterDamage'
   | 'openChestIconIndex'>;
 
@@ -400,7 +399,6 @@ function initialPlayState(): PlayState {
     attackOptionNames: ['', '', ''],
     closedAttackMenuOrdinal: 0,
     attackFlashValue: 0,
-    attackFlashUntilMs: 0,
     characterDamage: [null, null, null, null],
     openChestIconIndex: null,
   };
