@@ -202,7 +202,8 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
             MouseSystem (Mouse.cpp's engine half), HallOfChampions, the Monster* systems,
             MouseQueue and LoopState (the loop's `d.` state, at `ctx.mouseQueue` /
             `ctx.loop`), InputBoundary (the one door the page changes the game through, at
-            `Game.input`, and the VBLs counted), PeriodicUpdates (the ninety- and ten-second updates), LightLevel
+            `Game.input`, and the VBLs counted), Recorder (the game logged at that door from
+            the read it began at), PeriodicUpdates (the ninety- and ten-second updates), LightLevel
             (`SelectPaletteForLightLevel`: `d.CurrentPalette`), OpenChest (the open
             chest, opened and repacked at CSBWin's events, never by drawing),
             ShowHideInventory (the inventory shown and hidden, and `TAG02076e` and

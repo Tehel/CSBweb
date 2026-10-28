@@ -4,9 +4,10 @@
  *
  * The game runs one VBL at a time (`Game.runFrame`); between two, the page brings what
  * its events bring: a click, a key, the clock stopped by a dialog, a setting, a save's
- * tail, a read. Each goes through `apply`, which applies it at once and hands it first to
- * the listener with the VBLs run so far. So the game is a function of its start, its VBLs
- * and the changes told, each before the same VBL.
+ * tail, a read, the boot's DM rules. Each goes through `apply`, which applies it at once
+ * and hands it first to the listener with the VBLs run so far. So the game is a function
+ * of its start, its VBLs and the changes told, each before the same VBL. Its listener is
+ * the recorder (`Recorder`).
  *
  * What the game does inside a VBL is its own, whatever door it takes: the save menu its
  * disk icon opens holds the clock from a button's handler, and the Sleepsave's tail runs
@@ -46,6 +47,8 @@ export type InputChange =
     | { readonly kind: 'saveWritten' }
     /** A game read over the running one: told, not applied, since the read has done it (`readGame`). */
     | { readonly kind: 'read' }
+    /** The boot's `DM_rules`, forced once the game is read (`Game.forceDMRulesAtBoot`). */
+    | { readonly kind: 'forceDMRules' }
     /** `?dev`'s move a level down (1) or up (-1) (`Game.devChangeLevel`). */
     | { readonly kind: 'devLevel'; readonly delta: 1 | -1 }
     /** `?dev`'s move to a square, the map dialog's long press (`Game.devMoveParty`). */

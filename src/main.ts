@@ -42,6 +42,7 @@ import { showEndOfGame } from './renderer/intro/EndOfGame';
 import { Die } from './core/Die';
 import { csbGraphicsOpener } from './engine/FileSignatures';
 import type { PrisonDoorChoice } from './renderer/intro/PrisonDoor';
+import { Recorder } from './engine/Recorder';
 import { applySaveBytes } from './engine/SaveGameFile';
 import { Settings, applyToGame, type SettingsValues } from './settings/Settings';
 import type { KeyboardLayoutMap } from './renderer/ui/KeyLabels';
@@ -328,12 +329,14 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     // is the game's.
     const storeRandom = new CsbRandom();
     const saveStore = new BrowserSaveStore((rows) => drawPlaythrough(storeRandom, rows));
+    // Each read begins a recording of the game from it, which the next read ends.
+    const recorder = new Recorder(game, __CSBWEB_BUILD__, dataSet.id);
     const saves = new GameSaves(game, dataSet, setFiles, saveStore, {
         // A save packs a `CHARDESC`, and that needs graphic 26 for the champions who
         // carry only a portrait index.
         portraitOf: drawing.portraitOf,
         askBeginAdventure: (source) => { if (screen) askBeginAdventure(screen.ui, source); },
-    }, logSave, storeRandom, publishedDungeons);
+    }, logSave, storeRandom, publishedDungeons, recorder);
 
     // The statistics' events: sent by a production build only, and shown on the console
     // otherwise; neither when the player has turned them off.

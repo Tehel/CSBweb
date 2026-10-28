@@ -661,30 +661,33 @@ CSBWin records a game as the mouse-queue entries it takes, each with its tick an
 `doc/CSBwin-src/Recording.cpp`). `doc/RECORDING.md` holds how both work, what a replay
 needs, where the port stands against it, and the port's own recorder.
 
-The port has neither. It keeps only the recorder's count, `totalMoveCount`, which a save
-stores (`Game.recordFileRecord`, `src/engine/Game.ts:1043`), and `extraTicks` is always on
+The port has neither of CSBWin's. It keeps the recorder's count, `totalMoveCount`, which a
+save stores (`Game.recordFileRecord`, `src/engine/Game.ts`), and `extraTicks` is always on
 (`src/engine/MovementSystem.ts:115-116`). Conflux 3.5's `AutoRecord` (`doc/RECORDING.md`)
-asks for a recorder the port does not have.
+asks for a recorder, and the port records every game anyway.
 
 **The port's recorder is its own** (`doc/RECORDING.md` → "The port's recorder"): it logs
 the input boundary's changes (`src/engine/InputBoundary.ts`), each with the count of VBLs
-before it, where CSBWin logs the queue's entries with `d.Time`. Counted in VBLs, nothing that happens within a tick needs proving,
-and playback needs no `extraTicks` off. `d.Time` and `d.RandomNumber` go with every change,
-so a replay stops at the first that drifts. Playing CSBWin's own recordings back, which
-needs the port's draws to follow CSBWin's draw for draw, is not part of it.
+before it, where CSBWin logs the queue's entries with `d.Time`. Counted in VBLs, nothing
+that happens within a tick needs proving, and playback needs no `extraTicks` off. `d.Time`
+and `d.RandomNumber` go with every change, so a replay stops at the first that drifts.
+Playing CSBWin's own recordings back, which needs the port's draws to follow CSBWin's draw
+for draw, is not part of it.
 
 A change to what the engine does makes older recordings drift: each carries the build
 that made it, and the drift detector shows where it parts. `tools/checks/replay.ts` is the
 headless page a step's recorder and player can be proven on: it plays a game through the
-page's input path, logs it at the boundary, and plays the log back.
+page's input path, records it, and plays the recording back.
 
 Paying it, in steps:
 
-1. The recorder. The start: a new game's data set, rules and extras, and its stream and
-   `d.RandomGameID` as `GameSaves.newGameRead` leaves them, since it draws again while a
-   save of the set holds the id (`src/engine/GameSaves.ts:257-267`); or the save a game was
-   read from. Then the boundary's log. A read ends a recording.
-2. The store: recordings beside the saves in IndexedDB (`src/data/saves/BrowserSaveStore.ts`).
+1. The recorder: done. `Recorder` (`src/engine/Recorder.ts`) holds a `Recording`, begun by
+   each of `GameSaves`'s reads and ended by the next: its build and data set, its start (a
+   new game's stream and `d.RandomGameID`, or a save's file), its rules and extras, and the
+   boundary's changes. The page keeps the one begun last, in memory only. Playing one back
+   is the tool's (`Page.replay` in `tools/checks/replay.ts`), from the recording alone.
+2. The store: recordings beside the saves in IndexedDB (`src/data/saves/BrowserSaveStore.ts`),
+   written as they grow, since most end with the page closed, not with a read.
 3. The player: the boundary fed from a recording (`InputBoundary.apply`, before the
    VBL each change was logged at), the page's live input ignored but its own controls,
    every tick it plays drawn, at the wall clock's pace or faster. The boundary logs the

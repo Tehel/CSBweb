@@ -8,9 +8,9 @@
  *    queued as before.
  * 2. The count: every VBL, the stopped clock's too, which the play time leaves out.
  * 3. Inside a VBL: a change the game makes there is applied and not told.
- * 4. The other doors: the extras, a save's tail, `TAG0207cc`, the `?dev` moves, and the
- *    interface's dialogs, whose clock is told; a panel key goes to the interface that
- *    applies it, and to nobody headless.
+ * 4. The other doors: the extras, a save's tail, the boot's DM rules, `TAG0207cc`, the
+ *    `?dev` moves, and the interface's dialogs, whose clock is told; a panel key goes to
+ *    the interface that applies it, and to nobody headless.
  * 5. A read is told.
  *
  * Run: `npm test -- --only=input-boundary.ts`
@@ -81,6 +81,9 @@ console.log('\n=== 4. the other doors ===');
   const long = game.ctx.extras.unlimitedKeyQueue && Array.from({ length: MOUSEQLEN }, () => game.enqueueKeyButton(1)).every(Boolean);
   check(long, `the extras reach the game, and the queue takes ${MOUSEQLEN} keys (${LONG_MOUSEQLEN} long)`);
   game.saveWritten();
+  game.ctx.rules.dmRulesDesignOption = true;
+  game.forceDMRulesAtBoot();
+  check(game.ctx.rules.dmRules, 'the boot\'s DM rules reach the game');
   game.input.apply({ kind: 'tag0207cc' });
   const z = game.ctx.party.state.position.z;
   check(!game.devChangeLevel(-1), 'up from map 0, a `?dev` move does nothing, and says so');
@@ -96,7 +99,7 @@ console.log('\n=== 4. the other doors ===');
   const keys = MOUSEQLEN;
   console.log(`  ${log.slice(1 + keys).join(' ')}`);
   check(log.slice(0, 1 + keys).join(' ') === ['extras@0', ...Array<string>(keys).fill('key@0')].join(' '), 'the extras and the keys are told');
-  check(log.slice(1 + keys).join(' ') === 'saveWritten@0 tag0207cc@0 devLevel@0 devMove@0 pause@0 pause@0 panelKey@0',
+  check(log.slice(1 + keys).join(' ') === 'saveWritten@0 forceDMRules@0 tag0207cc@0 devLevel@0 devMove@0 pause@0 pause@0 panelKey@0',
     'and every other door, the dialog\'s clock and a panel key with them');
   check(panel, 'a panel key headless is told, and applied by nobody');
   const applied: string[] = [];

@@ -381,7 +381,7 @@ export class Game implements MainLoop {
      * (`Code1f9e6.cpp:310`) and does not force it.
      */
     forceDMRulesAtBoot(): void {
-        if (this.ctx.rules.dmRulesDesignOption) this.ctx.rules.dmRules = true;
+        this.input.apply({ kind: 'forceDMRules' });
     }
 
     /**
@@ -1124,6 +1124,7 @@ export class Game implements MainLoop {
             case 'extras': applyExtras(this.ctx, change.extras); return true;
             case 'saveWritten': this.writeSaveTail(); return true;
             case 'read': return true;
+            case 'forceDMRules': if (this.ctx.rules.dmRulesDesignOption) this.ctx.rules.dmRules = true; return true;
             case 'devLevel': return this.devLevel(change.delta);
             case 'devMove': return this.devMove(change.map, change.x, change.y);
         }

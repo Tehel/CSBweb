@@ -43,6 +43,7 @@ import { repackChest, showChestContents } from './OpenChest';
 import { UtilityDiskMessages, UtilityError, makeNewAdventure } from './Chaos';
 import type { Game } from './Game';
 import { drawRandomGameID } from './GameContext';
+import type { Recorder } from './Recorder';
 import { SaveFileError, applySaveBytes, buildSaveFile } from './SaveGameFile';
 import type { Champion } from './gameTypes';
 
@@ -228,6 +229,8 @@ export class GameSaves {
          * (`src/main.ts`), and answers none where it cannot.
          */
         private readonly publishedDungeons: () => Promise<readonly KnownDungeon[]> = async () => [],
+        /** The recording each read begins (`newGameRead`, `read`): the page's, or none. */
+        private readonly recorder: Recorder | null = null,
     ) {}
 
     /**
@@ -265,6 +268,7 @@ export class GameSaves {
         } catch (error) {
             this.log('New game: the saves could not be listed', error);
         }
+        this.recorder?.begin({ kind: 'new', random: this.game.ctx.random.getSeed(), randomGameID: block1.randomGameID });
     }
 
     /** A listed save out of the store, to be read into the game (`read`). */
@@ -365,9 +369,13 @@ export class GameSaves {
      *
      * The game's world is the file's, a modified dungeon's when the row says so
      * (`SaveEntry.unofficial`).
+     *
+     * A save read begins a recording from its file (`Recorder`), as a new game's
+     * playthrough drawn begins one from its stream (`newGameRead`).
      */
     read(save: OpenedSave): void {
         applySaveBytes(this.game, save.bytes);
+        this.recorder?.begin({ kind: 'save', bytes: save.bytes });
         this.game.setPlayTime(save.entry.playTime);
         this.unofficial = save.entry.unofficial;
         this.lastRead = 'loaded';

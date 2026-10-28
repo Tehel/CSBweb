@@ -1,9 +1,9 @@
 # Recording a game and playing it back
 
 CSBWin can record a game as the list of inputs it took and play that list back. The port
-has neither yet (`DEBT.md` G29). This document holds what CSBWin does, what a replay needs,
-where the port stands against those needs, the port's own recorder, and what sharing
-recordings would take.
+records every game in memory, and plays a recording back only in a tool so far (`DEBT.md`
+G29). This document holds what CSBWin does, what a replay needs, where the port stands
+against those needs, the port's own recorder, and what sharing recordings would take.
 
 **Recordings follow the engine.** Any change to what the engine does at a tick makes a
 recording made before it play out differently. A recording carries the build that made it,
@@ -146,7 +146,8 @@ What holds:
   `TAG0207cc` as the disk menu and the Oracle close; the settings' extras and the queue's
   length; a save's tail, `Game.saveWritten`, which re-attaches the monsters and runs
   `SmartDiscard`, and with the clock stopped runs once the store's write is awaited;
-  `?dev`'s moves; and a read, which is told. The boundary applies each at once and tells
+  `?dev`'s moves; the boot's DM rules (`Game.forceDMRulesAtBoot`); and a read, which is
+  told. The boundary applies each at once and tells
   its listener first, with `InputBoundary.vbls`, the VBLs run, on a count that never
   stops. What the game changes inside a VBL, as the disk menu its icon opens holds the
   clock, is its own: playing the VBL again makes it, so it is told to nobody
@@ -159,13 +160,14 @@ What a player must do:
 
 **The proof is a tool**, `tools/checks/replay.ts`. It stands up a page without the DOM, the
 engine, its `GameScreen` over a stand-in canvas, the page's `GameInput`, its `GameSaves`
-over a store in memory and its settings, wired as `src/main.ts` wires them, on a clock it
-moves itself. It plays a new game and `csbgame7.dat` as a player plays them: pointer
-events and keys handed to `GameInput` between wakes of the loop of uneven length, the
-screen composed after each input and at every VBL that asks. Then it plays the log back in
-a fresh page that draws only the tick's `DrawViewport`, and asserts every change logged at
-the same VBL with the same `d.Time` and `d.RandomNumber`, and the two final saves
-byte-identical. So, for what the two games do:
+over a store in memory, its `Recorder` and its settings, wired as `src/main.ts` wires
+them, on a clock it moves itself. It reads a new game and `csbgame7.dat` as the page reads
+them, with extras of its own, and plays them as a player plays them: pointer events and
+keys handed to `GameInput` between wakes of the loop of uneven length, the screen composed
+after each input and at every VBL that asks. Then it plays each recording back in a fresh
+page that has nothing else of the game, and draws only the tick's `DrawViewport`, and
+asserts every change recorded at the same VBL with the same `d.Time` and
+`d.RandomNumber`, and the two final saves byte-identical. So, for what the two games do:
 
 - **Nothing the page composes takes from the game's stream**, nor changes what the game
   reads: beyond the tick's views, the recorded page composes the screen about a hundred
@@ -175,9 +177,11 @@ byte-identical. So, for what the two games do:
   menu down itself, where the log lets the clock run.
 - **The doors it plays are the boundary's**: clicks, the button-up, keys, panel keys, the
   dialogs' clock, `TAG0207cc`, the extras, a save's tail and `?dev`'s move.
-- **A new game starts from its stream and its playthrough as the read leaves them**: the
-  read draws from a stream of its own, seeded by `Math.random` (`Game.readNewGame`), which
-  the replay's own read seeds anew, and the two are set over it.
+- **A recording's start is enough**: a new game's stream and playthrough as the read
+  leaves them (the read draws from a stream of its own, seeded by `Math.random`,
+  `Game.readNewGame`, which the replay's own read seeds anew, and the two are set over
+  it), or the save's file; and the rules and the extras.
+- **A read ends a recording**, and F9's begins the next from the save it reads.
 
 What is not verified:
 
@@ -193,8 +197,29 @@ What is not verified:
 
 Not CSBWin's format: playing CSBWin's own recordings back is not its aim (below). It logs
 the boundary where the page changes the game (`src/engine/InputBoundary.ts`), each change
-with the number of VBLs run before it, on a count that never stops, and the player applies
-each before the same VBL.
+with the number of VBLs run before it, and the player applies each before the same VBL.
+
+`Recorder` (`src/engine/Recorder.ts`) is the boundary's listener. The page has one
+(`src/main.ts`), which keeps the recording begun last in memory: the store is to come
+(`DEBT.md` G29). A `Recording` is:
+
+- the build that made it (`__CSBWEB_BUILD__`) and its data set's id;
+- its start: a new game's stream and `d.RandomGameID`, or a save's file;
+- the rules as its read left them (`RulesOptions`, process-wide globals in CSBWin, which a
+  read changes only where its file has an Extended Features block), and the extras;
+- every change the boundary is told, with the VBLs the recording had run before it,
+  `d.Time` and `d.RandomNumber`;
+- the VBLs it has run, and whether a read has ended it.
+
+The two reads in `GameSaves` begin one, the only places a game starts: a new game's once
+its playthrough is drawn (`newGameRead`), a save's once it is read (`read`), the disk menu's
+LOAD, F9, CONTINUE and RISE's adventure among them. The read itself is told at the boundary
+(`readGame`), which ends the recording before. The boot then forces DM rules where the
+dungeon asks, a change of the boundary's, the recording's first.
+
+A recording is played back by its start: the game read from it, a new one's stream and
+playthrough set over the read's, the rules and the extras set, the game begun, and each
+change applied before the VBL it was logged at.
 
 CSBWin's player can align an entry only with a tick, `d.Time`, so whatever the game counts
 in VBLs within a tick (the held-step test, the eye held, the attack menu's tick) must come
@@ -205,9 +230,6 @@ drift detector: a replay stops at the first that differs.
 
 Logging the boundary rather than the entries the queue takes replays the queue itself: a
 click a full queue drops, and the button a click turns out to be when it is taken.
-
-A recording starts from a new game (its data set, its rules and extras, and its stream as
-`newGameRead` leaves it) or from the save a game was read from. A read ends one.
 
 ## Recordings made in CSBWin
 
