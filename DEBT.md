@@ -282,6 +282,15 @@ For a set with the table item, `QueueSound` (`src/engine/SoundQueue.ts`) answers
 sounds. The delayed sounds (`TT_20`) are CSBWin's as they are. A check reads the left and
 right volumes for a source at each facing.
 
+That is the Amiga's spatial sound, and all of it, counted in squares (no metre scale):
+- **Distance:** 64 on the party's square, 58 one square ahead, 29 two, 20 three.
+- **Front and back:** a sound ahead is louder than the same sound as far behind (row 12 −
+  n against row 12 + n: 58 against 41 at one square).
+- **Left and right:** one square to the right is 58 in the right channel and 6 in the left.
+
+Nothing more, no filtering for behind or for walls between: a closer imitation (a Web
+Audio `PannerNode`, HRTF) would be the port's own, an X extra, not this item.
+
 ### A5 ⏳ Footsteps, `F0514_MOVE_GetSound`, and the war cry
 
 `F0514_MOVE_GetSound`, its A22E branch, called where a group arrives on its square (the
@@ -303,13 +312,15 @@ nothing in 2.2, that is recorded and it stays silent.
 `CHAMDRAW.C`, `GROUP.C`, `CLIKMENU.C`, `TEXT.C`, … Each one a player can see or hear is
 classed as carried by A2-A5, left (an H entry) or the machine's alone: among them the
 wall bump's sound mode (`CLIKMENU.C:307`) and the highlight box (`CLIKMENU.C:57-60`).
-Two more of the Amiga's own looks are weighed here, with the author:
+**The palettes, if they come easily** (the author: wanted, of little value). The Amiga's
+have 4 bits a channel where the Atari's have 3 (`DATA.C:210-231`, each with the Atari's in
+a comment), and the darker dungeon palettes black out slots 9 and 10. They live in `dm`, so
+they are read from there, into A2's table item. Where the port's palettes come from (the
+`0x232` item, at the Atari's 3 bits) decides how cheap that is; if it is not cheap, they
+are left, and H says so.
 
-- **The palettes.** The Amiga's have 4 bits a channel where the Atari's have 3
-  (`DATA.C:210-231`, each with the Atari's in a comment). The darker dungeon palettes black
-  out slots 9 and 10.
-- **The FTL logo.** The Amiga's is `swoosh`, a program of its own (a hunk executable), not
-  the Atari's `swoosh.img`.
+The Amiga's FTL logo (`swoosh`, a program of its own) is not taken: it plays and looks as
+the Atari's does (the author).
 
 ---
 
