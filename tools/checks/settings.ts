@@ -12,6 +12,7 @@
  */
 import { NO_EXTRAS, type Extras } from '../../src/engine/GameContext';
 import { MouseQueue } from '../../src/engine/MouseQueue';
+import { InputBoundary, applyExtras } from '../../src/engine/InputBoundary';
 import { DEFAULT_KEY_BINDINGS, keyAction, type KeyBindings } from '../../src/renderer/ui/Keyboard';
 import {
   DEFAULT_SETTINGS, OLD_SETTINGS_KEY, SETTINGS_KEY, Settings, applyToGame, type SettingsStorage, type SettingsValues,
@@ -30,6 +31,14 @@ class MapStorage implements SettingsStorage {
     this.items.set(key, value);
   }
 }
+
+/** A game of the extras and the mouse queue alone, whose input boundary applies the extras (`applyExtras`). */
+const gameOf = (ctx: { extras: Extras; mouseQueue: MouseQueue }): { input: InputBoundary } => ({
+  input: new InputBoundary((change) => {
+    if (change.kind === 'extras') applyExtras(ctx, change.extras);
+    return true;
+  }),
+});
 
 const stored = (storage: MapStorage): Record<string, unknown> =>
   JSON.parse(storage.items.get(SETTINGS_KEY) ?? 'null') as Record<string, unknown>;
@@ -143,12 +152,12 @@ console.log('\n=== a table of keys, saved and read back ===');
   check(new Settings(storage).values.keyBindings === DEFAULT_KEY_BINDINGS, 'and is read back as the preset');
 
   // The keys the game answers are the table in force.
-  const ctx = { extras: NO_EXTRAS, mouseQueue: new MouseQueue() };
-  applyToGame(ctx, { ...DEFAULT_SETTINGS, keyPreset: 'custom', keyBindings: table });
+  const game = gameOf({ extras: NO_EXTRAS, mouseQueue: new MouseQueue() });
+  applyToGame(game, { ...DEFAULT_SETTINGS, keyPreset: 'custom', keyBindings: table });
   console.log(`KeyW: ${keyAction('KeyW')}, ArrowUp: ${keyAction('ArrowUp')}, KeyK: ${keyAction('KeyK')}, Comma: ${keyAction('Comma')}`);
   check(keyAction('KeyW') === 'move.forward' && keyAction('ArrowUp') === 'move.forward', "the custom table's keys move");
   check(keyAction('KeyK') === null && keyAction('Comma') === null, "and the preset's moves no longer do");
-  applyToGame(ctx, DEFAULT_SETTINGS);
+  applyToGame(game, DEFAULT_SETTINGS);
   check(keyAction('KeyK') === 'move.forward' && keyAction('KeyW') === 'attack.1.0', "the preset's keys are back");
 }
 
@@ -156,7 +165,8 @@ console.log('\n=== each extra reaches the game alone ===');
 {
   const settings = new Settings(new MapStorage());
   const ctx: { extras: Extras; mouseQueue: MouseQueue } = { extras: NO_EXTRAS, mouseQueue: new MouseQueue() };
-  settings.subscribe((values) => applyToGame(ctx, values));
+  const game = gameOf(ctx);
+  settings.subscribe((values) => applyToGame(game, values));
   for (const extra of Object.keys(NO_EXTRAS) as Array<keyof Extras>) {
     settings.update({ extras: { ...NO_EXTRAS, [extra]: true } });
     console.log(`${extra}: ${JSON.stringify(ctx.extras)}`);

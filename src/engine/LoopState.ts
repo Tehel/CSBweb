@@ -5,6 +5,7 @@
  */
 import type { Rect } from '../data/tables/UITables';
 import type { GameContext } from './GameContext';
+import type { InputBoundary } from './InputBoundary';
 
 export interface LoopFlags {
   /**
@@ -134,6 +135,8 @@ export interface MainLoop {
   showCreditsAndEnd(): LoopScript;
   /** `d.CanRestartFromSavegame = 0`. */
   clearCanRestartFromSavegame(): void;
+  /** Where the page changes the game (`InputBoundary`): the interface's door to it. */
+  readonly input: InputBoundary;
 }
 
 export function createLoopFlags(): LoopFlags {

@@ -41,6 +41,7 @@
 import { emptyDungeonData } from '../../src/data/DungeonLoader';
 import type { Rect } from '../../src/data/tables/UITables';
 import type { Game } from '../../src/engine/Game';
+import { InputBoundary } from '../../src/engine/InputBoundary';
 import { GameInput, type InputScreen, type KeyPress } from '../../src/renderer/GameInput';
 import { MESSAGE_AREA } from '../../src/renderer/csbwin/ScrollingText';
 import { MESSAGE_DOUBLE_CLICK_MS, isDialogOpen } from '../../src/renderer/ui/Dialog';
@@ -495,8 +496,13 @@ console.log('\n=== 5. opening it ===');
     enqueueKeyButton: (button: number) => tableButtons.push(button),
     isPartySleeping: () => ui.uiMode === UIMode.Sleeping,
     isFrozen: () => ui.uiMode === UIMode.Frozen,
+    // The page's changes the interface applies, a panel key and the Reincarnate screen's,
+    // reach it as in play (`GameInput.install`); the engine's are nothing here.
+    input: new InputBoundary(() => true),
+    setMouseEventHandlers: () => {},
   } as unknown as Game;
   const input = new GameInput({ game, screen, refreshScreen: () => {}, onQuickSave: () => {}, onQuickLoad: () => {} });
+  input.install();
   const press = (code: string): KeyPress => ({ key: code, code, ctrlKey: false, metaKey: false, altKey: false });
   const mode = (m: UIMode) => { ui.uiMode = m; updateButtonLists(ui); };
 

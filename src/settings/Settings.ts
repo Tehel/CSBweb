@@ -10,8 +10,8 @@
  * field that is missing or of the wrong type is its default, so a damaged or older record
  * still gives a whole set.
  */
-import type { Extras, GameContext } from '../engine/GameContext';
-import { LONG_MOUSEQLEN, MOUSEQLEN } from '../engine/MouseQueue';
+import type { Extras } from '../engine/GameContext';
+import type { InputBoundary } from '../engine/InputBoundary';
 import { KEY_LABEL_LAYOUTS, type KeyLabelLayout } from '../renderer/ui/KeyLabels';
 import { KEY_PRESETS, setKeyBindings, type KeyAction, type KeyBindings, type KeyPreset, type KeySlots } from '../renderer/ui/Keyboard';
 
@@ -152,12 +152,12 @@ export class Settings {
 }
 
 /**
- * What the game reads of the settings: the extras, into `ctx`, the mouse queue's length
- * they choose, and the keys it answers.
+ * What the game reads of the settings: the extras, and the mouse queue's length they
+ * choose, through the game's input boundary (`applyExtras`), and the keys it answers,
+ * which are the page's.
  */
-export function applyToGame(ctx: Pick<GameContext, 'extras' | 'mouseQueue'>, values: SettingsValues): void {
-  ctx.extras = values.extras;
-  ctx.mouseQueue.setLength(values.extras.unlimitedKeyQueue ? LONG_MOUSEQLEN : MOUSEQLEN);
+export function applyToGame(game: { readonly input: Pick<InputBoundary, 'apply'> }, values: SettingsValues): void {
+  game.input.apply({ kind: 'extras', extras: values.extras });
   setKeyBindings(values.keyBindings);
 }
 

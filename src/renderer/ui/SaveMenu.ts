@@ -180,7 +180,7 @@ import {
   splitLongLine,
   type MenuPress,
 } from './Menu';
-import { tag02076e, tag0207cc } from '../../engine/ShowHideInventory';
+import { tag02076e } from '../../engine/ShowHideInventory';
 import { nowMs, type UIState } from './UIState';
 import {
   BUTTON_PIECE,
@@ -563,7 +563,7 @@ export function closeSaveMenu(ui: UIState): void {
   releaseLongPress(ui.saveMenu);
   ui.saveMenu = null;
   closeDialog(ui);
-  if (mode === 'full') tag0207cc(ui.ctx);
+  if (mode === 'full') ui.ctx.systems.mainLoop.input.apply({ kind: 'tag0207cc' });
 }
 
 /* ------------------------------------------------------------------ the list ---- */

@@ -145,7 +145,7 @@ async function main(): Promise<void> {
   // empties it at the change; turned off, it is CSBWin's again.
   reset();
   const longQueue = (on: boolean) =>
-    applyToGame(game.ctx, { ...DEFAULT_SETTINGS, extras: { ...NO_EXTRAS, unlimitedKeyQueue: on } });
+    applyToGame(game, { ...DEFAULT_SETTINGS, extras: { ...NO_EXTRAS, unlimitedKeyQueue: on } });
   game.enqueueMovement(MovementAction.TURN_LEFT);
   longQueue(true);
   const emptiedOn = game.ctx.mouseQueue.count();

@@ -11,17 +11,22 @@
  * (`src/renderer/ui/Dialog.ts`), a modal screen's, or a button searched in the
  * interface's lists and queued on the game's one mouse queue; a key is the dialog's, a
  * modal screen's, a key table's button queued the same way (`TAG0196da`), a panel key
- * (`handleUIKey`), or one of the port's own keys
+ * (`panelKey`), or one of the port's own keys
  * (`portKeyAction`). Esc and a double click on the message area open the settings
  * (`src/renderer/ui/SettingsDialog.ts`); the MAP key and a long press there, the map
  * (`src/renderer/ui/MapDialog.ts`); the CHAMPIONS key and a long press on a champion's
  * stat bars, the champions (`src/renderer/ui/ChampionDialog.ts`). The queued buttons come back through `Game.handleMouseEvents` in
  * their turn, and `install` hands them to the interface's dispatcher, `handleMouseButton`.
+ *
+ * What changes the game goes through its input boundary (`Game.input`, `InputBoundary`):
+ * a click and a key queued, and the Reincarnate screen's and the panel keys, which
+ * `install` gives it to apply. A dialog's own clicks and keys are the page's; what they
+ * change of the game takes the boundary's other doors (the clock, a save, a setting).
  */
 import type { Game } from '../engine/Game';
 import type { GameScreen } from './GameScreen';
 import { MESSAGE_AREA } from './csbwin/ScrollingText';
-import { handleUIKey, keyAction, portKeyAction, tableKeyButton } from './ui/Keyboard';
+import { keyAction, panelKey, panelKeyAction, portKeyAction, tableKeyButton } from './ui/Keyboard';
 import { handleMouseUnclick, searchMouseButtons } from './ui/Mouse';
 import { isReincarnateScreenOpen, reincarnateClick, reincarnateKey } from './ui/ReIncarnate';
 import { BARS_LONG_PRESS_MS, MESSAGE_DOUBLE_CLICK_MS, MESSAGE_LONG_PRESS_MS, isDialogOpen } from './ui/Dialog';
@@ -148,9 +153,17 @@ export class GameInput {
     return this.ui.hintOracleUp;
   }
 
-  /** Hand the game the interface's dispatcher for the buttons it does not handle itself. */
+  /**
+   * Hand the game the interface's dispatcher for the buttons it does not handle itself,
+   * and its input boundary what the interface applies of the page's changes.
+   */
   install(): void {
     const host = this.host;
+    host.game.input.setScreen({
+      panelKey: (action) => panelKey(this.ui, action),
+      reincarnateKey: (key) => { reincarnateKey(this.ui, key); },
+      reincarnateClick: (x, y) => { reincarnateClick(this.ui, x, y); },
+    });
     host.game.setMouseEventHandlers({
       translate: (x, y, buttons) => searchMouseButtons(this.ui, x, y, buttons),
       button: (num, x, y) => {
@@ -213,7 +226,7 @@ export class GameInput {
     // (`doc/CSBwin-src/Code13ea4.cpp:118-224`): it never consults a button list, and while
     // it is up nothing else may act on a click.
     if (isReincarnateScreenOpen(ui)) {
-      reincarnateClick(ui, x, y);
+      game.input.apply({ kind: 'reincarnateClick', x, y });
       this.host.refreshScreen();
       return;
     }
@@ -381,7 +394,7 @@ export class GameInput {
     }
     if (isReincarnateScreenOpen(ui)) {
       if (modified) return false;
-      reincarnateKey(ui, key);
+      game.input.apply({ kind: 'reincarnateKey', key });
       this.host.refreshScreen();
       return true;
     }
@@ -419,7 +432,9 @@ export class GameInput {
     // included.
     if (game.isPartySleeping() || game.isFrozen()) return true;
     // Then the panel keys, which claim theirs whatever the game state, and F5 and F9.
-    if (handleUIKey(ui, code)) {
+    const panel = panelKeyAction(code);
+    if (panel !== null) {
+      game.input.apply({ kind: 'panelKey', action: panel });
       this.host.refreshScreen();
       return true;
     }

@@ -812,7 +812,8 @@ function hintSquareOf(ui: UIState): HintSquare {
 
 /**
  * The flag acted on: `TAG02076e`, the clock stopped, and the screen's paint held for the
- * Oracle's (`hintOracleUp`). Returns the square to open the Oracle on.
+ * Oracle's (`hintOracleUp`). Returns the square to open the Oracle on. The game's own
+ * change, made in the VBL whose button raised the flag.
  */
 export function openHintOracle(ui: UIState): HintSquare {
   tag02076e(ui.ctx);
@@ -821,10 +822,14 @@ export function openHintOracle(ui: UIState): HintSquare {
   return hintSquareOf(ui);
 }
 
-/** The Oracle closed: the clock runs again, and `TAG0207cc` shows the inventory again. */
+/**
+ * The Oracle closed: the clock runs again, and `TAG0207cc` shows the inventory again,
+ * changes of the page's, through the game's input boundary (`InputBoundary`).
+ */
 export function closeHintOracle(ui: UIState): void {
   if (!ui.hintOracleUp) return;
   ui.hintOracleUp = false;
-  ui.ctx.state.paused = false;
-  tag0207cc(ui.ctx);
+  const { input } = ui.ctx.systems.mainLoop;
+  input.apply({ kind: 'pause', paused: false });
+  input.apply({ kind: 'tag0207cc' });
 }

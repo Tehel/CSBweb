@@ -8,8 +8,8 @@ recordings would take.
 **Recordings follow the engine.** Any change to what the engine does at a tick makes a
 recording made before it play out differently. A recording carries the build that made it,
 and its `d.RandomNumber` values show the first entry where a later build parts from it. The
-work that comes before the recorder is `DEBT.md` E43 and F22, from "The port against
-those needs" below.
+work that comes before the recorder is `DEBT.md` F22, from "The port against those needs"
+below.
 
 ## CSBWin's recorder
 
@@ -127,28 +127,32 @@ What holds:
   the game's.
 - **The engine reads no clock.** The loop runs one VBL at a time (`Game.runFrame`), and the
   host's clock only decides how many run at each wake (`gameLoop`,
-  `src/engine/Game.ts:488-508`). Under `src/engine` and `src/core`, `Date.now()` serves only
+  `src/engine/Game.ts:490-516`). Under `src/engine` and `src/core`, `Date.now()` serves only
   a save's date (`src/engine/GameSaves.ts`), and `Math.random()` only the seed. Its
   arithmetic is integer; the one `Math.sin` builds MD5's constants (`src/core/md5.ts:14`).
 - **Clicks and keys reach the engine through CSBWin's one mouse queue**
   (`src/engine/MouseQueue.ts`), a long press's click too, queued from a `setTimeout`. The
   port counts `totalMoveCount` where CSBWin records (`Game.recordFileRecord`,
-  `src/engine/Game.ts:1009`).
+  `src/engine/Game.ts:1043`).
 - **The attack menu's damage flash is counted in VBLs**, the engine's
   (`ATTACK_FLASH_VBLS`, `src/engine/AttackMenu.ts`), where CSBWin's `VBLDelay(15)` stops
   the game (`DEBT.md` H).
 - The page's wall-clock uses (`nowMs`, `src/renderer/ui/UIState.ts`), a menu button's
   press and the mouth's chew, only draw, a menu's under a stopped clock.
 
-What breaks determinism:
-
-- **The page changes the game outside the queue**, at the moment its events come (`DEBT.md`
-  E43): the panel keys, the save menu and the Reincarnate screen; `ctx.state.paused`, which
-  the dialogs, the save menu and the Hint Oracle set, and under which a tick that comes due
-  waits for the clock to run; the settings' extras and the queue's length; a save's tail,
-  `Game.saveWritten`, which re-attaches the monsters and runs `SmartDiscard`, and with the
-  clock stopped runs once the store's write is awaited; a read. None of these is wrong: a
-  recording holds each, with the VBL it came at.
+- **The page changes the game through one door**, its input boundary (`Game.input`,
+  `src/engine/InputBoundary.ts`), at the moment its events come: a click, the button-up
+  and a key queued; a panel key's action and the Reincarnate screen's keys and clicks,
+  which the interface applies; `ctx.state.paused`, which the dialogs and the Hint Oracle
+  hold and release, and under which a tick that comes due waits for the clock to run;
+  `TAG0207cc` as the disk menu and the Oracle close; the settings' extras and the queue's
+  length; a save's tail, `Game.saveWritten`, which re-attaches the monsters and runs
+  `SmartDiscard`, and with the clock stopped runs once the store's write is awaited;
+  `?dev`'s moves; and a read, which is told. The boundary applies each at once and tells
+  its listener first, with `InputBoundary.vbls`, the VBLs run, on a count that never
+  stops. What the game changes inside a VBL, as the disk menu its icon opens holds the
+  clock, is its own: playing the VBL again makes it, so it is told to nobody
+  (`tools/checks/input-boundary.ts`).
 
 What a player must do:
 
@@ -161,7 +165,11 @@ What is not verified:
   drawing sets, when the screen is composed at moments the wall clock chooses
   (`refreshScreen` after an input, the VBL's frame after a pointer move).
 - **The port's saves**: whether a save changes the game's state where CSBWin's does, so
-  that a recording with saves in it replays.
+  that a recording with saves in it replays. The boundary logs only a save's tail: with
+  the clock running, the open chest repacked and opened again around the file's build
+  (`GameSaves.save`) is not a change it is told, and must leave the state as it was.
+- **That the boundary has every door**: that nothing else of the page changes the game
+  between two VBLs.
 
 **The proof is a tool** (`DEBT.md` F22): a headless `tools/checks/replay.ts` that plays a
 scripted game, logs it at the boundary, plays the log back in a fresh `Game`, and asserts
@@ -172,9 +180,9 @@ once.
 ## The port's recorder
 
 Not CSBWin's format: playing CSBWin's own recordings back is not its aim (below). It logs
-the boundary where the page changes the game (`DEBT.md` E43), each change with the number of
-VBLs run before it, on a count that never stops, and the player applies each before the
-same VBL.
+the boundary where the page changes the game (`src/engine/InputBoundary.ts`), each change
+with the number of VBLs run before it, on a count that never stops, and the player applies
+each before the same VBL.
 
 CSBWin's player can align an entry only with a tick, `d.Time`, so whatever the game counts
 in VBLs within a tick (the held-step test, the eye held, the attack menu's tick) must come

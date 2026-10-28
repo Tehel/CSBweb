@@ -35,9 +35,10 @@ skins are drawn (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Skins in the data sets
 plays Dungeon Master with the Amiga 2.2's re-recorded sounds, the monsters heard moving as
 they approach, in stereo, and the Amiga's dungeon.
 
-**First, at the author's request: G29 — recording a game and playing it back.** Its two
-prerequisites come first, in order: E43 makes the game a function of its start, its VBLs
-and the inputs logged at them, and F22 proves it. Their rows head the index.
+**First, at the author's request: G29 — recording a game and playing it back.** Its
+prerequisite comes first: the game is meant to be a function of its start, its VBLs and
+the changes its input boundary logs at them (`src/engine/InputBoundary.ts`), and F22
+proves it. Its row heads the index.
 
 **Then, at the author's request: P — players' own data sets.** A player adds a dungeon
 from their own files to the welcome page, plays it, edits it, deletes it and publishes it,
@@ -123,9 +124,8 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E43 | One input boundary: every change the page makes to the game, logged with its VBL | M | ⏳ |
 | F22 | `tools/checks/replay.ts`: a game logged at the boundary plays back the same | M | ⏳ |
-| G29 | Recording a game and playing it back | L | ⏳ after E43, F22 |
+| G29 | Recording a game and playing it back | L | ⏳ after F22 |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
 | C194 | A DSA's wall graphic counts as a real decoration, so it hides no text | S | ⏳ |
 | C195 | Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space | S | ⏳ to decide with the author |
@@ -495,37 +495,6 @@ gather or split CSBWin's functions as the code's concerns ask. What still follow
 the behaviour, the names of ported functions, which keep the two codebases greppable
 against each other, and the file formats.
 
-### E43 ⏳ One input boundary: every change the page makes to the game, logged with its VBL
-
-The game runs one VBL at a time (`Game.runFrame`), and the wall clock only decides how many
-run at each wake (`gameLoop`, `src/engine/Game.ts:488-508`). Between two VBLs the page
-changes the game through many doors, each at the moment its event comes:
-
-- the mouse queue: `Game.onMouseClick`, `onMouseUnClick` and `enqueueKeyButton`
-  (`src/engine/Game.ts:816-836`), from `src/renderer/GameInput.ts`, a long press's click
-  among them (its `setTimeout`);
-- the panel keys, which call the handlers a click reaches (`handleUIKey`,
-  `src/renderer/ui/Keyboard.ts`), and the two modal screens, the save menu and the
-  Reincarnate screen, whose typed names are the game's (H, "Three inputs bypass the mouse
-  queue");
-- the clock stopped and started, `ctx.state.paused`: the dialogs
-  (`src/renderer/ui/Dialog.ts:69`, `:75`), the save menu, and the Hint Oracle
-  (`src/renderer/ui/Mouse.ts:819`, `:828`). A tick that comes due under it runs at the first
-  VBL after;
-- the settings, which set `ctx.extras` and the mouse queue's length at any change
-  (`applyToGame`, `src/settings/Settings.ts:158-162`);
-- a save's tail, `Game.saveWritten` (`:1075`), which re-attaches the monsters and runs
-  `SmartDiscard`: with the clock stopped, once the store's write is awaited (`GameSaves.save`,
-  `src/engine/GameSaves.ts:337`);
-- a read, F9's or the menu's, and `?dev`'s level keys (`Game.devChangeLevel`).
-
-Paying it: one object of `Game`'s that every one of these goes through, which applies the
-change at once, as now, and hands it to a listener with the count of VBLs run so far. That
-count is a new one that never stops: `playedVbls` (`:520`) leaves out the frozen game's
-and the paused clock's. Nothing the game does moves, so "How to work this list", point 3,
-applies. A recording is then a start and the boundary's changes, each with its VBL, which
-G29's player applies before the same VBL. Size M.
-
 ### E40 ⏳ The statistics page's heat map
 
 The statistics page is built (`doc/STATISTICS.md` → "The page"), all but a level's heat
@@ -666,8 +635,8 @@ New verification debt goes here; it can be taken anywhere ("Priority", point 5).
 
 ### F22 ⏳ `tools/checks/replay.ts`: a game logged at the boundary plays back the same
 
-Nothing proves the game a function of its start, its VBLs and E43's log, which G29 rests
-on. Paying it: a headless tool with the screen's interface (`tools/lib/ui.ts`), since a
+Nothing proves the game a function of its start, its VBLs and the log of its input
+boundary (`Game.input`, `src/engine/InputBoundary.ts`), which G29 rests on. Paying it: a headless tool with the screen's interface (`tools/lib/ui.ts`), since a
 click in the viewport is resolved through the picking the tick's `DrawViewport` leaves. It
 plays a scripted game, from a new game and from a save, its inputs coming between uneven
 numbers of VBLs a wake: clicks and moves, a panel key, an attack and its flash, a dialog's
@@ -709,18 +678,18 @@ CSBWin records a game as the mouse-queue entries it takes, each with its tick an
 needs, where the port stands against it, and the port's own recorder.
 
 The port has neither. It keeps only the recorder's count, `totalMoveCount`, which a save
-stores (`Game.recordFileRecord`, `src/engine/Game.ts:1009`), and `extraTicks` is always on
+stores (`Game.recordFileRecord`, `src/engine/Game.ts:1043`), and `extraTicks` is always on
 (`src/engine/MovementSystem.ts:115-116`). Conflux 3.5's `AutoRecord` (`doc/RECORDING.md`)
 asks for a recorder the port does not have.
 
 **The port's recorder is its own** (`doc/RECORDING.md` → "The port's recorder"): it logs
-E43's boundary, each change with the count of VBLs before it, where CSBWin logs the queue's
-entries with `d.Time`. Counted in VBLs, nothing that happens within a tick needs proving,
+the input boundary's changes (`src/engine/InputBoundary.ts`), each with the count of VBLs
+before it, where CSBWin logs the queue's entries with `d.Time`. Counted in VBLs, nothing that happens within a tick needs proving,
 and playback needs no `extraTicks` off. `d.Time` and `d.RandomNumber` go with every change,
 so a replay stops at the first that drifts. Playing CSBWin's own recordings back, which
 needs the port's draws to follow CSBWin's draw for draw, is not part of it.
 
-It comes after E43 and F22. A change to what the engine does makes older recordings
+It comes after F22. A change to what the engine does makes older recordings
 drift: each carries the build that made it, and the drift detector shows where it parts.
 
 Paying it, in steps:
@@ -730,8 +699,12 @@ Paying it, in steps:
    save of the set holds the id (`src/engine/GameSaves.ts:257-267`); or the save a game was
    read from. Then the boundary's log. A read ends a recording.
 2. The store: recordings beside the saves in IndexedDB (`src/data/saves/BrowserSaveStore.ts`).
-3. The player: the boundary fed from a recording, the page's live input ignored but its
-   own controls, every tick it plays drawn, at the wall clock's pace or faster.
+3. The player: the boundary fed from a recording (`InputBoundary.apply`, before the
+   VBL each change was logged at), the page's live input ignored but its own controls,
+   every tick it plays drawn, at the wall clock's pace or faster. The boundary logs the
+   game's changes, not the interface's: a dialog a played VBL opens (the disk menu, from
+   its icon) holds the clock, and the logged `pause` lets it run, but the player takes the
+   dialog down itself.
 4. Where a player starts, stops and plays one, to design with the author. Sharing
    (`doc/RECORDING.md` → "Shared recordings") comes after.
 

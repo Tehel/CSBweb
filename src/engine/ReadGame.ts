@@ -75,4 +75,6 @@ export function readGame(game: Game, read: GameRead): void {
         if (error instanceof Die) throw error;
         die(ctx.host, 0xbad, `SAVED GAME DAMAGED!\n${error instanceof Error ? error.message : error}`);
     }
+    // The game read, told at the page's door (`InputBoundary`): it ends a recording.
+    game.input.apply({ kind: 'read' });
 }

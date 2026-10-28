@@ -66,11 +66,11 @@ export function isDialogOpen(ui: UIState): boolean {
 /** Put `dialog` up and hold the clock. One dialog is up at a time: the caller checks. */
 export function openDialog(ui: UIState, dialog: Dialog): void {
   ui.dialog = dialog;
-  ui.ctx.state.paused = true;
+  ui.ctx.systems.mainLoop.input.apply({ kind: 'pause', paused: true });
 }
 
 /** Take the dialog down and let the clock run. */
 export function closeDialog(ui: UIState): void {
   ui.dialog = null;
-  ui.ctx.state.paused = false;
+  ui.ctx.systems.mainLoop.input.apply({ kind: 'pause', paused: false });
 }

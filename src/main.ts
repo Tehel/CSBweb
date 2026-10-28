@@ -6,7 +6,6 @@
 
 import { SoundManager } from './audio/SoundManager';
 import { CsbRandom } from './core/random';
-import { Position } from './core/types';
 import { extractPresetHeroes } from './data/HeroExtractor';
 import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, dataSetNamed, parseManifest, PLAYER_ID_HEADER, THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH, thumbnailPath, type DataSet, type DataSetManifest } from './data/DataSets';
 import { folderFiles, loadGameFiles, type DataSetFiles, type GameFiles } from './data/DataSetFiles';
@@ -408,10 +407,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // script holding the loop (the fusion) runs on the party where it stands. The game
         // sends no statistics from then on (`GameEvents.teleported`).
         onTeleport: new URLSearchParams(window.location.search).has('dev') ? (map, x, y) => {
-            if (game.isRunningScript()) return;
-            const state = game.ctx.party.state;
-            if (map === state.position.z) game.setPartyState({ ...state, position: new Position(x, y, map) });
-            else if (!game.devTeleport(map, x, y)) return;
+            if (!game.devMoveParty(map, x, y)) return;
             events.teleported();
             refreshScreen();
         } : null,
@@ -589,7 +585,7 @@ function applySettings({ game }: Built, sound: SoundManager, values: SettingsVal
     fullscreen.setAspect(values.aspectRatio);
     sound.setEnabled(values.sound);
     sound.setVolume(values.volume);
-    applyToGame(game.ctx, values);
+    applyToGame(game, values);
 }
 
 function start(game: Game): void {

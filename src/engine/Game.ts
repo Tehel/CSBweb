@@ -42,6 +42,8 @@ import { createGravityState, createLoopFlags, flashButton, vblFlashButton, vblIn
 import { smartDiscard } from './SmartDiscard';
 import { isNinetySecondTick, isTenSecondTick, ninetySecondUpdate, tenSecondUpdate } from './PeriodicUpdates';
 import { DsaSystem } from './DsaSystem';
+import { InputBoundary, applyExtras, type GameChange } from './InputBoundary';
+import { tag0207cc } from './ShowHideInventory';
 import { CursorFilterType } from './dsa/DsaTypes';
 import { OBJECT_ID_NULL, Position } from '../core/types';
 import { VBL_FREQUENCY } from '../core/constants';
@@ -170,6 +172,12 @@ export class Game implements MainLoop {
      * game's and the save menu's (`playTime`).
      */
     private playedVbls = 0;
+    /**
+     * Where the page changes the game (`InputBoundary`), and the count of VBLs run. Every
+     * door below that the page takes goes through it: the queue's, the clock's, a save's
+     * tail, the `?dev` moves.
+     */
+    readonly input = new InputBoundary((change) => this.applyInput(change));
 
     // Event callbacks
     private onTickCallbacks: GameEventCallback[] = [];
@@ -510,9 +518,13 @@ export class Game implements MainLoop {
     /**
      * One VBL of the loop: `vblInterrupt`, then the main loop's pass it wakes — the mouse
      * queue, a game tick if `d.clockTick` is set, and a message off the print queue.
-     * Public so that `tools/` can step VBLs.
+     * Public so that `tools/` can step VBLs. Counted, whatever it runs (`InputBoundary.runVbl`).
      */
     runFrame(): void {
+        this.input.runVbl(() => this.frame());
+    }
+
+    private frame(): void {
         // Nothing of the loop runs once `MainLoop` has returned: `ShowCredits` has the screen.
         if (this.mainLoopReturned) return;
         // The player's time in the game (`playTime`): not the frozen game's VBLs, nor the
@@ -718,6 +730,28 @@ export class Game implements MainLoop {
      * a level change already under way.
      */
     devChangeLevel(delta: 1 | -1): boolean {
+        return this.input.apply({ kind: 'devLevel', delta });
+    }
+
+    /**
+     * `?dev`'s move of the party to the square `(x, y)` of map `map`, the map dialog's long
+     * press: on its own level at once, to another as `devTeleport` goes. False, and
+     * nothing done, while a script holds the loop (the fusion runs on the party where it
+     * stands), or where `devTeleport` refuses.
+     */
+    devMoveParty(map: number, x: number, y: number): boolean {
+        return this.input.apply({ kind: 'devMove', map, x, y });
+    }
+
+    private devMove(map: number, x: number, y: number): boolean {
+        if (this.isRunningScript()) return false;
+        const state = this.ctx.party.state;
+        if (map !== state.position.z) return this.devTeleport(map, x, y);
+        this.setPartyState({ ...state, position: new Position(x, y, map) });
+        return true;
+    }
+
+    private devLevel(delta: 1 | -1): boolean {
         if (this.isRunningScript() || this.ctx.loop.newPartyLevel !== -1) return false;
         const here = this.ctx.party.state.position;
         const from = this.ctx.dungeon.getMap(here.z)?.descriptor;
@@ -814,7 +848,7 @@ export class Game implements MainLoop {
      * Return key of the sleep-mode table `Byte18440`, which is button 146.
      */
     enqueueKeyButton(num: number): boolean {
-        return this.ctx.mouseQueue.enqueueKey(num);
+        return this.input.apply({ kind: 'key', num });
     }
 
     /**
@@ -824,7 +858,7 @@ export class Game implements MainLoop {
      * when `handleMouseEvents` comes to it. Says whether it was queued.
      */
     onMouseClick(x: number, y: number, buttons: number): boolean {
-        return this.ctx.mouseQueue.enqueueClick(x, y, buttons);
+        return this.input.apply({ kind: 'click', x, y, buttons });
     }
 
     /**
@@ -832,7 +866,7 @@ export class Game implements MainLoop {
      * while fewer than `MOUSEQLEN-1` entries wait — whether or not its click was.
      */
     onMouseUnClick(): void {
-        this.ctx.mouseQueue.enqueueUnClick();
+        this.input.apply({ kind: 'unclick' });
     }
 
     /** Who handles the buttons that are not movement (see `MouseEventHandlers`). */
@@ -1073,6 +1107,29 @@ export class Game implements MainLoop {
      * (`:1358`).
      */
     saveWritten(): void {
+        this.input.apply({ kind: 'saveWritten' });
+    }
+
+    /**
+     * The engine's half of the page's changes (`InputBoundary.apply`): each applied as its
+     * door did before the boundary. A read is only told: it has been applied.
+     */
+    private applyInput(change: GameChange): boolean {
+        switch (change.kind) {
+            case 'click': return this.ctx.mouseQueue.enqueueClick(change.x, change.y, change.buttons);
+            case 'unclick': this.ctx.mouseQueue.enqueueUnClick(); return true;
+            case 'key': return this.ctx.mouseQueue.enqueueKey(change.num);
+            case 'pause': this.ctx.state.paused = change.paused; return true;
+            case 'tag0207cc': tag0207cc(this.ctx); return true;
+            case 'extras': applyExtras(this.ctx, change.extras); return true;
+            case 'saveWritten': this.writeSaveTail(); return true;
+            case 'read': return true;
+            case 'devLevel': return this.devLevel(change.delta);
+            case 'devMove': return this.devMove(change.map, change.x, change.y);
+        }
+    }
+
+    private writeSaveTail(): void {
         this.systems.monsters.reattachAfterSave();
         smartDiscard(this.ctx, true);
         this.canRestart = true;

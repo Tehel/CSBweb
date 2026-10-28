@@ -344,14 +344,32 @@ export function tableKeyButton(ui: UIState, code: string): number {
 }
 
 /**
- * Offer a `KeyboardEvent.code` to the interface. Returns whether the table claims it —
- * a bound key is claimed whatever the game state, the way a bound scancode is consumed
- * in `UIM_KEYDOWN` whether or not the click it becomes lands on anything.
+ * Offer a `KeyboardEvent.code` to the interface: its panel action done (`panelKey`).
+ * Returns whether the table claims it — a bound key is claimed whatever the game state,
+ * the way a bound scancode is consumed in `UIM_KEYDOWN` whether or not the click it
+ * becomes lands on anything.
  *
  * The caller must have dealt with the modal screens first: while the Reincarnate or
  * save/load screen is up they take the keyboard whole.
  */
 export function handleUIKey(ui: UIState, code: string): boolean {
+  const action = panelKeyAction(code);
+  if (action === null) return false;
+  panelKey(ui, action);
+  return true;
+}
+
+/** The panel action the table binds a `KeyboardEvent.code` to, or `null`: a key the panels do not claim. */
+export function panelKeyAction(code: string): KeyAction | null {
+  const action = keyAction(code);
+  return action !== null && isPanelAction(action) ? action : null;
+}
+
+/**
+ * A panel action done, as its key does it (`handleUIKey`). The page's change, which its
+ * input boundary applies (`InputBoundary`, `panelKey`), by the action's name.
+ */
+export function panelKey(ui: UIState, action: string): void {
   // While a script holds the loop, CSBWin's pass is suspended in `wvbl`
   // (doc/CSBwin-src/system.cpp:639-661) and its UI only queues: the key becomes a click
   // (`UIM_KEYDOWN`, `CSBUI.cpp:1141-1185`) that the first pass after the script takes. So
@@ -365,9 +383,7 @@ export function handleUIKey(ui: UIState, code: string): boolean {
   // `buttons18060` gives, so `handleMagicClick` answers it in its pass), or hold the keys
   // that arrive during a script in a small queue of their own and replay them, in order,
   // once `isRunningScript` turns false.
-  const action = keyAction(code);
-  if (action === null || !isPanelAction(action)) return false;
-  if (ui.ctx.systems.mainLoop.isRunningScript()) return true;
+  if (ui.ctx.systems.mainLoop.isRunningScript()) return;
 
   const [kind, first, second] = action.split('.');
   const n = Number(first);
@@ -380,7 +396,6 @@ export function handleUIKey(ui: UIState, code: string): boolean {
     case 'cast': magicButton(ui, 108); break;
     case 'pass': pass(ui); break;
   }
-  return true;
 }
 
 /** `d.PotentialCharacterOrdinal` — a champion only provisionally in the party. */
