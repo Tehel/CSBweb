@@ -397,9 +397,16 @@ export function drawWallText(draw: ViewportDraw, textRN: ObjectID, relativePosit
     }
   }
 
+  // A line's bottom is `*(d.Byte4196 + line)` (`doc/CSBwin-src/CSBCode.cpp:3335`), read
+  // with no check against `Byte4196`'s four entries: a fifth line on reads on into
+  // `Byte4192`, the next four bytes of item 0x22e (`Data.h:1178-1179`), which is the
+  // mortar joint's rectangle, x1 x2 y1 y2. Past those eight, CSBWin reads colour maps and
+  // `ub(y2 - 7)` wraps; no text of a data set has that many lines, and none is drawn.
+  const joint = tables.wallTextRect;
+  const lineY2 = [...tables.wallTextLineY2, joint.x1, joint.x2, joint.y1, joint.y2];
   let idx = 0;
   let lineIdx = 0;
-  while (idx < textBytes.length && lineIdx < tables.wallTextLineY2.length) {
+  while (idx < textBytes.length && lineIdx < lineY2.length) {
     let lineStart = idx;
     let lineLen = 0;
     while (idx < textBytes.length && textBytes[idx]! < 0x80) {
@@ -415,7 +422,7 @@ export function drawWallText(draw: ViewportDraw, textRN: ObjectID, relativePosit
     }
 
     if (lineLen > 18) lineLen = 18;
-    const y2 = tables.wallTextLineY2[lineIdx] ?? 60;
+    const y2 = lineY2[lineIdx]!;
     let x = 112 - 4 * lineLen;
 
     // `TAG0088b2(font, viewport, &rect, 8*code, 0, 144, 112, 10)`

@@ -4,7 +4,9 @@
  * `DrawWallDecoration` draws a text's lines itself when the wall is the one in front of
  * the party (`relativePosition == 12`, `doc/CSBwin-src/CSBCode.cpp:3306-3351`). A line is
  * the bytes up to one of 128 or more, 18 of them at most, centred: `x1 = 112 - 4*length`,
- * each glyph 8 pixels on, `y2 = d.Byte4196[line]`, `y1 = y2 - 7`. Each byte is blitted
+ * each glyph 8 pixels on, `y2 = *(d.Byte4196 + line)`, `y1 = y2 - 7`. Nothing stops `line`
+ * at `Byte4196`'s four entries: a fifth line on takes its bottom from `Byte4192`, the four
+ * bytes after it (`Data.h:1178-1179`), the mortar joint's x1 x2 y1 y2. Each byte is blitted
  * from graphic 120 by `TAG0088b2(font, viewport, &rect, 8*code, 0, 144, 112, 10)`
  * (`:3339-3346`): source x `8*code` in lines of 144 bytes, 288 pixels, colour 10 left out.
  *
@@ -17,9 +19,12 @@
  * scroll's and the message of a square the party is sent to, not a wall's.
  *
  *   1. graphic 120 is 288x8 in both sets: 36 glyphs, and the 144 bytes a line CSBWin gives.
- *   2. every text on a wall of `dm-atari` and of `dm-atari-1.3-fr`, drawn by `drawWallText`
- *      and by the addressing above written out here, pixel for pixel; none has more
- *      lines than `d.Byte4196` has entries, a line over 18 glyphs or a code past the font.
+ *   2. every text on a wall of `dm-atari`, of `dm-atari-1.3-fr` and of Conflux 3.5, drawn by
+ *      `drawWallText` and by the addressing above written out here, pixel for pixel; none
+ *      has more lines than the eight bytes of `Byte4196` and `Byte4192`, or a code past the
+ *      font, and only Conflux has a line over 18 glyphs. Conflux has 45 texts of five or
+ *      six lines: its "TO THE ROOM / OF FATE" at map 0 (4,7) sits on lines 4 and 5, so its
+ *      second line is drawn down at `Byte4192[0]`.
  *   3. a code of 50 on its own: glyph 14's rows 1 to 7 in rows 0 to 6, and row 7 untouched.
  *   4. a text seen from afar, at positions 0 to 11, is its plaque: CSBWin 20230608 blits it
  *      through `LOCAL_22`, a copy of its rectangle whose bottom is
@@ -78,22 +83,23 @@ function linesOf(bytes: Uint8Array): number[][] {
   return lines;
 }
 
-for (const set of ['dm-atari', 'dm-atari-1.3-fr']) {
+for (const set of ['dm-atari', 'dm-atari-1.3-fr', 'conflux-3.5-b8']) {
   console.log(`=== ${set} ===`);
-  const loader = new DungeonLoader();
-  loader.loadFromArray(new Uint8Array(readFileSync(resolve(`tools/fixtures/gamefiles/${set}/dungeon.dat`))));
-  const data = loader.getData();
+  const data = new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync(resolve(`tools/fixtures/gamefiles/${set}/dungeon.dat`))));
   if (!data) throw new Error(`${set}/dungeon.dat did not load`);
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve(`tools/fixtures/gamefiles/${set}/graphics.dat`))));
   const dungeon = newGame(data, graphics).ctx.dungeon;
   const tables = graphicsTablesOf(graphics).objects;
+  // `*(d.Byte4196 + line)`: `Byte4196`'s four bytes, then `Byte4192`'s, in memory order.
+  const joint = tables.wallTextRect;
+  const lineY2 = [...tables.wallTextLineY2, joint.x1, joint.x2, joint.y1, joint.y2];
   const store = graphicsStoreOf(graphics);
   const getGraphicBitmap = (n: number): IndexedBitmap | null => store.basicGraphic(n);
 
   // 1. The font.
   const font = getGraphicBitmap(120)!;
-  console.log(`graphic 120 is ${font.width}x${font.height}; Byte4196 ${Array.from(tables.wallTextLineY2).join(',')}`);
+  console.log(`graphic 120 is ${font.width}x${font.height}; Byte4196 ${Array.from(tables.wallTextLineY2).join(',')}; Byte4192 ${lineY2.slice(4).join(',')}`);
   check(font.width === 8 * GLYPHS && font.height === 8, 'graphic 120 is 288x8: 36 glyphs of 8x8, 144 bytes a line');
 
   const draw = (bytes: Uint8Array | null, rn: ObjectID): Uint8Array => {
@@ -141,7 +147,7 @@ for (const set of ['dm-atari', 'dm-atari-1.3-fr']) {
           longestLine = Math.max(longestLine, ...lines.map((codes) => codes.length));
           if (past) pastOnWalls.push(name);
           const expected = new Uint8Array(224 * 136).fill(UNDRAWN);
-          lines.slice(0, tables.wallTextLineY2.length).forEach((codes, line) => expectLine(font, expected, codes, tables.wallTextLineY2[line]!));
+          lines.forEach((codes, line) => expectLine(font, expected, codes, lineY2[line]!));
           if (Buffer.compare(draw(null, rn), expected) !== 0) {
             wrong++;
             console.log(`  ${name} is not drawn as CSBWin addresses it: ${lines.map((l) => l.join(' ')).join(' / ')}`);
@@ -153,11 +159,25 @@ for (const set of ['dm-atari', 'dm-atari-1.3-fr']) {
   console.log(`${wallTexts} visible texts on walls: ${mostLines} lines at most, ${longestLine} glyphs a line at most`);
   console.log(`a code past the font, on a wall: ${pastOnWalls.join('; ') || 'none'}; elsewhere: ${pastElsewhere.join('; ') || 'none'}`);
   check(wallTexts > 0 && wrong === 0, `every wall text of ${set} is drawn glyph for glyph as TAG0088b2 addresses graphic 120`);
-  check(mostLines <= tables.wallTextLineY2.length && longestLine <= 18,
-    'no wall text has more lines than Byte4196 has entries, or a line over 18 glyphs');
+  check(mostLines <= lineY2.length, 'no wall text has more lines than Byte4196 and Byte4192 have bytes');
+  if (set === 'conflux-3.5-b8') {
+    check(mostLines === 6 && longestLine > 18, 'Conflux has texts of six lines, and lines over 18 glyphs, drawn cut at 18');
+  } else {
+    check(mostLines <= tables.wallTextLineY2.length && longestLine <= 18, 'none has more lines than Byte4196 has entries, or a line over 18 glyphs');
+  }
   check(pastOnWalls.length === 0, `no wall text of ${set} has a code past the font`);
-  check(pastElsewhere.length === (set === 'dm-atari' ? 0 : 1),
-    set === 'dm-atari' ? 'and no text on a square' : "the French message of map 0 (9,1) decodes to one as a wall's, and is on a teleporter");
+  check(pastElsewhere.length === (set === 'dm-atari-1.3-fr' ? 1 : 0),
+    set !== 'dm-atari-1.3-fr' ? 'and no text on a square' : "the French message of map 0 (9,1) decodes to one as a wall's, and is on a teleporter");
+
+  if (set === 'conflux-3.5-b8') {
+    const fate = dungeon.findFirstObject(new Position(4, 7, 0));
+    let rn = fate;
+    while (rn !== OBJECT_ID_EOF && dungeon.rnMaps.dbType(rn) !== DBType.TEXT) rn = dungeon.getDBRecordLink(rn);
+    const pixels = draw(null, rn);
+    const rowsDrawn = (y2: number) => pixels.slice((y2 - 7) * 224, (y2 + 1) * 224).some((p) => p !== UNDRAWN);
+    console.log(`TEXT #${dungeon.rnMaps.idx(rn)} at map 0 (4,7): ${linesOf(dungeon.decodeWallTextBytes(dungeon.getTextRecord(rn)!, tables.textDecode)!).length} lines; drawn at y2 ${lineY2.filter((y2) => rowsDrawn(y2)).join(',')}`);
+    check(rowsDrawn(lineY2[3]!) && rowsDrawn(lineY2[4]!), '"TO THE ROOM" at Byte4196[3] and "OF FATE" below it at Byte4192[0]');
+  }
 
   // 3. A code of 50 alone on a line: source x 400, which is x 112 of the row below.
   const one = draw(Uint8Array.of(50, 129), dungeon.rnMaps.rn(DBType.TEXT, 0));

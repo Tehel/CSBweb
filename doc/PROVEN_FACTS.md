@@ -5436,7 +5436,7 @@ other three (`CSB.h:1128-1135`) — read from a save's extended-features block
 creature records in `dm-atari/dungeon.dat` sets any of bits 11-14. Evidence:
 `tools/checks/monster-move.ts` case 4.
 
-## A wall text's glyph is read from graphic 120 with no check of its code
+## A wall text's glyph is read from graphic 120, and its line's height from `Byte4196`, with no check
 
 `DrawWallDecoration` draws a text's words only on the wall in front of the party
 (`relativePosition == 12`, `doc/CSBwin-src/CSBCode.cpp:3306-3351`). A line is the bytes
@@ -5446,13 +5446,23 @@ byte is one `TAG0088b2(font, viewport, &rect, 8*code, 0, 144, 112, 10)` (`:3339-
 from graphic 120, 288x8: 36 glyphs. `TAG0088b2` addresses its source as
 `src + srcY*srcByteWidth + srcX/2` (`doc/CSBwin-src/Graphics.cpp:571`), and nothing checks
 `code`, so a code of 36 or more reads on into the rows below: glyph `code - 36` one row
-up, its last row read from past the graphic's end. Nothing checks the line count against
-`Byte4196[4]` either.
+up, its last row read from past the graphic's end.
 
-No data here reaches either: the 58 wall texts of `dm-atari` and of `dm-atari-1.3-fr`
-have four lines at most, 14 and 15 glyphs a line at most, and no code past 35. The French
-set's two texts that decode to a 50 are a scroll's and a teleporter square's message
-(`doc/ATARI_ST_DISK_REFERENCE.md` → "The French 1.3 disk").
+Nothing checks the line count against `Byte4196[4]` either: the bottom is
+`*(d.Byte4196 + LOCAL_14++)` (`:3335`), so a fifth line takes it from `Byte4192`, the four
+bytes after `Byte4196` in `d` (`doc/CSBwin-src/Data.h:1178-1179`) and in item 0x22e, which
+CSBWin reads into `d` whole (`CSBCode.cpp:10249`). `Byte4192` is the mortar joint's
+rectangle, x1 x2 y1 y2: 110, 113, 37, 62 in `dm-atari`, `csb` and Conflux, so lines five
+to eight are drawn with their bottoms at those rows. Past eight, the bytes are colour maps.
+
+The 58 wall texts of `dm-atari` and of `dm-atari-1.3-fr` have four lines at most, 14 and
+15 glyphs a line at most, and no code past 35. Conflux 3.5's 938 have six lines at most:
+45 have five or six, among them "TO THE ROOM / OF FATE" at map 0 (4,7), three empty lines
+and two of words, so its "OF FATE" is drawn at row 110, below the four lines of
+`Byte4196`. 263 of Conflux's have a line over 18 glyphs, drawn cut at 18. No set here
+has a text of more than six lines. The French set's two texts that decode to a 50 are a
+scroll's and a teleporter square's message (`doc/ATARI_ST_DISK_REFERENCE.md` → "The
+French 1.3 disk").
 
 Evidence: `tools/checks/wall-text.ts`.
 
