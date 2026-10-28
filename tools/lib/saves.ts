@@ -22,7 +22,7 @@ import { join, resolve } from 'node:path';
 
 import { sortSaveEntries, type SaveEntry, type SaveStore } from '../../src/data/saves/SaveStore';
 import {
-  assembleRecording, sortRecordingEntries,
+  RecordingPrunedError, assembleRecording, cutRecording, sortRecordingEntries,
   type RecordingEntry, type RecordingPart, type RecordingStore,
 } from '../../src/data/saves/RecordingStore';
 import { buildExtendedFeaturesPrefix } from '../../src/data/CsbwinExtendedFeatures';
@@ -169,7 +169,8 @@ export function memoryStore(
 /**
  * A recording store in memory, which keeps a clone of what it is given, as IndexedDB
  * does, so a value that does not clone fails here too. `writes` counts the writes, and a
- * store made to `fail` while `fail.now` holds rejects them.
+ * store made to `fail` while `fail.now` holds rejects them. A write after the first holds
+ * the row against what its page last wrote, as `BrowserRecordingStore`'s does.
  */
 export function memoryRecordingStore(fail: { now: boolean } = { now: false }): RecordingStore & {
   entries: Map<string, RecordingEntry>;
@@ -188,12 +189,22 @@ export function memoryRecordingStore(fail: { now: boolean } = { now: false }): R
       if (!entry) throw new Error(`no recording ${id}`);
       return assembleRecording(structuredClone(entry), structuredClone(parts.get(id) ?? []));
     },
-    write: async (entry: RecordingEntry, written: readonly RecordingPart[]) => {
+    write: async (entry: RecordingEntry, written: readonly RecordingPart[], held: { parts: number; changes: number } | null) => {
       store.writes++;
       if (fail.now) throw new Error('the store is full');
-      const held = (parts.get(entry.id) ?? []).filter((part) => !written.some((w) => w.seq === part.seq));
-      parts.set(entry.id, [...held, ...structuredClone(written)]);
+      const row = entries.get(entry.id);
+      if (held && (!row || row.parts !== held.parts || row.changes !== held.changes)) throw new RecordingPrunedError(entry.id);
+      const kept = held ? (parts.get(entry.id) ?? []).filter((part) => !written.some((w) => w.seq === part.seq)) : [];
+      parts.set(entry.id, [...kept, ...structuredClone(written)]);
       entries.set(entry.id, structuredClone(entry));
+    },
+    cut: async (id: string, point: { changes: number; vbls: number }) => {
+      const row = entries.get(id);
+      if (!row) return;
+      const cut = cutRecording(row, parts.get(id) ?? [], point);
+      const kept = (parts.get(id) ?? []).filter((part) => part.seq < cut.removeFrom && part.seq !== cut.last?.seq);
+      parts.set(id, [...kept, ...(cut.last ? [structuredClone(cut.last)] : [])]);
+      entries.set(id, structuredClone(cut.entry));
     },
     remove: async (id: string) => {
       entries.delete(id);

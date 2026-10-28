@@ -193,6 +193,8 @@ export class GameSaves {
      * meanwhile would be lost to it in a store that reads the row to write it back.
      */
     private marked: Promise<void> = Promise.resolve();
+    /** Told when a row is deleted or written over (`onRowGone`). */
+    private rowGone: () => void = () => {};
     /**
      * Whether the running game's world is a modified version of the data set's dungeon:
      * the row's of the save it was read from (`SaveEntry.unofficial`), which its own
@@ -232,6 +234,15 @@ export class GameSaves {
         /** The recording each read begins (`newGameRead`, `read`): the page's, or none. */
         private readonly recorder: Recorder | null = null,
     ) {}
+
+    /**
+     * Told when a row is deleted or written over, whose point in a recording may have been
+     * the last one reached (`SaveEntry.recording`): the page's writer prunes the
+     * recordings then (`RecordingWriter.prune`).
+     */
+    onRowGone(listener: () => void): void {
+        this.rowGone = listener;
+    }
 
     /**
      * A line in the message area on what F5 or F9 did. Both keys are awaited by nobody,
@@ -283,6 +294,7 @@ export class GameSaves {
     async remove(entry: SaveEntry): Promise<void> {
         await this.marked;
         await this.store.remove(entry.id);
+        this.rowGone();
     }
 
     /**
@@ -346,6 +358,7 @@ export class GameSaves {
         };
         await this.store.write(entry, bytes);
         if (clock === 'stopped') this.game.saveWritten();
+        if (over) this.rowGone();
         return entry;
     }
 

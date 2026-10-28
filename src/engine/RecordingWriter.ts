@@ -6,8 +6,7 @@
  * last. A recording a read has replaced is finished at the next.
  *
  * Nothing is written of a recording before its first change: the boot's DM rules are a
- * recording's first, so what this leaves out is a read straight over another. Its first
- * write removes, past `RECORDINGS_KEPT`, the recordings begun earliest.
+ * recording's first, so what this leaves out is a read straight over another.
  *
  * A branch is written as one only where the store holds its parent up to the point it
  * names: a save whose recording was never written, or not that far (a page closed before
@@ -15,12 +14,18 @@
  * replaced are written before the one running, so a parent this page played is in the
  * store before its branch's first write.
  *
+ * What no save and no running game reaches is pruned (`doc/RECORDING.md` → "The tree"):
+ * at a recording's first write, which follows the read that began it, and at a save
+ * deleted or written over (`prune`). A game running in another tab is no game this page
+ * plays, so its recording can be cut or removed here; its own page finds it so at its
+ * next write (`RecordingPrunedError`) and writes it whole again.
+ *
  * The clock is the page's (`RecordingWriterDeps`), and so are the ids (`Recorder`): the
  * engine reads neither.
  */
 import {
-    RECORDINGS_KEPT, readSaveFileFields,
-    type RecordingEntry, type RecordingPart, type RecordingStore,
+    RecordingPrunedError, readSaveFileFields,
+    type RecordingEntry, type RecordingPart, type RecordingStore, type SaveStore,
 } from '../data/saves';
 import type { Recorder, Recording, RecordingPoint, RecordingStart } from './Recorder';
 
@@ -45,6 +50,57 @@ interface Written {
     ended: boolean;
 }
 
+/** How far a recording is reached: its changes and its VBLs, up to a point. */
+type Reach = Omit<RecordingPoint, 'recording'>;
+
+/** What a prune does to the store: the recordings it removes, and those it cuts at a point. */
+export interface PrunePlan {
+    readonly remove: readonly string[];
+    readonly cut: readonly { readonly id: string; readonly point: Reach }[];
+}
+
+/**
+ * What no save and no running game reaches, among `rows`. A recording is reached up to
+ * the last point a save (`points`) or a branch kept names in it, and the running one,
+ * `running`, whole, with its parent. One reached nowhere is removed, and with it what
+ * its parent was reached by, up its path; one reached short of what the store holds is
+ * cut at its last point.
+ */
+export function prunePlan(
+    rows: readonly RecordingEntry[],
+    points: readonly (RecordingPoint | null)[],
+    running: Pick<Recording, 'id' | 'parent'> | null,
+): PrunePlan {
+    let kept = [...rows];
+    for (;;) {
+        const reach = new Map<string, Reach>();
+        const reachTo = (point: RecordingPoint | null | undefined) => {
+            if (!point) return;
+            const was = reach.get(point.recording);
+            reach.set(point.recording, {
+                changes: Math.max(was?.changes ?? 0, point.changes),
+                vbls: Math.max(was?.vbls ?? 0, point.vbls),
+            });
+        };
+        for (const point of points) reachTo(point);
+        reachTo(running?.parent);
+        for (const row of kept) reachTo(row.parent);
+        const next = kept.filter((row) => row.id === running?.id || reach.has(row.id));
+        if (next.length < kept.length) {
+            kept = next;
+            continue;
+        }
+        const cut: { id: string; point: Reach }[] = [];
+        for (const row of kept) {
+            const to = reach.get(row.id);
+            if (row.id === running?.id || !to || (to.changes >= row.changes && to.vbls >= row.vbls)) continue;
+            cut.push({ id: row.id, point: { changes: Math.min(to.changes, row.changes), vbls: Math.min(to.vbls, row.vbls) } });
+        }
+        const keptIds = new Set(kept.map((row) => row.id));
+        return { remove: rows.filter((row) => !keptIds.has(row.id)).map((row) => row.id), cut };
+    }
+}
+
 /** `start`'s playthrough: a new game's `d.RandomGameID`, or the one its save's file holds. */
 function playthroughOf(start: RecordingStart): number {
     return start.kind === 'new' ? start.randomGameID : readSaveFileFields(start.bytes)?.playthrough ?? 0;
@@ -57,8 +113,16 @@ export class RecordingWriter {
     private readonly finishing: { written: Written; recording: Recording }[] = [];
     /** The flushes, one after the other. */
     private writing: Promise<void> = Promise.resolve();
+    /** A prune is owed, once what the store has not is written. */
+    private pruneDue = false;
 
-    constructor(private readonly recorder: Recorder, private readonly store: RecordingStore, private readonly deps: RecordingWriterDeps) {
+    /** `saves` are the page's, whose points reach into the recordings (`SaveEntry.recording`). */
+    constructor(
+        private readonly recorder: Recorder,
+        private readonly store: RecordingStore,
+        private readonly saves: SaveStore,
+        private readonly deps: RecordingWriterDeps,
+    ) {
         recorder.onBegin((previous) => {
             if (this.current && previous) this.finishing.push({ written: this.current, recording: previous });
             this.current = {
@@ -70,12 +134,19 @@ export class RecordingWriter {
 
     /**
      * Writes what the store has not of the recordings replaced and of the one running,
-     * once the flush before has ended. A write that fails is written again at the next.
+     * once the flush before has ended, then prunes where it is owed. A write that fails is
+     * written again at the next, and the prune with it.
      */
     flush(): Promise<void> {
         const run = () => this.writeAll();
         this.writing = this.writing.then(run, run);
         return this.writing;
+    }
+
+    /** A save has been deleted or written over: the store pruned, once it is written. */
+    prune(): Promise<void> {
+        this.pruneDue = true;
+        return this.flush();
     }
 
     private async writeAll(): Promise<void> {
@@ -85,9 +156,10 @@ export class RecordingWriter {
         }
         const recording = this.recorder.recording;
         if (this.current && recording) await this.write(this.current, recording);
+        if (this.pruneDue) await this.pruneStore();
     }
 
-    private async write(written: Written, recording: Recording): Promise<void> {
+    private async write(written: Written, recording: Recording, rewrite = false): Promise<void> {
         const { vbls, ended } = recording;
         // The running recording's own list, which grows while the store writes.
         const changes = recording.changes.slice();
@@ -110,12 +182,20 @@ export class RecordingWriter {
             recordedAt: written.recordedAt, writtenAt: this.deps.now(),
             vbls, ended, changes: changes.length, parts: seq,
         };
-        await this.store.write(entry, parts);
+        try {
+            await this.store.write(entry, parts, first ? null : { parts: written.parts, changes: written.changes });
+        } catch (error) {
+            if (first || !(error instanceof RecordingPrunedError)) throw error;
+            // Another tab's prune has cut or removed it: written whole again, which owes no prune.
+            written.parts = 0;
+            written.changes = 0;
+            return this.write(written, recording, true);
+        }
         written.changes = changes.length;
         written.parts = seq;
         written.vbls = vbls;
         written.ended = ended;
-        if (first) await this.prune();
+        if (first && !rewrite) this.pruneDue = true;
     }
 
     /** `parent`, where the store holds its recording up to it; `null` otherwise. */
@@ -125,9 +205,12 @@ export class RecordingWriter {
         return held && held.changes >= parent.changes && held.vbls >= parent.vbls ? parent : null;
     }
 
-    /** The recordings past `RECORDINGS_KEPT`, the earliest begun, removed. */
-    private async prune(): Promise<void> {
-        const entries = await this.store.list();
-        for (const entry of entries.slice(RECORDINGS_KEPT)) await this.store.remove(entry.id);
+    /** What no save and no running game reaches, removed or cut (`prunePlan`). */
+    private async pruneStore(): Promise<void> {
+        const points = (await this.saves.list(null)).map((entry) => entry.recording);
+        const plan = prunePlan(await this.store.list(), points, this.recorder.recording);
+        for (const id of plan.remove) await this.store.remove(id);
+        for (const { id, point } of plan.cut) await this.store.cut(id, point);
+        this.pruneDue = false;
     }
 }

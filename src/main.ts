@@ -338,7 +338,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     // Written to the store as it grows: every few seconds, and as the page is hidden, the
     // way most games end. A write that fails is written again at the next.
     const recordingStore = new BrowserRecordingStore((rows) => drawPlaythrough(storeRandom, rows));
-    const recordings = new RecordingWriter(recorder, recordingStore, {
+    const recordings = new RecordingWriter(recorder, recordingStore, saveStore, {
         now: () => Date.now(),
     });
     const writeRecording = (): void => { recordings.flush().catch(() => {}); };
@@ -351,6 +351,8 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         portraitOf: drawing.portraitOf,
         askBeginAdventure: (source) => { if (screen) askBeginAdventure(screen.ui, source); },
     }, logSave, storeRandom, publishedDungeons, recorder);
+    // What a save deleted or written over alone reached of the recordings goes with it.
+    saves.onRowGone(() => { recordings.prune().catch(() => {}); });
 
     // The statistics' events: sent by a production build only, and shown on the console
     // otherwise; neither when the player has turned them off.

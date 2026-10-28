@@ -706,16 +706,14 @@ Paying it, in steps:
      parent makes is checked against it. `tools/checks/replay.ts` saves, plays on, loads
      with F9 and plays a branch, then replays it alone and from its root through the
      join.
-   - **3b, pruning.** What no save and no running game reaches is removed: a branch's
-     changes past the last point a save or a branch names, when no game plays it, and a
-     recording no save nor branch names at all. So at a load, what the game played since
-     the save its branch last reached; at a save deleted or written over (F5's, the
-     Sleepsave, a SAVE over a row), what it alone reached, up its path. It replaces
-     `RECORDINGS_KEPT`, which can now remove a branch's root, and the recordings step 2
-     wrote, which no save links, go at the first prune. A recording cut short is
-     rewritten in the store: its last part kept cut, the parts after it removed, its row
-     ended at the point. **Evidence:** `tools/checks/replay.ts` prunes at a load, a
-     delete and a save written over, and the branch still replays through its join.
+   - **3b, pruning: done.** What no save and no running game reaches is removed or cut
+     (`prunePlan`, `src/engine/RecordingWriter.ts`), at a recording's first write and at
+     a save deleted or written over (`GameSaves.onRowGone`), in place of a count of
+     recordings kept. A write after the first is held against its row, so a game in
+     another tab, whose recording this page's prune may cut, is written whole again
+     (`RecordingPrunedError`). `tools/checks/replay.ts` prunes at a load, a delete, a
+     save written over and another page's write, and the branch still replays through
+     its join; `tools/probe-frames.ts` cuts and refuses a write in IndexedDB.
 4. The player: the boundary fed from a recording (`InputBoundary.apply`, before the
    VBL each change was logged at), the page's live input ignored but its own controls,
    every tick it plays drawn, at the wall clock's pace or faster. No dialog opens while

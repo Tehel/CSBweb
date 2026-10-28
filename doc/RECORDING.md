@@ -192,10 +192,18 @@ asserts every change recorded at the same VBL with the same `d.Time` and
   memory that clones what it is given as IndexedDB does. Before its last write it holds
   the changes so far, what a page closed then leaves; a write that fails writes nothing
   and the next writes it all; the recording F9 replaced is finished, ended, at the next
-  write; and past `RECORDINGS_KEPT` the earliest go, their parts with them.
+  write; and one no save links, left in the store before, is gone at the first.
   `tools/probe-frames.ts` checks the IndexedDB half in a browser: a write of the game's
   recording read back as the recorder has it, a part added by a write after a click, the
-  upgrade to version 7, and a data set's DELETE taking its recordings.
+  upgrade to version 7, a data set's DELETE taking its recordings, a write refused where
+  the row is not as its page wrote it, a cut, and the running recording removed and
+  written whole at the next write.
+- **What no save reaches is pruned**: at a load, the recording replaced is cut at the
+  last point a save or a branch names; a save deleted cuts its recording back to the one
+  before it; a save written over removes a branch no save reaches any more, its parts
+  with it; a recording the running branch joins is kept; another page's prune cuts the
+  running branch, and its own page's next write writes it whole again. The branch still
+  replays from its root through the join.
 
 What is not verified:
 
@@ -250,8 +258,8 @@ Most games end with the page closed, not with a read, so `RecordingWriter`
 seconds (`RECORDING_WRITE_MS`, `src/main.ts`) and as the page is hidden, the row whenever
 its VBLs have moved and a part whenever it has new changes. A write that fails is written
 again at the next. A recording a read has replaced is finished, ended, at the next write.
-Nothing is written of a recording before its first change, and its first write removes,
-past `RECORDINGS_KEPT` (20), the recordings begun earliest. Deleting a player's own data
+Nothing is written of a recording before its first change, and its first write prunes
+the store (below, "The tree"). Deleting a player's own data
 set deletes the recordings played on it (`BrowserDataSetStore.remove`). The clock and the
 ids are the page's: the engine reads neither.
 
@@ -289,10 +297,24 @@ recording on from there, as a branch (`DEBT.md` G29, step 3):
   far is read as a root. It writes the recordings a read replaced before the one
   running, so a parent the page played is in the store before its branch.
 
-Not yet: pruning what no save and no running game reaches, which replaces
-`RECORDINGS_KEPT` (`DEBT.md` G29, step 3b). Until then a branch's root can be among the
-earliest recordings `RECORDINGS_KEPT` removes, and the branch then plays only from its
-own start.
+**Pruning.** What no save and no running game reaches is removed (`RecordingWriter`,
+`prunePlan`). A recording is reached up to the last point a save names in it or a branch
+kept branches from, and the running one whole, with its parent. One reached nowhere is
+removed, and what it alone reached of its parent with it, up its path; one reached short
+of what the store holds is cut at its last point: the changes before it kept, its last
+part cut, the parts after it removed, its row ended there (`cutRecording`,
+`src/data/saves/RecordingStore.ts`). The store is pruned at a recording's first write,
+which follows the read that began it, so a load cuts the recording it ends at the
+last save made in it; and at a save deleted or written over (`GameSaves.onRowGone`:
+the save menu's DELETE, a SAVE over a row, F5's and the Sleepsave's slots), what that
+save alone reached, up its path. A recording no save links, as those the store's version 7
+held before the tree, goes at the first prune.
+
+A game running in another tab is no game this page plays, so its recording can be cut
+or removed here. Each write after a recording's first is held against its row: where the
+row is not as the page last wrote it, nothing is written (`RecordingPrunedError`), and the
+page writes the recording whole again, which owes no prune, so two tabs never prune each
+other in turn.
 
 CSBWin's player can align an entry only with a tick, `d.Time`, so whatever the game counts
 in VBLs within a tick (the held-step test, the eye held, the attack menu's tick) must come

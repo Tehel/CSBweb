@@ -7,6 +7,9 @@
  * first part, holds its start, its rules and its extras, and each part after it the
  * changes recorded since the one before. The row says how many parts there are, and is
  * written with each, in one transaction, so a row never names a part the store has not.
+ * What no save reaches is cut or removed (`RecordingWriter`'s prune), so a write after
+ * the first holds the row against what its page last wrote of it, another tab's prune
+ * being able to cut it in between.
  *
  * **Nothing in this file touches the DOM**: `tools/checks/replay.ts` runs it over a
  * store in memory.
@@ -64,19 +67,47 @@ export interface RecordingChanges {
 
 export type RecordingPart = RecordingHead | RecordingChanges;
 
+/**
+ * What a page last wrote of a recording, which a write after it needs the store to hold
+ * still (`RecordingStore.write`).
+ */
+export interface RecordingHeld {
+    readonly parts: number;
+    readonly changes: number;
+}
+
+/**
+ * A write after the first found the row otherwise than its page last wrote it: another
+ * page's prune has cut or removed it (`RecordingWriter`), a game running in another tab
+ * being no game this page plays. Nothing was written.
+ */
+export class RecordingPrunedError extends Error {
+    constructor(id: string) {
+        super(`recording ${id} was pruned elsewhere`);
+        this.name = 'RecordingPrunedError';
+    }
+}
+
 export interface RecordingStore {
     /** Every row, the latest begun first. */
     list(): Promise<RecordingEntry[]>;
     /** The recording `id` names, its parts put back together. */
     read(id: string): Promise<Recording>;
-    /** `entry`, and the parts it has gained since it was last written, in one transaction. */
-    write(entry: RecordingEntry, parts: readonly RecordingPart[]): Promise<void>;
+    /**
+     * `entry`, and the parts it has gained since it was last written, in one transaction.
+     * `held` is what the page last wrote of it, which the row must still say, or nothing
+     * is written and the write throws `RecordingPrunedError`; `null` at a first write,
+     * which is written whole over whatever parts the id has.
+     */
+    write(entry: RecordingEntry, parts: readonly RecordingPart[], held: RecordingHeld | null): Promise<void>;
     /** The row and its parts, in one transaction. */
     remove(id: string): Promise<void>;
+    /**
+     * The recording `id` names cut at `point` (`cutRecording`), in one transaction:
+     * nothing for a row that is gone.
+     */
+    cut(id: string, point: Omit<RecordingPoint, 'recording'>): Promise<void>;
 }
-
-/** The recordings a store keeps: past them, the earliest begun are removed (`RecordingWriter`). */
-export const RECORDINGS_KEPT = 20;
 
 /** Rows, the latest begun first. */
 export function sortRecordingEntries(entries: RecordingEntry[]): RecordingEntry[] {
@@ -103,5 +134,44 @@ export function assembleRecording(entry: RecordingEntry, parts: readonly Recordi
         changes,
         vbls: entry.vbls,
         ended: entry.ended,
+    };
+}
+
+/** What `cutRecording` leaves of a recording. */
+export interface RecordingCut {
+    /** The row, ended at the point. */
+    readonly entry: RecordingEntry;
+    /** The last part kept, cut at the point; `null` where the point falls between two parts. */
+    readonly last: RecordingChanges | null;
+    /** The first `seq` removed: every part from it on. */
+    readonly removeFrom: number;
+}
+
+/**
+ * `entry`'s recording cut at `point`, given its parts: the changes recorded before it
+ * kept, the last part that holds some of them cut after them and the parts after it
+ * removed, and the row ended there, at the point's VBLs.
+ */
+export function cutRecording(
+    entry: RecordingEntry, parts: readonly RecordingPart[], point: Omit<RecordingPoint, 'recording'>,
+): RecordingCut {
+    const changesParts = parts.filter((part): part is RecordingChanges => part.seq > 0).sort((a, b) => a.seq - b.seq);
+    let changes = 0;
+    let kept = 1;
+    let last: RecordingChanges | null = null;
+    for (const part of changesParts) {
+        if (changes >= point.changes) break;
+        kept++;
+        if (changes + part.changes.length <= point.changes) {
+            changes += part.changes.length;
+            continue;
+        }
+        last = { ...part, changes: part.changes.slice(0, point.changes - changes) };
+        changes = point.changes;
+    }
+    return {
+        entry: { ...entry, changes, vbls: Math.min(entry.vbls, point.vbls), ended: true, parts: kept },
+        last,
+        removeFrom: kept,
     };
 }

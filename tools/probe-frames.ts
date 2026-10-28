@@ -1723,6 +1723,36 @@ check(recordingWritten.parts === 2 && recordingWritten.start === 'new' && record
   && recordingWritten.partsAfter === 3 && recordingWritten.changesAfter === recordingWritten.changes + 1 && recordingWritten.same,
   "the game's recording is written to the store, its head and its changes, and a write after a click adds a part, read back as the recorder has it");
 
+// A recording cut and a write held against the row (`BrowserRecordingStore`): a write
+// after the first that finds the row otherwise than it says writes nothing; a cut keeps
+// the changes before the point, its last part cut, and ends the row there. The running
+// recording removed, as another tab's prune removes it, is written whole at the next write.
+const recordingPruned = await evaluate(`(async()=>{ const { recorder, recordings, recordingStore } = window.__probe;
+  const id = 'probe-cut', change = (n) => ({ change: { kind: 'unclick' }, vbl: n, time: 0, random: n });
+  const entry = { id, dataSet: 'csb', build: 'probe', parent: null, playthrough: 7, recordedAt: 1, writtenAt: 1, vbls: 9, ended: false, changes: 4, parts: 3 };
+  await recordingStore.write(entry, [{ id, seq: 0, start: { kind: 'new', random: 1, randomGameID: 7 }, parent: null, rules: {}, extras: {} },
+    { id, seq: 1, changes: [change(1), change(2)] }, { id, seq: 2, changes: [change(3), change(4)] }], null);
+  let refused = '';
+  try { await recordingStore.write({ ...entry, changes: 5, parts: 4 }, [{ id, seq: 3, changes: [change(5)] }], { parts: 2, changes: 2 }); }
+  catch (error) { refused = error.name; }
+  const unchanged = (await recordingStore.read(id)).changes.length;
+  await recordingStore.cut(id, { changes: 3, vbls: 3 });
+  const cut = await recordingStore.read(id), row = (await recordingStore.list()).find((e) => e.id === id);
+  await recordingStore.remove(id);
+  const running = recorder.recording.id;
+  await recordingStore.remove(running);
+  window.__probe.game.input.apply({ kind: 'unclick' });
+  await recordings.flush();
+  const healed = await recordingStore.read(running);
+  return { refused, unchanged, cut: cut.changes.map((c) => c.random).join(), vbls: cut.vbls, ended: cut.ended, parts: row.parts,
+    healed: healed.changes.length === recorder.recording.changes.length && healed.changes.length > 0 }; })()`);
+console.log('  recording pruned:', JSON.stringify(recordingPruned));
+check(recordingPruned.refused === 'RecordingPrunedError' && recordingPruned.unchanged === 4,
+  'a write held against a row that says otherwise is refused, and writes nothing');
+check(recordingPruned.cut === '1,2,3' && recordingPruned.vbls === 3 && recordingPruned.ended && recordingPruned.parts === 3,
+  'a cut keeps the changes before its point, its last part cut, and ends the row there');
+check(recordingPruned.healed, "the running recording removed, as another tab's prune removes it, is written whole at the next write");
+
 // The map dialog (`src/renderer/ui/MapDialog.ts`), over CSB's `csbgame2.dat`, its party
 // where the save left it: a press held on the message area opens it, with MAP VIEW on
 // alone. A frame of it with the pointer off the canvas; a right click closes it.

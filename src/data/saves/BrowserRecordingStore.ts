@@ -4,9 +4,12 @@
  * together (`RecordingStore`).
  */
 import { RECORDINGS_STORE, RECORDING_PARTS_STORE, idbDone, idbGetAll, openSaveDatabase, recordingPartsOf } from './idb';
-import { assembleRecording, sortRecordingEntries, type RecordingEntry, type RecordingPart, type RecordingStore } from './RecordingStore';
+import {
+    RecordingPrunedError, assembleRecording, cutRecording, sortRecordingEntries,
+    type RecordingEntry, type RecordingHeld, type RecordingPart, type RecordingStore,
+} from './RecordingStore';
 import type { DrawPlaythrough } from './SaveStore';
-import type { Recording } from '../../engine/Recorder';
+import type { Recording, RecordingPoint } from '../../engine/Recorder';
 
 export class BrowserRecordingStore implements RecordingStore {
     /** `drawPlaythrough` is the database's upgrade's, as `BrowserSaveStore`'s is: whichever store opens it first. */
@@ -32,13 +35,59 @@ export class BrowserRecordingStore implements RecordingStore {
         return assembleRecording(read, parts.result as RecordingPart[]);
     }
 
-    /** The row and its new parts in one transaction: all of them, or none. */
-    async write(entry: RecordingEntry, parts: readonly RecordingPart[]): Promise<void> {
+    /**
+     * The row and its new parts in one transaction: all of them, or none. A first write
+     * clears what parts the id has; a later one is aborted where the row is not as `held`
+     * says, the requests of a transaction running in order.
+     */
+    async write(entry: RecordingEntry, parts: readonly RecordingPart[], held: RecordingHeld | null): Promise<void> {
         const tx = (await this.db()).transaction([RECORDINGS_STORE, RECORDING_PARTS_STORE], 'readwrite');
         const done = idbDone(tx);
-        tx.objectStore(RECORDINGS_STORE).put(entry);
+        const rows = tx.objectStore(RECORDINGS_STORE);
         const store = tx.objectStore(RECORDING_PARTS_STORE);
-        for (const part of parts) store.put(part);
+        const put = () => {
+            rows.put(entry);
+            for (const part of parts) store.put(part);
+        };
+        let pruned = false;
+        if (held === null) {
+            store.delete(recordingPartsOf(entry.id));
+            put();
+        } else {
+            const row = rows.get(entry.id);
+            row.onsuccess = () => {
+                const read = row.result as RecordingEntry | undefined;
+                if (read && read.parts === held.parts && read.changes === held.changes) {
+                    put();
+                } else {
+                    pruned = true;
+                    tx.abort();
+                }
+            };
+        }
+        try {
+            await done;
+        } catch (error) {
+            throw pruned ? new RecordingPrunedError(entry.id) : error;
+        }
+    }
+
+    async cut(id: string, point: Omit<RecordingPoint, 'recording'>): Promise<void> {
+        const tx = (await this.db()).transaction([RECORDINGS_STORE, RECORDING_PARTS_STORE], 'readwrite');
+        const done = idbDone(tx);
+        const rows = tx.objectStore(RECORDINGS_STORE);
+        const store = tx.objectStore(RECORDING_PARTS_STORE);
+        const row = rows.get(id);
+        const parts = store.getAll(recordingPartsOf(id));
+        // The row's request is answered before the parts'.
+        parts.onsuccess = () => {
+            const read = row.result as RecordingEntry | undefined;
+            if (!read) return;
+            const cut = cutRecording(read, parts.result as RecordingPart[], point);
+            rows.put(cut.entry);
+            store.delete(IDBKeyRange.bound([id, cut.removeFrom], [id, Infinity]));
+            if (cut.last) store.put(cut.last);
+        };
         await done;
     }
 

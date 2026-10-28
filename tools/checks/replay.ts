@@ -35,8 +35,8 @@
  * 5. The store holds a recording as it grows: before its last write, what the page had
  *    written when it was closed, the changes so far; after it, the whole recording, which
  *    the replay plays. A write that fails is written again at the next. The recording a
- *    read replaced is finished, ended, at the next write, and past `RECORDINGS_KEPT` the
- *    earliest begun are removed.
+ *    read replaced is finished, ended, at the next write, and one no save links, left in
+ *    the store before the game, is gone at the first.
  * 6. The recordings make a tree: F5's save and the disk menu's name the recording and
  *    their point in it, before their tail; F9's read of the disk menu's save begins a
  *    branch of the recording at that point, with what the read left beside the file
@@ -45,6 +45,12 @@
  *    makes the very file the branch read, and the branch read over it, what the read left
  *    set, plays out as recorded. The join needs that state: without it, the final saves
  *    differ.
+ * 7. What no save and no running game reaches is pruned: at a load, the recording
+ *    replaced is cut at the last point a save or a branch names; at a save deleted, at
+ *    the one before it; at a save written over, a branch no save reaches any more is
+ *    removed, its parts with it; a recording the running branch joins is kept. Another
+ *    page's prune cuts the running branch, and its page's next write writes it whole
+ *    again. The branch still replays from its root through the join.
  *
  * Run: `npm test -- --only=replay.ts`
  */
@@ -52,12 +58,12 @@ import { readFileSync } from 'node:fs';
 
 import { CsbRandom } from '../../src/core/random';
 import { emptyDungeonData } from '../../src/data/DungeonLoader';
-import { RECORDINGS_KEPT, readSaveFileFields, type SaveEntry } from '../../src/data/saves';
+import { readSaveFileFields, type RecordingEntry, type SaveEntry } from '../../src/data/saves';
 import { Game } from '../../src/engine/Game';
 import { NO_EXTRAS } from '../../src/engine/GameContext';
 import { GameSaves } from '../../src/engine/GameSaves';
 import { applyExtras } from '../../src/engine/InputBoundary';
-import { Recorder, setCarriedState, type Recording } from '../../src/engine/Recorder';
+import { Recorder, setCarriedState, type Recording, type RecordingPoint } from '../../src/engine/Recorder';
 import { RecordingWriter } from '../../src/engine/RecordingWriter';
 import { applySaveBytes, buildSaveFile } from '../../src/engine/SaveGameFile';
 import { NO_FULLSCREEN } from '../../src/lib/fullscreen';
@@ -92,6 +98,12 @@ const DUNGEON = new Uint8Array(readFileSync(`${STOCK_DIR}/dungeon.dat`));
 /** How often the page writes the running recording (`RECORDING_WRITE_MS`, `src/main.ts`). */
 const RECORDING_WRITE_MS = 5000;
 
+/** The pages' recordings' ids, one count for every page, which may share a store. */
+let recordingIds = 0;
+
+/** The id of a recording left in the store before the recorded game, which no save links. */
+const EARLIER = 'earlier';
+
 /** Let what the page awaits settle: the store's promises, and the timers of a menu's press. */
 const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -100,7 +112,7 @@ class Page {
   readonly clock = new ManualClock();
   /** The store's writes, a save written over another's row included. */
   writes = 0;
-  readonly store = memoryStore(() => { this.writes++; });
+  readonly store: ReturnType<typeof memoryStore>;
   readonly game: Game;
   readonly screen: GameScreen;
   readonly input: GameInput;
@@ -109,7 +121,7 @@ class Page {
   readonly recorder: Recorder;
   /** Whether the recording store refuses its writes. */
   readonly storeFull = { now: false };
-  readonly recordingStore = memoryRecordingStore(this.storeFull);
+  readonly recordingStore: ReturnType<typeof memoryRecordingStore>;
   readonly recordings: RecordingWriter;
   /** The clock's time the running recording was last written at. */
   private writtenAt = this.clock.time;
@@ -120,8 +132,11 @@ class Page {
   /**
    * `recorded`: the screen composed as the page composes it, after every input and at
    * every VBL that asks. Otherwise only the tick's `DrawViewport`, as a player draws.
+   * `shared`: a page whose stores this one writes to as well, as another tab's.
    */
-  private constructor(private readonly recorded: boolean) {
+  private constructor(private readonly recorded: boolean, shared: Page | null = null) {
+    this.store = shared?.store ?? memoryStore(() => { this.writes++; });
+    this.recordingStore = shared?.recordingStore ?? memoryRecordingStore(this.storeFull);
     const graphics = stockGraphics();
     const tables = gameTablesOf(graphics);
     const messages = new ScrollingText(tables.byte1830);
@@ -142,13 +157,13 @@ class Page {
       drawViewport: () => this.renderView(),
       paint: () => { if (this.recorded) this.refreshScreen(); },
     });
-    let ids = 0;
-    this.recorder = new Recorder(game, 'replay', STOCK_DATA_SET.id, () => `recording-${++ids}`);
-    this.recordings = new RecordingWriter(this.recorder, this.recordingStore, { now: () => this.clock.time });
+    this.recorder = new Recorder(game, 'replay', STOCK_DATA_SET.id, () => `recording-${++recordingIds}`);
+    this.recordings = new RecordingWriter(this.recorder, this.recordingStore, this.store, { now: () => this.clock.time });
     saves = new GameSaves(game, STOCK_DATA_SET, diskFiles(STOCK_DATA_SET), this.store, {
       portraitOf: drawing.portraitOf,
       askBeginAdventure: () => { throw new Error('no prison in this dungeon'); },
     }, () => {}, new CsbRandom(1), async () => [], this.recorder);
+    saves.onRowGone(() => { void this.recordings.prune().catch(() => {}); });
     const presenter = new Presenter(() => screen?.animationFrame(game.mainLoopHasReturned()));
     const image = { width: 320, height: 200, data: new Uint8ClampedArray(320 * 200 * 4) };
     const canvas = { getContext: () => ({ createImageData: () => image, putImageData: () => {} }) };
@@ -240,10 +255,11 @@ class Page {
    * A fresh page at `recording`'s start, from the recording alone: the new game's world
    * read and its stream and playthrough set, or the save read and what its read left
    * beside the file set; the rules and the extras set; its own recorder begun there, and
-   * the loop. The boot's DM rules are a root's first change.
+   * the loop. The boot's DM rules are a root's first change. `shared`: a page whose stores
+   * this one writes its recording to, as another tab's.
    */
-  static replay(recording: Recording): Page {
-    const page = new Page(false);
+  static replay(recording: Recording, shared: Page | null = null): Page {
+    const page = new Page(false, shared);
     const { game } = page;
     const { ctx } = game;
     const { start } = recording;
@@ -574,6 +590,7 @@ async function stored(page: Page): Promise<Recording> {
   check(others.length === 0 && held > 1 && held < recording.changes.length && !closed.ended && closed.vbls < recording.vbls
     && sameRecording(closed, { ...recording, changes: recording.changes.slice(0, held), vbls: closed.vbls, ended: false }),
     `the store holds the recording as it grows: closed now, its first ${held} changes of ${recording.changes.length}, ${closed.vbls} VBLs (${store.writes} writes, ${entry.parts} parts)`);
+  check(!store.entries.has(EARLIER) && !store.parts.has(EARLIER), 'and the recording no save links, left in the store before it, is gone at its first write');
   page.storeFull.now = true;
   const failed = await page.recordings.flush().then(() => false, () => true);
   page.storeFull.now = false;
@@ -594,20 +611,80 @@ async function replaced(page: Page, recording: Recording): Promise<void> {
     `the next write finishes the recording F9 replaced, ended (${finished?.vbls} VBLs), and holds nothing of the next before its first change`);
 }
 
-/** Past `RECORDINGS_KEPT`, the recordings begun earliest are removed. */
-async function keptRecordings(page: Page): Promise<void> {
-  const store = page.recordingStore;
-  const first = (await store.list()).at(-1)!.id;
-  const start = page.recording.start;
-  for (let n = 0; n <= RECORDINGS_KEPT; n++) {
-    page.recorder.begin(start);
-    page.game.input.apply({ kind: 'unclick' });
-    await page.recordings.flush();
-  }
-  const kept = await store.list();
-  check(kept.length === RECORDINGS_KEPT && !kept.some((e) => e.id === first) && kept[0]!.recordedAt >= kept[kept.length - 1]!.recordedAt
-    && store.parts.size === RECORDINGS_KEPT,
-    `past ${RECORDINGS_KEPT} recordings, the earliest begun are removed, their parts with them`);
+/** `recording` as the store holds it cut at `point`: its changes before it, its VBLs at it, ended. */
+function cutAt(recording: Recording, point: RecordingPoint): Recording {
+  return { ...recording, changes: recording.changes.slice(0, point.changes), vbls: point.vbls, ended: true };
+}
+
+/**
+ * What no save and no running game reaches, pruned, from where `branch` left `recorded`:
+ * the branch F9 began from the disk menu's save of `root` running, F5's save in it.
+ */
+async function pruned(recorded: Page, root: Recording): Promise<void> {
+  const store = recorded.recordingStore;
+  const { saves } = recorded;
+  const player = new Player(recorded);
+  // The prune a save deleted or written over owes is in the writer's queue, before this flush.
+  const written = () => recorded.recordings.flush();
+
+  const menu = (await saves.list()).find((entry) => entry.recording?.recording === root.id)!;
+  const rootCut = await store.read(root.id);
+  check(sameRecording(rootCut, cutAt(root, menu.recording!)) && rootCut.changes.length < root.changes.length,
+    `at a load, the recording replaced is cut at the last point a save or a branch names (${rootCut.changes.length} changes of ${root.changes.length}, ${store.entries.get(root.id)!.parts} parts)`);
+
+  // In the branch, a save of its own, then the disk menu's save read again: a second branch of the root.
+  const own = await saves.save('running', 'new');
+  player.play(800);
+  player.key('KeyW');
+  player.play(600);
+  const first = recorded.recording;
+  saves.read(await saves.open(menu));
+  const second = recorded.recording;
+  player.play(600);
+  player.key('KeyE');
+  player.play(600);
+  await written();
+  check(JSON.stringify(second.parent) === JSON.stringify(menu.recording)
+    && sameRecording(await store.read(first.id), cutAt(first, own.recording!)),
+    `and a load of an earlier save leaves the branch it ends cut at the last save made in it (${own.recording!.changes} changes)`);
+
+  await saves.remove(own);
+  await written();
+  const quick = (await saves.list()).find((entry) => entry.quick)!;
+  check(quick.recording?.recording === first.id && sameRecording(await store.read(first.id), cutAt(first, quick.recording)),
+    `a save deleted cuts its recording at the one before it, F5's (${quick.recording!.changes} changes)`);
+
+  player.key('F5');
+  await settle();
+  await written();
+  const over = (await saves.list()).find((entry) => entry.quick)!;
+  check(over.id === quick.id && over.recording?.recording === second.id && !store.entries.has(first.id) && !store.parts.has(first.id),
+    'a save written over, F5\'s in the second branch, removes the branch no save reaches any more, its parts with it');
+
+  await saves.remove(menu);
+  await written();
+  check(sameRecording(await store.read(root.id), rootCut),
+    'a save deleted whose point the running branch joins at leaves its recording as it was');
+
+  // Another page on the same stores, as a tab: its first write prunes what it does not play.
+  const other = Page.replay(rootCut, recorded);
+  await other.play(rootCut, { changes: 1, vbls: 10 });
+  await other.recordings.flush();
+  const cutHere = store.entries.get(second.id);
+  check(cutHere?.ended === true && cutHere.changes === over.recording!.changes && store.entries.has(other.recording.id),
+    `another page's prune cuts the running branch at its last save (${cutHere?.changes} changes of ${recorded.recording.changes.length})`);
+  player.key('KeyW');
+  player.play(400);
+  await written();
+  const healed = await store.read(second.id);
+  check(sameRecording(healed, recorded.recording) && !healed.ended,
+    `and its page's next write writes it whole again (${healed.changes.length} changes, ${store.entries.get(second.id)!.parts} parts)`);
+
+  const path = Page.replay(await store.read(root.id));
+  await path.play(rootCut, healed.parent!);
+  path.join(healed);
+  await path.play(healed);
+  sameGame(recorded, path, healed, 'the second branch, pruned around, replayed from its root through the join');
 }
 
 /** `start` played by `script` and recorded, then the recording played back in a fresh page. */
@@ -615,6 +692,12 @@ async function replay(name: string, start: Start, script: (player: Player) => Pr
   console.log(`\n=== ${name} ===`);
   const recorded = await Page.record(start);
   const begun = recorded.recording;
+  // Left by a page before the tree: no save links it.
+  const earlier: RecordingEntry = {
+    id: EARLIER, dataSet: STOCK_DATA_SET.id, build: 'replay', parent: null, playthrough: 0,
+    recordedAt: 0, writtenAt: 0, vbls: 0, ended: false, changes: 0, parts: 1,
+  };
+  await recorded.recordingStore.write(earlier, [{ id: EARLIER, seq: 0, start: begun.start, parent: null, rules: begun.rules, extras: begun.extras }], null);
   const { rules } = recorded.game.ctx;
   check(begun.start.kind === (start === 'new' ? 'new' : 'save') && begun.dataSet === STOCK_DATA_SET.id && begun.build === 'replay',
     `the read begins a recording of the ${begun.start.kind === 'new' ? 'new game' : 'save'}, its set's and its build's`);
@@ -665,7 +748,7 @@ async function replay(name: string, start: Start, script: (player: Player) => Pr
     `a branch of the recording, at the point the save names (${JSON.stringify(next.parent)}), the clock running as the read left it`);
   await replaced(recorded, recording);
   await branch(recorded);
-  await keptRecordings(recorded);
+  await pruned(recorded, recording);
 }
 
 /** `played` has replayed `recording`, which `recorded` played: the same changes at the same VBLs, and the same game. */
