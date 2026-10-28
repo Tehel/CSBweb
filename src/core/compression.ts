@@ -288,6 +288,16 @@ export function SNDexpand(compressedData: Uint8Array): Uint8Array {
 }
 
 /**
+ * An Amiga sound item, the `dm-amiga` set's (`doc/AMIGA_DISK_REFERENCE.md` → "The sounds,
+ * played"): a word, then 8-bit signed samples, Paula's. A22E plays the item's length less 2
+ * bytes from its third and never reads the word (`F0503_SOUND_LoadAll`, ReDMCSB
+ * `SOUND.C:1433-1446`).
+ */
+export function amigaSoundSamples(item: Uint8Array): Int8Array {
+    return new Int8Array(item.slice(2).buffer);
+}
+
+/**
  * Check if data is LZW+RLE compressed
  * (based on size mismatch in graphics.dat)
  */

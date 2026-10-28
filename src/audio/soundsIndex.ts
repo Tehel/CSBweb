@@ -18,6 +18,17 @@ export interface SoundInfo {
  */
 export const ratesDefault = [5486];
 
+/** A PAL Amiga's colour clock, Hz, which Paula counts its period in. */
+const PAL_PAULA_CLOCK = 3546895;
+
+/**
+ * The rate, in Hz, A22E plays a sound at for its `Period`: Paula's period is
+ * `72800 / Period` (ReDMCSB `SOUND.C:1107`), on a PAL machine. 112 is 650, 5456.8 Hz.
+ */
+export function amigaSoundRate(period: number): number {
+  return PAL_PAULA_CLOCK / Math.trunc(72800 / period);
+}
+
 const baseSounds: Record<number, SoundInfo> = {
   [SoundIndex.FALLING_ITEM]: { name: 'Falling item' },
   [SoundIndex.SWITCH]: { name: 'Switch' },

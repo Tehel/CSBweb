@@ -195,7 +195,7 @@ function createSoundManager(graphicsLoader: GraphicsLoader, tables: GameTables):
         };
         for (const type of AUDIO_UNLOCK_EVENTS) window.addEventListener(type, unlockAudio);
     }
-    sound.setSoundTable(tables.sound1772);
+    sound.setSoundTable(tables.sound1772, tables.amigaSounds);
     if (sound.isAvailable()) sound.preloadAll();
     return sound;
 }

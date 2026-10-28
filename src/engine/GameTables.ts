@@ -16,6 +16,7 @@ import type { FileSignature } from '../data/FileSignature';
 import type { GraphicsTables } from '../data/tables/GraphicsTables';
 import type { TextDecodeTables, WeaponDesc } from '../data/tables/ObjectTables';
 import { type MonsterDesc } from '../data/tables/MonsterDesc';
+import type { AmigaSoundTables } from '../data/tables/AmigaSoundTables';
 import type { Rect, SoundTableEntry } from '../data/tables/UITables';
 
 export interface GameTables {
@@ -134,6 +135,8 @@ export interface GameTables {
 
   /** `d.sound1772[22]` — `QueueSound`'s table (`Data.h:1417`). */
   readonly sound1772: SoundTableEntry[];
+  /** The Amiga's sound tables, which only the `dm-amiga` set's `graphics.dat` carries. */
+  readonly amigaSounds: AmigaSoundTables | null;
 
   // --- The file itself ---
 
@@ -195,6 +198,7 @@ export function buildGameTables(graphics: GraphicsTables): GameTables {
     word18560: ui.graphic231.word18560,
 
     sound1772: g232.sound1772,
+    amigaSounds: graphics.amiga,
 
     graphicsSignature: graphics.signature,
   };

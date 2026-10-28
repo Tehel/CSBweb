@@ -8,6 +8,7 @@
  */
 import type { FileSignature } from '../FileSignature';
 import type { GraphicsLoader } from '../GraphicsLoader';
+import { extractAmigaSoundTables, type AmigaSoundTables } from './AmigaSoundTables';
 import { extractObjectTables, type ObjectTables } from './ObjectTables';
 import { extractUITables, type UITables } from './UITables';
 import { extractViewportTables, type ViewportTables } from './ViewportTables';
@@ -19,6 +20,8 @@ export interface GraphicsTables {
   readonly viewport: ViewportTables;
   /** Graphic `0x22f`, and the object half of `0x22e`. */
   readonly objects: ObjectTables;
+  /** The `dm-amiga` set's table item, 598, or `null` for a file without one. */
+  readonly amiga: AmigaSoundTables | null;
   /** The file's own signature (`GraphicsLoader.getSignature`), which a read checks. */
   readonly signature: FileSignature;
 }
@@ -29,6 +32,7 @@ export function extractGraphicsTables(graphics: GraphicsLoader): GraphicsTables 
     ui: extractUITables(graphics),
     viewport,
     objects: extractObjectTables(graphics, viewport.wallRectanglesOffset),
+    amiga: extractAmigaSoundTables(graphics),
     signature: graphics.getSignature(),
   };
 }

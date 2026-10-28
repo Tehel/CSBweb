@@ -323,6 +323,9 @@ This is therefore one of the very few places where we intentionally do *not* fol
 CSBWin. Do not "fix" `ratesDefault` / the door rates in `src/audio/soundsIndex.ts` to
 match the C++ source.
 
+The `dm-amiga` set plays the Amiga's 8-bit recordings in their place, at A22E's own rates
+(`doc/AMIGA_DISK_REFERENCE.md` → "The sounds, played").
+
 The door sound specifically was verified correct in CSBweb: the divergence toward the JS
 pitch has already been applied and matches the real game.
 

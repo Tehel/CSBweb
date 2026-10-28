@@ -161,6 +161,35 @@ The table item, 935 bytes, is the port's layout, four of `dm`'s tables end to en
 | 897 | 11 | `G0244_auc_Graphic559_CreatureAttackSounds[11]` |
 | 908 | 27 | the 27 creatures' `AttackSoundOrdinal`, `CREATURE_INFO`'s second byte |
 
+## The sounds, played
+
+`F0503_SOUND_LoadAll` (`doc/ReDMCSB-src/SOUND.C:1423-1447`) loads each of the 34 sounds
+once: its `ByteCount` is the item's length less 2, its first sample the item's third byte;
+the word the item begins with, which the comment calls the sample count, is never read. In
+all 34 it is 2 to 4 less than the item's length. `F0060_SOUND_Play_CPSX`'s A22E branch
+(`SOUND.C:1050-1114`) plays `ByteCount` bytes from there on two of Paula's channels at the
+period `72800 / Period`, C's integer division (`:1107-1108`). The bytes are Paula's samples,
+8-bit signed: every sound's run from about -85 to 95. On a PAL machine, whose clock Paula
+counts its period in, 3546895 Hz, a sound plays at `3546895 / trunc(72800 / Period)` Hz:
+
+| `Period` | Paula's | Hz | Sounds |
+| --- | --- | --- | --- |
+| 112 | 650 | 5456.8 | 0-17, 19-21, 31 |
+| 138 | 527 | 6730.4 | 18, the wall bump; 22-30, 32 |
+| 145 | 502 | 7065.5 | the entrance's door rattle, sound 2 (`ENTRANCE.C:160`) |
+| 150 | 485 | 7313.2 | 33 |
+
+A larger `Period` plays faster on the Amiga, where on the Atari, a timer's count, it plays
+slower: the entrance's rattle is the Atari's 4237 Hz and the Amiga's 7065.5. The entrance
+plays its switch, sound 1, at 112 (`ENTRANCE.C:919`).
+
+The Atari's 22 ordinals are the Amiga's first 22, each naming the item that holds the
+Amiga's recording of the Atari's sound, at the Atari's `Period` but for 18's. So the port
+plays, for each Atari SND item, the Amiga sound its ordinals name
+(`amigaSoundsByAtariItem`, `src/data/tables/AmigaSoundTables.ts`), and for the entrance's
+second rate the rattle at 145 (`src/audio/SoundManager.ts`). `tools/checks/amiga-sounds.ts`
+decodes the 34 and plays them through `SoundManager`.
+
 ## `Dungeon.dat`
 
 The Amiga's English `Dungeon.dat` is the Atari 1.2 dungeon, compressed, with one

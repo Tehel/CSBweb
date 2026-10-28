@@ -1,11 +1,19 @@
-import { SNDexpand } from '../core/compression';
+import { amigaSoundSamples, SNDexpand } from '../core/compression';
 import { div } from '../core/intCast';
 import type { GraphicsLoader } from '../data/GraphicsLoader';
-import { buildSoundCatalog, ratesDefault, type SoundInfo } from './soundsIndex';
+import { amigaSoundRate, buildSoundCatalog, ratesDefault, type SoundInfo } from './soundsIndex';
+import { amigaSoundsByAtariItem, type AmigaSoundData, type AmigaSoundTables } from '../data/tables/AmigaSoundTables';
 import type { SoundTableEntry } from '../data/tables/UITables';
 
 /** `SNDHEAD`'s `nSamplesPerSecond` in `SOUNDDATA::Decode` (`doc/CSBwin-src/Sound.cpp:343`). */
 const CUSTOM_SOUND_RATE = 11025;
+
+/**
+ * The `Period` A22E plays the entrance's door rattle at, `F0060_SOUND_Play_CPSX(C02_SOUND_DOOR_RATTLE,
+ * 145, 0x4040)` (ReDMCSB `ENTRANCE.C:160`): the Atari's second rate variant
+ * (`timerDataToRateIndex`), the Atari's 145 too.
+ */
+const AMIGA_ENTRANCE_DOOR_PERIOD = 145;
 
 /**
  * `SOUNDDATA::Decode(volume)`'s samples (`doc/CSBwin-src/Sound.cpp:320-364`), without
@@ -27,6 +35,27 @@ interface SoundVariant {
   buffer: AudioBuffer;
 }
 
+/** `count` samples at `rate`, each held until the next, at the context's own rate. */
+function variant(
+  context: AudioContext,
+  name: string,
+  rate: number,
+  count: number,
+  sample: (k: number) => number,
+): SoundVariant {
+  const rateTarget = context.sampleRate;
+  const duration = count / rate;
+  const sampleCount = Math.max(1, Math.floor(duration * rateTarget));
+  const buffer = context.createBuffer(1, sampleCount, rateTarget);
+  const channel = buffer.getChannelData(0);
+  const factor = rateTarget / rate;
+  for (let i = 0; i < sampleCount; i++) {
+    const k = Math.floor(i / factor);
+    channel[i] = k < count ? sample(k) : 0;
+  }
+  return { name, rate, duration, buffer };
+}
+
 export class SoundManager {
   private audioContext: AudioContext | null;
   private gainNode: GainNode | null = null;
@@ -35,6 +64,8 @@ export class SoundManager {
   private volume = 0.8;
   private soundCatalog: Record<number, SoundInfo> = buildSoundCatalog();
   private recordings = new Map<string, AudioBuffer>();
+  /** The Amiga's sound for each Atari SND item, in a set that carries the table item. */
+  private amigaSounds = new Map<number, AmigaSoundData>();
 
   constructor(private graphics: GraphicsLoader) {
     const hasAudio = typeof globalThis !== 'undefined' && 'AudioContext' in globalThis;
@@ -97,35 +128,31 @@ export class SoundManager {
     }
   }
 
+  /**
+   * Item `id`'s variants, one per rate: the Atari's 4-bit sound at the port's rates (H), or
+   * where the set has the Amiga's, its 8-bit recording at its entry's `Period`, then the
+   * entrance door's.
+   */
   preloadSound(id: number, info: SoundInfo): void {
-    if (!this.audioContext) return;
+    const context = this.audioContext;
+    if (!context) return;
     if (this.cache.has(id)) return;
 
-    const raw = this.graphics.getRawGraphic(id);
-    const data = SNDexpand(raw);
-    const rateTarget = this.audioContext.sampleRate;
-
+    const rates = info.rates ?? ratesDefault;
+    const amiga = this.amigaSounds.get(id);
     const variants: SoundVariant[] = [];
-    for (const rate of info.rates ?? ratesDefault) {
-      const duration = data.length / rate;
-      const sampleCount = Math.max(1, Math.floor(duration * rateTarget));
-      const buffer = this.audioContext.createBuffer(1, sampleCount, rateTarget);
-      const channel = buffer.getChannelData(0);
-      const factor = rateTarget / rate;
-      for (let i = 0; i < sampleCount; i++) {
-        const src = data[Math.floor(i / factor)] ?? 0;
-        channel[i] = (src - 127.5) / 127.5;
-      }
-
-      const name = `${info.name} (${rate} Hz)`;
-      variants.push({
-        name,
-        rate,
-        duration,
-        buffer,
+    if (amiga) {
+      const samples = amigaSoundSamples(this.graphics.getRawGraphic(amiga.graphicIndex));
+      rates.forEach((_, i) => {
+        const rate = amigaSoundRate(i === 0 ? amiga.period : AMIGA_ENTRANCE_DOOR_PERIOD);
+        variants.push(variant(context, `${info.name} (Amiga, ${rate.toFixed(1)} Hz)`, rate, samples.length, (k) => samples[k]! / 128));
       });
+    } else {
+      const data = SNDexpand(this.graphics.getRawGraphic(id));
+      for (const rate of rates) {
+        variants.push(variant(context, `${info.name} (${rate} Hz)`, rate, data.length, (k) => (data[k]! - 127.5) / 127.5));
+      }
     }
-
     this.cache.set(id, variants);
   }
 
@@ -199,8 +226,11 @@ export class SoundManager {
     source.start();
   }
 
-  setSoundTable(soundTable?: SoundTableEntry[]): void {
+  /** The set's sound table, and the Amiga's tables where its `graphics.dat` carries them. */
+  setSoundTable(soundTable?: SoundTableEntry[], amiga?: AmigaSoundTables | null): void {
     this.soundCatalog = buildSoundCatalog(soundTable);
+    this.amigaSounds = soundTable && amiga ? amigaSoundsByAtariItem(soundTable, amiga) : new Map();
+    this.cache.clear();
   }
 
   getSoundCatalog(): Record<number, SoundInfo> {

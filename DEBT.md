@@ -123,7 +123,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| A3 | The Amiga's 8-bit sounds decoded and played at their Paula rate | S | ⏳ |
 | A4 | The Amiga's sound path: stereo volume by position, two voices | M | ⏳ |
 | A5 | Footsteps, `F0514_MOVE_GetSound`, and the war cry | M | ⏳ |
 | A6 | The rest of A22E's own code, classed | S | ⏳ |
@@ -176,8 +175,11 @@ source.
 `tools/checks/amiga-graphics.ts --write`, which proves it and plays a new game on it. It is
 `dm-atari`'s with the Amiga's credits (5), picture 396, objects' names (556) and font (557)
 in their place, then its 35 sounds and the port's table item, 598, appended
-(`doc/AMIGA_DISK_REFERENCE.md` → "The `dm-amiga` set's `graphics.dat`"). Nothing reads the
-appended items yet: the set plays the Atari's sounds until A3.
+(`doc/AMIGA_DISK_REFERENCE.md` → "The `dm-amiga` set's `graphics.dat`"). The port reads the
+table item into `GameTables.amigaSounds` (`src/data/tables/AmigaSoundTables.ts`), and
+`SoundManager` plays the Amiga's 8-bit recordings at their Paula rates in the Atari's place
+(`doc/AMIGA_DISK_REFERENCE.md` → "The sounds, played", `tools/checks/amiga-sounds.ts`),
+each still at the Atari's loud or quiet volume until A4.
 
 **The sound table** is `G0060_as_Graphic562_Sounds[34]` (`doc/ReDMCSB-src/DATA.C:1165-1201`),
 at `dm:data+3738`. Entries 0-21 are the Atari's ordinals; 22, 23, 24, 26, 27, 32 and 33 are
@@ -222,13 +224,6 @@ Decisions taken with the author:
   credits (5), font (557), objects' names (556) and picture 396 replace the Atari's in
   place: they are in the formats CSBWin reads, so the folder still plays in CSBWin.
 
-### A3 ⏳ The Amiga's 8-bit sounds decoded and played at their Paula rate
-
-The reader beside `SNDexpand` (`src/core/compression.ts`), the header word checked against
-every item's length; the rate PAL `3546895 / trunc(72800 / Period)` Hz.
-`SoundManager` plays a set's Amiga sound for an ordinal when the set carries the table
-item. The Atari rates (H, "Audio sample rates") do not change. The check decodes all 34.
-
 ### A4 ⏳ The Amiga's sound path: stereo volume by position, two voices
 
 For a set with the table item, `QueueSound` (`src/engine/SoundQueue.ts`) answers as A22E's
@@ -265,7 +260,7 @@ nothing in 2.2, that is recorded and it stays silent.
 64 `MEDIA*` macros hold A22E and not S21E, in `DUNVIEW.C`, `MEMORY.C`, `DATA.C`,
 `TIMELINE.C`, `FLOPPY.C`, `DIALOG.C`, `SOUND.C`, `MOVESENS.C`, `DUNGEON.C`, `INPUT.C`,
 `CHAMDRAW.C`, `GROUP.C`, `CLIKMENU.C`, `TEXT.C`, … Each one a player can see or hear is
-classed as carried by the set's `graphics.dat` or A3-A5, left (an H entry) or the machine's alone: among them the
+classed as carried by the set's `graphics.dat` or A4-A5, left (an H entry) or the machine's alone: among them the
 wall bump's sound mode (`CLIKMENU.C:307`) and the highlight box (`CLIKMENU.C:57-60`).
 **The palettes, if they come easily** (the author: wanted, of little value). The Amiga's
 have 4 bits a channel where the Atari's have 3, and the darker dungeon palettes black out
