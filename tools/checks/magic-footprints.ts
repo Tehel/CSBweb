@@ -147,7 +147,10 @@ function ring(): void {
   check([40, 41, 42, 43, 44].every(inRange) && !inRange(39) && !inRange(21),
     'ring: the five squares walked since the cast are magic, the one before it and the oldest are not');
 
-  // Every age but the newest falls by one a call, and the oldest print goes at zero.
+  // Every age but the newest falls by one a call, and the oldest print goes at zero. A
+  // walk leaves one strength along the trail, which would drop every print at once: the
+  // strengths are made distinct first, so that one goes.
+  trail.restore({ ...trail.capture(), ages: Array.from({ length: 24 }, (_, i) => i + 1) });
   const before = held();
   let calls = 0;
   while (trail.getCount() === 24 && calls < 100) {

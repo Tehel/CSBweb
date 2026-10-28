@@ -63,9 +63,9 @@ The English 1.2 disk's six files:
 | --- | --- | --- | --- | --- |
 | `BOOTER` | 1024 | 1999-12-31 | `e1abcf34…` | Not examined. Contains the string `start.pak`. |
 | `SWOOSH.IMG` | 3016 | 1999-12-31 | `57a685a0…` | The FTL logo: 68000 code, a picture, a sound, a palette script. |
-| `START.PRG` | 770 | 1999-12-31 | `a9730cd7…` | A GEMDOS program, run by `SWOOSH.IMG`. Not examined. |
+| `START.PRG` | 770 | 1999-12-31 | `a9730cd7…` | A GEMDOS program, run by `SWOOSH.IMG`: it unpacks `START.PAK` and runs it. |
 | `GRAPHICS.DAT` | 271918 | 1988-02-18 | `9ce2eaf7…` | The 1.2 graphics. |
-| `START.PAK` | 95148 | 1988-02-24 | `60df1980…` | Presumably the packed game program. Not examined. |
+| `START.PAK` | 95148 | 1988-02-24 | `60df1980…` | The game program, packed ("`START.PAK`, the game program"). |
 | `DUNGEON.DAT` | 33442 | 1988-03-01 | `050fb2cf…` | The 1.2 dungeon. |
 
 Three of them are in the repository under lower-case names: `graphics.dat` and
@@ -90,8 +90,8 @@ page's own, which every version shares, with the swoosh's sound as PCM (below). 
    it calls `Pexec(0, "START.PRG", "\4AUTO", "")` (`swoosh.img:$0046`). The strings are at
    `$005e`, `$0068` and `$006e`. It never draws again, so the logo stays on screen until
    the program it started replaces the screen.
-3. **`START.PRG`** runs the game, presumably by unpacking `START.PAK`. It was not
-   examined. The title animation (`doc/CSBWIN_TITLE_SCREEN_REFERENCE.md`) is the game's
+3. **`START.PRG`** runs the game, which it unpacks from `START.PAK` ("`START.PAK`, the
+   game program"). The title animation (`doc/CSBWIN_TITLE_SCREEN_REFERENCE.md`) is the game's
    own, and CSBWin's `_DisplayChaosStrikesBack` ports it.
 
 **How long the logo stays up is not established.** The palette script ends 30 VBLs after
@@ -400,6 +400,53 @@ The raw offsets: `Byte4100` starts at byte 3146 of `0x22e` (read through
 `ObjDesc` at 1958 (`10340 - 8382`, 6 bytes an entry). `0x230`'s attack tables start at
 byte 64 (7 tables of 44 bytes, in `UITables`' order) and `Spells` at 1026 (8 bytes an
 entry). Skill numbers are `CHARDESC.skills92`'s, four subskills a class from 4.
+
+## `START.PAK`, the game program
+
+Every disk's `START.PRG` is the same: a GEMDOS program of `$2d6` bytes of text. It opens
+`start.pak`, reads its first `0x16` bytes, hangs (`bra *`) unless the word at 4 is
+`0x601a`, and reads the file from byte `0x20` to the top of its memory. Its routine at text
+`$260` unpacks that to its basepage plus `0x3e80`; it then relocates the program and jumps
+into it.
+
+The file holds a long, the program's length in words (70965 on 1.2 English); from byte 4,
+the program's GEMDOS header: `0x601a`, then the text, data, bss and symbol lengths
+(`0x2240a`, `0x53c`, `0x584e` and 0 on 1.2 English); from byte `0x20`, a table of `0x780`
+words; then the packed words, read four bits at a time, each word's high nibble first. A
+nibble `n` below 8 and the next one, `m`, give the table's word `16n + m`; `n` from 8 to 14
+and the next two, `xy`, give the table's word `(n << 8 | xy) - 0x780`; `n` 15 is followed by
+the word itself, four nibbles. The words are the program's text, its data and its
+relocation table, as a GEMDOS program file holds them after its header. The file ends a
+few words short of the count: the text and the data decode from it, and the end of the
+relocation table is whatever follows the file in memory. Every disk's `START.PAK` unpacks
+so. No tool of the repository unpacks it.
+
+### The scents in the program
+
+The party's scents are `a4`-relative globals: the 24 locations at `-$31ce(a4)`, packed
+`[map:6][y:5][x:5]`, the 24 strengths at `-$319e(a4)`, bytes, and their count at
+`-$31d2(a4)`, a byte. `$4e(a5)`, `$d8(a5)` and `$de(a5)` are the program's jump table's
+entries at its text's start: a word compare (`cmpm.w` under `dbne`) whose result is only
+the flags, the larger of two signed words and the smaller. In 1.2 English, text offsets:
+
+- **`$168e4`**, ReDMCSB's `F0317_CHAMPION_AddScentStrength`. It packs its x and y with the
+  current map, calls the compare on each scent from the oldest up, and never tests the
+  result: the next instruction tests the "first strength written" flag. Its loop is
+  `move.w d6,d0; subq.w #1,d6; tst.w d0; bne` (`$169ac`): the index is tested before it is
+  decremented, so it writes the strengths from the newest down to 0. The first strength
+  written is `$d8`'s of it and the cycles, with bit 15 of the cycles set, or `$de`'s of 80
+  and their sum, and every later one takes that value. The party's move calls it with
+  `0x8018` at `$1250e`.
+- **`$17642`**, in the ten-second update: each scent but the newest is compared with the
+  party's square, the result thrown away the same way, and its strength lowered to
+  `$d8`'s of 0 and one less. When that leaves scent 0 at 0, it calls `$1684a`,
+  `F0316_CHAMPION_DeleteScent(0)`, and branches back to the loop's test (`$1768a`), the
+  index not raised.
+
+These are ReDMCSB's `MEDIA007` lines (`CHAMPION.C:1472-1525`, `:2311-2330`). The English,
+German and French disks, 1.0 to 1.3, hold the same two functions, only their addresses
+moved. CSBWin's two loops differ from them (`DEBT.md` H → "The scents' two loops are the
+Atari's, not CSBWin's").
 
 ## CSBWin's files
 

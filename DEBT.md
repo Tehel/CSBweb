@@ -128,7 +128,6 @@ In payoff order: the first row is the next item.
 | F22 | `tools/checks/replay.ts`: a game logged at the boundary plays back the same | M | ⏳ |
 | G29 | Recording a game and playing it back | L | ⏳ after E42, E43, F22 |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
-| F23 | CSBWin's scent loops against the Atari's program | S | ⏳ |
 | C194 | A DSA's wall graphic counts as a real decoration, so it hides no text | S | ⏳ |
 | C195 | Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space | S | ⏳ to decide with the author |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
@@ -697,20 +696,6 @@ dialogs do, so the tool also proves that nothing the page draws takes from the g
 stream (`doc/RECORDING.md` → "What is not verified"). Size M; a divergence it finds is an
 item of its own.
 
-### F23 ⏳ CSBWin's scent loops against the Atari's program
-
-CSBWin's `AddFootprintEntry` walks the strengths `while (index-- != 1)`
-(`doc/CSBwin-src/Code11f52.cpp:4394`), so it never writes strength 0, and its ten-second
-decay stops at the first print it drops (`break`, `doc/CSBwin-src/Code17818.cpp:194`).
-ReDMCSB's code, shared by every release the Atari's included, writes strength 0
-(`while (L0954_i_ScentIndex--)`, `doc/ReDMCSB-src/CHAMPION.C:1501`) and goes on after a
-drop (`continue`, `:2323-2324`), and so does the Amiga's `dm`, read in its binary (hunk 17
-at 0x3066 and 0x3c60, `doc/AMIGA_DISK_REFERENCE.md` → "A22E's own code, classed").
-`dm-amiga` plays A22E's; `dm-atari` plays CSBWin's. Whether CSBWin's two loops are slips of
-its translation, which `dm-atari` would then correct (H), is read in the Atari CSB
-program's own code, which no fixture holds (`fetch-gamefiles` takes CSB's data files
-only); until then CSBWin stands. `tools/checks/amiga-scents.ts` shows both trails.
-
 ### F21 ⏳ 3D2D1D's walkthrough is not replayed through `Game`
 
 `doc/3D2D1D_WALKTHROUGH.md` is a full route through 3D2D1D, computed by
@@ -1135,6 +1120,19 @@ Recorded so that nobody "fixes" them.
   runs before the byte swap"). The two differ only for a type-47 actuator under either
   reading: DM has none, Conflux's file has the flag, and `tools/checks/dungeon-conversions.ts`
   fails for a dungeon that has one.
+- 🚫 **The scents' two loops are the Atari's, not CSBWin's.** CSBWin's `AddFootprintEntry`
+  walks the strengths `while (index-- != 1)` (`doc/CSBwin-src/Code11f52.cpp:4394`), so it
+  never writes strength 0, and its ten-second decay `break`s after dropping the oldest print
+  (`doc/CSBwin-src/Code17818.cpp:194`). ReDMCSB writes `while (L0954_i_ScentIndex--)` and
+  `continue` for every release, the Atari's among them (`doc/ReDMCSB-src/CHAMPION.C:1501`,
+  `:2323-2324`), and so does every Atari DM program, 1.0 to 1.3: 1.2 English tests the index
+  before decrementing it (`START.PAK` text `$169ac`) and branches back to the loop's test
+  after the deletion (`$1768a`), its helpers the larger and the smaller of two words
+  (`doc/ATARI_ST_DISK_REFERENCE.md` → "The scents in the program"). CSB's Atari program is
+  on no fixture; ReDMCSB's S20E and S21E share the lines. Every set plays the Atari's loops
+  (`src/engine/PartyFootprints.ts`, `tools/checks/amiga-scents.ts`,
+  `tools/checks/magic-footprints.ts`). The comparisons thrown away stay: they are the
+  Atari's, ReDMCSB's `BUG0_00`.
 - 🚫 **A kill of `alternateGraphics` 4 to 7 is counted nowhere.** `ProcessMonsterDeleteFilter`
   indexes the kill statistics' four longwords with the three-bit subtype unchecked
   (`doc/CSBwin-src/Code11f52.cpp:990`, `:995`): a new record's count goes into the stack past

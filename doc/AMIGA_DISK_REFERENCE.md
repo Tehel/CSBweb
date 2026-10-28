@@ -394,8 +394,8 @@ does not run them.
   writes strength `N-1-k`, strength 0 included, and the first strength it changes sets the
   value every later one takes. The decay is hunk 17 at 0x3c60: it compares each scent but
   the newest with the party's square and map, and after deleting scent 0 branches back to
-  its test at the same index, `continue`. CSBWin never writes strength 0 and stops after
-  the deletion (`DEBT.md` F23).
+  its test at the same index, `continue`. Both loops are the Atari's too, where CSBWin
+  never writes strength 0 and stops after the deletion (`DEBT.md` H).
 
 **The bonus dungeon.** A21E and A22E load `DungeonB.dat`, the disk's Kids dungeon, in
 place of `Dungeon.dat` when Alt is held as the game starts (`STARTUP2.C:1329-1331`,

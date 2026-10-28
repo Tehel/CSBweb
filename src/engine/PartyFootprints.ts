@@ -17,14 +17,16 @@
  *
  * About `AddFootprintEntry`: Paul Stevens' own comment on it reads "I think this is
  * much hogwash. Does nothing useful. Is full of errors. Perhaps an old, abandoned
- * debug trace" (`doc/CSBwin-src/Code11f52.cpp:4382-4384`). It is ported anyway,
- * errors and all, because it is what writes the age bytes that the smelling check
- * then reads — and it is the only thing that writes them.
+ * debug trace" (`doc/CSBwin-src/Code11f52.cpp:4382-4384`). The Atari's program throws
+ * its comparison with the square away, and the ten-second decay's too, so every strength
+ * changes; that is the Atari's, and ported. Its two loops are not CSBWin's: they write
+ * strength 0, and the decay goes on after a drop (`doc/ATARI_ST_DISK_REFERENCE.md` →
+ * "The scents in the program"; `DEBT.md` H).
  *
  * With the Amiga's tables, the trail is A22E's (`doc/AMIGA_DISK_REFERENCE.md` → "A22E's own
  * code, classed"): `F0317_CHAMPION_AddScentStrength` changes only the strengths of the
  * prints on the square it is given, and the ten-second decay spares the print on the
- * party's square, where the Atari, and so CSBWin, throws both comparisons away.
+ * party's square. Its loops are the Atari's.
  */
 
 import type { Position } from '../core/types';
@@ -167,45 +169,21 @@ export class PartyFootprints {
   }
 
   /**
-   * `AddFootprintEntry` (`doc/CSBwin-src/Code11f52.cpp:4381`) — walk the trail from
-   * the newest end towards the oldest, writing `deltaTime` into every age byte.
+   * `AddFootprintEntry` (`doc/CSBwin-src/Code11f52.cpp:4381`), ReDMCSB's
+   * `F0317_CHAMPION_AddScentStrength(mapX, mapY, cycleCount)` (`CHAMPION.C:1472-1525`).
    *
-   * Bit 15 of `deltaTime` selects how the first entry it touches combines with what
-   * is already there: set means `max(existing, deltaTime)`, clear means
-   * `min(80, deltaTime + existing)`. Every subsequent entry is overwritten with the
-   * result, which is the part of this that Stevens calls hogwash — the whole tail
-   * ends up holding one value. The square is unused (`newX`, `newY` commented out).
+   * Bit 15 of `cycleCount` selects how the first strength it changes combines with what
+   * is already there: set means `max(existing, cycles)`, clear means
+   * `min(80, cycles + existing)`. Every later one it changes is overwritten with the
+   * result. Its pointer walks the prints up from the oldest while its index walks the
+   * strengths down from the newest, so it compares print `k` and writes strength `N-1-k`,
+   * strength 0 included: the index is tested before it is decremented, in the Atari's
+   * program (`START.PAK` 1.2 at `$168e4`) and in the Amiga's (`dm`'s hunk 17 at 0x3066),
+   * where CSBWin's `while (index-- != 1)` stops before 0. The Atari's throws the
+   * comparison away, so the whole trail ends up holding one value; the Amiga's changes a
+   * strength only where the print is the square's, on the current map.
    */
-  private addFootprintEntry(mapX: number, mapY: number, level: number, deltaTime: number): void {
-    if (this.byLocation) {
-      this.addScentStrength(mapX, mapY, level, deltaTime);
-      return;
-    }
-    let index = this.count;
-    if (index === 0) return;
-    const negative = (deltaTime & 0x8000) !== 0;
-    let delta = deltaTime & 0x7fff;
-    let combined = false;
-    while (index-- !== 1) {
-      if (!combined) {
-        combined = true;
-        const existing = this.ages[index] ?? 0;
-        delta = negative ? Math.max(existing, delta) : Math.min(80, delta + existing);
-      }
-      this.ages[index] = delta & 0xff;
-    }
-  }
-
-  /**
-   * A22E's `F0317_CHAMPION_AddScentStrength(mapX, mapY, cycleCount)` (ReDMCSB
-   * `CHAMPION.C:1472-1525`; `dm`'s hunk 17 at 0x3066), the Amiga's `AddFootprintEntry`:
-   * the same walk, but a strength changes only where the print is the square's, on the
-   * current map. Its pointer walks the prints up from the oldest while its index walks
-   * the strengths down from the newest, so it compares print `k` and writes strength
-   * `N-1-k`, strength 0 included (`dm`: the index tested before it is decremented, and
-   * the loop left at 0). The first strength written sets the value every later one takes.
-   */
-  private addScentStrength(mapX: number, mapY: number, level: number, cycleCount: number): void {
+  private addFootprintEntry(mapX: number, mapY: number, level: number, cycleCount: number): void {
     let index = this.count;
     if (index === 0) return;
     const merge = (cycleCount & 0x8000) !== 0;
@@ -213,7 +191,7 @@ export class PartyFootprints {
     const location = packLocation(level, mapX, mapY);
     let cycleCountDefined = false;
     for (let k = 0; index-- !== 0; k++) {
-      if (this.prints[k] !== location) continue;
+      if (this.byLocation && this.prints[k] !== location) continue;
       if (!cycleCountDefined) {
         cycleCountDefined = true;
         const strength = this.ages[index] ?? 0;
@@ -229,39 +207,27 @@ export class PartyFootprints {
   }
 
   /**
-   * The footprint half of `TenSecondUpdate` (`doc/CSBwin-src/Code17818.cpp:181-195`):
-   * every age byte but the newest ticks one step toward zero, and the moment the
-   * *oldest* one reaches zero it is dropped. (CSBWin's `SearchWordNE` call in the
-   * loop is commented out — "This does nothing that I can see".)
-   *
-   * The Amiga's (ReDMCSB `CHAMPION.C:2311-2330`; `dm`'s hunk 17 at 0x3c60) spares the print
-   * on the party's square, `party`, and after dropping the oldest goes on with the new
-   * oldest, where CSBWin's stops.
+   * The footprint half of `TenSecondUpdate` (`doc/CSBwin-src/Code17818.cpp:181-195`,
+   * ReDMCSB `CHAMPION.C:2311-2330`): every strength but the newest ticks one step toward
+   * zero, and the moment the *oldest* one reaches zero it is dropped, and the walk goes
+   * on with the new oldest at the same index (`START.PAK` 1.2 at `$17642`; `dm`'s hunk 17
+   * at 0x3c60), where CSBWin's `break`s. The Atari's compares each print with the party's
+   * square and throws the result away (CSBWin's `SearchWordNE`, commented out); the
+   * Amiga's spares the print on the party's square, `party`.
    */
   ageFootprints(party: Position): void {
-    if (this.byLocation) {
-      const location = packLocation(party.z, party.x, party.y);
-      let i = 0;
-      while (i < this.count - 1) {
-        if (this.prints[i] !== location) {
-          const strength = Math.max(0, (this.ages[i] ?? 0) - 1);
-          this.ages[i] = strength;
-          if (strength === 0 && i === 0) {
-            this.deleteFootprintEntry(0);
-            continue;
-          }
+    const location = packLocation(party.z, party.x, party.y);
+    let i = 0;
+    while (i < this.count - 1) {
+      if (!this.byLocation || this.prints[i] !== location) {
+        const strength = Math.max(0, (this.ages[i] ?? 0) - 1);
+        this.ages[i] = strength;
+        if (strength === 0 && i === 0) {
+          this.deleteFootprintEntry(0);
+          continue;
         }
-        i++;
       }
-      return;
-    }
-    for (let i = 0; i < this.count - 1; i++) {
-      const age = Math.max(0, (this.ages[i] ?? 0) - 1);
-      this.ages[i] = age;
-      if (age !== 0) continue;
-      if (i !== 0) continue;
-      this.deleteFootprintEntry(0);
-      break;
+      i++;
     }
   }
 

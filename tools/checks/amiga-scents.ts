@@ -1,21 +1,23 @@
 /**
- * The party's scents as A22E keeps them, on a set with the Amiga's tables, and as CSBWin
- * keeps them, on `dm-atari` (`src/engine/PartyFootprints.ts`):
+ * The party's scents as A22E keeps them, on a set with the Amiga's tables, and as the
+ * Atari's program keeps them, on `dm-atari` (`src/engine/PartyFootprints.ts`):
  *
  *  1. `F0317_CHAMPION_AddScentStrength` (ReDMCSB `CHAMPION.C:1472-1525`, `dm`'s hunk 17 at
  *     0x3066) changes a strength only where the print is the square it is given, the
  *     square left and then the square entered (`MOVESENS.C:772`, `:783`). It compares
- *     print `k` and writes strength `N-1-k`, strength 0 included. CSBWin's
- *     `AddFootprintEntry` (`doc/CSBwin-src/Code11f52.cpp:4381-4410`) ignores the square and
- *     writes every strength but 0. A party placed on S0 at time 0 walks to S1 at 10, S2 at
- *     30 and S1 at 35; the strengths, worked by hand from each source, are
- *     `[24, 0, 24, 0]` and `[0, 24, 24, 24]`.
+ *     print `k` and writes strength `N-1-k`, strength 0 included. The Atari's (`START.PAK`
+ *     1.2 at `$168e4`, `doc/ATARI_ST_DISK_REFERENCE.md` → "The scents in the program")
+ *     ignores the square and writes every strength, 0 included, where CSBWin's
+ *     `AddFootprintEntry` (`doc/CSBwin-src/Code11f52.cpp:4381-4410`) stops before 0. A
+ *     party placed on S0 at time 0 walks to S1 at 10, S2 at 30 and S1 at 35; the
+ *     strengths, worked by hand from each program, are `[24, 0, 24, 0]` and
+ *     `[24, 24, 24, 24]`.
  *  2. The ten-second decay (`CHAMPION.C:2311-2330`, hunk 17 at 0x3c60) spares the print on
- *     the party's square, and after dropping the oldest goes on with the next; CSBWin's
- *     (`doc/CSBwin-src/Code17818.cpp:181-195`) lowers every print but the newest and stops
- *     at a drop.
- *  3. Through `Game`: `dm-amiga`'s trail is A22E's and `dm-atari`'s CSBWin's, a move hands
- *     the trail the square it left, and `TenSecondUpdate` the party's square: a walk
+ *     the party's square; the Atari's (`$17642`) lowers every print but the newest. Both
+ *     go on with the next after dropping the oldest, where CSBWin's
+ *     (`doc/CSBwin-src/Code17818.cpp:181-195`) stops.
+ *  3. Through `Game`: `dm-amiga`'s trail is A22E's and `dm-atari`'s the Atari's, a move
+ *     hands the trail the square it left, and `TenSecondUpdate` the party's square: a walk
  *     P, Q, R, Q, a decay, R, worked by hand.
  *
  * Run: `npm test -- --only=amiga-scents.ts`
@@ -62,7 +64,7 @@ function checkTrails(): void {
   const atari = walk(false);
   console.log(`1. prints ${squares(amiga)}: dm-amiga's strengths ${strengths(amiga).join(' ')}, dm-atari's ${strengths(atari).join(' ')}`);
   check(strengths(amiga).join() === '24,0,24,0', 'the Amiga\'s: only the strengths of the prints on the square, written N-1-k, 0 included');
-  check(strengths(atari).join() === '0,24,24,24', 'CSBWin\'s: every strength but 0, whatever the square');
+  check(strengths(atari).join() === '24,24,24,24', 'the Atari\'s: every strength, 0 included, whatever the square');
 
   // 2. The decay, the party on S1.
   const party = new Position(S1.x, S1.y, LEVEL);
@@ -70,9 +72,9 @@ function checkTrails(): void {
   atari.ageFootprints(party);
   console.log(`2. one decay on S1: dm-amiga's ${strengths(amiga).join(' ')} (${squares(amiga)}), dm-atari's ${strengths(atari).join(' ')} (${squares(atari)})`);
   check(strengths(amiga).join() === '23,0,23,0', 'the Amiga\'s spares the print on the party\'s square');
-  check(squares(atari) === '3,5 4,5 3,5' && strengths(atari).join() === '24,24,24', 'CSBWin\'s drops the oldest, at 0, and stops');
+  check(squares(atari) === '3,4 3,5 4,5 3,5' && strengths(atari).join() === '23,23,23,24', 'the Atari\'s lowers every print but the newest, the party\'s square\'s too');
 
-  // Two prints at 1 then one at 5: the Amiga's drops both, and lowers the next.
+  // Two prints at 1 then one at 5: both drop both, and lower the next.
   const twice = new PartyFootprints(true);
   for (const [time, x] of [[0, 10], [1, 11], [2, 12], [3, 13]] as const) twice.recordPartyMove(time, LEVEL, x, 1, false, x - 1, 1);
   twice.restore({ ...twice.capture(), ages: [1, 1, 5, 0] });
@@ -82,7 +84,7 @@ function checkTrails(): void {
   once.ageFootprints(party);
   console.log(`   strengths 1 1 5 0, a decay off the trail: dm-amiga's ${strengths(twice).join(' ')}, dm-atari's ${strengths(once).join(' ')}`);
   check(strengths(twice).join() === '4,0', 'the Amiga\'s goes on after a drop: both prints at 1 go, the next is lowered');
-  check(strengths(once).join() === '1,5,0', 'CSBWin\'s stops at the first drop');
+  check(strengths(once).join() === '4,0', 'the Atari\'s goes on after a drop too, where CSBWin\'s stops at the first');
 }
 
 /**
@@ -135,11 +137,13 @@ function checkGames(): void {
   const tail = (rows: string[]): string => rows.slice(1).map((row) => row.replace(/^[QR] \d+,\d+: /, '')).join(' | ');
   // The trail starts empty. R at 30 raises Q's print, the square left, to 44 (24 without
   // the square); back on Q, the merge sets both of Q's prints' strengths, 2 and 0, to 24;
-  // the decay spares them; R at 40 raises them, the square left, to 29.
+  // the decay spares them; R at 40 raises them, the square left, to 29. On dm-atari every
+  // strength takes each value: 44 then 24 at R, 29 then 24 at Q, 23 but the newest at the
+  // decay, 28 then 24 at R.
   check(tail(amiga) === '24 | 44 0 | 24 0 24 | decay: 24 0 24 | 29 0 29 0',
     'dm-amiga: the walk\'s strengths are A22E\'s, the square left counts, and the decay spares the party\'s square');
-  check(tail(atari) === '0 | 0 24 | 0 24 24 | decay: 24 24 | 24 24 24',
-    'dm-atari: CSBWin\'s, and the decay drops the oldest');
+  check(tail(atari) === '24 | 24 24 | 24 24 24 | decay: 23 23 24 | 24 24 24 24',
+    'dm-atari: the Atari\'s, one value along the trail, and the decay lowers all but the newest');
 }
 
 function main(): void {
