@@ -362,7 +362,8 @@ export function createGameContext(
     loop: createLoopFlags(),
     interface: createInterfaceState(),
     sounds: new SoundQueue(party, tables.sound1772, host, state, timers,
-      (ordinal, highVolume, level, x, y) => ctx.systems.dsa.filters.soundFilter(ordinal, highVolume, level, x, y)),
+      (ordinal, highVolume, level, x, y) => ctx.systems.dsa.filters.soundFilter(ordinal, highVolume, level, x, y),
+      tables.amigaSounds),
     smartDiscard: createSmartDiscardState(),
     levelCleared: new Uint8Array(16),
     rules: {

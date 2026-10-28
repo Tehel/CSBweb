@@ -274,6 +274,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     const game = new Game(emptyDungeonData(), tables, {
         messages,
         playSound,
+        playAmigaSound: (soundIndex, period, volume) => sound.playAmigaSound(soundIndex, period, volume),
         playCustomSound: (samples, volume) => sound.playCustomSound(samples, volume),
         // `d.PartySleeping`: button 145 puts the party to sleep, 146 or a blow
         // wakes it. The UI follows with `Buttons17796` (`doc/CSBwin-src/Mouse.cpp:1837`)

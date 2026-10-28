@@ -77,3 +77,59 @@ export function amigaSoundsByAtariItem(
   });
   return byItem;
 }
+
+/** `SOUND_VOLUME` (ReDMCSB `DEFS.H:31-34`): Paula's volume on each channel, 0 to 64. */
+export interface SoundVolume {
+  readonly left: number;
+  readonly right: number;
+}
+
+/**
+ * `F0505_SOUND_GetVolume` (ReDMCSB `SOUND.C:1871-1919`): the volume of a sound on
+ * `(sourceX, sourceY)` heard by a party on `(partyX, partyY)` facing `facing`. The
+ * source's offset, turned to the party's facing, is a line (ahead is negative) and a
+ * column (right is positive) of `G1028_aauc_DistanceToSoundVolume`, centred on 12; the
+ * right channel reads that column, the left its mirror. `null`, not heard, more than 12
+ * squares away along either.
+ */
+export function getVolume(
+  tables: AmigaSoundTables,
+  partyX: number,
+  partyY: number,
+  facing: number,
+  sourceX: number,
+  sourceY: number,
+): SoundVolume | null {
+  let rightColumn = 0;
+  let line = 0;
+  switch (facing) {
+    case 0: rightColumn = sourceX - partyX; line = sourceY - partyY; break;
+    case 1: rightColumn = sourceY - partyY; line = -(sourceX - partyX); break;
+    case 2: rightColumn = -(sourceX - partyX); line = -(sourceY - partyY); break;
+    case 3: rightColumn = -(sourceY - partyY); line = sourceX - partyX; break;
+  }
+  if (rightColumn < -12 || rightColumn > 12) return null;
+  if (line < -12 || line > 12) return null;
+  const row = (line + 12) * 25;
+  return {
+    right: tables.distanceToSoundVolume[row + rightColumn + 12]!,
+    left: tables.distanceToSoundVolume[row - rightColumn + 12]!,
+  };
+}
+
+/**
+ * `F0502_SOUND_CompareVolumes` (ReDMCSB `SOUND.C:227-268`): 1, 0 or -1 as `volume1` is
+ * louder, as loud or quieter than `volume2`, each counted by its two channels' sum in
+ * three classes: above 25, 15 to 25, below 15.
+ */
+export function compareVolumes(volume1: SoundVolume, volume2: SoundVolume): number {
+  const level = (volume: SoundVolume): number => {
+    const total = volume.left + volume.right;
+    if (total > 25) return 2;
+    return 15 > total ? 0 : 1;
+  };
+  const level1 = level(volume1);
+  const level2 = level(volume2);
+  if (level1 > level2) return 1;
+  return level1 === level2 ? 0 : -1;
+}

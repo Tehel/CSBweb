@@ -2,7 +2,9 @@ import { amigaSoundSamples, SNDexpand } from '../core/compression';
 import { div } from '../core/intCast';
 import type { GraphicsLoader } from '../data/GraphicsLoader';
 import { amigaSoundRate, buildSoundCatalog, ratesDefault, type SoundInfo } from './soundsIndex';
-import { amigaSoundsByAtariItem, type AmigaSoundData, type AmigaSoundTables } from '../data/tables/AmigaSoundTables';
+import {
+  amigaSoundsByAtariItem, compareVolumes, type AmigaSoundData, type AmigaSoundTables, type SoundVolume,
+} from '../data/tables/AmigaSoundTables';
 import type { SoundTableEntry } from '../data/tables/UITables';
 
 /** `SNDHEAD`'s `nSamplesPerSecond` in `SOUNDDATA::Decode` (`doc/CSBwin-src/Sound.cpp:343`). */
@@ -14,6 +16,18 @@ const CUSTOM_SOUND_RATE = 11025;
  * (`timerDataToRateIndex`), the Atari's 145 too.
  */
 const AMIGA_ENTRANCE_DOOR_PERIOD = 145;
+
+/** Both channels at Paula's full volume, the `0x4040` of A22E's direct `F0060_SOUND_Play_CPSX` (`ENTRANCE.C:160`). */
+const AMIGA_FULL_VOLUME: SoundVolume = { left: 64, right: 64 };
+/** CSBWin's quiet sound, a DSA's `&SOUND` at volume 0, 18 times quieter (`doc/CSBwin-src/Sound.cpp:668`), on both channels. */
+const AMIGA_QUIET_VOLUME: SoundVolume = { left: 64 / 18, right: 64 / 18 };
+
+/** One of A22E's two voices, a pair of Paula's channels: the sound it plays and its volume. */
+interface Voice {
+  source: AudioBufferSourceNode | null;
+  /** `G1024_as_SoundVolume[i]`, the volume of the sound it was last given. */
+  volume: SoundVolume;
+}
 
 /**
  * `SOUNDDATA::Decode(volume)`'s samples (`doc/CSBwin-src/Sound.cpp:320-364`), without
@@ -66,6 +80,15 @@ export class SoundManager {
   private recordings = new Map<string, AudioBuffer>();
   /** The Amiga's sound for each Atari SND item, in a set that carries the table item. */
   private amigaSounds = new Map<number, AmigaSoundData>();
+  /** The Amiga's tables, in a set that carries the table item. */
+  private amigaTables: AmigaSoundTables | null = null;
+  /** The Amiga's sounds by their graphic and period, as `playAmigaSound` plays them. */
+  private amigaCache = new Map<string, SoundVariant>();
+  /** `Sound1` and `Sound2`, A22E's two voices (ReDMCSB `EXEC.C:478-520`). */
+  private readonly voices: [Voice, Voice] = [
+    { source: null, volume: { left: 0, right: 0 } },
+    { source: null, volume: { left: 0, right: 0 } },
+  ];
 
   constructor(private graphics: GraphicsLoader) {
     const hasAudio = typeof globalThis !== 'undefined' && 'AudioContext' in globalThis;
@@ -142,10 +165,8 @@ export class SoundManager {
     const amiga = this.amigaSounds.get(id);
     const variants: SoundVariant[] = [];
     if (amiga) {
-      const samples = amigaSoundSamples(this.graphics.getRawGraphic(amiga.graphicIndex));
       rates.forEach((_, i) => {
-        const rate = amigaSoundRate(i === 0 ? amiga.period : AMIGA_ENTRANCE_DOOR_PERIOD);
-        variants.push(variant(context, `${info.name} (Amiga, ${rate.toFixed(1)} Hz)`, rate, samples.length, (k) => samples[k]! / 128));
+        variants.push(this.amigaVariant(context, amiga.graphicIndex, i === 0 ? amiga.period : AMIGA_ENTRANCE_DOOR_PERIOD));
       });
     } else {
       const data = SNDexpand(this.graphics.getRawGraphic(id));
@@ -156,10 +177,71 @@ export class SoundManager {
     this.cache.set(id, variants);
   }
 
+  /** The Amiga's 8-bit recording in item `graphicIndex`, at Paula's `period`. */
+  private amigaVariant(context: AudioContext, graphicIndex: number, period: number): SoundVariant {
+    const key = `${graphicIndex}/${period}`;
+    let found = this.amigaCache.get(key);
+    if (!found) {
+      const samples = amigaSoundSamples(this.graphics.getRawGraphic(graphicIndex));
+      const rate = amigaSoundRate(period);
+      found = variant(context, `Item ${graphicIndex} (Amiga, ${rate.toFixed(1)} Hz)`, rate, samples.length, (k) => samples[k]! / 128);
+      this.amigaCache.set(key, found);
+    }
+    return found;
+  }
+
+  /**
+   * A22E's `F0060_SOUND_Play_CPSX` (ReDMCSB `SOUND.C:1057-1114`): sound `soundIndex` of the
+   * Amiga's table at `period`, on a voice. The first voice if it is free, else the second
+   * if it is; with both busy, the second if the first's sound is the louder
+   * (`compareVolumes`), else the first, whose sound stops (`ADCMD_FINISH`, its control
+   * request without `ADIOF_SYNCCYCLE`, `EXEC.C:481`). Its left channel plays on the left,
+   * its right on the right, each at its volume of Paula's 64.
+   */
+  playAmigaSound(soundIndex: number, period: number, volume: SoundVolume): void {
+    if (!this.audioContext || !this.enabled) return;
+    const sound = this.amigaTables?.sounds[soundIndex];
+    if (!sound) return;
+    this.playOnVoice(this.amigaVariant(this.audioContext, sound.graphicIndex, period).buffer, volume);
+  }
+
+  private playOnVoice(buffer: AudioBuffer, volume: SoundVolume): void {
+    const context = this.audioContext;
+    if (!context || !this.gainNode) return;
+    const [voice1, voice2] = this.voices;
+    let voice: Voice;
+    if (!voice1.source) voice = voice1;
+    else if (!voice2.source) voice = voice2;
+    else voice = compareVolumes(voice1.volume, voice2.volume) === 1 ? voice2 : voice1;
+    voice.volume = volume;
+    voice.source?.stop();
+
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+    const merger = context.createChannelMerger(2);
+    const left = context.createGain();
+    const right = context.createGain();
+    left.gain.value = volume.left / 64;
+    right.gain.value = volume.right / 64;
+    source.connect(left);
+    source.connect(right);
+    left.connect(merger, 0, 0);
+    right.connect(merger, 0, 1);
+    merger.connect(this.gainNode);
+    // `CheckIO`: the voice is free once its sound has played out.
+    source.onended = () => {
+      if (voice.source === source) voice.source = null;
+    };
+    voice.source = source;
+    source.start();
+  }
+
   /**
    * `StartSound(SoundBytes, timerData, highVolume)` (`doc/CSBwin-src/Sound.cpp:652`): a
    * quiet sound, `highVolume` 0, is attenuated 18 times (`:668`). `QueueSound` decides
-   * which from its ordinal's table entry; a direct `StartSound` plays loud.
+   * which from its ordinal's table entry; a direct `StartSound` plays loud. In a set with
+   * the Amiga's sounds it is A22E's direct `F0060_SOUND_Play_CPSX`, on a voice at full
+   * volume (`playOnVoice`); `QueueSound`'s sounds go to `playAmigaSound`, which places them.
    */
   playSound(id: number, rateIdx = 0, highVolume = 1): void {
     if (!this.audioContext) return;
@@ -173,6 +255,10 @@ export class SoundManager {
     const variants = this.cache.get(id);
     const entry = variants?.[rateIdx];
     if (!entry) return;
+    if (this.amigaSounds.has(id)) {
+      this.playOnVoice(entry.buffer, highVolume === 0 ? AMIGA_QUIET_VOLUME : AMIGA_FULL_VOLUME);
+      return;
+    }
 
     const source = this.audioContext.createBufferSource();
     source.buffer = entry.buffer;
@@ -229,8 +315,10 @@ export class SoundManager {
   /** The set's sound table, and the Amiga's tables where its `graphics.dat` carries them. */
   setSoundTable(soundTable?: SoundTableEntry[], amiga?: AmigaSoundTables | null): void {
     this.soundCatalog = buildSoundCatalog(soundTable);
+    this.amigaTables = soundTable && amiga ? amiga : null;
     this.amigaSounds = soundTable && amiga ? amigaSoundsByAtariItem(soundTable, amiga) : new Map();
     this.cache.clear();
+    this.amigaCache.clear();
   }
 
   getSoundCatalog(): Record<number, SoundInfo> {

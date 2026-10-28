@@ -21,9 +21,16 @@
  *
  * `PlayCustomSound`, a DSA's `&SOUND`, plays here too, at once and at no distance, a
  * sample of `graphics.dat` or a sound of `CSBgraphics.dat`.
+ *
+ * A set whose `graphics.dat` carries the Amiga's tables (`dm-amiga`) hears a sound as A22E's
+ * `F0064_SOUND_RequestPlay_CPSD` has it (ReDMCSB `SOUND.C:1476-1754`), not by `byte6` and
+ * `byte7`: at a volume on each channel that the square, the party's and its facing decide
+ * (`getVolume`), and with `deltaTime` 1 not at once but as one of two pending sounds,
+ * which `startQueuedSound` plays. Not the Atari's: the authority is ReDMCSB (`CLAUDE.md`).
  */
 import { readU32LE } from '../core/bytes';
 import { CSBGraphicType, type CSBGraphicsLoader } from '../data/CSBGraphicsLoader';
+import { compareVolumes, getVolume, type AmigaSoundTables, type SoundVolume } from '../data/tables/AmigaSoundTables';
 import type { SoundTableEntry } from '../data/tables/UITables';
 import type { GameHost } from './GameHost';
 import type { GameState } from './gameTypes';
@@ -40,22 +47,31 @@ export class SoundQueue {
    */
   csbGraphics: Pick<CSBGraphicsLoader, 'readSection'> | null = null;
 
+  /** `G0734_ps_AmigaData->PendingSound1Index` and `PendingSound2Index`: -1 for none. */
+  private pendingSound1Index = -1;
+  private pendingSound2Index = -1;
+  /** `G1026_s_PendingSound1Volume` and `G1027_s_PendingSound2Volume`. */
+  private pendingSound1Volume: SoundVolume = { left: 0, right: 0 };
+  private pendingSound2Volume: SoundVolume = { left: 0, right: 0 };
+
   /**
    * @param sound1772 `d.sound1772` — the sound table from `graphics.dat` item `0x232`.
-   * @param host where a sample goes (`GameHost.playSound`), and a sound of
+   * @param host where a sample goes (`GameHost.playSound`, `playAmigaSound`), and a sound of
    *   `CSBgraphics.dat` (`playCustomSound`), and `ReadSound`'s complaints (`trace`).
    * @param state `state.tickCount` is `d.Time`, the clock a delayed sound is due by.
    * @param timers where a delayed sound's `TT_20` goes.
    * @param soundFilter `SoundFilter(ordinal, highVolume, soundLocr)`, with the location as
    *   level, x and y (`DsaFilters.soundFilter`): 0 when a DSA took the sound.
+   * @param amiga the Amiga's tables, `GameTables.amigaSounds`: `null` for the Atari's sound.
    */
   constructor(
     private readonly party: Party,
     private readonly sound1772: ArrayLike<SoundTableEntry>,
-    private readonly host: Pick<GameHost, 'playSound' | 'playCustomSound' | 'trace'>,
+    private readonly host: Pick<GameHost, 'playSound' | 'playAmigaSound' | 'playCustomSound' | 'trace'>,
     private readonly state: Pick<GameState, 'tickCount'>,
     private readonly timers: TimerQueue,
     private readonly soundFilter: (ordinal: number, highVolume: number, level: number, x: number, y: number) => number,
+    private readonly amiga: AmigaSoundTables | null = null,
   ) {}
 
   /**
@@ -68,6 +84,9 @@ export class SoundQueue {
    * (`:1896-1905`). The sound filter sees that choice, a silent sound included, and plays
    * nothing here if its DSAs took the sound (`:1906`). The host is handed the choice, not
    * the distance (`:1923-1925`).
+   *
+   * With the Amiga's tables, the filter sees that same choice, and then the sound goes to
+   * `requestPlayAmiga`, which decides for itself whether it is heard.
    */
   queueSound(ordinal: number, mapX: number, mapY: number, deltaTime: number, level: number): void {
     const entry = this.sound1772[ordinal];
@@ -98,6 +117,10 @@ export class SoundQueue {
     let highVolume = distance <= (entry.byte6 & 0xff) ? 1 : 0;
     if (distance >= (entry.byte7 & 0xff)) highVolume = -1;
     if (this.soundFilter(ordinal, highVolume, level, mapX, mapY) === 0) return;
+    if (this.amiga) {
+      this.requestPlayAmiga(this.amiga, ordinal, mapX, mapY, deltaTime);
+      return;
+    }
     if (highVolume < 0) return;
 
     const soundId = entry.word0 | 0;
@@ -106,6 +129,70 @@ export class SoundQueue {
     // CSBWin's `byte3` playback rate, which `StartSound` consumes inside the audio
     // layer (doc/CSBwin-src/Sound.cpp:652). Everything else in the port passes 0.
     this.host.playSound(soundId, 0, highVolume);
+  }
+
+  /**
+   * The rest of `F0064_SOUND_RequestPlay_CPSD` past its event (ReDMCSB `SOUND.C:1561-1714`):
+   * not heard beyond `getVolume`'s 12 squares; `deltaTime` 0 plays at once
+   * (`F0060_SOUND_Play_CPSX`, `GameHost.playAmigaSound`) at its entry's `Period`; 1,
+   * `C01_MODE_PLAY_IF_PRIORITIZED`, waits as a pending sound. A free one takes it, the
+   * first first; with both taken, one it is louder than (`compareVolumes`) gives it its
+   * place, the second if the first is the louder of the two, else the first; and failing
+   * that, one as loud as it with a lower `Priority`, the first before the second.
+   */
+  private requestPlayAmiga(amiga: AmigaSoundTables, ordinal: number, mapX: number, mapY: number, deltaTime: number): void {
+    const sound = amiga.sounds[ordinal];
+    if (!sound) return;
+    const party = this.party.state;
+    const volume = getVolume(amiga, party.position.x, party.position.y, party.facing, mapX, mapY);
+    if (!volume) return;
+    if (deltaTime === 0) {
+      this.host.playAmigaSound(ordinal, sound.period, volume);
+      return;
+    }
+    if (this.pendingSound1Index === -1) {
+      this.pendingSound1Index = ordinal;
+      this.pendingSound1Volume = volume;
+    } else if (this.pendingSound2Index === -1) {
+      this.pendingSound2Index = ordinal;
+      this.pendingSound2Volume = volume;
+    } else if (compareVolumes(volume, this.pendingSound1Volume) === 1 || compareVolumes(volume, this.pendingSound2Volume) === 1) {
+      if (compareVolumes(this.pendingSound1Volume, this.pendingSound2Volume) === 1) {
+        this.pendingSound2Index = ordinal;
+        this.pendingSound2Volume = volume;
+      } else {
+        this.pendingSound1Index = ordinal;
+        this.pendingSound1Volume = volume;
+      }
+    } else if (compareVolumes(volume, this.pendingSound1Volume) === 0
+      && sound.priority > amiga.sounds[this.pendingSound1Index]!.priority) {
+      this.pendingSound1Index = ordinal;
+      this.pendingSound1Volume = volume;
+    } else if (compareVolumes(volume, this.pendingSound2Volume) === 0
+      && sound.priority > amiga.sounds[this.pendingSound2Index]!.priority) {
+      this.pendingSound2Index = ordinal;
+      this.pendingSound2Volume = volume;
+    }
+  }
+
+  /**
+   * `StartQueuedSound` (`doc/CSBwin-src/CSBCode.cpp:1940`), in the main loop's tick and in
+   * `_ProcessTimersViewportAndSound`. CSBWin's plays nothing (`QueueSound` plays every
+   * sound itself); with the Amiga's tables it is A22E's `F0065_SOUND_PlayPendingSound_CPSD`
+   * (ReDMCSB `SOUND.C:1812-1821`, called at `GAMELOOP.C:115`), the two pending sounds played,
+   * the first first, at the volumes they were requested at.
+   */
+  startQueuedSound(): void {
+    const amiga = this.amiga;
+    if (!amiga) return;
+    if (this.pendingSound1Index !== -1) {
+      this.host.playAmigaSound(this.pendingSound1Index, amiga.sounds[this.pendingSound1Index]!.period, this.pendingSound1Volume);
+      this.pendingSound1Index = -1;
+    }
+    if (this.pendingSound2Index !== -1) {
+      this.host.playAmigaSound(this.pendingSound2Index, amiga.sounds[this.pendingSound2Index]!.period, this.pendingSound2Volume);
+      this.pendingSound2Index = -1;
+    }
   }
 
   /**

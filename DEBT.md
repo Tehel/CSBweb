@@ -123,7 +123,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| A4 | The Amiga's sound path: stereo volume by position, two voices | M | ⏳ |
 | A5 | Footsteps, `F0514_MOVE_GetSound`, and the war cry | M | ⏳ |
 | A6 | The rest of A22E's own code, classed | S | ⏳ |
 | E42 | The attack menu's damage flash timed in VBLs, not milliseconds | S | ⏳ |
@@ -179,7 +178,9 @@ in their place, then its 35 sounds and the port's table item, 598, appended
 table item into `GameTables.amigaSounds` (`src/data/tables/AmigaSoundTables.ts`), and
 `SoundManager` plays the Amiga's 8-bit recordings at their Paula rates in the Atari's place
 (`doc/AMIGA_DISK_REFERENCE.md` → "The sounds, played", `tools/checks/amiga-sounds.ts`),
-each still at the Atari's loud or quiet volume until A4.
+and hears each as A22E does: at a volume on each channel by where it is, on two voices,
+and with `deltaTime` 1 as one of two pending sounds (`doc/AMIGA_DISK_REFERENCE.md` → "The
+sounds, heard", `tools/checks/amiga-sound-path.ts`).
 
 **The sound table** is `G0060_as_Graphic562_Sounds[34]` (`doc/ReDMCSB-src/DATA.C:1165-1201`),
 at `dm:data+3738`. Entries 0-21 are the Atari's ordinals; 22, 23, 24, 26, 27, 32 and 33 are
@@ -201,13 +202,8 @@ action code to play them: `F0407_MENUS_IsActionPerformed` is only named
 has a sound in play, the author's own memory of the PC version, which came from the
 Amiga's. The horn's is unknown.
 
-**Volume and stereo.** A22E's `F0064_SOUND_RequestPlay_CPSD` (`SOUND.C:1476`) does not
-use `LoudDistance` and `SoftDistance`. `F0505_SOUND_GetVolume` (`SOUND.C:1871-1919`) turns the
-source's square, relative to the party and its facing, into a row and a column of
-`G1028_aauc_DistanceToSoundVolume[25][25]` (`SOUND.C:55`), one read for the right channel
-and its mirror for the left, and nothing beyond 12 squares either way is heard. Two voices
-play; a third sound takes the quieter's (`F0502_SOUND_CompareVolumes`, `SOUND.C:227`, `:1060-1090`),
-and a sound requested for the next VBL waits as one of two pending sounds (`SOUND.C:1656-1712`).
+**Volume and stereo** are A22E's, and the port's for the set: `doc/AMIGA_DISK_REFERENCE.md`
+→ "The sounds, heard".
 
 **The dungeon** is the Amiga `Dungeon.dat` as it is: compressed, the Atari 1.2 image but
 for actuator 565 on map 7 (level 8), and a checksum (`doc/PROVEN_FACTS.md` → "A PC
@@ -224,23 +220,6 @@ Decisions taken with the author:
   credits (5), font (557), objects' names (556) and picture 396 replace the Atari's in
   place: they are in the formats CSBWin reads, so the folder still plays in CSBWin.
 
-### A4 ⏳ The Amiga's sound path: stereo volume by position, two voices
-
-For a set with the table item, `QueueSound` (`src/engine/SoundQueue.ts`) answers as A22E's
-`F0064_SOUND_RequestPlay_CPSD`: `F0505_SOUND_GetVolume`'s left and right (two gains, Paula's
-0-64), the 12 squares, the two voices and `F0502_SOUND_CompareVolumes`, the two pending
-sounds. The delayed sounds (`TT_20`) are CSBWin's as they are. A check reads the left and
-right volumes for a source at each facing.
-
-That is the Amiga's spatial sound, and all of it, counted in squares (no metre scale):
-- **Distance:** 64 on the party's square, 58 one square ahead, 29 two, 20 three.
-- **Front and back:** a sound ahead is louder than the same sound as far behind (row 12 −
-  n against row 12 + n: 58 against 41 at one square).
-- **Left and right:** one square to the right is 58 in the right channel and 6 in the left.
-
-Nothing more, no filtering for behind or for walls between: a closer imitation (a Web
-Audio `PannerNode`, HRTF) would be the port's own, an X extra, not this item.
-
 ### A5 ⏳ Footsteps, `F0514_MOVE_GetSound`, and the war cry
 
 `F0514_MOVE_GetSound`, its A22E branch, called where a group arrives on its square (the
@@ -248,6 +227,11 @@ port's group move, `src/engine/WorldMove.ts`) and at a couatl's flip; the three 
 sounds through the Amiga's ordinals. `tools/checks/watch-amiga-footsteps.ts` runs the
 clock and lists the sounds requested as a group comes towards the party, and none while it
 rests.
+
+Ordinals 22-33 have no `d.sound1772` entry, and `SoundQueue.queueSound` returns for an
+ordinal without one before it reaches the Amiga's path; a delayed one's `TT_20` takes its
+`byte4`. For a set with the Amiga's tables, the check is `G0060_as_Graphic562_Sounds`'s, and
+the event's priority its `Priority` (`SOUND.C:1536-1544`).
 
 The war cry plays sound 28 and the horn sound 25, if 2.2 plays it. ReDMCSB has no action
 code (above), so both are settled in `dm` itself: the 68000 code that requests
@@ -260,7 +244,7 @@ nothing in 2.2, that is recorded and it stays silent.
 64 `MEDIA*` macros hold A22E and not S21E, in `DUNVIEW.C`, `MEMORY.C`, `DATA.C`,
 `TIMELINE.C`, `FLOPPY.C`, `DIALOG.C`, `SOUND.C`, `MOVESENS.C`, `DUNGEON.C`, `INPUT.C`,
 `CHAMDRAW.C`, `GROUP.C`, `CLIKMENU.C`, `TEXT.C`, … Each one a player can see or hear is
-classed as carried by the set's `graphics.dat` or A4-A5, left (an H entry) or the machine's alone: among them the
+classed as carried by the set's `graphics.dat`, the sound path or A5, left (an H entry) or the machine's alone: among them the
 wall bump's sound mode (`CLIKMENU.C:307`) and the highlight box (`CLIKMENU.C:57-60`).
 **The palettes, if they come easily** (the author: wanted, of little value). The Amiga's
 have 4 bits a channel where the Atari's have 3, and the darker dungeon palettes black out

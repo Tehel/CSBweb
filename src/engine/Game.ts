@@ -617,8 +617,10 @@ export class Game implements MainLoop {
         waitForButtonFlash(this.ctx);
         const putBackAsked = this.ctx.loop.flashButnActive;
         // `StartQueuedSound(); DisplayCharacterDamage();` (doc/CSBwin-src/CSBCode.cpp:666-667):
-        // what `DamageCharacter` dealt since the last tick comes off the HP, and a champion
-        // it kills can lose the game just below.
+        // the pending sounds of a set with the Amiga's tables, then what `DamageCharacter`
+        // dealt since the last tick comes off the HP, and a champion it kills can lose the
+        // game just below.
+        this.ctx.sounds.startQueuedSound();
         this.ctx.systems.championDamage.displayCharacterDamage();
         // `tag000730`: `if (d.GameIsLost == 0) { d.Time++; … goto tag000698; } RETURN;`
         // (doc/CSBwin-src/CSBCode.cpp:668-788). With nobody left alive the rest of the tick
@@ -765,16 +767,17 @@ export class Game implements MainLoop {
      * runs between its `VBLDelay`s: `ProcessTimers`, and a win there ends the game
      * (`wonByTimers`); then `d.Time++` and `scrollingText.ClockTick()`. Not the rest of the
      * main loop's tick: no input, no periodic update, no print-queue entry. `DrawViewport` and
-     * `display` are the host's `drawViewport`. `StartQueuedSound` has no counterpart: it
-     * plays nothing, since `d.CurrentSound` stays -1 once `QueueSound`'s assignment is
-     * commented out (`doc/CSBwin-src/CSBCode.cpp:1935`) and `QueueSound` calls `StartSound`
-     * itself.
+     * `display` are the host's `drawViewport`. `StartQueuedSound` plays nothing in CSBWin,
+     * since `d.CurrentSound` stays -1 once `QueueSound`'s assignment is commented out
+     * (`doc/CSBwin-src/CSBCode.cpp:1935`) and `QueueSound` calls `StartSound` itself; with
+     * the Amiga's tables it plays the pending sounds (`SoundQueue.startQueuedSound`).
      */
     *processTimersViewportAndSound(): LoopScript {
         if (this.systems.timer.processTimers()) {
             yield* this.wonByTimers();
         }
         this.ctx.host.drawViewport();
+        this.ctx.sounds.startQueuedSound();
         this.advanceTime();
         this.ctx.host.messages.clockTick(this.ctx.state.tickCount);
     }

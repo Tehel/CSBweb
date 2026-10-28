@@ -190,6 +190,46 @@ plays, for each Atari SND item, the Amiga sound its ordinals name
 second rate the rattle at 145 (`src/audio/SoundManager.ts`). `tools/checks/amiga-sounds.ts`
 decodes the 34 and plays them through `SoundManager`.
 
+## The sounds, heard
+
+A22E's `F0064_SOUND_RequestPlay_CPSD` (`doc/ReDMCSB-src/SOUND.C:1476-1754`) reads neither
+`LoudDistance` nor `SoftDistance`. Its mode is CSBWin's `deltaTime`: any but 0 returns off
+the party's map (`:1523-1529`), and above 1 it adds a `C20_EVENT_PLAY_SOUND` event, which
+requests the sound again in mode 1 when it falls due (`TIMELINE.C:1903-1905`). Otherwise:
+
+- **The volume.** `F0505_SOUND_GetVolume` (`SOUND.C:1871-1919`) turns the source's offset
+  from the party to its facing: a line, negative ahead, and a column, positive to the
+  right. A sound more than 12 squares away along either is not heard (`:1907-1912`). Else
+  the right channel's volume is `G1028_aauc_DistanceToSoundVolume[line + 12][column + 12]`
+  and the left channel's `[line + 12][12 - column]` (`:1913-1917`), Paula's 0 to 64. So:
+  64 on the party's square, 58, 29 and 20 one, two and three squares ahead, 41 one
+  behind, and one to the right 58 on the right and 6 on the left.
+- **Mode 0** plays at once (`F0060_SOUND_Play_CPSX`, `:1608-1642`).
+- **Mode 1**, `C01_MODE_PLAY_IF_PRIORITIZED`, waits as one of two pending sounds
+  (`:1657-1714`). A free one takes it, the first first. With both taken, a sound louder
+  than either (`F0502_SOUND_CompareVolumes`, `:227-268`: the two channels' sum in three
+  classes, below 15, 15 to 25, above 25) replaces the second if the first is the louder of
+  the two, else the first. Failing that, it replaces one it is as loud as with a lower
+  `Priority`, the first before the second. Otherwise it is dropped.
+  `F0065_SOUND_PlayPendingSound_CPSD` (`:1812-1821`) plays the first, then the second, at
+  the volumes they were requested at. The main loop calls it after the dungeon view is drawn and before the
+  pending damage (`GAMELOOP.C:115-116`), where CSBWin calls its `StartQueuedSound`
+  (`doc/CSBwin-src/CSBCode.cpp:666`).
+- **Two voices.** `F0060_SOUND_Play_CPSX` (`SOUND.C:1057-1114`) plays on `Sound1`, a
+  left and a right channel, if it is free (`CheckIO`), else on `Sound2` if it is. With
+  both busy, it takes `Sound2` if `Sound1`'s sound is the louder, else `Sound1`
+  (`:1071-1087`), and remembers the volume it was given (`G1024_as_SoundVolume`). The voice's
+  sound stops at once: `ADCMD_FINISH`, its control request without `ADIOF_SYNCCYCLE`
+  (`EXEC.C:481`). The left channel plays at the left volume, the right at the right
+  (`:1109-1110`). A direct call plays both at 64, `0x4040` (`ENTRANCE.C:160`, `:919`).
+
+The port does all of this for a set with the table item: `SoundQueue.queueSound`
+(`src/engine/SoundQueue.ts`) after CSBWin's sound filter, `StartQueuedSound` at both of
+CSBWin's places, the two voices in `SoundManager.playAmigaSound`, each channel a gain of
+its volume over 64 into a channel merger. A Web Audio sound plays to its end. A voice is
+free from its source's `ended`. `tools/checks/amiga-sound-path.ts` proves it. Nothing more: no
+filtering for a sound behind, nor for walls between.
+
 ## `Dungeon.dat`
 
 The Amiga's English `Dungeon.dat` is the Atari 1.2 dungeon, compressed, with one

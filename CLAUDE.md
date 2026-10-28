@@ -184,7 +184,8 @@ data/       DataSets (the manifest's sets), LocalDataSets (a player's own, a rec
             the same database)
   tables/   Runtime table extraction from graphics.dat: ObjectTables, UITables,
             ViewportTables, MonsterDesc, AmigaSoundTables (the `dm-amiga` set's table
-            item), and GraphicsTables (all of them, read once)
+            item, and the volumes A22E reads from it), and GraphicsTables (all of them,
+            read once)
 engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), GameHost (what
             the engine asks of the page), GameTables (every graphics.dat table, one
             builder), DungeonState, Party, MovementSystem, TimerSystem, TimerQueue,

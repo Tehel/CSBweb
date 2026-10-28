@@ -7,6 +7,7 @@
  * null object that does nothing (a `die` that throws again), so no caller asks whether
  * anybody is listening. Headless, nobody is, and the game plays the same.
  */
+import type { SoundVolume } from '../data/tables/AmigaSoundTables';
 import type { Champion } from './gameTypes';
 
 /** A champion who has joined (`GameHost.championJoined`), by RESURRECT or REINCARNATE. */
@@ -66,6 +67,12 @@ export interface GameHost {
    * (`doc/CSBwin-src/Sound.cpp:668`); left out, the sample plays loud.
    */
   playSound(soundId: number, rateIdx?: number, highVolume?: number): void;
+  /**
+   * Play the Amiga's sound `soundIndex` of its table at Paula's `period`, each channel at
+   * its volume: A22E's `F0060_SOUND_Play_CPSX` (ReDMCSB `SOUND.C:860-1140`), for a set
+   * with the Amiga's tables (`SoundQueue`).
+   */
+  playAmigaSound(soundIndex: number, period: number, volume: SoundVolume): void;
   /**
    * Play a sound of `CSBgraphics.dat`, its samples as `ReadSound` left them: the rest of
    * `PlayCustomSound`, `SOUNDDATA::Decode(volume)` and `sounder.Sound`
@@ -254,6 +261,7 @@ const WALL_CLOCK: LoopClock = {
 export function createGameHost(host: Partial<GameHost> = {}): GameHost {
   return {
     playSound: host.playSound ?? (() => {}),
+    playAmigaSound: host.playAmigaSound ?? (() => {}),
     playCustomSound: host.playCustomSound ?? (() => {}),
     trace: host.trace ?? (() => {}),
     tracing: host.tracing ?? host.trace !== undefined,

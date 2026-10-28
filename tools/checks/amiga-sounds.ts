@@ -30,37 +30,11 @@ import { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import { AMIGA_SOUND_COUNT, amigaSoundsByAtariItem } from '../../src/data/tables/AmigaSoundTables';
 import { check, finish } from '../lib/check';
 import { gameTablesOf, stockGraphics } from '../lib/game';
+import { installRecordingContext } from '../lib/recordingAudio';
 
 const AMIGA = 'tools/fixtures/gamefiles/dm-amiga/graphics.dat';
-/** The context's rate, the one Chrome gives on most machines. */
-const CONTEXT_RATE = 48000;
 /** Where the built file holds the Amiga's recordings of the Atari's 533-555 (`amiga-graphics.ts`). */
 const AMIGA_RECORDINGS = 563;
-
-/** An `AudioContext` that hands back every buffer a source is started with. */
-class RecordingContext {
-  readonly sampleRate = CONTEXT_RATE;
-  readonly destination = {};
-  readonly state = 'running';
-  readonly started: { length: number; sampleRate: number; data: Float32Array }[] = [];
-  createGain() {
-    return { gain: { value: 1 }, connect: () => undefined };
-  }
-  createBuffer(_channels: number, length: number, sampleRate: number) {
-    const data = new Float32Array(length);
-    return { length, sampleRate, data, getChannelData: () => data };
-  }
-  createBufferSource() {
-    const started = this.started;
-    return {
-      buffer: null as null | { length: number; sampleRate: number; data: Float32Array },
-      connect: () => undefined,
-      start() {
-        if (this.buffer) started.push(this.buffer);
-      },
-    };
-  }
-}
 
 const hz = (rate: number) => rate.toFixed(1);
 
@@ -111,21 +85,21 @@ function main(): void {
     'every sound plays at period 112 but the wall bump\'s, ordinal 18, at 138');
 
   // The SoundManager, on both sets.
-  const context = new RecordingContext();
-  (globalThis as { AudioContext?: unknown }).AudioContext = function () { return context; };
+  const context = installRecordingContext();
+  const contextRate = context.sampleRate;
   const manager = new SoundManager(graphics);
   manager.setSoundTable(tables.sound1772, amiga);
   const wallBump = graphics.getRawGraphic(byItem.get(SoundIndex.WALL_BUMP)!.graphicIndex);
   manager.playSound(SoundIndex.WALL_BUMP);
   const bump = context.started.at(-1)!;
-  const bumpLength = Math.floor(((wallBump.length - 2) / amigaSoundRate(138)) * CONTEXT_RATE);
+  const bumpLength = Math.floor(((wallBump.length - 2) / amigaSoundRate(138)) * contextRate);
   console.log(`dm-amiga's wall bump: ${bump.length} samples at ${bump.sampleRate} Hz, starting ${[...bump.data.subarray(0, 4)].join(' ')}`);
   check(bump.length === bumpLength && bump.data[0] === ((wallBump[2]! << 24) >> 24) / 128,
     `dm-amiga's wall bump plays the Amiga's ${wallBump.length - 2} samples at 6730.4 Hz, signed`);
   manager.playSound(SoundIndex.DOOR, 1);
   const door = context.started.at(-1)!;
   const doorSamples = graphics.getRawGraphic(byItem.get(SoundIndex.DOOR)!.graphicIndex).length - 2;
-  check(door.length === Math.floor((doorSamples / amigaSoundRate(145)) * CONTEXT_RATE),
+  check(door.length === Math.floor((doorSamples / amigaSoundRate(145)) * contextRate),
     'dm-amiga\'s entrance door, the second variant, plays the Amiga\'s rattle at 7065.5 Hz');
 
   const stock = stockGraphics();
@@ -135,7 +109,7 @@ function main(): void {
   const atariBump = context.started.at(-1)!;
   const atariSamples = SNDexpand(stock.getRawGraphic(SoundIndex.WALL_BUMP)).length;
   console.log(`dm-atari's wall bump: ${atariBump.length} samples at ${atariBump.sampleRate} Hz`);
-  check(atariBump.length === Math.floor((atariSamples / 5486) * CONTEXT_RATE),
+  check(atariBump.length === Math.floor((atariSamples / 5486) * contextRate),
     `dm-atari's wall bump plays its ${atariSamples} 4-bit samples at 5486 Hz`);
   finish();
 }
