@@ -129,6 +129,8 @@ In payoff order: the first row is the next item.
 | G29 | Recording a game and playing it back | L | ⏳ after E42, E43, F22 |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
 | F23 | CSBWin's scent loops against the Atari's program | S | ⏳ |
+| C194 | A DSA's wall graphic counts as a real decoration, so it hides no text | S | ⏳ |
+| C195 | Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space | S | ⏳ to decide with the author |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | E40 | The statistics page's heat map | M | ⏸️ |
 | C150 | Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops | S | ⏸️ waits on the author |
@@ -147,7 +149,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: A11 · C194 · D22 · E44 · F24 · G31 · P13 · R17 · U13 · W8 · X18. An ID recorded and paid in one commit has no
+Next free IDs: A11 · C196 · D22 · E44 · F24 · G31 · P13 · R17 · U13 · W8 · X18. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -630,6 +632,30 @@ seen to band.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
+
+### C194 ⏳ A DSA's wall graphic counts as a real decoration, so it hides no text
+
+`SummarizeRoomInfo` gives a face with a visible text and no real decoration no decoration
+at all (`doc/CSBwin-src/Codea59a.cpp:172-179`). A DSA's extended graphic is written to
+`rslt->decorations` without `realDecoration` (`:113-127`), so under a text it is dropped.
+The port sets `realDecoration` for it too (`src/renderer/csbwin/SummarizeRoomInfo.ts`, the
+type 47 branch), so it draws both. No face of a set here holds a visible text and a DSA
+graphic without another actuator, so nothing shows it yet. Paying it: drop the line, and
+prove it on a face made in a tool.
+
+### C195 ⏳ Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space
+
+Before a wall text is drawn, `DrawWallDecoration` passes it through `TranslateWallLanguage`
+(`doc/CSBwin-src/CSBCode.cpp:3292`, `Translation.cpp:196-218`): codes 0-25 become `A`-`Z`,
+26 a space, 27 a period, 128 a newline, and every other code `'A' + code`. The result is
+looked up in `Translation.txt`'s table, unchanged without one, then turned back: `A`-`Z`,
+newline and period as they were, **anything else 26**. So with or without a translation
+file, a code from 28 to 127 is drawn as a space. The port has no `TranslateWallLanguage`
+and draws the code's glyph. No wall text of the English sets or of Conflux holds such a
+code. 13 of `dm-atari-1.3-fr`'s do, and CSBWin would show each of those codes as a space. `tools/checks/wall-text.ts` part 3 asserts what a
+code past the font draws, which CSBWin never reaches. Paying it: port the round trip
+without a table (G21 holds `Translation.txt`), and decide with the author whether the
+French set keeps its letters, a deliberate divergence under H.
 
 ### C150 ⏸️ Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops
 
