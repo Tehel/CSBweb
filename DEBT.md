@@ -126,6 +126,7 @@ In payoff order: the first row is the next item.
 | A7 | The wall bump heard from the wall | S | ⏳ |
 | A8 | The Amiga's ending explosions and its dialogs' "V2.2" | S | ⏳ |
 | A9 | `dm`'s own colours and ornament frames | M | ⏳ |
+| A10 | The scents compared with a square, as every release but the Atari's | S | ⏳ |
 | E42 | The attack menu's damage flash timed in VBLs, not milliseconds | S | ⏳ |
 | E43 | One input boundary: every change the page makes to the game, logged with its VBL | M | ⏳ |
 | F22 | `tools/checks/replay.ts`: a game logged at the boundary plays back the same | M | ⏳ |
@@ -149,7 +150,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: A10 · C194 · D22 · E44 · F23 · G31 · P13 · R17 · U13 · W8 · X18. An ID recorded and paid in one commit has no
+Next free IDs: A11 · C194 · D22 · E44 · F23 · G31 · P13 · R17 · U13 · W8 · X18. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -215,8 +216,9 @@ Decisions taken with the author:
 
 **A22E's own code is classed** (`doc/AMIGA_DISK_REFERENCE.md` → "A22E's own code,
 classed"): the machine's alone, the Atari's tables moved into `dm`, the compiler's layout,
-carried by the sound path, left as CSBWin does (H), or still to carry, which is A7-A9.
-The disk's bonus dungeon, `DungeonB.dat`, is not taken.
+carried by the sound path, left as CSBWin does (H), or still to carry, which is A7-A10.
+The disk's bonus dungeon, `DungeonB.dat`, the Amiga's own Kids dungeon, is not taken (the
+author).
 
 ### A7 ⏳ The wall bump heard from the wall
 
@@ -250,6 +252,30 @@ The dungeon view's palettes are at `dm:data+2848`; the others are not located in
 yet. Where the port's palettes come from (the `0x232` item, at the Atari's 3 bits) decides
 how cheap the colours are. **The palettes, if they come easily** (the author: wanted, of
 little value); if not, they are left, and H says so.
+
+### A10 ⏳ The scents compared with a square, as every release but the Atari's
+
+At the author's request, for a set with the table item: the scents as A22E keeps them,
+which every release but the Atari's does (the IIGS's and the Amiga's, `MEDIA353`; the
+later ports', `MEDIA529`), and CSB on the Atari, 2.0 and 2.1, does not, so it follows the
+set and not an engine version. The Atari, and CSBWin, throw both comparisons away
+(`doc/CSBwin-src/Code11f52.cpp:4383-4410`, whose x and y go unused;
+`doc/CSBwin-src/Code17818.cpp:181-195`, its `SearchWordNE` commented out), and
+`src/engine/PartyFootprints.ts` ports that. A22E:
+
+- `F0317_CHAMPION_AddScentStrength(x, y, cycles)` (`doc/ReDMCSB-src/CHAMPION.C:1472-1525`),
+  called with the square the party leaves and the square it enters
+  (`MOVESENS.C:772`, `:783`), changes a strength only where the scent's location
+  (x, y and the current map) is the square's. Its pointer walks the scents up from 0 while
+  its index walks the strengths down from the newest (`:1497-1507`), so it compares scent
+  `k` and writes strength `N-1-k`: the port does the same.
+- The ten-second decay (`CHAMPION.C:2311-2330`) spares the scent at the party's square.
+
+First settle the loops' bound: CSBWin's `while (index-- != 1)` never writes strength 0,
+ReDMCSB's `while (L0954_i_ScentIndex--)`, in every release, does; read the Atari's code
+before calling either a slip (`.claude/memory/memmove-source-first.md`). A
+`tools/checks/` tool walks a party on `dm-atari` and on `dm-amiga` and shows the
+strengths part. The H entry on the Amiga set then names it.
 
 The Amiga's FTL logo (`swoosh`, a program of its own) is not taken: it plays and looks as
 the Atari's does (the author).
@@ -1005,9 +1031,8 @@ Recorded so that nobody "fixes" them.
   `dm-amiga` set follows ReDMCSB's A22E branch (`doc/ReDMCSB-src/`,
   `doc/AMIGA_DISK_REFERENCE.md` → "The reference: ReDMCSB, A22E"), and its tables are read
   from the Amiga's `dm`. Everything CSBWin has, the Amiga set does as CSBWin does,
-  where A22E does it otherwise too: the couatl's picture is CSBWin's aspect, a scent's
-  strength changes as the Atari's does (every scent, where A22E changes only the one on
-  the square), and the click areas are the Atari's (A22E's RESURRECT, REINCARNATE and
+  where A22E does it otherwise too: the couatl's picture is CSBWin's aspect, and the click
+  areas are the Atari's (A22E's RESURRECT, REINCARNATE and
   CANCEL are smaller, and its names open the inventory a pixel further left).
   `doc/AMIGA_DISK_REFERENCE.md` → "A22E's own code, classed".
 

@@ -315,13 +315,17 @@ does not run them.
   pending sounds and the two voices, the footsteps, the attack sounds, the couatl's sound,
   the war cry and the horn (the sections above).
 - **Left, as CSBWin does** (`DEBT.md` H): the couatl's picture toggled on its coin toss
-  (`GROUP.C:265-279`); a scent's strength changed only on the square it names
-  (`CHAMPION.C:1505`, `:2316`), where the Atari's comparison is thrown away and every
-  scent changes; and the click areas the Amiga draws otherwise: RESURRECT, REINCARNATE and
+  (`GROUP.C:265-279`); and the click areas the Amiga draws otherwise: RESURRECT, REINCARNATE and
   CANCEL at `COMMAND.C:236-238`, smaller than the Atari's, and a champion's name, which
   opens the inventory on a left click, from x 43, 112, 181 and 250 where CSB's start a
   pixel further right (`COMMAND.C:92-95`).
-- **Still to carry** (`DEBT.md` A7-A9):
+- **Still to carry** (`DEBT.md` A7-A10):
+  - the scents compared with a square, which every release but the Atari's does
+    (`MEDIA353`, the IIGS's and the Amiga's; `MEDIA529`, the later ports'), and CSB on the
+    Atari, 2.0 and 2.1, does not: `F0317_CHAMPION_AddScentStrength` changes only a scent
+    on the square it is given (`CHAMPION.C:1505`), and the ten-second decay spares the
+    scent on the party's square (`CHAMPION.C:2316`), where the Atari's comparisons are
+    thrown away and every scent changes;
   - the wall bump's sound, which A22E asks for on the square bumped into, where the Atari
     asks for it on the party's (`CLIKMENU.C:307`), so the Amiga hears it ahead or to one
     side;
@@ -343,8 +347,8 @@ does not run them.
 
 **The bonus dungeon.** A21E and A22E load `DungeonB.dat`, the disk's Kids dungeon, in
 place of `Dungeon.dat` when Alt is held as the game starts (`STARTUP2.C:1329-1331`,
-`LOADSAVE.C:2319`). The port does not take it, and has not compared it with the
-`kids-dungeon` set's `dungeon.dat`.
+`LOADSAVE.C:2319`). It is the Amiga's own, slightly extended, where the `kids-dungeon`
+set plays the Apple IIGS's (the author). The port does not take it (the author).
 
 ## `Dungeon.dat`
 
