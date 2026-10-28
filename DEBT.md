@@ -322,6 +322,13 @@ are left, and H says so.
 The Amiga's FTL logo (`swoosh`, a program of its own) is not taken: it plays and looks as
 the Atari's does (the author).
 
+**Chaos Strikes Back for the Amiga is not part of A.** When a set of it is started, its
+introduction, a long animation with sound that the Atari's CSB does not have (seen by the
+author in a longplay, probably of the Amiga 3.6), needs a player of its own, as `Swoosh`
+is for the Atari disk's logo. Nothing of it is read yet: not the disk (`fetch-gamefiles`
+takes CSB's Atari archive only), not the files the introduction is in, nor their format,
+nor a reference for its code.
+
 ---
 
 ## P — Players' own data sets
