@@ -123,7 +123,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| A7 | The wall bump heard from the wall | S | ⏳ |
 | A8 | The Amiga's ending explosions and its dialogs' "V2.2" | S | ⏳ |
 | A10 | The scents compared with a square, as every release but the Atari's | S | ⏳ |
 | E42 | The attack menu's damage flash timed in VBLs, not milliseconds | S | ⏳ |
@@ -217,17 +216,9 @@ Decisions taken with the author:
 **A22E's own code is classed** (`doc/AMIGA_DISK_REFERENCE.md` → "A22E's own code,
 classed"): the machine's alone, the Atari's tables moved into `dm`, the compiler's layout,
 carried by the sound path or in the set's items `0x22e` and `0x232`, left as CSBWin does
-(H), or still to carry, which is A7, A8 and A10.
+(H), or still to carry, which is A8 and A10.
 The disk's bonus dungeon, `DungeonB.dat`, the Amiga's own Kids dungeon, is not taken (the
 author).
-
-### A7 ⏳ The wall bump heard from the wall
-
-A22E asks for the party-damaged sound of a bump on the square bumped into, mode 0
-(`doc/ReDMCSB-src/CLIKMENU.C:307`); the Atari, and the port, on the party's. Under the
-Amiga's volume grid the bump is heard at 58 ahead, or 58 and 6 to one side, where the
-party's square gives 64 on both. For a set with the table item only, through the sound
-path; a `tools/checks/` tool hears both.
 
 ### A8 ⏳ The Amiga's ending explosions and its dialogs' "V2.2"
 

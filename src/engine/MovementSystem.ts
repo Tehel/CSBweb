@@ -437,6 +437,11 @@ export class MovementSystem {
      * bump is silent when nobody was hurt — an empty party, or a blow armour absorbed.
      * `LOCAL_30` is a `ui16`, so a -1 in both compares unequal and `DamageCharacter(-1)`
      * runs, returning 0; the port keeps the comparison as written.
+     *
+     * With the Amiga's tables, the sound is asked for on the square bumped into, as A22E
+     * does (ReDMCSB `CLIKMENU.C:307`, `L1121_i_MapX`, `L1122_i_MapY`), so the Amiga's
+     * volume grid hears it ahead or to one side (`doc/AMIGA_DISK_REFERENCE.md` → "The
+     * sounds, heard").
      */
     private bumpWall(newPosition: Position, relDirection: number): MovementResult {
         let k = 0;
@@ -447,7 +452,10 @@ export class MovementSystem {
             const local10 = this.ctx.systems.championDamage.getCharacterToDamage(newPosition.x, newPosition.y, (direction + 1) & 3);
             const local30 = local10 & 0xffff;
             if (local8 !== local30) k |= this.ctx.systems.championDamage.damageCharacter(local10, 1, 24, 2);
-            if (k !== 0) this.ctx.sounds.queueSound(18, this.party.state.position.x, this.party.state.position.y, 0, this.party.state.position.z);
+            if (k !== 0) {
+                const square = this.ctx.tables.amigaSounds ? newPosition : this.party.state.position;
+                this.ctx.sounds.queueSound(18, square.x, square.y, 0, this.party.state.position.z);
+            }
         }
         return {
             success: false,

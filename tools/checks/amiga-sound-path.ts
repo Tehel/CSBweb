@@ -16,7 +16,11 @@
  *     else the first's, or of one as loud with a lower `Priority`, and is dropped
  *     otherwise (`SOUND.C:1657-1714`); a sound thirteen squares away is not heard, and one
  *     with `deltaTime` 1 on another level than the party's neither.
- *  4. `SoundManager`'s voices: the first free voice, the second, then with both busy the
+ *  4. The wall bump, sound 18, which A22E asks for on the square bumped into
+ *     (`CLIKMENU.C:307`): 58 on both channels walking into a wall, 6 on the left and 58 on
+ *     the right sidestepping into one; `dm-atari` asks for it on the party's square, as
+ *     CSBWin does (`doc/CSBwin-src/CSBCode.cpp:8376`).
+ *  5. `SoundManager`'s voices: the first free voice, the second, then with both busy the
  *     second if the first's sound is the louder, else the first, whose sound stops; a
  *     voice that played out is free again. Each channel at its volume of Paula's 64, and a
  *     direct `playSound` at 64 on both. `dm-atari`'s sounds play mono, as before.
@@ -28,13 +32,17 @@ import { resolve } from 'node:path';
 
 import { SoundManager } from '../../src/audio/SoundManager';
 import { SoundIndex } from '../../src/core/constants';
-import { Direction } from '../../src/core/types';
+import { Direction, Position, RoomType } from '../../src/core/types';
 import { DungeonLoader } from '../../src/data/DungeonLoader';
 import { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import { compareVolumes, getVolume, type SoundVolume } from '../../src/data/tables/AmigaSoundTables';
+import type { Game } from '../../src/engine/Game';
+import { MovementAction } from '../../src/engine/gameTypes';
 import { check, finish } from '../lib/check';
 import { gameTablesOf, newGame, stockGame, stockGraphics } from '../lib/game';
 import { installRecordingContext } from '../lib/recordingAudio';
+import { testChampion } from '../lib/champion';
+import { wrapMember } from '../lib/standIn';
 
 const AMIGA = 'tools/fixtures/gamefiles/dm-amiga';
 /** `C01_SOUND_SWITCH`, priority 15; `C00_SOUND_METALLIC_THUD` is 11 and `C08_SOUND_SWALLOW` 2 (ReDMCSB `DATA.C:1166-1174`). */
@@ -169,7 +177,46 @@ function main(): void {
   atari.ctx.sounds.queueSound(SWITCH, atariParty.x, atariParty.y, 1, atariParty.z);
   check(atariPlayed.length === 1 && played.length === 1, 'dm-atari plays a deltaTime 1 sound at once, through playSound, as CSBWin does');
 
-  // 4. `SoundManager`'s voices.
+  // 4. The wall bump.
+  const bumps = (bumper: Game): string[] => {
+    const asked: string[] = [];
+    wrapMember(bumper.ctx.sounds, 'queueSound', (queueSound) => (ordinal, mapX, mapY, deltaTime, level) => {
+      if (ordinal === 18) asked.push(`${mapX},${mapY}`);
+      queueSound(ordinal, mapX, mapY, deltaTime, level);
+    });
+    const state = bumper.ctx.party.state;
+    const level = state.position.z;
+    const map = bumper.ctx.dungeon.getMap(level)!;
+    const stone = (x: number, y: number): boolean => (bumper.ctx.dungeon.getCellFlag(new Position(x, y, level)) >> 5) === RoomType.STONE;
+    let at: [number, number] | null = null;
+    for (let x = 1; x < map.descriptor.width - 1 && !at; x++) {
+      for (let y = 1; y < map.descriptor.height - 1 && !at; y++) {
+        if ((bumper.ctx.dungeon.getCellFlag(new Position(x, y, level)) >> 5) === RoomType.OPEN && stone(x, y - 1) && stone(x + 1, y)) at = [x, y];
+      }
+    }
+    check(at !== null, 'an open square with stone to its north and east');
+    if (!at) return asked;
+    state.champions = [testChampion(0), testChampion(1), testChampion(2), testChampion(3)];
+    for (const action of [MovementAction.MOVE_FORWARD, MovementAction.STRAFE_RIGHT]) {
+      state.position = new Position(at[0], at[1], level);
+      bumper.ctx.party.setFacing(Direction.NORTH);
+      bumper.move(action);
+    }
+    asked.unshift(`${at[0]},${at[1]}`);
+    return asked;
+  };
+  played.splice(0);
+  const [amigaAt, ...amigaAsked] = bumps(game);
+  const amigaBumps = take();
+  console.log(`dm-amiga, at ${amigaAt} facing north, bumps asked on ${amigaAsked.join(' and ')}: ${amigaBumps}`);
+  const [ax, ay] = (amigaAt ?? '0,0').split(',').map(Number) as [number, number];
+  check(amigaAsked.join(' ') === `${ax},${ay - 1} ${ax + 1},${ay}` && amigaBumps === '18@138 58/58, 18@138 6/58',
+    'dm-amiga asks for the wall bump on the square bumped into: 58 on both ahead, 6 left and 58 right to the right');
+  const [atariAt, ...atariAsked] = bumps(stockGame());
+  console.log(`dm-atari, at ${atariAt} facing north, bumps asked on ${atariAsked.join(' and ')}`);
+  check(atariAsked.length === 2 && atariAsked.every((square) => square === atariAt), 'dm-atari asks for it on the party\'s square');
+
+  // 5. `SoundManager`'s voices.
   const context = installRecordingContext();
   const manager = new SoundManager(graphics);
   manager.setSoundTable(tables.sound1772, amiga);
@@ -182,7 +229,7 @@ function main(): void {
   manager.playAmigaSound(0, 112, v(58, 6)); // both busy, as loud: the first's
   const d = context.started[3];
   check(!!a && a.stopped && !!c && !c.stopped && !!d && !d.stopped, 'and with both as loud, the first voice\'s');
-  console.log(`one square to the right: left ${d?.left} right ${d?.right}`);
+  console.log(`one square to the left: left ${d?.left} right ${d?.right}`);
   check(d?.left === 58 / 64 && d.right === 6 / 64, 'each channel plays at its volume of Paula\'s 64');
   c?.end();
   manager.playAmigaSound(1, 112, v(1, 1)); // the second voice played out: free

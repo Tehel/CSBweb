@@ -350,22 +350,22 @@ does not run them.
   `return` that the Atari's compiler did without (`DUNGEON.C:1181-1206`): no behaviour.
 - **Carried by the sound path**: the 34 sounds and their table, the volume grid, the two
   pending sounds and the two voices, the footsteps, the attack sounds, the couatl's sound,
-  the war cry and the horn (the sections above).
+  the war cry and the horn (the sections above), and the wall bump, which A22E asks for on
+  the square bumped into, where the Atari asks for it on the party's (`CLIKMENU.C:307`),
+  so the Amiga hears it ahead or to one side (`bumpWall`, `src/engine/MovementSystem.ts`;
+  `tools/checks/amiga-sound-path.ts`).
 - **Left, as CSBWin does** (`DEBT.md` H): the couatl's picture toggled on its coin toss
   (`GROUP.C:265-279`); and the click areas the Amiga draws otherwise: RESURRECT, REINCARNATE and
   CANCEL at `COMMAND.C:236-238`, smaller than the Atari's, and a champion's name, which
   opens the inventory on a left click, from x 43, 112, 181 and 250 where CSB's start a
   pixel further right (`COMMAND.C:92-95`).
-- **Still to carry** (`DEBT.md` A7, A8 and A10):
+- **Still to carry** (`DEBT.md` A8 and A10):
   - the scents compared with a square, which every release but the Atari's does
     (`MEDIA353`, the IIGS's and the Amiga's; `MEDIA529`, the later ports'), and CSB on the
     Atari, 2.0 and 2.1, does not: `F0317_CHAMPION_AddScentStrength` changes only a scent
     on the square it is given (`CHAMPION.C:1505`), and the ten-second decay spares the
     scent on the party's square (`CHAMPION.C:2316`), where the Atari's comparisons are
     thrown away and every scent changes;
-  - the wall bump's sound, which A22E asks for on the square bumped into, where the Atari
-    asks for it on the party's (`CLIKMENU.C:307`), so the Amiga hears it ahead or to one
-    side;
   - the ending's six explosions: after its last message, A22E sets off a non-material
     harm explosion on Lord Chaos's square at 55, 95, 135, 175, 215 and 255, each followed by a
     step of the fuse sequence (`ENDGAME.C:953-958`);
