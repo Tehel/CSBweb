@@ -754,6 +754,26 @@ into a water flask, and leaves anything else as it is
 `tag01a69a: TouchWallF1()` (`:1228-1229`), so the wall is touched whether or not
 something was filled, as by a click on any other wall. Evidence: `tools/checks/fountain.ts`.
 
+## The wall in front is button 5 whatever draws its decoration
+
+`DrawWallDecoration` copies the front wall's rectangle, `pWDP`, into
+`d.ViewportObjectButtons[5]` under `if (graphicIndex >= 0)`, at `relativePosition == 12`
+(`doc/CSBwin-src/CSBCode.cpp:3355-3372`), with `d.FacingAlcove`, `d.FacingViAltar` and
+`d.FacingWaterFountain`. An extended decoration, the `0x10000 | ParameterA` of a DSA whose
+selector's `DSALevelIndex` is 255 (`doc/CSBwin-src/Codea59a.cpp:113-127`), has
+`graphicIndex = graphicOrdinal`, 0x10000 and up (`CSBCode.cpp:3240-3243`), so it passes,
+and `pWDP` is `CSBgraphics.dat`'s `pExtWallRects[12]` (`:3257-3262`). It is never an alcove
+(`:3270`), nor the ornate alcove's or the fountain's index. Only a missing
+`ReadWallDecoration` leaves the button unset (`:3258-3261`).
+
+A click on the wall holding an object touches it only through button 5
+(`doc/CSBwin-src/Mouse.cpp:1181-1229`), and so does an empty-handed one (`:1097-1129`).
+Conflux 3.5's four guild locks beside the start, the west faces of map 0's (22,25),
+(22,26), (22,29) and (22,30), each hold a lock (type 4: a SHURIKEN, a CORBUM, a MONK STAFF,
+a MACE) and then a DSA that draws an extended decoration over it, 0x22, 0x1f, 0x20 and 0x21. Once all four
+have taken their item, the combination at (23,27) opens the door at (22,27).
+Evidence: `tools/checks/extended-wall-button.ts`.
+
 ## Blocked movement has no message
 
 CSBWin answers a blocked move with a **sound only**. Verified by grep over the whole of

@@ -105,6 +105,7 @@ const CHECKS: Tool[] = [
   // byte for byte, and put through CSBWin's own save loop unchanged.
   { tool: 'expool.ts' },
   { tool: 'viewport-click.ts' },
+  { tool: 'extended-wall-button.ts' },
   { tool: 'fountain.ts' },
   { tool: 'item-properties.ts' },
   { tool: 'queue-sound.ts' },

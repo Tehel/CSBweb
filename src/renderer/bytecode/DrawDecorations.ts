@@ -282,6 +282,21 @@ function drawExtendedWallDecoration(
   const desc = ext.desc[relativePosition];
   if (!desc) return;
 
+  // The wall in front is button 5 whatever its decoration (`doc/CSBwin-src/CSBCode.cpp:3355-3372`):
+  // an extended one is never an alcove, and its `graphicIndex`, 0x10000 and up, is never the
+  // ornate alcove's nor the fountain's. Without it, a click on the wall touches nothing.
+  if (relativePosition === 12) {
+    const picking = draw.context.picking;
+    const button = picking.viewportObjectButtons[5]!;
+    button.x1 = desc.x1;
+    button.x2 = desc.x2;
+    button.y1 = desc.y1;
+    button.y2 = desc.y2;
+    picking.facingAlcove = false;
+    picking.facingViAltar = false;
+    picking.facingWaterFountain = false;
+  }
+
   const dstW = (desc.x2 | 0) - (desc.x1 | 0) + 1;
   const dstH = (desc.y2 | 0) - (desc.y1 | 0) + 1;
   if (dstW <= 0 || dstH <= 0) return;
