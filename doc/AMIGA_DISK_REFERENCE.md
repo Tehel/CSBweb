@@ -212,6 +212,14 @@ A larger `Period` plays faster on the Amiga, where on the Atari, a timer's count
 slower: the entrance's rattle is the Atari's 4237 Hz and the Amiga's 7065.5. The entrance
 plays its switch, sound 1, at 112 (`ENTRANCE.C:919`).
 
+The entrance's doors open faster on the Amiga. A22E draws a step and waits three vertical
+blanks of a PAL machine, 60 ms (`ENTRANCE.C:233-240`), where CSBWin waits six of its 60 Hz
+ones, 100 ms (`doc/CSBwin-src/CSBCode.cpp:9550`): the doors open in 1.86 s, not 3.1. The
+rattle, every third step in both (`ENTRANCE.C:152-160`), so starts every 180 ms, and plays
+321 ms, so two play at once on the two voices. For a set with the table item the port opens
+the doors on A22E's timing (`openPrisonDoors`, `src/renderer/intro/PrisonDoor.ts`;
+`tools/checks/intro.ts`).
+
 The Atari's 22 ordinals are the Amiga's first 22, each naming the item that holds the
 Amiga's recording of the Atari's sound, at the Atari's `Period` but for 18's. So the port
 plays, for each Atari SND item, the Amiga sound its ordinals name

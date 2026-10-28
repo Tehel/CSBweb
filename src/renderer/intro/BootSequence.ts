@@ -73,6 +73,8 @@ export interface BootSequenceDeps {
    * has a `mini.dat` to make a new adventure in.
    */
   rise: boolean;
+  /** Whether the set is the Amiga's, its `graphics.dat` carrying the table item: the entrance's doors open on A22E's timing. */
+  amiga: boolean;
   /**
    * The FTL logo to show before the title, with its sound, when `swoosh.img` is served.
    * Absent, the boot is CSBWin's.
@@ -606,7 +608,7 @@ export async function runBootSequence(deps: BootSequenceDeps): Promise<PrisonDoo
           if (!(await readGame(c))) return false;
           read = c;
           return true;
-        }, deps.rise);
+        }, deps.rise, deps.amiga);
         await tag021028(host, choice);
         return choice;
       } catch (error) {
@@ -666,7 +668,7 @@ export async function runShowCredits(deps: Omit<BootSequenceDeps, 'skip' | 'titl
  */
 async function gameSetupAfterRestart(host: IntroHost, deps: Omit<BootSequenceDeps, 'skip' | 'title'>): Promise<PrisonDoorChoice> {
   const readGame = readEntireGame(host, deps, true);
-  const choice = (await readGame('resume')) ? 'resume' : await showPrisonDoor(host, prisonDoorButtons(host), readGame, deps.rise);
+  const choice = (await readGame('resume')) ? 'resume' : await showPrisonDoor(host, prisonDoorButtons(host), readGame, deps.rise, deps.amiga);
   await tag021028(host, choice);
   return choice;
 }

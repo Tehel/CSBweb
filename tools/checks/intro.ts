@@ -18,7 +18,8 @@
  *    renders *a* corridor.
  * 4. **The door-slide arithmetic.** Thirty-one frames of two rectangles walking in
  *    opposite directions, with a sub-word shift carried in a separate buffer index. Off by
- *    one and the doors stop a few pixels short, or the left half vanishes early.
+ *    one and the doors stop a few pixels short, or the left half vanishes early. A frame
+ *    lasts CSBWin's 100 ms, or A22E's 60 in the `dm-amiga` set, the rattle every third.
  * 5. **`ShrinkBLT`'s fixed point.** Which source column each of the 48 destination columns
  *    lands on, at eighteen different scales.
  * 6. **The Timer-A mapping.** The two sound pitches the doors use are the argument CSBWin
@@ -380,6 +381,24 @@ async function checkDoors(graphics: GraphicsLoader, ui: UITables): Promise<void>
     'and the button panels never moved');
   check(regionMatches(host, entrance, panelLeft, SCREEN_WIDTH - 1, buttons2Y(ui), SCREEN_HEIGHT - 1),
     'nor did the scroll at the bottom of the panel column');
+
+  // A frame's wait, and the rattle every third: CSBWin's six blanks at 60 Hz (`:9550`), and
+  // in the `dm-amiga` set A22E's three of a PAL Amiga's 50 Hz (ReDMCSB `ENTRANCE.C:233-240`).
+  const { vbl, startSound } = host;
+  for (const [amiga, frameMs] of [[false, 100], [true, 60]] as const) {
+    const waits: number[] = [];
+    const rattles: number[] = [];
+    host.vbl = (count) => { waits.push(count); return Promise.resolve(); };
+    host.startSound = () => { rattles.push(waits.length + 1); };
+    await openPrisonDoors(host, assets, amiga);
+    const ms = waits.map((count) => Math.round((count * 1000) / 60));
+    console.log(`${amiga ? 'A22E' : 'CSBWin'}: ${waits.length} frames of ${ms[0]} ms, the rattle at frames ${rattles.join(' ')}`);
+    check(waits.length === DOOR_STEPS && ms.every((m) => m === frameMs),
+      `${amiga ? 'with amiga, A22E\'s' : 'CSBWin\'s'} ${DOOR_STEPS} frames last ${frameMs} ms each`);
+    check(rattles.join(' ') === '1 4 7 10 13 16 19 22 25 28 31', 'and the rattle starts at every third, from the first');
+  }
+  host.vbl = vbl;
+  host.startSound = startSound;
 }
 
 /* ------------------------------------------------------------ 5. ShrinkBLT ---- */

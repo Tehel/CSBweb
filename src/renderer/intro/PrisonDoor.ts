@@ -64,6 +64,12 @@ export const INTERIOR_VISIBLE_WIDTH = 232;
 export const DOOR_STEPS = 31;
 /** `for (i=0; i<6; i++) { CheckSoundQueue(); wvbl(_1_); }` (`:9550`). */
 const DOOR_STEP_VBLS = 6;
+/**
+ * A22E's step, in the `dm-amiga` set: `F0580_ENTRANCE_DrawDoorAnimationStep` and three
+ * vertical blanks of a PAL Amiga, 50 Hz (ReDMCSB `ENTRANCE.C:233-240`), 60 ms, in the
+ * host's 60 Hz ones. Its rattle plays every third step as CSBWin's does (`:152-160`).
+ */
+const AMIGA_DOOR_STEP_VBLS = (3 * 60) / 50;
 /** `VBLDelay(_3_, 20)` between the latch click and the doors moving (`:9659`). */
 const LATCH_TO_DOORS_VBLS = 20;
 
@@ -274,8 +280,9 @@ async function showCreditsScroll(host: IntroHost, assets: PrisonDoorAssets): Pro
  * Each frame is composed in a 256-pixel-wide working buffer: the pristine interior, then
  * the live viewport over it, then the two door halves, then 232 columns of it are copied
  * to the screen at row 30. The right-hand stone panel with the buttons is never touched.
+ * With `amiga`, a frame lasts A22E's 60 ms (`AMIGA_DOOR_STEP_VBLS`).
  */
-export async function openPrisonDoors(host: IntroHost, assets: PrisonDoorAssets): Promise<void> {
+export async function openPrisonDoors(host: IntroHost, assets: PrisonDoorAssets, amiga = false): Promise<void> {
   const rects = host.uiTables.graphic232;
   const work = createIndexedBitmap(INTERIOR_WIDTH, INTERIOR_HEIGHT);
 
@@ -306,7 +313,7 @@ export async function openPrisonDoors(host: IntroHost, assets: PrisonDoorAssets)
     tag0088b2Index(assets.slots[(step & 3) + 4]!, work, { ...rightRect, srcX: (step & 3) * 4, srcY: 0, srcStride: DOOR_SLOT_WIDTH }, -1);
     rightRect.x1 += 4;
 
-    await host.vbl(DOOR_STEP_VBLS);
+    await host.vbl(amiga ? AMIGA_DOOR_STEP_VBLS : DOOR_STEP_VBLS);
 
     tag0088b2Index(work, host.screen, {
       x1: 0,
@@ -343,6 +350,7 @@ export async function showPrisonDoor(
   buttons: UIButton[],
   readEntireGame: (choice: PrisonDoorChoice) => Promise<boolean>,
   rise = false,
+  amiga = false,
 ): Promise<PrisonDoorChoice> {
   const assets = loadAssets(host, rise);
   const list = rise ? withRiseButton(buttons) : buttons;
@@ -376,11 +384,11 @@ export async function showPrisonDoor(
   // RISE goes on as RESUME does: it ends in a save read, through the doors still shut.
   const choice: PrisonDoorChoice = gameState === GAMESTATE_RESUME_SAVED_GAME ? 'resume'
     : gameState === GAMESTATE_RISE ? 'rise' : 'enter';
-  if (choice === 'enter') await openPrisonDoors(host, assets);
+  if (choice === 'enter') await openPrisonDoors(host, assets, amiga);
 
   // `_GameSetup`'s `for (;;) { ReadEntireGame(); if (i16Result == 1) break; TAG01f746(); }`
   // (`:10758-10765`): `dungeon.dat` or the chosen save. A read that fails, or a load
   // that is cancelled, puts the entrance back up.
   if (await readEntireGame(choice)) return choice;
-  return showPrisonDoor(host, buttons, readEntireGame, rise);
+  return showPrisonDoor(host, buttons, readEntireGame, rise, amiga);
 }

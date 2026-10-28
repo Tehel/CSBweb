@@ -208,6 +208,9 @@ Decisions taken with the author:
   colours in items `0x22e` and `0x232`, at the Atari's 3 bits a channel.** Its sounds 533-555 stay the Atari's 4-bit ones, which CSBWin's
   `SNDexpand` reads, so the set stays a folder CSBWin plays; the port plays the appended
   ones. Re-encoding the Amiga's in 4 bits in their place would lose what they are for.
+- **The entrance's doors open on A22E's timing**, three blanks of a PAL Amiga a step,
+  60 ms, not CSBWin's 100 (`doc/AMIGA_DISK_REFERENCE.md` → "The sounds, played"), so that
+  its rattles overlap as on the Amiga.
 - **Whatever makes the set recognisable as the Amiga's comes with it.** The Amiga's
   credits (5), font (557), objects' names (556) and picture 396 replace the Atari's in
   place: they are in the formats CSBWin reads, so the folder still plays in CSBWin.

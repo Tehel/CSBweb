@@ -482,6 +482,7 @@ function introDeps({ game, screen, saves, events, input }: Built, sound: SoundMa
         consumeSavedGameRead: () => saves.consumeSavedGameRead(),
         readNewGame: () => readNewGame(game, saves, events),
         rise: dataSet.miniDat,
+        amiga: game.ctx.tables.amigaSounds !== null,
     };
 }
 
