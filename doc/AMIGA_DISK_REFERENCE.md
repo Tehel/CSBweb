@@ -333,7 +333,9 @@ does not run them.
   (`G1096_aps_MousePointerSprites`, `IO.C:169`), so A22E builds an object's pointer once,
   in its own colours (`IO.C:2171-2181`, through its own colour changes, `IO.C:163-165`),
   where the Atari draws the pointer into the screen and so builds a second, a silhouette
-  in colour 4, for the viewport below the palette split (`IO.C:2161-2170`). The highlight box (`CLIKMENU.C:57-60`) is the Atari's inversion of the same
+  in colour 4, for the viewport below the palette split (`IO.C:2161-2170`). The port
+  shows the object in its colours there on every set, by default (`DEBT.md` H, "An
+  object in hand keeps its colours over the dungeon view"). The highlight box (`CLIKMENU.C:57-60`) is the Atari's inversion of the same
   box (`F0006_MAIN_HighlightScreenBox`, `BASE.C:247`), done at once where the Atari asks
   its VBL to do it. The ending's screen filled and faded (`ENDGAME.C:334`, `:399`) differs
   only where BUG0_84 would, which DM never reaches.

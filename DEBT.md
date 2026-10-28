@@ -1024,9 +1024,10 @@ Recorded so that nobody "fixes" them.
   Everything CSBWin has, the Amiga set does as CSBWin does,
   where A22E does it otherwise too: the couatl's picture is CSBWin's aspect, the click
   areas are the Atari's (A22E's RESURRECT, REINCARNATE and
-  CANCEL are smaller, and its names open the inventory a pixel further left), and an
-  object held over the viewport is the Atari's silhouette in colour 4, where A22E's
-  pointer, a hardware sprite, shows it in its own colours.
+  CANCEL are smaller, and its names open the inventory a pixel further left). An object
+  held over the viewport keeps its colours, as A22E's pointer, a hardware sprite, shows
+  it: that is the port's on every set, "An object in hand keeps its colours over the
+  dungeon view" below, not the Amiga's.
   `doc/AMIGA_DISK_REFERENCE.md` → "A22E's own code, classed".
 
 - 🚫 **The keys are the port's table, not a `config.txt`.** CSBWin's keys are whatever
