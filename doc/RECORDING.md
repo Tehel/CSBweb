@@ -2,12 +2,14 @@
 
 CSBWin can record a game as the list of inputs it took and play that list back. The port
 has neither yet (`DEBT.md` G29). This document holds what CSBWin does, what a replay needs,
-where the port stands against those needs, and what sharing recordings would take.
+where the port stands against those needs, the port's own recorder, and what sharing
+recordings would take.
 
-**The engine settles first.** Any change to what the engine does at a tick makes every
-recording made before it play out differently, so G29 waits until the debt that changes
-behaviour is paid. The work that comes before it is the list under "The port against those
-needs" below.
+**Recordings follow the engine.** Any change to what the engine does at a tick makes a
+recording made before it play out differently. A recording carries the build that made it,
+and its `d.RandomNumber` values show the first entry where a later build parts from it. The
+work that comes before the recorder is `DEBT.md` E42, E43 and F22, from "The port against
+those needs" below.
 
 ## CSBWin's recorder
 
@@ -115,47 +117,80 @@ way only from:
 What holds:
 
 - **The random stream is CSBWin's**, one LCG in the game's context
-  (`src/core/random.ts`), restored from a save (`src/engine/RuntimeSave.ts:166`). Its seed
-  comes from `Math.random()` once, at the first draw (`random.ts:47`), which a recording
-  would write down as CSBWin's `0x3333` does.
+  (`src/core/random.ts`), restored from a save (`src/engine/RuntimeSave.ts:98`). Its seed
+  comes from `Math.random()` once, at the first draw (`random.ts:47`). A new game's stream
+  also depends on the player's saves: `GameSaves.newGameRead` draws `d.RandomGameID` again
+  while a save of the set holds it (`src/engine/GameSaves.ts:257-267`). So a recording
+  starts from the stream as that leaves it, not from the seed alone.
 - **Drawing has its own stream**, `viewportRandom`, as CSBWin's `DrawViewport` does
   (`src/renderer/bytecode/ViewportDrawState.ts:24-33`); nothing under `src/renderer` or `src/ui` draws from
   the game's.
-- **The engine reads no clock**: under `src/engine` and `src/core`, the loop is paced by
-  the host's clock (`GameHost.clock`, `src/engine/Game.ts:482-508`), and `Date.now()` serves
-  only a save's date
-  (`src/engine/GameSaves.ts`), and `Math.random()` only the seed. Its arithmetic is
-  integer; the one `Math.sin` builds MD5's constants (`src/core/md5.ts:14`).
-- **Input reaches the engine through CSBWin's one mouse queue** (`src/engine/MouseQueue.ts`),
-  and the port already counts `totalMoveCount` where CSBWin records
-  (`Game.recordFileRecord`, `src/engine/Game.ts:991`).
+- **The engine reads no clock.** The loop runs one VBL at a time (`Game.runFrame`), and the
+  host's clock only decides how many run at each wake (`gameLoop`,
+  `src/engine/Game.ts:488-508`). Under `src/engine` and `src/core`, `Date.now()` serves only
+  a save's date (`src/engine/GameSaves.ts`), and `Math.random()` only the seed. Its
+  arithmetic is integer; the one `Math.sin` builds MD5's constants (`src/core/md5.ts:14`).
+- **Clicks and keys reach the engine through CSBWin's one mouse queue**
+  (`src/engine/MouseQueue.ts`), a long press's click too, queued from a `setTimeout`. The
+  port counts `totalMoveCount` where CSBWin records (`Game.recordFileRecord`,
+  `src/engine/Game.ts:1003`).
+- The page's other wall-clock uses (`nowMs`, `src/renderer/ui/UIState.ts:506`), a menu
+  button's press and the mouth's chew, only draw, a menu's under a stopped clock.
 
 What breaks determinism:
 
-- **The attack menu's damage flash is timed on the wall clock.** The panel's tick does
-  nothing while `host.attackFlashHeld()` (`src/engine/AttackMenu.ts:117-119`), which is
-  `FLASH_MS` (400 ms) of `performance.now()` (`src/renderer/ui/Attack.ts:274-286`), where
-  CSBWin's `VBLDelay(15)` stops the game (`DEBT.md` H). Whether the attack options are
-  back at a given tick, and so what a click on them does, depends on real time.
+- **The attack menu's damage flash is timed on the wall clock** (`DEBT.md` E42). The
+  panel's tick does nothing while `host.attackFlashHeld()`
+  (`src/engine/AttackMenu.ts:117-119`), which is `FLASH_MS` (400 ms) of `performance.now()`
+  (`src/renderer/ui/Attack.ts:266-275`), where CSBWin's `VBLDelay(15)` stops the game
+  (`DEBT.md` H). Whether the attack options are back at a given tick, and so what a click
+  on them does, depends on real time.
+- **The page changes the game outside the queue**, at the moment its events come (`DEBT.md`
+  E43): the panel keys, the save menu and the Reincarnate screen; `ctx.state.paused`, which
+  the dialogs, the save menu and the Hint Oracle set, and under which a tick that comes due
+  waits for the clock to run; the settings' extras and the queue's length; a save's tail,
+  `Game.saveWritten`, which re-attaches the monsters and runs `SmartDiscard`, and with the
+  clock stopped runs once the store's write is awaited; a read. None of these is wrong: a
+  recording holds each, with the VBL it came at.
+
+What a player must do:
+
+- **Draw every tick it plays.** A click in the viewport is resolved through the picking the
+  tick's `DrawViewport` leaves, so playback draws, at the wall clock's pace or faster.
 
 What is not verified:
 
-- **Anything counted in VBLs within a tick.** Several entries taken in one tick are taken
-  in the same order, but not necessarily at the same VBL as when recorded. Every VBL-driven
-  state the engine reads must be checked: the held-step test, `extraTicks` (always on in
-  the port, `src/engine/MovementSystem.ts:115-116`), the eye held down, the attack menu's
-  tick.
-- **Input that reaches the game outside the queue**: the page's dialogs (settings, map,
-  champions), F5 and F9, the save menu's SAVE and its reads, and the pointer's other
-  wall-clock uses (`nowMs`, `src/renderer/ui/UIState.ts:488`: the menu button's press, the
-  message area's double click and long press, the mouth's chew).
+- **That nothing the page draws takes from the game's stream**, nor reads state only
+  drawing sets, when the screen is composed at moments the wall clock chooses
+  (`refreshScreen` after an input, the VBL's frame after a pointer move).
 - **The port's saves**: whether a save changes the game's state where CSBWin's does, so
   that a recording with saves in it replays.
 
-**The proof is a tool**: a headless `tools/checks/replay.ts` that plays a scripted game,
-records it, replays it at another frame pacing, and asserts `d.RandomNumber` equal at every
-entry and the two final saves byte-identical. It is the first step of G29, and a
-regression test of everything at once.
+**The proof is a tool** (`DEBT.md` F22): a headless `tools/checks/replay.ts` that plays a
+scripted game, logs it at the boundary, plays the log back in a fresh `Game`, and asserts
+`d.Time` and `d.RandomNumber` equal at every logged change and the two final saves
+byte-identical. It is the first proof G29 needs, and a regression test of everything at
+once.
+
+## The port's recorder
+
+Not CSBWin's format: playing CSBWin's own recordings back is not its aim (below). It logs
+the boundary where the page changes the game (`DEBT.md` E43), each change with the number of
+VBLs run before it, on a count that never stops, and the player applies each before the
+same VBL.
+
+CSBWin's player can align an entry only with a tick, `d.Time`, so whatever the game counts
+in VBLs within a tick (the held-step test, the eye held, the attack menu's tick) must come
+out the same wherever in the tick the entry falls, and playback turns `extraTicks` off.
+Counted in VBLs, the game is a function of its start, its VBLs and the log, whatever
+happens within a tick. Each change still carries `d.Time` and `d.RandomNumber`, CSBWin's
+drift detector: a replay stops at the first that differs.
+
+Logging the boundary rather than the entries the queue takes replays the queue itself: a
+click a full queue drops, and the button a click turns out to be when it is taken.
+
+A recording starts from a new game (its data set, its rules and extras, and its stream as
+`newGameRead` leaves it) or from the save a game was read from. A read ends one.
 
 ## Recordings made in CSBWin
 
@@ -177,7 +212,6 @@ Not decided; what sharing would take:
   way.
 - **The engine's version**, stored with each recording: a behaviour change makes older
   recordings drift, which their `random` values show at the first wrong entry. A shared
-  recording is then either played by the build it was made with or marked broken. This is
-  why the engine settles first.
+  recording is then either played by the build it was made with or marked broken.
 - **Speed**: fast-forward is free, as CSBWin's `#NoSpeedLimit` and `#FastVBLnn`; going
   back means replaying from the start, or from saves taken along the way.
