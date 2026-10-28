@@ -693,10 +693,23 @@ Paying it, in steps:
    holds.
 3. The player: the boundary fed from a recording (`InputBoundary.apply`, before the
    VBL each change was logged at), the page's live input ignored but its own controls,
-   every tick it plays drawn, at the wall clock's pace or faster. The boundary logs the
-   game's changes, not the interface's: a dialog a played VBL opens (the disk menu, from
-   its icon) holds the clock, and the logged `pause` lets it run, but the player takes the
-   dialog down itself.
+   every tick it plays drawn, at the wall clock's pace or faster. No dialog opens while
+   it plays:
+   - The settings, map and champion dialogs and the Hint Oracle are opened by the page's
+     input, which the player ignores: what the recording has of them is their `pause`
+     changes, which hold and release the clock with nothing shown.
+   - The disk menu is opened by the game itself, in the VBL whose click is on its icon
+     (`openSaveMenu`, `src/renderer/ui/SaveMenu.ts`), and that VBL changes the game:
+     `tag02076e`, `videoMode` `VM_LEFTMENU`, the clock stopped. While the player plays,
+     the open does that game half alone and draws nothing; the logged `pause` and
+     `tag0207cc` close it. A save the recorded game made is its logged `saveWritten`
+     alone: the player writes no save.
+   - A span the clock is held through, from a `pause` to the next that lets it run, is
+     played at once, undrawn and unpaced. Its VBLs cannot be dropped: under a held clock
+     each still counts down the attack panel's flash (`attackFlashVbls`, which the attack
+     menu waits on, `src/engine/AttackMenu.ts`), moves the message strip on, raises the
+     due tick and runs the mouse queue's pass, and under the disk menu CSBWin's VBL
+     handler runs. Played at once, they leave the game as the recorded one.
 4. Where a player starts, stops and plays one, to design with the author. Sharing
    (`doc/RECORDING.md` → "Shared recordings") comes after. With it, how many the store
    keeps: `RECORDINGS_KEPT`, 20 recordings, the latest begun, across every set, is a bound
