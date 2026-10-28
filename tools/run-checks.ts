@@ -114,6 +114,7 @@ const CHECKS: Tool[] = [
   { tool: 'amiga-graphics.ts' },
   { tool: 'amiga-sounds.ts' },
   { tool: 'amiga-sound-path.ts' },
+  { tool: 'watch-amiga-footsteps.ts' },
   { tool: 'zokathra-wall.ts' },
   { tool: 'hidden-alcove.ts' },
   { tool: 'door-ornaments.ts' },

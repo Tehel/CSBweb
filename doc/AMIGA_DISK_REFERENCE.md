@@ -230,6 +230,63 @@ its volume over 64 into a channel merger. A Web Audio sound plays to its end. A 
 free from its source's `ended`. `tools/checks/amiga-sound-path.ts` proves it. Nothing more: no
 filtering for a sound behind, nor for walls between.
 
+## The Amiga's own sounds
+
+Ordinals 22-33 have no entry in the Atari's `d.sound1772`. For a set with the table item,
+`QueueSound` reads an ordinal's entry from `G0060_as_Graphic562_Sounds`, as A22E does
+(`SOUND.C:1536-1544`): the sound plays only if it has one, and a delayed one's `TT_20`
+takes its `Priority`. For the Atari's 22 ordinals, `Priority`, `LoudDistance` and
+`SoftDistance` are the Atari's `byte4`, `byte6` and `byte7`, so the Atari's sounds are
+filtered as before. `tools/checks/watch-amiga-footsteps.ts` proves this section.
+
+- **Footsteps.** `F0514_MOVE_GetSound`'s A22E branch (`MOVESENS.C:911-1000`,
+  `moveGetSound` in `src/engine/SoundQueue.ts`) gives a creature type's movement sound:
+  22 the Deth Knight; 23 the couatl and the muncher; 24 the giggler, the stone golem, the
+  mummy, the vexirk, the ant man and the demon; 26 the scorpion, the hellhound, the
+  ruster, the screamer, the rock pile, the worm and the oitu; 27 the slime devil and the
+  water elemental; 32 the dragon; 33 the skeleton. The eye, the ghost, the black flame,
+  the zytaz and the three lords make none, and no creature makes one while the party
+  rests. A group asks for it with mode 1 on the square it arrives on, once neither the
+  party nor another group stands there (`MOVESENS.C:846-850`), wherever it came from,
+  a generator included.
+- **The couatl** that is not attacking asks for its sound, mode 1, on the coin toss that
+  flips its picture (`GROUP.C:265-279`). A22E toggles the picture on that toss; the port
+  keeps CSBWin's aspect, the picture mirrored on heads and not on tails, so the couatl
+  is heard as often and looks as it does in CSBWin.
+- **The attack sounds** are A22E's eleven, through its `AttackSoundOrdinal`
+  (`GROUP.C:1802-1804`), mode 1: the rock pile 29, the water elemental 30 and the couatl
+  31; the skeleton and the Deth Knight 16, and the stone golem and the ant man 4, the
+  sounds the Atari gives them under other ordinals.
+
+### The war cry and the horn
+
+ReDMCSB's A22E branch has no action code: `F0407_MENUS_IsActionPerformed` is only named
+(`GAMELOOP.C:124`). It is `dm`'s hunk 19 from 0x13b6, its arguments the champion's index
+and the action's. The game calls every function through a table at negative offsets of
+`a4`, `F0064_SOUND_RequestPlay_CPSD` at `-$7dc4(a4)`, its arguments pushed last first:
+sound, x, y, mode. The function puts in two locals the party's square plus
+`DeltaX`/`DeltaY` of the champion's direction (`CHAMPION`'s byte 0x1c, after its name
+and title), the square ahead of the champion, and switches on the action through a
+table at 0x1aa2. Actions 4, 8, 37 and 41 (BLOW HORN, WAR CRY, CALM, BRANDISH) go to
+0x15fa, and action 22 (CONFUSE) to 0x15f2, which spends a charge and falls into it. There:
+
+```
+015fa  cmpi.w #8, $a(a5)      ; WAR CRY
+       bne    1616
+       clr.w  -(a7)           ; C00_MODE_PLAY_IMMEDIATELY
+       move.w -8(a5), -(a7)   ; y ahead
+       move.w -6(a5), -(a7)   ; x ahead
+       move.w #28, -(a7)      ; M619_SOUND_WAR_CRY
+       jsr    -$7dc4(a4)      ; F0064_SOUND_RequestPlay_CPSD
+01616  cmpi.w #4, $a(a5)      ; BLOW HORN
+       ...                    ; the same with #25, M620_SOUND_BLOW_HORN
+01632  ...                    ; F0401_MENUS_IsGroupFrightenedByAction
+```
+
+So 2.2 plays the war cry and the horn at once, on the square ahead, before the action
+frightens anything. The port asks for them at the start of `WarCryEtc`, on its
+`attackX`, `attackY`, with `deltaTime` 0.
+
 ## `Dungeon.dat`
 
 The Amiga's English `Dungeon.dat` is the Atari 1.2 dungeon, compressed, with one

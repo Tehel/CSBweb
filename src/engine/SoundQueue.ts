@@ -26,16 +26,74 @@
  * `F0064_SOUND_RequestPlay_CPSD` has it (ReDMCSB `SOUND.C:1476-1754`), not by `byte6` and
  * `byte7`: at a volume on each channel that the square, the party's and its facing decide
  * (`getVolume`), and with `deltaTime` 1 not at once but as one of two pending sounds,
- * which `startQueuedSound` plays. Not the Atari's: the authority is ReDMCSB (`CLAUDE.md`).
+ * which `startQueuedSound` plays. Its ordinals are `G0060_as_Graphic562_Sounds`'s 34, the
+ * Atari's 22 and the Amiga's own: the footsteps (`moveGetSound`), the horn, the war cry and
+ * three attacks. Not the Atari's: the authority is ReDMCSB (`CLAUDE.md`).
  */
 import { readU32LE } from '../core/bytes';
 import { CSBGraphicType, type CSBGraphicsLoader } from '../data/CSBGraphicsLoader';
-import { compareVolumes, getVolume, type AmigaSoundTables, type SoundVolume } from '../data/tables/AmigaSoundTables';
+import {
+  AMIGA_SOUND_COUNT, compareVolumes, getVolume, type AmigaSoundTables, type SoundVolume,
+} from '../data/tables/AmigaSoundTables';
 import type { SoundTableEntry } from '../data/tables/UITables';
 import type { GameHost } from './GameHost';
 import type { GameState } from './gameTypes';
+import { MonsterType } from './monsterTypes';
 import type { Party } from './Party';
 import { TimerFunction, type TimerQueue } from './TimerQueue';
+
+/** `M513_SOUND_COUNT + 1`, `F0514_MOVE_GetSound`'s "no sound" (ReDMCSB `DEFS.H:55-57`). */
+export const AMIGA_NO_SOUND = AMIGA_SOUND_COUNT + 1;
+
+/**
+ * `F0514_MOVE_GetSound`, its A22E branch (ReDMCSB `MOVESENS.C:911-1000`): the sound a
+ * creature type makes moving, of the Amiga's ordinals 22-33, or `AMIGA_NO_SOUND` for the
+ * eye, the ghost, the black flame, the zytaz and the three lords, and for every creature
+ * while the party rests (`G0300_B_PartyIsResting`, CSBWin's `d.PartySleeping`).
+ */
+export function moveGetSound(creatureType: number, partyResting: boolean): number {
+  if (partyResting) return AMIGA_NO_SOUND;
+  switch (creatureType) {
+    case MonsterType.mon_FlyingEye:
+    case MonsterType.mon_Rive:
+    case MonsterType.mon_BlackFlame:
+    case MonsterType.mon_Zytaz:
+    case MonsterType.mon_LordChaos:
+    case MonsterType.mon_25:
+    case MonsterType.mon_GreyLord:
+      return AMIGA_NO_SOUND;
+    case MonsterType.mon_Giggler:
+    case MonsterType.mon_StoneGolem:
+    case MonsterType.mon_Mummy:
+    case MonsterType.mon_Vexirk:
+    case MonsterType.mon_AntMan:
+    case MonsterType.mon_Demon:
+      return 24; // C24_SOUND_MOVE_MUMMY_TROLIN_ANTMAN_STONE_GOLEM_GIGGLER_VEXIRK_DEMON
+    case MonsterType.mon_Scorpion:
+    case MonsterType.mon_Hellhound:
+    case MonsterType.mon_5:
+    case MonsterType.mon_Screamer:
+    case MonsterType.mon_RockPile:
+    case MonsterType.mon_Worm:
+    case MonsterType.mon_Oitu:
+      return 26; // C26_SOUND_MOVE_SCREAMER_ROCK_ROCKPILE_MAGENTA_WORM_WORM_PAIN_RAT_HELLHOUND_RUSTER_GIANT_SCORPION_SCORPION_OITU
+    case MonsterType.mon_Dragon:
+      return 32; // C32_SOUND_MOVE_RED_DRAGON
+    case MonsterType.mon_Skeleton:
+      return 33; // C33_SOUND_MOVE_SKELETON
+    case MonsterType.mon_DethKnight:
+      return 22; // C22_SOUND_MOVE_ANIMATED_ARMOUR_DETH_KNIGHT
+    case MonsterType.mon_SlimeDevil:
+    case MonsterType.mon_WaterElemental:
+      return 27; // C27_SOUND_MOVE_SWAMP_SLIME_SLIME_DEVIL_WATER_ELEMENTAL
+    case MonsterType.mon_Couatl:
+    case MonsterType.mon_Muncher:
+      return 23; // C23_SOUND_MOVE_COUATL_GIANT_WASP_MUNCHER
+    default:
+      // A type past the 27, which A22E's switch does not name: its local, never set.
+      return AMIGA_NO_SOUND;
+  }
+}
 
 export class SoundQueue {
   /** `ReadSound`'s `firstTime`: "Cannot find Sound" is said once. */
@@ -85,11 +143,19 @@ export class SoundQueue {
    * nothing here if its DSAs took the sound (`:1906`). The host is handed the choice, not
    * the distance (`:1923-1925`).
    *
-   * With the Amiga's tables, the filter sees that same choice, and then the sound goes to
-   * `requestPlayAmiga`, which decides for itself whether it is heard.
+   * With the Amiga's tables, the ordinal's entry is `G0060_as_Graphic562_Sounds`'s
+   * (`F0064_SOUND_RequestPlay_CPSD`, ReDMCSB `SOUND.C:1536-1544`), which has the Amiga's
+   * own ordinals 22-33 too; for the 22 it shares with `d.sound1772`, its `Priority`,
+   * `LoudDistance` and `SoftDistance` are `byte4`, `byte6` and `byte7`. The filter sees
+   * the same choice, and then the sound goes to `requestPlayAmiga`, which decides for
+   * itself whether it is heard.
    */
   queueSound(ordinal: number, mapX: number, mapY: number, deltaTime: number, level: number): void {
-    const entry = this.sound1772[ordinal];
+    const atari = this.sound1772[ordinal];
+    const amiga = this.amiga ? this.amiga.sounds[ordinal] : undefined;
+    const entry = this.amiga
+      ? amiga && { byte4: amiga.priority, byte6: amiga.loudDistance, byte7: amiga.softDistance }
+      : atari;
     if (!entry) return;
 
     if (deltaTime !== 0 && level !== this.party.state.position.z) return;
@@ -123,7 +189,7 @@ export class SoundQueue {
     }
     if (highVolume < 0) return;
 
-    const soundId = entry.word0 | 0;
+    const soundId = atari ? atari.word0 | 0 : 0;
     if (!soundId) return;
     // `rateIdx` selects among the decoded variants a SND item may have; it is not
     // CSBWin's `byte3` playback rate, which `StartSound` consumes inside the audio

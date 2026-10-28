@@ -23,6 +23,8 @@ import type { GameContext } from './GameContext';
 import { selectPaletteForLightLevel } from './LightLevel';
 import { TimerFunction, type TimerEntry, type TimerQueue } from './TimerQueue';
 import { MonsterEvents, type MmRecord } from './MmRecord';
+import { moveGetSound } from './SoundQueue';
+import { AMIGA_SOUND_COUNT } from '../data/tables/AmigaSoundTables';
 import { DeleteMonsterWhy, deleteMonsterParameters } from './filterParameters';
 import { MonsterType, monsterUnique, setPackedBits, StateOfFear } from './monsterTypes';
 import type { MonsterDesc } from '../data/tables/MonsterDesc';
@@ -416,7 +418,15 @@ export class MonsterSystem {
         sms |= SMS_ATTACKING;
       } else {
         if (monsterNonAttackingMirrorOK(desc)) {
-          sms = this.random.bool() ? sms | SMS_MIRROR : sms & ~SMS_MIRROR;
+          const heads = this.random.bool();
+          sms = heads ? sms | SMS_MIRROR : sms & ~SMS_MIRROR;
+          // A22E's couatl is heard on the toss that flips its picture (ReDMCSB
+          // `GROUP.C:265-279`). Its picture still flips as CSBWin's does, set on heads,
+          // where A22E's toggles (`doc/AMIGA_DISK_REFERENCE.md` → "The Amiga's own sounds").
+          if (heads && monster.creatureType === MonsterType.mon_Couatl && this.ctx.tables.amigaSounds) {
+            const sound = moveGetSound(MonsterType.mon_Couatl, this.ctx.party.state.sleeping);
+            if (sound <= AMIGA_SOUND_COUNT) this.ctx.sounds.queueSound(sound, monsterX, monsterY, 1, level);
+          }
         } else {
           sms &= ~SMS_MIRROR;
         }
@@ -585,6 +595,13 @@ export class MonsterSystem {
       if (item16Attached) this.detachItem16(monster.groupIndex);
       this.createMovementTimer(placed, destination, resolved.audible);
       return { code: 1, position: destination };
+    }
+
+    // A22E's footstep, where the group is about to arrive (ReDMCSB `MOVESENS.C:846-850`):
+    // for a set with the Amiga's tables, which alone have the sounds.
+    if (this.ctx.tables.amigaSounds) {
+      const sound = moveGetSound(monster.creatureType, this.ctx.party.state.sleeping);
+      if (sound < AMIGA_SOUND_COUNT) this.ctx.sounds.queueSound(sound, destination.x, destination.y, 1, destLevel);
     }
 
     // Crossing on or off the party's level detaches or attaches the slot (`:3399-3413`).

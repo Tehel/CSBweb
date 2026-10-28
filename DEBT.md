@@ -123,7 +123,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| A5 | Footsteps, `F0514_MOVE_GetSound`, and the war cry | M | ⏳ |
 | A6 | The rest of A22E's own code, classed | S | ⏳ |
 | E42 | The attack menu's damage flash timed in VBLs, not milliseconds | S | ⏳ |
 | E43 | One input boundary: every change the page makes to the game, logged with its VBL | M | ⏳ |
@@ -188,19 +187,11 @@ the movement sounds (`DEFS.H:87-98`), 25 the horn, 28 the war cry, 29-31 the att
 the rock, the water elemental and the couatl. The Amiga plays an entry at Paula period
 `72800 / Period` (`SOUND.C:1107`), so 112 is 650, 5457 Hz on a PAL machine.
 
-**Footsteps.** `F0514_MOVE_GetSound` (`MOVESENS.C:911-1000`, its A22E branch) gives a
-creature type's movement sound: none to the ghost, the eye, the black flame, the zytaz and
-the lords, nothing at all while the party rests (`M513_SOUND_COUNT + 1`). A group plays it
-where it arrives (`MOVESENS.C:846-850`), and a couatl when its picture flips
-(`GROUP.C:273-279`). The creatures' attack sounds grow from 8 to 11
-(`G0244_auc_Graphic559_CreatureAttackSounds`, `DUNGEON.C:500-516`), and some creatures'
-`AttackSoundOrdinal` changes with them (`DUNGEON.C:449-488`, the "Atari ST:" comments).
-
-**The war cry and the horn** have their entries, 28 and 25, but ReDMCSB's WIP holds no
-action code to play them: `F0407_MENUS_IsActionPerformed` is only named
-(`GAMELOOP.C:124`), and none of F0401-F0410 is defined in any of its sources. The war cry
-has a sound in play, the author's own memory of the PC version, which came from the
-Amiga's. The horn's is unknown.
+**The Amiga's own sounds**, ordinals 22-33, are played: a group's footsteps
+(`F0514_MOVE_GetSound`), a couatl's flip, A22E's eleven attack sounds, and the war cry
+and the horn, which `dm`'s own `F0407_MENUS_IsActionPerformed` plays
+(`doc/AMIGA_DISK_REFERENCE.md` → "The Amiga's own sounds",
+`tools/checks/watch-amiga-footsteps.ts`).
 
 **Volume and stereo** are A22E's, and the port's for the set: `doc/AMIGA_DISK_REFERENCE.md`
 → "The sounds, heard".
@@ -220,32 +211,15 @@ Decisions taken with the author:
   credits (5), font (557), objects' names (556) and picture 396 replace the Atari's in
   place: they are in the formats CSBWin reads, so the folder still plays in CSBWin.
 
-### A5 ⏳ Footsteps, `F0514_MOVE_GetSound`, and the war cry
-
-`F0514_MOVE_GetSound`, its A22E branch, called where a group arrives on its square (the
-port's group move, `src/engine/WorldMove.ts`) and at a couatl's flip; the three new attack
-sounds through the Amiga's ordinals. `tools/checks/watch-amiga-footsteps.ts` runs the
-clock and lists the sounds requested as a group comes towards the party, and none while it
-rests.
-
-Ordinals 22-33 have no `d.sound1772` entry, and `SoundQueue.queueSound` returns for an
-ordinal without one before it reaches the Amiga's path; a delayed one's `TT_20` takes its
-`byte4`. For a set with the Amiga's tables, the check is `G0060_as_Graphic562_Sounds`'s, and
-the event's priority its `Priority` (`SOUND.C:1536-1544`).
-
-The war cry plays sound 28 and the horn sound 25, if 2.2 plays it. ReDMCSB has no action
-code (above), so both are settled in `dm` itself: the 68000 code that requests
-`F0064_SOUND_RequestPlay_CPSD` with 28 sits in the action switch, with the horn's case beside
-it. The call's square and mode are copied from there, never guessed. If the horn plays
-nothing in 2.2, that is recorded and it stays silent.
-
 ### A6 ⏳ The rest of A22E's own code, classed
 
 64 `MEDIA*` macros hold A22E and not S21E, in `DUNVIEW.C`, `MEMORY.C`, `DATA.C`,
 `TIMELINE.C`, `FLOPPY.C`, `DIALOG.C`, `SOUND.C`, `MOVESENS.C`, `DUNGEON.C`, `INPUT.C`,
 `CHAMDRAW.C`, `GROUP.C`, `CLIKMENU.C`, `TEXT.C`, … Each one a player can see or hear is
-classed as carried by the set's `graphics.dat`, the sound path or A5, left (an H entry) or the machine's alone: among them the
-wall bump's sound mode (`CLIKMENU.C:307`) and the highlight box (`CLIKMENU.C:57-60`).
+classed as carried by the set's `graphics.dat` or the sound path, left (an H entry) or the machine's alone: among them the
+wall bump's sound mode (`CLIKMENU.C:307`) and the highlight box (`CLIKMENU.C:57-60`). One is classed: the couatl's
+picture toggled on its coin toss (`GROUP.C:265-279`) is left, the port keeping CSBWin's aspect and only the sound
+(`doc/AMIGA_DISK_REFERENCE.md` → "The Amiga's own sounds"); it goes into H with the rest.
 **The palettes, if they come easily** (the author: wanted, of little value). The Amiga's
 have 4 bits a channel where the Atari's have 3, and the darker dungeon palettes black out
 slots 9 and 10. They live in `dm`, so they are read from there, into the set's table item: the

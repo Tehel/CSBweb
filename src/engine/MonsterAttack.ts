@@ -161,7 +161,10 @@ export class MonsterAttack {
     }
 
     if (amended.attackSoundOrdinal !== 0) {
-      const ordinal = this.ctx.tables.uByte9672[amended.attackSoundOrdinal - 1] ?? 0;
+      // A set with the Amiga's tables reads A22E's eleven attack sounds
+      // (`G0244_auc_Graphic559_CreatureAttackSounds`, ReDMCSB `GROUP.C:1802-1804`).
+      const sounds = this.ctx.tables.amigaSounds?.creatureAttackSounds ?? this.ctx.tables.uByte9672;
+      const ordinal = sounds[amended.attackSoundOrdinal - 1] ?? 0;
       if (ordinal) this.ctx.sounds.queueSound(ordinal, amended.monsterX, amended.monsterY, 1, context.level);
     }
     return true;
@@ -276,7 +279,9 @@ export class MonsterAttack {
       p.heroToDamage = this.ctx.systems.championDamage.getCharacterToDamage(mapX, mapY, p.missileOriginPosition);
     }
 
-    p.attackSoundOrdinal = desc.attackSound;
+    // A22E's `AttackSoundOrdinal`, into its eleven attack sounds, for the 27 creatures it
+    // knows (`G0243_as_Graphic559_CreatureInfo`, ReDMCSB `DUNGEON.C:439-499`).
+    p.attackSoundOrdinal = this.ctx.tables.amigaSounds?.attackSoundOrdinals[monster.creatureType] ?? desc.attackSound;
 
     // `attack10 / 4 + 1`, then two rounds of `+= Random(range)`.
     let range = Math.trunc(desc.attack10 / 4) + 1;

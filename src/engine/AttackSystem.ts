@@ -57,6 +57,10 @@ import {
 } from '../data/tables/MonsterDesc';
 
 
+/** `M619_SOUND_WAR_CRY` and `M620_SOUND_BLOW_HORN`, of the Amiga's ordinals (ReDMCSB `DEFS.H:90-93`). */
+const SOUND_WAR_CRY = 28;
+const SOUND_BLOW_HORN = 25;
+
 /**
  * `objNI_*` for the three named blades the damage formula singles out
  * (`doc/CSBwin-src/Objects.h:477-484`). The Vorpal Blade is the one that can touch a
@@ -631,6 +635,16 @@ export class AttackSystem {
     params.dataType = AttackDataType.ADT_WarCry;
     let success = 0;
     this.trace("Entering 'WarCryEtc' for skill 14(WARCRY, CALM, BRANDISH, BLOWHORN).");
+
+    // The Amiga 2.2's war cry and horn, sounds 28 and 25, played at once on the square the
+    // action aims at, before anything else the action does (`dm`'s
+    // `F0407_MENUS_IsActionPerformed`, hunk 19 at 0x15fa: `doc/AMIGA_DISK_REFERENCE.md` →
+    // "The war cry and the horn"). Only a set with the Amiga's tables has the two ordinals.
+    if (this.ctx.tables.amigaSounds) {
+      const z = this.ctx.party.state.position.z;
+      if (params.attackType === AttackType.atk_WARCRY) this.ctx.sounds.queueSound(SOUND_WAR_CRY, params.attackX, params.attackY, 0, z);
+      if (params.attackType === AttackType.atk_BLOWHORN) this.ctx.sounds.queueSound(SOUND_BLOW_HORN, params.attackX, params.attackY, 0, z);
+    }
 
     if (this.monsterUnderAttack === OBJECT_ID_EOF) {
       // "We promised to always call" the filter.
