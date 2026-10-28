@@ -4,8 +4,9 @@
  *
  * Each table's bytes, read at its offset in the data hunk, are the initializer of
  * ReDMCSB's A22E branch, parsed from `doc/ReDMCSB-src/` (`npm run fetch-redmcsb-src`): the
- * dungeon view's six palettes, the 34 sounds, the 27 creatures, the 11 creature attack
- * sounds and the 25x25 volume grid. The source is read through a small preprocessor that
+ * credits' and the entrance's palettes, the dungeon view's six, the 34 sounds, the 27
+ * creatures, the 11 creature attack sounds, the wall ornaments' 8 coordinate sets, the 13
+ * creature replacement colour sets and the 25x25 volume grid. The source is read through a small preprocessor that
  * keeps the lines a `MEDIA*` macro naming `A22E` guards, so that a table with a branch per
  * release is read as A22E's.
  *
@@ -83,6 +84,11 @@ function checkDm(): void {
   console.log(`dm: ${hunks.length} hunks; hunk ${DM_DATA_HUNK}: ${data.type}, ${data.storedSize} bytes stored at file byte ${data.fileOffset}, ${data.memorySize} in memory`);
   check(hunks.filter((h) => h.type === 'data').length === 1 && data.type === 'data', `hunk ${DM_DATA_HUNK} is the program's one data hunk`);
 
+  const screens = initializerNumbers(a22eLines('DATA.C', 788, 795));
+  check(screens.length === 2 && screens.every((row) => row.length === 16), 'DATA.C:789-794 gives the credits\' and the entrance\'s palettes, 16 colours each');
+  compare('creditsPalette', pack(screens[0], screens[0].map(() => 2)), 'G0019_aui_Graphic562_Palette_Credits, DATA.C:789-790');
+  compare('entrancePalette', pack(screens[1], screens[1].map(() => 2)), 'G0020_aui_Graphic562_Palette_Entrance, DATA.C:792-793');
+
   const palettes = initializerNumbers(a22eLines('DATA.C', 832, 846)).flat();
   check(palettes.length === 96, 'DATA.C:833-845 gives 6 palettes of 16 colours');
   compare('dungeonViewPalettes', pack(palettes, palettes.map(() => 2)), "G0021_aaui_Graphic562_Palette_DungeonView, DATA.C:833-845");
@@ -109,6 +115,14 @@ function checkDm(): void {
   const attackSounds = attackNames.map((name) => defines.get(name) ?? -1);
   check(attackSounds.length === 11 && !attackSounds.includes(-1), `DUNGEON.C:503-517 names 11 sounds DEFS.H defines: ${attackSounds.join(', ')}`);
   compare('creatureAttackSounds', attackSounds, 'G0244_auc_Graphic559_CreatureAttackSounds, DUNGEON.C:503-517');
+
+  const coordinateSets = initializerNumbers(a22eLines('DUNVIEW.C', 1047, 1720).filter(([n]) => n >= 1061 && n <= 1166));
+  check(coordinateSets.length === 8 * 13 && coordinateSets.every((row) => row.length === 6), 'DUNVIEW.C:1061-1166 gives 8 coordinate sets of 13 views');
+  compare('wallOrnamentCoordinateSets', coordinateSets.flat(), 'G0205_aaauc_Graphic558_WallOrnamentCoordinateSets, DUNVIEW.C:1061-1166');
+
+  const colorSets = initializerNumbers(a22eLines('DUNVIEW.C', 1721, 1749).filter(([n]) => n <= 1736));
+  check(colorSets.length === 13 && colorSets.every((row) => row.length === 8), 'DUNVIEW.C:1722-1736 gives 13 creature replacement colour sets');
+  compare('creatureReplacementColorSets', colorSets.flatMap((row) => pack(row, [2, 2, 2, 2, 2, 2, 1, 1])), 'G0220_as_Graphic558_CreatureReplacementColorSets, DUNVIEW.C:1722-1736');
 
   const volume = initializerNumbers(a22eLines('SOUND.C', 54, 110));
   check(volume.length === 25 && volume.every((row) => row.length === 25), 'SOUND.C:55-81 gives 25 rows of 25');

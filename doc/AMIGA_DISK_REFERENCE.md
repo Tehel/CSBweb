@@ -72,20 +72,40 @@ SHA-256: `dm`, `graphics.dat` and `Dungeon.dat`. The disk's other files are
 
 `dm` is an AmigaDOS load file (`tools/lib/amigaDm.ts`): 142 hunks, all code but hunk 1, its
 one data hunk, 18920 bytes stored at file byte 1756 and 27688 in memory (the rest zero),
-and hunk 2, 4 bytes of BSS. Its data hunk holds the tables the Amiga's sound needs, each
+and hunk 2, 4 bytes of BSS. Its data hunk holds the tables the `dm-amiga` set takes, each
 the initializer of ReDMCSB's A22E branch, byte for byte (`tools/checks/amiga-disk.ts`):
 
 | Table | `dm:data+` | File byte | Bytes | ReDMCSB |
 | --- | --- | --- | --- | --- |
+| `G0019_aui_Graphic562_Palette_Credits[16]` | 2784 | 4540 | 32 | `DATA.C:789-790` |
+| `G0020_aui_Graphic562_Palette_Entrance[16]` | 2816 | 4572 | 32 | `DATA.C:792-793` |
 | `G0021_aaui_Graphic562_Palette_DungeonView[6][16]` | 2848 | 4604 | 192 | `DATA.C:833-845` |
 | `G0060_as_Graphic562_Sounds[34]`, `SOUND_DATA` | 3738 | 5494 | 272 | `DATA.C:1165-1201` |
 | `G0243_as_Graphic559_CreatureInfo[27]`, `CREATURE_INFO` | 5818 | 7574 | 702 | `DUNGEON.C:439-499` |
 | `G0244_auc_Graphic559_CreatureAttackSounds[11]` | 6520 | 8276 | 11 | `DUNGEON.C:503-517` |
+| `G0205_aaauc_Graphic558_WallOrnamentCoordinateSets[8][13][6]` | 8934 | 10690 | 624 | `DUNVIEW.C:1061-1166` |
+| `G0220_as_Graphic558_CreatureReplacementColorSets[13]` | 11134 | 12890 | 182 | `DUNVIEW.C:1722-1736` |
 | `G1028_aauc_DistanceToSoundVolume[25][25]` | 11974 | 13730 | 625 | `SOUND.C:55-81` |
 
-- **The palettes** are words `0x0RGB` at 4 bits a channel, where the Atari's have 3
-  (each A22E row has the Atari's in a comment). In the five darker ones, slots 9 and 10
-  are black.
+- **The palettes** are words `0x0RGB` at 4 bits a channel, where the Atari's have 3.
+  Every channel is twice the Atari's intensity, or 15 for 7, so each colour is the
+  Atari's at the Amiga's depth; against `dm-atari`'s items, the credits', the entrance's
+  and the brightest dungeon view palette are the Atari's, and the five darker ones are
+  but for slots 9 and 10, black, where the Atari's are dimmed browns. Those two slots are
+  the creatures' alone, each replaced on a map by a creature type that names a
+  replacement colour set (BUG0_04, `DUNVIEW.C:1737`).
+- **The wall ornaments' coordinate sets**, `{ X1, X2, Y1, Y2, ByteWidth, Height }` for
+  each of 13 views, are `dm-atari`'s item `0x22e`'s (CSBWin's `wallDecorationPosition`)
+  but in two sets. Set 7's three D3 front frames are for a bitmap 80 pixels wide, shown
+  at x 0-75, 74-149 and 148-223, where every Atari disk's are for one 96 wide, at x 0-83,
+  74-149 and 139-223 (ReDMCSB's "Atari ST:" comments, `DUNVIEW.C:1156-1158`); set 7 is
+  wall ornament 59's, on the Amiga (`G0194_auc_Graphic558_WallOrnamentCoordinateSetIndices`)
+  as in `0x22e`'s `Byte4100`, and DM's map 0 lists ornament 59. And set 5's D2R starts at
+  x 148, where every Atari disk's starts at 147, which ReDMCSB writes without a comment
+  (`DUNVIEW.C:1134`).
+- **The creature replacement colour sets** are `0x22e`'s (CSBWin's `specialColors`), each
+  colour at 4 bits as the palettes are, but the D3 replacement colour of sets 9 and 10:
+  70 and 120, where the Atari's are 30 and 100 (`DUNVIEW.C:1733-1734`).
 - **`SOUND_DATA`** (`DEFS.H:36-47`) is `GraphicIndex`, a word, then the bytes
   `aUnreferenced`, `Period`, `Priority`, `bUnreferenced`, `LoudDistance` and
   `SoftDistance`; A22E has 34 (`M513_SOUND_COUNT`, `DEFS.H:55-57`), their ordinals at
@@ -142,13 +162,22 @@ plays a new game on the set. The file holds 599 items:
 
 | Items | What |
 | --- | --- |
-| 0-562 | `dm-atari`'s, stored as there, but for 5, 396, 556 and 557, the Amiga's in their place, stored as is |
+| 0-562 | `dm-atari`'s, stored as there, but for 5, 396, 556 and 557, the Amiga's in their place, stored as is, and `0x22e` and `0x232`, `dm-atari`'s with `dm`'s tables, stored as is (below) |
 | 563-585 | the Amiga's 533-555, its 8-bit recordings of the Atari's sounds, in that order |
 | 586-597 | the Amiga's 563-574, its own sounds |
 | 598 | the table item, below |
 
-Items 0-562 keep the Atari's sounds, 4-bit, and its tables, so the folder is one CSBWin
-plays: CSBWin reads as many items as the file's first word counts
+Items `0x22e` and `0x232` are `dm-atari`'s with `dm`'s tables written over the Atari's,
+where CSBWin reads them: in `0x22e`, the coordinate sets at byte 2410 (`wallDecorationPosition`,
+`doc/CSBwin-src/Data.h:1175`) and the replacement colour sets at 650 (`specialColors`,
+`Data.h:1135`); in `0x232`, the dungeon view's six palettes at 1278, the entrance's at 1470
+and the credits' at 1502 (`Palette552`, `Palette360`, `Palette328`, `Data.h:1479-1482`).
+Each colour is halved to the Atari's 3 bits a channel, which loses nothing (above): the
+canvas shows an intensity times 36 for the Amiga's set as for the Atari's, where an Amiga
+shows a 4-bit channel times 17, the machine's own scale.
+
+Items 0-562 keep the Atari's sounds, 4-bit, and its tables in its formats, so the folder
+is one CSBWin plays: CSBWin reads as many items as the file's first word counts
 (`doc/CSBwin-src/Graphics.cpp:1944-2010`) and only those its tables name, and it reads an
 item whose two sizes are equal as stored (`Graphics.cpp:2648-2651`).
 
@@ -299,8 +328,12 @@ does not run them.
   the requesters and the files' names (`FLOPPY*.C`, `REQDISK.C`, `DIALOG.C:228-242`), the
   copy protection, the input device (`INPUT.C`: the Amiga's key codes, Alt with the Amiga
   key as a mouse button at `:344-370`, the pointer read at 640x400), the audio device, the
-  viewport's own palette switched by the copper (`DRAWVIEW.C:767-790`), and the waits on
-  the beam. The highlight box (`CLIKMENU.C:57-60`) is the Atari's inversion of the same
+  viewport's own palette switched by the copper (`DRAWVIEW.C:767-790`), the colours' 4
+  bits a channel (above), and the waits on the beam. The pointer is a hardware sprite
+  (`G1096_aps_MousePointerSprites`, `IO.C:169`), so A22E builds an object's pointer once,
+  in its own colours (`IO.C:2171-2181`, through its own colour changes, `IO.C:163-165`),
+  where the Atari draws the pointer into the screen and so builds a second, a silhouette
+  in colour 4, for the viewport below the palette split (`IO.C:2161-2170`). The highlight box (`CLIKMENU.C:57-60`) is the Atari's inversion of the same
   box (`F0006_MAIN_HighlightScreenBox`, `BASE.C:247`), done at once where the Atari asks
   its VBL to do it. The ending's screen filled and faded (`ENDGAME.C:334`, `:399`) differs
   only where BUG0_84 would, which DM never reaches.
@@ -308,7 +341,9 @@ does not run them.
   `Graphic562`, which the Atari reads from those items, are empty in the Amiga's
   `graphics.dat` and initialized in `dm` (`DUNVIEW.C`, `DUNGEON.C`, `MENU.C`,
   `COMMAND.C`, `DATA.C`). They hold the Atari's values but where ReDMCSB writes
-  "Atari ST:" beside one, which are listed below.
+  "Atari ST:" beside one, and set 5's D2R, where it writes nothing (above).
+- **Carried in the set's items `0x22e` and `0x232`**: the palettes, the coordinate sets
+  and the replacement colour sets, read from `dm` (above).
 - **The compiler's layout.** A block marked `ANOMALY_ST_BRANCH` is an `else` after a
   `return` that the Atari's compiler did without (`DUNGEON.C:1181-1206`): no behaviour.
 - **Carried by the sound path**: the 34 sounds and their table, the volume grid, the two
@@ -319,7 +354,7 @@ does not run them.
   CANCEL at `COMMAND.C:236-238`, smaller than the Atari's, and a champion's name, which
   opens the inventory on a left click, from x 43, 112, 181 and 250 where CSB's start a
   pixel further right (`COMMAND.C:92-95`).
-- **Still to carry** (`DEBT.md` A7-A10):
+- **Still to carry** (`DEBT.md` A7, A8 and A10):
   - the scents compared with a square, which every release but the Atari's does
     (`MEDIA353`, the IIGS's and the Amiga's; `MEDIA529`, the later ports'), and CSB on the
     Atari, 2.0 and 2.1, does not: `F0317_CHAMPION_AddScentStrength` changes only a scent
@@ -334,16 +369,6 @@ does not run them.
     step of the fuse sequence (`ENDGAME.C:953-958`);
   - "V2.2", which every dialog prints at x 192, y 7, where CSB 2.1 prints "V2.1" and
     CSBWin "V2.0" (`DIALOG.C:711`);
-  - the palettes at 4 bits a channel: the credits' and the entrance's
-    (`DATA.C:789-795`), the dungeon view's six (`DATA.C:833-845`, `dm:data+2848`); the
-    creatures' replacement colours, at 4 bits too, whose sets 9 and 10 take their D3 colour
-    at index 70 and 120 where the Atari's take 30 and 100 (`DUNVIEW.C:1724-1736`); and the
-    pointer's colour changes (`IO.C:164-165`);
-  - wall ornament coordinate set 7's three D3 front frames, for a bitmap 80 pixels wide
-    shown at x 0-75, 74-149 and 148-223, where the Atari's item `0x22e` has one 96 wide at
-    x 0-83, 74-149 and 139-223 (`DUNVIEW.C:1156-1158`). Set 7 is wall ornament 59's, on
-    the Amiga (`G0194_auc_Graphic558_WallOrnamentCoordinateSetIndices`) as in `0x22e`'s
-    `Byte4100`, and DM's map 0 lists ornament 59.
 
 **The bonus dungeon.** A21E and A22E load `DungeonB.dat`, the disk's Kids dungeon, in
 place of `Dungeon.dat` when Alt is held as the game starts (`STARTUP2.C:1329-1331`,

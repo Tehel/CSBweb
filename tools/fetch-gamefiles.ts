@@ -25,7 +25,7 @@
  *
  * Four steps make the rest, each by its own tool, in this order: `dm-atari`'s
  * `graphics.dat`, CSBWin's with three items of 1.2's (`tools/checks/dm-atari-graphics.ts
- * --write`); `dm-amiga`'s, `dm-atari`'s with the Amiga's credits, font, names and sounds
+ * --write`); `dm-amiga`'s, `dm-atari`'s with the Amiga's credits, font, names, sounds and colours
  * (`tools/checks/amiga-graphics.ts --write`); `csb`'s `utility-portraits.dat`, from the
  * utility disk (`tools/gen-utility-portraits.ts`); and every set's thumbnail
  * (`tools/gen-thumbnails.ts`).
@@ -167,7 +167,7 @@ const FILES: Record<string, [sha256: string, origin: Origin]> = {
   'dm-atari/graphics.dat': ['b5f238d299207b11107881ffa113c362685362c00c9c109116fe872ce6531ac5', { step: 'dmAtariGraphics' }],
   'dm-atari/dm-atari-thumbnail.png': ['0449c5fd626d79618ac0f21a0a30ee992a56b6e890aee184c86579aa095b8ae1', { step: 'thumbnails' }],
   'dm-amiga/dungeon.dat': ['f89f51bdecf95a5f9b9b4f70afb6381bdd2b7f6b571379ab33118d4a8b3d5c8b', { archive: 'dmAmiga', path: DM_AMIGA_ADF, disk: 'Dungeon.dat' }],
-  'dm-amiga/graphics.dat': ['6909479a6d71a97aeecc732e9118ef54cff4311e4ab31fbe72d5398c02dc4332', { step: 'dmAmigaGraphics' }],
+  'dm-amiga/graphics.dat': ['94e16696e93f85e35e64745333cca8bbaa32f882ace7e08b4706285554341ba9', { step: 'dmAmigaGraphics' }],
   'dm-amiga/dm-amiga-thumbnail.png': ['0449c5fd626d79618ac0f21a0a30ee992a56b6e890aee184c86579aa095b8ae1', { step: 'thumbnails' }],
   'dm-atari-1.0a/dungeon.dat': ['f388d156d2533abb90efb1235194d9d4f90e041193d8190e6a1efab809acf681', { archive: 'dmAtari', path: `${DM_STX} v1.0 (English) 1987-12-08.stx`, disk: 'DUNGEON.DAT' }],
   'dm-atari-1.0a/graphics.dat': ['e0daae7b956c10ae94c097e5294c6eb5fce5b3280bd1e29d96f2c2a51d5a863f', { archive: 'dmAtari', path: `${DM_STX} v1.0 (English) 1987-12-08.stx`, disk: 'GRAPHICS.DAT' }],

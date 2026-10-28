@@ -1,7 +1,7 @@
 /**
  * The Amiga 2.2 program, `tools/fixtures/gamefiles/amiga-2.2/dm`: its hunks, and where in
- * them the tables the Amiga's sound needs sit (`doc/AMIGA_DISK_REFERENCE.md` → "`dm`'s
- * tables"). `tools/checks/amiga-disk.ts` proves every offset against ReDMCSB's A22E source.
+ * them the tables the `dm-amiga` set takes sit (`doc/AMIGA_DISK_REFERENCE.md` → "`dm`, the
+ * program"). `tools/checks/amiga-disk.ts` proves every offset against ReDMCSB's A22E source.
  *
  * `dm` is an AmigaDOS load file: a `HUNK_HEADER` (0x3f3) giving the hunks' count and their
  * sizes in memory, then each hunk, a `HUNK_CODE` (0x3e9) or `HUNK_DATA` (0x3ea) with its
@@ -75,6 +75,10 @@ export const DM_DATA_HUNK = 1;
 
 /** The tables, by their offset in the data hunk and their size: ReDMCSB's names, A22E's branches. */
 export const DM_TABLES = {
+  /** `G0019_aui_Graphic562_Palette_Credits[16]`, words, 0x0RGB at 4 bits a channel. */
+  creditsPalette: { offset: 2784, size: 16 * 2 },
+  /** `G0020_aui_Graphic562_Palette_Entrance[16]`, words, 0x0RGB at 4 bits a channel. */
+  entrancePalette: { offset: 2816, size: 16 * 2 },
   /** `G0021_aaui_Graphic562_Palette_DungeonView[6][16]`, words, 0x0RGB at 4 bits a channel. */
   dungeonViewPalettes: { offset: 2848, size: 6 * 16 * 2 },
   /** `G0060_as_Graphic562_Sounds[34]`, `SOUND_DATA`: a word and six bytes. */
@@ -83,6 +87,10 @@ export const DM_TABLES = {
   creatureInfo: { offset: 5818, size: 27 * 26 },
   /** `G0244_auc_Graphic559_CreatureAttackSounds[11]`, bytes. */
   creatureAttackSounds: { offset: 6520, size: 11 },
+  /** `G0205_aaauc_Graphic558_WallOrnamentCoordinateSets[8][13][6]`: X1, X2, Y1, Y2, ByteWidth, Height. */
+  wallOrnamentCoordinateSets: { offset: 8934, size: 8 * 13 * 6 },
+  /** `G0220_as_Graphic558_CreatureReplacementColorSets[13]`: six words 0x0RGB at 4 bits, then the D2 and D3 bytes. */
+  creatureReplacementColorSets: { offset: 11134, size: 13 * 14 },
   /** `G1028_aauc_DistanceToSoundVolume[25][25]`, bytes. */
   distanceToSoundVolume: { offset: 11974, size: 25 * 25 },
 } as const;
