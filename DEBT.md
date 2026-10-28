@@ -123,7 +123,9 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| A6 | The rest of A22E's own code, classed | S | ⏳ |
+| A7 | The wall bump heard from the wall | S | ⏳ |
+| A8 | The Amiga's ending explosions and its dialogs' "V2.2" | S | ⏳ |
+| A9 | `dm`'s own colours and ornament frames | M | ⏳ |
 | E42 | The attack menu's damage flash timed in VBLs, not milliseconds | S | ⏳ |
 | E43 | One input boundary: every change the page makes to the game, logged with its VBL | M | ⏳ |
 | F22 | `tools/checks/replay.ts`: a game logged at the boundary plays back the same | M | ⏳ |
@@ -147,7 +149,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: A7 · C194 · D22 · E44 · F23 · G31 · P13 · R17 · U13 · W8 · X18. An ID recorded and paid in one commit has no
+Next free IDs: A10 · C194 · D22 · E44 · F23 · G31 · P13 · R17 · U13 · W8 · X18. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -211,22 +213,43 @@ Decisions taken with the author:
   credits (5), font (557), objects' names (556) and picture 396 replace the Atari's in
   place: they are in the formats CSBWin reads, so the folder still plays in CSBWin.
 
-### A6 ⏳ The rest of A22E's own code, classed
+**A22E's own code is classed** (`doc/AMIGA_DISK_REFERENCE.md` → "A22E's own code,
+classed"): the machine's alone, the Atari's tables moved into `dm`, the compiler's layout,
+carried by the sound path, left as CSBWin does (H), or still to carry, which is A7-A9.
+The disk's bonus dungeon, `DungeonB.dat`, is not taken.
 
-64 `MEDIA*` macros hold A22E and not S21E, in `DUNVIEW.C`, `MEMORY.C`, `DATA.C`,
-`TIMELINE.C`, `FLOPPY.C`, `DIALOG.C`, `SOUND.C`, `MOVESENS.C`, `DUNGEON.C`, `INPUT.C`,
-`CHAMDRAW.C`, `GROUP.C`, `CLIKMENU.C`, `TEXT.C`, … Each one a player can see or hear is
-classed as carried by the set's `graphics.dat` or the sound path, left (an H entry) or the machine's alone: among them the
-wall bump's sound mode (`CLIKMENU.C:307`) and the highlight box (`CLIKMENU.C:57-60`). One is classed: the couatl's
-picture toggled on its coin toss (`GROUP.C:265-279`) is left, the port keeping CSBWin's aspect and only the sound
-(`doc/AMIGA_DISK_REFERENCE.md` → "The Amiga's own sounds"); it goes into H with the rest.
-**The palettes, if they come easily** (the author: wanted, of little value). The Amiga's
-have 4 bits a channel where the Atari's have 3, and the darker dungeon palettes black out
-slots 9 and 10. They live in `dm`, so they are read from there, into the set's table item: the
-dungeon view's six are at `dm:data+2848` (`doc/AMIGA_DISK_REFERENCE.md`), the credits',
-the entrance's and the screen's not yet located. Where the port's palettes come from (the
-`0x232` item, at the Atari's 3 bits) decides how cheap that is; if it is not cheap, they
-are left, and H says so.
+### A7 ⏳ The wall bump heard from the wall
+
+A22E asks for the party-damaged sound of a bump on the square bumped into, mode 0
+(`doc/ReDMCSB-src/CLIKMENU.C:307`); the Atari, and the port, on the party's. Under the
+Amiga's volume grid the bump is heard at 58 ahead, or 58 and 6 to one side, where the
+party's square gives 64 on both. For a set with the table item only, through the sound
+path; a `tools/checks/` tool hears both.
+
+### A8 ⏳ The Amiga's ending explosions and its dialogs' "V2.2"
+
+Two things A22E's code does that CSBWin has no counterpart for, both seen, for a set with
+the table item only:
+
+- After the ending's last message, six non-material harm explosions on Lord Chaos's
+  square, at 55, 95, 135, 175, 215 and 255, each followed by a step of the fuse sequence, then
+  the delay both have (`doc/ReDMCSB-src/ENDGAME.C:953-958`), in `_FusionSequence`
+  (`src/engine/Fusion.ts`).
+- "V2.2" where `_DoMenu` stamps "V2.0" (`doc/ReDMCSB-src/DIALOG.C:711`,
+  `src/renderer/ui/Menu.ts`).
+
+### A9 ⏳ `dm`'s own colours and ornament frames
+
+What `dm` holds otherwise than the Atari's `graphics.dat`, listed in
+`doc/AMIGA_DISK_REFERENCE.md` → "A22E's own code, classed": the palettes at 4 bits a
+channel (the credits', the entrance's and the dungeon view's six), the creatures'
+replacement colours, the pointer's colour changes, and coordinate set 7's three D3 front
+frames. Each is read from `dm`, into the set's table item or the set's item `0x22e` (which
+CSBWin would then read too), so the set is proved by `tools/checks/amiga-graphics.ts`.
+The dungeon view's palettes are at `dm:data+2848`; the others are not located in `dm`
+yet. Where the port's palettes come from (the `0x232` item, at the Atari's 3 bits) decides
+how cheap the colours are. **The palettes, if they come easily** (the author: wanted, of
+little value); if not, they are left, and H says so.
 
 The Amiga's FTL logo (`swoosh`, a program of its own) is not taken: it plays and looks as
 the Atari's does (the author).
@@ -981,7 +1004,12 @@ Recorded so that nobody "fixes" them.
   moving, the volume by position in stereo, its palettes. For those alone, the
   `dm-amiga` set follows ReDMCSB's A22E branch (`doc/ReDMCSB-src/`,
   `doc/AMIGA_DISK_REFERENCE.md` → "The reference: ReDMCSB, A22E"), and its tables are read
-  from the Amiga's `dm`. Everything CSBWin has, the Amiga set does as CSBWin does.
+  from the Amiga's `dm`. Everything CSBWin has, the Amiga set does as CSBWin does,
+  where A22E does it otherwise too: the couatl's picture is CSBWin's aspect, a scent's
+  strength changes as the Atari's does (every scent, where A22E changes only the one on
+  the square), and the click areas are the Atari's (A22E's RESURRECT, REINCARNATE and
+  CANCEL are smaller, and its names open the inventory a pixel further left).
+  `doc/AMIGA_DISK_REFERENCE.md` → "A22E's own code, classed".
 
 - 🚫 **The keys are the port's table, not a `config.txt`.** CSBWin's keys are whatever
   its `config.txt` says (`doc/PROVEN_FACTS.md` → "CSBWin has no keyboard controls"). The

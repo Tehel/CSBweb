@@ -287,6 +287,65 @@ So 2.2 plays the war cry and the horn at once, on the square ahead, before the a
 frightens anything. The port asks for them at the start of `WarCryEtc`, on its
 `attackX`, `attackY`, with `deltaTime` 0.
 
+## A22E's own code, classed
+
+Every block of ReDMCSB under a `MEDIA*` macro that names A22E and no Atari ST release
+(`S10EA` to `S21E`) falls in one of these classes. Most are shared with the Apple IIGS, the
+other Amiga releases or every later port; what matters is that the Atari, and so CSBWin,
+does not run them.
+
+- **The machine's alone**, nothing to port: the blitter, the bitplanes and chip memory
+  (`BLIT*.C`, `COPYPRO*.C`, `VIEWPORT.C`, `PORTRAIT.C`'s planar conversion), the floppies,
+  the requesters and the files' names (`FLOPPY*.C`, `REQDISK.C`, `DIALOG.C:228-242`), the
+  copy protection, the input device (`INPUT.C`: the Amiga's key codes, Alt with the Amiga
+  key as a mouse button at `:344-370`, the pointer read at 640x400), the audio device, the
+  viewport's own palette switched by the copper (`DRAWVIEW.C:767-790`), and the waits on
+  the beam. The highlight box (`CLIKMENU.C:57-60`) is the Atari's inversion of the same
+  box (`F0006_MAIN_HighlightScreenBox`, `BASE.C:247`), done at once where the Atari asks
+  its VBL to do it. The ending's screen filled and faded (`ENDGAME.C:334`, `:399`) differs
+  only where BUG0_84 would, which DM never reaches.
+- **The Atari's tables, moved into the program.** The tables named `Graphic558` to
+  `Graphic562`, which the Atari reads from those items, are empty in the Amiga's
+  `graphics.dat` and initialized in `dm` (`DUNVIEW.C`, `DUNGEON.C`, `MENU.C`,
+  `COMMAND.C`, `DATA.C`). They hold the Atari's values but where ReDMCSB writes
+  "Atari ST:" beside one, which are listed below.
+- **The compiler's layout.** A block marked `ANOMALY_ST_BRANCH` is an `else` after a
+  `return` that the Atari's compiler did without (`DUNGEON.C:1181-1206`): no behaviour.
+- **Carried by the sound path**: the 34 sounds and their table, the volume grid, the two
+  pending sounds and the two voices, the footsteps, the attack sounds, the couatl's sound,
+  the war cry and the horn (the sections above).
+- **Left, as CSBWin does** (`DEBT.md` H): the couatl's picture toggled on its coin toss
+  (`GROUP.C:265-279`); a scent's strength changed only on the square it names
+  (`CHAMPION.C:1505`, `:2316`), where the Atari's comparison is thrown away and every
+  scent changes; and the click areas the Amiga draws otherwise: RESURRECT, REINCARNATE and
+  CANCEL at `COMMAND.C:236-238`, smaller than the Atari's, and a champion's name, which
+  opens the inventory on a left click, from x 43, 112, 181 and 250 where CSB's start a
+  pixel further right (`COMMAND.C:92-95`).
+- **Still to carry** (`DEBT.md` A7-A9):
+  - the wall bump's sound, which A22E asks for on the square bumped into, where the Atari
+    asks for it on the party's (`CLIKMENU.C:307`), so the Amiga hears it ahead or to one
+    side;
+  - the ending's six explosions: after its last message, A22E sets off a non-material
+    harm explosion on Lord Chaos's square at 55, 95, 135, 175, 215 and 255, each followed by a
+    step of the fuse sequence (`ENDGAME.C:953-958`);
+  - "V2.2", which every dialog prints at x 192, y 7, where CSB 2.1 prints "V2.1" and
+    CSBWin "V2.0" (`DIALOG.C:711`);
+  - the palettes at 4 bits a channel: the credits' and the entrance's
+    (`DATA.C:789-795`), the dungeon view's six (`DATA.C:833-845`, `dm:data+2848`); the
+    creatures' replacement colours, at 4 bits too, whose sets 9 and 10 take their D3 colour
+    at index 70 and 120 where the Atari's take 30 and 100 (`DUNVIEW.C:1724-1736`); and the
+    pointer's colour changes (`IO.C:164-165`);
+  - wall ornament coordinate set 7's three D3 front frames, for a bitmap 80 pixels wide
+    shown at x 0-75, 74-149 and 148-223, where the Atari's item `0x22e` has one 96 wide at
+    x 0-83, 74-149 and 139-223 (`DUNVIEW.C:1156-1158`). Set 7 is wall ornament 59's, on
+    the Amiga (`G0194_auc_Graphic558_WallOrnamentCoordinateSetIndices`) as in `0x22e`'s
+    `Byte4100`, and DM's map 0 lists ornament 59.
+
+**The bonus dungeon.** A21E and A22E load `DungeonB.dat`, the disk's Kids dungeon, in
+place of `Dungeon.dat` when Alt is held as the game starts (`STARTUP2.C:1329-1331`,
+`LOADSAVE.C:2319`). The port does not take it, and has not compared it with the
+`kids-dungeon` set's `dungeon.dat`.
+
 ## `Dungeon.dat`
 
 The Amiga's English `Dungeon.dat` is the Atari 1.2 dungeon, compressed, with one
