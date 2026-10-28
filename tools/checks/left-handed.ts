@@ -4,7 +4,7 @@
  * moved back.
  *
  * What it asserts:
- * - every `graphics.dat` under `tools/fixtures/gamefiles` fits it: no button the game reads in
+ * - every data set's `graphics.dat` fits it: no button the game reads in
  *   play, nor panel it draws outside the viewport, is cut by a region's edge or a gap's,
  *   and each has the top's gap at x 274-280 and the column's at 224-232;
  * - the canaries: the same tables with the turn-left arrow moved across the viewport's
@@ -21,7 +21,8 @@
  *
  * Run: `npm test -- --only=left-handed.ts`
  */
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { basename } from 'node:path';
 
 import { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import { extractUITables, type UIButton, type UITables } from '../../src/data/tables/UITables';
@@ -40,7 +41,7 @@ import { searchMouseButtons, updateButtonLists } from '../../src/renderer/ui/Mou
 import { TABS } from '../../src/renderer/ui/SettingsDialog';
 import type { UIState } from '../../src/renderer/ui/UIState';
 import { check, finish } from '../lib/check';
-import { GAMEFILES_DIR } from '../lib/dataSets';
+import { DATA_SETS } from '../lib/dataSets';
 import { newGame, stockDungeon, stockGraphics } from '../lib/game';
 import { readPng } from '../lib/png';
 import { newUIState } from '../lib/ui';
@@ -50,8 +51,9 @@ const H = 200;
 
 function main(): void {
   // ---- Every shipped graphics.dat fits.
-  for (const folder of readdirSync(GAMEFILES_DIR).sort()) {
-    const file = `${GAMEFILES_DIR}/${folder}/graphics.dat`;
+  for (const dir of [...new Set(DATA_SETS.map((set) => set.dir))].sort()) {
+    const folder = basename(dir);
+    const file = `${dir}/graphics.dat`;
     if (!existsSync(file)) continue;
     const graphics = new GraphicsLoader();
     graphics.loadFromArray(new Uint8Array(readFileSync(file)));

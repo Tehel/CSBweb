@@ -28,9 +28,11 @@ Play it at <https://csbweb.looten.net/>, the reference instance, or set up your 
 ### Prerequisites
 
 - Node.js 24 (`.nvmrc`)
-- `7z` (7-Zip or p7zip), for the two fetch commands
+- `7z` (7-Zip or p7zip), for the three fetch commands
 - `npm run fetch-csbwin-src` once: it fetches `doc/CSBwin-src/`, CSBWin's C++ source, which
   the docs cite and `npm test` reads
+- `npm run fetch-redmcsb-src` once: it fetches `doc/ReDMCSB-src/`, ReDMCSB's C source, the
+  reference for what only the Amiga release does, which the docs cite and `npm test` reads
 - `npm run fetch-gamefiles` once: it fetches the original game files and the fans' dungeons
   into `tools/fixtures/gamefiles/`, one directory per data set listed in
   `tools/data-sets.json`, from dmweb.free.fr, Paul R. Stevens' site and the Dungeon Master

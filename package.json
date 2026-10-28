@@ -8,6 +8,7 @@
     "test": "node tools/run-checks.ts",
     "fetch-csbwin-src": "tsx tools/fetch-csbwin-src.ts",
     "fetch-gamefiles": "tsx tools/fetch-gamefiles.ts",
+    "fetch-redmcsb-src": "tsx tools/fetch-redmcsb-src.ts",
     "preview": "vite preview",
     "start": "node server/server.ts",
     "deploy": "utils/deploy.sh"

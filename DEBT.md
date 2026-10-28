@@ -119,7 +119,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| A1 | The Amiga 2.2 disk fetched, ReDMCSB beside CSBWin as the Amiga's reference | M | ⏳ |
 | A2 | `dm-amiga`: `dm-atari`'s `graphics.dat` with the Amiga's credits, font and names, its sounds and tables appended | M | ⏳ |
 | A3 | The Amiga's 8-bit sounds decoded and played at their Paula rate | S | ⏳ |
 | A4 | The Amiga's sound path: stereo volume by position, two voices | M | ⏳ |
@@ -157,48 +156,21 @@ release's sounds where the Atari plays its own, adds the sounds the Atari never 
 among them a monster group heard moving, by position and in stereo, and plays the Amiga's
 dungeon. Everything else is the port as it is, CSBWin's engine under DM's rules.
 
-**The reference.** CSBWin has none of this, so for what only the Amiga does, ReDMCSB
-(`http://dmweb.free.fr/Stuff/ReDMCSB_WIP20210206.7z`, the reverse-engineered source of
-every DM and CSB release, `Toolchains/Common/Source/`) is the reference, its branch for
-**A22E**, "Dungeon Master for Amiga 2.2 English". A `MEDIA*` macro names the releases its
-code is built for; one that holds `A22E` and not `S21E` (CSB for Atari ST 2.1) is the
-Amiga's own. Everything CSBWin does still follows CSBWin. A1 writes the exception down.
+**The reference and the disk** are `doc/AMIGA_DISK_REFERENCE.md`'s. For what only the
+Amiga does, the reference is ReDMCSB's branch for **A22E**, "Dungeon Master for Amiga 2.2
+English", in `doc/ReDMCSB-src/` (`npm run fetch-redmcsb-src`); everything CSBWin does
+still follows CSBWin (H). The 2.2 English disk's `dm`, `graphics.dat` and `Dungeon.dat` are
+`tools/fixtures/gamefiles/amiga-2.2/` (`npm run fetch-gamefiles`). The doc lists how its
+`graphics.dat` differs from `dm-atari`'s, four items of which are what a player sees of the
+Amiga: 5, the credits; 557, the font; 556, the objects' names; and 396, a picture. And it
+gives where `dm`'s tables are, which `tools/lib/amigaDm.ts` reads and
+`tools/checks/amiga-disk.ts` proves against ReDMCSB's source.
 
-**The release.** `../DMweb-extra/archive/DungeonMaster Amiga/` is the 2.2 English disk, file
-for file: `dm`, `graphics.dat` and `Dungeon.dat` hash the same as those on
-`Floppy Disks ADF/Dungeon Master for Amiga v2.2 (English) Original (Not working).adf` in
-`http://dmweb.free.fr/files/Game,Dungeon_Master,Amiga,Software.7z`, and `dm` holds `V2.2`.
-The ADF is an OFS image whose files read whole, the copy protection notwithstanding. 3.6,
-in the same archive, has another `graphics.dat` format (`0x8001`, 749 items) and an engine
-in modules (`KAOS.FTL`, …); it is not the base. Its `Dungeon.DAT` is 2.2's byte for byte.
-`DungeonB.dat` is the Kids dungeon, already a set.
-
-**Its `graphics.dat`** has 575 items, each stored as is (compressed size = size). Against
-`dm-atari`'s, decompressed, 529 are the same. Items 533-555 are the same sounds recorded
-again, 8-bit, a word then the samples (533: `0x0372`, 882, in 886 bytes); 563-574 are twelve
-sounds the Atari does not have; 558-562 (`0x22e`-`0x232`, the viewport's rectangles, the
-creatures' table, the sound table, …) are empty, their tables being in `dm`. Six differ,
-and four of them are what a player sees of the Amiga:
-
-- **5, the credits**, whose last two lines read "Wayne Holder ~ producer" on the Atari and
-  "Phil Mercurio ~ Amiga director" on the Amiga.
-- **557, the font** (`0x22d`), 16 of its 768 bytes: characters 12, 16, 20 and 29 retouched,
-  and 120, empty on the Atari, drawn.
-- **556, the objects' names**: the Atari's "ANTIVEN POTIO…" is the Amiga's "BRO POTIO…",
-  and the Amiga has a "MA POTIO…" (the bytes compared, the slots each sits in not yet).
-- **396**, a 64x7 picture, redrawn.
-
-The other two are not: 120 decodes to the same pixels, encoded otherwise, and 21 is not a
-picture (its header reads 16x23 where the Atari's reads 16x12), still to identify.
-
-**The sound table** is `G0060_as_Graphic562_Sounds[34]` (`DATA.C:478-523`,
-`M513_SOUND_COUNT` 34 for A22E, `DEFS.H:56`), `SOUND_DATA` (`DEFS.H:36-46`): `GraphicIndex`,
-a byte, `Period`, `Priority`, a byte, `LoudDistance`, `SoftDistance`. In `dm` it starts at
-file offset 5494, `{ 533, 0, 112, 11, 0, 3, 6 }`; entry 22 names item 563, entry 33 item
-574. Entries 0-21 are the Atari's ordinals; 22, 23, 24, 26, 27, 32 and 33 are the movement
-sounds (`DEFS.H:87-98`), 25 the horn, 28 the war cry, 29-31 the attacks of the rock, the
-water elemental and the couatl. The Amiga plays an entry at Paula period `72800 / Period`
-(`SOUND.C:1107`), so 112 is 650, 5457 Hz on a PAL machine.
+**The sound table** is `G0060_as_Graphic562_Sounds[34]` (`doc/ReDMCSB-src/DATA.C:1165-1201`),
+at `dm:data+3738`. Entries 0-21 are the Atari's ordinals; 22, 23, 24, 26, 27, 32 and 33 are
+the movement sounds (`DEFS.H:87-98`), 25 the horn, 28 the war cry, 29-31 the attacks of
+the rock, the water elemental and the couatl. The Amiga plays an entry at Paula period
+`72800 / Period` (`SOUND.C:1107`), so 112 is 650, 5457 Hz on a PAL machine.
 
 **Footsteps.** `F0514_MOVE_GetSound` (`MOVESENS.C:911-1000`, its A22E branch) gives a
 creature type's movement sound: none to the ghost, the eye, the black flame, the zytaz and
@@ -237,19 +209,6 @@ Decisions taken with the author:
   credits (5), font (557), objects' names (556) and picture 396 replace the Atari's in
   place: they are in the formats CSBWin reads, so the folder still plays in CSBWin.
 
-### A1 ⏳ The Amiga 2.2 disk fetched, ReDMCSB beside CSBWin as the Amiga's reference
-
-- `npm run fetch-gamefiles` downloads `Game,Dungeon_Master,Amiga,Software.7z` and reads the
-  2.2 English ADF with a new `tools/lib/adf.ts` (OFS: the root block at 880, hash tables,
-  data blocks), as `tools/lib/stx.ts` reads a Pasti image; `dm`, `graphics.dat` and
-  `Dungeon.dat` are pinned by hash. The 2.0 disk's `Dungeon.dat` is compared on the way, to
-  correct `PROVEN_FACTS.md`'s "the Amiga 2.0 disk" to the releases it holds for.
-- `npm run fetch-redmcsb-src` fills `doc/ReDMCSB-src/`, git-ignored, as
-  `fetch-csbwin-src` fills `doc/CSBwin-src/`, with its sources and `Documentation/`.
-- `doc/AMIGA_DISK_REFERENCE.md`: the files, the comparison of the items, the offsets of
-  `dm`'s tables, each proven by a canary.
-- `CLAUDE.md` and H record ReDMCSB's A22E as the reference for what only the Amiga does.
-
 ### A2 ⏳ `dm-amiga`: `dm-atari`'s `graphics.dat` with the Amiga's credits, font and names, its sounds and tables appended
 
 - A step of `fetch-gamefiles` (as `thumbnails` is) writes `dm-amiga/graphics.dat`:
@@ -258,10 +217,14 @@ Decisions taken with the author:
   compared), then the Amiga's sounds 533-555 and 563-574, then one item of
   tables read from `dm`: the 34 `SOUND_DATA`, their `GraphicIndex` moved to the appended
   items; the 25x25 volume grid; the 11 creature attack sounds and the creatures'
-  `AttackSoundOrdinal`. The item's layout is the port's, written down in
-  `doc/AMIGA_DISK_REFERENCE.md`; its offsets in `dm` are proven by canaries
-  (`tools/checks/amiga-graphics.ts`).
-- `dm-amiga/dungeon.dat` is the Amiga `Dungeon.dat`.
+  `AttackSoundOrdinal`, each read through `tools/lib/amigaDm.ts`. The item's layout is
+  the port's, written down in `doc/AMIGA_DISK_REFERENCE.md`. `tools/checks/amiga-graphics.ts`
+  proves the file the step writes, and what it is made from: the Amiga's 575 items each
+  stored as is, and against `dm-atari`'s 563, decompressed, 529 the same and 5, 21, 120,
+  396 and 533-562 differing (`doc/AMIGA_DISK_REFERENCE.md` → "`graphics.dat`"), 558-562
+  empty, and every item the 34 sounds name holding something. The Amiga's `graphics.dat`
+  is read only by the step and that check.
+- `dm-amiga/dungeon.dat` is `amiga-2.2/Dungeon.dat`.
 - `tools/data-sets.json`: `dm-amiga`, "Dungeon Master Amiga", `dmRules`, `official`, its
   thumbnail.
 - H: the set's `graphics.dat` is built, as `dm-atari`'s is CSBWin's with three items from
@@ -313,9 +276,10 @@ nothing in 2.2, that is recorded and it stays silent.
 classed as carried by A2-A5, left (an H entry) or the machine's alone: among them the
 wall bump's sound mode (`CLIKMENU.C:307`) and the highlight box (`CLIKMENU.C:57-60`).
 **The palettes, if they come easily** (the author: wanted, of little value). The Amiga's
-have 4 bits a channel where the Atari's have 3 (`DATA.C:210-231`, each with the Atari's in
-a comment), and the darker dungeon palettes black out slots 9 and 10. They live in `dm`, so
-they are read from there, into A2's table item. Where the port's palettes come from (the
+have 4 bits a channel where the Atari's have 3, and the darker dungeon palettes black out
+slots 9 and 10. They live in `dm`, so they are read from there, into A2's table item: the
+dungeon view's six are at `dm:data+2848` (`doc/AMIGA_DISK_REFERENCE.md`), the credits',
+the entrance's and the screen's not yet located. Where the port's palettes come from (the
 `0x232` item, at the Atari's 3 bits) decides how cheap that is; if it is not cheap, they
 are left, and H says so.
 
@@ -995,6 +959,13 @@ encoded attributes and skills (`AZIZI JOHARI F AADNADACAAAH…`).
 ## H — Deliberate divergences (not debt)
 
 Recorded so that nobody "fixes" them.
+
+- 🚫 **What only the Amiga does follows ReDMCSB, not CSBWin.** CSBWin ports the Atari ST
+  release and has none of the Amiga's own: its 8-bit sounds and their table, a group heard
+  moving, the volume by position in stereo, its palettes. For those alone, the
+  `dm-amiga` set follows ReDMCSB's A22E branch (`doc/ReDMCSB-src/`,
+  `doc/AMIGA_DISK_REFERENCE.md` → "The reference: ReDMCSB, A22E"), and its tables are read
+  from the Amiga's `dm`. Everything CSBWin has, the Amiga set does as CSBWin does.
 
 - 🚫 **The keys are the port's table, not a `config.txt`.** CSBWin's keys are whatever
   its `config.txt` says (`doc/PROVEN_FACTS.md` → "CSBWin has no keyboard controls"). The

@@ -12,10 +12,13 @@
  * - the Atari ST disks of DM and CSB, as dmweb.free.fr keeps them: 1.1's dungeon (CSBWin's,
  *   `dm-atari`), 1.2 English's and 1.3 French's files, read from their Pasti images
  *   (`tools/lib/stx.ts`), and the CSB 2.1 utility disk's portraits;
+ * - the Amiga 2.2 English disk of DM, as dmweb.free.fr keeps it: its program, `graphics.dat`
+ *   and `Dungeon.dat`, read from its ADF (`tools/lib/adf.ts`) into `amiga-2.2/`, a folder
+ *   that is not a set, which only the tools read (`doc/AMIGA_DISK_REFERENCE.md`);
  * - CSBWin's DM and CSB packages and 3D2D1D, from Paul R. Stevens' site: `dm-windows`, the
  *   `graphics.dat` the Kids dungeon plays, `csb`'s files, and `3D2D1D`;
  * - his `CSBgraphics.dat`, the designers' library no set plays, a file of its own on his site:
- *   `csbgraphics/`, the one folder that is not a set, which only the tools read;
+ *   `csbgraphics/`, another folder that is not a set, which only the tools read;
  * - Conflux 3.5 beta 8 (his site, or the OneDrive), The Towers of Chaos 3.3 and the Kids
  *   dungeon 24 (the OneDrive).
  *
@@ -42,6 +45,7 @@ import { dirname, join, resolve } from 'node:path';
 
 import { thumbnailPath } from '../src/data/DataSets';
 import { DATA_SETS, GAMEFILES_DIR } from './lib/dataSets';
+import { adfFiles } from './lib/adf';
 import { fetchOk, oneDriveCustomDungeons, oneDriveFiles } from './lib/oneDrive';
 import { stxFiles } from './lib/stx';
 
@@ -68,6 +72,12 @@ const ARCHIVES = {
     sha256: 'be61def17c104cde187e802eaac40cc75ccb72799022bec8992cf4ba04fa4782',
     sources: [`${DMWEB}/Game,Dungeon_Master,Atari_ST,Software.7z`,
       `https://web.archive.org/web/20260106190803id_/${DMWEB}/Game,Dungeon_Master,Atari_ST,Software.7z`],
+  },
+  dmAmiga: {
+    file: 'Game,Dungeon_Master,Amiga,Software.7z',
+    sha256: '79fe5438ffa9dceb2f61346cf390bc41b052cf36c6f558389e76ce78ec72e0ea',
+    sources: [`${DMWEB}/Game,Dungeon_Master,Amiga,Software.7z`,
+      `https://web.archive.org/web/20260106192334id_/${DMWEB}/Game,Dungeon_Master,Amiga,Software.7z`],
   },
   csbAtari: {
     file: 'Game,Chaos_Strikes_Back,Atari_ST,Software.7z',
@@ -120,16 +130,20 @@ const ARCHIVES = {
 
 type ArchiveName = keyof typeof ARCHIVES;
 
-/** Where a file comes from: a file of an archive, a file of a Pasti image in it, or a step (`STEPS`). */
+/** Where a file comes from: a file of an archive, a file of a disk image in it (a Pasti image or an ADF, by its extension), or a step (`STEPS`). */
 type Origin =
   | { archive: ArchiveName; path: string; disk?: string }
   | { step: StepName };
 
 const DM_STX = 'Floppy Disks STX/Dungeon Master for Atati ST';
+const DM_AMIGA_ADF = 'Floppy Disks ADF/Dungeon Master for Amiga v2.2 (English) Original (Not working).adf';
 const CSB_UTILITY_STX = 'Floppy Disks STX/Chaos Strikes Back for Atari ST Utility Disk v2.1 (English).stx';
 
 /** Every file of the folder, by its path under it: its SHA-256 and where it comes from. */
 const FILES: Record<string, [sha256: string, origin: Origin]> = {
+  'amiga-2.2/dm': ['a21ae6b9b0c85d9c524a1b2d4b2a744b6427840e478e413c9ff38b4f04a3a44e', { archive: 'dmAmiga', path: DM_AMIGA_ADF, disk: 'dm' }],
+  'amiga-2.2/Dungeon.dat': ['f89f51bdecf95a5f9b9b4f70afb6381bdd2b7f6b571379ab33118d4a8b3d5c8b', { archive: 'dmAmiga', path: DM_AMIGA_ADF, disk: 'Dungeon.dat' }],
+  'amiga-2.2/graphics.dat': ['e371fc45d1b279bb2fc4254587c5cb2d0194226e4a9f901c6dee2f5a86449b79', { archive: 'dmAmiga', path: DM_AMIGA_ADF, disk: 'graphics.dat' }],
   '3D2D1D/dungeon.dat': ['80e2610f3061f79ed4f9a50e32f29c2b4461b7e0ab570bcc92afc43a7e0fc6e7', { archive: 'threeD2D1D', path: 'dungeon.dat' }],
   '3D2D1D/graphics.dat': ['7cceef26a20acec6c5f9de659a6a0c57cdb24908687a2ca3a58e3c62cc6b0593', { archive: 'threeD2D1D', path: 'GRAPHICS.DAT' }],
   '3D2D1D/3d2d1d-thumbnail.png': ['bd45d907acabbd887626d67a70c0e094af1d5dd7e4d5f4fb9fcd7cb45b495b68', { step: 'thumbnails' }],
@@ -283,7 +297,7 @@ if (!checkOnly && missing.length > 0) {
     if ('step' in origin) continue;
     const source = unpacked(origin.archive, origin.path);
     let bytes: Uint8Array | undefined = readFileSync(source);
-    if (origin.disk !== undefined) bytes = stxFiles(bytes).get(origin.disk);
+    if (origin.disk !== undefined) bytes = (origin.path.endsWith('.adf') ? adfFiles : stxFiles)(bytes).get(origin.disk);
     if (bytes === undefined) throw new Error(`${origin.path} has no readable ${origin.disk}`);
     mkdirSync(dirname(join(TREE, path)), { recursive: true });
     writeFileSync(join(TREE, path), bytes);

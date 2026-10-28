@@ -20,22 +20,24 @@
  *
  * Run: `npm test -- --only=derived-graphics.ts`
  */
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { basename } from 'node:path';
 import { Position } from '../../src/core/types';
 import { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import type { IndexedBitmap } from '../../src/renderer/csbwin/CanvasBlitter';
 import { GraphicsStore } from '../../src/renderer/GraphicsStore';
 import { ViewportRenderer } from '../../src/renderer/ViewportRenderer';
 import { check, finish } from '../lib/check';
+import { DATA_SETS } from '../lib/dataSets';
 import { graphicsTablesOf, newGame, stockDungeon, stockGraphics } from '../lib/game';
 
-const SETS = 'tools/fixtures/gamefiles';
 const DOOR_SWITCH_LAST = 103;
 const FIRST_CLOUD = 436;
 
 /* ------------------------------------------- 1. the object numbers, set by set ---- */
-for (const set of readdirSync(SETS).sort()) {
-  const path = `${SETS}/${set}/graphics.dat`;
+for (const dir of [...new Set(DATA_SETS.map((s) => s.dir))].sort()) {
+  const set = basename(dir);
+  const path = `${dir}/graphics.dat`;
   if (!existsSync(path)) continue;
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(path)));

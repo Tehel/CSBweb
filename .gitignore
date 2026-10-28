@@ -7,6 +7,9 @@ archive
 doc/CSBwin-src/
 doc/CSBwin-src-*/
 
+# ReDMCSB's source: the Amiga's reference (npm run fetch-redmcsb-src)
+doc/ReDMCSB-src/
+
 # The data sets the tests and the dev server read, fetched by npm run fetch-gamefiles
 tools/fixtures/gamefiles/
 

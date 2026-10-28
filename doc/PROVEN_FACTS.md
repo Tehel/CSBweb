@@ -4000,8 +4000,9 @@ It is a later revision than the Atari disks': maps 0, 5 and 10 are one column na
 the dropped column all rock; on map 5, the invisible teleporters at (18,5), (19,4), (19,5)
 and (19,6) are rock, six actuators changed and one added; and on map 7, actuator 565, the
 switch at (0,4) aimed at the false wall at (1,6), sets the wall where the Atari's toggles
-it. The Amiga 2.0 disk's `Dungeon.dat` holds that map-7 change alone: compressed, its
-image is the Atari 1.2 one but for that actuator's `word4` (0xb3c0 for 0xb3d0) and a
+it. The Amiga's English `Dungeon.dat`, one file on its 2.0, 2.1, 2.2 and 3.6 disks
+(`doc/AMIGA_DISK_REFERENCE.md` → "The disks"), holds that map-7 change alone: compressed,
+its image is the Atari 1.2 one but for that actuator's `word4` (0xb3c0 for 0xb3d0) and a
 big-endian checksum word after the cell flags.
 
 The form that adds a player's own set takes a PC file as the Atari file it is the twin
