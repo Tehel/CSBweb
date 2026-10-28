@@ -7,9 +7,7 @@ recordings would take.
 
 **Recordings follow the engine.** Any change to what the engine does at a tick makes a
 recording made before it play out differently. A recording carries the build that made it,
-and its `d.RandomNumber` values show the first entry where a later build parts from it. The
-work that comes before the recorder is `DEBT.md` F22, from "The port against those needs"
-below.
+and its `d.RandomNumber` values show the first entry where a later build parts from it.
 
 ## CSBWin's recorder
 
@@ -159,23 +157,37 @@ What a player must do:
 - **Draw every tick it plays.** A click in the viewport is resolved through the picking the
   tick's `DrawViewport` leaves, so playback draws, at the wall clock's pace or faster.
 
+**The proof is a tool**, `tools/checks/replay.ts`. It stands up a page without the DOM, the
+engine, its `GameScreen` over a stand-in canvas, the page's `GameInput`, its `GameSaves`
+over a store in memory and its settings, wired as `src/main.ts` wires them, on a clock it
+moves itself. It plays a new game and `csbgame7.dat` as a player plays them: pointer
+events and keys handed to `GameInput` between wakes of the loop of uneven length, the
+screen composed after each input and at every VBL that asks. Then it plays the log back in
+a fresh page that draws only the tick's `DrawViewport`, and asserts every change logged at
+the same VBL with the same `d.Time` and `d.RandomNumber`, and the two final saves
+byte-identical. So, for what the two games do:
+
+- **Nothing the page composes takes from the game's stream**, nor changes what the game
+  reads: beyond the tick's views, the recorded page composes the screen about a hundred
+  times in each game, and the replay a handful.
+- **A save leaves the game as the boundary says**: F5 with the clock running, and the disk
+  menu's SAVE with it stopped, each replayed by its tail alone. The replay takes the disk
+  menu down itself, where the log lets the clock run.
+- **The doors it plays are the boundary's**: clicks, the button-up, keys, panel keys, the
+  dialogs' clock, `TAG0207cc`, the extras, a save's tail and `?dev`'s move.
+- **A new game starts from its stream and its playthrough as the read leaves them**: the
+  read draws from a stream of its own, seeded by `Math.random` (`Game.readNewGame`), which
+  the replay's own read seeds anew, and the two are set over it.
+
 What is not verified:
 
-- **That nothing the page draws takes from the game's stream**, nor reads state only
-  drawing sets, when the screen is composed at moments the wall clock chooses
-  (`refreshScreen` after an input, the VBL's frame after a pointer move).
-- **The port's saves**: whether a save changes the game's state where CSBWin's does, so
-  that a recording with saves in it replays. The boundary logs only a save's tail: with
-  the clock running, the open chest repacked and opened again around the file's build
-  (`GameSaves.save`) is not a change it is told, and must leave the state as it was.
-- **That the boundary has every door**: that nothing else of the page changes the game
-  between two VBLs.
-
-**The proof is a tool** (`DEBT.md` F22): a headless `tools/checks/replay.ts` that plays a
-scripted game, logs it at the boundary, plays the log back in a fresh `Game`, and asserts
-`d.Time` and `d.RandomNumber` equal at every logged change and the two final saves
-byte-identical. It is the first proof G29 needs, and a regression test of everything at
-once.
+- **An open chest under a running save**: the open chest repacked and opened again around
+  the file's build (`GameSaves.save`) is not a change the boundary is told, and must leave
+  the state as it was. The tool's games save with no chest open.
+- **Whether a save changes the game's state where CSBWin's does**, so that a recording with
+  saves in it replays as CSBWin's would.
+- **That the boundary has every door**: the tool proves the doors it plays, not that
+  nothing else of the page changes the game between two VBLs.
 
 ## The port's recorder
 

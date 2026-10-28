@@ -35,10 +35,10 @@ skins are drawn (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Skins in the data sets
 plays Dungeon Master with the Amiga 2.2's re-recorded sounds, the monsters heard moving as
 they approach, in stereo, and the Amiga's dungeon.
 
-**First, at the author's request: G29 — recording a game and playing it back.** Its
-prerequisite comes first: the game is meant to be a function of its start, its VBLs and
-the changes its input boundary logs at them (`src/engine/InputBoundary.ts`), and F22
-proves it. Its row heads the index.
+**First, at the author's request: G29 — recording a game and playing it back.** It rests
+on the game being a function of its start, its VBLs and the changes its input boundary
+logs at them (`src/engine/InputBoundary.ts`), which `tools/checks/replay.ts` proves. Its
+row heads the index.
 
 **Then, at the author's request: P — players' own data sets.** A player adds a dungeon
 from their own files to the welcome page, plays it, edits it, deletes it and publishes it,
@@ -124,8 +124,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| F22 | `tools/checks/replay.ts`: a game logged at the boundary plays back the same | M | ⏳ |
-| G29 | Recording a game and playing it back | L | ⏳ after F22 |
+| G29 | Recording a game and playing it back | L | ⏳ |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
 | C194 | A DSA's wall graphic counts as a real decoration, so it hides no text | S | ⏳ |
 | C195 | Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space | S | ⏳ to decide with the author |
@@ -633,21 +632,6 @@ in CSBWin 20230608, and if the game goes on there, ports what that binary draws.
 
 New verification debt goes here; it can be taken anywhere ("Priority", point 5).
 
-### F22 ⏳ `tools/checks/replay.ts`: a game logged at the boundary plays back the same
-
-Nothing proves the game a function of its start, its VBLs and the log of its input
-boundary (`Game.input`, `src/engine/InputBoundary.ts`), which G29 rests on. Paying it: a headless tool with the screen's interface (`tools/lib/ui.ts`), since a
-click in the viewport is resolved through the picking the tick's `DrawViewport` leaves. It
-plays a scripted game, from a new game and from a save, its inputs coming between uneven
-numbers of VBLs a wake: clicks and moves, a panel key, an attack and its flash, a dialog's
-pause, a settings change, a save with the clock running and one with it stopped. It logs it
-at the boundary, plays the log back in a fresh `Game`, and asserts `d.Time` and
-`d.RandomNumber` equal at every logged change and the two final saves byte-identical. The
-recorded run composes the screen at moments the replay does not, as pointer moves and
-dialogs do, so the tool also proves that nothing the page draws takes from the game's
-stream (`doc/RECORDING.md` → "What is not verified"). Size M; a divergence it finds is an
-item of its own.
-
 ### F21 ⏳ 3D2D1D's walkthrough is not replayed through `Game`
 
 `doc/3D2D1D_WALKTHROUGH.md` is a full route through 3D2D1D, computed by
@@ -689,8 +673,10 @@ and playback needs no `extraTicks` off. `d.Time` and `d.RandomNumber` go with ev
 so a replay stops at the first that drifts. Playing CSBWin's own recordings back, which
 needs the port's draws to follow CSBWin's draw for draw, is not part of it.
 
-It comes after F22. A change to what the engine does makes older recordings
-drift: each carries the build that made it, and the drift detector shows where it parts.
+A change to what the engine does makes older recordings drift: each carries the build
+that made it, and the drift detector shows where it parts. `tools/checks/replay.ts` is the
+headless page a step's recorder and player can be proven on: it plays a game through the
+page's input path, logs it at the boundary, and plays the log back.
 
 Paying it, in steps:
 
