@@ -125,7 +125,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G31 | Recordings shared: the set's dialog, a package, the server | L | ⏳ to design with the author |
+| G31 | Recordings shared: the set's dialog, a package, the server | L | ⏳ step 1 of 5 |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
 | C194 | A DSA's wall graphic counts as a real decoration, so it hides no text | S | ⏳ |
 | C195 | Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space | S | ⏳ to decide with the author |
@@ -663,135 +663,83 @@ What sharing needs is in `doc/RECORDING.md` → "Shared recordings".
 
 Decided with the author:
 
+- **What a player shares**: a point the store keeps, never a running end. Either one of
+  their saves, which they know by name: the path from its root to the save's point
+  (`SaveEntry.recording`), the save's file ending the package, a check of its own. Or the
+  end of a game, won or lost, which no save can follow: at `showCredits` (`src/main.ts`)
+  the running recording is marked ended there with `word11694`, pruning keeps it whole as
+  it keeps a save's point, the dialog lists it among the saves and only the player deletes
+  it, and its replay is checked by reaching `showCredits` at the same VBL with the same
+  `word11694`. The save store does not change: an end is no CSBWin file.
 - **The package**: one file, the deliverable the server keeps and serves. It holds a
-  recording's path, root to the branch shared (`doc/RECORDING.md` → "The tree"), its
+  recording's path, root to the point shared (`doc/RECORDING.md` → "The tree"), its
   root's save when it starts from one, and its metadata: its data set's id, when it began and ended, the time
   played in it (`Game.playTime`), where it starts (a new game, or the save's level and
   champions), its author, its title and its description.
 - **The place**: the dialog the book opens on a set's tile (`showDocuments`,
-  `src/ui/welcomePage.ts`), which lists the set's documents. It also lists the set's
-  recordings, the browser's and the server's; one is selected, its metadata shown, and
-  UPLOAD or DOWNLOAD offered by where it is. UPLOAD asks a title, which it needs, and an
-  author and a description, which it does not.
+  `src/ui/welcomePage.ts`), titled with the set's name alone, in two tabs. DOCUMENTS
+  lists what the dialog lists now. RECORDINGS lists the site's recordings of the set, then
+  this browser's. A click selects one, and a panel under the list shows its metadata and
+  its buttons: PLAY for the site's, PLAY and UPLOAD for the browser's. UPLOAD opens its
+  form in that panel: a title, which it needs, and an author and a description, which it
+  does not, plain text with a length limit each, as a set's. There is no DOWNLOAD: the
+  site's recordings are played from the server.
+- **PLAY**: `?recording=<id>` plays a site's recording straight from the server, and it
+  never enters the browser's store; a browser's recording, from its store, as now
+  (`playRecording`, `src/main.ts`). The two kinds of id are told apart by their form.
+- **The viewer's controls**: a strip drawn in the canvas over the message area, with the
+  time played, pause, the pace (×1, ×2, ×4, ×8), RESTART and stop, clickable; and the
+  same actions on keys, Space to pause, `+` and `-` for the pace, a key for RESTART, Esc
+  to stop and go back to the welcome page, which HOW TO PLAY lists. RESTART plays the
+  recording again from its start; any jump back is a replay from the start, run at once
+  and undrawn (`doc/RECORDING.md` → "Shared recordings"). At the end, or at a drift, a
+  line in the message area says so.
+- **The package's format**: JSON, gzipped by the browser's own `CompressionStream`: the
+  format's version, the build, the set, the metadata, and the path, each recording's
+  start (a save's file in base64), rules, extras, parent and changes.
+- **The server**: `GET api/recordings?dataSet=<id>`, the list and its metadata; the
+  packages served as files, as the game files are; `POST api/recordings`, an upload, a
+  form of the package and its metadata; `POST api/recordings/<id>`, a moderation or a
+  withdrawal, JSON. A row each in the store's SQLite, the package in a folder of its own
+  that `backup.ts` copies. It checks the package's form alone: it parses, its set is
+  published, its sizes and metadata are within bounds. It does not replay it. Its limits:
+  a package's size, which step 2's measure sets, uploads per address per hour as
+  publishes are (`PUBLISHES_PER_HOUR`), and the disk the folder may take.
+- **Moderation**: a recording is pending until a moderator approves it, as a set is: its
+  title and description are free text nobody else sees unread. Its uploader withdraws
+  it whenever they like, pending or listed, by their `playerId`; a moderator hides or
+  deletes it.
+- **A set the site does not publish**: UPLOAD is not offered for it, and the dialog says
+  why. Once the set is published, its recordings made before are shared, since they name
+  it by its id.
+- **A recording made by an older build**: the list shows each recording's build, and PLAY
+  plays it all the same; a drift stops it and says it was made by another version of the
+  site. Before a deploy, a tool in `utils/` replays every listed recording against the new
+  build and marks those that drift as broken, which the list leaves out.
+- **What CSBWin's game does not hold**: UPLOAD refuses a path with a `?dev` move
+  (`devLevel`, `devMove`, which work on the public site); the list marks a recording
+  played with an extra on.
 
 **The author is a name, never the `playerId`.** The `playerId` is what the server knows a
 player by: the sets they own, and a moderator's rights (`X-Player-Id`, `server/app.ts`;
 `doc/DEPLOYMENT.md`, which a notification never sends it in). A package names its author
 by the name the player gives, or by nobody, and the server keeps its uploader's
-`playerId` apart, as a set's `owner` is kept, if a withdrawal needs it.
+`playerId` apart, as a set's `owner` is kept, for a withdrawal.
 
-Paying it, in steps:
+Paying it, in steps; the design is decided, and step 1 is next:
 
-1. The design, with the author, written here before any code: the dialog (its lists, the
-   selection, the upload's form, where PLAY is, which opens `?recording=<id>`
-   (`playRecording`, `src/main.ts`), and where a player stops one), the package's format,
-   the server's API and limits (size, rate, the W tier's rules), the controls a viewer
-   has over `?recording=`'s playback (a faster pace, a pause, a stop), and
-   these questions: whether a recording is moderated before it is listed, as a set is
-   (`server/moderate.ts`); whether its uploader can withdraw it; a recording of a set the
-   site does not publish, which a viewer has no `dungeon.dat` for; one made by an older
-   build, which drifts (`doc/RECORDING.md` → "Recordings follow the engine"); and what a
-   downloaded recording becomes in the browser.
-2. The package, written and read: a tool writes one, reads it back, and replays it.
-3. The server: storing, listing and serving them, with its checks in
-   `tools/checks/server.ts`.
-4. The dialog: the browser's and the server's recordings of the set, the selection and its
-   metadata, UPLOAD and DOWNLOAD, checked in `tools/probe-frames.ts`'s welcome page block.
-
-**Step 1 waits on the author**: the options for each open question, the recommended one
-first. The answers are written above, under "Decided with the author", and each question
-answered is deleted here.
-
-1. **What a player picks to share.** The store holds a tree for each playthrough: a root,
-   a branch at each load of a save, each cut back to its last save at the next load
-   ("Pruning", `doc/RECORDING.md`).
-   - (a) A save: the path from its root to the save's point (`SaveEntry.recording`). The
-     player knows their saves by name, every one is a point the store keeps, and the
-     save's file ends the package, a check of its own at the end.
-   - (b) A recording: each branch the store holds, from its root to its last VBL, listed
-     by playthrough, date and time played. It also reaches the game played since the last
-     save, until the next load cuts it.
-   - (c) Both: the saves, and each playthrough's running end.
-2. **The dialog's layout**, the one `showDocuments` opens.
-   - (a) A second list under the documents, RECORDINGS: the site's, then this browser's.
-     A click selects one, and a panel under the list shows its metadata and its buttons,
-     PLAY and DOWNLOAD for the site's, PLAY and UPLOAD for the browser's. UPLOAD opens its
-     form in that panel: a title, needed, an author and a description, plain text with a
-     length limit each, as a set's.
-   - (b) Two tabs, DOCUMENTS and RECORDINGS.
-   - (c) A dialog of its own, opened by an icon of its own on the tile.
-3. **PLAY.**
-   - (a) The site's recording is played by `?recording=<id>` straight from the server,
-     never entering the browser's store; the browser's, from its store as now. Two kinds
-     of id, told apart by their form.
-   - (b) The site's recording is downloaded into the store first (question 9), then played
-     as the browser's are.
-4. **The viewer's controls over `?recording=`**, which has none now. The page holds
-   nothing beside the canvas.
-   - (a) Keys alone, shown nowhere but in HOW TO PLAY: Space pauses, `+` and `-` change the
-     pace (×1, ×2, ×4, ×8), Esc stops and goes back to the welcome page. At the end, or at
-     a drift, a line in the message area says so.
-   - (b) A strip drawn in the canvas over the message area: the time played, pause, pace,
-     stop, clickable.
-   - (c) As (a) or (b), with RESTART: going back means replaying from the start
-     (`doc/RECORDING.md` → "Shared recordings", "Speed"), at once and undrawn, up to
-     where the viewer was.
-5. **The package's format.**
-   - (a) JSON, gzipped by the browser's own `CompressionStream`: the format's version, the
-     build, the set, the metadata, and the path, each recording's start (a save's file in
-     base64), rules, extras, parent and changes. One file, readable once unzipped.
-   - (b) A zip, which the site already writes (`dataSetArchive`): the path's JSON, and each
-     start's save beside it as a `.dat`, a CSBWin save a player can also load.
-   - (c) A binary format of its own: the smallest, with a writer and a reader to maintain.
-   Step 2 measures a long game's package in each before the limits of question 6 are set.
-6. **The server: API, storage and checks.** The API, whatever the answers: `GET
-   api/recordings?dataSet=<id>`, the list and its metadata; the packages served as files,
-   as the game files are; `POST api/recordings`, an upload, a form of the package and its
-   metadata; `POST api/recordings/<id>`, a moderation or a withdrawal, JSON. A row each in
-   the store's SQLite, the package in a folder of its own that `backup.ts` copies. Its
-   limits: a package's size, uploads per address per hour as publishes are
-   (`PUBLISHES_PER_HOUR`), and the disk the folder may take. What it checks of a package:
-   - (a) Its form alone: it parses, its set is published, its sizes and metadata are
-     within bounds. Cheap; what is listed may drift.
-   - (b) (a), and the server replays it headless, through the page's module it already
-     loads for `checkDataSet` (`dist/server/`), refusing one that drifts. What is listed
-     plays, but a long game is minutes of the VPS's CPU for each upload, against W's
-     availability.
-   - (c) (a) at the upload, and the replay later, off the request, one at a time: the
-     recording listed once it has played to its end.
-7. **Moderation and withdrawal.**
-   - (a) Pending until a moderator approves it, as a set: its title and description are
-     free text that nobody else sees unread. Its uploader withdraws it whenever they
-     like, pending or listed, by their `playerId`, and a moderator hides or deletes it.
-   - (b) As (a), but its uploader withdraws it only while it is pending, as a set's
-     owner does.
-   - (c) Listed at once; a moderator hides it afterwards.
-8. **A set the site does not publish.**
-   - (a) UPLOAD is not offered for it, and the dialog says why. A set published later
-     shares its recordings made before, which name it by its id.
-   - (b) UPLOAD is offered while the set is pending, and the recording waits for the set's
-     approval.
-9. **What DOWNLOAD makes in the browser.**
-   - (a) A file on the drive, as the save menu's EXPORT; the dialog plays a package
-     dropped on it, or chosen, without keeping it. The store does not change.
-   - (b) The path written into the browser's store, listed among its recordings with a
-     mark, played offline, deleted by the player. The store's rows gain an origin, and
-     pruning must leave a recording no save reaches when it came this way.
-   - (c) Both.
-10. **A recording made by an older build.** Every deploy changes `__CSBWEB_BUILD__`, most
-    of them without changing what a tick does.
-    - (a) The list shows each recording's build, and PLAY plays it all the same; a drift
-      stops it and says it was made by another version of the site.
-    - (b) (a), and a tool in `utils/` replays every listed recording against a new build
-      before it is deployed, and marks those that drift as broken, left out of the list.
-    - (c) The old builds stay deployed, each recording played by its own: always faithful,
-      but every build's `dist/` kept, with its bugs.
-11. **What a recording holds that CSBWin's game does not.** `?dev`'s moves (`devLevel`,
-    `devMove`) work on the public site, and the extras change play.
-    - (a) UPLOAD refuses a path with a `?dev` move; the list marks a recording played
-      with an extra on.
-    - (b) Neither refused; the list marks both.
-    - (c) Neither refused nor marked.
+1. A game's end, a point to share: marked at `showCredits`, kept whole by pruning, and its
+   replay checked by reaching `showCredits` at the same VBL with the same `word11694`, in
+   `tools/checks/replay.ts`.
+2. The package, written and read: a tool writes one from a save's point and from an end,
+   reads it back and replays it, and measures a long game's package for step 3's limits.
+3. The server: storing, listing, serving, moderating and withdrawing them, with its checks
+   in `tools/checks/server.ts`; and the `utils/` tool that replays the listed ones against
+   a build and marks the broken.
+4. The page's player: `?recording=` from the server, and the viewer's strip and keys.
+5. The dialog: its two tabs, the site's and the browser's recordings of the set, the
+   selection and its metadata, PLAY and UPLOAD, checked in `tools/probe-frames.ts`'s
+   welcome page block.
 
 ### Postponed
 
