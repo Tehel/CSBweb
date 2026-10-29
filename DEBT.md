@@ -698,6 +698,101 @@ Paying it, in steps:
 4. The dialog: the browser's and the server's recordings of the set, the selection and its
    metadata, UPLOAD and DOWNLOAD, checked in `tools/probe-frames.ts`'s welcome page block.
 
+**Step 1 waits on the author**: the options for each open question, the recommended one
+first. The answers are written above, under "Decided with the author", and each question
+answered is deleted here.
+
+1. **What a player picks to share.** The store holds a tree for each playthrough: a root,
+   a branch at each load of a save, each cut back to its last save at the next load
+   ("Pruning", `doc/RECORDING.md`).
+   - (a) A save: the path from its root to the save's point (`SaveEntry.recording`). The
+     player knows their saves by name, every one is a point the store keeps, and the
+     save's file ends the package, a check of its own at the end.
+   - (b) A recording: each branch the store holds, from its root to its last VBL, listed
+     by playthrough, date and time played. It also reaches the game played since the last
+     save, until the next load cuts it.
+   - (c) Both: the saves, and each playthrough's running end.
+2. **The dialog's layout**, the one `showDocuments` opens.
+   - (a) A second list under the documents, RECORDINGS: the site's, then this browser's.
+     A click selects one, and a panel under the list shows its metadata and its buttons,
+     PLAY and DOWNLOAD for the site's, PLAY and UPLOAD for the browser's. UPLOAD opens its
+     form in that panel: a title, needed, an author and a description, plain text with a
+     length limit each, as a set's.
+   - (b) Two tabs, DOCUMENTS and RECORDINGS.
+   - (c) A dialog of its own, opened by an icon of its own on the tile.
+3. **PLAY.**
+   - (a) The site's recording is played by `?recording=<id>` straight from the server,
+     never entering the browser's store; the browser's, from its store as now. Two kinds
+     of id, told apart by their form.
+   - (b) The site's recording is downloaded into the store first (question 9), then played
+     as the browser's are.
+4. **The viewer's controls over `?recording=`**, which has none now. The page holds
+   nothing beside the canvas.
+   - (a) Keys alone, shown nowhere but in HOW TO PLAY: Space pauses, `+` and `-` change the
+     pace (×1, ×2, ×4, ×8), Esc stops and goes back to the welcome page. At the end, or at
+     a drift, a line in the message area says so.
+   - (b) A strip drawn in the canvas over the message area: the time played, pause, pace,
+     stop, clickable.
+   - (c) As (a) or (b), with RESTART: going back means replaying from the start
+     (`doc/RECORDING.md` → "Shared recordings", "Speed"), at once and undrawn, up to
+     where the viewer was.
+5. **The package's format.**
+   - (a) JSON, gzipped by the browser's own `CompressionStream`: the format's version, the
+     build, the set, the metadata, and the path, each recording's start (a save's file in
+     base64), rules, extras, parent and changes. One file, readable once unzipped.
+   - (b) A zip, which the site already writes (`dataSetArchive`): the path's JSON, and each
+     start's save beside it as a `.dat`, a CSBWin save a player can also load.
+   - (c) A binary format of its own: the smallest, with a writer and a reader to maintain.
+   Step 2 measures a long game's package in each before the limits of question 6 are set.
+6. **The server: API, storage and checks.** The API, whatever the answers: `GET
+   api/recordings?dataSet=<id>`, the list and its metadata; the packages served as files,
+   as the game files are; `POST api/recordings`, an upload, a form of the package and its
+   metadata; `POST api/recordings/<id>`, a moderation or a withdrawal, JSON. A row each in
+   the store's SQLite, the package in a folder of its own that `backup.ts` copies. Its
+   limits: a package's size, uploads per address per hour as publishes are
+   (`PUBLISHES_PER_HOUR`), and the disk the folder may take. What it checks of a package:
+   - (a) Its form alone: it parses, its set is published, its sizes and metadata are
+     within bounds. Cheap; what is listed may drift.
+   - (b) (a), and the server replays it headless, through the page's module it already
+     loads for `checkDataSet` (`dist/server/`), refusing one that drifts. What is listed
+     plays, but a long game is minutes of the VPS's CPU for each upload, against W's
+     availability.
+   - (c) (a) at the upload, and the replay later, off the request, one at a time: the
+     recording listed once it has played to its end.
+7. **Moderation and withdrawal.**
+   - (a) Pending until a moderator approves it, as a set: its title and description are
+     free text that nobody else sees unread. Its uploader withdraws it whenever they
+     like, pending or listed, by their `playerId`, and a moderator hides or deletes it.
+   - (b) As (a), but its uploader withdraws it only while it is pending, as a set's
+     owner does.
+   - (c) Listed at once; a moderator hides it afterwards.
+8. **A set the site does not publish.**
+   - (a) UPLOAD is not offered for it, and the dialog says why. A set published later
+     shares its recordings made before, which name it by its id.
+   - (b) UPLOAD is offered while the set is pending, and the recording waits for the set's
+     approval.
+9. **What DOWNLOAD makes in the browser.**
+   - (a) A file on the drive, as the save menu's EXPORT; the dialog plays a package
+     dropped on it, or chosen, without keeping it. The store does not change.
+   - (b) The path written into the browser's store, listed among its recordings with a
+     mark, played offline, deleted by the player. The store's rows gain an origin, and
+     pruning must leave a recording no save reaches when it came this way.
+   - (c) Both.
+10. **A recording made by an older build.** Every deploy changes `__CSBWEB_BUILD__`, most
+    of them without changing what a tick does.
+    - (a) The list shows each recording's build, and PLAY plays it all the same; a drift
+      stops it and says it was made by another version of the site.
+    - (b) (a), and a tool in `utils/` replays every listed recording against a new build
+      before it is deployed, and marks those that drift as broken, left out of the list.
+    - (c) The old builds stay deployed, each recording played by its own: always faithful,
+      but every build's `dist/` kept, with its bugs.
+11. **What a recording holds that CSBWin's game does not.** `?dev`'s moves (`devLevel`,
+    `devMove`) work on the public site, and the extras change play.
+    - (a) UPLOAD refuses a path with a `?dev` move; the list marks a recording played
+      with an extra on.
+    - (b) Neither refused; the list marks both.
+    - (c) Neither refused nor marked.
+
 ### Postponed
 
 Not taken in order; the author names one to start it (see "Priority").
