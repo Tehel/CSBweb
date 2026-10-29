@@ -15,7 +15,7 @@
  * store in memory.
  */
 import type { Extras, RulesOptions } from '../../engine/GameContext';
-import type { RecordedChange, Recording, RecordingPoint, RecordingStart } from '../../engine/Recorder';
+import type { RecordedChange, Recording, RecordingEnd, RecordingPoint, RecordingStart } from '../../engine/Recorder';
 
 /** One row: a recording as a list shows it, without its start or its changes. */
 export interface RecordingEntry {
@@ -38,8 +38,14 @@ export interface RecordingEntry {
     readonly writtenAt: number;
     /** The VBLs it had run when it was last written (`Recording.vbls`). */
     readonly vbls: number;
-    /** A read has ended it (`Recording.ended`): nothing more will be written to it. */
+    /** A read or the game's end has ended it (`Recording.ended`): nothing more will be written to it. */
     readonly ended: boolean;
+    /**
+     * The game's end, where it ended it (`Recording.end`), which the prune keeps whole,
+     * whether a save reaches it or not. Absent from a row without one, as the store's
+     * earlier rows.
+     */
+    readonly end?: RecordingEnd | null;
     /** Its changes, every part's. */
     readonly changes: number;
     /** Its parts: the head and the changes' parts. */
@@ -134,6 +140,7 @@ export function assembleRecording(entry: RecordingEntry, parts: readonly Recordi
         changes,
         vbls: entry.vbls,
         ended: entry.ended,
+        end: entry.end ?? null,
     };
 }
 
@@ -150,7 +157,7 @@ export interface RecordingCut {
 /**
  * `entry`'s recording cut at `point`, given its parts: the changes recorded before it
  * kept, the last part that holds some of them cut after them and the parts after it
- * removed, and the row ended there, at the point's VBLs.
+ * removed, and the row ended there, at the point's VBLs, by no game's end.
  */
 export function cutRecording(
     entry: RecordingEntry, parts: readonly RecordingPart[], point: Omit<RecordingPoint, 'recording'>,
@@ -170,7 +177,7 @@ export function cutRecording(
         changes = point.changes;
     }
     return {
-        entry: { ...entry, changes, vbls: Math.min(entry.vbls, point.vbls), ended: true, parts: kept },
+        entry: { ...entry, changes, vbls: Math.min(entry.vbls, point.vbls), ended: true, end: null, parts: kept },
         last,
         removeFrom: kept,
     };

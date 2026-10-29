@@ -57,6 +57,12 @@
  * 8. A Sleepsave's point says it was taken inside a VBL, and F9's read of it begins a
  *    branch there, which replays from its root through both joins: the join is checked
  *    against the file the replayed VBL made where the recorded one made the Sleepsave.
+ * 9. The game's end is a point of its own: `csbgame7.dat` with every champion at 1 HP,
+ *    put before the Stone Golem, which kills them. The recording ends in the VBL that
+ *    asked for the credits, with `d.Word11694`, records nothing after it, and the store
+ *    holds it so; a read after it, which no save of it follows, prunes the store and
+ *    keeps it whole. It replays to the same end, and a recording whose end is moved a
+ *    VBL on, or whose `d.Word11694` is not the game's, or without its end, drifts there.
  *
  * Run: `npm test -- --only=replay.ts`
  */
@@ -146,6 +152,8 @@ class Page {
   /** A replay's spans under a held clock, and those whose VBLs more than one wake of the loop ran. */
   heldSpans = 0;
   heldSpread = 0;
+  /** Where the host was asked to show the credits: the boundary's VBLs, and `d.Word11694`. */
+  credits: { vbls: number; word11694: boolean } | null = null;
 
   /**
    * `recorded`: the screen composed as the page composes it, after every input and at
@@ -172,6 +180,7 @@ class Page {
       ...drawing,
       championJoined: () => saves?.championJoined(),
       die: (error) => { throw error; },
+      showCredits: (word11694) => { this.credits = { vbls: game.input.vbls, word11694 }; },
       drawViewport: () => this.renderView(),
       paint: () => { if (this.recorded) this.refreshScreen(); },
     });
@@ -835,8 +844,9 @@ function sameGame(recorded: Page, played: Page, recording: Recording, what: stri
     console.log(`  replayed: ${JSON.stringify(replayed.changes[parted])}`);
   }
   const drift = played.player!.drift;
-  check(drift === null && !played.player!.playing && parted < 0 && replayed.changes.length === changes.length && replayed.vbls === recording.vbls,
-    `${what}, with d.Time and d.RandomNumber as recorded (${replayed.changes.length} of ${changes.length}${drift ? `, drift ${JSON.stringify(drift)}` : ''})`);
+  check(drift === null && !played.player!.playing && parted < 0 && replayed.changes.length === changes.length && replayed.vbls === recording.vbls
+    && JSON.stringify(replayed.end) === JSON.stringify(recording.end),
+    `${what}, with d.Time and d.RandomNumber as recorded (${replayed.changes.length} of ${changes.length}${recording.end ? `, to the game's end` : ''}${drift ? `, drift ${JSON.stringify(drift)}` : ''})`);
   const differ = firstDifference(recorded.saveFile(), played.saveFile());
   check(differ < 0, `and the two final saves are byte-identical (${recorded.saveFile().length} bytes${differ < 0 ? '' : `, first difference at ${differ}`})`);
 }
@@ -876,6 +886,65 @@ async function branch(recorded: Page): Promise<void> {
   sameGame(recorded, path, written, 'and the branch replayed from its root through the join');
 }
 
+/**
+ * `csbgame7.dat`, every champion at 1 HP, put before the Stone Golem, which kills them:
+ * the game's end a point of its recording, kept by the prune and replayed to the same end.
+ */
+async function lostGame(): Promise<void> {
+  console.log('\n=== a lost game ===');
+  const scratch = await Page.record(CSBGAME7);
+  for (const champion of scratch.game.ctx.party.state.champions) champion.attributes.health = 1;
+  const recorded = await Page.record(scratch.saveFile());
+  const { game, recordingStore: store } = recorded;
+  const player = new Player(recorded);
+  player.play(300);
+  check(game.devMoveParty(6, 18, 13), '`?dev` moves the party before the Stone Golem');
+  for (let n = 0; n < 120 && !game.mainLoopHasReturned(); n++) player.play(500);
+  const recording = recorded.recording;
+  const { credits } = recorded;
+  check(game.ctx.party.state.gameIsLost && credits?.word11694 === false && recording.ended
+    && JSON.stringify(recording.end) === JSON.stringify({ word11694: false }) && recording.vbls === credits.vbls,
+    `the golem kills the party, and the recording ends in the VBL that asks for the credits, with d.Word11694 (${recording.vbls} VBLs, ${recording.changes.length} changes)`);
+  player.key('KeyW');
+  check(recorded.recording.changes.length === recording.changes.length && recorded.recording.vbls === recording.vbls,
+    'a key after the end is recorded nowhere');
+  await recorded.recordings.flush();
+  const written = await store.read(recording.id);
+  check(sameRecording(written, recording) && store.entries.get(recording.id)?.end?.word11694 === false,
+    'the store holds it, ended, its row with the game\'s end');
+
+  const played = Page.replay([written]);
+  played.play();
+  check(played.credits?.word11694 === false, 'the replay asks for the credits too');
+  sameGame(recorded, played, written, 'the lost game replayed');
+  const drifts: [string, Recording, boolean | null, number][] = [
+    ['its end a VBL early', { ...written, vbls: written.vbls - 1 }, null, written.vbls - 1],
+    ['its end a VBL late', { ...written, vbls: written.vbls + 1 }, false, written.vbls],
+    ['a d.Word11694 not the game\'s', { ...written, end: { word11694: true } }, false, written.vbls],
+    ['no end, played on past it', { ...written, vbls: written.vbls + 60, ended: false, end: null }, false, written.vbls],
+  ];
+  for (const [what, tampered, word11694, vbls] of drifts) {
+    const drifted = Page.replay([tampered]);
+    drifted.play();
+    const { drift } = drifted.player!;
+    check(drift?.kind === 'end' && drift.word11694 === word11694 && drift.vbls === vbls,
+      `a recording with ${what} drifts at its end (${JSON.stringify(drift)})`);
+  }
+
+  // A read after the end, which no save of its recording follows: its first write prunes.
+  const start = (await recorded.saves.list())[0]!;
+  check(start.recording === null, 'no save names a point in the lost game');
+  recorded.saves.read(await recorded.saves.open(start));
+  game.input.apply({ kind: 'unclick' });
+  const next = recorded.recording;
+  await recorded.recordings.flush();
+  check(store.entries.has(next.id) && store.entries.has(recording.id) && sameRecording(await store.read(recording.id), recording),
+    'the next read\'s first write prunes the store, and keeps the game\'s end whole');
+}
+
+const CSBGAME7 = new Uint8Array(readFileSync(savePath('csbgame7.dat')));
+
 await replay('a new game', 'new', newGameScript);
-await replay('csbgame7.dat', new Uint8Array(readFileSync(savePath('csbgame7.dat'))), saveScript);
+await replay('csbgame7.dat', CSBGAME7, saveScript);
+await lostGame();
 finish();

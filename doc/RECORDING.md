@@ -185,6 +185,12 @@ asserts every change recorded at the same VBL with the same `d.Time` and
   `Game.readNewGame`, which the replay's own read seeds anew, and the two are set over
   it), or the save's file; and the rules and the extras.
 - **A read ends a recording**, and F9's begins the next from the save it reads.
+- **The game's end ends one too, a point of its own**: a party the Stone Golem kills,
+  every champion of `csbgame7.dat` at 1 HP. The recording ends in the VBL that asks for
+  the credits, with `d.Word11694`, and records nothing after it; the prune at the next
+  read's first write keeps it whole, though no save names a point in it. It replays to
+  the same end, and a recording whose end is a VBL early or late, whose `d.Word11694` is
+  not the game's, or that plays on past the game's end, drifts there.
 - **The recordings make a tree** (below): a save names the recording and its point
   there; F9's read of it begins a branch of that point, which replays from its own start
   alone, and from its root through the join, where the root replayed up to the point
@@ -238,7 +244,8 @@ with the number of VBLs run before it, and the player applies each before the sa
   read changes only where its file has an Extended Features block), and the extras;
 - every change the boundary is told, with the VBLs the recording had run before it,
   `d.Time` and `d.RandomNumber`;
-- the VBLs it has run, and whether a read has ended it.
+- the VBLs it has run, and whether a read or the game's end has ended it, and the end
+  (`Recording.end`, `RecordingEnd`), with `d.Word11694`.
 
 The two reads in `GameSaves` begin one, the only places a game starts: a new game's once
 its playthrough is drawn (`newGameRead`), a save's once it is read (`read`), the disk menu's
@@ -246,10 +253,17 @@ LOAD, F9, CONTINUE and RISE's adventure among them. The read itself is told at t
 (`readGame`), which ends the recording before. The boot then forces DM rules where the
 dungeon asks, a change of the boundary's, the recording's first.
 
+**The game's end** ends one as well: `ShowCredits` once `MainLoop` has returned, on a
+game lost or won (`Game.mainLoopReturns`), told at the boundary with `d.Word11694`
+(`InputBoundary.ended`). It is the game's own, made inside the VBL that ended it, so the
+recording ends after that VBL and keeps the end: a point to share, as a save's is, that
+no save can follow (`DEBT.md` G31).
+
 **The store** holds the recordings beside the saves, in the same IndexedDB database
 (`doc/SAVES.md`), from version 7: a row each in `recordings` (`RecordingEntry`,
 `src/data/saves/RecordingStore.ts`: its set, build, playthrough, when it began and was
-last written, its VBLs, its changes and parts, whether a read has ended it), and its parts
+last written, its VBLs, its changes and parts, whether a read or the game's end has ended
+it, and that end), and its parts
 in `recordingParts`, keyed by the row's id and a `seq`. Part 0 is the head, the start, the
 rules and the extras; each part after it the changes recorded since the one before, so a
 write adds only what is new. A row and the parts it gains are written in one transaction,
@@ -261,7 +275,7 @@ Most games end with the page closed, not with a read, so `RecordingWriter`
 seconds (`RECORDING_WRITE_MS`, `src/main.ts`) and as the page is hidden, the row whenever
 its VBLs have moved and a part whenever it has new changes. A write that fails is written
 again at the next. A recording a read has replaced is finished, ended, at the next write.
-Nothing is written of a recording before its first change, and its first write prunes
+Nothing is written of a recording before its first change or the game's end, and its first write prunes
 the store (below, "The tree"). Deleting a player's own data
 set deletes the recordings played on it (`BrowserDataSetStore.remove`). The clock and the
 ids are the page's: the engine reads neither.
@@ -299,9 +313,10 @@ recording on from there, as a branch:
   far is read as a root. It writes the recordings a read replaced before the one
   running, so a parent the page played is in the store before its branch.
 
-**Pruning.** What no save and no running game reaches is removed (`RecordingWriter`,
-`prunePlan`). A recording is reached up to the last point a save names in it or a branch
-kept branches from, and the running one whole, with its parent. One reached nowhere is
+**Pruning.** What no save, no game's end and no running game reaches is removed
+(`RecordingWriter`, `prunePlan`). A recording is reached up to the last point a save names
+in it or a branch kept branches from, and one the game's end ended and the running one
+whole, with their parents: the prune never removes a game's end. One reached nowhere is
 removed, and what it alone reached of its parent with it, up its path; one reached short
 of what the store holds is cut at its last point: the changes before it kept, its last
 part cut, the parts after it removed, its row ended there (`cutRecording`,
@@ -346,7 +361,9 @@ a root and the branches down to the one played, or a branch alone, from its own 
 - **The drift detector.** Each change's `d.Time` and `d.RandomNumber` are checked before
   it is applied, and at each join the file the parent makes now, as the recorded save
   made it (`saveFileOf`, `src/engine/GameSaves.ts`), against the file the child read;
-  at a point taken inside a VBL, the file that VBL made (below).
+  at a point taken inside a VBL, the file that VBL made (below); and a recording the
+  game's end ended is played to it, the game ending in its last VBL with its
+  `d.Word11694`, and a game that ends anywhere else drifts there.
   The first that differs stops the player (`RecordingPlayer.drift`).
 - **What the game opens in a VBL** does its game half alone while a recording plays
   (`InputBoundary.playing`), and shows nothing: the disk menu its icon opens, and the

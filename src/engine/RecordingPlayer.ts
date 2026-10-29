@@ -18,7 +18,10 @@
  * (`doc/RECORDING.md` → "Recordings follow the engine"). A save made inside a VBL, the
  * Sleepsave's (`RecordingPoint.inVbl`), is checked against the file the played VBL made
  * at the same place, which the game tells it (`InputBoundary.savedInVbl`); its child is
- * read once the VBL has run, as the recorded read came after it. It plays no save: a save the
+ * read once the VBL has run, as the recorded read came after it. A recording the game's
+ * end ended (`Recording.end`) is played to the same end: the game ends in the VBL its
+ * recording ended in, with the same `d.Word11694`, which the game tells it
+ * (`InputBoundary.ended`), and a game that ends anywhere else is a drift. It plays no save: a save the
  * recorded game made is its logged tail (`saveWritten`), and what the game opens in a VBL
  * does its game half alone while it plays (`InputBoundary.playing`).
  *
@@ -37,7 +40,13 @@ export type Drift =
     /** A change met another `d.Time` or `d.RandomNumber`: the recording's, its index, and what the game had. */
     | { readonly kind: 'change'; readonly recording: string; readonly change: number; readonly time: number; readonly random: number }
     /** The parent, played up to the join, makes another file than its child read: the first byte that differs. */
-    | { readonly kind: 'join'; readonly recording: string; readonly byte: number };
+    | { readonly kind: 'join'; readonly recording: string; readonly byte: number }
+    /**
+     * The game ended where the recording did not, or did not end where it did: the VBLs
+     * it had run of the recording, and the `d.Word11694` it ended with, `null` where it
+     * did not end.
+     */
+    | { readonly kind: 'end'; readonly recording: string; readonly vbls: number; readonly word11694: boolean | null };
 
 export class RecordingPlayer {
     /** The recording of the path being played. */
@@ -54,6 +63,8 @@ export class RecordingPlayer {
      * inside the VBL (`RecordingPoint.inVbl`): what the join checks.
      */
     private savedAtJoin: Uint8Array | null = null;
+    /** The game's end, with `d.Word11694`, once the game has told it. */
+    private gameEnd: boolean | null = null;
     private beginListener: ((recording: Recording) => void) | null = null;
     private endListener: ((drift: Drift | null) => void) | null = null;
 
@@ -105,7 +116,11 @@ export class RecordingPlayer {
         } else {
             this.read(root);
         }
-        this.game.input.play({ afterVbl: () => this.feed(), savedInVbl: (file) => this.savedInVbl(file) });
+        this.game.input.play({
+            afterVbl: () => this.feed(),
+            savedInVbl: (file) => this.savedInVbl(file),
+            ended: (word11694) => { this.gameEnd = word11694; },
+        });
         this.feed();
     }
 
@@ -149,7 +164,8 @@ export class RecordingPlayer {
 
     /**
      * The changes logged before the next VBL applied, and a join read where the parent
-     * has reached its child's point, until a VBL is owed.
+     * has reached its child's point, until a VBL is owed. A game that has ended stops it,
+     * at its recording's end or at a drift.
      */
     private feed(): void {
         const { ctx } = this.game;
@@ -158,6 +174,12 @@ export class RecordingPlayer {
             const child = this.path[this.segment + 1] ?? null;
             const until = child?.parent ?? { changes: recording.changes.length, vbls: recording.vbls };
             const vbls = this.game.input.vbls - this.from;
+            if (this.gameEnd !== null) {
+                const atEnd = !child && recording.end?.word11694 === this.gameEnd && vbls === recording.vbls && this.next === recording.changes.length;
+                if (!atEnd) this.parted = { kind: 'end', recording: recording.id, vbls, word11694: this.gameEnd };
+                this.end();
+                return;
+            }
             while (this.next < until.changes && recording.changes[this.next]!.vbl <= vbls) {
                 const entry = recording.changes[this.next]!;
                 const time = ctx.state.tickCount;
@@ -172,6 +194,7 @@ export class RecordingPlayer {
             }
             if (this.next < until.changes || vbls < until.vbls) return;
             if (!child) {
+                if (recording.end) this.parted = { kind: 'end', recording: recording.id, vbls, word11694: null };
                 this.end();
                 return;
             }

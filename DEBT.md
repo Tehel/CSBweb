@@ -125,7 +125,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G31 | Recordings shared: the set's dialog, a package, the server | L | ⏳ step 1 of 5 |
+| G31 | Recordings shared: the set's dialog, a package, the server | L | ⏳ step 2 of 5 |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
 | C194 | A DSA's wall graphic counts as a real decoration, so it hides no text | S | ⏳ |
 | C195 | Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space | S | ⏳ to decide with the author |
@@ -666,7 +666,7 @@ Decided with the author:
 - **What a player shares**: a point the store keeps, never a running end. Either one of
   their saves, which they know by name: the path from its root to the save's point
   (`SaveEntry.recording`), the save's file ending the package, a check of its own. Or the
-  end of a game, won or lost, which no save can follow: at `showCredits` (`src/main.ts`)
+  end of a game, won or lost, which no save can follow: at `showCredits` (`Game.mainLoopReturns`)
   the running recording is marked ended there with `word11694`, pruning keeps it whole as
   it keeps a save's point, the dialog lists it among the saves and only the player deletes
   it, and its replay is checked by reaching `showCredits` at the same VBL with the same
@@ -726,11 +726,14 @@ player by: the sets they own, and a moderator's rights (`X-Player-Id`, `server/a
 by the name the player gives, or by nobody, and the server keeps its uploader's
 `playerId` apart, as a set's `owner` is kept, for a withdrawal.
 
-Paying it, in steps; the design is decided, and step 1 is next:
+Paying it, in steps; the design is decided, and step 2 is next.
 
-1. A game's end, a point to share: marked at `showCredits`, kept whole by pruning, and its
-   replay checked by reaching `showCredits` at the same VBL with the same `word11694`, in
-   `tools/checks/replay.ts`.
+1. A game's end is a point to share: the game tells it at the boundary as `ShowCredits`
+   follows `MainLoop`'s return (`InputBoundary.ended`), the recording ends in that VBL
+   with `d.Word11694` (`Recording.end`, `RecordingEntry.end`), the prune keeps it whole,
+   and the player drifts at a game that ends elsewhere (`tools/checks/replay.ts`, point
+   9). Nothing lists or deletes one yet: the store keeps every end until its data set is
+   deleted, which step 5 owes.
 2. The package, written and read: a tool writes one from a save's point and from an end,
    reads it back and replays it, and measures a long game's package for step 3's limits.
 3. The server: storing, listing, serving, moderating and withdrawing them, with its checks
@@ -738,8 +741,9 @@ Paying it, in steps; the design is decided, and step 1 is next:
    a build and marks the broken.
 4. The page's player: `?recording=` from the server, and the viewer's strip and keys.
 5. The dialog: its two tabs, the site's and the browser's recordings of the set, the
-   selection and its metadata, PLAY and UPLOAD, checked in `tools/probe-frames.ts`'s
-   welcome page block.
+   selection and its metadata, PLAY and UPLOAD, and DELETE for a browser's game's end,
+   the only way one leaves the store but its set's own deletion, checked in
+   `tools/probe-frames.ts`'s welcome page block.
 
 ### Postponed
 

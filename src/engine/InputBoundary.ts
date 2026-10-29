@@ -20,6 +20,10 @@
  * A recording played back feeds it (`RecordingPlayer`): after each VBL, the changes
  * logged before the next are applied, as the page's events applied them. The player is
  * told the file a VBL saves as well, the Sleepsave's, which its join is checked against.
+ *
+ * The game's end, `ShowCredits` once `MainLoop` has returned, is the game's own as well,
+ * made inside the VBL that ended it, but a point of its recording: the recorder ends the
+ * recording there, and the player checks it was played to the same end (`ended`).
  */
 import type { Extras, GameContext } from './GameContext';
 import { LONG_MOUSEQLEN, MOUSEQLEN } from './MouseQueue';
@@ -80,7 +84,12 @@ export interface PlayFeed {
     afterVbl(): void;
     /** A save's file made inside a VBL and written nowhere: the Sleepsave's (`GameSaves.sleepSave`). */
     savedInVbl(file: Uint8Array): void;
+    /** The game's end inside a VBL, with `d.Word11694` (`InputBoundary.ended`). */
+    ended(word11694: boolean): void;
 }
+
+/** Told the game's end, inside the VBL that ended it, with `d.Word11694`. */
+export type EndListener = (word11694: boolean) => void;
 
 export class InputBoundary {
     /**
@@ -91,6 +100,7 @@ export class InputBoundary {
     /** A VBL is running: a change now is the game's own. */
     private running = false;
     private listener: InputListener | null = null;
+    private endListener: EndListener | null = null;
     private screen: ScreenInput | null = null;
     /** The player's feed (`play`), or `null` while no recording plays. */
     private feed: PlayFeed | null = null;
@@ -148,6 +158,20 @@ export class InputBoundary {
     /** Tell `listener` every change from now on, or nobody (`null`). */
     listen(listener: InputListener | null): void {
         this.listener = listener;
+    }
+
+    /** Tell `listener` the game's end from now on, or nobody (`null`). */
+    listenEnd(listener: EndListener | null): void {
+        this.endListener = listener;
+    }
+
+    /**
+     * The game's end (`Game.mainLoopReturns`), with `d.Word11694`: told to the end's
+     * listener, the recorder, and to the player of a recording being played back.
+     */
+    ended(word11694: boolean): void {
+        this.endListener?.(word11694);
+        this.feed?.ended(word11694);
     }
 
     /** Who applies the interface's changes: the page's input path, or nobody headless. */

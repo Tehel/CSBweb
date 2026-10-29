@@ -663,9 +663,7 @@ export class Game implements MainLoop {
         // does not run, and `MainLoop` returns to `_StartCSB`, which shows the credits
         // (`:11557-11561`).
         if (this.ctx.party.state.gameIsLost) {
-            this.mainLoopReturned = true;
-            this.stop();
-            this.ctx.host.showCredits(this.ctx.state.gameWon);
+            this.mainLoopReturns();
             return;
         }
         // `d.Time++; ... scrollingText.ClockTick();` (doc/CSBwin-src/CSBCode.cpp:670-687):
@@ -716,10 +714,20 @@ export class Game implements MainLoop {
      * never resumed.
      */
     *showCreditsAndEnd(): LoopScript {
+        this.mainLoopReturns();
+        yield Infinity;
+    }
+
+    /**
+     * `MainLoop` has returned, and `ShowCredits` follows: the loop stopped, the game's
+     * end told at the boundary, inside the VBL that ended it (`InputBoundary.ended`), and
+     * the host's end of the game shown.
+     */
+    private mainLoopReturns(): void {
         this.mainLoopReturned = true;
         this.stop();
+        this.input.ended(this.ctx.state.gameWon);
         this.ctx.host.showCredits(this.ctx.state.gameWon);
-        yield Infinity;
     }
 
     /**

@@ -5,8 +5,9 @@
  * calls every few seconds and as it is hidden, the row and the changes recorded since the
  * last. A recording a read has replaced is finished at the next.
  *
- * Nothing is written of a recording before its first change: the boot's DM rules are a
- * recording's first, so what this leaves out is a read straight over another.
+ * Nothing is written of a recording before its first change or the game's end: the
+ * boot's DM rules are a recording's first, so what this leaves out is a read straight
+ * over another.
  *
  * A branch is written as one only where the store holds its parent up to the point it
  * names: a save whose recording was never written, or not that far (a page closed before
@@ -14,7 +15,8 @@
  * replaced are written before the one running, so a parent this page played is in the
  * store before its branch's first write.
  *
- * What no save and no running game reaches is pruned (`doc/RECORDING.md` → "The tree"):
+ * What no save, no game's end and no running game reaches is pruned (`doc/RECORDING.md` →
+ * "The tree"):
  * at a recording's first write, which follows the read that began it, and at a save
  * deleted or written over (`prune`). A game running in another tab is no game this page
  * plays, so its recording can be cut or removed here; its own page finds it so at its
@@ -60,11 +62,12 @@ export interface PrunePlan {
 }
 
 /**
- * What no save and no running game reaches, among `rows`. A recording is reached up to
- * the last point a save (`points`) or a branch kept names in it, and the running one,
- * `running`, whole, with its parent. One reached nowhere is removed, and with it what
- * its parent was reached by, up its path; one reached short of what the store holds is
- * cut at its last point.
+ * What no save, no game's end and no running game reaches, among `rows`. A recording is
+ * reached up to the last point a save (`points`) or a branch kept names in it, and one
+ * the game's end ended (`RecordingEntry.end`) and the running one, `running`, whole,
+ * with their parents. One reached nowhere is removed, and with it what its parent was
+ * reached by, up its path; one reached short of what the store holds is cut at its last
+ * point.
  */
 export function prunePlan(
     rows: readonly RecordingEntry[],
@@ -84,7 +87,10 @@ export function prunePlan(
         };
         for (const point of points) reachTo(point);
         reachTo(running?.parent);
-        for (const row of kept) reachTo(row.parent);
+        for (const row of kept) {
+            reachTo(row.parent);
+            if (row.end) reachTo({ recording: row.id, changes: row.changes, vbls: row.vbls });
+        }
         const next = kept.filter((row) => row.id === running?.id || reach.has(row.id));
         if (next.length < kept.length) {
             kept = next;
@@ -160,10 +166,10 @@ export class RecordingWriter {
     }
 
     private async write(written: Written, recording: Recording, rewrite = false): Promise<void> {
-        const { vbls, ended } = recording;
+        const { vbls, ended, end } = recording;
         // The running recording's own list, which grows while the store writes.
         const changes = recording.changes.slice();
-        if (changes.length === 0) return;
+        if (changes.length === 0 && !end) return;
         const first = written.parts === 0;
         if (!first && changes.length === written.changes && vbls === written.vbls && ended === written.ended) return;
         const { id } = written;
@@ -180,7 +186,7 @@ export class RecordingWriter {
         const entry: RecordingEntry = {
             id, dataSet: recording.dataSet, build: recording.build, parent: written.parent, playthrough,
             recordedAt: written.recordedAt, writtenAt: this.deps.now(),
-            vbls, ended, changes: changes.length, parts: seq,
+            vbls, ended, end, changes: changes.length, parts: seq,
         };
         try {
             await this.store.write(entry, parts, first ? null : { parts: written.parts, changes: written.changes });

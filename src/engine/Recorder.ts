@@ -10,7 +10,8 @@
  * and the rules as the read left them (`RulesOptions`, which a read only changes where its
  * file has an Extended Features block). Then every change the boundary is told, each with
  * the VBLs the recording has run before it, `d.Time` and `d.RandomNumber`. The boot's
- * DM rules (`Game.forceDMRulesAtBoot`) are such a change. The next read ends it.
+ * DM rules (`Game.forceDMRulesAtBoot`) are such a change. The next read ends it, or the
+ * game's end (`InputBoundary.ended`), which it keeps as a point to share (`end`).
  *
  * A recording is played back by the same start: the game read from it, its rules and
  * extras set, the game begun, and each change applied before the VBL it was logged at.
@@ -81,6 +82,16 @@ export interface RecordingPoint {
     readonly inVbl?: true;
 }
 
+/**
+ * The game's end, `ShowCredits` once `MainLoop` has returned, where it ended its
+ * recording: at the recording's last VBL, which ran it. A point to share as a save's is,
+ * which no save can follow.
+ */
+export interface RecordingEnd {
+    /** `d.Word11694`: the game won. */
+    readonly word11694: boolean;
+}
+
 /** A change as the boundary told it, with the game's clock and stream as they stood. */
 export interface RecordedChange {
     readonly change: InputChange;
@@ -107,19 +118,22 @@ export interface Recording {
     /** The extras as it began. */
     readonly extras: Extras;
     readonly changes: readonly RecordedChange[];
-    /** The VBLs it has run: up to the read that ended it, or so far. */
+    /** The VBLs it has run: up to the read or the game's end that ended it, or so far. */
     readonly vbls: number;
-    /** A read has ended it. */
+    /** A read or the game's end has ended it. */
     readonly ended: boolean;
+    /** The game's end, where it ended it; `null` otherwise. */
+    readonly end: RecordingEnd | null;
 }
 
 interface Running {
-    readonly recording: Omit<Recording, 'changes' | 'vbls' | 'ended'>;
+    readonly recording: Omit<Recording, 'changes' | 'vbls' | 'ended' | 'end'>;
     readonly changes: RecordedChange[];
     /** The boundary's VBLs as it began. */
     readonly from: number;
-    /** The boundary's VBLs as a read ended it, or `null` while it runs. */
+    /** The boundary's VBLs as a read or the game's end ended it, or `null` while it runs. */
     to: number | null;
+    end: RecordingEnd | null;
 }
 
 export class Recorder {
@@ -137,6 +151,7 @@ export class Recorder {
         private readonly newId: () => string,
     ) {
         game.input.listen((change, vbl) => this.told(change, vbl));
+        game.input.listenEnd((word11694) => this.gameEnded(word11694));
     }
 
     /**
@@ -160,6 +175,7 @@ export class Recorder {
             changes: [],
             from: this.game.input.vbls,
             to: null,
+            end: null,
         };
         this.beginListener?.(previous);
     }
@@ -180,7 +196,7 @@ export class Recorder {
         const current = this.current;
         if (!current) return null;
         const to = current.to ?? this.game.input.vbls;
-        return { ...current.recording, changes: current.changes, vbls: to - current.from, ended: current.to !== null };
+        return { ...current.recording, changes: current.changes, vbls: to - current.from, ended: current.to !== null, end: current.end };
     }
 
     private told(change: InputChange, vbl: number): void {
@@ -192,5 +208,13 @@ export class Recorder {
         }
         const { ctx } = this.game;
         current.changes.push({ change, vbl: vbl - current.from, time: ctx.state.tickCount, random: ctx.random.getSeed() });
+    }
+
+    /** The game's end, inside the VBL that ended it: the recording ended there, the VBL counted. */
+    private gameEnded(word11694: boolean): void {
+        const current = this.current;
+        if (!current || current.to !== null) return;
+        current.to = this.game.input.vbls;
+        current.end = { word11694 };
     }
 }
