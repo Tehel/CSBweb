@@ -30,8 +30,8 @@ FROM ${NODE_IMAGE}
 WORKDIR /app
 # No node_modules: the server has no dependency. `package.json` is there for its
 # `"type": "module"`, and `DataSets.ts` is the page's, whose routes and limits the server
-# imports from `../src/data/`. `dist/server/` is the page's check of a player's set,
-# bundled for Node, which the server loads at start-up.
+# imports from `../src/data/`. `dist/server/` is the page's readers, of a player's set and
+# of a shared recording, bundled for Node, which the server loads at start-up.
 COPY package.json ./
 COPY server/ server/
 COPY src/data/DataSets.ts src/data/DataSets.ts

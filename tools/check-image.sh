@@ -9,8 +9,9 @@
 # read-only, so that the probe's publish (`server/publish.ts`) writes its set's folder
 # there and leaves the checkout as it was.
 # Before the frames, it runs the server's check of a player's set (`dist/server/`,
-# `server/app.ts` → `CHECK_MODULE`) in the container, on DM's own files: the server loads
-# it at start-up, and the image's Node must also run it. And it has the store
+# `server/app.ts` → `READERS_MODULE`) in the container, on DM's own files, and its reader
+# of a recording's package, on a gzipped JSON that is none: the server loads them at
+# start-up, and the image's Node must also run them. And it has the store
 # (`server/store.ts`) update many rows in a transaction, in a scratch file beside the stats,
 # as a migration of a deployed store does: on the read-only file system, the statement's
 # temporary journal has nowhere to go but memory. The throwaway store, which holds no event,
@@ -55,7 +56,8 @@ done
 docker logs "$name"
 docker exec "$name" node --input-type=module -e '
   import { readFileSync } from "node:fs";
-  const { checkLocalDataSet } = await import("/app/dist/server/LocalDataSetCheck.js");
+  import { gzipSync } from "node:zlib";
+  const { checkLocalDataSet, readRecordingPackage } = await import("/app/dist/server/PageReaders.js");
   const dir = "/data/gamefiles/dm-atari";
   const blob = (name) => new Blob([readFileSync(`${dir}/${name}`)]);
   const draft = { id: "dm", name: "DM", description: "", authors: [], dmRules: true, baseSet: "dm-atari",
@@ -63,6 +65,9 @@ docker exec "$name" node --input-type=module -e '
   const { problems, record } = await checkLocalDataSet(draft, new Set(), () => null, 0);
   if (!record) { console.error("the server'"'"'s check refused DM:", JSON.stringify(problems)); process.exit(1); }
   console.log(`the server'"'"'s check: DM makes a record, signature ${record.dungeonSignature[0].slice(0, 12)}…`);
+  const refusal = await readRecordingPackage(new Uint8Array(gzipSync("{}")), 1024).then(() => "read", (error) => error.message);
+  if (!refusal.startsWith("not a package of version")) { console.error(`the server'"'"'s reader of a package: ${refusal}`); process.exit(1); }
+  console.log(`the server'"'"'s reader of a package: {} unzipped and refused, ${refusal}`);
 ' || exit 1
 docker exec "$name" node --input-type=module -e '
   import { rmSync } from "node:fs";

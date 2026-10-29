@@ -214,6 +214,32 @@ export const MODERATION_ACTIONS = ['approve', 'reject', 'hide', 'show'] as const
 export type ModerationAction = (typeof MODERATION_ACTIONS)[number];
 
 /**
+ * Where the page asks for a set's shared recordings, `?dataSet=<id>`, and uploads one,
+ * relative to the page, naming its player as `DATA_SETS_ROUTE` does (`server/recordings.ts`,
+ * `DEBT.md` G31). `POST RECORDINGS_ROUTE/<id>` moderates or withdraws one
+ * (`RECORDING_ACTIONS`).
+ */
+export const RECORDINGS_ROUTE = 'api/recordings';
+
+/** Where a shared recording's package is served, relative to the page: `RECORDING_FILES/<id>.gz`. */
+export const RECORDING_FILES = 'recordings';
+
+/**
+ * A shared recording's id, which the server draws: sixteen uppercase hexadecimal digits,
+ * which the page tells from its own store's recordings' ids by their form, since those hold
+ * a `-` (`src/main.ts`).
+ */
+export const SHARED_RECORDING_ID = /^[0-9A-F]{16}$/;
+
+/**
+ * What `POST RECORDINGS_ROUTE/<id>` does to a shared recording, its body's `{"action": …}`
+ * (`server/recordings.ts`): a moderator's approve, hide, show and delete, the replay tool's
+ * break, and its uploader's delete, a withdrawal.
+ */
+export const RECORDING_ACTIONS = ['approve', 'hide', 'show', 'break', 'delete'] as const;
+export type RecordingAction = (typeof RECORDING_ACTIONS)[number];
+
+/**
  * The segment below `DATA_SETS_ROUTE/<id>` where a moderator adds a document to the set,
  * by a form, and removes one, by `{"remove": "<file>"}` (`server/documents.ts`).
  */

@@ -2,15 +2,18 @@
  * What the server tells the moderators' phones: each change to the sets, through an ntfy
  * (`doc/DEPLOYMENT.md` → "Notifications"). A set published (`publish.ts`), approved,
  * rejected, withdrawn, hidden or shown (`moderate.ts`), edited (`edit.ts`), or given or
- * relieved of a document (`documents.ts`) is one message of two lines:
+ * relieved of a document (`documents.ts`), and a recording of a set's shared, approved,
+ * hidden, shown, broken, deleted or withdrawn (`recordings.ts`), is one message of two lines:
  *
  *   Dataset <name>: <added | approved | rejected | withdrawn | shown | hidden | edited>
  *   By <who> at YYYYMMDD HH:mm
  *
- * or, for a document, `Dataset <name>: document <added | removed> (<file>)` first.
+ * or, for a document, `Dataset <name>: document <added | removed> (<file>)` first, and for a
+ * recording, `Dataset <name>: recording <added | approved | …> (<title>)`.
  *
- * <who> is a moderator's name (`Moderator`, `dataSets.ts`), `its owner` for a set withdrawn,
- * and `a player` for a set published by one who does not moderate: never a `playerId`. The
+ * <who> is a moderator's name (`Moderator`, `dataSets.ts`), `its owner` for a set or a
+ * recording withdrawn, and `a player` for a set published or a recording shared by one who
+ * does not moderate: never a `playerId`. The
  * time is the server's local time, its `TZ`.
  *
  * A message is sent and forgotten: no request waits on ntfy, and one it refuses or does not
@@ -18,7 +21,8 @@
  */
 
 /** What became of a set. */
-export type DataSetActivity = 'added' | 'approved' | 'rejected' | 'withdrawn' | 'shown' | 'hidden' | 'edited' | 'document added' | 'document removed';
+export type DataSetActivity = 'added' | 'approved' | 'rejected' | 'withdrawn' | 'shown' | 'hidden' | 'edited' | 'document added' | 'document removed'
+    | `recording ${'added' | 'approved' | 'hidden' | 'shown' | 'broken' | 'deleted' | 'withdrawn'}`;
 
 /** A change to a set, as a notification says it. */
 export interface DataSetEvent {
@@ -27,6 +31,8 @@ export interface DataSetEvent {
     activity: DataSetActivity;
     /** The document's file, for a document added or removed. */
     document?: string;
+    /** The recording's title, for a recording's activity. */
+    recording?: string;
     /** Who did it: a moderator's name, `its owner` or `a player`. */
     by: string;
     /** When, as `Date.now()` gives it. */
@@ -43,11 +49,12 @@ export const NOBODY: Notify = () => {};
 const TIMEOUT_MS = 10_000;
 
 /** The message `event` is. */
-export function notificationText({ name, activity, document, by, at }: DataSetEvent): string {
+export function notificationText({ name, activity, document, recording, by, at }: DataSetEvent): string {
     const date = new Date(at);
     const two = (value: number) => String(value).padStart(2, '0');
     const stamp = `${date.getFullYear()}${two(date.getMonth() + 1)}${two(date.getDate())} ${two(date.getHours())}:${two(date.getMinutes())}`;
-    return `Dataset ${name}: ${activity}${document === undefined ? '' : ` (${document})`}\nBy ${by} at ${stamp}`;
+    const what = document ?? recording;
+    return `Dataset ${name}: ${activity}${what === undefined ? '' : ` (${what})`}\nBy ${by} at ${stamp}`;
 }
 
 /**

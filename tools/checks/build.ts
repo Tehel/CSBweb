@@ -1,12 +1,12 @@
 /**
- * What a build ships (`doc/DEPLOYMENT.md`): the page, the server's check of a player's set,
- * and none of `static/`.
+ * What a build ships (`doc/DEPLOYMENT.md`): the page, the server's readers of a player's set
+ * and of a shared recording, and none of `static/`.
  *
  * Builds with the project's own `vite.config.mts` (the CLI, as `npm run build` does: the
  * page, then `--ssr`) into a scratch folder, lists every file,
  * and asserts:
  *   - every file is `index.html`, `stats.html`, the web app manifest, under `assets/`, or the server's
- *     module (`CHECK_MODULE`), of a type the page itself is made of: no `.dat`, no `.pdf`
+ *     module (`READERS_MODULE`), of a type the page itself is made of: no `.dat`, no `.pdf`
  *     but HOW TO PLAY's sheets to print (`src/assets/how-to-play/`), nothing of `static/`;
  *   - every local `href` and `src` in `index.html` names a file the build holds, the
  *     manifest among them, and the manifest's icons are in it too, at the sizes it says;
@@ -19,7 +19,9 @@
  *     `checkLocalDataSet` says, its problems, record, census and walls, and of a
  *     `dungeon.dat` what `readDungeonWalls` says: DM's `dungeon.dat` on its
  *     base set's `graphics.dat`, read from the set's folder, the same with Chaos Strikes Back's
- *     own `graphics.dat`, and a `dungeon.dat` that does not read.
+ *     own `graphics.dat`, and a `dungeon.dat` that does not read; and of a package what the
+ *     page's `readRecordingPackage` says: one read, one past the limit it unzips to, and
+ *     bytes that are no package.
  *
  * Usage: npm test -- --only=build.ts
  */
@@ -28,11 +30,13 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:f
 import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 
-import { CHECK_MODULE, loadPageReaders } from '../../server/app.ts';
+import { READERS_MODULE, loadPageReaders } from '../../server/app.ts';
 import type { DataSetDraft, DataSetFolder } from '../../server/publish.ts';
 import { checkLocalDataSet, readDungeonWalls } from '../../src/engine/LocalDataSetCheck.ts';
+import { readRecordingPackage } from '../../src/engine/RecordingPackage.ts';
 import { check, finish } from '../lib/check.ts';
 import { dataSetNamed } from '../lib/dataSets.ts';
+import { packageOf } from '../lib/recordingPackages.ts';
 
 const ROOT = resolve(import.meta.dirname, '../..');
 const PAGE_TYPES = new Set(['.html', '.js', '.css', '.ico', '.jpg', '.png', '.ttf', '.woff2', '.img', '.wav', '.webmanifest']);
@@ -101,8 +105,8 @@ async function main(): Promise<void> {
         console.log(`  ${String(total).padStart(8)}  in all`);
 
         console.log('\nChecks:');
-        const strays = files.filter((f) => f !== 'index.html' && f !== STATS_PAGE && f !== WEB_MANIFEST && !f.startsWith('assets/') && f !== CHECK_MODULE);
-        check(strays.length === 0, `every file is index.html, ${STATS_PAGE}, ${WEB_MANIFEST}, under assets/ or ${CHECK_MODULE}${strays.length ? `: not ${strays.join(', ')}` : ''}`);
+        const strays = files.filter((f) => f !== 'index.html' && f !== STATS_PAGE && f !== WEB_MANIFEST && !f.startsWith('assets/') && f !== READERS_MODULE);
+        check(strays.length === 0, `every file is index.html, ${STATS_PAGE}, ${WEB_MANIFEST}, under assets/ or ${READERS_MODULE}${strays.length ? `: not ${strays.join(', ')}` : ''}`);
         const foreign = files.filter((f) => !PAGE_TYPES.has(f.slice(f.lastIndexOf('.'))) && !PRINTED_SHEET.test(f));
         check(foreign.length === 0, `every file is of the page's own types${foreign.length ? `: not ${foreign.join(', ')}` : ''}`);
         check(!files.some((f) => f.includes('gamefiles')), 'no game files');
@@ -144,10 +148,10 @@ async function main(): Promise<void> {
             'the FTL logo is in the build: swoosh.img, in the bundle or a file of its own, and swoosh.wav');
 
         console.log('\nThe server\'s check:');
-        const module = readFileSync(join(outDir, CHECK_MODULE), 'utf8');
+        const module = readFileSync(join(outDir, READERS_MODULE), 'utf8');
         const imports = module.match(/^\s*(?:import|export\s.*\sfrom)\s.*$|\bimport\(|\brequire\(/gm) ?? [];
-        check(imports.length === 0, `${CHECK_MODULE} imports nothing${imports.length ? `: not ${imports.join(', ')}` : ''}`);
-        const { checkDataSet: built, readDungeonWalls: builtWalls } = await loadPageReaders(outDir);
+        check(imports.length === 0, `${READERS_MODULE} imports nothing${imports.length ? `: not ${imports.join(', ')}` : ''}`);
+        const { checkDataSet: built, readDungeonWalls: builtWalls, readRecordingPackage: builtPackage } = await loadPageReaders(outDir);
         const base = (set: string): DataSetFolder | null => set === 'dm-atari' || set === 'csb' ? folder(set) : null;
         const drafts: [string, DataSetDraft, boolean][] = [
             ['DM, on its base set\'s graphics.dat', draftOf('dm-atari', ['dungeon.dat']), true],
@@ -167,6 +171,14 @@ async function main(): Promise<void> {
             const bytes = new Uint8Array(await draft.files['dungeon.dat']!.arrayBuffer());
             const wallsOf = (read: typeof builtWalls) => read(bytes).then((walls) => JSON.stringify(walls), (error: Error) => `throws: ${error.message}`);
             check(await wallsOf(builtWalls) === await wallsOf(readDungeonWalls), `${what}: the built reader of its walls says what the source's does`);
+        }
+        const won = await packageOf('dm-atari', 'A win', { extras: true });
+        const packages: [string, Uint8Array, number][] = [['a package', won, 1 << 20], ['a package past the limit', won, 100], ['bytes that are no package', new Uint8Array([1, 2, 3]), 1 << 20]];
+        for (const [what, bytes, limit] of packages) {
+            const read = (reader: typeof builtPackage) => reader(bytes, limit).then((pkg) => JSON.stringify(pkg), (error: Error) => `throws: ${error.message}`);
+            const fromBuild = await read(builtPackage);
+            console.log(`  ${what}: ${fromBuild.startsWith('throws') ? fromBuild : `${fromBuild.length} characters of JSON`}`);
+            check(fromBuild === await read(readRecordingPackage), `${what}: the built reader of a package says what the source's does`);
         }
     } finally {
         rmSync(outDir, { recursive: true, force: true });

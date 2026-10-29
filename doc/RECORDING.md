@@ -430,6 +430,10 @@ root began, when its point was made, the game's play time there (`Game.playTime`
 where it starts, a new game or the save's level and champions, which is read from the
 root, so it cannot disagree with it.
 
+**The server** keeps the packages shared, lists them by set, serves them and moderates
+them (`server/recordings.ts`, `doc/DEPLOYMENT.md` → "Shared recordings"). It reads a
+package with the page's own reader, bundled for Node (`src/engine/PageReaders.ts`).
+
 `readRecordingPackage` checks a package's form alone, the server's check: it unzips,
 to no more than a limit its caller gives, parses, each field has its type (the rules,
 the extras and the loop's flags their keys, each change its kind's fields, a read none),

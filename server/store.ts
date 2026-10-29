@@ -1,7 +1,7 @@
 /**
  * The server's one SQLite file, `STATS_DB`, through `node:sqlite`: the statistics' `events`
- * table (`stats.ts`) and the data sets' tables (`dataSets.ts`), on one connection, so that
- * `backup.ts`'s snapshot holds both.
+ * table (`stats.ts`), the data sets' tables (`dataSets.ts`) and the shared recordings'
+ * (`recordings.ts`), on one connection, so that `backup.ts`'s snapshot holds them all.
  *
  * The file runs in WAL mode. Closing the connection checkpoints the WAL into it, so the file
  * alone is the whole store once the server has stopped. A missing file is made; each

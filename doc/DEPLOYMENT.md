@@ -21,7 +21,8 @@ behind the host's nginx, and a deploy by `docker save`, `scp` and `docker load`.
 image      dist/ (the built page, and the server's check in dist/server/) + server/ (run by
            Node 24 as is) + src/data/DataSets.ts
 mounts     /data/gamefiles        the data sets, and players' uploads
-           /data/stats            stats.db (SQLite, WAL: the statistics and the data sets), backups/
+           /data/stats            stats.db (SQLite, WAL: the statistics, the data sets and the
+                                  recordings), recordings/, backups/
            /data/files            the files shared by link (below), read-only
 env        PORT (8085), DIST_DIR, GAMEFILES_DIR, FILES_DIR, STATS_DB, MODERATOR_PLAYER_IDS,
            NTFY_URL, NTFY_USER, NTFY_PASS, TZ
@@ -40,8 +41,9 @@ On the VPS, everything is in one folder, `DEPLOY_DIR` (`~/csbweb`):
 ├── files/                the files shared by link, uploaded by hand; all public
 └── stats/                written by the container (uid 1000)
     ├── stats.db, stats.db-wal, stats.db-shm
-    ├── backups/          the nightly snapshots, 14 days of them, and gamefiles/: the
-    │                     players' folders, each copied once and kept
+    ├── recordings/       the shared recordings' packages, `<id>.gz`, written by the server
+    ├── backups/          the nightly snapshots, 14 days of them, gamefiles/: the
+    │                     sets' folders, and recordings/: the packages, each copied once and kept
     └── backup.log
 ```
 
@@ -286,19 +288,21 @@ through `node:sqlite` (as below, to add the site's sets), and in `gamefiles/`:
 ### Notifications
 
 Each change to the sets is a message to the VPS's ntfy (`server/notify.ts`): a set
-published, approved, rejected, withdrawn by its owner, hidden, shown or edited, or a
-document added or removed. It is two lines:
+published, approved, rejected, withdrawn by its owner, hidden, shown or edited, a
+document added or removed, or a recording of the set shared, approved, hidden, shown,
+broken, deleted or withdrawn by its uploader ("Shared recordings", below). It is two lines:
 
 ```
 Dataset <name>: <added | approved | rejected | withdrawn | shown | hidden | edited>
 By <who> at YYYYMMDD HH:mm
 ```
 
-or, for a document, `Dataset <name>: document <added | removed> (<file>)` first.
+or, for a document, `Dataset <name>: document <added | removed> (<file>)` first, and for a
+recording, `Dataset <name>: recording <added | approved | …> (<title>)`.
 `<name>` is the set's name, not its id. `<who>` is the moderator's alias from
 `MODERATOR_PLAYER_IDS`, or `moderator <n>`, their place in that list, for one without;
-`its owner` for a set withdrawn; `a player` for a set published by someone who does not
-moderate. A `playerId` is never sent. The time is the server's local time: the container's
+`its owner` for a set or a recording withdrawn; `a player` for a set published or a
+recording shared by someone who does not moderate. A `playerId` is never sent. The time is the server's local time: the container's
 is UTC unless `.env` sets `TZ` (`TZ=Europe/Paris`).
 
 The server posts to `NTFY_URL`, the topic's whole URL (`https://<host>/<topic>`), with
@@ -435,18 +439,21 @@ The statistics page, `stats.html`, is the page's second entry, which shares none
 game's modules and links no manifest. A build is `index.html`, `stats.html`,
 `manifest.webmanifest` and `assets/`, about 1.4 MB, and the server's module.
 
-**The server's module** is the second build, `--ssr`: the page's check of a player's own
-set, `checkLocalDataSet` (`src/engine/LocalDataSetCheck.ts`) and every reader under it, bundled
-into one module that imports nothing, `dist/server/LocalDataSetCheck.js` (`vite.config.mts`).
+**The server's module** is the second build, `--ssr`: the page's readers the server uses
+(`src/engine/PageReaders.ts`), the check of a player's own set, `checkLocalDataSet`
+(`src/engine/LocalDataSetCheck.ts`), and every reader under it, and the reader of a shared
+recording's package, `readRecordingPackage` (`src/engine/RecordingPackage.ts`), bundled
+into one module that imports nothing, `dist/server/PageReaders.js` (`vite.config.mts`).
 The server cannot import the page's sources as it imports `DataSets.ts`, since they are not
 erasable syntax and the image has no `node_modules`, so it loads this module instead and
-reads a set with the page's own readers. It is never served.
+reads a set and a package with the page's own readers. It is never served.
 
 `tools/checks/build.ts` builds both into a scratch folder and asserts them: only the page's own file
 types, nothing of `static/`, every file `index.html` and `stats.html` name present, the manifest's icons too, the
 statistics page loading a few KB of script and none of the game's, no probe handle, and a
 server's module that imports nothing and says of DM's and CSB's files, and of a file that
-does not read, what the source's check says.
+does not read, what the source's check says, and of a package, one past its limit and bytes
+that are none, what the source's reader says.
 
 **The probe handle** (`window.__probe`, `src/main.ts`), through which the CDP probes drive
 the page, is the dev server's, and a build's only with `CSBWEB_PROBE=1` (`__CSBWEB_PROBE__`,
@@ -466,8 +473,10 @@ page's project and the tools'. The package is an ES module
 routes and limits the server imports from `../src/data/`. `npm start` runs it locally, on the project's Node (below).
 
 It reads `PORT` (8085), `DIST_DIR` and `GAMEFILES_DIR` (the checkout's `dist/` and
-`tools/fixtures/gamefiles/`), `FILES_DIR` (the checkout's `files/`, which git ignores), and `STATS_DB` (the
-checkout's `stats/stats.db`, which git ignores), `MODERATOR_PLAYER_IDS`, the moderators,
+`tools/fixtures/gamefiles/`), `FILES_DIR` (the checkout's `files/`, which git ignores), `STATS_DB` (the
+checkout's `stats/stats.db`, which git ignores), and `RECORDINGS_DIR`, the shared
+recordings' packages (`recordings/` beside the store, so the image's is in the mounted
+`stats/`), `MODERATOR_PLAYER_IDS`, the moderators,
 comma-separated `<playerId>[=<alias>]`, spaces around a comma or the `=` ignored, to whom
 `api/data-sets` offers every set (unset or empty, no one; an entry that is not a
 `playerId`, or whose alias is empty, stops the start), and `NTFY_URL`, `NTFY_USER`,
@@ -482,10 +491,13 @@ comma-separated `<playerId>[=<alias>]`, spaces around a comma or the `=` ignored
 | `/server/…` | 404: `dist/server/` is the server's module | |
 | `/gamefiles/…` | `GAMEFILES_DIR/…` | `no-cache`, ETag and Last-Modified |
 | `/files/…` | `FILES_DIR/…`, the files shared by link, under their own policy | `no-cache`, ETag and Last-Modified |
+| `/recordings/<id>.gz` | `RECORDINGS_DIR/<id>.gz`, a shared recording's package | `immutable` |
 | `/api/data-sets` | the `data_sets` table's sets the `X-Player-Id` may see, as a manifest; POST: a set published | `no-store`, `Vary: X-Player-Id` |
 | `/api/data-sets/<id>` | POST: the set approved, rejected, hidden or shown by a moderator, or withdrawn by its owner; with a form, edited by a moderator | `no-store` |
 | `/api/data-sets/<id>/documents` | POST: a document added to the set by a moderator, with a form, or removed, with JSON | `no-store` |
 | `/api/data-set-walls` | the walls of those of the same sets that keep some: the published ones | `no-store`, `Vary: X-Player-Id` |
+| `/api/recordings?dataSet=<id>` | the set's shared recordings the `X-Player-Id` may see; POST: a package shared ("Shared recordings", below) | `no-store`, `Vary: X-Player-Id` |
+| `/api/recordings/<id>` | POST: the recording approved, hidden, shown, broken or deleted by a moderator, or withdrawn by its uploader | `no-store` |
 | `/api/health` | `{"ok":true}`, for the healthcheck | `no-store` |
 | `/api/event` | POST: one of the page's events (`doc/STATISTICS.md`) | |
 | `/api/stats` | the public sets' statistics (`doc/STATISTICS.md`) | `public, max-age=30`, kept as long |
@@ -493,7 +505,8 @@ comma-separated `<playerId>[=<alias>]`, spaces around a comma or the `=` ignored
 | `/api/stats/<id>/<level>` | the deaths on its level's squares | `public, max-age=30`, kept as long |
 
 Every file answers a conditional GET with 304, and only GET and HEAD are allowed, except on
-`api/event`, `api/data-sets`'s POST, `api/data-sets/<id>` and `api/data-sets/<id>/documents`, POST only. A POST a
+`api/event`, `api/data-sets`'s POST, `api/data-sets/<id>`, `api/data-sets/<id>/documents`,
+`api/recordings`'s POST and `api/recordings/<id>`, POST only. A POST a
 browser says another site's page sent, by its `Sec-Fetch-Site` or its `Origin`, is refused
 with 403 (`isCrossSite`, `doc/STATISTICS.md`). A path with a segment that starts with `.`, or holds a `/`, a `\` or a NUL once
 decoded, is refused with 400 before it reaches the disk. A folder is 404, never a listing.
@@ -521,13 +534,29 @@ scripts.
 
 **At start-up** it opens the store (making it, and its folder, when missing), checks
 that `index.html` is built, and that the game files' folder and each folder the table's
-sets name exist, which may be none; then it loads the server's module (`loadCheckDataSet`, `server/app.ts`). Any failure prints `Not starting: <why>` and exits with 1, so a bad mount fails
+sets name exist, which may be none; then it makes the recordings' folder when missing, and
+loads the server's module (`loadPageReaders`, `server/app.ts`). Any failure prints `Not starting: <why>` and exits with 1, so a bad mount fails
 the container rather than the player's boot. On SIGTERM it stops listening, lets the
 requests in flight finish (5 s at most), closes the store, which checkpoints the WAL into
 the file, and exits with 0. It logs to stdout. `tools/checks/server.ts` asserts all of it,
 `server.ts` run as its own process included, from a folder laid out as the image's `/app`
 from the runtime stage's `COPY` lines (below), so that a module the server reaches and the
 image does not copy fails there too.
+
+**Shared recordings** (`server/recordings.ts`, `DEBT.md` G31, `doc/RECORDING.md` → "Shared
+recordings"): a player shares a package of a set the site publishes, approved, as a form of
+the one file `package`, at most 8 MiB and 32 MiB unzipped, five an hour per address, refused
+ones included. The server reads it with the page's own reader, which checks its form and
+never replays it, refuses one that holds a move of `?dev`, and keeps it as
+`RECORDINGS_DIR/<id>.gz` under an id it draws, sixteen uppercase hexadecimal digits, with a
+row of the store's `recordings` table, pending, its metadata the package's and its
+uploader's `playerId` beside them. The packages may take 1 GiB together, some three
+thousand hours of play; past that a share is refused with 507. A recording is listed to
+everyone once a moderator approves it, unless one hid it or the replay tool broke it, and
+to its uploader and the moderators in every state. Its uploader deletes it whenever they
+like; a moderator approves, hides, shows, breaks and deletes it. Each change is notified
+("Notifications", above). A package never changes after: it is served `immutable`, and
+copied once by the backup (below).
 
 ## The image and the stack
 
@@ -671,8 +700,10 @@ It then copies the folders the snapshot's sets live in, every set's, into
 `stats/backups/gamefiles/<dir>/`: a moderator's edit, or a document added or removed, writes
 any set a new folder, the site's too. A folder is whole before a row names it and never changes after, so each is copied
 once, through a `.partial` name renamed when whole, and kept for good, a deleted set's and
-an edited set's old one included, since a snapshot still names it. It prints one JSON line, `backup_ok` with the folders copied and the
-number kept, and exits with 1 when the store cannot be read or a folder cannot be copied
+an edited set's old one included, since a snapshot still names it. The shared recordings'
+packages, which never change either, are copied the same way into
+`stats/backups/recordings/<id>.gz`. It prints one JSON line, `backup_ok` with the folders and
+the packages copied and the number of each kept, and exits with 1 when the store cannot be read or a folder cannot be copied
 (`backup_failed`). The crontab line, `doc/SETUP.md` step 27's (`docker-compose` under Compose v1), deletes the
 snapshots older than 14 days, and only them:
 
@@ -686,8 +717,8 @@ harmless, but in a script fed over `ssh` it swallows the rest of the script.
 `ls ~/csbweb/stats/backups/` is the check that the job runs: an empty or missing folder
 means it does not. `tools/checks/server.ts` asserts the script against a running server: the
 snapshot holds the events still in the WAL, the server keeps serving, and a missing store
-exits 1; a player's folder is copied whole, the site's not, the next run keeps the copy,
-and a player's folder that is not there exits 1.
+exits 1; every set's folder is copied whole, and every shared recording's package, the next
+run keeps the copies, and a player's folder that is not there exits 1.
 
 `utils/pull-backups.sh` copies `stats/backups/` off the server, the snapshots and the players' folders, with `rsync`, into
 `../backups/csbweb/` beside the checkout (`BACKUP_PULL_DIR` overrides it), reading the
@@ -701,6 +732,7 @@ docker-compose stop
 cp stats/backups/stats-<date>.db stats/stats.db
 rm -f stats/stats.db-wal stats/stats.db-shm   # stale sidecars would bring the old state back
 cp -rn stats/backups/gamefiles/. gamefiles/   # the players' folders a lost gamefiles/ lacks
+cp -n stats/backups/recordings/*.gz stats/recordings/   # the packages a lost recordings/ lacks
 docker-compose up -d
 ```
 

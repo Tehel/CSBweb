@@ -2,7 +2,7 @@
  * A player's own set checked as the boot will read its files (`checkLocalDataSet`), and a
  * dropped file told by what it holds (`identifyLocalDataSetFile`): the form's
  * (`src/ui/addDataSetForm.ts`), and the server's, which `vite build --ssr` bundles from
- * this module alone (`server/app.ts` → `CHECK_MODULE`). The check plays the boot's
+ * `PageReaders.ts` (`server/app.ts` → `READERS_MODULE`). The check plays the boot's
  * readers and builds its tables (`buildGameTables`), and counts what the dungeon holds
  * (`dungeonCensus`); the record it makes is `src/data/LocalDataSets.ts`'s.
  */

@@ -76,6 +76,17 @@
  *     nothing changed: a body that is not one action, or too large (400, 413), an id the
  *     table does not hold (404), an asker who may not (403), an action the set's state
  *     does not take, and a reject of a site's set or the default (409);
+ *   - `/api/recordings` and `/recordings/` (`server/recordings.ts`): a package shared, kept
+ *     whole as `<id>.gz` under a drawn id, its row pending, its metadata the package's,
+ *     listed to its uploader, as theirs, and the moderators only, the list not cached and
+ *     naming no `playerId`, and its file served, `immutable`, reading back as the package;
+ *     one played with an extra on listed so; every refusal answered with nothing written:
+ *     no player, a form that is not the package alone, not a form (400), a package or a
+ *     request too large (413), bytes that are no package, a pending or unknown set's, a
+ *     `?dev` move (422), the packages' disk full (507), and the rate per address (429);
+ *     a moderator approves, hides, shows, breaks and deletes one, each state's refusals
+ *     409, nobody else 403; its uploader withdraws it, its row and file gone; a body not
+ *     one action 400, too large 413, an unknown id 404; and each change notified;
  *   - the walls a published set's row keeps, its `dungeon.dat`'s as the page reads them,
  *     and `/api/data-set-walls`, which gives a player those of the sets `api/data-sets`
  *     offers them, as the page parses them; and `fillWalls`, which reads those of the
@@ -92,11 +103,14 @@
  *   - `backup.ts`, run beside that server: a snapshot in `backups/` holding the events
  *     still in the WAL and the data sets, the server serving throughout, and exit 1 on a
  *     missing store; the folder of every set, with an owner or not, copied whole into
- *     `backups/gamefiles/`, kept by the next run rather than copied again, and exit 1 on
- *     a set whose folder is not there.
+ *     `backups/gamefiles/`, and every shared recording's package, from the `recordings/`
+ *     the server made beside the store, into `backups/recordings/`, each kept by the next
+ *     run rather than copied again, and exit 1 on a set whose folder is not there.
  *
- * The scratch build's check (`CHECK_MODULE`) is a stand-in that exports the functions:
- * `tools/checks/build.ts` builds the real one and checks sets through it.
+ * The scratch build's readers (`READERS_MODULE`) are a stand-in that exports the functions:
+ * `tools/checks/build.ts` builds the real one and checks sets and packages through it. The
+ * API is handed the page's own `readRecordingPackage`, which `tsc` holds to the shape
+ * `server/recordings.ts` types it by (`ReadRecordingPackage`).
  *
  * Usage: npm test -- --only=server.ts
  */
@@ -109,22 +123,27 @@ import { basename, join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { deflateSync } from 'node:zlib';
 
-import { CHECK_MODULE, checkFiles, createAppServer, FILES_POLICY, fillWalls, pathSegments, SECURITY_HEADERS, type ApiOptions, type ServerOptions } from '../../server/app.ts';
+import { READERS_MODULE, checkFiles, createAppServer, FILES_POLICY, fillWalls, pathSegments, SECURITY_HEADERS, type ApiOptions, type ServerOptions } from '../../server/app.ts';
 import { ANYONE, DataSetStore, manifestText, parseModerators } from '../../server/dataSets.ts';
 import { RateLimit } from '../../server/events.ts';
 import { NOBODY, notificationText } from '../../server/notify.ts';
 import { DOCUMENT_FIELD } from '../../server/documents.ts';
 import { MAX_MODERATION_BYTES } from '../../server/moderate.ts';
 import { MAX_PUBLISH_BYTES, MAX_PUBLISHED_FILE_BYTES } from '../../server/publish.ts';
+import { MAX_RECORDING_BYTES, MAX_RECORDING_MODERATION_BYTES, MAX_SHARE_BYTES, PACKAGE_FIELD, RecordingStore } from '../../server/recordings.ts';
 import { StatsStore } from '../../server/stats.ts';
 import { openStore } from '../../server/store.ts';
-import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, documentPath, LOCAL_DATA_SET_TEXT_LIMITS, parseManifest, PLAYER_ID_HEADER } from '../../src/data/DataSets.ts';
+import {
+    DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, documentPath, LOCAL_DATA_SET_TEXT_LIMITS, parseManifest, PLAYER_ID_HEADER, RECORDING_FILES, RECORDINGS_ROUTE, SHARED_RECORDING_ID,
+} from '../../src/data/DataSets.ts';
 import { localDataSet } from '../../src/data/LocalDataSets.ts';
 import { checkLocalDataSet, readDungeonWalls } from '../../src/engine/LocalDataSetCheck.ts';
+import { readRecordingPackage } from '../../src/engine/RecordingPackage.ts';
 import { parsePublishedDungeons } from '../../src/data/DungeonSignature.ts';
 import { indexedPng, indexedPngRows } from '../../src/core/png.ts';
 import { check, finish as verdict } from '../lib/check.ts';
 import { dataSetNamed, GAMEFILES_DIR, MANIFEST_FILE } from '../lib/dataSets.ts';
+import { packageOf } from '../lib/recordingPackages.ts';
 
 const ROOT = resolve(import.meta.dirname, '../..');
 
@@ -146,6 +165,22 @@ function ask(port: number, path: string, method = 'GET', headers: Record<string,
         req.on('error', fail);
         req.end(body);
     });
+}
+
+/** What the packages of a scratch server may take on the disk: more than any check shares but `checkRecordings`' own. */
+const RECORDINGS_DISK_BYTES = 1 << 30;
+
+/** Recordings shared per address and window, on a scratch server. */
+const SHARES_PER_WINDOW = 12;
+
+/**
+ * A scratch server's recordings, kept in `db` and `dir`, which is made: the reader the API
+ * is handed is the page's own `readRecordingPackage`, which `tsc` holds to the shape
+ * `server/recordings.ts` types it by (`ReadRecordingPackage`).
+ */
+function recordingsApi(db: DatabaseSync, dir: string, diskBytes = RECORDINGS_DISK_BYTES): ApiOptions['recordings'] {
+    mkdirSync(dir, { recursive: true });
+    return { store: new RecordingStore(db, diskBytes), dir, readPackage: readRecordingPackage, shareRateLimit: new RateLimit(SHARES_PER_WINDOW, 60_000) };
 }
 
 /** A store in memory, its tables empty. */
@@ -227,8 +262,9 @@ function scratchFiles(scratch: string): ServerOptions {
     writeFileSync(join(distDir, 'assets', 'font-AbC123.ttf'), Buffer.from([0, 1, 0, 0]));
     writeFileSync(join(distDir, 'assets', 'font-AbC123.woff2'), Buffer.from([0x77, 0x4f, 0x46, 0x32]));
     mkdirSync(join(distDir, 'server'));
-    writeFileSync(join(distDir, CHECK_MODULE), 'export function checkLocalDataSet() {}\n'
-        + 'export async function readDungeonWalls() { throw new Error("a stand-in"); }\n');
+    writeFileSync(join(distDir, READERS_MODULE), 'export function checkLocalDataSet() {}\n'
+        + 'export async function readDungeonWalls() { throw new Error("a stand-in"); }\n'
+        + 'export async function readRecordingPackage() { throw new Error("a stand-in"); }\n');
     writeFileSync(join(gamefilesDir, 'set-a', 'dungeon.dat'), Buffer.from([1, 2, 3, 4]));
     writeFileSync(join(gamefilesDir, 'set-a', 'large.dat'), Buffer.alloc(LARGE_FILE_BYTES));
     writeFileSync(join(gamefilesDir, 'set-a', '.hidden'), 'hidden');
@@ -299,7 +335,7 @@ async function checkAnswers(port: number, manifest: string, gamefilesDir: string
         `the web app manifest, as application/manifest+json, no-cache (${webManifest.headers['content-type']}, ${webManifest.headers['cache-control']})`);
     check((await ask(port, '/assets/nothing.js')).status === 404, 'a missing file is 404');
     check((await ask(port, '/assets')).status === 404, 'a folder is 404, not a listing');
-    check((await ask(port, `/${CHECK_MODULE}`)).status === 404, `the server's module, ${CHECK_MODULE}, is not served`);
+    check((await ask(port, `/${READERS_MODULE}`)).status === 404, `the server's module, ${READERS_MODULE}, is not served`);
 
     console.log('\nThe security headers:');
     const answers: [string, Promise<Answer>][] = [
@@ -571,7 +607,7 @@ async function checkEventBudget(scratch: string): Promise<void> {
     const server = createAppServer(options, {
         checkDataSet: checkLocalDataSet, dataSets, moderators: [], store, notify: NOBODY,
         rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000), eventBudget: new RateLimit(4, 86_400_000),
-        publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now,
+        publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now, recordings: recordingsApi(db, join(scratch, 'budget', 'recordings')),
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
     const port = (server.address() as AddressInfo).port;
@@ -640,7 +676,7 @@ async function checkPublish(scratch: string): Promise<void> {
         checkDataSet: checkLocalDataSet, dataSets, moderators: parseModerators(MODERATORS.join()), store: new StatsStore(db),
         notify: (event) => told.push(`${event.name}: ${event.activity} by ${event.by}`),
         rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000), eventBudget: new RateLimit(EVENTS_A_DAY, 86_400_000),
-        publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now,
+        publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now, recordings: recordingsApi(db, join(root, 'recordings')),
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
     const port = (server.address() as AddressInfo).port;
@@ -937,7 +973,7 @@ async function checkModeration(scratch: string): Promise<void> {
     const server = createAppServer(options, {
         checkDataSet: checkLocalDataSet, dataSets, moderators: parseModerators(MODERATORS.join()), notify: NOBODY, store: new StatsStore(db),
         rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000), eventBudget: new RateLimit(EVENTS_A_DAY, 86_400_000),
-        publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now,
+        publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now, recordings: recordingsApi(db, join(root, 'recordings')),
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
     const port = (server.address() as AddressInfo).port;
@@ -1054,7 +1090,7 @@ async function checkDocuments(scratch: string): Promise<void> {
         checkDataSet: checkLocalDataSet, dataSets, moderators: parseModerators(MODERATORS.join()), store: new StatsStore(db),
         notify: (event) => told.push(notificationText({ ...event, at: 0 }).split('\n')[0]!),
         rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000), eventBudget: new RateLimit(EVENTS_A_DAY, 86_400_000),
-        publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now,
+        publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now, recordings: recordingsApi(db, join(root, 'recordings')),
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
     const port = (server.address() as AddressInfo).port;
@@ -1163,6 +1199,153 @@ async function checkDocuments(scratch: string): Promise<void> {
     }
 }
 
+/**
+ * `api/recordings` and `recordings/` (`server/recordings.ts`), on a server of its own: `a` a
+ * set the site publishes, `p` one pending.
+ */
+async function checkRecordings(scratch: string): Promise<void> {
+    console.log('\nShared recordings:');
+    const root = join(scratch, 'recordings-server');
+    const options = scratchFiles(root);
+    mkdirSync(join(options.gamefilesDir, 'set-p'));
+    const db = new DatabaseSync(':memory:');
+    const dataSets = filledFrom(JSON.stringify({ default: 'a', dataSets: [{ id: 'a', name: 'A', dir: 'set-a' }, { id: 'p', name: 'P', dir: 'set-p', status: 'pending' }] }), new DataSetStore(db));
+    const told: string[] = [];
+    const won = await packageOf('a', 'My win');
+    // Room for three of these, so the fourth is refused.
+    const recordings = recordingsApi(db, join(root, 'recordings'), won.length * 3 + 100);
+    const dir = recordings.dir;
+    const server = createAppServer(options, {
+        checkDataSet: checkLocalDataSet, dataSets, moderators: parseModerators(`${MODERATORS[0]}=Alice`), store: new StatsStore(db),
+        notify: (event) => told.push(notificationText(event).split('\n')[0]!), rules: { hasSet: (id) => dataSets.hasSet(id) },
+        rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000), eventBudget: new RateLimit(EVENTS_A_DAY, 86_400_000),
+        publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now, recordings,
+    });
+    await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+    const port = (server.address() as AddressInfo).port;
+    try {
+        let address = 0;
+        /** `form` posted from an address of its own, as `player`, the page's `fetch` would send it. */
+        const post = async (form: FormData, player: string | null = PLAYER, ip = `10.4.0.${++address}`) => {
+            const headers: Record<string, string> = { 'X-Real-IP': ip };
+            if (player !== null) headers[PLAYER_ID_HEADER] = player;
+            const response = await fetch(`http://127.0.0.1:${port}/${RECORDINGS_ROUTE}`, { method: 'POST', headers, body: form });
+            const body = await response.text();
+            return { status: response.status, body, json: JSON.parse(body) as { id?: string; error?: string } };
+        };
+        const share = (bytes: Uint8Array<ArrayBuffer>, player: string | null = PLAYER) => {
+            const form = new FormData();
+            form.append(PACKAGE_FIELD, fileOf(bytes, 'recording.gz', 'application/gzip'));
+            return post(form, player);
+        };
+        type Listed = { id: string; title: string; status?: string; hidden?: boolean; broken?: boolean; mine?: boolean; extras?: boolean };
+        const listed = async (player: string | null, set = 'a') => (JSON.parse((await ask(port, `/${RECORDINGS_ROUTE}?dataSet=${set}`, 'GET',
+            player === null ? {} : { [PLAYER_ID_HEADER]: player })).body) as { recordings: Listed[] }).recordings;
+        const seen = async (player: string | null) => (await listed(player))
+            .map((one) => `${one.title}${one.status ? ` ${one.status}` : ''}${one.hidden ? ' hidden' : ''}${one.broken ? ' broken' : ''}${one.extras ? ' extras' : ''}${one.mine ? ' mine' : ''}`).join();
+        /** The folder and the table: compared before and after a refusal. */
+        const kept = () => `${readdirSync(dir).sort().join()} | ${recordings.store.of('a').map((one) => `${one.id}:${one.pending}${one.hidden}${one.broken}`).join()}`;
+
+        const shared = await share(won);
+        console.log(`  shared: ${shared.status} ${shared.body.replace(/[0-9A-F]{16}/, '<id>')}`);
+        const id = shared.json.id ?? '';
+        check(shared.status === 201 && SHARED_RECORDING_ID.test(id) && !shared.body.includes(PLAYER), 'a package is shared: 201, an id of sixteen hexadecimal digits, no playerId');
+        check(readdirSync(dir).join() === `${id}.gz` && readFileSync(join(dir, `${id}.gz`)).equals(won), 'its file is kept whole as <id>.gz, and no .partial is left');
+        const row = db.prepare('SELECT * FROM recordings WHERE id = ?').get(id) as Record<string, unknown>;
+        console.log(`  its row: ${JSON.stringify({ ...row, id: '<id>', uploader: row.uploader === PLAYER ? '<the player>' : row.uploader, uploaded_at: '<now>' })}`);
+        check(row.status === 'pending' && row.uploader === PLAYER && row.data_set === 'a' && row.title === 'My win' && row.author === 'A Player'
+            && row.play_time === 500 && row.extras === 0 && row.size === won.length && row.start === '{"kind":"new"}', 'its row is pending, its uploader the sender, its metadata the package\'s');
+        check(await seen(PLAYER) === 'My win pending mine' && await seen(MODERATORS[0]) === 'My win pending', 'it is listed, pending, to its uploader, said to be theirs, and to the moderators');
+        check(await seen(null) === '' && await seen(OTHER) === '', 'and to nobody else');
+        const list = await ask(port, `/${RECORDINGS_ROUTE}?dataSet=a`, 'GET', { [PLAYER_ID_HEADER]: PLAYER });
+        check(list.headers['cache-control'] === 'no-store' && list.headers.vary === PLAYER_ID_HEADER && !list.body.includes(PLAYER), 'the list is not cached, varies by player, and names no playerId');
+        check((await listed(PLAYER, 'p')).length === 0, 'another set\'s list does not hold it');
+        check((await ask(port, `/${RECORDINGS_ROUTE}`)).status === 400, 'a list without a set is 400');
+
+        const file = await ask(port, `/${RECORDING_FILES}/${id}.gz`);
+        check(file.status === 200 && file.headers['content-type'] === 'application/gzip' && String(file.headers['cache-control']).includes('immutable'),
+            `its package is served as recordings/<id>.gz, application/gzip, immutable (${file.headers['content-type']}, ${file.headers['cache-control']})`);
+        const served = new Uint8Array(await (await fetch(`http://127.0.0.1:${port}/${RECORDING_FILES}/${id}.gz`)).arrayBuffer());
+        check((await readRecordingPackage(served)).info.title === 'My win', 'the file served reads back as the package shared');
+        check((await ask(port, `/${RECORDING_FILES}/${id}`)).status === 404 && (await ask(port, `/${RECORDING_FILES}/x.gz`)).status === 404
+            && (await ask(port, `/${RECORDING_FILES}/`)).status === 404, 'a name that is no package\'s, and the folder, are 404');
+
+        // Every refusal, answered with nothing written.
+        const before = kept();
+        const refusals: [string, Promise<{ status: number; body: string }>, number][] = [];
+        const twoFields = new FormData();
+        twoFields.append(PACKAGE_FIELD, fileOf(won, 'a.gz'));
+        twoFields.append('title', 'x');
+        const textOnly = new FormData();
+        textOnly.append(PACKAGE_FIELD, 'not a file');
+        refusals.push(['no player', share(won, null), 400]);
+        refusals.push(['a field beside the package', post(twoFields), 400]);
+        refusals.push(['a package that is text', post(textOnly), 400]);
+        refusals.push(['not a form', ask(port, `/${RECORDINGS_ROUTE}`, 'POST', { [PLAYER_ID_HEADER]: PLAYER, 'Content-Type': 'application/json', 'X-Real-IP': '10.4.1.1' }, '{}'), 400]);
+        refusals.push(['a package too large', share(new Uint8Array(MAX_RECORDING_BYTES + 1)), 413]);
+        // Sent without its body, on a connection of its own, which the next request would otherwise be read as.
+        refusals.push(['a request too large', ask(port, `/${RECORDINGS_ROUTE}`, 'POST', { [PLAYER_ID_HEADER]: PLAYER, 'Content-Type': 'multipart/form-data; boundary=x',
+            'Content-Length': String(MAX_SHARE_BYTES + 1), 'X-Real-IP': '10.4.1.2', Connection: 'close' }), 413]);
+        refusals.push(['not a package', share(new Uint8Array([1, 2, 3])), 422]);
+        refusals.push(['a pending set\'s', share(await packageOf('p', 'Pending')), 422]);
+        refusals.push(['a set the site does not have', share(await packageOf('nowhere', 'Nowhere')), 422]);
+        refusals.push(['a ?dev move', share(await packageOf('a', 'Cheat', { dev: true })), 422]);
+        for (const [what, answer, status] of refusals) {
+            const { status: got, body } = await answer;
+            console.log(`  ${what}: ${got} ${body}`);
+            check(got === status, `${what} is refused, ${status}`);
+        }
+        check(kept() === before, 'and nothing was written');
+
+        const extras = await share(await packageOf('a', 'With extras', { extras: true }));
+        check(extras.status === 201 && await seen(PLAYER) === 'With extras pending extras mine,My win pending mine', 'one played with an extra on is listed so, the latest shared first');
+        check((await share(won)).status === 201, 'a third fills the disk the packages may take');
+        const full = await share(won);
+        console.log(`  the disk full: ${full.status} ${full.body}`);
+        check(full.status === 507 && readdirSync(dir).length === 3, 'a fourth would pass it: 507, nothing written');
+
+        const moderate = (target: string, body: string, player: string | null) =>
+            ask(port, `/${RECORDINGS_ROUTE}/${target}`, 'POST', { 'Content-Type': 'application/json', ...(player === null ? {} : { [PLAYER_ID_HEADER]: player }) }, body);
+        const action = (name: string) => JSON.stringify({ action: name });
+        const answered = async (target: string, name: string, player: string | null) => (await moderate(target, action(name), player)).status;
+        check(await answered(id, 'approve', OTHER) === 403 && await answered(id, 'approve', PLAYER) === 403 && await answered(id, 'approve', null) === 403,
+            'nobody but a moderator approves, its uploader neither');
+        check(await answered(id, 'approve', MODERATORS[0]) === 200 && (await seen(null)).endsWith('My win'), 'a moderator approves it, and everyone has it listed');
+        check(await answered(id, 'approve', MODERATORS[0]) === 409, 'approving it again is 409');
+        check(await answered(id, 'show', MODERATORS[0]) === 409, 'showing one not hidden is 409');
+        check(await answered(id, 'hide', MODERATORS[0]) === 200 && !(await seen(null)).includes('My win') && (await seen(PLAYER)).endsWith('My win hidden mine'),
+            'hidden, it is listed to its uploader and the moderators only');
+        check(await answered(id, 'hide', MODERATORS[0]) === 409 && await answered(id, 'show', MODERATORS[0]) === 200 && (await seen(null)).endsWith('My win'), 'shown, everyone has it again');
+        check(await answered(id, 'break', MODERATORS[0]) === 200 && !(await seen(null)).includes('My win') && (await seen(MODERATORS[0])).endsWith('My win broken'),
+            'broken, it is listed to its uploader and the moderators only');
+        check(await answered(id, 'break', MODERATORS[0]) === 409, 'breaking it again is 409');
+        const bad = await Promise.all([moderate(id, '{"action":"approve","x":1}', MODERATORS[0]), moderate(id, 'approve', MODERATORS[0])]);
+        check(bad.every((answer) => answer.status === 400), 'a body that is not one action is 400');
+        check((await moderate(id, ' '.repeat(MAX_RECORDING_MODERATION_BYTES + 1), MODERATORS[0])).status === 413, 'a body too large is 413');
+        check(await answered('0123456789ABCDEF', 'approve', MODERATORS[0]) === 404 && await answered('nothing', 'approve', MODERATORS[0]) === 404, 'an id the site has not is 404');
+        check((await ask(port, `/${RECORDINGS_ROUTE}/${id}`)).status === 405, 'a GET of one is 405');
+
+        check(await answered(id, 'delete', OTHER) === 403, 'nobody else withdraws it');
+        const withdrawn = await moderate(id, action('delete'), PLAYER);
+        check(withdrawn.status === 200 && !existsSync(join(dir, `${id}.gz`)) && recordings.store.get(id) === null, 'its uploader withdraws it, broken or not: its row and its file gone');
+        check((await ask(port, `/${RECORDING_FILES}/${id}.gz`)).status === 404, 'and it is no longer served');
+        const other = recordings.store.of('a').find((one) => one.title === 'With extras')!;
+        check(await answered(other.id, 'delete', MODERATORS[0]) === 200 && !existsSync(join(dir, `${other.id}.gz`)), 'a moderator deletes one, pending');
+        console.log(`  told: ${told.join(' | ')}`);
+        check(told.join('|') === ['Dataset A: recording added (My win)', 'Dataset A: recording added (With extras)', 'Dataset A: recording added (My win)',
+            'Dataset A: recording approved (My win)', 'Dataset A: recording hidden (My win)', 'Dataset A: recording shown (My win)',
+            'Dataset A: recording broken (My win)', 'Dataset A: recording withdrawn (My win)', 'Dataset A: recording deleted (With extras)'].join('|'),
+            'each change is notified, under its set\'s name, the recording named by its title');
+
+        let limited = 0;
+        for (let i = 0; i <= SHARES_PER_WINDOW; i++) limited = (await post(new FormData(), PLAYER, '10.4.9.9')).status;
+        check(limited === 429, 'shares past the rate per address are 429');
+    } finally {
+        server.close();
+        db.close();
+    }
+}
+
 /** A table made before the publish's columns gains them, its rows kept, read as before. */
 function checkAddedColumns(): void {
     const db = new DatabaseSync(':memory:');
@@ -1236,6 +1419,9 @@ function finish(child: ChildProcess, onLine: (line: string) => void = () => {}):
     }));
 }
 
+/** The recording `checkEntry` shares beside the server. */
+const SHARED_ID = '0123456789ABCDEF';
+
 /** What `checkEntry` learnt of the first `backup.ts` run beside the server. */
 interface Backup {
     code: number | null;
@@ -1261,7 +1447,7 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
     writeFileSync(join(noCheck, 'index.html'), '<!doctype html><title>page</title>');
     const unbuilt = await finish(startEntry(app, { PORT: '0', DIST_DIR: noCheck, GAMEFILES_DIR: options.gamefilesDir, STATS_DB: join(scratch, 'unbuilt', 'stats.db') }));
     console.log(`  no check built: exit ${unbuilt.code}, ${firstLine(unbuilt.out).split(scratch).join('<scratch>').replace(/ \(.*\)/, ' (…)')}`);
-    check(unbuilt.code === 1 && unbuilt.out.includes(`${CHECK_MODULE} does not load`), 'a page\'s check that is not built exits 1 before it listens');
+    check(unbuilt.code === 1 && unbuilt.out.includes(`${READERS_MODULE} does not load`), 'a page\'s check that is not built exits 1 before it listens');
     const badModerator = await finish(startEntry(app, { PORT: '0', DIST_DIR: options.distDir, GAMEFILES_DIR: options.gamefilesDir, STATS_DB: join(scratch, 'moderator', 'stats.db'), MODERATOR_PLAYER_IDS: `${MODERATORS[0]},the-moderator` }));
     console.log(`  bad moderator: exit ${badModerator.code}, ${firstLine(badModerator.out)}`);
     check(badModerator.code === 1 && badModerator.out.includes('MODERATOR_PLAYER_IDS holds an entry that is not a playerId') && !existsSync(join(scratch, 'moderator')),
@@ -1326,6 +1512,10 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
             writeFileSync(join(options.gamefilesDir, 'set-b', 'sub', 'dungeon.dat'), Buffer.from([5, 6, 7]));
             const store = openStore(statsDb);
             store.prepare("INSERT INTO data_sets (id, name, dir, position, status, owner) VALUES ('b', 'B', 'set-b', 1, 'pending', ?)").run(PLAYER);
+            // And a recording shared, its package in the folder the server made beside the store.
+            writeFileSync(join(scratch, 'stats', 'recordings', `${SHARED_ID}.gz`), Buffer.from([8, 9]));
+            store.prepare('INSERT INTO recordings (id, data_set, build, title, author, description, recorded_at, ended_at, play_time, start, extras, size, uploader, uploaded_at, status) '
+                + "VALUES (?, 'a', 'test', 'T', '', '', 0, 0, 0, '{\"kind\":\"new\"}', 0, 2, ?, 0, 'pending')").run(SHARED_ID, PLAYER);
             store.close();
             const run = await finish(startEntry(app, { STATS_DB: statsDb, GAMEFILES_DIR: options.gamefilesDir }, 'backup.ts'));
             const target = /"target":"([^"]+)"/.exec(run.out)?.[1];
@@ -1363,9 +1553,13 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
         'the folder of the set with an owner is copied whole into backups/gamefiles/');
     check(readFileSync(join(folders, 'set-a', 'dungeon.dat')).equals(Buffer.from([1, 2, 3, 4])) && !existsSync(join(folders, 'set-b.partial')),
         'the site\'s too, since an edit writes it a new one, and no .partial is left');
+    const recordingCopy = join(scratch, 'stats', 'backups', 'recordings', `${SHARED_ID}.gz`);
+    check((backup?.out ?? '').includes('"recordingsCopied":1,"recordingsKept":0') && existsSync(recordingCopy) && readFileSync(recordingCopy).equals(Buffer.from([8, 9])),
+        'a shared recording\'s package is copied into backups/recordings/, from the folder the server made beside the store');
     const second = again as { code: number | null; out: string } | null;
     console.log(`  backup.ts again: ${shown(second)}`);
-    check(second?.code === 0 && second.out.includes('"copied":[],"kept":2'), 'the next backup keeps those copies rather than copying them again');
+    check(second?.code === 0 && second.out.includes('"copied":[],"kept":2') && second.out.includes('"recordingsCopied":0,"recordingsKept":1'),
+        'the next backup keeps those copies rather than copying them again');
     const noStore = await finish(startEntry(app, { STATS_DB: join(scratch, 'nowhere', 'stats.db') }, 'backup.ts'));
     check(noStore.code === 1 && noStore.out.includes('backup_failed'), 'backup.ts on a store that is not there exits 1');
     const missing = noFolder as { code: number | null; out: string } | null;
@@ -1410,6 +1604,7 @@ async function main(): Promise<void> {
             eventBudget: new RateLimit(EVENTS_A_DAY, 86_400_000),
             publishRateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000),
             now: Date.now,
+            recordings: recordingsApi(db, join(scratch, 'recordings')),
         };
         server = createAppServer(options, api);
         await new Promise<void>((done) => server!.listen(0, '127.0.0.1', done));
@@ -1421,6 +1616,7 @@ async function main(): Promise<void> {
         await checkPublish(scratch);
         await checkModeration(scratch);
         await checkDocuments(scratch);
+        await checkRecordings(scratch);
         checkAddedColumns();
 
         await checkEntry(scratch, options);

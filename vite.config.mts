@@ -271,11 +271,12 @@ function webAppManifest(): Plugin {
 }
 
 /**
- * The server's build of the page's check of a player's own set (`checkLocalDataSet`): `vite
- * build --ssr`, after the page's, one self-contained module that the server, which has no
- * `node_modules`, loads from `dist/server/` (`server/app.ts`, `CHECK_MODULE`).
+ * The server's build of the page's readers (`src/engine/PageReaders.ts`): the check of a
+ * player's own set and the reader of a shared recording's package. `vite build --ssr`, after
+ * the page's, one self-contained module that the server, which has no `node_modules`,
+ * loads from `dist/server/` (`server/app.ts`, `READERS_MODULE`).
  */
-const SERVER_ENTRY = resolve(import.meta.dirname, 'src', 'engine', 'LocalDataSetCheck.ts');
+const SERVER_ENTRY = resolve(import.meta.dirname, 'src', 'engine', 'PageReaders.ts');
 
 export default defineConfig(({ command, isSsrBuild }) => ({
   // The server's module is no page, and has no manifest.

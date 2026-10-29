@@ -1,12 +1,13 @@
 /**
- * A snapshot of the store (`store.ts`), the statistics and the data sets' tables, taken
- * while the server keeps serving, and a copy of the folders players' sets were uploaded to
- * (`doc/DEPLOYMENT.md` → "Backups"). The server's cron runs it in the container:
+ * A snapshot of the store (`store.ts`), the statistics', the data sets' and the recordings'
+ * tables, taken while the server keeps serving, and a copy of the folders players' sets
+ * were uploaded to and of the recordings' packages (`doc/DEPLOYMENT.md` → "Backups"). The server's cron runs it in the container:
  *
  *   docker-compose exec -T csbweb node --disable-warning=ExperimentalWarning server/backup.ts
  *
  *   STATS_DB        the store (the checkout's `stats/stats.db`), as `server.ts` reads it
  *   GAMEFILES_DIR   the data sets (the checkout's `tools/fixtures/gamefiles/`), as `server.ts` reads it
+ *   RECORDINGS_DIR  the recordings' packages (`recordings/` beside the store), as `server.ts` reads it
  *   BACKUP_DIR      where the snapshot goes (`backups/` beside the store), made when missing
  *
  * A `cp` of the live file is unsafe: its WAL holds committed events the file does not yet,
@@ -18,9 +19,11 @@
  * it, and never changes after, so each is copied once, into `gamefiles/<dir>/` under
  * `BACKUP_DIR`, through a `.partial` name renamed when whole, and kept: an older snapshot
  * needs the folders of its rows, a deleted set's and an edited set's old one included.
+ * A recording's package, `<id>.gz`, is never changed either, and is copied once in the same
+ * way, into `recordings/` under `BACKUP_DIR`.
  *
- * It prints one JSON line, and exits with 1 when the store cannot be read or a folder
- * cannot be copied.
+ * It prints one JSON line, and exits with 1 when the store cannot be read or a folder or a
+ * package cannot be copied.
  */
 import { cpSync, existsSync, mkdirSync, renameSync, rmSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -29,6 +32,7 @@ import { backup, DatabaseSync } from 'node:sqlite';
 const ROOT = join(import.meta.dirname, '..');
 const statsDb = process.env.STATS_DB ?? join(ROOT, 'stats', 'stats.db');
 const gamefilesDir = process.env.GAMEFILES_DIR ?? join(ROOT, 'tools', 'fixtures', 'gamefiles');
+const recordingsDir = process.env.RECORDINGS_DIR ?? join(dirname(statsDb), 'recordings');
 const dir = process.env.BACKUP_DIR ?? join(dirname(statsDb), 'backups');
 
 const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -52,8 +56,12 @@ try {
     }
     const snapshot = new DatabaseSync(target, { readOnly: true });
     let uploaded: string[];
+    let packages: string[];
     try {
         uploaded = (snapshot.prepare('SELECT dir FROM data_sets ORDER BY position').all() as { dir: string }[]).map((row) => row.dir);
+        // A store the server has not opened since it kept recordings has no such table.
+        const recordings = snapshot.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'recordings'").get() !== undefined;
+        packages = recordings ? (snapshot.prepare('SELECT id FROM recordings ORDER BY uploaded_at').all() as { id: string }[]).map((row) => `${row.id}.gz`) : [];
     } finally {
         snapshot.close();
     }
@@ -71,7 +79,21 @@ try {
         renameSync(partial, copy);
         copied.push(set);
     }
-    console.log(JSON.stringify({ msg: 'backup_ok', target, bytes: statSync(target).size, folders, copied, kept: uploaded.length - copied.length }));
+    const recordingsCopy = join(dir, 'recordings');
+    mkdirSync(recordingsCopy, { recursive: true });
+    let recordingsCopied = 0;
+    for (const file of packages) {
+        const copy = inside(recordingsCopy, file);
+        if (existsSync(copy)) continue;
+        const partial = join(recordingsCopy, `.${file}.partial`);
+        cpSync(inside(recordingsDir, file), partial);
+        renameSync(partial, copy);
+        recordingsCopied++;
+    }
+    console.log(JSON.stringify({
+        msg: 'backup_ok', target, bytes: statSync(target).size, folders, copied, kept: uploaded.length - copied.length,
+        recordings: recordingsCopy, recordingsCopied, recordingsKept: packages.length - recordingsCopied,
+    }));
 } catch (error) {
     console.error(JSON.stringify({ msg: 'backup_failed', error: error instanceof Error ? error.message : String(error) }));
     process.exit(1);

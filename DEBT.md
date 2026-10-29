@@ -102,7 +102,7 @@ by default, so with them off the game is CSBWin's and the golden frames do not m
    byte-identical before and after (only `checks/save-menu`, by one byte, and
    `checks/savegame`, by its payload's size, vary on their own: both carry the save's
    wall-clock date; `checks/new-game` and `checks/game-events`, by the random game ids
-   they print; and `checks/monster-design-options`, whose unseeded games draw their seed
+   they print; `checks/server`, by the ids the server draws for the recordings shared; and `checks/monster-design-options`, whose unseeded games draw their seed
    from `Math.random`, so it compares only with `Math.random` pinned, through
    `npx tsx --import`), and the author's runtime saves hash the same after load and
    after 600 ticks. A refactor that uncovers a divergence records it in tier C. If it is
@@ -125,7 +125,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G31 | Recordings shared: the set's dialog, a package, the server | L | ⏳ step 3 of 5 |
+| G31 | Recordings shared: the set's dialog, a package, the server | L | ⏳ step 4 of 6 |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
 | C194 | A DSA's wall graphic counts as a real decoration, so it hides no text | S | ⏳ |
 | C195 | Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space | S | ⏳ to decide with the author |
@@ -296,8 +296,8 @@ local, red pending, purple hidden (the one colour of the page outside the UI pal
 white otherwise. Its `gamefiles/` is mounted read-write, and `server/backup.ts` copies the folders
 of the sets beside the store's snapshots. It reads a set with the page's own
 check: `npm run build` bundles `checkLocalDataSet` and its readers for Node into
-`dist/server/LocalDataSetCheck.js` (`vite.config.mts`, `doc/DEPLOYMENT.md` → "The build"),
-which `server.ts` loads at start-up and hands the API (`CheckDataSet`, `loadCheckDataSet`,
+`dist/server/PageReaders.js` (`vite.config.mts`, `doc/DEPLOYMENT.md` → "The build"),
+which `server.ts` loads at start-up and hands the API (`CheckDataSet`, `loadPageReaders`,
 `server/app.ts`), a tool the source's function instead, and the publish route reads a set
 with it (`server/publish.ts`).
 `tools/checks/build.ts` proves the bundle says what the source says, `tools/checks/server.ts`
@@ -727,28 +727,40 @@ player by: the sets they own, and a moderator's rights (`X-Player-Id`, `server/a
 by the name the player gives, or by nobody, and the server keeps its uploader's
 `playerId` apart, as a set's `owner` is kept, for a withdrawal.
 
-Paying it, in steps; the design is decided, and step 3 is next.
+Paying it, in steps; the design is decided, and step 4 is next.
 
 1. A game's end is a point to share: the game tells it at the boundary as `ShowCredits`
    follows `MainLoop`'s return (`InputBoundary.ended`), the recording ends in that VBL
    with `d.Word11694` (`Recording.end`, `RecordingEntry.end`), the prune keeps it whole,
    and the player drifts at a game that ends elsewhere (`tools/checks/replay.ts`, point
    9). Nothing lists or deletes one yet: the store keeps every end until its data set is
-   deleted, which step 5 owes.
+   deleted, which step 6 owes.
 2. The package (`src/engine/RecordingPackage.ts`, `doc/RECORDING.md` → "Shared
    recordings"): written from a save's point and from an end, read back with its form
    checked, and played from it alone to its point, a save's file checked there
    (`SavedAtEnd`), in `tools/checks/replay.ts`, point 10. An hour of a new game at a
    player's pace, seven recordings, is a 340 KB package, 930 KB unzipped: each save's
    file in it about 42 KB, each change about 11 bytes (`replay.ts --measure`).
-3. The server: storing, listing, serving, moderating and withdrawing them, with its checks
-   in `tools/checks/server.ts`; and the `utils/` tool that replays the listed ones against
-   a build and marks the broken. It reads a package with `readRecordingPackage`, whose
-   imports name no extension and whose values reach into the engine (`GameContext`'s
-   `NO_EXTRAS`, `LoopState`'s flags, `CsbwinSaveInfo`'s save reader); the server's Node
-   resolution refuses them (TS2835), so this step settles how it reads one.
-4. The page's player: `?recording=` from the server, and the viewer's strip and keys.
-5. The dialog: its two tabs, the site's and the browser's recordings of the set, the
+3. The server (`server/recordings.ts`, `doc/DEPLOYMENT.md` → "Shared recordings"): a
+   package shared as a form of the one file, read with the page's own
+   `readRecordingPackage`, bundled for Node beside the set's check
+   (`src/engine/PageReaders.ts`, `READERS_MODULE`) and typed by its shape
+   (`ReadRecordingPackage`), as the check is; kept as `RECORDINGS_DIR/<id>.gz` under a
+   drawn id (`SHARED_RECORDING_ID`, which the page tells from its own ids' form) and a row
+   of the `recordings` table, pending; listed by set, served `immutable`, moderated
+   (approve, hide, show, break, delete) and withdrawn by its uploader, each change
+   notified; the metadata are the package's own, so the form carries nothing else; its
+   limits, 8 MiB a package, 32 MiB unzipped, five shares an hour per address and 1 GiB for
+   them all; and the packages copied by `backup.ts`. `tools/checks/server.ts` asserts it,
+   and `tools/checks/build.ts` the built reader against the source's. The dev server does
+   not answer the routes yet, which step 5 owes.
+4. The `utils/` tool that replays every listed recording of the site's against a build, as
+   a moderator, and marks those that drift as broken (`POST api/recordings/<id>`,
+   `{"action": "break"}`), run before a deploy.
+5. The page's player: `?recording=` from the server, and the viewer's strip and keys; and
+   the dev server's `api/recordings` and `recordings/`, as the deployed server answers them,
+   for the probes.
+6. The dialog: its two tabs, the site's and the browser's recordings of the set, the
    selection and its metadata, PLAY and UPLOAD, and DELETE for a browser's game's end,
    the only way one leaves the store but its set's own deletion, checked in
    `tools/probe-frames.ts`'s welcome page block. An end's UPLOAD needs the game's play

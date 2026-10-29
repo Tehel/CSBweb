@@ -2,12 +2,15 @@
  * The deployed game's server (`doc/DEPLOYMENT.md`, `doc/STATISTICS.md`): `node server/server.ts`,
  * on Node 24, which strips the types. No dependency: `node:http` serves the page, the game
  * files and the API (`app.ts`), and `node:sqlite` keeps the store (`store.ts`): the
- * statistics (`stats.ts`) and the data sets (`dataSets.ts`).
+ * statistics (`stats.ts`), the data sets (`dataSets.ts`) and the shared recordings
+ * (`recordings.ts`).
  *
  *   PORT            the port to listen on (8085; 0 picks a free one)
- *   DIST_DIR        the built page (the checkout's `dist/`), and the page's check built for
- *                   Node, `server/LocalDataSetCheck.js` under it (`npm run build`)
+ *   DIST_DIR        the built page (the checkout's `dist/`), and the page's readers built for
+ *                   Node, `server/PageReaders.js` under it (`npm run build`)
  *   GAMEFILES_DIR   the data sets (the checkout's `tools/fixtures/gamefiles/`)
+ *   RECORDINGS_DIR  the shared recordings' packages (`recordings/` beside the store), made
+ *                   when missing
  *   FILES_DIR       the files shared by link, under `files/` (the checkout's `files/`, which
  *                   git ignores): a folder that is not there is not checked, and serves nothing
  *   STATS_DB        the store's SQLite file (the checkout's `stats/stats.db`), created
@@ -23,8 +26,9 @@
  *   NTFY_USER, NTFY_PASS  its Basic authentication, where NTFY_USER is set
  *   TZ              the time zone a notification is dated in (the container's is UTC)
  *
- * It opens the store, checks the files and loads the page's check of a player's set and
- * its reader of a dungeon's walls (`loadPageReaders`) before it listens, and reads the
+ * It opens the store, checks the files and loads the page's check of a player's set, its
+ * reader of a dungeon's walls and its reader of a recording's package (`loadPageReaders`)
+ * before it listens, and reads the
  * walls of a published set whose row keeps none (`fillWalls`), logging a `dungeon.dat`
  * that does not read. It exits with 1 on an entry of
  * `MODERATOR_PLAYER_IDS` that is not a `playerId` or has an empty alias, an `NTFY_URL` that is not an http(s) URL, a store it cannot open, a game files'
@@ -40,6 +44,7 @@ import { checkFiles, createAppServer, fillWalls, loadPageReaders, type PageReade
 import { DataSetStore, parseModerators, type Moderator } from './dataSets.ts';
 import { RateLimit } from './events.ts';
 import { NOBODY, ntfyNotifier, type Notify } from './notify.ts';
+import { RecordingStore } from './recordings.ts';
 import { StatsStore } from './stats.ts';
 import { openStore } from './store.ts';
 
@@ -55,6 +60,12 @@ const EVENTS_PER_DAY = 10_000;
 /** Publishes per address and hour, refused ones included: a player publishes a set now and then. */
 const PUBLISHES_PER_HOUR = 5;
 
+/** Recordings shared per address and hour, refused ones included, as publishes are. */
+const SHARES_PER_HOUR = 5;
+
+/** The most the shared recordings' packages may take on the disk: some three thousand hours of play (`recordings.ts`). */
+const RECORDINGS_DISK_BYTES = 1024 * 1024 * 1024;
+
 /** How long a shutdown waits for the requests in flight before it closes their sockets. */
 const SHUTDOWN_GRACE_MS = 5000;
 
@@ -67,10 +78,12 @@ const options: ServerOptions = {
 const port = Number(process.env.PORT ?? 8085);
 const statsDb = process.env.STATS_DB ?? join(ROOT, 'stats', 'stats.db');
 const ntfyUrl = process.env.NTFY_URL ?? '';
+const recordingsDir = process.env.RECORDINGS_DIR ?? join(dirname(statsDb), 'recordings');
 
 let db: DatabaseSync;
 let dataSets: DataSetStore;
 let store: StatsStore;
+let recordings: RecordingStore;
 let ids: string[];
 let readers: PageReaders;
 let moderators: Moderator[];
@@ -83,6 +96,8 @@ try {
     db = openStore(statsDb);
     dataSets = new DataSetStore(db);
     store = new StatsStore(db);
+    recordings = new RecordingStore(db, RECORDINGS_DISK_BYTES);
+    mkdirSync(recordingsDir, { recursive: true });
     ids = checkFiles(options, dataSets);
     readers = await loadPageReaders(options.distDir);
 } catch (error) {
@@ -105,11 +120,12 @@ const server = createAppServer(options, {
     publishRateLimit: new RateLimit(PUBLISHES_PER_HOUR, 3_600_000),
     now: Date.now,
     notify,
+    recordings: { store: recordings, dir: recordingsDir, readPackage: readers.readRecordingPackage, shareRateLimit: new RateLimit(SHARES_PER_HOUR, 3_600_000) },
 });
 server.listen(port, () => {
     const address = server.address();
     const bound = typeof address === 'object' && address !== null ? address.port : port;
-    console.log(`Listening on port ${bound}: ${options.distDir}, and ${options.gamefilesDir} (${ids.join(', ') || 'no set'}, from the data_sets table); store in ${statsDb}; shared files in ${options.filesDir}`);
+    console.log(`Listening on port ${bound}: ${options.distDir}, and ${options.gamefilesDir} (${ids.join(', ') || 'no set'}, from the data_sets table); store in ${statsDb}; recordings in ${recordingsDir}; shared files in ${options.filesDir}`);
 });
 
 function shutDown(signal: string): void {

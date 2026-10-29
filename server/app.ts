@@ -10,8 +10,9 @@
  *   /stats            dist/stats.html, the statistics page, whatever the query  no-cache
  *   /manifest.webmanifest  the installed game's     no-cache
  *   /assets/…         dist/assets/…, hashed names   immutable
- *   /server/…         404: the server's own module (`CHECK_MODULE`), never served
+ *   /server/…         404: the server's own module (`READERS_MODULE`), never served
  *   /gamefiles/…      GAMEFILES_DIR/…               no-cache, with ETag and Last-Modified
+ *   /recordings/<id>.gz  RECORDINGS_DIR/…, a shared recording's package    immutable
  *   /files/…          FILES_DIR/…, the author's files shared by link, as the game files are,
  *                     under `FILES_POLICY`; 404 everywhere when there is no such folder
  *   /api/data-sets    the page's list of sets, from the store's table (`dataSets.ts`), for
@@ -24,6 +25,11 @@
  *                     form, or removed, with JSON (`documents.ts`)
  *   /api/data-set-walls  the walls of the sets `api/data-sets` offers the same player
  *                     that keep them, the published ones (`wallsText`)
+ *   /api/recordings?dataSet=<id>  the set's shared recordings, for the player its
+ *                     `X-Player-Id` names (`recordingsText`); POST: that player's package
+ *                     shared, pending (`shareRecording`, `recordings.ts`)
+ *   /api/recordings/<id>  POST: the recording approved, hidden, shown or broken by a
+ *                     moderator, or deleted by one or by its uploader (`moderateRecording`)
  *   /api/health       200, for the compose healthcheck
  *   /api/event        POST: a game's event, checked (`events.ts`) and stored (`stats.ts`)
  *   /api/stats        the public sets' statistics, as JSON (`StatsStore.summary`)  max-age 30 s
@@ -35,7 +41,7 @@
  * browser says another site's page sent is refused with 403 (`isCrossSite`).
  * Every file answers a conditional GET with 304. A path with a `.` segment, a backslash or
  * a NUL, encoded or not, is refused before it reaches the disk, so no request leaves the
- * three folders. A folder is 404, never a listing.
+ * four folders. A folder is 404, never a listing.
  */
 import { closeSync, createReadStream, fstatSync, openSync, statSync, type Stats } from 'node:fs';
 import { readFile } from 'node:fs/promises';
@@ -44,7 +50,7 @@ import { extname, join } from 'node:path';
 import { pipeline } from 'node:stream';
 import { pathToFileURL } from 'node:url';
 
-import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, PLAYER_ID_HEADER } from '../src/data/DataSets.ts';
+import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, PLAYER_ID_HEADER, RECORDING_FILES, RECORDINGS_ROUTE } from '../src/data/DataSets.ts';
 import type { StatsSet } from './answers.ts';
 import { manifestText, samePlayerId, wallsText, type DataSetStore, type DataSetViewer, type Moderator } from './dataSets.ts';
 import { addDocument, removeDocument } from './documents.ts';
@@ -53,6 +59,9 @@ import { addressBucket, checkEvent, isPlayerId, MAX_EVENT_BYTES, type EventRules
 import { MAX_MODERATION_BYTES, moderateDataSet, type ModerationAnswer } from './moderate.ts';
 import type { Notify } from './notify.ts';
 import { MAX_PUBLISH_BYTES, publishDataSet, type CheckDataSet, type PublishAnswer, type ReadDungeonWalls } from './publish.ts';
+import {
+    MAX_RECORDING_MODERATION_BYTES, MAX_SHARE_BYTES, moderateRecording, recordingsText, shareRecording, type ReadRecordingPackage, type RecordingAnswer, type RecordingStore,
+} from './recordings.ts';
 import { AnswerCache, LEVELS, STATS_CACHE_MS, type StatsStore } from './stats.ts';
 
 export interface ServerOptions {
@@ -67,19 +76,23 @@ export interface ServerOptions {
 /** The folder of `distDir` that holds the server's own module, not the page's: never served. */
 const SERVER_DIR = 'server';
 
-/** The page's check built for Node (`CheckDataSet`, `publish.ts`), under `distDir`. */
-export const CHECK_MODULE = `${SERVER_DIR}/LocalDataSetCheck.js`;
+/** The page's readers built for Node (`src/engine/PageReaders.ts`), under `distDir`. */
+export const READERS_MODULE = `${SERVER_DIR}/PageReaders.js`;
 
-/** What the server uses of `CHECK_MODULE`: the page's check of a set, and its reader of a dungeon's walls. */
+/**
+ * What the server uses of `READERS_MODULE`: the page's check of a set, its reader of a
+ * dungeon's walls, and its reader of a shared recording's package.
+ */
 export interface PageReaders {
     checkDataSet: CheckDataSet;
     readDungeonWalls: ReadDungeonWalls;
+    readRecordingPackage: ReadRecordingPackage;
 }
 
-/** What `CHECK_MODULE` exports, loaded from `distDir`; throws, saying why, where it is not built. */
+/** What `READERS_MODULE` exports, loaded from `distDir`; throws, saying why, where it is not built. */
 export async function loadPageReaders(distDir: string): Promise<PageReaders> {
-    const file = join(distDir, CHECK_MODULE);
-    let module: { checkLocalDataSet?: unknown; readDungeonWalls?: unknown };
+    const file = join(distDir, READERS_MODULE);
+    let module: { checkLocalDataSet?: unknown; readDungeonWalls?: unknown; readRecordingPackage?: unknown };
     try {
         module = await import(pathToFileURL(file).href);
     } catch (error) {
@@ -87,7 +100,11 @@ export async function loadPageReaders(distDir: string): Promise<PageReaders> {
     }
     if (typeof module.checkLocalDataSet !== 'function') throw new Error(`${file} exports no checkLocalDataSet`);
     if (typeof module.readDungeonWalls !== 'function') throw new Error(`${file} exports no readDungeonWalls`);
-    return { checkDataSet: module.checkLocalDataSet as CheckDataSet, readDungeonWalls: module.readDungeonWalls as ReadDungeonWalls };
+    if (typeof module.readRecordingPackage !== 'function') throw new Error(`${file} exports no readRecordingPackage`);
+    return {
+        checkDataSet: module.checkLocalDataSet as CheckDataSet, readDungeonWalls: module.readDungeonWalls as ReadDungeonWalls,
+        readRecordingPackage: module.readRecordingPackage as ReadRecordingPackage,
+    };
 }
 
 /**
@@ -127,8 +144,21 @@ export interface ApiOptions {
     publishRateLimit: RateLimit;
     /** The clock events are stored and notifications dated with. */
     now: () => number;
-    /** Who is told of each change to the sets (`notify.ts`). */
+    /** Who is told of each change to the sets and their recordings (`notify.ts`). */
     notify: Notify;
+    /** The shared recordings (`recordings.ts`). */
+    recordings: RecordingsApi;
+}
+
+/** What the API needs of the shared recordings. */
+export interface RecordingsApi {
+    store: RecordingStore;
+    /** `RECORDINGS_DIR`: the packages, `<id>.gz` each. */
+    dir: string;
+    /** The page's reader of a package (`ReadRecordingPackage`). */
+    readPackage: ReadRecordingPackage;
+    /** Recordings shared per address, refused ones included. */
+    shareRateLimit: RateLimit;
 }
 
 /** The URL prefix of the game files: the page's `GAMEFILES_DIR` (`src/main.ts`). */
@@ -279,6 +309,15 @@ function route({ distDir, gamefilesDir, filesDir }: ServerOptions, api: ApiOptio
             if (req.method !== 'POST') return refuseMethod(res, 'POST');
             return receiveDocument(segments[2]!, gamefilesDir, api, req, res);
         }
+        if (segments.join('/') === RECORDINGS_ROUTE) {
+            if (req.method === 'POST') return receiveShare(api, req, res);
+            if (req.method !== 'GET' && req.method !== 'HEAD') return refuseMethod(res, 'GET, HEAD, POST');
+            return answerRecordings(api, req, res);
+        }
+        if (segments.length === 3 && segments.slice(0, 2).join('/') === RECORDINGS_ROUTE) {
+            if (req.method !== 'POST') return refuseMethod(res, 'POST');
+            return receiveRecordingModeration(segments[2]!, api, req, res);
+        }
         const name = segments.length === 2 ? segments[1] : undefined;
         if (name === 'event') {
             if (req.method !== 'POST') return refuseMethod(res, 'POST');
@@ -297,6 +336,10 @@ function route({ distDir, gamefilesDir, filesDir }: ServerOptions, api: ApiOptio
     if (segments[0] === GAMEFILES) {
         return serveFile(req, res, join(gamefilesDir, ...segments.slice(1)), NO_CACHE);
     }
+    if (segments[0] === RECORDING_FILES) {
+        if (segments.length !== 2 || !RECORDING_FILE.test(segments[1]!)) return send(res, 404, 'Not found');
+        return serveFile(req, res, join(api.recordings.dir, segments[1]!), IMMUTABLE);
+    }
     if (segments[0] === FILES) {
         res.setHeader('Content-Security-Policy', FILES_POLICY);
         if (filesDir === undefined) return send(res, 404, 'Not found');
@@ -307,6 +350,9 @@ function route({ distDir, gamefilesDir, filesDir }: ServerOptions, api: ApiOptio
     if (segments[0] === SERVER_DIR) return send(res, 404, 'Not found');
     return serveFile(req, res, join(distDir, ...segments), segments[0] === 'assets' ? IMMUTABLE : NO_CACHE);
 }
+
+/** A shared recording's package, as `RECORDING_FILES/` serves it: never changed once written (`recordings.ts`). */
+const RECORDING_FILE = /^[0-9A-F]{16}\.gz$/;
 
 /** What `answerStats` needs of the API. */
 export type StatsApi = Pick<ApiOptions, 'dataSets' | 'store'>;
@@ -500,9 +546,9 @@ function isForm(req: IncomingMessage): boolean {
 /** Why a form was not read. */
 const FORM_REFUSALS = { large: `The request is larger than ${MAX_PUBLISH_BYTES / (1024 * 1024)} MiB.`, broken: 'The body is not a form.' };
 
-/** `req`'s form, a body of at most `MAX_PUBLISH_BYTES`, or why not. */
-async function readForm(req: IncomingMessage): Promise<FormData | keyof typeof FORM_REFUSALS> {
-    const body = await readBody(req, MAX_PUBLISH_BYTES);
+/** `req`'s form, a body of at most `limit` bytes, or why not. */
+async function readForm(req: IncomingMessage, limit = MAX_PUBLISH_BYTES): Promise<FormData | keyof typeof FORM_REFUSALS> {
+    const body = await readBody(req, limit);
     if (body === null) return 'large';
     const request = new Request('http://localhost/', { method: 'POST', headers: { 'Content-Type': req.headers['content-type']! }, body: new Uint8Array(body) });
     return await request.formData().catch(() => null) ?? 'broken';
@@ -573,6 +619,58 @@ export async function receiveModeration(id: string, gamefilesDir: string, api: M
     const body = await readBody(req, MAX_MODERATION_BYTES);
     const reply: ModerationAnswer = body === null ? { status: 413, body: { error: `The body is larger than ${MAX_MODERATION_BYTES} bytes.` } }
         : await moderateDataSet(id, body.toString('utf8'), dataSetViewer(api, req), { dataSets: api.dataSets, gamefilesDir, notify: api.notify, now: api.now });
+    res.setHeader('Cache-Control', 'no-store');
+    send(res, reply.status, JSON.stringify(reply.body), 'application/json; charset=utf-8');
+}
+
+/**
+ * `GET api/recordings?dataSet=<id>`: the set's recordings, as `recordingsText` gives them to
+ * the player the request names; 400 without a set.
+ */
+function answerRecordings(api: ApiOptions, req: IncomingMessage, res: ServerResponse): void {
+    const dataSet = new URL(req.url ?? '', 'http://localhost').searchParams.get('dataSet');
+    if (dataSet === null || dataSet === '') return send(res, 400, 'No dataSet');
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Vary', PLAYER_ID_HEADER);
+    send(res, 200, recordingsText(api.recordings.store.of(dataSet), dataSetViewer(api, req)), 'application/json; charset=utf-8');
+}
+
+/** The options `recordings.ts` decides with. */
+function recordingOptions(api: ApiOptions) {
+    const { store, dir, readPackage } = api.recordings;
+    return { recordings: store, dir, readPackage, dataSets: api.dataSets, notify: api.notify, now: api.now };
+}
+
+/**
+ * `POST api/recordings`: the rate limit first, then the player, a `multipart/form-data` body
+ * of at most `MAX_SHARE_BYTES`, and its form, before `shareRecording` decides. Every answer
+ * is JSON (`RecordingAnswer`).
+ */
+async function receiveShare(api: ApiOptions, req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const answer = (status: number, error: string): RecordingAnswer => ({ status, body: { error } });
+    let reply: RecordingAnswer | null = null;
+    if (!api.recordings.shareRateLimit.allow(clientAddress(req), api.now())) reply = answer(429, 'Too many recordings shared from here: try again in an hour.');
+    else if (!isPlayerId(req.headers[PLAYER_ID_HEADER.toLowerCase()])) reply = answer(400, `No player: ${PLAYER_ID_HEADER} is not a playerId.`);
+    else if (!isForm(req)) reply = answer(400, 'The body is not multipart/form-data.');
+    if (reply !== null) req.resume();
+    else {
+        const playerId = req.headers[PLAYER_ID_HEADER.toLowerCase()] as string;
+        const form = await readForm(req, MAX_SHARE_BYTES);
+        reply = typeof form === 'string' ? answer(form === 'large' ? 413 : 400, form === 'large' ? `The request is larger than ${MAX_SHARE_BYTES} bytes.` : FORM_REFUSALS.broken)
+            : await shareRecording(form, playerId, dataSetViewer(api, req).moderator?.name ?? 'a player', recordingOptions(api));
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    send(res, reply.status, JSON.stringify(reply.body), 'application/json; charset=utf-8');
+}
+
+/**
+ * `POST api/recordings/<id>`: its asker and a body of at most `MAX_RECORDING_MODERATION_BYTES`,
+ * before `moderateRecording` decides. Every answer is JSON (`RecordingAnswer`).
+ */
+async function receiveRecordingModeration(id: string, api: ApiOptions, req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const body = await readBody(req, MAX_RECORDING_MODERATION_BYTES);
+    const reply: RecordingAnswer = body === null ? { status: 413, body: { error: `The body is larger than ${MAX_RECORDING_MODERATION_BYTES} bytes.` } }
+        : await moderateRecording(id, body.toString('utf8'), dataSetViewer(api, req), recordingOptions(api));
     res.setHeader('Cache-Control', 'no-store');
     send(res, reply.status, JSON.stringify(reply.body), 'application/json; charset=utf-8');
 }

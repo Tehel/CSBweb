@@ -20,7 +20,8 @@
  * field has its type, the texts their limits, the path its joins. It does not replay it.
  *
  * **Nothing in this file touches the DOM**: `tools/checks/replay.ts` writes, reads and
- * plays packages.
+ * plays packages, and the server reads them, built for Node (`PageReaders.ts`,
+ * `server/recordings.ts`).
  */
 import { readCsbwinSaveInfo } from '../data/CsbwinSaveInfo';
 import { LOCAL_DATA_SET_TEXT_LIMITS } from '../data/DataSets';

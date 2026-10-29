@@ -220,7 +220,8 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
             `mini.dat`), FileSignatures (the graphics files checked against what a
             read names), DungeonCensus (what a dungeon holds: its items, monsters and
             DSAs, counted), LocalDataSetCheck (a player's own set checked as the boot
-            reads it: the form's and the server's), Die (CSBWin's `die`), RelativeXY (a square counted in steps
+            reads it: the form's and the server's), PageReaders (what the server bundles of the
+            page: that check, and the reader of a shared recording), Die (CSBWin's `die`), RelativeXY (a square counted in steps
             through `d.DeltaX`), skills, rules (what the systems all read of the
             party: a champion alive, a mastery, the level's difficulty), AddCharacter, objectIndex
             (the one DescIndex / GetBasicObjectType / NameIndex)
