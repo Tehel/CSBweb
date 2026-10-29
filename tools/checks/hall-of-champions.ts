@@ -353,8 +353,8 @@ function main(): void {
   const messages = probeMessages(game);
   const printed = messages.map((m) => m.text);
   check(printed.includes('HALK'), 'the champion is named in the message area');
-  check(printed.includes(' RESURRECTED'), 'followed by RESURRECTED');
-  check(!printed.includes(' REINCARNATED'), 'and not by REINCARNATED');
+  check(printed.includes(' RESURRECTED.'), 'followed by RESURRECTED., with its full stop');
+  check(!printed.includes(' REINCARNATED.'), 'and not by REINCARNATED');
   check(
     party.champions[0]!.skills.every((s, i) => s.experience === skillsBefore[i]),
     'Resurrect leaves the skills from the hero text alone',
@@ -446,7 +446,7 @@ function main(): void {
   check(wizard.attributes.maxHealth === scale(before.maxHealth), 'MaxHP is scaled by (16 - statPenalty)/16');
   check(wizard.attributes.maxStamina === scale(before.maxStamina), 'MaxStamina likewise');
   check(wizard.attributes.maxMana === scale(before.maxMana), 'MaxMana likewise');
-  check(probeMessages(game).some((m) => m.text === ' REINCARNATED'), 'REINCARNATED is printed');
+  check(probeMessages(game).some((m) => m.text === ' REINCARNATED.'), 'REINCARNATED. is printed, with its full stop');
   check(party.magicCasterIndex === 0, 'a second champion does not steal the magic tab');
 
   /* ------------------------------------------- 5b. Reincarnate under DM_rules ---- */

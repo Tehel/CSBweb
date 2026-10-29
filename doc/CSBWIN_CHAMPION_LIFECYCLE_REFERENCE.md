@@ -208,7 +208,9 @@ which also sets `d.DisplayResurrectChestOrScroll = 5`.
   the hero text (`Character.cpp:687`) is **never read** by this path.
   Luck (index 0) is outside the penalty loop, so it can only gain.
 - Both then: `SetHandOwner(0)` and `SelectMagicCaster(0)` if this is the only champion,
-  and print "`<name> RESURRECTED`" or "` REINCARNATED`".
+  and print "`<name> RESURRECTED`" or "` REINCARNATED`". The Atari's have a full stop,
+  "` RESURRECTED.`" and "` REINCARNATED.`" (`doc/ReDMCSB-src/REVIVE.C:875`), and so do the
+  port's (`DEBT.md` H).
 
 The menu is modal by click gating, not by a mode flag: while `PotentialCharacterOrdinal`
 is non-zero the dispatcher drops clicks on the portrait boxes (ids 12-15), the inventory

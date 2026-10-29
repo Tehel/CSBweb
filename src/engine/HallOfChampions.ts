@@ -226,7 +226,9 @@ export class HallOfChampions {
     const color = this.ctx.systems.actuators.getChampionMessageColor(party.champions.length - 1);
     messages.printLinefeed();
     messages.quePrintLines(color, champion.name);
-    messages.quePrintLines(color, button === 160 ? ' RESURRECTED' : ' REINCARNATED');
+    // The Atari's, with its full stop (`doc/ReDMCSB-src/REVIVE.C:875`), where CSBWin has
+    // none (`doc/CSBwin-src/CSBCode.cpp:6859-6863`): `DEBT.md` H.
+    messages.quePrintLines(color, button === 160 ? ' RESURRECTED.' : ' REINCARNATED.');
 
     // `ShowHideInventory(4)` (`:6866`), with its `d.clockTick = 1` (`:7500`) and
     // `videoMode = VM_ADVENTURE` (`:7512`) and `DiscardAllInput()` (`:7539`), then

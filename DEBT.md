@@ -1237,6 +1237,12 @@ Recorded so that nobody "fixes" them.
   (`src/engine/PartyFootprints.ts`, `tools/checks/amiga-scents.ts`,
   `tools/checks/magic-footprints.ts`). The comparisons thrown away stay: they are the
   Atari's, ReDMCSB's `BUG0_00`.
+- 🚫 **RESURRECTED and REINCARNATED end with a full stop.** CSBWin prints a champion's
+  name, then `" RESURRECTED"` or `" REINCARNATED"` (`doc/CSBwin-src/CSBCode.cpp:6859-6863`).
+  The Atari's English programs, DM's and CSB's, print `" RESURRECTED."` and
+  `" REINCARNATED."` (ReDMCSB `doc/ReDMCSB-src/REVIVE.C:875`, `MEDIA195`, S10EA to S21E),
+  and the port prints those (`HallOfChampions.finishResurrectReincarnate`).
+  `tools/checks/hall-of-champions.ts` checks both words and the stop.
 - 🚫 **A kill of `alternateGraphics` 4 to 7 is counted nowhere.** `ProcessMonsterDeleteFilter`
   indexes the kill statistics' four longwords with the three-bit subtype unchecked
   (`doc/CSBwin-src/Code11f52.cpp:990`, `:995`): a new record's count goes into the stack past
