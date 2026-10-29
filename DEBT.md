@@ -125,7 +125,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G31 | Recordings shared: the set's dialog, a package, the server | L | ⏳ step 4 of 6 |
+| G31 | Recordings shared: the set's dialog, a package, the server | L | ⏳ step 5 of 6 |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
 | C194 | A DSA's wall graphic counts as a real decoration, so it hides no text | S | ⏳ |
 | C195 | Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space | S | ⏳ to decide with the author |
@@ -727,7 +727,7 @@ player by: the sets they own, and a moderator's rights (`X-Player-Id`, `server/a
 by the name the player gives, or by nobody, and the server keeps its uploader's
 `playerId` apart, as a set's `owner` is kept, for a withdrawal.
 
-Paying it, in steps; the design is decided, and step 4 is next.
+Paying it, in steps; the design is decided, and step 5 is next.
 
 1. A game's end is a point to share: the game tells it at the boundary as `ShowCredits`
    follows `MainLoop`'s return (`InputBoundary.ended`), the recording ends in that VBL
@@ -754,9 +754,13 @@ Paying it, in steps; the design is decided, and step 4 is next.
    them all; and the packages copied by `backup.ts`. `tools/checks/server.ts` asserts it,
    and `tools/checks/build.ts` the built reader against the source's. The dev server does
    not answer the routes yet, which step 5 owes.
-4. The `utils/` tool that replays every listed recording of the site's against a build, as
-   a moderator, and marks those that drift as broken (`POST api/recordings/<id>`,
-   `{"action": "break"}`), run before a deploy.
+4. The replay tool (`utils/replay-recordings.ts`, `doc/DEPLOYMENT.md` → "Deploying"), run
+   before a deploy as a moderator: every listed recording not broken yet, its package
+   played from it alone with the working tree's engine, in a page without the DOM over
+   the set's files as the instance serves them (`tools/lib/playback.ts`, which
+   `tools/checks/replay.ts`'s point 10 holds to its own replayed page), and a yes asked
+   for each that drifts before it is broken (`{"action": "break"}`).
+   `tools/checks/replay-recordings.ts` runs it against a scratch server.
 5. The page's player: `?recording=` from the server, and the viewer's strip and keys; and
    the dev server's `api/recordings` and `recordings/`, as the deployed server answers them,
    for the probes.

@@ -456,6 +456,7 @@ What sharing takes:
   way.
 - **The engine's version**, stored with each recording: a behaviour change makes older
   recordings drift, which their `random` values show at the first wrong entry. A shared
-  recording is then either played by the build it was made with or marked broken.
+  recording is then either played by the build it was made with or marked broken, which
+  the replay tool does before a deploy (`utils/replay-recordings.ts`).
 - **Speed**: fast-forward is free, as CSBWin's `#NoSpeedLimit` and `#FastVBLnn`; going
   back means replaying from the start, or from saves taken along the way.

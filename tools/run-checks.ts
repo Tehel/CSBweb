@@ -415,6 +415,8 @@ const CHECKS: Tool[] = [
   { tool: 'mouse-queue.ts' },
   { tool: 'input-boundary.ts' },
   { tool: 'replay.ts' },
+  // The replay tool, its own process, against a scratch server.
+  { tool: 'replay-recordings.ts' },
   { tool: 'party-collision.ts', args: ['2'] },
   // Level 2's door at (0,25) is up-down, which is the mode that exercises VerticalSize.
   { tool: 'door-crush.ts', args: ['2'] },

@@ -67,7 +67,8 @@
  *    F5's save in the branch, to the Sleepsave inside a VBL in the third, and to the lost
  *    game's end, each written, read back the same and played from the package alone, a
  *    save's path to the file its save holds, through its joins. A package whose save's
- *    file is not the path's drifts at its end; one whose form is wrong is refused.
+ *    file is not the path's drifts at its end; one whose form is wrong is refused. The
+ *    replay tool's page (`tools/lib/playback.ts`) plays each the same, to the same game.
  *
  * Run: `npm test -- --only=replay.ts`
  *
@@ -107,6 +108,7 @@ import { check, finish } from '../lib/check';
 import { ManualClock } from '../lib/clock';
 import { STOCK_DATA_SET, diskFiles } from '../lib/dataSets';
 import { STOCK_DIR, gameTablesOf, graphicsTablesOf, stockGraphics } from '../lib/game';
+import { playPath } from '../lib/playback';
 import { memoryRecordingStore, memoryStore, savePath } from '../lib/saves';
 
 /** Where a recorded game starts: a new game of the stock set, or a save's file read. */
@@ -984,9 +986,25 @@ async function playPackage(pkg: RecordingPackage, what: string): Promise<Page> {
   const read = await readRecordingPackage(file);
   console.log(`  ${what}: a package of ${read.path.length} recording${read.path.length === 1 ? '' : 's'}, ${Math.round(file.length / 1024)} KB`);
   check(samePackage(read, pkg), `${what}: its package written (${file.length} bytes) and read back the same`);
-  const played = Page.replay(read.path, null, read.shared.kind === 'save' ? read.shared : null);
+  const savedAtEnd = read.shared.kind === 'save' ? read.shared : null;
+  const played = Page.replay(read.path, null, savedAtEnd);
   played.play();
+  await samePlayback(played, read.path, savedAtEnd);
   return played;
+}
+
+/**
+ * `path` played again by the replay tool's page (`tools/lib/playback.ts`), which plays it
+ * as `played` did: the same drift, or none, at the same point, through as many joins, to
+ * the same game.
+ */
+async function samePlayback(played: Page, path: readonly Recording[], savedAtEnd: SavedAtEnd | null): Promise<void> {
+  const alone = await playPath(STOCK_DATA_SET, diskFiles(STOCK_DATA_SET), path, savedAtEnd);
+  const player = played.player!;
+  const file = buildSaveFile(alone.game, { portraitOf: (champion) => alone.game.ctx.host.portraitOf(champion) });
+  check(JSON.stringify(alone.drift) === JSON.stringify(player.drift) && JSON.stringify(alone.point) === JSON.stringify(player.point)
+    && alone.joins === player.joins && firstDifference(file, played.saveFile()) < 0,
+    `and the replay tool's page plays it the same${alone.drift ? `, to its drift (${alone.drift.kind})` : ''}`);
 }
 
 /**
@@ -1012,6 +1030,7 @@ async function savePackage(recorded: Page, path: readonly Recording[], save: Sav
   tampered.play();
   const parted = tampered.player!.drift;
   check(parted?.kind === 'save' && parted.byte === 100, `and a package whose save's file is not the path's drifts at its end (${JSON.stringify(parted)})`);
+  await samePlayback(tampered, pkg.path, { file: other, inVbl: point.inVbl === true });
   return pkg;
 }
 

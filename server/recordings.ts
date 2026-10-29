@@ -13,7 +13,7 @@
  * (`src/engine/RecordingPackage.ts`), built for Node into its module (`READERS_MODULE`,
  * `app.ts`): it checks the package's form alone, and never replays it. Whether a
  * recording still plays on the site's build is the replay tool's to say, which marks one
- * that drifts as broken (`DEBT.md` G31).
+ * that drifts as broken (`utils/replay-recordings.ts`).
  *
  * A recording is pending until a moderator approves it, as a set is: its title and
  * description are free text nobody else sees unread. An approved one is listed to

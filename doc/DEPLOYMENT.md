@@ -552,7 +552,7 @@ never replays it, refuses one that holds a move of `?dev`, and keeps it as
 row of the store's `recordings` table, pending, its metadata the package's and its
 uploader's `playerId` beside them. The packages may take 1 GiB together, some three
 thousand hours of play; past that a share is refused with 507. A recording is listed to
-everyone once a moderator approves it, unless one hid it or the replay tool broke it, and
+everyone once a moderator approves it, unless one hid it or the replay tool broke it ("Deploying", below), and
 to its uploader and the moderators in every state. Its uploader deletes it whenever they
 like; a moderator approves, hides, shows, breaks and deletes it. Each change is notified
 ("Notifications", above). A package never changes after: it is served `immutable`, and
@@ -636,8 +636,22 @@ the file, and quoted in the remote command anyway.
 ```bash
 npm test                       # the gate, before the commit
 bash tools/check-image.sh      # optional: the golden frames against the image (Docker, Chrome)
+npx tsx utils/replay-recordings.ts --instance https://csbweb.example --player <playerId>
 npm run deploy                 # utils/deploy.sh
 ```
+
+`utils/replay-recordings.ts` replays the instance's shared recordings against the build
+about to be deployed, and marks those that drift as broken, which the list leaves out
+("Shared recordings", above). `--player` is a moderator's `playerId`, so that the lists
+hold every recording, pending and hidden ones included, and the break is allowed;
+`--dry-run` breaks none. Each recording that is not broken yet has its package fetched
+and played from it alone, in a page without the DOM (`tools/lib/playback.ts`) over the
+set's files as the instance serves them, with the working tree's engine: what the build
+made from it plays. Once all are played, it asks a yes for each one that drifts, or whose
+package does not read or play, and says why; a yes posts `{"action": "break"}`, which no
+action takes back. A behaviour change that makes recordings drift is a reason to look
+before deploying, not only to break them. `tools/checks/replay-recordings.ts` runs it
+against a scratch server.
 
 `utils/deploy.sh` deploys a commit: it refuses a working tree that differs from it in what
 the image is built from, the build context (`.dockerignore`'s allowlist, untracked files
