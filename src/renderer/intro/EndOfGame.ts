@@ -37,8 +37,9 @@ export async function showEndOfGame(deps: EndOfGameDeps, word11694: boolean): Pr
     word11694,
     champions: word11694 ? wonChampions(game, screen) : [],
     // `_StartCSB` turns palette switching off before a lost game's credits
-    // (doc/CSBwin-src/CSBCode.cpp:11558); `MainLoop`'s won game leaves it as it was.
-    palette11946: word11694 ? screen.composer.palette11946() : null,
+    // (doc/CSBwin-src/CSBCode.cpp:11558); the Atari leaves it as it was, as `MainLoop`'s won
+    // game does (doc/ReDMCSB-src/GAMELOOP.C:329), and so does the port (`DEBT.md` H).
+    palette11946: screen.composer.palette11946(),
   });
   if (end === 'terminate') return;
   messages.restart();

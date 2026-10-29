@@ -1243,6 +1243,18 @@ Recorded so that nobody "fixes" them.
   `" REINCARNATED."` (ReDMCSB `doc/ReDMCSB-src/REVIVE.C:875`, `MEDIA195`, S10EA to S21E),
   and the port prints those (`HallOfChampions.finishResurrectReincarnate`).
   `tools/checks/hall-of-champions.ts` checks both words and the stop.
+- 🚫 **A lost game keeps the dungeon view's palette until it darkens.** CSBWin's
+  `_StartCSB` clears `d.DynamicPaletteSwitching` as `MainLoop` returns
+  (`doc/CSBwin-src/CSBCode.cpp:11558`), so through the dying sound's 240 VBLs the dungeon
+  view shows in the interface's palette, brighter than the level's light (in the dark,
+  much brighter), and `_ShowCredits`' `Darken` branch is never taken for a lost game
+  (`Code1f9e6.cpp:148-170`). The Atari reaches `F0444_STARTEND_Endgame` with switching as
+  the game left it (ReDMCSB `doc/ReDMCSB-src/GAMELOOP.C:329`), plays the scream, darkens both
+  palettes eight steps, and only then turns switching off (`ENDGAME.C:303-317`). The port
+  does as the Atari: `showEndOfGame` hands over the viewport palette, lost game or won, or
+  `null` with an inventory open, and `showCredits` keeps it through the dying sound and
+  drops it after the `Darken` steps, before "THE END" (`src/renderer/intro/ShowCredits.ts`).
+  `tools/checks/show-credits.ts` checks the lost game with switching on.
 - 🚫 **A kill of `alternateGraphics` 4 to 7 is counted nowhere.** `ProcessMonsterDeleteFilter`
   indexes the kill statistics' four longwords with the three-bit subtype unchecked
   (`doc/CSBwin-src/Code11f52.cpp:990`, `:995`): a new record's count goes into the stack past

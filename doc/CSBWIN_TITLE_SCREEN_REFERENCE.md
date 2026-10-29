@@ -605,6 +605,9 @@ which runs its timers and ends the same way.
    The fade starts from
    `globalPalette`, which the VBL had kept equal to `d.Palette11978`
    (`WinScreen.cpp:1493-1498`), that is `d.Palette552[0]` (`CSBCode.cpp:10747`).
+   The port keeps the switching the game left, as the Atari does (ReDMCSB `ENDGAME.C:303-317`):
+   the dungeon view stays in its palette through step 2, and step 4 takes the `Darken` steps
+   of the won game's step 3, then turns switching off (`ENDGAME.C:301`) (`DEBT.md` H).
 5. `tag01fd10`: the screen cleared, graphic 6 blitted to `d.Word108`, and a palette of sixteen
    `0x002` (`fillMemory(&LOCAL_110, 16, 2, 2)`) with colour 15 at `0x777` faded up; then
    `VBLDelay(300)`, the first time only (`LOCAL_132`) (`:227-238`).
@@ -683,8 +686,9 @@ before `GameHost.showCredits(true)`. `d.Word11694` is `GameState.gameWon`.
    with `RepeatGame` false it never ends, and the champions stay up for good.
 
 The port gives `IntroHost` a `palette11946`, drawn over the viewport by `present` while it is
-set, for step 3; the page's is the viewport palette the adventure showed, or `null` with an
-inventory open (`GameScreen.palette11946`). `tools/checks/show-credits.ts` checks both branches.
+set, for step 3 and the lost game's step 4; the page's is the viewport palette the adventure
+showed, or `null` with an inventory open (`ScreenComposer.palette11946`).
+`tools/checks/show-credits.ts` checks both branches.
 
 
 ## Skipping it

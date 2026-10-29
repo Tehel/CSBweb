@@ -3,13 +3,14 @@
  *
  * `MainLoop` returns on the tick the last champion dies, and `_StartCSB` clears
  * `d.DynamicPaletteSwitching` and calls `ShowCredits(_3_, d.GameIsLost)`
- * (`doc/CSBwin-src/CSBCode.cpp:11557-11561`). What follows is a still picture and a wait,
- * drawn straight to the screen like the pre-game screens, so it runs over the same
- * `IntroHost`:
+ * (`doc/CSBwin-src/CSBCode.cpp:11557-11561`). The port keeps the switching as the game
+ * left it, as the Atari does (`DEBT.md` H): the dungeon view stays in its own palette. What
+ * follows is a still picture and a wait, drawn straight to the screen like the pre-game
+ * screens, so it runs over the same `IntroHost`:
  *
  * 1. the dying sound, and 240 VBLs (`:122-129`);
- * 2. the fade to black: `d.DynamicPaletteSwitching` is 0, so `FadeToPalette(Palette11914)`
- *    rather than the `Darken` steps (`:148-170`);
+ * 2. the fade to black: the `Darken` steps with switching on, which then goes off, or
+ *    `FadeToPalette(Palette11914)` with it off, an inventory open (`:148-170`);
  * 3. "THE END", graphic 6, alone on a cleared screen at `d.Word108`, faded up to a palette
  *    of `0x002` with colour 15 at `0x777`, and 300 VBLs (`:227-238`);
  * 4. with `d.CanRestartFromSavegame` set, the "RESTART THIS GAME" button for 899 VBLs
@@ -94,7 +95,10 @@ export interface ShowCreditsHooks {
   champions: readonly WonChampion[];
   /**
    * `d.Palette11946` if `d.DynamicPaletteSwitching` is on, `null` if it is off. `_StartCSB`
-   * turns it off before a lost game's `ShowCredits` (`doc/CSBwin-src/CSBCode.cpp:11558`).
+   * turns it off before a lost game's `ShowCredits` (`doc/CSBwin-src/CSBCode.cpp:11558`),
+   * which leaves the dungeon view in the interface's palette, brighter, through the dying
+   * sound. The Atari keeps it until its `Darken` steps are done (ReDMCSB
+   * `doc/ReDMCSB-src/ENDGAME.C:303-317`, `GAMELOOP.C:329`), and so does the port (`DEBT.md` H).
    */
   palette11946: readonly number[] | null;
 }
@@ -116,6 +120,7 @@ export async function showCredits(host: IntroHost, hooks: ShowCreditsHooks): Pro
   // `SetCursorShape(0); STHideCursor(HC50);` and the four input tables emptied (`:116-121`):
   // the caller has stopped the adventure's input.
   host.setCursorVisible(false);
+  host.palette11946 = hooks.palette11946 ? [...hooks.palette11946] : null;
   if (!hooks.word11694) {
     hooks.queueDyingSound();
     await host.vbl(DYING_SOUND_VBLS);
@@ -123,7 +128,6 @@ export async function showCredits(host: IntroHost, hooks: ShowCreditsHooks): Pro
 
   const theEnd = host.getGraphic(GRAPHIC_THE_END);
   const credits = host.getGraphic(GRAPHIC_CREDITS);
-  host.palette11946 = hooks.palette11946 ? [...hooks.palette11946] : null;
   host.present();
   if (host.palette11946) {
     // `:148-166`: `d.Palette11978` saved in `LOCAL_78`, then both palettes darkened a step
@@ -139,6 +143,9 @@ export async function showCredits(host: IntroHost, hooks: ShowCreditsHooks): Pro
       }
       host.present();
     }
+    // `G0322_B_PaletteSwitchingEnabled = C0_FALSE` (ReDMCSB `ENDGAME.C:301`), where CSBWin
+    // leaves it to the won screen (`:217`): "THE END" is drawn over the whole screen.
+    host.palette11946 = null;
     await host.vbl(1);
   } else {
     // The whole screen is in `globalPalette`, the interface's, and fades from it (`:168-170`).

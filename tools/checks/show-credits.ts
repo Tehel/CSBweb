@@ -11,7 +11,9 @@
  * 2. **The screen.** `showCredits` over a headless `IntroHost` and the real
  *    `graphics.dat`: the dying sound before any wait, the waits CSBWin names, "THE END"
  *    alone at `d.Word108` in the dark-blue palette, and the credits picture in
- *    `d.Palette328` until a button is held or a key waits. The rectangle is a canary for
+ *    `d.Palette328` until a button is held or a key waits. With palette switching on, the
+ *    dungeon view in its own palette through the dying sound, then both palettes darkened
+ *    to black and switching off for "THE END", as the Atari does (`DEBT.md` H). The rectangle is a canary for
  *    the parse of item 0x232: `BLT2Screen(…, d.Word108, 40, -1)` blits a 40-byte-wide
  *    source, and graphic 6 fills the 560 bytes `A3` skips (`Code1f9e6.cpp:136`, `:229`).
  *
@@ -632,12 +634,55 @@ function checkCsbWin(): void {
   check(game.mainLoopHasReturned(), 'MainLoop is over');
 }
 
+/* ------------------------------------- 2b. a lost game with palette switching on ---- */
+
+/**
+ * Last of the screens: its `Darken` branch writes `LOCAL_78`, a static (`Code1f9e6.cpp:76`),
+ * which the won game without switching reads as never written.
+ */
+async function checkLostWithSwitching(): Promise<void> {
+  console.log('');
+  console.log('=== _ShowCredits(1), a lost game with palette switching on (ENDGAME.C:303-317) ===');
+  const ui = graphicsTablesOf(stockGraphics()).ui;
+  const g = ui.graphic232;
+  // Switching on, as the dungeon view leaves it: the Atari keeps it through the dying sound
+  // and darkens both palettes (ReDMCSB `ENDGAME.C:303-317`), where CSBWin's `_StartCSB` has
+  // turned it off (`CSBCode.cpp:11558`) and the view shows in the interface's (`DEBT.md` H).
+  const viewport552 = g.palette552[3] ?? PALETTE_11914;
+  const on = recordingHost(ui, { heldAfterPolls: Infinity, keyAfterPolls: 3 });
+  const vbl = on.host.vbl;
+  // A holder, not a `let`: `tsc` does not see the closure assign it.
+  const captured: { duringSound: number[] | null } = { duringSound: null };
+  on.host.vbl = (count) => {
+    if (count === DYING_SOUND_VBLS) captured.duringSound = on.host.palette11946 ? [...on.host.palette11946] : null;
+    return vbl(count);
+  };
+  const shown: { global: number[]; viewport: number[] | null }[] = [];
+  on.host.present = () => { shown.push({ global: [...on.host.globalPalette], viewport: on.host.palette11946 ? [...on.host.palette11946] : null }); };
+  await showCredits(on.host, { queueDyingSound: () => { on.steps.push({ kind: 'sound' }); }, canRestartFromSavegame: false, word11694: false, champions: [], palette11946: viewport552 });
+  const onLog = on.steps.map((step) => (step.kind === 'sound' ? 'sound 6' : `vbl ${step.count}`)).join(', ').replace(/(vbl 1, ){7}vbl 1/g, 'fade');
+  console.log(`switching on: ${onLog}`);
+  check(onLog === `sound 6, vbl ${DYING_SOUND_VBLS}, fade, fade, vbl 1, vbl ${THE_END_VBLS}, fade, fade, vbl 1, vbl 1, vbl 1`,
+    'switching on: the dying sound, 240, eight Darken steps and a VBL, THE END, 300, dark blue, the credits');
+  const kept = captured.duringSound;
+  check(kept !== null && kept.every((c, i) => c === viewport552[i]), 'the dungeon view keeps its own palette through the dying sound');
+  const darkened = shown[1];
+  check(darkened !== undefined && darkened.viewport !== null && darkened.viewport.every((c, i) => c === darken(viewport552[i] ?? 0)),
+    'the first Darken step darkens the dungeon view');
+  const blackened = shown[8];
+  check(blackened !== undefined && blackened.global.every((c) => c === 0) && (blackened.viewport ?? [1]).every((c) => c === 0),
+    'the eighth leaves both palettes black');
+  check(on.host.palette11946 === null && on.theEnd !== null && on.theEnd.palette.every((c, i) => c === PALETTE_LOCAL_46[i]),
+    'THE END is shown with switching off (ENDGAME.C:301), in 0x002 with colour 15 at 0x777');
+}
+
 async function main(): Promise<void> {
   checkTickOfDeath();
   checkCsbWin();
   await checkScreen();
   await checkRestart();
   await checkWon();
+  await checkLostWithSwitching();
   finish();
 }
 

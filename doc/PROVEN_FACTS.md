@@ -6855,7 +6855,8 @@ and `MarkViewportUpdated` consumes that flag at once by calling `vblInterrupt()`
 steps (`doc/CSBwin-src/Code1f9e6.cpp:148-170`), from `globalPalette`, which the VBL kept
 equal to `d.Palette11978` (`doc/CSBwin-src/WinScreen.cpp:1493-1498`). The rest of the
 screen is in `doc/CSBWIN_TITLE_SCREEN_REFERENCE.md` → "The end of the game";
-`tools/checks/show-credits.ts` checks both halves.
+`tools/checks/show-credits.ts` checks both halves. The port keeps the switching, as the
+Atari does (`DEBT.md` H).
 
 
 ## "RESTART THIS GAME" clears `d` before the chooser, so any save loads after it
