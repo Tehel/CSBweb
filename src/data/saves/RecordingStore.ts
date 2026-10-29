@@ -175,3 +175,21 @@ export function cutRecording(
         removeFrom: kept,
     };
 }
+
+/**
+ * The path `store` holds to the recording `id` names (`RecordingPlayer`): its root and the
+ * branches down to it, each the child of the one before (`Recording.parent`), as far up
+ * as the store holds the parents. Where it holds no parent, the path begins at the
+ * branch, which plays from its own start.
+ */
+export async function readRecordingPath(store: Pick<RecordingStore, 'list' | 'read'>, id: string): Promise<Recording[]> {
+    const held = new Set((await store.list()).map((entry) => entry.id));
+    const path: Recording[] = [];
+    for (let next: string | null = id; next !== null;) {
+        const recording: Recording = await store.read(next);
+        path.unshift(recording);
+        const parent = recording.parent?.recording ?? null;
+        next = parent !== null && held.has(parent) ? parent : null;
+    }
+    return path;
+}

@@ -13,7 +13,7 @@ import { parsePublishedDungeons, type KnownDungeon } from './data/DungeonSignatu
 import { isLocalDataSetId, localDataSet, recordFiles } from './data/LocalDataSets';
 import { emptyDungeonData } from './data/DungeonLoader';
 import { GraphicsLoader } from './data/GraphicsLoader';
-import { BrowserDataSetStore, BrowserRecordingStore, BrowserSaveStore, downloadSaveFile, type DrawPlaythrough, type OpenedSave } from './data/saves';
+import { BrowserDataSetStore, BrowserRecordingStore, BrowserSaveStore, downloadSaveFile, readRecordingPath, type DrawPlaythrough, type OpenedSave } from './data/saves';
 import { UTILITY_PORTRAITS_FILE, readUtilityPortraits, type UtilityPortraits } from './data/UtilityPortraits';
 import { Game } from './engine/Game';
 import { buildGameTables, type GameTables } from './engine/GameTables';
@@ -44,6 +44,7 @@ import { csbGraphicsOpener } from './engine/FileSignatures';
 import type { PrisonDoorChoice } from './renderer/intro/PrisonDoor';
 import { Recorder } from './engine/Recorder';
 import { RecordingWriter } from './engine/RecordingWriter';
+import { RecordingPlayer } from './engine/RecordingPlayer';
 import { applySaveBytes } from './engine/SaveGameFile';
 import { Settings, applyToGame, type SettingsValues } from './settings/Settings';
 import type { KeyboardLayoutMap } from './renderer/ui/KeyLabels';
@@ -77,6 +78,12 @@ let dataSet!: DataSet;
 let setFiles!: DataSetFiles;
 /** Its thumbnail, `null` where it has none: from its folder, or a local set's record (`chooseDataSet`). */
 let setThumbnail!: () => Promise<Blob | null>;
+/**
+ * `?recording=<id>`: the store's recording this page plays back in place of a game
+ * (`playRecording`), or `null`. Its player, once it is begun.
+ */
+const playedRecording = new URLSearchParams(window.location.search).get('recording');
+let recordingPlayer: RecordingPlayer | null = null;
 const gameCanvasEl = document.getElementById('game-canvas') as HTMLCanvasElement;
 if (!gameCanvasEl) console.log(`Couldn't find game canvas !`);
 /**
@@ -147,13 +154,17 @@ function refreshScreen() {
  * The game's playthrough is then held against the store's (`GameSaves.newGameRead`).
  */
 async function readNewGame(game: Game, saves: GameSaves, events: GameEvents): Promise<void> {
-    const name = setFiles.where('dungeon.dat');
-    const bytes = await setFiles.read('dungeon.dat');
-    if (!bytes) throw new Die(50, `Cannot open dungeon file '${name}'`);
-    game.readDungeonDat(bytes);
-    console.log(`✓ Read ${name}: ${game.ctx.dungeon.getData().maps.length} levels`);
+    game.readDungeonDat(await readDungeonFile());
+    console.log(`✓ Read ${setFiles.where('dungeon.dat')}: ${game.ctx.dungeon.getData().maps.length} levels`);
     await saves.newGameRead();
     events.newGameRead();
+}
+
+/** The data set's `dungeon.dat`: one that will not open is `die(50)` (`readNewGame`). */
+async function readDungeonFile(): Promise<Uint8Array> {
+    const bytes = await setFiles.read('dungeon.dat');
+    if (!bytes) throw new Die(50, `Cannot open dungeon file '${setFiles.where('dungeon.dat')}'`);
+    return bytes;
 }
 
 /**
@@ -355,13 +366,14 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     saves.onRowGone(() => { recordings.prune().catch(() => {}); });
 
     // The statistics' events: sent by a production build only, and shown on the console
-    // otherwise; neither when the player has turned them off.
+    // otherwise; neither when the player has turned them off, nor of a recording played
+    // back, no game of the player's.
     const events = new GameEvents({
         game,
         set: dataSet.id,
         build: __CSBWEB_BUILD__,
         player: playerId,
-        enabled: () => settings.values.statistics,
+        enabled: () => settings.values.statistics && playedRecording === null,
         send: import.meta.env.PROD ? sendBeacon : (event) => console.debug('Event, not sent:', event),
         teleported: keptTeleportedPlaythroughs(pageStorage),
     });
@@ -481,12 +493,13 @@ interface Built {
  * The probes' handle, `window.__probe`: what `tools/probe-ui.ts` and `tools/probe-frames.ts`
  * drive the live app through over CDP. `presetHeroes`: the heroes behind the dungeon's
  * mirrors, for `tools/lib/buildParty.ts`. `intro`: the pre-game screens' VBLs and waits
- * (`introProbe`).
+ * (`introProbe`). `player`: the recording `?recording=` plays (`playRecording`), or `null`.
  */
 function probeHandle(built: Built, sound: SoundManager) {
     const presetHeroes = () => extractPresetHeroes(built.game.ctx.dungeon.getData(), built.game.ctx.tables.textDecode, built.game.ctx.tables);
     return { game: built.game, screen: built.screen, sound, saves: built.saves,
-        recorder: built.recorder, recordings: built.recordings, recordingStore: built.recordingStore, renderView, refreshScreen, presetHeroes, applySaveBytes, intro: introProbe };
+        recorder: built.recorder, recordings: built.recordings, recordingStore: built.recordingStore, player: () => recordingPlayer,
+        renderView, refreshScreen, presetHeroes, applySaveBytes, intro: introProbe };
 }
 
 /** `window.__probe` (`probeHandle`), whose type the probes' page-side functions are checked against. */
@@ -562,9 +575,13 @@ async function continueSave({ saves, events }: Built, id: string): Promise<boole
     }
 }
 
-/** The page's side of play: its input, and a redraw per move and per tick. */
-function wire({ game, screen, messages, events, playInput }: Built): void {
-    playInput();
+/**
+ * The page's side of play: its input, and a redraw per move and per tick. A recording
+ * played back (`player`) takes none of the page's input, and its spans under a held
+ * clock, which the loop runs at once, are not drawn (`RecordingPlayer.held`).
+ */
+function wire({ game, screen, messages, events, playInput }: Built, player: RecordingPlayer | null = null): void {
+    if (!player) playInput();
 
     game.onMove((success) => {
         if (success) console.debug(game.getPositionInfo() || 'Moved');
@@ -589,13 +606,21 @@ function wire({ game, screen, messages, events, playInput }: Built): void {
     // the pointer has moved before: the VBL handler alone draws the cursor (`:1050-1053`),
     // and a move of the pointer draws nothing itself (`GameInput.mouseMove`), nor does
     // the wheel in a dialog (`GameScreen.handleDialogWheel`).
+    let heldThrough = false;
     game.onFrame(() => {
+        if (player?.held) {
+            heldThrough = true;
+            return;
+        }
         if (game.paintHeld()) return;
         const scrolled = messages.takeChanged();
         const flashed = game.takeFlashChanged();
         const moved = screen.takeCursorMoved();
         const wheeled = screen.takeWheelTurned();
-        if (scrolled || flashed || moved || wheeled) refreshScreen();
+        if (scrolled || flashed || moved || wheeled || heldThrough) {
+            heldThrough = false;
+            refreshScreen();
+        }
     });
 }
 
@@ -609,6 +634,37 @@ function applySettings({ game }: Built, sound: SoundManager, values: SettingsVal
     sound.setEnabled(values.sound);
     sound.setVolume(values.volume);
     applyToGame(game, values);
+}
+
+/**
+ * `?recording=<id>`: the store's recording `id` played back in place of a game
+ * (`RecordingPlayer`, `doc/RECORDING.md` → "The port's player"), from its root through
+ * each branch down to it (`readRecordingPath`), as far up as the store holds them. Every
+ * tick is drawn, at the wall clock's pace; a span under a held clock is played at once
+ * and undrawn (`Game.runAtOnceWhile`). The page's input reaches nothing, and the page
+ * records nothing: no read of `GameSaves` begins a recording, nor sends a statistic. At
+ * the path's end, or at a drift, the loop stops, the screen as the recording left it.
+ *
+ * A recording of another data set, or one the store does not hold, ends the page as an
+ * error does.
+ */
+async function playRecording(built: Built, id: string): Promise<void> {
+    const { game } = built;
+    const path = await readRecordingPath(built.recordingStore, id);
+    if (path.some((recording) => recording.dataSet !== dataSet.id)) throw new Error(`RECORDING ${id} IS NOT OF ${dataSet.name}`);
+    const player = new RecordingPlayer(game, path, await readDungeonFile());
+    recordingPlayer = player;
+    player.onEnd((drift) => {
+        game.stop();
+        refreshScreen();
+        if (drift) console.warn(`Recording ${id} drifted:`, drift);
+        else console.log(`✓ Recording ${id} played to its end`);
+    });
+    game.runAtOnceWhile(() => player.held);
+    wire(built, player);
+    player.start();
+    if (player.playing) game.start(true);
+    console.log(`✓ Playing recording ${id}, from ${path.length > 1 ? `its root through ${path.length - 1} joins` : 'its start'}`);
 }
 
 function start(game: Game): void {
@@ -735,6 +791,7 @@ async function init() {
         // the dev server's, and a build's only with `CSBWEB_PROBE=1` (`vite.config.mts`),
         // so the handle cannot reach a deployed bundle.
         if (__CSBWEB_PROBE__) (window as unknown as Record<string, unknown>).__probe = probeHandle(built, sound);
+        if (playedRecording !== null) return await playRecording(built, playedRecording);
         // Before the intro: the entrance's chooser takes a dropped save as the disk menu does.
         bindSaveDrop(built.screen.ui);
         await runIntro(built, sound);

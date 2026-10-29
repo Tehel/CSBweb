@@ -1753,6 +1753,41 @@ check(recordingPruned.cut === '1,2,3' && recordingPruned.vbls === 3 && recording
   'a cut keeps the changes before its point, its last part cut, and ends the row there');
 check(recordingPruned.healed, "the running recording removed, as another tab's prune removes it, is written whole at the next write");
 
+// A recording played back in the page (`playRecording`, `src/main.ts`): the game's own,
+// played on with a turn, the settings dialog holding the clock and a turn back, then its
+// loop stopped and the recording written. `?recording=` plays it to its end, at the wall
+// clock's pace and the held clock at once: the page's input reaches nothing, its Esc
+// opening no dialog; the store's recordings and saves are as they were; and the game
+// ends as the recorded one stood, its loop stopped.
+await key('KeyL'); await vbls(TICK);
+await key('Escape'); await vbls(30);
+await key('Escape'); await vbls(SHOWN);
+await key('KeyJ'); await vbls(TICK);
+const recordedGame = await evaluate(`(async()=>{ const { game, recorder, recordings, recordingStore, saves } = window.__probe;
+  game.stop();
+  await recordings.flush();
+  const { ctx } = game, { position, facing } = ctx.party.state, { id, changes, vbls } = recorder.recording;
+  return { id, changes: changes.length, pauses: changes.filter((c) => c.change.kind === 'pause').length, vbls,
+    state: JSON.stringify([ctx.state.tickCount, ctx.random.getSeed(), position, facing]),
+    recordings: (await recordingStore.list()).length, saves: (await saves.list()).length }; })()`);
+await navigate(`${APP}?dungeon=csb&recording=${recordedGame.id}&keepsaves`, 'window.__probe?.player() != null');
+const playStarted = Date.now();
+await key('Escape');
+const escDuring = await evaluate(`window.__probe.screen.ui.dialog !== null`);
+await until('!window.__probe.player().playing', 'the recording played to its end');
+const playedFor = Date.now() - playStarted;
+const playedGame = await evaluate(`(async()=>{ const { game, recordingStore, saves, screen } = window.__probe, player = window.__probe.player();
+  const { ctx } = game, { position, facing } = ctx.party.state;
+  return { drift: player.drift, running: game.running, dialog: screen.ui.dialog !== null || screen.ui.saveMenu !== null,
+    state: JSON.stringify([ctx.state.tickCount, ctx.random.getSeed(), position, facing]),
+    recordings: (await recordingStore.list()).length, saves: (await saves.list()).length }; })()`);
+console.log('  recording played:', JSON.stringify({ recordedGame, playedGame, escDuring, playedFor }));
+check(recordedGame.pauses === 2 && playedGame.drift === null && playedGame.state === recordedGame.state && !playedGame.running,
+  `?recording= plays the store's recording to its end, the settings' held clock among it, the game as the recorded one stood, and stops (${recordedGame.vbls} VBLs, ${recordedGame.changes} changes)`);
+check(!escDuring && !playedGame.dialog, 'the page\'s input reaches nothing while it plays: Esc opens no dialog');
+check(playedGame.recordings === recordedGame.recordings && playedGame.saves === recordedGame.saves,
+  'and the page records nothing and saves nothing');
+
 // The map dialog (`src/renderer/ui/MapDialog.ts`), over CSB's `csbgame2.dat`, its party
 // where the save left it: a press held on the message area opens it, with MAP VIEW on
 // alone. A frame of it with the pointer off the canvas; a right click closes it.

@@ -19,7 +19,9 @@
  * recorded game made is its logged tail (`saveWritten`), and what the game opens in a VBL
  * does its game half alone while it plays (`InputBoundary.playing`).
  *
- * It runs no VBL. Whoever runs the game's VBLs plays it: a tool's loop, or the page's.
+ * It runs no VBL. Whoever runs the game's VBLs plays it: a tool's loop, or the page's,
+ * which runs a span the clock is held through at once (`held`, `Game.runAtOnceWhile`) and
+ * stops at its end (`onEnd`).
  */
 import type { Game } from './Game';
 import { saveFileOf } from './GameSaves';
@@ -45,6 +47,7 @@ export class RecordingPlayer {
     private parted: Drift | null = null;
     private joined = 0;
     private beginListener: ((recording: Recording) => void) | null = null;
+    private endListener: ((drift: Drift | null) => void) | null = null;
 
     /**
      * `path`, each recording after the first the child of the one before, played into
@@ -68,6 +71,14 @@ export class RecordingPlayer {
      */
     onBegin(listener: (recording: Recording) => void): void {
         this.beginListener = listener;
+    }
+
+    /**
+     * Told once as it stops of itself, inside the feed: at the path's end (`null`), or at
+     * the drift that stopped it. Not at `stop`, its owner's.
+     */
+    onEnd(listener: (drift: Drift | null) => void): void {
+        this.endListener = listener;
     }
 
     /**
@@ -99,6 +110,18 @@ export class RecordingPlayer {
     /** Whether it still plays: neither the path's end reached, nor a drift met, nor stopped. */
     get playing(): boolean {
         return !this.finished;
+    }
+
+    /**
+     * Whether it plays a span the clock is held through (`ctx.state.paused`), from the
+     * change or the VBL that held it to the change that lets it run: a dialog the
+     * recorded page showed, or the disk menu. The game moves on in none of its VBLs but
+     * what counts VBLs under a held clock (the attack panel's flash, the message strip,
+     * the due tick, the mouse queue's pass), so the page plays it at once, and shows
+     * nothing of it.
+     */
+    get held(): boolean {
+        return !this.finished && this.game.ctx.state.paused;
     }
 
     /** The drift that stopped it, or `null`. */
@@ -133,7 +156,7 @@ export class RecordingPlayer {
                 const random = ctx.random.getSeed();
                 if (entry.vbl !== vbls || entry.time !== time || entry.random !== random) {
                     this.parted = { kind: 'change', recording: recording.id, change: this.next, time, random };
-                    this.stop();
+                    this.end();
                     return;
                 }
                 this.next++;
@@ -141,7 +164,7 @@ export class RecordingPlayer {
             }
             if (this.next < until.changes || vbls < until.vbls) return;
             if (!child) {
-                this.stop();
+                this.end();
                 return;
             }
             if (!this.join(child)) return;
@@ -161,13 +184,19 @@ export class RecordingPlayer {
         const byte = made.length !== read.length ? Math.min(made.length, read.length) : made.findIndex((value, n) => value !== read[n]);
         if (byte >= 0) {
             this.parted = { kind: 'join', recording: child.id, byte };
-            this.stop();
+            this.end();
             return false;
         }
         this.joined++;
         this.segment++;
         this.read(child);
         return true;
+    }
+
+    /** Stopped of itself, at the path's end or a drift, and its listener told. */
+    private end(): void {
+        this.stop();
+        this.endListener?.(this.parted);
     }
 
     /** `recording`'s save read, what its read left beside the file set, and it begun. */

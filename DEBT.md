@@ -725,21 +725,19 @@ Paying it, in steps:
      makes its file and tail again and writes nothing (`GameSaves.sleepSave`).
      `tools/checks/replay.ts` plays every recording through it, the Sleepsave among
      them, and shows no dialog and writes no save.
-   - **4b, the page: ⏳.** The player in the page (`src/main.ts`), started on a recording
-     of the store by its id, which G31's dialog will call and `tools/probe-frames.ts`
-     calls through the probe handle until then. The page's live input to the game is
-     ignored; the controls a viewer has (stopping it, its speed) are G31's design. Every
-     tick it plays is drawn, at the wall clock's pace or faster, and the page records
-     nothing while it plays: a game played back is no new recording. The settings, map
-     and champion dialogs are opened by the page's input, which the player ignores: what
-     the recording has of them is their `pause` changes, which hold and release the
-     clock with nothing shown. A span the clock is held through, from a `pause` to the
-     next that lets it run, is played at once, undrawn and unpaced. Its VBLs cannot be
-     dropped: under a held clock each still counts down the attack panel's flash
-     (`attackFlashVbls`, which the attack menu waits on, `src/engine/AttackMenu.ts`),
-     moves the message strip on, raises the due tick and runs the mouse queue's pass,
-     and under the disk menu CSBWin's VBL handler runs. Played at once, they leave the
-     game as the recorded one.
+   - **4b, the page: done.** `?recording=<id>` plays the store's recording in place of a
+     game (`playRecording`, `src/main.ts`), from its root through each branch down to it
+     (`readRecordingPath`, `src/data/saves/RecordingStore.ts`); G31's dialog will open
+     the page so. Every tick is drawn at the wall clock's pace, and a span the clock is
+     held through, a dialog of the recorded page's or the disk menu, is played at once
+     and undrawn (`RecordingPlayer.held`, `Game.runAtOnceWhile`): its VBLs still count
+     what a held clock counts, so they cannot be dropped. The page's input reaches
+     nothing, nothing is recorded, saved or sent to the statistics, and at the path's
+     end or a drift the loop stops, the screen as the recording left it, the drift on
+     the console. `tools/checks/replay.ts` plays every replay through the loop as the
+     page does, each held span in one wake of it; `tools/probe-frames.ts` plays the
+     page's own recording back with `?recording=`. A faster pace, stopping and the
+     controls a viewer has are G31's design.
    - **4c, a branch of a Sleepsave joined: ⏳.** A Sleepsave's point is taken inside the
      VBL of its click (`GameSaves.sleepSave`, `Recorder.point`), and the player joins
      after a VBL, so the parent makes its file once the rest of that VBL has run, its

@@ -146,6 +146,8 @@ export class Game implements MainLoop {
     private vblClockStart = 0;
     private vblsPaced = 0;
     private loopTimer: unknown = null;
+    /** While it holds, the loop's VBLs run at once, unpaced (`runAtOnceWhile`). */
+    private atOnce: (() => boolean) | null = null;
     /** `MainLoop` has returned, on the tick of a lost game (see `gameTick`), or won. */
     private mainLoopReturned = false;
     /** An error has ended the game (`die`): it never runs again, and nothing saves it. */
@@ -502,18 +504,37 @@ export class Game implements MainLoop {
         } else {
             this.vblsPaced += due;
         }
+        let ranAtOnce = false;
         try {
-            for (let n = 0; n < due && this.running; n++) this.runFrame();
+            for (let n = 0; n < due && this.running; n++) {
+                this.runFrame();
+                for (; this.running && this.atOnce?.(); ranAtOnce = true) this.runFrame();
+            }
         } catch (error) {
             this.die();
             this.ctx.host.die(error);
             return;
         }
         if (!this.running) return;
+        // The wall clock counts on from after the VBLs run at once, which owe it nothing.
+        if (ranAtOnce) {
+            this.vblClockStart = clock.now();
+            this.vblsPaced = 0;
+        }
 
         const nextVbl = this.vblClockStart + (this.vblsPaced + 1) * 1000 / VBL_FREQUENCY;
         this.loopTimer = clock.setTimeout(this.gameLoop, Math.max(0, nextVbl - clock.now()));
     };
+
+    /**
+     * While `predicate` holds, after any VBL of the loop (`gameLoop`), the VBLs run at
+     * once, one after the other, and the wall clock counts on from after them: a
+     * recording's span under a held clock, played back (`RecordingPlayer.held`). `null`:
+     * every VBL paced.
+     */
+    runAtOnceWhile(predicate: (() => boolean) | null): void {
+        this.atOnce = predicate;
+    }
 
     /**
      * One VBL of the loop: `vblInterrupt`, then the main loop's pass it wakes — the mouse

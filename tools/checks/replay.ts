@@ -14,8 +14,9 @@
  * page is a fresh one fed the recording alone, as the recorded page's store holds it
  * (`RecordingWriter` over a store in memory, written every five seconds of the clock as
  * the page writes it), and played by the player (`RecordingPlayer`): its start read, its
- * rules and extras set, each change applied before its VBL, VBLs run one by one, and the
- * screen drawn only at the tick's `DrawViewport`, which a click in the viewport is
+ * rules and extras set, each change applied before its VBL, the VBLs run by the loop as
+ * the page runs them, a span under a held clock at once and the loop stopped at the end,
+ * and the screen drawn only at the tick's `DrawViewport`, which a click in the viewport is
  * resolved through. It shows no dialog and writes no save: the disk menu a played VBL
  * opens is its game half alone.
  *
@@ -58,9 +59,10 @@
  */
 import { readFileSync } from 'node:fs';
 
+import { VBL_FREQUENCY } from '../../src/core/constants';
 import { CsbRandom } from '../../src/core/random';
 import { emptyDungeonData } from '../../src/data/DungeonLoader';
-import { readSaveFileFields, type RecordingEntry, type SaveEntry } from '../../src/data/saves';
+import { readRecordingPath, readSaveFileFields, type RecordingEntry, type SaveEntry } from '../../src/data/saves';
 import { Game } from '../../src/engine/Game';
 import { NO_EXTRAS } from '../../src/engine/GameContext';
 import { GameSaves } from '../../src/engine/GameSaves';
@@ -99,6 +101,8 @@ const DUNGEON = new Uint8Array(readFileSync(`${STOCK_DIR}/dungeon.dat`));
 
 /** How often the page writes the running recording (`RECORDING_WRITE_MS`, `src/main.ts`). */
 const RECORDING_WRITE_MS = 5000;
+/** A VBL of the wall clock, rounded up: a wake of the loop runs one, now and then two. */
+const VBL_MS = Math.ceil(1000 / VBL_FREQUENCY);
 
 /** The pages' recordings' ids, one count for every page, which may share a store. */
 let recordingIds = 0;
@@ -135,6 +139,9 @@ class Page {
   /** A replay's VBLs with a dialog up, and with the clock held. */
   dialogVbls = 0;
   heldVbls = 0;
+  /** A replay's spans under a held clock, and those whose VBLs more than one wake of the loop ran. */
+  heldSpans = 0;
+  heldSpread = 0;
 
   /**
    * `recorded`: the screen composed as the page composes it, after every input and at
@@ -221,9 +228,17 @@ class Page {
       if (selectedCharacterIndex < 0 && !sleeping) this.renderView();
     });
     if (!recorded) {
+      let heldAt: number | null = null;
       game.onFrame(() => {
         if (screen.ui.dialog || screen.ui.saveMenu || screen.ui.hintOracleUp) this.dialogVbls++;
-        if (game.ctx.state.paused) this.heldVbls++;
+        if (!game.ctx.state.paused) {
+          heldAt = null;
+          return;
+        }
+        this.heldVbls++;
+        if (heldAt === null) this.heldSpans++;
+        else if (heldAt !== this.clock.time) this.heldSpread++;
+        heldAt = this.clock.time;
       });
     }
     if (recorded) {
@@ -267,23 +282,30 @@ class Page {
   /**
    * A fresh page playing `path` from the first recording's start, from the recordings
    * alone (`RecordingPlayer`), its own recorder begun at each start the player reads, then
-   * the loop. The boot's DM rules are a root's first change. `shared`: a page whose
-   * stores this one writes its recording to, as another tab's.
+   * the loop, as the page plays one (`playRecording`, `src/main.ts`): a span under a held
+   * clock run at once, and the loop stopped at the end. The boot's DM rules are a root's
+   * first change. `shared`: a page whose stores this one writes its recording to, as
+   * another tab's.
    */
   static replay(path: readonly Recording[], shared: Page | null = null): Page {
     const page = new Page(false, shared);
-    const player = new RecordingPlayer(page.game, path, DUNGEON);
+    const { game } = page;
+    const player = new RecordingPlayer(game, path, DUNGEON);
     player.onBegin((recording) => page.recorder.begin(recording.start, recording.parent));
+    player.onEnd(() => game.stop());
+    game.runAtOnceWhile(() => player.held);
     player.start();
     page.player = player;
-    page.game.start(true);
+    game.start(true);
     return page;
   }
 
-  /** The VBLs run while the player plays, up to `vbls` of the recording it plays. */
+  /** The loop woken a VBL apart while the player plays, up to `vbls` of the recording it plays. */
   play(vbls = Infinity): void {
     const player = this.player!;
-    while (player.playing && player.point.vbls < vbls) this.game.runFrame();
+    while (player.playing && player.point.vbls < vbls) {
+      if (!this.clock.advance(VBL_MS)) throw new Error('the loop stopped while the player plays');
+    }
   }
 
   /** The running recording written, as the page writes it every `RECORDING_WRITE_MS`. */
@@ -679,7 +701,10 @@ async function pruned(recorded: Page, root: Recording): Promise<void> {
   check(sameRecording(healed, recorded.recording) && !healed.ended,
     `and its page's next write writes it whole again (${healed.changes.length} changes, ${store.entries.get(second.id)!.parts} parts)`);
 
-  const path = Page.replay([await store.read(root.id), healed]);
+  const read = await readRecordingPath(store, second.id);
+  check(read.map((recording) => recording.id).join() === `${root.id},${second.id}`,
+    'the store gives the branch\'s path from its root (`readRecordingPath`)');
+  const path = Page.replay(read);
   path.play();
   sameGame(recorded, path, healed, 'the second branch, pruned around, replayed from its root through the join');
 }
@@ -726,6 +751,8 @@ async function replay(name: string, start: Start, script: (player: Player) => Pr
   sameGame(recorded, played, recording, 'every change is replayed at its VBL');
   check(played.dialogVbls === 0 && played.heldVbls > 0 && played.store.files.size === 0,
     `the replay shows no dialog and writes no save: the disk menu's and the settings' clock held through ${played.heldVbls} VBLs, nothing shown`);
+  check(played.heldSpans > 0 && played.heldSpread === 0 && played.clock.pending === null,
+    `each span under a held clock is played at once, in the wake of the loop that held it (${played.heldSpans} spans), and the loop stops at the end`);
 
   // A read ends the replay's recording, and F9's begins the recorded page's next.
   applySaveBytes(game, recorded.saveFile());

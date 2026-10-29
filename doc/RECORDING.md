@@ -355,6 +355,17 @@ a root and the branches down to the one played, or a branch alone, from its own 
   not log, so the player's game makes them again there and writes nothing
   (`GameSaves.sleepSave`).
 
+**The page** plays one with `?recording=<id>` (`playRecording`, `src/main.ts`): the path
+the store holds to it, from its root (`readRecordingPath`,
+`src/data/saves/RecordingStore.ts`), played by the page's own loop. Every tick is drawn at
+the wall clock's pace. A span the clock is held through (`RecordingPlayer.held`), from the
+change or the VBL that held it to the change that lets it run, is played at once and not
+drawn (`Game.runAtOnceWhile`): its VBLs cannot be dropped, since a held clock still counts
+the attack panel's flash, moves the message strip on, raises the due tick and runs the
+mouse queue's pass. The page's input reaches nothing, and the page records nothing,
+saves nothing and sends no statistic. At the path's end, or at a drift, the loop stops,
+the screen as the recording left it.
+
 **A branch of a Sleepsave does not join.** Its point is taken inside the VBL of its click,
 and the player joins after a VBL, so the parent makes its file once the rest of that VBL
 has run, its tick among them: the join's check stops the path (`DEBT.md` G29). The branch
