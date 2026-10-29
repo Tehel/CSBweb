@@ -221,6 +221,9 @@ export type ModerationAction = (typeof MODERATION_ACTIONS)[number];
  */
 export const RECORDINGS_ROUTE = 'api/recordings';
 
+/** The one field of the form `POST RECORDINGS_ROUTE` takes: the package's file. */
+export const RECORDING_PACKAGE_FIELD = 'package';
+
 /** Where a shared recording's package is served, relative to the page: `RECORDING_FILES/<id>.gz`. */
 export const RECORDING_FILES = 'recordings';
 

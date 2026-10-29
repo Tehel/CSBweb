@@ -363,6 +363,8 @@ body.welcome {
 .recordings-info, .recordings-reading { color: var(--p13); }
 .recordings-description { color: var(--p13); white-space: pre-line; overflow-wrap: anywhere; }
 .recordings-failure { color: var(--p9); }
+.recordings-why { margin: 0; color: var(--p2); }
+.recordings-upload-form { display: flex; flex-direction: column; gap: 10px; }
 .add-set-columns { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 24px; }
 .add-set-give { display: flex; flex-direction: column; gap: 10px; }
 .add-set-field { display: grid; grid-template-columns: 150px 1fr; align-items: center; gap: 12px; }

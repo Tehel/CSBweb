@@ -125,7 +125,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G31 | Recordings shared: the set's dialog, a package, the server | L | ⏳ step 10 of 11 |
+| G31 | Recordings shared: the set's dialog, a package, the server | L | ⏳ step 11 of 11 |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
 | C194 | A DSA's wall graphic counts as a real decoration, so it hides no text | S | ⏳ |
 | C195 | Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space | S | ⏳ to decide with the author |
@@ -727,7 +727,7 @@ player by: the sets they own, and a moderator's rights (`X-Player-Id`, `server/a
 by the name the player gives, or by nobody, and the server keeps its uploader's
 `playerId` apart, as a set's `owner` is kept, for a withdrawal.
 
-Paying it, in steps; the design is decided, and step 10 is next.
+Paying it, in steps; the design is decided, and step 11 is next.
 
 1. A game's end is a point to share: the game tells it at the boundary as `ShowCredits`
    follows `MainLoop`'s return (`InputBoundary.ended`), the recording ends in that VBL
@@ -812,13 +812,15 @@ Paying it, in steps; the design is decided, and step 10 is next.
    anew, a refusal said in the dialog. `tools/probe-frames.ts` lists, selects, approves,
    hides, shows, deletes and withdraws through the dialog, against the dev server's
    `api/recordings`, and a refusal of a HIDE behind the page's back.
-10. UPLOAD, on a browser's point: its form in the panel, a title, which it needs, and an
-   author and a description, which it does not (`RECORDING_TEXT_LIMITS`); the package
-   written (`packageOfSave`, `packageOfEnd`) and sent (`POST api/recordings`), then the
-   site's list anew, the recording pending. Refused in the page with a `?dev` move in the
-   path, as the server refuses it. Not offered for a set the site does not publish, a
-   local one or a pending one, and the dialog says why. `tools/probe-frames.ts` uploads
-   through the dialog.
+10. UPLOAD, on a browser's point (`showUpload`, `src/ui/welcomePage.ts`): its form in the
+   panel, a title, which UPLOAD waits for, and an author and a description, which it does
+   not (`RECORDING_TEXT_LIMITS`), then CANCEL and UPLOAD; the package written
+   (`packageOfSave`, `packageOfEnd`) and sent as `RECORDING_PACKAGE_FIELD` (`uploadPoint`,
+   `POST api/recordings`), then the site's list anew, the recording selected in it,
+   pending, a refusal said and the form kept. Not offered for a local set, a pending one,
+   nor a path with a `?dev` move (`playedWithDevMoves`, the server's `DEV_CHANGES`' twin),
+   and the panel says why in its place. `tools/probe-frames.ts` uploads a quick save
+   through the dialog, and sees a game's end with a `?dev` move not offered it.
 11. The credits a recording of a game's end plays into: they take the input as in play
    (`showEndOfGame`), so neither the viewer's strip nor its keys reach them, and their
    RESTART THIS GAME, where a save allows it, would read the save into the page that plays

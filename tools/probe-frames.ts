@@ -1896,7 +1896,7 @@ const endWritten = await evaluate(`(async()=>{ const { recordingStore, saves } =
   const recording = await recordingStore.read(row.id), id = 'probe-end', now = Date.now();
   await recordingStore.write({ ...row, id, parent: null, ended: true, end: { word11694: true }, endedAt: now, playTime: 754000, parts: 2 },
     [{ id, seq: 0, start: recording.start, parent: null, rules: recording.rules, extras: recording.extras }, { id, seq: 1, changes: recording.changes }], null);
-  return { save: entry.name, saveId: entry.id, point: [entry.recording.changes, entry.recording.vbls].join(), level: entry.level }; })()`);
+  return { save: entry.name, saveId: entry.id, recording: entry.recording.recording, point: [entry.recording.changes, entry.recording.vbls].join(), level: entry.level }; })()`);
 await navigate(`${APP}?dungeon=nowhere&keepsaves`, WELCOME);
 await clickOn('.pick-cell:has(.pick[data-set="csb"]) .pick-documents');
 await clickOn('#documents-tab-recordings');
@@ -2034,6 +2034,66 @@ check(toUploader?.site.join() === `${first}|Probe|hidden|yours|true` && toUpload
   && askedSiteWithdraw?.title === 'Withdraw Probe?' && askedSiteWithdraw.button === 'Withdraw'
   && siteWithdrawn?.site.join() === 'No recording of this dungeon on the site yet.' && leftOnSite === 0,
   'its uploader sees it hidden and theirs, with WITHDRAW, which asks first, then the site has neither recording');
+
+// UPLOAD on the browser's points (`src/ui/welcomePage.ts`), by the uploader above: a game's
+// end whose path holds a move of `?dev`, a copy of the quick save's recording with one
+// added, is not uploadOffered it, and the panel says why. The quick save is: its form in the
+// panel, UPLOAD waiting for a title, CANCEL back to its panel; then filled and sent, the
+// site has it pending, listed to its uploader alone, selected, with WITHDRAW, its text as
+// given. Its uploader withdraws it, and the game's end is deleted.
+await navigate(`${APP}?intro=0&dungeon=csb&keepsaves&keepsettings`, GAME);
+await evaluate(`(async()=>{ const { recordingStore } = window.__probe;
+  const row = (await recordingStore.list()).find((r) => r.id === ${JSON.stringify(endWritten.recording)});
+  const recording = await recordingStore.read(row.id), id = 'probe-dev-end';
+  const changes = [...recording.changes, { change: { kind: 'devLevel', delta: 1 }, vbl: recording.changes.at(-1)?.vbl ?? 0, time: 0, random: 0 }];
+  await recordingStore.write({ ...row, id, parent: null, ended: true, end: { word11694: false }, endedAt: Date.now(), playTime: 1000, changes: changes.length, parts: 2 },
+    [{ id, seq: 0, start: recording.start, parent: null, rules: recording.rules, extras: recording.extras }, { id, seq: 1, changes }], null);
+  return 1; })()`);
+await navigate(`${APP}?dungeon=nowhere&keepsaves&keepsettings`, WELCOME);
+await openCsbRecordings();
+await clickOn('.recordings-item[data-recording="probe-dev-end"]');
+const devEnd = await recordingsTab();
+const devWhy: string | null = await evaluate(`document.querySelector('.recordings-panel .recordings-why')?.textContent ?? null`);
+await clickOn(`.recordings-item[data-recording="${savePoint}"]`);
+const uploadOffered = await recordingsTab();
+const uploadForm = () => evaluate(`(p=>({ fields: [...p.querySelectorAll('input, textarea')].map(f=>f.name+':'+f.maxLength).join(),
+  buttons: [...p.querySelectorAll('.btn')].map(b=>b.textContent+(b.disabled?':off':'')).join(), focused: document.activeElement?.name ?? null }))(document.querySelector('.recordings-panel'))`);
+await clickOn('.recordings-upload');
+const blankForm = await uploadForm();
+await clickOn('.recordings-cancel');
+const cancelled = await recordingsTab();
+await clickOn('.recordings-upload');
+await evaluate(`(p=>{ for (const [name, value] of [['title', '  Probe upload '], ['author', 'A Probe'], ['description', 'Up to the quick save.\\nTwo lines.']]) {
+  const f = p.querySelector('[name=' + name + ']'); f.value = value; f.dispatchEvent(new Event('input')); } return 1; })(document.querySelector('.recordings-panel'))`);
+const filledForm = await uploadForm();
+await clickOn('.recordings-send');
+await until(`!document.querySelector('.recordings-panel .recordings-upload-form') && !!document.querySelector('.recordings-withdraw')`, 'the upload listed');
+const uploaded = await recordingsTab();
+const uploadedId: string | null = await evaluate(`document.querySelector('.recordings-site .recordings-item[aria-selected="true"]')?.dataset.recording ?? null`);
+const uploadedRow = await evaluate(`(async()=>{ const row = (p) => fetch('api/recordings?dataSet=csb', p ? { headers: { 'X-Player-Id': p } } : undefined)
+  .then((r) => r.json()).then((j) => j.recordings.find((r) => r.id === ${JSON.stringify(uploadedId)}) ?? null);
+  const mine = await row(${JSON.stringify(SHARER)});
+  return { mine: mine && [mine.title, mine.author, mine.description, mine.status, mine.mine].join('|'), toNobody: await row(null) }; })()`);
+await clickOn('.recordings-withdraw');
+await confirmDelete();
+await clickOn('.recordings-item[data-recording="probe-dev-end"]');
+await clickOn('.recordings-delete');
+await confirmDelete();
+const uploadLeft = await recordingsTab();
+await clickOn('#documents-close');
+console.log('  UPLOAD:', JSON.stringify({ devEnd: devEnd?.buttons, devWhy, uploadOffered: uploadOffered?.buttons, blankForm, cancelled: cancelled?.buttons, filledForm,
+  uploaded, uploadedId, uploadedRow, uploadLeft: uploadLeft && { site: uploadLeft.site, items: uploadLeft.items.length } }));
+check(devEnd?.buttons === 'Play,Delete' && devWhy === 'Not to upload: it holds a move of ?dev, which no game holds.',
+  'a game\'s end whose path holds a move of ?dev is not offered UPLOAD, and its panel says why');
+check(uploadOffered?.buttons === 'Play,Upload' && blankForm.fields === 'title:60,author:200,description:300' && blankForm.buttons === 'Cancel,Upload:off'
+  && blankForm.focused === 'title' && cancelled?.buttons === 'Play,Upload' && filledForm.buttons === 'Cancel,Upload',
+  'the save offers UPLOAD: its form in the panel, a title, an author and a description within their limits, UPLOAD waiting for the title; CANCEL is its panel again');
+check(/^[0-9A-F]{16}$/.test(uploadedId ?? '') && uploaded?.site.join() === `${uploadedId}|Probe upload|pending|yours|true` && uploaded.buttons === 'Play,Withdraw'
+  && uploaded.panel.includes('By: A Probe') && uploaded.panel.includes('Up to the quick save.\nTwo lines.') && uploaded.status.startsWith('Probe upload is uploaded: ')
+  && uploadedRow.mine === 'Probe upload|A Probe|Up to the quick save.\nTwo lines.|pending|true' && uploadedRow.toNobody === null,
+  'UPLOAD sends its package: the site has it pending, its text trimmed, listed to its uploader alone, selected, with WITHDRAW');
+check(uploadLeft?.site.join() === 'No recording of this dungeon on the site yet.' && !uploadLeft.items.some((item: string) => item.startsWith('probe-dev-end|')),
+  'its uploader withdraws it, and the game\'s end with the ?dev move is deleted');
 
 // The map dialog (`src/renderer/ui/MapDialog.ts`), over CSB's `csbgame2.dat`, its party
 // where the save left it: a press held on the message area opens it, with MAP VIEW on

@@ -64,9 +64,13 @@
  *   whether an extra was on, a site's its author, its description and when it was shared
  *   too, with PLAY, a link that plays it (`?recording=`). On a site's, to a moderator,
  *   APPROVE on a pending one, HIDE or SHOW on any other, and DELETE, and to its uploader
- *   WITHDRAW, after which the list is the server's anew, a refusal said in the dialog; on
- *   a game's end DELETE, the only way one leaves the store but its set's own deletion.
- *   Each delete and withdrawal asks first.
+ *   WITHDRAW, after which the list is the server's anew, a refusal said in the dialog. On
+ *   a browser's, UPLOAD, which opens its form in the panel, a title, which it needs, an
+ *   author and a description, and sends its package (`POST api/recordings`), after which
+ *   the site's list is asked anew, the recording selected in it, pending; it is not offered
+ *   for a local set, a pending one, nor a path that holds a move of `?dev`, and the panel
+ *   says why. On a game's end DELETE, the only way one leaves the store but its set's own
+ *   deletion. Each delete and withdrawal asks first.
  * - **The moderator's switch**, at the page's top right corner, is offered to a moderator
  *   alone. Off, the page is the one a player sees (`playerView`): neither a hidden set nor
  *   a pending one, the moderator's own pending sets included since the page is not told
@@ -101,7 +105,7 @@ import { archiveName, dataSetArchive, type ReadArchiveFile } from '../data/DataS
 import { folderFiles } from '../data/DataSetFiles';
 import {
     chooserSets, DATA_SETS_ROUTE, DOCUMENT_EXTENSIONS, DOCUMENTS_SEGMENT, documentPath, isDocumentName, PLAYER_ID_HEADER, PNG_HEAD_BYTES, pngSize,
-    RECORDINGS_ROUTE, SHARED_RECORDING_ID, thumbnailPath,
+    RECORDING_PACKAGE_FIELD, RECORDINGS_ROUTE, SHARED_RECORDING_ID, thumbnailPath,
     type DataSet, type DataSetManifest, type ModerationAction, type RecordingAction,
 } from '../data/DataSets';
 import { localDataSet, type LocalDataSetFile, type LocalDataSetRecord } from '../data/LocalDataSets';
@@ -114,7 +118,11 @@ import {
     type BrowserDataSetStore, type RecordingEntry, type RecordingStore, type SaveEntry, type SaveStore,
 } from '../data/saves';
 import { pointInfo, pointMadeAt, pointPath, pointRecordingId, storedPoints, type PointInfo, type StoredPoint } from '../engine/RecordingPoints';
-import type { RecordingPackageStart } from '../engine/RecordingPackage';
+import {
+    packageOfEnd, packageOfSave, playedWithDevMoves, RECORDING_TEXT_LIMITS, writeRecordingPackage,
+    type RecordingPackageStart, type RecordingPackageText,
+} from '../engine/RecordingPackage';
+import type { Recording } from '../engine/Recorder';
 import { pruneRecordings } from '../engine/RecordingWriter';
 
 /** The page's static half: the logo, the places the grid and the buttons go, and the bottom. */
@@ -238,6 +246,19 @@ const DOCUMENTS = `
 </form>`;
 
 /**
+ * The UPLOAD form in the RECORDINGS tab's panel: a recording's title, author and
+ * description (`RecordingPackageText`), as long as a set's may be, and who reads them first.
+ */
+const UPLOAD = `
+<label class="add-set-field"><span class="px px2">Title</span>
+  <input name="title" maxlength="${RECORDING_TEXT_LIMITS.title}" autocomplete="off"></label>
+<label class="add-set-field"><span class="px px2">Author</span>
+  <input name="author" maxlength="${RECORDING_TEXT_LIMITS.author}" placeholder="Your name, or none" autocomplete="off"></label>
+<label class="add-set-field"><span class="px px2">Description</span>
+  <textarea name="description" rows="3" maxlength="${RECORDING_TEXT_LIMITS.description}"></textarea></label>
+<p class="recordings-why">A moderator reads them before the site lists it to anyone but you.</p>`;
+
+/**
  * The extensions of the documents a browser shows, which a link opens in a new tab; any
  * other is downloaded (`DOCUMENT_EXTENSIONS`).
  */
@@ -260,7 +281,7 @@ const DONE: Record<ModerationAction, string> = { approve: 'approved', reject: 'r
 export async function showWelcomePage(
     body: HTMLElement,
     manifest: DataSetManifest,
-    store: Pick<SaveStore, 'list'>,
+    store: Pick<SaveStore, 'list' | 'read'>,
     localSets: Pick<BrowserDataSetStore, 'list' | 'put' | 'remove'>,
     recordings: RecordingStore,
     loadManifest: () => Promise<DataSetManifest>,
@@ -499,11 +520,21 @@ function moderateDataSet(id: string, action: ModerationAction): Promise<string |
  * `headers`: `null` once done, else why not, as the server says it.
  */
 async function postAsPlayer(route: string, headers: Record<string, string>, body: string | FormData): Promise<string | null> {
+    const answer = await answerAsPlayer(route, headers, body);
+    return typeof answer === 'string' ? answer : null;
+}
+
+/**
+ * `body` posted to `route` as `postAsPlayer` posts it: the server's JSON answer once done,
+ * `null` where it is none, else why not, as the server says it.
+ */
+async function answerAsPlayer(route: string, headers: Record<string, string>, body: string | FormData): Promise<{ readonly json: unknown } | string> {
     const response = await fetch(route, { method: 'POST', headers: { [PLAYER_ID_HEADER]: playerId(), ...headers }, body }).catch(() => null);
     if (!response) return 'the server cannot be reached.';
-    if (response.ok) return null;
-    const answer = await response.json().catch(() => null) as { error?: unknown } | null;
-    return typeof answer?.error === 'string' ? answer.error : `the server answered HTTP ${response.status}.`;
+    const json: unknown = await response.json().catch(() => null);
+    if (response.ok) return { json };
+    const error = (json as { error?: unknown } | null)?.error;
+    return typeof error === 'string' ? error : `the server answered HTTP ${response.status}.`;
 }
 
 /**
@@ -568,7 +599,7 @@ function confirmation(prefix: string, title: string, text: string, verb: string,
 
 /** The stores the RECORDINGS tab reads: the saves and the recordings. */
 interface RecordingsSource {
-    readonly saves: Pick<SaveStore, 'list'>;
+    readonly saves: Pick<SaveStore, 'list' | 'read'>;
     readonly recordings: RecordingStore;
 }
 
@@ -583,7 +614,9 @@ interface RecordingsSource {
  * selects one, and the panel under the lists shows its metadata (`pointInfo`) and PLAY,
  * which plays it (`?recording=`, `pointRecordingId`). On a site's, to a `moderator`,
  * APPROVE, HIDE or SHOW, and DELETE, and to its uploader WITHDRAW (`POST
- * RECORDINGS_ROUTE/<id>`), after which the site's list is asked anew; on a game's end
+ * RECORDINGS_ROUTE/<id>`), after which the site's list is asked anew. On a browser's,
+ * UPLOAD, its form in the panel, which sends its package (`uploadPoint`), but where the
+ * site does not publish the set or the path holds a move of `?dev`. On a game's end
  * DELETE, which deletes it, then what no other point reaches of the recordings before it
  * (`pruneRecordings`). Each delete asks first. A local set, `isLocal`, has RECORDINGS
  * alone, and no site's list. `closed`
@@ -735,6 +768,11 @@ function showRecordings(dialog: HTMLElement, set: DataSet, published: boolean, m
     // The site's, `null` until it answers first.
     let shared: SiteRecording[] | null = null;
     let selected: string | null = null;
+    // The browser's point whose UPLOAD form the panel holds, which a list asked anew keeps.
+    let uploadFor: string | null = null;
+    // Why the browser's points cannot be uploaded, where the site does not publish the set.
+    const unpublished = !published ? 'Not to upload: the site shares the recordings of the dungeons it publishes, and this one is this browser\'s own.'
+        : set.pending ? 'Not to upload yet: the site shares this dungeon\'s recordings once a moderator approves it.' : null;
 
     const refresh = async () => {
         try {
@@ -772,6 +810,7 @@ function showRecordings(dialog: HTMLElement, set: DataSet, published: boolean, m
             line('recordings-when', `${formatSaveDate(when)} ${formatSaveTime(when)}`));
         button.addEventListener('click', () => {
             selected = id;
+            uploadFor = null;
             render();
         });
         entry.append(button);
@@ -800,8 +839,11 @@ function showRecordings(dialog: HTMLElement, set: DataSet, published: boolean, m
         const recording = shared?.find((one) => one.id === selected);
         const point = points.find((one) => pointRecordingId(one) === selected);
         if (recording) showShared(recording);
-        else if (point) void showPoint(point);
-        else panel.replaceChildren();
+        else if (point) {
+            if (uploadFor !== selected) void showPoint(point);
+        } else {
+            panel.replaceChildren();
+        }
     };
 
     /**
@@ -842,13 +884,19 @@ function showRecordings(dialog: HTMLElement, set: DataSet, published: boolean, m
             buttons);
     };
 
-    /** The panel of `point`: its metadata, once its path is read, then PLAY, and DELETE on a game's end. */
+    /**
+     * The panel of `point`: its metadata, once its path is read, then PLAY, UPLOAD, and DELETE
+     * on a game's end. Where the site does not publish the set, or the path holds a move of
+     * `?dev`, a line says why in UPLOAD's place.
+     */
     const showPoint = async (point: StoredPoint) => {
         const id = pointRecordingId(point);
         panel.replaceChildren(line('recordings-reading', 'Reading the recording…'));
+        let path: Recording[];
         let info: PointInfo;
         try {
-            info = pointInfo(point, await pointPath(source.recordings, point), rows);
+            path = await pointPath(source.recordings, point);
+            info = pointInfo(point, path, rows);
         } catch (error) {
             if (selected === id) panel.replaceChildren(line('recordings-failure', `It could not be read: ${error instanceof Error ? error.message : String(error)}`));
             return;
@@ -857,6 +905,13 @@ function showRecordings(dialog: HTMLElement, set: DataSet, published: boolean, m
         const buttons = document.createElement('div');
         buttons.className = 'add-set-buttons';
         buttons.append(playLink(recordingQuery(set.id, id)));
+        const why = unpublished ?? (playedWithDevMoves(path) ? 'Not to upload: it holds a move of ?dev, which no game holds.' : null);
+        if (why === null) {
+            buttons.append(panelButton('recordings-upload', 'Upload', () => {
+                uploadFor = id;
+                showUpload(point, path, info);
+            }));
+        }
         if (point.kind === 'end') {
             buttons.append(panelButton('recordings-delete', 'Delete', () => confirmation('delete-recording', `Delete ${pointName(point).toLowerCase()}?`,
                 'This browser deletes the recording of the game to its end, and what nothing else reaches of the recordings before it.',
@@ -870,12 +925,85 @@ function showRecordings(dialog: HTMLElement, set: DataSet, published: boolean, m
                     await refresh();
                 })())));
         }
-        panel.replaceChildren(...pointLines(info).map((text) => line('recordings-info', text)), buttons);
+        panel.replaceChildren(...pointLines(info).map((text) => line('recordings-info', text)), ...(why === null ? [] : [line('recordings-why', why)]), buttons);
+    };
+
+    /**
+     * The panel's UPLOAD form on `point`, whose path is `path` and metadata `info`: its
+     * title, which UPLOAD waits for, and its author and description, then CANCEL, back to
+     * its panel, and UPLOAD, which sends its package (`uploadPoint`). Once the site has it,
+     * the site's list is asked anew, the recording selected in it, pending; a refusal is
+     * said, and the form kept.
+     */
+    const showUpload = (point: StoredPoint, path: readonly Recording[], info: PointInfo) => {
+        const fields = document.createElement('div');
+        fields.className = 'recordings-upload-form';
+        fields.innerHTML = UPLOAD;
+        const title = fields.querySelector<HTMLInputElement>('[name="title"]')!;
+        const author = fields.querySelector<HTMLInputElement>('[name="author"]')!;
+        const description = fields.querySelector<HTMLTextAreaElement>('[name="description"]')!;
+        const buttons = document.createElement('div');
+        buttons.className = 'add-set-buttons';
+        const send = panelButton('recordings-send', 'Upload', () => void upload()) as HTMLButtonElement;
+        const ready = () => { send.disabled = title.value.trim() === ''; };
+        const editable = (on: boolean) => {
+            for (const field of [title, author, description]) field.disabled = !on;
+            for (const button of buttons.querySelectorAll('button')) button.disabled = !on;
+            if (on) ready();
+        };
+        const upload = async () => {
+            const text = { title: title.value.trim(), author: author.value.trim(), description: description.value.trim() };
+            status.textContent = `Uploading ${text.title}…`;
+            editable(false);
+            const answer = await uploadPoint(point, path, info, text, source.saves);
+            if (typeof answer === 'string') {
+                status.textContent = `Uploading ${text.title} failed: ${answer}`;
+                editable(true);
+                return;
+            }
+            uploadFor = null;
+            selected = answer.id;
+            status.textContent = `${text.title} is uploaded: the site lists it to you alone until a moderator approves it.`;
+            await refreshSite();
+        };
+        buttons.append(panelButton('recordings-cancel', 'Cancel', () => {
+            uploadFor = null;
+            render();
+        }), send);
+        title.addEventListener('input', ready);
+        ready();
+        panel.replaceChildren(fields, buttons);
+        title.focus();
     };
 
     if (published) void refreshSite();
     else for (const shown of dialog.querySelectorAll('.recordings-site-heading, .recordings-site')) shown.remove();
     void refresh();
+}
+
+/**
+ * The package of `point`, whose path is `path` (`pointPath`) and metadata `info`, said by
+ * `text`, written and uploaded (`POST RECORDINGS_ROUTE`) by the player whose `playerId`
+ * this is, a save's file read from `saves`: the id the site gives it, or why not.
+ */
+async function uploadPoint(
+    point: StoredPoint, path: readonly Recording[], info: PointInfo, text: RecordingPackageText, saves: Pick<SaveStore, 'read'>,
+): Promise<{ readonly id: string } | string> {
+    let bytes: Uint8Array;
+    try {
+        const times = { recordedAt: info.recordedAt, endedAt: info.endedAt, playTime: info.playTime };
+        bytes = await writeRecordingPackage(point.kind === 'save'
+            ? packageOfSave(path, point.save.recording, await saves.read(point.save.id), text, times)
+            : packageOfEnd(path, text, times));
+    } catch (error) {
+        return `it could not be packed: ${error instanceof Error ? error.message : String(error)}.`;
+    }
+    const form = new FormData();
+    form.append(RECORDING_PACKAGE_FIELD, new Blob([bytes as Uint8Array<ArrayBuffer>], { type: 'application/gzip' }), 'recording.gz');
+    const answer = await answerAsPlayer(RECORDINGS_ROUTE, {}, form);
+    if (typeof answer === 'string') return answer;
+    const id = (answer.json as { id?: unknown } | null)?.id;
+    return typeof id === 'string' && SHARED_RECORDING_ID.test(id) ? { id } : 'the server answered no id.';
 }
 
 /** The panel's PLAY: a link to `href`. */

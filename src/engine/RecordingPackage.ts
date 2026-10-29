@@ -142,6 +142,15 @@ export function playedWithExtras(path: readonly Recording[]): boolean {
     return path.some((recording) => on(recording.extras) || recording.changes.some(({ change }) => change.kind === 'extras' && on(change.extras)));
 }
 
+/**
+ * Whether a recording of `path` holds a move of the page's `?dev` (`devLevel`, `devMove`),
+ * which no game of CSBWin's holds, so the server refuses its package. The server's twin is
+ * `DEV_CHANGES` (`server/recordings.ts`).
+ */
+export function playedWithDevMoves(path: readonly Recording[]): boolean {
+    return path.some((recording) => recording.changes.some(({ change }) => change.kind === 'devLevel' || change.kind === 'devMove'));
+}
+
 function packageOf(
     path: readonly Recording[], shared: RecordingShared, text: RecordingPackageText,
     times: Pick<RecordingPackageInfo, 'recordedAt' | 'endedAt' | 'playTime'>,

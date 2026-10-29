@@ -130,11 +130,11 @@ import { NOBODY, notificationText } from '../../server/notify.ts';
 import { DOCUMENT_FIELD } from '../../server/documents.ts';
 import { MAX_MODERATION_BYTES } from '../../server/moderate.ts';
 import { MAX_PUBLISH_BYTES, MAX_PUBLISHED_FILE_BYTES } from '../../server/publish.ts';
-import { MAX_RECORDING_BYTES, MAX_RECORDING_MODERATION_BYTES, MAX_SHARE_BYTES, PACKAGE_FIELD, RecordingStore } from '../../server/recordings.ts';
+import { MAX_RECORDING_BYTES, MAX_RECORDING_MODERATION_BYTES, MAX_SHARE_BYTES, RecordingStore } from '../../server/recordings.ts';
 import { StatsStore } from '../../server/stats.ts';
 import { openStore } from '../../server/store.ts';
 import {
-    DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, documentPath, LOCAL_DATA_SET_TEXT_LIMITS, parseManifest, PLAYER_ID_HEADER, RECORDING_FILES, RECORDINGS_ROUTE, SHARED_RECORDING_ID,
+    DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, documentPath, LOCAL_DATA_SET_TEXT_LIMITS, parseManifest, PLAYER_ID_HEADER, RECORDING_FILES, RECORDING_PACKAGE_FIELD, RECORDINGS_ROUTE, SHARED_RECORDING_ID,
 } from '../../src/data/DataSets.ts';
 import { localDataSet } from '../../src/data/LocalDataSets.ts';
 import { checkLocalDataSet, readDungeonWalls } from '../../src/engine/LocalDataSetCheck.ts';
@@ -1235,7 +1235,7 @@ async function checkRecordings(scratch: string): Promise<void> {
         };
         const share = (bytes: Uint8Array<ArrayBuffer>, player: string | null = PLAYER) => {
             const form = new FormData();
-            form.append(PACKAGE_FIELD, fileOf(bytes, 'recording.gz', 'application/gzip'));
+            form.append(RECORDING_PACKAGE_FIELD, fileOf(bytes, 'recording.gz', 'application/gzip'));
             return post(form, player);
         };
         type Listed = { id: string; title: string; status?: string; hidden?: boolean; broken?: boolean; mine?: boolean; extras?: boolean };
@@ -1274,10 +1274,10 @@ async function checkRecordings(scratch: string): Promise<void> {
         const before = kept();
         const refusals: [string, Promise<{ status: number; body: string }>, number][] = [];
         const twoFields = new FormData();
-        twoFields.append(PACKAGE_FIELD, fileOf(won, 'a.gz'));
+        twoFields.append(RECORDING_PACKAGE_FIELD, fileOf(won, 'a.gz'));
         twoFields.append('title', 'x');
         const textOnly = new FormData();
-        textOnly.append(PACKAGE_FIELD, 'not a file');
+        textOnly.append(RECORDING_PACKAGE_FIELD, 'not a file');
         refusals.push(['no player', share(won, null), 400]);
         refusals.push(['a field beside the package', post(twoFields), 400]);
         refusals.push(['a package that is text', post(textOnly), 400]);

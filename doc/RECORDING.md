@@ -479,6 +479,13 @@ APPROVE on a pending one, HIDE or SHOW on any other, and DELETE, and to its uplo
 WITHDRAW (`POST api/recordings/<id>`). Each delete asks first, and the list is then the
 server's anew, a refusal said in the dialog. A local set's book has no site's list.
 
+**UPLOAD** shares a browser's point: its form in the panel takes a title, which it needs,
+an author and a description (`RECORDING_TEXT_LIMITS`), then writes the point's package
+and sends it (`uploadPoint`, `POST api/recordings`); the site's list is then asked anew,
+the recording selected in it, pending until a moderator approves it. It is not offered
+where the site would refuse it, and the panel says why: a local set, a pending one, or a
+path that holds a move of `?dev` (`playedWithDevMoves`).
+
 **The package** (`RecordingPackage`, `src/engine/RecordingPackage.ts`) is one file,
 JSON gzipped by `CompressionStream`: the format's version, the build of the recording
 shared, its data set, the metadata, the path and the point shared. The point is a

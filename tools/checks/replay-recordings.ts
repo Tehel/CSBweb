@@ -23,9 +23,9 @@ import { DatabaseSync } from 'node:sqlite';
 import { createAppServer, type ServerOptions } from '../../server/app.ts';
 import { DataSetStore, parseModerators } from '../../server/dataSets.ts';
 import { RateLimit } from '../../server/events.ts';
-import { PACKAGE_FIELD, RecordingStore } from '../../server/recordings.ts';
+import { RecordingStore } from '../../server/recordings.ts';
 import { StatsStore } from '../../server/stats.ts';
-import { parseManifest, PLAYER_ID_HEADER, RECORDINGS_ROUTE } from '../../src/data/DataSets.ts';
+import { parseManifest, PLAYER_ID_HEADER, RECORDING_PACKAGE_FIELD, RECORDINGS_ROUTE } from '../../src/data/DataSets.ts';
 import { checkLocalDataSet } from '../../src/engine/LocalDataSetCheck.ts';
 import { readRecordingPackage } from '../../src/engine/RecordingPackage.ts';
 import { check, finish } from '../lib/check.ts';
@@ -79,7 +79,7 @@ const instance = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 try {
     const share = async (bytes: Uint8Array<ArrayBuffer>): Promise<string> => {
         const form = new FormData();
-        form.append(PACKAGE_FIELD, new File([bytes], 'recording.gz', { type: 'application/gzip' }));
+        form.append(RECORDING_PACKAGE_FIELD, new File([bytes], 'recording.gz', { type: 'application/gzip' }));
         const response = await fetch(`${instance}/${RECORDINGS_ROUTE}`, { method: 'POST', headers: { [PLAYER_ID_HEADER]: PLAYER }, body: form });
         const body = await response.json() as { id?: string; error?: string };
         if (!body.id) throw new Error(`the share was refused: ${response.status} ${body.error}`);

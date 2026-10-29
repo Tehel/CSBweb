@@ -33,7 +33,7 @@ import { rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { DatabaseSync, StatementSync } from 'node:sqlite';
 
-import { RECORDING_ACTIONS as ACTIONS, SHARED_RECORDING_ID, type RecordingAction } from '../src/data/DataSets.ts';
+import { RECORDING_ACTIONS as ACTIONS, RECORDING_PACKAGE_FIELD as PACKAGE_FIELD, SHARED_RECORDING_ID, type RecordingAction } from '../src/data/DataSets.ts';
 import { samePlayerId, type DataSetStore, type DataSetViewer } from './dataSets.ts';
 import type { DataSetActivity, Notify } from './notify.ts';
 
@@ -71,9 +71,6 @@ export const MAX_SHARE_BYTES = MAX_RECORDING_BYTES + 64 * 1024;
 
 /** The largest body `POST RECORDINGS_ROUTE/<id>` reads. */
 export const MAX_RECORDING_MODERATION_BYTES = 1024;
-
-/** The form's one field: the package's file. */
-export const PACKAGE_FIELD = 'package';
 
 /**
  * What the server uses of a package, as `readRecordingPackage` (`src/engine/RecordingPackage.ts`)
@@ -264,7 +261,10 @@ function playedWithExtras(pkg: SharedPackage): boolean {
     return pkg.path.some((recording) => on(recording.extras) || recording.changes.some(({ change }) => change.kind === 'extras' && on(change.extras)));
 }
 
-/** The moves of the page's `?dev` (`devLevel`, `devMove`), which no game of CSBWin's holds. */
+/**
+ * The moves of the page's `?dev` (`devLevel`, `devMove`), which no game of CSBWin's holds.
+ * The page's twin is `playedWithDevMoves` (`src/engine/RecordingPackage.ts`).
+ */
 const DEV_CHANGES: ReadonlySet<string> = new Set(['devLevel', 'devMove']);
 
 /**
