@@ -125,6 +125,7 @@ In payoff order: the first row is the next item.
 | C195 | Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space | S | ⏳ to decide with the author |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | E40 | The statistics page's heat map | M | ⏸️ |
+| E44 | The recording viewer seeks forward and back | M–L | ⏸️ |
 | C150 | Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops | S | ⏸️ waits on the author |
 | G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
@@ -142,7 +143,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: A11 · C196 · D22 · E44 · F24 · G32 · P13 · R17 · U13 · W8 · X19. An ID recorded and paid in one commit has no
+Next free IDs: A11 · C196 · D22 · E45 · F24 · G32 · P13 · R17 · U13 · W8 · X19. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -482,7 +483,7 @@ New state-representation debt goes here, and jumps the queue.
 
 New architecture debt goes here, and jumps the queue. Every E item is a refactor: the rules
 of "How to work this list", point 3, apply, byte-identical tool output included. What the
-page redesign adds is the exception: E40's heat map, and E22's fill.
+page redesign adds is the exception: E40's heat map, E44's seeking, and E22's fill.
 
 The structure need no longer follow CSBWin's files (the author's decision): a module may
 gather or split CSBWin's functions as the code's concerns ask. What still follows CSBWin is
@@ -503,6 +504,57 @@ map, as designed with the author:
 
 Paying it: the heat map, checked in `tools/probe-frames.ts`'s statistics block (a level
 opens its map) and by a screenshot over the dev server's fortnight.
+
+### E44 ⏸️ The recording viewer seeks forward and back
+
+The viewer's strip (`doc/RECORDING.md` → "The port's player") pauses, sets the pace, restarts
+and stops; nothing moves the play to a time of the path. Wanted: forward and back by 10 s
+and by a minute, as designed with the author. Size M for steps 1 and 2, L with step 3.
+
+**What the engine costs.** Read from `csbgame7.dat` with an idle party in Node, 36000 VBLs
+(ten minutes of game) run in 83 ms without a view drawn; `saveFileOf` builds the 63 KB
+file in 1.8 ms and `applySaveBytes` reads it back in 2.9 ms. What a seek pays beyond that is
+`DrawViewport`, which a player runs at every tick, four a second, since a click in the
+viewport is resolved through the tick's picking (`doc/RECORDING.md` → "What a player must
+do"). It is not measured.
+
+1. **Forward**: the player run to a VBL at once, as a span under a held clock is
+   (`Game.runAtOnceWhile`), in slices of about 10 ms an animation frame so the strip still
+   answers and can show the progress; the sound silent and the screen composed only at
+   the arrival. The drift checks and the joins play as ever. A target inside a held span
+   moves to its end, one past the path's end to the end.
+2. **Back, without checkpoints**: RESTART's rewind (`rewindPage`), then forward to the
+   target. A path's joins are checkpoints already, proven by `tools/checks/replay.ts`
+   (a branch's file and `CarriedState` set over its read play on byte for byte), so the
+   play may begin from the last join before the target. Measure a long recording's
+   seek in the browser before step 3: a few seconds to go back an hour may be enough.
+3. **Checkpoints, only if step 2 is too slow**: taken by the player in memory every N
+   VBLs as it plays, each a save's file (`saveFileOf`, with no save's tail:
+   `saveWritten` changes the game), its `CarriedState` and the player's cursor (its
+   recording, next change and VBL counts); back is the latest checkpoint before the
+   target read, then forward. Port-only and never written, so the saves' compatibility
+   with CSBWin does not reach them. A join is proven only at a save's point, after its
+   tail has re-attached the monsters and run `SmartDiscard`; at any other VBL the file
+   may not hold all the game reads on. To find out, in this order:
+   - **The tool first**: over a long path, a checkpoint every N VBLs, each read into a
+     fresh page and played to the end, with no drift and the final file the uninterrupted
+     play's. Each failure names a field the checkpoint adds beyond `CarriedState`.
+   - **The candidates**, none checked: the monsters' ITEM16s, which a read attaches anew
+     where the play never detached them; the mouse queue's waiting clicks; a `LoopScript`
+     in its `VBLDelay` (`Game.script`, `scriptDelay`) and `Game`'s other private state;
+     the attack menu's flash; `viewportRandom`; and, for the screen alone, the message
+     strip and the interface's state (an inventory open). Taking checkpoints only at
+     quiet VBLs (just after a tick, the queue empty, no script, the clock running) narrows
+     them.
+   - **At run time**, the player's drift stops a seek that a checkpoint misled: the
+     checkpoint is dropped and the seek begins again from an earlier one or a join.
+   - **Memory**: one every 30 s of game is 600 × 63 KB, about 38 MB, over five hours;
+     dense near the play and sparse behind it (one every five minutes), or compressed,
+     the files being mostly zeros.
+
+Paying it: the strip's new controls (a golden frame), the seeks checked in
+`tools/checks/replay.ts` (a seek forward and back each lands on the uninterrupted play's
+state, its file compared), and `doc/RECORDING.md`'s strip updated.
 
 ### E22 ⏸️ Fullscreen filled by a fraction
 
