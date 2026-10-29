@@ -125,7 +125,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G31 | Recordings shared: the set's dialog, a package, the server | L | ⏳ step 2 of 5 |
+| G31 | Recordings shared: the set's dialog, a package, the server | L | ⏳ step 3 of 5 |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
 | C194 | A DSA's wall graphic counts as a real decoration, so it hides no text | S | ⏳ |
 | C195 | Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space | S | ⏳ to decide with the author |
@@ -703,7 +703,8 @@ Decided with the author:
   withdrawal, JSON. A row each in the store's SQLite, the package in a folder of its own
   that `backup.ts` copies. It checks the package's form alone: it parses, its set is
   published, its sizes and metadata are within bounds. It does not replay it. Its limits:
-  a package's size, which step 2's measure sets, uploads per address per hour as
+  a package's size, which step 2's measure informs (`doc/RECORDING.md` → "What a package
+  costs"), uploads per address per hour as
   publishes are (`PUBLISHES_PER_HOUR`), and the disk the folder may take.
 - **Moderation**: a recording is pending until a moderator approves it, as a set is: its
   title and description are free text nobody else sees unread. Its uploader withdraws
@@ -726,7 +727,7 @@ player by: the sets they own, and a moderator's rights (`X-Player-Id`, `server/a
 by the name the player gives, or by nobody, and the server keeps its uploader's
 `playerId` apart, as a set's `owner` is kept, for a withdrawal.
 
-Paying it, in steps; the design is decided, and step 2 is next.
+Paying it, in steps; the design is decided, and step 3 is next.
 
 1. A game's end is a point to share: the game tells it at the boundary as `ShowCredits`
    follows `MainLoop`'s return (`InputBoundary.ended`), the recording ends in that VBL
@@ -734,16 +735,25 @@ Paying it, in steps; the design is decided, and step 2 is next.
    and the player drifts at a game that ends elsewhere (`tools/checks/replay.ts`, point
    9). Nothing lists or deletes one yet: the store keeps every end until its data set is
    deleted, which step 5 owes.
-2. The package, written and read: a tool writes one from a save's point and from an end,
-   reads it back and replays it, and measures a long game's package for step 3's limits.
+2. The package (`src/engine/RecordingPackage.ts`, `doc/RECORDING.md` → "Shared
+   recordings"): written from a save's point and from an end, read back with its form
+   checked, and played from it alone to its point, a save's file checked there
+   (`SavedAtEnd`), in `tools/checks/replay.ts`, point 10. An hour of a new game at a
+   player's pace, seven recordings, is a 340 KB package, 930 KB unzipped: each save's
+   file in it about 42 KB, each change about 11 bytes (`replay.ts --measure`).
 3. The server: storing, listing, serving, moderating and withdrawing them, with its checks
    in `tools/checks/server.ts`; and the `utils/` tool that replays the listed ones against
-   a build and marks the broken.
+   a build and marks the broken. It reads a package with `readRecordingPackage`, whose
+   imports name no extension and whose values reach into the engine (`GameContext`'s
+   `NO_EXTRAS`, `LoopState`'s flags, `CsbwinSaveInfo`'s save reader); the server's Node
+   resolution refuses them (TS2835), so this step settles how it reads one.
 4. The page's player: `?recording=` from the server, and the viewer's strip and keys.
 5. The dialog: its two tabs, the site's and the browser's recordings of the set, the
    selection and its metadata, PLAY and UPLOAD, and DELETE for a browser's game's end,
    the only way one leaves the store but its set's own deletion, checked in
-   `tools/probe-frames.ts`'s welcome page block.
+   `tools/probe-frames.ts`'s welcome page block. An end's UPLOAD needs the game's play
+   time there (`Game.playTime`) for its package, which the store does not keep yet
+   (`RecordingEntry`).
 
 ### Postponed
 

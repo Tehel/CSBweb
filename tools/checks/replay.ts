@@ -63,8 +63,16 @@
  *    holds it so; a read after it, which no save of it follows, prunes the store and
  *    keeps it whole. It replays to the same end, and a recording whose end is moved a
  *    VBL on, or whose `d.Word11694` is not the game's, or without its end, drifts there.
+ * 10. A point is shared as a package (`src/engine/RecordingPackage.ts`): the path to
+ *    F5's save in the branch, to the Sleepsave inside a VBL in the third, and to the lost
+ *    game's end, each written, read back the same and played from the package alone, a
+ *    save's path to the file its save holds, through its joins. A package whose save's
+ *    file is not the path's drifts at its end; one whose form is wrong is refused.
  *
  * Run: `npm test -- --only=replay.ts`
+ *
+ * `--measure` plays a long new game instead, keys and clicks at a player's pace, F5 and
+ * F9 now and then, and prints what its package costs: a change, a branch, the whole.
  */
 import { readFileSync } from 'node:fs';
 
@@ -77,7 +85,10 @@ import { Game } from '../../src/engine/Game';
 import { NO_EXTRAS } from '../../src/engine/GameContext';
 import { GameSaves } from '../../src/engine/GameSaves';
 import { Recorder, type Recording, type RecordingPoint } from '../../src/engine/Recorder';
-import { RecordingPlayer } from '../../src/engine/RecordingPlayer';
+import {
+  packageOfEnd, packageOfSave, readRecordingPackage, RecordingPackageError, writeRecordingPackage, type RecordingPackage,
+} from '../../src/engine/RecordingPackage';
+import { RecordingPlayer, type SavedAtEnd } from '../../src/engine/RecordingPlayer';
 import { RecordingWriter } from '../../src/engine/RecordingWriter';
 import { applySaveBytes, buildSaveFile } from '../../src/engine/SaveGameFile';
 import { NO_FULLSCREEN } from '../../src/lib/fullscreen';
@@ -298,12 +309,12 @@ class Page {
    * the loop, as the page plays one (`playRecording`, `src/main.ts`): a span under a held
    * clock run at once, and the loop stopped at the end. The boot's DM rules are a root's
    * first change. `shared`: a page whose stores this one writes its recording to, as
-   * another tab's.
+   * another tab's. `savedAtEnd`: the save a path shared at a save's point ends at.
    */
-  static replay(path: readonly Recording[], shared: Page | null = null): Page {
+  static replay(path: readonly Recording[], shared: Page | null = null, savedAtEnd: SavedAtEnd | null = null): Page {
     const page = new Page(false, shared);
     const { game } = page;
-    const player = new RecordingPlayer(game, path, DUNGEON);
+    const player = new RecordingPlayer(game, path, DUNGEON, savedAtEnd);
     player.onBegin((recording) => page.recorder.begin(recording.start, recording.parent));
     player.onEnd(() => game.stop());
     game.runAtOnceWhile(() => player.held);
@@ -522,26 +533,12 @@ class Player {
 /** A new game: walks, a mirror clicked in the viewport and its champion resurrected, then the rest. */
 async function newGameScript(player: Player): Promise<void> {
   const { page } = player;
-  const { game } = page;
   player.play(500);
   player.wander();
   player.key('Numpad7');
   player.key('KeyL');
   player.play(400);
-  // Up to Iaido's mirror, the south face of (10,3): `?dev`'s move, then the party turned to face it.
-  check(game.devMoveParty(0, 10, 4), '`?dev` moves the party below Iaido\'s mirror');
-  page.input.mouseMove(100, 100);
-  while (game.ctx.party.state.facing !== 0) player.key('KeyL');
-  player.play(600);
-  player.click(VIEWPORT_X + 112, VIEWPORT_Y + 50);
-  player.play(300);
-  const potential = game.ctx.party.state.potentialChampionIndex;
-  check(potential >= 0, `a click on the mirror in the viewport brings its champion (${potential})`);
-  const resurrect = page.ui.uiTables.graphic231.buttons.buttons18372[0]!;
-  player.click((resurrect.x1 + resurrect.x2) >> 1, (resurrect.y1 + resurrect.y2) >> 1);
-  player.play(500);
-  const party = game.ctx.party.state;
-  check(party.champions.length === 1 && party.potentialChampionIndex < 0, `and RESURRECT adds ${party.champions[0]?.name ?? 'nobody'}`);
+  resurrectIaido(player);
   player.key('KeyQ', 'q');
   player.key('KeyQ', 'q');
   player.play(1500);
@@ -558,6 +555,25 @@ async function newGameScript(player: Player): Promise<void> {
   await player.diskMenuSave();
   player.play(2000);
   await player.end();
+}
+
+/** Up to Iaido's mirror, the south face of (10,3): `?dev`'s move, the party turned to face it, the mirror clicked and RESURRECT. */
+function resurrectIaido(player: Player): void {
+  const { page } = player;
+  const { game } = page;
+  check(game.devMoveParty(0, 10, 4), '`?dev` moves the party below Iaido\'s mirror');
+  page.input.mouseMove(100, 100);
+  while (game.ctx.party.state.facing !== 0) player.key('KeyL');
+  player.play(600);
+  player.click(VIEWPORT_X + 112, VIEWPORT_Y + 50);
+  player.play(300);
+  const potential = game.ctx.party.state.potentialChampionIndex;
+  check(potential >= 0, `a click on the mirror in the viewport brings its champion (${potential})`);
+  const resurrect = page.ui.uiTables.graphic231.buttons.buttons18372[0]!;
+  player.click((resurrect.x1 + resurrect.x2) >> 1, (resurrect.y1 + resurrect.y2) >> 1);
+  player.play(500);
+  const party = game.ctx.party.state;
+  check(party.champions.length === 1 && party.potentialChampionIndex < 0, `and RESURRECT adds ${party.champions[0]?.name ?? 'nobody'}`);
 }
 
 /** `csbgame7.dat`: the party put before a Stone Golem, which its attacks hit, among the rest. */
@@ -758,6 +774,7 @@ async function sleepBranch(recorded: Page, home: Position): Promise<void> {
   check(joins === 2 && drift?.kind !== 'join',
     `the branch replayed up to the Sleepsave's point makes the file it made inside the VBL${drift?.kind === 'join' ? ` (first difference at ${drift.byte})` : ', byte-identical'}`);
   sameGame(recorded, path, await store.read(third.id), 'and the Sleepsave\'s branch replayed from its root through both joins');
+  await savePackage(recorded, read.slice(0, 2), sleep, 'the Sleepsave');
 }
 
 /** `start` played by `script` and recorded, then the recording played back in a fresh page. */
@@ -884,6 +901,10 @@ async function branch(recorded: Page): Promise<void> {
   check(joins === 1 && drift?.kind !== 'join',
     `the root replayed up to the point makes the file the branch read${drift?.kind === 'join' ? ` (first difference at ${drift.byte})` : ', byte-identical'}`);
   sameGame(recorded, path, written, 'and the branch replayed from its root through the join');
+
+  const quick = (await recorded.saves.list()).find((entry) => entry.quick && entry.recording?.recording === written.id)!;
+  const shared = await savePackage(recorded, [root, written], quick, 'F5 in the branch');
+  await refusals(shared);
 }
 
 /**
@@ -930,6 +951,10 @@ async function lostGame(): Promise<void> {
     check(drift?.kind === 'end' && drift.word11694 === word11694 && drift.vbls === vbls,
       `a recording with ${what} drifts at its end (${JSON.stringify(drift)})`);
   }
+  const entry = store.entries.get(written.id)!;
+  const shared = packageOfEnd([written], TEXT, { recordedAt: entry.recordedAt, endedAt: entry.writtenAt, playTime: recorded.game.playTime() });
+  const fromPackage = await playPackage(shared, 'the lost game\'s end shared');
+  sameGame(recorded, fromPackage, written, 'the lost game played from its package');
 
   // A read after the end, which no save of its recording follows: its first write prunes.
   const start = (await recorded.saves.list())[0]!;
@@ -942,9 +967,164 @@ async function lostGame(): Promise<void> {
     'the next read\'s first write prunes the store, and keeps the game\'s end whole');
 }
 
+/* ------------------------------------------------------------ packages ---- */
+
+/** What a player says of the recordings the tool shares. */
+const TEXT = { title: 'The tool\'s game', author: 'replay.ts', description: 'Played by a tool.\nTwo lines.' };
+
+/** Two packages the same, their files byte for byte. */
+function samePackage(a: RecordingPackage, b: RecordingPackage): boolean {
+  const json = (pkg: RecordingPackage) => JSON.stringify(pkg, (_, value: unknown) => (value instanceof Uint8Array ? [...value] : value));
+  return json(a) === json(b);
+}
+
+/** `pkg` written, read back the same, and played in a fresh page from the package alone. */
+async function playPackage(pkg: RecordingPackage, what: string): Promise<Page> {
+  const file = await writeRecordingPackage(pkg);
+  const read = await readRecordingPackage(file);
+  console.log(`  ${what}: a package of ${read.path.length} recording${read.path.length === 1 ? '' : 's'}, ${Math.round(file.length / 1024)} KB`);
+  check(samePackage(read, pkg), `${what}: its package written (${file.length} bytes) and read back the same`);
+  const played = Page.replay(read.path, null, read.shared.kind === 'save' ? read.shared : null);
+  played.play();
+  return played;
+}
+
+/**
+ * The package of `path`, the store's path to `save`'s recording, shared at `save`'s
+ * point: played from the package to the file the save holds, through its joins, and
+ * a package whose file is not the path's drifting at its end.
+ */
+async function savePackage(recorded: Page, path: readonly Recording[], save: SaveEntry, what: string): Promise<RecordingPackage> {
+  const point = save.recording!;
+  const file = await recorded.store.read(save.id);
+  const root = recorded.recordingStore.entries.get(path[0]!.id)!;
+  const pkg = packageOfSave(path, point, file, TEXT, { recordedAt: root.recordedAt, endedAt: save.savedAt, playTime: save.playTime });
+  const last = pkg.path[pkg.path.length - 1]!;
+  check(last.changes.length === point.changes && last.vbls === point.vbls && last.ended && pkg.info.start.kind === (path[0]!.start.kind),
+    `${what}'s point shared: the path's last recording cut at it (${point.changes} changes, ${point.vbls} VBLs${point.inVbl ? ', inside the VBL' : ''})`);
+  const played = await playPackage(pkg, what);
+  const { drift, joins, point: at } = played.player!;
+  check(drift === null && !played.player!.playing && joins === path.length - 1 && at.changes === point.changes && at.vbls === point.vbls,
+    `played from the package to the save's point through ${joins} join${joins === 1 ? '' : 's'}, making the file the save holds${drift ? ` (drift ${JSON.stringify(drift)})` : ''}`);
+  const other = new Uint8Array(file);
+  other[100] ^= 1;
+  const tampered = Page.replay(pkg.path, null, { file: other, inVbl: point.inVbl === true });
+  tampered.play();
+  const parted = tampered.player!.drift;
+  check(parted?.kind === 'save' && parted.byte === 100, `and a package whose save's file is not the path's drifts at its end (${JSON.stringify(parted)})`);
+  return pkg;
+}
+
+/** Packages whose form is wrong, each refused. */
+async function refusals(pkg: RecordingPackage): Promise<void> {
+  const [root, branch] = pkg.path as [Recording, Recording];
+  const wrong: [string, () => Promise<unknown>][] = [
+    ['no gzip', () => readRecordingPackage(new TextEncoder().encode('{}'))],
+    ['no JSON', async () => readRecordingPackage(await gzipped('{'))],
+    ['another version', async () => readRecordingPackage(await gzipped(JSON.stringify({ version: 2 })))],
+    ['more than the limit unzipped', async () => readRecordingPackage(await writeRecordingPackage(pkg), 1000)],
+    ['an empty title', () => writeRecordingPackage({ ...pkg, info: { ...pkg.info, title: ' ' } })],
+    ['a title too long', () => writeRecordingPackage({ ...pkg, info: { ...pkg.info, title: 'x'.repeat(61) } })],
+    ['a control character in its author', () => writeRecordingPackage({ ...pkg, info: { ...pkg.info, author: 'a\nb' } })],
+    ['a start not its root\'s', () => writeRecordingPackage({ ...pkg, info: { ...pkg.info, start: { kind: 'save', level: 99, champions: [] } } })],
+    ['a branch of no recording of the path', () => writeRecordingPackage({ ...pkg, path: [root, { ...branch, parent: { ...branch.parent!, recording: 'other' } }] })],
+    ['a parent played on past its child\'s point', () => writeRecordingPackage({ ...pkg, path: [{ ...root, vbls: root.vbls + 1 }, branch] })],
+    ['a recording of another set', () => writeRecordingPackage({ ...pkg, path: [{ ...root, dataSet: 'other' }, branch] })],
+    ['the game\'s end at a save\'s point', () => writeRecordingPackage({ ...pkg, path: [root, { ...branch, end: { word11694: false } }] })],
+    ['a read among its changes', async () => readRecordingPackage(await edited(pkg, (json) => { json.path[1].changes[0].change = { kind: 'read' }; }))],
+    ['a rule too many', async () => readRecordingPackage(await edited(pkg, (json) => { json.path[0].rules.more = false; }))],
+    ['a loop flag of another type', async () => readRecordingPackage(await edited(pkg, (json) => { json.path[1].start.carried.loop.moveHistory = [0]; }))],
+  ];
+  const refused: string[] = [];
+  for (const [what, read] of wrong) {
+    if (await read().then(() => false, (error: unknown) => error instanceof RecordingPackageError)) refused.push(what);
+    else console.log(`  not refused: ${what}`);
+  }
+  check(refused.length === wrong.length, `a package is refused with ${refused.join(', ')}`);
+}
+
+async function gzipped(text: string): Promise<Uint8Array> {
+  const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+/** `pkg`'s file with its JSON edited by `edit`. */
+async function edited(pkg: RecordingPackage, edit: (json: any) => void): Promise<Uint8Array> {
+  const stream = new Blob([new Uint8Array(await writeRecordingPackage(pkg))]).stream().pipeThrough(new DecompressionStream('gzip'));
+  const json: unknown = JSON.parse(await new Response(stream).text());
+  edit(json);
+  return gzipped(JSON.stringify(json));
+}
+
+/* ------------------------------------------------------- the long game ---- */
+
+/** How long `--measure`'s game is played, in minutes of its clock. */
+const MEASURE_MINUTES = Number(process.argv.find((arg) => arg.startsWith('--minutes='))?.slice(10) ?? 60);
+
+/**
+ * A new game played for `MEASURE_MINUTES` at a player's pace: a key or a click in the
+ * viewport every second or so, F5 every three minutes and F9 every nine, each F9 a
+ * branch from F5's save. Then the package of a last F5's point: what it costs, a change
+ * and a branch, and that it plays to that save.
+ */
+async function measure(): Promise<void> {
+  console.log(`\n=== a long game, ${MEASURE_MINUTES} minutes, measured ===`);
+  const began = Date.now();
+  const recorded = await Page.record('new');
+  const { clock } = recorded;
+  const player = new Player(recorded);
+  resurrectIaido(player);
+  const choices = new CsbRandom(0x1095);
+  const keys = ['KeyW', 'KeyS', 'KeyA', 'KeyD', 'KeyQ', 'KeyE'];
+  const end = clock.time + MEASURE_MINUTES * 60_000;
+  let saveAt = clock.time + 3 * 60_000;
+  let loadAt = clock.time + 9 * 60_000;
+  while (clock.time < end) {
+    if (choices.below(4) === 0) player.click(VIEWPORT_X + 20 + choices.below(184), VIEWPORT_Y + 10 + choices.below(116));
+    else player.key(keys[choices.below(keys.length)]!);
+    player.play(300 + choices.below(1200));
+    if (clock.time >= saveAt) {
+      player.key('F5');
+      await settle();
+      saveAt += 3 * 60_000;
+    }
+    if (clock.time >= loadAt) {
+      player.key('F9');
+      await settle();
+      loadAt += 9 * 60_000;
+    }
+  }
+  player.key('F5');
+  await settle();
+  await recorded.recordings.flush();
+  const save = (await recorded.saves.list()).find((entry) => entry.quick)!;
+  const store = recorded.recordingStore;
+  const path = await readRecordingPath(store, save.recording!.recording);
+  const pkg = packageOfSave(path, save.recording!, await recorded.store.read(save.id), TEXT,
+    { recordedAt: store.entries.get(path[0]!.id)!.recordedAt, endedAt: save.savedAt, playTime: save.playTime });
+  const file = await writeRecordingPackage(pkg);
+  const changes = pkg.path.reduce((sum, recording) => sum + recording.changes.length, 0);
+  const branches = pkg.path.length - 1;
+  const unsaved = { ...pkg, path: pkg.path.map((recording, n) => (n === 0 || recording.start.kind !== 'save' ? recording : { ...recording, start: { ...recording.start, bytes: new Uint8Array(0) } })) };
+  const bare = (await writeRecordingPackage({ ...unsaved, shared: { kind: 'save', file: new Uint8Array(0), inVbl: false } })).length;
+  const json = new TextEncoder().encode(JSON.stringify(pkg, (_, value: unknown) => (value instanceof Uint8Array ? 'x'.repeat(Math.ceil(value.length / 3) * 4) : value))).length;
+  console.log(`  played: ${recorded.game.input.vbls} VBLs, ${changes} changes on its path, ${branches} branches, in ${((Date.now() - began) / 1000).toFixed(1)} s`);
+  console.log(`  package: ${file.length} bytes gzipped, ${json} bytes of JSON`);
+  console.log(`  a change: ${(bare / changes).toFixed(1)} bytes; a save's file: ${((file.length - bare) / (branches + 1)).toFixed(0)} bytes (${(await recorded.store.read(save.id)).length} bytes raw)`);
+  const playedAt = Date.now();
+  const played = Page.replay(pkg.path, null, pkg.shared.kind === 'save' ? pkg.shared : null);
+  played.play();
+  const { drift, joins } = played.player!;
+  check(drift === null && joins === branches, `the long game plays from its package to the save, through ${joins} joins (${((Date.now() - playedAt) / 1000).toFixed(1)} s)`);
+}
+
 const CSBGAME7 = new Uint8Array(readFileSync(savePath('csbgame7.dat')));
 
-await replay('a new game', 'new', newGameScript);
-await replay('csbgame7.dat', CSBGAME7, saveScript);
-await lostGame();
+if (process.argv.includes('--measure')) {
+  await measure();
+} else {
+  await replay('a new game', 'new', newGameScript);
+  await replay('csbgame7.dat', CSBGAME7, saveScript);
+  await lostGame();
+}
 finish();

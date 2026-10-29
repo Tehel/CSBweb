@@ -106,8 +106,10 @@ export interface LoopFlags {
  * screens before it (`VM_PRESENTS`, `VM_PRISONDOOR`, `VM_CREDITS`) and after it
  * (`VM_THEEND`, `VM_CAST`) are the intro's host, which has no overlay.
  */
-type VideoMode =
-  | 'VM_DEFAULT' | 'VM_CENTERMENU' | 'VM_LEFTMENU' | 'VM_ADVENTURE' | 'VM_INVENTORY' | 'VM_FROZEN' | 'VM_SLEEPING';
+export const VIDEO_MODES = [
+  'VM_DEFAULT', 'VM_CENTERMENU', 'VM_LEFTMENU', 'VM_ADVENTURE', 'VM_INVENTORY', 'VM_FROZEN', 'VM_SLEEPING',
+] as const;
+type VideoMode = (typeof VIDEO_MODES)[number];
 
 /**
  * A `RESTARTABLE` sequence that holds the main loop inside one of its calls, as

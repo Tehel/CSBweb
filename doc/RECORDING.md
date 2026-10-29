@@ -213,6 +213,11 @@ asserts every change recorded at the same VBL with the same `d.Time` and
   with it; a recording the running branch joins is kept; another page's prune cuts the
   running branch, and its own page's next write writes it whole again. The branch still
   replays from its root through the join.
+- **A point shared is a package** (below, "Shared recordings"): the path to F5's save in a
+  branch, to the Sleepsave taken inside a VBL, and to the lost game's end, each written,
+  read back the same and played from the package alone, a save's path to the very file
+  the save holds, through its joins. A package whose save's file is not the path's
+  drifts at its end, and one whose form is wrong is refused.
 
 What is not verified:
 
@@ -363,7 +368,9 @@ a root and the branches down to the one played, or a branch alone, from its own 
   made it (`saveFileOf`, `src/engine/GameSaves.ts`), against the file the child read;
   at a point taken inside a VBL, the file that VBL made (below); and a recording the
   game's end ended is played to it, the game ending in its last VBL with its
-  `d.Word11694`, and a game that ends anywhere else drifts there.
+  `d.Word11694`, and a game that ends anywhere else drifts there; a path shared at a
+  save's point is played to that point, and the file the game makes there checked
+  against the save's (`SavedAtEnd`), as a join's.
   The first that differs stops the player (`RecordingPlayer.drift`).
 - **What the game opens in a VBL** does its game half alone while a recording plays
   (`InputBoundary.playing`), and shows nothing: the disk menu its icon opens, and the
@@ -405,7 +412,39 @@ state. A port-only recorder does not need this compatibility.
 
 What is decided, and the steps, are `DEBT.md` G31's: a package of a recording's path and
 its metadata, kept and served by the server, listed in the dialog the book opens on a
-set's tile. What sharing takes:
+set's tile.
+
+**The package** (`RecordingPackage`, `src/engine/RecordingPackage.ts`) is one file,
+JSON gzipped by `CompressionStream`: the format's version, the build of the recording
+shared, its data set, the metadata, the path and the point shared. The point is a
+save's (`packageOfSave`): the path the store holds to the save's recording
+(`readRecordingPath`), the last recording cut at the save's point, and the save's file,
+which the path played to its end makes again, at a point taken inside a VBL as the
+Sleepsave's is too. Or the game's end (`packageOfEnd`): the path to a recording the end
+ended, which its replay reaches. Every recording before the last is cut at the point its
+child joins it, so the package holds what the player plays and nothing after it. Each
+recording is as the store holds it (`Recording`), a save's file in base64. The metadata
+are the player's title, which it needs, author and description, plain text as long as a
+set's name, authors and description may be (`RECORDING_TEXT_LIMITS`); when the path's
+root began, when its point was made, the game's play time there (`Game.playTime`); and
+where it starts, a new game or the save's level and champions, which is read from the
+root, so it cannot disagree with it.
+
+`readRecordingPackage` checks a package's form alone, the server's check: it unzips,
+to no more than a limit its caller gives, parses, each field has its type (the rules,
+the extras and the loop's flags their keys, each change its kind's fields, a read none),
+the texts their limits, each recording its set and each branch its join at its parent's
+end, and the point its path's end. It does not replay it.
+
+**What a package costs**, measured by `tools/checks/replay.ts --measure`: a new game
+played for an hour of its clock at a player's pace, a key or a click in the viewport
+every second or so, F5 every three minutes and F9 every nine, shared at a last F5. Its
+path is seven recordings and 3,883 changes; its package is 340 KB, 930 KB unzipped. A
+save's file, about 61 KB, costs about 42 KB of it, once for each branch's start and once
+for the save shared: a CSBWin file is scrambled, and gzip takes little off it. A change
+costs about 11 bytes. So a package's size is the loads in its path more than its length.
+
+What sharing takes:
 
 - **Storage**: the store's recordings (above), sent to the server to share.
 - **A starting point the viewer has**: a new game of a published data set, or the starting
