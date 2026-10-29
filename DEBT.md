@@ -121,6 +121,7 @@ In payoff order: the first row is the next item.
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
+| F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
 | C194 | A DSA's wall graphic counts as a real decoration, so it hides no text | S | ⏳ |
 | C195 | Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space | S | ⏳ to decide with the author |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
@@ -143,7 +144,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: A11 · C196 · D22 · E45 · F24 · G32 · P13 · R17 · U13 · W8 · X19. An ID recorded and paid in one commit has no
+Next free IDs: A11 · C196 · D22 · E45 · F25 · G32 · P13 · R17 · U13 · W8 · X19. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -694,6 +695,106 @@ checks each resting square and the three gold keys, then the end. Size M; where 
 and the engine part, CSBWin decides which is wrong.
 
 ---
+
+### F24 ⏳ CSBWin's own recordings played to their end, and shared as the port's
+
+The players' CSBWin recordings, `playfile.log` files of speedruns and challenge games, are
+the longest end-to-end test there is: every line carries its `d.Time` and its random
+number, so a run played in the port checks every draw of 40 minutes of play against
+CSBWin's. Played to their end, they become recordings of the port's (`doc/RECORDING.md`) and
+are shared on the site. That is not a player's feature: a local tool reads a log, builds a
+recording from it and submits it, and a log may be corrected where a run needs it.
+
+**The runs** are in the author's collection, `../DMweb-extra/Clone,CSBwin,Movies,Data/`:
+Dungeon Master's in `Race to fusion/` (seventeen folders, `DMMovie1` to `DMMovie8`, made
+by CSBWin 8.0 to 17.6) and `Dungeon Master minimum item picking/`, Chaos Strikes Back's
+in `Race to Fulya Pit/` and `Chaos Strikes Back minimum item picking/`. Each folder holds
+its `playfile.log` (some name it `Playfile.log`, `DMMovie2823`'s annotated folder also has
+`record00000.log`), the `dungeon.dat` and `graphics.dat` it was played on, often the
+`CSBwin.exe`, and sometimes an `Annotation.txt`. The DM runs' `dungeon.dat` is
+`dm-atari`'s; their `graphics.dat` is CSBWin's, not `dm-atari`'s (`doc/PROVEN_FACTS.md`
+→ "`dm-atari/graphics.dat` is CSBWin's with three items from the 1.2 disk").
+
+**The diagnostic**, `tools/play-csbwin-log.ts` over `tools/lib/playfile.ts`, is not
+evidence. It reads a log as `PLAYFILE::Play` does (`doc/CSBwin-src/Recording.cpp:226-477`),
+its three compressed line forms included, and plays it into a page without the DOM over
+`dm-atari`, as `tools/lib/playback.ts` stands one up: a new game, the log's entries put in
+the mouse queue at the top of `HandleMouseEvents` once `d.Time` reaches them
+(`Mouse.cpp:1493-1505`), the frozen discard and `lastTime`'s wait skipped as under playback
+(`:1548-1605`), a waiting step put back (`PLAYFILE::Backspace`, `:1626-1630`), the
+Reincarnate screen fed the `0x4444` lines (`Code13ea4.cpp:86-108`: a character, or 0 for
+OK), `0x2221` drawing `y + 1` times (`RECORDFILE::CycleRandom`), and `extraTicks` off
+(`CSBUI.cpp:985`). It stops at the first entry whose random is neither `d.RandomNumber` nor
+the game's draws since the entry before (`Recording.cpp:483-503`), and prints where.
+`--step-draw` adds the stand-in below; `--resync` takes a differing absolute random and
+goes on, as CSBWin's "Sequence/timing error" answered No does. A log of 8000 entries plays
+in well under a second while it holds.
+
+What it establishes:
+
+- **The format.** `DMMovie40a`'s 8238 entries are 7965 compressed. A line's random is
+  `d.RandomNumber` or the count of draws since the entry before; CSBWin accepts either.
+  The count leaves out the view's draws: `DrawViewport` saves and restores
+  `numRandomCalls` with `d.RandomNumber` (`Viewport.cpp:6712-6714`).
+- **The start matches, in every version tried** (9.6, 11.017, 11.018, 15.9, 17.6). The
+  first line, `0xc8` at `d.Time` 0, is the entrance's click. Then the read takes the
+  `0x3333` line's seed and draws twice for `d.RandomGameID` (`SaveGame.cpp:1606-1645`),
+  which leaves exactly the random recorded at the first move.
+- **Drift 1: a draw at every step.** In every one of those versions, each step that moves
+  the party is followed by one draw before the next entry, and a turn by none, from the
+  first step, before any champion has joined. The port draws nothing there. Several
+  versions agreeing puts it in the port, not in a CSBWin version. Not the cause:
+  `MoveParty`'s own code (no draw, `CSBCode.cpp:8031-8420`), `AdjustStamina` and
+  `TimeToMove` (no champion yet), `QueueSound`, the view (its stream is swapped, its count
+  restored), `SmartDiscard(false)` at the tick (`CSBCode.cpp:688`, ported, and it would
+  draw after a turn too). The draw is not found. `--step-draw` stands in for it.
+- **With the stand-in:**
+
+  | Run (version) | Matched | Then |
+  | --- | --- | --- |
+  | `DMMovie2823` annotated, `playfile.log` (17.6) | 161 entries, all by `d.RandomNumber`: four champions chosen, the walk to the stairs | Line 206, `d.Time` 0xc6, a step on level 1 at (3,1): 159 draws since the entry before, the record 12 draws further |
+  | `DMMovie2823` annotated, `record00000.log` (15.9) | All 110 entries, to its end | — |
+  | `DMMovie40a` (9.6, Hawk) | 65 entries, through the Reincarnate screen | Line 84, `d.Time` 0x55, a step on level 1 at (3,1): 40 draws, the record 39 |
+  | `DMMovie42` (11.017) | 84 entries | Line 130, `d.Time` 0x6b, a step on level 0 at (11,15): 1 draw, the record 2 |
+  | `DMMovie43a` (11.018) | 64 entries | Line 110, `d.Time` 0x6b, a turn on level 0 at (11,15): 0 draws, the record 1 |
+
+  So the next drifts are the stairs down to level 1 (or what the stand-in does on them:
+  it also draws after the stairs) and something at (11,15) on level 0 that the minimum
+  item picking runs reach.
+- **Not handled yet:** a save inside a log (`0x6668`, `0x6669`) and CSBWin's hand-made
+  substitutes for one (`0x2223`, `0x2224`, `Recording.cpp:734-761`), the `0xdddd` line
+  that writes a word of `d.`, the annotations, the runs' own `graphics.dat`, and Chaos
+  Strikes Back's runs, which need a CSB set. `extraTicks` is imitated by undoing the
+  step's `d.clockTick = 1`, and no run has shown a difference either way. DM rules are on,
+  as the `dm-atari` set reads them; no run has shown a difference with them off.
+- **Not established:** that CSBWin 2023, the port's reference, plays these logs to their
+  end. Its version check warns and plays on (`Recording.cpp:172-191`, its message box
+  commented out), so it accepts them.
+
+Paying it, in steps:
+
+1. **The step's draw.** Search CSBWin (an Explore agent) for every draw a step reaches,
+   `MoveParty` through the party's `MoveObject` and the tick after it, with no champion,
+   on level 0. Port it as a C fix, with a check, and drop `--step-draw`.
+2. **Each next drift, the same way**: a port divergence, fixed with its CSBWin citation and
+   its check; or, where CSBWin's own versions differ (two runs of different versions part
+   at the same place differently), a correction of the log. A correction is written in
+   CSBWin's own playback lines so the log stays a playfile: `0x2222` draws its random field's
+   count and goes on as button 0 (`Recording.cpp:639-649`), `0xdddd` sets a word of `d.`
+   (`:672-680`). Each is listed beside the
+   log with its reason.
+3. **The check**: the logs that play to their end copied into `tools/fixtures/`, and a
+   `tools/checks/` tool that plays each to its end (Lord Chaos fused for a race to fusion),
+   listed in `tools/run-checks.ts`: every later change to the engine then answers to them.
+4. **The recording**: a log played into the port's `Recorder` as the page's changes, each
+   entry queued at the VBL that takes it in the playback (a key, a click at its point, the
+   Reincarnate screen's keys and OK), so that the port's player, `RecordingPlayer`, plays
+   the recording to the same end with its own drift check. A start of kind `'new'` with the
+   log's stream after the read, as the port's own new game's.
+5. **The upload**: a script in `utils/` (`.claude/memory/instance-scripts-in-utils.md`)
+   that takes a log, its corrections, the instance and a `playerId`, builds the package of
+   the game's end (`RecordingPackage`) and submits it to `api/recordings`, with the run's
+   player and time in its metadata.
 
 ## G — Unported CSBWin features
 
