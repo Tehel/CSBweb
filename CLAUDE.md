@@ -261,6 +261,7 @@ ui/         The page's DOM side: events (the canvas's and the keyboard's listene
             screen an error that ends the game leaves), and gameEvents (what the
             server's statistics are told: a game started, joined, won or lost), and
             welcomePage (the page without a known `?dungeon=`: the games and the saves),
+            backdropClose (its dialogs that only show, closed by a click beside them),
             addDataSetForm (its form that adds, edits, publishes and deletes a player's own data set)
             and howToPlay (its HOW TO PLAY: the keys, the runes, the first steps), and about
             (its ABOUT: the questions a player asks of the site, the statistics among them)

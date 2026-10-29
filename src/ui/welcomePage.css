@@ -207,6 +207,7 @@ body.welcome {
 .btn:active { border-color: var(--p3) var(--p10) var(--p10) var(--p3); color: var(--p11); }
 .btn:focus-visible { outline: 3px solid var(--p11); outline-offset: 12px; }
 .btn[aria-disabled="true"], .btn:disabled { color: var(--p1); cursor: default; pointer-events: none; }
+.btn[hidden] { display: none; }
 .welcome-preview {
     box-sizing: border-box;
     min-width: 336px;

@@ -23,6 +23,7 @@
  * holds the page's sheet to, so a sheet changed without its files made again fails.
  */
 import type { Settings } from '../settings/Settings';
+import { closeOnBackdrop } from './backdropClose';
 import { type KeyAction, type KeyBindings, type KeyPreset } from '../renderer/ui/Keyboard';
 import { keyLabel, type KeyboardLayoutMap } from '../renderer/ui/KeyLabels';
 
@@ -160,6 +161,7 @@ export function openHowToPlay(host: HowToPlayHost): void {
     render();
 
     dialog.querySelector('#how-close')!.addEventListener('click', () => dialog.close());
+    closeOnBackdrop(dialog);
     dialog.addEventListener('close', () => {
         dialog.remove();
         if (window.location.hash === HOW_TO_PLAY_HASH) history.replaceState(null, '', window.location.pathname + window.location.search);

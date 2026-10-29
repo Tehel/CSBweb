@@ -532,6 +532,14 @@ const clickOn = async (selector: string, leaves = false) => {
     await send('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: 1 });
   if (!leaves) await settled();
 };
+// A click on a dialog's backdrop, at the page's top left corner, which no dialog reaches;
+// or pressed on `from`, in the dialog, and released there, a drag out of it.
+const clickBeside = async (from?: string) => {
+  const p = from && await evaluate(`(r=>({x:r.left+r.width/2, y:r.top+r.height/2}))(document.querySelector(${JSON.stringify(from)}).getBoundingClientRect())`);
+  await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: p ? p.x : 8, y: p ? p.y : 8, button: 'left', buttons: 1, clickCount: 1 });
+  await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: 8, y: 8, button: 'left', buttons: 0, clickCount: 1 });
+  await settled();
+};
 console.log('state: welcome page');
 const atWelcome = await welcome();
 console.log('  ', JSON.stringify(atWelcome));
@@ -626,7 +634,11 @@ check(await evaluate(`!document.querySelector('dialog.how-to-play') && location.
 await clickOn('#welcome-help');
 const reopened = await howToPlay();
 check(reopened?.open === true && reopened.hash === '#how-to-play', 'the page\'s HOW TO PLAY opens it');
-await clickOn('#how-close');
+await clickBeside('#how-title');
+const draggedOut = await howToPlay();
+await clickBeside();
+check(draggedOut?.open === true && await evaluate(`!document.querySelector('dialog.how-to-play') && location.hash === ''`),
+  'a drag from its title out of it leaves it open; a click beside it closes it, and takes #how-to-play off the address');
 // ABOUT (`src/ui/about.ts`): the page opened at `#about` shows its dialog, its questions
 // each a title over its answer, the statistics' linking to the statistics page and naming
 // the setting that sends none. CLOSE takes the fragment off, and the footer's ABOUT, a
@@ -647,7 +659,8 @@ check(await evaluate(`!document.querySelector('dialog.about') && location.hash =
 await clickOn('.welcome-footer nav a[href="#about"]');
 const aboutAgain = await about();
 check(aboutAgain?.open === true && aboutAgain.hash === '#about', 'the footer\'s ABOUT opens it');
-await clickOn('#about-close');
+await clickBeside();
+check(await evaluate(`!document.querySelector('dialog.about') && location.hash === ''`), 'a click beside it closes it, and takes #about off the address');
 await clickOn('.pick[data-set="dm-atari-1.2"]');
 // The form that adds a set (`src/ui/addDataSetForm.ts`), which "+ Add my own" opens: its
 // checklist, a row each for the name, the id and the six files, crossed where needed and
@@ -1903,7 +1916,7 @@ await clickOn('.pick-cell:has(.pick[data-set="csb"]) .pick-documents');
 await clickOn('#documents-tab-recordings');
 const recordingsTab = () => evaluate(`(d=>d&&{ title: d.querySelector('h2').textContent,
   tabs: [...d.querySelectorAll('.documents-tab')].map(t=>t.textContent+':'+t.getAttribute('aria-selected')).join(),
-  shown: [...d.querySelectorAll('.documents-pane')].map(p=>p.id+':'+!p.hidden).join(), add: !(d.querySelector('#documents-add')?.hidden ?? true),
+  shown: [...d.querySelectorAll('.documents-pane')].map(p=>p.id+':'+!p.hidden).join(), add: d.querySelector('#documents-add')?.checkVisibility() ?? false,
   site: [...d.querySelectorAll('.recordings-site li')].map(l=>(b=>b ? [b.dataset.recording, ...[...b.children].slice(0, -1).map(c=>c.textContent), b.getAttribute('aria-selected')].join('|') : l.textContent)(l.querySelector('.recordings-item'))),
   items: [...d.querySelectorAll('.recordings-browser .recordings-item')].map(b=>b.dataset.recording+'|'+b.querySelector('.recordings-name').textContent+'|'+b.getAttribute('aria-selected')),
   panel: [...d.querySelectorAll('.recordings-info, .recordings-description, .recordings-panel .recordings-failure')].map(l=>l.textContent), play: d.querySelector('.recordings-play')?.getAttribute('href') ?? null,
@@ -1979,7 +1992,8 @@ const confirmDelete = async () => {
 await asPlayer(MODERATOR);
 await openCsbRecordings();
 const toModerator = await recordingsTab();
-await clickOn('#documents-close');
+await clickBeside();
+const besideBook = await evaluate(`!document.querySelector('dialog.documents')`);
 await clickOn('.welcome-moderation');
 await openCsbRecordings();
 const switchedOffList = await recordingsTab();
@@ -2020,6 +2034,7 @@ console.log('  the site\'s recordings moderated:', JSON.stringify({ pendingId, t
 const first = sharedRecording.id;
 check(toModerator?.site.join() === `${pendingId}|Probe|pending|false,${first}|Probe|false` && switchedOffList?.site.join() === `${first}|Probe|false`,
   'to a moderator, the site\'s list holds the pending recording too, marked, the latest shared first; with the switch off, it is a player\'s');
+check(toModerator?.add === false && besideBook, 'its RECORDINGS tab shows a moderator no ADD, and a click beside the dialog closes it');
 check(pendingSelected?.buttons === 'Play,Approve,Delete' && pendingSelected.panel.some((line: string) => line.endsWith(', awaiting a moderator'))
   && approvedNow?.site[0] === `${pendingId}|Probe|true` && approvedNow.buttons === 'Play,Hide,Delete',
   'the pending one offers APPROVE and DELETE, and APPROVE approves it, the list asked anew, the selection kept, HIDE offered');

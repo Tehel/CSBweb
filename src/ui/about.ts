@@ -7,6 +7,7 @@
  *
  * `#about` in the page's address opens it, and the footer's ABOUT is a link to it.
  */
+import { closeOnBackdrop } from './backdropClose';
 
 /** The address's fragment that opens the dialog. */
 export const ABOUT_HASH = '#about';
@@ -55,6 +56,7 @@ export function openAbout(): void {
     dialog.setAttribute('aria-labelledby', 'about-title');
     dialog.innerHTML = DIALOG;
     dialog.querySelector('#about-close')!.addEventListener('click', () => dialog.close());
+    closeOnBackdrop(dialog);
     dialog.addEventListener('close', () => {
         dialog.remove();
         if (window.location.hash === ABOUT_HASH) history.replaceState(null, '', window.location.pathname + window.location.search);

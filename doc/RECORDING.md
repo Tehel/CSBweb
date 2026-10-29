@@ -483,9 +483,13 @@ leaves out but for its uploader and the moderators.
 **The browser's points** (`src/engine/RecordingPoints.ts`) are what a player plays and
 shares of the store: each save whose recording the store holds up to its point
 (`SaveEntry.recording`), and each recording the game's end ended. The book's dialog lists
-a set's in its RECORDINGS tab (`src/ui/welcomePage.ts`), the latest made first, each with
-what its package would say of it (`pointInfo`), its build and whether an extra was on; it
-plays one by `?recording=`, and deletes a game's end, then prunes the store
+a set's in its RECORDINGS tab (`src/ui/welcomePage.ts`), but those another passes on its
+way (`shownPoints`): a Sleepsave the game went on from, a save F9 read, a save its game's
+end followed, each at or before a place the path to a later point goes through, which
+plays it whole. Of two at one place, the latest made is listed. It lists them the latest
+made first, each with what its package would say of it (`pointInfo`), its build and
+whether an extra was on; it plays one by `?recording=`, and deletes a game's end, then
+prunes the store
 (`pruneRecordings`, `src/engine/RecordingWriter.ts`), which is how one leaves it but by
 its set's own deletion.
 

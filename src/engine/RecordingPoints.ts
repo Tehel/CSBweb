@@ -10,7 +10,7 @@
  */
 import { readRecordingPath, type RecordingEntry, type RecordingStore, type SaveEntry } from '../data/saves';
 import { packageStart, pathAtEnd, pathAtSave, playedWithExtras, type RecordingPackageInfo } from './RecordingPackage';
-import type { Recording } from './Recorder';
+import type { Recording, RecordingPoint } from './Recorder';
 
 /** A point the store keeps: a save made in a recording it holds, or a game's end. */
 export type StoredPoint =
@@ -43,6 +43,46 @@ export function storedPoints(saves: readonly SaveEntry[], rows: readonly Recordi
         if (row.dataSet === dataSet && row.end) points.push({ kind: 'end', recording: { ...row, end: row.end } });
     }
     return points.sort((a, b) => pointMadeAt(b) - pointMadeAt(a));
+}
+
+/**
+ * The points of `points` a list shows, `rows` the store's: each that no other passes on
+ * its way, the path to it no beginning of another's. A Sleepsave, a save F5 made and F9
+ * read, a save the game went on from to a later one or to its end: the point past it
+ * plays it whole. Of two at one place, the latest made.
+ */
+export function shownPoints(points: readonly StoredPoint[], rows: readonly RecordingEntry[]): StoredPoint[] {
+    const held = new Map(rows.map((row) => [row.id, row]));
+    return points.filter((point) => !points.some((other) => other !== point && passes(other, point, held)));
+}
+
+/** Where `point` is: a save's point, or the game's end at its recording's last VBL. */
+function placeOf(point: StoredPoint): RecordingPoint {
+    return point.kind === 'save' ? point.save.recording
+        : { recording: point.recording.id, changes: point.recording.changes, vbls: point.recording.vbls };
+}
+
+/**
+ * Whether the path to `later` passes `earlier`: up the joins of its branches
+ * (`RecordingEntry.parent`) to `earlier`'s recording, a join there at or past its place;
+ * in that recording itself, past it, or at it and made later.
+ */
+function passes(later: StoredPoint, earlier: StoredPoint, held: ReadonlyMap<string, RecordingEntry>): boolean {
+    const to = placeOf(earlier);
+    for (let at: RecordingPoint | null | undefined = placeOf(later), branched = false; at; at = held.get(at.recording)?.parent, branched = true) {
+        if (at.recording !== to.recording) continue;
+        const order = placeOrder(at, to);
+        return order > 0 || order === 0 && (branched || pointMadeAt(later) > pointMadeAt(earlier));
+    }
+    return false;
+}
+
+/**
+ * The order of two places in one recording: by its VBLs, then a place taken inside its
+ * last VBL before one taken after it, then by its changes.
+ */
+function placeOrder(a: RecordingPoint, b: RecordingPoint): number {
+    return a.vbls - b.vbls || Number(!a.inVbl) - Number(!b.inVbl) || a.changes - b.changes;
 }
 
 /**

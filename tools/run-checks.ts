@@ -415,6 +415,7 @@ const CHECKS: Tool[] = [
   { tool: 'mouse-queue.ts' },
   { tool: 'input-boundary.ts' },
   { tool: 'replay.ts' },
+  { tool: 'recording-points.ts' },
   // The replay tool, its own process, against a scratch server.
   { tool: 'replay-recordings.ts' },
   { tool: 'party-collision.ts', args: ['2'] },

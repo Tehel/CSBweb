@@ -58,7 +58,8 @@
  *   whom the server tells it: pending, hidden or broken, and "yours" to its uploader
  *   (`server/recordings.ts`); a moderator whose switch is off is listed them as a player
  *   is. Then this browser's points of the set, the latest made first: its saves whose
- *   recording the store holds up to them, by name, and its games' ends, won or lost
+ *   recording the store holds up to them, by name, and its games' ends, won or lost, but
+ *   for those another passes on its way, as a Sleepsave the game went on from
  *   (`src/engine/RecordingPoints.ts`). A click selects one, and the panel under the lists
  *   says where its path starts, when it began and ended, the time played, its build and
  *   whether an extra was on, a site's its author, its description and when it was shared
@@ -70,7 +71,8 @@
  *   the site's list is asked anew, the recording selected in it, pending; it is not offered
  *   for a local set, a pending one, nor a path that holds a move of `?dev`, and the panel
  *   says why. On a game's end DELETE, the only way one leaves the store but its set's own
- *   deletion. Each delete and withdrawal asks first.
+ *   deletion. Each delete and withdrawal asks first. CLOSE closes the dialog, and so does
+ *   a click beside it (`closeOnBackdrop`), as it closes HOW TO PLAY's and ABOUT's.
  * - **The moderator's switch**, at the page's top right corner, is offered to a moderator
  *   alone. Off, the page is the one a player sees (`playerView`): neither a hidden set nor
  *   a pending one, the moderator's own pending sets included since the page is not told
@@ -111,13 +113,14 @@ import {
 import { localDataSet, type LocalDataSetFile, type LocalDataSetRecord } from '../data/LocalDataSets';
 import { openAddDataSetForm, openPublishedSetForm, type EditedPublishedSet } from './addDataSetForm';
 import { ABOUT_HASH, openAbout } from './about';
+import { closeOnBackdrop } from './backdropClose';
 import { HOW_TO_PLAY_HASH, openHowToPlay, type HowToPlayHost } from './howToPlay';
 import { playerId } from './gameEvents';
 import {
     formatPlayTime, formatSaveDate, formatSaveTime, lastUsedSave,
     type BrowserDataSetStore, type RecordingEntry, type RecordingStore, type SaveEntry, type SaveStore,
 } from '../data/saves';
-import { pointInfo, pointMadeAt, pointPath, pointRecordingId, storedPoints, type PointInfo, type StoredPoint } from '../engine/RecordingPoints';
+import { pointInfo, pointMadeAt, pointPath, pointRecordingId, shownPoints, storedPoints, type PointInfo, type StoredPoint } from '../engine/RecordingPoints';
 import {
     packageOfEnd, packageOfSave, playedWithDevMoves, RECORDING_TEXT_LIMITS, writeRecordingPackage,
     type RecordingPackageStart, type RecordingPackageText,
@@ -216,7 +219,7 @@ const CONFIRMATION = (prefix: string) => `
  * The dialog the book opens: the set's name, then its two tabs, DOCUMENTS, the set's
  * description, its authors and the documents, and RECORDINGS, the site's recordings of the
  * set, then the browser's points of it, and the panel of the one selected; then a
- * moderator's ADD, and CLOSE.
+ * moderator's ADD, on DOCUMENTS alone, and CLOSE.
  */
 const DOCUMENTS = `
 <form class="add-set-form">
@@ -610,7 +613,8 @@ interface RecordingsSource {
  * removes it once confirmed, and ADD, which sends the file chosen on the drive. After a
  * change, the list is the set as `loadManifest` gives it anew, its folder a new one.
  * RECORDINGS: the site's recordings of the set (`siteRecordings`), the latest shared
- * first, then the browser's points of it (`storedPoints`), the latest made first; a click
+ * first, then the browser's points of it (`storedPoints`) but those another passes
+ * (`shownPoints`), the latest made first; a click
  * selects one, and the panel under the lists shows its metadata (`pointInfo`) and PLAY,
  * which plays it (`?recording=`, `pointRecordingId`). On a site's, to a `moderator`,
  * APPROVE, HIDE or SHOW, and DELETE, and to its uploader WITHDRAW (`POST
@@ -724,6 +728,7 @@ function showDocuments(
         void change(`Sending ${file.name}…`, () => postAsPlayer(route, {}, form));
     });
     dialog.querySelector('#documents-close')!.addEventListener('click', () => dialog.close());
+    closeOnBackdrop(dialog);
     dialog.addEventListener('close', () => {
         dialog.remove();
         closed(asked);
@@ -777,7 +782,7 @@ function showRecordings(dialog: HTMLElement, set: DataSet, published: boolean, m
     const refresh = async () => {
         try {
             rows = await source.recordings.list();
-            points = storedPoints(await source.saves.list(null), rows, set.id);
+            points = shownPoints(storedPoints(await source.saves.list(null), rows, set.id), rows);
         } catch (error) {
             rows = [];
             points = [];
