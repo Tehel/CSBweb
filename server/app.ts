@@ -623,11 +623,15 @@ export async function receiveModeration(id: string, gamefilesDir: string, api: M
     send(res, reply.status, JSON.stringify(reply.body), 'application/json; charset=utf-8');
 }
 
+/** What `answerRecordings` needs of the API. */
+export type RecordingListApi = Pick<ApiOptions, 'moderators'> & { recordings: Pick<RecordingsApi, 'store'> };
+
 /**
  * `GET api/recordings?dataSet=<id>`: the set's recordings, as `recordingsText` gives them to
- * the player the request names; 400 without a set.
+ * the player the request names; 400 without a set. The dev server answers the route with it
+ * too (`vite.config.mts`), as it does the two below.
  */
-function answerRecordings(api: ApiOptions, req: IncomingMessage, res: ServerResponse): void {
+export function answerRecordings(api: RecordingListApi, req: IncomingMessage, res: ServerResponse): void {
     const dataSet = new URL(req.url ?? '', 'http://localhost').searchParams.get('dataSet');
     if (dataSet === null || dataSet === '') return send(res, 400, 'No dataSet');
     res.setHeader('Cache-Control', 'no-store');
@@ -635,8 +639,11 @@ function answerRecordings(api: ApiOptions, req: IncomingMessage, res: ServerResp
     send(res, 200, recordingsText(api.recordings.store.of(dataSet), dataSetViewer(api, req)), 'application/json; charset=utf-8');
 }
 
+/** What `receiveShare` and `receiveRecordingModeration` need of the API. */
+export type RecordingShareApi = Pick<ApiOptions, 'dataSets' | 'moderators' | 'now' | 'notify' | 'recordings'>;
+
 /** The options `recordings.ts` decides with. */
-function recordingOptions(api: ApiOptions) {
+function recordingOptions(api: RecordingShareApi) {
     const { store, dir, readPackage } = api.recordings;
     return { recordings: store, dir, readPackage, dataSets: api.dataSets, notify: api.notify, now: api.now };
 }
@@ -646,7 +653,7 @@ function recordingOptions(api: ApiOptions) {
  * of at most `MAX_SHARE_BYTES`, and its form, before `shareRecording` decides. Every answer
  * is JSON (`RecordingAnswer`).
  */
-async function receiveShare(api: ApiOptions, req: IncomingMessage, res: ServerResponse): Promise<void> {
+export async function receiveShare(api: RecordingShareApi, req: IncomingMessage, res: ServerResponse): Promise<void> {
     const answer = (status: number, error: string): RecordingAnswer => ({ status, body: { error } });
     let reply: RecordingAnswer | null = null;
     if (!api.recordings.shareRateLimit.allow(clientAddress(req), api.now())) reply = answer(429, 'Too many recordings shared from here: try again in an hour.');
@@ -667,7 +674,7 @@ async function receiveShare(api: ApiOptions, req: IncomingMessage, res: ServerRe
  * `POST api/recordings/<id>`: its asker and a body of at most `MAX_RECORDING_MODERATION_BYTES`,
  * before `moderateRecording` decides. Every answer is JSON (`RecordingAnswer`).
  */
-async function receiveRecordingModeration(id: string, api: ApiOptions, req: IncomingMessage, res: ServerResponse): Promise<void> {
+export async function receiveRecordingModeration(id: string, api: RecordingShareApi, req: IncomingMessage, res: ServerResponse): Promise<void> {
     const body = await readBody(req, MAX_RECORDING_MODERATION_BYTES);
     const reply: RecordingAnswer = body === null ? { status: 413, body: { error: `The body is larger than ${MAX_RECORDING_MODERATION_BYTES} bytes.` } }
         : await moderateRecording(id, body.toString('utf8'), dataSetViewer(api, req), recordingOptions(api));

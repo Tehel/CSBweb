@@ -135,7 +135,7 @@ There is still **no test framework** (`PLAN.md` → "The evidence") — `npm tes
   the stat bars, where a tap opens the inventory at its release, and fullscreen, entered
   by a tap and by a click, the screen and the effect sized and centred in it, at 16:10
   and at 4:3; the save store held by another tab; a recording played back to its end by
-  `?recording=`, the page's input reaching nothing; and the welcome page's tiles, its fonts, its selection, its HOW TO PLAY and its ABOUT, where PLAY and
+  `?recording=`, the page's input reaching nothing, and a save's shared through the dev server's `api/recordings`, moderated, and played from it; and the welcome page's tiles, its fonts, its selection, its HOW TO PLAY and its ABOUT, where PLAY and
   CONTINUE lead, CONTINUE's save read straight into play, and the form that adds a set,
   and edits, publishes and deletes one, the tiles that moderate a published one, and the book that
   downloads a set's archive and lists its documents, where a moderator adds and removes them;

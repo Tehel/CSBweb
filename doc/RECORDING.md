@@ -382,9 +382,12 @@ a root and the branches down to the one played, or a branch alone, from its own 
   not log, so the player's game makes them again there and writes nothing
   (`GameSaves.sleepSave`); the file goes to the player (`InputBoundary.savedInVbl`).
 
-**The page** plays one with `?recording=<id>` (`playRecording`, `src/main.ts`): the path
-the store holds to it, from its root (`readRecordingPath`,
-`src/data/saves/RecordingStore.ts`), played by the page's own loop. Every tick is drawn at
+**The page** plays one with `?recording=<id>` (`playRecording`, `src/main.ts`), by the
+page's own loop. A store's id is the path the store holds to it, from its root
+(`readRecordingPath`, `src/data/saves/RecordingStore.ts`). A site's, sixteen uppercase
+hexadecimal digits (`SHARED_RECORDING_ID`), is its package's path ("Shared recordings",
+below), read from the server (`recordings/<id>.gz`) and never put in the store, played to
+the point it was shared at, a save's file checked there. Every tick is drawn at
 the wall clock's pace. A span the clock is held through (`RecordingPlayer.held`), from the
 change or the VBL that held it to the change that lets it run, is played at once and not
 drawn (`Game.runAtOnceWhile`): its VBLs cannot be dropped, since a held clock still counts

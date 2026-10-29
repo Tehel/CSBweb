@@ -558,6 +558,11 @@ like; a moderator approves, hides, shows, breaks and deletes it. Each change is 
 ("Notifications", above). A package never changes after: it is served `immutable`, and
 copied once by the backup (below).
 
+The dev server answers `api/recordings` and serves `recordings/<id>.gz` as the server does
+(`vite.config.mts`), with the page's own reader of a package, over a store of its own in
+memory and a scratch folder of the packages, both gone when it stops. Its sets are those
+it answers `api/data-sets` with, and its moderator the same.
+
 ## The image and the stack
 
 `Dockerfile`, two stages on `NODE_IMAGE`, `node:24.22.0-alpine3.24` pinned by the digest

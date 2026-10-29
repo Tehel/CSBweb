@@ -125,7 +125,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G31 | Recordings shared: the set's dialog, a package, the server | L | ⏳ step 5 of 6 |
+| G31 | Recordings shared: the set's dialog, a package, the server | L | ⏳ step 6 of 7 |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
 | C194 | A DSA's wall graphic counts as a real decoration, so it hides no text | S | ⏳ |
 | C195 | Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space | S | ⏳ to decide with the author |
@@ -727,7 +727,7 @@ player by: the sets they own, and a moderator's rights (`X-Player-Id`, `server/a
 by the name the player gives, or by nobody, and the server keeps its uploader's
 `playerId` apart, as a set's `owner` is kept, for a withdrawal.
 
-Paying it, in steps; the design is decided, and step 5 is next.
+Paying it, in steps; the design is decided, and step 6 is next.
 
 1. A game's end is a point to share: the game tells it at the boundary as `ShowCredits`
    follows `MainLoop`'s return (`InputBoundary.ended`), the recording ends in that VBL
@@ -752,8 +752,7 @@ Paying it, in steps; the design is decided, and step 5 is next.
    notified; the metadata are the package's own, so the form carries nothing else; its
    limits, 8 MiB a package, 32 MiB unzipped, five shares an hour per address and 1 GiB for
    them all; and the packages copied by `backup.ts`. `tools/checks/server.ts` asserts it,
-   and `tools/checks/build.ts` the built reader against the source's. The dev server does
-   not answer the routes yet, which step 5 owes.
+   and `tools/checks/build.ts` the built reader against the source's.
 4. The replay tool (`utils/replay-recordings.ts`, `doc/DEPLOYMENT.md` → "Deploying"), run
    before a deploy as a moderator: every listed recording not broken yet, its package
    played from it alone with the working tree's engine, in a page without the DOM over
@@ -761,10 +760,20 @@ Paying it, in steps; the design is decided, and step 5 is next.
    `tools/checks/replay.ts`'s point 10 holds to its own replayed page), and a yes asked
    for each that drifts before it is broken (`{"action": "break"}`).
    `tools/checks/replay-recordings.ts` runs it against a scratch server.
-5. The page's player: `?recording=` from the server, and the viewer's strip and keys; and
-   the dev server's `api/recordings` and `recordings/`, as the deployed server answers them,
-   for the probes.
-6. The dialog: its two tabs, the site's and the browser's recordings of the set, the
+5. The site's recording played by the page: `?recording=<id>`, a `SHARED_RECORDING_ID`,
+   read from `recordings/<id>.gz` with its form checked and never put in the store
+   (`fetchSharedRecording`, `src/main.ts`), played to its point, a save's file checked
+   there; a drift logs the build that made it where it is another. The dev server answers
+   `api/recordings` and serves `recordings/` as the deployed server does (`vite.config.mts`,
+   with `server/app.ts`'s own handlers). `tools/probe-frames.ts` shares a quick save's
+   package there, sees it listed to its uploader alone, then to everyone once approved, and
+   plays it from the server.
+6. The viewer's strip and keys (the decision above): the time played, pause, the pace,
+   RESTART and stop drawn over the message area and on Space, `+`, `-`, Backspace and Esc,
+   which HOW TO PLAY lists; and at the end or at a drift, the line in the message area,
+   which says, for a drift of a recording made by another build, that another version of
+   the site made it (`fetchSharedRecording` has the package's build).
+7. The dialog: its two tabs, the site's and the browser's recordings of the set, the
    selection and its metadata, PLAY and UPLOAD, and DELETE for a browser's game's end,
    the only way one leaves the store but its set's own deletion, checked in
    `tools/probe-frames.ts`'s welcome page block. An end's UPLOAD needs the game's play

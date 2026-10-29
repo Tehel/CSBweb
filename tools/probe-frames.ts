@@ -1788,6 +1788,61 @@ check(!escDuring && !playedGame.dialog, 'the page\'s input reaches nothing while
 check(playedGame.recordings === recordedGame.recordings && playedGame.saves === recordedGame.saves,
   'and the page records nothing and saves nothing');
 
+// A site's recording (`fetchSharedRecording`, `src/main.ts`), through the dev server's
+// `api/recordings` and `recordings/` (`vite.config.mts`; the image's own server in
+// `tools/check-image.sh`): CSB's `csbgame2.dat` read, a turn, and F5, the package of the
+// quick save's path shared at its point by a player. Pending, it is listed to its
+// uploader alone, then to everyone once the moderator approves it. `?recording=<id>`
+// plays it from the server to the save's point, the file made there the save's, and the
+// store, which a shared recording never enters, is as it was.
+const SHARER = '00000000-0000-4000-8000-000000000002';
+await navigate(`${APP}?intro=0&dungeon=csb`, GAME);
+await evaluate(`(async()=>{ const { saves } = window.__probe;
+  const bytes = new Uint8Array(await (await fetch('/gamefiles/csb/csbgame2.dat')).arrayBuffer());
+  const imported = await saves.importSave({ name: 'csbgame2.dat', bytes });
+  if (imported.kind === 'stored') saves.read(await saves.open(imported.entry));
+  return imported.kind; })()`);
+await vbls(TICK);
+await key('KeyL'); await vbls(TICK);
+await key('F5');
+await until(`window.__probe.saves.list().then((rows) => rows.some((e) => e.quick && e.recording))`, 'the quick save');
+const sharedRecording = await evaluate(`(async()=>{ const { saves, recordings, recordingStore, readRecordingPath, packageOfSave, writeRecordingPackage } = window.__probe;
+  await recordings.flush();
+  const entry = (await saves.list()).find((e) => e.quick && e.recording);
+  const path = await readRecordingPath(recordingStore, entry.recording.recording);
+  const { bytes } = await saves.open(entry);
+  const pkg = packageOfSave(path, entry.recording, bytes, { title: 'Probe', author: '', description: '' },
+    { recordedAt: entry.savedAt, endedAt: entry.savedAt, playTime: entry.playTime });
+  const form = new FormData();
+  form.append('package', new Blob([await writeRecordingPackage(pkg)]), 'probe.gz');
+  const shared = await fetch('api/recordings', { method: 'POST', headers: { 'X-Player-Id': ${JSON.stringify(SHARER)} }, body: form });
+  const { id } = await shared.json();
+  const listed = async (player) => (await (await fetch('api/recordings?dataSet=csb', player ? { headers: { 'X-Player-Id': player } } : undefined)).json())
+    .recordings.find((r) => r.id === id) ?? null;
+  const toSharer = await listed(${JSON.stringify(SHARER)}), toNobody = await listed(null);
+  const approved = (await fetch('api/recordings/' + id, { method: 'POST', headers: { 'X-Player-Id': ${JSON.stringify(MODERATOR)} },
+    body: JSON.stringify({ action: 'approve' }) })).status;
+  const afterApproval = await listed(null);
+  return { status: shared.status, id, joins: path.length - 1, changes: entry.recording.changes, vbls: entry.recording.vbls,
+    toSharer: toSharer && [toSharer.title, toSharer.status, toSharer.mine].join(), toNobody, approved,
+    afterApproval: afterApproval && [afterApproval.title, afterApproval.status ?? 'listed', afterApproval.mine ?? false].join(),
+    recordings: (await recordingStore.list()).length, saves: (await saves.list()).length }; })()`);
+console.log('  recording shared:', JSON.stringify(sharedRecording));
+check(sharedRecording.status === 201 && /^[0-9A-F]{16}$/.test(sharedRecording.id) && sharedRecording.toSharer === 'Probe,pending,true'
+  && sharedRecording.toNobody === null && sharedRecording.approved === 200 && sharedRecording.afterApproval === 'Probe,listed,false',
+  'a save\'s package shared through api/recordings is pending, listed to its uploader alone, and to everyone once the moderator approves it');
+await navigate(`${APP}?dungeon=csb&recording=${sharedRecording.id}&keepsaves`, 'window.__probe?.player() != null');
+await until('!window.__probe.player().playing', 'the shared recording played to its end');
+const playedShared = await evaluate(`(async()=>{ const { game, recordingStore, saves } = window.__probe, player = window.__probe.player();
+  return { drift: player.drift, joins: player.joins, point: [player.point.changes, player.point.vbls].join(), running: game.running,
+    recordings: (await recordingStore.list()).length, saves: (await saves.list()).length }; })()`);
+console.log('  shared recording played:', JSON.stringify(playedShared));
+check(playedShared.drift === null && playedShared.joins === sharedRecording.joins && !playedShared.running
+  && playedShared.point === `${sharedRecording.changes},${sharedRecording.vbls}`,
+  `?recording=<id> plays the site's recording from the server to the save's point, through its ${sharedRecording.joins} join(s), the file made there the save's, and stops`);
+check(playedShared.recordings === sharedRecording.recordings && playedShared.saves === sharedRecording.saves,
+  'and the shared recording enters no store');
+
 // The map dialog (`src/renderer/ui/MapDialog.ts`), over CSB's `csbgame2.dat`, its party
 // where the save left it: a press held on the message area opens it, with MAP VIEW on
 // alone. A frame of it with the pointer off the canvas; a right click closes it.

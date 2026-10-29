@@ -7,13 +7,19 @@ import { dirname, join } from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { DatabaseSync } from 'node:sqlite';
 
-import { answerStats, contentType, dataSetViewer, pathSegments, receiveDocument, receiveEdit, receiveModeration, receivePublish } from './server/app.ts';
+import {
+  answerRecordings, answerStats, contentType, dataSetViewer, pathSegments, receiveDocument, receiveEdit, receiveModeration, receivePublish,
+  receiveRecordingModeration, receiveShare,
+} from './server/app.ts';
 import { DataSetStore, manifestText, parseModerators, wallsText } from './server/dataSets.ts';
 import { RateLimit } from './server/events.ts';
 import { NOBODY } from './server/notify.ts';
 import type { CheckDataSet } from './server/publish.ts';
+import { RecordingStore, type ReadRecordingPackage } from './server/recordings.ts';
 import { AnswerCache, StatsStore } from './server/stats.ts';
-import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, PLAYER_ID_HEADER, parseManifest } from './src/data/DataSets.ts';
+import {
+  DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, PLAYER_ID_HEADER, RECORDING_FILES, RECORDINGS_ROUTE, SHARED_RECORDING_ID, parseManifest,
+} from './src/data/DataSets.ts';
 import { fillFortnight } from './tools/lib/statsFortnight.ts';
 
 /**
@@ -57,6 +63,12 @@ const DEV_MODERATOR_PLAYER_ID = '00000000-0000-4000-8000-000000000001';
  * edit, and a document added or removed, copies a site's folder through its link, and
  * deletes the link, never `tools/fixtures/gamefiles/`. The store is `node:sqlite`'s, in memory:
  * on a Node without it, a GET answers the manifest and a POST 501.
+ *
+ * `api/recordings` is `answerRecordings`, `receiveShare` and `receiveRecordingModeration`
+ * over the same store, with the page's own reader of a package (`ssrLoadModule`), and a
+ * store of the recordings of its own, in memory, kept while the dev server runs: a
+ * recording shared is a row of it and a package in a scratch folder, made at start and
+ * removed at the end, served under `recordings/<id>.gz`. Without `node:sqlite`, it is 501.
  *
  * `api/stats` is `answerStats` over the same store's public sets, and over statistics made
  * once, at start, of `checks/stats`' fortnight (`tools/lib/statsFortnight.ts`), which names
@@ -212,6 +224,60 @@ function dataSetsRoute(): Plugin {
         } finally {
           db.close();
         }
+      });
+
+      const recordingsDb = sqlite ? new sqlite.DatabaseSync(':memory:') : null;
+      const recordingStore = recordingsDb ? new RecordingStore(recordingsDb, 1024 * 1024 * 1024) : null;
+      const recordingsDir = mkdtempSync(join(tmpdir(), 'csbweb-recordings-'));
+      server.httpServer?.once('close', () => {
+        recordingsDb?.close();
+        rmSync(recordingsDir, { recursive: true, force: true });
+      });
+      const shareRateLimit = new RateLimit(1000, 60_000);
+      const readPackage: ReadRecordingPackage = async (...args) =>
+        ((await server.ssrLoadModule('/src/engine/RecordingPackage.ts')) as { readRecordingPackage: ReadRecordingPackage }).readRecordingPackage(...args);
+      server.middlewares.use(`/${RECORDINGS_ROUTE}`, async (req, res, next) => {
+        const id = pathSegments(req.url ?? '');
+        const list = req.url === '/' || req.url?.startsWith('/?');
+        if (id?.length !== 1 && !list) return next();
+        const allow = id?.length === 1 ? 'POST' : 'GET, HEAD, POST';
+        if (!allow.split(', ').includes(req.method ?? '')) {
+          res.statusCode = 405;
+          res.setHeader('Allow', allow);
+          return res.end();
+        }
+        if (!sqlite || !recordingStore) {
+          res.statusCode = 501;
+          return res.end();
+        }
+        const db = new sqlite.DatabaseSync(':memory:');
+        try {
+          const api = {
+            dataSets: openStore(db), moderators, now: Date.now, notify: NOBODY,
+            recordings: { store: recordingStore, dir: recordingsDir, readPackage, shareRateLimit },
+          };
+          if (id?.length === 1) await receiveRecordingModeration(id[0]!, api, req, res);
+          else if (req.method === 'POST') await receiveShare(api, req, res);
+          else answerRecordings(api, req, res);
+        } catch (error) {
+          next(error);
+        } finally {
+          db.close();
+        }
+      });
+
+      // A shared recording's package, from the scratch folder.
+      server.middlewares.use(`/${RECORDING_FILES}`, (req, res, next) => {
+        const segments = pathSegments(req.url ?? '');
+        const name = segments?.length === 1 ? segments[0]! : '';
+        if (!name.endsWith('.gz') || !SHARED_RECORDING_ID.test(name.slice(0, -'.gz'.length)) || (req.method !== 'GET' && req.method !== 'HEAD')) return next();
+        const path = join(recordingsDir, name);
+        if (!statSync(path, { throwIfNoEntry: false })?.isFile()) return next();
+        res.setHeader('Content-Type', contentType(path));
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Cache-Control', 'no-cache');
+        if (req.method === 'HEAD') return res.end();
+        createReadStream(path).pipe(res);
       });
 
       // A set's files: a published one's from the scratch folder, a site's from the fixtures.

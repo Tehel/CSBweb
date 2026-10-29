@@ -7,7 +7,10 @@
 import { SoundManager } from './audio/SoundManager';
 import { CsbRandom } from './core/random';
 import { extractPresetHeroes } from './data/HeroExtractor';
-import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, dataSetNamed, parseManifest, PLAYER_ID_HEADER, THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH, thumbnailPath, type DataSet, type DataSetManifest } from './data/DataSets';
+import {
+    DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, dataSetNamed, parseManifest, PLAYER_ID_HEADER, RECORDING_FILES, SHARED_RECORDING_ID, THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH,
+    thumbnailPath, type DataSet, type DataSetManifest,
+} from './data/DataSets';
 import { folderFiles, loadGameFiles, type DataSetFiles, type GameFiles } from './data/DataSetFiles';
 import { parsePublishedDungeons, type KnownDungeon } from './data/DungeonSignature';
 import { isLocalDataSetId, localDataSet, recordFiles } from './data/LocalDataSets';
@@ -44,7 +47,9 @@ import { csbGraphicsOpener } from './engine/FileSignatures';
 import type { PrisonDoorChoice } from './renderer/intro/PrisonDoor';
 import { Recorder } from './engine/Recorder';
 import { RecordingWriter } from './engine/RecordingWriter';
-import { RecordingPlayer } from './engine/RecordingPlayer';
+import { RecordingPlayer, type SavedAtEnd } from './engine/RecordingPlayer';
+import { packageOfSave, readRecordingPackage, writeRecordingPackage } from './engine/RecordingPackage';
+import type { Recording } from './engine/Recorder';
 import { applySaveBytes } from './engine/SaveGameFile';
 import { Settings, applyToGame, type SettingsValues } from './settings/Settings';
 import type { KeyboardLayoutMap } from './renderer/ui/KeyLabels';
@@ -79,8 +84,8 @@ let setFiles!: DataSetFiles;
 /** Its thumbnail, `null` where it has none: from its folder, or a local set's record (`chooseDataSet`). */
 let setThumbnail!: () => Promise<Blob | null>;
 /**
- * `?recording=<id>`: the store's recording this page plays back in place of a game
- * (`playRecording`), or `null`. Its player, once it is begun.
+ * `?recording=<id>`: the recording this page plays back in place of a game, the site's or
+ * the store's (`playRecording`), or `null`. Its player, once it is begun.
  */
 const playedRecording = new URLSearchParams(window.location.search).get('recording');
 let recordingPlayer: RecordingPlayer | null = null;
@@ -499,7 +504,7 @@ function probeHandle(built: Built, sound: SoundManager) {
     const presetHeroes = () => extractPresetHeroes(built.game.ctx.dungeon.getData(), built.game.ctx.tables.textDecode, built.game.ctx.tables);
     return { game: built.game, screen: built.screen, sound, saves: built.saves,
         recorder: built.recorder, recordings: built.recordings, recordingStore: built.recordingStore, player: () => recordingPlayer,
-        renderView, refreshScreen, presetHeroes, applySaveBytes, intro: introProbe };
+        readRecordingPath, packageOfSave, writeRecordingPackage, renderView, refreshScreen, presetHeroes, applySaveBytes, intro: introProbe };
 }
 
 /** `window.__probe` (`probeHandle`), whose type the probes' page-side functions are checked against. */
@@ -637,27 +642,31 @@ function applySettings({ game }: Built, sound: SoundManager, values: SettingsVal
 }
 
 /**
- * `?recording=<id>`: the store's recording `id` played back in place of a game
- * (`RecordingPlayer`, `doc/RECORDING.md` → "The port's player"), from its root through
- * each branch down to it (`readRecordingPath`), as far up as the store holds them. Every
+ * `?recording=<id>`: the recording `id` played back in place of a game (`RecordingPlayer`,
+ * `doc/RECORDING.md` → "The port's player"), from its root through each branch down to
+ * it. A site's id (`SHARED_RECORDING_ID`) is its package's path, read from the server and
+ * never put in the store (`fetchSharedRecording`), played to the point it was shared at,
+ * a save's file checked there. Any other is the store's, its path as far up as the store
+ * holds it (`readRecordingPath`). Every
  * tick is drawn, at the wall clock's pace; a span under a held clock is played at once
  * and undrawn (`Game.runAtOnceWhile`). The page's input reaches nothing, and the page
  * records nothing: no read of `GameSaves` begins a recording, nor sends a statistic. At
  * the path's end, or at a drift, the loop stops, the screen as the recording left it.
  *
- * A recording of another data set, or one the store does not hold, ends the page as an
- * error does.
+ * A recording of another data set, or one neither the site nor the store holds, ends the
+ * page as an error does.
  */
 async function playRecording(built: Built, id: string): Promise<void> {
     const { game } = built;
-    const path = await readRecordingPath(built.recordingStore, id);
+    const { path, savedAtEnd, build } = SHARED_RECORDING_ID.test(id) ? await fetchSharedRecording(id)
+        : { path: await readRecordingPath(built.recordingStore, id), savedAtEnd: null, build: null };
     if (path.some((recording) => recording.dataSet !== dataSet.id)) throw new Error(`RECORDING ${id} IS NOT OF ${dataSet.name}`);
-    const player = new RecordingPlayer(game, path, await readDungeonFile());
+    const player = new RecordingPlayer(game, path, await readDungeonFile(), savedAtEnd);
     recordingPlayer = player;
     player.onEnd((drift) => {
         game.stop();
         refreshScreen();
-        if (drift) console.warn(`Recording ${id} drifted:`, drift);
+        if (drift) console.warn(`Recording ${id} drifted${build !== null && build !== __CSBWEB_BUILD__ ? `, made by build ${build}` : ''}:`, drift);
         else console.log(`✓ Recording ${id} played to its end`);
     });
     game.runAtOnceWhile(() => player.held);
@@ -665,6 +674,21 @@ async function playRecording(built: Built, id: string): Promise<void> {
     player.start();
     if (player.playing) game.start(true);
     console.log(`✓ Playing recording ${id}, from ${path.length > 1 ? `its root through ${path.length - 1} joins` : 'its start'}`);
+}
+
+/**
+ * The site's recording `id`, read from its package as the server serves it
+ * (`RECORDING_FILES/<id>.gz`), its form checked (`readRecordingPackage`): its path, the
+ * save its end makes where it was shared at a save's point, and the build that made it. A
+ * package the server does not serve, or whose form is wrong, ends the page as an error
+ * does.
+ */
+async function fetchSharedRecording(id: string): Promise<{ path: readonly Recording[]; savedAtEnd: SavedAtEnd | null; build: string }> {
+    const url = `${RECORDING_FILES}/${id}.gz`;
+    const response = await fetch(url).catch(() => null);
+    if (!response?.ok) throw new Error(`Cannot read the recording '${url}'${response ? ` (HTTP ${response.status})` : ''}.`);
+    const pkg = await readRecordingPackage(new Uint8Array(await response.arrayBuffer()));
+    return { path: pkg.path, savedAtEnd: pkg.shared.kind === 'save' ? pkg.shared : null, build: pkg.build };
 }
 
 function start(game: Game): void {
