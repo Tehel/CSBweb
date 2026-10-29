@@ -772,7 +772,15 @@ Paying it, in steps; the design is decided, and step 6 is next.
    RESTART and stop drawn over the message area and on Space, `+`, `-`, Backspace and Esc,
    which HOW TO PLAY lists; and at the end or at a drift, the line in the message area,
    which says, for a drift of a recording made by another build, that another version of
-   the site made it (`fetchSharedRecording` has the package's build).
+   the site made it (`fetchSharedRecording` has the package's build). And at the end of a
+   span the player runs at once (`RecordingPlayer.held`), a line in the message area too:
+   "SKIPPED 12S ON THE SAVE MENU", its seconds the span's VBLs over 60, rounded. The
+   save menu and the Hint Oracle are known as they hold the clock: the game opens them in
+   a VBL (`openSaveMenu`, `stopForHintOracle`). The settings, map and champion dialogs
+   hold it by the page's logged `pause` (`openDialog`), which does not say which dialog it
+   was, so that change gains a field naming it (`settings`, `map`, `champions`).
+   `readRecordingPackage` accepts it, and a recording that lacks it, made before, says
+   "A MENU".
 7. The dialog: its two tabs, the site's and the browser's recordings of the set, the
    selection and its metadata, PLAY and UPLOAD, and DELETE for a browser's game's end,
    the only way one leaves the store but its set's own deletion, checked in
