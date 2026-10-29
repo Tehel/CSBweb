@@ -125,7 +125,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G31 | Recordings shared: the set's dialog, a package, the server | L | ⏳ step 8 of 8 |
+| G31 | Recordings shared: the set's dialog, a package, the server | L | ⏳ step 8 of 11 |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
 | C194 | A DSA's wall graphic counts as a real decoration, so it hides no text | S | ⏳ |
 | C195 | Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space | S | ⏳ to decide with the author |
@@ -787,16 +787,38 @@ Paying it, in steps; the design is decided, and step 8 is next.
    played on alone. `tools/checks/replay.ts`, point 11, restarts each package's path a
    second into its play, at ×8 and paused a second, to the same end; `tools/probe-frames.ts`
    pauses, paces, restarts and stops one in the page, and frames the strip at the end.
-8. The dialog: its two tabs, the site's and the browser's recordings of the set, the
-   selection and its metadata, PLAY and UPLOAD, and DELETE for a browser's game's end,
-   the only way one leaves the store but its set's own deletion, checked in
-   `tools/probe-frames.ts`'s welcome page block. An end's UPLOAD needs the game's play
-   time there (`Game.playTime`) for its package, which the store does not keep yet
-   (`RecordingEntry`). And the credits a recording of a game's end plays into: they take
-   the input as in play (`showEndOfGame`), so neither the viewer's strip nor its keys
-   reach them, and their RESTART THIS GAME, where a save allows it, would read the save
-   into the page that plays the recording; there the viewer's RESTART and stop are owed
-   in their place.
+8. The dialog's tabs and the browser's points: the dialog the book opens titled with the
+   set's name alone, in two tabs, DOCUMENTS as the dialog is now and RECORDINGS; the book
+   on a local set's tile too, whose dialog is RECORDINGS alone. The browser's points of the
+   set: each save whose link the store holds a path to (`SaveEntry.recording`), by its
+   name, and each recording the game's end ended, won or lost. A click selects one, and the
+   panel under the list shows its metadata, as a package would say them
+   (`RecordingPackageInfo`: where it starts, the play time, when it began and its point was
+   made), its build, and whether an extra was on; and PLAY, and DELETE for a game's end,
+   the only way one leaves the store but its set's own deletion, then the store pruned
+   (`prunePlan`). PLAY of a game's end is `?recording=<its recording's id>`, as now; of a
+   save, `?recording=save:<its row's id>`, which no recording id's form takes (theirs have
+   no `:`), played to the save's point and its file checked there, as a site's
+   recording is. The game's end keeps the game's play time in its row (`Game.playTime`,
+   `RecordingEntry`), which the panel shows and an end's package needs. Checked in
+   `tools/probe-frames.ts`'s welcome page block.
+9. The site's recordings in RECORDINGS, before the browser's: `GET api/recordings?dataSet=<id>`,
+   each with its build and a mark where an extra was on, and its state to whom the server
+   tells it (pending, hidden, `mine`); PLAY, `?recording=<id>`; to a moderator, approve,
+   hide or show, and delete, once confirmed, and to its uploader, withdraw
+   (`POST api/recordings/<id>`), then the list anew. A refusal is said in the dialog.
+   Checked in `tools/probe-frames.ts`, against the dev server's `api/recordings`.
+10. UPLOAD, on a browser's point: its form in the panel, a title, which it needs, and an
+   author and a description, which it does not (`RECORDING_TEXT_LIMITS`); the package
+   written (`packageOfSave`, `packageOfEnd`) and sent (`POST api/recordings`), then the
+   site's list anew, the recording pending. Refused in the page with a `?dev` move in the
+   path, as the server refuses it. Not offered for a set the site does not publish, a
+   local one or a pending one, and the dialog says why. `tools/probe-frames.ts` uploads
+   through the dialog.
+11. The credits a recording of a game's end plays into: they take the input as in play
+   (`showEndOfGame`), so neither the viewer's strip nor its keys reach them, and their
+   RESTART THIS GAME, where a save allows it, would read the save into the page that plays
+   the recording; there the viewer's RESTART and stop are owed in their place.
 
 ### Postponed
 
