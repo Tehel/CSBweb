@@ -85,7 +85,21 @@ export interface GameSavesScreen {
  * and repacked an open chest (`TAG02076e`, `doc/CSBwin-src/Character.cpp:5141-5150`); F5
  * and the Sleepsave have done neither.
  */
-type SaveClock = 'running' | 'stopped';
+export type SaveClock = 'running' | 'stopped';
+
+/**
+ * The file a save of `game` makes now (`GameSaves.save`): with the clock running, an open
+ * chest repacked around its build, as the disk menu's `TAG02076e` has repacked it with the
+ * clock stopped. A recording played back makes it at each join, to check it against the
+ * file the branch read (`RecordingPlayer`).
+ */
+export function saveFileOf(game: Game, clock: SaveClock, portraitOf: (champion: Champion) => number[] | undefined): Uint8Array {
+    const openChest = clock === 'running' ? game.ctx.interface.openChestId : null;
+    if (openChest !== null) repackChest(game.ctx);
+    const bytes = buildSaveFile(game, { portraitOf });
+    if (openChest !== null) showChestContents(game.ctx, openChest);
+    return bytes;
+}
 
 /**
  * Where a save is written: a row of its own, a slot of the playthrough (F5's or the
@@ -333,13 +347,8 @@ export class GameSaves {
      */
     async save(clock: SaveClock, target: SaveTarget): Promise<SaveEntry> {
         if (this.game.isDead()) throw new Error('an error has ended the game');
-        const openChest = clock === 'running' ? this.game.ctx.interface.openChestId : null;
-        if (openChest !== null) repackChest(this.game.ctx);
-        const bytes = buildSaveFile(this.game, {
-            portraitOf: (champion) => this.screen.portraitOf(champion),
-        });
+        const bytes = saveFileOf(this.game, clock, (champion) => this.screen.portraitOf(champion));
         const point = this.recorder?.point() ?? null;
-        if (openChest !== null) showChestContents(this.game.ctx, openChest);
         const savedAt = Date.now();
         const playTime = this.game.playTime();
         const fields = readSaveFileFields(bytes);
@@ -647,6 +656,14 @@ export class GameSaves {
         if (champions.length === 0 || potentialChampionIndex >= 0 || this.game.isRunningScript()
             || this.game.ctx.systems.dsa.disableSaves || this.inPrison()) {
             this.log('Sleepsave skipped: no party, a champion being chosen, a script running, saves disabled, or the prison');
+            return;
+        }
+        // A recording played back writes no save. The recorded one made its file and ran its
+        // tail inside the VBL of its click, which the boundary does not log, so they are
+        // made here again, and nothing is written (`RecordingPlayer`).
+        if (this.game.input.playing) {
+            saveFileOf(this.game, 'running', (champion) => this.screen.portraitOf(champion));
+            this.game.saveWritten();
             return;
         }
         try {

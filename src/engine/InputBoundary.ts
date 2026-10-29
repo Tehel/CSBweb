@@ -16,6 +16,9 @@
  * Most changes are the engine's to apply (`Game`'s applier). Three are the interface's,
  * which the engine does not import: a panel key, and the Reincarnate screen's key and
  * click (`ScreenInput`, which the page's input path gives).
+ *
+ * A recording played back feeds it (`RecordingPlayer`): after each VBL, the changes
+ * logged before the next are applied, as the page's events applied them.
  */
 import type { Extras, GameContext } from './GameContext';
 import { LONG_MOUSEQLEN, MOUSEQLEN } from './MouseQueue';
@@ -80,6 +83,8 @@ export class InputBoundary {
     private inVbl = false;
     private listener: InputListener | null = null;
     private screen: ScreenInput | null = null;
+    /** The player's feed (`play`), or `null` while no recording plays. */
+    private feed: (() => void) | null = null;
 
     /** `applyToGame` applies the engine's changes, and returns what its door returns. */
     constructor(private readonly applyToGame: (change: GameChange) => boolean) {}
@@ -89,7 +94,10 @@ export class InputBoundary {
         return this.vblsRun;
     }
 
-    /** Run one VBL: counted, and the changes made in it the game's own. */
+    /**
+     * Run one VBL: counted, and the changes made in it the game's own. Then, while a
+     * recording plays, its feed applies what was logged before the next.
+     */
     runVbl(frame: () => void): void {
         this.vblsRun++;
         this.inVbl = true;
@@ -98,6 +106,23 @@ export class InputBoundary {
         } finally {
             this.inVbl = false;
         }
+        this.feed?.();
+    }
+
+    /**
+     * A recording played back (`RecordingPlayer`): `feed` is called after every VBL,
+     * outside it, to apply what was logged before the next. `null` when it stops.
+     */
+    play(feed: (() => void) | null): void {
+        this.feed = feed;
+    }
+
+    /**
+     * Whether a recording is playing: what the game opens in a VBL then does its game
+     * half alone, and shows nothing (`openSaveMenu`, `GameScreen.handleMouseButton`).
+     */
+    get playing(): boolean {
+        return this.feed !== null;
     }
 
     /** Tell `listener` every change from now on, or nobody (`null`). */

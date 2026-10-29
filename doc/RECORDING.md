@@ -1,8 +1,8 @@
 # Recording a game and playing it back
 
 CSBWin can record a game as the list of inputs it took and play that list back. The port
-records every game and keeps the latest in the browser's store, and plays a recording back
-only in a tool so far (`DEBT.md` G29). This document holds what CSBWin does, what a replay needs, where the port stands
+records every game and keeps it in the browser's store, and plays a recording back through
+its player, which only a tool starts so far (`DEBT.md` G29). This document holds what CSBWin does, what a replay needs, where the port stands
 against those needs, the port's own recorder, and what sharing recordings would take.
 
 **Recordings follow the engine.** Any change to what the engine does at a tick makes a
@@ -173,8 +173,10 @@ asserts every change recorded at the same VBL with the same `d.Time` and
   reads: beyond the tick's views, the recorded page composes the screen about a hundred
   times in each game, and the replay a handful.
 - **A save leaves the game as the boundary says**: F5 with the clock running, and the disk
-  menu's SAVE with it stopped, each replayed by its tail alone. The replay takes the disk
-  menu down itself, where the log lets the clock run.
+  menu's SAVE with it stopped, each replayed by its tail alone; the Sleepsave, lying down
+  and woken, by its file and its tail made again in the VBL of its click.
+- **The replay shows no dialog and writes no save**: the disk menu a played VBL opens
+  holds the clock with nothing shown, until the logged `pause` lets it run.
 - **The doors it plays are the boundary's**: clicks, the button-up, keys, panel keys, the
   dialogs' clock, `TAG0207cc`, the extras, a save's tail and `?dev`'s move.
 - **A recording's start is enough**: a new game's stream and playthrough as the read
@@ -263,10 +265,8 @@ the store (below, "The tree"). Deleting a player's own data
 set deletes the recordings played on it (`BrowserDataSetStore.remove`). The clock and the
 ids are the page's: the engine reads neither.
 
-A recording is played back by its start: the game read from it, a new one's stream and
-playthrough set over the read's, or a save's `CarriedState` set over its read (below),
-the rules and the extras set, the game begun, and each change applied before the VBL it
-was logged at.
+A recording is played back by its start, and each change applied before the VBL it was
+logged at (below, "The port's player").
 
 ### The tree
 
@@ -325,6 +325,40 @@ drift detector: a replay stops at the first that differs.
 
 Logging the boundary rather than the entries the queue takes replays the queue itself: a
 click a full queue drops, and the button a click turns out to be when it is taken.
+
+## The port's player
+
+`RecordingPlayer` (`src/engine/RecordingPlayer.ts`) plays a recording's path into a game:
+a root and the branches down to the one played, or a branch alone, from its own start.
+
+- **The start.** The path's first start is read: a new game's world, its stream and
+  playthrough set over the read's (`Game.readNewGame` draws from a stream of its own), or
+  a save's file and its `CarriedState`; then its rules and its extras. The game is
+  started by its owner, as after any read.
+- **The feed.** The boundary calls the player after every VBL, outside it
+  (`InputBoundary.play`), and the player applies the changes logged before the next, so
+  nothing of the page comes between. The player runs no VBL: a tool's loop or the page's
+  runs them.
+- **The joins.** Where a parent reaches the point its child names, the child's file is
+  read, its `CarriedState` set over it, its rules and extras set, and its changes follow.
+- **The drift detector.** Each change's `d.Time` and `d.RandomNumber` are checked before
+  it is applied, and at each join the file the parent makes now, as the recorded save
+  made it (`saveFileOf`, `src/engine/GameSaves.ts`), against the file the child read.
+  The first that differs stops the player (`RecordingPlayer.drift`).
+- **What the game opens in a VBL** does its game half alone while a recording plays
+  (`InputBoundary.playing`), and shows nothing: the disk menu its icon opens, and the
+  prison's question, `TAG02076e`, the video mode and the clock held (`openSaveMenu`); the
+  Hint Oracle's button, `TAG02076e` and the clock held (`stopForHintOracle`). The
+  recording's logged `pause` and `tag0207cc` undo them, as their close did.
+- **No save is written.** A save the page made is its logged tail (`saveWritten`). The
+  Sleepsave's file and tail are made inside the VBL of its click, which the boundary does
+  not log, so the player's game makes them again there and writes nothing
+  (`GameSaves.sleepSave`).
+
+**A branch of a Sleepsave does not join.** Its point is taken inside the VBL of its click,
+and the player joins after a VBL, so the parent makes its file once the rest of that VBL
+has run, its tick among them: the join's check stops the path (`DEBT.md` G29). The branch
+plays alone from its own start.
 
 ## Recordings made in CSBWin
 

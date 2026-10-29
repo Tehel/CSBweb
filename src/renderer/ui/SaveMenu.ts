@@ -516,11 +516,20 @@ const SAVE_MENU_DIALOG: Dialog = {
  * `ClearOldScreen` of 0 (`SaveGame.cpp:889`), `VM_CENTERMENU` for `_ReadEntireGame`'s 1
  * (`:1665`). Closing the menu leaves it, until `TAG0207cc` shows an open inventory again
  * or the next tick's top (`CSBCode.cpp:613-621`).
+ *
+ * While a recording plays (`RecordingPlayer`), the game opens the menu in a VBL and no
+ * dialog shows: `TAG02076e`, the video mode and the clock held, which the recording's
+ * logged `pause` and `tag0207cc` undo, as the menu's close did.
  */
 export function openSaveMenu(ui: UIState, mode: SaveMenuMode = 'full'): void {
   if (ui.dialog) return;
   if (mode === 'full') tag02076e(ui.ctx);
   ui.ctx.loop.videoMode = mode === 'full' ? 'VM_LEFTMENU' : 'VM_CENTERMENU';
+  const { input } = ui.ctx.systems.mainLoop;
+  if (input.playing) {
+    input.apply({ kind: 'pause', paused: true });
+    return;
+  }
   openDialog(ui, SAVE_MENU_DIALOG);
   ui.saveMenu = {
     mode,

@@ -24,6 +24,7 @@ import {
   handleMouseButton,
   closeHintOracle,
   openHintOracle,
+  stopForHintOracle,
   syncInventoryButtons,
   setUIMode,
   updateButtonLists,
@@ -97,7 +98,8 @@ export class GameScreen {
     }
     if (this.ui.hintOracleNeeded) {
       this.ui.hintOracleNeeded = false;
-      this.openHintOracle();
+      if (this.ui.ctx.systems.mainLoop.input.playing) stopForHintOracle(this.ui);
+      else this.openHintOracle();
     }
     if (this.ui.sleepSaveNeeded) {
       this.ui.sleepSaveNeeded = false;

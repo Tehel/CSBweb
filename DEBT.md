@@ -685,8 +685,7 @@ Paying it, in steps:
 1. The recorder: done. `Recorder` (`src/engine/Recorder.ts`) holds a `Recording`, begun by
    each of `GameSaves`'s reads and ended by the next: its build and data set, its start (a
    new game's stream and `d.RandomGameID`, or a save's file), its rules and extras, and the
-   boundary's changes. Playing one back is the tool's (`Page.replay` in
-   `tools/checks/replay.ts`), from the recording alone.
+   boundary's changes, which the player (step 4a) plays back from the recording alone.
 2. The store: done. The recordings beside the saves in IndexedDB, a row and parts each
    (`src/data/saves/RecordingStore.ts`, `BrowserRecordingStore`), written as they grow by
    `RecordingWriter` (`src/engine/RecordingWriter.ts`), every five seconds and as the page
@@ -715,27 +714,17 @@ Paying it, in steps:
      save written over and another page's write, and the branch still replays through
      its join; `tools/probe-frames.ts` cuts and refuses a write in IndexedDB.
 4. The player, in two halves:
-   - **4a, the player itself: ⏳.** `RecordingPlayer` (`src/engine/RecordingPlayer.ts`)
-     plays a recording's path into a game: the root's start read, its rules and extras
-     set, each change applied through the boundary (`InputBoundary.apply`) once the VBL
-     before the one it was logged at has run, and each join read where its parent
-     reaches the point it names, what the read left beside the file set over it. A
-     branch is so played as its path: the root's start, then each parent up to the point
-     its child joins, the child's read, and on. `d.Time` and `d.RandomNumber` are checked
-     at every change, and the file the parent makes at every join; the first that
-     differs stops it. While it plays, what the game opens in a VBL does its game half
-     alone:
-     - The disk menu is opened by the game itself, in the VBL whose click is on its icon
-       (`openSaveMenu`, `src/renderer/ui/SaveMenu.ts`), and that VBL changes the game:
-       `tag02076e`, `videoMode` `VM_LEFTMENU`, the clock stopped. The open does that
-       alone and draws nothing; the logged `pause` and `tag0207cc` close it. The prison's
-       question (`askBeginAdventure`) opens it the same way.
-     - The Hint Oracle's button (`openHintOracle`, `src/renderer/ui/Mouse.ts`) does
-       `tag02076e` and stops the clock, and runs no Oracle; the logged `pause` and
-       `tag0207cc` close it.
-     - The Sleepsave writes no save, nor does any save the recorded game made: its
-       logged `saveWritten` alone is played.
-     `tools/checks/replay.ts` plays every recording through it, and takes no dialog down.
+   - **4a, the player itself: done.** `RecordingPlayer` (`src/engine/RecordingPlayer.ts`,
+     `doc/RECORDING.md` → "The port's player") plays a path into a game: its first start
+     read, each change applied after the VBL before the one it was logged at
+     (`InputBoundary.play`), each join read where its parent reaches its point; `d.Time`
+     and `d.RandomNumber` checked at every change and the file at every join, the first
+     that differs stopping it. While it plays (`InputBoundary.playing`), what the game
+     opens in a VBL does its game half alone: the disk menu and the prison's question
+     (`openSaveMenu`), the Hint Oracle's button (`stopForHintOracle`); the Sleepsave
+     makes its file and tail again and writes nothing (`GameSaves.sleepSave`).
+     `tools/checks/replay.ts` plays every recording through it, the Sleepsave among
+     them, and shows no dialog and writes no save.
    - **4b, the page: ⏳.** The player in the page (`src/main.ts`), started on a recording
      of the store by its id, which G31's dialog will call and `tools/probe-frames.ts`
      calls through the probe handle until then. The page's live input to the game is
@@ -751,6 +740,12 @@ Paying it, in steps:
      moves the message strip on, raises the due tick and runs the mouse queue's pass,
      and under the disk menu CSBWin's VBL handler runs. Played at once, they leave the
      game as the recorded one.
+   - **4c, a branch of a Sleepsave joined: ⏳.** A Sleepsave's point is taken inside the
+     VBL of its click (`GameSaves.sleepSave`, `Recorder.point`), and the player joins
+     after a VBL, so the parent makes its file once the rest of that VBL has run, its
+     tick among them, and the join's check stops the path. The branch plays alone. The
+     point could say it was taken inside a VBL, and the join then check nothing, or the
+     player join inside it; `tools/checks/replay.ts` would play a path through one.
 
 Where a player chooses one to play, stops it and shares it is G31's.
 

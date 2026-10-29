@@ -816,10 +816,19 @@ function hintSquareOf(ui: UIState): HintSquare {
  * change, made in the VBL whose button raised the flag.
  */
 export function openHintOracle(ui: UIState): HintSquare {
-  tag02076e(ui.ctx);
-  ui.ctx.state.paused = true;
+  stopForHintOracle(ui);
   ui.hintOracleUp = true;
   return hintSquareOf(ui);
+}
+
+/**
+ * The game's half of the Oracle's open: `TAG02076e` and the clock stopped. All of it while
+ * a recording plays (`RecordingPlayer`), which runs no Oracle: its logged `pause` and
+ * `tag0207cc` undo it, as the Oracle's close did.
+ */
+export function stopForHintOracle(ui: UIState): void {
+  tag02076e(ui.ctx);
+  ui.ctx.state.paused = true;
 }
 
 /**

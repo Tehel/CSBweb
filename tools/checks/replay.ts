@@ -13,24 +13,26 @@
  * each input, at every VBL that asks, and at every frame of a menu's press. The replayed
  * page is a fresh one fed the recording alone, as the recorded page's store holds it
  * (`RecordingWriter` over a store in memory, written every five seconds of the clock as
- * the page writes it): its start read, its rules and extras set,
- * each change applied before its VBL, VBLs run one by one, and the screen drawn only at
- * the tick's `DrawViewport`, which a click in the viewport is resolved through. A dialog
- * that a played VBL opened (the disk menu, from its icon) the replay takes down itself,
- * where the recording lets the clock run.
+ * the page writes it), and played by the player (`RecordingPlayer`): its start read, its
+ * rules and extras set, each change applied before its VBL, VBLs run one by one, and the
+ * screen drawn only at the tick's `DrawViewport`, which a click in the viewport is
+ * resolved through. It shows no dialog and writes no save: the disk menu a played VBL
+ * opens is its game half alone.
  *
  * Two games, a new one and `csbgame7.dat`, each played through the boundary's doors but
  * a read, the Reincarnate screen and `?dev`'s level keys: clicks and pointer moves, the movement keys, a mirror clicked in the
  * viewport and its champion resurrected, panel keys (a rune, an inventory, an attack and
  * its damage's flash), the settings dialog's held clock and a change of the extras in it,
- * `?dev`'s move, F5 with the clock running, and the disk menu's SAVE with it stopped.
+ * `?dev`'s move, F5 with the clock running, the Sleepsave as the party lies down and
+ * wakes, and the disk menu's SAVE with the clock stopped.
  *
  * 1. A read begins a recording: a new game's from its stream and playthrough, a save's
  *    from its file, with the rules and the extras, and the boot's DM rules its first change.
  * 2. Every change is recorded at the same VBL, with the same `d.Time` and `d.RandomNumber`,
  *    in both games: what the recorded page composes and the replay does not takes nothing
  *    from the game's stream, and changes nothing the game reads.
- * 3. The two games' final saves are byte-identical.
+ * 3. The two games' final saves are byte-identical, the replay showed no dialog and
+ *    wrote no save, and its player met no drift.
  * 4. A read ends a recording, and F9's begins the next from the save it reads.
  * 5. The store holds a recording as it grows: before its last write, what the page had
  *    written when it was closed, the changes so far; after it, the whole recording, which
@@ -62,8 +64,8 @@ import { readSaveFileFields, type RecordingEntry, type SaveEntry } from '../../s
 import { Game } from '../../src/engine/Game';
 import { NO_EXTRAS } from '../../src/engine/GameContext';
 import { GameSaves } from '../../src/engine/GameSaves';
-import { applyExtras } from '../../src/engine/InputBoundary';
-import { Recorder, setCarriedState, type Recording, type RecordingPoint } from '../../src/engine/Recorder';
+import { Recorder, type Recording, type RecordingPoint } from '../../src/engine/Recorder';
+import { RecordingPlayer } from '../../src/engine/RecordingPlayer';
 import { RecordingWriter } from '../../src/engine/RecordingWriter';
 import { applySaveBytes, buildSaveFile } from '../../src/engine/SaveGameFile';
 import { NO_FULLSCREEN } from '../../src/lib/fullscreen';
@@ -128,6 +130,11 @@ class Page {
   /** The screens composed: the tick's views, and the rest. */
   views = 0;
   composed = 0;
+  /** A replay's player. */
+  player: RecordingPlayer | null = null;
+  /** A replay's VBLs with a dialog up, and with the clock held. */
+  dialogVbls = 0;
+  heldVbls = 0;
 
   /**
    * `recorded`: the screen composed as the page composes it, after every input and at
@@ -213,6 +220,12 @@ class Page {
       const { selectedCharacterIndex, sleeping } = game.ctx.party.state;
       if (selectedCharacterIndex < 0 && !sleeping) this.renderView();
     });
+    if (!recorded) {
+      game.onFrame(() => {
+        if (screen.ui.dialog || screen.ui.saveMenu || screen.ui.hintOracleUp) this.dialogVbls++;
+        if (game.ctx.state.paused) this.heldVbls++;
+      });
+    }
     if (recorded) {
       game.onFrame(() => {
         if (game.paintHeld()) return;
@@ -252,67 +265,25 @@ class Page {
   }
 
   /**
-   * A fresh page at `recording`'s start, from the recording alone: the new game's world
-   * read and its stream and playthrough set, or the save read and what its read left
-   * beside the file set; the rules and the extras set; its own recorder begun there, and
-   * the loop. The boot's DM rules are a root's first change. `shared`: a page whose stores
-   * this one writes its recording to, as another tab's.
+   * A fresh page playing `path` from the first recording's start, from the recordings
+   * alone (`RecordingPlayer`), its own recorder begun at each start the player reads, then
+   * the loop. The boot's DM rules are a root's first change. `shared`: a page whose
+   * stores this one writes its recording to, as another tab's.
    */
-  static replay(recording: Recording, shared: Page | null = null): Page {
+  static replay(path: readonly Recording[], shared: Page | null = null): Page {
     const page = new Page(false, shared);
-    const { game } = page;
-    const { ctx } = game;
-    const { start } = recording;
-    if (start.kind === 'new') {
-      game.readDungeonDat(DUNGEON);
-      ctx.random.setSeed(start.random);
-      ctx.state.block1.randomGameID = start.randomGameID;
-      page.begin(recording);
-    } else {
-      page.join(recording);
-    }
-    game.start(true);
+    const player = new RecordingPlayer(page.game, path, DUNGEON);
+    player.onBegin((recording) => page.recorder.begin(recording.start, recording.parent));
+    player.start();
+    page.player = player;
+    page.game.start(true);
     return page;
   }
 
-  /**
-   * `branch` read over the game this page plays, as its join is played: its save read,
-   * what the recorded read left beside the file set, its rules and its extras; the disk
-   * menu a played VBL opened taken down where the read let the clock run; its own
-   * recorder begun there.
-   */
-  join(branch: Recording): void {
-    const { start } = branch;
-    if (start.kind !== 'save') throw new Error('a branch starts from a save');
-    applySaveBytes(this.game, start.bytes);
-    if (start.carried) setCarriedState(this.game, start.carried);
-    if (!this.game.ctx.state.paused && this.ui.saveMenu) this.takeDownDialog();
-    this.begin(branch);
-  }
-
-  /** `recording`'s rules and extras set, and this page's recorder begun at its start. */
-  private begin(recording: Recording): void {
-    const { ctx } = this.game;
-    Object.assign(ctx.rules, recording.rules);
-    applyExtras(ctx, recording.extras);
-    this.recorder.begin(recording.start, recording.parent);
-  }
-
-  /**
-   * `recording`'s changes applied to this page's game, each before the VBL it was logged
-   * at, counted from the recording this page's recorder began at its start or its join;
-   * then its VBLs run, up to `until` where the join of a branch is.
-   */
-  async play(recording: Recording, until: { changes: number; vbls: number } = { changes: recording.changes.length, vbls: recording.vbls }): Promise<void> {
-    const { game } = this;
-    const vbls = () => this.recorder.point()!.vbls;
-    for (const entry of recording.changes.slice(0, until.changes)) {
-      while (vbls() < entry.vbl) game.runFrame();
-      if (entry.change.kind === 'pause' && !entry.change.paused && this.ui.saveMenu) this.takeDownDialog();
-      game.input.apply(entry.change);
-      await settle();
-    }
-    while (vbls() < until.vbls) game.runFrame();
+  /** The VBLs run while the player plays, up to `vbls` of the recording it plays. */
+  play(vbls = Infinity): void {
+    const player = this.player!;
+    while (player.playing && player.point.vbls < vbls) this.game.runFrame();
   }
 
   /** The running recording written, as the page writes it every `RECORDING_WRITE_MS`. */
@@ -347,11 +318,6 @@ class Page {
   }
 
   /** The disk menu a VBL opened, taken down by the player: the interface's alone, the clock the recording's. */
-  takeDownDialog(): void {
-    this.ui.saveMenu = null;
-    this.ui.dialog = null;
-  }
-
   /** The final save, as the disk menu would write it now. */
   saveFile(): Uint8Array {
     return buildSaveFile(this.game, { portraitOf: (champion) => this.game.ctx.host.portraitOf(champion) });
@@ -430,10 +396,10 @@ class Player {
 
   /** F5: the quick-save, with the clock running. */
   async quickSave(): Promise<void> {
-    const before = this.page.store.files.size;
+    const before = this.page.writes;
     this.key('F5');
     await settle();
-    check(this.page.store.files.size === before + 1, 'F5 writes a save with the clock running');
+    check(this.page.writes === before + 1, 'F5 writes a save with the clock running');
     await this.savedAtItsPoint(true);
   }
 
@@ -481,6 +447,35 @@ class Player {
     this.key('Digit7', '7');
   }
 
+  /**
+   * The party laid down from the first champion's inventory, and woken after `ms`: the
+   * Sleepsave written at each, its file and its tail made inside the VBL of the click.
+   */
+  async sleepSave(ms = 1500): Promise<void> {
+    const before = this.page.writes;
+    this.key('Digit7', '7');
+    const zzz = this.pointOf(145);
+    this.click(zzz.x, zzz.y);
+    await settle();
+    check(this.page.game.ctx.party.state.sleeping && this.page.writes === before + 1, 'the party lies down, and the Sleepsave is written');
+    this.play(ms);
+    const wake = this.pointOf(146);
+    this.click(wake.x, wake.y);
+    await settle();
+    check(!this.page.game.ctx.party.state.sleeping && this.page.writes === before + 2, 'and wakes, the Sleepsave written over');
+  }
+
+  /**
+   * The game's end, as the store's tests want it: the store's last write settled, VBLs
+   * after it, and a last change after the last VBL, which the player applies with no
+   * VBL to follow.
+   */
+  async end(): Promise<void> {
+    await settle();
+    this.play(100);
+    this.page.input.keyDown({ key: '', code: 'KeyW', ctrlKey: false, metaKey: false, altKey: false });
+  }
+
   /** Pointer moves over the viewport and the panels, each composing the screen at the VBL's frame. */
   wander(): void {
     for (const [x, y] of [[40, 60], [160, 120], [250, 80], [300, 160], [110, 100]] as const) this.move(x, y);
@@ -523,10 +518,11 @@ async function newGameScript(player: Player): Promise<void> {
   for (let n = 0; n < 6; n++) page.input.keyDown({ key: '', code: 'KeyK', ctrlKey: false, metaKey: false, altKey: false });
   player.play(3000);
   await player.quickSave();
+  await player.sleepSave();
   player.play(800);
   await player.diskMenuSave();
-  player.key('Comma');
   player.play(2000);
+  await player.end();
 }
 
 /** `csbgame7.dat`: the party put before a Stone Golem, which its attacks hit, among the rest. */
@@ -534,6 +530,8 @@ async function saveScript(player: Player): Promise<void> {
   const { page } = player;
   const { game } = page;
   player.play(400);
+  // Asleep, a tick runs every VBL: a short sleep, which the Stone Golem below sleeps through.
+  await player.sleepSave(100);
   player.wander();
   // The golem at (18,12) of map 6, from the square south of it, facing north.
   check(game.devMoveParty(6, 18, 13), '`?dev` moves the party before the Stone Golem');
@@ -559,6 +557,7 @@ async function saveScript(player: Player): Promise<void> {
   await player.diskMenuSave();
   player.key('Numpad8');
   player.play(3000);
+  await player.end();
 }
 
 /** The first of two byte arrays' differences, or -1. */
@@ -667,8 +666,8 @@ async function pruned(recorded: Page, root: Recording): Promise<void> {
     'a save deleted whose point the running branch joins at leaves its recording as it was');
 
   // Another page on the same stores, as a tab: its first write prunes what it does not play.
-  const other = Page.replay(rootCut, recorded);
-  await other.play(rootCut, { changes: 1, vbls: 10 });
+  const other = Page.replay([rootCut], recorded);
+  other.play(10);
   await other.recordings.flush();
   const cutHere = store.entries.get(second.id);
   check(cutHere?.ended === true && cutHere.changes === over.recording!.changes && store.entries.has(other.recording.id),
@@ -680,10 +679,8 @@ async function pruned(recorded: Page, root: Recording): Promise<void> {
   check(sameRecording(healed, recorded.recording) && !healed.ended,
     `and its page's next write writes it whole again (${healed.changes.length} changes, ${store.entries.get(second.id)!.parts} parts)`);
 
-  const path = Page.replay(await store.read(root.id));
-  await path.play(rootCut, healed.parent!);
-  path.join(healed);
-  await path.play(healed);
+  const path = Page.replay([await store.read(root.id), healed]);
+  path.play();
   sameGame(recorded, path, healed, 'the second branch, pruned around, replayed from its root through the join');
 }
 
@@ -722,11 +719,13 @@ async function replay(name: string, start: Start, script: (player: Player) => Pr
     check(kinds.has(kind), `the game takes the boundary's ${kind}`);
   }
 
-  const played = Page.replay(await stored(recorded));
+  const played = Page.replay([await stored(recorded)]);
   const { game } = played;
-  await played.play(recording);
+  played.play();
   console.log(`  composed: recorded ${recorded.views} views and ${recorded.composed} screens more, replayed ${played.views} and ${played.composed}`);
   sameGame(recorded, played, recording, 'every change is replayed at its VBL');
+  check(played.dialogVbls === 0 && played.heldVbls > 0 && played.store.files.size === 0,
+    `the replay shows no dialog and writes no save: the disk menu's and the settings' clock held through ${played.heldVbls} VBLs, nothing shown`);
 
   // A read ends the replay's recording, and F9's begins the recorded page's next.
   applySaveBytes(game, recorded.saveFile());
@@ -763,8 +762,9 @@ function sameGame(recorded: Page, played: Page, recording: Recording, what: stri
     console.log(`  recorded: ${JSON.stringify(changes[parted])}`);
     console.log(`  replayed: ${JSON.stringify(replayed.changes[parted])}`);
   }
-  check(parted < 0 && replayed.changes.length === changes.length && replayed.vbls === recording.vbls,
-    `${what}, with d.Time and d.RandomNumber as recorded (${replayed.changes.length} of ${changes.length})`);
+  const drift = played.player!.drift;
+  check(drift === null && !played.player!.playing && parted < 0 && replayed.changes.length === changes.length && replayed.vbls === recording.vbls,
+    `${what}, with d.Time and d.RandomNumber as recorded (${replayed.changes.length} of ${changes.length}${drift ? `, drift ${JSON.stringify(drift)}` : ''})`);
   const differ = firstDifference(recorded.saveFile(), played.saveFile());
   check(differ < 0, `and the two final saves are byte-identical (${recorded.saveFile().length} bytes${differ < 0 ? '' : `, first difference at ${differ}`})`);
 }
@@ -790,20 +790,17 @@ async function branch(recorded: Page): Promise<void> {
   check(sameRecording(written, recording) && written.parent !== null,
     `the store holds the branch, its parent with it (${written.changes.length} changes, ${written.vbls} VBLs)`);
 
-  const alone = Page.replay(written);
-  await alone.play(written);
+  const alone = Page.replay([written]);
+  alone.play();
   sameGame(recorded, alone, written, 'the branch replayed from its own start alone');
 
-  const parent = written.parent!;
-  const root = await store.read(parent.recording);
+  const root = await store.read(written.parent!.recording);
   check(root.parent === null && root.ended, 'its parent is the root, ended');
-  const path = Page.replay(root);
-  await path.play(root, parent);
-  const start = written.start.kind === 'save' ? written.start.bytes : new Uint8Array(0);
-  const differ = firstDifference(path.saveFile(), start);
-  check(differ < 0, `the root replayed up to the point makes the file the branch read (${differ < 0 ? 'byte-identical' : `first difference at ${differ}`})`);
-  path.join(written);
-  await path.play(written);
+  const path = Page.replay([root, written]);
+  path.play();
+  const { drift, joins } = path.player!;
+  check(joins === 1 && drift?.kind !== 'join',
+    `the root replayed up to the point makes the file the branch read${drift?.kind === 'join' ? ` (first difference at ${drift.byte})` : ', byte-identical'}`);
   sameGame(recorded, path, written, 'and the branch replayed from its root through the join');
 }
 
