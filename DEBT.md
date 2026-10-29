@@ -125,7 +125,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G31 | Recordings shared: the set's dialog, a package, the server | L | ⏳ step 11 of 11 |
+| G31 | Recordings shared: the set's dialog, a package, the server | L | ⏳ step 11 of 11, to decide with the author |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
 | C194 | A DSA's wall graphic counts as a real decoration, so it hides no text | S | ⏳ |
 | C195 | Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space | S | ⏳ to decide with the author |
@@ -727,7 +727,7 @@ player by: the sets they own, and a moderator's rights (`X-Player-Id`, `server/a
 by the name the player gives, or by nobody, and the server keeps its uploader's
 `playerId` apart, as a set's `owner` is kept, for a withdrawal.
 
-Paying it, in steps; the design is decided, and step 11 is next.
+Paying it, in steps; the design is decided but for step 11, which is next and waits on the author.
 
 1. A game's end is a point to share: the game tells it at the boundary as `ShowCredits`
    follows `MainLoop`'s return (`InputBoundary.ended`), the recording ends in that VBL
@@ -821,10 +821,33 @@ Paying it, in steps; the design is decided, and step 11 is next.
    nor a path with a `?dev` move (`playedWithDevMoves`, the server's `DEV_CHANGES`' twin),
    and the panel says why in its place. `tools/probe-frames.ts` uploads a quick save
    through the dialog, and sees a game's end with a `?dev` move not offered it.
-11. The credits a recording of a game's end plays into: they take the input as in play
-   (`showEndOfGame`), so neither the viewer's strip nor its keys reach them, and their
-   RESTART THIS GAME, where a save allows it, would read the save into the page that plays
-   the recording; there the viewer's RESTART and stop are owed in their place.
+11. The credits a recording of a game's end plays into, **to decide with the author**.
+   They run on the intro host (`showEndOfGame`, `runShowCredits`), which takes the page's
+   input (`input.take`, `createIntroHost`) and presents the whole screen through the
+   credits' palette (`composer.presentScreen`), without the composer's overlay: neither the
+   viewer's strip nor its keys reach them. A recording whose game read a save has
+   `canRestartFromSavegame()` set, so the lost game's RESTART THIS GAME is offered, and a
+   click on it opens the save chooser in the page that plays the recording. In every
+   option the credits' RESTART THIS GAME is never offered while a recording plays, the
+   viewer's Backspace and Esc work throughout, and Space and the pace do nothing, the
+   recording having ended. What the viewer clicks is the choice:
+   - **A, the strip over the credits**: the strip drawn on its row, scanlines 172-178,
+     over every credits screen, in the interface's colours whatever the credits' palette
+     (the screen shown through two, as the viewport and the interface are), so it covers
+     the foot of "THE END"'s screen, of the credits picture and of the won screen. Then a
+     lost game rests on the credits picture after its press, as CSBWin's does without a
+     save, and a won one on its champions. The decided design's strip, everywhere; the
+     dearest, a second palette in the intro host's present.
+   - **B, the viewer's buttons in RESTART THIS GAME's place** (recommended): the credits
+     as the game plays them up to "THE END", then, where RESTART THIS GAME is drawn and in
+     its style (`offerRestart`'s `word116` and `word124`, `PALETTE_RESTART`), two buttons,
+     RESTART and STOP, offered for good, with no 899 VBLs and no credits picture after; on
+     the won screen, which has no such place, the same two at its foot. The game's own
+     look, the cheapest.
+   - **C, no credits**: the recording ends at the game's end as at any other point, the
+     loop stopped on the last frame the game drew, after the dying sound, the strip as
+     everywhere and a line, "THE GAME IS LOST HERE." or "THE GAME IS WON HERE.". The
+     viewer never sees "THE END" nor the won screen's champions.
 
 ### Postponed
 
