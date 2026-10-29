@@ -148,6 +148,8 @@ export class Game implements MainLoop {
     private loopTimer: unknown = null;
     /** While it holds, the loop's VBLs run at once, unpaced (`runAtOnceWhile`). */
     private atOnce: (() => boolean) | null = null;
+    /** The loop's VBLs to a VBL of the wall clock, 0 holding it (`setPace`). */
+    private pace = 1;
     /** `MainLoop` has returned, on the tick of a lost game (see `gameTick`), or won. */
     private mainLoopReturned = false;
     /** An error has ended the game (`die`): it never runs again, and nothing saves it. */
@@ -488,17 +490,21 @@ export class Game implements MainLoop {
      * completely idle exactly when a real VBL wouldn't.
      *
      * A VBL that throws is CSBWin's `die`: the game dies (`die`), and the host reports it.
+     *
+     * At a pace other than 1 (`setPace`) the wall clock lets that many VBLs pass to its
+     * own, and at 0 none, the loop then waiting for a pace.
      */
     private gameLoop = (): void => {
-        if (!this.running) {
+        if (!this.running || this.pace === 0) {
             return;
         }
 
         const clock = this.ctx.host.clock;
         const now = clock.now();
-        let due = Math.floor((now - this.vblClockStart) * VBL_FREQUENCY / 1000) - this.vblsPaced;
-        if (due > MAX_VBLS_PER_CALL) {
-            due = MAX_VBLS_PER_CALL;
+        const frequency = VBL_FREQUENCY * this.pace;
+        let due = Math.floor((now - this.vblClockStart) * frequency / 1000) - this.vblsPaced;
+        if (due > MAX_VBLS_PER_CALL * this.pace) {
+            due = MAX_VBLS_PER_CALL * this.pace;
             this.vblClockStart = now;
             this.vblsPaced = 0;
         } else {
@@ -522,9 +528,29 @@ export class Game implements MainLoop {
             this.vblsPaced = 0;
         }
 
-        const nextVbl = this.vblClockStart + (this.vblsPaced + 1) * 1000 / VBL_FREQUENCY;
+        const nextVbl = this.vblClockStart + (this.vblsPaced + 1) * 1000 / frequency;
         this.loopTimer = clock.setTimeout(this.gameLoop, Math.max(0, nextVbl - clock.now()));
     };
+
+    /**
+     * The loop's VBLs to a VBL of the wall clock from now on (`gameLoop`): a recording's
+     * viewer's pace, 1, 2, 4 or 8, or 0, which holds the loop where it is until a pace is
+     * given again. Not CSBWin's, whose VBLs are the machine's. The wall clock counts on
+     * from now, so no VBL is owed for the time before.
+     */
+    setPace(pace: number): void {
+        this.pace = pace;
+        if (this.loopTimer !== null) {
+            this.ctx.host.clock.clearTimeout(this.loopTimer);
+            this.loopTimer = null;
+        }
+        this.vblClockStart = this.ctx.host.clock.now();
+        this.vblsPaced = 0;
+        if (this.running && pace > 0) {
+            const clock = this.ctx.host.clock;
+            this.loopTimer = clock.setTimeout(this.gameLoop, 1000 / (VBL_FREQUENCY * pace));
+        }
+    }
 
     /**
      * While `predicate` holds, after any VBL of the loop (`gameLoop`), the VBLs run at

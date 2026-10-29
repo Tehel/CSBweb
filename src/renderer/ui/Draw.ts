@@ -219,8 +219,13 @@ export function drawObjectIconAt(ui: UIState,
  * Draw the CSBWin scrolling message area. All row/timeout/wrap logic lives in
  * `ScrollingText`; the renderer only paints its current rows.
  */
-export function drawMessageLines(ui: UIState, messages: ScrollingText): void {
-  messages.draw(ui.screenIndexBuffer, ui.fontData);
+/**
+ * The message area's lines. `lowered`, under a recording's viewer's strip, which covers
+ * the top row (`RecordingStrip.ts`): a row lower while the bottom row is empty and no
+ * scroll is under way, so the three rows shown hold the newest lines.
+ */
+export function drawMessageLines(ui: UIState, messages: ScrollingText, lowered = false): void {
+  messages.draw(ui.screenIndexBuffer, ui.fontData, lowered);
 }
 
 export function drawFoodWaterBar(ui: UIState, value: number, y: number, color: number): void {

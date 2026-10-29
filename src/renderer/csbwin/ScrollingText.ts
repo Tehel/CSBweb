@@ -355,6 +355,17 @@ export class ScrollingText {
     this.changed = true;
   }
 
+  /**
+   * The strip as a new page's, empty, nothing queued and nothing counted: the port's own,
+   * a recording's RESTART, which plays it again as a new page would.
+   */
+  clear(): void {
+    this.restart();
+    this.rowPrintLinesCount = [-1, -1, -1, -1];
+    this.printLinesCounter = 0;
+    this.printQueue = [];
+  }
+
   /** CSBWin `SCROLLING_TEXT::ResetTime()` (`doc/CSBwin-src/CSBCode.cpp:1574`). */
   resetTime(newTime: number, currentTime: number): void {
     for (let row = 0; row < NUM_ROWS; row++) {
@@ -388,15 +399,18 @@ export class ScrollingText {
    * Render the four rows into the screen index buffer at CSBWin's geometry.
    * Text at `x = col*6`, `y = row*7 + 177` (`doc/CSBwin-src/CSBCode.cpp:1547`). While a scroll
    * runs, every row sits `7 - count` scanlines below its place, and the row scrolling out
-   * sits above row 0, cut off at the top of the strip.
+   * sits above row 0, cut off at the top of the strip. `lowered`, the port's own: every row
+   * a row lower while the bottom one is empty and no scroll runs (`drawMessageLines`).
    */
-  draw(buffer: PaletteIndexViewportBuffer, font: FontData): void {
+  draw(buffer: PaletteIndexViewportBuffer, font: FontData, lowered = false): void {
     const strip: PaletteIndexViewportBuffer = {
       width: buffer.width,
       height: STRIP_HEIGHT,
       pixels: buffer.pixels.subarray(ROW_CLEAR_TOP_Y * buffer.width, (ROW_CLEAR_TOP_Y + STRIP_HEIGHT) * buffer.width),
     };
-    const offset = this.textScanlineScrollCount >= 0 ? ROW_HEIGHT - this.textScanlineScrollCount : 0;
+    const scrolling = this.textScanlineScrollCount >= 0;
+    const lower = lowered && !scrolling && this.rows[NUM_ROWS - 1]!.length === 0 ? ROW_HEIGHT : 0;
+    const offset = (scrolling ? ROW_HEIGHT - this.textScanlineScrollCount : 0) + lower;
     for (let row = -1; row < NUM_ROWS; row++) {
       const pieces = row < 0 ? this.scrollingOut : this.rows[row]!;
       if (pieces.length === 0) continue;

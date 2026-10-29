@@ -6,7 +6,8 @@
  * CSBWin's K J L M are no one's first guess and its letters attack. Then the runes, which
  * the scrolls name in words and the magic panel shows only as glyphs, then the first
  * steps and the mouse. Above the chooser, and only in the dialog, a line says the game
- * needs no key at all.
+ * needs no key at all; under the sheet, and only in the dialog too, the keys of a
+ * recording's viewer (`src/renderer/ui/RecordingStrip.ts`), which no setting changes.
  *
  * The runes are drawn in the page's font, `dm-screen.ttf`, where `tools/gen-font.ts`
  * puts graphics.dat's 24 rune glyphs at U+E060 to U+E077. Their names, and the names of
@@ -94,6 +95,16 @@ const DIALOG = `
   <p class="how-downloads"><span class="px px2">To print</span><a class="how-pdf">PDF</a><a class="how-png">PNG</a><span class="how-downloads-note"></span></p>
   <p class="how-print-head"></p>
   <div class="how-sheet"></div>
+  <section class="how-section how-replay">
+    <h3 class="px">Watching a recording</h3>
+    <p>The strip over the messages shows the time played, and a click on it pauses, changes the pace, starts again or stops. So do these keys:</p>
+    <dl class="how-list">
+      <dt><span class="how-key px px2">Space</span></dt><dd>Pause, and play on</dd>
+      <dt><span class="how-key px px2">+</span><span class="how-key px px2">-</span></dt><dd>Faster and slower: once, twice, four or eight times the game's pace</dd>
+      <dt><span class="how-key px px2">Backspace</span></dt><dd>Start again from the beginning</dd>
+      <dt><span class="how-key px px2">Esc</span></dt><dd>Stop, and come back to this page</dd>
+    </dl>
+  </section>
 </form>`;
 
 /** The dialog opened over the page, the address's fragment `#how-to-play` while it is. */

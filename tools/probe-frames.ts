@@ -1756,10 +1756,14 @@ check(recordingPruned.healed, "the running recording removed, as another tab's p
 // A recording played back in the page (`playRecording`, `src/main.ts`): the game's own,
 // played on with a turn, the settings dialog holding the clock and a turn back, then its
 // loop stopped and the recording written. `?recording=` plays it to its end, at the wall
-// clock's pace and the held clock at once: the page's input reaches nothing, its Esc
-// opening no dialog; the store's recordings and saves are as they were; the game
-// ends as the recorded one stood, its loop stopped; and the message area says what was
-// skipped, the settings' span, and that the recording ends.
+// clock's pace times the viewer's and the held clock at once: the game's keys reach
+// nothing; the viewer's strip (`src/renderer/ui/RecordingStrip.ts`) pauses on Space, no
+// VBL running, sets the pace on `+`, and plays on at a click on it; the store's
+// recordings and saves are as they were; the game ends as the recorded one stood, its
+// loop stopped; and the message area says what was skipped, the settings' span, and that
+// the recording ends, a frame of it with the strip over it. Backspace plays it again from
+// its start, the message area emptied, to the same end, and Esc goes back to the welcome
+// page.
 await key('KeyL'); await vbls(TICK);
 await key('Escape'); await vbls(30);
 await key('Escape'); await vbls(SHOWN);
@@ -1772,26 +1776,46 @@ const recordedGame = await evaluate(`(async()=>{ const { game, recorder, recordi
     state: JSON.stringify([ctx.state.tickCount, ctx.random.getSeed(), position, facing]),
     recordings: (await recordingStore.list()).length, saves: (await saves.list()).length }; })()`);
 await navigate(`${APP}?dungeon=csb&recording=${recordedGame.id}&keepsaves`, 'window.__probe?.player() != null');
-const playStarted = Date.now();
-await key('Escape');
-const escDuring = await evaluate(`window.__probe.screen.ui.dialog !== null`);
+await key('KeyL');
+await key('F5');
+await key('Space');
+const pausedAt = await evaluate(`window.__probe.player().vbls`);
+await wait(300);
+const paused = await evaluate(`(({ screen }) => ({ vbls: window.__probe.player().vbls, playing: window.__probe.player().playing,
+  dialog: screen.ui.dialog !== null }))(window.__probe)`);
+await key('+'); await key('+');
+await canvasClick(80, 175);
+const paced = await evaluate(`window.__probe.game.pace`);
 await until('!window.__probe.player().playing', 'the recording played to its end');
-const playedFor = Date.now() - playStarted;
 await until(`window.__probe.game.ctx.host.messages.snapshot().includes('THE RECORDING ENDS HERE.')`, 'the line at its end');
+await until(`(m => m.backlog().printQueue === 0 && m.backlog().futureLines === 0 && m.scrollState().textScanlineScrollCount < 0)(window.__probe.game.ctx.host.messages)`,
+  'the message area at rest');
 const playedLines: string[] = await evaluate(`window.__probe.game.ctx.host.messages.snapshot()`);
-const playedGame = await evaluate(`(async()=>{ const { game, recordingStore, saves, screen } = window.__probe, player = window.__probe.player();
+const playedState = `(async()=>{ const { game, recordingStore, saves, screen } = window.__probe, player = window.__probe.player();
   const { ctx } = game, { position, facing } = ctx.party.state;
   return { drift: player.drift, running: game.running, dialog: screen.ui.dialog !== null || screen.ui.saveMenu !== null,
     state: JSON.stringify([ctx.state.tickCount, ctx.random.getSeed(), position, facing]),
-    recordings: (await recordingStore.list()).length, saves: (await saves.list()).length }; })()`);
-console.log('  recording played:', JSON.stringify({ recordedGame, playedGame, escDuring, playedFor }));
+    recordings: (await recordingStore.list()).length, saves: (await saves.list()).length }; })()`;
+const playedGame = await evaluate(playedState);
+console.log('  recording played:', JSON.stringify({ recordedGame, playedGame, pausedAt, paused, paced }));
 check(recordedGame.pauses === 2 && playedGame.drift === null && playedGame.state === recordedGame.state && !playedGame.running,
   `?recording= plays the store's recording to its end, the settings' held clock among it, the game as the recorded one stood, and stops (${recordedGame.vbls} VBLs, ${recordedGame.changes} changes)`);
-check(!escDuring && !playedGame.dialog, 'the page\'s input reaches nothing while it plays: Esc opens no dialog');
+check(!paused.dialog && !playedGame.dialog, 'the game\'s keys reach nothing while it plays: its turn turns nothing, F5 saves nothing, and no dialog opens');
+check(paused.playing && paused.vbls === pausedAt && paced === 4,
+  `Space pauses it, no VBL running for 300 ms (${pausedAt} VBLs played), + twice sets the pace to x4, and a click on PLAY plays on`);
 check(playedLines.some((line) => /^SKIPPED \d+S ON THE SETTINGS$/.test(line)),
   `a line in the message area says what was run at once, and another the end: ${JSON.stringify(playedLines.filter((line) => line))}`);
 check(playedGame.recordings === recordedGame.recordings && playedGame.saves === recordedGame.saves,
   'and the page records nothing and saves nothing');
+await shot('32-recording-ended');
+await key('Backspace');
+const restartedLines: string[] = await evaluate(`window.__probe.game.ctx.host.messages.snapshot()`);
+await until('!window.__probe.player().playing', 'the recording played again to its end');
+const replayedGame = await evaluate(playedState);
+check(!restartedLines.includes('THE RECORDING ENDS HERE.') && replayedGame.drift === null && replayedGame.state === recordedGame.state,
+  'Backspace plays it again from its start, the message area emptied, to the same end');
+await leave(() => key('Escape'), WELCOME);
+check(await evaluate(`!new URLSearchParams(location.search).has('recording')`), 'and Esc goes back to the welcome page');
 
 // A site's recording (`fetchSharedRecording`, `src/main.ts`), through the dev server's
 // `api/recordings` and `recordings/` (`vite.config.mts`; the image's own server in

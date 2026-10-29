@@ -880,13 +880,15 @@ function link(anchor: HTMLAnchorElement, query: string | null | undefined): void
 }
 
 /**
- * The page's own query without the game's set and save: the welcome page's, where the
- * settings dialog's EXIT leads (`UIState.onExit`). Every other parameter is kept.
+ * The page's own query without the game's set, save and recording: the welcome page's,
+ * where the settings dialog's EXIT leads (`UIState.onExit`), and a recording's viewer's
+ * stop (`playRecording`, `src/main.ts`). Every other parameter is kept.
  */
 export function welcomePageQuery(): string {
     const params = new URLSearchParams(window.location.search);
     params.delete('dungeon');
     params.delete('save');
+    params.delete('recording');
     const query = `${params}`;
     return query ? `?${query}` : window.location.pathname;
 }

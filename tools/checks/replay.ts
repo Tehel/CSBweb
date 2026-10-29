@@ -71,6 +71,10 @@
  *    save's path to the file its save holds, through its joins. A package whose save's
  *    file is not the path's drifts at its end; one whose form is wrong is refused. The
  *    replay tool's page (`tools/lib/playback.ts`) plays each the same, to the same game.
+ * 11. The viewer's RESTART (`rewindPage`, `src/renderer/ui/RecordingStrip.ts`): each
+ *    package's path, stopped a second into its play in the replay tool's page, the page
+ *    rewound and the path played again at ×8, paused a second in it, plays to the same
+ *    end; the loop runs eight VBLs to one of the clock, and none in the pause.
  *
  * Run: `npm test -- --only=replay.ts`
  *
@@ -1039,6 +1043,14 @@ async function samePlayback(played: Page, path: readonly Recording[], savedAtEnd
   check(JSON.stringify(alone.drift) === JSON.stringify(player.drift) && JSON.stringify(alone.point) === JSON.stringify(player.point)
     && alone.joins === player.joins && firstDifference(file, played.saveFile()) < 0,
     `and the replay tool's page plays it the same${alone.drift ? `, to its drift (${alone.drift.kind})` : ''}`);
+  const again = await playPath(STOCK_DATA_SET, diskFiles(STOCK_DATA_SET), path, savedAtEnd, { afterMs: 1000, pace: 8 });
+  const againFile = buildSaveFile(again.game, { portraitOf: (champion) => again.game.ctx.host.portraitOf(champion) });
+  const { ms, vbls, pausedVbls } = again.restarted!;
+  check(JSON.stringify(again.drift) === JSON.stringify(alone.drift) && JSON.stringify(again.point) === JSON.stringify(alone.point)
+    && again.joins === alone.joins && firstDifference(againFile, file) < 0,
+    `and RESTART a second into it plays it again from its start, at x8 and paused a second, to the same end${again.drift && JSON.stringify(again.drift) !== JSON.stringify(alone.drift) ? ` (drift ${JSON.stringify(again.drift)})` : ''}`);
+  check(pausedVbls === 0 && vbls >= Math.floor(ms * VBL_FREQUENCY * 8 / 1000 * 0.9),
+    `the loop running eight VBLs to one of the clock (${vbls} VBLs in ${ms} ms), and none in the pause`);
 }
 
 /**

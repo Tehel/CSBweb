@@ -49,6 +49,9 @@ import type { PrisonDoorChoice } from './renderer/intro/PrisonDoor';
 import { Recorder } from './engine/Recorder';
 import { RecordingWriter } from './engine/RecordingWriter';
 import { endLines, RecordingPlayer, skippedLine, type SavedAtEnd } from './engine/RecordingPlayer';
+import {
+    drawRecordingStrip, nextPace, rewindPage, stripActionAt, stripKeyAction, timePlayed, type Pace, type StripAction, type StripState,
+} from './renderer/ui/RecordingStrip';
 import { packageOfSave, readRecordingPackage, writeRecordingPackage } from './engine/RecordingPackage';
 import type { Recording } from './engine/Recorder';
 import { applySaveBytes } from './engine/SaveGameFile';
@@ -584,12 +587,22 @@ async function continueSave({ saves, events }: Built, id: string): Promise<boole
 }
 
 /**
- * The page's side of play: its input, and a redraw per move and per tick. A recording
- * played back (`player`) takes none of the page's input, and its spans under a held
- * clock, which the loop runs at once, are not drawn (`RecordingPlayer.held`).
+ * What `wire` asks of a recording's viewer (`playRecording`): whether a span under a held
+ * clock plays, and whether its strip shows something new.
  */
-function wire({ game, screen, messages, events, playInput }: Built, player: RecordingPlayer | null = null): void {
-    if (!player) playInput();
+interface Viewer {
+    held(): boolean;
+    takeChanged(): boolean;
+}
+
+/**
+ * The page's side of play: its input, and a redraw per move and per tick. A recording
+ * played back (`viewer`) takes none of the page's input, its viewer's strip having it,
+ * and its spans under a held clock, which the loop runs at once, are not drawn
+ * (`RecordingPlayer.held`).
+ */
+function wire({ game, screen, messages, events, playInput }: Built, viewer: Viewer | null = null): void {
+    if (!viewer) playInput();
 
     game.onMove((success) => {
         if (success) console.debug(game.getPositionInfo() || 'Moved');
@@ -616,7 +629,7 @@ function wire({ game, screen, messages, events, playInput }: Built, player: Reco
     // the wheel in a dialog (`GameScreen.handleDialogWheel`).
     let heldThrough = false;
     game.onFrame(() => {
-        if (player?.held) {
+        if (viewer?.held()) {
             heldThrough = true;
             return;
         }
@@ -625,7 +638,8 @@ function wire({ game, screen, messages, events, playInput }: Built, player: Reco
         const flashed = game.takeFlashChanged();
         const moved = screen.takeCursorMoved();
         const wheeled = screen.takeWheelTurned();
-        if (scrolled || flashed || moved || wheeled || heldThrough) {
+        const stripped = viewer?.takeChanged() ?? false;
+        if (scrolled || flashed || moved || wheeled || stripped || heldThrough) {
             heldThrough = false;
             refreshScreen();
         }
@@ -651,43 +665,137 @@ function applySettings({ game }: Built, sound: SoundManager, values: SettingsVal
  * never put in the store (`fetchSharedRecording`), played to the point it was shared at,
  * a save's file checked there. Any other is the store's, its path as far up as the store
  * holds it (`readRecordingPath`). Every
- * tick is drawn, at the wall clock's pace; a span under a held clock is played at once
- * and undrawn (`Game.runAtOnceWhile`), and a line in the message area says so
- * (`skippedLine`). The page's input reaches nothing, and the page records nothing: no
- * read of `GameSaves` begins a recording, nor sends a statistic. At the path's end, or at
- * a drift, the loop stops, the screen as the recording left it, and a line in the message
- * area says which (`endLines`), the area played on alone (`runMessagesAlone`); but not
- * over the game's end, whose credits have the screen.
+ * tick is drawn, at the wall clock's pace times the viewer's; a span under a held clock
+ * is played at once and undrawn (`Game.runAtOnceWhile`), and a line in the message area
+ * says so (`skippedLine`). The page's input reaches nothing of the game, and the page
+ * records nothing: no read of `GameSaves` begins a recording, nor sends a statistic. At
+ * the path's end, or at a drift, the loop stops, the screen as the recording left it, and
+ * a line in the message area says which (`endLines`), the area played on alone
+ * (`runMessagesAlone`); but not over the game's end, whose credits have the screen.
+ *
+ * The viewer's strip (`src/renderer/ui/RecordingStrip.ts`) has the input, and the screen
+ * draws it over the message area: the time played, pause, the pace, RESTART, which plays
+ * the path again from its start in this page (`rewindPage`), and stop, which goes back
+ * to the welcome page. RESTART and stop end the message area played on alone. While the
+ * loop does not run, paused or at the end, a move of the pointer is drawn at the
+ * display's next frame (`Presenter.animate`), as the loop's VBL draws it while it runs.
  *
  * A recording of another data set, or one neither the site nor the store holds, ends the
  * page as an error does.
  */
 async function playRecording(built: Built, id: string): Promise<void> {
-    const { game } = built;
+    const { game, screen, messages, input } = built;
     const { path, savedAtEnd } = SHARED_RECORDING_ID.test(id) ? await fetchSharedRecording(id)
         : { path: await readRecordingPath(built.recordingStore, id), savedAtEnd: null };
     if (path.some((recording) => recording.dataSet !== dataSet.id)) throw new Error(`RECORDING ${id} IS NOT OF ${dataSet.name}`);
-    const player = new RecordingPlayer(game, path, await readDungeonFile(), savedAtEnd);
-    recordingPlayer = player;
+    const dungeonDat = await readDungeonFile();
     const print = (line: string): void => {
-        built.messages.printLinefeed();
-        built.messages.quePrintLines(RECORDING_LINE_COLOR, line);
+        messages.printLinefeed();
+        messages.quePrintLines(RECORDING_LINE_COLOR, line);
     };
-    player.onSkipped((span) => print(skippedLine(span)));
-    player.onEnd((drift) => {
-        game.stop();
-        if (!game.mainLoopHasReturned()) {
-            for (const line of endLines(path, drift, __CSBWEB_BUILD__)) print(line);
-            runMessagesAlone(game, built.messages);
+    let paused = false;
+    let pace: Pace = 1;
+    let hover: StripAction | null = null;
+    /** The strip as last drawn, to tell a change (`Viewer.takeChanged`). */
+    let drawn = '';
+    let messagesAlone: (() => void) | null = null;
+    const strip = (): StripState => ({ vbls: recordingPlayer?.vbls ?? 0, paused, pace, hover });
+    const shown = (state: StripState): string => `${timePlayed(state.vbls)} ${state.paused} ${state.pace} ${state.hover}`;
+    screen.composer.overlay = (ui) => {
+        const state = strip();
+        drawn = shown(state);
+        drawRecordingStrip(ui, state);
+    };
+
+    const play = (): void => {
+        const player = new RecordingPlayer(game, path, dungeonDat, savedAtEnd);
+        recordingPlayer = player;
+        player.onSkipped((span) => print(skippedLine(span)));
+        player.onEnd((drift) => {
+            game.stop();
+            if (!game.mainLoopHasReturned()) {
+                for (const line of endLines(path, drift, __CSBWEB_BUILD__)) print(line);
+                messagesAlone = runMessagesAlone(game, messages);
+            }
+            refreshScreen();
+            if (drift) console.warn(`Recording ${id} drifted, in a recording of build ${path.find((recording) => recording.id === drift.recording)?.build}:`, drift);
+            else console.log(`✓ Recording ${id} played to its end`);
+        });
+        player.start();
+        if (player.playing) game.start(true);
+    };
+    const looping = (): boolean => !paused && (recordingPlayer?.playing ?? false);
+    /** The screen composed at the display's next frame, once however many moves ask before. */
+    let framePending = false;
+    const drawAtNextFrame = (): void => {
+        if (looping() || framePending) return;
+        framePending = true;
+        presenter.animate(() => {
+            const again = framePending;
+            framePending = false;
+            return again;
+        });
+    };
+    const setPace = (next: Pace): void => {
+        pace = next;
+        if (!paused) game.setPace(pace);
+    };
+    const act = (action: StripAction | 'faster' | 'slower'): void => {
+        switch (action) {
+            case 'pause':
+                if (!recordingPlayer?.playing) return;
+                paused = !paused;
+                game.setPace(paused ? 0 : pace);
+                break;
+            case 'pace': setPace(nextPace(pace, 'round')); break;
+            case 'faster': setPace(nextPace(pace, 'up')); break;
+            case 'slower': setPace(nextPace(pace, 'down')); break;
+            case 'restart':
+                messagesAlone?.();
+                messagesAlone = null;
+                recordingPlayer?.stop();
+                // The screen's play state put back drops every animation (`Presenter.cancel`).
+                rewindPage(game, screen, messages);
+                framePending = false;
+                paused = false;
+                game.setPace(pace);
+                play();
+                break;
+            case 'stop':
+                messagesAlone?.();
+                recordingPlayer?.stop();
+                game.stop();
+                window.location.assign(welcomePageQuery());
+                return;
         }
         refreshScreen();
-        if (drift) console.warn(`Recording ${id} drifted, in a recording of build ${path.find((recording) => recording.id === drift.recording)?.build}:`, drift);
-        else console.log(`✓ Recording ${id} played to its end`);
+    };
+    input.take({
+        mouseMove: (x, y) => {
+            screen.setCursorPoint(screen.screenPoint(x, y));
+            hover = stripActionAt(strip(), x, y);
+            drawAtNextFrame();
+        },
+        mouseDown: (x, y, button) => {
+            const action = button === 0 ? stripActionAt(strip(), x, y) : null;
+            if (action) act(action);
+        },
+        mouseUp: () => {},
+        mouseLeave: () => {
+            screen.setCursorPoint(null);
+            hover = null;
+            drawAtNextFrame();
+        },
+        wheel: () => false,
+        keyDown: (press) => {
+            const action = stripKeyAction(press);
+            if (action) act(action);
+            return action !== null;
+        },
     });
-    game.runAtOnceWhile(() => player.held);
-    wire(built, player);
-    player.start();
-    if (player.playing) game.start(true);
+    game.runAtOnceWhile(() => recordingPlayer?.held ?? false);
+    wire(built, { held: () => recordingPlayer?.held ?? false, takeChanged: () => shown(strip()) !== drawn });
+    play();
     console.log(`✓ Playing recording ${id}, from ${path.length > 1 ? `its root through ${path.length - 1} joins` : 'its start'}`);
 }
 
@@ -695,9 +803,9 @@ async function playRecording(built: Built, id: string): Promise<void> {
  * The message area played on alone once the loop has stopped at a recording's end, until
  * what it was given is shown: its scroll a VBL, and a queued line placed a pass, as the
  * loop plays them (`Game.runFrame`), at the `d.Time` the loop stopped at, so nothing
- * shown expires.
+ * shown expires. Returns what ends it sooner: RESTART's and stop's.
  */
-function runMessagesAlone(game: Game, messages: ScrollingText): void {
+function runMessagesAlone(game: Game, messages: ScrollingText): () => void {
     const time = game.ctx.state.tickCount;
     const timer = setInterval(() => {
         messages.vblInterrupt();
@@ -708,6 +816,7 @@ function runMessagesAlone(game: Game, messages: ScrollingText): void {
         const { pushTextUp, textScanlineScrollCount } = messages.scrollState();
         if (printQueue === 0 && futureLines === 0 && pushTextUp === 0 && textScanlineScrollCount < 0) clearInterval(timer);
     }, 1000 / VBL_FREQUENCY);
+    return () => clearInterval(timer);
 }
 
 /**

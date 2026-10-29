@@ -101,6 +101,13 @@ export class ScreenComposer {
   private shownLeftHanded: LeftHandedLayout | null = null;
   /** A row of the screen, the room `makeLeftHanded` moves the regions through. */
   private readonly rowScratch = new Uint8Array(SCREEN_WIDTH);
+  /**
+   * The page's own over the adventure's frame, under the cursor and on CSBWin's screen
+   * as shown, never moved for the left-handed one: a recording's viewer's strip
+   * (`ui/RecordingStrip.ts`), over the message area's top row, whose lines are then
+   * drawn lowered (`drawMessageLines`); or `null`.
+   */
+  overlay: ((ui: UIState) => void) | null = null;
 
   constructor(private readonly output: ScreenOutput, deps: ScreenComposerDeps, hooks: ScreenHooks) {
     this.messages = deps.messages;
@@ -188,7 +195,7 @@ export class ScreenComposer {
     drawSpellPanel(this.ui);
     drawSpellControls(this.ui);
     drawHeldObjectName(this.ui);
-    drawMessageLines(this.ui, this.messages);
+    drawMessageLines(this.ui, this.messages, this.overlay !== null);
     if (this.ui.shadedByTag02076e) {
       // `TAG02076e` shades the movement-arrow area, unless an inventory is open, then the
       // magic and weapon-ready areas (`doc/CSBwin-src/Character.cpp:5143-5157`), until
@@ -211,6 +218,7 @@ export class ScreenComposer {
     const leftHanded = this.leftHandedLayout();
     if (leftHanded) makeLeftHanded(leftHanded, this.screen.pixels, this.rowScratch);
     this.shownLeftHanded = leftHanded;
+    this.overlay?.(this.ui);
     const viewportSpan = leftHanded ? LEFT_HANDED_VIEWPORT : VIEWPORT_SPAN;
     drawCursorItem(this.ui, !inventoryOpen, leftHanded ? (x, y) => leftHandedX(leftHanded, x, y) : undefined);
 

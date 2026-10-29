@@ -148,6 +148,17 @@ export class GameScreen {
   }
 
   /**
+   * The cursor's place alone, drawn by the next frame as a move's is: a recording's
+   * viewer's pointer, which is not the recorded game's, so it touches nothing the
+   * interface keeps of the pointer (`setHoverPoint`).
+   */
+  setCursorPoint(point: { x: number; y: number } | null): void {
+    const at = this.ui.hoverPoint;
+    if (point?.x !== at?.x || point?.y !== at?.y) this.cursorMoved = true;
+    this.ui.hoverPoint = point;
+  }
+
+  /**
    * Where the pointer is, `d.CurMouseX` and `d.CurMouseY`. Nothing is drawn from here:
    * the cursor is the VBL's to draw (`takeCursorMoved`).
    */

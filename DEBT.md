@@ -125,7 +125,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G31 | Recordings shared: the set's dialog, a package, the server | L | ⏳ step 7 of 8 |
+| G31 | Recordings shared: the set's dialog, a package, the server | L | ⏳ step 8 of 8 |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
 | C194 | A DSA's wall graphic counts as a real decoration, so it hides no text | S | ⏳ |
 | C195 | Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space | S | ⏳ to decide with the author |
@@ -727,7 +727,7 @@ player by: the sets they own, and a moderator's rights (`X-Player-Id`, `server/a
 by the name the player gives, or by nobody, and the server keeps its uploader's
 `playerId` apart, as a set's `owner` is kept, for a withdrawal.
 
-Paying it, in steps; the design is decided, and step 7 is next.
+Paying it, in steps; the design is decided, and step 8 is next.
 
 1. A game's end is a point to share: the game tells it at the boundary as `ShowCredits`
    follows `MainLoop`'s return (`InputBoundary.ended`), the recording ends in that VBL
@@ -778,15 +778,25 @@ Paying it, in steps; the design is decided, and step 7 is next.
    (`endLines`), the message area played on alone once the loop has stopped
    (`runMessagesAlone`, `src/main.ts`). `tools/checks/replay.ts` asserts the spans and
    their holders, and a recording whose logged stops name nothing.
-7. The viewer's strip and keys (the decision above): the time played, pause, the pace,
-   RESTART and stop drawn over the message area and on Space, `+`, `-`, Backspace and Esc,
-   which HOW TO PLAY lists. RESTART and stop end the message area played on alone.
+7. The viewer's strip and keys (`src/renderer/ui/RecordingStrip.ts`, `doc/RECORDING.md` →
+   "The port's player"): the time played, pause, the pace (`Game.setPace`), RESTART and
+   stop, over the message area's top row, whose lines are drawn a row lower while its
+   bottom row is empty, and on Space, `+`, `-`, Backspace and Esc, which HOW TO PLAY lists
+   beside its sheet. RESTART puts the page back as a new page has it (`rewindPage`) and
+   plays the path again; stop goes back to the welcome page; both end the message area
+   played on alone. `tools/checks/replay.ts`, point 11, restarts each package's path a
+   second into its play, at ×8 and paused a second, to the same end; `tools/probe-frames.ts`
+   pauses, paces, restarts and stops one in the page, and frames the strip at the end.
 8. The dialog: its two tabs, the site's and the browser's recordings of the set, the
    selection and its metadata, PLAY and UPLOAD, and DELETE for a browser's game's end,
    the only way one leaves the store but its set's own deletion, checked in
    `tools/probe-frames.ts`'s welcome page block. An end's UPLOAD needs the game's play
    time there (`Game.playTime`) for its package, which the store does not keep yet
-   (`RecordingEntry`).
+   (`RecordingEntry`). And the credits a recording of a game's end plays into: they take
+   the input as in play (`showEndOfGame`), so neither the viewer's strip nor its keys
+   reach them, and their RESTART THIS GAME, where a save allows it, would read the save
+   into the page that plays the recording; there the viewer's RESTART and stop are owed
+   in their place.
 
 ### Postponed
 

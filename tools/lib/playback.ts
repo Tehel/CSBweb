@@ -9,7 +9,8 @@
  * takes nothing from the game (`replay.ts`, point 2), which also proves that this plays a
  * package as its own page does (point 10).
  *
- * What the replay tool (`utils/replay-recordings.ts`) plays a shared recording with.
+ * What the replay tool (`utils/replay-recordings.ts`) plays a shared recording with. A
+ * play may be restarted as the viewer's RESTART restarts it (`Restart`).
  */
 import { VBL_FREQUENCY } from '../../src/core/constants';
 import { CsbRandom } from '../../src/core/random';
@@ -29,6 +30,7 @@ import { GameScreen } from '../../src/renderer/GameScreen';
 import { Presenter } from '../../src/renderer/Presenter';
 import { ScrollingText } from '../../src/renderer/csbwin/ScrollingText';
 import { hostDrawing } from '../../src/renderer/ui/HostDrawing';
+import { rewindPage, type Pace } from '../../src/renderer/ui/RecordingStrip';
 import { openReincarnateScreen } from '../../src/renderer/ui/ReIncarnate';
 import { askBeginAdventure } from '../../src/renderer/ui/SaveMenu';
 import { UIMode } from '../../src/renderer/ui/UIState';
@@ -49,6 +51,22 @@ export interface Played {
   readonly joins: number;
   /** The game, as the path left it. */
   readonly game: Game;
+  /**
+   * Where the path was played again (`Restart`): the clock's milliseconds and the VBLs
+   * run in the play again, its second's pause left out, and the VBLs run in the pause.
+   */
+  readonly restarted: { readonly ms: number; readonly vbls: number; readonly pausedVbls: number } | null;
+}
+
+/**
+ * RESTART, as the viewer's strip does it (`playRecording`, `src/main.ts`): the first play
+ * stopped once it has played `afterMs` of the clock, or at its end, the page rewound
+ * (`rewindPage`) and the path played again with a new player at `pace`, paused for a
+ * second of the clock once it has played `afterMs` again.
+ */
+export interface Restart {
+  readonly afterMs: number;
+  readonly pace: Pace;
 }
 
 /**
@@ -70,9 +88,12 @@ export function keptFiles(files: DataSetFiles): DataSetFiles {
 /**
  * `path` played from its first recording's start in a fresh page of `set`, whose files
  * `files` reads, to its end or its first drift; `savedAtEnd`, the save a path shared at a
- * save's point ends at. A frame that throws, CSBWin's `die`, throws.
+ * save's point ends at; `restart`, a RESTART in it. A frame that throws, CSBWin's `die`,
+ * throws.
  */
-export async function playPath(set: DataSet, files: DataSetFiles, path: readonly Recording[], savedAtEnd: SavedAtEnd | null = null): Promise<Played> {
+export async function playPath(
+  set: DataSet, files: DataSetFiles, path: readonly Recording[], savedAtEnd: SavedAtEnd | null = null, restart: Restart | null = null,
+): Promise<Played> {
   const loaded = await loadGameFiles(set, files);
   const dungeonDat = await files.read('dungeon.dat');
   if (!dungeonDat) throw new Error(`Cannot open dungeon file '${files.where('dungeon.dat')}'`);
@@ -159,13 +180,40 @@ export async function playPath(set: DataSet, files: DataSetFiles, path: readonly
   });
   game.ctx.rules.dmRulesDesignOption = set.dmRules;
 
-  const player = new RecordingPlayer(game, path, dungeonDat, savedAtEnd);
-  player.onEnd(() => game.stop());
+  let player!: RecordingPlayer;
+  const play = (): void => {
+    player = new RecordingPlayer(game, path, dungeonDat, savedAtEnd);
+    player.onEnd(() => game.stop());
+    player.start();
+    if (player.playing) game.start(true);
+  };
+  /** The loop run until the player stops, or, given, until `ms` of the clock have passed. */
+  const run = (ms = Infinity): void => {
+    for (const until = clock.time + ms; player.playing && clock.time < until;) {
+      if (!clock.advance(VBL_MS)) throw new Error('the loop stopped while the player plays');
+    }
+  };
   game.runAtOnceWhile(() => player.held);
-  player.start();
-  if (player.playing) game.start(true);
-  while (player.playing) {
-    if (!clock.advance(VBL_MS)) throw new Error('the loop stopped while the player plays');
+  play();
+  if (!restart) {
+    run();
+    return { drift: player.drift, point: player.point, joins: player.joins, game, restarted: null };
   }
-  return { drift: player.drift, point: player.point, joins: player.joins, game };
+  run(restart.afterMs);
+  player.stop();
+  rewindPage(game, screen, messages);
+  game.setPace(restart.pace);
+  const from = clock.time;
+  play();
+  run(restart.afterMs);
+  const before = player.vbls;
+  game.setPace(0);
+  for (const until = clock.time + 1000; clock.time < until;) clock.advance(VBL_MS);
+  const pausedVbls = player.vbls - before;
+  game.setPace(restart.pace);
+  run();
+  return {
+    drift: player.drift, point: player.point, joins: player.joins, game,
+    restarted: { ms: clock.time - from - 1000, vbls: player.vbls, pausedVbls },
+  };
 }

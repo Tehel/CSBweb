@@ -79,8 +79,9 @@ export class RecordingPlayer {
     private segment = 0;
     /** Its next change. */
     private next = 0;
-    /** The boundary's VBLs as it began. */
+    /** The boundary's VBLs as the recording it plays began, and as the path did. */
     private from = 0;
+    private started = 0;
     private finished = false;
     private parted: Drift | null = null;
     private joined = 0;
@@ -150,6 +151,7 @@ export class RecordingPlayer {
     start(): void {
         const root = this.path[0]!;
         const { ctx } = this.game;
+        this.started = this.game.input.vbls;
         if (root.start.kind === 'new') {
             this.game.readDungeonDat(this.dungeonDat);
             ctx.random.setSeed(root.start.random);
@@ -197,6 +199,11 @@ export class RecordingPlayer {
     /** The joins played, each checked. */
     get joins(): number {
         return this.joined;
+    }
+
+    /** The VBLs run since the path's start: the viewer's time played, sixty a second. */
+    get vbls(): number {
+        return this.game.input.vbls - this.started;
     }
 
     /** Where it stands in the recording it plays: its changes applied, and its VBLs run. */
