@@ -689,7 +689,7 @@ Decided with the author:
   (`playRecording`, `src/main.ts`). The two kinds of id are told apart by their form.
 - **The viewer's controls**: a strip drawn in the canvas over the message area, with the
   time played, pause, the pace (×1, ×2, ×4, ×8), RESTART and stop, clickable; and the
-  same actions on keys, Space to pause, `+` and `-` for the pace, a key for RESTART, Esc
+  same actions on keys, Space to pause, `+` and `-` for the pace, Backspace to RESTART, Esc
   to stop and go back to the welcome page, which HOW TO PLAY lists. RESTART plays the
   recording again from its start; any jump back is a replay from the start, run at once
   and undrawn (`doc/RECORDING.md` → "Shared recordings"). At the end, or at a drift, a
