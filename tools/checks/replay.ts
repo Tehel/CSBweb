@@ -54,6 +54,9 @@
  *    removed, its parts with it; a recording the running branch joins is kept. Another
  *    page's prune cuts the running branch, and its page's next write writes it whole
  *    again. The branch still replays from its root through the join.
+ * 8. A Sleepsave's point says it was taken inside a VBL, and F9's read of it begins a
+ *    branch there, which replays from its root through both joins: the join is checked
+ *    against the file the replayed VBL made where the recorded one made the Sleepsave.
  *
  * Run: `npm test -- --only=replay.ts`
  */
@@ -61,6 +64,7 @@ import { readFileSync } from 'node:fs';
 
 import { VBL_FREQUENCY } from '../../src/core/constants';
 import { CsbRandom } from '../../src/core/random';
+import { Position } from '../../src/core/types';
 import { emptyDungeonData } from '../../src/data/DungeonLoader';
 import { readRecordingPath, readSaveFileFields, type RecordingEntry, type SaveEntry } from '../../src/data/saves';
 import { Game } from '../../src/engine/Game';
@@ -709,11 +713,51 @@ async function pruned(recorded: Page, root: Recording): Promise<void> {
   sameGame(recorded, path, healed, 'the second branch, pruned around, replayed from its root through the join');
 }
 
+/**
+ * From where `pruned` left `recorded`, the second branch running: the party moved back to
+ * `home`, where it sleeps with nothing about to wake it, laid down and woken, the Sleepsave made inside the VBL of each click, and F9's read of it a third branch,
+ * whose point says it was taken inside a VBL. Played on, it replays from its root
+ * through both joins: the second join is checked against the file the replayed VBL made
+ * where the recorded one made the Sleepsave, before the rest of that VBL ran.
+ */
+async function sleepBranch(recorded: Page, home: Position): Promise<void> {
+  const player = new Player(recorded);
+  const second = recorded.recording;
+  check(recorded.game.devMoveParty(home.z, home.x, home.y), '`?dev` moves the party back to where the game began');
+  player.play(300);
+  await player.sleepSave(100);
+  const sleep = (await recorded.saves.list()).find((entry) => entry.sleep)!;
+  check(sleep.recording?.recording === second.id && sleep.recording.inVbl === true,
+    `the Sleepsave names its point in the branch, taken inside a VBL (${JSON.stringify(sleep.recording)})`);
+  player.play(400);
+  recorded.input.keyDown({ key: '', code: 'F9', ctrlKey: false, metaKey: false, altKey: false });
+  await settle();
+  const third = recorded.recording;
+  check(JSON.stringify(third.parent) === JSON.stringify(sleep.recording) && third.start.kind === 'save'
+    && firstDifference(third.start.bytes, await recorded.store.read(sleep.id)) < 0,
+    'F9 reads the Sleepsave, a branch at its point');
+  player.play(600);
+  player.key('KeyW');
+  player.play(800);
+  await recorded.recordings.flush();
+  const store = recorded.recordingStore;
+  const read = await readRecordingPath(store, third.id);
+  check(read.length === 3 && read[1]!.id === second.id, `the store gives its path from its root (${read.map((recording) => recording.id).join()})`);
+  const path = Page.replay(read);
+  path.play();
+  const { drift, joins } = path.player!;
+  check(joins === 2 && drift?.kind !== 'join',
+    `the branch replayed up to the Sleepsave's point makes the file it made inside the VBL${drift?.kind === 'join' ? ` (first difference at ${drift.byte})` : ', byte-identical'}`);
+  sameGame(recorded, path, await store.read(third.id), 'and the Sleepsave\'s branch replayed from its root through both joins');
+}
+
 /** `start` played by `script` and recorded, then the recording played back in a fresh page. */
 async function replay(name: string, start: Start, script: (player: Player) => Promise<void>): Promise<void> {
   console.log(`\n=== ${name} ===`);
   const recorded = await Page.record(start);
   const begun = recorded.recording;
+  const { position } = recorded.game.ctx.party.state;
+  const home = new Position(position.x, position.y, position.z);
   // Left by a page before the tree: no save links it.
   const earlier: RecordingEntry = {
     id: EARLIER, dataSet: STOCK_DATA_SET.id, build: 'replay', parent: null, playthrough: 0,
@@ -775,6 +819,7 @@ async function replay(name: string, start: Start, script: (player: Player) => Pr
   await replaced(recorded, recording);
   await branch(recorded);
   await pruned(recorded, recording);
+  await sleepBranch(recorded, home);
 }
 
 /** `played` has replayed `recording`, which `recorded` played: the same changes at the same VBLs, and the same game. */

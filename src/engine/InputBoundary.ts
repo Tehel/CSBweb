@@ -18,7 +18,8 @@
  * click (`ScreenInput`, which the page's input path gives).
  *
  * A recording played back feeds it (`RecordingPlayer`): after each VBL, the changes
- * logged before the next are applied, as the page's events applied them.
+ * logged before the next are applied, as the page's events applied them. The player is
+ * told the file a VBL saves as well, the Sleepsave's, which its join is checked against.
  */
 import type { Extras, GameContext } from './GameContext';
 import { LONG_MOUSEQLEN, MOUSEQLEN } from './MouseQueue';
@@ -73,6 +74,14 @@ export interface ScreenInput {
 /** Told every change the page makes, before it is applied, with the VBLs run before it. */
 export type InputListener = (change: InputChange, vbl: number) => void;
 
+/** What a recording played back is told (`RecordingPlayer`, `play`). */
+export interface PlayFeed {
+    /** After every VBL, outside it: what was logged before the next applied. */
+    afterVbl(): void;
+    /** A save's file made inside a VBL and written nowhere: the Sleepsave's (`GameSaves.sleepSave`). */
+    savedInVbl(file: Uint8Array): void;
+}
+
 export class InputBoundary {
     /**
      * The VBLs run (`Game.runFrame`), every one: the frozen game's and the stopped
@@ -80,11 +89,11 @@ export class InputBoundary {
      */
     private vblsRun = 0;
     /** A VBL is running: a change now is the game's own. */
-    private inVbl = false;
+    private running = false;
     private listener: InputListener | null = null;
     private screen: ScreenInput | null = null;
     /** The player's feed (`play`), or `null` while no recording plays. */
-    private feed: (() => void) | null = null;
+    private feed: PlayFeed | null = null;
 
     /** `applyToGame` applies the engine's changes, and returns what its door returns. */
     constructor(private readonly applyToGame: (change: GameChange) => boolean) {}
@@ -94,27 +103,38 @@ export class InputBoundary {
         return this.vblsRun;
     }
 
+    /** Whether a VBL is running: a save made now is made inside it (`Recorder.point`). */
+    get inVbl(): boolean {
+        return this.running;
+    }
+
     /**
      * Run one VBL: counted, and the changes made in it the game's own. Then, while a
      * recording plays, its feed applies what was logged before the next.
      */
     runVbl(frame: () => void): void {
         this.vblsRun++;
-        this.inVbl = true;
+        this.running = true;
         try {
             frame();
         } finally {
-            this.inVbl = false;
+            this.running = false;
         }
-        this.feed?.();
+        this.feed?.afterVbl();
     }
 
     /**
-     * A recording played back (`RecordingPlayer`): `feed` is called after every VBL,
-     * outside it, to apply what was logged before the next. `null` when it stops.
+     * A recording played back (`RecordingPlayer`): `feed` is told after every VBL,
+     * outside it, to apply what was logged before the next, and each file a VBL saves.
+     * `null` when it stops.
      */
-    play(feed: (() => void) | null): void {
+    play(feed: PlayFeed | null): void {
         this.feed = feed;
+    }
+
+    /** A save's file made inside a VBL while a recording plays, told to its player. */
+    savedInVbl(file: Uint8Array): void {
+        this.feed?.savedInVbl(file);
     }
 
     /**
@@ -141,7 +161,7 @@ export class InputBoundary {
      * for the rest.
      */
     apply(change: InputChange): boolean {
-        if (!this.inVbl) this.listener?.(change, this.vblsRun);
+        if (!this.running) this.listener?.(change, this.vblsRun);
         switch (change.kind) {
             case 'panelKey': this.screen?.panelKey(change.action); return true;
             case 'reincarnateKey': this.screen?.reincarnateKey(change.key); return true;

@@ -35,10 +35,11 @@ skins are drawn (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Skins in the data sets
 plays Dungeon Master with the Amiga 2.2's re-recorded sounds, the monsters heard moving as
 they approach, in stereo, and the Amiga's dungeon.
 
-**First, at the author's request: G29 — recording a game and playing it back.** It rests
-on the game being a function of its start, its VBLs and the changes its input boundary
-logs at them (`src/engine/InputBoundary.ts`), which `tools/checks/replay.ts` proves. Its
-row heads the index, and G31, sharing the recordings, follows it.
+**First, at the author's request: G31 — sharing the recordings.** The port records every
+game and plays a recording back (`doc/RECORDING.md`), resting on the game being a function
+of its start, its VBLs and the changes its input boundary logs at them
+(`src/engine/InputBoundary.ts`), which `tools/checks/replay.ts` proves. Sharing them heads
+the index.
 
 **Then, at the author's request: P — players' own data sets.** A player adds a dungeon
 from their own files to the welcome page, plays it, edits it, deletes it and publishes it,
@@ -124,7 +125,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G29 | Recording a game and playing it back | L | ⏳ |
 | G31 | Recordings shared: the set's dialog, a package, the server | L | ⏳ to design with the author |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
 | C194 | A DSA's wall graphic counts as a real decoration, so it hides no text | S | ⏳ |
@@ -655,109 +655,17 @@ Things CSBWin does that the port has not built. These are not defects in existin
 they are listed so nothing is lost. The active ones come in the index's order; the
 postponed ones follow, under their own heading (see "Priority").
 
-### G29 ⏳ Recording a game and playing it back
-
-CSBWin records a game as the mouse-queue entries it takes, each with its tick and
-`d.RandomNumber`, and plays them back in place of the queue (`RECORDFILE` and `PLAYFILE`,
-`doc/CSBwin-src/Recording.cpp`). `doc/RECORDING.md` holds how both work, what a replay
-needs, where the port stands against it, and the port's own recorder.
-
-The port has neither of CSBWin's. It keeps the recorder's count, `totalMoveCount`, which a
-save stores (`Game.recordFileRecord`, `src/engine/Game.ts`), and `extraTicks` is always on
-(`src/engine/MovementSystem.ts:115-116`). Conflux 3.5's `AutoRecord` (`doc/RECORDING.md`)
-asks for a recorder, and the port records every game anyway, and keeps it.
-
-**The port's recorder is its own** (`doc/RECORDING.md` → "The port's recorder"): it logs
-the input boundary's changes (`src/engine/InputBoundary.ts`), each with the count of VBLs
-before it, where CSBWin logs the queue's entries with `d.Time`. Counted in VBLs, nothing
-that happens within a tick needs proving, and playback needs no `extraTicks` off. `d.Time`
-and `d.RandomNumber` go with every change, so a replay stops at the first that drifts.
-Playing CSBWin's own recordings back, which needs the port's draws to follow CSBWin's draw
-for draw, is not part of it.
-
-A change to what the engine does makes older recordings drift: each carries the build
-that made it, and the drift detector shows where it parts. `tools/checks/replay.ts` is the
-headless page a step's recorder and player can be proven on: it plays a game through the
-page's input path, records it, and plays the recording back.
-
-Paying it, in steps:
-
-1. The recorder: done. `Recorder` (`src/engine/Recorder.ts`) holds a `Recording`, begun by
-   each of `GameSaves`'s reads and ended by the next: its build and data set, its start (a
-   new game's stream and `d.RandomGameID`, or a save's file), its rules and extras, and the
-   boundary's changes, which the player (step 4a) plays back from the recording alone.
-2. The store: done. The recordings beside the saves in IndexedDB, a row and parts each
-   (`src/data/saves/RecordingStore.ts`, `BrowserRecordingStore`), written as they grow by
-   `RecordingWriter` (`src/engine/RecordingWriter.ts`), every five seconds and as the page
-   is hidden (`doc/RECORDING.md` → "The port's recorder"). The replay plays what the store
-   holds.
-3. The tree, decided with the author (`doc/RECORDING.md` → "The tree"). A save made in a
-   recorded game knows its place in the recording, and a load of it carries the
-   recording on from there, as a branch. In two halves:
-   - **3a, the link and the branch: done.** A save's row names its recording and its
-     point (`SaveEntry.recording`, `Recorder.point`); a read of it begins a branch that
-     names the point (`Recording.parent`, kept in the row and the head), from the save's
-     file and what the read left beside it (`CarriedState`), which the join sets over
-     its read; `RecordingWriter` writes a branch as one only where the store holds its
-     parent up to the point. Decided in the step: a branch's start holds the save's
-     file, about 60 KB a load, rather than being made again at the parent's point. A
-     branch then plays alone, whatever later builds write, and at each join the file the
-     parent makes is checked against it. `tools/checks/replay.ts` saves, plays on, loads
-     with F9 and plays a branch, then replays it alone and from its root through the
-     join.
-   - **3b, pruning: done.** What no save and no running game reaches is removed or cut
-     (`prunePlan`, `src/engine/RecordingWriter.ts`), at a recording's first write and at
-     a save deleted or written over (`GameSaves.onRowGone`), in place of a count of
-     recordings kept. A write after the first is held against its row, so a game in
-     another tab, whose recording this page's prune may cut, is written whole again
-     (`RecordingPrunedError`). `tools/checks/replay.ts` prunes at a load, a delete, a
-     save written over and another page's write, and the branch still replays through
-     its join; `tools/probe-frames.ts` cuts and refuses a write in IndexedDB.
-4. The player, in two halves:
-   - **4a, the player itself: done.** `RecordingPlayer` (`src/engine/RecordingPlayer.ts`,
-     `doc/RECORDING.md` → "The port's player") plays a path into a game: its first start
-     read, each change applied after the VBL before the one it was logged at
-     (`InputBoundary.play`), each join read where its parent reaches its point; `d.Time`
-     and `d.RandomNumber` checked at every change and the file at every join, the first
-     that differs stopping it. While it plays (`InputBoundary.playing`), what the game
-     opens in a VBL does its game half alone: the disk menu and the prison's question
-     (`openSaveMenu`), the Hint Oracle's button (`stopForHintOracle`); the Sleepsave
-     makes its file and tail again and writes nothing (`GameSaves.sleepSave`).
-     `tools/checks/replay.ts` plays every recording through it, the Sleepsave among
-     them, and shows no dialog and writes no save.
-   - **4b, the page: done.** `?recording=<id>` plays the store's recording in place of a
-     game (`playRecording`, `src/main.ts`), from its root through each branch down to it
-     (`readRecordingPath`, `src/data/saves/RecordingStore.ts`); G31's dialog will open
-     the page so. Every tick is drawn at the wall clock's pace, and a span the clock is
-     held through, a dialog of the recorded page's or the disk menu, is played at once
-     and undrawn (`RecordingPlayer.held`, `Game.runAtOnceWhile`): its VBLs still count
-     what a held clock counts, so they cannot be dropped. The page's input reaches
-     nothing, nothing is recorded, saved or sent to the statistics, and at the path's
-     end or a drift the loop stops, the screen as the recording left it, the drift on
-     the console. `tools/checks/replay.ts` plays every replay through the loop as the
-     page does, each held span in one wake of it; `tools/probe-frames.ts` plays the
-     page's own recording back with `?recording=`. A faster pace, stopping and the
-     controls a viewer has are G31's design.
-   - **4c, a branch of a Sleepsave joined: ⏳.** A Sleepsave's point is taken inside the
-     VBL of its click (`GameSaves.sleepSave`, `Recorder.point`), and the player joins
-     after a VBL, so the parent makes its file once the rest of that VBL has run, its
-     tick among them, and the join's check stops the path. The branch plays alone. The
-     point could say it was taken inside a VBL, and the join then check nothing, or the
-     player join inside it; `tools/checks/replay.ts` would play a path through one.
-
-Where a player chooses one to play, stops it and shares it is G31's.
-
 ### G31 ⏳ Recordings shared: the set's dialog, a package, the server
 
-At the author's request, after G29's player: not CSBWin's, the site's. A recording leaves
+At the author's request: not CSBWin's, the site's. A recording leaves
 the browser for the server, which keeps, lists and serves it, and another player plays it.
 What sharing needs is in `doc/RECORDING.md` → "Shared recordings".
 
 Decided with the author:
 
 - **The package**: one file, the deliverable the server keeps and serves. It holds a
-  recording's path, root to the branch shared (G29, step 3), its root's save when it
-  starts from one, and its metadata: its data set's id, when it began and ended, the time
+  recording's path, root to the branch shared (`doc/RECORDING.md` → "The tree"), its
+  root's save when it starts from one, and its metadata: its data set's id, when it began and ended, the time
   played in it (`Game.playTime`), where it starts (a new game, or the save's level and
   champions), its author, its title and its description.
 - **The place**: the dialog the book opens on a set's tile (`showDocuments`,
@@ -775,8 +683,10 @@ by the name the player gives, or by nobody, and the server keeps its uploader's
 Paying it, in steps:
 
 1. The design, with the author, written here before any code: the dialog (its lists, the
-   selection, the upload's form, where PLAY is and where a player stops one), the
-   package's format, the server's API and limits (size, rate, the W tier's rules), and
+   selection, the upload's form, where PLAY is, which opens `?recording=<id>`
+   (`playRecording`, `src/main.ts`), and where a player stops one), the package's format,
+   the server's API and limits (size, rate, the W tier's rules), the controls a viewer
+   has over `?recording=`'s playback (a faster pace, a pause, a stop), and
    these questions: whether a recording is moderated before it is listed, as a set is
    (`server/moderate.ts`); whether its uploader can withdraw it; a recording of a set the
    site does not publish, which a viewer has no `dungeon.dat` for; one made by an older
@@ -1550,6 +1460,15 @@ Recorded so that nobody "fixes" them.
   no record, or a timer past the table (`validateCsbwinWorld`,
   `src/engine/CsbwinSaveGame.ts`), and the running game plays on. No save CSBWin or the
   port writes holds such a value. `tools/checks/damaged-read.ts` checks each case.
+- 🚫 **The recorder and the player are the port's, not CSBWin's `RECORDFILE` and
+  `PLAYFILE`** (`doc/CSBwin-src/Recording.cpp`). CSBWin logs the mouse queue's entries
+  with `d.Time`, and plays them back with `extraTicks` off; the port logs its input
+  boundary's changes with the VBLs before them, which needs nothing proven within a tick,
+  and keeps `extraTicks` on (`src/engine/MovementSystem.ts:116-119`, `doc/RECORDING.md` →
+  "The port's recorder"). It neither writes nor plays CSBWin's recordings, which would
+  need its draws to follow CSBWin's draw for draw (`doc/RECORDING.md` → "Recordings made
+  in CSBWin"). The count CSBWin's recorder keeps, `totalMoveCount`, is kept, since a save
+  stores it (`Game.recordFileRecord`, `src/engine/Game.ts`).
 - **Not debt** (listed so it is not raised again):
   - Table names like `byte20090`, `word1074` and `uByte590` are CSBWin's own
     (`d.Byte20090`…), kept greppable by rule.

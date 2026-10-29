@@ -72,7 +72,13 @@ export interface RecordingPoint {
     /** The recording's id (`Recording.id`). */
     readonly recording: string;
     readonly changes: number;
+    /** Those run, and the one running where it was taken inside a VBL. */
     readonly vbls: number;
+    /**
+     * Taken inside its last VBL, before the rest of it ran: the Sleepsave's, made at the
+     * click (`GameSaves.sleepSave`). Absent from a point taken between two.
+     */
+    readonly inVbl?: true;
 }
 
 /** A change as the boundary told it, with the game's clock and stream as they stood. */
@@ -165,7 +171,8 @@ export class Recorder {
     point(): RecordingPoint | null {
         const current = this.current;
         if (!current || current.to !== null) return null;
-        return { recording: current.recording.id, changes: current.changes.length, vbls: this.game.input.vbls - current.from };
+        const point = { recording: current.recording.id, changes: current.changes.length, vbls: this.game.input.vbls - current.from };
+        return this.game.input.inVbl ? { ...point, inVbl: true } : point;
     }
 
     /** The recording begun last, ended or not, or `null` before any read. */

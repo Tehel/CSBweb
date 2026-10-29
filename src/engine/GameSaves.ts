@@ -660,9 +660,10 @@ export class GameSaves {
         }
         // A recording played back writes no save. The recorded one made its file and ran its
         // tail inside the VBL of its click, which the boundary does not log, so they are
-        // made here again, and nothing is written (`RecordingPlayer`).
+        // made here again, and nothing is written: the file is the player's, which checks a
+        // branch of the Sleepsave against it (`RecordingPlayer`).
         if (this.game.input.playing) {
-            saveFileOf(this.game, 'running', (champion) => this.screen.portraitOf(champion));
+            this.game.input.savedInVbl(saveFileOf(this.game, 'running', (champion) => this.screen.portraitOf(champion)));
             this.game.saveWritten();
             return;
         }

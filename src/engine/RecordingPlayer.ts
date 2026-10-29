@@ -15,7 +15,10 @@
  *
  * It stops at the first drift: a change whose `d.Time` or `d.RandomNumber` is not the
  * recorded one, or a join where the parent does not make the very file its child read
- * (`doc/RECORDING.md` → "Recordings follow the engine"). It plays no save: a save the
+ * (`doc/RECORDING.md` → "Recordings follow the engine"). A save made inside a VBL, the
+ * Sleepsave's (`RecordingPoint.inVbl`), is checked against the file the played VBL made
+ * at the same place, which the game tells it (`InputBoundary.savedInVbl`); its child is
+ * read once the VBL has run, as the recorded read came after it. It plays no save: a save the
  * recorded game made is its logged tail (`saveWritten`), and what the game opens in a VBL
  * does its game half alone while it plays (`InputBoundary.playing`).
  *
@@ -46,6 +49,11 @@ export class RecordingPlayer {
     private finished = false;
     private parted: Drift | null = null;
     private joined = 0;
+    /**
+     * The file a VBL saved at the point the next join names, where that point was taken
+     * inside the VBL (`RecordingPoint.inVbl`): what the join checks.
+     */
+    private savedAtJoin: Uint8Array | null = null;
     private beginListener: ((recording: Recording) => void) | null = null;
     private endListener: ((drift: Drift | null) => void) | null = null;
 
@@ -97,7 +105,7 @@ export class RecordingPlayer {
         } else {
             this.read(root);
         }
-        this.game.input.play(() => this.feed());
+        this.game.input.play({ afterVbl: () => this.feed(), savedInVbl: (file) => this.savedInVbl(file) });
         this.feed();
     }
 
@@ -171,15 +179,25 @@ export class RecordingPlayer {
         }
     }
 
+    /** A file the running VBL saved: kept where the next join's point was taken there. */
+    private savedInVbl(file: Uint8Array): void {
+        const parent = this.path[this.segment + 1]?.parent;
+        const { changes, vbls } = this.point;
+        if (parent?.inVbl && parent.changes === changes && parent.vbls === vbls) this.savedAtJoin = file;
+    }
+
     /**
      * `child` read where its parent has reached its point: the file the parent makes now
      * checked against the one it read, made as the recorded save made it, the clock
-     * stopped where the disk menu held it.
+     * stopped where the disk menu held it. A point taken inside a VBL is checked against
+     * the file that VBL saved, and none saved is a drift at the first byte.
      */
     private join(child: Recording): boolean {
         if (child.start.kind !== 'save') throw new Error('a branch starts from a save');
         const { ctx } = this.game;
-        const made = saveFileOf(this.game, ctx.state.paused ? 'stopped' : 'running', (champion) => ctx.host.portraitOf(champion));
+        const made = child.parent?.inVbl ? this.savedAtJoin ?? new Uint8Array(0)
+            : saveFileOf(this.game, ctx.state.paused ? 'stopped' : 'running', (champion) => ctx.host.portraitOf(champion));
+        this.savedAtJoin = null;
         const read = child.start.bytes;
         const byte = made.length !== read.length ? Math.min(made.length, read.length) : made.findIndex((value, n) => value !== read[n]);
         if (byte >= 0) {

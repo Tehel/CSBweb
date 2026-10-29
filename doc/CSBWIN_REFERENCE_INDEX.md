@@ -22,7 +22,7 @@ behaves as 15.8. Every change between the two that alters what the port has is p
 for the utility's stop on a word-10 saved game (`DEBT.md` H). The rest changes nothing the
 port has: the 64-bit port (`uintptr_t`, and typed structs in `Chaos.cpp` and `Hint.cpp`,
 whose allocator fixes are in code the port never had), `TranslateLanguage` hooks (`DEBT.md`
-G21), the playfile (G29), and the Linux and Raspberry Pi front-ends. None of the port's
+G21), the playfile, whose format the port's recorder does not use (`DEBT.md` H), and the Linux and Raspberry Pi front-ends. None of the port's
 deliberate divergences (`DEBT.md` H, and the exceptions `CLAUDE.md` names) is a code path
 that 2023 changed.
 

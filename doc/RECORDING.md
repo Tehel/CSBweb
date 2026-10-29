@@ -2,8 +2,9 @@
 
 CSBWin can record a game as the list of inputs it took and play that list back. The port
 records every game and keeps it in the browser's store, and plays a recording back through
-its player, which only a tool starts so far (`DEBT.md` G29). This document holds what CSBWin does, what a replay needs, where the port stands
-against those needs, the port's own recorder, and what sharing recordings would take.
+its player, which `?recording=` starts in the page. This document holds what CSBWin does,
+what a replay needs, where the port stands against those needs, the port's own recorder
+and player, and what sharing recordings would take.
 
 **Recordings follow the engine.** Any change to what the engine does at a tick makes a
 recording made before it play out differently. A recording carries the build that made it,
@@ -271,11 +272,12 @@ logged at (below, "The port's player").
 ### The tree
 
 A save made in a recording knows its place there, and a load of it carries the
-recording on from there, as a branch (`DEBT.md` G29, step 3):
+recording on from there, as a branch:
 
 - **The link.** A save's row names the recording it was made in and its point there,
   as its file was made (`SaveEntry.recording`, `Recorder.point`): the recording's id,
-  the changes recorded before it and the VBLs run. The changes past the point begin with
+  the changes recorded before it, the VBLs run, and whether it was taken inside the
+  last of them (`inVbl`, the Sleepsave's). The changes past the point begin with
   the save's tail (`saveWritten`). The file stays CSBWin's.
 - **A branch.** A read of a linked save begins a recording that names that point as its
   parent (`Recording.parent`). The read is not transparent, so the branch begins at it,
@@ -343,7 +345,8 @@ a root and the branches down to the one played, or a branch alone, from its own 
   read, its `CarriedState` set over it, its rules and extras set, and its changes follow.
 - **The drift detector.** Each change's `d.Time` and `d.RandomNumber` are checked before
   it is applied, and at each join the file the parent makes now, as the recorded save
-  made it (`saveFileOf`, `src/engine/GameSaves.ts`), against the file the child read.
+  made it (`saveFileOf`, `src/engine/GameSaves.ts`), against the file the child read;
+  at a point taken inside a VBL, the file that VBL made (below).
   The first that differs stops the player (`RecordingPlayer.drift`).
 - **What the game opens in a VBL** does its game half alone while a recording plays
   (`InputBoundary.playing`), and shows nothing: the disk menu its icon opens, and the
@@ -353,7 +356,7 @@ a root and the branches down to the one played, or a branch alone, from its own 
 - **No save is written.** A save the page made is its logged tail (`saveWritten`). The
   Sleepsave's file and tail are made inside the VBL of its click, which the boundary does
   not log, so the player's game makes them again there and writes nothing
-  (`GameSaves.sleepSave`).
+  (`GameSaves.sleepSave`); the file goes to the player (`InputBoundary.savedInVbl`).
 
 **The page** plays one with `?recording=<id>` (`playRecording`, `src/main.ts`): the path
 the store holds to it, from its root (`readRecordingPath`,
@@ -366,10 +369,11 @@ mouse queue's pass. The page's input reaches nothing, and the page records nothi
 saves nothing and sends no statistic. At the path's end, or at a drift, the loop stops,
 the screen as the recording left it.
 
-**A branch of a Sleepsave does not join.** Its point is taken inside the VBL of its click,
-and the player joins after a VBL, so the parent makes its file once the rest of that VBL
-has run, its tick among them: the join's check stops the path (`DEBT.md` G29). The branch
-plays alone from its own start.
+**A branch of a Sleepsave** joins as any other, once the VBL has run. Its point is taken
+inside the VBL of its click, before the rest of it, its tick among them, and says so
+(`RecordingPoint.inVbl`): the join is checked against the file the played VBL made at the
+same place (`InputBoundary.savedInVbl`), not one made after it. The recorded read came
+after the VBL, so the branch is read after it too.
 
 ## Recordings made in CSBWin
 
