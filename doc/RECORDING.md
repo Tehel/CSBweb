@@ -425,11 +425,13 @@ the time played flush right, the player's VBLs since the path's start
 - **RESTART** (Backspace): the path played again from its start in the same page, by a
   new player, once the page is put back as a new page has it (`rewindPage`): the loop
   stopped, its state a new loop's (`Game.resumeMainLoop`), the message area empty, the
-  screen's play state its first, and `totalMoveCount` 0. That one is a global, not `d.`'s,
+  screen's play state its first, the clock running, and `totalMoveCount` 0. The clock is
+  the page's: a path shared at a save the disk menu made ends under the menu's held clock,
+  and a new game's read does not set it going. `totalMoveCount` is a global, not `d.`'s,
   which a new game's read counts on from and a saved game's sets: a page reads a new game
   at its boot alone, so a recording from one assumes 0, and the file a join checks holds
   it. `tools/checks/replay.ts` (point 11) restarts each package's path a second into its
-  play and plays it to the same end.
+  play, and again at its end, and plays it to the same end.
 - **Stop** (Esc): the player and the loop stopped, and the page left for the welcome
   page.
 - **The pace** (`+` and `-`, or a click, round from ×8 to ×1): the loop's VBLs to a VBL

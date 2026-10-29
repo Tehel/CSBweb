@@ -66,15 +66,18 @@
  *    keeps it whole. It replays to the same end, and a recording whose end is moved a
  *    VBL on, or whose `d.Word11694` is not the game's, or without its end, drifts there.
  * 10. A point is shared as a package (`src/engine/RecordingPackage.ts`): the path to
- *    F5's save in the branch, to the Sleepsave inside a VBL in the third, and to the lost
- *    game's end, each written, read back the same and played from the package alone, a
- *    save's path to the file its save holds, through its joins. A package whose save's
+ *    F5's save in the branch, to the Sleepsave inside a VBL in the third, to the disk
+ *    menu's save in each game, and to the lost game's end, each written, read back the
+ *    same and played from the package alone, a save's path to the file its save holds,
+ *    through its joins. A package whose save's
  *    file is not the path's drifts at its end; one whose form is wrong is refused. The
  *    replay tool's page (`tools/lib/playback.ts`) plays each the same, to the same game.
  * 11. The viewer's RESTART (`rewindPage`, `src/renderer/ui/RecordingStrip.ts`): each
  *    package's path, stopped a second into its play in the replay tool's page, the page
  *    rewound and the path played again at ×8, paused a second in it, plays to the same
- *    end; the loop runs eight VBLs to one of the clock, and none in the pause.
+ *    end; the loop runs eight VBLs to one of the clock, and none in the pause. And the
+ *    page rewound at the path's end, under the disk menu's held clock among them, plays
+ *    it again to the same end.
  *
  * Run: `npm test -- --only=replay.ts`
  *
@@ -835,6 +838,9 @@ async function replay(name: string, start: Start, script: (player: Player) => Pr
   check(played.heldSpans > 0 && played.heldSpread === 0 && played.clock.pending === null,
     `each span under a held clock is played at once, in the wake of the loop that held it (${played.heldSpans} spans), and the loop stops at the end`);
   heldSpans(played, ['settings', 'saveMenu']);
+  // The disk menu's save: its point under the menu's held clock.
+  const diskSave = (await recorded.saves.list()).find((entry) => !entry.quick && !entry.sleep && entry.recording?.recording === recording.id)!;
+  await savePackage(recorded, await readRecordingPath(recorded.recordingStore, recording.id), diskSave, 'the disk menu\'s save');
   if (start === 'new') {
     // Made before a logged stop of the clock named what held it.
     const unnamed: Recording = {
@@ -1060,6 +1066,11 @@ async function samePlayback(played: Page, path: readonly Recording[], savedAtEnd
     `and RESTART a second into it plays it again from its start, at x8 and paused a second, to the same end${again.drift && JSON.stringify(again.drift) !== JSON.stringify(alone.drift) ? ` (drift ${JSON.stringify(again.drift)})` : ''}`);
   check(pausedVbls === 0 && vbls >= Math.floor(ms * VBL_FREQUENCY * 8 / 1000 * 0.9),
     `the loop running eight VBLs to one of the clock (${vbls} VBLs in ${ms} ms), and none in the pause`);
+  const atEnd = await playPath(STOCK_DATA_SET, diskFiles(STOCK_DATA_SET), path, savedAtEnd, { afterMs: Infinity, pace: 8 });
+  const atEndFile = buildSaveFile(atEnd.game, { portraitOf: (champion) => atEnd.game.ctx.host.portraitOf(champion) });
+  check(JSON.stringify(atEnd.drift) === JSON.stringify(alone.drift) && JSON.stringify(atEnd.point) === JSON.stringify(alone.point)
+    && atEnd.joins === alone.joins && firstDifference(atEndFile, file) < 0,
+    `and RESTART at its end plays it again to the same end${JSON.stringify(atEnd.drift) !== JSON.stringify(alone.drift) ? ` (drift ${JSON.stringify(atEnd.drift)})` : ''}`);
 }
 
 /**

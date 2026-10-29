@@ -2135,8 +2135,12 @@ check(lostPlayed.lines.includes('THE GAME IS LOST HERE.') && !lostPlayed.lines.i
 await leaveCanvas(); await wait(100);
 await shot('33-recording-lost');
 await key('Backspace');
-check(await evaluate(`window.__probe.player().playing && !window.__probe.game.mainLoopHasReturned()`),
-  'and Backspace plays it again from its start');
+const lostRestarted = await evaluate(`window.__probe.player().playing && !window.__probe.game.mainLoopHasReturned()`);
+await until('!window.__probe.player().playing', 'the lost game played again to its end');
+const lostAgain = await evaluate(`(({ game }) => ({ drift: window.__probe.player().drift, returned: game.mainLoopHasReturned(),
+  lines: game.ctx.host.messages.snapshot().filter((line) => line) }))(window.__probe)`);
+check(lostRestarted && lostAgain.drift === null && lostAgain.returned,
+  `and Backspace plays it again from its start, to the same end (${JSON.stringify(lostAgain)})`);
 await leave(() => key('Escape'), WELCOME);
 
 // The map dialog (`src/renderer/ui/MapDialog.ts`), over CSB's `csbgame2.dat`, its party
