@@ -42,8 +42,9 @@
  *   pending set too, which the server refuses; never on the default set. The page then
  *   asks for the sets anew and shows them, the selection kept but for a set gone. A
  *   refusal is said in the box beside CONTINUE.
- * - **The book** is on every published set's tile, after the triangle. It opens a dialog that says the
- *   set's description, under its title, if it has one, then its authors, "By: " and
+ * - **The book** is on every tile, after the triangle. It opens a dialog titled with the
+ *   set's name, in two tabs, DOCUMENTS and RECORDINGS; a local set's has RECORDINGS alone.
+ *   DOCUMENTS says the set's description, if it has one, then its authors, "By: " and
  *   their names separated by commas, if it has any, and offers the set's files as one zip, `<name>.zip`, made in the page from the files the server serves
  *   (`src/data/DataSetArchive.ts`), so that the set can be played in CSBWin; then its
  *   documents, the files its folder holds for its players (`DataSetDocument`), each a link
@@ -52,7 +53,13 @@
  *   moderator, each has a cross that removes it, once confirmed, and ADD offers to choose
  *   a file on the drive to add (`server/documents.ts`); the list then shows the set as the
  *   server lists it anew, and so does the page once the dialog is closed. A refusal is said
- *   in the dialog. A local set has none.
+ *   in the dialog. RECORDINGS lists this browser's points of the set, the latest made
+ *   first: its saves whose recording the store holds up to them, by name, and its games'
+ *   ends, won or lost (`src/engine/RecordingPoints.ts`). A click selects one, and the panel
+ *   under the list says where its path starts, when it began and ended, the time played,
+ *   its build and whether an extra was on, with PLAY, a link that plays it
+ *   (`?recording=`), and on a game's end DELETE, the only way one leaves the store but its
+ *   set's own deletion, which asks first.
  * - **The moderator's switch**, at the page's top right corner, is offered to a moderator
  *   alone. Off, the page is the one a player sees (`playerView`): neither a hidden set nor
  *   a pending one, the moderator's own pending sets included since the page is not told
@@ -95,9 +102,11 @@ import { ABOUT_HASH, openAbout } from './about';
 import { HOW_TO_PLAY_HASH, openHowToPlay, type HowToPlayHost } from './howToPlay';
 import { playerId } from './gameEvents';
 import {
-    formatSaveDate, formatSaveTime, lastUsedSave,
-    type BrowserDataSetStore, type SaveEntry, type SaveStore,
+    formatPlayTime, formatSaveDate, formatSaveTime, lastUsedSave,
+    type BrowserDataSetStore, type RecordingEntry, type RecordingStore, type SaveEntry, type SaveStore,
 } from '../data/saves';
+import { pointInfo, pointMadeAt, pointPath, pointRecordingId, storedPoints, type PointInfo, type StoredPoint } from '../engine/RecordingPoints';
+import { pruneRecordings } from '../engine/RecordingWriter';
 
 /** The page's static half: the logo, the places the grid and the buttons go, and the bottom. */
 const PAGE = `
@@ -186,13 +195,28 @@ const CONFIRMATION = (prefix: string) => `
   </div>
 </form>`;
 
-/** The dialog the book opens: the set's description, its authors, the documents, then a moderator's ADD, and CLOSE. */
+/**
+ * The dialog the book opens: the set's name, then its two tabs, DOCUMENTS, the set's
+ * description, its authors and the documents, and RECORDINGS, the browser's points of the
+ * set and the panel of the one selected; then a moderator's ADD, and CLOSE.
+ */
 const DOCUMENTS = `
 <form class="add-set-form">
   <h2 class="px" id="documents-title"></h2>
-  <p class="documents-description"></p>
-  <p class="documents-authors"></p>
-  <ul class="documents-list"></ul>
+  <div class="documents-tabs px px2" role="tablist">
+    <button type="button" role="tab" class="documents-tab" id="documents-tab-documents" aria-controls="documents-pane">Documents</button>
+    <button type="button" role="tab" class="documents-tab" id="documents-tab-recordings" aria-controls="recordings-pane">Recordings</button>
+  </div>
+  <div class="documents-pane" id="documents-pane" role="tabpanel" aria-labelledby="documents-tab-documents">
+    <p class="documents-description"></p>
+    <p class="documents-authors"></p>
+    <ul class="documents-list"></ul>
+  </div>
+  <div class="documents-pane" id="recordings-pane" role="tabpanel" aria-labelledby="documents-tab-recordings">
+    <h3 class="px px2 recordings-heading">On this browser</h3>
+    <ul class="recordings-list" role="listbox" aria-label="Recordings on this browser"></ul>
+    <div class="recordings-panel" aria-live="polite"></div>
+  </div>
   <p class="documents-status" aria-live="polite"></p>
   <div class="add-set-buttons">
     <button type="button" class="btn px" id="documents-close">Close</button>
@@ -226,6 +250,7 @@ export async function showWelcomePage(
     manifest: DataSetManifest,
     store: Pick<SaveStore, 'list'>,
     localSets: Pick<BrowserDataSetStore, 'list' | 'put' | 'remove'>,
+    recordings: RecordingStore,
     loadManifest: () => Promise<DataSetManifest>,
     help: HowToPlayHost,
     select: string | null = null,
@@ -275,7 +300,8 @@ export async function showWelcomePage(
         if (record) tile.classList.add('local');
         if (set.pending) tile.classList.add('pending');
         if (set.hidden) tile.classList.add('hidden');
-        const controls = record ? [control('pick-edit', `Edit ${record.name}`, PEN, () => openForm({ record, saves }))]
+        const controls = record ? [control('pick-documents', `Recordings of ${set.name}`, BOOK, () => openDocuments(set)),
+            control('pick-edit', `Edit ${record.name}`, PEN, () => openForm({ record, saves }))]
             : [control('pick-documents', `Documents of ${set.name}`, BOOK, () => openDocuments(set)), ...moderation(set)];
         (set.official ? officialGrid : customGrid).append(withControls(tile, [playControl(set), ...controls]));
         return { set, tile };
@@ -290,7 +316,7 @@ export async function showWelcomePage(
 
     /** The page shown again, `select` selected, for the manifest `shown`. */
     function again(select: string | null, shown = manifest): void {
-        void showWelcomePage(body, shown, store, localSets, loadManifest, help, select);
+        void showWelcomePage(body, shown, store, localSets, recordings, loadManifest, help, select);
     }
 
     /** The form that adds a set, or edits `edited`'s, with its `saves`; the page shown again after it. */
@@ -311,12 +337,14 @@ export async function showWelcomePage(
     }
 
     /**
-     * The dialog the book opens on `set`'s documents; the page shown again as the server
-     * lists the sets once it is closed, where a document was added or removed, the selection kept.
+     * The dialog the book opens on `set`'s documents and recordings, a local set's
+     * recordings alone; the page shown again as the server lists the sets once it is
+     * closed, where a document was added or removed, the selection kept.
      */
     function openDocuments(set: DataSet): void {
         const keep = selected?.id ?? null;
-        showDocuments(set, viewed.moderator, loadManifest, (asked) => {
+        const isLocal = local.some((l) => l.set === set);
+        showDocuments(set, isLocal, viewed.moderator, loadManifest, { saves: store, recordings }, (asked) => {
             if (asked) again(keep, asked);
         });
     }
@@ -526,22 +554,37 @@ function confirmation(prefix: string, title: string, text: string, verb: string,
     dialog.showModal();
 }
 
+/** The stores the RECORDINGS tab reads: the saves and the recordings. */
+interface RecordingsSource {
+    readonly saves: Pick<SaveStore, 'list'>;
+    readonly recordings: RecordingStore;
+}
+
 /**
- * The dialog the book opens on `set`'s files: first its archive, `<name>.zip`, which is
- * made and downloaded once clicked, then its documents, each a link, with its size; to a
- * `moderator`, a cross on each, which removes it once confirmed, and ADD, which sends the
- * file chosen on the drive. After a change, the list is the set as `loadManifest` gives it
- * anew, its folder a new one. `closed` is called once it is closed, with the last manifest
- * asked for, or `null` where nothing changed.
+ * The dialog the book opens on `set`, titled with its name, in two tabs. DOCUMENTS, the
+ * first shown: its archive, `<name>.zip`, which is made and downloaded once clicked, then
+ * its documents, each a link, with its size; to a `moderator`, a cross on each, which
+ * removes it once confirmed, and ADD, which sends the file chosen on the drive. After a
+ * change, the list is the set as `loadManifest` gives it anew, its folder a new one.
+ * RECORDINGS: the browser's points of the set (`storedPoints`), the latest made first; a
+ * click selects one, and the panel under the list shows its metadata (`pointInfo`) and
+ * PLAY, which plays it (`?recording=`, `pointRecordingId`), and on a game's end DELETE,
+ * which deletes it once confirmed, then what no other point reaches of the recordings
+ * before it (`pruneRecordings`). A local set, `isLocal`, has RECORDINGS alone. `closed`
+ * is called once it is closed, with the last manifest asked for, or `null` where nothing
+ * changed.
  */
-function showDocuments(shown: DataSet, moderator: boolean, loadManifest: () => Promise<DataSetManifest>, closed: (asked: DataSetManifest | null) => void): void {
+function showDocuments(
+    shown: DataSet, isLocal: boolean, moderator: boolean, loadManifest: () => Promise<DataSetManifest>,
+    source: RecordingsSource, closed: (asked: DataSetManifest | null) => void,
+): void {
     let set = shown;
     let asked: DataSetManifest | null = null;
     const dialog = document.createElement('dialog');
     dialog.className = 'add-set delete-set documents';
     dialog.setAttribute('aria-labelledby', 'documents-title');
     dialog.innerHTML = DOCUMENTS;
-    dialog.querySelector('#documents-title')!.textContent = `${set.name}: documents`;
+    dialog.querySelector('#documents-title')!.textContent = set.name;
     const list = dialog.querySelector<HTMLElement>('.documents-list')!;
     const status = dialog.querySelector<HTMLElement>('.documents-status')!;
     const add = dialog.querySelector<HTMLButtonElement>('#documents-add')!;
@@ -636,9 +679,142 @@ function showDocuments(shown: DataSet, moderator: boolean, loadManifest: () => P
         dialog.remove();
         closed(asked);
     });
-    render();
+
+    const tabs = [...dialog.querySelectorAll<HTMLButtonElement>('.documents-tab')];
+    const panes = [...dialog.querySelectorAll<HTMLElement>('.documents-pane')];
+    const showTab = (shownTab: number) => {
+        tabs.forEach((tab, n) => tab.setAttribute('aria-selected', String(n === shownTab)));
+        panes.forEach((pane, n) => { pane.hidden = n !== shownTab; });
+        add.hidden = shownTab !== 0;
+        status.textContent = '';
+    };
+    tabs.forEach((tab, n) => tab.addEventListener('click', () => showTab(n)));
+    showRecordings(dialog, set, source, status);
+    if (isLocal) {
+        dialog.querySelector('.documents-tabs')!.remove();
+        panes[0]!.remove();
+        add.remove();
+        panes[1]!.hidden = false;
+    } else {
+        render();
+        showTab(0);
+    }
     document.body.append(dialog);
     dialog.showModal();
+}
+
+/**
+ * The RECORDINGS tab of `dialog`, on `set`: the browser's points of the set, from
+ * `source`, and the panel of the one selected; what goes wrong said in `status`.
+ */
+function showRecordings(dialog: HTMLElement, set: DataSet, source: RecordingsSource, status: HTMLElement): void {
+    const list = dialog.querySelector<HTMLElement>('.recordings-list')!;
+    const panel = dialog.querySelector<HTMLElement>('.recordings-panel')!;
+    let rows: RecordingEntry[] = [];
+    let points: StoredPoint[] = [];
+    let selected: string | null = null;
+
+    const refresh = async () => {
+        try {
+            rows = await source.recordings.list();
+            points = storedPoints(await source.saves.list(null), rows, set.id);
+        } catch (error) {
+            rows = [];
+            points = [];
+            status.textContent = `This browser's recordings could not be read: ${error instanceof Error ? error.message : String(error)}`;
+        }
+        if (!points.some((point) => pointRecordingId(point) === selected)) selected = null;
+        render();
+    };
+
+    const render = () => {
+        list.replaceChildren(...points.map((point) => {
+            const id = pointRecordingId(point);
+            const item = document.createElement('li');
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'recordings-item';
+            button.setAttribute('role', 'option');
+            button.setAttribute('aria-selected', String(id === selected));
+            button.dataset.recording = id;
+            const made = pointMadeAt(point);
+            button.append(line('recordings-name', pointName(point)), line('recordings-when', `${formatSaveDate(made)} ${formatSaveTime(made)}`));
+            button.addEventListener('click', () => {
+                selected = id;
+                render();
+            });
+            item.append(button);
+            return item;
+        }));
+        if (points.length === 0) {
+            const none = document.createElement('li');
+            none.className = 'documents-none';
+            none.textContent = 'No recording of this dungeon on this browser yet: a save, or the end of a game, is one.';
+            list.append(none);
+        }
+        const point = points.find((one) => pointRecordingId(one) === selected);
+        if (point) void showPoint(point);
+        else panel.replaceChildren();
+    };
+
+    /** The panel of `point`: its metadata, once its path is read, then PLAY, and DELETE on a game's end. */
+    const showPoint = async (point: StoredPoint) => {
+        const id = pointRecordingId(point);
+        panel.replaceChildren(line('recordings-reading', 'Reading the recording…'));
+        let info: PointInfo;
+        try {
+            info = pointInfo(point, await pointPath(source.recordings, point), rows);
+        } catch (error) {
+            if (selected === id) panel.replaceChildren(line('recordings-failure', `It could not be read: ${error instanceof Error ? error.message : String(error)}`));
+            return;
+        }
+        if (selected !== id) return;
+        const play = document.createElement('a');
+        play.className = 'btn px recordings-play';
+        play.textContent = 'Play';
+        play.href = recordingQuery(set.id, id);
+        const buttons = document.createElement('div');
+        buttons.className = 'add-set-buttons';
+        buttons.append(play);
+        if (point.kind === 'end') {
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'btn px recordings-delete';
+            remove.textContent = 'Delete';
+            remove.addEventListener('click', () => confirmation('delete-recording', `Delete ${pointName(point).toLowerCase()}?`,
+                'This browser deletes the recording of the game to its end, and what nothing else reaches of the recordings before it.',
+                'Delete', () => void (async () => {
+                    try {
+                        await source.recordings.remove(point.recording.id);
+                        await pruneRecordings(source.recordings, source.saves, null);
+                    } catch (error) {
+                        status.textContent = `It could not be deleted: ${error instanceof Error ? error.message : String(error)}`;
+                    }
+                    await refresh();
+                })()));
+            buttons.append(remove);
+        }
+        panel.replaceChildren(...pointLines(info).map((text) => line('recordings-info', text)), buttons);
+    };
+
+    void refresh();
+}
+
+/** What the list names `point` by: a save's name, or the game won or lost. */
+function pointName(point: StoredPoint): string {
+    return point.kind === 'save' ? point.save.name : point.recording.end.word11694 ? 'The game won' : 'The game lost';
+}
+
+/** The panel's lines of a point's metadata `info`. */
+function pointLines(info: PointInfo): string[] {
+    const { start } = info;
+    const party = start.kind === 'save' ? start.champions.map((name) => name.trim()).filter((name) => name !== '').join(' · ') : '';
+    return [
+        start.kind === 'new' ? 'From a new game' : `From a saved game, level ${start.level}${party ? `: ${party}` : ''}`,
+        `Began ${formatSaveDate(info.recordedAt)} ${formatSaveTime(info.recordedAt)}, ended ${formatSaveDate(info.endedAt)} ${formatSaveTime(info.endedAt)}`,
+        `Time played ${formatPlayTime(info.playTime)}`,
+        `Build ${info.build}${info.extras ? ', played with an extra on' : ''}`,
+    ];
 }
 
 /** The files of the published `set`'s folder as the server serves them, each with its date, its `Last-Modified`, or now. */
@@ -891,6 +1067,15 @@ export function welcomePageQuery(): string {
     params.delete('recording');
     const query = `${params}`;
     return query ? `?${query}` : window.location.pathname;
+}
+
+/** The page's own query, the game's set and the recording `recording` to play (`?recording=`), with no save. */
+function recordingQuery(dataSet: string, recording: string): string {
+    const params = new URLSearchParams(window.location.search);
+    params.set('dungeon', dataSet);
+    params.delete('save');
+    params.set('recording', recording);
+    return `?${params}`;
 }
 
 /** The page's own query, the game's set and, to continue, its save in it. */

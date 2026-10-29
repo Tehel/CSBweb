@@ -206,7 +206,7 @@ class Page {
       paint: () => { if (this.recorded) this.refreshScreen(); },
     });
     this.recorder = new Recorder(game, 'replay', STOCK_DATA_SET.id, () => `recording-${++recordingIds}`);
-    this.recordings = new RecordingWriter(this.recorder, this.recordingStore, this.store, { now: () => this.clock.time });
+    this.recordings = new RecordingWriter(this.recorder, this.recordingStore, this.store, { now: () => this.clock.time, playTime: () => game.playTime() });
     saves = new GameSaves(game, STOCK_DATA_SET, diskFiles(STOCK_DATA_SET), this.store, {
       portraitOf: drawing.portraitOf,
       askBeginAdventure: () => { throw new Error('no prison in this dungeon'); },
@@ -973,6 +973,9 @@ async function lostGame(): Promise<void> {
   const written = await store.read(recording.id);
   check(sameRecording(written, recording) && store.entries.get(recording.id)?.end?.word11694 === false,
     'the store holds it, ended, its row with the game\'s end');
+  const ending = store.entries.get(recording.id)!;
+  check(ending.playTime === game.playTime() && ending.playTime > 0 && ending.endedAt !== undefined && ending.endedAt <= ending.writtenAt,
+    `and with when it ended and the game's play time then, which the end stopped (${ending.playTime} ms)`);
 
   const played = Page.replay([written]);
   played.play();
@@ -992,7 +995,7 @@ async function lostGame(): Promise<void> {
       `a recording with ${what} drifts at its end (${JSON.stringify(drift)})`);
   }
   const entry = store.entries.get(written.id)!;
-  const shared = packageOfEnd([written], TEXT, { recordedAt: entry.recordedAt, endedAt: entry.writtenAt, playTime: recorded.game.playTime() });
+  const shared = packageOfEnd([written], TEXT, { recordedAt: entry.recordedAt, endedAt: entry.endedAt!, playTime: entry.playTime! });
   const fromPackage = await playPackage(shared, 'the lost game\'s end shared');
   sameGame(recorded, fromPackage, written, 'the lost game played from its package');
 

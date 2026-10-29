@@ -53,6 +53,7 @@ import {
     drawRecordingStrip, nextPace, rewindPage, stripActionAt, stripKeyAction, timePlayed, type Pace, type StripAction, type StripState,
 } from './renderer/ui/RecordingStrip';
 import { packageOfSave, readRecordingPackage, writeRecordingPackage } from './engine/RecordingPackage';
+import { pointPath, SAVE_POINT_PREFIX, storedPoints } from './engine/RecordingPoints';
 import type { Recording } from './engine/Recorder';
 import { applySaveBytes } from './engine/SaveGameFile';
 import { Settings, applyToGame, type SettingsValues } from './settings/Settings';
@@ -362,6 +363,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     const recordingStore = new BrowserRecordingStore((rows) => drawPlaythrough(storeRandom, rows));
     const recordings = new RecordingWriter(recorder, recordingStore, saveStore, {
         now: () => Date.now(),
+        playTime: () => game.playTime(),
     });
     const writeRecording = (): void => { recordings.flush().catch(() => {}); };
     setInterval(writeRecording, RECORDING_WRITE_MS);
@@ -663,8 +665,10 @@ function applySettings({ game }: Built, sound: SoundManager, values: SettingsVal
  * `doc/RECORDING.md` → "The port's player"), from its root through each branch down to
  * it. A site's id (`SHARED_RECORDING_ID`) is its package's path, read from the server and
  * never put in the store (`fetchSharedRecording`), played to the point it was shared at,
- * a save's file checked there. Any other is the store's, its path as far up as the store
- * holds it (`readRecordingPath`). Every
+ * a save's file checked there. A store's save, `save:<its row's id>` (`SAVE_POINT_PREFIX`),
+ * is the path the store holds to its point, played to it and its file checked there, as a
+ * site's (`readSavePoint`). Any other is the store's recording, its path as far up as the
+ * store holds it (`readRecordingPath`). Every
  * tick is drawn, at the wall clock's pace times the viewer's; a span under a held clock
  * is played at once and undrawn (`Game.runAtOnceWhile`), and a line in the message area
  * says so (`skippedLine`). The page's input reaches nothing of the game, and the page
@@ -686,7 +690,8 @@ function applySettings({ game }: Built, sound: SoundManager, values: SettingsVal
 async function playRecording(built: Built, id: string): Promise<void> {
     const { game, screen, messages, input } = built;
     const { path, savedAtEnd } = SHARED_RECORDING_ID.test(id) ? await fetchSharedRecording(id)
-        : { path: await readRecordingPath(built.recordingStore, id), savedAtEnd: null };
+        : id.startsWith(SAVE_POINT_PREFIX) ? await readSavePoint(built, id.slice(SAVE_POINT_PREFIX.length))
+            : { path: await readRecordingPath(built.recordingStore, id), savedAtEnd: null };
     if (path.some((recording) => recording.dataSet !== dataSet.id)) throw new Error(`RECORDING ${id} IS NOT OF ${dataSet.name}`);
     const dungeonDat = await readDungeonFile();
     const print = (line: string): void => {
@@ -833,6 +838,20 @@ async function fetchSharedRecording(id: string): Promise<{ path: readonly Record
     return { path: pkg.path, savedAtEnd: pkg.shared.kind === 'save' ? pkg.shared : null };
 }
 
+/**
+ * The store's save `rowId` names as a point to play (`SAVE_POINT_PREFIX`): the path the
+ * store holds to it, cut at its point (`pointPath`), and its file, which the path's end
+ * makes again. A save the store does not hold up to its point ends the page as an error
+ * does.
+ */
+async function readSavePoint(built: Built, rowId: string): Promise<{ path: readonly Recording[]; savedAtEnd: SavedAtEnd }> {
+    const save = (await built.saves.list()).find((entry) => entry.id === rowId);
+    const point = save && storedPoints([save], await built.recordingStore.list(), save.dataSet)[0];
+    if (!save || point?.kind !== 'save') throw new Error(`No recording reaches the save '${rowId}'.`);
+    const { bytes } = await built.saves.open(save);
+    return { path: await pointPath(built.recordingStore, point), savedAtEnd: { file: bytes, inVbl: point.save.recording.inVbl === true } };
+}
+
 function start(game: Game): void {
     // The game is read, new or resumed: where CSBWin's boot forces DM rules, before
     // `_TAG021028` and the party's entry (doc/CSBwin-src/CSBCode.cpp:10796-10806).
@@ -914,13 +933,13 @@ async function fetchThumbnail(set: DataSet): Promise<Blob | null> {
 
 /**
  * The welcome page (`src/ui/welcomePage.ts`), in the game's place: nothing of the game
- * is built. It lists the store's saves, so it opens the store as the game does, whose
- * upgrade may draw a playthrough for an older row.
+ * is built. It lists the store's saves and recordings, so it opens the store as the game
+ * does, whose upgrade may draw a playthrough for an older row.
  */
 function openWelcomePage(manifest: DataSetManifest): Promise<void> {
     const storeRandom = new CsbRandom();
     const draw: DrawPlaythrough = (rows) => drawPlaythrough(storeRandom, rows);
-    return showWelcomePage(document.body, manifest, new BrowserSaveStore(draw), new BrowserDataSetStore(draw), loadManifest,
+    return showWelcomePage(document.body, manifest, new BrowserSaveStore(draw), new BrowserDataSetStore(draw), new BrowserRecordingStore(draw), loadManifest,
         { settings, keyboardLayout: () => keyboardLayout });
 }
 

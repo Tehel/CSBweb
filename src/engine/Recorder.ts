@@ -139,6 +139,7 @@ interface Running {
 export class Recorder {
     private current: Running | null = null;
     private beginListener: ((previous: Recording | null) => void) | null = null;
+    private endListener: (() => void) | null = null;
 
     /**
      * Records `game`'s boundary, the only listener it has, for `build` playing `dataSet`.
@@ -161,6 +162,15 @@ export class Recorder {
      */
     onBegin(listener: (previous: Recording | null) => void): void {
         this.beginListener = listener;
+    }
+
+    /**
+     * Told as the game's end ends the running recording, inside the VBL that ended it: the
+     * store's writer, which keeps the game's play time then in its row
+     * (`RecordingEntry.playTime`).
+     */
+    onEnd(listener: () => void): void {
+        this.endListener = listener;
     }
 
     /** A read has made the game `start`, a branch of `parent` where it read a save made in a recording. */
@@ -216,5 +226,6 @@ export class Recorder {
         if (!current || current.to !== null) return;
         current.to = this.game.input.vbls;
         current.end = { word11694 };
+        this.endListener?.();
     }
 }

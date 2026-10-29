@@ -268,7 +268,8 @@ no save can follow (`DEBT.md` G31).
 (`doc/SAVES.md`), from version 7: a row each in `recordings` (`RecordingEntry`,
 `src/data/saves/RecordingStore.ts`: its set, build, playthrough, when it began and was
 last written, its VBLs, its changes and parts, whether a read or the game's end has ended
-it, and that end), and its parts
+it, and that end, with when it ended and the game's play time then, `Game.playTime`,
+which the writer takes as the game ends, `Recorder.onEnd`), and its parts
 in `recordingParts`, keyed by the row's id and a `seq`. Part 0 is the head, the start, the
 rules and the extras; each part after it the changes recorded since the one before, so a
 write adds only what is new. A row and the parts it gains are written in one transaction,
@@ -384,7 +385,10 @@ a root and the branches down to the one played, or a branch alone, from its own 
 
 **The page** plays one with `?recording=<id>` (`playRecording`, `src/main.ts`), by the
 page's own loop. A store's id is the path the store holds to it, from its root
-(`readRecordingPath`, `src/data/saves/RecordingStore.ts`). A site's, sixteen uppercase
+(`readRecordingPath`, `src/data/saves/RecordingStore.ts`). A store's save,
+`save:<its row's id>` (`SAVE_POINT_PREFIX`, `src/engine/RecordingPoints.ts`), is the path the
+store holds to its point, played to it and the save's file checked there, as a site's
+(`readSavePoint`). A site's, sixteen uppercase
 hexadecimal digits (`SHARED_RECORDING_ID`), is its package's path ("Shared recordings",
 below), read from the server (`recordings/<id>.gz`) and never put in the store, played to
 the point it was shared at, a save's file checked there. Every tick is drawn at
@@ -455,6 +459,15 @@ state. A port-only recorder does not need this compatibility.
 What is decided, and the steps, are `DEBT.md` G31's: a package of a recording's path and
 its metadata, kept and served by the server, listed in the dialog the book opens on a
 set's tile.
+
+**The browser's points** (`src/engine/RecordingPoints.ts`) are what a player plays and
+shares of the store: each save whose recording the store holds up to its point
+(`SaveEntry.recording`), and each recording the game's end ended. The book's dialog lists
+a set's in its RECORDINGS tab (`src/ui/welcomePage.ts`), the latest made first, each with
+what its package would say of it (`pointInfo`), its build and whether an extra was on; it
+plays one by `?recording=`, and deletes a game's end, then prunes the store
+(`pruneRecordings`, `src/engine/RecordingWriter.ts`), which is how one leaves it but by
+its set's own deletion.
 
 **The package** (`RecordingPackage`, `src/engine/RecordingPackage.ts`) is one file,
 JSON gzipped by `CompressionStream`: the format's version, the build of the recording

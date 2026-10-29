@@ -46,6 +46,17 @@ export interface RecordingEntry {
      * earlier rows.
      */
     readonly end?: RecordingEnd | null;
+    /**
+     * Milliseconds since the epoch: when the game's end ended it, for a row with an `end`;
+     * absent otherwise, and from a row written before the store kept it.
+     */
+    readonly endedAt?: number;
+    /**
+     * The game's play time as its end ended it (`Game.playTime`), which a game's end
+     * shared says (`RecordingPackageInfo.playTime`), as a save's row has its own; as
+     * `endedAt`, for a row with an `end`.
+     */
+    readonly playTime?: number;
     /** Its changes, every part's. */
     readonly changes: number;
     /** Its parts: the head and the changes' parts. */
@@ -176,8 +187,9 @@ export function cutRecording(
         last = { ...part, changes: part.changes.slice(0, point.changes - changes) };
         changes = point.changes;
     }
+    const { endedAt: _endedAt, playTime: _playTime, ...row } = entry;
     return {
-        entry: { ...entry, changes, vbls: Math.min(entry.vbls, point.vbls), ended: true, end: null, parts: kept },
+        entry: { ...row, changes, vbls: Math.min(entry.vbls, point.vbls), ended: true, end: null, parts: kept },
         last,
         removeFrom: kept,
     };

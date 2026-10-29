@@ -25,7 +25,7 @@
  */
 import { readCsbwinSaveInfo } from '../data/CsbwinSaveInfo';
 import { LOCAL_DATA_SET_TEXT_LIMITS } from '../data/DataSets';
-import { NO_EXTRAS, type RulesOptions } from './GameContext';
+import { NO_EXTRAS, type Extras, type RulesOptions } from './GameContext';
 import { CLOCK_HOLDERS, type ClockHolder, type InputChange } from './InputBoundary';
 import { createLoopFlags, VIDEO_MODES } from './LoopState';
 import type { CarriedState, RecordedChange, Recording, RecordingEnd, RecordingPoint, RecordingStart } from './Recorder';
@@ -104,9 +104,7 @@ export function packageOfSave(
     path: readonly Recording[], point: RecordingPoint, file: Uint8Array, text: RecordingPackageText,
     times: Pick<RecordingPackageInfo, 'recordedAt' | 'endedAt' | 'playTime'>,
 ): RecordingPackage {
-    const last = path[path.length - 1];
-    if (last?.id !== point.recording) throw new RecordingPackageError('the path does not reach the save\'s point');
-    return checked(packageOf([...path.slice(0, -1), cutAt(last, point)], { kind: 'save', file, inVbl: point.inVbl === true }, text, times));
+    return checked(packageOf(pathAtSave(path, point), { kind: 'save', file, inVbl: point.inVbl === true }, text, times));
 }
 
 /** The package of `path`, the store's path to a recording the game's end ended, shared at that end. */
@@ -114,8 +112,34 @@ export function packageOfEnd(
     path: readonly Recording[], text: RecordingPackageText,
     times: Pick<RecordingPackageInfo, 'recordedAt' | 'endedAt' | 'playTime'>,
 ): RecordingPackage {
+    return checked(packageOf(pathAtEnd(path), { kind: 'end' }, text, times));
+}
+
+/**
+ * The path a package holds of `path`, the store's path to a save's recording, shared at
+ * the save's `point`: the last recording cut at the point, each before it at its child's
+ * join.
+ */
+export function pathAtSave(path: readonly Recording[], point: RecordingPoint): Recording[] {
+    const last = path[path.length - 1];
+    if (last?.id !== point.recording) throw new RecordingPackageError('the path does not reach the save\'s point');
+    return cutAtJoins([...path.slice(0, -1), cutAt(last, point)]);
+}
+
+/** The path a package holds of `path`, the store's path to a recording the game's end ended: each recording before the last cut at its child's join. */
+export function pathAtEnd(path: readonly Recording[]): Recording[] {
     if (!path[path.length - 1]?.end) throw new RecordingPackageError('the path does not end at the game\'s end');
-    return checked(packageOf(path, { kind: 'end' }, text, times));
+    return cutAtJoins(path);
+}
+
+/**
+ * Whether a recording of `path` was played with an extra on: at its start, or turned on
+ * by a change. The server's twin is `playedWithExtras` (`server/recordings.ts`), which
+ * cannot import the page's sources.
+ */
+export function playedWithExtras(path: readonly Recording[]): boolean {
+    const on = (extras: Extras) => Object.values(extras).some((flag) => flag === true);
+    return path.some((recording) => on(recording.extras) || recording.changes.some(({ change }) => change.kind === 'extras' && on(change.extras)));
 }
 
 function packageOf(
@@ -124,12 +148,16 @@ function packageOf(
 ): RecordingPackage {
     const last = path[path.length - 1]!;
     const { title, author, description } = text;
-    const info = { title, author, description, ...times, start: startOf(path[0]!) };
-    const cut = path.map((recording, n) => {
+    const info = { title, author, description, ...times, start: packageStart(path[0]!) };
+    return { version: RECORDING_PACKAGE_VERSION, build: last.build, dataSet: last.dataSet, info, path, shared };
+}
+
+/** `path` with each recording before the last cut at the point its child joins it. */
+function cutAtJoins(path: readonly Recording[]): Recording[] {
+    return path.map((recording, n) => {
         const point = path[n + 1]?.parent;
         return point ? cutAt(recording, point) : recording;
     });
-    return { version: RECORDING_PACKAGE_VERSION, build: last.build, dataSet: last.dataSet, info, path: cut, shared };
 }
 
 /** `recording` cut at `point`: its changes before it, its VBLs up to it, ended there by no game's end. */
@@ -139,7 +167,7 @@ function cutAt(recording: Recording, point: Omit<RecordingPoint, 'recording'>): 
 }
 
 /** Where `root` starts, as a list shows it. */
-function startOf(root: Recording): RecordingPackageStart {
+export function packageStart(root: Recording): RecordingPackageStart {
     if (root.start.kind === 'new') return { kind: 'new' };
     const save = readCsbwinSaveInfo(root.start.bytes);
     if (!save) throw new RecordingPackageError('the path\'s root is no save the port reads');
@@ -210,7 +238,7 @@ function checked(pkg: RecordingPackage): RecordingPackage {
         }
     });
     if ((shared.kind === 'end') !== (last.end !== null)) throw new RecordingPackageError('its point is not where its path ends');
-    if (JSON.stringify(info.start) !== JSON.stringify(startOf(path[0]!))) throw new RecordingPackageError('where it starts is not its root\'s start');
+    if (JSON.stringify(info.start) !== JSON.stringify(packageStart(path[0]!))) throw new RecordingPackageError('where it starts is not its root\'s start');
     return pkg;
 }
 

@@ -832,6 +832,13 @@ const pen = await evaluate(`(()=>{const pens=[...document.querySelectorAll('.pic
 check(pen.count === 1 && pen.of === `local:${MINE}` && pen.label === 'Edit My Own Dungeon' && pen.corner,
   "only a local set's tile has the pen, over its picture's top right corner");
 console.log('  tile heights by row:', pen.rows);
+// The local set's book opens RECORDINGS alone: no tab, no document, no ADD.
+await clickOn(`.pick-cell:has(.pick[data-set="local:${MINE}"]) .pick-documents`);
+const localBook = await evaluate(`(d=>d&&{ title: d.querySelector('h2').textContent, tabs: d.querySelectorAll('.documents-tab').length,
+  documents: !!d.querySelector('#documents-pane'), recordings: !d.querySelector('#recordings-pane').hidden, add: !!d.querySelector('#documents-add') })(document.querySelector('dialog.documents'))`);
+await clickOn('#documents-close');
+check(localBook?.title === 'My Own Dungeon' && localBook.tabs === 0 && !localBook.documents && localBook.recordings && !localBook.add,
+  "a local set's book opens its recordings alone, titled with its name: no tab, no document and no ADD");
 check(pen.rows.split(',').every((row: string) => !row.includes('/')), "a local set's tile is as tall as the others on its row");
 check(pen.names.split('|').every((name: string) => name.endsWith(name.startsWith('local:') ? ' rgb(0, 216, 216)' : ' rgb(252, 252, 252)')),
   "a local set's name is in cyan, palette entry 4, the others' in white");
@@ -907,10 +914,11 @@ console.log('  to its owner:', JSON.stringify(owned));
 /** A set of `tools/data-sets.json`, the manifest the probe reads. */
 interface ManifestRow { id: string; name: string; hidden?: boolean; status?: string }
 const manifestRows: ManifestRow[] = JSON.parse(readFileSync(new URL('data-sets.json', import.meta.url), 'utf8')).dataSets;
-check(owned[MINE] === 'pick-documents:Documents of My Edited Dungeon,pick-reject:Withdraw My Edited Dungeon' && owned[`local:${MINE}`] === 'pick-edit:Edit My Edited Dungeon'
+check(owned[MINE] === 'pick-documents:Documents of My Edited Dungeon,pick-reject:Withdraw My Edited Dungeon'
+  && owned[`local:${MINE}`] === 'pick-documents:Recordings of My Edited Dungeon,pick-edit:Edit My Edited Dungeon'
   && Object.entries(owned).every(([set, controls]) => set === MINE || set.startsWith('local:')
     || controls === `pick-documents:Documents of ${manifestRows.find((row) => row.id === set)?.name}`),
-  'to its owner, the pending set has the book and the cross, which withdraws it, every other published set the book alone, and a local set the pen');
+  'to its owner, the pending set has the book and the cross, which withdraws it, every other published set the book alone, and a local set the book and the pen');
 await clickOn('.pick-edit');
 await inForm(`d.querySelector('.add-set-publish').click()`);
 await settled();
@@ -1097,7 +1105,7 @@ await clickOn('#documents-close');
 const afterDocuments = { dialog: await documentsDialog(), mine: await mineOf() };
 const ARCHIVE = 'My Edited Dungeon.zip|every file';
 console.log('  the book:', JSON.stringify({ noDocument, packed, oneDocument, refusedDocument: refusedDocument?.status, twoDocuments, askedRemoval, afterRemoval }));
-check(noDocument?.open === true && noDocument.title === 'My Edited Dungeon: documents' && noDocument.description === 'Edited by a moderator.' && noDocument.authors === 'By: Ann, Bob' && noDocument.items.join() === `${ARCHIVE},No document yet.` && noDocument.add,
+check(noDocument?.open === true && noDocument.title === 'My Edited Dungeon' && noDocument.description === 'Edited by a moderator.' && noDocument.authors === 'By: Ann, Bob' && noDocument.items.join() === `${ARCHIVE},No document yet.` && noDocument.add,
   'to a moderator, the book opens the set\'s description, its authors, its archive, then its documents, none yet, with ADD');
 check(packed.downloaded.join() === 'My Edited Dungeon.zip' && packed.status === '', 'the archive, clicked, is made and downloaded as <name>.zip');
 check(oneDocument?.items.join() === `${ARCHIVE},Notes.txt|gamefiles/${MINE}@3/Notes.txt|_blank|14 B|Remove Notes.txt` && oneDocument.status === '' && servedDocument === 'Read me first.',
@@ -1871,6 +1879,67 @@ check(playedShared.drift === null && playedShared.joins === sharedRecording.join
   `?recording=<id> plays the site's recording from the server to the save's point, through its ${sharedRecording.joins} join(s), the file made there the save's, and stops`);
 check(playedShared.recordings === sharedRecording.recordings && playedShared.saves === sharedRecording.saves,
   'and the shared recording enters no store');
+
+// The book's RECORDINGS (`src/ui/welcomePage.ts`): the browser's points of CSB, the latest
+// made first, among them the quick save above, by its name, and a game's end, a copy of
+// its recording the game's end ended, written here. A click selects one, and the panel
+// says where its path starts, its times, its build, with PLAY, and on the game's end
+// DELETE: it asks first, then the end leaves the list and the store. PLAY on the quick
+// save plays the path the store holds to it, `?recording=save:<row>`, to its point, the
+// file made there the save's.
+const endWritten = await evaluate(`(async()=>{ const { recordingStore, saves } = window.__probe;
+  const entry = (await saves.list()).find((e) => e.quick && e.recording);
+  const row = (await recordingStore.list()).find((r) => r.id === entry.recording.recording);
+  const recording = await recordingStore.read(row.id), id = 'probe-end', now = Date.now();
+  await recordingStore.write({ ...row, id, parent: null, ended: true, end: { word11694: true }, endedAt: now, playTime: 754000, parts: 2 },
+    [{ id, seq: 0, start: recording.start, parent: null, rules: recording.rules, extras: recording.extras }, { id, seq: 1, changes: recording.changes }], null);
+  return { save: entry.name, saveId: entry.id, point: [entry.recording.changes, entry.recording.vbls].join(), level: entry.level }; })()`);
+await navigate(`${APP}?dungeon=nowhere&keepsaves`, WELCOME);
+await clickOn('.pick-cell:has(.pick[data-set="csb"]) .pick-documents');
+await clickOn('#documents-tab-recordings');
+const recordingsTab = () => evaluate(`(d=>d&&{ title: d.querySelector('h2').textContent,
+  tabs: [...d.querySelectorAll('.documents-tab')].map(t=>t.textContent+':'+t.getAttribute('aria-selected')).join(),
+  shown: [...d.querySelectorAll('.documents-pane')].map(p=>p.id+':'+!p.hidden).join(), add: !(d.querySelector('#documents-add')?.hidden ?? true),
+  items: [...d.querySelectorAll('.recordings-item')].map(b=>b.dataset.recording+'|'+b.querySelector('.recordings-name').textContent+'|'+b.getAttribute('aria-selected')),
+  panel: [...d.querySelectorAll('.recordings-info')].map(l=>l.textContent), play: d.querySelector('.recordings-play')?.getAttribute('href') ?? null,
+  remove: !!d.querySelector('.recordings-delete') })(document.querySelector('dialog.documents'))`);
+const listed = await recordingsTab();
+const savePoint = `save:${endWritten.saveId}`;
+await clickOn(`.recordings-item[data-recording="${savePoint}"]`);
+const saveSelected = await recordingsTab();
+await clickOn('.recordings-item[data-recording="probe-end"]');
+const endSelected = await recordingsTab();
+await clickOn('.recordings-delete');
+const askedDelete = await evaluate(`(d=>d&&{ title: d.querySelector('h2').textContent, button: d.querySelector('#delete-recording-confirm').textContent })(document.querySelector('dialog.delete-recording'))`);
+await evaluate(`document.querySelector('#delete-recording-confirm').click()`);
+await settled();
+const afterDelete = await recordingsTab();
+const endInStore = await evaluate(`new Promise((resolve) => { const open = indexedDB.open('csbweb-saves');
+  open.onsuccess = () => { const tx = open.result.transaction(['recordings', 'recordingParts']);
+    const row = tx.objectStore('recordings').get('probe-end'), parts = tx.objectStore('recordingParts').getAllKeys();
+    tx.oncomplete = () => { open.result.close(); resolve(!!row.result || parts.result.some((k) => k[0] === 'probe-end')); }; }; })`);
+console.log('  the browser\'s recordings:', JSON.stringify({ endWritten, listed, saveSelected, endSelected, askedDelete, afterDelete, endInStore }));
+check(listed?.title === 'Chaos Strikes Back', 'the book\'s dialog is titled with the set\'s name');
+check(listed?.tabs === 'Documents:false,Recordings:true' && listed.shown === 'documents-pane:false,recordings-pane:true' && !listed.add,
+  'its RECORDINGS tab, clicked, is shown in DOCUMENTS\' place, without ADD');
+check(listed?.items[0] === 'probe-end|The game won|false' && listed.items.includes(`${savePoint}|${endWritten.save}|false`) && listed.panel.length === 0,
+  'it lists the browser\'s points of the set, the latest made first, a game\'s end and the quick save by its name, none selected');
+const playQuery = new URLSearchParams(saveSelected?.play ?? '');
+check(saveSelected?.items.includes(`${savePoint}|${endWritten.save}|true`) && saveSelected.panel[0]?.startsWith('From a saved game, level ')
+  && saveSelected.panel.some((line: string) => /^Time played \d+:\d\d:\d\d$/.test(line)) && saveSelected.panel.some((line: string) => line.startsWith('Build '))
+  && playQuery.get('dungeon') === 'csb' && playQuery.get('recording') === savePoint && playQuery.has('keepsaves') && !saveSelected.remove,
+  'a click selects the save, and the panel says where it starts, the time played and its build, with PLAY, ?recording=save:<row>, and no DELETE');
+const endQuery = new URLSearchParams(endSelected?.play ?? '');
+check(endSelected?.panel.includes('Time played 0:12:34') && endQuery.get('dungeon') === 'csb' && endQuery.get('recording') === 'probe-end' && endSelected.remove,
+  'the game\'s end selected, the panel says the play time its row keeps, with PLAY and DELETE');
+check(askedDelete?.button === 'Delete' && afterDelete?.items.every((item: string) => !item.startsWith('probe-end|')) && afterDelete.items.length === listed!.items.length - 1 && !endInStore,
+  'DELETE asks first, then the game\'s end leaves the list and the store');
+await leave(() => clickOn(`.recordings-item[data-recording="${savePoint}"]`).then(() => clickOn('.recordings-play', true)), 'window.__probe?.player() != null');
+await until('!window.__probe.player().playing', 'the save\'s point played to its end');
+const playedSavePoint = await evaluate(`(p => ({ drift: p.drift, point: [p.point.changes, p.point.vbls].join() }))(window.__probe.player())`);
+console.log('  the save\'s point played:', JSON.stringify(playedSavePoint));
+check(playedSavePoint.drift === null && playedSavePoint.point === endWritten.point,
+  'PLAY on the save plays the path the store holds to it, to its point, the file made there the save\'s');
 
 // The map dialog (`src/renderer/ui/MapDialog.ts`), over CSB's `csbgame2.dat`, its party
 // where the save left it: a press held on the message area opens it, with MAP VIEW on

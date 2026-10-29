@@ -34,6 +34,8 @@ import type { Recorder, Recording, RecordingPoint, RecordingStart } from './Reco
 export interface RecordingWriterDeps {
     /** Milliseconds since the epoch. */
     now(): number;
+    /** The game's play time (`Game.playTime`). */
+    playTime(): number;
 }
 
 /** What the store has of a recording. */
@@ -50,6 +52,8 @@ interface Written {
     parts: number;
     vbls: number;
     ended: boolean;
+    /** When the game's end ended it, and the game's play time then (`Recorder.onEnd`); `null` before. */
+    ending: { readonly endedAt: number; readonly playTime: number } | null;
 }
 
 /** How far a recording is reached: its changes and its VBLs, up to a point. */
@@ -107,6 +111,20 @@ export function prunePlan(
     }
 }
 
+/**
+ * What no save of `saves`, no game's end and no running game, `running`, reaches among
+ * `store`'s recordings, removed or cut (`prunePlan`): the page's writer's prune, and the
+ * welcome page's once a game's end is deleted, where no game runs.
+ */
+export async function pruneRecordings(
+    store: RecordingStore, saves: Pick<SaveStore, 'list'>, running: Pick<Recording, 'id' | 'parent'> | null,
+): Promise<void> {
+    const points = (await saves.list(null)).map((entry) => entry.recording);
+    const plan = prunePlan(await store.list(), points, running);
+    for (const id of plan.remove) await store.remove(id);
+    for (const { id, point } of plan.cut) await store.cut(id, point);
+}
+
 /** `start`'s playthrough: a new game's `d.RandomGameID`, or the one its save's file holds. */
 function playthroughOf(start: RecordingStart): number {
     return start.kind === 'new' ? start.randomGameID : readSaveFileFields(start.bytes)?.playthrough ?? 0;
@@ -133,8 +151,11 @@ export class RecordingWriter {
             if (this.current && previous) this.finishing.push({ written: this.current, recording: previous });
             this.current = {
                 id: recorder.recording!.id, recordedAt: deps.now(), playthrough: null, parent: null,
-                changes: 0, parts: 0, vbls: 0, ended: false,
+                changes: 0, parts: 0, vbls: 0, ended: false, ending: null,
             };
+        });
+        recorder.onEnd(() => {
+            if (this.current) this.current.ending = { endedAt: deps.now(), playTime: deps.playTime() };
         });
     }
 
@@ -186,7 +207,7 @@ export class RecordingWriter {
         const entry: RecordingEntry = {
             id, dataSet: recording.dataSet, build: recording.build, parent: written.parent, playthrough,
             recordedAt: written.recordedAt, writtenAt: this.deps.now(),
-            vbls, ended, end, changes: changes.length, parts: seq,
+            vbls, ended, end, ...(end && written.ending), changes: changes.length, parts: seq,
         };
         try {
             await this.store.write(entry, parts, first ? null : { parts: written.parts, changes: written.changes });
@@ -211,12 +232,8 @@ export class RecordingWriter {
         return held && held.changes >= parent.changes && held.vbls >= parent.vbls ? parent : null;
     }
 
-    /** What no save and no running game reaches, removed or cut (`prunePlan`). */
     private async pruneStore(): Promise<void> {
-        const points = (await this.saves.list(null)).map((entry) => entry.recording);
-        const plan = prunePlan(await this.store.list(), points, this.recorder.recording);
-        for (const id of plan.remove) await this.store.remove(id);
-        for (const { id, point } of plan.cut) await this.store.cut(id, point);
+        await pruneRecordings(this.store, this.saves, this.recorder.recording);
         this.pruneDue = false;
     }
 }

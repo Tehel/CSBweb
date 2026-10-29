@@ -328,6 +328,38 @@ body.welcome {
 .documents-none { color: var(--p2); }
 .documents-status { margin: 0; font-size: 15px; color: var(--p9); }
 .documents-status:empty { display: none; }
+/* Its two tabs, DOCUMENTS and RECORDINGS, the one shown underlined; and RECORDINGS' list of
+   the browser's points, a line each, the selected one framed, then the panel of its metadata. */
+.documents-tabs { display: flex; gap: 24px; border-bottom: 3px solid #1d1d30; }
+.documents-tab { appearance: none; margin: 0 0 -3px; padding: 0 0 6px; background: none; border: 0; border-bottom: 3px solid transparent; font: inherit; color: var(--p2); cursor: pointer; }
+.documents-tab:hover { color: var(--p9); }
+.documents-tab[aria-selected="true"] { color: var(--p11); border-bottom-color: var(--p11); }
+.documents-pane { display: flex; flex-direction: column; gap: 18px; }
+.documents-pane[hidden] { display: none; }
+.recordings-heading { margin: 0; color: var(--p9); }
+.recordings-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow-y: auto; font-size: 18px; }
+.recordings-item {
+    appearance: none;
+    box-sizing: border-box;
+    display: flex;
+    width: 100%;
+    gap: 12px;
+    padding: 6px 9px;
+    background: none;
+    border: 3px solid transparent;
+    font: inherit;
+    color: var(--p13);
+    text-align: left;
+    cursor: pointer;
+}
+.recordings-item:hover { color: var(--p11); }
+.recordings-item[aria-selected="true"] { border-color: var(--p9); color: var(--p11); }
+.recordings-name { overflow-wrap: anywhere; }
+.recordings-when { margin-left: auto; font-size: 15px; color: var(--p2); white-space: nowrap; }
+.recordings-panel { display: flex; flex-direction: column; gap: 6px; font-size: 17px; }
+.recordings-panel:empty { display: none; }
+.recordings-info, .recordings-reading { color: var(--p13); }
+.recordings-failure { color: var(--p9); }
 .add-set-columns { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 24px; }
 .add-set-give { display: flex; flex-direction: column; gap: 10px; }
 .add-set-field { display: grid; grid-template-columns: 150px 1fr; align-items: center; gap: 12px; }

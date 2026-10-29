@@ -125,7 +125,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G31 | Recordings shared: the set's dialog, a package, the server | L | ⏳ step 8 of 11 |
+| G31 | Recordings shared: the set's dialog, a package, the server | L | ⏳ step 9 of 11 |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
 | C194 | A DSA's wall graphic counts as a real decoration, so it hides no text | S | ⏳ |
 | C195 | Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space | S | ⏳ to decide with the author |
@@ -727,7 +727,7 @@ player by: the sets they own, and a moderator's rights (`X-Player-Id`, `server/a
 by the name the player gives, or by nobody, and the server keeps its uploader's
 `playerId` apart, as a set's `owner` is kept, for a withdrawal.
 
-Paying it, in steps; the design is decided, and step 8 is next.
+Paying it, in steps; the design is decided, and step 9 is next.
 
 1. A game's end is a point to share: the game tells it at the boundary as `ShowCredits`
    follows `MainLoop`'s return (`InputBoundary.ended`), the recording ends in that VBL
@@ -787,21 +787,21 @@ Paying it, in steps; the design is decided, and step 8 is next.
    played on alone. `tools/checks/replay.ts`, point 11, restarts each package's path a
    second into its play, at ×8 and paused a second, to the same end; `tools/probe-frames.ts`
    pauses, paces, restarts and stops one in the page, and frames the strip at the end.
-8. The dialog's tabs and the browser's points: the dialog the book opens titled with the
-   set's name alone, in two tabs, DOCUMENTS as the dialog is now and RECORDINGS; the book
-   on a local set's tile too, whose dialog is RECORDINGS alone. The browser's points of the
-   set: each save whose link the store holds a path to (`SaveEntry.recording`), by its
-   name, and each recording the game's end ended, won or lost. A click selects one, and the
-   panel under the list shows its metadata, as a package would say them
-   (`RecordingPackageInfo`: where it starts, the play time, when it began and its point was
-   made), its build, and whether an extra was on; and PLAY, and DELETE for a game's end,
-   the only way one leaves the store but its set's own deletion, then the store pruned
-   (`prunePlan`). PLAY of a game's end is `?recording=<its recording's id>`, as now; of a
-   save, `?recording=save:<its row's id>`, which no recording id's form takes (theirs have
-   no `:`), played to the save's point and its file checked there, as a site's
-   recording is. The game's end keeps the game's play time in its row (`Game.playTime`,
-   `RecordingEntry`), which the panel shows and an end's package needs. Checked in
-   `tools/probe-frames.ts`'s welcome page block.
+8. The dialog's tabs and the browser's points (`showDocuments`, `src/ui/welcomePage.ts`):
+   the dialog the book opens titled with the set's name alone, in two tabs, DOCUMENTS and
+   RECORDINGS; the book on a local set's tile too, whose dialog is RECORDINGS alone. The
+   browser's points of the set (`storedPoints`, `src/engine/RecordingPoints.ts`): each
+   save whose recording the store holds up to its point, by its name, and each recording
+   the game's end ended, the latest made first. A click selects one, and the panel under
+   the list shows its metadata as a package would say them (`pointInfo`), its build and
+   whether an extra was on, with PLAY, and DELETE on a game's end, which asks first, then
+   prunes the store (`pruneRecordings`). PLAY of a game's end is `?recording=<its
+   recording's id>`; of a save, `?recording=save:<its row's id>` (`SAVE_POINT_PREFIX`),
+   played to its point and its file checked there (`readSavePoint`, `src/main.ts`). A
+   game's end keeps when it ended and the game's play time then in its row
+   (`RecordingEntry.endedAt`, `playTime`, `Recorder.onEnd`). `tools/probe-frames.ts`
+   checks a local set's book, the list, the panel, DELETE and PLAY of a save;
+   `tools/checks/replay.ts` the end's row.
 9. The site's recordings in RECORDINGS, before the browser's: `GET api/recordings?dataSet=<id>`,
    each with its build and a mark where an extra was on, and its state to whom the server
    tells it (pending, hidden, `mine`); PLAY, `?recording=<id>`; to a moderator, approve,
