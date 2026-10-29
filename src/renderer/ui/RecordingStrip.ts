@@ -84,13 +84,17 @@ export function stripActionAt(state: StripState, x: number, y: number): StripAct
   return CONTROLS.find((control) => contains(controlRect(control.x, control.label(state)), { x, y }))?.action ?? null;
 }
 
-/** What a key does: a control's action, the pace one step up or down, or nothing (`null`). */
+/**
+ * What a key does: a control's action, the pace one step up or down, or nothing (`null`).
+ * Faster is the key that bears `+`, with or without Shift: `Equal`, `=` unshifted on a US
+ * keyboard as on a French one, or the keypad's.
+ */
 export function stripKeyAction(press: KeyPress): StripAction | 'faster' | 'slower' | null {
   if (press.ctrlKey || press.metaKey || press.altKey) return null;
   if (press.code === 'Space') return 'pause';
   if (press.code === 'Backspace') return 'restart';
   if (press.code === 'Escape') return 'stop';
-  if (press.key === '+' || press.code === 'NumpadAdd') return 'faster';
+  if (press.key === '+' || press.code === 'Equal' || press.code === 'NumpadAdd') return 'faster';
   if (press.key === '-' || press.code === 'NumpadSubtract') return 'slower';
   return null;
 }

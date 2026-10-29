@@ -434,7 +434,7 @@ the time played flush right, the player's VBLs since the path's start
   play, and again at its end, and plays it to the same end.
 - **Stop** (Esc): the player and the loop stopped, and the page left for the welcome
   page.
-- **The pace** (`+` and `-`, or a click, round from ×8 to ×1): the loop's VBLs to a VBL
+- **The pace** (`+`, its key with or without Shift, and `-`, or a click, round from ×8 to ×1): the loop's VBLs to a VBL
   of the wall clock, 1, 2, 4 or 8 (`Game.setPace`). A span under a held clock is run at
   once at any pace.
 

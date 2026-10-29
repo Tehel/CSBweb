@@ -1792,7 +1792,8 @@ const pausedAt = await evaluate(`window.__probe.player().vbls`);
 await wait(300);
 const paused = await evaluate(`(({ screen }) => ({ vbls: window.__probe.player().vbls, playing: window.__probe.player().playing,
   dialog: screen.ui.dialog !== null }))(window.__probe)`);
-await key('+'); await key('+');
+await key('+');
+await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown',{key:'=',code:'Equal',bubbles:true})),1`);
 await canvasClick(14, 175);
 const paced = await evaluate(`window.__probe.game.pace`);
 await until('!window.__probe.player().playing', 'the recording played to its end');
@@ -1811,7 +1812,7 @@ check(recordedGame.pauses === 2 && playedGame.drift === null && playedGame.state
   `?recording= plays the store's recording to its end, the settings' held clock among it, the game as the recorded one stood, and stops (${recordedGame.vbls} VBLs, ${recordedGame.changes} changes)`);
 check(!paused.dialog && !playedGame.dialog, 'the game\'s keys reach nothing while it plays: its turn turns nothing, F5 saves nothing, and no dialog opens');
 check(paused.playing && paused.vbls === pausedAt && paced === 4,
-  `Space pauses it, no VBL running for 300 ms (${pausedAt} VBLs played), + twice sets the pace to x4, and a click on PLAY plays on`);
+  `Space pauses it, no VBL running for 300 ms (${pausedAt} VBLs played), +, then its key unshifted, sets the pace to x4, and a click on PLAY plays on`);
 check(playedLines.some((line) => /^SKIPPED \d+S ON THE SETTINGS$/.test(line)),
   `a line in the message area says what was run at once, and another the end: ${JSON.stringify(playedLines.filter((line) => line))}`);
 check(playedGame.recordings === recordedGame.recordings && playedGame.saves === recordedGame.saves,
