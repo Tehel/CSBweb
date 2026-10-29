@@ -714,27 +714,43 @@ Paying it, in steps:
      (`RecordingPrunedError`). `tools/checks/replay.ts` prunes at a load, a delete, a
      save written over and another page's write, and the branch still replays through
      its join; `tools/probe-frames.ts` cuts and refuses a write in IndexedDB.
-4. The player: the boundary fed from a recording (`InputBoundary.apply`, before the
-   VBL each change was logged at), the page's live input ignored but its own controls,
-   every tick it plays drawn, at the wall clock's pace or faster. No dialog opens while
-   it plays:
-   - The settings, map and champion dialogs and the Hint Oracle are opened by the page's
-     input, which the player ignores: what the recording has of them is their `pause`
-     changes, which hold and release the clock with nothing shown.
-   - The disk menu is opened by the game itself, in the VBL whose click is on its icon
-     (`openSaveMenu`, `src/renderer/ui/SaveMenu.ts`), and that VBL changes the game:
-     `tag02076e`, `videoMode` `VM_LEFTMENU`, the clock stopped. While the player plays,
-     the open does that game half alone and draws nothing; the logged `pause` and
-     `tag0207cc` close it. A save the recorded game made is its logged `saveWritten`
-     alone: the player writes no save.
-   - A span the clock is held through, from a `pause` to the next that lets it run, is
-     played at once, undrawn and unpaced. Its VBLs cannot be dropped: under a held clock
-     each still counts down the attack panel's flash (`attackFlashVbls`, which the attack
-     menu waits on, `src/engine/AttackMenu.ts`), moves the message strip on, raises the
-     due tick and runs the mouse queue's pass, and under the disk menu CSBWin's VBL
-     handler runs. Played at once, they leave the game as the recorded one.
-   - A branch is played as its path: the root's start, then each parent up to the point
-     its child joins, the child's read, and on.
+4. The player, in two halves:
+   - **4a, the player itself: ⏳.** `RecordingPlayer` (`src/engine/RecordingPlayer.ts`)
+     plays a recording's path into a game: the root's start read, its rules and extras
+     set, each change applied through the boundary (`InputBoundary.apply`) once the VBL
+     before the one it was logged at has run, and each join read where its parent
+     reaches the point it names, what the read left beside the file set over it. A
+     branch is so played as its path: the root's start, then each parent up to the point
+     its child joins, the child's read, and on. `d.Time` and `d.RandomNumber` are checked
+     at every change, and the file the parent makes at every join; the first that
+     differs stops it. While it plays, what the game opens in a VBL does its game half
+     alone:
+     - The disk menu is opened by the game itself, in the VBL whose click is on its icon
+       (`openSaveMenu`, `src/renderer/ui/SaveMenu.ts`), and that VBL changes the game:
+       `tag02076e`, `videoMode` `VM_LEFTMENU`, the clock stopped. The open does that
+       alone and draws nothing; the logged `pause` and `tag0207cc` close it. The prison's
+       question (`askBeginAdventure`) opens it the same way.
+     - The Hint Oracle's button (`openHintOracle`, `src/renderer/ui/Mouse.ts`) does
+       `tag02076e` and stops the clock, and runs no Oracle; the logged `pause` and
+       `tag0207cc` close it.
+     - The Sleepsave writes no save, nor does any save the recorded game made: its
+       logged `saveWritten` alone is played.
+     `tools/checks/replay.ts` plays every recording through it, and takes no dialog down.
+   - **4b, the page: ⏳.** The player in the page (`src/main.ts`), started on a recording
+     of the store by its id, which G31's dialog will call and `tools/probe-frames.ts`
+     calls through the probe handle until then. The page's live input to the game is
+     ignored; the controls a viewer has (stopping it, its speed) are G31's design. Every
+     tick it plays is drawn, at the wall clock's pace or faster, and the page records
+     nothing while it plays: a game played back is no new recording. The settings, map
+     and champion dialogs are opened by the page's input, which the player ignores: what
+     the recording has of them is their `pause` changes, which hold and release the
+     clock with nothing shown. A span the clock is held through, from a `pause` to the
+     next that lets it run, is played at once, undrawn and unpaced. Its VBLs cannot be
+     dropped: under a held clock each still counts down the attack panel's flash
+     (`attackFlashVbls`, which the attack menu waits on, `src/engine/AttackMenu.ts`),
+     moves the message strip on, raises the due tick and runs the mouse queue's pass,
+     and under the disk menu CSBWin's VBL handler runs. Played at once, they leave the
+     game as the recorded one.
 
 Where a player chooses one to play, stops it and shares it is G31's.
 
