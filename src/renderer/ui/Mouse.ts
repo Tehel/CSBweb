@@ -828,7 +828,7 @@ export function openHintOracle(ui: UIState): HintSquare {
  */
 export function stopForHintOracle(ui: UIState): void {
   tag02076e(ui.ctx);
-  ui.ctx.state.paused = true;
+  ui.ctx.systems.mainLoop.input.apply({ kind: 'pause', paused: true, dialog: 'hintOracle' });
 }
 
 /**

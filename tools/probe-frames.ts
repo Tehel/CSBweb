@@ -1757,8 +1757,9 @@ check(recordingPruned.healed, "the running recording removed, as another tab's p
 // played on with a turn, the settings dialog holding the clock and a turn back, then its
 // loop stopped and the recording written. `?recording=` plays it to its end, at the wall
 // clock's pace and the held clock at once: the page's input reaches nothing, its Esc
-// opening no dialog; the store's recordings and saves are as they were; and the game
-// ends as the recorded one stood, its loop stopped.
+// opening no dialog; the store's recordings and saves are as they were; the game
+// ends as the recorded one stood, its loop stopped; and the message area says what was
+// skipped, the settings' span, and that the recording ends.
 await key('KeyL'); await vbls(TICK);
 await key('Escape'); await vbls(30);
 await key('Escape'); await vbls(SHOWN);
@@ -1776,6 +1777,8 @@ await key('Escape');
 const escDuring = await evaluate(`window.__probe.screen.ui.dialog !== null`);
 await until('!window.__probe.player().playing', 'the recording played to its end');
 const playedFor = Date.now() - playStarted;
+await until(`window.__probe.game.ctx.host.messages.snapshot().includes('THE RECORDING ENDS HERE.')`, 'the line at its end');
+const playedLines: string[] = await evaluate(`window.__probe.game.ctx.host.messages.snapshot()`);
 const playedGame = await evaluate(`(async()=>{ const { game, recordingStore, saves, screen } = window.__probe, player = window.__probe.player();
   const { ctx } = game, { position, facing } = ctx.party.state;
   return { drift: player.drift, running: game.running, dialog: screen.ui.dialog !== null || screen.ui.saveMenu !== null,
@@ -1785,6 +1788,8 @@ console.log('  recording played:', JSON.stringify({ recordedGame, playedGame, es
 check(recordedGame.pauses === 2 && playedGame.drift === null && playedGame.state === recordedGame.state && !playedGame.running,
   `?recording= plays the store's recording to its end, the settings' held clock among it, the game as the recorded one stood, and stops (${recordedGame.vbls} VBLs, ${recordedGame.changes} changes)`);
 check(!escDuring && !playedGame.dialog, 'the page\'s input reaches nothing while it plays: Esc opens no dialog');
+check(playedLines.some((line) => /^SKIPPED \d+S ON THE SETTINGS$/.test(line)),
+  `a line in the message area says what was run at once, and another the end: ${JSON.stringify(playedLines.filter((line) => line))}`);
 check(playedGame.recordings === recordedGame.recordings && playedGame.saves === recordedGame.saves,
   'and the page records nothing and saves nothing');
 

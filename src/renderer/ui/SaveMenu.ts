@@ -492,6 +492,7 @@ export function isSaveMenuOpen(ui: UIState): boolean {
 
 /** The menu as the dialog over the game: what the slot asks of it. */
 const SAVE_MENU_DIALOG: Dialog = {
+  name: 'saveMenu',
   draw: (ui) => drawSaveMenu(ui),
   click: (ui, x, y, buttons) => saveMenuClick(ui, x, y, buttons),
   key: (ui, key) => saveMenuKey(ui, key),
@@ -527,7 +528,7 @@ export function openSaveMenu(ui: UIState, mode: SaveMenuMode = 'full'): void {
   ui.ctx.loop.videoMode = mode === 'full' ? 'VM_LEFTMENU' : 'VM_CENTERMENU';
   const { input } = ui.ctx.systems.mainLoop;
   if (input.playing) {
-    input.apply({ kind: 'pause', paused: true });
+    input.apply({ kind: 'pause', paused: true, dialog: 'saveMenu' });
     return;
   }
   openDialog(ui, SAVE_MENU_DIALOG);

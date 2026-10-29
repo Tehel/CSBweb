@@ -125,7 +125,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G31 | Recordings shared: the set's dialog, a package, the server | L | ⏳ step 6 of 7 |
+| G31 | Recordings shared: the set's dialog, a package, the server | L | ⏳ step 7 of 8 |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
 | C194 | A DSA's wall graphic counts as a real decoration, so it hides no text | S | ⏳ |
 | C195 | Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space | S | ⏳ to decide with the author |
@@ -727,7 +727,7 @@ player by: the sets they own, and a moderator's rights (`X-Player-Id`, `server/a
 by the name the player gives, or by nobody, and the server keeps its uploader's
 `playerId` apart, as a set's `owner` is kept, for a withdrawal.
 
-Paying it, in steps; the design is decided, and step 6 is next.
+Paying it, in steps; the design is decided, and step 7 is next.
 
 1. A game's end is a point to share: the game tells it at the boundary as `ShowCredits`
    follows `MainLoop`'s return (`InputBoundary.ended`), the recording ends in that VBL
@@ -768,20 +768,20 @@ Paying it, in steps; the design is decided, and step 6 is next.
    with `server/app.ts`'s own handlers). `tools/probe-frames.ts` shares a quick save's
    package there, sees it listed to its uploader alone, then to everyone once approved, and
    plays it from the server.
-6. The viewer's strip and keys (the decision above): the time played, pause, the pace,
+6. The lines in the message area: at the end of a span the player runs at once, "SKIPPED
+   12S ON THE SAVE MENU" (`RecordingPlayer.onSkipped`, `skippedLine`), what held the clock
+   named by the stop that began the span (`InputBoundary.holder`): a dialog's logged
+   `pause` names it (`settings`, `map`, `champions`), which `readRecordingPackage` accepts
+   and a recording made before lacks ("A MENU"), and so does the stop the disk menu and the
+   Hint Oracle make in a VBL; and at the end or at a drift, its line, a drift of a
+   recording made by another build saying another version of the site made it
+   (`endLines`), the message area played on alone once the loop has stopped
+   (`runMessagesAlone`, `src/main.ts`). `tools/checks/replay.ts` asserts the spans and
+   their holders, and a recording whose logged stops name nothing.
+7. The viewer's strip and keys (the decision above): the time played, pause, the pace,
    RESTART and stop drawn over the message area and on Space, `+`, `-`, Backspace and Esc,
-   which HOW TO PLAY lists; and at the end or at a drift, the line in the message area,
-   which says, for a drift of a recording made by another build, that another version of
-   the site made it (`fetchSharedRecording` has the package's build). And at the end of a
-   span the player runs at once (`RecordingPlayer.held`), a line in the message area too:
-   "SKIPPED 12S ON THE SAVE MENU", its seconds the span's VBLs over 60, rounded. The
-   save menu and the Hint Oracle are known as they hold the clock: the game opens them in
-   a VBL (`openSaveMenu`, `stopForHintOracle`). The settings, map and champion dialogs
-   hold it by the page's logged `pause` (`openDialog`), which does not say which dialog it
-   was, so that change gains a field naming it (`settings`, `map`, `champions`).
-   `readRecordingPackage` accepts it, and a recording that lacks it, made before, says
-   "A MENU".
-7. The dialog: its two tabs, the site's and the browser's recordings of the set, the
+   which HOW TO PLAY lists. RESTART and stop end the message area played on alone.
+8. The dialog: its two tabs, the site's and the browser's recordings of the set, the
    selection and its metadata, PLAY and UPLOAD, and DELETE for a browser's game's end,
    the only way one leaves the store but its set's own deletion, checked in
    `tools/probe-frames.ts`'s welcome page block. An end's UPLOAD needs the game's play

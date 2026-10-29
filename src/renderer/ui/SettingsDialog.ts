@@ -353,6 +353,7 @@ export interface SettingsDialogState {
 }
 
 const SETTINGS_DIALOG: Dialog = {
+  name: 'settings',
   uiPalette: true,
   draw: (ui) => drawSettingsDialog(ui),
   click: (ui, x, y, buttons) => settingsDialogClick(ui, x, y, buttons),

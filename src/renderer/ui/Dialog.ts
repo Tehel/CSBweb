@@ -14,6 +14,7 @@
  * to the main loop: the loop's pass makes no tick and prints no message, and its VBLs
  * are left out of the play time (`ctx.state.paused`, `Game.runFrame`).
  */
+import type { ClockHolder } from '../../engine/InputBoundary';
 import type { UIState } from './UIState';
 
 /** A point of the screen, or `null` for the pointer off the canvas. */
@@ -27,6 +28,8 @@ export const MESSAGE_LONG_PRESS_MS = 500;
 export const BARS_LONG_PRESS_MS = MESSAGE_LONG_PRESS_MS;
 
 export interface Dialog {
+  /** What it is, as the stop of the clock it opens with names it (`ClockHolder`). */
+  readonly name: Extract<ClockHolder, 'settings' | 'map' | 'champions' | 'saveMenu'>;
   /**
    * Shown through the interface's palette whole, the viewport's lines too, which the
    * screen otherwise shows through the light level's palette, as CSBWin shows its menus
@@ -66,7 +69,7 @@ export function isDialogOpen(ui: UIState): boolean {
 /** Put `dialog` up and hold the clock. One dialog is up at a time: the caller checks. */
 export function openDialog(ui: UIState, dialog: Dialog): void {
   ui.dialog = dialog;
-  ui.ctx.systems.mainLoop.input.apply({ kind: 'pause', paused: true });
+  ui.ctx.systems.mainLoop.input.apply({ kind: 'pause', paused: true, dialog: dialog.name });
 }
 
 /** Take the dialog down and let the clock run. */

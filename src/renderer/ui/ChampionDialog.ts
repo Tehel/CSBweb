@@ -203,6 +203,7 @@ export interface ChampionDialogState {
 }
 
 const CHAMPION_DIALOG: Dialog = {
+  name: 'champions',
   uiPalette: true,
   draw: (ui) => drawChampionDialog(ui),
   click: (ui, x, y, buttons) => championDialogClick(ui, x, y, buttons),

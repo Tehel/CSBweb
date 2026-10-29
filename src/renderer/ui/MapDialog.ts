@@ -228,6 +228,7 @@ export interface MapDialogState {
 }
 
 const MAP_DIALOG: Dialog = {
+  name: 'map',
   uiPalette: true,
   draw: (ui) => drawMapDialog(ui),
   click: (ui, x, y, buttons) => mapDialogClick(ui, x, y, buttons),

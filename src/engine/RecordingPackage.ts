@@ -26,7 +26,7 @@
 import { readCsbwinSaveInfo } from '../data/CsbwinSaveInfo';
 import { LOCAL_DATA_SET_TEXT_LIMITS } from '../data/DataSets';
 import { NO_EXTRAS, type RulesOptions } from './GameContext';
-import type { InputChange } from './InputBoundary';
+import { CLOCK_HOLDERS, type ClockHolder, type InputChange } from './InputBoundary';
 import { createLoopFlags, VIDEO_MODES } from './LoopState';
 import type { CarriedState, RecordedChange, Recording, RecordingEnd, RecordingPoint, RecordingStart } from './Recorder';
 import type { SavedAtEnd } from './RecordingPlayer';
@@ -307,7 +307,12 @@ function changeFromJson(json: unknown, what: string): RecordedChange {
             case 'panelKey': return { kind, action: word(change['action'], what) };
             case 'reincarnateKey': return { kind, key: word(change['key'], what) };
             case 'reincarnateClick': return { kind, x: int('x'), y: int('y') };
-            case 'pause': return { kind, paused: boolean(change['paused'], what) };
+            case 'pause': {
+                const paused = boolean(change['paused'], what);
+                const dialog = change['dialog'];
+                if (dialog === undefined) return { kind, paused };
+                return CLOCK_HOLDERS.includes(dialog as ClockHolder) ? { kind, paused, dialog: dialog as ClockHolder } : fail(what);
+            }
             case 'extras': return { kind, extras: shaped(change['extras'], NO_EXTRAS, what) };
             case 'devLevel': {
                 const delta = change['delta'];

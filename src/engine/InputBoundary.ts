@@ -42,8 +42,11 @@ export type InputChange =
     | { readonly kind: 'reincarnateKey'; readonly key: string }
     /** A click on the Reincarnate screen, in CSBWin's screen's coordinates (`reincarnateClick`). */
     | { readonly kind: 'reincarnateClick'; readonly x: number; readonly y: number }
-    /** The clock stopped or let run, by a dialog (`ctx.state.paused`). */
-    | { readonly kind: 'pause'; readonly paused: boolean }
+    /**
+     * The clock stopped or let run, by a dialog (`ctx.state.paused`). A stop names what
+     * holds it, which a recording made before the name lacks.
+     */
+    | { readonly kind: 'pause'; readonly paused: boolean; readonly dialog?: ClockHolder }
     /**
      * `TAG0207cc`, the interface put back, as the disk menu and the Hint Oracle close
      * (`closeSaveMenu`, `closeHintOracle`).
@@ -61,6 +64,15 @@ export type InputChange =
     | { readonly kind: 'devLevel'; readonly delta: 1 | -1 }
     /** `?dev`'s move to a square, the map dialog's long press (`Game.devMoveParty`). */
     | { readonly kind: 'devMove'; readonly map: number; readonly x: number; readonly y: number };
+
+/**
+ * What holds the clock: a dialog the page opens (`openDialog`), whose stop it logs, or
+ * what the game opens in a VBL, the disk menu and the Hint Oracle.
+ */
+export type ClockHolder = 'settings' | 'map' | 'champions' | 'saveMenu' | 'hintOracle';
+
+/** Every `ClockHolder`, for a reader checking one. */
+export const CLOCK_HOLDERS: readonly ClockHolder[] = ['settings', 'map', 'champions', 'saveMenu', 'hintOracle'];
 
 /** The changes the interface applies. */
 type ScreenChange = Extract<InputChange, { kind: 'panelKey' | 'reincarnateKey' | 'reincarnateClick' }>;
@@ -104,6 +116,8 @@ export class InputBoundary {
     private screen: ScreenInput | null = null;
     /** The player's feed (`play`), or `null` while no recording plays. */
     private feed: PlayFeed | null = null;
+    /** What the last stop of the clock named (`holder`). */
+    private heldBy: ClockHolder | null = null;
 
     /** `applyToGame` applies the engine's changes, and returns what its door returns. */
     constructor(private readonly applyToGame: (change: GameChange) => boolean) {}
@@ -155,6 +169,14 @@ export class InputBoundary {
         return this.feed !== null;
     }
 
+    /**
+     * What holds the clock, as the last `pause` that stopped it named it, the page's or
+     * a VBL's; `null` where it named nothing, or before any.
+     */
+    get holder(): ClockHolder | null {
+        return this.heldBy;
+    }
+
     /** Tell `listener` every change from now on, or nobody (`null`). */
     listen(listener: InputListener | null): void {
         this.listener = listener;
@@ -186,6 +208,7 @@ export class InputBoundary {
      */
     apply(change: InputChange): boolean {
         if (!this.running) this.listener?.(change, this.vblsRun);
+        if (change.kind === 'pause' && change.paused) this.heldBy = change.dialog ?? null;
         switch (change.kind) {
             case 'panelKey': this.screen?.panelKey(change.action); return true;
             case 'reincarnateKey': this.screen?.reincarnateKey(change.key); return true;

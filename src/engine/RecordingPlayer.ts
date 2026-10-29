@@ -29,12 +29,13 @@
  * does its game half alone while it plays (`InputBoundary.playing`).
  *
  * It runs no VBL. Whoever runs the game's VBLs plays it: a tool's loop, or the page's,
- * which runs a span the clock is held through at once (`held`, `Game.runAtOnceWhile`) and
- * stops at its end (`onEnd`).
+ * which runs a span the clock is held through at once (`held`, `Game.runAtOnceWhile`),
+ * told each such span as it ends (`onSkipped`), and stops at its end (`onEnd`).
  */
+import { VBL_FREQUENCY } from '../core/constants';
 import type { Game } from './Game';
 import { saveFileOf } from './GameSaves';
-import { applyExtras } from './InputBoundary';
+import { applyExtras, type ClockHolder } from './InputBoundary';
 import { setCarriedState, type Recording, type RecordingPoint } from './Recorder';
 import { applySaveBytes } from './SaveGameFile';
 
@@ -63,6 +64,16 @@ export interface SavedAtEnd {
     readonly inVbl: boolean;
 }
 
+/**
+ * A span the clock was held through (`RecordingPlayer.held`): its VBLs, and what held it,
+ * as the stop that began it named it (`InputBoundary.holder`), or `null` where it named
+ * nothing, as in a recording made before the name.
+ */
+export interface HeldSpan {
+    readonly vbls: number;
+    readonly holder: ClockHolder | null;
+}
+
 export class RecordingPlayer {
     /** The recording of the path being played. */
     private segment = 0;
@@ -80,7 +91,11 @@ export class RecordingPlayer {
     private savedAtJoin: Uint8Array | null = null;
     /** The game's end, with `d.Word11694`, once the game has told it. */
     private gameEnd: boolean | null = null;
+    /** The boundary's VBLs as the span the clock is held through began, and what held it. */
+    private heldSince: number | null = null;
+    private heldBy: ClockHolder | null = null;
     private beginListener: ((recording: Recording) => void) | null = null;
+    private skipListener: ((span: HeldSpan) => void) | null = null;
     private endListener: ((drift: Drift | null) => void) | null = null;
 
     /**
@@ -119,6 +134,15 @@ export class RecordingPlayer {
     }
 
     /**
+     * Told each span the clock was held through (`held`) as it ends, at the change that
+     * lets the clock run, or at the path's end or a drift inside it: the page's line that
+     * says what it ran at once.
+     */
+    onSkipped(listener: (span: HeldSpan) => void): void {
+        this.skipListener = listener;
+    }
+
+    /**
      * The path's first start read into the game, its rules and extras set, and its changes
      * logged before its first VBL applied; then the boundary fed after every VBL. The
      * game is started by its owner, as after any read.
@@ -135,11 +159,11 @@ export class RecordingPlayer {
             this.read(root);
         }
         this.game.input.play({
-            afterVbl: () => this.feed(),
+            afterVbl: () => this.feedAndWatch(),
             savedInVbl: (file) => this.savedInVbl(file),
             ended: (word11694) => { this.gameEnd = word11694; },
         });
-        this.feed();
+        this.feedAndWatch();
     }
 
     /** Stop playing: the boundary is fed no more. */
@@ -178,6 +202,26 @@ export class RecordingPlayer {
     /** Where it stands in the recording it plays: its changes applied, and its VBLs run. */
     get point(): RecordingPoint {
         return { recording: this.path[this.segment]!.id, changes: this.next, vbls: this.game.input.vbls - this.from };
+    }
+
+    /** The feed (`feed`), then a span under a held clock begun or ended there (`onSkipped`). */
+    private feedAndWatch(): void {
+        this.feed();
+        const held = this.held;
+        if (held && this.heldSince === null) {
+            this.heldSince = this.game.input.vbls;
+            this.heldBy = this.game.input.holder;
+        } else if (!held) {
+            this.endSpan();
+        }
+    }
+
+    /** The span under a held clock, if one runs, ended here and told. */
+    private endSpan(): void {
+        if (this.heldSince === null) return;
+        const span = { vbls: this.game.input.vbls - this.heldSince, holder: this.heldBy };
+        this.heldSince = null;
+        this.skipListener?.(span);
     }
 
     /**
@@ -269,6 +313,7 @@ export class RecordingPlayer {
     /** Stopped of itself, at the path's end or a drift, and its listener told. */
     private end(): void {
         this.stop();
+        this.endSpan();
         this.endListener?.(this.parted);
     }
 
@@ -295,4 +340,35 @@ export class RecordingPlayer {
 /** The first byte two files differ at, or -1. */
 function firstDifference(made: Uint8Array, read: Uint8Array): number {
     return made.length !== read.length ? Math.min(made.length, read.length) : made.findIndex((value, n) => value !== read[n]);
+}
+
+/** What held the clock, as the page's line names it (`skippedLine`). */
+const HOLDER_NAMES: Record<ClockHolder, string> = {
+    settings: 'THE SETTINGS',
+    map: 'THE MAP',
+    champions: 'THE CHAMPIONS',
+    saveMenu: 'THE SAVE MENU',
+    hintOracle: 'THE HINT ORACLE',
+};
+
+/**
+ * The page's line in the message area at the end of a span it ran at once (`onSkipped`):
+ * its seconds, its VBLs over sixty, rounded, and what held the clock, "A MENU" where its
+ * stop named nothing.
+ */
+export function skippedLine(span: HeldSpan): string {
+    return `SKIPPED ${Math.round(span.vbls / VBL_FREQUENCY)}S ON ${span.holder ? HOLDER_NAMES[span.holder] : 'A MENU'}`;
+}
+
+/**
+ * The page's lines in the message area where the player stops of itself (`onEnd`): at the
+ * path's end, or at a drift, which, where the recording that drifted was made by a build
+ * other than `build`, the page's, says another version of the site made it.
+ */
+export function endLines(path: readonly Recording[], drift: Drift | null, build: string): string[] {
+    if (!drift) return ['THE RECORDING ENDS HERE.'];
+    const made = path.find((recording) => recording.id === drift.recording)?.build;
+    return made !== undefined && made !== build
+        ? ['THE RECORDING DRIFTED FROM THE GAME HERE.', 'ANOTHER VERSION OF THE SITE MADE IT.']
+        : ['THE RECORDING DRIFTED FROM THE GAME HERE.'];
 }

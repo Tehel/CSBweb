@@ -5,6 +5,7 @@
  */
 
 import { SoundManager } from './audio/SoundManager';
+import { VBL_FREQUENCY } from './core/constants';
 import { CsbRandom } from './core/random';
 import { extractPresetHeroes } from './data/HeroExtractor';
 import {
@@ -47,7 +48,7 @@ import { csbGraphicsOpener } from './engine/FileSignatures';
 import type { PrisonDoorChoice } from './renderer/intro/PrisonDoor';
 import { Recorder } from './engine/Recorder';
 import { RecordingWriter } from './engine/RecordingWriter';
-import { RecordingPlayer, type SavedAtEnd } from './engine/RecordingPlayer';
+import { endLines, RecordingPlayer, skippedLine, type SavedAtEnd } from './engine/RecordingPlayer';
 import { packageOfSave, readRecordingPackage, writeRecordingPackage } from './engine/RecordingPackage';
 import type { Recording } from './engine/Recorder';
 import { applySaveBytes } from './engine/SaveGameFile';
@@ -72,6 +73,8 @@ const presenter = new Presenter(() => {
 
 /** The folder of the games, relative to the page as every fetch is. */
 const GAMEFILES_DIR = 'gamefiles';
+/** The colour of the page's lines in the message area while a recording plays: the room texts' white. */
+const RECORDING_LINE_COLOR = 15;
 /** How often the running recording is written to the store (`RecordingWriter`), in milliseconds. */
 const RECORDING_WRITE_MS = 5000;
 /**
@@ -649,24 +652,36 @@ function applySettings({ game }: Built, sound: SoundManager, values: SettingsVal
  * a save's file checked there. Any other is the store's, its path as far up as the store
  * holds it (`readRecordingPath`). Every
  * tick is drawn, at the wall clock's pace; a span under a held clock is played at once
- * and undrawn (`Game.runAtOnceWhile`). The page's input reaches nothing, and the page
- * records nothing: no read of `GameSaves` begins a recording, nor sends a statistic. At
- * the path's end, or at a drift, the loop stops, the screen as the recording left it.
+ * and undrawn (`Game.runAtOnceWhile`), and a line in the message area says so
+ * (`skippedLine`). The page's input reaches nothing, and the page records nothing: no
+ * read of `GameSaves` begins a recording, nor sends a statistic. At the path's end, or at
+ * a drift, the loop stops, the screen as the recording left it, and a line in the message
+ * area says which (`endLines`), the area played on alone (`runMessagesAlone`); but not
+ * over the game's end, whose credits have the screen.
  *
  * A recording of another data set, or one neither the site nor the store holds, ends the
  * page as an error does.
  */
 async function playRecording(built: Built, id: string): Promise<void> {
     const { game } = built;
-    const { path, savedAtEnd, build } = SHARED_RECORDING_ID.test(id) ? await fetchSharedRecording(id)
-        : { path: await readRecordingPath(built.recordingStore, id), savedAtEnd: null, build: null };
+    const { path, savedAtEnd } = SHARED_RECORDING_ID.test(id) ? await fetchSharedRecording(id)
+        : { path: await readRecordingPath(built.recordingStore, id), savedAtEnd: null };
     if (path.some((recording) => recording.dataSet !== dataSet.id)) throw new Error(`RECORDING ${id} IS NOT OF ${dataSet.name}`);
     const player = new RecordingPlayer(game, path, await readDungeonFile(), savedAtEnd);
     recordingPlayer = player;
+    const print = (line: string): void => {
+        built.messages.printLinefeed();
+        built.messages.quePrintLines(RECORDING_LINE_COLOR, line);
+    };
+    player.onSkipped((span) => print(skippedLine(span)));
     player.onEnd((drift) => {
         game.stop();
+        if (!game.mainLoopHasReturned()) {
+            for (const line of endLines(path, drift, __CSBWEB_BUILD__)) print(line);
+            runMessagesAlone(game, built.messages);
+        }
         refreshScreen();
-        if (drift) console.warn(`Recording ${id} drifted${build !== null && build !== __CSBWEB_BUILD__ ? `, made by build ${build}` : ''}:`, drift);
+        if (drift) console.warn(`Recording ${id} drifted, in a recording of build ${path.find((recording) => recording.id === drift.recording)?.build}:`, drift);
         else console.log(`✓ Recording ${id} played to its end`);
     });
     game.runAtOnceWhile(() => player.held);
@@ -677,18 +692,36 @@ async function playRecording(built: Built, id: string): Promise<void> {
 }
 
 /**
- * The site's recording `id`, read from its package as the server serves it
- * (`RECORDING_FILES/<id>.gz`), its form checked (`readRecordingPackage`): its path, the
- * save its end makes where it was shared at a save's point, and the build that made it. A
- * package the server does not serve, or whose form is wrong, ends the page as an error
- * does.
+ * The message area played on alone once the loop has stopped at a recording's end, until
+ * what it was given is shown: its scroll a VBL, and a queued line placed a pass, as the
+ * loop plays them (`Game.runFrame`), at the `d.Time` the loop stopped at, so nothing
+ * shown expires.
  */
-async function fetchSharedRecording(id: string): Promise<{ path: readonly Recording[]; savedAtEnd: SavedAtEnd | null; build: string }> {
+function runMessagesAlone(game: Game, messages: ScrollingText): void {
+    const time = game.ctx.state.tickCount;
+    const timer = setInterval(() => {
+        messages.vblInterrupt();
+        messages.printNextQueued(time);
+        messages.clockTick(time);
+        if (messages.takeChanged()) refreshScreen();
+        const { printQueue, futureLines } = messages.backlog();
+        const { pushTextUp, textScanlineScrollCount } = messages.scrollState();
+        if (printQueue === 0 && futureLines === 0 && pushTextUp === 0 && textScanlineScrollCount < 0) clearInterval(timer);
+    }, 1000 / VBL_FREQUENCY);
+}
+
+/**
+ * The site's recording `id`, read from its package as the server serves it
+ * (`RECORDING_FILES/<id>.gz`), its form checked (`readRecordingPackage`): its path, and
+ * the save its end makes where it was shared at a save's point. A package the server does
+ * not serve, or whose form is wrong, ends the page as an error does.
+ */
+async function fetchSharedRecording(id: string): Promise<{ path: readonly Recording[]; savedAtEnd: SavedAtEnd | null }> {
     const url = `${RECORDING_FILES}/${id}.gz`;
     const response = await fetch(url).catch(() => null);
     if (!response?.ok) throw new Error(`Cannot read the recording '${url}'${response ? ` (HTTP ${response.status})` : ''}.`);
     const pkg = await readRecordingPackage(new Uint8Array(await response.arrayBuffer()));
-    return { path: pkg.path, savedAtEnd: pkg.shared.kind === 'save' ? pkg.shared : null, build: pkg.build };
+    return { path: pkg.path, savedAtEnd: pkg.shared.kind === 'save' ? pkg.shared : null };
 }
 
 function start(game: Game): void {

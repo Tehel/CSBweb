@@ -392,9 +392,20 @@ the wall clock's pace. A span the clock is held through (`RecordingPlayer.held`)
 change or the VBL that held it to the change that lets it run, is played at once and not
 drawn (`Game.runAtOnceWhile`): its VBLs cannot be dropped, since a held clock still counts
 the attack panel's flash, moves the message strip on, raises the due tick and runs the
-mouse queue's pass. The page's input reaches nothing, and the page records nothing,
+mouse queue's pass. The player tells the page each span as it ends (`onSkipped`), and
+a line in the message area says what was run at once: "SKIPPED 12S ON THE SAVE MENU",
+its VBLs over sixty, rounded (`skippedLine`). What held the clock is what the stop that
+began the span named (`InputBoundary.holder`): a dialog's logged `pause` names it
+(`settings`, `map`, `champions`, `Dialog.name`), and so does the stop the disk menu and
+the Hint Oracle make in a VBL (`saveMenu`, `hintOracle`); a logged stop recorded before
+the name says "A MENU". The page's input reaches nothing, and the page records nothing,
 saves nothing and sends no statistic. At the path's end, or at a drift, the loop stops,
-the screen as the recording left it.
+the screen as the recording left it, and a line in the message area says which: "THE
+RECORDING ENDS HERE.", or "THE RECORDING DRIFTED FROM THE GAME HERE.", and, where the
+recording that drifted was made by another build than the page's, "ANOTHER VERSION OF
+THE SITE MADE IT." (`endLines`). The message area plays on alone until they are shown,
+its scroll a VBL at the `d.Time` the loop stopped at (`runMessagesAlone`, `src/main.ts`),
+except at the game's end, whose credits have the screen.
 
 **A branch of a Sleepsave** joins as any other, once the VBL has run. Its point is taken
 inside the VBL of its click, before the rest of it, its tick among them, and says so

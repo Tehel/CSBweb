@@ -33,7 +33,9 @@
  *    in both games: what the recorded page composes and the replay does not takes nothing
  *    from the game's stream, and changes nothing the game reads.
  * 3. The two games' final saves are byte-identical, the replay showed no dialog and
- *    wrote no save, and its player met no drift.
+ *    wrote no save, and its player met no drift. It told each span under a held clock
+ *    as it ended, with what held it, the settings or the disk menu; a recording whose
+ *    logged stops name nothing plays the same spans, held by "A MENU".
  * 4. A read ends a recording, and F9's begins the next from the save it reads.
  * 5. The store holds a recording as it grows: before its last write, what the page had
  *    written when it was closed, the changes so far; after it, the whole recording, which
@@ -89,7 +91,7 @@ import { Recorder, type Recording, type RecordingPoint } from '../../src/engine/
 import {
   packageOfEnd, packageOfSave, readRecordingPackage, RecordingPackageError, writeRecordingPackage, type RecordingPackage,
 } from '../../src/engine/RecordingPackage';
-import { RecordingPlayer, type SavedAtEnd } from '../../src/engine/RecordingPlayer';
+import { endLines, RecordingPlayer, skippedLine, type HeldSpan, type SavedAtEnd } from '../../src/engine/RecordingPlayer';
 import { RecordingWriter } from '../../src/engine/RecordingWriter';
 import { applySaveBytes, buildSaveFile } from '../../src/engine/SaveGameFile';
 import { NO_FULLSCREEN } from '../../src/lib/fullscreen';
@@ -165,6 +167,8 @@ class Page {
   /** A replay's spans under a held clock, and those whose VBLs more than one wake of the loop ran. */
   heldSpans = 0;
   heldSpread = 0;
+  /** The spans under a held clock its player told it (`RecordingPlayer.onSkipped`). */
+  readonly skipped: HeldSpan[] = [];
   /** Where the host was asked to show the credits: the boundary's VBLs, and `d.Word11694`. */
   credits: { vbls: number; word11694: boolean } | null = null;
 
@@ -319,6 +323,7 @@ class Page {
     const player = new RecordingPlayer(game, path, DUNGEON, savedAtEnd);
     player.onBegin((recording) => page.recorder.begin(recording.start, recording.parent));
     player.onEnd(() => game.stop());
+    player.onSkipped((span) => page.skipped.push(span));
     game.runAtOnceWhile(() => player.held);
     player.start();
     page.player = player;
@@ -825,6 +830,19 @@ async function replay(name: string, start: Start, script: (player: Player) => Pr
     `the replay shows no dialog and writes no save: the disk menu's and the settings' clock held through ${played.heldVbls} VBLs, nothing shown`);
   check(played.heldSpans > 0 && played.heldSpread === 0 && played.clock.pending === null,
     `each span under a held clock is played at once, in the wake of the loop that held it (${played.heldSpans} spans), and the loop stops at the end`);
+  heldSpans(played, ['settings', 'saveMenu']);
+  if (start === 'new') {
+    // Made before a logged stop of the clock named what held it.
+    const unnamed: Recording = {
+      ...recording,
+      changes: recording.changes.map((entry) => entry.change.kind === 'pause' ? { ...entry, change: { kind: 'pause', paused: entry.change.paused } } : entry),
+    };
+    const before = Page.replay([unnamed]);
+    before.play();
+    check(before.player!.drift === null && JSON.stringify(before.skipped) === JSON.stringify(played.skipped.map((span) => span.holder === 'settings' ? { ...span, holder: null } : span))
+      && skippedLine(before.skipped[0]!).endsWith(' ON A MENU'),
+      `a recording whose logged stops name nothing plays the same spans, the settings' "${skippedLine(before.skipped[0]!)}"`);
+  }
 
   // A read ends the replay's recording, and F9's begins the recorded page's next.
   applySaveBytes(game, recorded.saveFile());
@@ -848,6 +866,22 @@ async function replay(name: string, start: Start, script: (player: Player) => Pr
   await branch(recorded);
   await pruned(recorded, recording);
   await sleepBranch(recorded, home);
+}
+
+/**
+ * The player told `played` each span under a held clock as it ended (`onSkipped`), one for
+ * each the loop ran at once, held by `holders` in order: the settings' named by their
+ * logged stop, the disk menu's by the VBL that opened it. Their VBLs are those run after
+ * what held the clock: every one the clock was held through at its end but the disk
+ * menu's VBL, which held it halfway through.
+ */
+function heldSpans(played: Page, holders: readonly string[]): void {
+  const { skipped } = played;
+  const vbls = skipped.reduce((sum, span) => sum + span.vbls, 0);
+  const inVbl = skipped.filter(({ holder }) => holder === 'saveMenu').length;
+  check(skipped.length === played.heldSpans && vbls === played.heldVbls - inVbl
+    && JSON.stringify(skipped.map(({ holder }) => holder)) === JSON.stringify(holders),
+    `the player tells each span under a held clock as it ends, ${vbls} VBLs in all, held by ${holders.join(' then ')}: ${skipped.map(skippedLine).join(', ')}`);
 }
 
 /** `played` has replayed `recording`, which `recorded` played: the same changes at the same VBLs, and the same game. */
@@ -1030,6 +1064,10 @@ async function savePackage(recorded: Page, path: readonly Recording[], save: Sav
   tampered.play();
   const parted = tampered.player!.drift;
   check(parted?.kind === 'save' && parted.byte === 100, `and a package whose save's file is not the path's drifts at its end (${JSON.stringify(parted)})`);
+  const ours = endLines(pkg.path, parted, 'replay');
+  const theirs = endLines(pkg.path, parted, 'another');
+  check(ours.length === 1 && theirs.length === 2 && theirs[1] === 'ANOTHER VERSION OF THE SITE MADE IT.' && endLines(pkg.path, null, 'replay')[0] === 'THE RECORDING ENDS HERE.',
+    `the page says so in the message area, "${ours[0]}", and "${theirs[1]}" on a page of another build`);
   await samePlayback(tampered, pkg.path, { file: other, inVbl: point.inVbl === true });
   return pkg;
 }
@@ -1052,6 +1090,9 @@ async function refusals(pkg: RecordingPackage): Promise<void> {
     ['the game\'s end at a save\'s point', () => writeRecordingPackage({ ...pkg, path: [root, { ...branch, end: { word11694: false } }] })],
     ['a read among its changes', async () => readRecordingPackage(await edited(pkg, (json) => { json.path[1].changes[0].change = { kind: 'read' }; }))],
     ['a rule too many', async () => readRecordingPackage(await edited(pkg, (json) => { json.path[0].rules.more = false; }))],
+    ['a clock stopped by no dialog the page has', async () => readRecordingPackage(await edited(pkg, (json) => {
+      for (const recording of json.path) for (const entry of recording.changes) if (entry.change.kind === 'pause' && entry.change.paused) entry.change.dialog = 'other';
+    }))],
     ['a loop flag of another type', async () => readRecordingPackage(await edited(pkg, (json) => { json.path[1].start.carried.loop.moveHistory = [0]; }))],
   ];
   const refused: string[] = [];
