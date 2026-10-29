@@ -262,7 +262,7 @@ dungeon asks, a change of the boundary's, the recording's first.
 game lost or won (`Game.mainLoopReturns`), told at the boundary with `d.Word11694`
 (`InputBoundary.ended`). It is the game's own, made inside the VBL that ended it, so the
 recording ends after that VBL and keeps the end: a point to share, as a save's is, that
-no save can follow (`DEBT.md` G31).
+no save can follow ("Shared recordings", below).
 
 **The store** holds the recordings beside the saves, in the same IndexedDB database
 (`doc/SAVES.md`), from version 7: a row each in `recordings` (`RecordingEntry`,
@@ -408,8 +408,11 @@ the screen as the recording left it, and a line in the message area says which: 
 RECORDING ENDS HERE.", or "THE RECORDING DRIFTED FROM THE GAME HERE.", and, where the
 recording that drifted was made by another build than the page's, "ANOTHER VERSION OF
 THE SITE MADE IT." (`endLines`). The message area plays on alone until they are shown,
-its scroll a VBL at the `d.Time` the loop stopped at (`runMessagesAlone`, `src/main.ts`),
-except at the game's end, whose credits have the screen.
+its scroll a VBL at the `d.Time` the loop stopped at (`runMessagesAlone`, `src/main.ts`).
+The game's end is such a point: the credits are not played, a lost game's dying sound
+alone, and the line says "THE GAME IS LOST HERE." or "THE GAME IS WON HERE." in place of
+the recording's end, before the drift's where the recording drifted there. The screen
+stays the page's, the strip over it as everywhere.
 
 **The viewer's strip** (`src/renderer/ui/RecordingStrip.ts`) has the page's input while
 a recording plays, drawn over the message area's top row, whose lines are then drawn a
@@ -456,9 +459,24 @@ state. A port-only recorder does not need this compatibility.
 
 ## Shared recordings
 
-What is decided, and the steps, are `DEBT.md` G31's: a package of a recording's path and
-its metadata, kept and served by the server, listed in the dialog the book opens on a
-set's tile.
+A player shares a point the store keeps, never a running game: a save, by its name, or
+a game's end, won or lost. Its package, a recording's path and its metadata, is kept and
+served by the server, which a moderator approves it on, and listed in the dialog the book
+opens on a set's tile, where another player plays it. A recording of a set the site does
+not publish is not shared; once the set is published, its recordings made before are,
+since they name it by its id.
+
+**The author is a name, never the `playerId`.** The `playerId` is what the server knows a
+player by: the sets they own, and a moderator's rights (`X-Player-Id`, `server/app.ts`;
+`doc/DEPLOYMENT.md`). A package names its author by the name the player gives, or by
+nobody, and the server keeps its uploader's `playerId` apart, as a set's `owner` is
+kept, for a withdrawal.
+
+**A recording made by an older build** is listed with its build, and PLAY plays it all
+the same; a drift stops it and says another version of the site made it (`endLines`).
+Before a deploy, the replay tool (`utils/replay-recordings.ts`) plays every listed
+recording against the new build and marks those that drift as broken, which the list
+leaves out but for its uploader and the moderators.
 
 **The browser's points** (`src/engine/RecordingPoints.ts`) are what a player plays and
 shares of the store: each save whose recording the store holds up to its point

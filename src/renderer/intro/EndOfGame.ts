@@ -31,9 +31,8 @@ export async function showEndOfGame(deps: EndOfGameDeps, word11694: boolean): Pr
   const { game, gameScreen: screen, messages } = deps;
   screen.setHoverPoint(null);
   screen.refreshOverlay();
-  const { x, y, z } = game.ctx.party.state.position;
   const end = await runShowCredits(deps, {
-    queueDyingSound: () => game.ctx.sounds.queueSound(SOUND_DYING, x, y, 0, z),
+    queueDyingSound: () => queueDyingSound(game),
     canRestartFromSavegame: game.canRestartFromSavegame(),
     word11694,
     champions: word11694 ? wonChampions(game, screen) : [],
@@ -46,6 +45,16 @@ export async function showEndOfGame(deps: EndOfGameDeps, word11694: boolean): Pr
   screen.initializePlayState();
   game.resumeMainLoop();
   game.start();
+}
+
+/**
+ * `QueueSound(6, d.partyX, d.partyY, 0); //Dying sound` (`doc/CSBwin-src/Code1f9e6.cpp:126`),
+ * a lost game's first sound of its credits, and all a recording played back plays of them
+ * (`playRecording`, `src/main.ts`).
+ */
+export function queueDyingSound(game: Game): void {
+  const { x, y, z } = game.ctx.party.state.position;
+  game.ctx.sounds.queueSound(SOUND_DYING, x, y, 0, z);
 }
 
 /** `d.CH16482[0 … d.NumCharacter - 1]` as the won screen shows them (`Code1f9e6.cpp:176-215`). */

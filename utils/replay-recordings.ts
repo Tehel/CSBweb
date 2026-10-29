@@ -1,7 +1,7 @@
 /**
  * Replay every recording a CSBweb instance shares against this checkout's build, before
- * it is deployed there, and mark those that drift as broken (`DEBT.md` G31,
- * `doc/DEPLOYMENT.md` → "Shared recordings"): a behaviour change makes an older recording
+ * it is deployed there, and mark those that drift as broken
+ * (`doc/DEPLOYMENT.md` → "Shared recordings"): a behaviour change makes an older recording
  * drift (`doc/RECORDING.md` → "Shared recordings"), and the list leaves a broken one out
  * but for its uploader and the moderators.
  *

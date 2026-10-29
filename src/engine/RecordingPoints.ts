@@ -1,6 +1,6 @@
 /**
- * The points the page's store keeps that its player plays and shares (`DEBT.md` G31,
- * `doc/RECORDING.md` → "Shared recordings"): a save whose recording the store holds up to
+ * The points the page's store keeps that its player plays and shares
+ * (`doc/RECORDING.md` → "Shared recordings"): a save whose recording the store holds up to
  * the save's point (`SaveEntry.recording`), and a recording the game's end ended
  * (`RecordingEntry.end`), won or lost. The dialog the book opens lists them, the
  * browser's recordings of a set (`src/ui/welcomePage.ts`), and `?recording=` plays them

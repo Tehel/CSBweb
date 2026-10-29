@@ -981,6 +981,9 @@ async function lostGame(): Promise<void> {
   played.play();
   check(played.credits?.word11694 === false, 'the replay asks for the credits too');
   sameGame(recorded, played, written, 'the lost game replayed');
+  const lost = endLines([written], null, 'replay', played.game.ctx.state.gameWon);
+  check(lost.join() === 'THE GAME IS LOST HERE.' && endLines([written], null, 'replay', true).join() === 'THE GAME IS WON HERE.',
+    `the page says the game is lost there in place of the recording's end, "${lost[0]}", and a won one that it is won`);
   const drifts: [string, Recording, boolean | null, number][] = [
     ['its end a VBL early', { ...written, vbls: written.vbls - 1 }, null, written.vbls - 1],
     ['its end a VBL late', { ...written, vbls: written.vbls + 1 }, false, written.vbls],
@@ -993,6 +996,9 @@ async function lostGame(): Promise<void> {
     const { drift } = drifted.player!;
     check(drift?.kind === 'end' && drift.word11694 === word11694 && drift.vbls === vbls,
       `a recording with ${what} drifts at its end (${JSON.stringify(drift)})`);
+    const lines = endLines([tampered], drift, 'replay', drifted.game.mainLoopHasReturned() ? drifted.game.ctx.state.gameWon : null);
+    const said = word11694 === null ? ['THE RECORDING DRIFTED FROM THE GAME HERE.'] : ['THE GAME IS LOST HERE.', 'THE RECORDING DRIFTED FROM THE GAME HERE.'];
+    check(lines.join('|') === said.join('|'), `and the page says ${JSON.stringify(lines)}`);
   }
   const entry = store.entries.get(written.id)!;
   const shared = packageOfEnd([written], TEXT, { recordedAt: entry.recordedAt, endedAt: entry.endedAt!, playTime: entry.playTime! });
@@ -1079,9 +1085,9 @@ async function savePackage(recorded: Page, path: readonly Recording[], save: Sav
   tampered.play();
   const parted = tampered.player!.drift;
   check(parted?.kind === 'save' && parted.byte === 100, `and a package whose save's file is not the path's drifts at its end (${JSON.stringify(parted)})`);
-  const ours = endLines(pkg.path, parted, 'replay');
-  const theirs = endLines(pkg.path, parted, 'another');
-  check(ours.length === 1 && theirs.length === 2 && theirs[1] === 'ANOTHER VERSION OF THE SITE MADE IT.' && endLines(pkg.path, null, 'replay')[0] === 'THE RECORDING ENDS HERE.',
+  const ours = endLines(pkg.path, parted, 'replay', null);
+  const theirs = endLines(pkg.path, parted, 'another', null);
+  check(ours.length === 1 && theirs.length === 2 && theirs[1] === 'ANOTHER VERSION OF THE SITE MADE IT.' && endLines(pkg.path, null, 'replay', null)[0] === 'THE RECORDING ENDS HERE.',
     `the page says so in the message area, "${ours[0]}", and "${theirs[1]}" on a page of another build`);
   await samePlayback(tampered, pkg.path, { file: other, inVbl: point.inVbl === true });
   return pkg;

@@ -216,7 +216,7 @@ export type ModerationAction = (typeof MODERATION_ACTIONS)[number];
 /**
  * Where the page asks for a set's shared recordings, `?dataSet=<id>`, and uploads one,
  * relative to the page, naming its player as `DATA_SETS_ROUTE` does (`server/recordings.ts`,
- * `DEBT.md` G31). `POST RECORDINGS_ROUTE/<id>` moderates or withdraws one
+ * `doc/RECORDING.md` → "Shared recordings"). `POST RECORDINGS_ROUTE/<id>` moderates or withdraws one
  * (`RECORDING_ACTIONS`).
  */
 export const RECORDINGS_ROUTE = 'api/recordings';

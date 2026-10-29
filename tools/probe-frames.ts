@@ -2095,6 +2095,50 @@ check(/^[0-9A-F]{16}$/.test(uploadedId ?? '') && uploaded?.site.join() === `${up
 check(uploadLeft?.site.join() === 'No recording of this dungeon on the site yet.' && !uploadLeft.items.some((item: string) => item.startsWith('probe-dev-end|')),
   'its uploader withdraws it, and the game\'s end with the ?dev move is deleted');
 
+// A lost game's end played back (`playRecording`, `src/main.ts`): `csbgame7.dat`, every
+// champion at 1 HP, saved by F5 and read back, which begins a recording from it, then put
+// before the Stone Golem by `?dev`, which kills the party, at x8. `?recording=` plays it to
+// its end as to any other point: no credits, the line saying the game is lost there, a
+// frame of it with the strip over it, and Backspace, which the credits' host would take,
+// playing it again.
+await navigate(`${APP}?intro=0&dungeon=csb`, GAME);
+const lostBytes = readFileSync(new URL('fixtures/csbgame7.dat', import.meta.url)).toString('base64');
+const lostRecorded = await evaluate(`(async()=>{
+  const { game, saves, recorder, recordings, applySaveBytes } = window.__probe;
+  applySaveBytes(game, Uint8Array.from(atob(${JSON.stringify(lostBytes)}), (c) => c.charCodeAt(0)));
+  for (const champion of game.ctx.party.state.champions) champion.attributes.health = 1;
+  await saves.quickSave();
+  const opened = await saves.open((await saves.list())[0]);
+  saves.read({ ...opened, entry: { ...opened.entry, recording: null } });
+  if (!game.devMoveParty(6, 18, 13)) return null;
+  game.setPace(8);
+  for (let n = 0; n < 200 && !game.mainLoopHasReturned(); n++) await new Promise((r) => setTimeout(r, 50));
+  await recordings.flush();
+  const { id, end } = recorder.recording;
+  return { id, end, lost: game.ctx.party.state.gameIsLost };
+})()`);
+check(lostRecorded?.lost && lostRecorded.end?.word11694 === false, `the golem kills the party in the page, and its recording ends with the game (${JSON.stringify(lostRecorded)})`);
+await navigate(`${APP}?dungeon=csb&recording=${lostRecorded.id}&keepsaves`, 'window.__probe?.player() != null');
+await key('+'); await key('+'); await key('+');
+const lostIntroVbls = await evaluate(`window.__probe.intro.vbls`);
+await until('!window.__probe.player().playing', 'the lost game played to its end');
+await until(`(m => m.backlog().printQueue === 0 && m.backlog().futureLines === 0 && m.scrollState().textScanlineScrollCount < 0)(window.__probe.game.ctx.host.messages)`,
+  'the message area at rest');
+await wait(100);
+const lostPlayed = await evaluate(`(({ game, intro }) => ({ drift: window.__probe.player().drift, returned: game.mainLoopHasReturned(),
+  introVbls: intro.vbls, lines: game.ctx.host.messages.snapshot().filter((line) => line) }))(window.__probe)`);
+console.log('  lost game played:', JSON.stringify({ lostIntroVbls, lostPlayed }));
+check(lostPlayed.drift === null && lostPlayed.returned && lostPlayed.introVbls === lostIntroVbls,
+  'the lost game plays to its end, and no credits follow it');
+check(lostPlayed.lines.includes('THE GAME IS LOST HERE.') && !lostPlayed.lines.includes('THE RECORDING ENDS HERE.'),
+  `the message area says the game is lost there: ${JSON.stringify(lostPlayed.lines)}`);
+await leaveCanvas(); await wait(100);
+await shot('33-recording-lost');
+await key('Backspace');
+check(await evaluate(`window.__probe.player().playing && !window.__probe.game.mainLoopHasReturned()`),
+  'and Backspace plays it again from its start');
+await leave(() => key('Escape'), WELCOME);
+
 // The map dialog (`src/renderer/ui/MapDialog.ts`), over CSB's `csbgame2.dat`, its party
 // where the save left it: a press held on the message area opens it, with MAP VIEW on
 // alone. A frame of it with the pointer off the canvas; a right click closes it.

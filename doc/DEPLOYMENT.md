@@ -543,10 +543,10 @@ the file, and exits with 0. It logs to stdout. `tools/checks/server.ts` asserts 
 from the runtime stage's `COPY` lines (below), so that a module the server reaches and the
 image does not copy fails there too.
 
-**Shared recordings** (`server/recordings.ts`, `DEBT.md` G31, `doc/RECORDING.md` → "Shared
-recordings"): a player shares a package of a set the site publishes, approved, as a form of
-the one file `package`, at most 8 MiB and 32 MiB unzipped, five an hour per address, refused
-ones included. The server reads it with the page's own reader, which checks its form and
+**Shared recordings** (`server/recordings.ts`, `doc/RECORDING.md` → "Shared
+recordings"): a player shares a package of a set the site publishes, approved, as a form
+of the one file `package`, at most 8 MiB and 32 MiB unzipped, five an hour per address,
+refused ones included. The server reads it with the page's own reader, which checks its form and
 never replays it, refuses one that holds a move of `?dev`, and keeps it as
 `RECORDINGS_DIR/<id>.gz` under an id it draws, sixteen uppercase hexadecimal digits, with a
 row of the store's `recordings` table, pending, its metadata the package's and its

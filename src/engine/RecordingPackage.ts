@@ -1,5 +1,5 @@
 /**
- * A recording shared (`doc/RECORDING.md` → "Shared recordings", `DEBT.md` G31): one file,
+ * A recording shared (`doc/RECORDING.md` → "Shared recordings"): one file,
  * the deliverable the server keeps and serves and another player plays.
  *
  * It holds a recording's path, from its root to the point shared (`doc/RECORDING.md` →
@@ -16,7 +16,7 @@
  * save's level and champions, is read from the path's root, so a package's never
  * disagrees with its path.
  *
- * Reading one checks its form alone, the server's check (`DEBT.md` G31): it parses, each
+ * Reading one checks its form alone, the server's check (`server/recordings.ts`): it parses, each
  * field has its type, the texts their limits, the path its joins. It does not replay it.
  *
  * **Nothing in this file touches the DOM**: `tools/checks/replay.ts` writes, reads and

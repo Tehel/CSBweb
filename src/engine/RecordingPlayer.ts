@@ -370,12 +370,15 @@ export function skippedLine(span: HeldSpan): string {
 /**
  * The page's lines in the message area where the player stops of itself (`onEnd`): at the
  * path's end, or at a drift, which, where the recording that drifted was made by a build
- * other than `build`, the page's, says another version of the site made it.
+ * other than `build`, the page's, says another version of the site made it. Where the
+ * game has ended there, `gameEnd` is its `d.Word11694`, and the first line says it is won
+ * or lost there, in place of the path's end; otherwise it is `null`.
  */
-export function endLines(path: readonly Recording[], drift: Drift | null, build: string): string[] {
-    if (!drift) return ['THE RECORDING ENDS HERE.'];
-    const made = path.find((recording) => recording.id === drift.recording)?.build;
-    return made !== undefined && made !== build
-        ? ['THE RECORDING DRIFTED FROM THE GAME HERE.', 'ANOTHER VERSION OF THE SITE MADE IT.']
-        : ['THE RECORDING DRIFTED FROM THE GAME HERE.'];
+export function endLines(path: readonly Recording[], drift: Drift | null, build: string, gameEnd: boolean | null): string[] {
+  const ended = gameEnd === null ? [] : [gameEnd ? 'THE GAME IS WON HERE.' : 'THE GAME IS LOST HERE.'];
+  if (!drift) return ended.length ? ended : ['THE RECORDING ENDS HERE.'];
+  const made = path.find((recording) => recording.id === drift.recording)?.build;
+  return made !== undefined && made !== build
+    ? [...ended, 'THE RECORDING DRIFTED FROM THE GAME HERE.', 'ANOTHER VERSION OF THE SITE MADE IT.']
+    : [...ended, 'THE RECORDING DRIFTED FROM THE GAME HERE.'];
 }

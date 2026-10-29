@@ -1,5 +1,5 @@
 /**
- * The replay tool (`utils/replay-recordings.ts`, `DEBT.md` G31) against a scratch server
+ * The replay tool (`utils/replay-recordings.ts`) against a scratch server
  * (`server/app.ts`) that serves `dm-atari`'s files and shares three of its recordings: one
  * that plays to its point, approved (`quietPackage`); one whose changes' `d.Time` and
  * `d.RandomNumber` are no game's, pending (`packageOf`); and one such, broken already. The

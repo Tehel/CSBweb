@@ -1,5 +1,5 @@
 /**
- * The recordings players share (`DEBT.md` G31, `doc/RECORDING.md` → "Shared recordings"):
+ * The recordings players share (`doc/RECORDING.md` → "Shared recordings"):
  * the store's `recordings` table (`store.ts`), a row each, and each package, the file the
  * page uploaded, kept whole in `RECORDINGS_DIR` as `<id>.gz` and served from there as
  * `RECORDING_FILES/<id>.gz` (`app.ts`). `app.ts` takes each request, names its asker

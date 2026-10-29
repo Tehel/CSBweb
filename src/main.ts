@@ -42,7 +42,7 @@ import { askBeginAdventure } from './renderer/ui/SaveMenu';
 import { introProbe, openHintOracle, runBootSequence, type BootSequenceDeps } from './renderer/intro/BootSequence';
 import { reduceTitlePicture } from './renderer/intro/TitlePicture';
 import type { TitleFrame } from './renderer/intro/TitleThumbnail';
-import { showEndOfGame } from './renderer/intro/EndOfGame';
+import { queueDyingSound, showEndOfGame } from './renderer/intro/EndOfGame';
 import { Die } from './core/Die';
 import { csbGraphicsOpener } from './engine/FileSignatures';
 import type { PrisonDoorChoice } from './renderer/intro/PrisonDoor';
@@ -152,9 +152,13 @@ function renderView() {
     screen.drawViewport(party.state.position, party.state.facing, game.ctx.state.word1868);
 }
 
-/** The screen composed again over the viewport as it stands, without `DrawViewport`. */
+/**
+ * The screen composed again over the viewport as it stands, without `DrawViewport`. Once
+ * `MainLoop` has returned the screen is `_ShowCredits`'s, but where a recording plays,
+ * whose end has no credits (`playRecording`).
+ */
 function refreshScreen() {
-    if (!game || !screen || game.mainLoopHasReturned()) return;
+    if (!game || !screen || (game.mainLoopHasReturned() && playedRecording === null)) return;
     screen.syncParty();
     screen.refreshOverlay();
 }
@@ -332,6 +336,12 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
             // The adventure's animations end with it: a chew draws nothing over the credits.
             presenter.cancel();
             events.ended(word11694);
+            // A recording played back ends at the game's end as at any other point, with
+            // no credits: a lost game's dying sound alone (`playRecording`).
+            if (playedRecording !== null) {
+                if (!word11694) queueDyingSound(game);
+                return;
+            }
             if (screen) showEndOfGame({ ...introDeps({ game, screen, saves, events, input }, sound), game, messages }, word11694).catch(reportError);
         },
         // A script's tick, `_ProcessTimersViewportAndSound`, draws the viewport itself.
@@ -675,7 +685,8 @@ function applySettings({ game }: Built, sound: SoundManager, values: SettingsVal
  * records nothing: no read of `GameSaves` begins a recording, nor sends a statistic. At
  * the path's end, or at a drift, the loop stops, the screen as the recording left it, and
  * a line in the message area says which (`endLines`), the area played on alone
- * (`runMessagesAlone`); but not over the game's end, whose credits have the screen.
+ * (`runMessagesAlone`). The game's end is such a point: the credits are not played, a lost
+ * game's dying sound alone, and the line says the game is won or lost there.
  *
  * The viewer's strip (`src/renderer/ui/RecordingStrip.ts`) has the input, and the screen
  * draws it over the message area: the time played, pause, the pace, RESTART, which plays
@@ -718,10 +729,9 @@ async function playRecording(built: Built, id: string): Promise<void> {
         player.onSkipped((span) => print(skippedLine(span)));
         player.onEnd((drift) => {
             game.stop();
-            if (!game.mainLoopHasReturned()) {
-                for (const line of endLines(path, drift, __CSBWEB_BUILD__)) print(line);
-                messagesAlone = runMessagesAlone(game, messages);
-            }
+            const gameEnd = game.mainLoopHasReturned() ? game.ctx.state.gameWon : null;
+            for (const line of endLines(path, drift, __CSBWEB_BUILD__, gameEnd)) print(line);
+            messagesAlone = runMessagesAlone(game, messages);
             refreshScreen();
             if (drift) console.warn(`Recording ${id} drifted, in a recording of build ${path.find((recording) => recording.id === drift.recording)?.build}:`, drift);
             else console.log(`✓ Recording ${id} played to its end`);

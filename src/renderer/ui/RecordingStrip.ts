@@ -1,7 +1,7 @@
 /**
  * A recording's viewer's strip: the page's own, over the message area's top row while
- * `?recording=` plays (`playRecording`, `src/main.ts`), as `DEBT.md` G31 decides it. From
- * the left: four controls, which a click or a key works, pause, RESTART, stop and the pace
+ * `?recording=` plays (`playRecording`, `src/main.ts`; `doc/RECORDING.md` → "The port's
+ * player"). From the left: four controls, which a click or a key works, pause, RESTART, stop and the pace
  * (×1, ×2, ×4, ×8), then the time played at the right edge. Space pauses, Backspace
  * restarts, Esc stops, and `+` and `-` change the pace.
  *
