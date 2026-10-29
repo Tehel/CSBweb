@@ -53,13 +53,20 @@
  *   moderator, each has a cross that removes it, once confirmed, and ADD offers to choose
  *   a file on the drive to add (`server/documents.ts`); the list then shows the set as the
  *   server lists it anew, and so does the page once the dialog is closed. A refusal is said
- *   in the dialog. RECORDINGS lists this browser's points of the set, the latest made
- *   first: its saves whose recording the store holds up to them, by name, and its games'
- *   ends, won or lost (`src/engine/RecordingPoints.ts`). A click selects one, and the panel
- *   under the list says where its path starts, when it began and ended, the time played,
- *   its build and whether an extra was on, with PLAY, a link that plays it
- *   (`?recording=`), and on a game's end DELETE, the only way one leaves the store but its
- *   set's own deletion, which asks first.
+ *   in the dialog. RECORDINGS lists the site's recordings of a published set first, by
+ *   title, the latest shared first, each marked where an extra was on and with its state to
+ *   whom the server tells it: pending, hidden or broken, and "yours" to its uploader
+ *   (`server/recordings.ts`); a moderator whose switch is off is listed them as a player
+ *   is. Then this browser's points of the set, the latest made first: its saves whose
+ *   recording the store holds up to them, by name, and its games' ends, won or lost
+ *   (`src/engine/RecordingPoints.ts`). A click selects one, and the panel under the lists
+ *   says where its path starts, when it began and ended, the time played, its build and
+ *   whether an extra was on, a site's its author, its description and when it was shared
+ *   too, with PLAY, a link that plays it (`?recording=`). On a site's, to a moderator,
+ *   APPROVE on a pending one, HIDE or SHOW on any other, and DELETE, and to its uploader
+ *   WITHDRAW, after which the list is the server's anew, a refusal said in the dialog; on
+ *   a game's end DELETE, the only way one leaves the store but its set's own deletion.
+ *   Each delete and withdrawal asks first.
  * - **The moderator's switch**, at the page's top right corner, is offered to a moderator
  *   alone. Off, the page is the one a player sees (`playerView`): neither a hidden set nor
  *   a pending one, the moderator's own pending sets included since the page is not told
@@ -93,8 +100,9 @@ import logoUrl from '../assets/csbweb-logo.jpg';
 import { archiveName, dataSetArchive, type ReadArchiveFile } from '../data/DataSetArchive';
 import { folderFiles } from '../data/DataSetFiles';
 import {
-    chooserSets, DATA_SETS_ROUTE, DOCUMENT_EXTENSIONS, DOCUMENTS_SEGMENT, documentPath, isDocumentName, PLAYER_ID_HEADER, PNG_HEAD_BYTES, pngSize, thumbnailPath,
-    type DataSet, type DataSetManifest, type ModerationAction,
+    chooserSets, DATA_SETS_ROUTE, DOCUMENT_EXTENSIONS, DOCUMENTS_SEGMENT, documentPath, isDocumentName, PLAYER_ID_HEADER, PNG_HEAD_BYTES, pngSize,
+    RECORDINGS_ROUTE, SHARED_RECORDING_ID, thumbnailPath,
+    type DataSet, type DataSetManifest, type ModerationAction, type RecordingAction,
 } from '../data/DataSets';
 import { localDataSet, type LocalDataSetFile, type LocalDataSetRecord } from '../data/LocalDataSets';
 import { openAddDataSetForm, openPublishedSetForm, type EditedPublishedSet } from './addDataSetForm';
@@ -106,6 +114,7 @@ import {
     type BrowserDataSetStore, type RecordingEntry, type RecordingStore, type SaveEntry, type SaveStore,
 } from '../data/saves';
 import { pointInfo, pointMadeAt, pointPath, pointRecordingId, storedPoints, type PointInfo, type StoredPoint } from '../engine/RecordingPoints';
+import type { RecordingPackageStart } from '../engine/RecordingPackage';
 import { pruneRecordings } from '../engine/RecordingWriter';
 
 /** The page's static half: the logo, the places the grid and the buttons go, and the bottom. */
@@ -197,8 +206,9 @@ const CONFIRMATION = (prefix: string) => `
 
 /**
  * The dialog the book opens: the set's name, then its two tabs, DOCUMENTS, the set's
- * description, its authors and the documents, and RECORDINGS, the browser's points of the
- * set and the panel of the one selected; then a moderator's ADD, and CLOSE.
+ * description, its authors and the documents, and RECORDINGS, the site's recordings of the
+ * set, then the browser's points of it, and the panel of the one selected; then a
+ * moderator's ADD, and CLOSE.
  */
 const DOCUMENTS = `
 <form class="add-set-form">
@@ -213,8 +223,10 @@ const DOCUMENTS = `
     <ul class="documents-list"></ul>
   </div>
   <div class="documents-pane" id="recordings-pane" role="tabpanel" aria-labelledby="documents-tab-recordings">
+    <h3 class="px px2 recordings-heading recordings-site-heading">On the site</h3>
+    <ul class="recordings-list recordings-site" role="listbox" aria-label="Recordings on the site"></ul>
     <h3 class="px px2 recordings-heading">On this browser</h3>
-    <ul class="recordings-list" role="listbox" aria-label="Recordings on this browser"></ul>
+    <ul class="recordings-list recordings-browser" role="listbox" aria-label="Recordings on this browser"></ul>
     <div class="recordings-panel" aria-live="polite"></div>
   </div>
   <p class="documents-status" aria-live="polite"></p>
@@ -478,15 +490,15 @@ function moderationSwitch(on: boolean, toggle: () => void): HTMLElement {
  * this is: `null` once done, else why not, as the server says it.
  */
 function moderateDataSet(id: string, action: ModerationAction): Promise<string | null> {
-    return postToSet(`${DATA_SETS_ROUTE}/${encodeURIComponent(id)}`, { 'Content-Type': 'application/json' }, JSON.stringify({ action }));
+    return postAsPlayer(`${DATA_SETS_ROUTE}/${encodeURIComponent(id)}`, { 'Content-Type': 'application/json' }, JSON.stringify({ action }));
 }
 
 /**
- * `body` posted to `route`, a set's (`server/moderate.ts`, `server/documents.ts`), by the
- * player whose `playerId` this is, with `headers`: `null` once done, else why not, as the
- * server says it.
+ * `body` posted to `route`, a set's (`server/moderate.ts`, `server/documents.ts`) or a
+ * shared recording's (`server/recordings.ts`), by the player whose `playerId` this is, with
+ * `headers`: `null` once done, else why not, as the server says it.
  */
-async function postToSet(route: string, headers: Record<string, string>, body: string | FormData): Promise<string | null> {
+async function postAsPlayer(route: string, headers: Record<string, string>, body: string | FormData): Promise<string | null> {
     const response = await fetch(route, { method: 'POST', headers: { [PLAYER_ID_HEADER]: playerId(), ...headers }, body }).catch(() => null);
     if (!response) return 'the server cannot be reached.';
     if (response.ok) return null;
@@ -566,11 +578,15 @@ interface RecordingsSource {
  * its documents, each a link, with its size; to a `moderator`, a cross on each, which
  * removes it once confirmed, and ADD, which sends the file chosen on the drive. After a
  * change, the list is the set as `loadManifest` gives it anew, its folder a new one.
- * RECORDINGS: the browser's points of the set (`storedPoints`), the latest made first; a
- * click selects one, and the panel under the list shows its metadata (`pointInfo`) and
- * PLAY, which plays it (`?recording=`, `pointRecordingId`), and on a game's end DELETE,
- * which deletes it once confirmed, then what no other point reaches of the recordings
- * before it (`pruneRecordings`). A local set, `isLocal`, has RECORDINGS alone. `closed`
+ * RECORDINGS: the site's recordings of the set (`siteRecordings`), the latest shared
+ * first, then the browser's points of it (`storedPoints`), the latest made first; a click
+ * selects one, and the panel under the lists shows its metadata (`pointInfo`) and PLAY,
+ * which plays it (`?recording=`, `pointRecordingId`). On a site's, to a `moderator`,
+ * APPROVE, HIDE or SHOW, and DELETE, and to its uploader WITHDRAW (`POST
+ * RECORDINGS_ROUTE/<id>`), after which the site's list is asked anew; on a game's end
+ * DELETE, which deletes it, then what no other point reaches of the recordings before it
+ * (`pruneRecordings`). Each delete asks first. A local set, `isLocal`, has RECORDINGS
+ * alone, and no site's list. `closed`
  * is called once it is closed, with the last manifest asked for, or `null` where nothing
  * changed.
  */
@@ -629,7 +645,7 @@ function showDocuments(
             item.append(link, line('documents-size', formatSize(size)));
             if (moderator) item.append(control('documents-remove', `Remove ${file}`, CROSS, () => confirmation('remove-document', `Remove ${file}?`,
                 'The site deletes the file. The night\'s backup keeps a copy.', 'Remove', () => void change(`Removing ${file}…`,
-                    () => postToSet(route, { 'Content-Type': 'application/json' }, JSON.stringify({ remove: file }))))));
+                    () => postAsPlayer(route, { 'Content-Type': 'application/json' }, JSON.stringify({ remove: file }))))));
             return item;
         }));
         if (set.documents.length === 0 && moderator) {
@@ -672,7 +688,7 @@ function showDocuments(
         }
         const form = new FormData();
         form.append('file', file);
-        void change(`Sending ${file.name}…`, () => postToSet(route, {}, form));
+        void change(`Sending ${file.name}…`, () => postAsPlayer(route, {}, form));
     });
     dialog.querySelector('#documents-close')!.addEventListener('click', () => dialog.close());
     dialog.addEventListener('close', () => {
@@ -689,7 +705,7 @@ function showDocuments(
         status.textContent = '';
     };
     tabs.forEach((tab, n) => tab.addEventListener('click', () => showTab(n)));
-    showRecordings(dialog, set, source, status);
+    showRecordings(dialog, set, !isLocal, moderator, source, status);
     if (isLocal) {
         dialog.querySelector('.documents-tabs')!.remove();
         panes[0]!.remove();
@@ -704,14 +720,20 @@ function showDocuments(
 }
 
 /**
- * The RECORDINGS tab of `dialog`, on `set`: the browser's points of the set, from
- * `source`, and the panel of the one selected; what goes wrong said in `status`.
+ * The RECORDINGS tab of `dialog`, on `set`: where it is `published`, the site's recordings
+ * of the set, as the server lists them to this player, or as it lists them to a player
+ * where the viewer is no `moderator`; then the browser's points of the set, from `source`;
+ * and the panel of the one selected, a single selection over the two lists, whose ids
+ * differ in form (`SHARED_RECORDING_ID`). What goes wrong is said in `status`.
  */
-function showRecordings(dialog: HTMLElement, set: DataSet, source: RecordingsSource, status: HTMLElement): void {
-    const list = dialog.querySelector<HTMLElement>('.recordings-list')!;
+function showRecordings(dialog: HTMLElement, set: DataSet, published: boolean, moderator: boolean, source: RecordingsSource, status: HTMLElement): void {
+    const siteList = dialog.querySelector<HTMLElement>('.recordings-site')!;
+    const list = dialog.querySelector<HTMLElement>('.recordings-browser')!;
     const panel = dialog.querySelector<HTMLElement>('.recordings-panel')!;
     let rows: RecordingEntry[] = [];
     let points: StoredPoint[] = [];
+    // The site's, `null` until it answers first.
+    let shared: SiteRecording[] | null = null;
     let selected: string | null = null;
 
     const refresh = async () => {
@@ -723,38 +745,101 @@ function showRecordings(dialog: HTMLElement, set: DataSet, source: RecordingsSou
             points = [];
             status.textContent = `This browser's recordings could not be read: ${error instanceof Error ? error.message : String(error)}`;
         }
-        if (!points.some((point) => pointRecordingId(point) === selected)) selected = null;
         render();
     };
 
-    const render = () => {
-        list.replaceChildren(...points.map((point) => {
-            const id = pointRecordingId(point);
-            const item = document.createElement('li');
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'recordings-item';
-            button.setAttribute('role', 'option');
-            button.setAttribute('aria-selected', String(id === selected));
-            button.dataset.recording = id;
-            const made = pointMadeAt(point);
-            button.append(line('recordings-name', pointName(point)), line('recordings-when', `${formatSaveDate(made)} ${formatSaveTime(made)}`));
-            button.addEventListener('click', () => {
-                selected = id;
-                render();
-            });
-            item.append(button);
-            return item;
-        }));
-        if (points.length === 0) {
-            const none = document.createElement('li');
-            none.className = 'documents-none';
-            none.textContent = 'No recording of this dungeon on this browser yet: a save, or the end of a game, is one.';
-            list.append(none);
+    const refreshSite = async () => {
+        try {
+            const listed = await siteRecordings(set.id);
+            shared = moderator ? listed : listed.filter((recording) => recording.mine || !(recording.pending || recording.hidden || recording.broken));
+        } catch (error) {
+            shared = [];
+            status.textContent = `The site's recordings could not be read: ${error instanceof Error ? error.message : String(error)}`;
         }
+        render();
+    };
+
+    /** A line of a list, `id` its selection's, `name` and `marks` on its left, `when` on its right. */
+    const item = (id: string, name: string, marks: readonly string[], when: number) => {
+        const entry = document.createElement('li');
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'recordings-item';
+        button.setAttribute('role', 'option');
+        button.setAttribute('aria-selected', String(id === selected));
+        button.dataset.recording = id;
+        button.append(line('recordings-name', name), ...marks.map((mark) => line('recordings-mark', mark)),
+            line('recordings-when', `${formatSaveDate(when)} ${formatSaveTime(when)}`));
+        button.addEventListener('click', () => {
+            selected = id;
+            render();
+        });
+        entry.append(button);
+        return entry;
+    };
+
+    /** `into` holding `items`, or the line `none` where there is none. */
+    const fill = (into: HTMLElement, items: HTMLElement[], none: string) => {
+        if (items.length > 0) return into.replaceChildren(...items);
+        const empty = document.createElement('li');
+        empty.className = 'documents-none';
+        empty.textContent = none;
+        into.replaceChildren(empty);
+    };
+
+    const render = () => {
+        if (selected !== null && !points.some((point) => pointRecordingId(point) === selected) && !shared?.some((recording) => recording.id === selected)) {
+            selected = null;
+        }
+        if (published) {
+            fill(siteList, (shared ?? []).map((recording) => item(recording.id, recording.title, siteMarks(recording), recording.uploadedAt)),
+                shared === null ? 'Asking the site…' : 'No recording of this dungeon on the site yet.');
+        }
+        fill(list, points.map((point) => item(pointRecordingId(point), pointName(point), [], pointMadeAt(point))),
+            'No recording of this dungeon on this browser yet: a save, or the end of a game, is one.');
+        const recording = shared?.find((one) => one.id === selected);
         const point = points.find((one) => pointRecordingId(one) === selected);
-        if (point) void showPoint(point);
+        if (recording) showShared(recording);
+        else if (point) void showPoint(point);
         else panel.replaceChildren();
+    };
+
+    /**
+     * The panel of the site's `recording`: its author, its description and its metadata,
+     * when it was shared and its state, then PLAY; to a moderator, APPROVE on a pending one,
+     * HIDE or SHOW on any other, and DELETE, and to its uploader, WITHDRAW, either asking
+     * first.
+     */
+    const showShared = (recording: SiteRecording) => {
+        const buttons = document.createElement('div');
+        buttons.className = 'add-set-buttons';
+        buttons.append(playLink(recordingQuery(set.id, recording.id)));
+        const act = async (action: RecordingAction, doing: string) => {
+            status.textContent = doing;
+            for (const button of panel.querySelectorAll('button')) button.disabled = true;
+            const error = await postAsPlayer(`${RECORDINGS_ROUTE}/${encodeURIComponent(recording.id)}`, { 'Content-Type': 'application/json' },
+                JSON.stringify({ action }));
+            status.textContent = error === null ? '' : `${doing.slice(0, -1)} failed: ${error}`;
+            await refreshSite();
+        };
+        const ask = (verb: string, text: string) => confirmation('delete-recording', `${verb} ${recording.title}?`, text, verb,
+            () => void act('delete', `${verb === 'Delete' ? 'Deleting' : 'Withdrawing'} ${recording.title}…`));
+        if (moderator) {
+            buttons.append(recording.pending ? panelButton('recordings-approve', 'Approve', () => void act('approve', `Approving ${recording.title}…`))
+                : recording.hidden ? panelButton('recordings-show', 'Show', () => void act('show', `Showing ${recording.title}…`))
+                    : panelButton('recordings-hide', 'Hide', () => void act('hide', `Hiding ${recording.title}…`)),
+            panelButton('recordings-delete', 'Delete', () => ask('Delete', 'The site deletes the recording. Its uploader may share it again.')));
+        } else if (recording.mine) {
+            buttons.append(panelButton('recordings-withdraw', 'Withdraw', () => ask('Withdraw', 'The site deletes the recording you shared. This browser\'s stays.')));
+        }
+        const state = recording.pending ? ', awaiting a moderator' : recording.hidden ? ', hidden by a moderator' : '';
+        panel.replaceChildren(
+            ...(recording.author ? [line('recordings-info', `By: ${recording.author}`)] : []),
+            ...(recording.description ? [line('recordings-description', recording.description)] : []),
+            ...pointLines(recording).map((text) => line('recordings-info', text)),
+            line('recordings-info', `Shared ${formatSaveDate(recording.uploadedAt)} ${formatSaveTime(recording.uploadedAt)}${state}`),
+            ...(recording.broken ? [line('recordings-failure', 'It drifts on the site\'s version: it plays, and stops where it drifts.')] : []),
+            buttons);
     };
 
     /** The panel of `point`: its metadata, once its path is read, then PLAY, and DELETE on a game's end. */
@@ -769,19 +854,11 @@ function showRecordings(dialog: HTMLElement, set: DataSet, source: RecordingsSou
             return;
         }
         if (selected !== id) return;
-        const play = document.createElement('a');
-        play.className = 'btn px recordings-play';
-        play.textContent = 'Play';
-        play.href = recordingQuery(set.id, id);
         const buttons = document.createElement('div');
         buttons.className = 'add-set-buttons';
-        buttons.append(play);
+        buttons.append(playLink(recordingQuery(set.id, id)));
         if (point.kind === 'end') {
-            const remove = document.createElement('button');
-            remove.type = 'button';
-            remove.className = 'btn px recordings-delete';
-            remove.textContent = 'Delete';
-            remove.addEventListener('click', () => confirmation('delete-recording', `Delete ${pointName(point).toLowerCase()}?`,
+            buttons.append(panelButton('recordings-delete', 'Delete', () => confirmation('delete-recording', `Delete ${pointName(point).toLowerCase()}?`,
                 'This browser deletes the recording of the game to its end, and what nothing else reaches of the recordings before it.',
                 'Delete', () => void (async () => {
                     try {
@@ -791,13 +868,101 @@ function showRecordings(dialog: HTMLElement, set: DataSet, source: RecordingsSou
                         status.textContent = `It could not be deleted: ${error instanceof Error ? error.message : String(error)}`;
                     }
                     await refresh();
-                })()));
-            buttons.append(remove);
+                })())));
         }
         panel.replaceChildren(...pointLines(info).map((text) => line('recordings-info', text)), buttons);
     };
 
+    if (published) void refreshSite();
+    else for (const shown of dialog.querySelectorAll('.recordings-site-heading, .recordings-site')) shown.remove();
     void refresh();
+}
+
+/** The panel's PLAY: a link to `href`. */
+function playLink(href: string): HTMLElement {
+    const play = document.createElement('a');
+    play.className = 'btn px recordings-play';
+    play.textContent = 'Play';
+    play.href = href;
+    return play;
+}
+
+/** A button of the panel, `className` naming what it does, `text` saying it. */
+function panelButton(className: string, text: string, click: () => void): HTMLElement {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `btn px ${className}`;
+    button.textContent = text;
+    button.addEventListener('click', click);
+    return button;
+}
+
+/**
+ * A recording of the site's, as `GET RECORDINGS_ROUTE?dataSet=<id>` lists it
+ * (`recordingsText`, `server/recordings.ts`): what a point's panel shows of it, and its
+ * text, when it was shared, and its state to whom the server tells it.
+ */
+interface SiteRecording extends PointInfo {
+    readonly id: string;
+    readonly title: string;
+    readonly author: string;
+    readonly description: string;
+    readonly uploadedAt: number;
+    readonly pending: boolean;
+    readonly hidden: boolean;
+    readonly broken: boolean;
+    /** This player shared it, and may withdraw it. */
+    readonly mine: boolean;
+}
+
+/** The marks a list's line puts after a site's recording's title: an extra on, and its state. */
+function siteMarks(recording: SiteRecording): string[] {
+    return [
+        ...(recording.extras ? ['extra on'] : []), ...(recording.pending ? ['pending'] : []), ...(recording.hidden ? ['hidden'] : []),
+        ...(recording.broken ? ['broken'] : []), ...(recording.mine ? ['yours'] : []),
+    ];
+}
+
+/**
+ * The site's recordings of the set `dataSet` the player whose `playerId` this is may see,
+ * the latest shared first, each of them as the server lists it; a row not of that form is
+ * left out. Throws where the server cannot be reached or does not answer the list.
+ */
+async function siteRecordings(dataSet: string): Promise<SiteRecording[]> {
+    const response = await fetch(`${RECORDINGS_ROUTE}?dataSet=${encodeURIComponent(dataSet)}`, { headers: { [PLAYER_ID_HEADER]: playerId() } })
+        .catch(() => null);
+    if (!response) throw new Error('the server cannot be reached.');
+    if (!response.ok) throw new Error(`the server answered HTTP ${response.status}.`);
+    const listed = (await response.json().catch(() => null) as { recordings?: unknown } | null)?.recordings;
+    if (!Array.isArray(listed)) throw new Error('the server answered no list.');
+    return listed.flatMap((row: unknown) => {
+        const recording = siteRecording(row);
+        return recording ? [recording] : [];
+    });
+}
+
+/** `row` as a site's recording, or `null` where it is not one. */
+function siteRecording(row: unknown): SiteRecording | null {
+    if (typeof row !== 'object' || row === null) return null;
+    const r = row as Record<string, unknown>;
+    const { id, build, title, author, description, recordedAt, endedAt, playTime, uploadedAt } = r;
+    const start = startOf(r.start);
+    if (typeof id !== 'string' || !SHARED_RECORDING_ID.test(id) || typeof build !== 'string' || typeof title !== 'string'
+        || typeof author !== 'string' || typeof description !== 'string' || typeof recordedAt !== 'number' || typeof endedAt !== 'number'
+        || typeof playTime !== 'number' || typeof uploadedAt !== 'number' || start === null) return null;
+    return {
+        id, build, title, author, description, recordedAt, endedAt, playTime, uploadedAt, start,
+        extras: r.extras === true, pending: r.status === 'pending', hidden: r.hidden === true, broken: r.broken === true, mine: r.mine === true,
+    };
+}
+
+/** `start` as where a package's path starts, or `null` where it is not that. */
+function startOf(start: unknown): RecordingPackageStart | null {
+    if (typeof start !== 'object' || start === null) return null;
+    const { kind, level, champions } = start as Record<string, unknown>;
+    if (kind === 'new') return { kind };
+    return kind === 'save' && typeof level === 'number' && Array.isArray(champions) && champions.every((name) => typeof name === 'string')
+        ? { kind, level, champions } : null;
 }
 
 /** What the list names `point` by: a save's name, or the game won or lost. */

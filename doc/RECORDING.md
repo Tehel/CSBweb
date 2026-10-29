@@ -469,6 +469,16 @@ plays one by `?recording=`, and deletes a game's end, then prunes the store
 (`pruneRecordings`, `src/engine/RecordingWriter.ts`), which is how one leaves it but by
 its set's own deletion.
 
+**The site's recordings** of a published set come first in that tab, as the server lists
+them to the player (`siteRecordings`, `GET api/recordings?dataSet=<id>`), by title, the
+latest shared first, each marked where an extra was on and with its state to whom the
+server tells it: pending, hidden, broken, and "yours" to its uploader. A moderator whose
+switch is off is listed them as a player is. The panel says its author, its description,
+its metadata and when it was shared, with PLAY, `?recording=<id>`; to a moderator,
+APPROVE on a pending one, HIDE or SHOW on any other, and DELETE, and to its uploader,
+WITHDRAW (`POST api/recordings/<id>`). Each delete asks first, and the list is then the
+server's anew, a refusal said in the dialog. A local set's book has no site's list.
+
 **The package** (`RecordingPackage`, `src/engine/RecordingPackage.ts`) is one file,
 JSON gzipped by `CompressionStream`: the format's version, the build of the recording
 shared, its data set, the metadata, the path and the point shared. The point is a

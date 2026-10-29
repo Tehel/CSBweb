@@ -138,7 +138,7 @@ There is still **no test framework** (`PLAN.md` → "The evidence") — `npm tes
   `?recording=`, the page's input reaching nothing of the game, its viewer's strip pausing, setting the pace, restarting and stopping it, and a save's shared through the dev server's `api/recordings`, moderated, and played from it; and the welcome page's tiles, its fonts, its selection, its HOW TO PLAY and its ABOUT, where PLAY and
   CONTINUE lead, CONTINUE's save read straight into play, and the form that adds a set,
   and edits, publishes and deletes one, the tiles that moderate a published one, and the book that
-  downloads a set's archive and lists its documents, where a moderator adds and removes them, and lists the browser's recordings of the set, played and deleted;
+  downloads a set's archive and lists its documents, where a moderator adds and removes them, and lists the site's recordings of the set, moderated and withdrawn, and the browser's, played and deleted;
   and the statistics page its footer links to, as `api/stats` answers, a click selecting a set.
 - `tools/checks/*.ts` stand the real engine up against the real game files, print what
   happened, and assert invariants. Each is named for what it checks; a `watch-` tool runs

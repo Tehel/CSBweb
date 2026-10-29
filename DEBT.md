@@ -125,7 +125,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G31 | Recordings shared: the set's dialog, a package, the server | L | ⏳ step 9 of 11 |
+| G31 | Recordings shared: the set's dialog, a package, the server | L | ⏳ step 10 of 11 |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
 | C194 | A DSA's wall graphic counts as a real decoration, so it hides no text | S | ⏳ |
 | C195 | Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space | S | ⏳ to decide with the author |
@@ -727,7 +727,7 @@ player by: the sets they own, and a moderator's rights (`X-Player-Id`, `server/a
 by the name the player gives, or by nobody, and the server keeps its uploader's
 `playerId` apart, as a set's `owner` is kept, for a withdrawal.
 
-Paying it, in steps; the design is decided, and step 9 is next.
+Paying it, in steps; the design is decided, and step 10 is next.
 
 1. A game's end is a point to share: the game tells it at the boundary as `ShowCredits`
    follows `MainLoop`'s return (`InputBoundary.ended`), the recording ends in that VBL
@@ -802,12 +802,16 @@ Paying it, in steps; the design is decided, and step 9 is next.
    (`RecordingEntry.endedAt`, `playTime`, `Recorder.onEnd`). `tools/probe-frames.ts`
    checks a local set's book, the list, the panel, DELETE and PLAY of a save;
    `tools/checks/replay.ts` the end's row.
-9. The site's recordings in RECORDINGS, before the browser's: `GET api/recordings?dataSet=<id>`,
-   each with its build and a mark where an extra was on, and its state to whom the server
-   tells it (pending, hidden, `mine`); PLAY, `?recording=<id>`; to a moderator, approve,
-   hide or show, and delete, once confirmed, and to its uploader, withdraw
-   (`POST api/recordings/<id>`), then the list anew. A refusal is said in the dialog.
-   Checked in `tools/probe-frames.ts`, against the dev server's `api/recordings`.
+9. The site's recordings in RECORDINGS, before the browser's, on a published set's book
+   (`siteRecordings`, `src/ui/welcomePage.ts`): `GET api/recordings?dataSet=<id>`, by
+   title, each marked where an extra was on and with its state to whom the server tells
+   it (pending, hidden, broken, "yours"), a moderator whose switch is off listed them as a
+   player is; the panel its author, description and metadata, when it was shared, and
+   PLAY, `?recording=<id>`; to a moderator APPROVE, HIDE or SHOW, and DELETE, to its
+   uploader WITHDRAW, each delete asking first (`POST api/recordings/<id>`), then the list
+   anew, a refusal said in the dialog. `tools/probe-frames.ts` lists, selects, approves,
+   hides, shows, deletes and withdraws through the dialog, against the dev server's
+   `api/recordings`, and a refusal of a HIDE behind the page's back.
 10. UPLOAD, on a browser's point: its form in the panel, a title, which it needs, and an
    author and a description, which it does not (`RECORDING_TEXT_LIMITS`); the package
    written (`packageOfSave`, `packageOfEnd`) and sent (`POST api/recordings`), then the

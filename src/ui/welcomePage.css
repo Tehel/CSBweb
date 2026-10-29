@@ -328,8 +328,9 @@ body.welcome {
 .documents-none { color: var(--p2); }
 .documents-status { margin: 0; font-size: 15px; color: var(--p9); }
 .documents-status:empty { display: none; }
-/* Its two tabs, DOCUMENTS and RECORDINGS, the one shown underlined; and RECORDINGS' list of
-   the browser's points, a line each, the selected one framed, then the panel of its metadata. */
+/* Its two tabs, DOCUMENTS and RECORDINGS, the one shown underlined; and RECORDINGS' lists of
+   the site's recordings and the browser's points, a line each, a site's with its marks, the
+   selected one framed, then the panel of its metadata. */
 .documents-tabs { display: flex; gap: 24px; border-bottom: 3px solid #1d1d30; }
 .documents-tab { appearance: none; margin: 0 0 -3px; padding: 0 0 6px; background: none; border: 0; border-bottom: 3px solid transparent; font: inherit; color: var(--p2); cursor: pointer; }
 .documents-tab:hover { color: var(--p9); }
@@ -355,10 +356,12 @@ body.welcome {
 .recordings-item:hover { color: var(--p11); }
 .recordings-item[aria-selected="true"] { border-color: var(--p9); color: var(--p11); }
 .recordings-name { overflow-wrap: anywhere; }
+.recordings-mark { font-size: 15px; color: var(--p9); white-space: nowrap; }
 .recordings-when { margin-left: auto; font-size: 15px; color: var(--p2); white-space: nowrap; }
 .recordings-panel { display: flex; flex-direction: column; gap: 6px; font-size: 17px; }
 .recordings-panel:empty { display: none; }
 .recordings-info, .recordings-reading { color: var(--p13); }
+.recordings-description { color: var(--p13); white-space: pre-line; overflow-wrap: anywhere; }
 .recordings-failure { color: var(--p9); }
 .add-set-columns { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 24px; }
 .add-set-give { display: flex; flex-direction: column; gap: 10px; }

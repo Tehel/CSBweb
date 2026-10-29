@@ -832,13 +832,14 @@ const pen = await evaluate(`(()=>{const pens=[...document.querySelectorAll('.pic
 check(pen.count === 1 && pen.of === `local:${MINE}` && pen.label === 'Edit My Own Dungeon' && pen.corner,
   "only a local set's tile has the pen, over its picture's top right corner");
 console.log('  tile heights by row:', pen.rows);
-// The local set's book opens RECORDINGS alone: no tab, no document, no ADD.
+// The local set's book opens RECORDINGS alone: no tab, no document, no ADD, and no site's list.
 await clickOn(`.pick-cell:has(.pick[data-set="local:${MINE}"]) .pick-documents`);
 const localBook = await evaluate(`(d=>d&&{ title: d.querySelector('h2').textContent, tabs: d.querySelectorAll('.documents-tab').length,
-  documents: !!d.querySelector('#documents-pane'), recordings: !d.querySelector('#recordings-pane').hidden, add: !!d.querySelector('#documents-add') })(document.querySelector('dialog.documents'))`);
+  documents: !!d.querySelector('#documents-pane'), recordings: !d.querySelector('#recordings-pane').hidden, add: !!d.querySelector('#documents-add'),
+  site: !!d.querySelector('.recordings-site, .recordings-site-heading') })(document.querySelector('dialog.documents'))`);
 await clickOn('#documents-close');
-check(localBook?.title === 'My Own Dungeon' && localBook.tabs === 0 && !localBook.documents && localBook.recordings && !localBook.add,
-  "a local set's book opens its recordings alone, titled with its name: no tab, no document and no ADD");
+check(localBook?.title === 'My Own Dungeon' && localBook.tabs === 0 && !localBook.documents && localBook.recordings && !localBook.add && !localBook.site,
+  "a local set's book opens its recordings alone, titled with its name: no tab, no document, no ADD and no site's list");
 check(pen.rows.split(',').every((row: string) => !row.includes('/')), "a local set's tile is as tall as the others on its row");
 check(pen.names.split('|').every((name: string) => name.endsWith(name.startsWith('local:') ? ' rgb(0, 216, 216)' : ' rgb(252, 252, 252)')),
   "a local set's name is in cyan, palette entry 4, the others' in white");
@@ -1880,7 +1881,9 @@ check(playedShared.drift === null && playedShared.joins === sharedRecording.join
 check(playedShared.recordings === sharedRecording.recordings && playedShared.saves === sharedRecording.saves,
   'and the shared recording enters no store');
 
-// The book's RECORDINGS (`src/ui/welcomePage.ts`): the browser's points of CSB, the latest
+// The book's RECORDINGS (`src/ui/welcomePage.ts`): first the site's recordings of CSB, the
+// one shared above, approved, which a click selects, its panel offering a player PLAY,
+// `?recording=<id>`, alone. Then the browser's points of CSB, the latest
 // made first, among them the quick save above, by its name, and a game's end, a copy of
 // its recording the game's end ended, written here. A click selects one, and the panel
 // says where its path starts, its times, its build, with PLAY, and on the game's end
@@ -1900,10 +1903,21 @@ await clickOn('#documents-tab-recordings');
 const recordingsTab = () => evaluate(`(d=>d&&{ title: d.querySelector('h2').textContent,
   tabs: [...d.querySelectorAll('.documents-tab')].map(t=>t.textContent+':'+t.getAttribute('aria-selected')).join(),
   shown: [...d.querySelectorAll('.documents-pane')].map(p=>p.id+':'+!p.hidden).join(), add: !(d.querySelector('#documents-add')?.hidden ?? true),
-  items: [...d.querySelectorAll('.recordings-item')].map(b=>b.dataset.recording+'|'+b.querySelector('.recordings-name').textContent+'|'+b.getAttribute('aria-selected')),
-  panel: [...d.querySelectorAll('.recordings-info')].map(l=>l.textContent), play: d.querySelector('.recordings-play')?.getAttribute('href') ?? null,
+  site: [...d.querySelectorAll('.recordings-site li')].map(l=>(b=>b ? [b.dataset.recording, ...[...b.children].slice(0, -1).map(c=>c.textContent), b.getAttribute('aria-selected')].join('|') : l.textContent)(l.querySelector('.recordings-item'))),
+  items: [...d.querySelectorAll('.recordings-browser .recordings-item')].map(b=>b.dataset.recording+'|'+b.querySelector('.recordings-name').textContent+'|'+b.getAttribute('aria-selected')),
+  panel: [...d.querySelectorAll('.recordings-info, .recordings-description, .recordings-panel .recordings-failure')].map(l=>l.textContent), play: d.querySelector('.recordings-play')?.getAttribute('href') ?? null,
+  buttons: [...d.querySelectorAll('.recordings-panel .btn')].map(b=>b.textContent).join(), status: d.querySelector('.documents-status').textContent,
   remove: !!d.querySelector('.recordings-delete') })(document.querySelector('dialog.documents'))`);
 const listed = await recordingsTab();
+await clickOn(`.recordings-item[data-recording="${sharedRecording.id}"]`);
+const siteSelected = await recordingsTab();
+console.log('  the site\'s recordings:', JSON.stringify({ listed: listed?.site, siteSelected }));
+check(listed?.site.join() === `${sharedRecording.id}|Probe|false`, 'RECORDINGS lists the site\'s recording of the set first, by its title, unmarked to a player');
+const siteQuery = new URLSearchParams(siteSelected?.play ?? '');
+check(siteSelected?.site.join() === `${sharedRecording.id}|Probe|true` && siteSelected.panel[0]?.startsWith('From a saved game, level ')
+  && siteSelected.panel.some((line: string) => /^Time played \d+:\d\d:\d\d$/.test(line)) && siteSelected.panel.some((line: string) => /^Shared \d{4}-\d\d-\d\d \d\d:\d\d$/.test(line))
+  && siteSelected.buttons === 'Play' && siteQuery.get('dungeon') === 'csb' && siteQuery.get('recording') === sharedRecording.id,
+  'a click selects it, and the panel says where it starts, its times and when it was shared, with PLAY alone, ?recording=<id>');
 const savePoint = `save:${endWritten.saveId}`;
 await clickOn(`.recordings-item[data-recording="${savePoint}"]`);
 const saveSelected = await recordingsTab();
@@ -1940,6 +1954,86 @@ const playedSavePoint = await evaluate(`(p => ({ drift: p.drift, point: [p.point
 console.log('  the save\'s point played:', JSON.stringify(playedSavePoint));
 check(playedSavePoint.drift === null && playedSavePoint.point === endWritten.point,
   'PLAY on the save plays the path the store holds to it, to its point, the file made there the save\'s');
+
+// The site's recordings moderated from the book (`server/recordings.ts`), by the dev
+// server's moderator: a second share of the package above, pending and listed first to
+// them alone, APPROVE approves; on the first, HIDE hides it, marked so, and SHOW shows it.
+// With the moderator's switch off, the list is a player's. A refusal is said in the
+// dialog: HIDE on the recording hidden meanwhile behind the page's back, the list then
+// anew. DELETE asks first, then the second leaves the list. Then the first's uploader,
+// who sees it hidden and theirs, withdraws it, which asks first, and the site has neither.
+const pendingId: string = await evaluate(`(async()=>{ const form = new FormData();
+  form.append('package', await (await fetch('recordings/${sharedRecording.id}.gz')).blob(), 'probe.gz');
+  return (await (await fetch('api/recordings', { method: 'POST', headers: { 'X-Player-Id': ${JSON.stringify(SHARER)} }, body: form })).json()).id; })()`);
+const openCsbRecordings = async () => {
+  await clickOn('.pick-cell:has(.pick[data-set="csb"]) .pick-documents');
+  await clickOn('#documents-tab-recordings');
+};
+const confirmDelete = async () => {
+  const asked = await evaluate(`(d=>d&&{ title: d.querySelector('h2').textContent, button: d.querySelector('#delete-recording-confirm').textContent })(document.querySelector('dialog.delete-recording'))`);
+  await evaluate(`document.querySelector('#delete-recording-confirm').click()`);
+  await settled();
+  return asked;
+};
+await asPlayer(MODERATOR);
+await openCsbRecordings();
+const toModerator = await recordingsTab();
+await clickOn('#documents-close');
+await clickOn('.welcome-moderation');
+await openCsbRecordings();
+const switchedOffList = await recordingsTab();
+await clickOn('#documents-close');
+await clickOn('.welcome-moderation');
+await openCsbRecordings();
+await clickOn(`.recordings-item[data-recording="${pendingId}"]`);
+const pendingSelected = await recordingsTab();
+await clickOn('.recordings-approve');
+const approvedNow = await recordingsTab();
+await clickOn(`.recordings-item[data-recording="${sharedRecording.id}"]`);
+await clickOn('.recordings-hide');
+const hiddenNow = await recordingsTab();
+await clickOn('.recordings-show');
+const shownNow = await recordingsTab();
+await evaluate(`fetch('api/recordings/${sharedRecording.id}', { method: 'POST', headers: { 'X-Player-Id': ${JSON.stringify(MODERATOR)} },
+  body: JSON.stringify({ action: 'hide' }) }).then((r) => r.status)`);
+await clickOn('.recordings-hide');
+const refusedHide = await recordingsTab();
+await clickOn(`.recordings-item[data-recording="${pendingId}"]`);
+await clickOn('.recordings-delete');
+const askedSiteDelete = await confirmDelete();
+const siteDeleted = await recordingsTab();
+await clickOn('#documents-close');
+await asPlayer(SHARER);
+await openCsbRecordings();
+await clickOn(`.recordings-item[data-recording="${sharedRecording.id}"]`);
+const toUploader = await recordingsTab();
+await clickOn('.recordings-withdraw');
+const askedSiteWithdraw = await confirmDelete();
+const siteWithdrawn = await recordingsTab();
+await clickOn('#documents-close');
+const leftOnSite = await evaluate(`fetch('api/recordings?dataSet=csb', { headers: { 'X-Player-Id': ${JSON.stringify(MODERATOR)} } })
+  .then((r) => r.json()).then((j) => j.recordings.filter((r) => [${JSON.stringify(sharedRecording.id)}, ${JSON.stringify(pendingId)}].includes(r.id)).length)`);
+console.log('  the site\'s recordings moderated:', JSON.stringify({ pendingId, toModerator: toModerator?.site, switchedOff: switchedOffList?.site,
+  pendingSelected, approvedNow, hiddenNow, shownNow, refusedHide, askedSiteDelete, siteDeleted: siteDeleted?.site, toUploader, askedSiteWithdraw,
+  siteWithdrawn: siteWithdrawn?.site, leftOnSite }));
+const first = sharedRecording.id;
+check(toModerator?.site.join() === `${pendingId}|Probe|pending|false,${first}|Probe|false` && switchedOffList?.site.join() === `${first}|Probe|false`,
+  'to a moderator, the site\'s list holds the pending recording too, marked, the latest shared first; with the switch off, it is a player\'s');
+check(pendingSelected?.buttons === 'Play,Approve,Delete' && pendingSelected.panel.some((line: string) => line.endsWith(', awaiting a moderator'))
+  && approvedNow?.site[0] === `${pendingId}|Probe|true` && approvedNow.buttons === 'Play,Hide,Delete',
+  'the pending one offers APPROVE and DELETE, and APPROVE approves it, the list asked anew, the selection kept, HIDE offered');
+check(hiddenNow?.site.includes(`${first}|Probe|hidden|true`) && hiddenNow.buttons === 'Play,Show,Delete' && hiddenNow.panel.some((line: string) => line.endsWith(', hidden by a moderator'))
+  && shownNow?.site.includes(`${first}|Probe|true`) && shownNow.buttons === 'Play,Hide,Delete',
+  'HIDE hides the approved one, marked hidden, SHOW offered, and SHOW shows it again');
+check(refusedHide?.status === 'Hiding Probe failed: The recording is hidden, which hide does not take.'
+  && refusedHide.site.includes(`${first}|Probe|hidden|true`) && refusedHide.buttons === 'Play,Show,Delete',
+  'a refusal is said in the dialog, and the list is the server\'s anew');
+check(askedSiteDelete?.title === 'Delete Probe?' && askedSiteDelete.button === 'Delete' && siteDeleted?.site.join() === `${first}|Probe|hidden|false`,
+  'DELETE asks first, then the recording leaves the list');
+check(toUploader?.site.join() === `${first}|Probe|hidden|yours|true` && toUploader.buttons === 'Play,Withdraw'
+  && askedSiteWithdraw?.title === 'Withdraw Probe?' && askedSiteWithdraw.button === 'Withdraw'
+  && siteWithdrawn?.site.join() === 'No recording of this dungeon on the site yet.' && leftOnSite === 0,
+  'its uploader sees it hidden and theirs, with WITHDRAW, which asks first, then the site has neither recording');
 
 // The map dialog (`src/renderer/ui/MapDialog.ts`), over CSB's `csbgame2.dat`, its party
 // where the save left it: a press held on the message area opens it, with MAP VIEW on
