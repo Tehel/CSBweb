@@ -1784,7 +1784,7 @@ await wait(300);
 const paused = await evaluate(`(({ screen }) => ({ vbls: window.__probe.player().vbls, playing: window.__probe.player().playing,
   dialog: screen.ui.dialog !== null }))(window.__probe)`);
 await key('+'); await key('+');
-await canvasClick(80, 175);
+await canvasClick(14, 175);
 const paced = await evaluate(`window.__probe.game.pace`);
 await until('!window.__probe.player().playing', 'the recording played to its end');
 await until(`window.__probe.game.ctx.host.messages.snapshot().includes('THE RECORDING ENDS HERE.')`, 'the line at its end');

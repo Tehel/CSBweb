@@ -779,9 +779,9 @@ Paying it, in steps; the design is decided, and step 8 is next.
    (`runMessagesAlone`, `src/main.ts`). `tools/checks/replay.ts` asserts the spans and
    their holders, and a recording whose logged stops name nothing.
 7. The viewer's strip and keys (`src/renderer/ui/RecordingStrip.ts`, `doc/RECORDING.md` →
-   "The port's player"): the time played, pause, the pace (`Game.setPace`), RESTART and
-   stop, over the message area's top row, whose lines are drawn a row lower while its
-   bottom row is empty, and on Space, `+`, `-`, Backspace and Esc, which HOW TO PLAY lists
+   "The port's player"): pause, RESTART, stop, the pace (`Game.setPace`) and the time
+   played, in that order from the left, over the message area's top row, whose lines are drawn a row lower while its
+   bottom row is empty, and on Space, Backspace, Esc, `+` and `-`, which HOW TO PLAY lists
    beside its sheet. RESTART puts the page back as a new page has it (`rewindPage`) and
    plays the path again; stop goes back to the welcome page; both end the message area
    played on alone. `tools/checks/replay.ts`, point 11, restarts each package's path a

@@ -409,14 +409,12 @@ except at the game's end, whose credits have the screen.
 
 **The viewer's strip** (`src/renderer/ui/RecordingStrip.ts`) has the page's input while
 a recording plays, drawn over the message area's top row, whose lines are then drawn a
-row lower while its bottom row is empty, so the three rows shown hold the newest. It
-shows the time played, the player's VBLs since the path's start (`RecordingPlayer.vbls`)
-over sixty, and four controls, which a click or a key works:
+row lower while its bottom row is empty, so the three rows shown hold the newest. From
+the left, it shows four controls, which a click or a key works, in the order below, then
+the time played flush right, the player's VBLs since the path's start
+(`RecordingPlayer.vbls`) over sixty:
 
 - **Pause** (Space): the loop held where it is (`Game.setPace(0)`), and on again.
-- **The pace** (`+` and `-`, or a click, round from ×8 to ×1): the loop's VBLs to a VBL
-  of the wall clock, 1, 2, 4 or 8 (`Game.setPace`). A span under a held clock is run at
-  once at any pace.
 - **RESTART** (Backspace): the path played again from its start in the same page, by a
   new player, once the page is put back as a new page has it (`rewindPage`): the loop
   stopped, its state a new loop's (`Game.resumeMainLoop`), the message area empty, the
@@ -427,6 +425,9 @@ over sixty, and four controls, which a click or a key works:
   play and plays it to the same end.
 - **Stop** (Esc): the player and the loop stopped, and the page left for the welcome
   page.
+- **The pace** (`+` and `-`, or a click, round from ×8 to ×1): the loop's VBLs to a VBL
+  of the wall clock, 1, 2, 4 or 8 (`Game.setPace`). A span under a held clock is run at
+  once at any pace.
 
 RESTART and stop end the message area played on alone. While the loop does not run,
 paused or at the end, a move of the pointer is drawn at the display's next frame

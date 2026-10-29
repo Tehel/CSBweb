@@ -1,9 +1,9 @@
 /**
  * A recording's viewer's strip: the page's own, over the message area's top row while
- * `?recording=` plays (`playRecording`, `src/main.ts`), as `DEBT.md` G31 decides it. It
- * shows the time played and four controls, which a click or a key works: pause, the pace
- * (×1, ×2, ×4, ×8), RESTART and stop. Space pauses, `+` and `-` change the pace, Backspace
- * restarts and Esc stops.
+ * `?recording=` plays (`playRecording`, `src/main.ts`), as `DEBT.md` G31 decides it. From
+ * the left: four controls, which a click or a key works, pause, RESTART, stop and the pace
+ * (×1, ×2, ×4, ×8), then the time played at the right edge. Space pauses, Backspace
+ * restarts, Esc stops, and `+` and `-` change the pace.
  *
  * It is drawn in the menu's font and colours (`Widgets.ts`), a label lit under the
  * pointer, on CSBWin's screen as shown (`ScreenComposer.overlay`). The message area's
@@ -44,15 +44,15 @@ export interface StripState {
 export const STRIP_RECT: Rect = { x1: 0, y1: 172, x2: 319, y2: 178 };
 /** Its text's baseline, row 0's (`row*7 + 177`). */
 const STRIP_BASELINE = 177;
-/** Where the time played starts. */
-const TIME_X = 4;
+/** Where the time played ends, its last character's cell: it is set flush right. */
+const TIME_RIGHT = 316;
 
-/** Each control's left edge, and the label it shows. */
+/** Each control's left edge, and the label it shows, in the strip's order from the left. */
 const CONTROLS: ReadonlyArray<{ action: StripAction; x: number; label: (state: StripState) => string }> = [
-  { action: 'pause', x: 70, label: (state) => (state.paused ? 'PLAY' : 'PAUSE') },
-  { action: 'pace', x: 124, label: (state) => `PACE X${state.pace}` },
-  { action: 'restart', x: 202, label: () => 'RESTART' },
-  { action: 'stop', x: 286, label: () => 'STOP' },
+  { action: 'pause', x: 4, label: (state) => (state.paused ? 'PLAY' : 'PAUSE') },
+  { action: 'restart', x: 58, label: () => 'RESTART' },
+  { action: 'stop', x: 124, label: () => 'STOP' },
+  { action: 'pace', x: 172, label: (state) => `PACE X${state.pace}` },
 ];
 
 /** The time played, `M:SS`, or `H:MM:SS` from an hour on: the VBLs over sixty. */
@@ -72,7 +72,8 @@ function controlRect(x: number, label: string): Rect {
 /** The strip drawn over the message area's top row. */
 export function drawRecordingStrip(ui: UIState, state: StripState): void {
   fillRectIndex(ui.screenIndexBuffer, STRIP_RECT, MENU_PANEL_COLOR);
-  drawText(ui, timePlayed(state.vbls), TIME_X, STRIP_BASELINE);
+  const time = timePlayed(state.vbls);
+  drawText(ui, time, TIME_RIGHT - time.length * CHAR_WIDTH, STRIP_BASELINE);
   for (const control of CONTROLS) {
     drawText(ui, control.label(state), control.x, STRIP_BASELINE, state.hover === control.action ? LIT_COLOR : MENU_OPTION_COLOR);
   }
