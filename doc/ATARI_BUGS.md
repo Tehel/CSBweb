@@ -103,21 +103,21 @@ A number alone is `BUG0_nn`.
 | BUG0_29 | 2 | An explosion can trigger a floor sensor | never | has it: `MoveObject` sets a missile down with `AddObjectToRoom`, and anything else, a cloud too, with `PlaceOrRemoveObjectInRoom`, which presses the pads (`Code11f52.cpp:3462-3483`) | has it (`moveObject`, `WorldMove.ts:227`) | faithful |
 | BUG0_30 | 2 | A floor sensor is not triggered when you put an object on the floor if a levitating … | never | has it: a type 1 pad does nothing while a group is on its square (`PressurePadOrAlcove`, `Code11f52.cpp:3782`), flying or not (`:3981`) | has it (`ActuatorSystem.ts:414`, `:569`) | faithful |
 | BUG0_31 | 2 | Floor sensors to detect the party on a stairs square are never triggered | CSB 2.1 (CHANGE8_05) | has it: a type 5 pad never acts (`Code11f52.cpp:3827-3828`) | has it (`ActuatorSystem.ts:438-440`) | faithful |
-| BUG0_32 | 4 | The load of a champion with no objects in his inventory is not 0 | never | — | — | — |
+| BUG0_32 | 4 | The load of a champion with no objects in his inventory is not 0 | never | fixed: a read leaves `d.HandChar` as saved, "the Atari code added the weight of the object in hand already", so `SetHandOwner` returns at once (`CSBCode.cpp:6394-6411`, `:8483`), "patch has been put into the Atari code" | fixed: the load is summed from the possessions and the object in hand, counted once (`characterLoad`, `CharacterStats.ts:110`) | CSBWin's fix: to decide (`DEBT.md` F25) |
 | BUG0_33 | 6 | The highlighted box around the acting champion's action hand is not cleared when clicking … | 1.1 EN (CHANGE2_08) | — | — | — |
 | BUG0_34 | 6 | Graphical glitch when you quickly move the mouse into the action area after clicking on a … | never | — | — | — |
 | BUG0_35 | 8 | The closed chest icon is drawn when the chest is opened | 1.1 EN (CHANGE2_10) | — | — | — |
 | BUG0_36 | 8 | A champion icon may be missing in the upper right corner of the screen after loading a … | 1.2 EN (CHANGE3_07) | — | — | — |
 | BUG0_37 | 8 | The contents of a chest are refreshed when grabbing or putting a Rabbit's Foot anywhere in … | CSB 2.0 (CHANGE7_25) | — | — | — |
-| BUG0_38 | 4 | A champion is much luckier than expected during combat when equipped with at least 4 cursed … | never | — | — | — |
+| BUG0_38 | 4 | A champion is much luckier than expected during combat when equipped with at least 4 cursed … | never | fixed: an attribute's getters read a byte above 240 as 0 (`ATTRIBUTE::Minimum`, `data.cpp:1719-1729`), so a luck minimum wrapped by four cursed objects bounds nothing (`IsCharacterLucky`, `Character.cpp:2193-2201`) | fixed: the same getters (`readByte`, `attributes.ts:61`; `isCharacterLucky`, `ChampionDamage.ts:429`) | CSBWin's fix: to decide (`DEBT.md` F25) |
 | BUG0_39 | 8 | In the leader inventory, the Food/Water/Poisoned panel is briefly drawn when replacing a … | never | — | — | — |
-| BUG0_40 | 4 | If a champion has The Firestaff in the action hand then skill modifiers from other objects … | 1.2 EN (CHANGE3_09) | — | — | — |
-| BUG0_41 | 4 | The Antifire and Antimagic statistics are completely ignored | never | — | — | — |
+| BUG0_40 | 4 | If a champion has The Firestaff in the action hand then skill modifiers from other objects … | 1.2 EN (CHANGE3_09) | fixed: the Firestaff's bonus adds to the neck's (`DetermineMastery`, `Code17818.cpp:76-148`) | fixed: the same (`possessionMasteryBonus`, `skills.ts:162`) | absent |
+| BUG0_41 | 4 | The Antifire and Antimagic statistics are completely ignored | never | fixed: `TAG016426` reads the statistic, `170 - w_10`, after a forum discussion with ReDMCSB's author (`Character.cpp:2062`, `:2063-2146`): antifire, antimagic and vitality count, against fire, magic, wounds and a creature's poison (`:2772`, `:2779`, `:2800`; `Monster.cpp:4603`) | fixed: the same (`attributeScaledReduction`, `ChampionDamage.ts:449`; `MonsterAttack.ts:400`) | CSBWin's fix: to decide, with `BUG0_45` (`DEBT.md` F25) |
 | BUG0_42 | 8 | The action icons are not drawn in the action area after you unfreeze the game | 1.2 EN (CHANGE3_10) | — | — | — |
 | BUG0_43 | 6 | The game does not end if the last living champion in the party is killed while looking at a … | never | — | — | — |
-| BUG0_44 | 4 | A champion may take much more damage than expected after a Black Flame attack or an impact … | 1.2 EN (CHANGE3_12) | — | — | — |
-| BUG0_45 | 4 | Champions with a high vitality are more likely to get wounded | never | — | — | — |
-| BUG0_46 | 4 | You can run into a projectile shot by a champion | CSB 2.1 (CHANGE8_07) | — | — | — |
+| BUG0_44 | 4 | A champion may take much more damage than expected after a Black Flame attack or an impact … | 1.2 EN (CHANGE3_12) | fixed: a blow at or below 0 after the fire shield returns 0 before it is scaled (`DamageCharacter`, `Character.cpp:2792`) | fixed: the same (`damageCharacter`, `ChampionDamage.ts:145`) | absent |
+| BUG0_45 | 4 | Champions with a high vitality are more likely to get wounded | never | has it, and shows it, since it reads vitality (`BUG0_41`): the wound threshold is `TAG016426` of vitality, smaller the higher vitality is (`Character.cpp:2799-2812`) | has it (`damageCharacter`, `ChampionDamage.ts:156`) | faithful to CSBWin, unseen on the Atari: to decide, with `BUG0_41` (`DEBT.md` F25) |
+| BUG0_46 | 4 | You can run into a projectile shot by a champion | CSB 2.1 (CHANGE8_07) | has it: only a throw locks the move ahead, `d.Word11712 = 4` (`Mouse.cpp:754`); `LaunchObject`, which shoots and casts, does not (`Magic.cpp:452-466`) | has it (`launchObject`, `MagicSystem.ts:556`; the throw's lock, `MouseSystem.ts:255`) | faithful |
 | BUG0_47 | 8 | Graphical glitch when you open a scroll | never | — | — | — |
 | BUG0_48 | 8 | The contents of a chest are reorganized when an object with a statistic modifier is placed … | CSB 2.0 (CHANGE7_27) | — | — | — |
 | BUG0_49 | 8 | When examining an 'Empty Flask' the description string shows an undesired symbol | never | — | — | — |
@@ -125,8 +125,8 @@ A number alone is `BUG0_nn`.
 | BUG0_51 | 5 | Throwing the object in the leader hand does not stop the wait for player input in the main loop | CSB 2.1 (CHANGE8_11) | — | — | — |
 | BUG0_52 | 8 | Graphical glitches and crashes | CSB 2.0 (CHANGE7_02) | — | — | — |
 | BUG0_53 | 6 | It is possible to sleep while the inventory of a candidate champion is open | 1.1 EN (CHANGE2_15) | — | — | — |
-| BUG0_54 | 4 | The defense modifier of an action is permanent | never | — | — | — |
-| BUG0_55 | 4 | A champion in the back row may perform a melee attack even if there is another champion … | 1.2 EN (CHANGE3_14) | — | — | — |
+| BUG0_54 | 4 | The defense modifier of an action is permanent | never | fixed: an attack sets `word64` to its modifier and its end clears it, "instead of adding and subtracting" (`Character.cpp:4995`, `Timer.cpp:2652`, `CSB.h:2599-2621`), so a failed Climb Down, which leaves the action enabled (`Attack.cpp:2039`), keeps its −15 only until the next action | fixed: the same (`CharacterSystem.ts:282`, `TimerSystem.ts:276`) | CSBWin's fix: to decide (`DEBT.md` F25) |
+| BUG0_55 | 4 | A champion in the back row may perform a melee attack even if there is another champion … | 1.2 EN (CHANGE3_14) | fixed: the back right checks the front right and the back left the front left (`Attack.cpp:1097-1116`) | fixed: the same (`AttackSystem.ts:584`) | absent |
 | BUG0_56 | 5 | You can climb down a pit with the rope even if there is a group levitating over it | 1.3b FR (CHANGE6_00) | — | — | — |
 | BUG0_57 | 6 | The object in the leader hand disappears after saving the game | 1.0b EN (CHANGE1_02) | — | — | — |
 | BUG0_58 | 0 | The game stops with message 'SYSTEM ERROR 41' when you click Resume on the entrance screen … | 1.1 EN (CHANGE2_19) | n/a: the floppy disk | n/a | n/a |
@@ -143,7 +143,7 @@ A number alone is `BUG0_nn`.
 | BUG0_69 | 3 | Memory corruption when you close a door on Lord Chaos | CSB 2.0 (CHANGE7_19) | fixed: the double move's directions are drawn at random (`Process_Invincible_And_Finish`, `Monster.cpp:1950-1952`) | fixed: the same (`processInvincibleAndFinish`, `MonsterAI.ts:1121-1122`) | CSBWin's fix, as CSB 2.0's, game-breaking: kept (`DEBT.md` H) |
 | BUG0_70 | 3 | A projectile impact on a creature may be ignored | never | has it: `CheckMonsterVersusMissiles` compares a missile's corner with the whole positions byte (`Monster.cpp:4491`), as the corner move passes it (`:3974`) | has it (`checkMonsterVersusMissiles`, `MonsterAI.ts:1268`) | faithful |
 | BUG0_71 | 0 | Some timings are too short on fast computers | never | paced: the zoom's `VBLDelay(2)` and the `VBLDelay(20)` after it (`CSBCode.cpp:9451`, `:9476`), the doors' six VBLs a step (`:9550`), the fusion's `testdelay` (`Attack.cpp:19`, `:2312`); no view drawn in a fall (`Code11f52.cpp:3068`) | the same: `TitleSequence.ts:127`, `PrisonDoor.ts:66`, `Fusion.ts:20`, and `WorldMove.ts` draws nothing | n/a: no ST to outrun |
-| BUG0_72 | 4 | The party moves very slowly even though no champion 'Load' value is drawn in red | never | — | — | — |
+| BUG0_72 | 4 | The party moves very slowly even though no champion 'Load' value is drawn in red | never | has it: `MaxLoad > load` is the fast branch (`TimeToMove`, `CSBCode.cpp:7071`), where the load is drawn red only above it (`Character.cpp:1427`) | has it (`timeToMove`, `CharacterStats.ts:170`) | faithful |
 | BUG0_73 | 5 | A mouse click may be ignored | never | — | — | — |
 | BUG0_74 | 7 | Creatures are drawn with wrong colors when viewed through a wall with the 'Thieve's Eye' spell | never | — | — | — |
 | BUG0_75 | 6 | Multiple champion portraits are drawn (one at a time) then the game crashes | never | — | — | — |
@@ -152,7 +152,7 @@ A number alone is `BUG0_nn`.
 | BUG0_78 | 1 | A closing horizontal door wounds champions to the head instead of to the hands | never | has it: mask 4 (`Timer.cpp:1302`) | has it (`TimerSystem.ts:736`) | faithful |
 | BUG0_79 | 5 | Stamina is decreased and experience is gained even when the Climb Down action fails | never | — | — | — |
 | BUG0_80 | 6 | Data is corrupted in memory and the game eventually crashes | never | — | — | — |
-| BUG0_81 | 4 | A weak champion may inflict high damage | never | — | — | — |
+| BUG0_81 | 4 | A weak champion may inflict high damage | never | fixed: `D6W = 0` when the throwing distance is 0, "Tiggy 'Bashing' with a stone club" (`DeterminePhysicalAttackDamage`, `Attack.cpp:707-709`) | fixed: the same (`AttackSystem.ts:479`) | CSBWin's fix: to decide (`DEBT.md` F25) |
 | BUG0_82 | 0 | LZW compressed data fails to decompress | never | has it: `Graphics.cpp:2764`, and the Hint Oracle's `Hint.cpp:3070` | has it: `compression.ts:132`, both files' one decoder | faithful: the three decode alike, so a file reads here as on the Atari |
 | BUG0_83 | 7 | The hole created by the Window action or the Thieve's Eye spell moves with opening doors | never | — | — | — |
 | BUG0_84 | 8 | The ending screen with champion portraits is displayed with an incorrect color palette that … | never | — | — | — |

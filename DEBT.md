@@ -122,7 +122,7 @@ In payoff order: the first row is the next item.
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
 | C198 | A missile that cannot be made loses the object it was to carry | S | ⏳ |
-| F25 | The Atari's 93 known bugs, checked against CSBWin and the port | L | ⏳ step 4 next |
+| F25 | The Atari's 93 known bugs, checked against CSBWin and the port | L | ⏳ step 5 next; five of step 4 wait on the author |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏸️ |
@@ -807,7 +807,7 @@ and the port have each one is not known, but for `BUG0_78` (faithful: a door clo
 the party wounds the head, never the hands) and `BUG0_00`'s scents (X18).
 `doc/ATARI_BUGS.md` holds the list, the way one bug is checked, the verdicts and the
 nine steps it is split into, by subsystem: step 0 is the eight with nothing to compare,
-steps 1 to 8 hold 9 to 14 bugs each, one session a step. Steps 0 to 3 are checked; step 4
+steps 1 to 8 hold 9 to 14 bugs each, one session a step. Steps 0 to 4 are checked; step 5
 is next. Paying it: each step fills its
 rows and adds nothing but its findings: a **port diverges** becomes a C item, a
 **CSBWin's fix** a C item or an H entry as the author decides, and a **faithful** bug
@@ -815,6 +815,44 @@ stays a row, unless the author names it for H or X. A **game-breaking** bug (a c
 a hang, corrupted data, an object cloned or lost) is fixed even when it is faithful: a C
 item, then an H entry. A step's commit names `F25` and the
 step; the item is paid when no row is at "—".
+
+**Waiting on the author: `BUG0_32`, `BUG0_38`, `BUG0_41` with `BUG0_45`, `BUG0_54` and
+`BUG0_81`**, champions' bugs that no Atari release fixes and CSBWin does, as the port
+does. None is game-breaking: none hangs, crashes or loses an object.
+
+- `BUG0_32`: a read adds the object in hand's weight to the leader's load twice, once
+  for good, so every save made holding something adds to it (`doc/ReDMCSB-src/CHAMPRST.C:50`).
+  CSBWin leaves `d.HandChar` alone so that `SetHandOwner` adds nothing, "patch has been
+  put into the Atari code" (`doc/CSBwin-src/CSBCode.cpp:6394-6411`); the port sums the
+  load from the possessions (`CharacterStats.characterLoad`), so the Atari's would need a
+  load kept as a field.
+- `BUG0_38`: four cursed objects wrap a champion's luck minimum past 255, which makes them
+  luckier, not less lucky (`CHAMPION.C:482`, `:1144`). CSBWin's getters read a byte above 240 as
+  0 (`data.cpp:1713-1729`), so the curse lowers luck as meant; the port's too
+  (`attributes.ts`, `readByte`).
+- `BUG0_41` and `BUG0_45`: on the Atari, a compiler bug makes antifire, antimagic and
+  vitality count as 0 against fire, magic, poison and wounds (`CHAMPION.C:1117`), where
+  the Amiga's program reads them (`doc/CSBwin-src/Character.cpp:2098-2134`). CSBWin
+  reads them, after a discussion with ReDMCSB's author quoted in its source
+  (`Character.cpp:2047-2146`), and so does the port
+  (`ChampionDamage.attributeScaledReduction`). Reading vitality shows `BUG0_45`, which
+  the Atari's 0 hides: the wound test is inverted, so a champion of high vitality is
+  wounded more (`CHAMPION.C:1908`, `Character.cpp:2799-2812`).
+- `BUG0_54`: an action's defence modifier is added as it is done and taken off when the
+  champion may act again (`MENU.C:833`, `TIMELINE.C:1594`). A failed Climb Down never
+  disables the action (`MENU.C:1563`), so on the Atari each one leaves −15 for good, and
+  they add up; ReDMCSB's comment, that no action of the games' data meets the case, misses
+  it. CSBWin sets the modifier and clears it, "instead of adding and subtracting"
+  (`Character.cpp:4995`, `Timer.cpp:2652`, `CSB.h:2599-2621`), so the −15 lasts until the
+  next action; the port's too (`CharacterSystem.ts`, `TimerSystem.enableCharacterAction`).
+- `BUG0_81`: a champion whose strength in hand comes to 0 adds an uninitialised
+  modifier to a blow's damage (`PROJEXPL.C:1493`). CSBWin writes 0 (`Attack.cpp:707-709`), and so does the port
+  (`AttackSystem.ts`). No value is the Atari's to play.
+
+The options, for each: **(a)** keep CSBWin's fix, an H entry (recommended; for `BUG0_81`
+the only one a port can play); **(b)** play the Atari's, a C item. For `BUG0_41` and
+`BUG0_45` together, (a) keeps both, the statistics read and the wound test inverted, and
+(b) ignores the three statistics again, which hides `BUG0_45` with them.
 
 ---
 
