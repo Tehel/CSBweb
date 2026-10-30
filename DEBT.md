@@ -124,7 +124,6 @@ In payoff order: the first row is the next item.
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
 | F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
 | F25 | The Atari's 93 known bugs, checked against CSBWin and the port | L | ⏳ step 2 next |
-| C194 | A DSA's wall graphic counts as a real decoration, so it hides no text | S | ⏳ |
 | C195 | Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space | S | ⏳ to decide with the author |
 | C197 | A launcher aimed off its map loses what it takes, and a first missile not launched stops the second | S | ⏳ |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
@@ -633,16 +632,6 @@ seen to band.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
-
-### C194 ⏳ A DSA's wall graphic counts as a real decoration, so it hides no text
-
-`SummarizeRoomInfo` gives a face with a visible text and no real decoration no decoration
-at all (`doc/CSBwin-src/Codea59a.cpp:172-179`). A DSA's extended graphic is written to
-`rslt->decorations` without `realDecoration` (`:113-127`), so under a text it is dropped.
-The port sets `realDecoration` for it too (`src/renderer/csbwin/SummarizeRoomInfo.ts`, the
-type 47 branch), so it draws both. No face of a set here holds a visible text and a DSA
-graphic without another actuator, so nothing shows it yet. Paying it: drop the line, and
-prove it on a face made in a tool.
 
 ### C195 ⏳ Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space
 

@@ -288,8 +288,8 @@ function summarizeStoneRoom(
             const absIndex = dungeon.getDsaLevelIndex(levelNumber, selector);
             if (absIndex === 255) {
               const { paramA } = getActuatorDsaParameters(rec);
+              // No `realDecoration`: a visible text on the face hides it (Codea59a.cpp:113-127, 172-179).
               rslt.decorations[(relativePosition - 1) as 0 | 1 | 2] = 0x10000 | (paramA & 0xffff);
-              realDecoration[(relativePosition - 1) as 0 | 1 | 2] = true;
             }
           } else if (getActuatorType(rec) !== 127 || (getActuatorState(rec) & PORTRAIT_HIDE_GRAPHIC) === 0) {
             // Every actuator on the face writes its ordinal, 0 included, so the last one

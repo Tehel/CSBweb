@@ -20,7 +20,11 @@
  *      button 5 is that decoration's rectangle 12, and the party faces no alcove;
  *   3. a click at its centre with the lock's item in hand, through `handleMouseButton`,
  *      takes the item;
- *   4. once the four are taken, the door at (22,27) opens.
+ *   4. once the four are taken, the door at (22,27) opens;
+ *   5. with the lock of (22,25) taken off its face and a visible text put up there, the
+ *      DSA's graphic is the face's only decoration, and it is no real one: a face with a
+ *      text and no real decoration shows none (`Codea59a.cpp:172-179`), so it shows the
+ *      text alone.
  *
  * Run: `npm test -- --only=extended-wall-button.ts`
  */
@@ -131,5 +135,40 @@ for (const { lock, item, name } of LOCKS) {
 for (let i = 0; i < 20; i++) game.gameTick();
 console.log(`door (22,27) state ${doorState()}`);
 check(doorState() === 0, '4. with the four taken, the door at (22,27) is open');
+
+/** The first text of map 0, taken off its square. */
+function takeText(): ObjectID {
+  const map = dungeon.getMap(0)!;
+  for (let x = 0; x < map.descriptor.width; x++) for (let y = 0; y < map.descriptor.height; y++) {
+    const at = new Position(x, y, 0);
+    for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
+      if (dungeon.rnMaps.dbType(rn) !== DBType.TEXT) continue;
+      dungeon.removeObjectFromCell(at, rn);
+      return rn;
+    }
+  }
+  throw new Error('no text on map 0');
+}
+
+const face = LOCKS[0]!.lock;
+for (let rn = dungeon.findFirstObject(face); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
+  const rec = dungeon.rnMaps.dbType(rn) === DBType.ACTUATOR ? dungeon.getActuatorRecord(rn) : undefined;
+  if (rec && (rec.word2 & 0x7f) !== 47) { dungeon.removeObjectFromCell(face, rn); break; }
+}
+const text = dungeon.rnMaps.setPos(takeText(), WEST);
+dungeon.getTextRecord(text)!.visible = true;
+dungeon.addObjectToCell(face, text);
+const rslt: SummarizeRoomData = {
+  x: face.x, y: face.y, relativeCellNumber: 17, skinNumber: 0, roomType: 0, championPortraitOrdinal: 0,
+  graphicRoomType: 0, rn2: OBJECT_ID_EOF, decorations: [0, 0, 0], text: [OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF],
+};
+summarizeRoomInfoCsbwin(rslt, dungeon, face, EAST, tables.objects);
+const chain: string[] = [];
+for (let rn = dungeon.findFirstObject(face); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
+  chain.push(dungeon.rnMaps.dbType(rn) === DBType.TEXT ? 'text' : `type ${dungeon.getActuatorRecord(rn)!.word2 & 0x7f}`);
+}
+console.log(`(${face.x},${face.y}) west face: ${chain.join(', ')}; decoration 0x${rslt.decorations[1]!.toString(16)}, text ${rslt.text[1] === text ? 'shown' : 'not shown'}`);
+check(chain.join(',') === 'type 47,text', '5. the face holds the DSA and a visible text, and nothing else');
+check(rslt.text[1] === text && rslt.decorations[1] === 0, '5. it shows the text and no decoration: the DSA\'s graphic is no real decoration');
 
 finish();

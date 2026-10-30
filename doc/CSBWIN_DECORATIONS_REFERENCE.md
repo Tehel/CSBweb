@@ -73,6 +73,10 @@ carries its own 13 rectangles, one per position above, then the side view and th
 view (`doc/PROVEN_FACTS.md` → "A `CSBgraphics.dat` wall or floor decoration's bitmaps are
 Atari bitplanes"). Entry 11 is the side view's size and entry 12 the front's.
 
+It is no real decoration: the branch leaves `realDecoration` unset, so a face that also
+holds a visible text and no other actuator shows the text alone, its decoration cleared
+(`doc/CSBwin-src/Codea59a.cpp:172-179`; `tools/checks/extended-wall-button.ts` part 5).
+
 - At **10, 11 and 12** the bitmap is drawn as it stands, in entry `p`'s rectangle with
   entry `p`'s width as its line: the side view at 10, mirrored at 11 (`MakeMirror` to
   entry 11's width and height), the front view at 12 (`:3384-3405`). So these three
