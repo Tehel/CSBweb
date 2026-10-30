@@ -757,7 +757,9 @@ export class MissileEncounter {
    * A fireball passes none and the door goes at once.
    */
   hitDoor(position: Position, force: number, explosion: boolean, delay = 0): boolean {
-    const doorRn = this.dungeon.findFirstObject(position);
+    // `FirstObjectRecordAddressDB0` is `FindFirstDoor`'s record (`Code11f52.cpp:375`):
+    // a square may chain an actuator or a text ahead of its door.
+    const doorRn = this.dungeon.findFirstDoor(position);
     if (doorRn === OBJECT_ID_EOF) return false;
     const door = this.dungeon.getDoorRecordByIndex(this.dungeon.rnMaps.idx(doorRn));
     if (!door) return false;

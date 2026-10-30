@@ -19,10 +19,14 @@
  *  8. A blow at a breakable door: `HitDoor`'s delay of 2 — the door holds on the tick
  *     of the blow and shatters when `TT_BASH_DOOR` fires, and queueing that timer
  *     cancels the door's own timers. And the force it needs is `DoorTOC`'s, the
- *     level's own choice of door characteristics.
+ *     level's own choice of door characteristics. And the door is the square's first
+ *     DOOR, not its first object: Conflux's GATES OF MEMBERSHIP chain an actuator first.
  *
  * Run: `npm test -- --only=player-attacks.ts`
  */
+import { readFileSync } from 'node:fs';
+import { DungeonLoader } from '../../src/data/DungeonLoader';
+import { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import { DBType, OBJECT_ID_EOF, Position, type ObjectID } from '../../src/core/types';
 import { CsbRandom } from '../../src/core/random';
 import { Game } from '../../src/engine/Game';
@@ -33,6 +37,7 @@ import type { Champion } from '../../src/engine/gameTypes';
 import { monsterInvincible, monsterNonMaterial } from '../../src/data/tables/MonsterDesc';
 import { determineMastery } from '../../src/engine/skills';
 import { graphicsTablesOf, newGame, stockDungeon, stockGraphics } from '../lib/game';
+import { GAMEFILES_DIR } from '../lib/dataSets';
 import { check, fail, finish } from '../lib/check';
 import { testChampion } from '../lib/champion';
 
@@ -456,6 +461,28 @@ async function main(): Promise<void> {
     map.descriptor.doorType1Index = 1;
     const broke = game.systems.missileEncounter.hitDoor(door, 100, false) && (map.cellFlags[11]![0]! & 7) === 5;
     check(broke, 'and does break it through entry 1 (force 42)');
+  }
+
+  // `HitDoor` reads `FirstObjectRecordAddressDB0`, which is `FindFirstDoor`'s record
+  // (`Code11f52.cpp:375-378`), not the square's first object. Conflux's GATES OF
+  // MEMBERSHIP, map 0 (3,10), chain an actuator ahead of the door: read as a door
+  // record, it turned every blow away.
+  console.log('\n=== 8c. HitDoor finds the door behind an actuator ===');
+  {
+    const conflux = `${GAMEFILES_DIR}/conflux-3.5-b8`;
+    const confluxGraphics = new GraphicsLoader();
+    confluxGraphics.loadFromArray(new Uint8Array(readFileSync(`${conflux}/graphics.dat`)));
+    const game = newGame(new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync(`${conflux}/dungeon.dat`))), confluxGraphics);
+    const gates = new Position(3, 10, 0);
+    const dungeon = game.ctx.dungeon;
+    const first = dungeon.findFirstObject(gates);
+    const door = dungeon.getDoorRecordByIndex(dungeon.rnMaps.idx(dungeon.findFirstDoor(gates)))!;
+    const toc = dungeon.doorTOC(0, door.doorType, game.ctx.tables.doorCharacteristics) & 0xff;
+    console.log(`first object is ${DBType[dungeon.rnMaps.dbType(first)]}; the door breaks to blows: ${door.destructibleByChop}, force ${toc}`);
+    check(dungeon.rnMaps.dbType(first) === DBType.ACTUATOR, 'the square chains an actuator before its door');
+    const map = dungeon.getMap(0)!;
+    const broke = game.systems.missileEncounter.hitDoor(gates, toc, false) && (map.cellFlags[3]![10]! & 7) === 5;
+    check(broke, `a blow of force ${toc} breaks the GATES OF MEMBERSHIP`);
   }
 
   finish();

@@ -5027,6 +5027,12 @@ every `TT_1` or `TT_DOOR` timer with the same `timerWord6` (the cell) and level 
 whatever its time — so a door that was opening or closing stops being animated before it
 shatters. Evidence: `tools/checks/player-attacks.ts` case 8.
 
+The door `HitDoor` tests is the square's first DOOR, not its first object:
+`FirstObjectRecordAddressDB0` is `GetRecordAddressDB0(FindFirstDoor(x, y))`
+(`doc/CSBwin-src/Code11f52.cpp:375-378`, read at `:2309`). A door square may chain an
+actuator or a text ahead of it, as Conflux's GATES OF MEMBERSHIP do, map 0 (3,10).
+Evidence: `tools/checks/player-attacks.ts` case 8c.
+
 ## A missile hits the monster in its corner, for `64 × magic / defense`
 
 `ProcessMissileEncounter`'s monster arm (`doc/CSBwin-src/Code11f52.cpp:1995-2077`):
