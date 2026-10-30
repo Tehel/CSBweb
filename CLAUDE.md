@@ -17,8 +17,9 @@ player something the game means to give (a hint, an item, a message) — the por
 right thing instead. "Obviously" is earned: cite both readings, and rule out a misread
 helper first (`.claude/memory/memmove-source-first.md`). A game-breaking bug (a crash or a
 hang, corrupted data, an object cloned or lost) is fixed even where the Atari and CSBWin
-share it (`doc/ATARI_BUGS.md`). Each such fix is a deliberate
-divergence, listed under `DEBT.md` H with its proof.
+share it. Each such fix is a deliberate divergence, listed under `DEBT.md` H with its
+proof. Any other bug the two share stays, so that CSBWin's recordings still play
+(`DEBT.md` F24).
 
 The goal is the Atari ST program; CSBWin, which ports it, is the proxy for it. ReDMCSB
 (`doc/ReDMCSB-src/`) is a reconstruction faithful to the Atari binaries, so where its Atari
@@ -361,7 +362,7 @@ behind the disk icon lists them by playthrough, and exports and imports them
 load and play, Dungeon Master and Theron's Quest have been played to their end, and the
 site around them is deployed (`doc/DEPLOYMENT.md`). **The current priority is paying the
 debt**, `DEBT.md`'s active rows, one item per commit, **then cleaning the repository up to
-publish it as open source**. Players' own data sets come first (`DEBT.md` P). CSBWin's
+publish it as open source**. CSBWin's own recordings come first (`DEBT.md` F24), then players' own data sets (P). CSBWin's
 debugging extras, a save of an unknown dungeon, comparing frames with CSBWin's and the
 extras (X) are postponed until the author names one; a CSBWin feature a played dungeon
 needs is not. The first row of `DEBT.md`'s index is the next item, and `/pay-debt` starts

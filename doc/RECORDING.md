@@ -10,8 +10,8 @@ and player, and what sharing recordings would take.
 recording made before it play out differently. A recording carries the build that made it,
 and its `d.RandomNumber` values show the first entry where a later build parts from it.
 
-**Recordings are paused.** The port's behaviour is still changing (the Atari's known bugs,
-`DEBT.md` F25, and the monsters' scents, X18), and each change would leave every recording
+**Recordings are paused.** The port's behaviour is still changing (the monsters' scents,
+`DEBT.md` X18), and each change would leave every recording
 made before it unplayable. So a page writes no recording to the store, and the welcome
 page's book has no RECORDINGS tab, a local set no book (`src/ui/recordingsSwitch.ts`). The
 recorder still runs in the page, and a save still names its point in the running

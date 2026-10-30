@@ -37,7 +37,14 @@ skins are drawn (`doc/CSBWIN_RENDERING_REFERENCE.md` → "Skins in the data sets
 plays Dungeon Master with the Amiga 2.2's re-recorded sounds, the monsters heard moving as
 they approach, in stereo, and the Amiga's dungeon.
 
-**First, at the author's request: P — players' own data sets.** A player adds a dungeon
+**First, at the author's request: F24 — CSBWin's own recordings.** The players'
+`playfile.log` runs are played in the port to their end and shared as its recordings. A
+run checks every random draw against CSBWin's, so it is the longest test there is, and
+it holds only while the port plays as CSBWin does: a bug CSBWin and the port share stays,
+unless it breaks the game (H, "The Atari's bugs that CSBWin shares stay"). F24 comes
+before every other item.
+
+**Then, at the author's request: P — players' own data sets.** A player adds a dungeon
 from their own files to the welcome page, plays it, edits it, deletes it and publishes it,
 and the moderators approve, hide, show and edit what is published; what is left is P11, to
 design with the author. They are not CSBWin features but the page's, and come before
@@ -121,10 +128,9 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C198 | A missile that cannot be made loses the object it was to carry | S | ⏳ |
-| F25 | The Atari's 93 known bugs, checked against CSBWin and the port | L | ⏳ step 5 next |
-| P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
+| C198 | A missile that cannot be made loses the object it was to carry | S | ⏳ |
+| P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏸️ |
 | E40 | The statistics page's heat map | M | ⏸️ |
 | E44 | The recording viewer seeks forward and back | M–L | ⏸️ |
@@ -635,7 +641,7 @@ A divergence found along the way goes here, with the next free ID.
 ### C198 ⏳ A missile that cannot be made loses the object it was to carry
 
 The Atari's `BUG0_16`, which CSBWin and the port share, and a game-breaking one: an
-object is lost (`doc/ATARI_BUGS.md`). `LaunchMissile` returns -1 when
+object is lost. `LaunchMissile` returns -1 when
 `FindEmptyDB14Entry` finds no record (`doc/CSBwin-src/Magic.cpp:33-34`): the missile
 database has grown to 8000 (`CSB.h:1649`, `data.cpp:814-877`) and `MakeMoreRoomInDB`
 finds no missile to end outside the 11×11 squares around the party
@@ -797,24 +803,6 @@ Paying it, in steps:
    that takes a log, its corrections, the instance and a `playerId`, builds the package of
    the game's end (`RecordingPackage`) and submits it to `api/recordings`, with the run's
    player and time in its metadata.
-
----
-
-### F25 ⏳ The Atari's 93 known bugs, checked against CSBWin and the port
-
-ReDMCSB lists 93 bugs of the Atari releases and tags each in its source. Whether CSBWin
-and the port have each one is not known, but for `BUG0_78` (faithful: a door closing on
-the party wounds the head, never the hands) and `BUG0_00`'s scents (X18).
-`doc/ATARI_BUGS.md` holds the list, the way one bug is checked, the verdicts and the
-nine steps it is split into, by subsystem: step 0 is the eight with nothing to compare,
-steps 1 to 8 hold 9 to 14 bugs each, one session a step. Steps 0 to 4 are checked; step 5
-is next. The list is a hint
-toward bugs neither CSBWin nor the port fixes, so what a step finds is its **faithful**
-rows: a game-breaking one (a crash or a hang, corrupted data, an object cloned or lost)
-becomes a C item to fix, and the rest wait for the author to name one for H or X. A bug
-CSBWin or the port already fixes needs nothing but its row, and a **port diverges**, a
-bug CSBWin fixes and the port has, becomes a C item. A step's commit names `F25` and the
-step; the item is paid when no row is at "—".
 
 ---
 
@@ -1260,10 +1248,21 @@ Recorded so that nobody "fixes" them.
   (`src/engine/PartyFootprints.ts`, `tools/checks/amiga-scents.ts`,
   `tools/checks/magic-footprints.ts`). The comparisons thrown away stay: they are the
   Atari's, ReDMCSB's `BUG0_00`.
-- 🚫 **The Atari's bugs that CSBWin fixes stay fixed.** Where an Atari release has a
-  bug and CSBWin and the port do not, the port stays as it is, game-breaking or not:
-  the rows of `doc/ATARI_BUGS.md` whose verdict is "CSBWin's fix" or "absent", each
-  with both readings cited.
+- 🚫 **The Atari's bugs that CSBWin fixes stay fixed.** ReDMCSB lists 93 bugs of the
+  Atari releases (`doc/ReDMCSB-src/Documentation/BugsAndChanges.htm` → "Bugs"). Where an
+  Atari release has one and CSBWin and the port do not, the port stays as it is,
+  game-breaking or not, though ReDMCSB's Atari branch differs there.
+- 🚫 **The Atari's bugs that CSBWin shares stay.** A bug of that list that CSBWin has too
+  is the port's as well, unless it breaks the game (a crash or a hang, corrupted data,
+  an object cloned or lost), which is fixed (`CLAUDE.md`). Fixing one would leave every
+  CSBWin recording that meets it unplayable from there (F24), and a dungeon tested in
+  CSBWin may count on it. So a launcher's missiles take no step energy, where CSB 2.1
+  gives them the sensor's (`BUG0_21`, `doc/PROVEN_FACTS.md` → "A launcher's step energy
+  is bits 12-15 of its `word6`…"); a missile cast or shot does not stop the party
+  walking into it, where CSB 2.1 does, a quirk players know (`BUG0_46`,
+  `doc/ReDMCSB-src/CHAMPION.C:2066`, `doc/CSBwin-src/Magic.cpp:452-466`); and the others
+  are what CSBWin does. The list is not checked bug by bug: a game-breaking one is found
+  by play or by a CSBWin recording.
 - 🚫 **A launcher aimed off its map launches nothing.** No release checks the square in
   front of a wall launcher: on the Atari, one on a map's edge shooting off it crashes the
   game, ReDMCSB's `BUG0_20` (`doc/ReDMCSB-src/TIMELINE.C:1117`), and CSBWin, which checks
