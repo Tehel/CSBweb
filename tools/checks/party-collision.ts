@@ -82,6 +82,8 @@ async function main(): Promise<void> {
   const facing = dy === -1 ? 0 : dx === 1 ? 1 : dy === 1 ? 2 : 3;
   const monsterRn = game.ctx.dungeon.findFirstMonster(new Position(scene.mx, scene.my, level));
   const creature = dungeon.getCreatureRecord(monsterRn)!;
+  // Asked now: the empty party crushes it below, and what it drops can take its slot.
+  const foundCreature = game.ctx.dungeon.rnMaps.dbType(monsterRn) === DBType.CREATURE;
 
   console.log(
     `level ${level}: party at (${scene.px},${scene.py}) facing ${facing}, ` +
@@ -743,7 +745,7 @@ async function main(): Promise<void> {
 
   // ---- Assertions ---------------------------------------------------------
 
-  check(game.ctx.dungeon.rnMaps.dbType(monsterRn) === DBType.CREATURE, 'the scene should have found a real creature');
+  check(foundCreature, 'the scene should have found a real creature');
   check(roomTypeAt(scene.mx, scene.my) !== RoomType.STONE, 'the monster should not be standing in stone');
 
   // The vacuity guard: without the `d.NumCharacter != 0` gate the block would fire

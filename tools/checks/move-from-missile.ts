@@ -23,6 +23,12 @@
  *     port's deletes no timer, not even one queued since in the slot the missile's timer
  *     left.
  *
+ *  4. Every one-square move draws, missiles or not: `GetPrimaryAndSecondaryDirection`
+ *     (`Code11f52.cpp:2699`) draws the secondary direction for a move along an axis
+ *     (`:2237`, `:2247`). A move to another level (`newX < 0`) and a turn draw nothing.
+ *     So a party without a champion, on level 0, draws once a step and never a turn,
+ *     which every CSBWin `playfile.log` records (`DEBT.md` F24).
+ *
  * The filter is stood in for at the DSA boundary, `DsaFilters.processMissileEncounterFilter`,
  * which records its parameters and answers 0, the default action.
  *
@@ -33,6 +39,7 @@ import { DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, t
 import { RN_FIREBALL } from '../../src/core/spellRn';
 import type { Game } from '../../src/engine/Game';
 import { type Champion } from '../../src/engine/gameTypes';
+import { MovementAction } from '../../src/engine/gameTypes';
 import { newGame, stockGraphics, processTimersAt, stockDungeon } from '../lib/game';
 import { standIn } from '../lib/standIn';
 import { check, finish } from '../lib/check';
@@ -197,6 +204,49 @@ const show = (label: string, c: FilterCall | undefined): void =>
   check(tq.getTimer(squatter)?.function === TimerFunction.TT_DOOR, 'and its hit deletes no queued timer');
   check(tq.missileFilterObject === OBJECT_ID_NULL, 'MissileTimer\'s exit puts missileFilterObject back to RNnul');
   tq.deleteTimer(squatter);
+}
+
+/* -------------------------------------------------- 4. the step's draw ---------- */
+{
+  const fresh = newGame(stockDungeon(), stockGraphics());
+  fresh.setRandomSeed(0x12345678);
+  const random = fresh.ctx.random;
+  const draws = (act: () => void): number => {
+    const from = random.getSeed();
+    act();
+    const to = random.getSeed();
+    let n = 0;
+    for (let s = from; s !== to && n < 100; n++) s = (Math.imul(s, 0xbb40e62d) + 11) >>> 0;
+    return n;
+  };
+  const here = fresh.ctx.party.state.position;
+  const east = new Position(here.x + 1, here.y, here.z);
+  const south = new Position(here.x, here.y + 1, here.z);
+  const byAxis = [draws(() => fresh.systems.missileEncounter.checkPartyMoveFromMissile(here, east)),
+    draws(() => fresh.systems.missileEncounter.checkPartyMoveFromMissile(here, south))];
+  const away = draws(() => fresh.systems.missileEncounter.checkPartyMoveFromMissile(here, null));
+  console.log(`4. CheckMoveFromMissile's draws: a step east ${byAxis[0]}, south ${byAxis[1]}, off the level ${away}`);
+  check(byAxis[0] === 1 && byAxis[1] === 1, 'a one-square move draws the secondary direction once, along either axis');
+  check(away === 0, 'a move off the level draws nothing');
+
+  // The party at the entrance, without a champion: turn until the square ahead is open,
+  // then step.
+  const party = fresh.ctx.party.state;
+  const turns: number[] = [];
+  for (let i = 0; i < 4; i++) {
+    const delta = [[0, -1], [1, 0], [0, 1], [-1, 0]][party.facing]!;
+    const map = fresh.ctx.dungeon.getMap(here.z)!;
+    if (((map.cellFlags[here.x + delta[0]!]?.[here.y + delta[1]!] ?? 0) >> 5 & 7) === RoomType.OPEN) break;
+    turns.push(draws(() => fresh.move(MovementAction.TURN_RIGHT)));
+    party.partyMoveDisableTimer = 0;
+  }
+  const before = `${here.x},${here.y}`;
+  const step = draws(() => fresh.move(MovementAction.MOVE_FORWARD));
+  const after = party.position;
+  const turn = draws(() => fresh.move(MovementAction.TURN_LEFT));
+  console.log(`4. no champion: a step from (${before}) to (${after.x},${after.y}) drawing ${step}, then a turn drawing ${turn}`);
+  check(party.champions.length === 0 && turns.every((n) => n === 0) && turn === 0, 'a turn draws nothing');
+  check(`${after.x},${after.y}` !== before && step === 1, 'a step of a party without a champion draws exactly once');
 }
 
 console.log(`health after the three blows: ${game.ctx.party.state.champions.map((c) => c.attributes.health).join(', ')}`);

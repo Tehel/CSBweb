@@ -184,7 +184,10 @@ async function main(): Promise<void> {
     const placed = messages.timeouts()[0]!;
     game.systems.mouse.sleep();
     const asleep = messages.timeouts()[0]!;
+    // The monsters two squares north would reach the party and wake it: life frozen.
+    party.freezeLifeTimer = 200;
     for (let i = 0; i < 100; i++) frame(1);
+    party.freezeLifeTimer = 0;
     const t1 = game.ctx.state.tickCount;
     wakeUp(game.ctx);
     const awake = messages.timeouts()[0]!;

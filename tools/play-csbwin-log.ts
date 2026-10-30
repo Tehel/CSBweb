@@ -9,10 +9,12 @@
  * skipped, a waiting step put back (`PLAYFILE::Backspace`), the Reincarnate screen fed the
  * file's `0x4444` lines (`Code13ea4.cpp:86-108`), and `extraTicks` off (`CSBUI.cpp:985`).
  *
- *   npx tsx tools/play-csbwin-log.ts <playfile.log> [--step-draw] [--extra-ticks] [--no-dm-rules] [--resync]
+ *   npx tsx tools/play-csbwin-log.ts <playfile.log> [--extra-ticks] [--no-dm-rules]  [--resync] [--fake] [--trace=<from>-<to>]
  *
- * `--step-draw`: one draw after every step that moves the party, the stand-in for the draw
- * F24 has not found. `--resync`: an absolute random that differs is taken, as CSBWin's
+ * `--trace=<from>-<to>`: the stack of every game draw from `d.Time` <from> to <to>, in hex.
+ * `--fake`: a drift where the port is short of draws, up to 1000, is made up with draws,
+ * and the play goes on, each printed: the map of where the port draws too little.
+ * `--resync`: an absolute random that differs is taken, as CSBWin's
  * "Sequence/timing error" answered No takes it, and the play goes on.
  */
 import { VBL_FREQUENCY } from '../src/core/constants';
@@ -43,7 +45,8 @@ const args = process.argv.slice(2);
 const extraTicks = args.includes('--extra-ticks');
 const dmRules = !args.includes('--no-dm-rules');
 const resync = args.includes('--resync');
-const stepDraw = args.includes('--step-draw');
+const fake = args.includes('--fake');
+const traceArg = args.find((a) => a.startsWith('--trace='))?.slice(8).split('-').map((n) => parseInt(n, 16));
 const { version, items } = readPlayfile(args[0]!);
 
 // `numRandomCalls` (doc/CSBwin-src/CSBCode.cpp:1190-1225): the game's draws; `DrawViewport`
@@ -53,7 +56,15 @@ let gameCalls = 0;
 let gameRandom: CsbRandom | null = null;
 const proto = CsbRandom.prototype as unknown as { advance(this: CsbRandom): number };
 const advance = proto.advance;
-proto.advance = function (this: CsbRandom) { calls++; if (this === gameRandom) gameCalls++; return advance.call(this); };
+proto.advance = function (this: CsbRandom) {
+  calls++;
+  if (this === gameRandom) {
+    gameCalls++;
+    const t = game.ctx.state.tickCount;
+    if (traceArg && t >= traceArg[0]! && t <= traceArg[1]!) console.log(`  draw at d.Time ${t.toString(16)}:\n` + new Error().stack!.split('\n').slice(2, 9).join('\n'));
+  }
+  return advance.call(this);
+};
 const lcg = (s: number) => (Math.imul(s, 0xbb40e62d) + 11) >>> 0;
 function drawsBetween(from: number, to: number, max = 100000): number | null {
   for (let n = 0, s = from >>> 0; n <= max; n++, s = lcg(s)) if (s === to >>> 0) return n;
@@ -125,7 +136,7 @@ let at = 0;               // next item
 let pending: PlayEntry | null = null; // m_time != -1
 let oldCallCount = 0;
 let drift: string | null = null;
-let checked = 0, absChecked = 0, countChecked = 0, resyncs = 0;
+let checked = 0, absChecked = 0, countChecked = 0, resyncs = 0, fakes = 0;
 const history: string[] = [];
 const hx = (n: number, w = 4) => n.toString(16).padStart(w, '0');
 const where = () => { const p = ctx.party.state; return `L${p.position.z ?? '?'} (${p.position.x},${p.position.y}) f${p.facing}`; };
@@ -150,6 +161,13 @@ function play(): PlayEntry | null {
         const n = drawsBetween(seed, e.ran);
         const msg = `line ${e.line}: d.Time ${hx(e.time, 8)} ${hx(e.x)} ${hx(e.y)} button ${hx(e.num)}: recorded ${hx(e.ran, 8)}, port d.RandomNumber ${hx(seed, 8)}, ${since} draws since the last entry (${gameCalls} game draws so far)` +
           (n !== null ? `; the recorded value is ${n} draws ahead of the port` : '') + `; party ${where()}`;
+        const missing = e.ran < 0x10000 ? e.ran - since : n;
+        if (fake && missing !== null && missing > 0 && missing <= 1000) {
+          console.log(`  FAKE ${missing} draw(s) at line ${e.line}, d.Time ${hx(e.time)}, party ${where()}, after: ${history.at(-1) ?? ''}`);
+          for (let i = 0; i < missing; i++) ctx.random.next();
+          fakes++;
+          continue;
+        }
         if (!resync || e.ran < 0x10000) { drift = msg; return null; }
         console.log(`  RESYNC ${msg}`); resyncs++;
         ctx.random.setSeed(e.ran);
@@ -174,13 +192,9 @@ const g = game as unknown as {
   translateMouseClick(e: unknown): boolean; recordFileRecord(e: unknown): void; moveParty(a: unknown): { refused: boolean };
   mouseEventHandlers: { unclick(): void; button(n: number, x: number, y: number): void } | null; lastInputTime: number;
 };
-if (stepDraw) {
-  const inner = g.systems.movement.moveParty.bind(g.systems.movement);
-  g.systems.movement.moveParty = (a) => { const p = ctx.party.state.position; const before = `${p.x},${p.y},${p.z}`; const r = inner(a); const q = ctx.party.state.position; if (`${q.x},${q.y},${q.z}` !== before) ctx.random.next(); return r; };
-}
 if (!extraTicks) {
   // `if (extraTicks) d.clockTick = 1;` left out (CSBCode.cpp:7953-7956, :8171-8174).
-  const cur = g.systems.movement.moveParty; g.systems.movement.moveParty = (a) => { const before = ctx.loop.clockTick; const r = cur(a); if (!r.inhibited && ctx.loop.clockTick && !before) ctx.loop.clockTick = before; return r; };
+  const cur = g.systems.movement.moveParty.bind(g.systems.movement); g.systems.movement.moveParty = (a) => { const before = ctx.loop.clockTick; const r = cur(a); if (!r.inhibited && ctx.loop.clockTick && !before) ctx.loop.clockTick = before; return r; };
 }
 const origHandle = g.handleMouseEvents.bind(game);
 g.handleMouseEvents = (delta: number): number => {
@@ -234,7 +248,7 @@ const VBL_MS = Math.ceil(1000 / VBL_FREQUENCY);
 const t0 = performance.now();
 let vbls = 0;
 while (!drift && !ended && vbls < 60 * 60 * 60 * 3) { clock.advance(VBL_MS); vbls++; }
-console.log(`ran ${vbls} VBLs in ${((performance.now() - t0) / 1000).toFixed(1)} s; d.Time ${ctx.state.tickCount}; ${checked} entries checked (${absChecked} by d.RandomNumber, ${countChecked} by draw count), ${resyncs} resyncs`);
+console.log(`ran ${vbls} VBLs in ${((performance.now() - t0) / 1000).toFixed(1)} s; d.Time ${ctx.state.tickCount}; ${checked} entries checked (${absChecked} by d.RandomNumber, ${countChecked} by draw count), ${resyncs} resyncs, ${fakes} fakes`);
 console.log(`  line ${(items[Math.min(at, items.length) - 1] as PlayEntry | undefined)?.line ?? '?'} of the file; party ${where()}`);
 console.log(drift ? `DRIFT ${drift}` : `ENDED ${ended}`);
 console.log('last entries taken:\n  ' + history.join('\n  '));

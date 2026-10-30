@@ -734,9 +734,11 @@ Reincarnate screen fed the `0x4444` lines (`Code13ea4.cpp:86-108`: a character, 
 OK), `0x2221` drawing `y + 1` times (`RECORDFILE::CycleRandom`), and `extraTicks` off
 (`CSBUI.cpp:985`). It stops at the first entry whose random is neither `d.RandomNumber` nor
 the game's draws since the entry before (`Recording.cpp:483-503`), and prints where.
-`--step-draw` adds the stand-in below; `--resync` takes a differing absolute random and
-goes on, as CSBWin's "Sequence/timing error" answered No does. A log of 8000 entries plays
-in well under a second while it holds.
+`--resync` takes a differing absolute random and goes on, as CSBWin's "Sequence/timing
+error" answered No does; `--fake` makes up a count the port falls short of with draws and
+goes on, printing each, which maps where the port draws too little; `--trace=<from>-<to>`
+prints the stack of each of the port's draws in that `d.Time` range. A log of 8000 entries
+plays in well under a second while it holds.
 
 What it establishes:
 
@@ -748,29 +750,25 @@ What it establishes:
   first line, `0xc8` at `d.Time` 0, is the entrance's click. Then the read takes the
   `0x3333` line's seed and draws twice for `d.RandomGameID` (`SaveGame.cpp:1606-1645`),
   which leaves exactly the random recorded at the first move.
-- **Drift 1: a draw at every step.** In every one of those versions, each step that moves
-  the party is followed by one draw before the next entry, and a turn by none, from the
-  first step, before any champion has joined. The port draws nothing there. Several
-  versions agreeing puts it in the port, not in a CSBWin version. Not the cause:
-  `MoveParty`'s own code (no draw, `CSBCode.cpp:8031-8420`), `AdjustStamina` and
-  `TimeToMove` (no champion yet), `QueueSound`, the view (its stream is swapped, its count
-  restored), `SmartDiscard(false)` at the tick (`CSBCode.cpp:688`, ported, and it would
-  draw after a turn too). The draw is not found. `--step-draw` stands in for it.
-- **With the stand-in:**
-
-  | Run (version) | Matched | Then |
-  | --- | --- | --- |
-  | `DMMovie2823` annotated, `playfile.log` (17.6) | 161 entries, all by `d.RandomNumber`: four champions chosen, the walk to the stairs | Line 206, `d.Time` 0xc6, a step on level 1 at (3,1): 159 draws since the entry before, the record 12 draws further |
-  | `DMMovie2823` annotated, `record00000.log` (15.9) | All 110 entries, to its end | — |
-  | `DMMovie40a` (9.6, Hawk) | 65 entries, through the Reincarnate screen | Line 84, `d.Time` 0x55, a step on level 1 at (3,1): 40 draws, the record 39 |
-  | `DMMovie42` (11.017) | 84 entries | Line 130, `d.Time` 0x6b, a step on level 0 at (11,15): 1 draw, the record 2 |
-  | `DMMovie43a` (11.018) | 64 entries | Line 110, `d.Time` 0x6b, a turn on level 0 at (11,15): 0 draws, the record 1 |
-
-  So the next drifts are the stairs down to level 1 (or what the stand-in does on them:
-  it also draws after the stairs) and something at (11,15) on level 0 that the minimum
-  item picking runs reach.
-- **Not handled yet:** a save inside a log (`0x6668`, `0x6669`) and CSBWin's hand-made
-  substitutes for one (`0x2223`, `0x2224`, `Recording.cpp:734-761`), the `0xdddd` line
+- **Level 0 and the stairs match** in the race to fusion runs: the champions chosen,
+  every step's draw (`doc/PROVEN_FACTS.md` → "Every one-square move draws once in
+  `CheckMoveFromMissile`"), the step onto the stairs, and level 1's load, whose 39 draws
+  (`ProcessMonstersOnLevel`) are the record's `0x27` in every run. `DMMovie2823`'s
+  `record00000.log` (15.9) plays to its end.
+- **Drift 2: the monsters' first round on level 1.** In every DM run, the tick after the
+  load, when level 1's fifteen groups take their first turn (`StartMonsterMovementTimers`
+  queues each at `d.Time + 1`), the port draws fewer than CSBWin: 1 to 21 fewer, by run
+  (`DMMovie40a` 120 for 139, `DMMovie3145` 7 short, `DMMovie3358` 1, `DMMovie38` 21). Never
+  more. `--fake` making up the count takes a run a few entries further, to the next
+  shortfall a few ticks on, so the monsters' states differ too, not only the count.
+- **Drift 3, in the 11.0xx runs only** (`DMMovie42`, `43a`, `43b`, `45`): on level 0, with
+  one champion, 1 draw short in the entry at about `d.Time` 0x6b and 2 in the next, at
+  0x6e, wherever the party stands and whenever the champion joined; nothing after. The 17.6
+  run `DMMovie2823` matches there.
+- **Not handled yet:** older logs whose `+` lines have fewer than five fields
+  (`DMMovie1`, `3`, `4`, `6`, `7`: "plus line 27"), a save inside a log (`0x6668`,
+  `0x6669`) and CSBWin's hand-made substitutes for one (`0x2223`, `0x2224`,
+  `Recording.cpp:734-761`; `DMMovie43a` and `45` stop on one), the `0xdddd` line
   that writes a word of `d.`, the annotations, the runs' own `graphics.dat`, and Chaos
   Strikes Back's runs, which need a CSB set. `extraTicks` is imitated by undoing the
   step's `d.clockTick = 1`, and no run has shown a difference either way. DM rules are on,
@@ -781,9 +779,11 @@ What it establishes:
 
 Paying it, in steps:
 
-1. **The step's draw.** Search CSBWin (an Explore agent) for every draw a step reaches,
-   `MoveParty` through the party's `MoveObject` and the tick after it, with no champion,
-   on level 0. Port it as a C fix, with a check, and drop `--step-draw`.
+1. **The monsters' first round on level 1** (drift 2): `--trace` the round in
+   `DMMovie3358`, the run 1 draw short, and compare each group's turn with
+   `Monster.cpp`'s, the first turn after `AttachItem16ToMonster` above all (its
+   `uByte4 = d.Time - 127`, `CSBCode.cpp:6151`). Then drift 3, whose fixed `d.Time`
+   points at a timer or a periodic update.
 2. **Each next drift, the same way**: a port divergence, fixed with its CSBWin citation and
    its check; or, where CSBWin's own versions differ (two runs of different versions part
    at the same place differently), a correction of the log. A correction is written in

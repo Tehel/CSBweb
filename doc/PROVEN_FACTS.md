@@ -1433,6 +1433,20 @@ A missile that kills *some* of the group does not stop the move. `d.MonsterDamag
 global precisely because the call chain between `DamageMonster` and here carries no return
 value.
 
+## Every one-square move draws once in `CheckMoveFromMissile`
+
+`MoveObject` calls `CheckMoveFromMissile` for the party and for a monster whenever `oldX >= 0`
+(`doc/CSBwin-src/Code11f52.cpp:2882-2888`). When `newX >= 0` and the move is one square
+(`distanceTraveled == 1`), it calls `GetPrimaryAndSecondaryDirection` (`:2699`) before it looks
+at a champion or a missile, and that draws the secondary direction: `D0L = STRandom();` for a
+move along a column (`:2237`), `(STRandom() & 2)` along a row (`:2247`). Nothing there reads
+the secondary direction, so the draw is all it leaves. The party's step draws once, even
+without a champion; a turn (`_TurnParty`, `CSBCode.cpp:7941-8024`) never calls `MoveObject`, and
+a move off the level or onto it (`newX < 0` or `oldX < 0`: stairs, `MoveParty` `:8299`, the
+arrival `CSBCode.cpp:632`) draws nothing here. Every CSBWin `playfile.log` shows it: one draw
+after each step of a party without a champion, none after a turn
+(`tools/checks/move-from-missile.ts`).
+
 ## Only `MissileTimer` writes the missile filter's globals, and the timer copy outlives it
 
 `doc/CSBwin-src/Timer.cpp:176-177` declares `RN missileFilterObject = RNnul;` and

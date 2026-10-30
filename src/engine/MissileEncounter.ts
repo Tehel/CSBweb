@@ -15,7 +15,7 @@
  * `CheckMonsterVersusMissiles`, is `MonsterAI`'s.
  */
 import { isAlive } from './rules';
-import { DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
 import { PotionType } from '../core/constants';
 import type { CsbRandom } from '../core/random';
 import { sw } from '../core/intCast';
@@ -38,6 +38,7 @@ import { ordinalOfMonsterAtPosition } from './monsterPosition';
 import { DescIndex, IsAKey } from './objectIndex';
 import { TimerFunction, type TimerQueue } from './TimerQueue';
 import type { MmRecord } from './MmRecord';
+import { getPrimaryAndSecondaryDirection } from './MonsterPerception';
 import { setDoorState, type MissileDropTarget } from './TimerSystem';
 
 const WEAPON_DAGGER = 8;
@@ -128,7 +129,10 @@ export class MissileEncounter {
     if (sameLevelNewPos) {
       const distanceTraveled = Math.abs(oldPos.x - sameLevelNewPos.x) + Math.abs(oldPos.y - sameLevelNewPos.y);
       if (distanceTraveled === 1) {
-        const headPosLeft = this.primaryDirectionFromMove(oldPos, sameLevelNewPos);
+        // `GetPrimaryAndSecondaryDirection` (`doc/CSBwin-src/Code11f52.cpp:2699`): a step
+        // draws the secondary direction, which nothing here reads, so every one-square move
+        // of the party or a monster costs a draw, missiles or not.
+        const headPosLeft = getPrimaryAndSecondaryDirection(this.random, oldPos.x, oldPos.y, sameLevelNewPos.x, sameLevelNewPos.y).primary;
         const headPosRight = (headPosLeft + 1) & 0x3;
         const tailPosLeft = (headPosLeft + 3) & 0x3;
         const tailPosRight = (headPosLeft + 2) & 0x3;
@@ -497,13 +501,6 @@ export class MissileEncounter {
       if (decoded.category === DBType.MISSILE) missiles.push(rn);
     }
     return missiles;
-  }
-
-  private primaryDirectionFromMove(oldPos: Position, newPos: Position): number {
-    if (newPos.x > oldPos.x) return Direction.EAST;
-    if (newPos.x < oldPos.x) return Direction.WEST;
-    if (newPos.y > oldPos.y) return Direction.SOUTH;
-    return Direction.NORTH;
   }
 
   /**
