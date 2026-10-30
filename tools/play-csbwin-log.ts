@@ -11,7 +11,8 @@
  *
  *   npx tsx tools/play-csbwin-log.ts <playfile.log> [--extra-ticks] [--no-dm-rules]  [--resync] [--fake] [--trace=<from>-<to>]
  *
- * `--trace=<from>-<to>`: the stack of every game draw from `d.Time` <from> to <to>, in hex.
+ * `--trace=<from>-<to>`: every game draw from `d.Time` <from> to <to>, in hex, with its
+ * callers, and the engine's AI and attack trace in between.
  * `--fake`: a drift where the port is short of draws, up to 1000, is made up with draws,
  * and the play goes on, each printed: the map of where the port draws too little.
  * `--resync`: an absolute random that differs is taken, as CSBWin's
@@ -61,10 +62,16 @@ proto.advance = function (this: CsbRandom) {
   if (this === gameRandom) {
     gameCalls++;
     const t = game.ctx.state.tickCount;
-    if (traceArg && t >= traceArg[0]! && t <= traceArg[1]!) console.log(`  draw at d.Time ${t.toString(16)}:\n` + new Error().stack!.split('\n').slice(2, 9).join('\n'));
+    if (inTrace()) console.log(`  draw ${t.toString(16)}: ` + new Error().stack!.split('\n').slice(2, 12)
+      .map((l) => /at (?:\S+\.)?([\w$<>]+) \(.*?(\w+)\.ts:(\d+)/.exec(l)).filter((m) => m && m[2] !== 'random')
+      .map((m) => `${m![1]}:${m![3]}`).join(' < '));
   }
   return advance.call(this);
 };
+function inTrace(): boolean {
+  const t = game.ctx.state.tickCount;
+  return !!traceArg && t >= traceArg[0]! && t <= traceArg[1]!;
+}
 const lcg = (s: number) => (Math.imul(s, 0xbb40e62d) + 11) >>> 0;
 function drawsBetween(from: number, to: number, max = 100000): number | null {
   for (let n = 0, s = from >>> 0; n <= max; n++, s = lcg(s)) if (s === to >>> 0) return n;
@@ -97,6 +104,9 @@ const game = new Game(emptyDungeonData(), tables, {
   die: (error) => { throw error; },
   drawViewport: renderView,
   showCredits: (won) => { ended = `credits, d.Word11694 ${won}`; },
+  // The engine's AI and attack trace, inside `--trace`'s window.
+  trace: (line) => { if (inTrace()) console.log(line); },
+  tracing: traceArg !== undefined,
 });
 loaded.csbGraphicsLoader.opener = csbGraphicsOpener(game.ctx);
 game.ctx.sounds.csbGraphics = loaded.csbGraphicsLoader;

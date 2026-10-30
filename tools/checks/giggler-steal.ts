@@ -54,7 +54,7 @@ function main(): void {
   const ticks = Number(process.argv[2] ?? 60);
 
   const game = newGame(data, graphics);
-  game.setRandomSeed(0xdeadbeef); // a seed whose sixty ticks steal more than once and see fear state 5
+  game.setRandomSeed(0xcafebabe); // a seed whose sixty ticks steal more than once and see fear state 5
   const dungeon = game.ctx.dungeon;
 
   // The first giggler group in the dungeon, and an open cell beside it.

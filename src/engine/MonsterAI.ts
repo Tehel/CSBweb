@@ -91,7 +91,11 @@ export interface AiConst {
   invincible: boolean;
   xDistance: number;
   yDistance: number;
-  /** `attackDistance` — not const in practice; a few paths overwrite it. */
+  /**
+   * `attackDistance`: 24 from `InitialChecks`, then what each `attackDistance =
+   * Blocked(…)` of the turn answers (`doc/CSBwin-src/Monster.cpp:2188`, `:3850`, `:4185`,
+   * `:4271`), which `Standard_Finish` compares with the smelling distance (`:1792`).
+   */
   attackDistance: number;
   /** `timeFunc`, rewritten into its negative form by the 29/30/31 branches. */
   timerFunction: number;
@@ -550,7 +554,7 @@ export class MonsterAI {
     if (member > c.indexOfLastMonster) return;
 
     const preferredDirection = this.scratch.primaryDirectionToParty;
-    let attackDistance = this.blocked(c, member);
+    const attackDistance = (c.attackDistance = this.blocked(c, member));
     if (attackDistance !== 0) this.rememberPartyPosition(c.slot);
 
     // A lone monster in an open cell sometimes shuffles to another corner, or spreads
@@ -635,7 +639,6 @@ export class MonsterAI {
 
     frame.timer.function = c.timerFunction;
     this.setMonsterTimer(frame.timer, frame.i60, c.timeUntilAlternateUpdate, false);
-    void attackDistance;
   }
 
   /**
@@ -721,7 +724,7 @@ export class MonsterAI {
         return;
       }
       // State 7: charging.
-      const seen = this.blocked(c, -1);
+      const seen = (c.attackDistance = this.blocked(c, -1));
       if (seen !== 0) {
         if (seen <= monsterWord14_12_15(c.desc) && (c.xDistance === 0 || c.yDistance === 0)) {
           this.maybeDelTimersFear6TurnIndividuals(
@@ -731,7 +734,6 @@ export class MonsterAI {
           );
           return;
         }
-        c.attackDistance = seen;
         this.d4d0Finish(frame, c);
         return;
       }
@@ -739,7 +741,7 @@ export class MonsterAI {
       return;
     }
 
-    const seen = this.blocked(c, -1);
+    const seen = (c.attackDistance = this.blocked(c, -1));
     if (this.ctx.host.tracing) this.trace(`      MAI fearFactor is 0, 2, or 3.  attackDistance=${seen}`);
     if (seen !== 0) {
       if (seen <= monsterWord14_12_15(c.desc) && (c.xDistance === 0 || c.yDistance === 0)) {
@@ -931,7 +933,7 @@ export class MonsterAI {
    * zero the group calms to fear state 0.
    */
   private tryToMove(frame: AiFrame, c: AiConst): void {
-    const seen = this.blocked(c, -1);
+    const seen = (c.attackDistance = this.blocked(c, -1));
     if (seen !== 0) {
       this.rememberPartyPosition(c.slot);
       const dirs = getPrimaryAndSecondaryDirection(

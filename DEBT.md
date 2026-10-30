@@ -737,7 +737,8 @@ the game's draws since the entry before (`Recording.cpp:483-503`), and prints wh
 `--resync` takes a differing absolute random and goes on, as CSBWin's "Sequence/timing
 error" answered No does; `--fake` makes up a count the port falls short of with draws and
 goes on, printing each, which maps where the port draws too little; `--trace=<from>-<to>`
-prints the stack of each of the port's draws in that `d.Time` range. A log of 8000 entries
+prints each of the port's draws in that `d.Time` range with its callers, and the engine's
+AI trace between them. A log of 8000 entries
 plays in well under a second while it holds.
 
 What it establishes:
@@ -755,16 +756,20 @@ What it establishes:
   `CheckMoveFromMissile`"), the step onto the stairs, and level 1's load, whose 39 draws
   (`ProcessMonstersOnLevel`) are the record's `0x27` in every run. `DMMovie2823`'s
   `record00000.log` (15.9) plays to its end.
-- **Drift 2: the monsters' first round on level 1.** In every DM run, the tick after the
-  load, when level 1's fifteen groups take their first turn (`StartMonsterMovementTimers`
-  queues each at `d.Time + 1`), the port draws fewer than CSBWin: 1 to 21 fewer, by run
-  (`DMMovie40a` 120 for 139, `DMMovie3145` 7 short, `DMMovie3358` 1, `DMMovie38` 21). Never
-  more. `--fake` making up the count takes a run a few entries further, to the next
-  shortfall a few ticks on, so the monsters' states differ too, not only the count.
+- **Level 1's first round matches**: its fifteen groups' first turns
+  (`doc/PROVEN_FACTS.md` → "A monster's turn reads `attackDistance` from its last
+  `Blocked`").
+- **The 17.6 runs play on to level 2**: `DMMovie2615` to line 937 (`d.Time` 0x49e, level 1
+  at (21,21)), `DMMovie2823` to line 1203 (0x654, level 2 at (24,23)), each by
+  `d.RandomNumber`, the record 20 and 15 draws ahead of the port.
 - **Drift 3, in the 11.0xx runs only** (`DMMovie42`, `43a`, `43b`, `45`): on level 0, with
   one champion, 1 draw short in the entry at about `d.Time` 0x6b and 2 in the next, at
   0x6e, wherever the party stands and whenever the champion joined; nothing after. The 17.6
   run `DMMovie2823` matches there.
+- **Drift 4, in the 9.x runs** (9.1 to 9.6a: `DMMovie3145`, `3358`, `3445`, `36`, `38`,
+  `40`, `40a`, `5`, `8`): on level 1, between `d.Time` 0x69 and 0xae, a few ticks after
+  the first round, the port drawing sometimes more, sometimes fewer than CSBWin (`3145` 25
+  for 21, `3358` 26 for 35). The 17.6 runs pass the same ticks.
 - **Not handled yet:** older logs whose `+` lines have fewer than five fields
   (`DMMovie1`, `3`, `4`, `6`, `7`: "plus line 27"), a save inside a log (`0x6668`,
   `0x6669`) and CSBWin's hand-made substitutes for one (`0x2223`, `0x2224`,
@@ -779,11 +784,10 @@ What it establishes:
 
 Paying it, in steps:
 
-1. **The monsters' first round on level 1** (drift 2): `--trace` the round in
-   `DMMovie3358`, the run 1 draw short, and compare each group's turn with
-   `Monster.cpp`'s, the first turn after `AttachItem16ToMonster` above all (its
-   `uByte4 = d.Time - 127`, `CSBCode.cpp:6151`). Then drift 3, whose fixed `d.Time`
-   points at a timer or a periodic update.
+1. **The 17.6 runs' drifts first**, the version nearest CSBWin 2023: `--trace` the ticks
+   before `DMMovie2615`'s line 937 and `DMMovie2823`'s line 1203. Then drift 4, which the
+   17.6 runs pass, so a 9.x CSBWin of its own until shown otherwise, and drift 3, whose
+   fixed `d.Time` points at a timer or a periodic update.
 2. **Each next drift, the same way**: a port divergence, fixed with its CSBWin citation and
    its check; or, where CSBWin's own versions differ (two runs of different versions part
    at the same place differently), a correction of the log. A correction is written in

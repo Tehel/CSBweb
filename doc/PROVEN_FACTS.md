@@ -1447,6 +1447,18 @@ arrival `CSBCode.cpp:632`) draws nothing here. Every CSBWin `playfile.log` shows
 after each step of a party without a champion, none after a turn
 (`tools/checks/move-from-missile.ts`).
 
+## A monster's turn reads `attackDistance` from its last `Blocked`
+
+`ProcessTimers29to41`'s `attackDistance` is 24 after `InitialChecks`
+(`doc/CSBwin-src/Monster.cpp:2872`), and each of the turn's four `attackDistance =
+Blocked(...)` overwrites it: `Try_To_Move` (`:2188`), a member's own turn (`:3850`), a
+charging group (`:4185`) and a calm one, fear 0, 2 or 3 (`:4271`). `Blocked` answers 0
+when no member sees the party (`:518-591`). The sub-functions take it by value, so
+`Standard_Finish` reads what the last `Blocked` before it answered, and turns the group
+unless it is beyond the monster's smelling distance (`:1792`). A calm group that sees
+nothing and smells nothing reaches it with 0, and always turns, three draws or more
+(`tools/checks/standard-finish.ts`).
+
 ## Only `MissileTimer` writes the missile filter's globals, and the timer copy outlives it
 
 `doc/CSBwin-src/Timer.cpp:176-177` declares `RN missileFilterObject = RNnul;` and
