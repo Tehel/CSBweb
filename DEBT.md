@@ -125,7 +125,6 @@ In payoff order: the first row is the next item.
 | F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
 | F25 | The Atari's 93 known bugs, checked against CSBWin and the port | L | ⏳ step 2 next |
 | C195 | Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space | S | ⏳ to decide with the author |
-| C197 | A launcher aimed off its map loses what it takes, and a first missile not launched stops the second | S | ⏳ |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | E40 | The statistics page's heat map | M | ⏸️ |
 | E44 | The recording viewer seeks forward and back | M–L | ⏸️ |
@@ -646,24 +645,6 @@ code. 13 of `dm-atari-1.3-fr`'s do, and CSBWin would show each of those codes as
 code past the font draws, which CSBWin never reaches. Paying it: port the round trip
 without a table (G21 holds `Translation.txt`), and decide with the author whether the
 French set keeps its letters, a deliberate divergence under H.
-
-### C197 ⏳ A launcher aimed off its map loses what it takes, and a first missile not launched stops the second
-
-`TriggerMissileLauncher` checks no bound on the square in front of the launcher
-(`doc/CSBwin-src/Timer.cpp:1982-1983`). Off the map, `AddObjectToRoom` places the missile
-nowhere at x -1 (`Code11f52.cpp:465`), and past the other edges indexes past the level's
-columns or a column's cells: ReDMCSB's `BUG0_20`, a crash on the Atari
-(`doc/ReDMCSB-src/TIMELINE.C:1117`), which finds no such launcher in DM's and CSB's
-dungeons. The port returns there (`triggerMissileLauncher`,
-`src/engine/TimerSystem.ts:1325`), but only after the object launchers (types 14 and 15)
-have unlinked their objects from their square, or the others have made their missiles
-(`constructPredefinedMissile`), so those are lost: out of every chain, never freed. A bug
-that loses an object is fixed (`CLAUDE.md`), so the bound is checked before anything is
-taken or made, and a launcher aimed off its map launches nothing and keeps its objects, an
-H entry that cites both readings. And the port returns when the first `LaunchMissile`
-fails (`:1341`), where CSBWin launches the second all the same (`Timer.cpp:1997-2008`).
-Paying it: the bound before the objects, the second missile as CSBWin launches it, and a
-tool that triggers a launcher on a map's edge, aimed off it, with objects on its square.
 
 ### C150 ⏸️ Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops
 
@@ -1297,6 +1278,15 @@ Recorded so that nobody "fixes" them.
   as before; CSB's 12 now stop where its designers set them to, and so do 2 of Conflux
   3.5's and 6 of The Towers of Chaos's, dungeons tuned in CSBWin, where they flew on
   (`doc/PROVEN_FACTS.md` → "A launcher's step energy…", `tools/checks/missile-launcher.ts`).
+- 🚫 **A launcher aimed off its map launches nothing.** No release checks the square in
+  front of a wall launcher: on the Atari, one on a map's edge shooting off it crashes the
+  game, ReDMCSB's `BUG0_20` (`doc/ReDMCSB-src/TIMELINE.C:1117`), and CSBWin, which checks
+  no bound either (`doc/CSBwin-src/Timer.cpp:1982-1983`), sets the missile down nowhere at
+  x -1 (`AddObjectToRoom`, `Code11f52.cpp:465`) and past the level's columns or a column's
+  cells elsewhere. A game-breaking bug, so the port checks the bound before the launcher
+  takes its objects from its square or makes its missiles, and returns: nothing is
+  launched, lost or made (`triggerMissileLauncher`, `src/engine/TimerSystem.ts`,
+  `tools/checks/missile-launcher.ts`). No such launcher is in DM's and CSB's dungeons.
 - 🚫 **RESURRECTED and REINCARNATED end with a full stop.** CSBWin prints a champion's
   name, then `" RESURRECTED"` or `" REINCARNATED"` (`doc/CSBwin-src/CSBCode.cpp:6859-6863`).
   The Atari's English programs, DM's and CSB's, print `" RESURRECTED."` and

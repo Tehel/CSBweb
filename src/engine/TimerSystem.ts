@@ -1274,6 +1274,14 @@ export class TimerSystem {
     let initialPosition = (timerPos + 2) & 0x3;
     let singleMissile = actuatorType === 7 || actuatorType === 8 || actuatorType === 14;
 
+    const dir = timerPos & 0x3;
+    const launchX = timer.uByte6 + this.ctx.tables.deltaX[dir]!;
+    const launchY = timer.uByte7 + this.ctx.tables.deltaY[dir]!;
+    // CSBWin checks no bound (`doc/CSBwin-src/Timer.cpp:1982-1983`), the Atari's BUG0_20
+    // (`doc/ReDMCSB-src/TIMELINE.C:1117`): a launcher aimed off its map launches nothing
+    // and takes nothing from its square, `DEBT.md` H.
+    if (launchX < 0 || launchY < 0 || launchX >= map.descriptor.width || launchY >= map.descriptor.height) return;
+
     const source = new Position(timer.uByte6, timer.uByte7, timer.level);
     const altPos = (timerPos + 1) & 0x3;
     const takeObject = (): ObjectID => {
@@ -1319,13 +1327,8 @@ export class TimerSystem {
       initialPosition = (initialPosition + this.random.bool()) & 0x3; // doc/CSBwin-src/Timer.cpp:1980
     }
 
-    const dir = timerPos & 0x3;
-    const launchX = timer.uByte6 + this.ctx.tables.deltaX[dir]!;
-    const launchY = timer.uByte7 + this.ctx.tables.deltaY[dir]!;
-    if (launchX < 0 || launchY < 0 || launchX >= map.descriptor.width || launchY >= map.descriptor.height) return;
-
     const launchLevel = timer.level;
-    const launched = this.ctx.systems.magic.launchMissile(
+    this.ctx.systems.magic.launchMissile(
       firstObject,
       launchX,
       launchY,
@@ -1338,8 +1341,7 @@ export class TimerSystem {
       timer.time,
       true,
     );
-    if (!launched) return;
-
+    // The second flies whether the first did or not (`doc/CSBwin-src/Timer.cpp:1997-2008`).
     if (!singleMissile && secondObject !== OBJECT_ID_EOF) {
       this.ctx.systems.magic.launchMissile(
         secondObject,
