@@ -1264,16 +1264,6 @@ Recorded so that nobody "fixes" them.
   bug and CSBWin and the port do not, the port stays as it is, game-breaking or not:
   the rows of `doc/ATARI_BUGS.md` whose verdict is "CSBWin's fix" or "absent", each
   with both readings cited.
-- 🚫 **A launcher's missiles lose its step energy, as CSB 2.1's do.** Every DM release
-  and CSB 2.0 launch a wall launcher's missiles with no step energy, so they fly until they
-  strike something, ReDMCSB's `BUG0_21` (`doc/ReDMCSB-src/TIMELINE.C:1120`, `:1127`); CSB
-  2.1 gives them the sensor's, bits 12-15 of its `word6` (`CHANGE8_01`, `:1122-1130`), and
-  CSBWin passes 0 (`doc/CSBwin-src/Timer.cpp:1993`, `:2005`). The author's choice: the
-  port plays the official CSB 2.1's, on every set (`triggerMissileLauncher`,
-  `src/engine/TimerSystem.ts`). The DM sets hold no launcher with a step energy and play
-  as before; CSB's 12 now stop where its designers set them to, and so do 2 of Conflux
-  3.5's and 6 of The Towers of Chaos's, dungeons tuned in CSBWin, where they flew on
-  (`doc/PROVEN_FACTS.md` → "A launcher's step energy…", `tools/checks/missile-launcher.ts`).
 - 🚫 **A launcher aimed off its map launches nothing.** No release checks the square in
   front of a wall launcher: on the Atari, one on a map's edge shooting off it crashes the
   game, ReDMCSB's `BUG0_20` (`doc/ReDMCSB-src/TIMELINE.C:1117`), and CSBWin, which checks

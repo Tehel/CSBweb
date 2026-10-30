@@ -1,16 +1,16 @@
 /**
- * A wall's spell launcher gives its missiles the step energy it holds, CSB 2.1's
- * `CHANGE8_01` (`doc/ReDMCSB-src/TIMELINE.C:1122-1130`): `Local.Multiple >> 8`, bits 12-15
- * of `word6` (`M048_STEP_ENERGY`, `DEFS.H:1304`), where every DM release and CSB 2.0 pass
- * 0, ReDMCSB's `BUG0_21`, and so does CSBWin (`doc/CSBwin-src/Timer.cpp:1993`, `:2005`).
- * The port plays 2.1's on every set (`DEBT.md` H).
+ * A wall's spell launcher gives its missiles no step energy, as CSBWin passes 0
+ * (`doc/CSBwin-src/Timer.cpp:1993`, `:2005`), and as every DM release and CSB 2.0 do,
+ * ReDMCSB's `BUG0_21`, though the sensor holds one in bits 12-15 of `word6`
+ * (`M048_STEP_ENERGY`, `doc/ReDMCSB-src/DEFS.H:1304`) that CSB 2.1 passes (`CHANGE8_01`,
+ * `TIMELINE.C:1122-1130`). CSBWin's recordings and the dungeons tested in it fly them so.
  *
  * Each launcher of type 8 or 10 of Chaos Strikes Back's game (the `csb` set's
- * `csbgame2.dat`) that holds a step energy is fired by a `TT_STONEROOM` at its corner, as an actuator's target fires it,
- * and its missiles are read: their range is the kinetic energy, and their timer's decay
- * the step energy. Then the clock runs until the first missile moves, and unless it
- * struck something at once (one launcher's square has a monster in front), its range has
- * lost that much.
+ * `csbgame2.dat`) that holds a step energy is fired by a `TT_STONEROOM` at its corner, as
+ * an actuator's target fires it, and its missiles are read: their range is the kinetic
+ * energy, and their timer's decay 0. Then the clock runs until the first missile moves,
+ * and unless it struck something at once (one launcher's square has a monster in front),
+ * its range is what it was.
  *
  * Then a launcher aimed off its map. CSBWin checks no bound on the square it launches into
  * (`doc/CSBwin-src/Timer.cpp:1982-1983`), the Atari's `BUG0_20`, a crash
@@ -92,7 +92,7 @@ for (const launcher of launchers) {
   const count = launcher.type === 10 ? 2 : 1;
   check(read.length === count, `${name}: launches ${count === 2 ? 'two missiles' : 'one missile'}`);
   check(read.every((m) => m.range === launcher.kinetic), `${name}: its missiles' range is its kinetic energy`);
-  check(read.every((m) => m.decay === launcher.step), `${name}: their timers' decay is its step energy`);
+  check(read.every((m) => m.decay === 0), `${name}: their timers' decay is 0, not its step energy`);
 
   const first = read[0];
   if (!first) continue;
@@ -104,14 +104,16 @@ for (const launcher of launchers) {
     const square = new Position(x, y, timer.level);
     return missilesAt(game, square).includes(first.rn) ? square : null;
   };
-  for (let i = 0; i < 4 && flying() !== null && missile.rangeRemaining === first.range; i++) game.gameTick();
+  const atFront = (p: Position | null): boolean => p !== null && p.x === front.x && p.y === front.y && p.z === front.z;
+  for (let i = 0; i < 4 && atFront(flying()); i++) game.gameTick();
   const square = flying();
   if (square === null) {
     console.log('    it struck something on its first move');
     continue;
   }
   console.log(`    after its first move: range ${missile.rangeRemaining}, at ${square.z}(${square.x},${square.y})`);
-  check(missile.rangeRemaining === first.range - launcher.step, `${name}: a move costs its missile the step energy`);
+  check(!atFront(square), `${name}: its missile has moved`);
+  check(missile.rangeRemaining === first.range, `${name}: a move costs its missile nothing`);
 }
 
 /** Every database's records in use. */

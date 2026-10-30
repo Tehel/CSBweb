@@ -1021,7 +1021,9 @@ top four bits their step energy, what each square they fly costs them (`M047_KIN
 `:1122-1130`). CSBWin reads the field into `w_12`, commented out, and passes 0
 (`doc/CSBwin-src/Timer.cpp:1906`, `:1993`, `:2005`). No DM set's launcher holds a step
 energy; 12 of the 30 in CSB's `csbgame2.dat` do, as do 2 of Conflux 3.5's and 6 of The
-Towers of Chaos's. The port passes it (`DEBT.md` H, `tools/checks/missile-launcher.ts`).
+Towers of Chaos's. The port passes 0, as CSBWin does, so those launchers' missiles fly
+as they do in the dungeons tested in CSBWin and in its recordings
+(`tools/checks/missile-launcher.ts`).
 
 ## A thrown weapon flies as its own missile graphic
 
