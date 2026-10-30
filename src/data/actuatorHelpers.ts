@@ -89,6 +89,15 @@ export function getActuatorEnergyRemaining(rec: ActuatorRecord): number {
   return (rec.word6 >> 4) & 0xff;
 }
 
+/**
+ * A launcher's step energy, what each square costs its missiles: `M048_STEP_ENERGY`,
+ * `Local.Multiple >> 8` (`doc/ReDMCSB-src/DEFS.H:1304`), the `w_12` CSBWin reads and
+ * leaves commented out (`doc/CSBwin-src/Timer.cpp:1906`).
+ */
+export function getActuatorStepEnergy(rec: ActuatorRecord): number {
+  return (rec.word6 >> 12) & 0xf;
+}
+
 export function getActuatorDisableTime(rec: ActuatorRecord): number {
   return (rec.word6 >> 8) & 0xff;
 }

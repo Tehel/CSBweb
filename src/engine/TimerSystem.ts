@@ -25,6 +25,7 @@ import {
   getActuatorAndOrEdge,
   getActuatorDelay,
   getActuatorEnergyRemaining,
+  getActuatorStepEnergy,
   getActuatorDisableTime,
   getActuatorDrawAsSize4,
   getActuatorHitPointMultiplier,
@@ -1265,6 +1266,9 @@ export class TimerSystem {
     const actuatorType = getActuatorType(actuator);
     const missileType = getActuatorValue(actuator);
     const energyRemaining = getActuatorEnergyRemaining(actuator) & 0xff;
+    // CSB 2.1's step energy (`CHANGE8_01`, `doc/ReDMCSB-src/TIMELINE.C:1122-1130`), where
+    // CSBWin passes 0 (`doc/CSBwin-src/Timer.cpp:1993`, `:2005`): `DEBT.md` H.
+    const stepEnergy = getActuatorStepEnergy(actuator);
 
     const timerPos = timer.uByte8 & 0x3;
     let initialPosition = (timerPos + 2) & 0x3;
@@ -1330,7 +1334,7 @@ export class TimerSystem {
       dir,
       energyRemaining,
       100,
-      0,
+      stepEnergy,
       timer.time,
       true,
     );
@@ -1346,7 +1350,7 @@ export class TimerSystem {
         dir,
         energyRemaining,
         100,
-        0,
+        stepEnergy,
         timer.time,
         true,
       );

@@ -194,6 +194,7 @@ const CHECKS: Tool[] = [
   { tool: 'missile-door.ts' },
   { tool: 'move-from-missile.ts' },
   { tool: 'missile-teleport.ts' },
+  { tool: 'missile-launcher.ts' },
   { tool: 'missile-exterior.ts' },
   { tool: 'party-move.ts' },
   { tool: 'last-monster-attack.ts' },

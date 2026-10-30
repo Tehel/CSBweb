@@ -1010,6 +1010,19 @@ champion's spell attack, through `LaunchObject` (`doc/CSBwin-src/Magic.cpp:452-4
 record is built for a spell: only a shooter's rocks, arrows and boulders are objects
 made on the spot (`constructPredefinedMissile`).
 
+## A launcher's step energy is bits 12-15 of its `word6`, and only CSB 2.1 uses it
+
+A wall's launcher (types 7-10, 14 and 15) keeps a 12-bit `Local.Multiple` in bits 4-15 of
+its `word6`: the low byte its missiles' kinetic energy, the range they start with, and the
+top four bits their step energy, what each square they fly costs them (`M047_KINETIC_ENERGY`,
+`M048_STEP_ENERGY`, `doc/ReDMCSB-src/DEFS.H:1303-1304`). Every DM release and CSB 2.0 pass
+0 for the step energy, so a launcher's missiles fly until they strike something
+(`BUG0_21`, `TIMELINE.C:1120`, `:1127`); CSB 2.1 passes the sensor's (`CHANGE8_01`,
+`:1122-1130`). CSBWin reads the field into `w_12`, commented out, and passes 0
+(`doc/CSBwin-src/Timer.cpp:1906`, `:1993`, `:2005`). No DM set's launcher holds a step
+energy; 12 of the 30 in CSB's `csbgame2.dat` do, as do 2 of Conflux 3.5's and 6 of The
+Towers of Chaos's. The port passes it (`DEBT.md` H, `tools/checks/missile-launcher.ts`).
+
 ## A thrown weapon flies as its own missile graphic
 
 `GetGraphicClass` (`doc/CSBwin-src/Code51a4.cpp:2838-2870`) chooses how a missile's flying

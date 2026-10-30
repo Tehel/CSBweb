@@ -666,13 +666,13 @@ nowhere at x -1 (`Code11f52.cpp:465`), and past the other edges indexes past the
 columns or a column's cells: ReDMCSB's `BUG0_20`, a crash on the Atari
 (`doc/ReDMCSB-src/TIMELINE.C:1117`), which finds no such launcher in DM's and CSB's
 dungeons. The port returns there (`triggerMissileLauncher`,
-`src/engine/TimerSystem.ts:1321`), but only after the object launchers (types 14 and 15)
+`src/engine/TimerSystem.ts:1325`), but only after the object launchers (types 14 and 15)
 have unlinked their objects from their square, or the others have made their missiles
 (`constructPredefinedMissile`), so those are lost: out of every chain, never freed. A bug
 that loses an object is fixed (`CLAUDE.md`), so the bound is checked before anything is
 taken or made, and a launcher aimed off its map launches nothing and keeps its objects, an
 H entry that cites both readings. And the port returns when the first `LaunchMissile`
-fails (`:1337`), where CSBWin launches the second all the same (`Timer.cpp:1997-2008`).
+fails (`:1341`), where CSBWin launches the second all the same (`Timer.cpp:1997-2008`).
 Paying it: the bound before the objects, the second missile as CSBWin launches it, and a
 tool that triggers a launcher on a map's edge, aimed off it, with objects on its square.
 
@@ -1298,6 +1298,16 @@ Recorded so that nobody "fixes" them.
   - `BUG0_25`: the Vi altar unlinks the bones and never frees them, until no junk is left
     to make bones of (`TIMELINE.C:1685`; CSB 2.1 frees them, `:1686-1688`). CSBWin deletes
     them (`Timer.cpp:2762`, `:2781`, `:2793`).
+- 🚫 **A launcher's missiles lose its step energy, as CSB 2.1's do.** Every DM release
+  and CSB 2.0 launch a wall launcher's missiles with no step energy, so they fly until they
+  strike something, ReDMCSB's `BUG0_21` (`doc/ReDMCSB-src/TIMELINE.C:1120`, `:1127`); CSB
+  2.1 gives them the sensor's, bits 12-15 of its `word6` (`CHANGE8_01`, `:1122-1130`), and
+  CSBWin passes 0 (`doc/CSBwin-src/Timer.cpp:1993`, `:2005`). The author's choice: the
+  port plays the official CSB 2.1's, on every set (`triggerMissileLauncher`,
+  `src/engine/TimerSystem.ts`). The DM sets hold no launcher with a step energy and play
+  as before; CSB's 12 now stop where its designers set them to, and so do 2 of Conflux
+  3.5's and 6 of The Towers of Chaos's, dungeons tuned in CSBWin, where they flew on
+  (`doc/PROVEN_FACTS.md` → "A launcher's step energy…", `tools/checks/missile-launcher.ts`).
 - 🚫 **RESURRECTED and REINCARNATED end with a full stop.** CSBWin prints a champion's
   name, then `" RESURRECTED"` or `" REINCARNATED"` (`doc/CSBwin-src/CSBCode.cpp:6859-6863`).
   The Atari's English programs, DM's and CSB's, print `" RESURRECTED."` and
