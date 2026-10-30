@@ -122,7 +122,7 @@ In payoff order: the first row is the next item.
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
 | C198 | A missile that cannot be made loses the object it was to carry | S | ⏳ |
-| F25 | The Atari's 93 known bugs, checked against CSBWin and the port | L | ⏳ step 5 next; five of step 4 wait on the author |
+| F25 | The Atari's 93 known bugs, checked against CSBWin and the port | L | ⏳ step 5 next |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏸️ |
@@ -810,49 +810,11 @@ nine steps it is split into, by subsystem: step 0 is the eight with nothing to c
 steps 1 to 8 hold 9 to 14 bugs each, one session a step. Steps 0 to 4 are checked; step 5
 is next. Paying it: each step fills its
 rows and adds nothing but its findings: a **port diverges** becomes a C item, a
-**CSBWin's fix** a C item or an H entry as the author decides, and a **faithful** bug
-stays a row, unless the author names it for H or X. A **game-breaking** bug (a crash or
+**CSBWin's fix** is kept without asking, the author's rule, a line of H's "The
+Atari's bugs that CSBWin fixes stay fixed", and a **faithful** bug stays a row, unless the author names it for H or X. A **game-breaking** bug (a crash or
 a hang, corrupted data, an object cloned or lost) is fixed even when it is faithful: a C
 item, then an H entry. A step's commit names `F25` and the
 step; the item is paid when no row is at "—".
-
-**Waiting on the author: `BUG0_32`, `BUG0_38`, `BUG0_41` with `BUG0_45`, `BUG0_54` and
-`BUG0_81`**, champions' bugs that no Atari release fixes and CSBWin does, as the port
-does. None is game-breaking: none hangs, crashes or loses an object.
-
-- `BUG0_32`: a read adds the object in hand's weight to the leader's load twice, once
-  for good, so every save made holding something adds to it (`doc/ReDMCSB-src/CHAMPRST.C:50`).
-  CSBWin leaves `d.HandChar` alone so that `SetHandOwner` adds nothing, "patch has been
-  put into the Atari code" (`doc/CSBwin-src/CSBCode.cpp:6394-6411`); the port sums the
-  load from the possessions (`CharacterStats.characterLoad`), so the Atari's would need a
-  load kept as a field.
-- `BUG0_38`: four cursed objects wrap a champion's luck minimum past 255, which makes them
-  luckier, not less lucky (`CHAMPION.C:482`, `:1144`). CSBWin's getters read a byte above 240 as
-  0 (`data.cpp:1713-1729`), so the curse lowers luck as meant; the port's too
-  (`attributes.ts`, `readByte`).
-- `BUG0_41` and `BUG0_45`: on the Atari, a compiler bug makes antifire, antimagic and
-  vitality count as 0 against fire, magic, poison and wounds (`CHAMPION.C:1117`), where
-  the Amiga's program reads them (`doc/CSBwin-src/Character.cpp:2098-2134`). CSBWin
-  reads them, after a discussion with ReDMCSB's author quoted in its source
-  (`Character.cpp:2047-2146`), and so does the port
-  (`ChampionDamage.attributeScaledReduction`). Reading vitality shows `BUG0_45`, which
-  the Atari's 0 hides: the wound test is inverted, so a champion of high vitality is
-  wounded more (`CHAMPION.C:1908`, `Character.cpp:2799-2812`).
-- `BUG0_54`: an action's defence modifier is added as it is done and taken off when the
-  champion may act again (`MENU.C:833`, `TIMELINE.C:1594`). A failed Climb Down never
-  disables the action (`MENU.C:1563`), so on the Atari each one leaves −15 for good, and
-  they add up; ReDMCSB's comment, that no action of the games' data meets the case, misses
-  it. CSBWin sets the modifier and clears it, "instead of adding and subtracting"
-  (`Character.cpp:4995`, `Timer.cpp:2652`, `CSB.h:2599-2621`), so the −15 lasts until the
-  next action; the port's too (`CharacterSystem.ts`, `TimerSystem.enableCharacterAction`).
-- `BUG0_81`: a champion whose strength in hand comes to 0 adds an uninitialised
-  modifier to a blow's damage (`PROJEXPL.C:1493`). CSBWin writes 0 (`Attack.cpp:707-709`), and so does the port
-  (`AttackSystem.ts`). No value is the Atari's to play.
-
-The options, for each: **(a)** keep CSBWin's fix, an H entry (recommended; for `BUG0_81`
-the only one a port can play); **(b)** play the Atari's, a C item. For `BUG0_41` and
-`BUG0_45` together, (a) keeps both, the statistics read and the wound test inverted, and
-(b) ignores the three statistics again, which hides `BUG0_45` with them.
 
 ---
 
@@ -1298,9 +1260,9 @@ Recorded so that nobody "fixes" them.
   (`src/engine/PartyFootprints.ts`, `tools/checks/amiga-scents.ts`,
   `tools/checks/magic-footprints.ts`). The comparisons thrown away stay: they are the
   Atari's, ReDMCSB's `BUG0_00`.
-- 🚫 **The Atari's game-breaking bugs that CSBWin fixes stay fixed.** Where an Atari
-  release hangs, crashes or loses an object and CSBWin does not, the port does as CSBWin
-  (`doc/ATARI_BUGS.md`):
+- 🚫 **The Atari's bugs that CSBWin fixes stay fixed.** The author's rule: where an Atari
+  release has a bug and CSBWin does not, the port does as CSBWin, on every set, whether
+  the bug hangs the game or only changes a number (`doc/ATARI_BUGS.md`):
   - `BUG0_02`: the timeline's times are 24 bits, so past 2^24 ticks every new event
     expires at once and the watchdog's loops forever (`doc/ReDMCSB-src/GAMELOOP.C:124`).
     CSBWin's are 32 bits (`doc/CSBwin-src/CSB.h:1881-1884`), a read save's widened
@@ -1348,6 +1310,44 @@ Recorded so that nobody "fixes" them.
     (`GROUP.C:2215`). CSB 2.0 draws it at random (`CHANGE7_19`, `:2208-2210`), and so do
     CSBWin (`Process_Invincible_And_Finish`, `Monster.cpp:1950-1952`) and the port
     (`MonsterAI.processInvincibleAndFinish`).
+  - `BUG0_67`: off the party's map, a group of wariness 10 or more (Vexirk, Zytaz,
+    Demon, Lord Chaos, Dragon) tests whether it may enter a teleporter against the
+    creature type of `G0380_T_CurrentGroupThing`, which every Atari release has not yet
+    set to that group (`doc/ReDMCSB-src/GROUP.C:1924`), so it may walk into a teleporter
+    to a map it dies on, or keep out of one it may take. CSBWin sets `d.LastMonsterMoved`
+    to the group first (`doc/CSBwin-src/Monster.cpp:2796`, "I have patched the Atari
+    code", `:736-741`), and the port tests the group moved
+    (`MonsterPerception.possibleMove`).
+  - `BUG0_68`: on every Atari release, an off-map group's next event and a reaction's
+    carry an uninitialised `C.Ticks`, CSBWin's `uByte8` (`GROUP.C:1940`, `:1979`), whatever the stack held,
+    so no value is the Atari's to play. CSBWin writes 0, "also patched into the Atari
+    binary" (`Monster.cpp:2880-2891`), and so does the port (`MonsterAI.ts`, `makeTimer`
+    in the group's turn).
+  - `BUG0_32`: a read adds the object in hand's weight to the leader's load twice, once
+    for good, so every save made holding something adds to it (`CHAMPRST.C:50`). CSBWin
+    leaves `d.HandChar` alone so that `SetHandOwner` adds nothing, "patch has been put
+    into the Atari code" (`doc/CSBwin-src/CSBCode.cpp:6394-6411`); the port sums the load
+    from the possessions and the object in hand (`CharacterStats.characterLoad`).
+  - `BUG0_38`: four cursed objects wrap a champion's luck minimum past 255, which makes
+    them luckier, not less lucky (`CHAMPION.C:482`, `:1144`). CSBWin's getters read a
+    byte above 240 as 0 (`data.cpp:1713-1729`), so the curse lowers luck as meant, and so
+    do the port's (`attributes.ts`, `readByte`).
+  - `BUG0_41`: a compiler bug makes antifire, antimagic and vitality count as 0 against
+    fire, magic, poison and wounds on the Atari (`CHAMPION.C:1117`), where the Amiga's
+    program reads them (`Character.cpp:2098-2134`). CSBWin reads them, after a discussion
+    with ReDMCSB's author quoted in its source (`Character.cpp:2047-2146`), and so does
+    the port (`ChampionDamage.attributeScaledReduction`). Reading vitality shows
+    `BUG0_45`, a faithful row.
+  - `BUG0_54`: an action's defence modifier is added as it is done and taken off when the
+    champion may act again (`MENU.C:833`, `TIMELINE.C:1594`). A failed Climb Down never
+    disables the action (`MENU.C:1563`), so each one leaves −15 for good, and they add up.
+    CSBWin sets the modifier and clears it, "instead of adding and subtracting"
+    (`Character.cpp:4995`, `Timer.cpp:2652`, `CSB.h:2599-2621`), so the −15 lasts until
+    the next action, as in the port (`CharacterSystem.ts`,
+    `TimerSystem.enableCharacterAction`).
+  - `BUG0_81`: a champion whose strength in hand comes to 0 adds an uninitialised modifier
+    to a blow's damage (`PROJEXPL.C:1493`). CSBWin writes 0 (`Attack.cpp:707-709`), and so
+    does the port (`AttackSystem.ts`).
 - 🚫 **A launcher's missiles lose its step energy, as CSB 2.1's do.** Every DM release
   and CSB 2.0 launch a wall launcher's missiles with no step energy, so they fly until they
   strike something, ReDMCSB's `BUG0_21` (`doc/ReDMCSB-src/TIMELINE.C:1120`, `:1127`); CSB
@@ -1367,22 +1367,6 @@ Recorded so that nobody "fixes" them.
   `doc/CSBwin-src/Character.cpp:261-265`). The author's choice: the port does so on every
   set, the DM sets too (`makeMoreRoomInDB`, `src/engine/MakeMoreRoomInDB.ts`,
   `tools/checks/make-more-room.ts`).
-- 🚫 **A wary group off the party's map is tested as itself, and a group's next event
-  carries 0 in its `uByte8`, as CSBWin patched the Atari binary.** The author's choice,
-  on every set:
-  - `BUG0_67`: off the party's map, a group of wariness 10 or more (Vexirk, Zytaz,
-    Demon, Lord Chaos, Dragon) tests whether it may enter a teleporter against the
-    creature type of `G0380_T_CurrentGroupThing`, which every Atari release has not yet
-    set to that group (`doc/ReDMCSB-src/GROUP.C:1924`), so it may walk into a teleporter
-    to a map it dies on, or keep out of one it may take. CSBWin sets `d.LastMonsterMoved`
-    to the group first (`doc/CSBwin-src/Monster.cpp:2796`, "I have patched the Atari
-    code", `:736-741`), and the port tests the group moved
-    (`MonsterPerception.possibleMove`).
-  - `BUG0_68`: on every Atari release, an off-map group's next event and a reaction's
-    carry an uninitialised `C.Ticks`, CSBWin's `uByte8` (`GROUP.C:1940`, `:1979`), whatever the stack held,
-    so no value is the Atari's to play. CSBWin writes 0, "also patched into the Atari
-    binary" (`Monster.cpp:2880-2891`), and so does the port (`MonsterAI.ts`, `makeTimer`
-    in the group's turn).
 - 🚫 **A launcher aimed off its map launches nothing.** No release checks the square in
   front of a wall launcher: on the Atari, one on a map's edge shooting off it crashes the
   game, ReDMCSB's `BUG0_20` (`doc/ReDMCSB-src/TIMELINE.C:1117`), and CSBWin, which checks
