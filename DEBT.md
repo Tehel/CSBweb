@@ -122,7 +122,7 @@ In payoff order: the first row is the next item.
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
 | C198 | A missile that cannot be made loses the object it was to carry | S | ⏳ |
-| F25 | The Atari's 93 known bugs, checked against CSBWin and the port | L | ⏳ step 3 next |
+| F25 | The Atari's 93 known bugs, checked against CSBWin and the port | L | ⏳ step 4 next; `BUG0_67` and `BUG0_68` wait on the author |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏸️ |
@@ -807,7 +807,7 @@ and the port have each one is not known, but for `BUG0_78` (faithful: a door clo
 the party wounds the head, never the hands) and `BUG0_00`'s scents (X18).
 `doc/ATARI_BUGS.md` holds the list, the way one bug is checked, the verdicts and the
 nine steps it is split into, by subsystem: step 0 is the eight with nothing to compare,
-steps 1 to 8 hold 9 to 14 bugs each, one session a step. Steps 0 to 2 are checked; step 3
+steps 1 to 8 hold 9 to 14 bugs each, one session a step. Steps 0 to 3 are checked; step 4
 is next. Paying it: each step fills its
 rows and adds nothing but its findings: a **port diverges** becomes a C item, a
 **CSBWin's fix** a C item or an H entry as the author decides, and a **faithful** bug
@@ -815,6 +815,26 @@ stays a row, unless the author names it for H or X. A **game-breaking** bug (a c
 a hang, corrupted data, an object cloned or lost) is fixed even when it is faithful: a C
 item, then an H entry. A step's commit names `F25` and the
 step; the item is paid when no row is at "—".
+
+**Waiting on the author: `BUG0_67` and `BUG0_68`**, two of the Atari's group bugs that
+no release fixes and that CSBWin patched out of the Atari binary it translated. Neither
+is game-breaking.
+
+- `BUG0_67`: off the party's map, a wary group (wariness 10 or more: Vexirk, Zytaz,
+  Demon, Lord Chaos, Dragon) tests whether it may enter a teleporter against the creature
+  type of `G0380_T_CurrentGroupThing`, which the Atari has not yet set to that group
+  (`doc/ReDMCSB-src/GROUP.C:1924`), so it may walk into a teleporter to a map it dies on,
+  or keep out of one it may take. CSBWin sets `d.LastMonsterMoved` to the group first
+  (`doc/CSBwin-src/Monster.cpp:2796`, "I have patched the Atari code", `:736-741`), and
+  the port tests the group moved (`MonsterPerception.ts:467`). Playing the Atari's means
+  keeping the last group that variable held, from every place the Atari sets it.
+- `BUG0_68`: an off-map group's next event and a reaction's carry an uninitialised
+  `C.Ticks` (`GROUP.C:1940`, `:1979`), whatever the stack held. CSBWin writes 0, "also
+  patched into the Atari binary" (`Monster.cpp:2880-2891`), and so does the port
+  (`MonsterAI.ts:1387`). No value is the Atari's to play.
+
+The options, for each: **(a)** keep CSBWin's patch, an H entry (recommended, and for
+`BUG0_68` the only one a port can play); **(b)** play the Atari's, a C item.
 
 ---
 
@@ -1285,6 +1305,31 @@ Recorded so that nobody "fixes" them.
   - `BUG0_25`: the Vi altar unlinks the bones and never frees them, until no junk is left
     to make bones of (`TIMELINE.C:1685`; CSB 2.1 frees them, `:1686-1688`). CSBWin deletes
     them (`Timer.cpp:2762`, `:2781`, `:2793`).
+  - `BUG0_11`: the groups on the party's map have 60 `ACTIVE_GROUP`s, and one group more
+    gets none and corrupts what lies past them (`GROUP.C:419`). CSBWin grows `d.Item16`
+    by 50 when none is free (`AttachItem16ToMonster`, `doc/CSBwin-src/CSBCode.cpp:6102-6131`)
+    and gives up past 1050, ending the program (`:6133-6137`); the port grows it as
+    CSBWin does, and past 1050 leaves the group without one (`attachItem16ToMonster`,
+    `src/engine/MonsterSystem.ts`).
+  - `BUG0_12`: an object taken from an open chest keeps its link to the next one, so a
+    Giggler with nothing yet that steals it steals the rest of the chest too, cloned
+    (`GROUP.C:1064`). CSBWin clears every link when it shows a chest's contents
+    (`ShowChestContents`, `Character.cpp:3093-3106`), as the port does (`showChestContents`,
+    `src/engine/OpenChest.ts`).
+  - `BUG0_13`: a Lord Order or a Grey Lord casts a missile of whatever thing an
+    uninitialised variable names (`GROUP.C:1763`). CSBWin starts from `RNnul` and launches
+    nothing for it (`Monster.cpp:1045`, `:1181-1196`), and so does the port
+    (`MonsterAttack.chooseMissile`).
+  - `BUG0_22`: on every DM release, a teleporter or pit that opens under two things that
+    land on its own square again loops forever (`TIMELINE.C:1389`). CSB 2.0 moves the
+    group first, then only as many things as it counted (`CHANGE7_22`, `:1398-1417`), and
+    so do CSBWin (`WiggleEverything`, `Timer.cpp:2446-2470`) and the port
+    (`TimerSystem.wiggleEverything`).
+  - `BUG0_69`: on DM's releases, Lord Chaos sensing danger on his square, a closing door
+    among them, moves in a direction read from an uninitialised variable and corrupts memory
+    (`GROUP.C:2215`). CSB 2.0 draws it at random (`CHANGE7_19`, `:2208-2210`), and so do
+    CSBWin (`Process_Invincible_And_Finish`, `Monster.cpp:1950-1952`) and the port
+    (`MonsterAI.processInvincibleAndFinish`).
 - 🚫 **A launcher's missiles lose its step energy, as CSB 2.1's do.** Every DM release
   and CSB 2.0 launch a wall launcher's missiles with no step energy, so they fly until they
   strike something, ReDMCSB's `BUG0_21` (`doc/ReDMCSB-src/TIMELINE.C:1120`, `:1127`); CSB
