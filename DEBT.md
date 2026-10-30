@@ -122,7 +122,7 @@ In payoff order: the first row is the next item.
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
 | C198 | A missile that cannot be made loses the object it was to carry | S | ⏳ |
-| F25 | The Atari's 93 known bugs, checked against CSBWin and the port | L | ⏳ step 3 next; `BUG0_09` waits on the author |
+| F25 | The Atari's 93 known bugs, checked against CSBWin and the port | L | ⏳ step 3 next |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏸️ |
@@ -816,15 +816,6 @@ a hang, corrupted data, an object cloned or lost) is fixed even when it is faith
 item, then an H entry. A step's commit names `F25` and the
 step; the item is paid when no row is at "—".
 
-**Waiting on the author: `BUG0_09`.** When a database is full, the Atari's DM releases
-discard an object from any square, a pad's too, so the pad lets go and may close a door
-or open a pit; CSB 2.0 skips a square with an actuator that is not disabled
-(`CHANGE7_17`, `doc/ReDMCSB-src/DUNGEON.C:1995-2004`), and so do CSBWin
-(`MakeMoreRoomInDB`, `doc/CSBwin-src/Character.cpp:261-265`) and the port, on every set.
-CSBWin reaches the discard only once a database holds 8000 records (`CSB.h:1649`). The
-options: **(a)** keep CSB 2.0's skip on every set, an H entry, as `BUG0_21` plays CSB
-2.1's (recommended); **(b)** the DM sets discard as DM's releases do, a C item.
-
 ---
 
 ## G — Unported CSBWin features
@@ -1304,6 +1295,15 @@ Recorded so that nobody "fixes" them.
   as before; CSB's 12 now stop where its designers set them to, and so do 2 of Conflux
   3.5's and 6 of The Towers of Chaos's, dungeons tuned in CSBWin, where they flew on
   (`doc/PROVEN_FACTS.md` → "A launcher's step energy…", `tools/checks/missile-launcher.ts`).
+- 🚫 **A full database discards nothing from a square with a working sensor, as CSB 2.0
+  does.** When a database is full, the Atari's DM releases, 1.0 to 1.3, discard an object
+  from any square, a pad's too, so the pad lets go and may close a door or open a pit,
+  ReDMCSB's `BUG0_09` (`doc/ReDMCSB-src/DUNGEON.C:1995-1996`). CSB 2.0 and every later
+  release, the Amiga's and the PC's among them, leave a square at its first sensor that is
+  not disabled (`CHANGE7_17`, `:1998-2004`), and so does CSBWin (`MakeMoreRoomInDB`,
+  `doc/CSBwin-src/Character.cpp:261-265`). The author's choice: the port does so on every
+  set, the DM sets too (`makeMoreRoomInDB`, `src/engine/MakeMoreRoomInDB.ts`,
+  `tools/checks/make-more-room.ts`).
 - 🚫 **A launcher aimed off its map launches nothing.** No release checks the square in
   front of a wall launcher: on the Atari, one on a map's edge shooting off it crashes the
   game, ReDMCSB's `BUG0_20` (`doc/ReDMCSB-src/TIMELINE.C:1117`), and CSBWin, which checks
