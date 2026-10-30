@@ -122,6 +122,7 @@ In payoff order: the first row is the next item.
 | --- | --- | --- | --- |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
 | F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
+| F25 | The Atari's 93 known bugs, checked against CSBWin and the port | L | ⏳ step 0 next |
 | C194 | A DSA's wall graphic counts as a real decoration, so it hides no text | S | ⏳ |
 | C195 | Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space | S | ⏳ to decide with the author |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
@@ -144,7 +145,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: A11 · C196 · D22 · E45 · F25 · G32 · P13 · R17 · U13 · W8 · X19. An ID recorded and paid in one commit has no
+Next free IDs: A11 · C196 · D22 · E45 · F26 · G32 · P13 · R17 · U13 · W8 · X19. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -795,6 +796,23 @@ Paying it, in steps:
    that takes a log, its corrections, the instance and a `playerId`, builds the package of
    the game's end (`RecordingPackage`) and submits it to `api/recordings`, with the run's
    player and time in its metadata.
+
+---
+
+### F25 ⏳ The Atari's 93 known bugs, checked against CSBWin and the port
+
+ReDMCSB lists 93 bugs of the Atari releases and tags each in its source. Whether CSBWin
+and the port have each one is not known, but for `BUG0_78` (faithful: a door closing on
+the party wounds the head, never the hands) and `BUG0_00`'s scents (X18).
+`doc/ATARI_BUGS.md` holds the list, the way one bug is checked, the verdicts and the
+nine steps it is split into, by subsystem: step 0 is the eight with nothing to compare,
+steps 1 to 8 hold 9 to 14 bugs each, one session a step. Paying it: each step fills its
+rows and adds nothing but its findings: a **port diverges** becomes a C item, a
+**CSBWin's fix** a C item or an H entry as the author decides, and a **faithful** bug
+stays a row, unless the author names it for H or X. A step's commit names `F25` and the
+step; the item is paid when no row is at "—".
+
+---
 
 ## G — Unported CSBWin features
 
