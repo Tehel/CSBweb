@@ -71,10 +71,10 @@ A number alone is `BUG0_nn`.
 
 | Bug | Step | What the player sees | Fixed by the Atari | CSBWin | Port | Verdict |
 | --- | --- | --- | --- | --- | --- | --- |
-| BUG0_00 | 0 | No perceptible symptom while playing the game | partly (CHANGE2_06) | — | — | — |
-| BUG0_01 | 0 | No perceptible symptom while playing the game | never | — | — | — |
+| BUG0_00 | 0 | No perceptible symptom while playing the game | partly (CHANGE2_06) | n/a: code with no effect, but the scents' comparison, which has one (X18) | n/a, but the scents (X18) | n/a |
+| BUG0_01 | 0 | No perceptible symptom while playing the game | never | n/a: errors with no effect | n/a | n/a |
 | BUG0_02 | 1 | After playing a single game for hundreds of hours (in one row or across multiple save/load … | never | — | — | — |
-| BUG0_03 | 0 | Graphical glitch | CSB 2.0 (CHANGE7_01) | — | — | — |
+| BUG0_03 | 0 | Graphical glitch | CSB 2.0 (CHANGE7_01) | n/a: no vertical blank interrupt switches its palette | n/a: each frame is composed with both palettes (`ScreenComposer`) | n/a |
 | BUG0_04 | 7 | Some creatures may be drawn with unexpected colors in Dungeon Master | never (DM's creature table only) | — | — | — |
 | BUG0_05 | 7 | A champion portrait sensor on a wall square is visible on all sides of the wall | never | — | — | — |
 | BUG0_06 | 7 | Graphical glitch when drawing projectiles or explosions | never | — | — | — |
@@ -129,11 +129,11 @@ A number alone is `BUG0_nn`.
 | BUG0_55 | 4 | A champion in the back row may perform a melee attack even if there is another champion … | 1.2 EN (CHANGE3_14) | — | — | — |
 | BUG0_56 | 5 | You can climb down a pit with the rope even if there is a group levitating over it | 1.3b FR (CHANGE6_00) | — | — | — |
 | BUG0_57 | 6 | The object in the leader hand disappears after saving the game | 1.0b EN (CHANGE1_02) | — | — | — |
-| BUG0_58 | 0 | The game stops with message 'SYSTEM ERROR 41' when you click Resume on the entrance screen … | 1.1 EN (CHANGE2_19) | — | — | — |
+| BUG0_58 | 0 | The game stops with message 'SYSTEM ERROR 41' when you click Resume on the entrance screen … | 1.1 EN (CHANGE2_19) | n/a: the floppy disk | n/a | n/a |
 | BUG0_59 | 6 | The game hangs when using the Fuse action on Lord Chaos | 1.1 EN (CHANGE2_20) | — | — | — |
 | BUG0_60 | 6 | On the Reincarnate/Resurrect screen, the 'Arrow' mouse pointer is replaced by the 'Hand' … | never | — | — | — |
-| BUG0_61 | 0 | The game stops with message 'SYSTEM ERROR 60' right after restarting from a saved game | 1.1 EN (CHANGE2_05) | — | — | — |
-| BUG0_62 | 0 | The game stops with message 'SYSTEM ERROR 41' if the game disk is removed from the floppy … | CSB 2.0 (CHANGE7_39) | — | — | — |
+| BUG0_61 | 0 | The game stops with message 'SYSTEM ERROR 60' right after restarting from a saved game | 1.1 EN (CHANGE2_05) | fixed: `TAG021028` resets `d.WatchdogTime` (`CSBCode.cpp:10610`) at the start (`:10801`) and at a restart (`Code1f9e6.cpp:318`) | no watchdog at all: C196 | absent; the port diverges (C196) |
+| BUG0_62 | 0 | The game stops with message 'SYSTEM ERROR 41' if the game disk is removed from the floppy … | CSB 2.0 (CHANGE7_39) | n/a: the floppy disk | n/a | n/a |
 | BUG0_63 | 5 | The behavior of groups and the directions of individual creatures in groups are not … | never | — | — | — |
 | BUG0_64 | 7 | Floor ornaments are drawn over open pits | never | — | — | — |
 | BUG0_65 | 2 | Torches created by object generator or projectile launcher sensors have no charges | never | — | — | — |
@@ -142,7 +142,7 @@ A number alone is `BUG0_nn`.
 | BUG0_68 | 3 | A group moves or acts with a wrong timing | never | — | — | — |
 | BUG0_69 | 3 | Memory corruption when you close a door on Lord Chaos | CSB 2.0 (CHANGE7_19) | — | — | — |
 | BUG0_70 | 3 | A projectile impact on a creature may be ignored | never | — | — | — |
-| BUG0_71 | 0 | Some timings are too short on fast computers | never | — | — | — |
+| BUG0_71 | 0 | Some timings are too short on fast computers | never | paced: the zoom's `VBLDelay(2)` and the `VBLDelay(20)` after it (`CSBCode.cpp:9451`, `:9476`), the doors' six VBLs a step (`:9550`), the fusion's `testdelay` (`Attack.cpp:19`, `:2312`); no view drawn in a fall (`Code11f52.cpp:3068`) | the same: `TitleSequence.ts:127`, `PrisonDoor.ts:66`, `Fusion.ts:20`, and `WorldMove.ts` draws nothing | n/a: no ST to outrun |
 | BUG0_72 | 4 | The party moves very slowly even though no champion 'Load' value is drawn in red | never | — | — | — |
 | BUG0_73 | 5 | A mouse click may be ignored | never | — | — | — |
 | BUG0_74 | 7 | Creatures are drawn with wrong colors when viewed through a wall with the 'Thieve's Eye' spell | never | — | — | — |
@@ -153,7 +153,7 @@ A number alone is `BUG0_nn`.
 | BUG0_79 | 5 | Stamina is decreased and experience is gained even when the Climb Down action fails | never | — | — | — |
 | BUG0_80 | 6 | Data is corrupted in memory and the game eventually crashes | never | — | — | — |
 | BUG0_81 | 4 | A weak champion may inflict high damage | never | — | — | — |
-| BUG0_82 | 0 | LZW compressed data fails to decompress | never | — | — | — |
+| BUG0_82 | 0 | LZW compressed data fails to decompress | never | has it: `Graphics.cpp:2764`, and the Hint Oracle's `Hint.cpp:3070` | has it: `compression.ts:132`, both files' one decoder | faithful: the three decode alike, so a file reads here as on the Atari |
 | BUG0_83 | 7 | The hole created by the Window action or the Thieve's Eye spell moves with opening doors | never | — | — | — |
 | BUG0_84 | 8 | The ending screen with champion portraits is displayed with an incorrect color palette that … | never | — | — | — |
 | BUG0_85 | 5 | Movement over a group is not blocked if there are no champions in the party | never | — | — | — |

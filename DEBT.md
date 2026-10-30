@@ -123,9 +123,10 @@ In payoff order: the first row is the next item.
 | --- | --- | --- | --- |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
 | F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
-| F25 | The Atari's 93 known bugs, checked against CSBWin and the port | L | ⏳ step 0 next |
+| F25 | The Atari's 93 known bugs, checked against CSBWin and the port | L | ⏳ step 1 next |
 | C194 | A DSA's wall graphic counts as a real decoration, so it hides no text | S | ⏳ |
 | C195 | Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space | S | ⏳ to decide with the author |
+| C196 | No watchdog timer: CSBWin's `TT_53`, queued every 300 ticks | S | ⏳ |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | E40 | The statistics page's heat map | M | ⏸️ |
 | E44 | The recording viewer seeks forward and back | M–L | ⏸️ |
@@ -146,7 +147,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: A11 · C196 · D22 · E45 · F26 · G32 · P13 · R17 · U13 · W8 · X19. An ID recorded and paid in one commit has no
+Next free IDs: A11 · C197 · D22 · E45 · F26 · G32 · P13 · R17 · U13 · W8 · X19. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -657,6 +658,24 @@ code past the font draws, which CSBWin never reaches. Paying it: port the round 
 without a table (G21 holds `Translation.txt`), and decide with the author whether the
 French set keeps its letters, a deliberate divergence under H.
 
+### C196 ⏳ No watchdog timer: CSBWin's `TT_53`, queued every 300 ticks
+
+A new game in CSBWin queues a `TT_53` timer 300 ticks on (`GameTimers::InitializeTimers`,
+`doc/CSBwin-src/Timer.cpp:730-741`; `SetWatchdogTimer`, `:2817-2829`), and each one that
+fires queues the next (`CSBCode.cpp:6572`) and sets `d.WatchdogTime` to its time.
+`MainLoop` dies with error 60 once `d.Time` passes it (`:708-712`), and `TAG021028` sets it
+to `0xffffffff` at every start and restart (`:10610`), so a save read waits for its own
+timer. Every genuine save in `tools/fixtures/` queues exactly one, at a multiple of 300.
+The port's `TimerFunction` has no `TT_53`: a new game queues none, a save's fires into
+`dispatch`'s `default` and is dropped (`src/engine/TimerSystem.ts`), so the port's saves
+hold none, and there is no `d.WatchdogTime` nor its check. What that changes: the queue
+holds one timer fewer than CSBWin's, and since every `SetTimer` stamps the next sequence
+(`Timer.cpp:1189`), every timer queued after the first watchdog carries a lower stamp than
+CSBWin's, and so does `gb2.TimerSequence` in a save. Paying it: `TT_53` and
+`SetWatchdogTimer`, at a new game and at the timer; `d.WatchdogTime`, reset where
+`TAG021028` resets it and checked where `MainLoop` checks it, through `die`; and a check
+that a new game and a read save each keep one `TT_53` queued as the clock runs.
+
 ### C150 ⏸️ Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops
 
 Not a divergence yet: the port does what CSBWin's source does. Recorded because only play
@@ -807,7 +826,8 @@ and the port have each one is not known, but for `BUG0_78` (faithful: a door clo
 the party wounds the head, never the hands) and `BUG0_00`'s scents (X18).
 `doc/ATARI_BUGS.md` holds the list, the way one bug is checked, the verdicts and the
 nine steps it is split into, by subsystem: step 0 is the eight with nothing to compare,
-steps 1 to 8 hold 9 to 14 bugs each, one session a step. Paying it: each step fills its
+steps 1 to 8 hold 9 to 14 bugs each, one session a step. Step 0 is checked; step 1 is
+next. Paying it: each step fills its
 rows and adds nothing but its findings: a **port diverges** becomes a C item, a
 **CSBWin's fix** a C item or an H entry as the author decides, and a **faithful** bug
 stays a row, unless the author names it for H or X. A **game-breaking** bug (a crash or
