@@ -146,7 +146,8 @@ What holds:
   `src/engine/Game.ts:1043`).
 - **The attack menu's damage flash is counted in VBLs**, the engine's
   (`ATTACK_FLASH_VBLS`, `src/engine/AttackMenu.ts`), where CSBWin's `VBLDelay(15)` stops
-  the game (`DEBT.md` H).
+  the game (`DEBT.md` H). It only draws: the buttons are back in the game at the next
+  tick, as CSBWin's.
 - The page's wall-clock uses (`nowMs`, `src/renderer/ui/UIState.ts`), a menu button's
   press and the mouth's chew, only draw, a menu's under a stopped clock.
 

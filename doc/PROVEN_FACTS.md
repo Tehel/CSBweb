@@ -2300,7 +2300,12 @@ it sets `d.AttackingCharacterOrdinal = 0` and `d.Word20250 = 1` (`:4904-4922`). 
 closed menu stays on the screen until the next tick's `TAG01b29a`
 (`doc/CSBwin-src/CSBCode.cpp:8948-8959`) flashes the damage over it, or draws the
 buttons. After the flash, `d.Word20250` is still 1, so the damage stays up until the tick
-after, whose `TAG01b29a` draws the buttons. `tools/checks/attack-panel.ts` checks the port.
+after, whose `TAG01b29a` draws the buttons and sets `d.Word20252`. `VBLDelay` only waits
+VBLs (`CSBCode.cpp:1147-1157`) and counts no `d.Time`, so in a recording's ticks the
+buttons are back, and a click on one opens its menu (`_TAG019fac`,
+`doc/CSBwin-src/Character.cpp:4741-4752`), at the tick after the flash's: the 17.6 run
+`DMMovie2615` clicks one there at `d.Time` 0x49c (`DEBT.md` F24).
+`tools/checks/attack-panel.ts` checks the port.
 
 `TAG01b29a` turns no champion to face their attacker while the party sleeps or a candidate
 stands at a mirror (`d.PotentialCharacterOrdinal`, `doc/CSBwin-src/CSBCode.cpp:8913-8921`),

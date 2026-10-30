@@ -24,10 +24,12 @@
  * quarter-second in which the whole game is stopped, and the next tick, due by then,
  * draws the buttons over it. A browser cannot block the frame loop, so the flash is
  * counted instead, in the engine's VBLs (`ATTACK_FLASH_VBLS`, `src/engine/AttackMenu.ts`),
- * and `tag01b29a` brings the buttons back no sooner than it runs out; the game keeps
- * running underneath, as it already does for the feeding animation. The author's decision
- * is a longer flash, for the text to be read (`DEBT.md` H). The figure stays up after the
- * flash, as CSBWin's does, until `DrawLegalAttackTypes` draws over it.
+ * and the game keeps running underneath, as it already does for the feeding animation.
+ * The author's decision is a longer flash, for the text to be read (`DEBT.md` H). It is
+ * the screen's alone: `tag01b29a` brings the buttons back at the next tick, as CSBWin's,
+ * and the panel draws the damage over them until the flash runs out, or a menu opens.
+ * The figure stays up after the flash, as CSBWin's does, until `DrawLegalAttackTypes`
+ * draws over it.
  */
 import { OBJNI_SPECIAL_C } from '../../core/objectNameIndex';
 import { DBType, OBJECT_ID_NULL } from '../../core/types';
@@ -152,7 +154,8 @@ export function prepareAttack(ui: UIState, chIdx: number): void {
  */
 export function drawLegalAttackTypesDrawing(ui: UIState, options: AttackOptions | null): void {
   ui.closedAttackMenuOrdinal = 0;
-  ui.attackFlashValue = 0;
+  // The buttons are drawn once the flash has run out (`drawAttackPanel`).
+  if (options || ui.ctx.interface.attackFlashVbls === 0) ui.attackFlashValue = 0;
   if (!options) return;
   ui.attackOptionCount = options.count;
   for (let i = 0; i < 3; i++) ui.attackOptionNames[i] = options.names[i]!;
@@ -315,8 +318,9 @@ export function drawAttackPanel(ui: UIState): void {
 
   fillRectIndex(ui.screenIndexBuffer, ui.uiTables.graphic232.word20, 0);
 
-  // The damage stays up after its flash, until `DrawLegalAttackTypes` draws over it.
-  if (ui.attackFlashValue !== 0) {
+  // The damage stays up after its flash, until `DrawLegalAttackTypes` draws over it, and
+  // over the buttons it brought back until the flash runs out (`ATTACK_FLASH_VBLS`).
+  if (ui.attackFlashValue !== 0 && (ui.ctx.interface.word20252 === 0 || ui.ctx.interface.attackFlashVbls !== 0)) {
     drawAttackDamageFlash(ui);
     return;
   }

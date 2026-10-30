@@ -47,8 +47,8 @@ export interface InterfaceState {
   word20252: number;
   /**
    * The port's own: the VBLs left of the damage's flash, which `TAG01b29a` sets and
-   * `Game.runFrame` runs down, and while which it leaves the panel owed its redraw, where
-   * CSBWin's `VBLDelay(15)` stops the game (`DEBT.md` H, `ATTACK_FLASH_VBLS`).
+   * `Game.runFrame` runs down, and while which the panel draws the damage over the
+   * buttons, where CSBWin's `VBLDelay(15)` stops the game (`DEBT.md` H, `ATTACK_FLASH_VBLS`).
    */
   attackFlashVbls: number;
 }

@@ -22,7 +22,7 @@ import { Party } from '../../src/engine/Party';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../../src/engine/AddCharacter';
 import { createPaletteIndexViewportBuffer } from '../../src/renderer/csbwin/CanvasBlitter';
 import { ATTACK_FLASH_VBLS, tag01b1c0, tag01b29a } from '../../src/engine/AttackMenu';
-import { drawAttackPanel, executeAttack, prepareAttack, takeAttackOption } from '../../src/renderer/ui/Attack';
+import { attackButtonRect, drawAttackPanel, executeAttack, handleAttackAreaClick, prepareAttack, takeAttackOption } from '../../src/renderer/ui/Attack';
 import { VBL_PER_TICK } from '../../src/engine/LoopState';
 import { type UIState } from '../../src/renderer/ui/UIState';
 import { check, finish } from '../lib/check';
@@ -103,10 +103,10 @@ async function main(): Promise<void> {
   const damage = render('the tick: the damage');
   check(damage !== menu && damage !== buttons, "the tick's FlashAttackDamage draws the damage over it");
   // The author's flash (DEBT.md H): over one tick and under two, where CSBWin's
-  // VBLDelay(15) is one. The next tick, a tick's VBLs on, leaves the damage up.
+  // VBLDelay(15) is one. The next tick, a tick's VBLs on, leaves the damage drawn.
   check(ATTACK_FLASH_VBLS > VBL_PER_TICK && ATTACK_FLASH_VBLS < 2 * VBL_PER_TICK,
     `the flash, ${ATTACK_FLASH_VBLS} VBLs, is over one tick and under two`);
-  check(ui.ctx.interface.attackFlashVbls === ATTACK_FLASH_VBLS, 'the flash holds the buttons back for its VBLs');
+  check(ui.ctx.interface.attackFlashVbls === ATTACK_FLASH_VBLS, 'the flash is drawn for its VBLs');
   // A tick's VBLs, the clock stopped so that only this tool's `TAG01b29a` runs: each runs
   // the flash down, whatever the wall clock.
   const clockRunning = game.ctx.loop.clockRunning;
@@ -116,10 +116,31 @@ async function main(): Promise<void> {
   check(ui.ctx.interface.attackFlashVbls === ATTACK_FLASH_VBLS - VBL_PER_TICK,
     `a tick's ${VBL_PER_TICK} VBLs leave ${ATTACK_FLASH_VBLS - VBL_PER_TICK} of the flash, not ${ui.ctx.interface.attackFlashVbls}`);
   tag01b29a(ui.ctx);
-  check(render('a tick on') === damage, 'the first tick after the flash leaves the damage up');
-  ui.ctx.interface.attackFlashVbls = 0;
+  // The flash is the screen's alone: in the game, the buttons are back at the next tick,
+  // as CSBWin's, whose VBLDelay(15) counts no d.Time (CSBCode.cpp:8954-8958), and a
+  // click on one opens its menu (`_TAG019fac`, Character.cpp:4741-4752).
+  check(ui.ctx.interface.word20252 === 1, 'the next tick brings the buttons back in the game (CSBCode.cpp:8954-8958)');
+  check(render('a tick on') === damage, 'and the damage stays drawn over them for the rest of the flash');
+  const button = attackButtonRect(0);
+  handleAttackAreaClick(ui, button.x1 + 2, button.y1 + 2);
+  check(render('a click on champion 1 under the flash') === menu,
+    "a click on a button under the flash opens its menu, without the damage (Character.cpp:4741-4752)");
+  check(ui.ctx.interface.attackFlashVbls === 0, 'and ends the flash');
+  executeAttack(ui, -1);
+  tag01b29a(ui.ctx);
+  check(render('PASS, and the tick') === buttons, 'its PASS brings the buttons back at the tick');
+
+  takeAttackOption(ui, 0);
+  check(render('no menu open, an attack') === buttons, 'an attack with no menu open does nothing');
+  prepareAttack(ui, 0);
+  takeAttackOption(ui, 0);
+  tag01b29a(ui.ctx);
+  check(render('the damage, its tick') === damage, 'another attack flashes the damage');
+  game.ctx.loop.clockRunning = false;
+  for (let n = 0; n < ATTACK_FLASH_VBLS; n++) game.runFrame();
+  game.ctx.loop.clockRunning = clockRunning;
   check(render('the flash over, before the tick') === damage,
-    'the damage stays up after its VBLDelay(15) (Attack.cpp:1039)');
+    'the damage stays up after its VBLDelay(15) until the tick (Attack.cpp:1039)');
   tag01b29a(ui.ctx);
   check(render('the next tick') === buttons, 'and the next tick draws the buttons');
 
@@ -149,6 +170,7 @@ async function main(): Promise<void> {
     const screen = createPaletteIndexViewportBuffer(320, 200, 7);
     ui.screenIndexBuffer = screen;
     ui.ctx.interface.attackingCharacterOrdinal = 0;
+    ui.ctx.interface.word20252 = 0;
     ui.attackFlashValue = value;
     drawAttackPanel(ui);
     let x1 = 320, x2 = -1;
@@ -162,6 +184,7 @@ async function main(): Promise<void> {
       `damage ${value}: the burst is whole inside ${name} and centred on the digits`);
   }
   ui.attackFlashValue = 0;
+  ui.ctx.interface.word20252 = 1;
 
   console.log('');
   console.log("=== CAN'T REACH and NEED AMMO, centred on x 272 (Attack.cpp:972-980) ===");
@@ -172,6 +195,7 @@ async function main(): Promise<void> {
     const screen = createPaletteIndexViewportBuffer(320, 200, 7);
     ui.screenIndexBuffer = screen;
     ui.ctx.interface.attackingCharacterOrdinal = 0;
+    ui.ctx.interface.word20252 = 0;
     ui.attackFlashValue = value;
     drawAttackPanel(ui);
     let x1 = 320;
@@ -184,6 +208,7 @@ async function main(): Promise<void> {
     check(x1 === left, `damage ${value}: the text starts at x ${left}`);
   }
   ui.attackFlashValue = 0;
+  ui.ctx.interface.word20252 = 1;
 
   console.log('');
   console.log('=== the flinch, with a candidate at the mirror (CSBCode.cpp:8913-8942) ===');

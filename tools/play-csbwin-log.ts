@@ -128,7 +128,7 @@ screen = new GameScreen(canvas as unknown as ConstructorParameters<typeof GameSc
   onReincarnated: () => {}, onListSaves: () => saves.list(), onListEverySave: () => saves.listEverySet(),
   onReadSave: no, onMakeNewAdventure: no, onHasNewFaces: async () => false, onSaveGame: no,
   isPrison: () => saves.inPrison(), onExportSave: no, onDeleteSave: no, onImportSave: no,
-  onRestoreSave: no, onRestoreFailed: (e) => { throw e; }, onOpenHintOracle: no, onSleepSave: no,
+  onRestoreSave: no, onRestoreFailed: (e) => { throw e; }, onOpenHintOracle: no, onSleepSave: () => {},
   onExit: () => {}, settings, isCrtAvailable: () => false, fullscreen: NO_FULLSCREEN,
   keyboardLayout: () => null, onTeleport: null,
 }, presenter, () => {});

@@ -759,9 +759,11 @@ What it establishes:
 - **Level 1's first round matches**: its fifteen groups' first turns
   (`doc/PROVEN_FACTS.md` → "A monster's turn reads `attackDistance` from its last
   `Blocked`").
-- **The 17.6 runs play on to level 2**: `DMMovie2615` to line 937 (`d.Time` 0x49e, level 1
-  at (21,21)), `DMMovie2823` to line 1203 (0x654, level 2 at (24,23)), each by
-  `d.RandomNumber`, the record 20 and 15 draws ahead of the port.
+- **The 17.6 runs play on deep**: `DMMovie2615` to line 3607 (`d.Time` 0x14a7, level 8
+  at (16,3)), `DMMovie2823` to line 2492 (0xe21, level 4 at (2,4)), each by
+  `d.RandomNumber`, through the attacks of the earlier levels (`doc/PROVEN_FACTS.md` →
+  "The attack panel keeps its last drawing until the next tick": the buttons are back
+  at the tick after the flash's).
 - **Drift 3, in the 11.0xx runs only** (`DMMovie42`, `43a`, `43b`, `45`): on level 0, with
   one champion, 1 draw short in the entry at about `d.Time` 0x6b and 2 in the next, at
   0x6e, wherever the party stands and whenever the champion joined; nothing after. The 17.6
@@ -785,7 +787,7 @@ What it establishes:
 Paying it, in steps:
 
 1. **The 17.6 runs' drifts first**, the version nearest CSBWin 2023: `--trace` the ticks
-   before `DMMovie2615`'s line 937 and `DMMovie2823`'s line 1203. Then drift 4, which the
+   before `DMMovie2615`'s line 3607 and `DMMovie2823`'s line 2492. Then drift 4, which the
    17.6 runs pass, so a 9.x CSBWin of its own until shown otherwise, and drift 3, whose
    fixed `d.Time` points at a timer or a periodic update.
 2. **Each next drift, the same way.** CSBWin's versions diverge from each other, which is
@@ -1313,17 +1315,18 @@ Recorded so that nobody "fixes" them.
   cursor's owner, rather than cached and adjusted at each of CSBWin's possession writers
   and `SetHandOwner`; a save file's without the hand, as `SaveGame` writes it. Same value,
   and it cannot drift. `tools/checks/hand-owner.ts` checks the hand's share; recorded in the module comment of `src/engine/CharacterStats.ts`.
-- 🚫 **`_FlashAttackDamage` does not stop the game, and lasts two ticks.** CSBWin's ends in
-  `VBLDelay(15)`, which halts everything for a quarter of a second, and the tick due by
-  then draws the buttons over the damage (`doc/CSBwin-src/Attack.cpp:1039`,
-  `CSBCode.cpp:8950-8958`). The port holds the panel's redraw back while the game keeps
-  running, as it already does for the feeding animation. The author's decision is 24
-  VBLs, 400 ms (`ATTACK_FLASH_VBLS`, `src/engine/AttackMenu.ts`), over one tick and under
-  two, so the text can be read: the damage is up for two ticks, half a second, where
-  CSBWin's is up for one. The count is the engine's, run down by every VBL
-  (`Game.runFrame`), so a replay of the same inputs holds it alike. The keys still open
-  an attack menu over it, which ends the flash. `tools/checks/attack-panel.ts` checks that
-  the first tick after the flash leaves it up.
+- 🚫 **`_FlashAttackDamage` does not stop the game, and is drawn for two ticks.** CSBWin's
+  ends in `VBLDelay(15)`, which halts everything for a quarter of a second, and the tick
+  due by then draws the buttons over the damage (`doc/CSBwin-src/Attack.cpp:1039`,
+  `CSBCode.cpp:8950-8958`). The port draws the damage while the game keeps running, as it
+  already does for the feeding animation. The author's decision is 24 VBLs, 400 ms
+  (`ATTACK_FLASH_VBLS`, `src/engine/AttackMenu.ts`), over one tick and under two, so the
+  text can be read: the damage is up for two ticks, half a second, where CSBWin's is up
+  for one. The count is the engine's, run down by every VBL (`Game.runFrame`), so a
+  replay of the same inputs holds it alike. It is the screen's alone: the next tick's
+  `TAG01b29a` brings the buttons back in the game, as CSBWin's, so a click or a key on
+  one then opens its menu over the damage, which ends the flash, and CSBWin's recordings
+  click them when CSBWin's player did (F24). `tools/checks/attack-panel.ts` checks both.
 - 🚫 **Three inputs bypass the mouse queue:** the save menu and the Reincarnate screen,
   which are modal, and the panel keys in `src/renderer/ui/Keyboard.ts`, whose module
   comment gives the reason. So none of them reaches `totalMoveCount`: CSBWin's save menu
