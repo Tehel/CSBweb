@@ -123,9 +123,10 @@ In payoff order: the first row is the next item.
 | --- | --- | --- | --- |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
 | F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
-| F25 | The Atari's 93 known bugs, checked against CSBWin and the port | L | ⏳ step 1 next |
+| F25 | The Atari's 93 known bugs, checked against CSBWin and the port | L | ⏳ step 2 next |
 | C194 | A DSA's wall graphic counts as a real decoration, so it hides no text | S | ⏳ |
 | C195 | Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space | S | ⏳ to decide with the author |
+| C197 | A launcher aimed off its map loses what it takes, and a first missile not launched stops the second | S | ⏳ |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | E40 | The statistics page's heat map | M | ⏸️ |
 | E44 | The recording viewer seeks forward and back | M–L | ⏸️ |
@@ -146,7 +147,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: A11 · C197 · D22 · E45 · F26 · G32 · P13 · R17 · U13 · W8 · X19. An ID recorded and paid in one commit has no
+Next free IDs: A11 · C198 · D22 · E45 · F26 · G32 · P13 · R17 · U13 · W8 · X19. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -657,6 +658,24 @@ code past the font draws, which CSBWin never reaches. Paying it: port the round 
 without a table (G21 holds `Translation.txt`), and decide with the author whether the
 French set keeps its letters, a deliberate divergence under H.
 
+### C197 ⏳ A launcher aimed off its map loses what it takes, and a first missile not launched stops the second
+
+`TriggerMissileLauncher` checks no bound on the square in front of the launcher
+(`doc/CSBwin-src/Timer.cpp:1982-1983`). Off the map, `AddObjectToRoom` places the missile
+nowhere at x -1 (`Code11f52.cpp:465`), and past the other edges indexes past the level's
+columns or a column's cells: ReDMCSB's `BUG0_20`, a crash on the Atari
+(`doc/ReDMCSB-src/TIMELINE.C:1117`), which finds no such launcher in DM's and CSB's
+dungeons. The port returns there (`triggerMissileLauncher`,
+`src/engine/TimerSystem.ts:1321`), but only after the object launchers (types 14 and 15)
+have unlinked their objects from their square, or the others have made their missiles
+(`constructPredefinedMissile`), so those are lost: out of every chain, never freed. A bug
+that loses an object is fixed (`CLAUDE.md`), so the bound is checked before anything is
+taken or made, and a launcher aimed off its map launches nothing and keeps its objects, an
+H entry that cites both readings. And the port returns when the first `LaunchMissile`
+fails (`:1337`), where CSBWin launches the second all the same (`Timer.cpp:1997-2008`).
+Paying it: the bound before the objects, the second missile as CSBWin launches it, and a
+tool that triggers a launcher on a map's edge, aimed off it, with objects on its square.
+
 ### C150 ⏸️ Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops
 
 Not a divergence yet: the port does what CSBWin's source does. Recorded because only play
@@ -807,8 +826,8 @@ and the port have each one is not known, but for `BUG0_78` (faithful: a door clo
 the party wounds the head, never the hands) and `BUG0_00`'s scents (X18).
 `doc/ATARI_BUGS.md` holds the list, the way one bug is checked, the verdicts and the
 nine steps it is split into, by subsystem: step 0 is the eight with nothing to compare,
-steps 1 to 8 hold 9 to 14 bugs each, one session a step. Step 0 is checked; step 1 is
-next. Paying it: each step fills its
+steps 1 to 8 hold 9 to 14 bugs each, one session a step. Steps 0 and 1 are checked; step 2
+is next. Paying it: each step fills its
 rows and adds nothing but its findings: a **port diverges** becomes a C item, a
 **CSBWin's fix** a C item or an H entry as the author decides, and a **faithful** bug
 stays a row, unless the author names it for H or X. A **game-breaking** bug (a crash or
@@ -1259,6 +1278,26 @@ Recorded so that nobody "fixes" them.
   (`src/engine/PartyFootprints.ts`, `tools/checks/amiga-scents.ts`,
   `tools/checks/magic-footprints.ts`). The comparisons thrown away stay: they are the
   Atari's, ReDMCSB's `BUG0_00`.
+- 🚫 **The Atari's game-breaking bugs that CSBWin fixes stay fixed.** Where an Atari
+  release hangs, crashes or loses an object and CSBWin does not, the port does as CSBWin
+  (`doc/ATARI_BUGS.md`):
+  - `BUG0_02`: the timeline's times are 24 bits, so past 2^24 ticks every new event
+    expires at once and the watchdog's loops forever (`doc/ReDMCSB-src/GAMELOOP.C:124`).
+    CSBWin's are 32 bits (`doc/CSBwin-src/CSB.h:1881-1884`), a read save's widened
+    (`SaveGame.cpp:1879-1882`) and a save written so (`:991`), and the port's too.
+  - `BUG0_18`: from 1.2, the Atari stops with error 45 once the timeline holds the
+    dungeon's count of events (`TIMELINE.C:512-520`). CSBWin grows its table by a quarter
+    and stops only at 5000 (`Timer.cpp:1001-1010`), as the port does
+    (`src/engine/TimerQueue.ts:287-290`).
+  - `BUG0_19`: the object launcher's walks end at `THING_NONE`, not at the end of the
+    list, and run off it (`TIMELINE.C:1081-1099`). CSBWin's end at `RNeof`
+    (`Timer.cpp:1919-1953`).
+  - `BUG0_23`: an opened pit or teleporter moves a Fluxcage but not its `C24` event, so
+    the Fluxcage stays forever and clones what is put on it (`TIMELINE.C:1446`). CSBWin
+    moves `TT_24`'s with `TT_25`'s (`Timer.cpp:2497-2498`).
+  - `BUG0_25`: the Vi altar unlinks the bones and never frees them, until no junk is left
+    to make bones of (`TIMELINE.C:1685`; CSB 2.1 frees them, `:1686-1688`). CSBWin deletes
+    them (`Timer.cpp:2762`, `:2781`, `:2793`).
 - 🚫 **RESURRECTED and REINCARNATED end with a full stop.** CSBWin prints a champion's
   name, then `" RESURRECTED"` or `" REINCARNATED"` (`doc/CSBwin-src/CSBCode.cpp:6859-6863`).
   The Atari's English programs, DM's and CSB's, print `" RESURRECTED."` and

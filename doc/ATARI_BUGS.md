@@ -73,7 +73,7 @@ A number alone is `BUG0_nn`.
 | --- | --- | --- | --- | --- | --- | --- |
 | BUG0_00 | 0 | No perceptible symptom while playing the game | partly (CHANGE2_06) | n/a: code with no effect, but the scents' comparison, which has one (X18) | n/a, but the scents (X18) | n/a |
 | BUG0_01 | 0 | No perceptible symptom while playing the game | never | n/a: errors with no effect | n/a | n/a |
-| BUG0_02 | 1 | After playing a single game for hundreds of hours (in one row or across multiple save/load … | never | — | — | — |
+| BUG0_02 | 1 | After playing a single game for hundreds of hours (in one row or across multiple save/load … | never | fixed: a timer's time is 32 bits since 12.4 (`m_time`, `CSB.h:1881-1884`), a read save's 24-bit times are widened (`SaveGame.cpp:1879-1882`), and a save is written with `ExtendedTimers` (`:991`) | fixed: 32-bit times, read from any of the three forms (`parseTimers`, `src/data/SaveFile.ts`) and written in the 16-byte one (`SaveGameFile.ts:122`) | CSBWin's fix, game-breaking: kept (`DEBT.md` H) |
 | BUG0_03 | 0 | Graphical glitch | CSB 2.0 (CHANGE7_01) | n/a: no vertical blank interrupt switches its palette | n/a: each frame is composed with both palettes (`ScreenComposer`) | n/a |
 | BUG0_04 | 7 | Some creatures may be drawn with unexpected colors in Dungeon Master | never (DM's creature table only) | — | — | — |
 | BUG0_05 | 7 | A champion portrait sensor on a wall square is visible on all sides of the wall | never | — | — | — |
@@ -85,18 +85,18 @@ A number alone is `BUG0_nn`.
 | BUG0_11 | 3 | Data corruption in memory | never | — | — | — |
 | BUG0_12 | 3 | An object is cloned and appears at two different locations in the dungeon and/or inventory | partly (CHANGE8_09) | — | — | — |
 | BUG0_13 | 3 | The game may crash when Lord Order or Grey Lord cast spells | never (DM only) | — | — | — |
-| BUG0_14 | 1 | While life is frozen, creature reaction events are not ignored as they should | 1.2 EN (CHANGE3_04) | — | — | — |
+| BUG0_14 | 1 | While life is frozen, creature reaction events are not ignored as they should | 1.2 EN (CHANGE3_04) | fixed: a reaction (`timeFunc < TT_EMPTY`) is dropped while life is frozen (`Monster.cpp:3000-3014`) | fixed: the same test (`MonsterAI.ts:1449`) | absent |
 | BUG0_15 | 3 | The game hangs when you close a door on Lord Chaos | 1.1 EN (CHANGE2_03) | — | — | — |
 | BUG0_16 | 2 | An object disappears when it is thrown or shot by a champion or launched by a projectile … | CSB 2.1 (CHANGE8_00) | — | — | — |
 | BUG0_17 | 2 | The game crashes after the Fuse action is performed while looking at a wall on a map boundary | 1.3a FR (CHANGE5_02) | — | — | — |
-| BUG0_18 | 1 | A projectile stays immobile in the air, an explosion remains forever on a square, a spell … | 1.2 EN (CHANGE3_05) | — | — | — |
-| BUG0_19 | 1 | The game crashes when an object launcher sensor is triggered | never | — | — | — |
-| BUG0_20 | 1 | Game crash when a launcher sensor is triggered | never | — | — | — |
-| BUG0_21 | 1 | Projectiles created by launcher sensors never run out of kinetic energy and move until they … | CSB 2.1 (CHANGE8_01) | — | — | — |
+| BUG0_18 | 1 | A projectile stays immobile in the air, an explosion remains forever on a square, a spell … | 1.2 EN (CHANGE3_05) | fixed: `SetTimer` dies with error 45, but only at 5000 timers, growing the table by a quarter before (`Timer.cpp:1001-1010`), where the Atari stops at the dungeon's count | the same (`TimerQueue.ts:287-290`) | absent; the table's growth kept (`DEBT.md` H) |
+| BUG0_19 | 1 | The game crashes when an object launcher sensor is triggered | never | fixed: the object launcher's walks end at `RNeof`, "Original had RNnul" (`Timer.cpp:1919-1933`, `:1939-1953`) | fixed: the same walk (`takeObject`, `TimerSystem.ts:1275`) | CSBWin's fix, game-breaking: kept (`DEBT.md` H) |
+| BUG0_20 | 1 | Game crash when a launcher sensor is triggered | never | has it: no bound is checked (`Timer.cpp:1982-1983`), so `AddObjectToRoom` places the missile nowhere at x -1 (`Code11f52.cpp:465`) and reads past the level's columns or a column's cells elsewhere | diverges: it returns when the square is off the map (`TimerSystem.ts:1321`), after the launcher has taken its objects from the square or made its missiles, which are lost | port diverges, game-breaking: C197 |
+| BUG0_21 | 1 | Projectiles created by launcher sensors never run out of kinetic energy and move until they … | CSB 2.1 (CHANGE8_01) | has it: `decayRate` 0 (`Timer.cpp:1993`, `:2005`) | has it: 0 (`TimerSystem.ts:1333`, `:1349`) | faithful to DM and CSB 2.0, not CSB 2.1 |
 | BUG0_22 | 3 | When a teleporter or pit opens, the game hangs or some things are not moved correctly | CSB 2.0 (CHANGE7_22) | — | — | — |
-| BUG0_23 | 1 | A Fluxcage explosion remains on a square forever | never | — | — | — |
-| BUG0_24 | 1 | Lord Chaos becomes invisible | 1.1 EN (CHANGE2_07) | — | — | — |
-| BUG0_25 | 1 | When a champion dies, no bones object is created so it is not possible to bring the … | CSB 2.1 (CHANGE8_03) | — | — | — |
+| BUG0_23 | 1 | A Fluxcage explosion remains on a square forever | never | fixed: an opened pit or teleporter moves every `TT_25` and `TT_24` naming the cloud (`WiggleEverything`, `Timer.cpp:2497-2498`), and a DSA's move too (`MoveObject.cpp:238`) | fixed: the same two (`wiggleEverything`, `TimerSystem.ts:1773`; `src/engine/dsa/ops/move.ts:266`) | CSBWin's fix, game-breaking: kept (`DEBT.md` H) |
+| BUG0_24 | 1 | Lord Chaos becomes invisible | 1.1 EN (CHANGE2_07) | fixed: Lord Chaos tries a random adjacent square one time in four (`ProcessTimer60and61`, `Timer.cpp:2597-2623`) | fixed: the same (`processAbeyanceTimer`, `MonsterSystem.ts:699`) | absent |
+| BUG0_25 | 1 | When a champion dies, no bones object is created so it is not possible to bring the … | CSB 2.1 (CHANGE8_03) | fixed: the altar deletes the bones it takes (`ProcessTT_ViAltar`, `Timer.cpp:2762`, `:2781`, `:2793`) | fixed: the same (`processViAltar`, `TimerSystem.ts:1043-1044`; `reviveInWings`, `:1070-1071`) | CSBWin's fix, as CSB 2.1's, game-breaking: kept (`DEBT.md` H) |
 | BUG0_26 | 2 | An explosion may fall in a pit | never | — | — | — |
 | BUG0_27 | 5 | The dungeon view is drawn during a fall while the party is sleeping | 1.2 EN (CHANGE3_06) | — | — | — |
 | BUG0_28 | 5 | When falling through multiple pits the dungeon view is updated to show each traversed map … | CSB 2.1 (CHANGE8_04) | — | — | — |
