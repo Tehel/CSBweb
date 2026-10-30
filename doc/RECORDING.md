@@ -10,6 +10,17 @@ and player, and what sharing recordings would take.
 recording made before it play out differently. A recording carries the build that made it,
 and its `d.RandomNumber` values show the first entry where a later build parts from it.
 
+**Recordings are paused.** The port's behaviour is still changing (the Atari's known bugs,
+`DEBT.md` F25, and the monsters' scents, X18), and each change would leave every recording
+made before it unplayable. So a page writes no recording to the store, and the welcome
+page's book has no RECORDINGS tab, a local set no book (`src/ui/recordingsSwitch.ts`). The
+recorder still runs in the page, and a save still names its point in the running
+recording, which the store does not hold, so that save is read as a root once recordings
+resume (`src/engine/RecordingWriter.ts`). A page opened with `?recordings`, which its links
+keep, records and lists them as before: the probes use it, and so does the work on
+recordings. A recording's link, `?recording=`, plays whatever the switch, and the server
+still lists and takes recordings, which the page no longer offers.
+
 ## CSBWin's recorder
 
 `RECORDFILE` (`doc/CSBwin-src/Recording.cpp:864-1300`), opened by the "Record" menu item

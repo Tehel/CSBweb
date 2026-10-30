@@ -811,7 +811,20 @@ await saveDatabase({
     parts.put({ id: 'probe-local-recording', seq: 0, start: { kind: 'new', random: 1, randomGameID: 7 }, rules: {}, extras: {} });
     parts.put({ id: 'probe-local-recording', seq: 1, changes: [{ change: { kind: 'forceDMRules' }, vbl: 0, time: 0, random: 1 }] });`,
 });
+// Recordings are paused (`src/ui/recordingsSwitch.ts`): without `?recordings`, the local
+// set has no book, and a published set's book DOCUMENTS alone, with no tab. The pages that
+// check recordings below are opened with it.
 await navigate(`${APP}?dungeon=nowhere&keepsaves`, WELCOME);
+const pausedBooks = await evaluate(`(()=>{const cell=(set)=>document.querySelector('.pick-cell:has(.pick[data-set="'+set+'"])');
+  return { local: !!cell('local:${MINE}')?.querySelector('.pick-documents'), csb: !!cell('csb')?.querySelector('.pick-documents') };})()`);
+await clickOn('.pick-cell:has(.pick[data-set="csb"]) .pick-documents');
+const pausedBook = await evaluate(`(d=>d&&{ tabs: d.querySelectorAll('.documents-tab').length, documents: !!d.querySelector('#documents-pane:not([hidden])'),
+  recordings: !!d.querySelector('#recordings-pane, .recordings-list') })(document.querySelector('dialog.documents'))`);
+await clickOn('#documents-close');
+console.log('  recordings paused:', JSON.stringify({ pausedBooks, pausedBook }));
+check(!pausedBooks.local && pausedBooks.csb && pausedBook?.tabs === 0 && pausedBook.documents && !pausedBook.recordings,
+  "recordings paused, a local set has no book, and a published set's book has its documents alone, no tab and no recording");
+await navigate(`${APP}?dungeon=nowhere&keepsaves&recordings`, WELCOME);
 const withLocal = await welcome();
 console.log('  local set:', JSON.stringify(withLocal));
 check(withLocal.tiles === [...OFFICIAL, `local:${MINE}*`, 'conflux-3.5', 'towers-of-chaos'].join()
@@ -985,9 +998,9 @@ check(deleted.dialog === null && deleted.form === null && deleted.store.name ===
 // control on the approved set, withdraws a second set of theirs, published by hand: the
 // cross asks first, and CANCEL keeps it.
 const MODERATOR = '00000000-0000-4000-8000-000000000001';
-const asPlayer = async (player: string) => {
+const asPlayer = async (player: string, query = '') => {
   await evaluate(`localStorage.setItem('csbweb_player_v1', ${JSON.stringify(player)}),1`);
-  await navigate(`${APP}?dungeon=nowhere&keepsaves&keepsettings`, WELCOME);
+  await navigate(`${APP}?dungeon=nowhere&keepsaves&keepsettings${query}`, WELCOME);
 };
 const mineOf = async () => ({ ...(await evaluate(`(t=>({ colour: getComputedStyle(t.querySelector('.pick-name')).color, selected: t.getAttribute('aria-pressed') }))(document.querySelector('.pick[data-set="${MINE}"]'))`)),
   controls: (await controlsOf())[MINE] });
@@ -1643,6 +1656,14 @@ check(left.welcome && left.query, `the question's EXIT opens the welcome page, t
 // disk menu for ever; and so is the next, which would only queue behind it. Let go, the
 // open goes on, and the store lists.
 await navigate(`${APP}?intro=0&dungeon=dm-atari`, GAME);
+// Recordings paused, the page hidden writes nothing to the store, though the game is recorded.
+const pausedWrite = await evaluate(`(async()=>{ const { recorder, recordingStore } = window.__probe;
+  const before = (await recordingStore.list()).length;
+  window.dispatchEvent(new Event('pagehide'));
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  return { before, after: (await recordingStore.list()).length, changes: recorder.recording?.changes.length ?? 0 }; })()`);
+console.log('  paused write:', JSON.stringify(pausedWrite));
+check(pausedWrite.changes > 0 && pausedWrite.after === pausedWrite.before, 'recordings paused, the page hidden writes no recording to the store');
 const heldStore = await evaluate(`(async()=>{
   // Every step bounded, so a store that hangs fails the checks instead of the run.
   const within = (promise) => Promise.race([promise, new Promise((r) => setTimeout(() => r('hung'), 2000))]);
@@ -1911,7 +1932,7 @@ const endWritten = await evaluate(`(async()=>{ const { recordingStore, saves } =
   await recordingStore.write({ ...row, id, parent: null, ended: true, end: { word11694: true }, endedAt: now, playTime: 754000, parts: 2 },
     [{ id, seq: 0, start: recording.start, parent: null, rules: recording.rules, extras: recording.extras }, { id, seq: 1, changes: recording.changes }], null);
   return { save: entry.name, saveId: entry.id, recording: entry.recording.recording, point: [entry.recording.changes, entry.recording.vbls].join(), level: entry.level }; })()`);
-await navigate(`${APP}?dungeon=nowhere&keepsaves`, WELCOME);
+await navigate(`${APP}?dungeon=nowhere&keepsaves&recordings`, WELCOME);
 await clickOn('.pick-cell:has(.pick[data-set="csb"]) .pick-documents');
 await clickOn('#documents-tab-recordings');
 const recordingsTab = () => evaluate(`(d=>d&&{ title: d.querySelector('h2').textContent,
@@ -1989,7 +2010,7 @@ const confirmDelete = async () => {
   await settled();
   return asked;
 };
-await asPlayer(MODERATOR);
+await asPlayer(MODERATOR, '&recordings');
 await openCsbRecordings();
 const toModerator = await recordingsTab();
 await clickBeside();
@@ -2018,7 +2039,7 @@ await clickOn('.recordings-delete');
 const askedSiteDelete = await confirmDelete();
 const siteDeleted = await recordingsTab();
 await clickOn('#documents-close');
-await asPlayer(SHARER);
+await asPlayer(SHARER, '&recordings');
 await openCsbRecordings();
 await clickOn(`.recordings-item[data-recording="${sharedRecording.id}"]`);
 const toUploader = await recordingsTab();
@@ -2065,7 +2086,7 @@ await evaluate(`(async()=>{ const { recordingStore } = window.__probe;
   await recordingStore.write({ ...row, id, parent: null, ended: true, end: { word11694: false }, endedAt: Date.now(), playTime: 1000, changes: changes.length, parts: 2 },
     [{ id, seq: 0, start: recording.start, parent: null, rules: recording.rules, extras: recording.extras }, { id, seq: 1, changes }], null);
   return 1; })()`);
-await navigate(`${APP}?dungeon=nowhere&keepsaves&keepsettings`, WELCOME);
+await navigate(`${APP}?dungeon=nowhere&keepsaves&keepsettings&recordings`, WELCOME);
 await openCsbRecordings();
 await clickOn('.recordings-item[data-recording="probe-dev-end"]');
 const devEnd = await recordingsTab();

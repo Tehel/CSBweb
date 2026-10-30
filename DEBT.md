@@ -18,8 +18,9 @@ Markers are `PLAN.md`'s: ⚠️ knowingly divergent or incomplete · ⏳ not sta
 the welcome page lists. Dungeon Master has been won, once with a single champion on
 a tablet, and Theron's Quest played to its end. The site around them is
 deployed: the welcome page (`src/ui/welcomePage.ts`), a player's own data sets, the
-server (`doc/DEPLOYMENT.md`). Every game is recorded, and a player shares a save's or a
-game's end's recording, which the site lists and plays back (`doc/RECORDING.md`). The work now is this list, in the index's order, and after
+server (`doc/DEPLOYMENT.md`). Every game can be recorded, and a save's or a game's end's
+recording shared, listed and played back, but recordings are paused while the port's
+behaviour still changes (`doc/RECORDING.md` → "Recordings are paused"). The work now is this list, in the index's order, and after
 it cleaning the repository up to publish it as open source. Tiers D and E hold what the
 code needs to be a base others can read and build on. The page's redesign is in: the
 interface in the canvas (U), and the welcome page with its HOW TO PLAY, its ABOUT

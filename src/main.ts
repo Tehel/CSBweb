@@ -34,7 +34,7 @@ import { NO_FULLSCREEN, createFullscreen, type PageFullscreen } from './lib/full
 import { GameScreen } from './renderer/GameScreen';
 import { NO_INPUT, type GameInput } from './renderer/GameInput';
 import { hostDrawing } from './renderer/ui/HostDrawing';
-import { bindSaveDrop, bindUIEvents, showFatalMessage, showWelcomePage, welcomePageQuery } from './ui';
+import { bindSaveDrop, bindUIEvents, recordingsOn, showFatalMessage, showWelcomePage, welcomePageQuery } from './ui';
 import { ScrollingText } from './renderer/csbwin/ScrollingText';
 import { UIMode } from './renderer/ui/UIState';
 import { openReincarnateScreen } from './renderer/ui/ReIncarnate';
@@ -369,16 +369,19 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     const recorder = new Recorder(game, __CSBWEB_BUILD__, dataSet.id,
         () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
     // Written to the store as it grows: every few seconds, and as the page is hidden, the
-    // way most games end. A write that fails is written again at the next.
+    // way most games end. A write that fails is written again at the next. Nothing is
+    // written while recordings are paused (`recordingsOn`).
     const recordingStore = new BrowserRecordingStore((rows) => drawPlaythrough(storeRandom, rows));
     const recordings = new RecordingWriter(recorder, recordingStore, saveStore, {
         now: () => Date.now(),
         playTime: () => game.playTime(),
     });
-    const writeRecording = (): void => { recordings.flush().catch(() => {}); };
-    setInterval(writeRecording, RECORDING_WRITE_MS);
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') writeRecording(); });
-    window.addEventListener('pagehide', writeRecording);
+    if (recordingsOn()) {
+        const writeRecording = (): void => { recordings.flush().catch(() => {}); };
+        setInterval(writeRecording, RECORDING_WRITE_MS);
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') writeRecording(); });
+        window.addEventListener('pagehide', writeRecording);
+    }
     const saves = new GameSaves(game, dataSet, setFiles, saveStore, {
         // A save packs a `CHARDESC`, and that needs graphic 26 for the champions who
         // carry only a portrait index.
