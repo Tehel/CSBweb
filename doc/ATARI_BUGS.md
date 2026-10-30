@@ -22,18 +22,24 @@ when its step is checked, and a row still at "—" is not checked yet.
 3. **The port.** It keeps CSBWin's names, so a grep of `src/` for them finds it.
 4. **The row.** CSBWin's cell and the port's cite their `File:line`, and the verdict is
    one of:
-   - **faithful**: the Atari, CSBWin and the port all have it. Not debt. Fixing it is the
-     author's call, either a deliberate divergence (`DEBT.md` H, under `CLAUDE.md`'s test:
-     obviously wrong, and costing the player something the game means to give) or an
-     extra behind a setting (`DEBT.md` X), as X18 is for `BUG0_00`'s scents.
+   - **faithful**: the Atari, CSBWin and the port all have it. Unless it is game-breaking
+     (below), not debt: fixing it is the author's call, bug by bug, either a deliberate
+     divergence (`DEBT.md` H) or an extra behind a setting (`DEBT.md` X), as X18 is for
+     `BUG0_00`'s scents.
    - **CSBWin's fix**: the Atari releases have it, CSBWin does not, and the port follows
      CSBWin. Where ReDMCSB's Atari branch and CSBWin behave differently, ReDMCSB wins
      (`CLAUDE.md`), so each one is an item for `DEBT.md` C, or an H entry if the author
-     keeps the fix.
+     keeps the fix. A game-breaking one keeps CSBWin's fix, an H entry.
    - **port diverges**: the port is not what CSBWin does, an item for `DEBT.md` C.
    - **absent**: none of the three has it, because an Atari release CSBWin follows fixed it.
    - **n/a**: nothing in the port matches the code: the hardware, the floppy disk, or
      code with no effect.
+
+**A game-breaking bug is fixed**, the author's rule, even where the Atari and CSBWin
+share it: a crash or a hang, corrupted data, an object cloned or lost, and what follows
+from them. Such a row's verdict says so (**faithful, game-breaking**), it becomes a
+`DEBT.md` C item to fix, and its fix an H entry that cites both readings. Every other bug
+is decided with the author one by one.
 
 Which Atari release CSBWin follows is not known: the "V2.0" its dialogs print may come
 from its data. So the eight bugs CSB 2.1 alone fixes (`CHANGE8_*`) are each checked

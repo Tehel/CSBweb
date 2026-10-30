@@ -809,7 +809,9 @@ nine steps it is split into, by subsystem: step 0 is the eight with nothing to c
 steps 1 to 8 hold 9 to 14 bugs each, one session a step. Paying it: each step fills its
 rows and adds nothing but its findings: a **port diverges** becomes a C item, a
 **CSBWin's fix** a C item or an H entry as the author decides, and a **faithful** bug
-stays a row, unless the author names it for H or X. A step's commit names `F25` and the
+stays a row, unless the author names it for H or X. A **game-breaking** bug (a crash or
+a hang, corrupted data, an object cloned or lost) is fixed even when it is faithful: a C
+item, then an H entry. A step's commit names `F25` and the
 step; the item is paid when no row is at "—".
 
 ---

@@ -15,7 +15,9 @@ It is followed faithfully, not blindly. When CSBWin is **obviously wrong** — a
 own translation, such as a byte offset read as a word index, or a bug that costs the
 player something the game means to give (a hint, an item, a message) — the port does the
 right thing instead. "Obviously" is earned: cite both readings, and rule out a misread
-helper first (`.claude/memory/memmove-source-first.md`). Each such fix is a deliberate
+helper first (`.claude/memory/memmove-source-first.md`). A game-breaking bug (a crash or a
+hang, corrupted data, an object cloned or lost) is fixed even where the Atari and CSBWin
+share it (`doc/ATARI_BUGS.md`). Each such fix is a deliberate
 divergence, listed under `DEBT.md` H with its proof.
 
 The goal is the Atari ST program; CSBWin, which ports it, is the proxy for it. ReDMCSB
