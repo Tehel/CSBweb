@@ -788,13 +788,23 @@ Paying it, in steps:
    before `DMMovie2615`'s line 937 and `DMMovie2823`'s line 1203. Then drift 4, which the
    17.6 runs pass, so a 9.x CSBWin of its own until shown otherwise, and drift 3, whose
    fixed `d.Time` points at a timer or a periodic update.
-2. **Each next drift, the same way**: a port divergence, fixed with its CSBWin citation and
-   its check; or, where CSBWin's own versions differ (two runs of different versions part
-   at the same place differently), a correction of the log. A correction is written in
-   CSBWin's own playback lines so the log stays a playfile: `0x2222` draws its random field's
-   count and goes on as button 0 (`Recording.cpp:639-649`), `0xdddd` sets a word of `d.`
-   (`:672-680`). Each is listed beside the
-   log with its reason.
+2. **Each next drift, the same way.** CSBWin's versions diverge from each other, which is
+   why each run was shipped with the executable that recorded it, so each run is converted
+   on its own and may need tweaks no other run needs. A drift is one of two things:
+   - **A port divergence**: CSBWin 2023's source does what the run recorded and the port
+     does not. It is fixed in the engine with its CSBWin citation and its check, as any C
+     item.
+   - **The run's own version**: the run parts where 2023's source agrees with the port,
+     or runs of different versions part at the same place differently. The engine stays
+     CSBWin 2023's and is never changed for an old version; the tweak belongs to the run.
+     It is a correction of the log, written in CSBWin's own playback lines so the log
+     stays a playfile: `0x2222` draws its random field's count and goes on as button 0
+     (`Recording.cpp:639-649`), `0xdddd` sets a word of `d.` (`:672-680`). Where a version
+     differs throughout rather than at one place (a rule of its own, which would take a
+     correction at every turn), the run may not be convertible by corrections; that is
+     written into this entry for the author, with the version and the rule, rather than
+     worked around.
+   Each tweak is listed beside its log with its reason and the version it answers.
 3. **The check**: the logs that play to their end copied into `tools/fixtures/`, and a
    `tools/checks/` tool that plays each to its end (Lord Chaos fused for a race to fusion),
    listed in `tools/run-checks.ts`: every later change to the engine then answers to them.
