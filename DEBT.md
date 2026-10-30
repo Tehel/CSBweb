@@ -121,11 +121,10 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏳ |
-| F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
 | F25 | The Atari's 93 known bugs, checked against CSBWin and the port | L | ⏳ step 2 next |
-| C195 | Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space | S | ⏳ to decide with the author |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
+| F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
+| F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏸️ |
 | E40 | The statistics page's heat map | M | ⏸️ |
 | E44 | The recording viewer seeks forward and back | M–L | ⏸️ |
 | C150 | Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops | S | ⏸️ waits on the author |
@@ -632,20 +631,6 @@ seen to band.
 
 A divergence found along the way goes here, with the next free ID.
 
-### C195 ⏳ Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space
-
-Before a wall text is drawn, `DrawWallDecoration` passes it through `TranslateWallLanguage`
-(`doc/CSBwin-src/CSBCode.cpp:3292`, `Translation.cpp:196-218`): codes 0-25 become `A`-`Z`,
-26 a space, 27 a period, 128 a newline, and every other code `'A' + code`. The result is
-looked up in `Translation.txt`'s table, unchanged without one, then turned back: `A`-`Z`,
-newline and period as they were, **anything else 26**. So with or without a translation
-file, a code from 28 to 127 is drawn as a space. The port has no `TranslateWallLanguage`
-and draws the code's glyph. No wall text of the English sets or of Conflux holds such a
-code. 13 of `dm-atari-1.3-fr`'s do, and CSBWin would show each of those codes as a space. `tools/checks/wall-text.ts` part 3 asserts what a
-code past the font draws, which CSBWin never reaches. Paying it: port the round trip
-without a table (G21 holds `Translation.txt`), and decide with the author whether the
-French set keeps its letters, a deliberate divergence under H.
-
 ### C150 ⏸️ Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops
 
 Not a divergence yet: the port does what CSBWin's source does. Recorded because only play
@@ -830,7 +815,8 @@ when it has none. The port prints the English literals, so the French 1.3 set
 CSBWin translates at about a hundred call sites: `QuePrintLines`'s `translate` argument
 (" JUST GAINED A ", `Magic.cpp:178`), the level gain, the menu titles (`Menu.cpp`), the
 inventory's labels and object descriptions, scrolls and floor texts, and wall texts in
-their 5-bit code (`TranslateWallLanguage`, `doc/CSBwin-src/Translation.cpp`). It reads the
+their 5-bit code (`TranslateWallLanguage`, `doc/CSBwin-src/Translation.cpp`), whose spaces
+for codes from 28 stay out (H, "A wall text draws every code's glyph"). It reads the
 file into a table hashed on the first two characters.
 
 A French file exists: `TranslationFrench.txt` on dianneandpaul.net/CSBwin/ (2018, 201
@@ -1523,6 +1509,18 @@ Recorded so that nobody "fixes" them.
   CSBWin's memory holds there. `tag0088b2Explicit` (`src/renderer/csbwin/CanvasBlitter.ts`)
   writes nothing for them: `doc/PROVEN_FACTS.md` → "See-Thru-Walls is a counter read as
   a boolean".
+- 🚫 **A wall text draws every code's glyph, as the Atari does.** CSBWin passes a wall
+  text through `TranslateWallLanguage` before drawing it (`doc/CSBwin-src/CSBCode.cpp:3292`,
+  `Translation.cpp:196-218`): a code from 28 to 127 becomes `'A' + code` and comes back,
+  translated or not, as 26, a space. The Atari blits glyph `code` of the inscription font
+  for every code below 128 (`doc/ReDMCSB-src/DUNVIEW.C:3621-3633`). Its escapes are read
+  from item 559 (`0x22f`) of `graphics.dat`
+  (`G0257_aac_Graphic559_InscriptionEscapeReplacementStrings`, `DUNGEON.C:30`), where the
+  French 1.3 disk's make codes 28-35, so its walls show their apostrophe, glyph 33, where
+  CSBWin shows a space (`doc/ATARI_ST_DISK_REFERENCE.md` → "The French 1.3 disk"). ReDMCSB
+  wins: the port has no `TranslateWallLanguage` and draws the glyph (`drawWallText`,
+  `src/renderer/bytecode/DrawDecorations.ts`). No wall text of the English sets or of
+  Conflux holds such a code.
 - 🚫 **A wall-text glyph's rows past graphic 120.** `DrawWallDecoration` reads a code of
   36 or more on into the font's lower rows, and its last row from whatever follows the
   graphic in CSBWin's memory. The port draws the rows the graphic has and writes nothing
