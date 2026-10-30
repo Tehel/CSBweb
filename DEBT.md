@@ -122,7 +122,7 @@ In payoff order: the first row is the next item.
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
 | C198 | A missile that cannot be made loses the object it was to carry | S | ⏳ |
-| F25 | The Atari's 93 known bugs, checked against CSBWin and the port | L | ⏳ step 4 next; `BUG0_67` and `BUG0_68` wait on the author |
+| F25 | The Atari's 93 known bugs, checked against CSBWin and the port | L | ⏳ step 4 next |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏸️ |
@@ -816,26 +816,6 @@ a hang, corrupted data, an object cloned or lost) is fixed even when it is faith
 item, then an H entry. A step's commit names `F25` and the
 step; the item is paid when no row is at "—".
 
-**Waiting on the author: `BUG0_67` and `BUG0_68`**, two of the Atari's group bugs that
-no release fixes and that CSBWin patched out of the Atari binary it translated. Neither
-is game-breaking.
-
-- `BUG0_67`: off the party's map, a wary group (wariness 10 or more: Vexirk, Zytaz,
-  Demon, Lord Chaos, Dragon) tests whether it may enter a teleporter against the creature
-  type of `G0380_T_CurrentGroupThing`, which the Atari has not yet set to that group
-  (`doc/ReDMCSB-src/GROUP.C:1924`), so it may walk into a teleporter to a map it dies on,
-  or keep out of one it may take. CSBWin sets `d.LastMonsterMoved` to the group first
-  (`doc/CSBwin-src/Monster.cpp:2796`, "I have patched the Atari code", `:736-741`), and
-  the port tests the group moved (`MonsterPerception.ts:467`). Playing the Atari's means
-  keeping the last group that variable held, from every place the Atari sets it.
-- `BUG0_68`: an off-map group's next event and a reaction's carry an uninitialised
-  `C.Ticks` (`GROUP.C:1940`, `:1979`), whatever the stack held. CSBWin writes 0, "also
-  patched into the Atari binary" (`Monster.cpp:2880-2891`), and so does the port
-  (`MonsterAI.ts:1387`). No value is the Atari's to play.
-
-The options, for each: **(a)** keep CSBWin's patch, an H entry (recommended, and for
-`BUG0_68` the only one a port can play); **(b)** play the Atari's, a C item.
-
 ---
 
 ## G — Unported CSBWin features
@@ -1349,6 +1329,22 @@ Recorded so that nobody "fixes" them.
   `doc/CSBwin-src/Character.cpp:261-265`). The author's choice: the port does so on every
   set, the DM sets too (`makeMoreRoomInDB`, `src/engine/MakeMoreRoomInDB.ts`,
   `tools/checks/make-more-room.ts`).
+- 🚫 **A wary group off the party's map is tested as itself, and a group's next event
+  carries 0 in its `uByte8`, as CSBWin patched the Atari binary.** The author's choice,
+  on every set:
+  - `BUG0_67`: off the party's map, a group of wariness 10 or more (Vexirk, Zytaz,
+    Demon, Lord Chaos, Dragon) tests whether it may enter a teleporter against the
+    creature type of `G0380_T_CurrentGroupThing`, which every Atari release has not yet
+    set to that group (`doc/ReDMCSB-src/GROUP.C:1924`), so it may walk into a teleporter
+    to a map it dies on, or keep out of one it may take. CSBWin sets `d.LastMonsterMoved`
+    to the group first (`doc/CSBwin-src/Monster.cpp:2796`, "I have patched the Atari
+    code", `:736-741`), and the port tests the group moved
+    (`MonsterPerception.possibleMove`).
+  - `BUG0_68`: on every Atari release, an off-map group's next event and a reaction's
+    carry an uninitialised `C.Ticks`, CSBWin's `uByte8` (`GROUP.C:1940`, `:1979`), whatever the stack held,
+    so no value is the Atari's to play. CSBWin writes 0, "also patched into the Atari
+    binary" (`Monster.cpp:2880-2891`), and so does the port (`MonsterAI.ts`, `makeTimer`
+    in the group's turn).
 - 🚫 **A launcher aimed off its map launches nothing.** No release checks the square in
   front of a wall launcher: on the Atari, one on a map's edge shooting off it crashes the
   game, ReDMCSB's `BUG0_20` (`doc/ReDMCSB-src/TIMELINE.C:1117`), and CSBWin, which checks
