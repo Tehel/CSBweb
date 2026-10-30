@@ -126,7 +126,6 @@ In payoff order: the first row is the next item.
 | F25 | The Atari's 93 known bugs, checked against CSBWin and the port | L | ⏳ step 1 next |
 | C194 | A DSA's wall graphic counts as a real decoration, so it hides no text | S | ⏳ |
 | C195 | Wall texts skip `TranslateWallLanguage`, which makes every code from 28 a space | S | ⏳ to decide with the author |
-| C196 | No watchdog timer: CSBWin's `TT_53`, queued every 300 ticks | S | ⏳ |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | E40 | The statistics page's heat map | M | ⏸️ |
 | E44 | The recording viewer seeks forward and back | M–L | ⏸️ |
@@ -657,24 +656,6 @@ code. 13 of `dm-atari-1.3-fr`'s do, and CSBWin would show each of those codes as
 code past the font draws, which CSBWin never reaches. Paying it: port the round trip
 without a table (G21 holds `Translation.txt`), and decide with the author whether the
 French set keeps its letters, a deliberate divergence under H.
-
-### C196 ⏳ No watchdog timer: CSBWin's `TT_53`, queued every 300 ticks
-
-A new game in CSBWin queues a `TT_53` timer 300 ticks on (`GameTimers::InitializeTimers`,
-`doc/CSBwin-src/Timer.cpp:730-741`; `SetWatchdogTimer`, `:2817-2829`), and each one that
-fires queues the next (`CSBCode.cpp:6572`) and sets `d.WatchdogTime` to its time.
-`MainLoop` dies with error 60 once `d.Time` passes it (`:708-712`), and `TAG021028` sets it
-to `0xffffffff` at every start and restart (`:10610`), so a save read waits for its own
-timer. Every genuine save in `tools/fixtures/` queues exactly one, at a multiple of 300.
-The port's `TimerFunction` has no `TT_53`: a new game queues none, a save's fires into
-`dispatch`'s `default` and is dropped (`src/engine/TimerSystem.ts`), so the port's saves
-hold none, and there is no `d.WatchdogTime` nor its check. What that changes: the queue
-holds one timer fewer than CSBWin's, and since every `SetTimer` stamps the next sequence
-(`Timer.cpp:1189`), every timer queued after the first watchdog carries a lower stamp than
-CSBWin's, and so does `gb2.TimerSequence` in a save. Paying it: `TT_53` and
-`SetWatchdogTimer`, at a new game and at the timer; `d.WatchdogTime`, reset where
-`TAG021028` resets it and checked where `MainLoop` checks it, through `die`; and a check
-that a new game and a read save each keep one `TT_53` queued as the clock runs.
 
 ### C150 ⏸️ Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops
 

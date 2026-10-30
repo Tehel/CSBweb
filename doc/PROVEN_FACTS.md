@@ -3607,6 +3607,21 @@ random stream advances, and `NextMonsterUpdateTime` (`doc/CSBwin-src/CSBCode.cpp
 re-rolls each group member's `singleMonsterStatus` walk offsets — so a monster's sprite
 can sit a pixel further over after a load. CSBWin does all three.
 
+## A new game's one timer is the watchdog, stamped 1
+
+A new game reaches `GameTimers::InitializeTimers` twice: in `ReadDatabases`, after
+`Allocate(100)` (`doc/CSBwin-src/SaveGame.cpp:2759-2763`), and in `_ReadEntireGame` once
+the databases are read (`:2047-2048`). Each empties every slot, calls `Clear()`, which
+zeroes the count and the free cursor but not the sequence counter (`Data.h:1602`), and
+`SetWatchdogTimer`, a `TT_53` at `d.Time + 300` and level 0 (`Timer.cpp:722-742`,
+`:2817-2829`). So the first watchdog, stamped 0, is wiped, and a new game holds one timer,
+a `TT_53` at 300 in slot 0, stamped 1, with the next stamp 2. Every genuine save made
+before time 300 holds exactly that (`csbgame-early-1hero.dat`, saved at 70, with
+`gb2.TimerSequence` 2). Each `TT_53` that fires queues the next (`CSBCode.cpp:6572`) and
+sets `d.WatchdogTime` to its time; `MainLoop` dies with error 60 once `d.Time` passes
+it (`:708-712`), and `TAG021028` makes it 0xffffffff at every start and restart
+(`:10610`), so a game read waits for its own `TT_53`. `tools/checks/watchdog.ts`.
+
 ## A timer's object is in bytes 6-7 for a missile, 8-9 for six functions
 
 `TIMER` reads a pair of its bytes as an `RN` through `timerObj6()` and `timerObj8()`,

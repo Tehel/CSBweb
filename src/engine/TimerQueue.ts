@@ -72,6 +72,12 @@ export enum TimerFunction {
   // monster — waits in "abeyance" on one of these and retries every 5 ticks
   // (`ProcessTimer60and61`, doc/CSBwin-src/Timer.cpp:2566). TT_61 is the audible
   // variant, which buzzes on arrival.
+  /**
+   * The watchdog (`SetWatchdogTimer`, `doc/CSBwin-src/Timer.cpp:2817-2829`): always one
+   * in the queue, each queuing the next 300 ticks on, and `MainLoop` stops the game once
+   * `d.Time` passes the last one's time (`GameState.watchdogTime`).
+   */
+  TT_53 = 53,
   TT_60 = 60,
   TT_61 = 61,
   TT_REACTIVATE_GENERATOR = 65,
@@ -237,6 +243,31 @@ export class TimerQueue {
   /** A `TIMER` filled as a caller of `SetTimer` fills one (`newTimerEntry`), and queued (`addTimer`). */
   createTimer(timer: NewTimer): TimerEntry {
     return this.addTimer(newTimerEntry(timer));
+  }
+
+  /**
+   * `GameTimers::InitializeTimers` (`doc/CSBwin-src/Timer.cpp:722-742`) for a game that
+   * is not resumed: every slot emptied, `Clear()` (`Data.h:1602`), which leaves the
+   * sequence counter, and the watchdog at `time`, `d.Time`. The `d.WatchdogTime` it sets
+   * is not returned: `TAG021028` sets it again before the game's first tick
+   * (`GameState.watchdogTime`).
+   */
+  initializeTimers(time: number): void {
+    this.queue = [];
+    this.indexMap.clear();
+    this.firstAvailTimer = 0;
+    this.setWatchdogTimer(time);
+  }
+
+  /**
+   * `SetWatchdogTimer` (`doc/CSBwin-src/Timer.cpp:2817-2829`): a `TT_53` at level 0,
+   * 300 ticks after `time`, `d.Time`, its other bytes the constructor's. Returns its
+   * time, which CSBWin sets `d.WatchdogTime` to.
+   */
+  setWatchdogTimer(time: number): number {
+    const watchdogTime = (time + 300) >>> 0;
+    this.createTimer({ function: TimerFunction.TT_53, time: watchdogTime, level: 0 });
+    return watchdogTime;
   }
 
   /**

@@ -229,14 +229,21 @@ export interface RulesOptions {
  * and `d.Byte7302`'s extra ones together (`DungeonState.addNewGameSpares`). The read
  * then takes `deleteDuplicateTimers` from the world's `EXPOOL` (`:1965-1975`,
  * `Game.installWorld`).
+ *
+ * `InitializeTimers` runs twice, in `ReadDatabases` (`:2762`) and again in
+ * `_ReadEntireGame` (`:2048`), at `d.Time` 0. The second empties the first's watchdog
+ * and queues its own, so a new game holds one `TT_53` at 300, stamped 1, and its next
+ * timer is stamped 2, as every genuine save made before time 300 holds them.
  */
 function newGameTimerQueue(dungeonData: DungeonData): TimerQueue {
   const timers = new TimerQueue();
   timers.allocate(100);
+  timers.initializeTimers(0);
   for (let db = 0; db < 16; db++) {
     if (db !== DBType.CREATURE && db < DBType.MISSILE) continue;
     timers.allocate(sw(timers.getMaxTimers() + (dungeonData.header.objectCounts[db] ?? 0)));
   }
+  timers.initializeTimers(0);
   return timers;
 }
 
@@ -348,6 +355,7 @@ export function createGameContext(
     tickCount: 0,
     gameWon: false,
     word1868: false,
+    watchdogTime: 0xffffffff,
     currentPalette: 0,
     block1,
   };
@@ -391,11 +399,13 @@ export function createGameContext(
  * (`Code1f9e6.cpp:309`), as the program's start leaves it before the boot's, so every
  * game read (`readGame`) begins with these as a new context has them. The rest of the
  * context's `d.` the read sets itself (`installRuntimeState`), and the restart resets the
- * loop's (`Game.resumeMainLoop`).
+ * loop's (`Game.resumeMainLoop`). `d.WatchdogTime` is `TAG021028`'s, 0xffffffff
+ * (`CSBCode.cpp:10610`), which every read is followed by before a tick runs.
  */
 export function initializeGameContext(ctx: GameContext): void {
   ctx.levelCleared.fill(0);
   ctx.state.word1868 = false;
+  ctx.state.watchdogTime = 0xffffffff;
   ctx.state.currentPalette = 0;
   Object.assign(ctx.interface, createInterfaceState());
 }

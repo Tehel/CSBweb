@@ -132,7 +132,7 @@ A number alone is `BUG0_nn`.
 | BUG0_58 | 0 | The game stops with message 'SYSTEM ERROR 41' when you click Resume on the entrance screen … | 1.1 EN (CHANGE2_19) | n/a: the floppy disk | n/a | n/a |
 | BUG0_59 | 6 | The game hangs when using the Fuse action on Lord Chaos | 1.1 EN (CHANGE2_20) | — | — | — |
 | BUG0_60 | 6 | On the Reincarnate/Resurrect screen, the 'Arrow' mouse pointer is replaced by the 'Hand' … | never | — | — | — |
-| BUG0_61 | 0 | The game stops with message 'SYSTEM ERROR 60' right after restarting from a saved game | 1.1 EN (CHANGE2_05) | fixed: `TAG021028` resets `d.WatchdogTime` (`CSBCode.cpp:10610`) at the start (`:10801`) and at a restart (`Code1f9e6.cpp:318`) | no watchdog at all: C196 | absent; the port diverges (C196) |
+| BUG0_61 | 0 | The game stops with message 'SYSTEM ERROR 60' right after restarting from a saved game | 1.1 EN (CHANGE2_05) | fixed: `TAG021028` resets `d.WatchdogTime` (`CSBCode.cpp:10610`) at the start (`:10801`) and at a restart (`Code1f9e6.cpp:318`) | fixed: every read makes `watchdogTime` 0xffffffff (`initializeGameContext`, `src/engine/GameContext.ts`), and every start and restart follows a read (`tools/checks/watchdog.ts`) | absent |
 | BUG0_62 | 0 | The game stops with message 'SYSTEM ERROR 41' if the game disk is removed from the floppy … | CSB 2.0 (CHANGE7_39) | n/a: the floppy disk | n/a | n/a |
 | BUG0_63 | 5 | The behavior of groups and the directions of individual creatures in groups are not … | never | — | — | — |
 | BUG0_64 | 7 | Floor ornaments are drawn over open pits | never | — | — | — |

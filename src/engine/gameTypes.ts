@@ -323,6 +323,13 @@ export interface GameState {
      */
     word1868: boolean;
     /**
+     * `d.WatchdogTime`, a `ui32` (`doc/CSBwin-src/Data.h:503`): the time of the last
+     * `TT_53` queued, which `MainLoop` dies on once `d.Time` passes it
+     * (`CSBCode.cpp:708-712`). `TAG021028` makes it 0xffffffff at every start and
+     * restart (`:10610`), so a game waits for its first `TT_53` to fire. Not in a save.
+     */
+    watchdogTime: number;
+    /**
      * `d.CurrentPalette` — the viewport light-level palette index, 0 (brightest) to 5.
      * `SelectPaletteForLightLevel` sets it where the light changes
      * (`src/engine/LightLevel.ts`); the screen draws the view with that palette, and the

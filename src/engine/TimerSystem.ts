@@ -204,6 +204,10 @@ export class TimerSystem {
       case TimerFunction.TT_25:
         this.processTT_25(timer);
         break;
+      // `case TT_53: SetWatchdogTimer(); break;` (doc/CSBwin-src/CSBCode.cpp:6572).
+      case TimerFunction.TT_53:
+        this.ctx.state.watchdogTime = this.timers.setWatchdogTimer(this.ctx.state.tickCount);
+        break;
       case TimerFunction.TT_60:
       case TimerFunction.TT_61:
         this.ctx.systems.monsters.processAbeyanceTimer(timer);

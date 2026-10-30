@@ -347,6 +347,9 @@ const CHECKS: Tool[] = [
   // CSBgraphics.dat's first section read: a file the game does not name ends the game.
   { tool: 'file-signatures.ts' },
   { tool: 'csbwin-timers.ts' },
+  // The watchdog: a new game's TT_53 as a genuine save's, one queued as the clock runs,
+  // a save read waiting for its own, and a lost one ending the game with error 60.
+  { tool: 'watchdog.ts' },
   // Our *own* save, the CSBWin file F5, F9 and the disk menu write and read: saved and
   // loaded over genuine saves and over played games, with the whole of what a load
   // changes held to a named list. `checks/savegame.ts` drives the runtime snapshot directly

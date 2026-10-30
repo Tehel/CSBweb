@@ -717,6 +717,11 @@ export class Game implements MainLoop {
         // `d.Word11712` (doc/CSBwin-src/CSBCode.cpp:699-705).
         if (this.ctx.party.state.partyMoveDisableTimer !== 0) this.ctx.party.state.partyMoveDisableTimer--;
         if (this.ctx.party.state.word11712 !== 0) this.ctx.party.state.word11712--;
+        // `if (d.WatchdogTime < d.Time) die(60, "Watchdog Timer failure");`
+        // (doc/CSBwin-src/CSBCode.cpp:708-712): the `TT_53` that should have fired is lost.
+        if (this.ctx.state.watchdogTime >>> 0 < this.ctx.state.tickCount >>> 0) {
+            die(this.ctx.host, 60, 'Watchdog Timer failure');
+        }
         // `d.clockTick=0;` (doc/CSBwin-src/CSBCode.cpp:714).
         this.ctx.loop.clockTick = false;
     }
