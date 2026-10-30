@@ -79,16 +79,16 @@ A number alone is `BUG0_nn`.
 | BUG0_05 | 7 | A champion portrait sensor on a wall square is visible on all sides of the wall | never | — | — | — |
 | BUG0_06 | 7 | Graphical glitch when drawing projectiles or explosions | never | — | — | — |
 | BUG0_07 | 7 | Graphical glitch when drawing explosions | 1.1 EN (CHANGE2_02) | — | — | — |
-| BUG0_08 | 2 | Objects disappear in the dungeon and data is corrupted in memory | never | — | — | — |
-| BUG0_09 | 2 | The game may trigger a sensor and cause an undesired effect when discarding a thing from a … | CSB 2.0 (CHANGE7_17) | — | — | — |
-| BUG0_10 | 2 | No perceptible symptom when playing the game | CSB 2.0 (CHANGE7_18) | — | — | — |
+| BUG0_08 | 2 | Objects disappear in the dungeon and data is corrupted in memory | never | fixed: `AddObjectToRoom` grows `d.objectList` by 50 entries once fewer than 5 are free (`Code11f52.cpp:445-462`) | fixed: the list has no fixed size, and an entry is spliced in (`addObjectToCell`, `DungeonState.ts:361`; `doc/PROVEN_FACTS.md` → "The column index is saved state") | CSBWin's fix, game-breaking: kept (`DEBT.md` H) |
+| BUG0_09 | 2 | The game may trigger a sensor and cause an undesired effect when discarding a thing from a … | CSB 2.0 (CHANGE7_17) | fixed: `MakeMoreRoomInDB` leaves a square at its first actuator that is not disabled (`Character.cpp:261-265`) | fixed: the same (`makeMoreRoomInDB`, `MakeMoreRoomInDB.ts:64-67`) | CSBWin's fix, as CSB 2.0's: waits on the author (`DEBT.md` F25) |
+| BUG0_10 | 2 | No perceptible symptom when playing the game | CSB 2.0 (CHANGE7_18) | n/a: no bit 15, the bones' `important` is an argument of its own (`FindEmptyDBEntry`, `data.cpp:921`; `FindEmptyDB10Entry`, `CSBCode.cpp:5105`) | n/a: the same (`findEmptyDBEntry`, `DungeonState.ts:491`) | n/a: no symptom |
 | BUG0_11 | 3 | Data corruption in memory | never | — | — | — |
 | BUG0_12 | 3 | An object is cloned and appears at two different locations in the dungeon and/or inventory | partly (CHANGE8_09) | — | — | — |
 | BUG0_13 | 3 | The game may crash when Lord Order or Grey Lord cast spells | never (DM only) | — | — | — |
 | BUG0_14 | 1 | While life is frozen, creature reaction events are not ignored as they should | 1.2 EN (CHANGE3_04) | fixed: a reaction (`timeFunc < TT_EMPTY`) is dropped while life is frozen (`Monster.cpp:3000-3014`) | fixed: the same test (`MonsterAI.ts:1449`) | absent |
 | BUG0_15 | 3 | The game hangs when you close a door on Lord Chaos | 1.1 EN (CHANGE2_03) | — | — | — |
-| BUG0_16 | 2 | An object disappears when it is thrown or shot by a champion or launched by a projectile … | CSB 2.1 (CHANGE8_00) | — | — | — |
-| BUG0_17 | 2 | The game crashes after the Fuse action is performed while looking at a wall on a map boundary | 1.3a FR (CHANGE5_02) | — | — | — |
+| BUG0_16 | 2 | An object disappears when it is thrown or shot by a champion or launched by a projectile … | CSB 2.1 (CHANGE8_00) | has it: `LaunchMissile` returns -1 without a missile record (`Magic.cpp:33-34`), once the database holds 8000 (`CSB.h:1649`) and `MakeMoreRoomInDB` finds none outside the party's 11×11 squares, and its callers lose what they took (`Mouse.cpp:744`, `Timer.cpp:1985`, `:1997`, `:2067`) | has it (`launchMissile`, `MagicSystem.ts:62`), but a throw from the cursor puts the object back in the hand (`MouseSystem.ts:188`), as no release does | faithful, game-breaking: to fix (`DEBT.md` C198) |
+| BUG0_17 | 2 | The game crashes after the Fuse action is performed while looking at a wall on a map boundary | 1.3a FR (CHANGE5_02) | fixed: `_Fusion` returns off the map (`Attack.cpp:150-157`) | fixed: the same (`fusion`, `Fusion.ts:113-114`) | absent |
 | BUG0_18 | 1 | A projectile stays immobile in the air, an explosion remains forever on a square, a spell … | 1.2 EN (CHANGE3_05) | fixed: `SetTimer` dies with error 45, but only at 5000 timers, growing the table by a quarter before (`Timer.cpp:1001-1010`), where the Atari stops at the dungeon's count | the same (`TimerQueue.ts:287-290`) | absent; the table's growth kept (`DEBT.md` H) |
 | BUG0_19 | 1 | The game crashes when an object launcher sensor is triggered | never | fixed: the object launcher's walks end at `RNeof`, "Original had RNnul" (`Timer.cpp:1919-1933`, `:1939-1953`) | fixed: the same walk (`takeObject`, `TimerSystem.ts:1287`) | CSBWin's fix, game-breaking: kept (`DEBT.md` H) |
 | BUG0_20 | 1 | Game crash when a launcher sensor is triggered | never | has it: no bound is checked (`Timer.cpp:1982-1983`), so `AddObjectToRoom` places the missile nowhere at x -1 (`Code11f52.cpp:465`) and reads past the level's columns or a column's cells elsewhere | fixed: the bound is checked before the launcher takes anything from its square or makes anything, and it launches nothing (`TimerSystem.ts:1283`, `tools/checks/missile-launcher.ts`) | faithful, game-breaking: fixed (`DEBT.md` H) |
@@ -97,12 +97,12 @@ A number alone is `BUG0_nn`.
 | BUG0_23 | 1 | A Fluxcage explosion remains on a square forever | never | fixed: an opened pit or teleporter moves every `TT_25` and `TT_24` naming the cloud (`WiggleEverything`, `Timer.cpp:2497-2498`), and a DSA's move too (`MoveObject.cpp:238`) | fixed: the same two (`wiggleEverything`, `TimerSystem.ts:1779`; `src/engine/dsa/ops/move.ts:266`) | CSBWin's fix, game-breaking: kept (`DEBT.md` H) |
 | BUG0_24 | 1 | Lord Chaos becomes invisible | 1.1 EN (CHANGE2_07) | fixed: Lord Chaos tries a random adjacent square one time in four (`ProcessTimer60and61`, `Timer.cpp:2597-2623`) | fixed: the same (`processAbeyanceTimer`, `MonsterSystem.ts:699`) | absent |
 | BUG0_25 | 1 | When a champion dies, no bones object is created so it is not possible to bring the … | CSB 2.1 (CHANGE8_03) | fixed: the altar deletes the bones it takes (`ProcessTT_ViAltar`, `Timer.cpp:2762`, `:2781`, `:2793`) | fixed: the same (`processViAltar`, `TimerSystem.ts:1044-1045`; `reviveInWings`, `:1071-1072`) | CSBWin's fix, as CSB 2.1's, game-breaking: kept (`DEBT.md` H) |
-| BUG0_26 | 2 | An explosion may fall in a pit | never | — | — | — |
+| BUG0_26 | 2 | An explosion may fall in a pit | never | has it: `Levitating` is false for a cloud, its test commented out (`Code11f52.cpp:2452-2475`), so `MoveObject`'s pit takes it | has it (`levitating`, `WorldMove.ts:551`; `allowFall`, `:211`) | faithful |
 | BUG0_27 | 5 | The dungeon view is drawn during a fall while the party is sleeping | 1.2 EN (CHANGE3_06) | — | — | — |
 | BUG0_28 | 5 | When falling through multiple pits the dungeon view is updated to show each traversed map … | CSB 2.1 (CHANGE8_04) | — | — | — |
-| BUG0_29 | 2 | An explosion can trigger a floor sensor | never | — | — | — |
-| BUG0_30 | 2 | A floor sensor is not triggered when you put an object on the floor if a levitating … | never | — | — | — |
-| BUG0_31 | 2 | Floor sensors to detect the party on a stairs square are never triggered | CSB 2.1 (CHANGE8_05) | — | — | — |
+| BUG0_29 | 2 | An explosion can trigger a floor sensor | never | has it: `MoveObject` sets a missile down with `AddObjectToRoom`, and anything else, a cloud too, with `PlaceOrRemoveObjectInRoom`, which presses the pads (`Code11f52.cpp:3462-3483`) | has it (`moveObject`, `WorldMove.ts:227`) | faithful |
+| BUG0_30 | 2 | A floor sensor is not triggered when you put an object on the floor if a levitating … | never | has it: a type 1 pad does nothing while a group is on its square (`PressurePadOrAlcove`, `Code11f52.cpp:3782`), flying or not (`:3981`) | has it (`ActuatorSystem.ts:414`, `:569`) | faithful |
+| BUG0_31 | 2 | Floor sensors to detect the party on a stairs square are never triggered | CSB 2.1 (CHANGE8_05) | has it: a type 5 pad never acts (`Code11f52.cpp:3827-3828`) | has it (`ActuatorSystem.ts:438-440`) | faithful |
 | BUG0_32 | 4 | The load of a champion with no objects in his inventory is not 0 | never | — | — | — |
 | BUG0_33 | 6 | The highlighted box around the acting champion's action hand is not cleared when clicking … | 1.1 EN (CHANGE2_08) | — | — | — |
 | BUG0_34 | 6 | Graphical glitch when you quickly move the mouse into the action area after clicking on a … | never | — | — | — |
@@ -136,7 +136,7 @@ A number alone is `BUG0_nn`.
 | BUG0_62 | 0 | The game stops with message 'SYSTEM ERROR 41' if the game disk is removed from the floppy … | CSB 2.0 (CHANGE7_39) | n/a: the floppy disk | n/a | n/a |
 | BUG0_63 | 5 | The behavior of groups and the directions of individual creatures in groups are not … | never | — | — | — |
 | BUG0_64 | 7 | Floor ornaments are drawn over open pits | never | — | — | — |
-| BUG0_65 | 2 | Torches created by object generator or projectile launcher sensors have no charges | never | — | — | — |
+| BUG0_65 | 2 | Torches created by object generator or projectile launcher sensors have no charges | never | has it: `ConstructPredefinedMissile` charges a torch only if it is lit (`Mouse.cpp:163-168`), and a new record is cleared (`data.cpp:991`) | has it: no charges (`constructPredefinedMissile`, `missileHelpers.ts:81-82`) | faithful |
 | BUG0_66 | 3 | Smoke is placed on the source map instead of the destination map when a creature dies by … | never | — | — | — |
 | BUG0_67 | 3 | A group that is not on the party map may wrongly move or not move into a teleporter | never | — | — | — |
 | BUG0_68 | 3 | A group moves or acts with a wrong timing | never | — | — | — |

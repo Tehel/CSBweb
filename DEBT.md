@@ -121,7 +121,8 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| F25 | The Atari's 93 known bugs, checked against CSBWin and the port | L | ⏳ step 2 next |
+| C198 | A missile that cannot be made loses the object it was to carry | S | ⏳ |
+| F25 | The Atari's 93 known bugs, checked against CSBWin and the port | L | ⏳ step 3 next; `BUG0_09` waits on the author |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏸️ |
@@ -144,7 +145,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: A11 · C198 · D22 · E45 · F26 · G32 · P13 · R17 · U13 · W8 · X19. An ID recorded and paid in one commit has no
+Next free IDs: A11 · C199 · D22 · E45 · F26 · G32 · P13 · R17 · U13 · W8 · X19. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -631,6 +632,31 @@ seen to band.
 
 A divergence found along the way goes here, with the next free ID.
 
+### C198 ⏳ A missile that cannot be made loses the object it was to carry
+
+The Atari's `BUG0_16`, which CSBWin and the port share, and a game-breaking one: an
+object is lost (`doc/ATARI_BUGS.md`). `LaunchMissile` returns -1 when
+`FindEmptyDB14Entry` finds no record (`doc/CSBwin-src/Magic.cpp:33-34`): the missile
+database has grown to 8000 (`CSB.h:1649`, `data.cpp:814-877`) and `MakeMoreRoomInDB`
+finds no missile to end outside the 11×11 squares around the party
+(`Character.cpp:183-359`). Every caller has taken its object already and puts it
+nowhere: a shot (`LaunchObject`, `Magic.cpp:457`), a throw (`Mouse.cpp:744`), a wall
+launcher's objects, taken from its square or made (`Timer.cpp:1985`, `:1997`), and the
+DSA's `&THROW` (`ThrowMissile`, `:2067`); a monster's spell is only not cast
+(`Monster.cpp:1198`). The port's `launchMissile` does the same
+(`src/engine/MagicSystem.ts:62`), but for a throw from the cursor, which puts the object
+back in the hand after the throw's stamina, skill and sound (`throwObjectFromCursor`,
+`src/engine/MouseSystem.ts:188`), as no release does.
+
+Paying it: CSB 2.1's fix, `CHANGE8_00` (`doc/ReDMCSB-src/PROJEXPL.C:61-67`). When no
+missile record is found, an object that is not a spell is moved from nowhere onto the
+launch square at the missile's corner (`F0267_MOVE_GetMoveResult_CPSCE(…, -1, 0, mapX,
+mapY)`), so a teleporter or a pit takes it and a pad feels it; a spell is still lost.
+It goes in `launchMissile`, for every caller, and the cursor's put-back goes. A
+`tools/checks/` tool fills the missile database to its maximum around the party, then
+throws, shoots and launches, and finds each object on the floor. Then the H entry, as
+for `BUG0_20`.
+
 ### C150 ⏸️ Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops
 
 Not a divergence yet: the port does what CSBWin's source does. Recorded because only play
@@ -781,7 +807,7 @@ and the port have each one is not known, but for `BUG0_78` (faithful: a door clo
 the party wounds the head, never the hands) and `BUG0_00`'s scents (X18).
 `doc/ATARI_BUGS.md` holds the list, the way one bug is checked, the verdicts and the
 nine steps it is split into, by subsystem: step 0 is the eight with nothing to compare,
-steps 1 to 8 hold 9 to 14 bugs each, one session a step. Steps 0 and 1 are checked; step 2
+steps 1 to 8 hold 9 to 14 bugs each, one session a step. Steps 0 to 2 are checked; step 3
 is next. Paying it: each step fills its
 rows and adds nothing but its findings: a **port diverges** becomes a C item, a
 **CSBWin's fix** a C item or an H entry as the author decides, and a **faithful** bug
@@ -789,6 +815,15 @@ stays a row, unless the author names it for H or X. A **game-breaking** bug (a c
 a hang, corrupted data, an object cloned or lost) is fixed even when it is faithful: a C
 item, then an H entry. A step's commit names `F25` and the
 step; the item is paid when no row is at "—".
+
+**Waiting on the author: `BUG0_09`.** When a database is full, the Atari's DM releases
+discard an object from any square, a pad's too, so the pad lets go and may close a door
+or open a pit; CSB 2.0 skips a square with an actuator that is not disabled
+(`CHANGE7_17`, `doc/ReDMCSB-src/DUNGEON.C:1995-2004`), and so do CSBWin
+(`MakeMoreRoomInDB`, `doc/CSBwin-src/Character.cpp:261-265`) and the port, on every set.
+CSBWin reaches the discard only once a database holds 8000 records (`CSB.h:1649`). The
+options: **(a)** keep CSB 2.0's skip on every set, an H entry, as `BUG0_21` plays CSB
+2.1's (recommended); **(b)** the DM sets discard as DM's releases do, a C item.
 
 ---
 
@@ -1241,6 +1276,11 @@ Recorded so that nobody "fixes" them.
     expires at once and the watchdog's loops forever (`doc/ReDMCSB-src/GAMELOOP.C:124`).
     CSBWin's are 32 bits (`doc/CSBwin-src/CSB.h:1881-1884`), a read save's widened
     (`SaveGame.cpp:1879-1882`) and a save written so (`:991`), and the port's too.
+  - `BUG0_08`: the list of squares' first things has a fixed size, and a thing set on
+    one square too many overwrites what follows it, so things vanish
+    (`doc/ReDMCSB-src/DUNGEON.C:1825`). CSBWin grows it by 50 entries once fewer than 5
+    are free (`AddObjectToRoom`, `doc/CSBwin-src/Code11f52.cpp:445-462`); the port's has
+    no fixed size (`DungeonState.addObjectToCell`).
   - `BUG0_18`: from 1.2, the Atari stops with error 45 once the timeline holds the
     dungeon's count of events (`TIMELINE.C:512-520`). CSBWin grows its table by a quarter
     and stops only at 5000 (`Timer.cpp:1001-1010`), as the port does
