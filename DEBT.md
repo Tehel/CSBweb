@@ -20,7 +20,8 @@ a tablet, and Theron's Quest played to its end. The site around them is
 deployed: the welcome page (`src/ui/welcomePage.ts`), a player's own data sets, the
 server (`doc/DEPLOYMENT.md`). Every game can be recorded, and a save's or a game's end's
 recording shared, listed and played back, but recordings are paused while the port's
-behaviour still changes (`doc/RECORDING.md` → "Recordings are paused"). The work now is this list, in the index's order, and after
+behaviour still changes (`doc/RECORDING.md` → "Recordings are paused"), until R18 lets a
+recording play by the behaviour it was made with. The work now is this list, in the index's order, and after
 it cleaning the repository up to publish it as open source. Tiers D and E hold what the
 code needs to be a base others can read and build on. The page's redesign is in: the
 interface in the canvas (U), and the welcome page with its HOW TO PLAY, its ABOUT
@@ -128,6 +129,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
+| R18 | A recording plays by the engine's behaviour as it was made | L | ⏳ waits on the author |
 | F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
 | C198 | A missile that cannot be made loses the object it was to carry | S | ⏳ |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
@@ -463,6 +465,89 @@ takes untrusted data. A file the player drops on the page and a custom dungeon a
 untrusted: they may stop the game with a message, as CSBWin dies, but never crash or hang
 the tab, nor corrupt what is stored. Each item owes what a fix owes ("How to work this
 list", point 4), its check included.
+
+### R18 ⏳ A recording plays by the engine's behaviour as it was made
+
+Waits on the author's decisions (below). Recordings are paused (`doc/RECORDING.md` →
+"Recordings are paused") because any change to what a tick does makes every recording made
+before it drift. A recording carries `build` (`__CSBWEB_BUILD__`, `src/engine/Recorder.ts`),
+which changes with every deploy, a change of play or not, and the player can only say
+"ANOTHER VERSION OF THE SITE MADE IT" (`endLines`). F24's other CSBWin versions run into
+the same wall: 9.x and 11.0xx differ from 2023 throughout.
+
+**CSBWin's own answer** is a flag: `version90Compatible`, set when a playfile's version line
+is 9.0's and the program 9.03 (`doc/CSBwin-src/Recording.cpp:172-180`), keeps 9.0's level
+in `MonsterPositionByte` when a monster drops its possessions
+(`doc/CSBwin-src/Code11f52.cpp:907-910`). One engine, the old behaviour kept beside the new
+behind a named switch, chosen by the recording.
+
+**The proposal**, one engine with behaviour flags:
+
+- **A flag per change of play.** `src/engine/Behaviour.ts` lists every old behaviour the
+  engine still keeps: its name (for the behaviour it keeps, as `version90Compatible` is),
+  what it does, the commit's debt ID, and the level it ended at (`until`). The code keeps
+  the old lines verbatim behind it, `if (ctx.behaviour.<name>) { old } else { new }`, the
+  new with its citation. The engine reads `ctx.behaviour`, a frozen record set before a
+  game starts, as `ctx.rules` and `ctx.extras` are.
+- **A level, not the build.** `ENGINE_LEVEL` is an integer bumped by a commit that changes
+  what a tick does from the same inputs, and only by one. A recording and a package carry
+  `level` beside `build` (which stays, for display); the recordings made before it are level
+  0. A new game plays at `ENGINE_LEVEL`, every flag off; a recording plays at its own, each
+  flag whose `until` is above it on. A recording of a level the page does not know (a later
+  build's, in a stale tab) is refused before it plays.
+- **What counts as a change of play**: whatever lies between the input boundary and the
+  state (`doc/RECORDING.md` → "The port against those needs"): the engine, and the
+  interface's hit tests and the viewport's picking that turn a logged click into an action.
+  A change that only draws needs no flag. A new extra, off by default, needs none; a
+  change to an extra's behaviour does.
+- **The gate that makes it hold.** A forgotten bump breaks recordings silently, so `npm
+  test` plays a corpus of the port's own recordings, `tools/fixtures/recordings/`, each at
+  its level, and fails on any drift. Its packages: the three F24 runs' recordings
+  (`recordRun`: forty minutes of play each, Dungeon Master to its end, Chaos Strikes Back to
+  Fulya Pit), `tools/checks/replay.ts`'s games, and the author's own games exported from
+  the site. When the level is bumped, the old packages stay (they test the flags on) and the
+  runs are recorded again at the new level (they test the flags off). The deploy's
+  `utils/replay-recordings.ts` turns from marking a drifting recording broken to refusing
+  the deploy: a drift there is a flag missed.
+- **What it does not cover**: a player's recordings in the browser, which no check sees,
+  are safe as far as the corpus reaches; and a set whose files change (a corrected
+  `graphics.dat` item, P11's new `dungeon.dat`), which no flag answers. A recording would
+  carry its files' signatures (`FileSignatures`) and refuse to play over others.
+- **Older CSBWin versions** (F24) are profiles of the same flags: `csbwin-11.014` names the
+  flags that version needs, and a run's recording carries its profile beside its level. Its
+  flags are read from a diff of that version's source against 2023's, not found by trial:
+  Paul R. Stevens' site keeps the sources of 9.9.63 (`CSBwin9963src.zip`, 2006), 10.0,
+  10.056, 10.078, 11.0, 11.1, 11.014, 11.056, 11.059, 11.067, 11.068, 12.0, 12.3, and the
+  2015 to 2023 snapshots (`https://www.dianneandpaul.net/CSBwin/index`). The 11.0xx runs lie
+  between 11.014's and 11.056's sources; the 9.x runs (9.05 to 9.6a) have none of their
+  own, the nearest being 9.9.63's, later than them.
+
+**The cost, and its bound.** Each flag is an `if` that stays while a kept recording needs
+it. The game is complete, so changes of play are rare now: C198, X18 if the author decides
+it, what F24's runs turn up. A version profile may hold many flags: 11.014 to 2023 is
+fourteen years of changes, most of them to what the port does not have (the front-ends,
+the menus), and its diff is measured before the profile is taken on.
+
+**The alternative**: keep every level's built page and play a recording with the bundle
+that made it (`/engine/<level>/`). No `if` in the engine, but each old bundle must still
+read today's package, server API, data set files and store (an IndexedDB upgraded past
+its version refuses it), keeps its own interface's bugs, and answers nothing for CSBWin's
+versions. It is the fallback for a change of play no flag can carry.
+
+**Decisions for the author:**
+
+1. Flags with a level (proposed), or archived bundles.
+2. When a flag retires: never; or when no shared recording needs it, a player's own then
+   drifting with "ANOTHER VERSION OF THE SITE MADE IT"; or after a time.
+3. Whether a recording pins its set's files' signatures now, or with P11.
+4. Whether CSBWin's older versions are taken up after recordings resume, and which first
+   (proposed: 11.0xx, four runs, its source near).
+
+**Paying it, in steps**, once decided: (1) `Behaviour.ts`, `ENGINE_LEVEL`, `level` in the
+recording, the store's row and the package, the player setting the flags, no flag yet; (2)
+the corpus and its check in `npm test`; (3) the deploy's check refusing a drift; (4) the
+rule written into `CLAUDE.md` and `doc/RECORDING.md`, and recordings resumed
+(`src/ui/recordingsSwitch.ts`). Size L.
 
 ---
 
@@ -809,10 +894,9 @@ Paying it, in steps:
    Conflux's runs when the author has them. **The 9.x and 11.0xx runs are left out for
    now**, the author's decision: each version differs from CSBWin 2023 throughout
    (above), so corrections to the log cannot convert them, and only the runs CSBWin 2023
-   plays are shared. Taking them up again would mean finding each version's rules by
-   running the executable shipped with its run under Wine as the oracle for that version,
-   and porting them as a per-run mode, which step 2 rules out ("the engine stays CSBWin
-   2023's").
+   plays are shared. Taking them up again is R18's: each version a profile of behaviour
+   flags read from its own source's diff against 2023's, the executable shipped with its
+   run the oracle for that version.
 2. **Each next drift, the same way.** CSBWin's versions diverge from each other, which is
    why each run was shipped with the executable that recorded it, so each run is converted
    on its own and may need tweaks no other run needs. A drift is one of two things:
@@ -826,9 +910,8 @@ Paying it, in steps:
      stays a playfile: `0x2222` draws its random field's count and goes on as button 0
      (`Recording.cpp:639-649`), `0xdddd` sets a word of `d.` (`:672-680`). Where a version
      differs throughout rather than at one place (a rule of its own, which would take a
-     correction at every turn), the run may not be convertible by corrections; that is
-     written into this entry for the author, with the version and the rule, rather than
-     worked around.
+     correction at every turn), the run is not convertible by corrections; it waits on
+     its version's profile of behaviour flags (R18), and the engine's default stays 2023's.
    Each tweak is listed beside its log with its reason and the version it answers.
 3. **The check**, done for the three runs: their logs in `tools/fixtures/csbwin-runs/`,
    listed in `CSBWIN_RUNS` (`tools/lib/csbwinRun.ts`), and `tools/checks/csbwin-runs.ts`,
