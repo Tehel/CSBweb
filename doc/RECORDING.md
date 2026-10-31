@@ -506,6 +506,11 @@ run recorded in play kept to, and `extraTicks`, which playback turns off and the
 on; none of the three runs draws otherwise for either. So the recording takes fewer VBLs
 than CSBWin's playback, at the same `d.Time`.
 
+A run's recording is shared as a player's is, packaged at the game's end for a race to
+fusion, and at a save made at its log's end for the race to Fulya Pit, by a script the
+site's owner runs (`utils/share-csbwin-runs.ts`, `doc/DEPLOYMENT.md` → "Shared
+recordings").
+
 ## Shared recordings
 
 A player shares a point the store keeps, never a running game: a save, by its name, or

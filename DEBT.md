@@ -804,8 +804,8 @@ What it establishes:
 Paying it, in steps:
 
 1. **The 17.6 runs and `CSBMovie0640` through steps 3 to 5**, the author's request.
-   Steps 3 and 4 are done for the three of them: their check and their recordings
-   (below). Step 5, their upload, is next. Then the other CSB runs through the oracle, and
+   Steps 3 to 5 are done for the three of them: their check, their recordings and their
+   upload (below), which the author runs. Next, the other CSB runs through the oracle, and
    Conflux's runs when the author has them. **The 9.x and 11.0xx runs are left out for
    now**, the author's decision: each version differs from CSBWin 2023 throughout
    (above), so corrections to the log cannot convert them, and only the runs CSBWin 2023
@@ -840,10 +840,12 @@ Paying it, in steps:
    in CSBWin"), its recorder's own draws and its spliced saves the `playfile` change, and
    the recording packaged and played by `RecordingPlayer` to the same end, in the same
    check.
-5. **The upload**: a script in `utils/` (`.claude/memory/instance-scripts-in-utils.md`)
-   that takes a log, its corrections, the instance and a `playerId`, builds the package of
-   the game's end (`RecordingPackage`) and submits it to `api/recordings`, with the run's
-   player and time in its metadata.
+5. **The upload**, done for the three runs: `utils/share-csbwin-runs.ts`, which the author
+   runs (`doc/DEPLOYMENT.md` → "Shared recordings"). It plays each run of `CSBWIN_RUNS`,
+   packages it at the game's end or at a save made at its log's end, with the run's
+   player, title and description, plays the package back, and submits it to
+   `api/recordings` on a yes, pending. A run that needs corrections takes them in its log,
+   as step 2 writes them.
 
 ---
 

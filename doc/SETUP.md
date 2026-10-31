@@ -233,3 +233,12 @@ npx tsx utils/submit-forum-dungeons.ts --instance https://csbweb.example.org --p
 Those dungeons belong to their authors, so offering them is your call. The server takes
 five submissions an hour from one address: when the script stops at the sixth, run it
 again an hour later.
+
+**Optionally, CSBWin's own runs.** `utils/share-csbwin-runs.ts` shares the CSBWin players'
+recordings that the port plays to their end, races to fusion and to Fulya Pit, as
+recordings of the instance, each pending until you approve it (`doc/DEPLOYMENT.md` →
+"Shared recordings"):
+
+```bash
+npx tsx utils/share-csbwin-runs.ts --instance https://csbweb.example.org --player <your playerId>
+```

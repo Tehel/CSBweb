@@ -563,6 +563,21 @@ The dev server answers `api/recordings` and serves `recordings/<id>.gz` as the s
 memory and a scratch folder of the packages, both gone when it stops. Its sets are those
 it answers `api/data-sets` with, and its moderator the same.
 
+**CSBWin's own runs** are shared by `utils/share-csbwin-runs.ts`, which submits each as
+a player's UPLOAD does, pending a moderator's approval:
+
+```bash
+npx tsx utils/share-csbwin-runs.ts --instance https://csbweb.example --player <playerId> [--dry-run] [<run id>…]
+```
+
+It plays each run of `tools/fixtures/csbwin-runs/` (`CSBWIN_RUNS`, `doc/RECORDING.md` →
+"Recordings made in CSBWin") to its end with the engine of the working tree, packages its
+recording at the game's end, or at a save made at its log's end, plays the package back,
+and asks, one at a time, with its title, its player and its description. A run whose
+title the instance already lists on its set is not offered again. The instance must run a
+build whose package reader takes the `playfile` change, the draws a CSBWin run carries; an
+older one refuses each.
+
 ## The image and the stack
 
 `Dockerfile`, two stages on `NODE_IMAGE`, `node:24.22.0-alpine3.24` pinned by the digest
