@@ -5,6 +5,11 @@
  * boundary and recorded (`recordRun`), its package written as the welcome page's UPLOAD
  * writes one, and submitted to `POST api/recordings`, pending a moderator's approval.
  *
+ * A recording names its set by the instance's id, which need not be the checkout's: the
+ * run is shared on the instance's set whose files are the run's set's, byte for byte
+ * (`gameFiles`), an official one first. An instance with none is told so, and the run is
+ * not offered: a set of other files plays another game, which drifts.
+ *
  * Run:
  *
  *   npx tsx utils/share-csbwin-runs.ts --instance https://csbweb.example --player <playerId> [--dry-run] [<run id>…]
@@ -18,8 +23,8 @@
  * whose title the instance already lists on its set (to `--player`: pending, hidden and
  * its own included) is not offered again. For each other, the script plays it to its end
  * (Lord Chaos fused, or its log's last entry, where a save is made to share it at), plays
- * its package back with the port's player (`playPath`), shows its title, its player, its
- * description and its size, and asks:
+ * its package back with the port's player (`playPath`) over the instance's files, shows
+ * its title, its player, its description, its set and its size, and asks:
  *
  *   y  yes: submit it
  *   n  no, next
@@ -33,7 +38,8 @@ import { spawnSync } from 'node:child_process';
 import { stdin, stdout } from 'node:process';
 import { createInterface } from 'node:readline/promises';
 
-import { PLAYER_ID_HEADER, RECORDING_PACKAGE_FIELD, RECORDINGS_ROUTE } from '../src/data/DataSets';
+import { folderFiles } from '../src/data/DataSetFiles';
+import { DATA_SETS_ROUTE, parseManifest, PLAYER_ID_HEADER, RECORDING_PACKAGE_FIELD, RECORDINGS_ROUTE, type DataSet } from '../src/data/DataSets';
 import { packageOfEnd, packageOfSave, readRecordingPackage, writeRecordingPackage } from '../src/engine/RecordingPackage';
 import { CSBWIN_RUNS, recordRun, type CsbwinRun } from '../tools/lib/csbwinRun';
 import { dataSetNamed, diskFiles } from '../tools/lib/dataSets';
@@ -89,9 +95,50 @@ async function listedTitles(dataSet: string): Promise<Set<string>> {
     return new Set(recordings.map((recording) => recording.title));
 }
 
-/** `run` played, packaged and played back: its package, or why it cannot be shared. */
-async function packageOf(run: CsbwinRun, build: string): Promise<Uint8Array | string> {
-    const recorded = await recordRun(run, build);
+/**
+ * The files a set's game is read from, which an instance's set must hold byte for byte to
+ * play a run's recording: the dungeon, its graphics and, where the set has them, CSB's.
+ * Not `mini.dat`, nor the Hint Oracle's, which a game under way never reads.
+ */
+function gameFiles(set: DataSet): string[] {
+    return ['dungeon.dat', 'graphics.dat', ...(set.csbGraphics ? ['CSBgraphics.dat'] : [])];
+}
+
+/** Whether two files are the same bytes. */
+function same(a: Uint8Array | null, b: Uint8Array | null): boolean {
+    return a !== null && b !== null && a.length === b.length && a.every((byte, n) => byte === b[n]);
+}
+
+/**
+ * The instance's set whose game files (`gameFiles`) are `run`'s set's, an official one
+ * first, or `null`. Each set's `dungeon.dat` is fetched, and the rest only of a set whose
+ * dungeon is the run's.
+ */
+async function siteSetOf(run: CsbwinRun, sets: readonly DataSet[]): Promise<DataSet | null> {
+    const local = dataSetNamed(run.dataSet);
+    const ours = diskFiles(local);
+    const names = gameFiles(local);
+    const wanted = new Map<string, Uint8Array | null>();
+    for (const name of names) wanted.set(name, await ours.read(name));
+    const ordered = [...sets.filter((set) => set.official), ...sets.filter((set) => !set.official)];
+    for (const set of ordered) {
+        if (set.csbGraphics !== local.csbGraphics) continue;
+        const theirs = folderFiles(set.dir);
+        let match = true;
+        for (const name of names) {
+            if (!same(await theirs.read(name), wanted.get(name)!)) {
+                match = false;
+                break;
+            }
+        }
+        if (match) return set;
+    }
+    return null;
+}
+
+/** `run` played, packaged as a recording of the instance's `set`, and played back over its files: its package, or why it cannot be shared. */
+async function packageOf(run: CsbwinRun, set: DataSet, build: string): Promise<Uint8Array | string> {
+    const recorded = await recordRun(run, build, set.id);
     if (recorded.drift) return `it drifts at ${recorded.drift}`;
     if (run.end === 'won' ? recorded.won !== true : recorded.saved === null) return 'it does not reach its end';
     const text = { title: run.title, author: run.player, description: run.description };
@@ -102,25 +149,33 @@ async function packageOf(run: CsbwinRun, build: string): Promise<Uint8Array | st
         : packageOfEnd([recorded.recording], text, times);
     const bytes = await writeRecordingPackage(pkg);
     const read = await readRecordingPackage(bytes);
-    const set = dataSetNamed(run.dataSet);
-    const played = await playPath(set, diskFiles(set), read.path, read.shared.kind === 'save' ? read.shared : null);
-    return played.drift ? `its package drifts as it plays back: ${JSON.stringify(played.drift)}` : bytes;
+    const played = await playPath(set, folderFiles(set.dir), read.path, read.shared.kind === 'save' ? read.shared : null);
+    return played.drift ? `its package drifts as it plays back over ${set.id}'s files: ${JSON.stringify(played.drift)}` : bytes;
 }
 
 async function main(): Promise<void> {
     const build = checkoutBuild();
     console.log(`Sharing CSBWin's runs on ${instance} as ${player}, build ${build}${dryRun ? ', a dry run' : ''}.`);
+    const manifest = await fetch(`${instance}/${DATA_SETS_ROUTE}`, { headers: asPlayer });
+    if (!manifest.ok) fail(`${instance}/${DATA_SETS_ROUTE} answered HTTP ${manifest.status}`);
+    const sets = parseManifest(await manifest.text(), `${instance}/gamefiles`).dataSets;
     const listed = new Map<string, Set<string>>();
     let shared = 0;
     for (const [i, run] of runs.entries()) {
-        let titles = listed.get(run.dataSet);
-        if (!titles) listed.set(run.dataSet, titles = await listedTitles(run.dataSet));
-        console.log(`\n[${i + 1}/${runs.length}] ${run.id}, on ${run.dataSet}`);
+        console.log(`\n[${i + 1}/${runs.length}] ${run.id}, recorded on the files of ${run.dataSet}`);
+        const set = await siteSetOf(run, sets);
+        if (!set) {
+            console.log(`  Not offered: no set of ${instance} holds ${run.dataSet}'s ${gameFiles(dataSetNamed(run.dataSet)).join(', ')}, byte for byte.`);
+            continue;
+        }
+        console.log(`  ${instance}'s set: ${set.id}, ${set.name}`);
+        let titles = listed.get(set.id);
+        if (!titles) listed.set(set.id, titles = await listedTitles(set.id));
         if (titles.has(run.title)) {
             console.log(`  '${run.title}' is listed already: not offered.`);
             continue;
         }
-        const bytes = await packageOf(run, build);
+        const bytes = await packageOf(run, set, build);
         if (typeof bytes === 'string') {
             console.log(`  Not offered: ${bytes}.`);
             continue;

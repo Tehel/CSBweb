@@ -111,14 +111,18 @@ function drawsBetween(from: number, to: number, max = 100000): number | null {
   return null;
 }
 
-/** `run` played from its folder into a fresh page of its set, `build` naming its recording's build. */
-export async function recordRun(run: CsbwinRun, build: string): Promise<RecordedRun> {
+/**
+ * `run` played from its folder into a fresh page of its set, `build` naming its
+ * recording's build and `dataSet` its set: the run's own, or the id a site gives the same
+ * files (`utils/share-csbwin-runs.ts`).
+ */
+export async function recordRun(run: CsbwinRun, build: string, dataSet = run.dataSet): Promise<RecordedRun> {
   const folder = runFolder(run);
   const set = dataSetNamed(run.dataSet);
   const page = await standPage(set, diskFiles(set));
   const { game, screen } = page;
   const { ctx } = game;
-  const recorder = new Recorder(game, build, set.id, () => run.id);
+  const recorder = new Recorder(game, build, dataSet, () => run.id);
   const { items } = readPlayfile(`${folder}/playfile.log`);
   const entries = items.filter((item): item is PlayEntry => 'num' in item);
 

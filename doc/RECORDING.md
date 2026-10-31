@@ -507,9 +507,9 @@ on; none of the three runs draws otherwise for either. So the recording takes fe
 than CSBWin's playback, at the same `d.Time`.
 
 A run's recording is shared as a player's is, packaged at the game's end for a race to
-fusion, and at a save made at its log's end for the race to Fulya Pit, by a script the
-site's owner runs (`utils/share-csbwin-runs.ts`, `doc/DEPLOYMENT.md` → "Shared
-recordings").
+fusion, and at a save made at its log's end for the race to Fulya Pit, on the site's set
+whose files are the run's own, whatever its id, by a script the site's owner runs
+(`utils/share-csbwin-runs.ts`, `doc/DEPLOYMENT.md` → "Shared recordings").
 
 ## Shared recordings
 

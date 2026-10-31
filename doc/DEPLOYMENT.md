@@ -573,8 +573,15 @@ npx tsx utils/share-csbwin-runs.ts --instance https://csbweb.example --player <p
 It plays each run of `tools/fixtures/csbwin-runs/` (`CSBWIN_RUNS`, `doc/RECORDING.md` →
 "Recordings made in CSBWin") to its end with the engine of the working tree, packages its
 recording at the game's end, or at a save made at its log's end, plays the package back,
-and asks, one at a time, with its title, its player and its description. A run whose
-title the instance already lists on its set is not offered again. The instance must run a
+and asks, one at a time, with its title, its player and its description. A recording
+names its set by the instance's id: the run is shared on the instance's set whose
+`dungeon.dat` and `graphics.dat` (and `CSBgraphics.dat`, where it has one) are its own
+set's byte for byte, whatever its id, and its package is played back over that set's
+files; an instance with no such set is told so, and the run is not offered. The two races
+to fusion need CSBWin's mix, `tools/fixtures/gamefiles/dm-atari/`, published as a set of
+its own: the reference instance's `dm-atari` is the 1.2 disk's, on which they drift at the
+first Ant Men. A run whose title the instance already lists on its set is not offered
+again. The instance must run a
 build whose package reader takes the `playfile` change, the draws a CSBWin run carries; an
 older one refuses each.
 

@@ -841,9 +841,10 @@ Paying it, in steps:
    the recording packaged and played by `RecordingPlayer` to the same end, in the same
    check.
 5. **The upload**, done for the three runs: `utils/share-csbwin-runs.ts`, which the author
-   runs (`doc/DEPLOYMENT.md` → "Shared recordings"). It plays each run of `CSBWIN_RUNS`,
-   packages it at the game's end or at a save made at its log's end, with the run's
-   player, title and description, plays the package back, and submits it to
+   runs (`doc/DEPLOYMENT.md` → "Shared recordings"). It plays each run of `CSBWIN_RUNS`
+   as a recording of the instance's set whose files are the run's set's, packages it at
+   the game's end or at a save made at its log's end, with the run's player, title and
+   description, plays the package back over that set's files, and submits it to
    `api/recordings` on a yes, pending. A run that needs corrections takes them in its log,
    as step 2 writes them.
 
