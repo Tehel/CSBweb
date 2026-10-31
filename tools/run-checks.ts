@@ -127,6 +127,7 @@ const CHECKS: Tool[] = [
   { tool: 'watch-thrown-weapons.ts' },
   { tool: 'reincarnate-entry.ts' },
   { tool: 'pit-fall.ts' },
+  { tool: 'party-lands-across-levels.ts' },
   { tool: 'teleporter-drop.ts' },
   { tool: 'teleporter-target.ts' },
   { tool: 'dev-level.ts' },

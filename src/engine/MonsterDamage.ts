@@ -100,6 +100,17 @@ export class MonsterDamage {
     this.random = ctx.random;
   }
 
+  /**
+   * `level == d.partyLevel`: the level whose groups hold `ITEM16` slots, which
+   * `LoadPartyLevel` alone moves (`doc/CSBwin-src/CSBCode.cpp:806`, `:5858`). Not the
+   * party's square: inside a move onto another level the party already stands there,
+   * and a monster it lands on dies while `d.partyLevel` is still the level it left
+   * (`Code11f52.cpp:3333-3359`).
+   */
+  private isPartyLevel(level: number): boolean {
+    return level === this.ctx.systems.monsters.getLoadedLevel();
+  }
+
   /* ------------------------------------------------- packed byte accessors ---- */
 
   /**
@@ -111,7 +122,7 @@ export class MonsterDamage {
    */
   monsterPositionByte(monster: CreatureRecord, level: number, noItem16: boolean): number {
     if (noItem16) return monster.groupIndex & 0xff;
-    if (level === this.ctx.party.state.position.z) {
+    if (this.isPartyLevel(level)) {
       const item16 = this.dungeon.getAttachedItem16(monster);
       if (!item16) return 0; // CSBWin asserts then returns 0
       return item16.positions & 0xff;
@@ -121,7 +132,7 @@ export class MonsterDamage {
 
   /** `SetMonsterPositionByte` (`doc/CSBwin-src/Code11f52.cpp:238`). */
   setMonsterPositionByte(monster: CreatureRecord, value: number, level: number, noItem16: boolean): void {
-    if (level === this.ctx.party.state.position.z && !noItem16) {
+    if (this.isPartyLevel(level) && !noItem16) {
       const item16 = this.dungeon.getAttachedItem16(monster);
       if (item16) item16.positions = value & 0xff;
       return;
@@ -136,7 +147,7 @@ export class MonsterDamage {
    * 4-entry replication table rather than being packed per member.
    */
   monsterFacingByte(monster: CreatureRecord, level: number, noItem16: boolean): number {
-    if (level === this.ctx.party.state.position.z && !noItem16) {
+    if (this.isPartyLevel(level) && !noItem16) {
       const item16 = this.dungeon.getAttachedItem16(monster);
       if (!item16) return 0;
       return item16.facings & 0xff;
@@ -146,7 +157,7 @@ export class MonsterDamage {
 
   /** `SetMonsterFacingByte` (`doc/CSBwin-src/Code11f52.cpp:272`). */
   setMonsterFacingByte(monster: CreatureRecord, value: number, level: number, noItem16: boolean): void {
-    if (level === this.ctx.party.state.position.z && !noItem16) {
+    if (this.isPartyLevel(level) && !noItem16) {
       const item16 = this.dungeon.getAttachedItem16(monster);
       if (item16) item16.facings = value & 0xff;
       return;
@@ -397,7 +408,7 @@ export class MonsterDamage {
     const groupIndex = monster.groupIndex;
     this.dungeon.deleteDBEntry(rn);
 
-    if (this.ctx.party.state.position.z === level) {
+    if (this.isPartyLevel(level)) {
       const slot = this.dungeon.getItem16Record(groupIndex);
       if (slot) {
         slot.word0 = ITEM16_FREE;
@@ -621,7 +632,7 @@ export class MonsterDamage {
     positions: number,
     noItem16: boolean,
   ): void {
-    const onPartyLevel = level === this.ctx.party.state.position.z;
+    const onPartyLevel = this.isPartyLevel(level);
     const item16 = onPartyLevel ? this.dungeon.getAttachedItem16(monster) : null;
 
     if (monster.fear === StateOfFear.StateOfFear6) {

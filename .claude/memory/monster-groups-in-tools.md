@@ -19,8 +19,10 @@ as a level change does (it re-rolls their status, so set the status after it).
 
 **The trap.** `DungeonState.getAttachedItem16` checks only that `groupIndex` is within the
 pool (`src/engine/DungeonState.ts:771-775`). A group off the party's level keeps its
-corners byte in that field (5, 6, …), so it gets an unrelated `ITEM16` back. Test
-`level === party.position.z` first, as `MonsterDamage.monsterPositionByte` does.
+corners byte in that field (5, 6, …), so it gets an unrelated `ITEM16` back. Test the
+level against `d.partyLevel` first, which is `monsters.getLoadedLevel()`, not
+`party.position.z`, as `MonsterDamage.isPartyLevel` does: inside a fall or a jump to
+another level the party's square is already the new level's.
 
 **Why:** the next monster work needs this, the DSA's `I_DelMon`, `I_InsMon` and
 `I_MonsterStore`, and the DSA's monster move filter, and finding it took a scan of every

@@ -1396,6 +1396,18 @@ object teleporter under the square sends them on, an open pit takes them and a p
 as for anything dropped there. Theron's Quest's village of thieves depends on it: Gigglers
 fall to their death on item teleporters, which carry their armour into a block of alcoves.
 
+When the party arrives from another level, a pit's fall or a teleporter's jump, the group
+dies under `LoadLevel(curLevel)` while `d.partyLevel` is still the level the party left:
+only `SetPartyLevel`, from `LoadPartyLevel`, moves it (`doc/CSBwin-src/CSBCode.cpp:806`,
+`:5858`), at the top of the next tick. So the group is a detached one to every
+`level == d.partyLevel` test. `DeleteMonster` frees no `ITEM16` (`Code11f52.cpp:1076-1081`),
+though its `groupIndex`, the packed positions, may name a slot of the level the party left,
+and `DropMonsterRemains` drops each member's dropping at its own corner from those
+positions (`MonsterPositionByte`, `:211-231`). The stairs never reach this: `TraverseStairway`
+lifts the party, and it lands at the top of the next tick, after `LoadPartyLevel`
+(`CSBCode.cpp:7859-7868`, `:625-633`). Speedruns land on a group from below to kill it,
+"Squish" in `DMMovie2823`'s annotations (`tools/checks/party-lands-across-levels.ts`).
+
 ## Monster AI timers are addressed by map square, and only a DSA move re-aims them all
 
 Timer types 29-41 are found by `uByte6`/`uByte7` (`doc/CSBwin-src/Monster.cpp:1324-1331`).

@@ -759,11 +759,13 @@ What it establishes:
 - **Level 1's first round matches**: its fifteen groups' first turns
   (`doc/PROVEN_FACTS.md` → "A monster's turn reads `attackDistance` from its last
   `Blocked`").
-- **The 17.6 runs play on deep**: `DMMovie2615` to line 3607 (`d.Time` 0x14a7, level 8
-  at (16,3)), `DMMovie2823` to line 2492 (0xe21, level 4 at (2,4)), each by
-  `d.RandomNumber`, through the attacks of the earlier levels (`doc/PROVEN_FACTS.md` →
-  "The attack panel keeps its last drawing until the next tick": the buttons are back
-  at the tick after the flash's).
+- **The 17.6 runs play on deep**: `DMMovie2615` to line 4294 (`d.Time` 0x198b, level 9
+  at (3,27), the port 9 draws short), `DMMovie2823` to line 3669 (0x15c1, level 8 at
+  (11,12), 10 short), each by `d.RandomNumber`, through the attacks of the earlier levels
+  (`doc/PROVEN_FACTS.md` → "The attack panel keeps its last drawing until the next tick":
+  the buttons are back at the tick after the flash's) and the groups the party kills by
+  falling onto them from the level above (→ "The party landing on a monster group kills
+  it, champions or not": `d.partyLevel` is still the level it left).
 - **Drift 3, in the 11.0xx runs only** (`DMMovie42`, `43a`, `43b`, `45`): on level 0, with
   one champion, 1 draw short in the entry at about `d.Time` 0x6b and 2 in the next, at
   0x6e, wherever the party stands and whenever the champion joined; nothing after. The 17.6
@@ -787,7 +789,7 @@ What it establishes:
 Paying it, in steps:
 
 1. **The 17.6 runs' drifts first**, the version nearest CSBWin 2023: `--trace` the ticks
-   before `DMMovie2615`'s line 3607 and `DMMovie2823`'s line 2492. Then drift 4, which the
+   before `DMMovie2615`'s line 4294 and `DMMovie2823`'s line 3669. Then drift 4, which the
    17.6 runs pass, so a 9.x CSBWin of its own until shown otherwise, and drift 3, whose
    fixed `d.Time` points at a timer or a periodic update.
 2. **Each next drift, the same way.** CSBWin's versions diverge from each other, which is
