@@ -325,7 +325,7 @@ export class AttackSystem {
 
     const order = this.ctx.systems.championDamage.determineAttackOrder(attackX, attackY, partyX, partyY, charPos);
     for (const pos of order) {
-      const ordinal = ordinalOfMonsterAtPosition(this.ctx.dungeon, this.ctx.tables.monsterDesc, monster, pos);
+      const ordinal = ordinalOfMonsterAtPosition(this.ctx, monster, this.ctx.party.state.position.z, pos);
       if (ordinal !== 0) return ordinal;
     }
     return 0;

@@ -5110,7 +5110,13 @@ Evidence: `tools/checks/player-attacks.ts` case 8c.
   runs first (`tools/checks/missile-crossing.ts`).
 - The victim is `OrdinalOfMonsterAtPosition(group, objectPos)` (`:1996-1997`) — the member
   in the corner the missile reached. An ordinal of 0 returns 0, and the missile flies on,
-  unless the group is `drawAsSize4()`, when member 1 is hit (`:1998-2002`).
+  unless the group is `drawAsSize4()`, when member 1 is hit (`:1998-2002`). The corners are
+  `MonsterPositionByte(pDB4, d.LoadedLevel, false)` (`:654-660`), which reads the `ITEM16`
+  only when that level is `d.partyLevel`, and is `groupIndex` itself everywhere else
+  (`:211-231`). A group off the party's level whose positions byte, read as a number,
+  indexes an `ITEM16` still has its corners in that byte: a fireball on level 7 meets a
+  group of three there in `DMMovie2823` at `d.Time` 0x15bf, the party on level 8
+  (`tools/checks/missile-monster.ts`, scenario 7).
 - A **fireball reaching a Black Flame heals it**: `hitPoints6[i] = Smaller(1000, hp +
   DetermineMagicDamage(...))`, then the missile is removed and returns 1 — no damage, no
   sound, no cloud (`:2011-2031`).

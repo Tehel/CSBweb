@@ -673,10 +673,10 @@ export class MonsterAI {
       // branch deliberately does nothing but consume the die roll.
     } else {
       pos = ((preferredDirection & 1) === (pos & 1) ? pos - 1 : pos + 1) & 0x3;
-      let ordinal = ordinalOfMonsterAtPosition(this.dungeon, this.ctx.tables.monsterDesc, c.monster, pos);
+      let ordinal = ordinalOfMonsterAtPosition(this.ctx, c.monster, c.level, pos);
       if (ordinal !== 0 && this.random.bool() !== 0) {
         pos = (pos + 2) & 0x3;
-        ordinal = ordinalOfMonsterAtPosition(this.dungeon, this.ctx.tables.monsterDesc, c.monster, pos);
+        ordinal = ordinalOfMonsterAtPosition(this.ctx, c.monster, c.level, pos);
       }
       if (ordinal === 0) {
         if (this.checkMonsterVersusMissiles(c)) return true;

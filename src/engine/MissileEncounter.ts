@@ -118,7 +118,7 @@ export class MissileEncounter {
       const hasHp = monster.hp.some((hp) => hp > 0);
       if (!hasHp) return;
       for (let pos = 0; pos < 4; pos++) {
-        if (ordinalOfMonsterAtPosition(this.dungeon, this.ctx.tables.monsterDesc, monster, pos) !== 0) {
+        if (ordinalOfMonsterAtPosition(this.ctx, monster, oldPos.z, pos) !== 0) {
           whoLeavesCell[pos] = (pos + 1) & 0xff;
         }
       }
@@ -393,7 +393,7 @@ export class MissileEncounter {
         if (!monster) return false;
         // The member in the corner the missile reached. Nobody there lets it fly on —
         // unless the group is drawn as one full-cell figure, when member 1 takes it.
-        let monsterOrdinal = ordinalOfMonsterAtPosition(this.dungeon, this.ctx.tables.monsterDesc, monster, objectPos);
+        let monsterOrdinal = ordinalOfMonsterAtPosition(this.ctx, monster, position.z, objectPos);
         if (monsterOrdinal === 0) {
           if (!monsterDrawAsSize4(this.ctx.rules, monster)) return false;
           monsterOrdinal = 1;

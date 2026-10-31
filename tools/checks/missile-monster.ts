@@ -34,6 +34,10 @@
  * (`:3896`, `:3974`). A lone monster spread over its cell (255), or one whose byte still
  * holds another member's corner, meets no missile at all.
  *
+ * Scenario 7: off the party's level a group's corners are its `groupIndex`, read by
+ * `MonsterPositionByte` at `d.LoadedLevel` (`Code11f52.cpp:211-231`, `:654-660`), never the
+ * `ITEM16` that number happens to index.
+ *
  * Run: `npm test -- --only=missile-monster.ts`
  */
 import { PotionType } from '../../src/core/constants';
@@ -434,6 +438,38 @@ function main(): void {
     console.log(`positions 3: DamageMonster ${JSON.stringify(log.hits)}, missiles in corner 3: ${missilesIn()}`);
     check(log.hits.length === 1 && log.hits[0]?.index === 0 && missilesIn() === 0,
       'positions 3 is: the missile meets member 0 and is gone');
+  }
+
+  /* ----------------------- 7. a group off the party's level ------------------------- */
+  console.log('');
+  console.log('=== 7. a thrown falchion reaches a group of two off the party\'s level ===');
+  {
+    const arena = makeArena(2)!;
+    const { game, group, launch, target } = arena;
+    let elsewhere: Position | null = null;
+    for (let level = 0; level < game.ctx.dungeon.getMapCount() && !elsewhere; level++) {
+      if (level !== target.z) elsewhere = findRange(game, level)?.party ?? null;
+    }
+    game.ctx.party.state.position = elsewhere!;
+    game.systems.monsters.loadPartyLevel(elsewhere!.z);
+    // Off the party's level `groupIndex` is the positions byte (`MonsterPositionByte`,
+    // `Code11f52.cpp:211-231`): member 0 in the south-west corner, member 1 in the
+    // north-west one. As a number it also indexes an ITEM16, another group's, whose
+    // byte has nobody in the north-west corner.
+    group.groupIndex = 3 | (0 << 2);
+    const stale = game.ctx.dungeon.getAttachedItem16(group);
+    if (stale) stale.positions = 3 | (2 << 2);
+    check(stale !== null && elsewhere!.z !== target.z,
+      `the party is on level ${elsewhere!.z}, the group on level ${target.z}, and groupIndex ${group.groupIndex} indexes an ITEM16`);
+    const log = spy(game);
+    const falchion = newRecord(game, game.ctx.dungeon.getData().databases.weapons, DBType.WEAPON, {
+      nextObject: OBJECT_ID_EOF, broken: false, charges: 0, litTorch: false, poisoned: false,
+      cursed: false, important: false, weaponType: WEAPON_FALCHION,
+    });
+    fly(game, falchion, launch);
+    console.log(`DamageMonster: ${JSON.stringify(log.hits)}   hp now [${group.hp.slice(0, 2)}]`);
+    check(log.hits.length === 1 && log.hits[0]?.index === 1,
+      'member 1, in the corner the missile reached by groupIndex, is hit: the ITEM16 it indexes is not read');
   }
 
   finish();

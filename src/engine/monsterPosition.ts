@@ -18,8 +18,8 @@
  */
 
 import type { CreatureRecord } from '../data/dungeonTypes';
-import { monsterHorizontalSize, type MonsterDesc } from '../data/tables/MonsterDesc';
-import type { DungeonState } from './DungeonState';
+import { monsterHorizontalSize } from '../data/tables/MonsterDesc';
+import type { GameContext } from './GameContext';
 
 /** The facings byte of a group whose members all face `facing`: its two bits for each member. */
 export function groupFacingsByte(facing: number): number {
@@ -29,20 +29,21 @@ export function groupFacingsByte(facing: number): number {
 
 /**
  * `OrdinalOfMonsterAtPosition(pDB4, pos)` (`doc/CSBwin-src/Code11f52.cpp:654`): reads the
- * group's position and facing bytes and its descriptor's `horizontalSize`, then asks
- * {@link ordinalAtPositionBytes}.
+ * group's position and facing bytes at `level`, CSBWin's `d.LoadedLevel`, through
+ * `MonsterPositionByte` and `MonsterFacingByte` (`:211`, `:256`), and its descriptor's
+ * `horizontalSize`, then asks {@link ordinalAtPositionBytes}. Off the party's level the
+ * positions byte is `groupIndex` itself, never the `ITEM16` its value happens to index.
  */
 export function ordinalOfMonsterAtPosition(
-  dungeon: DungeonState,
-  monsterDesc: ArrayLike<MonsterDesc> | null | undefined,
+  ctx: GameContext,
   monster: CreatureRecord,
+  level: number,
   position: number,
 ): number {
-  const render = dungeon.getMonsterRenderState(monster);
-  const desc = monsterDesc?.[monster.creatureType];
+  const desc = ctx.tables.monsterDesc[monster.creatureType];
   return ordinalAtPositionBytes({
-    positions: render.positions,
-    facings: render.facings,
+    positions: ctx.systems.monsterDamage.monsterPositionByte(monster, level, false),
+    facings: ctx.systems.monsterDamage.monsterFacingByte(monster, level, false),
     numMonM1: monster.numMonM1,
     horizontalSize: desc ? monsterHorizontalSize(desc) : 0,
     position,
