@@ -531,10 +531,10 @@ behind a named switch, chosen by the recording.
   the same commit; the corpus passing is what proves it did.
 - **The data set's files.** A recording and a package carry the MD5 of each file its set
   read (`FileSignatures`). Where the set's files no longer have them (a corrected
-  `graphics.dat` item, P11's new `dungeon.dat`), the page looks for files that do, and
-  plays over those; it refuses the recording, saying so, only where none has them. Where
-  it looks (a set's earlier files the server keeps, another set's) is settled at that
-  step, with P11.
+  `graphics.dat` item, P11's new `dungeon.dat`), the page looks for them among the other
+  sets the server has, the author's decision, and plays over the set whose files have
+  them. Where none has them, it refuses the recording and says so plainly: which file of
+  which set no longer matches.
 - **Older CSBWin versions** (F24) are profiles of the same flags: `csbwin-11.014` names the
   flags that version needs, and a run's recording carries its profile beside its level. Its
   flags are read from a diff of that version's source against 2023's, not found by trial:
@@ -558,7 +558,7 @@ behind a named switch, chosen by the recording.
    the three runs of `CSBWIN_RUNS` playing to their end all along (F24's step 2 for that
    version).
 6. Where a set's files mismatch, the page looking for the files a recording's signatures
-   name.
+   name among the server's other sets, and saying which file matches none.
 7. Recordings resumed (`src/ui/recordingsSwitch.ts`, `doc/RECORDING.md` → "Recordings are
    paused").
 
