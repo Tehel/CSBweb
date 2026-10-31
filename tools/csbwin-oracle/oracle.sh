@@ -57,9 +57,12 @@ play)
   folder="${2:?a run folder}"
   [ -x "$build/CSBwin-oracle" ] || { echo "not built: bash tools/csbwin-oracle/oracle.sh build" >&2; exit 1; }
   run="$(mktemp -d)"
-  # Lower case, as CSBWin opens them on Linux: some folders have `GRAPHICS.DAT`.
+  # In lower case and in upper case: the Linux build folds no case, and asks for
+  # `graphics.dat` but for `CSBGAME.DAT` (`_SelectSaveGame`), where folders have either.
   find "$folder" -maxdepth 1 -type f ! -iname '*.exe' -print0 |
-    while IFS= read -r -d '' file; do b="$(basename "$file")"; cp "$file" "$run/${b,,}"; done
+    while IFS= read -r -d '' file; do
+      b="$(basename "$file")"; cp "$file" "$run/${b,,}"; [ "${b^^}" = "${b,,}" ] || ln -sf "${b,,}" "$run/${b^^}"
+    done
   log="$(cd "$run" && ls | grep -i '^playfile\.log$' | head -1)"
   [ -n "$log" ] || { echo "no playfile.log in $folder" >&2; exit 1; }
   rm -f "$run"/[Rr]ecord*.log
@@ -76,7 +79,7 @@ play)
     if [ "$now" = "$size" ]; then still=$((still + 1)); [ $still -ge 30 ] && break; else still=0; fi
     size=$now
   done
-  kill "$pid" 2>/dev/null || true
+  kill -9 "$pid" 2>/dev/null || true # SIGTERM only queues an SDL quit, which the game ignores
   wait "$pid" 2>/dev/null || true
   echo "playfile:  $(grep -v '^#' "$run/$log" | tail -1)"
   # CSBWin's own message boxes, printed: a file it cannot find, a line it cannot read, a `die`.
