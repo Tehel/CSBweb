@@ -88,7 +88,7 @@ import { readFileSync } from 'node:fs';
 
 import { VBL_FREQUENCY } from '../../src/core/constants';
 import { CsbRandom } from '../../src/core/random';
-import { Position } from '../../src/core/types';
+import { OBJECT_ID_EOF, Position } from '../../src/core/types';
 import { emptyDungeonData } from '../../src/data/DungeonLoader';
 import { readRecordingPath, readSaveFileFields, type RecordingEntry, type SaveEntry } from '../../src/data/saves';
 import { Game } from '../../src/engine/Game';
@@ -598,8 +598,10 @@ async function saveScript(player: Player): Promise<void> {
   // Asleep, a tick runs every VBL: a short sleep, which the Stone Golem below sleeps through.
   await player.sleepSave(100);
   player.wander();
-  // The golem at (18,12) of map 6, from the square south of it, facing north.
-  check(game.devMoveParty(6, 18, 13), '`?dev` moves the party before the Stone Golem');
+  // The golem in its corridor of map 6, x 18, from (18,12) where the save has it: the party
+  // put on the square south of it, facing north.
+  const golemY = [11, 12, 13, 14].find((y) => game.ctx.dungeon.findFirstMonster({ x: 18, y, z: 6 } as Position) !== OBJECT_ID_EOF);
+  check(golemY !== undefined && game.devMoveParty(6, 18, golemY + 1), `\`?dev\` moves the party before the Stone Golem, at (18,${golemY})`);
   player.play(600);
   let flashed = 0;
   game.onFrame(() => { if (game.ctx.interface.attackFlashVbls !== 0) flashed++; });

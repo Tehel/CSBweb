@@ -323,7 +323,8 @@ export class GameSaves {
      *
      * With the clock stopped, the save's tail (`Game.saveWritten`) runs once the file is
      * written, and a write that fails skips it, as CSBWin's `goto tag01e4f0` jumps past it
-     * (`doc/CSBwin-src/SaveGame.cpp:1361`).
+     * (`doc/CSBwin-src/SaveGame.cpp:1361`). The Sleepsave's is its own
+     * (`Game.sleepSaveWritten`).
      *
      * With the clock running, an open chest's objects are out of its chain
      * (`doc/PROVEN_FACTS.md` → "The disk menu saves an open chest packed"), so it is
@@ -353,7 +354,8 @@ export class GameSaves {
         const playTime = this.game.playTime();
         const fields = readSaveFileFields(bytes);
         if (!fields) throw new Error('the save file does not read back');
-        if (clock === 'running') this.game.saveWritten();
+        if (target === 'sleep') this.game.sleepSaveWritten();
+        else if (clock === 'running') this.game.saveWritten();
         await this.marked;
         const rows = typeof target === 'string' ? await this.store.list(null) : [];
         const over = typeof target !== 'string' ? target
@@ -366,7 +368,7 @@ export class GameSaves {
             unofficial: this.unofficial, recording: point, ...fields,
         };
         await this.store.write(entry, bytes);
-        if (clock === 'stopped') this.game.saveWritten();
+        if (clock === 'stopped' && target !== 'sleep') this.game.saveWritten();
         if (over) this.rowGone();
         return entry;
     }
@@ -649,7 +651,9 @@ export class GameSaves {
      *
      * Not where F5 is refused (`quickSave`), nor in the prison, where a save would ask
      * "BEGIN THE ADVENTURE?". It says nothing in the message area, refused, written or
-     * failed: what it did is a line for the console alone.
+     * failed: what it did is a line for the console alone. Its tail is the RESTART a death
+     * offers alone (`Game.sleepSaveWritten`): a save the player did not ask for changes
+     * nothing of CSBWin's game.
      */
     async sleepSave(): Promise<void> {
         const { champions, potentialChampionIndex } = this.game.ctx.party.state;
@@ -664,7 +668,7 @@ export class GameSaves {
         // branch of the Sleepsave against it (`RecordingPlayer`).
         if (this.game.input.playing) {
             this.game.input.savedInVbl(saveFileOf(this.game, 'running', (champion) => this.screen.portraitOf(champion)));
-            this.game.saveWritten();
+            this.game.sleepSaveWritten();
             return;
         }
         try {

@@ -9,6 +9,8 @@
  * 2. **The slot**: two Sleepsaves are one row, written over; F5's slot and the
  *    Sleepsave never touch each other; the menu's SAVE over the Sleepsave makes it the
  *    menu's, and the next Sleepsave a row of its own; F9 loads it when it is newest.
+ *    It changes nothing of the game but the RESTART a death offers: F5's tail draws, its
+ *    own does not.
  * 3. **Silent**: nothing in the message area, written, refused or failed; refused with
  *    no party, a champion being chosen, a script running, saves disabled, and in CSB's
  *    prison, with no row written and the save's tail not run.
@@ -111,7 +113,17 @@ async function checkSlot(): Promise<void> {
   try {
     const s = stage();
     const toldBefore = told.length;
+    const random = s.game.ctx.random.getSeed();
+    const item16 = JSON.stringify(s.game.ctx.dungeon.getData().item16 ?? null);
     await s.saves.sleepSave();
+    console.log(`  the first Sleepsave: d.RandomNumber ${random === s.game.ctx.random.getSeed() ? 'kept' : 'DRAWN FROM'}`);
+    check(random === s.game.ctx.random.getSeed() && item16 === JSON.stringify(s.game.ctx.dungeon.getData().item16 ?? null),
+      'it changes nothing of the game: no monster re-attached, no draw, as CSBWin\'s sleep, which saves nothing');
+    const f5 = stage();
+    const f5Told = told.length;
+    await f5.saves.quickSave();
+    told.splice(f5Told);
+    check(f5.game.ctx.random.getSeed() !== random, 'where F5\'s tail, a save\'s, re-attaches the monsters, and draws');
     now += 60_000;
     await s.saves.sleepSave();
     const rows = await s.saves.list();
@@ -119,7 +131,7 @@ async function checkSlot(): Promise<void> {
     check(rows.length === 1 && rows[0]!.sleep && !rows[0]!.quick && rows[0]!.savedAt === now,
       'the second Sleepsave writes over the first, under its key and its name');
     const sleepRow = rows[0]!;
-    check(s.game.canRestartFromSavegame(), 'the save\'s tail runs, as F5\'s does');
+    check(s.game.canRestartFromSavegame(), 'a death after it offers its RESTART');
 
     now += 60_000;
     await s.saves.quickSave();

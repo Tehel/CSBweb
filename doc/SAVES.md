@@ -521,6 +521,12 @@ touches F5's or a dialog's save.
 - **Saved as F5 saves**, the clock running. A party lying down has closed the inventory
   first, and `d.PartySleeping` is in no file, so a load of either save is of a party
   awake.
+- **It changes nothing of the game.** A save the player makes runs CSBWin's tail, the
+  monsters re-attached, whose new turns draw, and `SmartDiscard` started over
+  (`Game.saveWritten`, `doc/CSBwin-src/SaveGame.cpp:1341-1358`). CSBWin's sleep saves
+  nothing, so the Sleepsave runs none of it but `d.CanRestartFromSavegame = 1`, the
+  RESTART a death offers (`Game.sleepSaveWritten`): a party that lies down plays on as
+  CSBWin's, which CSBWin's own recordings check draw for draw (`DEBT.md` F24).
 
 ## What the dialog leaves out
 

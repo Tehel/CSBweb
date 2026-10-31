@@ -1171,6 +1171,17 @@ export class Game implements MainLoop {
     }
 
     /**
+     * The end of the Sleepsave, the port's own (`GameSaves.sleepSave`), which CSBWin's
+     * sleep does not make: `d.CanRestartFromSavegame = 1` alone, so that a death offers
+     * its RESTART. Not the rest of a save's tail (`saveWritten`), whose monsters
+     * re-attached draw and whose `SmartDiscard` starts over: lying down leaves the game
+     * CSBWin's. Made inside the VBL of the click, the game's own.
+     */
+    sleepSaveWritten(): void {
+        this.canRestart = true;
+    }
+
+    /**
      * The engine's half of the page's changes (`InputBoundary.apply`): each applied as its
      * door did before the boundary. A read is only told: it has been applied.
      */
