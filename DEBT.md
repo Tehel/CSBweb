@@ -741,6 +741,15 @@ prints each of the port's draws in that `d.Time` range with its callers, and the
 AI trace between them. A log of 8000 entries
 plays in well under a second while it holds.
 
+**The oracle**, `tools/csbwin-oracle/oracle.sh`, is not evidence either: CSBWin 2023's
+own Linux build, from `doc/CSBwin-src/` and a small patch, playing a run's log headless
+and unpaced (a whole run in about twenty seconds). `build` compiles it into
+`doc/CSBwin-src-oracle/`, fetching the SDL2 and GLib headers with `apt-get download`;
+`play <run folder> [<from>-<to>]` says whether CSBWin reaches the log's end and where it
+meets each "Sequence/timing error", and lists every draw of that `d.Time` range with its
+callers, to set against `--trace`'s. A drift the oracle does not have is the port's; one it
+has at the same place is the run's version's.
+
 What it establishes:
 
 - **The format.** `DMMovie40a`'s 8238 entries are 7965 compressed. A line's random is
@@ -767,38 +776,43 @@ What it establishes:
   party landing on a monster group kills it, champions or not": `d.partyLevel` is still the
   level it left), and the fireballs that meet groups off the party's level (→ "A missile
   hits the monster in its corner": their corners are `groupIndex`).
-- **Drift 3, in the 11.0xx runs only** (`DMMovie42`, `43a`, `43b`, `45`): on level 0, with
-  one champion, 1 draw short in the entry at about `d.Time` 0x6b and 2 in the next, at
-  0x6e, wherever the party stands and whenever the champion joined; nothing after. The 17.6
-  run `DMMovie2823` matches there.
-- **Drift 4, in the 9.x runs** (9.1 to 9.6a: `DMMovie3145`, `3358`, `3445`, `36`, `38`,
-  `40`, `40a`, `5`, `8`): on level 1, between `d.Time` 0x69 and 0xae, a few ticks after
-  the first round, the port drawing sometimes more, sometimes fewer than CSBWin (`3145` 25
-  for 21, `3358` 26 for 35). The 17.6 runs pass the same ticks.
-- **Not handled yet:** older logs whose `+` lines have fewer than five fields
-  (`DMMovie1`, `3`, `4`, `6`, `7`: "plus line 27"), a save inside a log (`0x6668`,
+- **Every other DM run parts from CSBWin 2023 itself, at the port's first drift**, to the
+  same `d.Time` and `d.RandomNumber` (the oracle), and then meets hundreds of sequence errors:
+  the 9.x runs (9.1 to 9.6a: `DMMovie3145`, `3358`, `3445`, `36`, `38`, `40`, `40a`, `5`,
+  `8`) on level 1 between `d.Time` 0x69 and 0x182, a few ticks after the first round; the
+  11.0xx runs (`DMMovie42`, `43a`, `43b`, `45`) on level 0 at 0x6b or 0x6c, with one
+  champion. Those are their versions' own rules, not the port's divergences, and they
+  differ throughout, not at one place.
+- **The oldest logs** (`DMMovie1`, `3`, `4`, `6`, `7`, 9.05 and 9.07), whose `+` lines have
+  fewer than five fields, CSBWin 2023 cannot read either: "Playback Plus line did not have
+  5 fields", then `die`. The port's reader stops on the same line ("plus line 27").
+- **Not handled yet:** a save inside a log (`0x6668`,
   `0x6669`) and CSBWin's hand-made substitutes for one (`0x2223`, `0x2224`,
   `Recording.cpp:734-761`; `DMMovie43a` and `45` stop on one), the `0xdddd` line
   that writes a word of `d.`, the annotations, the runs' own `graphics.dat`, and Chaos
   Strikes Back's runs, which need a CSB set. `extraTicks` is imitated by undoing the
   step's `d.clockTick = 1`, and no run has shown a difference either way. DM rules are on,
   as the `dm-atari` set reads them; no run has shown a difference with them off.
-- **Not established:** that CSBWin 2023, the port's reference, plays these logs to their
-  end. Its version check warns and plays on (`Recording.cpp:172-191`, its message box
-  commented out), so it accepts them.
+- **CSBWin 2023 plays the 17.6 runs to their end** with no sequence error (the oracle).
 
 Paying it, in steps:
 
-1. **Drift 4 next**, which the 17.6 runs pass, so a 9.x CSBWin of its own until shown
-   otherwise, then drift 3, whose fixed `d.Time` points at a timer or a periodic update.
+1. **The 17.6 runs through steps 3 to 5**, the author's request: their check, their
+   recordings, and the script that uploads them. Then Chaos Strikes Back's runs, through the
+   oracle first. **Waiting on the author:** the 9.x and 11.0xx runs. Each version differs
+   from CSBWin 2023 throughout (above), so corrections to the log cannot convert them. The
+   options: (a) find each version's rules by running the executable shipped with its run
+   under Wine as the oracle for that version, and port the rules as a per-run mode, which
+   step 2 rules out ("the engine stays CSBWin 2023's"); (b) leave them out, and share only
+   the runs CSBWin 2023 plays.
 2. **Each next drift, the same way.** CSBWin's versions diverge from each other, which is
    why each run was shipped with the executable that recorded it, so each run is converted
    on its own and may need tweaks no other run needs. A drift is one of two things:
    - **A port divergence**: CSBWin 2023's source does what the run recorded and the port
      does not. It is fixed in the engine with its CSBWin citation and its check, as any C
      item.
-   - **The run's own version**: the run parts where 2023's source agrees with the port,
-     or runs of different versions part at the same place differently. The engine stays
+   - **The run's own version**: the oracle parts from the run where the port does, or
+     runs of different versions part at the same place differently. The engine stays
      CSBWin 2023's and is never changed for an old version; the tweak belongs to the run.
      It is a correction of the log, written in CSBWin's own playback lines so the log
      stays a playfile: `0x2222` draws its random field's count and goes on as button 0
