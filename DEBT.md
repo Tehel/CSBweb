@@ -794,12 +794,18 @@ What it establishes:
   step's `d.clockTick = 1`, and no run has shown a difference either way. DM rules are on,
   as the `dm-atari` set reads them; no run has shown a difference with them off.
 - **CSBWin 2023 plays the 17.6 runs to their end** with no sequence error (the oracle).
+- **Chaos Strikes Back's `CSBMovie0640` (17.6, the race to Fulya Pit in 6 min 40 s) plays
+  to the end of its log**, in CSBWin 2023 and in the port alike: `--set=csb
+  --save=<folder>/csbgame.dat`, every one of its 1873 entries by `d.RandomNumber`. Its log is
+  eleven recordings spliced at the saves its author cut out (`0x2224`). On the way it
+  passes the doors that bounce off a group (`doc/CSBWIN_TIMERS_REFERENCE.md`: two ticks).
+  The other CSB runs are not checked yet.
 
 Paying it, in steps:
 
-1. **The 17.6 runs through steps 3 to 5**, the author's request: their check, their
-   recordings, and the script that uploads them. Then Chaos Strikes Back's runs, through the
-   oracle first. **Waiting on the author:** the 9.x and 11.0xx runs. Each version differs
+1. **The 17.6 runs and `CSBMovie0640` through steps 3 to 5**, the author's request: their
+   check, their recordings, and the script that uploads them, one run per dungeon. Then the
+   other CSB runs through the oracle, and Conflux's runs when the author has them. **Waiting on the author:** the 9.x and 11.0xx runs. Each version differs
    from CSBWin 2023 throughout (above), so corrections to the log cannot convert them. The
    options: (a) find each version's rules by running the executable shipped with its run
    under Wine as the oracle for that version, and port the rules as a per-run mode, which

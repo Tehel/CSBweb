@@ -739,6 +739,8 @@ export class TimerSystem {
           const hurt = this.ctx.systems.championDamage.damageAllCharacters(5, 4, 2);
           if (hurt !== 0) this.ctx.sounds.queueSound(SOUND_DOOR_OPENING, x, y, 1, timer.level);
         }
+        // A second `Time + 1` before the timer goes back (`:1309-1310`): two ticks.
+        timer.time = (timer.time + 1) >>> 0;
         this.timers.addTimer(timer);
         return;
       }
@@ -773,6 +775,8 @@ export class TimerSystem {
             // The rebound: one step back up, floored at 0, then re-queue.
             setDoorState(map, x, y, doorState === 0 ? 0 : doorState - 1);
             this.ctx.sounds.queueSound(SOUND_DOOR_STRUGGLE, x, y, 1, timer.level);
+            // And here too (`:1349-1351`).
+            timer.time = (timer.time + 1) >>> 0;
             this.timers.addTimer(timer);
             return;
           }

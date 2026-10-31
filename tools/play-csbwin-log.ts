@@ -11,6 +11,11 @@
  *
  *   npx tsx tools/play-csbwin-log.ts <playfile.log> [--extra-ticks] [--no-dm-rules]  [--resync] [--fake] [--trace=<from>-<to>]
  *
+ * `--set=<id>` plays on another data set than `dm-atari`; `--save=<file>` starts from that
+ * CSBWin save instead of a new game, read at the log's first `0x6669` (a CSB run's
+ * `csbgame.dat`, which the log's first clicks resume). A save the run's author cut out of
+ * the log, `0x2223` or `0x2224`, does what the save did (`Recording.cpp:734-761`).
+ *
  * `--trace=<from>-<to>`: every game draw from `d.Time` <from> to <to>, in hex, with its
  * callers, and the engine's AI and attack trace in between.
  * `--fake`: a drift where the port is short of draws, up to 1000, is made up with draws,
@@ -25,6 +30,10 @@ import { emptyDungeonData } from '../src/data/DungeonLoader';
 import { extractGraphicsTables } from '../src/data/tables/GraphicsTables';
 import { csbGraphicsOpener } from '../src/engine/FileSignatures';
 import { Game } from '../src/engine/Game';
+import { applySaveBytes } from '../src/engine/SaveGameFile';
+import { smartDiscard } from '../src/engine/SmartDiscard';
+import { drawLegalAttackTypes } from '../src/engine/AttackMenu';
+import { readFileSync } from 'node:fs';
 import { GameSaves } from '../src/engine/GameSaves';
 import { buildGameTables } from '../src/engine/GameTables';
 import { NO_FULLSCREEN } from '../src/lib/fullscreen';
@@ -38,7 +47,7 @@ import { askBeginAdventure } from '../src/renderer/ui/SaveMenu';
 import { UIMode } from '../src/renderer/ui/UIState';
 import { Settings, applyToGame } from '../src/settings/Settings';
 import { ManualClock } from './lib/clock';
-import { STOCK_DATA_SET, diskFiles } from './lib/dataSets';
+import { STOCK_DATA_SET, dataSetNamed, diskFiles } from './lib/dataSets';
 import { memoryStore } from './lib/saves';
 import { readPlayfile, type PlayEntry } from './lib/playfile';
 
@@ -78,7 +87,9 @@ function drawsBetween(from: number, to: number, max = 100000): number | null {
   return null;
 }
 
-const set = STOCK_DATA_SET;
+const setArg = args.find((a) => a.startsWith('--set='))?.slice(6);
+const saveArg = args.find((a) => a.startsWith('--save='))?.slice(7);
+const set = setArg ? dataSetNamed(setArg) : STOCK_DATA_SET;
 const files = diskFiles(set);
 const loaded = await loadGameFiles(set, files);
 const dungeonDat = (await files.read('dungeon.dat'))!;
@@ -191,14 +202,29 @@ function play(): PlayEntry | null {
     if (e.num === 0x3333) { ctx.random.setSeed(((e.x << 16) | (e.y & 0xffff)) >>> 0); continue; }
     if (e.num === 0x2221) { for (let i = 0; i <= e.y; i++) ctx.random.next(); continue; } // RECORDFILE::CycleRandom
     if (e.num >= 0x6665 && e.num <= 0x666a && e.num !== 0x6668 && e.num !== 0x6669) { ctx.random.next(); continue; } // Signature
-    if (e.num === 0x6668 || e.num === 0x6669 || e.num === 0x5555 || e.num === 0xdddd || e.num === 0x2223 || e.num === 0x2224) throw new Error(`unsupported ${hx(e.num)} at line ${e.line}`);
+    if (e.num === 0x6668 || e.num === 0x6669) continue; // a save's or a read's signature, only recorded (Recording.cpp:723-727)
+    if (e.num === 0x2223 || e.num === 0x2224) {
+      // What the save it replaces would have done (Recording.cpp:734-761).
+      g.systems.monsters.reattachAfterSave();
+      smartDiscard(ctx, true);
+      if (e.num === 0x2224) {
+        ctx.state.block1.totalMoveCount += 4;
+        if (ctx.interface.attackingCharacterOrdinal !== 0) {
+          ctx.interface.attackingCharacterOrdinal = 0;
+          ctx.interface.word20252 = 1;
+          drawLegalAttackTypes(ctx);
+        }
+      }
+      continue;
+    }
+    if (e.num === 0x5555 || e.num === 0xdddd) throw new Error(`unsupported ${hx(e.num)} at line ${e.line}`);
     return e;
   }
 }
 
 // HandleMouseEvents with a playfile open, the port's body with CSBWin's playback branches.
 const g = game as unknown as {
-  handleMouseEvents(delta: number): number; systems: { movement: { gravityMove(): number; moveParty(a: unknown): { refused?: boolean; inhibited?: boolean } } };
+  handleMouseEvents(delta: number): number; systems: { monsters: { reattachAfterSave(): void }; movement: { gravityMove(): number; moveParty(a: unknown): { refused?: boolean; inhibited?: boolean } } };
   translateMouseClick(e: unknown): boolean; recordFileRecord(e: unknown): void; moveParty(a: unknown): { refused: boolean };
   mouseEventHandlers: { unclick(): void; button(n: number, x: number, y: number): void } | null; lastInputTime: number;
 };
@@ -240,17 +266,25 @@ g.handleMouseEvents = (delta: number): number => {
   return result;
 };
 
-// --- the start: a new game, the playfile's 0x3333 seed, then ReadEntireGame's two draws ---
-game.readDungeonDat(dungeonDat);
+// --- the start: a new game, the playfile's 0x3333 seed, then ReadEntireGame's two draws;
+// or, with --save=, that file read (a CSB run's csbgame.dat) once the log's menu clicks
+// have chosen it, at its first 0x6669 ---
 gameRandom = (ctx as unknown as { random: CsbRandom }).random;
-const first = items.findIndex((it) => 'num' in it && it.num === 0x3333);
-const seedEntry = items[first] as PlayEntry;
-at = first + 1;
-ctx.random.setSeed(((seedEntry.x << 16) | (seedEntry.y & 0xffff)) >>> 0);
-const d0 = ctx.random.next() & 0xffff, d1 = ctx.random.next() & 0xffff;
-ctx.state.block1.randomGameID = (d0 * d1) >>> 0;
+if (saveArg) {
+  applySaveBytes(game, new Uint8Array(readFileSync(saveArg)));
+  at = items.findIndex((it) => 'num' in it && it.num === 0x6669) + 1;
+  console.log(`${version}: ${items.length} lines; extraTicks ${extraTicks}, DM rules ${dmRules}; ${saveArg} read, d.Time ${ctx.state.tickCount}, seed ${hx(ctx.random.getSeed(), 8)}`);
+} else {
+  game.readDungeonDat(dungeonDat);
+  const first = items.findIndex((it) => 'num' in it && it.num === 0x3333);
+  const seedEntry = items[first] as PlayEntry;
+  at = first + 1;
+  ctx.random.setSeed(((seedEntry.x << 16) | (seedEntry.y & 0xffff)) >>> 0);
+  const d0 = ctx.random.next() & 0xffff, d1 = ctx.random.next() & 0xffff;
+  ctx.state.block1.randomGameID = (d0 * d1) >>> 0;
+  console.log(`${version}: ${items.length} lines; extraTicks ${extraTicks}, DM rules ${dmRules}; seed ${hx(ctx.random.getSeed(), 8)}`);
+}
 oldCallCount = gameCalls;
-console.log(`${version}: ${items.length} lines; extraTicks ${extraTicks}, DM rules ${dmRules}; seed ${hx(ctx.random.getSeed(), 8)}`);
 const firstMove = items.slice(at).find((it) => 'num' in it) as PlayEntry;
 console.log(`  draws from the seed after the read to line ${firstMove.line}'s value: ${drawsBetween(ctx.random.getSeed(), firstMove.ran)}`);
 game.start(true);

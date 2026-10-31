@@ -17,7 +17,7 @@ This document captures verified timer behavior from the CSBWin C++ source under 
 ## Door timers
 
 - `ProcessTT_DOOR` does not animate doors directly: it checks door state and action, resolves toggle to open/close based on `cellFlag & 7`, converts the timer to `TT_1`, and requeues it (`doc/CSBwin-src/Timer.cpp`).
-- `ProcessTT_1` advances door state by one step and requeues itself until fully open/closed; it returns immediately if the door is already at the requested end state and defers if the party/monsters block the door (`doc/CSBwin-src/Timer.cpp`).
+- `ProcessTT_1` advances door state by one step and requeues itself until fully open/closed, one tick later (`Time() + 1`, `doc/CSBwin-src/Timer.cpp:1287`); it returns immediately if the door is already at the requested end state. A closing door that meets the party (it springs fully open) or a group (it strikes it and steps back up one) adds 1 to the time again before requeuing, so it tries again two ticks later (`:1309-1310`, `:1349-1351`; ReDMCSB `TIMELINE.C:772-773`, `:794-795`; `tools/checks/door-crush.ts`).
 
 ## False wall timers
 

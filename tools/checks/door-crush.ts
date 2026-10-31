@@ -94,6 +94,13 @@ async function main(): Promise<void> {
     game.ctx.state.tickCount++;
   };
 
+  // When the door's next step is due, counted from the tick that just ran it.
+  const doorStepDelay = (ran: number): number | null => {
+    const timer = game.ctx.timers.getTimers().find((t) =>
+      t.function === TimerFunction.TT_DOOR_STEP && t.uByte6 === door!.x && t.uByte7 === door!.y);
+    return timer ? timer.time - ran : null;
+  };
+
   const rows: string[][] = [];
 
   // ---- Case 1: the door closes on nothing, and reaches shut ---------------
@@ -110,8 +117,14 @@ async function main(): Promise<void> {
   game.ctx.party.state.champions = [testChampion(0), testChampion(1)];
   game.ctx.party.state.position = new Position(door.x, door.y, level);
   const hpBefore = game.ctx.party.state.champions.map((c) => c.attributes.health);
+  const partyDelays: number[] = [];
   startClosing();
-  for (let i = 0; i < 8; i++) tick();
+  for (let i = 0; i < 8; i++) {
+    const ran = game.ctx.state.tickCount;
+    const due = game.ctx.timers.getTimers().some((t) => t.function === TimerFunction.TT_DOOR_STEP && t.time === ran);
+    tick();
+    if (due) partyDelays.push(doorStepDelay(ran) ?? -1);
+  }
   const partyClose = doorStateAt(door.x, door.y);
   const hpAfter = game.ctx.party.state.champions.map((c) => c.attributes.health);
   const hpLost = hpBefore.reduce((a, h, i) => a + (h - hpAfter[i]), 0);
@@ -158,9 +171,13 @@ async function main(): Promise<void> {
 
   const states: number[] = [];
   const hpTrace: number[] = [hpTotal()];
+  const crushDelays: number[] = [];
   startClosing();
   for (let i = 0; i < 10; i++) {
+    const ran = game.ctx.state.tickCount;
+    const before = hpTotal();
     tick();
+    if (hpTotal() < before) crushDelays.push(doorStepDelay(ran) ?? -1);
     states.push(doorStateAt(door.x, door.y));
     hpTrace.push(hpTotal());
     if (game.ctx.dungeon.findFirstMonster(new Position(door.x, door.y, level)) === OBJECT_ID_EOF) break;
@@ -169,6 +186,8 @@ async function main(): Promise<void> {
   console.log(`  group HP per tick:   ${hpTrace.join(' ')}`);
   const stillThere = game.ctx.dungeon.findFirstMonster(new Position(door.x, door.y, level)) !== OBJECT_ID_EOF;
   console.log(`  monster still under the door: ${stillThere}`);
+  console.log(`  next step after each crush, in ticks: ${crushDelays.join(' ')}`);
+  console.log(`  next step after each step over the party, in ticks: ${partyDelays.join(' ')}`);
   console.log('');
 
   // ---- Assertions ---------------------------------------------------------
@@ -191,6 +210,14 @@ async function main(): Promise<void> {
     states.some((state, i) => i > 0 && state < states[i - 1]),
     `the door should step back *up* after a crush, not just stall (states ${states.join(' ')})`,
   );
+
+  // Both arms add 1 to the timer's time a second time before they queue it again
+  // (`doc/CSBwin-src/Timer.cpp:1309-1310`, `:1349-1351`; ReDMCSB `TIMELINE.C:772-773`,
+  // `:794-795`): a door that bounces off tries again two ticks later, not one.
+  check(crushDelays.length > 0 && crushDelays.every((d) => d === 2),
+    `after crushing the group the door steps again 2 ticks later (${crushDelays.join(' ')})`);
+  check(partyDelays.includes(2) && partyDelays.every((d) => d === 1 || d === 2),
+    `after springing open over the party, 2 ticks later; after a plain step, 1 (${partyDelays.join(' ')})`);
 
   finish();
 }
