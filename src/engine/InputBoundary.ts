@@ -63,7 +63,13 @@ export type InputChange =
     /** `?dev`'s move a level down (1) or up (-1) (`Game.devChangeLevel`). */
     | { readonly kind: 'devLevel'; readonly delta: 1 | -1 }
     /** `?dev`'s move to a square, the map dialog's long press (`Game.devMoveParty`). */
-    | { readonly kind: 'devMove'; readonly map: number; readonly x: number; readonly y: number };
+    | { readonly kind: 'devMove'; readonly map: number; readonly x: number; readonly y: number }
+    /**
+     * A line of a CSBWin `playfile.log` that changes the game and is no input, its button
+     * code and its `y` field (`applyPlayfileLine`, `PLAYFILE_LINES`): only a CSBWin run
+     * played into the port records one (`tools/lib/csbwinRun.ts`).
+     */
+    | { readonly kind: 'playfile'; readonly num: number; readonly y: number };
 
 /**
  * What holds the clock: a dialog the page opens (`openDialog`), whose stop it logs, or

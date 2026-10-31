@@ -422,6 +422,8 @@ const CHECKS: Tool[] = [
   { tool: 'input-boundary.ts' },
   { tool: 'replay.ts' },
   { tool: 'recording-points.ts' },
+  // CSBWin's own runs, played to their end through the page's input and recorded.
+  { tool: 'csbwin-runs.ts' },
   // The replay tool, its own process, against a scratch server.
   { tool: 'replay-recordings.ts' },
   { tool: 'party-collision.ts', args: ['2'] },

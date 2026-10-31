@@ -247,7 +247,8 @@ What is not verified:
 
 ## The port's recorder
 
-Not CSBWin's format: playing CSBWin's own recordings back is not its aim (below). It logs
+Not CSBWin's format: CSBWin's own recordings are played into it, not read by it (below,
+"Recordings made in CSBWin"). It logs
 the boundary where the page changes the game (`src/engine/InputBoundary.ts`), each change
 with the number of VBLs run before it, and the player applies each before the same VBL.
 
@@ -469,7 +470,41 @@ follow CSBWin's draw for draw, and the recorder's own draws (signatures, `0x2221
 reproduced. Every line's `random` then points at the first divergence, which makes such a
 recording an end-to-end test of the whole port. A recording cannot be written by hand, nor
 by a solver such as `tools/solve-3d2d1d.ts`: every line needs its exact tick and random
-state. A port-only recorder does not need this compatibility.
+state.
+
+**The runs that play to their end** (`DEBT.md` F24) are kept in
+`tools/fixtures/csbwin-runs/<run>/`, its `playfile.log`, the CSBWin save its first read
+reads where it has one, and its readme, and listed in `CSBWIN_RUNS`
+(`tools/lib/csbwinRun.ts`): `DMMovie2615` and `DMMovie2823`, two races to fusion, and
+`CSBMovie0640`, the race to Fulya Pit, all three recorded by CSBWin 17.6.
+`tools/checks/csbwin-runs.ts` plays each to its end.
+
+**A run becomes a recording of the port's** (`recordRun`) by being played into a page
+without the DOM through its input boundary, the port's `Recorder` listening, as a player's
+page would have changed the game: the port's recording format is kept, and the port's
+player plays it. Its start is a new game whose stream is the log's `0x3333` seed after
+`ReadEntireGame`'s two draws, or the run's save. CSBWin's player puts an entry in the queue
+at the top of `HandleMouseEvents`, which the port's pass reads before its VBL's tick, so the
+game between two VBLs is the game that pass sees, and each entry due is applied there as a
+change: a click at its point where the screen has the entry's button there, its key
+otherwise, the button-up as the button-up. One entry a pass but after a button-up, as
+`HandleMouseEvents` takes them, none while the queue still holds one (a step that waits,
+as `PLAYFILE::Backspace` puts it back) or while gravity moves the party; the Reincarnate
+screen takes its `0x4444` lines as its keys and its OK. Each entry's random is checked as
+CSBWin's player checks it.
+
+**Three line kinds are no input** and change the game: `0x2221` and the signatures, the
+recorder's own draws, and `0x2223` and `0x2224`, the save a run's author cut out of it.
+Each is recorded as a change of its own, `playfile`, with its button code and its `y`
+field (`InputChange`, `src/engine/InputBoundary.ts`), applied as `PLAYFILE::Play` applies
+it (`applyPlayfileLine`, `src/engine/PlayfileLine.ts`). The page makes none, and a
+package's reader takes only those codes (`PLAYFILE_LINES`).
+
+**Where the page differs from CSBWin's playback**, the recording is the page's game: the
+frozen game's discard and `lastTime`'s one entry a tick (`Mouse.cpp:1548-1605`), which a
+run recorded in play kept to, and `extraTicks`, which playback turns off and the port keeps
+on; none of the three runs draws otherwise for either. So the recording takes fewer VBLs
+than CSBWin's playback, at the same `d.Time`.
 
 ## Shared recordings
 

@@ -803,14 +803,16 @@ What it establishes:
 
 Paying it, in steps:
 
-1. **The 17.6 runs and `CSBMovie0640` through steps 3 to 5**, the author's request: their
-   check, their recordings, and the script that uploads them, one run per dungeon. Then the
-   other CSB runs through the oracle, and Conflux's runs when the author has them. **Waiting on the author:** the 9.x and 11.0xx runs. Each version differs
-   from CSBWin 2023 throughout (above), so corrections to the log cannot convert them. The
-   options: (a) find each version's rules by running the executable shipped with its run
-   under Wine as the oracle for that version, and port the rules as a per-run mode, which
-   step 2 rules out ("the engine stays CSBWin 2023's"); (b) leave them out, and share only
-   the runs CSBWin 2023 plays.
+1. **The 17.6 runs and `CSBMovie0640` through steps 3 to 5**, the author's request.
+   Steps 3 and 4 are done for the three of them: their check and their recordings
+   (below). Step 5, their upload, is next. Then the other CSB runs through the oracle, and
+   Conflux's runs when the author has them. **The 9.x and 11.0xx runs are left out for
+   now**, the author's decision: each version differs from CSBWin 2023 throughout
+   (above), so corrections to the log cannot convert them, and only the runs CSBWin 2023
+   plays are shared. Taking them up again would mean finding each version's rules by
+   running the executable shipped with its run under Wine as the oracle for that version,
+   and porting them as a per-run mode, which step 2 rules out ("the engine stays CSBWin
+   2023's").
 2. **Each next drift, the same way.** CSBWin's versions diverge from each other, which is
    why each run was shipped with the executable that recorded it, so each run is converted
    on its own and may need tweaks no other run needs. A drift is one of two things:
@@ -828,14 +830,16 @@ Paying it, in steps:
      written into this entry for the author, with the version and the rule, rather than
      worked around.
    Each tweak is listed beside its log with its reason and the version it answers.
-3. **The check**: the logs that play to their end copied into `tools/fixtures/`, and a
-   `tools/checks/` tool that plays each to its end (Lord Chaos fused for a race to fusion),
-   listed in `tools/run-checks.ts`: every later change to the engine then answers to them.
-4. **The recording**: a log played into the port's `Recorder` as the page's changes, each
-   entry queued at the VBL that takes it in the playback (a key, a click at its point, the
-   Reincarnate screen's keys and OK), so that the port's player, `RecordingPlayer`, plays
-   the recording to the same end with its own drift check. A start of kind `'new'` with the
-   log's stream after the read, as the port's own new game's.
+3. **The check**, done for the three runs: their logs in `tools/fixtures/csbwin-runs/`,
+   listed in `CSBWIN_RUNS` (`tools/lib/csbwinRun.ts`), and `tools/checks/csbwin-runs.ts`,
+   which plays each to its end (Lord Chaos fused for a race to fusion, the log's last
+   entry for the race to Fulya Pit), so every later change to the engine answers to them.
+   A run added is a row of `CSBWIN_RUNS` and its folder.
+4. **The recording**, done for the three runs: a log played into the port's `Recorder`
+   through the page's input boundary (`recordRun`, `doc/RECORDING.md` → "Recordings made
+   in CSBWin"), its recorder's own draws and its spliced saves the `playfile` change, and
+   the recording packaged and played by `RecordingPlayer` to the same end, in the same
+   check.
 5. **The upload**: a script in `utils/` (`.claude/memory/instance-scripts-in-utils.md`)
    that takes a log, its corrections, the instance and a `playerId`, builds the package of
    the game's end (`RecordingPackage`) and submits it to `api/recordings`, with the run's

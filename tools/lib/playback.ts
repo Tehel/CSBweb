@@ -85,15 +85,22 @@ export function keptFiles(files: DataSetFiles): DataSetFiles {
   };
 }
 
+/** A page of `set` without the DOM, wired as `construct` wires one, its loop on `clock`. */
+export interface Page {
+  readonly game: Game;
+  readonly screen: GameScreen;
+  readonly messages: ScrollingText;
+  readonly clock: ManualClock;
+  /** The set's `dungeon.dat`, which a new game reads. */
+  readonly dungeonDat: Uint8Array;
+}
+
 /**
- * `path` played from its first recording's start in a fresh page of `set`, whose files
- * `files` reads, to its end or its first drift; `savedAtEnd`, the save a path shared at a
- * save's point ends at; `restart`, a RESTART in it. A frame that throws, CSBWin's `die`,
- * throws.
+ * A fresh page of `set`, whose files `files` reads: the engine, its screen over a stand-in
+ * canvas, the page's input path and its saves over a store in memory. A frame that
+ * throws, CSBWin's `die`, throws.
  */
-export async function playPath(
-  set: DataSet, files: DataSetFiles, path: readonly Recording[], savedAtEnd: SavedAtEnd | null = null, restart: Restart | null = null,
-): Promise<Played> {
+export async function standPage(set: DataSet, files: DataSetFiles): Promise<Page> {
   const loaded = await loadGameFiles(set, files);
   const dungeonDat = await files.read('dungeon.dat');
   if (!dungeonDat) throw new Error(`Cannot open dungeon file '${files.where('dungeon.dat')}'`);
@@ -180,6 +187,19 @@ export async function playPath(
   });
   game.ctx.rules.dmRulesDesignOption = set.dmRules;
 
+  return { game, screen, messages, clock, dungeonDat };
+}
+
+/**
+ * `path` played from its first recording's start in a fresh page of `set`, whose files
+ * `files` reads, to its end or its first drift; `savedAtEnd`, the save a path shared at a
+ * save's point ends at; `restart`, a RESTART in it. A frame that throws, CSBWin's `die`,
+ * throws.
+ */
+export async function playPath(
+  set: DataSet, files: DataSetFiles, path: readonly Recording[], savedAtEnd: SavedAtEnd | null = null, restart: Restart | null = null,
+): Promise<Played> {
+  const { game, screen, messages, clock, dungeonDat } = await standPage(set, files);
   let player!: RecordingPlayer;
   const play = (): void => {
     player = new RecordingPlayer(game, path, dungeonDat, savedAtEnd);

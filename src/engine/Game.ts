@@ -40,6 +40,7 @@ import { HallOfChampions } from './HallOfChampions';
 import { MOUSE_UNCLICK, UNTRANSLATED_CLICK, type MouseQueueEntry } from './MouseQueue';
 import { createGravityState, createLoopFlags, flashButton, vblFlashButton, vblInterrupt, waitForButtonFlash, type LoopScript, type MainLoop } from './LoopState';
 import { smartDiscard } from './SmartDiscard';
+import { applyPlayfileLine } from './PlayfileLine';
 import { isNinetySecondTick, isTenSecondTick, ninetySecondUpdate, tenSecondUpdate } from './PeriodicUpdates';
 import { DsaSystem } from './DsaSystem';
 import { InputBoundary, applyExtras, type GameChange } from './InputBoundary';
@@ -1198,6 +1199,7 @@ export class Game implements MainLoop {
             case 'forceDMRules': if (this.ctx.rules.dmRulesDesignOption) this.ctx.rules.dmRules = true; return true;
             case 'devLevel': return this.devLevel(change.delta);
             case 'devMove': return this.devMove(change.map, change.x, change.y);
+            case 'playfile': applyPlayfileLine(this.ctx, change.num, change.y); return true;
         }
     }
 

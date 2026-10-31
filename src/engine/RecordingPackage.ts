@@ -28,6 +28,7 @@ import { LOCAL_DATA_SET_TEXT_LIMITS } from '../data/DataSets';
 import { NO_EXTRAS, type Extras, type RulesOptions } from './GameContext';
 import { CLOCK_HOLDERS, type ClockHolder, type InputChange } from './InputBoundary';
 import { createLoopFlags, VIDEO_MODES } from './LoopState';
+import { PLAYFILE_LINES } from './PlayfileLine';
 import type { CarriedState, RecordedChange, Recording, RecordingEnd, RecordingPoint, RecordingStart } from './Recorder';
 import type { SavedAtEnd } from './RecordingPlayer';
 
@@ -356,6 +357,11 @@ function changeFromJson(json: unknown, what: string): RecordedChange {
                 return delta === 1 || delta === -1 ? { kind, delta } : fail(what);
             }
             case 'devMove': return { kind, map: int('map'), x: int('x'), y: int('y') };
+            case 'playfile': {
+                const num = int('num');
+                const y = int('y');
+                return PLAYFILE_LINES.has(num) && y >= 0 && y <= 0xffff ? { kind, num, y } : fail(what);
+            }
             // A read ends its recording, which records nothing of it (`Recorder`).
             default: return fail(what);
         }

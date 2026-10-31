@@ -31,8 +31,7 @@ import { extractGraphicsTables } from '../src/data/tables/GraphicsTables';
 import { csbGraphicsOpener } from '../src/engine/FileSignatures';
 import { Game } from '../src/engine/Game';
 import { applySaveBytes } from '../src/engine/SaveGameFile';
-import { smartDiscard } from '../src/engine/SmartDiscard';
-import { drawLegalAttackTypes } from '../src/engine/AttackMenu';
+import { applyPlayfileLine, PLAYFILE_LINES } from '../src/engine/PlayfileLine';
 import { readFileSync } from 'node:fs';
 import { GameSaves } from '../src/engine/GameSaves';
 import { buildGameTables } from '../src/engine/GameTables';
@@ -200,23 +199,9 @@ function play(): PlayEntry | null {
     if (history.length > 12) history.shift();
     if (e.num === 0xd7) { ended = 'game over (0xd7)'; return null; }
     if (e.num === 0x3333) { ctx.random.setSeed(((e.x << 16) | (e.y & 0xffff)) >>> 0); continue; }
-    if (e.num === 0x2221) { for (let i = 0; i <= e.y; i++) ctx.random.next(); continue; } // RECORDFILE::CycleRandom
-    if (e.num >= 0x6665 && e.num <= 0x666a && e.num !== 0x6668 && e.num !== 0x6669) { ctx.random.next(); continue; } // Signature
     if (e.num === 0x6668 || e.num === 0x6669) continue; // a save's or a read's signature, only recorded (Recording.cpp:723-727)
-    if (e.num === 0x2223 || e.num === 0x2224) {
-      // What the save it replaces would have done (Recording.cpp:734-761).
-      g.systems.monsters.reattachAfterSave();
-      smartDiscard(ctx, true);
-      if (e.num === 0x2224) {
-        ctx.state.block1.totalMoveCount += 4;
-        if (ctx.interface.attackingCharacterOrdinal !== 0) {
-          ctx.interface.attackingCharacterOrdinal = 0;
-          ctx.interface.word20252 = 1;
-          drawLegalAttackTypes(ctx);
-        }
-      }
-      continue;
-    }
+    // The recorder's own draws, and what a save cut out of the log did (Recording.cpp:650-761).
+    if (PLAYFILE_LINES.has(e.num)) { applyPlayfileLine(ctx, e.num, e.y); continue; }
     if (e.num === 0x5555 || e.num === 0xdddd) throw new Error(`unsupported ${hx(e.num)} at line ${e.line}`);
     return e;
   }
@@ -224,7 +209,7 @@ function play(): PlayEntry | null {
 
 // HandleMouseEvents with a playfile open, the port's body with CSBWin's playback branches.
 const g = game as unknown as {
-  handleMouseEvents(delta: number): number; systems: { monsters: { reattachAfterSave(): void }; movement: { gravityMove(): number; moveParty(a: unknown): { refused?: boolean; inhibited?: boolean } } };
+  handleMouseEvents(delta: number): number; systems: { movement: { gravityMove(): number; moveParty(a: unknown): { refused?: boolean; inhibited?: boolean } } };
   translateMouseClick(e: unknown): boolean; recordFileRecord(e: unknown): void; moveParty(a: unknown): { refused: boolean };
   mouseEventHandlers: { unclick(): void; button(n: number, x: number, y: number): void } | null; lastInputTime: number;
 };
