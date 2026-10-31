@@ -12,7 +12,7 @@ import {
     DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, dataSetNamed, parseManifest, PLAYER_ID_HEADER, RECORDING_FILES, SHARED_RECORDING_ID, THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH,
     thumbnailPath, type DataSet, type DataSetManifest,
 } from './data/DataSets';
-import { folderFiles, loadGameFiles, type DataSetFiles, type GameFiles } from './data/DataSetFiles';
+import { digestedFiles, folderFiles, loadGameFiles, type DataSetFiles, type DigestedFiles, type GameFiles } from './data/DataSetFiles';
 import { parsePublishedDungeons, type KnownDungeon } from './data/DungeonSignature';
 import { isLocalDataSetId, localDataSet, recordFiles } from './data/LocalDataSets';
 import { emptyDungeonData } from './data/DungeonLoader';
@@ -87,7 +87,7 @@ const RECORDING_WRITE_MS = 5000;
  */
 let dataSet!: DataSet;
 /** Where its files are read from: its folder, or a local set's record (`chooseDataSet`). */
-let setFiles!: DataSetFiles;
+let setFiles!: DigestedFiles;
 /** Its thumbnail, `null` where it has none: from its folder, or a local set's record (`chooseDataSet`). */
 let setThumbnail!: () => Promise<Blob | null>;
 /**
@@ -366,7 +366,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     const storeRandom = new CsbRandom();
     const saveStore = new BrowserSaveStore((rows) => drawPlaythrough(storeRandom, rows));
     // Each read begins a recording of the game from it, which the next read ends.
-    const recorder = new Recorder(game, __CSBWEB_BUILD__, dataSet.id,
+    const recorder = new Recorder(game, __CSBWEB_BUILD__, dataSet.id, () => setFiles.digests(),
         () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
     // Written to the store as it grows: every few seconds, and as the page is hidden, the
     // way most games end. A write that fails is written again at the next. Nothing is
@@ -982,7 +982,9 @@ async function init() {
         const played = playedRecording === null ? null : await readPlayedRecording(playedRecording);
         const chosen = await chooseDataSet(manifest, new URLSearchParams(window.location.search).get('dungeon') ?? played?.path[0]?.dataSet ?? null);
         if (!chosen) return await openWelcomePage(manifest);
-        ({ set: dataSet, files: setFiles, thumbnail: setThumbnail } = chosen);
+        ({ set: dataSet, thumbnail: setThumbnail } = chosen);
+        // Each file read through them keeps its digest, which a recording carries (`Recording.files`).
+        setFiles = digestedFiles(chosen.files);
         console.log(`Loading ${dataSet.name}...`);
         const files = await loadGameFiles(dataSet, setFiles);
         console.log(`✓ Loaded graphics: ${files.graphicsLoader.getItemCount()} items${dataSet.csbGraphics ? ', and the CSBgraphics.dat overlay' : ''}`);

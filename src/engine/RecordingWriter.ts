@@ -199,13 +199,16 @@ export class RecordingWriter {
             // A view onto a larger buffer would be cloned whole.
             const start = recording.start.kind === 'save' ? { ...recording.start, bytes: recording.start.bytes.slice() } : recording.start;
             written.parent = await this.parentHeld(recording.parent);
-            parts.push({ id, seq: 0, start, parent: written.parent, rules: recording.rules, extras: recording.extras });
+            parts.push({
+                id, seq: 0, start, parent: written.parent, rules: recording.rules, extras: recording.extras,
+                ...(recording.files ? { files: recording.files } : {}),
+            });
         }
         let seq = Math.max(written.parts, 1);
         if (changes.length > written.changes) parts.push({ id, seq: seq++, changes: changes.slice(written.changes) });
         const playthrough = written.playthrough ??= playthroughOf(recording.start);
         const entry: RecordingEntry = {
-            id, dataSet: recording.dataSet, build: recording.build, parent: written.parent, playthrough,
+            id, dataSet: recording.dataSet, build: recording.build, level: recording.level, parent: written.parent, playthrough,
             recordedAt: written.recordedAt, writtenAt: this.deps.now(),
             vbls, ended, end, ...(end && written.ending), changes: changes.length, parts: seq,
         };

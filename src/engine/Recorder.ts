@@ -8,7 +8,9 @@
  * its `d.RandomGameID` as that leaves them; a save's once it is read (`GameSaves.read`),
  * whose start is the save's bytes. Beside the start it takes what no read sets: the extras,
  * and the rules as the read left them (`RulesOptions`, which a read only changes where its
- * file has an Extended Features block). Then every change the boundary is told, each with
+ * file has an Extended Features block). And what it is played by: the engine's level
+ * (`src/engine/Behaviour.ts`), and the digest of each file its set has read
+ * (`FileDigests`). Then every change the boundary is told, each with
  * the VBLs the recording has run before it, `d.Time` and `d.RandomNumber`. The boot's
  * DM rules (`Game.forceDMRulesAtBoot`) are such a change. The next read ends it, or the
  * game's end (`InputBoundary.ended`), which it keeps as a point to share (`end`).
@@ -25,6 +27,7 @@
  *
  * The page writes each recording to its store as it grows (`RecordingWriter`).
  */
+import type { FileDigests } from '../data/DataSetFiles';
 import type { Extras, RulesOptions } from './GameContext';
 import type { Game } from './Game';
 import type { InputChange } from './InputBoundary';
@@ -106,8 +109,18 @@ export interface RecordedChange {
 export interface Recording {
     /** Its key in the store, and what a save made in it names (`RecordingPoint.recording`). */
     readonly id: string;
-    /** The build that made it: a later build's engine may play it out otherwise. */
+    /** The build that made it, which a list shows. */
     readonly build: string;
+    /**
+     * The engine's level it was played at (`ctx.behaviour.level`), which a later engine
+     * plays it by (`behaviourAt`). A recording made before levels is 0.
+     */
+    readonly level: number;
+    /**
+     * The MD5 of each file its set had read as it began (`DigestedFiles`); `null` for a
+     * recording made before they were kept.
+     */
+    readonly files: FileDigests | null;
     /** The data set it was played on (`DataSet.id`), whose `dungeon.dat` a new game reads. */
     readonly dataSet: string;
     readonly start: RecordingStart;
@@ -143,12 +156,14 @@ export class Recorder {
 
     /**
      * Records `game`'s boundary, the only listener it has, for `build` playing `dataSet`.
+     * `files` gives the digest of each file the set has read, as a recording begins.
      * `newId` is the page's: an id no other recording of its store has.
      */
     constructor(
         private readonly game: Game,
         private readonly build: string,
         private readonly dataSet: string,
+        private readonly files: () => FileDigests,
         private readonly newId: () => string,
     ) {
         game.input.listen((change, vbl) => this.told(change, vbl));
@@ -179,8 +194,8 @@ export class Recorder {
         const { ctx } = this.game;
         this.current = {
             recording: {
-                id: this.newId(), build: this.build, dataSet: this.dataSet, start, parent,
-                rules: { ...ctx.rules }, extras: { ...ctx.extras },
+                id: this.newId(), build: this.build, level: ctx.behaviour.level, files: this.files(),
+                dataSet: this.dataSet, start, parent, rules: { ...ctx.rules }, extras: { ...ctx.extras },
             },
             changes: [],
             from: this.game.input.vbls,

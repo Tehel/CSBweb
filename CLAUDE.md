@@ -210,7 +210,8 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
             `Game.input`, and the VBLs counted), Recorder (the game logged at that door from
             the read it began at), RecordingPlayer (a recording's path played back through
             it), RecordingPackage (a path shared as one file), RecordingPoints (the store's saves and
-            games' ends to play and share), RecordingWriter (the recordings written to the store as they grow), PeriodicUpdates (the ninety- and ten-second updates), LightLevel
+            games' ends to play and share), RecordingWriter (the recordings written to the store as they grow), Behaviour (the
+            engine's level, and the old behaviours a recording of an earlier one plays by), PeriodicUpdates (the ninety- and ten-second updates), LightLevel
             (`SelectPaletteForLightLevel`: `d.CurrentPalette`), OpenChest (the open
             chest, opened and repacked at CSBWin's events, never by drawing),
             ShowHideInventory (the inventory shown and hidden, and `TAG02076e` and

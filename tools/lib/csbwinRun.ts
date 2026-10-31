@@ -26,6 +26,7 @@
  * draws otherwise for it. Each entry's random is checked as CSBWin's player checks it, so
  * a run that drifts stops there, and says where.
  */
+import { digestedFiles } from '../../src/data/DataSetFiles';
 import { MOUSE_UNCLICK } from '../../src/engine/MouseQueue';
 import { PLAYFILE_LINES } from '../../src/engine/PlayfileLine';
 import { carriedStateOf, Recorder, type Recording, type RecordingPoint } from '../../src/engine/Recorder';
@@ -119,10 +120,11 @@ function drawsBetween(from: number, to: number, max = 100000): number | null {
 export async function recordRun(run: CsbwinRun, build: string, dataSet = run.dataSet): Promise<RecordedRun> {
   const folder = runFolder(run);
   const set = dataSetNamed(run.dataSet);
-  const page = await standPage(set, diskFiles(set));
+  const files = digestedFiles(diskFiles(set));
+  const page = await standPage(set, files);
   const { game, screen } = page;
   const { ctx } = game;
-  const recorder = new Recorder(game, build, dataSet, () => run.id);
+  const recorder = new Recorder(game, build, dataSet, () => files.digests(), () => run.id);
   const { items } = readPlayfile(`${folder}/playfile.log`);
   const entries = items.filter((item): item is PlayEntry => 'num' in item);
 

@@ -9,6 +9,7 @@
  * `systems` holds the subsystems themselves, so that they call each other directly, as
  * CSBWin's functions do; `host` holds the calls that leave the engine (`GameHost`).
  */
+import { CURRENT_BEHAVIOUR, type Behaviour } from './Behaviour';
 import { globalTextKey, readOverlayPalette } from '../data/CsbwinExpool';
 import { noExpectedSignatures, type ExpectedSignatures } from '../data/CsbwinExtendedFeatures';
 import { noRuntimeFileSignatures, type RuntimeFileSignatures } from '../data/FileSignature';
@@ -168,6 +169,12 @@ export interface GameContext {
    * (`src/settings/Settings.ts`): what CSBWin does not have. All off, the game is CSBWin's.
    */
   extras: Extras;
+  /**
+   * The engine's behaviour (`src/engine/Behaviour.ts`): `CURRENT_BEHAVIOUR`, every flag
+   * off, unless a recording of an earlier level is played (`RecordingPlayer`), which sets
+   * its own before each of its reads.
+   */
+  behaviour: Behaviour;
   /** What THROW and SHOOT sent off, for the extra that gathers it back (`ThrownWeapons`). */
   readonly thrownWeapons: ThrownWeaponTags;
   /** What only the host can do: play a sample, trace, tell the UI something. */
@@ -385,6 +392,7 @@ export function createGameContext(
     overlay: new Overlay(overlayPalette, (line) => host.trace(line)),
     tables,
     extras: NO_EXTRAS,
+    behaviour: CURRENT_BEHAVIOUR,
     thrownWeapons: new Map(),
     host,
     systems: null as unknown as GameSystems,

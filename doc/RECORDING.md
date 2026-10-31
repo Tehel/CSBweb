@@ -9,6 +9,9 @@ and player, and what sharing recordings would take.
 **Recordings follow the engine.** Any change to what the engine does at a tick makes a
 recording made before it play out differently. A recording carries the build that made it,
 and its `d.RandomNumber` values show the first entry where a later build parts from it.
+It also carries the engine's level it was played at, so that a later engine can play it
+by the behaviour it was made with ("A recording's level", below), and the digest of each
+file its set had read.
 
 **Recordings are paused.** The port's behaviour is still changing (the monsters' scents,
 `DEBT.md` X18), and each change would leave every recording
@@ -257,6 +260,9 @@ with the number of VBLs run before it, and the player applies each before the sa
 `Recording` is:
 
 - the build that made it (`__CSBWEB_BUILD__`) and its data set's id;
+- the engine's level it was played at (`ctx.behaviour.level`, below), and the MD5 of each
+  file its set had read as it began, by name (`FileDigests`: the page reads its set's files
+  through `digestedFiles`, `src/data/DataSetFiles.ts`);
 - its start: a new game's stream and `d.RandomGameID`, or a save's file;
 - the rules as its read left them (`RulesOptions`, process-wide globals in CSBWin, which a
   read changes only where its file has an Extended Features block), and the extras;
@@ -279,15 +285,29 @@ no save can follow ("Shared recordings", below).
 
 **The store** holds the recordings beside the saves, in the same IndexedDB database
 (`doc/SAVES.md`), from version 7: a row each in `recordings` (`RecordingEntry`,
-`src/data/saves/RecordingStore.ts`: its set, build, playthrough, when it began and was
+`src/data/saves/RecordingStore.ts`: its set, build, level, playthrough, when it began and was
 last written, its VBLs, its changes and parts, whether a read or the game's end has ended
 it, and that end, with when it ended and the game's play time then, `Game.playTime`,
 which the writer takes as the game ends, `Recorder.onEnd`), and its parts
 in `recordingParts`, keyed by the row's id and a `seq`. Part 0 is the head, the start, the
-rules and the extras; each part after it the changes recorded since the one before, so a
+rules, the extras and the files' digests; each part after it the changes recorded since the one before, so a
 write adds only what is new. A row and the parts it gains are written in one transaction,
 and a row never names a part the store has not (`assembleRecording` refuses one that
-does).
+does). A row written before levels has none, and is of level 0; a head written before the
+digests has none, and its recording names no files (`files` is `null`).
+
+### A recording's level
+
+`src/engine/Behaviour.ts` keeps the engine's level, `ENGINE_LEVEL`, and every old
+behaviour the engine keeps beside the new (`BEHAVIOURS`), as CSBWin keeps 9.0's behind
+`version90Compatible` (`doc/CSBwin-src/Recording.cpp:172-180`,
+`doc/CSBwin-src/Code11f52.cpp:907-910`). Each is a flag, named for the behaviour it keeps,
+with what it does, the debt ID of the commit that changed it and the level that commit
+made (`until`). The engine reads them from `ctx.behaviour`, frozen: a game the page plays
+is at `ENGINE_LEVEL`, every flag off (`CURRENT_BEHAVIOUR`), and the player sets each
+recording's own before its read (`behaviourAt`), each flag whose `until` is above the
+recording's level on. The level is 0 and no flag is kept yet. Recordings made before
+levels are of level 0.
 
 Most games end with the page closed, not with a read, so `RecordingWriter`
 (`src/engine/RecordingWriter.ts`) writes the running recording while it runs: every five
@@ -367,6 +387,10 @@ click a full queue drops, and the button a click turns out to be when it is take
 `RecordingPlayer` (`src/engine/RecordingPlayer.ts`) plays a recording's path into a game:
 a root and the branches down to the one played, or a branch alone, from its own start.
 
+- **The level.** A path that holds a level above `ENGINE_LEVEL`, a later build's in a
+  stale tab, is refused before it plays: "A LATER VERSION OF THE SITE MADE THIS
+  RECORDING". Each recording's behaviour is set before its read, the root's and each
+  join's ("A recording's level", above).
 - **The start.** The path's first start is read: a new game's world, its stream and
   playthrough set over the read's (`Game.readNewGame` draws from a stream of its own), or
   a save's file and its `CarriedState`; then its rules and its extras. The game is
@@ -565,8 +589,10 @@ where the site would refuse it, and the panel says why: a local set, a pending o
 path that holds a move of `?dev` (`playedWithDevMoves`).
 
 **The package** (`RecordingPackage`, `src/engine/RecordingPackage.ts`) is one file,
-JSON gzipped by `CompressionStream`: the format's version, the build of the recording
-shared, its data set, the metadata, the path and the point shared. The point is a
+JSON gzipped by `CompressionStream`: the format's version, 2, the build and the level of
+the recording shared, its data set, the metadata, the path and the point shared. A
+package of version 1, written before levels, still reads: each recording of its path of
+level 0, naming no files. The point is a
 save's (`packageOfSave`): the path the store holds to the save's recording
 (`readRecordingPath`), the last recording cut at the save's point, and the save's file,
 which the path played to its end makes again, at a point taken inside a VBL as the
@@ -604,9 +630,10 @@ What sharing takes:
 - **A starting point the viewer has**: a new game of a published data set, or the starting
   save uploaded with the recording. A player's own unpublished set cannot be shared this
   way.
-- **The engine's version**, stored with each recording: a behaviour change makes older
-  recordings drift, which their `random` values show at the first wrong entry. A shared
-  recording is then either played by the build it was made with or marked broken, which
-  the replay tool does before a deploy (`utils/replay-recordings.ts`).
+- **The engine's level**, stored with each recording ("A recording's level", above): a
+  behaviour change makes older recordings drift unless it keeps the old behaviour behind
+  a flag, which their `random` values show at the first wrong entry. A shared recording
+  that drifts is marked broken, which the replay tool does before a deploy
+  (`utils/replay-recordings.ts`).
 - **Speed**: fast-forward is free, as CSBWin's `#NoSpeedLimit` and `#FastVBLnn`; going
   back means replaying from the start, or from saves taken along the way.

@@ -79,6 +79,11 @@
  *    page rewound at the path's end, under the disk menu's held clock among them, plays
  *    it again to the same end.
  *
+ * 12. A recording carries the engine's level and its set's files' digests, through the
+ *    store and a package; a row, a head and a package of version 1, made before levels,
+ *    read as level 0, naming no files. The player sets each recording's level before its
+ *    read, and refuses a path of a later level before it plays.
+ *
  * Run: `npm test -- --only=replay.ts`
  *
  * `--measure` plays a long new game instead, keys and clicks at a player's pace, F5 and
@@ -86,6 +91,8 @@
  */
 import { readFileSync } from 'node:fs';
 
+import { digestedFiles, fileDigest } from '../../src/data/DataSetFiles';
+import { BEHAVIOURS, behaviourAt, CURRENT_BEHAVIOUR, ENGINE_LEVEL, knownLevel, type BehaviourChange } from '../../src/engine/Behaviour';
 import { VBL_FREQUENCY } from '../../src/core/constants';
 import { CsbRandom } from '../../src/core/random';
 import { OBJECT_ID_EOF, Position } from '../../src/core/types';
@@ -96,7 +103,7 @@ import { NO_EXTRAS } from '../../src/engine/GameContext';
 import { GameSaves } from '../../src/engine/GameSaves';
 import { Recorder, type Recording, type RecordingPoint } from '../../src/engine/Recorder';
 import {
-  packageOfEnd, packageOfSave, readRecordingPackage, RecordingPackageError, writeRecordingPackage, type RecordingPackage,
+  packageOfEnd, packageOfSave, readRecordingPackage, RECORDING_PACKAGE_VERSION, RecordingPackageError, writeRecordingPackage, type RecordingPackage,
 } from '../../src/engine/RecordingPackage';
 import { endLines, RecordingPlayer, skippedLine, type HeldSpan, type SavedAtEnd } from '../../src/engine/RecordingPlayer';
 import { RecordingWriter } from '../../src/engine/RecordingWriter';
@@ -130,6 +137,9 @@ const NEW_GAME_SEED = 0x2b5a1c07;
 const START_EXTRAS = { ...NO_EXTRAS, drinkAtFountain: true, showItemProperties: true };
 
 const DUNGEON = new Uint8Array(readFileSync(`${STOCK_DIR}/dungeon.dat`));
+
+/** The digests the pages' recordings carry: the file their games read, `dungeon.dat`'s. */
+const DIGESTS = { 'dungeon.dat': fileDigest(DUNGEON) };
 
 /** How often the page writes the running recording (`RECORDING_WRITE_MS`, `src/main.ts`). */
 const RECORDING_WRITE_MS = 5000;
@@ -208,7 +218,7 @@ class Page {
       drawViewport: () => this.renderView(),
       paint: () => { if (this.recorded) this.refreshScreen(); },
     });
-    this.recorder = new Recorder(game, 'replay', STOCK_DATA_SET.id, () => `recording-${++recordingIds}`);
+    this.recorder = new Recorder(game, 'replay', STOCK_DATA_SET.id, () => DIGESTS, () => `recording-${++recordingIds}`);
     this.recordings = new RecordingWriter(this.recorder, this.recordingStore, this.store, { now: () => this.clock.time, playTime: () => game.playTime() });
     saves = new GameSaves(game, STOCK_DATA_SET, diskFiles(STOCK_DATA_SET), this.store, {
       portraitOf: drawing.portraitOf,
@@ -809,6 +819,8 @@ async function replay(name: string, start: Start, script: (player: Player) => Pr
   const { rules } = recorded.game.ctx;
   check(begun.start.kind === (start === 'new' ? 'new' : 'save') && begun.dataSet === STOCK_DATA_SET.id && begun.build === 'replay',
     `the read begins a recording of the ${begun.start.kind === 'new' ? 'new game' : 'save'}, its set's and its build's`);
+  check(begun.level === ENGINE_LEVEL && recorded.game.ctx.behaviour === CURRENT_BEHAVIOUR && JSON.stringify(begun.files) === JSON.stringify(DIGESTS),
+    `at the engine's level, ${ENGINE_LEVEL}, the game played by its behaviour, and with its set's files' digests (dungeon.dat ${DIGESTS['dungeon.dat']})`);
   if (begun.start.kind === 'new') {
     check(begun.start.random === recorded.game.ctx.random.getSeed() && begun.start.randomGameID === recorded.game.ctx.state.block1.randomGameID,
       `from the stream and the playthrough its read left (${begun.start.random.toString(16)}, ${begun.start.randomGameID.toString(16)})`);
@@ -953,6 +965,7 @@ async function branch(recorded: Page): Promise<void> {
   const quick = (await recorded.saves.list()).find((entry) => entry.quick && entry.recording?.recording === written.id)!;
   const shared = await savePackage(recorded, [root, written], quick, 'F5 in the branch');
   await refusals(shared);
+  await levels(shared);
 }
 
 /**
@@ -1112,7 +1125,10 @@ async function refusals(pkg: RecordingPackage): Promise<void> {
   const wrong: [string, () => Promise<unknown>][] = [
     ['no gzip', () => readRecordingPackage(new TextEncoder().encode('{}'))],
     ['no JSON', async () => readRecordingPackage(await gzipped('{'))],
-    ['another version', async () => readRecordingPackage(await gzipped(JSON.stringify({ version: 2 })))],
+    ['another version', async () => readRecordingPackage(await edited(pkg, (json) => { json.version = 3; }))],
+    ['a level not the last recording\'s', () => writeRecordingPackage({ ...pkg, level: pkg.level + 1 })],
+    ['a negative level', async () => readRecordingPackage(await edited(pkg, (json) => { json.level = -1; json.path[1].level = -1; }))],
+    ['a file\'s digest no MD5', async () => readRecordingPackage(await edited(pkg, (json) => { json.path[0].files['dungeon.dat'] = 'x'; }))],
     ['more than the limit unzipped', async () => readRecordingPackage(await writeRecordingPackage(pkg), 1000)],
     ['an empty title', () => writeRecordingPackage({ ...pkg, info: { ...pkg.info, title: ' ' } })],
     ['a title too long', () => writeRecordingPackage({ ...pkg, info: { ...pkg.info, title: 'x'.repeat(61) } })],
@@ -1135,6 +1151,70 @@ async function refusals(pkg: RecordingPackage): Promise<void> {
     else console.log(`  not refused: ${what}`);
   }
   check(refused.length === wrong.length, `a package is refused with ${refused.join(', ')}`);
+}
+
+/**
+ * A recording's level (`src/engine/Behaviour.ts`): the engine's behaviour by level, the
+ * store's row and head of before levels, a package of version 1, and a path of a later
+ * level refused before it plays. `pkg` is a path of two, each recording at the engine's
+ * level, which the player sets before each read.
+ */
+async function levels(pkg: RecordingPackage): Promise<void> {
+  const behaviour = behaviourAt(ENGINE_LEVEL);
+  const kept: readonly BehaviourChange[] = BEHAVIOURS;
+  check(Object.isFrozen(behaviour) && JSON.stringify(behaviour) === JSON.stringify(CURRENT_BEHAVIOUR) && behaviour.level === ENGINE_LEVEL
+    && knownLevel(0) && knownLevel(ENGINE_LEVEL) && !knownLevel(-1) && !knownLevel(ENGINE_LEVEL + 1) && !knownLevel(0.5),
+    `the engine plays the levels 0 to ${ENGINE_LEVEL}, each by a frozen behaviour, ${kept.length} flag${kept.length === 1 ? '' : 's'} kept`);
+  const read = digestedFiles(diskFiles(STOCK_DATA_SET));
+  await read.read('dungeon.dat');
+  await read.read('no such file');
+  check(JSON.stringify(read.digests()) === JSON.stringify(DIGESTS), `a set's files keep the digest of each file read through them (${JSON.stringify(read.digests())})`);
+
+  const leveled = (await readRecordingPackage(await writeRecordingPackage(pkg))).path;
+  check(pkg.level === ENGINE_LEVEL && leveled.every((recording) => recording.level === ENGINE_LEVEL && JSON.stringify(recording.files) === JSON.stringify(DIGESTS)),
+    `a package carries the shared recording's level, ${pkg.level}, and each recording's own and its files' digests`);
+  const v1 = await readRecordingPackage(await edited(pkg, (json) => {
+    json.version = 1;
+    delete json.level;
+    for (const recording of json.path) {
+      delete recording.level;
+      delete recording.files;
+    }
+  }));
+  check(v1.version === RECORDING_PACKAGE_VERSION && v1.level === 0 && v1.path.every((recording) => recording.level === 0 && recording.files === null),
+    'a package of version 1, made before levels, reads as this version\'s: each recording of level 0, naming no files');
+
+  const store = memoryRecordingStore({ now: false });
+  const [root] = pkg.path as [Recording, Recording];
+  const entry: RecordingEntry = {
+    id: 'before-levels', dataSet: root.dataSet, build: root.build, parent: null, playthrough: 0,
+    recordedAt: 0, writtenAt: 0, vbls: root.vbls, ended: true, changes: root.changes.length, parts: 2,
+  };
+  await store.write(entry, [
+    { id: entry.id, seq: 0, start: root.start, parent: null, rules: root.rules, extras: root.extras },
+    { id: entry.id, seq: 1, changes: root.changes },
+  ], null);
+  const before = await store.read(entry.id);
+  check(before.level === 0 && before.files === null, 'a row and a head the store wrote before levels read as a recording of level 0, naming no files');
+
+  const played = Page.replay(pkg.path);
+  // The root has begun, the branch is yet to.
+  const seen = [played.game.ctx.behaviour.level];
+  played.player!.onBegin((recording) => {
+    seen.push(played.game.ctx.behaviour.level);
+    played.recorder.begin(recording.start, recording.parent);
+  });
+  played.play();
+  check(played.player!.drift === null && seen.length === 2 && seen.every((level) => level === ENGINE_LEVEL) && played.recording.level === ENGINE_LEVEL,
+    `the player sets each recording's level before its read, and a recorder of the game played back records it (${seen.join(', ')})`);
+  const later = pkg.path.map((recording, n) => (n === 1 ? { ...recording, level: ENGINE_LEVEL + 1 } : recording));
+  let refused = '';
+  try {
+    Page.replay(later);
+  } catch (error) {
+    refused = (error as Error).message;
+  }
+  check(refused === 'A LATER VERSION OF THE SITE MADE THIS RECORDING', `a path that holds a later level is refused before it plays: "${refused}"`);
 }
 
 async function gzipped(text: string): Promise<Uint8Array> {

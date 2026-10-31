@@ -14,6 +14,7 @@
  * **Nothing in this file touches the DOM**: `tools/checks/replay.ts` runs it over a
  * store in memory.
  */
+import type { FileDigests } from '../DataSetFiles';
 import type { Extras, RulesOptions } from '../../engine/GameContext';
 import type { RecordedChange, Recording, RecordingEnd, RecordingPoint, RecordingStart } from '../../engine/Recorder';
 
@@ -25,6 +26,8 @@ export interface RecordingEntry {
     readonly dataSet: string;
     /** The build that made it (`Recording.build`). */
     readonly build: string;
+    /** The engine's level it was played at (`Recording.level`); absent from a row written before levels, which is 0. */
+    readonly level?: number;
     /**
      * The point it branches from (`Recording.parent`), `null` for a root, and for one the
      * store's version 7 wrote before the tree, which has none.
@@ -72,6 +75,8 @@ export interface RecordingHead {
     readonly parent?: RecordingPoint | null;
     readonly rules: RulesOptions;
     readonly extras: Extras;
+    /** The digests of its set's files (`Recording.files`); absent from a head written before they were kept. */
+    readonly files?: FileDigests;
 }
 
 /** A part after the head: the changes recorded since the part before. */
@@ -143,6 +148,8 @@ export function assembleRecording(entry: RecordingEntry, parts: readonly Recordi
     return {
         id: entry.id,
         build: entry.build,
+        level: entry.level ?? 0,
+        files: head.files ?? null,
         dataSet: entry.dataSet,
         start: head.start,
         parent: head.parent ?? null,

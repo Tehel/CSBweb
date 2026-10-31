@@ -26,7 +26,7 @@ export async function packageOf(dataSet: string, title: string, { extras = false
     const changes: RecordedChange[] = [{ change: { kind: 'key', num: 1 }, vbl: 10, time: 0, random: 0 }];
     if (dev) changes.push({ change: { kind: 'devLevel', delta: 1 }, vbl: 20, time: 0, random: 0 });
     const recording: Recording = {
-        id: 'root', build: 'test', dataSet, start: { kind: 'new', random: 1, randomGameID: 2 }, parent: null, rules: RULES_OFF,
+        id: 'root', build: 'test', level: 0, files: null, dataSet, start: { kind: 'new', random: 1, randomGameID: 2 }, parent: null, rules: RULES_OFF,
         extras: { ...NO_EXTRAS, drinkAtFountain: extras }, changes, vbls: 100, ended: true, end: { word11694: true },
     };
     const pkg = packageOfEnd([recording], { title, author: 'A Player', description: 'Won.' }, { recordedAt: 1000, endedAt: 2000, playTime: 500 });
@@ -40,7 +40,7 @@ export async function packageOf(dataSet: string, title: string, { extras = false
  */
 export async function quietPackage(set: DataSet, files: DataSetFiles, title: string, vbls: number): Promise<Uint8Array<ArrayBuffer>> {
     const root: Recording = {
-        id: 'root', build: 'test', dataSet: set.id, start: { kind: 'new', random: 0x1234, randomGameID: 5 }, parent: null, rules: RULES_OFF,
+        id: 'root', build: 'test', level: 0, files: null, dataSet: set.id, start: { kind: 'new', random: 0x1234, randomGameID: 5 }, parent: null, rules: RULES_OFF,
         extras: NO_EXTRAS, changes: [], vbls, ended: true, end: null,
     };
     const { game } = await playPath(set, files, [root]);

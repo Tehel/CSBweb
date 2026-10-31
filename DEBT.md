@@ -548,8 +548,9 @@ behind a named switch, chosen by the recording.
 
 **Paying it, in steps:**
 
-1. `Behaviour.ts`, `ENGINE_LEVEL`, `level` and the files' signatures in the recording, the
+1. ✅ `Behaviour.ts`, `ENGINE_LEVEL`, `level` and the files' signatures in the recording, the
    store's row and the package, the player setting the flags; no flag yet.
+   (`doc/RECORDING.md` → "A recording's level", `tools/checks/replay.ts`, 12.)
 2. The corpus and its check in `npm test`.
 3. The deploy's check refusing a drift.
 4. The policy written down.
@@ -561,6 +562,14 @@ behind a named switch, chosen by the recording.
    name among the server's other sets, and saying which file matches none.
 7. Recordings resumed (`src/ui/recordingsSwitch.ts`, `doc/RECORDING.md` → "Recordings are
    paused").
+
+**Where it stands:** step 1 is paid. `ENGINE_LEVEL` is 0 and `BEHAVIOURS` empty. A
+recording carries `level` and `files` (`FileDigests`, the MD5 of each file the set had
+read as it began, through `digestedFiles`); the store keeps the level in the row and the
+digests in the head; a package is of version 2, and one of version 1 still reads, at level
+0 naming no files. The server's table (`server/recordings.ts`) keeps no level column: its
+list shows the build alone, and step 3 reads the level from the package. The next step is
+2.
 
 Size L.
 

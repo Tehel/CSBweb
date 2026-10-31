@@ -5,7 +5,10 @@
  *
  * A path is a root and the branches down to the one played, each the child of the one
  * before (`Recording.parent`, `doc/RECORDING.md` → "The tree"), or a branch alone, which
- * plays from its own start. Its first recording's start is read,
+ * plays from its own start. Each recording is played by the engine's behaviour at its own
+ * level (`Recording.level`, `src/engine/Behaviour.ts`), set before its read; a path that
+ * holds a level this engine does not know, a later build's, is refused before it plays.
+ * Its first recording's start is read,
  * a new game's world and its stream and playthrough set over the read, or a save's file
  * and what its read left beside it (`CarriedState`); then its rules and its extras. Each
  * change is applied once the VBL before the one it was logged at has run, the boundary's
@@ -33,6 +36,7 @@
  * told each such span as it ends (`onSkipped`), and stops at its end (`onEnd`).
  */
 import { VBL_FREQUENCY } from '../core/constants';
+import { behaviourAt, knownLevel } from './Behaviour';
 import type { Game } from './Game';
 import { saveFileOf } from './GameSaves';
 import { applyExtras, type ClockHolder } from './InputBoundary';
@@ -111,6 +115,7 @@ export class RecordingPlayer {
         private readonly savedAtEnd: SavedAtEnd | null = null,
     ) {
         if (path.length === 0) throw new Error('a path holds a recording');
+        if (path.some((recording) => !knownLevel(recording.level))) throw new Error('A LATER VERSION OF THE SITE MADE THIS RECORDING');
         if (savedAtEnd && path[path.length - 1]!.end) throw new Error('a path ends at a save or at the game\'s end');
         for (let n = 1; n < path.length; n++) {
             const { parent, start } = path[n]!;
@@ -153,6 +158,7 @@ export class RecordingPlayer {
         const { ctx } = this.game;
         this.started = this.game.input.vbls;
         if (root.start.kind === 'new') {
+            ctx.behaviour = behaviourAt(root.level);
             this.game.readDungeonDat(this.dungeonDat);
             ctx.random.setSeed(root.start.random);
             ctx.state.block1.randomGameID = root.start.randomGameID;
@@ -324,10 +330,11 @@ export class RecordingPlayer {
         this.endListener?.(this.parted);
     }
 
-    /** `recording`'s save read, what its read left beside the file set, and it begun. */
+    /** `recording`'s save read at its level, what its read left beside the file set, and it begun. */
     private read(recording: Recording): void {
         const { start } = recording;
         if (start.kind !== 'save') throw new Error('a branch starts from a save');
+        this.game.ctx.behaviour = behaviourAt(recording.level);
         applySaveBytes(this.game, start.bytes);
         if (start.carried) setCarriedState(this.game, start.carried);
         this.begin(recording);

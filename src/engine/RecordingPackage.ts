@@ -11,8 +11,10 @@
  * (`Recording.end`), which its replay must reach.
  *
  * The file is JSON, gzipped by the browser's own `CompressionStream`: the format's version,
- * the build, the set, the metadata, the path and the point. Each recording is as the store
- * holds it (`Recording`), a save's file in base64. Where it starts, a new game or the
+ * the build, the engine's level, the set, the metadata, the path and the point. Each
+ * recording is as the store holds it (`Recording`), a save's file in base64. A package of
+ * version 1, written before levels, is still read: each recording of its path is of level
+ * 0, and names no files. Where it starts, a new game or the
  * save's level and champions, is read from the path's root, so a package's never
  * disagrees with its path.
  *
@@ -24,6 +26,7 @@
  * `server/recordings.ts`).
  */
 import { readCsbwinSaveInfo } from '../data/CsbwinSaveInfo';
+import type { FileDigests } from '../data/DataSetFiles';
 import { LOCAL_DATA_SET_TEXT_LIMITS } from '../data/DataSets';
 import { NO_EXTRAS, type Extras, type RulesOptions } from './GameContext';
 import { CLOCK_HOLDERS, type ClockHolder, type InputChange } from './InputBoundary';
@@ -32,8 +35,8 @@ import { PLAYFILE_LINES } from './PlayfileLine';
 import type { CarriedState, RecordedChange, Recording, RecordingEnd, RecordingPoint, RecordingStart } from './Recorder';
 import type { SavedAtEnd } from './RecordingPlayer';
 
-/** The format's version: a package of another is refused. */
-export const RECORDING_PACKAGE_VERSION = 1;
+/** The format's version: a package of another is refused, but for version 1's, written before levels (`readRecordingPackage`). */
+export const RECORDING_PACKAGE_VERSION = 2;
 
 /**
  * The longest text the metadata takes in each field, in characters, as a set's: a title as
@@ -80,6 +83,8 @@ export interface RecordingPackage {
     readonly version: typeof RECORDING_PACKAGE_VERSION;
     /** The build that made the shared recording, the path's last. */
     readonly build: string;
+    /** The engine's level the shared recording was played at, the path's last's (`Recording.level`). */
+    readonly level: number;
     /** The data set every recording of the path was played on (`DataSet.id`). */
     readonly dataSet: string;
     readonly info: RecordingPackageInfo;
@@ -159,7 +164,7 @@ function packageOf(
     const last = path[path.length - 1]!;
     const { title, author, description } = text;
     const info = { title, author, description, ...times, start: packageStart(path[0]!) };
-    return { version: RECORDING_PACKAGE_VERSION, build: last.build, dataSet: last.dataSet, info, path, shared };
+    return { version: RECORDING_PACKAGE_VERSION, build: last.build, level: last.level, dataSet: last.dataSet, info, path, shared };
 }
 
 /** `path` with each recording before the last cut at the point its child joins it. */
@@ -197,7 +202,8 @@ export async function writeRecordingPackage(pkg: RecordingPackage): Promise<Uint
 
 /**
  * The package `bytes` hold, its form checked: refused with a `RecordingPackageError`, or
- * where it unzips to more than `limit` bytes.
+ * where it unzips to more than `limit` bytes. One of version 1 is read as this version's,
+ * each recording of level 0 and naming no files.
  */
 export async function readRecordingPackage(bytes: Uint8Array, limit = Infinity): Promise<RecordingPackage> {
     let text: string;
@@ -233,6 +239,7 @@ function checked(pkg: RecordingPackage): RecordingPackage {
     const last = path[path.length - 1];
     if (!last) throw new RecordingPackageError('the path is empty');
     if (pkg.build !== last.build) throw new RecordingPackageError('the build is not the last recording\'s');
+    if (pkg.level !== last.level) throw new RecordingPackageError('the level is not the last recording\'s');
     path.forEach((recording, n) => {
         if (recording.dataSet !== pkg.dataSet) throw new RecordingPackageError(`recording ${n} is of another set`);
         const parent = n === 0 ? null : path[n - 1]!;
@@ -255,13 +262,16 @@ function checked(pkg: RecordingPackage): RecordingPackage {
 /** The fields' types: what a JSON object must be to be a package. */
 function packageFromJson(json: unknown): RecordingPackage {
     const pkg = record(json, 'the package');
-    if (pkg['version'] !== RECORDING_PACKAGE_VERSION) throw new RecordingPackageError(`not a package of version ${RECORDING_PACKAGE_VERSION}`);
+    const version = pkg['version'];
+    if (version !== RECORDING_PACKAGE_VERSION && version !== 1) throw new RecordingPackageError(`not a package of version ${RECORDING_PACKAGE_VERSION}, nor 1`);
+    const leveled = version === RECORDING_PACKAGE_VERSION;
     const info = record(pkg['info'], 'the metadata');
     const start = record(info['start'], 'the metadata\'s start');
     const shared = record(pkg['shared'], 'the point');
     return {
         version: RECORDING_PACKAGE_VERSION,
         build: word(pkg['build'], 'the build'),
+        level: leveled ? count(pkg['level'], 'the level') : 0,
         dataSet: word(pkg['dataSet'], 'the set'),
         info: {
             title: string(info['title'], 'the title'),
@@ -277,19 +287,22 @@ function packageFromJson(json: unknown): RecordingPackage {
                 }
                     : fail('where it starts'),
         },
-        path: array(pkg['path'], 'the path').map((recording, n) => recordingFromJson(recording, `recording ${n}`)),
+        path: array(pkg['path'], 'the path').map((recording, n) => recordingFromJson(recording, `recording ${n}`, leveled)),
         shared: shared['kind'] === 'end' ? { kind: 'end' }
             : shared['kind'] === 'save' ? { kind: 'save', file: bytes(shared['file'], 'the save\'s file'), inVbl: boolean(shared['inVbl'], 'the save\'s inVbl') }
                 : fail('the point'),
     };
 }
 
-function recordingFromJson(json: unknown, what: string): Recording {
+/** A recording of a package; `leveled` for this version's, which carries its level and its files. */
+function recordingFromJson(json: unknown, what: string, leveled: boolean): Recording {
     const recording = record(json, what);
     const start = record(recording['start'], `${what}'s start`);
     return {
         id: word(recording['id'], `${what}'s id`),
         build: word(recording['build'], `${what}'s build`),
+        level: leveled ? count(recording['level'], `${what}'s level`) : 0,
+        files: leveled && recording['files'] !== null ? digestsFromJson(recording['files'], `${what}'s files`) : null,
         dataSet: word(recording['dataSet'], `${what}'s set`),
         start: start['kind'] === 'new'
             ? { kind: 'new', random: uint32(start['random'], `${what}'s seed`), randomGameID: uint32(start['randomGameID'], `${what}'s playthrough`) }
@@ -307,6 +320,15 @@ function recordingFromJson(json: unknown, what: string): Recording {
         ended: boolean(recording['ended'], `${what}'s ended`),
         end: recording['end'] === null ? null : endFromJson(recording['end'], `${what}'s end`),
     };
+}
+
+/** A file's name, and its MD5 in lower-case hex, each (`FileDigests`). */
+function digestsFromJson(json: unknown, what: string): FileDigests {
+    const files = record(json, what);
+    for (const [name, digest] of Object.entries(files)) {
+        if (word(name, what) !== name || typeof digest !== 'string' || !/^[0-9a-f]{32}$/.test(digest)) fail(what);
+    }
+    return files as FileDigests;
 }
 
 function pointFromJson(json: unknown, what: string): RecordingPoint {

@@ -8,6 +8,7 @@
  * the tools alike. `dungeon.dat`, `mini.dat` and the utility's portraits are read later,
  * by name, as CSBWin reads them.
  */
+import { md5 } from '../core/md5';
 import { CSBGraphicsLoader } from './CSBGraphicsLoader';
 import type { DataSet } from './DataSets';
 import { GraphicsLoader } from './GraphicsLoader';
@@ -30,6 +31,37 @@ export function folderFiles(dir: string): DataSetFiles {
         },
         where: (name) => `${dir}/${name}`,
     };
+}
+
+/**
+ * The MD5 of each file a set's game has read, by name, in lower-case hex: what a recording
+ * carries of the files it was played over (`Recording.files`).
+ */
+export type FileDigests = Readonly<Record<string, string>>;
+
+/** A set's files that keep the digest of each file read through them (`digestedFiles`). */
+export interface DigestedFiles extends DataSetFiles {
+    /** The digest of every file read so far, the last read's where one was read twice. */
+    digests(): FileDigests;
+}
+
+/** `files`, keeping the MD5 of each file read through them. */
+export function digestedFiles(files: DataSetFiles): DigestedFiles {
+    const digests = new Map<string, string>();
+    return {
+        async read(name) {
+            const bytes = await files.read(name);
+            if (bytes) digests.set(name, fileDigest(bytes));
+            return bytes;
+        },
+        where: (name) => files.where(name),
+        digests: () => Object.fromEntries([...digests].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))),
+    };
+}
+
+/** `bytes`' MD5, in lower-case hex (`FileDigests`). */
+export function fileDigest(bytes: Uint8Array): string {
+    return [...md5(bytes)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 /** What the boot reads of a set before anything is built. */
