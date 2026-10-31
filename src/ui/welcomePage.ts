@@ -868,7 +868,7 @@ function showRecordings(dialog: HTMLElement, set: DataSet, published: boolean, m
     const showShared = (recording: SiteRecording) => {
         const buttons = document.createElement('div');
         buttons.className = 'add-set-buttons';
-        buttons.append(playLink(recordingQuery(set.id, recording.id)));
+        buttons.append(playLink(recordingQuery(recording.id)));
         const act = async (action: RecordingAction, doing: string) => {
             status.textContent = doing;
             for (const button of panel.querySelectorAll('button')) button.disabled = true;
@@ -917,7 +917,7 @@ function showRecordings(dialog: HTMLElement, set: DataSet, published: boolean, m
         if (selected !== id) return;
         const buttons = document.createElement('div');
         buttons.className = 'add-set-buttons';
-        buttons.append(playLink(recordingQuery(set.id, id)));
+        buttons.append(playLink(recordingQuery(id)));
         const why = unpublished ?? (playedWithDevMoves(path) ? 'Not to upload: it holds a move of ?dev, which no game holds.' : null);
         if (why === null) {
             buttons.append(panelButton('recordings-upload', 'Upload', () => {
@@ -1375,10 +1375,13 @@ export function welcomePageQuery(): string {
     return query ? `?${query}` : window.location.pathname;
 }
 
-/** The page's own query, the game's set and the recording `recording` to play (`?recording=`), with no save. */
-function recordingQuery(dataSet: string, recording: string): string {
+/**
+ * The page's own query and the recording `recording` to play (`?recording=`), with no set
+ * and no save: the page plays the set the recording names (`src/main.ts`).
+ */
+function recordingQuery(recording: string): string {
     const params = new URLSearchParams(window.location.search);
-    params.set('dungeon', dataSet);
+    params.delete('dungeon');
     params.delete('save');
     params.set('recording', recording);
     return `?${params}`;

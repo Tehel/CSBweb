@@ -17,7 +17,7 @@ import { parsePublishedDungeons, type KnownDungeon } from './data/DungeonSignatu
 import { isLocalDataSetId, localDataSet, recordFiles } from './data/LocalDataSets';
 import { emptyDungeonData } from './data/DungeonLoader';
 import { GraphicsLoader } from './data/GraphicsLoader';
-import { BrowserDataSetStore, BrowserRecordingStore, BrowserSaveStore, downloadSaveFile, readRecordingPath, type DrawPlaythrough, type OpenedSave } from './data/saves';
+import { BrowserDataSetStore, BrowserRecordingStore, BrowserSaveStore, downloadSaveFile, readRecordingPath, type DrawPlaythrough, type OpenedSave, type SaveStore } from './data/saves';
 import { UTILITY_PORTRAITS_FILE, readUtilityPortraits, type UtilityPortraits } from './data/UtilityPortraits';
 import { Game } from './engine/Game';
 import { buildGameTables, type GameTables } from './engine/GameTables';
@@ -92,7 +92,7 @@ let setFiles!: DataSetFiles;
 let setThumbnail!: () => Promise<Blob | null>;
 /**
  * `?recording=<id>`: the recording this page plays back in place of a game, the site's or
- * the store's (`playRecording`), or `null`. Its player, once it is begun.
+ * the store's (`playRecording`), on the set it names, or `null`. Its player, once it is begun.
  */
 const playedRecording = new URLSearchParams(window.location.search).get('recording');
 let recordingPlayer: RecordingPlayer | null = null;
@@ -698,14 +698,12 @@ function applySettings({ game }: Built, sound: SoundManager, values: SettingsVal
  * loop does not run, paused or at the end, a move of the pointer is drawn at the
  * display's next frame (`Presenter.animate`), as the loop's VBL draws it while it runs.
  *
- * A recording of another data set, or one neither the site nor the store holds, ends the
- * page as an error does.
+ * The path is read before the page is built (`readPlayedRecording`), and plays on the set
+ * its root names, or the one `?dungeon=` names, which must be the same: a recording of
+ * another data set ends the page as an error does.
  */
-async function playRecording(built: Built, id: string): Promise<void> {
+async function playRecording(built: Built, id: string, { path, savedAtEnd }: PlayedPath): Promise<void> {
     const { game, screen, messages, input } = built;
-    const { path, savedAtEnd } = SHARED_RECORDING_ID.test(id) ? await fetchSharedRecording(id)
-        : id.startsWith(SAVE_POINT_PREFIX) ? await readSavePoint(built, id.slice(SAVE_POINT_PREFIX.length))
-            : { path: await readRecordingPath(built.recordingStore, id), savedAtEnd: null };
     if (path.some((recording) => recording.dataSet !== dataSet.id)) throw new Error(`RECORDING ${id} IS NOT OF ${dataSet.name}`);
     const dungeonDat = await readDungeonFile();
     const print = (line: string): void => {
@@ -837,13 +835,34 @@ function runMessagesAlone(game: Game, messages: ScrollingText): () => void {
     return () => clearInterval(timer);
 }
 
+/** What `?recording=` plays: a path, and the save its end makes where it ends at a save's point. */
+interface PlayedPath {
+    readonly path: readonly Recording[];
+    readonly savedAtEnd: SavedAtEnd | null;
+}
+
+/**
+ * The path `?recording=<id>` names (`playRecording`), read before anything of the game is
+ * built, so that its root names the set the page plays: the site's package, or the store's
+ * save or recording, through stores of its own, as the welcome page opens them. One that
+ * neither the site nor the store holds ends the page as an error does.
+ */
+async function readPlayedRecording(id: string): Promise<PlayedPath> {
+    if (SHARED_RECORDING_ID.test(id)) return fetchSharedRecording(id);
+    const storeRandom = new CsbRandom();
+    const draw: DrawPlaythrough = (rows) => drawPlaythrough(storeRandom, rows);
+    const recordingStore = new BrowserRecordingStore(draw);
+    if (id.startsWith(SAVE_POINT_PREFIX)) return readSavePoint(new BrowserSaveStore(draw), recordingStore, id.slice(SAVE_POINT_PREFIX.length));
+    return { path: await readRecordingPath(recordingStore, id), savedAtEnd: null };
+}
+
 /**
  * The site's recording `id`, read from its package as the server serves it
  * (`RECORDING_FILES/<id>.gz`), its form checked (`readRecordingPackage`): its path, and
  * the save its end makes where it was shared at a save's point. A package the server does
  * not serve, or whose form is wrong, ends the page as an error does.
  */
-async function fetchSharedRecording(id: string): Promise<{ path: readonly Recording[]; savedAtEnd: SavedAtEnd | null }> {
+async function fetchSharedRecording(id: string): Promise<PlayedPath> {
     const url = `${RECORDING_FILES}/${id}.gz`;
     const response = await fetch(url).catch(() => null);
     if (!response?.ok) throw new Error(`Cannot read the recording '${url}'${response ? ` (HTTP ${response.status})` : ''}.`);
@@ -857,12 +876,12 @@ async function fetchSharedRecording(id: string): Promise<{ path: readonly Record
  * makes again. A save the store does not hold up to its point ends the page as an error
  * does.
  */
-async function readSavePoint(built: Built, rowId: string): Promise<{ path: readonly Recording[]; savedAtEnd: SavedAtEnd }> {
-    const save = (await built.saves.list()).find((entry) => entry.id === rowId);
-    const point = save && storedPoints([save], await built.recordingStore.list(), save.dataSet)[0];
+async function readSavePoint(saveStore: SaveStore, recordingStore: BrowserRecordingStore, rowId: string): Promise<PlayedPath> {
+    const save = (await saveStore.list(null)).find((entry) => entry.id === rowId);
+    const point = save && storedPoints([save], await recordingStore.list(), save.dataSet)[0];
     if (!save || point?.kind !== 'save') throw new Error(`No recording reaches the save '${rowId}'.`);
-    const { bytes } = await built.saves.open(save);
-    return { path: await pointPath(built.recordingStore, point), savedAtEnd: { file: bytes, inVbl: point.save.recording.inVbl === true } };
+    const bytes = await saveStore.read(save.id);
+    return { path: await pointPath(recordingStore, point), savedAtEnd: { file: bytes, inVbl: point.save.recording.inVbl === true } };
 }
 
 function start(game: Game): void {
@@ -913,13 +932,13 @@ function publishedDungeons(): Promise<KnownDungeon[]> {
 }
 
 /**
- * The set `?dungeon=<id>` names and where its files are read from, or `null` for none or
- * an unknown one: the welcome page's. A `local:` id is a record of the store's
- * (`src/data/LocalDataSets.ts`), which plays its base set's `graphics.dat` where it has
- * none; any other is the manifest's, read from its folder.
+ * The set `id` names and where its files are read from, or `null` for none or an unknown
+ * one: the welcome page's. `id` is `?dungeon=`'s, or a recording's set where the page plays
+ * one without it. A `local:` id is a record of the store's (`src/data/LocalDataSets.ts`),
+ * which plays its base set's `graphics.dat` where it has none; any other is the
+ * manifest's, read from its folder.
  */
-async function chooseDataSet(manifest: DataSetManifest): Promise<{ set: DataSet; files: DataSetFiles; thumbnail: () => Promise<Blob | null> } | null> {
-    const id = new URLSearchParams(window.location.search).get('dungeon');
+async function chooseDataSet(manifest: DataSetManifest, id: string | null): Promise<{ set: DataSet; files: DataSetFiles; thumbnail: () => Promise<Blob | null> } | null> {
     if (isLocalDataSetId(id)) {
         const storeRandom = new CsbRandom();
         const record = await new BrowserDataSetStore((rows) => drawPlaythrough(storeRandom, rows)).get(id!).catch((error: unknown) => {
@@ -959,7 +978,9 @@ function openWelcomePage(manifest: DataSetManifest): Promise<void> {
 async function init() {
     try {
         const manifest = await loadManifest();
-        const chosen = await chooseDataSet(manifest);
+        // A recording is read first: the set it plays is its root's, unless `?dungeon=` names one.
+        const played = playedRecording === null ? null : await readPlayedRecording(playedRecording);
+        const chosen = await chooseDataSet(manifest, new URLSearchParams(window.location.search).get('dungeon') ?? played?.path[0]?.dataSet ?? null);
         if (!chosen) return await openWelcomePage(manifest);
         ({ set: dataSet, files: setFiles, thumbnail: setThumbnail } = chosen);
         console.log(`Loading ${dataSet.name}...`);
@@ -989,7 +1010,7 @@ async function init() {
         // the dev server's, and a build's only with `CSBWEB_PROBE=1` (`vite.config.mts`),
         // so the handle cannot reach a deployed bundle.
         if (__CSBWEB_PROBE__) (window as unknown as Record<string, unknown>).__probe = probeHandle(built, sound);
-        if (playedRecording !== null) return await playRecording(built, playedRecording);
+        if (playedRecording !== null && played) return await playRecording(built, playedRecording, played);
         // Before the intro: the entrance's chooser takes a dropped save as the disk menu does.
         bindSaveDrop(built.screen.ui);
         await runIntro(built, sound);

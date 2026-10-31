@@ -1904,7 +1904,7 @@ console.log('  recording shared:', JSON.stringify(sharedRecording));
 check(sharedRecording.status === 201 && /^[0-9A-F]{16}$/.test(sharedRecording.id) && sharedRecording.toSharer === 'Probe,pending,true'
   && sharedRecording.toNobody === null && sharedRecording.approved === 200 && sharedRecording.afterApproval === 'Probe,listed,false',
   'a save\'s package shared through api/recordings is pending, listed to its uploader alone, and to everyone once the moderator approves it');
-await navigate(`${APP}?dungeon=csb&recording=${sharedRecording.id}&keepsaves`, 'window.__probe?.player() != null');
+await navigate(`${APP}?recording=${sharedRecording.id}&keepsaves`, 'window.__probe?.player() != null');
 await until('!window.__probe.player().playing', 'the shared recording played to its end');
 const playedShared = await evaluate(`(async()=>{ const { game, recordingStore, saves } = window.__probe, player = window.__probe.player();
   return { drift: player.drift, joins: player.joins, point: [player.point.changes, player.point.vbls].join(), running: game.running,
@@ -1951,7 +1951,7 @@ check(listed?.site.join() === `${sharedRecording.id}|Probe|false`, 'RECORDINGS l
 const siteQuery = new URLSearchParams(siteSelected?.play ?? '');
 check(siteSelected?.site.join() === `${sharedRecording.id}|Probe|true` && siteSelected.panel[0]?.startsWith('From a saved game, level ')
   && siteSelected.panel.some((line: string) => /^Time played \d+:\d\d:\d\d$/.test(line)) && siteSelected.panel.some((line: string) => /^Shared \d{4}-\d\d-\d\d \d\d:\d\d$/.test(line))
-  && siteSelected.buttons === 'Play' && siteQuery.get('dungeon') === 'csb' && siteQuery.get('recording') === sharedRecording.id,
+  && siteSelected.buttons === 'Play' && siteQuery.get('dungeon') === null && siteQuery.get('recording') === sharedRecording.id,
   'a click selects it, and the panel says where it starts, its times and when it was shared, with PLAY alone, ?recording=<id>');
 const savePoint = `save:${endWritten.saveId}`;
 await clickOn(`.recordings-item[data-recording="${savePoint}"]`);
@@ -1976,10 +1976,10 @@ check(listed?.items[0] === 'probe-end|The game won|false' && listed.items.includ
 const playQuery = new URLSearchParams(saveSelected?.play ?? '');
 check(saveSelected?.items.includes(`${savePoint}|${endWritten.save}|true`) && saveSelected.panel[0]?.startsWith('From a saved game, level ')
   && saveSelected.panel.some((line: string) => /^Time played \d+:\d\d:\d\d$/.test(line)) && saveSelected.panel.some((line: string) => line.startsWith('Build '))
-  && playQuery.get('dungeon') === 'csb' && playQuery.get('recording') === savePoint && playQuery.has('keepsaves') && !saveSelected.remove,
+  && playQuery.get('dungeon') === null && playQuery.get('recording') === savePoint && playQuery.has('keepsaves') && !saveSelected.remove,
   'a click selects the save, and the panel says where it starts, the time played and its build, with PLAY, ?recording=save:<row>, and no DELETE');
 const endQuery = new URLSearchParams(endSelected?.play ?? '');
-check(endSelected?.panel.includes('Time played 0:12:34') && endQuery.get('dungeon') === 'csb' && endQuery.get('recording') === 'probe-end' && endSelected.remove,
+check(endSelected?.panel.includes('Time played 0:12:34') && endQuery.get('dungeon') === null && endQuery.get('recording') === 'probe-end' && endSelected.remove,
   'the game\'s end selected, the panel says the play time its row keeps, with PLAY and DELETE');
 check(askedDelete?.button === 'Delete' && afterDelete?.items.every((item: string) => !item.startsWith('probe-end|')) && afterDelete.items.length === listed!.items.length - 1 && !endInStore,
   'DELETE asks first, then the game\'s end leaves the list and the store');
@@ -2155,7 +2155,7 @@ const lostRecorded = await evaluate(`(async()=>{
   return { id, end, lost: game.ctx.party.state.gameIsLost };
 })()`);
 check(lostRecorded?.lost && lostRecorded.end?.word11694 === false, `the golem kills the party in the page, and its recording ends with the game (${JSON.stringify(lostRecorded)})`);
-await navigate(`${APP}?dungeon=csb&recording=${lostRecorded.id}&keepsaves`, 'window.__probe?.player() != null');
+await navigate(`${APP}?recording=${lostRecorded.id}&keepsaves`, 'window.__probe?.player() != null');
 await key('+'); await key('+'); await key('+');
 const lostIntroVbls = await evaluate(`window.__probe.intro.vbls`);
 await until('!window.__probe.player().playing', 'the lost game played to its end');

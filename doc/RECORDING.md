@@ -397,7 +397,9 @@ a root and the branches down to the one played, or a branch alone, from its own 
   (`GameSaves.sleepSave`); the file goes to the player (`InputBoundary.savedInVbl`).
 
 **The page** plays one with `?recording=<id>` (`playRecording`, `src/main.ts`), by the
-page's own loop. A store's id is the path the store holds to it, from its root
+page's own loop, on the set its root names: the path is read before the page is built
+(`readPlayedRecording`), so the link needs no `?dungeon=`, and one that names another set
+than the recording's ends the page as an error. A store's id is the path the store holds to it, from its root
 (`readRecordingPath`, `src/data/saves/RecordingStore.ts`). A store's save,
 `save:<its row's id>` (`SAVE_POINT_PREFIX`, `src/engine/RecordingPoints.ts`), is the path the
 store holds to its point, played to it and the save's file checked there, as a site's
