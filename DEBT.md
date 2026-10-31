@@ -1322,6 +1322,12 @@ Recorded so that nobody "fixes" them.
   `" REINCARNATED."` (ReDMCSB `doc/ReDMCSB-src/REVIVE.C:875`, `MEDIA195`, S10EA to S21E),
   and the port prints those (`HallOfChampions.finishResurrectReincarnate`).
   `tools/checks/hall-of-champions.ts` checks both words and the stop.
+- 🚫 **A level gained ends with an exclamation mark.** CSBWin prints a champion's name,
+  `" JUST GAINED A "`, the skill's name and `" LEVEL"` (`doc/CSBwin-src/Magic.cpp:177-180`).
+  The Atari's English programs, DM's and CSB's, print `" LEVEL!"` (ReDMCSB
+  `doc/ReDMCSB-src/CHAMPION.C:1004`, `MEDIA195`, S10EA to S21E; the later releases' one
+  string, `:911`, ends the same), and the port prints that (`printLevelUp`,
+  `src/engine/skills.ts`). `tools/checks/adjust-skills.ts` checks the whole line.
 - 🚫 **A lost game keeps the dungeon view's palette until it darkens.** CSBWin's
   `_StartCSB` clears `d.DynamicPaletteSwitching` as `MainLoop` returns
   (`doc/CSBwin-src/CSBCode.cpp:11558`), so through the dying sound's 240 VBLs the dungeon

@@ -659,7 +659,7 @@ export class MagicSystem {
         messages.quePrintLines(MSG_COLOR_SPELL, ' NEEDS AN EMPTY FLASK IN HAND FOR POTION.');
         break;
       default:
-        messages.quePrintLines(MSG_COLOR_SPELL, ' UNKNOWN SPELL ERROR');
+        messages.quePrintLines(MSG_COLOR_SPELL, 'UNKNOWN SPELL ERROR');
         break;
     }
   }

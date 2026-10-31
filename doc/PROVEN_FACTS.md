@@ -640,7 +640,9 @@ It opens three things in the viewport, and no other:
 `AdjustSkills` (`doc/CSBwin-src/Magic.cpp:188`) is the same for every caller: it runs the
 Adjust Skills Filter DSA (`:255-314`), and when the basic skill's mastery rises it calls
 `LevelUp`, which prints a linefeed and then "<NAME>", " JUST GAINED A ", the skill's name,
-" LEVEL", all in `d.Byte1386[chIdx]` (`:175-179`). So a monster's blow, which trains
+" LEVEL", all in `d.Byte1386[chIdx]` (`:175-179`). The Atari's English programs end it
+" LEVEL!" (ReDMCSB `doc/ReDMCSB-src/CHAMPION.C:1004`, `MEDIA195`), and the port prints
+that (`DEBT.md` H). So a monster's blow, which trains
 defence skill 7 (`Monster.cpp:4548`), is filtered and announced like a spell or an
 actuator's skill increase.
 

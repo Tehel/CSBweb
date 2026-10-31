@@ -59,7 +59,7 @@ This document lists skill/experience behavior directly visible in the CSBWin C++
   - Ninja: MaxStamina/21, Dexterity major increment, Strength minor; `newMastery *= 2` for HP scaling.
   - Priest: MaxStamina/25, MaxMana increases by `newMastery` plus a smaller random add, Wisdom minor, AntiMagic increases by `STRandom(3)`.
   - Wizard: MaxStamina/32, MaxMana increases by `newMastery + newMastery/2`, Wisdom major, AntiMagic increases by `STRandom(3)`.
-- On level-up, `CHARFLAG_statsChanged` is set, the character UI redraws, and the message “JUST GAINED A {CLASS} LEVEL” is queued (`doc/CSBwin-src/Magic.cpp`).
+- On level-up, `CHARFLAG_statsChanged` is set, the character UI redraws, and the message “JUST GAINED A {CLASS} LEVEL” is queued (`doc/CSBwin-src/Magic.cpp`); the Atari's ends “LEVEL!” (ReDMCSB `doc/ReDMCSB-src/CHAMPION.C:1004`), which the port prints.
 
 ## Skill effects on actions (attack + magic)
 

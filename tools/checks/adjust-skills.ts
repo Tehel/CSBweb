@@ -1,8 +1,8 @@
 /**
  * `AdjustSkills` (`doc/CSBwin-src/Magic.cpp:188`) is one function for every caller: each
  * one runs the Adjust Skills Filter DSA (`:255-314`), and a mastery gained calls `LevelUp`,
- * which prints "<NAME> JUST GAINED A <SKILL> LEVEL" in the champion's colour
- * (`:175-179`). `DetermineMastery` reports 1 while the party sleeps
+ * which prints "<NAME> JUST GAINED A <SKILL> LEVEL!" in the champion's colour
+ * (`:175-179`; the "!" is the Atari's, ReDMCSB `doc/ReDMCSB-src/CHAMPION.C:1004`). `DetermineMastery` reports 1 while the party sleeps
  * (`doc/CSBwin-src/Code17818.cpp:28-35`), so a sleeping champion never levels up.
  *
  * The case that tells them apart is a monster's blow (`MonsterDamagesCharacter`,
@@ -69,7 +69,7 @@ function primeFighter(): void {
   filtered.length = 0;
 }
 const fighter = (): number => determineMastery(party.champions[0], 0xc000);
-const levelLine = 'HERO0 JUST GAINED A FIGHTER LEVEL';
+const levelLine = 'HERO0 JUST GAINED A FIGHTER LEVEL!';
 const announced = (): string => printed.join('').trim();
 
 // --- a monster's blow ---
@@ -153,7 +153,7 @@ const retarget = (answer: { chIdx: number; skillNumber: number }, champ1Fighter:
   const r = retarget({ chIdx: 1, skillNumber: 4 }, 600);
   console.log(`=== filter answers champion 1, whose Fighter is already mastery 2 ===`);
   console.log(`  levelled ${r.leveledUp}, printed ${JSON.stringify(announced())}`);
-  check(r.leveledUp && announced() === 'HERO1 JUST GAINED A FIGHTER LEVEL',
+  check(r.leveledUp && announced() === 'HERO1 JUST GAINED A FIGHTER LEVEL!',
     'LevelUp(chIdx, basicSkill) goes to the filter\'s champion when its mastery beats champion 0\'s old one');
 }
 

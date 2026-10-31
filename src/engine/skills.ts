@@ -323,7 +323,9 @@ export function addToSkill(
 
 /**
  * The tail of CSBWin `LevelUp` (`doc/CSBwin-src/Magic.cpp:175-179`): a linefeed, then four
- * fragments in the champion's own colour, `d.Byte1386[chIdx]`, flowing onto one line.
+ * fragments in the champion's own colour, `d.Byte1386[chIdx]`, flowing onto one line. The
+ * last is the Atari's `" LEVEL!"` (ReDMCSB `doc/ReDMCSB-src/CHAMPION.C:1004`, `MEDIA195`),
+ * where CSBWin prints `" LEVEL"` (`DEBT.md` H).
  */
 function printLevelUp(ctx: GameContext, chIdx: number, basicSkill: number): void {
   const champ = ctx.party.state.champions[chIdx]!;
@@ -334,7 +336,7 @@ function printLevelUp(ctx: GameContext, chIdx: number, basicSkill: number): void
   messages.quePrintLines(color, champ.name);
   messages.quePrintLines(color, ' JUST GAINED A ');
   messages.quePrintLines(color, labels[basicSkill]!);
-  messages.quePrintLines(color, ' LEVEL');
+  messages.quePrintLines(color, ' LEVEL!');
 }
 
 /**
