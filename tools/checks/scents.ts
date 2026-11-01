@@ -169,7 +169,7 @@ function checkGames(): void {
   // print by the 20 spent there; Q at 35, R's by 5; the decay spares Q's, the party's,
   // and the newest; R at 40 raises both of Q's by 5.
   const meant = 'Q: 24 | R: 44 24 | Q: 44 29 24 | decay: 44 28 24 | R: 49 28 29 24';
-  check(ENGINE_LEVEL === 2 && amiga === meant && atari === meant,
+  check(ENGINE_LEVEL >= 2 && amiga === meant && atari === meant,
     `level ${ENGINE_LEVEL}: what FTL meant on dm-amiga and dm-atari alike, the square left on its level, the decay sparing the party's square`);
   // A22E's: R at 30 raises Q's print, the square left, to 44; back on Q, the merge sets
   // both of Q's prints' strengths, 2 and 0, to 24; the decay spares them; R at 40 raises

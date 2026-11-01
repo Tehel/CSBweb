@@ -131,7 +131,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| R18 | A recording plays by the engine's behaviour as it was made | L | ⏳ step 5.4 under way (`DMMovie42` drifts at line 6977) |
+| R18 | A recording plays by the engine's behaviour as it was made | L | ⏳ step 5.4 under way (`DMMovie42` drifts at line 7483) |
 | F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
 | C198 | A missile that cannot be made loses the object it was to carry | S | ⏳ |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
@@ -632,8 +632,9 @@ which each flag moves on. Both log players take the log's `#DMRules` as CSBWin's
 does (`dmRulesBefore`, `doc/PROVEN_FACTS.md` → "`DM_rules` and `DMRulesDesignOption`…"),
 so the champion P reincarnates at `d.Time` 0x43 with strength 52, as in the oracle.
 
-It drifts at **line 6977**, `d.Time` 0x33a3, an entry at x 0xf3, y 0x73, button `0x006f`, the
-party on level 7 at (7,8), whose recorded `d.RandomNumber` is not the port's; what 11.014 draws there is not read yet.
+It drifts at **line 7483**, `d.Time` 0x370e, button `0x0add`, the party on level 8 at
+(4,16): 11.014 drew once since the entry before, the port nine; what 11.014 draws there is
+not read yet.
 On the way it saves at lines 1485-1489 (`d.Time` 0x8f9): the disk icon, "SAVE AND PLAY",
 the save's file, the signature `0x6668`. The oracle draws that save's
 `ProcessMonstersOnLevel` inside `_DisplayDiskMenu`, so the save was the log players' gap,
@@ -653,14 +654,19 @@ of `CSBWIN_RUNS` names its profile (`csbwin-2023` for the three) and `recordRun`
 it; `tools/play-csbwin-log.ts --profile=csbwin-11.014` plays a log at it, `csbwin-2023` by
 default.
 
-Step 5.4 is under way. `ENGINE_LEVEL` is 2, and the profiles' flags are two:
+Step 5.4 is under way. `ENGINE_LEVEL` is 3, and the profiles' flags are three:
 `smartDiscardDrawnPriority`, `csbwin-11.014`'s from level 1, 11.014's `SmartDiscard` whole
 (`smartDiscard11014`, `src/engine/SmartDiscard.ts`, checked at its profile by
 `tools/checks/watch-smart-discard.ts`), which takes `DMMovie42` past line 130; and
 `csbwinScentLoops`, both profiles' from level 2, CSBWin's scents
 (`src/engine/PartyFootprints.ts`, `tools/checks/scents.ts`), which takes it past line 2664
 and keeps the three 17.6 runs playing to their end, now that a game plays what FTL meant
-(H, "The scents are what FTL meant"). What stops it now is the drift at line 6977.
+(H, "The scents are what FTL meant"); and `tag016426StatisticIgnored`, `csbwin-11.014`'s
+from level 3, 11.014's `TAG016426`, which reads every statistic as 0, the Atari's
+`BUG0_41` (`ChampionDamage.attributeScaledReduction`, `doc/PROVEN_FACTS.md` →
+"`TAG016426` has a second branch…", `tools/checks/character-damage.ts`, section 4), which
+takes it past line 6977, a wound 11.014 did not draw. What stops it now is the drift at
+line 7483.
 
 Size L.
 

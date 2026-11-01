@@ -112,7 +112,7 @@ export const CSBWIN_RUNS_UNDER_WAY: readonly RunUnderWay[] = [
     title: 'Dungeon Master, minimum item picking',
     description: 'A CSBWin 11.017 recording, DMMovie42 of CSBWin\'s movies, played back in CSBweb.',
     recordedAt: '2009-05-28',
-    drifts: 6977,
+    drifts: 7483,
   },
 ];
 

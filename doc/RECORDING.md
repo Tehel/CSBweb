@@ -327,7 +327,8 @@ plays, as one of a later level. The profiles are `csbwin-2023`, for the runs of 
 level 2: CSBWin's scents (`src/engine/PartyFootprints.ts`). `csbwin-11.014` plays
 `smartDiscardDrawnPriority` too, joined at level 1: 11.014's `SmartDiscard`, which ranks
 every object it scans by a priority drawn afresh at each comparison (`smartDiscard11014`,
-`src/engine/SmartDiscard.ts`).
+`src/engine/SmartDiscard.ts`), and `tag016426StatisticIgnored`, joined at level 3: 11.014's
+`TAG016426`, which reads every statistic as 0 (`ChampionDamage.attributeScaledReduction`).
 
 A run of an older version that does not play to its end yet is **under way**
 (`CSBWIN_RUNS_UNDER_WAY`, `tools/lib/csbwinRun.ts`): its log is kept beside the others',

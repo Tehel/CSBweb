@@ -442,11 +442,19 @@ export class ChampionDamage {
    *
    * CSBWin carries a long comment here about a genuine FTL bug — the original stored
    * a word and fetched a byte — which Christophe Fontanel confirmed against the Atari
-   * binary. Paul Stevens removed the `/256`, and this follows his corrected version.
+   * binary (ReDMCSB's `BUG0_41`, `doc/ReDMCSB-src/CHAMPION.C:1117`). Paul Stevens removed
+   * the `/256`, and this follows his corrected version (`:2062`); CSBWin 11.014 kept it
+   * (`doc/CSBwin-src-11.014/Character.cpp:2049`), so every statistic read as 0, and its
+   * profile plays it (`tag016426StatisticIgnored`).
    */
   attributeScaledReduction(champ: Champion, attrNum: number, value: number): number {
     const attr = championAttribute(champ, attrNum);
-    const margin = 170 - attr;
+    let margin: number;
+    if (this.ctx.behaviour.tag016426StatisticIgnored) {
+      margin = 170 - Math.trunc(attr / 256);
+    } else {
+      margin = 170 - attr;
+    }
     // A very high attribute (above 154) falls into a separate branch that divides by
     // 8 flat rather than scaling (doc/CSBwin-src/Character.cpp:2065-2067).
     if (margin < 16) return value >> 3;

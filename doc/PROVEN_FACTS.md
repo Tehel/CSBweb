@@ -1719,6 +1719,17 @@ else { D0W = ScaledMultiply(P3, 7, D7W); }
 
 Easy to miss, and it only shows up on a champion with an exceptional stat.
 
+The statistic is read only from CSBWin's 2023 source on: `D7W = sw(170 - w_10)`
+(`doc/CSBwin-src/Character.cpp:2062`). CSBWin 11.014 has `D7W = sw(170 - w_10/256)`
+(`doc/CSBwin-src-11.014/Character.cpp:2049`), which, a statistic being a byte, is always
+170: the Atari's own result, a Megamax compiler bug (ReDMCSB's `BUG0_41`,
+`doc/ReDMCSB-src/CHAMPION.C:1117`). So in 11.014 and on the Atari, Antifire and Antimagic
+are ignored, and Vitality against poison (`Monster.cpp:4603`) and in the threshold of a
+wound (`Character.cpp:2800`). The `csbwin-11.014` profile plays it
+(`tag016426StatisticIgnored`); without it `DMMovie42` draws a wound at line 6977 that
+11.014 does not (`tools/checks/csbwin-runs.ts`, `tools/checks/character-damage.ts`,
+section 4).
+
 ## Champion bones carry `value = 2` and the champion's own party position
 
 `KillCharacter` (`doc/CSBwin-src/Character.cpp:2631-2650`) drops all possessions, then makes

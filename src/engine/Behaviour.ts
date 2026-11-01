@@ -30,7 +30,7 @@
  */
 
 /** The engine's level: what a recording made now carries (`Recording.level`). Recordings made before levels are 0. */
-export const ENGINE_LEVEL = 2;
+export const ENGINE_LEVEL = 3;
 
 /** A CSBWin version whose runs the engine plays by the flags that name it. */
 export interface BehaviourProfile {
@@ -99,6 +99,13 @@ export const BEHAVIOURS = [
         debt: 'R18',
         until: null,
         profiles: { 'csbwin-2023': 2, 'csbwin-11.014': 2 },
+    },
+    {
+        name: 'tag016426StatisticIgnored',
+        does: "CSBWin 11.014's `TAG016426`, `170 - w_10/256`: the Atari's compiler bug (ReDMCSB's `BUG0_41`), which reads every statistic as 0, so Antifire and Antimagic are ignored and Vitality against poison and a wound (`ChampionDamage.attributeScaledReduction`)",
+        debt: 'R18',
+        until: null,
+        profiles: { 'csbwin-11.014': 3 },
     },
 ] as const satisfies readonly BehaviourChange[];
 

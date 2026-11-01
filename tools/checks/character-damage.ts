@@ -18,6 +18,8 @@
  *   3. The screen: `drawPartyStatus` with the real graphics and font — what the readout
  *      covers in each mode, and when it is dropped.
  *
+ *   4. `TAG016426` at CSBWin 11.014's profile, which reads every statistic as 0.
+ *
  * Run: `npm test -- --only=character-damage.ts`
  */
 import { PotionType } from '../../src/core/constants';
@@ -29,7 +31,8 @@ import { applyFeedParameters, derivePotionFeeding } from '../../src/engine/Feedi
 import { clearFeedParameters } from '../../src/engine/filterParameters';
 import { Party, setHandOwner } from '../../src/engine/Party';
 import { TimerFunction } from '../../src/engine/TimerQueue';
-import { AttributeIndex, attributeCurrent, makeAddCharacterAttributes } from '../../src/engine/attributes';
+import { AttributeIndex, attributeCurrent, makeAddCharacterAttributes, setAttributeCurrent } from '../../src/engine/attributes';
+import { behaviourAt, ENGINE_LEVEL } from '../../src/engine/Behaviour';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../../src/engine/AddCharacter';
 import { CHARFLAG_CURSOR, CHARFLAG_PORTRAIT_CHANGED } from '../../src/core/charDesc';
 import { createPaletteIndexViewportBuffer } from '../../src/renderer/csbwin/CanvasBlitter';
@@ -505,6 +508,28 @@ console.log('=== drawPartyStatus ===');
   console.log(`CHARFLAG_portraitChanged on both: shown [${shown()}]`);
   check(shown() === '- - - -', 'CHARFLAG_portraitChanged takes the figure off the name and off the portrait (Character.cpp:1260-1302)');
   party.state.selectedCharacterIndex = -1;
+}
+
+/* ----------------------------------------------- 4. TAG016426 at 11.014's profile -- */
+console.log('');
+console.log("=== TAG016426: the statistic read, and CSBWin 11.014's /256 ===");
+{
+  // 2023 scales by `170 - w_10` (doc/CSBwin-src/Character.cpp:2062); 11.014 by
+  // `170 - w_10/256` (doc/CSBwin-src-11.014/Character.cpp:2049), the Atari's compiler bug
+  // (ReDMCSB's BUG0_41), so a statistic of 100 scales 128 to 70 in one and 170 in the other.
+  const g = makeGame(1, []);
+  const hero = g.ctx.party.state.champions[0]!;
+  setAttributeCurrent(hero.attributes.stats[AttributeIndex.AntiFire]!, 100);
+  const reduce = (): number => g.systems.championDamage.attributeScaledReduction(hero, AttributeIndex.AntiFire, 128);
+  const read = reduce();
+  g.ctx.behaviour = behaviourAt(ENGINE_LEVEL, 'csbwin-11.014');
+  const ignored = reduce();
+  g.ctx.behaviour = behaviourAt(2, 'csbwin-11.014');
+  const before = reduce();
+  console.log(`128 by Antifire 100: ${read}; at csbwin-11.014 ${ignored}; at its level 2 ${before}`);
+  check(read === 70, 'the statistic is read (Character.cpp:2062)');
+  check(ignored === 170, "11.014's profile reads it as 0 (tag016426StatisticIgnored)");
+  check(before === 70, 'and a recording of its profile before level 3 reads it, as it was made');
 }
 
 finish();
