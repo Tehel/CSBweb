@@ -520,8 +520,10 @@ behind a named switch, chosen by the recording.
   its level, and fails on any drift. Its packages: the three F24 runs' recordings
   (`recordRun`: forty minutes of play each, Dungeon Master to its end, Chaos Strikes Back to
   Fulya Pit), `tools/checks/replay.ts`'s games, and the author's own games exported from
-  the site. When the level is bumped, the old packages stay (they test the flags on) and the
-  runs are recorded again at the new level (they test the flags off). The deploy's
+  the site. When the level is bumped, the old packages stay and test the flags on; nothing
+  is recorded again, so the corpus grows only by new recordings, never by a bump. The flags
+  off are what `csbwin-runs.ts` and `replay.ts` already play live, at `ENGINE_LEVEL`, and a
+  run's inputs are its log's at every level. The deploy's
   `utils/replay-recordings.ts` turns from marking a drifting recording broken to refusing
   the deploy: a drift there is a flag missed. A player's recordings in the browser, which
   no check sees, are safe as far as the corpus reaches.
@@ -573,10 +575,12 @@ list shows the build alone, and step 3 reads the level from the package.
 
 Step 2 is paid: `tools/fixtures/recordings/` holds the three runs' packages and three of
 `replay.ts`'s (F5 in a branch, a Sleepsave inside a VBL, a lost game's end), all of level
-0, 540 KB, and `npm test` plays each at its level and asks for every run at
-`ENGINE_LEVEL`. The author's own games from the site are not in it yet: a package the site
-serves joins it renamed to `<name>.L<level>.gz`, which the author may do at any time. The
-next step is 3.
+0, 540 KB, and `npm test` plays each at its level and asks for every run once, at any
+level. None of the author's own games from the site is in it: the four the site shares are
+three of these runs, played the same, and a test game that already drifts before its first
+input. A package the site serves names the site's set (`dungeon-master-csbwin` for
+`dm-atari`'s files), so it joins the corpus only once its set is read by its files'
+digests, step 6, or its `dataSet` is rewritten to the manifest's id. The next step is 3.
 
 Size L.
 

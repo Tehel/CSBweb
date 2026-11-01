@@ -338,12 +338,16 @@ behaviour.
 It holds CSBWin's three runs (`CSBWIN_RUNS`, below: forty minutes of Dungeon Master to
 its end each, and Chaos Strikes Back to Fulya Pit) and three of `tools/checks/replay.ts`'s
 packages: F5 in the new game's branch, the Sleepsave inside a VBL in `csbgame7.dat`'s, and
-the lost game's end. The check also asks for each run at `ENGINE_LEVEL`, so the commit that
-bumps the level records the runs again at it (`--write` records each the corpus lacks at
-that level; `replay.ts --corpus` keeps its own three the same way, once): the old packages
-stay and play with the flags on, the new ones with the flags off. A package the site
-serves (`recordings/<id>.gz`), the author's own games among them, joins the corpus renamed
-to `<name>.L<level>.gz`.
+the lost game's end. The check asks for each run once, at any level (`--write` records
+each the corpus has at none; `replay.ts --corpus` keeps its own three the same way). A bump
+records nothing again, so the corpus grows only by new recordings: the old packages stay
+and play with the flags on, and the flags off are what `tools/checks/csbwin-runs.ts` and
+`replay.ts` play live at `ENGINE_LEVEL`. A run's recording is the same at every level,
+its inputs being its log's.
+
+A package the site serves (`recordings/<id>.gz`) names the site's set, whose id need not be
+`tools/data-sets.json`'s (`dungeon-master-csbwin` for `dm-atari`'s files), so the check
+cannot play it as it is: its `dataSet` must name the manifest's set.
 
 ### The tree
 

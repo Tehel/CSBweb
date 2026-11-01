@@ -11,17 +11,17 @@
  * recording (`playPath`): each recording at its own level, to its point without a drift,
  * a save's file made again there or the game's end reached.
  *
- * And the corpus holds each of CSBWin's runs (`CSBWIN_RUNS`) at `ENGINE_LEVEL`, so a level
- * bumped has its runs recorded again at it: the packages of every level before stay, and
- * play with that level's flags on.
+ * And the corpus holds each of CSBWin's runs (`CSBWIN_RUNS`), once, at the level it was
+ * kept at. A bump records none again: a run's inputs are its log's at every level, and
+ * `csbwin-runs.ts` already records and plays each at `ENGINE_LEVEL` in every `npm test`.
  *
  *   npm test -- --only=recording-corpus.ts            play the corpus
- *   npm test -- --only=recording-corpus.ts --write    first, record each run the corpus lacks at ENGINE_LEVEL
+ *   npm test -- --only=recording-corpus.ts --write    first, record each run the corpus has at no level
  *
  * `tools/checks/replay.ts --corpus` keeps its own games' packages the same way.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 
 import { fileDigest } from '../../src/data/DataSetFiles';
 import { ENGINE_LEVEL, knownLevel } from '../../src/engine/Behaviour';
@@ -30,12 +30,17 @@ import { check, finish } from '../lib/check';
 import { CSBWIN_RUNS, recordRun, runPackage } from '../lib/csbwinRun';
 import { DATA_SETS, diskFiles } from '../lib/dataSets';
 import { playPath } from '../lib/playback';
-import { CORPUS_DIR, CORPUS_FILE, corpusFile, corpusFiles, keepInCorpus } from '../lib/recordingCorpus';
+import { CORPUS_DIR, CORPUS_FILE, corpusFiles, keepInCorpus } from '../lib/recordingCorpus';
+
+/** Whether the corpus keeps a package of the run `id`, at any level. */
+function keptRun(id: string): boolean {
+  return corpusFiles().some((file) => CORPUS_FILE.exec(file)?.[1] === id);
+}
 
 if (process.argv.includes('--write')) {
   const build = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).stdout.trim() || 'corpus';
   for (const run of CSBWIN_RUNS) {
-    if (existsSync(corpusFile(run.id, ENGINE_LEVEL))) continue;
+    if (keptRun(run.id)) continue;
     const recorded = await recordRun(run, build);
     if (recorded.drift || (run.end === 'won' ? recorded.won !== true : recorded.saved === null)) {
       check(false, `${run.id} plays to its end, to be kept${recorded.drift ? `: it drifts at ${recorded.drift}` : ''}`);
@@ -95,7 +100,6 @@ for (const file of files) {
 }
 
 for (const run of CSBWIN_RUNS) {
-  check(files.includes(`${run.id}.L${ENGINE_LEVEL}.gz`),
-    `the corpus holds ${run.id} at the engine's level, ${ENGINE_LEVEL}${files.includes(`${run.id}.L${ENGINE_LEVEL}.gz`) ? '' : ': npm test -- --only=recording-corpus.ts --write'}`);
+  check(keptRun(run.id), `the corpus holds ${run.id}${keptRun(run.id) ? '' : ': npm test -- --only=recording-corpus.ts --write'}`);
 }
 finish();
