@@ -131,7 +131,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| R18 | A recording plays by the engine's behaviour as it was made | L | ⏳ step 5.4 under way (`DMMovie42` drifts at line 7483) |
+| R18 | A recording plays by the engine's behaviour as it was made | L | ⏳ step 5.4 waits on the author: the 11.0xx runs' own dungeon |
 | F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
 | C198 | A missile that cannot be made loses the object it was to carry | S | ⏳ |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
@@ -633,8 +633,38 @@ does (`dmRulesBefore`, `doc/PROVEN_FACTS.md` → "`DM_rules` and `DMRulesDesignO
 so the champion P reincarnates at `d.Time` 0x43 with strength 52, as in the oracle.
 
 It drifts at **line 7483**, `d.Time` 0x370e, button `0x0add`, the party on level 8 at
-(4,16): 11.014 drew once since the entry before, the port nine; what 11.014 draws there is
-not read yet.
+(4,16): 11.014 drew once since the entry before, the port nine. The draws are the same,
+but the 11.014 discard's two `AddObject` draws fall at 0x370a in the port and at 0x370b in
+11.014: its scan counts the objects in each cell against 50 a tick, so a cell holding one
+object more or less shifts every later draw of the scan. **The run's own dungeon is not
+`dm-atari`'s.** The four 11.0xx runs (`Dungeon Master minimum item picking/`) share a
+`dungeon.dat` (MD5 `3d3cf037…`) and CSBWin's own `graphics.dat` (`dm-windows`'s). The
+dungeon is DM's but on level 0: at (0,0), a stone square, an actuator of type 47, a DSA
+running the script "DIE", and a text, ".N.AB OBJECTS PICKED UP" (the challenge's counter);
+and every champion mirror's `word6` set (`0x1000` to `0x3000`). Played over `dm-atari`,
+the scan counts nothing at (0,0) and parts from 11.014's at its first step, `d.Time` 0x6a.
+Played over the run's dungeon (tried in a scratch tree, the run's file in `dm-atari`'s
+place), it keeps to 11.014's until 0x3661, where four monster groups of level 7 stand in
+other cells than 11.014's ((10,15), (12,8), (14,2), (14,17) against (9,14), (12,18),
+(13,9), and a scroll at (15,28)), every draw still the same; the drift line stays 7483.
+
+**Waiting on the author: how the 11.0xx runs get their dungeon.** A run's `dataSet` is a
+set of `tools/data-sets.json`, and the recording it shares plays on the site over that
+set's files (step 6), so the dungeon must be a set's, not only a tool's:
+
+- **A. A hidden data set** (recommended), `dm-minimum-item-picking`, "Dungeon Master,
+  minimum item picking": the runs' `dungeon.dat` and `dm-atari`'s `graphics.dat` (or
+  CSBWin's, the runs'), fetched by `fetch-gamefiles` from where CSBWin's movies are
+  downloaded, by SHA-256, and published on the site beside `dm-atari` so its recordings
+  play there. The four runs name it.
+- **B. The dungeon kept beside the log**, `tools/fixtures/csbwin-runs/DMMovie42/dungeon.dat`
+  (42 KB, committed as the saves in `tools/fixtures/` are), a run naming a file that
+  replaces its set's: the tools play it, but a shared recording names `dm-atari`'s
+  digests and plays on the site only once a set has that dungeon, which is A again.
+
+Once it plays over its dungeon, the next thing to read is why level 7's groups stand
+elsewhere at 0x3661 (`doc/CSBwin-src-11.014-oracle/SmartDiscard.cpp`'s scan, traced per
+cell, against the port's `scanDungeon11014`).
 On the way it saves at lines 1485-1489 (`d.Time` 0x8f9): the disk icon, "SAVE AND PLAY",
 the save's file, the signature `0x6668`. The oracle draws that save's
 `ProcessMonstersOnLevel` inside `_DisplayDiskMenu`, so the save was the log players' gap,
@@ -925,8 +955,10 @@ by CSBWin 8.0 to 17.6) and `Dungeon Master minimum item picking/`, Chaos Strikes
 in `Race to Fulya Pit/` and `Chaos Strikes Back minimum item picking/`. Each folder holds
 its `playfile.log` (some name it `Playfile.log`, `DMMovie2823`'s annotated folder also has
 `record00000.log`), the `dungeon.dat` and `graphics.dat` it was played on, often the
-`CSBwin.exe`, and sometimes an `Annotation.txt`. The DM runs' `dungeon.dat` is
-`dm-atari`'s; their `graphics.dat` is CSBWin's, not `dm-atari`'s (`doc/PROVEN_FACTS.md`
+`CSBwin.exe`, and sometimes an `Annotation.txt`. `DMMovie2615`'s and `DMMovie2823`'s
+`dungeon.dat` play as `dm-atari`'s; the minimum item picking runs' is a dungeon of its own, DM's with
+the challenge's DSA on level 0 (R18, step 5.4). Their `graphics.dat` is CSBWin's, not
+`dm-atari`'s (`doc/PROVEN_FACTS.md`
 → "`dm-atari/graphics.dat` is CSBWin's with three items from the 1.2 disk").
 
 **The diagnostic**, `tools/play-csbwin-log.ts` over `tools/lib/playfile.ts`, is not
