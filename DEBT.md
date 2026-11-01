@@ -653,23 +653,14 @@ the print and draws 9. With CSBWin's two loops (`index-- != 1`, and `break` afte
 oldest print is dropped) in a scratch tree, `DMMovie42` plays on to **line 6977**
 (`d.Time` 0x33a3, level 7), and the three runs of `CSBWIN_RUNS` still play to their end.
 
-**Waiting on the author:** a profile's flags were to be read from its version's diff
-against 2023's source. This one is not in that diff. It undoes one of the port's
-deliberate divergences from CSBWin (H) for a CSBWin version. The options:
-
-1. **A flag `csbwinScentLoops` in `csbwin-11.014`'s profile** (recommended): CSBWin's
-   two loops behind it, no `until` (the port's engine never had them), joined at level 2.
-   A profile then means "CSBWin's version as its own source plays", the port's Atari
-   choices undone where its recordings need it. H gains the line that CSBWin's profiles
-   play CSBWin's loops; a new game stays the Atari's. The 9.x profile will want it too,
-   and a CSBWin 2023 run that drifts on it a `csbwin-2023` profile.
-2. **CSBWin's loops for every game**, H's entry removed: the port follows CSBWin here, as
-   CLAUDE.md's rule does where ReDMCSB is not taken, and no flag is needed for 2023's
-   runs. It changes what a tick does, so it is a flag of the old (Atari) loops with an
-   `until` and a bump, and `tools/checks/amiga-scents.ts` and
-   `tools/checks/magic-footprints.ts` change with it.
-3. **Neither**: the run is corrected in its log (F24 step 2) at each turn the strengths
-   part, which is the whole run, not one place: in effect, not convertible.
+**The author's decision:** the scents become what FTL meant from level 2, on every set
+(X18's third choice, a divergence in H): on a step, only the prints on the square left
+change, each its own strength plus the time spent, up to 80, and the new print is at 24;
+every ten seconds every print but the newest and the party's square's loses one, the
+oldest at 0 is dropped and the walk goes on. The release's loops (the Atari's, the
+Amiga's on `dm-amiga`) stay behind a flag `until` 2; CSBWin's loops are a flag of the
+`csbwin-11.014` profile, joined at level 2, and of a `csbwin-2023` profile if the three
+runs of `CSBWIN_RUNS` need it to play to their end.
 
 Step 5.3 is paid: `PROFILES` (`src/engine/Behaviour.ts`) holds `csbwin-11.014`. A flag a profile plays lists it in its `profiles` with the level it joined it
 at, and one the port never had has no `until` (`doc/RECORDING.md` → "A recording's level",
