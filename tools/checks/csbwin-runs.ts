@@ -12,15 +12,24 @@
  *
  * Then each run under way (`CSBWIN_RUNS_UNDER_WAY`), a run of an older CSBWin version
  * played at its profile (`doc/RECORDING.md` → "A recording's level"), to the line it
- * drifts at and no other.
+ * drifts at and no other, and its recording up to there, packaged at a save made there,
+ * played back to the same `d.Time` and `d.RandomNumber`.
  *
  *   npm test -- --only=csbwin-runs.ts [<run id>]
  */
+import type { Recording } from '../../src/engine/Recorder';
 import { readRecordingPackage, writeRecordingPackage } from '../../src/engine/RecordingPackage';
 import { check, finish } from '../lib/check';
 import { CSBWIN_RUNS, CSBWIN_RUNS_UNDER_WAY, recordRun, runPackage } from '../lib/csbwinRun';
 import { dataSetNamed, diskFiles } from '../lib/dataSets';
 import { playPath } from '../lib/playback';
+
+/** A recording's changes counted by kind, in the order each first comes. */
+function changeKinds(recording: Recording): Map<string, number> {
+  const kinds = new Map<string, number>();
+  for (const { change } of recording.changes) kinds.set(change.kind, (kinds.get(change.kind) ?? 0) + 1);
+  return kinds;
+}
 
 const only = process.argv[2];
 const runs = CSBWIN_RUNS.filter((run) => !only || run.id === only);
@@ -31,8 +40,7 @@ for (const run of runs) {
   console.log(`${run.id} (${run.dataSet}${run.save ? `, from ${run.save}` : ', a new game'}):`);
   const recorded = await recordRun(run, 'csbwin-runs');
   const { recording, page } = recorded;
-  const kinds = new Map<string, number>();
-  for (const { change } of recording.changes) kinds.set(change.kind, (kinds.get(change.kind) ?? 0) + 1);
+  const kinds = changeKinds(recording);
   console.log(`  played: ${recorded.entries} entries, ${recording.vbls} VBLs, d.Time ${page.game.ctx.state.tickCount}, ${recording.changes.length} changes`);
   console.log(`  ${[...kinds].map(([kind, n]) => `${kind} ${n}`).join(', ')}`);
   check(recorded.drift === null, `${run.id} plays to its end, every entry's random CSBWin's${recorded.drift ? `: drifts at ${recorded.drift}` : ''}`);
@@ -61,7 +69,15 @@ for (const run of underWay) {
   console.log(`${run.id} (${run.dataSet}, at ${run.profile}), under way:`);
   const recorded = await recordRun(run, 'csbwin-runs');
   console.log(`  played: ${recorded.entries} entries, d.Time ${recorded.page.game.ctx.state.tickCount}; drifts at ${recorded.drift}`);
+  console.log(`  ${[...changeKinds(recorded.recording)].map(([kind, n]) => `${kind} ${n}`).join(', ')}`);
   check(recorded.drift !== null && recorded.drift.startsWith(`line ${run.drifts}:`),
     `${run.id} plays at ${run.profile} to line ${run.drifts} of its log, where it drifts${recorded.drift?.startsWith(`line ${run.drifts}:`) ? '' : `, not ${recorded.drift === null ? 'at its end' : recorded.drift.split(':')[0]}: move its \`drifts\` on where it plays further`}`);
+  const read = await readRecordingPackage(await writeRecordingPackage(runPackage(run, recorded)));
+  const set = dataSetNamed(run.dataSet);
+  const played = await playPath(set, diskFiles(set), read.path, read.shared.kind === 'save' ? read.shared : null);
+  const { page } = recorded;
+  check(played.drift === null && played.game.ctx.state.tickCount === page.game.ctx.state.tickCount
+    && played.game.ctx.random.getSeed() === page.game.ctx.random.getSeed(),
+    `the port's player plays ${run.id}'s recording to there, d.Time ${played.game.ctx.state.tickCount} and the run's d.RandomNumber${played.drift ? `: ${JSON.stringify(played.drift)}` : ''}`);
 }
 finish();

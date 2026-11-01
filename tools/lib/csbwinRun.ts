@@ -27,7 +27,8 @@
  * a run that drifts stops there, and says where; so does one whose clock stands still while
  * an entry waits, the game held where CSBWin's went on. `DM_rules` is the log's: its
  * `#DMRules` and `#NoDMRules`, which CSBWin's playback takes after the game is read
- * (`dmRulesBefore`), and which a player's DM runs end with `#DMRules`.
+ * (`dmRulesBefore`), and which a player's DM runs end with `#DMRules`. A save in the log is
+ * made on the port's save menu, which the log's disk icon opens (`diskMenuSave`).
  */
 import { digestedFiles } from '../../src/data/DataSetFiles';
 import { behaviourAt, ENGINE_LEVEL, type ProfileName } from '../../src/engine/Behaviour';
@@ -37,7 +38,10 @@ import { carriedStateOf, Recorder, type Recording, type RecordingPoint } from '.
 import { packageOfEnd, packageOfSave, type RecordingPackage } from '../../src/engine/RecordingPackage';
 import { applySaveBytes } from '../../src/engine/SaveGameFile';
 import { saveFileOf } from '../../src/engine/GameSaves';
+import type { Game } from '../../src/engine/Game';
 import { searchMouseButtons } from '../../src/renderer/ui/Mouse';
+import { closeSaveMenu } from '../../src/renderer/ui/SaveMenu';
+import type { UIState } from '../../src/renderer/ui/UIState';
 import { readFileSync } from 'node:fs';
 import { dataSetNamed, diskFiles } from './dataSets';
 import { standPage, type Page } from './playback';
@@ -108,9 +112,32 @@ export const CSBWIN_RUNS_UNDER_WAY: readonly RunUnderWay[] = [
     title: 'Dungeon Master, minimum item picking',
     description: 'A CSBWin 11.017 recording, DMMovie42 of CSBWin\'s movies, played back in CSBweb.',
     recordedAt: '2009-05-28',
-    drifts: 1488,
+    drifts: 2664,
   },
 ];
+
+/**
+ * An entry of a save in a log, taken by the port's save menu that the log's disk icon
+ * opened, as `_DisplayDiskMenu` takes it (doc/CSBwin-src/SaveGame.cpp:825-1377): `true`
+ * where the menu took it. The menu's two first options, `0xd2`, are "SAVE AND PLAY" and
+ * the save's file (`SelectSaveGame`); the save's signature, `0x6668`, which CSBWin records
+ * once the file is written (`:1325-1332`), stands for the save the menu makes: its tail
+ * (`Game.saveWritten`: `TAG00bd40`, `ProcessMonstersOnLevel`, `SmartDiscard(true)`,
+ * `:1341-1343`, and `d.CanRestartFromSavegame = 1`, `:1358`), then the menu closed
+ * (`TAG0207cc`, `:1375`), as the menu's own save and close make them. The file itself is
+ * not made: nothing in the log reads it. "SAVE AND QUIT", "CANCEL" and the rest are not
+ * played yet: they throw.
+ */
+export function diskMenuSave(game: Game, ui: UIState, num: number, line: number): boolean {
+  if (num === 0xd2) return true;
+  if (num === 0x6668) {
+    game.saveWritten();
+    closeSaveMenu(ui);
+    return true;
+  }
+  if (num === MOUSE_UNCLICK) return false;
+  throw new Error(`line ${line}: button ${hx(num)} in the disk menu, which the port does not play`);
+}
 
 /** The folder a run's files are in. */
 export function runFolder(run: CsbwinRun): string {
@@ -239,6 +266,7 @@ export async function recordRun(run: CsbwinRun, build: string, dataSet = run.dat
     if (ctx.loop.gravityMove || ctx.mouseQueue.count() !== 0) return;
     for (let entry = due(); entry; entry = due()) {
       const { num, x, y } = entry;
+      if (ui.saveMenu?.mode === 'full' && diskMenuSave(game, ui, num, entry.line)) continue;
       if (num === 0x6668 || num === 0x6669) continue; // a save's or a read's signature, only recorded (Recording.cpp:723-727)
       if (PLAYFILE_LINES.has(num)) {
         game.input.apply({ kind: 'playfile', num, y });

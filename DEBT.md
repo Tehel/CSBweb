@@ -633,16 +633,15 @@ which each flag moves on. Both log players take the log's `#DMRules` as CSBWin's
 does (`dmRulesBefore`, `doc/PROVEN_FACTS.md` → "`DM_rules` and `DMRulesDesignOption`…"),
 so the champion P reincarnates at `d.Time` 0x43 with strength 52, as in the oracle.
 
-It stalls at **line 1488**, `d.Time` 0x8f9: the run saves there, two `0x00d2` clicks (the
-log's "First Menu option", at (0x69,0x67) and (0x5c,0x69)), then the save's signature
-`0x6668` at line 1489, and the next entry, `0x000b` at 0x8fb. In `recordRun` the clock
-stays at 0x8f9 and the second click is never taken (the stall is `recordRun`'s, five
-minutes of VBLs without `d.Time` moving while an entry waits); `tools/play-csbwin-log.ts`
-takes both clicks and the signature and then stalls at line 1490. None of the three runs of
-`CSBWIN_RUNS` saves before its log's end, so this is the first save in play a log player
-meets (F24, "Not handled yet": a save inside a log). The next step is to find whether it
-is the players' gap (what CSBWin's disk menu did with those clicks, which the port's save
-dialog does otherwise) or 11.014's, by the oracle at 0x8f8-0x8fc, before any flag.
+It drifts at **line 2664**, `d.Time` 0xf87, a step forward (`0x0003`) on level 1 at
+(6,28) whose recorded count is 12 draws where the port has made 10, in both log players.
+On the way it saves at lines 1485-1489 (`d.Time` 0x8f9): the disk icon, "SAVE AND PLAY",
+the save's file, the signature `0x6668`. The oracle draws that save's
+`ProcessMonstersOnLevel` inside `_DisplayDiskMenu`, so the save was the log players' gap,
+not 11.014's; they now make it on the port's save menu (`diskMenuSave`,
+`tools/lib/csbwinRun.ts`, `doc/RECORDING.md` → "Recordings made in CSBWin"), and
+`tools/checks/csbwin-runs.ts` plays the recording, the save in it, back to the drift. The
+next step is the oracle at 0xf80-0xf87 against `--trace=f80-f87`, before any flag.
 
 Step 5.3 is paid: `PROFILES` (`src/engine/Behaviour.ts`) holds `csbwin-11.014`. A flag a profile plays lists it in its `profiles` with the level it joined it
 at, and one the port never had has no `until` (`doc/RECORDING.md` → "A recording's level",
@@ -656,7 +655,7 @@ Step 5.4 is under way. `ENGINE_LEVEL` is 1, and the one flag is the profile's:
 `smartDiscardDrawnPriority`, joined at level 1, 11.014's `SmartDiscard` whole
 (`smartDiscard11014`, `src/engine/SmartDiscard.ts`, checked at its profile by
 `tools/checks/watch-smart-discard.ts`), which takes `DMMovie42` past line 130. What
-stops it now is the stall at line 1488, above.
+stops it now is the drift at line 2664, above.
 
 Size L.
 
@@ -983,8 +982,12 @@ What it establishes:
 - **The oldest logs** (`DMMovie1`, `3`, `4`, `6`, `7`, 9.05 and 9.07), whose `+` lines have
   fewer than five fields, CSBWin 2023 cannot read either: "Playback Plus line did not have
   5 fields", then `die`. The port's reader stops on the same line ("plus line 27").
-- **Not handled yet:** a save inside a log (`0x6668`,
-  `0x6669`) and CSBWin's hand-made substitutes for one (`0x2223`, `0x2224`,
+- **A save inside a log** is made on the port's save menu, which the log's disk icon opens
+  (`diskMenuSave`, `doc/RECORDING.md` → "Recordings made in CSBWin"): "SAVE AND PLAY" and
+  its file, then the save's tail and the menu's close at its `0x6668`. `DMMovie42` saves so
+  at `d.Time` 0x8f9 and plays on.
+- **Not handled yet:** a save inside a log that quits ("SAVE AND QUIT") or is cancelled,
+  a read inside a log (`0x6669` past the start), and CSBWin's hand-made substitutes for a save (`0x2223`, `0x2224`,
   `Recording.cpp:734-761`; `DMMovie43a` and `45` stop on one), the `0xdddd` line
   that writes a word of `d.`, the annotations, the runs' own `graphics.dat`, and Chaos
   Strikes Back's runs, which need a CSB set. `extraTicks` is imitated by undoing the

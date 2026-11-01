@@ -21,7 +21,8 @@
  * `--set=<id>` plays on another data set than `dm-atari`; `--save=<file>` starts from that
  * CSBWin save instead of a new game, read at the log's first `0x6669` (a CSB run's
  * `csbgame.dat`, which the log's first clicks resume). A save the run's author cut out of
- * the log, `0x2223` or `0x2224`, does what the save did (`Recording.cpp:734-761`).
+ * the log, `0x2223` or `0x2224`, does what the save did (`Recording.cpp:734-761`); a save
+ * the log holds is made on the port's save menu, which its disk icon opens (`diskMenuSave`).
  *
  * `--trace=<from>-<to>`: every game draw from `d.Time` <from> to <to>, in hex, with its
  * callers, and the engine's AI and attack trace in between.
@@ -55,6 +56,7 @@ import { UIMode } from '../src/renderer/ui/UIState';
 import { Settings, applyToGame } from '../src/settings/Settings';
 import { ManualClock } from './lib/clock';
 import { STOCK_DATA_SET, dataSetNamed, diskFiles } from './lib/dataSets';
+import { diskMenuSave } from './lib/csbwinRun';
 import { memoryStore } from './lib/saves';
 import { readPlayfile, type PlayEntry } from './lib/playfile';
 
@@ -215,6 +217,9 @@ function play(): PlayEntry | null {
     if (history.length > 12) history.shift();
     if (e.num === 0xd7) { ended = 'game over (0xd7)'; return null; }
     if (e.num === 0x3333) { ctx.random.setSeed(((e.x << 16) | (e.y & 0xffff)) >>> 0); continue; }
+    // A save in the log: the disk icon opened the port's save menu, whose save stands for
+    // the disk menu's (`diskMenuSave`).
+    if (screen!.ui.saveMenu?.mode === 'full' && diskMenuSave(game, screen!.ui, e.num, e.line)) continue;
     if (e.num === 0x6668 || e.num === 0x6669) continue; // a save's or a read's signature, only recorded (Recording.cpp:723-727)
     // The recorder's own draws, and what a save cut out of the log did (Recording.cpp:650-761).
     if (PLAYFILE_LINES.has(e.num)) { applyPlayfileLine(ctx, e.num, e.y); continue; }

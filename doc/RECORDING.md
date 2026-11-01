@@ -610,6 +610,15 @@ field (`InputChange`, `src/engine/InputBoundary.ts`), applied as `PLAYFILE::Play
 it (`applyPlayfileLine`, `src/engine/PlayfileLine.ts`). The page makes none, and a
 package's reader takes only those codes (`PLAYFILE_LINES`).
 
+**A save in the log** is made on the port's save menu, which the log's disk icon opens
+as it opens a player's (`diskMenuSave`, `tools/lib/csbwinRun.ts`). The menu takes the log's
+two `0xd2`, "SAVE AND PLAY" and the save's file, and at its `0x6668`, which CSBWin
+records once the file is written, the save's tail and the menu's close are made
+(`saveWritten`, then `tag0207cc`), in `_DisplayDiskMenu`'s order
+(`doc/CSBwin-src/SaveGame.cpp:1325-1375`). The recording holds them as a player's save
+holds them, and the file itself is not made. "SAVE AND QUIT" and a menu cancelled are
+not played yet.
+
 **Where the page differs from CSBWin's playback**, the recording is the page's game: the
 frozen game's discard and `lastTime`'s one entry a tick (`Mouse.cpp:1548-1605`), which a
 run recorded in play kept to, and `extraTicks`, which playback turns off and the port keeps
