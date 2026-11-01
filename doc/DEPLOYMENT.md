@@ -680,7 +680,8 @@ hidden ones included, or the tool refuses before it plays. Each recording that i
 broken has its package fetched and played from it alone, in a page without the DOM
 (`tools/lib/playback.ts`) over the files the instance serves of the set the page would play
 it over, found by their digests (`api/data-set-files`, `doc/RECORDING.md` → "The set a
-recording plays over"); a package that does not read or play, a later level's among them,
+recording plays over", or, from a site whose build predates that route, the digests of the
+files it serves, the same ones); a package that does not read or play, a later level's among them,
 or whose files no set has, fails as a drift does.
 `npm run deploy -- --no-replay` deploys without it, for the first deploy, which has no
 site to ask (`doc/SETUP.md`).

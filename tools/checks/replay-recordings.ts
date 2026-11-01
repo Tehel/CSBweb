@@ -12,13 +12,16 @@
  *    go on: it exits 0.
  * 4. Once `dm-atari`'s `dungeon.dat` is another, the one left plays over a set whose files
  *    are those it was made over, `dm-copy`; and without it, it is refused, the gate saying
- *    which file of its set no longer matches (`findRecordingSet`).
+ *    which file of its set no longer matches (`findRecordingSet`). The same from an
+ *    instance without `api/data-set-files`, a build from before it: the gate digests the
+ *    files it serves, and finds the same set.
  * 5. A player who does not moderate is refused before anything plays, by the gate and by
  *    `--break`: the lists would leave recordings out.
  *
  * Usage: npm test -- --only=replay-recordings.ts
  */
 import { spawn } from 'node:child_process';
+import { createServer } from 'node:http';
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -30,7 +33,7 @@ import { DataSetStore, parseModerators } from '../../server/dataSets.ts';
 import { RateLimit } from '../../server/events.ts';
 import { RecordingStore } from '../../server/recordings.ts';
 import { StatsStore } from '../../server/stats.ts';
-import { parseManifest, PLAYER_ID_HEADER, RECORDING_PACKAGE_FIELD, RECORDINGS_ROUTE } from '../../src/data/DataSets.ts';
+import { DATA_SET_FILES_ROUTE, parseManifest, PLAYER_ID_HEADER, RECORDING_PACKAGE_FIELD, RECORDINGS_ROUTE } from '../../src/data/DataSets.ts';
 import { checkLocalDataSet } from '../../src/engine/LocalDataSetCheck.ts';
 import { readRecordingPackage } from '../../src/engine/RecordingPackage.ts';
 import { check, finish } from '../lib/check.ts';
@@ -133,6 +136,29 @@ try {
     show(moved.out);
     check(moved.code === 0 && moved.out.includes(`✓ ${plays} 'Quiet' (build test): plays to its point, over dm-copy's files`),
         'the recording plays over the set whose files are those it was made over');
+    // An instance whose build predates api/data-set-files: the scratch server behind a
+    // proxy that answers that route 404, and forwards the rest.
+    const older = createServer((request, response) => {
+        if ((request.url ?? '').split('?')[0] === `/${DATA_SET_FILES_ROUTE}`) {
+            response.writeHead(404).end();
+            return;
+        }
+        const player = request.headers[PLAYER_ID_HEADER.toLowerCase()];
+        void fetch(`${instance}${request.url}`, { headers: typeof player === 'string' ? { [PLAYER_ID_HEADER]: player } : {} }).then(async (answer) => {
+            response.writeHead(answer.status, { 'Content-Type': answer.headers.get('Content-Type') ?? 'application/octet-stream' });
+            response.end(Buffer.from(await answer.arrayBuffer()));
+        });
+    });
+    await new Promise<void>((done) => older.listen(0, '127.0.0.1', done));
+    try {
+        const before = await runTool(`http://127.0.0.1:${(older.address() as AddressInfo).port}`, ['--player', MODERATOR], '');
+        show(before.out);
+        check(before.code === 0 && before.out.includes(`has no ${DATA_SET_FILES_ROUTE}, so the files it serves are digested here.`)
+            && before.out.includes(`✓ ${plays} 'Quiet' (build test): plays to its point, over dm-copy's files`),
+            'and from an instance without api/data-set-files, the gate digests the files it serves, and finds the same set');
+    } finally {
+        older.close();
+    }
     db.prepare("DELETE FROM data_sets WHERE id = 'dm-copy'").run();
     const gone = await runTool(instance, ['--player', MODERATOR], '');
     show(gone.out);

@@ -21,8 +21,9 @@
  * played, from the package alone, in a page without the DOM over the files as the
  * instance serves them (`playPath`, `tools/lib/playback.ts`): those of the set the page
  * would play it over, found by its files' digests (`findRecordingSet`, against
- * `api/data-set-files`), its own or another whose files have them, with the engine of this
- * working tree: what the build deployed from it will play. A recording that plays to its
+ * `api/data-set-files`; from an instance whose build predates that route, the digests of
+ * the files it serves, which are those the route digests), its own or another whose files
+ * have them, with the engine of this working tree: what the build deployed from it will play. A recording that plays to its
  * point, a save's file checked there or the game's end reached, passes; one that drifts,
  * or whose package does not read or play (a later level's among them), is shown with why.
  * The run exits 0 where every one passed, and 1 where one did not: the deploy refused.
@@ -42,8 +43,8 @@ import { spawnSync } from 'node:child_process';
 import { stdin, stdout } from 'node:process';
 import { createInterface } from 'node:readline/promises';
 
-import { folderFiles } from '../src/data/DataSetFiles';
-import { DATA_SET_FILES_ROUTE, DATA_SETS_ROUTE, parseManifest, PLAYER_ID_HEADER, RECORDING_FILES, RECORDINGS_ROUTE, SHARED_RECORDING_ID, type DataSet } from '../src/data/DataSets';
+import { fileDigest, folderFiles } from '../src/data/DataSetFiles';
+import { DATA_SET_FILES_ROUTE, DATA_SETS_ROUTE, GAME_FILES, parseManifest, PLAYER_ID_HEADER, RECORDING_FILES, RECORDINGS_ROUTE, SHARED_RECORDING_ID, type DataSet } from '../src/data/DataSets';
 import { findRecordingSet, parseSetDigests, type SetDigests } from '../src/data/RecordingSet';
 import { readRecordingPackage } from '../src/engine/RecordingPackage';
 import type { Drift } from '../src/engine/RecordingPlayer';
@@ -115,6 +116,28 @@ function driftText(drift: Drift): string {
     }
 }
 
+/**
+ * The digests of each game file of the sets `served` holds: the instance's
+ * `api/data-set-files`, or, where it answers 404, a build from before that route, those
+ * of the files it serves, which the route digests from the same folders.
+ */
+async function setDigests(served: Served): Promise<SetDigests[]> {
+    const response = await fetch(`${instance}/${DATA_SET_FILES_ROUTE}`, { headers: asPlayer });
+    if (response.status !== 404) {
+        if (!response.ok) throw new Error(`${instance}/${DATA_SET_FILES_ROUTE} answered HTTP ${response.status}`);
+        return parseSetDigests(await response.text(), new Map([...served.values()].map(({ set }) => [set.id, set.name])));
+    }
+    console.log(`${instance} has no ${DATA_SET_FILES_ROUTE}, so the files it serves are digested here.`);
+    return Promise.all([...served.values()].map(async ({ set, files }) => {
+        const digests: Record<string, string> = {};
+        for (const name of GAME_FILES) {
+            const bytes = await files.read(name);
+            if (bytes) digests[name] = fileDigest(bytes);
+        }
+        return { id: set.id, name: set.name, files: digests };
+    }));
+}
+
 /** The commit this working tree is, as the deploy names its build. */
 function checkoutBuild(): string {
     const head = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf8' });
@@ -151,9 +174,8 @@ async function main(): Promise<void> {
     console.log(`Replaying ${instance}'s recordings against ${checkoutBuild()}.`);
     const manifest = parseManifest(await (await fetchOk(`${instance}/${DATA_SETS_ROUTE}`, { headers: asPlayer })).text(), `${instance}/gamefiles`);
     if (!manifest.moderator) fail(`${instance} refuses: --player is not one of its moderators, so its lists would leave recordings out.`);
-    const digests = parseSetDigests(await (await fetchOk(`${instance}/${DATA_SET_FILES_ROUTE}`, { headers: asPlayer })).text(),
-        new Map(manifest.dataSets.map((set) => [set.id, set.name])));
     const served: Served = new Map(manifest.dataSets.map((set) => [set.id, { set, files: keptFiles(folderFiles(set.dir)) }]));
+    const digests = await setDigests(served);
     const drifted: Drifted[] = [];
     let played = 0;
     for (const set of manifest.dataSets) {
