@@ -6,8 +6,9 @@
  * Its sets were written by hand before the script, under ids of their own: its `dm-atari`
  * is the 1.2 disk's, and CSBWin's mix, the manifest's `dm-atari`, is its
  * `dungeon-master-csbwin`. A script that took an id for its files installed six sets a
- * second time (`DEBT.md` R17); this one finds each set's files under the id that holds
- * them, and names the six pairs.
+ * second time, which the author then removed; this one finds each set's files under the id
+ * that holds them, names the six pairs on the table that had them, and none on the table
+ * the instance has now.
  *
  * Run: `npm test -- --only=official-sets.ts`
  */
@@ -69,6 +70,10 @@ const REFERENCE: Row[] = [
   ['dm-minimum-item-picking', 'dm-minimum-item-picking', ...H.pickingItems],
 ];
 const BEFORE = REFERENCE.findIndex(([id]) => id === 'dm-atari-1.0a');
+/** The six rows the old script wrote a second time, which the author removed from the instance, rows and folders. */
+const REMOVED = new Set(['dm-atari-1.0a', 'dm-atari-1.0b', 'dm-atari-1.1', 'dm-atari-1.2', 'dm-atari-1.2-de', 'dm-amiga']);
+/** The reference instance's table now: `REFERENCE` without them. */
+const NOW = REFERENCE.filter(([id]) => !REMOVED.has(id));
 
 const rowsOf = (rows: Row[]): InstanceSet[] => rows.map(([id, dir, dungeon, graphics, mini]) => ({
   id, dir, files: { 'dungeon.dat': dungeon, 'graphics.dat': graphics, 'CSBgraphics.dat': null, 'mini.dat': mini ?? null },
@@ -132,7 +137,16 @@ check(JSON.stringify(twice) === JSON.stringify([
   ['dungeon-master-atari-st-1.1-english', 'dm-atari-1.1'],
 ]), 'the six sets the old script installed a second time, each after the row it duplicates');
 
-console.log('=== 3. an id or a folder that holds other files ===');
+console.log('=== 3. the reference instance now, its duplicates removed ===');
+const now = table(rowsOf(NOW));
+for (const [id, what] of Object.entries(wanted)) {
+  const held = written.has(id) && !REMOVED.has(id) ? `as ${id}` : what;
+  check(now[id] === held, `now: ${id} is ${held} (got ${now[id]})`);
+}
+check(duplicates(rowsOf(NOW)).length === 0, 'now: the instance holds no set twice');
+check(Object.values(now).every((what) => what.startsWith('as ') || what === 'id-taken'), 'now: every official set is installed, but kids-dungeon, whose files the table does not list');
+
+console.log('=== 4. an id or a folder that holds other files ===');
 const dmAtari = official.find((set) => set.id === 'dm-atari')!;
 const withoutMix = rowsOf(REFERENCE.slice(0, BEFORE).filter(([id]) => id !== 'dungeon-master-csbwin'));
 console.log(`  dm-atari, CSBWin's mix nowhere: ${said(holding(dmAtari, withoutMix))}`);

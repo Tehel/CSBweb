@@ -39,7 +39,9 @@
  * folder, since everything under `gamefiles/` can be downloaded. The rows are written by
  * the container's Node through `node:sqlite`, the server's own store, which takes them at
  * once: no restart. At its end it names the instance's duplicates, the sets that hold the
- * same files under several ids, which it never removes (`DEBT.md` R17).
+ * same files under several ids, which it never removes: that is the author's, on the
+ * server, once nothing names the duplicate (its recordings, statistics, documents and
+ * defaults, and the saves in players' browsers).
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -267,7 +269,7 @@ async function main(): Promise<void> {
 
     const twice = duplicates(instance.rows);
     if (twice.length > 0) {
-        console.log('\nThe instance holds the same files under several ids, which this script does not remove (DEBT.md R17):');
+        console.log('\nThe instance holds the same files under several ids, which this script does not remove:');
         for (const ids of twice) console.log(`  ${ids.join(', ')}`);
     }
 }
