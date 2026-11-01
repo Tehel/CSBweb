@@ -131,7 +131,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| R18 | A recording plays by the engine's behaviour as it was made | L | ⏳ |
+| R18 | A recording plays by the engine's behaviour as it was made | L | ⏳ step 5.4 waits on the author (the scents' loops) |
 | F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
 | C198 | A missile that cannot be made loses the object it was to carry | S | ⏳ |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
@@ -640,8 +640,36 @@ the save's file, the signature `0x6668`. The oracle draws that save's
 `ProcessMonstersOnLevel` inside `_DisplayDiskMenu`, so the save was the log players' gap,
 not 11.014's; they now make it on the port's save menu (`diskMenuSave`,
 `tools/lib/csbwinRun.ts`, `doc/RECORDING.md` → "Recordings made in CSBWin"), and
-`tools/checks/csbwin-runs.ts` plays the recording, the save in it, back to the drift. The
-next step is the oracle at 0xf80-0xf87 against `--trace=f80-f87`, before any flag.
+`tools/checks/csbwin-runs.ts` plays the recording, the save in it, back to the drift.
+
+**The drift at line 2664 is the scents' loops** (H, "The scents' two loops are the
+Atari's, not CSBWin's"), not 11.014. 11.014's `GetBestMonsterFacingP1`, `TenSecondUpdate`
+and `AddFootprintEntry` are 2023's, line for line. At 0xf86 group (0,21)'s B-group turn
+finds footprint 1. The oracle has its strength at 23 (the ten-second decay at 0xf80) and a
+roll of 3: 26 is not above `30 - 2 * 2`, no direction is preferred, and its random branch
+draws 11. The port's party step at 0xf85 has written strength 0 back to 24, as the Atari's
+`AddFootprintEntry` writes it and CSBWin's `while (index-- != 1)` does not. So it follows
+the print and draws 9. With CSBWin's two loops (`index-- != 1`, and `break` after the
+oldest print is dropped) in a scratch tree, `DMMovie42` plays on to **line 6977**
+(`d.Time` 0x33a3, level 7), and the three runs of `CSBWIN_RUNS` still play to their end.
+
+**Waiting on the author:** a profile's flags were to be read from its version's diff
+against 2023's source. This one is not in that diff. It undoes one of the port's
+deliberate divergences from CSBWin (H) for a CSBWin version. The options:
+
+1. **A flag `csbwinScentLoops` in `csbwin-11.014`'s profile** (recommended): CSBWin's
+   two loops behind it, no `until` (the port's engine never had them), joined at level 2.
+   A profile then means "CSBWin's version as its own source plays", the port's Atari
+   choices undone where its recordings need it. H gains the line that CSBWin's profiles
+   play CSBWin's loops; a new game stays the Atari's. The 9.x profile will want it too,
+   and a CSBWin 2023 run that drifts on it a `csbwin-2023` profile.
+2. **CSBWin's loops for every game**, H's entry removed: the port follows CSBWin here, as
+   CLAUDE.md's rule does where ReDMCSB is not taken, and no flag is needed for 2023's
+   runs. It changes what a tick does, so it is a flag of the old (Atari) loops with an
+   `until` and a bump, and `tools/checks/amiga-scents.ts` and
+   `tools/checks/magic-footprints.ts` change with it.
+3. **Neither**: the run is corrected in its log (F24 step 2) at each turn the strengths
+   part, which is the whole run, not one place: in effect, not convertible.
 
 Step 5.3 is paid: `PROFILES` (`src/engine/Behaviour.ts`) holds `csbwin-11.014`. A flag a profile plays lists it in its `profiles` with the level it joined it
 at, and one the port never had has no `until` (`doc/RECORDING.md` → "A recording's level",
@@ -655,7 +683,8 @@ Step 5.4 is under way. `ENGINE_LEVEL` is 1, and the one flag is the profile's:
 `smartDiscardDrawnPriority`, joined at level 1, 11.014's `SmartDiscard` whole
 (`smartDiscard11014`, `src/engine/SmartDiscard.ts`, checked at its profile by
 `tools/checks/watch-smart-discard.ts`), which takes `DMMovie42` past line 130. What
-stops it now is the drift at line 2664, above.
+stops it now is the drift at line 2664, the scents' loops, which waits on the author
+(above).
 
 Size L.
 
