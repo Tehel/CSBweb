@@ -155,6 +155,12 @@ There is still **no test framework** (`PLAN.md` → "The evidence") — `npm tes
   `main.ts` does, and finds a genuine CSBWin save through `tools/lib/saves.ts`, in
   `tools/fixtures/`.
 
+**Recordings keep playing (non-negotiable):** a commit that may change what a tick does
+from the same inputs (the engine, and the hit tests and the picking that turn a click into
+an action) keeps the old lines behind a flag of `src/engine/Behaviour.ts` and bumps
+`ENGINE_LEVEL` by one, in that commit (`doc/RECORDING.md` → "The policy"). The corpus in
+`npm test` and the deploy's replay of the site's recordings fail where one was forgotten.
+
 When porting behaviour that is invisible on screen, write the tool in the same commit.
 The `verification-tools` skill in `.claude/skills/` has the pattern, the gotchas, and
 the "canary" technique for proving an extracted table sits at the right offset.

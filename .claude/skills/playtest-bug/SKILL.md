@@ -85,7 +85,9 @@ than starting a new one.
 
 The last several bug-fix commits shipped exactly these five things. Treat it as a checklist:
 
-1. **`src/`** — the fix.
+1. **`src/`** — the fix. Where it may change what a tick does from the same inputs, the
+   old lines kept verbatim behind a flag of `BEHAVIOURS` and `ENGINE_LEVEL` bumped by one
+   (`doc/RECORDING.md` → "The policy"), or every recording made before it drifts.
 2. **`tools/checks/*.ts`** — new or extended, asserting the thing that was broken.
 3. **`tools/run-checks.ts`** — one line, `{ tool: '<name>.ts' },`, if the tool is new.
    A tool nobody runs is not a regression test.

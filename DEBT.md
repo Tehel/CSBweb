@@ -114,7 +114,9 @@ by default, so with them off the game is CSBWin's and the golden frames do not m
    behaviour-neutral or a fix, never both.
 4. **A fix owes the usual five things** (`.claude/skills/playtest-bug/`): the CSBWin
    citation, the fix, a `tools/checks/` tool that fails before it, a `doc/PROVEN_FACTS.md` entry
-   if a new fact was verified, and the bookkeeping here.
+   if a new fact was verified, and the bookkeeping here. A fix that changes what a tick
+   does keeps the old behaviour behind a flag and bumps `ENGINE_LEVEL`
+   (`doc/RECORDING.md` → "The policy").
 5. **When an item is paid,** delete its entry and its index row, and rewrite or remove
    every code comment that cites its ID: an ID in the code means the debt is still open.
    Name the ID in the commit message (`Debt C33: …`); that is the record.
@@ -557,7 +559,8 @@ behind a named switch, chosen by the recording.
    `tools/checks/recording-corpus.ts`).
 3. ✅ The deploy's check refusing a drift (`doc/DEPLOYMENT.md` → "Deploying",
    `tools/checks/replay-recordings.ts`).
-4. The policy written down.
+4. ✅ The policy written down (`doc/RECORDING.md` → "The policy", `CLAUDE.md`, the fix's
+   list in `.claude/skills/playtest-bug/`).
 5. The 11.0xx profile: 11.014's and 11.056's sources fetched beside 2023's, their diff
    measured, and the flags one 11.0xx run needs, until it plays further than it does now,
    the three runs of `CSBWIN_RUNS` playing to their end all along (F24's step 2 for that
@@ -589,7 +592,11 @@ recording that drifts, or whose package does not read or play, refuses the deplo
 (`--no-replay` for a first deploy, which has no site). `--break` keeps the old way, a yes
 per recording that drifts, for one no flag mends: made before levels by a build whose play
 had already changed. The site's test game that drifts before its first input is one: it
-must be broken, or deleted, before the first deploy the gate runs on. The next step is 4.
+must be broken, or deleted, before the first deploy the gate runs on.
+
+Step 4 is paid: the policy is `doc/RECORDING.md` → "The policy", and `CLAUDE.md`, the
+fix's list (`.claude/skills/playtest-bug/`), `/pay-debt` and "How to work this list"
+point to it. The next step is 5.
 
 Size L.
 

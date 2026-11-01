@@ -322,6 +322,34 @@ ids are the page's: the engine reads neither.
 A recording is played back by its start, and each change applied before the VBL it was
 logged at (below, "The port's player").
 
+### The policy
+
+**A commit that may change what a tick does from the same inputs keeps the old behaviour
+behind a flag and bumps the level, in that commit.** What it covers is whatever lies
+between the input boundary and the state ("The port against those needs", above): the
+engine, and the interface's hit tests and the viewport's picking that turn a logged click
+into an action. A fix, a port of a CSBWin function, a refactor that turns out not to be
+one: each counts, and "may" means a doubt is enough. The commit:
+
+1. adds a flag to `BEHAVIOURS` (`src/engine/Behaviour.ts`), named for the behaviour it
+   keeps, saying what that behaviour does, the commit's debt ID, and as its `until` the
+   level the commit makes;
+2. keeps the old lines verbatim behind it, `if (ctx.behaviour.<name>) { old } else { new }`,
+   the new with its citation, where the engine reads the change; no old line is tidied,
+   since a recording plays it;
+3. bumps `ENGINE_LEVEL` by one, so that a game the page plays has the flag off and every
+   recording made before it on.
+
+A change that only draws owes none, nor a new extra that is off by default; a change to an
+extra's behaviour does. A refactor of tiers D and E changes no behaviour, which its
+whole-output diff proves, so it owes none; where it finds a divergence, the fix is a
+commit of its own and owes the flag. A flag is never removed: a player may import an old
+recording at any time.
+
+What proves it is the corpus, below, in `npm test`, and the site's recordings, which the
+deploy plays. Each proves only what its recordings reach, so the flag is owed whether a
+recording reaches the change or not.
+
 ### The corpus
 
 A level bumped without its flag, or a change of play the commit did not count as one,

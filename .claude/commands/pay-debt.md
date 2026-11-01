@@ -38,7 +38,9 @@ name a different item, take that one instead of the first row.
   output"), and run `npm test -- --frames` when anything under `src/renderer/` or `src/ui/`
   moves. If a refactor uncovers a divergence from CSBWin, record it in tier C with the
   next free ID. Don't fix it in the same commit: a fix is a commit of its own.
-- A fix owes the five things listed in `.claude/skills/playtest-bug/`.
+- A fix owes the five things listed in `.claude/skills/playtest-bug/`, the behaviour flag
+  and the level's bump among them where it changes what a tick does
+  (`doc/RECORDING.md` → "The policy").
 - Run `npm test` before every commit. Commit messages are one line, `Debt <ID>: …` or
   `Docs: …`, with no trailers. Never push.
 - Do the bookkeeping in the same commit as the work. For a paid item, delete its entry and
