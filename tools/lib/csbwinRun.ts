@@ -30,6 +30,7 @@ import { digestedFiles } from '../../src/data/DataSetFiles';
 import { MOUSE_UNCLICK } from '../../src/engine/MouseQueue';
 import { PLAYFILE_LINES } from '../../src/engine/PlayfileLine';
 import { carriedStateOf, Recorder, type Recording, type RecordingPoint } from '../../src/engine/Recorder';
+import { packageOfEnd, packageOfSave, type RecordingPackage } from '../../src/engine/RecordingPackage';
 import { applySaveBytes } from '../../src/engine/SaveGameFile';
 import { saveFileOf } from '../../src/engine/GameSaves';
 import { searchMouseButtons } from '../../src/renderer/ui/Mouse';
@@ -223,4 +224,18 @@ export async function recordRun(run: CsbwinRun, build: string, dataSet = run.dat
     file: saveFileOf(game, ctx.state.paused ? 'stopped' : 'running', (champion) => ctx.host.portraitOf(champion)),
   };
   return { page, recording, entries: taken, drift, won: recording.end?.word11694 ?? null, saved };
+}
+
+/**
+ * `recorded`'s package, as the site shares `run` (`RecordingPackage`): at the game's end, or
+ * at the save made at its log's end, with the run's player, title and description, begun
+ * and ended at its log's date.
+ */
+export function runPackage(run: CsbwinRun, recorded: RecordedRun): RecordingPackage {
+  const text = { title: run.title, author: run.player, description: run.description };
+  const date = Date.parse(run.recordedAt);
+  const times = { recordedAt: date, endedAt: date, playTime: recorded.page.game.playTime() };
+  return recorded.saved
+    ? packageOfSave([recorded.recording], recorded.saved.point, recorded.saved.file, text, times)
+    : packageOfEnd([recorded.recording], text, times);
 }

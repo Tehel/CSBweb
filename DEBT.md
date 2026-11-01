@@ -551,7 +551,8 @@ behind a named switch, chosen by the recording.
 1. ✅ `Behaviour.ts`, `ENGINE_LEVEL`, `level` and the files' signatures in the recording, the
    store's row and the package, the player setting the flags; no flag yet.
    (`doc/RECORDING.md` → "A recording's level", `tools/checks/replay.ts`, 12.)
-2. The corpus and its check in `npm test`.
+2. ✅ The corpus and its check in `npm test` (`doc/RECORDING.md` → "The corpus",
+   `tools/checks/recording-corpus.ts`).
 3. The deploy's check refusing a drift.
 4. The policy written down.
 5. The 11.0xx profile: 11.014's and 11.056's sources fetched beside 2023's, their diff
@@ -568,8 +569,14 @@ recording carries `level` and `files` (`FileDigests`, the MD5 of each file the s
 read as it began, through `digestedFiles`); the store keeps the level in the row and the
 digests in the head; a package is of version 2, and one of version 1 still reads, at level
 0 naming no files. The server's table (`server/recordings.ts`) keeps no level column: its
-list shows the build alone, and step 3 reads the level from the package. The next step is
-2.
+list shows the build alone, and step 3 reads the level from the package.
+
+Step 2 is paid: `tools/fixtures/recordings/` holds the three runs' packages and three of
+`replay.ts`'s (F5 in a branch, a Sleepsave inside a VBL, a lost game's end), all of level
+0, 540 KB, and `npm test` plays each at its level and asks for every run at
+`ENGINE_LEVEL`. The author's own games from the site are not in it yet: a package the site
+serves joins it renamed to `<name>.L<level>.gz`, which the author may do at any time. The
+next step is 3.
 
 Size L.
 

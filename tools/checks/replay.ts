@@ -86,6 +86,10 @@
  *
  * Run: `npm test -- --only=replay.ts`
  *
+ * `--corpus` keeps three of its packages in the corpus of recordings, where it has none of
+ * their name at their level (`tools/lib/recordingCorpus.ts`): F5 in the new game's
+ * branch, the Sleepsave in `csbgame7.dat`'s, and the lost game's end.
+ *
  * `--measure` plays a long new game instead, keys and clicks at a player's pace, F5 and
  * F9 now and then, and prints what its package costs: a change, a branch, the whole.
  */
@@ -125,6 +129,7 @@ import { ManualClock } from '../lib/clock';
 import { STOCK_DATA_SET, diskFiles } from '../lib/dataSets';
 import { STOCK_DIR, gameTablesOf, graphicsTablesOf, stockGraphics } from '../lib/game';
 import { playPath } from '../lib/playback';
+import { keepInCorpus } from '../lib/recordingCorpus';
 import { memoryRecordingStore, memoryStore, savePath } from '../lib/saves';
 
 /** Where a recorded game starts: a new game of the stock set, or a save's file read. */
@@ -1042,6 +1047,16 @@ async function lostGame(): Promise<void> {
 /** What a player says of the recordings the tool shares. */
 const TEXT = { title: 'The tool\'s game', author: 'replay.ts', description: 'Played by a tool.\nTwo lines.' };
 
+/** `--corpus`: the packages kept in the corpus of recordings (`tools/lib/recordingCorpus.ts`), a game's each. */
+const CORPUS = process.argv.includes('--corpus');
+
+/** The corpus's names of the packages it keeps, by their start's kind and what they share. */
+const CORPUS_NAMES = new Map([
+  ['new:F5 in the branch', 'replay-new-game-branch'],
+  ['save:the Sleepsave', 'replay-csbgame7-sleepsave'],
+  ['save:the lost game\'s end shared', 'replay-lost-game'],
+]);
+
 /** Two packages the same, their files byte for byte. */
 function samePackage(a: RecordingPackage, b: RecordingPackage): boolean {
   const json = (pkg: RecordingPackage) => JSON.stringify(pkg, (_, value: unknown) => (value instanceof Uint8Array ? [...value] : value));
@@ -1050,6 +1065,8 @@ function samePackage(a: RecordingPackage, b: RecordingPackage): boolean {
 
 /** `pkg` written, read back the same, and played in a fresh page from the package alone. */
 async function playPackage(pkg: RecordingPackage, what: string): Promise<Page> {
+  const kept = CORPUS ? CORPUS_NAMES.get(`${pkg.info.start.kind}:${what}`) : undefined;
+  if (kept) console.log(`  ${what}: ${(await keepInCorpus(kept, pkg)) ?? `kept as ${kept}.L${pkg.level}.gz already`}`);
   const file = await writeRecordingPackage(pkg);
   const read = await readRecordingPackage(file);
   console.log(`  ${what}: a package of ${read.path.length} recording${read.path.length === 1 ? '' : 's'}, ${Math.round(file.length / 1024)} KB`);

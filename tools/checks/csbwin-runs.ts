@@ -12,9 +12,9 @@
  *
  *   npm test -- --only=csbwin-runs.ts [<run id>]
  */
-import { packageOfEnd, packageOfSave, readRecordingPackage, writeRecordingPackage } from '../../src/engine/RecordingPackage';
+import { readRecordingPackage, writeRecordingPackage } from '../../src/engine/RecordingPackage';
 import { check, finish } from '../lib/check';
-import { CSBWIN_RUNS, recordRun } from '../lib/csbwinRun';
+import { CSBWIN_RUNS, recordRun, runPackage } from '../lib/csbwinRun';
 import { dataSetNamed, diskFiles } from '../lib/dataSets';
 import { playPath } from '../lib/playback';
 
@@ -38,12 +38,7 @@ for (const run of runs) {
   }
   check((kinds.get('playfile') ?? 0) > 0, `${run.id} carries CSBWin's recorder's own draws as changes`);
 
-  const text = { title: run.title, author: run.player, description: run.description };
-  const date = Date.parse(run.recordedAt);
-  const times = { recordedAt: date, endedAt: date, playTime: page.game.playTime() };
-  const pkg = recorded.saved
-    ? packageOfSave([recording], recorded.saved.point, recorded.saved.file, text, times)
-    : packageOfEnd([recording], text, times);
+  const pkg = runPackage(run, recorded);
   const bytes = await writeRecordingPackage(pkg);
   const read = await readRecordingPackage(bytes);
   check(JSON.stringify(read.path[0]!.changes) === JSON.stringify(pkg.path[0]!.changes),

@@ -40,8 +40,8 @@ import { createInterface } from 'node:readline/promises';
 
 import { folderFiles } from '../src/data/DataSetFiles';
 import { DATA_SETS_ROUTE, parseManifest, PLAYER_ID_HEADER, RECORDING_PACKAGE_FIELD, RECORDINGS_ROUTE, type DataSet } from '../src/data/DataSets';
-import { packageOfEnd, packageOfSave, readRecordingPackage, writeRecordingPackage } from '../src/engine/RecordingPackage';
-import { CSBWIN_RUNS, recordRun, type CsbwinRun } from '../tools/lib/csbwinRun';
+import { readRecordingPackage, writeRecordingPackage } from '../src/engine/RecordingPackage';
+import { CSBWIN_RUNS, recordRun, runPackage, type CsbwinRun } from '../tools/lib/csbwinRun';
 import { dataSetNamed, diskFiles } from '../tools/lib/dataSets';
 import { playPath } from '../tools/lib/playback';
 
@@ -141,13 +141,7 @@ async function packageOf(run: CsbwinRun, set: DataSet, build: string): Promise<U
     const recorded = await recordRun(run, build, set.id);
     if (recorded.drift) return `it drifts at ${recorded.drift}`;
     if (run.end === 'won' ? recorded.won !== true : recorded.saved === null) return 'it does not reach its end';
-    const text = { title: run.title, author: run.player, description: run.description };
-    const date = Date.parse(run.recordedAt);
-    const times = { recordedAt: date, endedAt: date, playTime: recorded.page.game.playTime() };
-    const pkg = recorded.saved
-        ? packageOfSave([recorded.recording], recorded.saved.point, recorded.saved.file, text, times)
-        : packageOfEnd([recorded.recording], text, times);
-    const bytes = await writeRecordingPackage(pkg);
+    const bytes = await writeRecordingPackage(runPackage(run, recorded));
     const read = await readRecordingPackage(bytes);
     const played = await playPath(set, folderFiles(set.dir), read.path, read.shared.kind === 'save' ? read.shared : null);
     return played.drift ? `its package drifts as it plays back over ${set.id}'s files: ${JSON.stringify(played.drift)}` : bytes;

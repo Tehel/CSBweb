@@ -322,6 +322,29 @@ ids are the page's: the engine reads neither.
 A recording is played back by its start, and each change applied before the VBL it was
 logged at (below, "The port's player").
 
+### The corpus
+
+A level bumped without its flag, or a change of play the commit did not count as one,
+would break every recording made before it silently. So `npm test` plays a corpus of the
+port's own recordings, `tools/fixtures/recordings/`, each package named for what it plays
+and the level it was made at, `<name>.L<level>.gz` (`tools/lib/recordingCorpus.ts`).
+`tools/checks/recording-corpus.ts` reads each by the page's reader, checks its name's
+level against its own and against the levels the engine plays, and its recordings' files'
+digests against its set's, then plays it from the package alone over that set
+(`playPath`), each recording at its own level, to its point without a drift. A package is
+never rewritten: at its level, it proves the flags of every later level keep its
+behaviour.
+
+It holds CSBWin's three runs (`CSBWIN_RUNS`, below: forty minutes of Dungeon Master to
+its end each, and Chaos Strikes Back to Fulya Pit) and three of `tools/checks/replay.ts`'s
+packages: F5 in the new game's branch, the Sleepsave inside a VBL in `csbgame7.dat`'s, and
+the lost game's end. The check also asks for each run at `ENGINE_LEVEL`, so the commit that
+bumps the level records the runs again at it (`--write` records each the corpus lacks at
+that level; `replay.ts --corpus` keeps its own three the same way, once): the old packages
+stay and play with the flags on, the new ones with the flags off. A package the site
+serves (`recordings/<id>.gz`), the author's own games among them, joins the corpus renamed
+to `<name>.L<level>.gz`.
+
 ### The tree
 
 A save made in a recording knows its place there, and a load of it carries the
