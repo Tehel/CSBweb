@@ -133,6 +133,7 @@ In payoff order: the first row is the next item.
 | --- | --- | --- | --- |
 | R18 | A recording plays by the engine's behaviour as it was made | L | ⏳ step 5.4: `DMMovie42` drifts at line 7483 |
 | F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
+| R17 | The site's sets installed twice under two ids, and the install script that did it | S | ⏳ the instance's duplicates to list |
 | C198 | A missile that cannot be made loses the object it was to carry | S | ⏳ |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏸️ |
@@ -154,7 +155,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: A11 · C199 · D22 · E45 · F26 · G32 · P13 · R17 · U13 · W8 · X19. An ID recorded and paid in one commit has no
+Next free IDs: A11 · C199 · D22 · E45 · F26 · G32 · P13 · R19 · U13 · W8 · X19. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -689,6 +690,44 @@ takes it past line 6977, a wound 11.014 did not draw. What stops it now is the d
 line 7483.
 
 Size L.
+
+---
+
+### R17 ⏳ The site's sets installed twice under two ids, and the install script that did it
+
+`utils/install-official-sets.ts` decides that the instance holds a set by its id or its
+folder alone (`instance.ids`, `instance.dirs`). The reference instance's sets were written
+by hand before the script, under ids and folders of their own (its `dm-atari` is the 1.2
+disk's, `doc/DEPLOYMENT.md` → "CSBWin's own runs"), so a run of the script offered again
+sets the instance already had under another id, and installed them: the instance now holds
+duplicates, the same files under two ids, the new rows hidden by hand. The same test fails
+the other way too: a manifest set whose id the instance uses for other files is skipped as
+installed. `utils/share-csbwin-runs.ts` already matches a set by its files, byte for byte
+(`gameFiles`), which is the test the install script needs.
+
+**Paying it:**
+
+1. **The script**: a set is installed where the instance has a row whose game files
+   (`dungeon.dat`, `graphics.dat`, `CSBgraphics.dat`, `mini.dat` where the set has one)
+   hash as the fetched folder's, whatever its id, and then says which; a set whose id the
+   instance holds with other files is named and not installed, never skipped silently. Its
+   check, against a store whose rows and folders a test writes (`tools/checks/server.ts`'s
+   way of standing one up), `--dry-run` asserting what it offers.
+2. **The instance's duplicates**: for each pair, which row stays. What names a set's id:
+   `recordings.data_set`, the statistics' `events`, `games`, `deaths`, `picks` and
+   `sessions`, `data_set_documents`, `data_set_defaults`, and outside the server every
+   player's saves and recordings in their browser (`SaveEntry.dataSet`), which CONTINUE and
+   LOAD read under that id. So the row to remove is the one nothing names: the duplicate
+   just installed, hidden, which no event, recording or save can name yet unless someone
+   played it by its `?dungeon=`; its row and its folder go, after counting each table's
+   rows for its id, all zero. A row something names is not removed without the author's
+   decision on how its references move.
+
+**Waiting on:** the list of the instance's duplicates, each pair's ids and the counts
+above, read on the server (a read of the production store, which the session that recorded
+this was not allowed to make).
+
+Size S.
 
 ---
 
