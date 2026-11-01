@@ -133,7 +133,7 @@ In payoff order: the first row is the next item.
 | --- | --- | --- | --- |
 | R18 | A recording plays by the engine's behaviour as it was made | L | ⏳ step 5.4: `DMMovie42` drifts at line 7483 |
 | F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
-| R17 | The site's sets installed twice under two ids, and the install script that did it | S | ⏳ the instance's duplicates to list |
+| R17 | The site's sets installed twice under two ids | S | ⏳ the author removes six duplicates on the instance |
 | C198 | A missile that cannot be made loses the object it was to carry | S | ⏳ |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏸️ |
@@ -693,39 +693,36 @@ Size L.
 
 ---
 
-### R17 ⏳ The site's sets installed twice under two ids, and the install script that did it
+### R17 ⏳ The site's sets installed twice under two ids
 
-`utils/install-official-sets.ts` decides that the instance holds a set by its id or its
-folder alone (`instance.ids`, `instance.dirs`). The reference instance's sets were written
-by hand before the script, under ids and folders of their own (its `dm-atari` is the 1.2
-disk's, `doc/DEPLOYMENT.md` → "CSBWin's own runs"), so a run of the script offered again
-sets the instance already had under another id, and installed them: the instance now holds
-duplicates, the same files under two ids, the new rows hidden by hand. The same test fails
-the other way too: a manifest set whose id the instance uses for other files is skipped as
-installed. `utils/share-csbwin-runs.ts` already matches a set by its files, byte for byte
-(`gameFiles`), which is the test the install script needs.
+The reference instance's sets were written by hand before `utils/install-official-sets.ts`,
+under ids and folders of their own (its `dm-atari` is the 1.2 disk's, CSBWin's mix is its
+`dungeon-master-csbwin`), and a version of the script that took a set's id or folder for
+its files installed six of them a second time. The script now finds a set by its game
+files, whatever its id (`holding`, `tools/lib/officialSets.ts`), names a set whose id or
+folder holds other files instead of offering it, and ends by naming the instance's
+duplicates; `tools/checks/official-sets.ts` holds it to the instance's table as it was
+before that run and as it is.
 
-**Paying it:**
+**What is left: the six duplicates**, each the old script's row after the row it repeats,
+all hidden:
 
-1. **The script**: a set is installed where the instance has a row whose game files
-   (`dungeon.dat`, `graphics.dat`, `CSBgraphics.dat`, `mini.dat` where the set has one)
-   hash as the fetched folder's, whatever its id, and then says which; a set whose id the
-   instance holds with other files is named and not installed, never skipped silently. Its
-   check, against a store whose rows and folders a test writes (`tools/checks/server.ts`'s
-   way of standing one up), `--dry-run` asserting what it offers.
-2. **The instance's duplicates**: for each pair, which row stays. What names a set's id:
-   `recordings.data_set`, the statistics' `events`, `games`, `deaths`, `picks` and
-   `sessions`, `data_set_documents`, `data_set_defaults`, and outside the server every
-   player's saves and recordings in their browser (`SaveEntry.dataSet`), which CONTINUE and
-   LOAD read under that id. So the row to remove is the one nothing names: the duplicate
-   just installed, hidden, which no event, recording or save can name yet unless someone
-   played it by its `?dungeon=`; its row and its folder go, after counting each table's
-   rows for its id, all zero. A row something names is not removed without the author's
-   decision on how its references move.
+| Kept | Duplicate, to remove |
+| --- | --- |
+| `dm-atari` (`dm-atari@4/`) | `dm-atari-1.2` |
+| `dungeon-master-amiga-2.2-english` | `dm-amiga` |
+| `original-pc-german` (`original-pc-german@2/`) | `dm-atari-1.2-de` |
+| `dungeon-master-atari-st-1.0a-english` | `dm-atari-1.0a` |
+| `dungeon-master-atari-st-1.0b-english` | `dm-atari-1.0b` |
+| `dungeon-master-atari-st-1.1-english` | `dm-atari-1.1` |
 
-**Waiting on:** the list of the instance's duplicates, each pair's ids and the counts
-above, read on the server (a read of the production store, which the session that recorded
-this was not allowed to make).
+The kept rows are the ones the site's players, statistics and recordings name. A
+duplicate's id is named by `recordings.data_set`, the statistics' `events`, `games`,
+`deaths`, `picks` and `sessions`, `data_set_documents`, `data_set_defaults`, and every
+player's saves and recordings in their browser (`SaveEntry.dataSet`), which no server
+table shows. A duplicate whose every table counts 0 rows for its id is removed, its row
+and its folder; one that something names waits on the author's decision on how its
+references move. The author counts and removes, on the server.
 
 Size S.
 

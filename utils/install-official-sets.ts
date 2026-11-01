@@ -21,8 +21,11 @@
  * manifest's, `official` and `hidden` included, last in the list; and the manifest's
  * default set is made the instance's where it has none.
  *
- * For each set the table does not hold (by id, or by folder), the script shows its name,
- * authors and description, and asks:
+ * A set is installed where a row of the instance holds its game files, byte for byte,
+ * whatever its id (`holding`, `tools/lib/officialSets.ts`): the instance's own sets may
+ * have been written by hand under ids of their own. A set whose id the instance gives other
+ * files, or whose folder another set has, is named and not offered. For each other set,
+ * the script shows its name, authors and description, and asks:
  *
  *   y  yes: copy its folder to `<DEPLOY_DIR>/gamefiles/<dir>/`, then write its row
  *   n  no, next
@@ -35,9 +38,11 @@
  * where the fetched folder has one, `utility-portraits.dat`; nothing else of the fetched
  * folder, since everything under `gamefiles/` can be downloaded. The rows are written by
  * the container's Node through `node:sqlite`, the server's own store, which takes them at
- * once: no restart.
+ * once: no restart. At its end it names the instance's duplicates, the sets that hold the
+ * same files under several ids, which it never removes (`DEBT.md` R17).
  */
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { stdin, stdout } from 'node:process';
@@ -47,6 +52,7 @@ import { archiveFiles } from '../src/data/DataSetArchive';
 import { LOCAL_DATA_SET_TEXT_LIMITS, parseManifest, type DataSet } from '../src/data/DataSets';
 import { UTILITY_PORTRAITS_FILE } from '../src/data/UtilityPortraits';
 import { GAMEFILES_DIR, MANIFEST_FILE } from '../tools/lib/dataSets';
+import { duplicates, GAME_FILES, gameFilesOf, holding, type GameDigests, type InstanceSet } from '../tools/lib/officialSets';
 
 /** The authors an official set is offered with: FTL's own games, by the manifest's `official`. */
 const OFFICIAL_AUTHORS = ['FTL Games'];
@@ -57,10 +63,9 @@ interface Text {
     authors: string[];
 }
 
-/** What the instance's table holds, as far as this script asks. */
+/** What the instance's table holds, as far as this script asks: its sets in their order, their files' digests read in its `gamefiles/`. */
 interface Instance {
-    ids: string[];
-    dirs: string[];
+    rows: InstanceSet[];
     defaultSet: string | null;
 }
 
@@ -109,9 +114,21 @@ function inStore(program: string): string {
 
 function readInstance(): Instance {
     return JSON.parse(inStore(`
-const rows = db.prepare('SELECT id, dir FROM data_sets').all();
+const { createHash } = require('node:crypto');
+const { readFileSync } = require('node:fs');
+const digest = (dir, name) => { try { return createHash('sha256').update(readFileSync(process.env.GAMEFILES_DIR + '/' + dir + '/' + name)).digest('hex'); } catch { return null; } };
+const names = ${JSON.stringify(GAME_FILES)};
+const rows = db.prepare('SELECT id, dir, csb_graphics, mini_dat FROM data_sets ORDER BY position').all().map((row) => ({ id: row.id, dir: row.dir,
+    files: Object.fromEntries(names.map((name) => [name, (name === 'CSBgraphics.dat' && !row.csb_graphics) || (name === 'mini.dat' && !row.mini_dat) ? null : digest(row.dir, name)])) }));
 const defaults = db.prepare('SELECT default_set FROM data_set_defaults').get();
-console.log(JSON.stringify({ ids: rows.map((row) => row.id), dirs: rows.map((row) => row.dir), defaultSet: defaults ? defaults.default_set : null }));`)) as Instance;
+console.log(JSON.stringify({ rows, defaultSet: defaults ? defaults.default_set : null }));`)) as Instance;
+}
+
+/** `set`'s game files in its fetched folder, by name. */
+function localDigests(set: DataSet): GameDigests {
+    const named = gameFilesOf(set);
+    return Object.fromEntries(GAME_FILES.map((name) => [name, named.includes(name)
+        ? createHash('sha256').update(readFileSync(join(GAMEFILES_DIR, set.dir, name))).digest('hex') : null])) as GameDigests;
 }
 
 /** The files of `set`'s fetched folder that go to the instance; the run ends on one it needs that is not there. */
@@ -200,12 +217,18 @@ async function main(): Promise<void> {
     console.log(`Reading ${host}:${deployDir}'s sets…`);
     const instance = readInstance();
     for (const [i, set] of sets.entries()) {
-        if (instance.ids.includes(set.id)) {
-            console.log(`- ${set.name}: the instance has '${set.id}'.`);
+        const digests = localDigests(set);
+        const held = holding({ id: set.id, dir: set.dir, files: digests }, instance.rows);
+        if (held.kind === 'installed') {
+            console.log(`- ${set.name}: the instance has its files${held.as === set.id ? '' : ' as'} '${held.as}'.`);
             continue;
         }
-        if (instance.dirs.includes(set.dir)) {
-            console.log(`- ${set.name}: a set of the instance's is in gamefiles/${set.dir}/: skipped.`);
+        if (held.kind === 'id-taken') {
+            console.log(`- ${set.name}: the instance's '${set.id}' holds other files: not offered.`);
+            continue;
+        }
+        if (held.kind === 'dir-taken') {
+            console.log(`- ${set.name}: the instance's '${held.by}' is in gamefiles/${set.dir}/: not offered.`);
             continue;
         }
         const text: Text = { name: set.name, description: set.description, authors: set.authors.length > 0 ? [...set.authors] : OFFICIAL_AUTHORS };
@@ -227,20 +250,26 @@ async function main(): Promise<void> {
                 writeRow(set, text);
                 console.log(`  Installed '${set.id}', approved${set.hidden ? ' and hidden' : ''}.`);
             }
-            instance.ids.push(set.id);
+            instance.rows.push({ id: set.id, dir: set.dir, files: digests });
             break;
         }
     }
 
     const wanted = manifest.defaultSet?.id ?? null;
     if (instance.defaultSet !== null) console.log(`\nThe default set is '${instance.defaultSet}'.`);
-    else if (wanted !== null && instance.ids.includes(wanted)) {
+    else if (wanted !== null && instance.rows.some((row) => row.id === wanted)) {
         if (dryRun) console.log(`\nDry run: would make '${wanted}' the default set.`);
         else {
             writeDefault(wanted);
             console.log(`\n'${wanted}' is the default set, the one the welcome page selects on a first visit.`);
         }
     } else console.log('\nThe instance has no default set: the welcome page selects none on a first visit (doc/DEPLOYMENT.md).');
+
+    const twice = duplicates(instance.rows);
+    if (twice.length > 0) {
+        console.log('\nThe instance holds the same files under several ids, which this script does not remove (DEBT.md R17):');
+        for (const ids of twice) console.log(`  ${ids.join(', ')}`);
+    }
 }
 
 await main();

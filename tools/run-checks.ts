@@ -306,6 +306,9 @@ const CHECKS: Tool[] = [
   { tool: 'server.ts' },
   // The statistics: what api/event accepts and rebuilds, the SQLite store, its aggregates.
   { tool: 'stats.ts' },
+  // utils/install-official-sets.ts's test of what an instance holds: a set by its files,
+  // whatever its id, held to the reference instance's table, and its duplicates named.
+  { tool: 'official-sets.ts' },
   // The statistics' events the page sends: a new game's first tick, the Hall's joins by
   // name and charID, a won game's masteries, a lost game's square, all as the server takes
   // them; none for a player's own set.

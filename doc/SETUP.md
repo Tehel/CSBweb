@@ -190,7 +190,8 @@ and `~/csbweb` as the stack's folder. Replace them with your own.
     graphics plays one of theirs, `dm-atari`'s being CSBWin's Dungeon Master's with three
     pictures from the 1.2 disk (`doc/PROVEN_FACTS.md`). The manifest's default set, the 1.2 disk's Dungeon Master,
     becomes the one the welcome page selects on a first visit. A second run offers only
-    what is not installed yet.
+    what is not installed yet: a set whose files the instance holds under any id is
+    installed, and one whose id the instance gives other files is named, not offered.
 
 24. **Look at the store**, if you like: on the server,
     `sqlite3 ~/csbweb/stats/stats.db 'SELECT id, name, status, official, hidden FROM data_sets'`.
