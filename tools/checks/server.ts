@@ -134,9 +134,11 @@ import { MAX_RECORDING_BYTES, MAX_RECORDING_MODERATION_BYTES, MAX_SHARE_BYTES, R
 import { StatsStore } from '../../server/stats.ts';
 import { openStore } from '../../server/store.ts';
 import {
-    DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, documentPath, LOCAL_DATA_SET_TEXT_LIMITS, parseManifest, PLAYER_ID_HEADER, RECORDING_FILES, RECORDING_PACKAGE_FIELD, RECORDINGS_ROUTE, SHARED_RECORDING_ID,
+    DATA_SET_FILES_ROUTE, DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, documentPath, GAME_FILES, LOCAL_DATA_SET_TEXT_LIMITS, parseManifest, PLAYER_ID_HEADER, RECORDING_FILES, RECORDING_PACKAGE_FIELD, RECORDINGS_ROUTE, SHARED_RECORDING_ID,
 } from '../../src/data/DataSets.ts';
+import { fileDigest } from '../../src/data/DataSetFiles.ts';
 import { localDataSet } from '../../src/data/LocalDataSets.ts';
+import { parseSetDigests } from '../../src/data/RecordingSet.ts';
 import { checkLocalDataSet, readDungeonWalls } from '../../src/engine/LocalDataSetCheck.ts';
 import { readRecordingPackage } from '../../src/engine/RecordingPackage.ts';
 import { parsePublishedDungeons } from '../../src/data/DungeonSignature.ts';
@@ -787,6 +789,38 @@ async function checkPublish(scratch: string): Promise<void> {
         check((await fillWalls(gamefilesDir, dataSets, async () => { throw new Error('not asked'); })).filled.length === 0, 'the others are not read again');
         db.prepare("DELETE FROM data_sets WHERE id IN ('broken', 'approved')").run();
         rmSync(join(gamefilesDir, 'broken'), { recursive: true });
+
+        // api/data-set-files: each visible set's game files' digests, from its folder.
+        const filesSeen = async (player: string | null) => {
+            const answer = await ask(port, `/${DATA_SET_FILES_ROUTE}`, 'GET', player === null ? {} : { [PLAYER_ID_HEADER]: player });
+            return { answer, sets: parseSetDigests(answer.body, new Map()) };
+        };
+        /** What the folder of the set `id` holds of the game files, digested here. */
+        const onDisk = (id: string): Record<string, string> => {
+            const dir = join(gamefilesDir, dataSets.read().dataSets.find((set) => set.id === id)!.dir);
+            return Object.fromEntries([...GAME_FILES].sort().filter((name) => existsSync(join(dir, name))).map((name) => [name, fileDigest(new Uint8Array(readFileSync(join(dir, name))))]));
+        };
+        const filesForOwner = await filesSeen(PLAYER);
+        console.log(`  api/data-set-files, to the owner of my-dm: ${filesForOwner.sets.map((set) => `${set.id} (${Object.keys(set.files).join(', ') || 'none'})`).join(', ')}`);
+        check(filesForOwner.answer.status === 200 && String(filesForOwner.answer.headers['content-type']).startsWith('application/json')
+            && filesForOwner.answer.headers['cache-control'] === 'no-store' && filesForOwner.answer.headers.vary === PLAYER_ID_HEADER,
+            'api/data-set-files answers JSON, not cached, by player');
+        check(filesForOwner.sets.map((set) => set.id).join() === 'dm-atari,csb,conflux,my-dm'
+            && filesForOwner.sets.every((set) => JSON.stringify(set.files) === JSON.stringify(onDisk(set.id)))
+            && filesForOwner.sets.find((set) => set.id === 'my-dm')!.files['dungeon.dat'] === fileDigest(dmDungeon),
+            'a player is given the sets api/data-sets offers them, each with the MD5 of every game file its folder holds, and nothing else of it');
+        check((await filesSeen(MODERATORS[0])).sets.map((set) => set.id).join() === 'dm-atari,csb,conflux,my-dm,my-csb'
+            && (await filesSeen(null)).sets.map((set) => set.id).join() === 'dm-atari,csb,conflux',
+            'a moderator every set\'s, and anyone else the approved ones\'');
+        const hcsbPath = join(gamefilesDir, 'my-csb', 'hcsb.dat');
+        const hcsb = readFileSync(hcsbPath);
+        writeFileSync(hcsbPath, Buffer.concat([hcsb, Buffer.from([0])]));
+        const rewritten = (await filesSeen(MODERATORS[0])).sets.find((set) => set.id === 'my-csb')!.files['hcsb.dat'];
+        writeFileSync(hcsbPath, hcsb);
+        const restored = (await filesSeen(MODERATORS[0])).sets.find((set) => set.id === 'my-csb')!.files['hcsb.dat'];
+        check(rewritten === fileDigest(new Uint8Array(Buffer.concat([hcsb, Buffer.from([0])]))) && restored === fileDigest(new Uint8Array(hcsb)),
+            'a file written anew is digested anew');
+        check((await ask(port, `/${DATA_SET_FILES_ROUTE}`, 'POST')).status === 405, 'and only to GET and HEAD');
 
         console.log('  refusals:');
         const refused = async (label: string, status: number, send: () => Promise<{ status: number; body: string }>, says = '') => {

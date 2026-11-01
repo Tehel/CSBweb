@@ -131,7 +131,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| R18 | A recording plays by the engine's behaviour as it was made | L | ⏳ step 6: a recording's files found among the server's sets |
+| R18 | A recording plays by the engine's behaviour as it was made | L | ⏳ step 7: recordings resumed |
 | F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
 | C198 | A missile that cannot be made loses the object it was to carry | S | ⏳ |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
@@ -569,8 +569,9 @@ behind a named switch, chosen by the recording.
    3. ✅ The profile itself: `Behaviour.ts`'s `csbwin-11.014` naming its flags, a recording
       carrying its profile beside its level, and `tools/play-csbwin-log.ts --profile=`.
    4. ✅ The flags, one per commit, each read from the diff, until `DMMovie42` plays further.
-6. Where a set's files mismatch, the page looking for the files a recording's signatures
-   name among the server's other sets, and saying which file matches none.
+6. ✅ Where a set's files mismatch, the page looking for the files a recording's signatures
+   name among the server's other sets, and saying which file matches none
+   (`doc/RECORDING.md` → "The set a recording plays over", `tools/checks/recording-set.ts`).
 7. Recordings resumed (`src/ui/recordingsSwitch.ts`, `doc/RECORDING.md` → "Recordings are
    paused").
 
@@ -587,8 +588,8 @@ Sleepsave inside a VBL, a lost game's end), of level 0, and `npm test` plays eac
 level. None of the author's own games from the site is in it: the four the site shares are
 three of these runs, played the same, and a test game that already drifts before its first
 input. A package the site serves names the site's set (`dungeon-master-csbwin` for
-`dm-atari`'s files), so it joins the corpus only once its set is read by its files'
-digests, step 6, or its `dataSet` is rewritten to the manifest's id.
+`dm-atari`'s files), and plays over the set its files are found in (step 6), so one can
+join the corpus as it is.
 
 Step 3 is paid: `utils/deploy.sh` runs `utils/replay-recordings.ts` against the local
 `.env`'s `DEPLOY_INSTANCE` as its moderator `DEPLOY_PLAYER` before it builds, and a
@@ -663,6 +664,13 @@ sets it with the level and refuses one it does not play (`tools/checks/replay.ts
 of `CSBWIN_RUNS` names its profile (`csbwin-2023` for the three) and `recordRun` plays at
 it; `tools/play-csbwin-log.ts --profile=csbwin-11.014` plays a log at it, `csbwin-2023` by
 default.
+
+Step 6 is paid: a recording plays over the set its files are found in (`findRecordingSet`,
+`src/data/RecordingSet.ts`), its own where its files still have the digests it names, or
+else the first the server offers whose files have them, the server answering each set's
+game files' MD5 (`api/data-set-files`, `server/setFiles.ts`). Where none has them, the page
+refuses it and says which file of its set no longer matches. The corpus and the deploy's
+gate find the set the same way (`doc/RECORDING.md` → "The set a recording plays over").
 
 Step 5.4 is paid. `ENGINE_LEVEL` is 4, and the profiles' flags are four:
 `smartDiscardDrawnPriority`, `csbwin-11.014`'s from level 1, 11.014's `SmartDiscard` whole

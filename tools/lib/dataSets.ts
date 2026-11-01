@@ -11,8 +11,9 @@
  */
 import { readFileSync } from 'node:fs';
 
-import type { DataSetFiles } from '../../src/data/DataSetFiles';
-import { parseManifest, type DataSet, type DataSetManifest } from '../../src/data/DataSets';
+import { fileDigest, type DataSetFiles } from '../../src/data/DataSetFiles';
+import { GAME_FILES, parseManifest, type DataSet, type DataSetManifest } from '../../src/data/DataSets';
+import type { SetDigests } from '../../src/data/RecordingSet';
 
 /** The folder the page's `gamefiles/` is served from. */
 export const GAMEFILES_DIR = 'tools/fixtures/gamefiles';
@@ -48,4 +49,20 @@ export function diskFiles(set: DataSet): DataSetFiles {
     },
     where: (name) => `${set.dir}/${name}`,
   };
+}
+
+/**
+ * Each set's game files' digests (`GAME_FILES`), read from its folder on disk, as the
+ * server's `api/data-set-files` gives them to the page: what a recording is matched
+ * against (`findRecordingSet`, `src/data/RecordingSet.ts`).
+ */
+export async function diskSetDigests(sets: readonly DataSet[] = DATA_SETS): Promise<SetDigests[]> {
+  return Promise.all(sets.map(async (set) => {
+    const files: Record<string, string> = {};
+    for (const name of GAME_FILES) {
+      const bytes = await diskFiles(set).read(name);
+      if (bytes) files[name] = fileDigest(bytes);
+    }
+    return { id: set.id, name: set.name, files };
+  }));
 }

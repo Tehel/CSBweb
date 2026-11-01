@@ -10,13 +10,16 @@
  * 2. `--break`, answered yes, breaks the one that drifts, and only it.
  * 3. The gate again replays the one left, which plays, asks nothing, and lets the deploy
  *    go on: it exits 0.
- * 4. A player who does not moderate is refused before anything plays, by the gate and by
+ * 4. Once `dm-atari`'s `dungeon.dat` is another, the one left plays over a set whose files
+ *    are those it was made over, `dm-copy`; and without it, it is refused, the gate saying
+ *    which file of its set no longer matches (`findRecordingSet`).
+ * 5. A player who does not moderate is refused before anything plays, by the gate and by
  *    `--break`: the lists would leave recordings out.
  *
  * Usage: npm test -- --only=replay-recordings.ts
  */
 import { spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -119,7 +122,26 @@ try {
     check(again.code === 0 && again.out.includes('1 recording replayed, 0 that drift.') && again.out.includes('and 2 broken already')
         && !again.out.includes('refused') && !again.out.includes('Mark it broken?'), 'it replays the one left, which plays, asks nothing, and lets the deploy go on');
 
-    console.log('\n4. A player who does not moderate:');
+    console.log('\n4. Its set\'s dungeon.dat another:');
+    mkdirSync(join(gamefilesDir, 'dm-copy'));
+    for (const name of ['dungeon.dat', 'graphics.dat']) symlinkSync(resolve(dm.dir, name), join(gamefilesDir, 'dm-copy', name));
+    db.prepare("INSERT INTO data_sets (id, name, dir, position, status, owner) VALUES ('dm-copy', 'DM copy', 'dm-copy', 99, 'approved', NULL)").run();
+    const dungeon = join(gamefilesDir, 'dm-atari', 'dungeon.dat');
+    unlinkSync(dungeon);
+    symlinkSync(resolve(dataSetNamed('csb').dir, 'dungeon.dat'), dungeon);
+    const moved = await runTool(instance, ['--player', MODERATOR], '');
+    show(moved.out);
+    check(moved.code === 0 && moved.out.includes(`✓ ${plays} 'Quiet' (build test): plays to its point, over dm-copy's files`),
+        'the recording plays over the set whose files are those it was made over');
+    db.prepare("DELETE FROM data_sets WHERE id = 'dm-copy'").run();
+    const gone = await runTool(instance, ['--player', MODERATOR], '');
+    show(gone.out);
+    check(gone.code === 1 && gone.out.includes(`✗ ${plays} 'Quiet' (build test): is refused: DM's dungeon.dat no longer matches the recording, and no other set on this site holds its files.`)
+        && gone.out.includes('The deploy is refused'), 'and where no set has them, it is refused, and the deploy with it');
+    unlinkSync(dungeon);
+    symlinkSync(resolve(dm.dir, 'dungeon.dat'), dungeon);
+
+    console.log('\n5. A player who does not moderate:');
     store.remove(plays);
     const fake = await share(await packageOf('dm-atari', 'Another fake'));
     for (const args of [[], ['--break']]) {

@@ -18,8 +18,10 @@
  * Each set the instance lists (`api/data-sets`) has its recordings listed
  * (`api/recordings?dataSet=<id>`), and each that is not broken yet has its package
  * fetched (`recordings/<id>.gz`), read by the page's reader (`readRecordingPackage`) and
- * played, from the package alone, in a page without the DOM over the set's files as the
- * instance serves them (`playPath`, `tools/lib/playback.ts`), with the engine of this
+ * played, from the package alone, in a page without the DOM over the files as the
+ * instance serves them (`playPath`, `tools/lib/playback.ts`): those of the set the page
+ * would play it over, found by its files' digests (`findRecordingSet`, against
+ * `api/data-set-files`), its own or another whose files have them, with the engine of this
  * working tree: what the build deployed from it will play. A recording that plays to its
  * point, a save's file checked there or the game's end reached, passes; one that drifts,
  * or whose package does not read or play (a later level's among them), is shown with why.
@@ -41,7 +43,8 @@ import { stdin, stdout } from 'node:process';
 import { createInterface } from 'node:readline/promises';
 
 import { folderFiles } from '../src/data/DataSetFiles';
-import { DATA_SETS_ROUTE, parseManifest, PLAYER_ID_HEADER, RECORDING_FILES, RECORDINGS_ROUTE, SHARED_RECORDING_ID, type DataSet } from '../src/data/DataSets';
+import { DATA_SET_FILES_ROUTE, DATA_SETS_ROUTE, parseManifest, PLAYER_ID_HEADER, RECORDING_FILES, RECORDINGS_ROUTE, SHARED_RECORDING_ID, type DataSet } from '../src/data/DataSets';
+import { findRecordingSet, parseSetDigests, type SetDigests } from '../src/data/RecordingSet';
 import { readRecordingPackage } from '../src/engine/RecordingPackage';
 import type { Drift } from '../src/engine/RecordingPlayer';
 import { keptFiles, playPath } from '../tools/lib/playback';
@@ -119,16 +122,28 @@ function checkoutBuild(): string {
     return `${head.stdout.trim() || 'an unknown commit'}${changed.stdout.trim() ? ', its src/ changed' : ''}`;
 }
 
-/** `recording` of `set` played from its package: `null` where it plays to its point, or why it does not. */
-async function replay(set: DataSet, files: ReturnType<typeof keptFiles>, recording: Listed): Promise<string | null> {
+/** The sets the instance lists, by id: each with its files as the instance serves them, read once. */
+type Served = ReadonlyMap<string, { set: DataSet; files: ReturnType<typeof keptFiles> }>;
+
+/**
+ * `recording` of `set` played from its package over the set the page would play it over
+ * (`findRecordingSet`): why it does not play to its point, `null` where it does, and the
+ * set it played over where that is another.
+ */
+async function replay(set: DataSet, served: Served, digests: readonly SetDigests[], recording: Listed): Promise<{ why: string | null; over: string | null }> {
+    const result = (why: string | null, over: string | null = null) => ({ why, over });
     try {
         const bytes = new Uint8Array(await (await fetchOk(`${instance}/${RECORDING_FILES}/${recording.id}.gz`)).arrayBuffer());
         const pkg = await readRecordingPackage(bytes);
-        if (pkg.dataSet !== set.id) return `its package plays ${pkg.dataSet}, not ${set.id}`;
-        const played = await playPath(set, files, pkg.path, pkg.shared.kind === 'save' ? pkg.shared : null);
-        return played.drift ? driftText(played.drift) : null;
+        if (pkg.dataSet !== set.id) return result(`its package plays ${pkg.dataSet}, not ${set.id}`);
+        const found = findRecordingSet(pkg.path, digests);
+        if (found.kind === 'refused') return result(`is refused: ${found.why}`);
+        const over = served.get(found.id);
+        if (!over) return result(`plays over ${found.id}, which the instance does not list`);
+        const played = await playPath(over.set, over.files, pkg.path, pkg.shared.kind === 'save' ? pkg.shared : null);
+        return result(played.drift ? driftText(played.drift) : null, over.set.id === set.id ? null : over.set.id);
     } catch (error) {
-        return `does not play: ${error instanceof Error ? error.message : String(error)}`;
+        return result(`does not play: ${error instanceof Error ? error.message : String(error)}`);
     }
 }
 
@@ -136,6 +151,9 @@ async function main(): Promise<void> {
     console.log(`Replaying ${instance}'s recordings against ${checkoutBuild()}.`);
     const manifest = parseManifest(await (await fetchOk(`${instance}/${DATA_SETS_ROUTE}`, { headers: asPlayer })).text(), `${instance}/gamefiles`);
     if (!manifest.moderator) fail(`${instance} refuses: --player is not one of its moderators, so its lists would leave recordings out.`);
+    const digests = parseSetDigests(await (await fetchOk(`${instance}/${DATA_SET_FILES_ROUTE}`, { headers: asPlayer })).text(),
+        new Map(manifest.dataSets.map((set) => [set.id, set.name])));
+    const served: Served = new Map(manifest.dataSets.map((set) => [set.id, { set, files: keptFiles(folderFiles(set.dir)) }]));
     const drifted: Drifted[] = [];
     let played = 0;
     for (const set of manifest.dataSets) {
@@ -145,12 +163,11 @@ async function main(): Promise<void> {
         if (toPlay.length === 0) continue;
         console.log(`\n${set.name} (${set.id}): ${toPlay.length} recording${toPlay.length === 1 ? '' : 's'}`
             + `${listed.length > toPlay.length ? `, and ${listed.length - toPlay.length} broken already` : ''}`);
-        const files = keptFiles(folderFiles(set.dir));
         for (const recording of toPlay) {
             const state = recording.status === 'pending' ? ', pending' : recording.hidden ? ', hidden' : '';
-            const why = await replay(set, files, recording);
+            const { why, over } = await replay(set, served, digests, recording);
             played++;
-            console.log(`  ${why ? '✗' : '✓'} ${recording.id} '${recording.title}' (build ${recording.build}${state}): ${why ?? 'plays to its point'}`);
+            console.log(`  ${why ? '✗' : '✓'} ${recording.id} '${recording.title}' (build ${recording.build}${state}): ${why ?? 'plays to its point'}${over ? `, over ${over}'s files` : ''}`);
             if (why) drifted.push({ set, recording, why });
         }
     }

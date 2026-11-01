@@ -6,8 +6,10 @@
  *
  * Each package of `tools/fixtures/recordings/` (`tools/lib/recordingCorpus.ts`) is read by
  * the page's reader, its name's level checked against its own and against the levels the
- * engine plays (`knownLevel`), its recordings' files' digests against its set's files,
- * and played from the package alone over that set, as the replay tool plays a shared
+ * engine plays (`knownLevel`), its recordings' files' digests against the sets' files, to
+ * find the set it plays over as the page finds it (`findRecordingSet`): its own, or
+ * another whose files have them, as a package the site serves names the site's set. It is
+ * played from the package alone over that set, as the replay tool plays a shared
  * recording (`playPath`): each recording at its own level, to its point without a drift,
  * a save's file made again there or the game's end reached.
  *
@@ -23,12 +25,12 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
-import { fileDigest } from '../../src/data/DataSetFiles';
 import { ENGINE_LEVEL, knownLevel } from '../../src/engine/Behaviour';
+import { findRecordingSet } from '../../src/data/RecordingSet';
 import { readRecordingPackage, type RecordingPackage } from '../../src/engine/RecordingPackage';
 import { check, finish } from '../lib/check';
 import { CSBWIN_RUNS, recordRun, runPackage } from '../lib/csbwinRun';
-import { DATA_SETS, diskFiles } from '../lib/dataSets';
+import { DATA_SETS, diskFiles, diskSetDigests } from '../lib/dataSets';
 import { playPath } from '../lib/playback';
 import { CORPUS_DIR, CORPUS_FILE, corpusFiles, keepInCorpus } from '../lib/recordingCorpus';
 
@@ -56,20 +58,7 @@ function holds(ok: boolean, what: string): boolean {
   return ok;
 }
 
-/** `pkg`'s recordings' files whose digests its set's files no longer have: `<file>`, or why. */
-async function mismatchedFiles(pkg: RecordingPackage): Promise<string[]> {
-  const set = DATA_SETS.find((candidate) => candidate.id === pkg.dataSet);
-  if (!set) return [`no set ${pkg.dataSet}`];
-  const files = diskFiles(set);
-  const wrong = new Set<string>();
-  for (const recording of pkg.path) {
-    for (const [name, digest] of Object.entries(recording.files ?? {})) {
-      const bytes = await files.read(name);
-      if (!bytes || fileDigest(bytes) !== digest) wrong.add(name);
-    }
-  }
-  return [...wrong];
-}
+const digests = await diskSetDigests();
 
 const files = corpusFiles();
 console.log(`${CORPUS_DIR}: ${files.length} packages, the engine at level ${ENGINE_LEVEL}`);
@@ -90,9 +79,13 @@ for (const file of files) {
     + `${pkg.path.length} recording${pkg.path.length === 1 ? '' : 's'}, ${changes} changes, ${vbls} VBLs, level${pkg.path.length === 1 ? '' : 's'} ${[...new Set(pkg.path.map((recording) => recording.level))].join(', ')}, ${Math.round(bytes.length / 1024)} KB`);
   if (!holds(Number(named![2]) === pkg.level, `${file}'s name says its level, ${pkg.level}`)) continue;
   if (!holds(pkg.path.every((recording) => knownLevel(recording.level)), `${file}'s levels are the engine's, 0 to ${ENGINE_LEVEL}`)) continue;
-  const mismatched = await mismatchedFiles(pkg);
-  if (!holds(mismatched.length === 0, `${file}'s files are ${pkg.dataSet}'s${mismatched.length ? `: ${mismatched.join(', ')} no longer match` : ''}`)) continue;
-  const set = DATA_SETS.find((candidate) => candidate.id === pkg.dataSet)!;
+  const found = findRecordingSet(pkg.path, digests);
+  if (found.kind === 'refused') {
+    check(false, `${file}'s files are a set's: ${found.why}`);
+    continue;
+  }
+  check(true, `${file}'s files are ${found.id}'s${found.id === pkg.dataSet ? '' : `, not ${pkg.dataSet}'s`}`);
+  const set = DATA_SETS.find((candidate) => candidate.id === found.id)!;
   const startedAt = Date.now();
   const played = await playPath(set, diskFiles(set), pkg.path, pkg.shared.kind === 'save' ? pkg.shared : null);
   check(played.drift === null, `${file} plays to its point at its level${played.joins ? `, through ${played.joins} join${played.joins === 1 ? '' : 's'}` : ''}, `

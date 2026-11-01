@@ -25,6 +25,8 @@
  *                     form, or removed, with JSON (`documents.ts`)
  *   /api/data-set-walls  the walls of the sets `api/data-sets` offers the same player
  *                     that keep them, the published ones (`wallsText`)
+ *   /api/data-set-files  the MD5 of each game file of the sets `api/data-sets` offers the
+ *                     same player (`filesText`, `setFiles.ts`)
  *   /api/recordings?dataSet=<id>  the set's shared recordings, for the player its
  *                     `X-Player-Id` names (`recordingsText`); POST: that player's package
  *                     shared, pending (`shareRecording`, `recordings.ts`)
@@ -50,7 +52,7 @@ import { extname, join } from 'node:path';
 import { pipeline } from 'node:stream';
 import { pathToFileURL } from 'node:url';
 
-import { DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, PLAYER_ID_HEADER, RECORDING_FILES, RECORDINGS_ROUTE } from '../src/data/DataSets.ts';
+import { DATA_SET_FILES_ROUTE, DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, PLAYER_ID_HEADER, RECORDING_FILES, RECORDINGS_ROUTE } from '../src/data/DataSets.ts';
 import type { StatsSet } from './answers.ts';
 import { manifestText, samePlayerId, wallsText, type DataSetStore, type DataSetViewer, type Moderator } from './dataSets.ts';
 import { addDocument, removeDocument } from './documents.ts';
@@ -58,6 +60,7 @@ import { editDataSet } from './edit.ts';
 import { addressBucket, checkEvent, isPlayerId, MAX_EVENT_BYTES, type EventRules, type RateLimit } from './events.ts';
 import { MAX_MODERATION_BYTES, moderateDataSet, type ModerationAnswer } from './moderate.ts';
 import type { Notify } from './notify.ts';
+import { FileDigestCache, filesText } from './setFiles.ts';
 import { MAX_PUBLISH_BYTES, publishDataSet, type CheckDataSet, type PublishAnswer, type ReadDungeonWalls } from './publish.ts';
 import {
     MAX_RECORDING_MODERATION_BYTES, MAX_SHARE_BYTES, moderateRecording, recordingsText, shareRecording, type ReadRecordingPackage, type RecordingAnswer, type RecordingStore,
@@ -263,6 +266,7 @@ export const FILES_POLICY = "default-src 'self'; style-src 'self' 'unsafe-inline
 /** The server, not yet listening. */
 export function createAppServer(options: ServerOptions, api: ApiOptions): Server {
     const statsCache = new AnswerCache(STATS_CACHE_MS, api.now);
+    const digests = new FileDigestCache();
     return createServer((req, res) => {
         for (const [name, value] of Object.entries(SECURITY_HEADERS)) res.setHeader(name, value);
         const fail = (error: unknown) => {
@@ -271,14 +275,14 @@ export function createAppServer(options: ServerOptions, api: ApiOptions): Server
             else res.destroy();
         };
         try {
-            route(options, api, statsCache, req, res)?.catch(fail);
+            route(options, api, statsCache, digests, req, res)?.catch(fail);
         } catch (error) {
             fail(error);
         }
     });
 }
 
-function route({ distDir, gamefilesDir, filesDir }: ServerOptions, api: ApiOptions, statsCache: AnswerCache, req: IncomingMessage, res: ServerResponse): Promise<void> | void {
+function route({ distDir, gamefilesDir, filesDir }: ServerOptions, api: ApiOptions, statsCache: AnswerCache, digests: FileDigestCache, req: IncomingMessage, res: ServerResponse): Promise<void> | void {
     const segments = pathSegments(req.url ?? '');
     if (segments === null) return send(res, 400, 'Bad path');
 
@@ -299,6 +303,13 @@ function route({ distDir, gamefilesDir, filesDir }: ServerOptions, api: ApiOptio
             res.setHeader('Cache-Control', 'no-store');
             res.setHeader('Vary', PLAYER_ID_HEADER);
             return send(res, 200, wallsText(api.dataSets.read(), api.dataSets.walls(), dataSetViewer(api, req)), 'application/json; charset=utf-8');
+        }
+        if (segments.join('/') === DATA_SET_FILES_ROUTE) {
+            if (req.method !== 'GET' && req.method !== 'HEAD') return refuseMethod(res);
+            res.setHeader('Cache-Control', 'no-store');
+            res.setHeader('Vary', PLAYER_ID_HEADER);
+            return filesText(api.dataSets.read(), dataSetViewer(api, req), gamefilesDir, digests)
+                .then((text) => send(res, 200, text, 'application/json; charset=utf-8'));
         }
         if (segments.length === 3 && segments.slice(0, 2).join('/') === DATA_SETS_ROUTE) {
             if (req.method !== 'POST') return refuseMethod(res, 'POST');

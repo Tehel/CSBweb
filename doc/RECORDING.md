@@ -392,7 +392,8 @@ port's own recordings, `tools/fixtures/recordings/`, each package named for what
 and the level it was made at, `<name>.L<level>.gz` (`tools/lib/recordingCorpus.ts`).
 `tools/checks/recording-corpus.ts` reads each by the page's reader, checks its name's
 level against its own and against the levels the engine plays, and its recordings' files'
-digests against its set's, then plays it from the package alone over that set
+digests against the sets' files, to find the set it plays over ("The set a recording plays
+over", below), then plays it from the package alone over that set
 (`playPath`), each recording at its own level, to its point without a drift. A package is
 never rewritten: at its level, it proves the flags of every later level keep its
 behaviour.
@@ -409,12 +410,40 @@ and play with the flags on, and the flags off are what `tools/checks/csbwin-runs
 its inputs being its log's.
 
 A package the site serves (`recordings/<id>.gz`) names the site's set, whose id need not be
-`tools/data-sets.json`'s (`dungeon-master-csbwin` for `dm-atari`'s files), so the check
-cannot play it as it is: its `dataSet` must name the manifest's set.
+`tools/data-sets.json`'s (`dungeon-master-csbwin` for `dm-atari`'s files): the check plays
+it over the set whose files it names, as the page does.
 
 The site's own recordings are the deploy's corpus: `utils/deploy.sh` replays every one the
 site shares with the build it is about to deploy, each at its level, and refuses the
 deploy where one drifts (`utils/replay-recordings.ts`, `doc/DEPLOYMENT.md` → "Deploying").
+
+### The set a recording plays over
+
+A recording names its set by id, and carries the MD5 of each file the set had read as it
+began (`Recording.files`). A set's files may change after it (a corrected `graphics.dat`
+item, a moderator's new `dungeon.dat`), and the site may name a set's files by another id
+than the manifest's (`dungeon-master-csbwin` for `dm-atari`'s). So the set a recording
+plays over is found by its files (`findRecordingSet`, `src/data/RecordingSet.ts`): its own
+where its files have every digest the path's recordings name, or else the first set, in
+the manifest's order, whose files have them all. A path recorded before the digests names
+none, and plays over its own set. Where no set has them, the recording is refused, and the
+refusal says which file of its set no longer matches ("Dungeon Master's dungeon.dat no
+longer matches the recording, and no other set on this site holds its files."), or that
+its set is not on the site. Two recordings of a path that read one file with different
+bytes are refused too: no set has both.
+
+The page asks the server for the digests (`api/data-set-files`, `server/setFiles.ts`): the
+MD5 of each game file (`GAME_FILES`, `src/data/DataSets.ts`) of each set the manifest offers
+its player, a file digested once while its size and its time stay. It asks only to play a
+recording that names files, before the page is built (`playedSetOf`, `src/main.ts`); a
+local set's recording is matched against its record's files alone; and where the server
+cannot answer, the recording plays over its own set, the console saying why. `?dungeon=`,
+where given, must name the set found. The corpus (`tools/checks/recording-corpus.ts`) and
+the deploy's gate (`utils/replay-recordings.ts`) find the set the same way, the corpus from
+the repository's sets' files on disk (`diskSetDigests`), the gate from the instance's
+answer. `tools/checks/recording-set.ts` proves the choice and the refusals,
+`tools/checks/server.ts` the answer, and `tools/checks/replay-recordings.ts` the gate
+playing over another set.
 
 ### The tree
 
@@ -515,9 +544,9 @@ a root and the branches down to the one played, or a branch alone, from its own 
   (`GameSaves.sleepSave`); the file goes to the player (`InputBoundary.savedInVbl`).
 
 **The page** plays one with `?recording=<id>` (`playRecording`, `src/main.ts`), by the
-page's own loop, on the set its root names: the path is read before the page is built
-(`readPlayedRecording`), so the link needs no `?dungeon=`, and one that names another set
-than the recording's ends the page as an error. A store's id is the path the store holds to it, from its root
+page's own loop, over the set its files are found in ("The set a recording plays over",
+above): the path is read before the page is built (`readPlayedRecording`), so the link
+needs no `?dungeon=`, and one that names another set ends the page as an error. A store's id is the path the store holds to it, from its root
 (`readRecordingPath`, `src/data/saves/RecordingStore.ts`). A store's save,
 `save:<its row's id>` (`SAVE_POINT_PREFIX`, `src/engine/RecordingPoints.ts`), is the path the
 store holds to its point, played to it and the save's file checked there, as a site's

@@ -4,7 +4,7 @@
  * (`tools/checks/build.ts`) and the replay tool plays (`tools/checks/replay-recordings.ts`).
  * `tools/checks/replay.ts` makes packages of games played.
  */
-import type { DataSetFiles } from '../../src/data/DataSetFiles.ts';
+import { digestedFiles, type DataSetFiles } from '../../src/data/DataSetFiles.ts';
 import type { DataSet } from '../../src/data/DataSets.ts';
 import { NO_EXTRAS, type RulesOptions } from '../../src/engine/GameContext.ts';
 import { saveFileOf } from '../../src/engine/GameSaves.ts';
@@ -36,16 +36,18 @@ export async function packageOf(dataSet: string, title: string, { extras = false
 /**
  * A package of a new game of `set`'s, whose files `files` reads, left alone for `vbls`
  * VBLs and shared at a save made there, titled `title`: one that plays to its point. The
- * save's file is the one the game makes there, played by the replay tool's page.
+ * save's file is the one the game makes there, played by the replay tool's page, and the
+ * recording names the digests of the files it read, as the page's does.
  */
 export async function quietPackage(set: DataSet, files: DataSetFiles, title: string, vbls: number): Promise<Uint8Array<ArrayBuffer>> {
     const root: Recording = {
         id: 'root', build: 'test', level: 0, profile: null, files: null, dataSet: set.id, start: { kind: 'new', random: 0x1234, randomGameID: 5 }, parent: null, rules: RULES_OFF,
         extras: NO_EXTRAS, changes: [], vbls, ended: true, end: null,
     };
-    const { game } = await playPath(set, files, [root]);
+    const digested = digestedFiles(files);
+    const { game } = await playPath(set, digested, [root]);
     const file = saveFileOf(game, 'running', (champion) => game.ctx.host.portraitOf(champion));
-    const pkg = packageOfSave([root], { recording: root.id, changes: 0, vbls }, file, { title, author: '', description: '' },
+    const pkg = packageOfSave([{ ...root, files: digested.digests() }], { recording: root.id, changes: 0, vbls }, file, { title, author: '', description: '' },
         { recordedAt: 1000, endedAt: 2000, playTime: 500 });
     return new Uint8Array(await writeRecordingPackage(pkg));
 }

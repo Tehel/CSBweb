@@ -391,7 +391,7 @@ export function wallsText(stored: StoredDataSets, walls: ReadonlyMap<string, Dat
 }
 
 /** The sets of `stored` that `viewer` may see: the approved ones, their own pending ones, and every one for a moderator. */
-function visibleSets(stored: StoredDataSets, viewer: DataSetViewer): StoredDataSet[] {
+export function visibleSets(stored: StoredDataSets, viewer: DataSetViewer): StoredDataSet[] {
     return stored.dataSets.filter((set) => !set.pending || viewer.moderator !== null
         || (viewer.playerId !== null && set.owner !== null && samePlayerId(set.owner, viewer.playerId)));
 }

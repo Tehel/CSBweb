@@ -201,6 +201,23 @@ export const DATA_SETS_ROUTE = 'api/data-sets';
 export const DATA_SET_WALLS_ROUTE = 'api/data-set-walls';
 
 /**
+ * Where the page asks for the MD5 of each game file of the sets `DATA_SETS_ROUTE` offers
+ * it, naming its player the same way (`server/setFiles.ts`): what a recording played by
+ * `?recording=` is matched against, to find a set whose files are those it was made over
+ * (`findRecordingSet`, `src/data/RecordingSet.ts`).
+ */
+export const DATA_SET_FILES_ROUTE = 'api/data-set-files';
+
+/**
+ * The files a game reads of its set by name (`DataSetFiles.read`), which a recording's
+ * digests may name (`FileDigests`, `src/data/DataSetFiles.ts`): the boot's
+ * (`loadGameFiles`), `dungeon.dat` and `mini.dat` (`src/main.ts`), and RISE's portraits
+ * (`UTILITY_PORTRAITS_FILE`). The server digests these alone of a set's folder, which also
+ * holds its thumbnail and its documents.
+ */
+export const GAME_FILES = ['graphics.dat', 'CSBgraphics.dat', 'hcsb.hct', 'hcsb.dat', 'dungeon.dat', 'mini.dat', 'utility-portraits.dat'] as const;
+
+/**
  * The header in which the page names its player to `DATA_SETS_ROUTE`: their `playerId`
  * (`src/ui/gameEvents.ts`), a secret, which a URL's query would leak into logs.
  */

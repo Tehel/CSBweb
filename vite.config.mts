@@ -12,13 +12,14 @@ import {
   receiveRecordingModeration, receiveShare,
 } from './server/app.ts';
 import { DataSetStore, manifestText, parseModerators, wallsText } from './server/dataSets.ts';
+import { FileDigestCache, filesText } from './server/setFiles.ts';
 import { RateLimit } from './server/events.ts';
 import { NOBODY } from './server/notify.ts';
 import type { CheckDataSet } from './server/publish.ts';
 import { RecordingStore, type ReadRecordingPackage } from './server/recordings.ts';
 import { AnswerCache, StatsStore } from './server/stats.ts';
 import {
-  DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, PLAYER_ID_HEADER, RECORDING_FILES, RECORDINGS_ROUTE, SHARED_RECORDING_ID, parseManifest,
+  DATA_SET_FILES_ROUTE, DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, PLAYER_ID_HEADER, RECORDING_FILES, RECORDINGS_ROUTE, SHARED_RECORDING_ID, parseManifest,
 } from './src/data/DataSets.ts';
 import { fillFortnight } from './tools/lib/statsFortnight.ts';
 
@@ -53,6 +54,8 @@ const DEV_MODERATOR_PLAYER_ID = '00000000-0000-4000-8000-000000000001';
  * (`ssrLoadModule`), and a POST to `api/data-sets/<id>` `receiveModeration`, or
  * `receiveEdit` for a form, and to `api/data-sets/<id>/documents` `receiveDocument`.
  * `api/data-set-walls` answers `wallsText` over the same store: the published sets'.
+ * `api/data-set-files` answers `filesText` over it, each set's files read from the scratch
+ * folder, which holds the site's sets too.
  *
  * A published set is written into a scratch folder, made at start and removed at the end,
  * which holds a link to each entry of `tools/fixtures/gamefiles/`, so that a base set's
@@ -219,6 +222,29 @@ function dataSetsRoute(): Plugin {
         try {
           const dataSets = openStore(db);
           res.end(req.method === 'HEAD' ? undefined : wallsText(dataSets.read(), dataSets.walls(), dataSetViewer({ moderators }, req)));
+        } catch (error) {
+          next(error);
+        } finally {
+          db.close();
+        }
+      });
+
+      const digests = new FileDigestCache();
+      server.middlewares.use(`/${DATA_SET_FILES_ROUTE}`, async (req, res, next) => {
+        if (req.url !== '/' && !req.url?.startsWith('/?')) return next();
+        if (req.method !== 'GET' && req.method !== 'HEAD') {
+          res.statusCode = 405;
+          res.setHeader('Allow', 'GET, HEAD');
+          return res.end();
+        }
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-store');
+        res.setHeader('Vary', PLAYER_ID_HEADER);
+        if (!sqlite) return res.end(req.method === 'HEAD' ? undefined : JSON.stringify({ dataSets: [] }));
+        const db = new sqlite.DatabaseSync(':memory:');
+        try {
+          const text = await filesText(openStore(db).read(), dataSetViewer({ moderators }, req), scratch, digests);
+          res.end(req.method === 'HEAD' ? undefined : text);
         } catch (error) {
           next(error);
         } finally {

@@ -9,12 +9,13 @@ import { VBL_FREQUENCY } from './core/constants';
 import { CsbRandom } from './core/random';
 import { extractPresetHeroes } from './data/HeroExtractor';
 import {
-    DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, dataSetNamed, parseManifest, PLAYER_ID_HEADER, RECORDING_FILES, SHARED_RECORDING_ID, THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH,
+    DATA_SET_FILES_ROUTE, DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, dataSetNamed, parseManifest, PLAYER_ID_HEADER, RECORDING_FILES, SHARED_RECORDING_ID, THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH,
     thumbnailPath, type DataSet, type DataSetManifest,
 } from './data/DataSets';
-import { digestedFiles, folderFiles, loadGameFiles, type DataSetFiles, type DigestedFiles, type GameFiles } from './data/DataSetFiles';
+import { digestedFiles, fileDigest, folderFiles, loadGameFiles, type DataSetFiles, type DigestedFiles, type GameFiles } from './data/DataSetFiles';
 import { parsePublishedDungeons, type KnownDungeon } from './data/DungeonSignature';
 import { isLocalDataSetId, localDataSet, recordFiles } from './data/LocalDataSets';
+import { findRecordingSet, parseSetDigests, type SetDigests } from './data/RecordingSet';
 import { emptyDungeonData } from './data/DungeonLoader';
 import { GraphicsLoader } from './data/GraphicsLoader';
 import { BrowserDataSetStore, BrowserRecordingStore, BrowserSaveStore, downloadSaveFile, readRecordingPath, type DrawPlaythrough, type OpenedSave, type SaveStore } from './data/saves';
@@ -698,13 +699,13 @@ function applySettings({ game }: Built, sound: SoundManager, values: SettingsVal
  * loop does not run, paused or at the end, a move of the pointer is drawn at the
  * display's next frame (`Presenter.animate`), as the loop's VBL draws it while it runs.
  *
- * The path is read before the page is built (`readPlayedRecording`), and plays on the set
- * its root names, or the one `?dungeon=` names, which must be the same: a recording of
- * another data set ends the page as an error does.
+ * The path is read before the page is built (`readPlayedRecording`), and plays over `set`,
+ * the set its files were found in (`playedSetOf`), or the one `?dungeon=` names, which must
+ * be the same: a recording of another data set ends the page as an error does.
  */
-async function playRecording(built: Built, id: string, { path, savedAtEnd }: PlayedPath): Promise<void> {
+async function playRecording(built: Built, id: string, { path, savedAtEnd }: PlayedPath, set: string): Promise<void> {
     const { game, screen, messages, input } = built;
-    if (path.some((recording) => recording.dataSet !== dataSet.id)) throw new Error(`RECORDING ${id} IS NOT OF ${dataSet.name}`);
+    if (dataSet.id !== set) throw new Error(`RECORDING ${id} IS NOT OF ${dataSet.name}`);
     const dungeonDat = await readDungeonFile();
     const print = (line: string): void => {
         messages.printLinefeed();
@@ -884,6 +885,54 @@ async function readSavePoint(saveStore: SaveStore, recordingStore: BrowserRecord
     return { path: await pointPath(recordingStore, point), savedAtEnd: { file: bytes, inVbl: point.save.recording.inVbl === true } };
 }
 
+/**
+ * The set `path` plays over (`findRecordingSet`, `src/data/RecordingSet.ts`): its root's own
+ * where its files still have the digests the path's recordings name, or another the server
+ * offers whose files have them. A local set's recording is matched against its record's
+ * files alone. A path that names no file plays over its own set, and so does one the server
+ * cannot answer for, the console saying why. One whose files no set has ends the page as an
+ * error does, saying which file of its set no longer matches.
+ */
+async function playedSetOf(manifest: DataSetManifest, path: readonly Recording[]): Promise<string> {
+    const own = path[0]?.dataSet ?? '';
+    if (path.every((recording) => recording.files === null)) return own;
+    const sets = isLocalDataSetId(own) ? await localSetDigests(manifest, own, path) : await serverSetDigests(manifest);
+    if (sets === null) return own;
+    const found = findRecordingSet(path, sets);
+    if (found.kind === 'refused') throw new Error(found.why);
+    if (found.id !== own) console.log(`✓ The recording's files are ${found.id}'s: it plays over that set, not ${own}`);
+    return found.id;
+}
+
+/** The local set `id`'s digests of the files `path` names, read from its record; `null` where the store has no such set. */
+async function localSetDigests(manifest: DataSetManifest, id: string, path: readonly Recording[]): Promise<SetDigests[] | null> {
+    const chosen = await chooseDataSet(manifest, id);
+    if (!chosen) return null;
+    const files: Record<string, string> = {};
+    for (const name of new Set(path.flatMap((recording) => Object.keys(recording.files ?? {})))) {
+        const bytes = await chosen.files.read(name);
+        if (bytes) files[name] = fileDigest(bytes);
+    }
+    return [{ id, name: chosen.set.name, files }];
+}
+
+/**
+ * The digests of the game files of the sets the server offers the page's player
+ * (`DATA_SET_FILES_ROUTE`), named as the manifest names them; `null` where it cannot answer,
+ * the console saying why.
+ */
+async function serverSetDigests(manifest: DataSetManifest): Promise<SetDigests[] | null> {
+    try {
+        const player = keptPlayerId();
+        const response = await fetch(DATA_SET_FILES_ROUTE, player === null ? undefined : { headers: { [PLAYER_ID_HEADER]: player } });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return parseSetDigests(await response.text(), new Map(manifest.dataSets.map((set) => [set.id, set.name])));
+    } catch (error) {
+        console.warn(`Cannot read the sets' files' digests '${DATA_SET_FILES_ROUTE}', so the recording plays over its own set: ${error instanceof Error ? error.message : String(error)}`);
+        return null;
+    }
+}
+
 function start(game: Game): void {
     // The game is read, new or resumed: where CSBWin's boot forces DM rules, before
     // `_TAG021028` and the party's entry (doc/CSBwin-src/CSBCode.cpp:10796-10806).
@@ -978,9 +1027,10 @@ function openWelcomePage(manifest: DataSetManifest): Promise<void> {
 async function init() {
     try {
         const manifest = await loadManifest();
-        // A recording is read first: the set it plays is its root's, unless `?dungeon=` names one.
+        // A recording is read first: the set it plays is the one its files are found in, unless `?dungeon=` names one.
         const played = playedRecording === null ? null : await readPlayedRecording(playedRecording);
-        const chosen = await chooseDataSet(manifest, new URLSearchParams(window.location.search).get('dungeon') ?? played?.path[0]?.dataSet ?? null);
+        const playedSet = played && await playedSetOf(manifest, played.path);
+        const chosen = await chooseDataSet(manifest, new URLSearchParams(window.location.search).get('dungeon') ?? playedSet);
         if (!chosen) return await openWelcomePage(manifest);
         ({ set: dataSet, thumbnail: setThumbnail } = chosen);
         // Each file read through them keeps its digest, which a recording carries (`Recording.files`).
@@ -1012,7 +1062,7 @@ async function init() {
         // the dev server's, and a build's only with `CSBWEB_PROBE=1` (`vite.config.mts`),
         // so the handle cannot reach a deployed bundle.
         if (__CSBWEB_PROBE__) (window as unknown as Record<string, unknown>).__probe = probeHandle(built, sound);
-        if (playedRecording !== null && played) return await playRecording(built, playedRecording, played);
+        if (playedRecording !== null && played && playedSet !== null) return await playRecording(built, playedRecording, played, playedSet);
         // Before the intro: the entrance's chooser takes a dropped save as the disk menu does.
         bindSaveDrop(built.screen.ui);
         await runIntro(built, sound);

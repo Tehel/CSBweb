@@ -496,6 +496,7 @@ comma-separated `<playerId>[=<alias>]`, spaces around a comma or the `=` ignored
 | `/api/data-sets/<id>` | POST: the set approved, rejected, hidden or shown by a moderator, or withdrawn by its owner; with a form, edited by a moderator | `no-store` |
 | `/api/data-sets/<id>/documents` | POST: a document added to the set by a moderator, with a form, or removed, with JSON | `no-store` |
 | `/api/data-set-walls` | the walls of those of the same sets that keep some: the published ones | `no-store`, `Vary: X-Player-Id` |
+| `/api/data-set-files` | the MD5 of each game file of the same sets, which a recording is matched against (`doc/RECORDING.md` → "The set a recording plays over") | `no-store`, `Vary: X-Player-Id` |
 | `/api/recordings?dataSet=<id>` | the set's shared recordings the `X-Player-Id` may see; POST: a package shared ("Shared recordings", below) | `no-store`, `Vary: X-Player-Id` |
 | `/api/recordings/<id>` | POST: the recording approved, hidden, shown, broken or deleted by a moderator, or withdrawn by its uploader | `no-store` |
 | `/api/health` | `{"ok":true}`, for the healthcheck | `no-store` |
@@ -677,8 +678,10 @@ refused: the tool exits 1, and says which recording drifted and where. The insta
 take `DEPLOY_PLAYER` for a moderator, so that the lists hold every recording, pending and
 hidden ones included, or the tool refuses before it plays. Each recording that is not
 broken has its package fetched and played from it alone, in a page without the DOM
-(`tools/lib/playback.ts`) over the set's files as the instance serves them; a package
-that does not read or play, a later level's among them, fails as a drift does.
+(`tools/lib/playback.ts`) over the files the instance serves of the set the page would play
+it over, found by their digests (`api/data-set-files`, `doc/RECORDING.md` → "The set a
+recording plays over"); a package that does not read or play, a later level's among them,
+or whose files no set has, fails as a drift does.
 `npm run deploy -- --no-replay` deploys without it, for the first deploy, which has no
 site to ask (`doc/SETUP.md`).
 

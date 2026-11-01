@@ -429,6 +429,8 @@ const CHECKS: Tool[] = [
   { tool: 'csbwin-runs.ts' },
   // The corpus of the port's recordings, each played at the engine's level it was made at.
   { tool: 'recording-corpus.ts' },
+  // The set a recording plays over, found by its files.
+  { tool: 'recording-set.ts' },
   // The replay tool, its own process, against a scratch server.
   { tool: 'replay-recordings.ts' },
   { tool: 'party-collision.ts', args: ['2'] },
