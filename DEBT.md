@@ -131,7 +131,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| R18 | A recording plays by the engine's behaviour as it was made | L | ⏳ step 5.4: `DMMovie42` drifts at line 7483 |
+| R18 | A recording plays by the engine's behaviour as it was made | L | ⏳ step 6: a recording's files found among the server's sets |
 | F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
 | C198 | A missile that cannot be made loses the object it was to carry | S | ⏳ |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
@@ -560,7 +560,7 @@ behind a named switch, chosen by the recording.
    `tools/checks/replay-recordings.ts`).
 4. ✅ The policy written down (`doc/RECORDING.md` → "The policy", `CLAUDE.md`, the fix's
    list in `.claude/skills/playtest-bug/`).
-5. The 11.0xx profile: the flags one 11.0xx run needs, until it plays further than it does
+5. ✅ The 11.0xx profile: the flags one 11.0xx run needs, until it plays further than it does
    now, the three runs of `CSBWIN_RUNS` playing to their end all along (F24's step 2 for
    that version). In four:
    1. ✅ 11.014's and 11.056's sources fetched beside 2023's, and their diff measured.
@@ -568,7 +568,7 @@ behind a named switch, chosen by the recording.
       and listing its draws with their callers (`play --version=11.014`).
    3. ✅ The profile itself: `Behaviour.ts`'s `csbwin-11.014` naming its flags, a recording
       carrying its profile beside its level, and `tools/play-csbwin-log.ts --profile=`.
-   4. The flags, one per commit, each read from the diff, until `DMMovie42` plays further.
+   4. ✅ The flags, one per commit, each read from the diff, until `DMMovie42` plays further.
 6. Where a set's files mismatch, the page looking for the files a recording's signatures
    name among the server's other sets, and saying which file matches none.
 7. Recordings resumed (`src/ui/recordingsSwitch.ts`, `doc/RECORDING.md` → "Recordings are
@@ -581,9 +581,9 @@ digests in the head; a package is of version 2, and one of version 1 still reads
 0 naming no files. The server's table (`server/recordings.ts`) keeps no level column: its
 list shows the build alone, and step 3 reads the level from the package.
 
-Step 2 is paid: `tools/fixtures/recordings/` holds the three runs' packages and three of
-`replay.ts`'s (F5 in a branch, a Sleepsave inside a VBL, a lost game's end), all of level
-0, 540 KB, and `npm test` plays each at its level and asks for every run once, at any
+Step 2 is paid: `tools/fixtures/recordings/` holds the runs' packages, the three 17.6 runs'
+of level 0 and `DMMovie42`'s of level 4, and three of `replay.ts`'s (F5 in a branch, a
+Sleepsave inside a VBL, a lost game's end), of level 0, and `npm test` plays each at its level and asks for every run once, at any
 level. None of the author's own games from the site is in it: the four the site shares are
 three of these runs, played the same, and a test game that already drifts before its first
 input. A package the site serves names the site's set (`dungeon-master-csbwin` for
@@ -624,12 +624,12 @@ source plays all four 11.0xx runs to their end with no sequence error**: `DMMovi
 is their version, near enough that no run's `.exe` is needed, and where the port at a
 profile parts from a run, the oracle says what 11.014 drew there.
 
-`DMMovie42` is the run under way (`CSBWIN_RUNS_UNDER_WAY`, `tools/lib/csbwinRun.ts`): its
-log is `tools/fixtures/csbwin-runs/DMMovie42/`, played over `dm-minimum-item-picking`, and
-`tools/checks/csbwin-runs.ts` holds it at the line it drifts or stalls at, which each flag
-moves on. Both log players take the log's `#DMRules` as CSBWin's playback does
-(`dmRulesBefore`, `doc/PROVEN_FACTS.md` → "`DM_rules` and `DMRulesDesignOption`…"), so the
-champion P reincarnates at `d.Time` 0x43 with strength 52, as in the oracle.
+`DMMovie42` plays at `csbwin-11.014` to its end, Lord Chaos fused, a run of `CSBWIN_RUNS`
+(`tools/lib/csbwinRun.ts`): its log is `tools/fixtures/csbwin-runs/DMMovie42/`, played over
+`dm-minimum-item-picking`, every one of its 12,940 entries by CSBWin's random. Both log
+players take the log's `#DMRules` as CSBWin's playback does (`dmRulesBefore`,
+`doc/PROVEN_FACTS.md` → "`DM_rules` and `DMRulesDesignOption`…"), so the champion P
+reincarnates at `d.Time` 0x43 with strength 52, as in the oracle.
 
 **The 11.0xx runs' set**, the author's decision, is `dm-minimum-item-picking`, "Dungeon
 Master, minimum item picking", hidden and official: the four runs' `dungeon.dat`
@@ -645,22 +645,12 @@ the 11.014 discard's scan counts. The site installs it with `utils/install-offic
 ("The runs' data sets"), one hidden set each where no set has its files, as many as the
 runs that play need.
 
-It drifts at **line 7483**, `d.Time` 0x370e, button `0x0add`, the party on level 8 at
-(4,16): 11.014 drew once since the entry before, the port nine. The draws are the same,
-but the 11.014 discard's two `AddObject` draws fall at 0x370a in the port and at 0x370b in
-11.014: its scan counts the objects in each cell against 50 a tick, so a cell holding one
-object more or less shifts every later draw of the scan. The port's scan keeps to 11.014's
-until 0x3661, where four monster groups of level 7 stand in other cells than 11.014's
-((10,15), (12,8), (14,2), (14,17) against (9,14), (12,18), (13,9), and a scroll at
-(15,28)), every draw still the same. The next thing to read is why
-(`doc/CSBwin-src-11.014-oracle/SmartDiscard.cpp`'s scan, traced per cell, against the
-port's `scanDungeon11014`).
-On the way it saves at lines 1485-1489 (`d.Time` 0x8f9): the disk icon, "SAVE AND PLAY",
+On the way `DMMovie42` saves at lines 1485-1489 (`d.Time` 0x8f9): the disk icon, "SAVE AND PLAY",
 the save's file, the signature `0x6668`. The oracle draws that save's
 `ProcessMonstersOnLevel` inside `_DisplayDiskMenu`, so the save was the log players' gap,
 not 11.014's; they now make it on the port's save menu (`diskMenuSave`,
 `tools/lib/csbwinRun.ts`, `doc/RECORDING.md` → "Recordings made in CSBWin"), and
-`tools/checks/csbwin-runs.ts` plays the recording, the save in it, back to the drift. It
+`tools/checks/csbwin-runs.ts` plays the recording, the save in it, back to its end. It
 plays past line 2664 on CSBWin's scents (`csbwinScentLoops`): there, at `d.Time` 0xf86,
 group (0,21)'s turn finds footprint 1 at strength 23 in the oracle, where the Atari's
 loops have written 24 back, and so parts from a run that plays them otherwise.
@@ -674,19 +664,24 @@ of `CSBWIN_RUNS` names its profile (`csbwin-2023` for the three) and `recordRun`
 it; `tools/play-csbwin-log.ts --profile=csbwin-11.014` plays a log at it, `csbwin-2023` by
 default.
 
-Step 5.4 is under way. `ENGINE_LEVEL` is 3, and the profiles' flags are three:
+Step 5.4 is paid. `ENGINE_LEVEL` is 4, and the profiles' flags are four:
 `smartDiscardDrawnPriority`, `csbwin-11.014`'s from level 1, 11.014's `SmartDiscard` whole
 (`smartDiscard11014`, `src/engine/SmartDiscard.ts`, checked at its profile by
-`tools/checks/watch-smart-discard.ts`), which takes `DMMovie42` past line 130; and
+`tools/checks/watch-smart-discard.ts`), which takes `DMMovie42` past line 130;
 `csbwinScentLoops`, both profiles' from level 2, CSBWin's scents
 (`src/engine/PartyFootprints.ts`, `tools/checks/scents.ts`), which takes it past line 2664
 and keeps the three 17.6 runs playing to their end, now that a game plays what FTL meant
-(H, "The scents are what FTL meant"); and `tag016426StatisticIgnored`, `csbwin-11.014`'s
+(H, "The scents are what FTL meant"); `tag016426StatisticIgnored`, `csbwin-11.014`'s
 from level 3, 11.014's `TAG016426`, which reads every statistic as 0, the Atari's
 `BUG0_41` (`ChampionDamage.attributeScaledReduction`, `doc/PROVEN_FACTS.md` →
 "`TAG016426` has a second branch…", `tools/checks/character-damage.ts`, section 4), which
-takes it past line 6977, a wound 11.014 did not draw. What stops it now is the drift at
-line 7483.
+takes it past line 6977, a wound 11.014 did not draw; and `missileRangeFromDexterity`,
+`csbwin-11.014`'s from level 4, a monster's missile's range from its dexterity
+(`MonsterAttack.fillAttackParameters`, `doc/PROVEN_FACTS.md` → "A monster's missile's
+range is from its attack…", `tools/checks/monster-attack-filter.ts`, section 7), which
+takes it to its end. The other three 11.0xx runs are F24's: at `csbwin-11.014`, `43a`
+drifts at line 12126 of its log, `43b` meets a disk menu button the log players do not
+play, and `45` reaches the credits at `d.Time` 22320 with `d.Word11694` 0.
 
 Size L.
 
@@ -1030,7 +1025,8 @@ What it establishes:
   `8`) on level 1 between `d.Time` 0x69 and 0x182, a few ticks after the first round; the
   11.0xx runs (`DMMovie42`, `43a`, `43b`, `45`) on level 0 at 0x6b or 0x6c, with one
   champion. Those are their versions' own rules, not the port's divergences, and they
-  differ throughout, not at one place.
+  differ throughout, not at one place. At their version's profile, `csbwin-11.014` (R18),
+  `DMMovie42` plays to its end; `43a`, `43b` and `45` do not yet, each stopping where R18's step 5.4 says.
 - **The oldest logs** (`DMMovie1`, `3`, `4`, `6`, `7`, 9.05 and 9.07), whose `+` lines have
   fewer than five fields, CSBWin 2023 cannot read either: "Playback Plus line did not have
   5 fields", then `die`. The port's reader stops on the same line ("plus line 27").
@@ -1081,17 +1077,17 @@ Paying it, in steps:
      correction at every turn), the run is not convertible by corrections; it waits on
      its version's profile of behaviour flags (R18), and the engine's default stays 2023's.
    Each tweak is listed beside its log with its reason and the version it answers.
-3. **The check**, done for the three runs: their logs in `tools/fixtures/csbwin-runs/`,
+3. **The check**, done for the runs of `CSBWIN_RUNS`, the three 17.6 runs and `DMMovie42`: their logs in `tools/fixtures/csbwin-runs/`,
    listed in `CSBWIN_RUNS` (`tools/lib/csbwinRun.ts`), and `tools/checks/csbwin-runs.ts`,
    which plays each to its end (Lord Chaos fused for a race to fusion, the log's last
    entry for the race to Fulya Pit), so every later change to the engine answers to them.
    A run added is a row of `CSBWIN_RUNS` and its folder.
-4. **The recording**, done for the three runs: a log played into the port's `Recorder`
+4. **The recording**, done for the same runs: a log played into the port's `Recorder`
    through the page's input boundary (`recordRun`, `doc/RECORDING.md` → "Recordings made
    in CSBWin"), its recorder's own draws and its spliced saves the `playfile` change, and
    the recording packaged and played by `RecordingPlayer` to the same end, in the same
    check.
-5. **The upload**, done for the three runs: `utils/share-csbwin-runs.ts`, which the author
+5. **The upload**, done for the same runs: `utils/share-csbwin-runs.ts`, which the author
    runs (`doc/DEPLOYMENT.md` → "Shared recordings"). It plays each run of `CSBWIN_RUNS`
    as a recording of the instance's set whose files are the run's set's, packages it at
    the game's end or at a save made at its log's end, with the run's player, title and

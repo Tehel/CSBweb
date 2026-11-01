@@ -20,6 +20,10 @@
  * 5. **Champion 4 is the leader**, `d.HandChar` (`:1219-1221`): whoever holds the cursor.
  * 6. **The block outlives the attack**: `disableTime`, which `MonsterAttacks` never writes,
  *    is what the last filter left there.
+ * 7. **The missile's range** begins from the attack, `attack10 / 4 + 1`, then takes two
+ *    draws of `+= Random(range)` (`:1114-1119`, ReDMCSB's `GROUP.C:1764`); at
+ *    `csbwin-11.014`'s profile from level 4 it begins from the dexterity, `uByte8[4]`
+ *    (`doc/CSBwin-src-11.014/Monster.cpp:1108-1113`, `missileRangeFromDexterity`).
  *
  * Run: `npm test -- --only=monster-attack-filter.ts`
  */
@@ -27,6 +31,7 @@ import { DBType, OBJECT_ID_EOF, Position, type ObjectID } from '../../src/core/t
 import { RN_FIREBALL } from '../../src/core/spellRn';
 import { StkOp } from '../../src/engine/dsa/DsaTypes';
 import type { Game } from '../../src/engine/Game';
+import { behaviourAt, ENGINE_LEVEL } from '../../src/engine/Behaviour';
 import { attackParametersToWords } from '../../src/engine/filterParameters';
 import { MonsterType } from '../../src/engine/monsterTypes';
 import { UNSET, freshGame, globalStore, int, op, varFetch, varStore, withFilterDsas } from '../lib/dsa';
@@ -167,6 +172,46 @@ for (const missile of [RN_FIREBALL, -128]) {
   const second = game.systems.dsa.getGlobalVariables()[19];
   console.log(`6. disableTime seen by the first attack's filter ${first}, by the second's ${second}`);
   check(first === 0 && second === 77, 'the second attack\'s filter sees the disableTime the first left');
+}
+
+/* ------------------------------- 7. the missile's range ------------------------- */
+{
+  const game = freshGame();
+  const { rn } = group(game);
+  const desc = game.ctx.tables.monsterDesc[game.ctx.dungeon.getCreatureRecord(rn)!.creatureType]!;
+  const random = game.ctx.random;
+  const below = random.below.bind(random);
+  /** The attack at `level` and `profile`: the range drawn, and the bounds of the generator's draws. */
+  const ranged = (level: number, profile: 'csbwin-11.014' | null): { range: number; bounds: number[] } => {
+    game.ctx.behaviour = behaviourAt(level, profile);
+    const bounds: number[] = [];
+    random.below = (n: number): number => { bounds.push(n); return below(n); };
+    try {
+      attack(game);
+    } finally {
+      random.below = below;
+    }
+    return { range: game.systems.monsterAttack.attackParameters.missileRange, bounds };
+  };
+  /** Whether `bounds` holds the range's two draws from `base`, `base` then `base + first`, summing to `range`. */
+  const drawnFrom = (base: number, { range, bounds }: { range: number; bounds: number[] }): boolean =>
+    bounds.some((n, i) => {
+      const second = bounds[i + 1];
+      return n === base && second !== undefined && second - base >= 0 && second - base < base
+        && range - second >= 0 && range - second < second;
+    });
+  const fromAttack = Math.trunc(desc.attack10 / 4) + 1;
+  const fromDexterity = Math.trunc(desc.dexterity12 / 4) + 1;
+  const now = ranged(ENGINE_LEVEL, null);
+  const old = ranged(ENGINE_LEVEL, 'csbwin-11.014');
+  const before = ranged(3, 'csbwin-11.014');
+  console.log(`7. attack ${desc.attack10}, dexterity ${desc.dexterity12}: range ${now.range} drawn from [${now.bounds.join(', ')}]; `
+    + `at csbwin-11.014 ${old.range} from [${old.bounds.join(', ')}]; at its level 3 ${before.range} from [${before.bounds.join(', ')}]`);
+  check(fromAttack !== fromDexterity, 'the group\'s attack and dexterity give two bases');
+  check(drawnFrom(fromAttack, now) && !drawnFrom(fromDexterity, now), `the range begins from the attack, ${fromAttack} (Monster.cpp:1114-1119)`);
+  check(drawnFrom(fromDexterity, old) && !drawnFrom(fromAttack, old),
+    `at csbwin-11.014 it begins from the dexterity, ${fromDexterity} (missileRangeFromDexterity)`);
+  check(drawnFrom(fromAttack, before) && !drawnFrom(fromDexterity, before), 'and a recording of its profile before level 4 from the attack, as it was made');
 }
 
 finish();

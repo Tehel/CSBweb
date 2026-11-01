@@ -90,6 +90,12 @@ export const CSBWIN_RUNS: readonly CsbwinRun[] = [
     description: 'Chaos Strikes Back from the prison to Fulya Pit with Buzzzz. A CSBWin 17.6 recording, CSBMovie0640 of CSBWin\'s movies, eleven recordings spliced at the saves made between them, played back in CSBweb.',
     recordedAt: '2021-04-30',
   },
+  {
+    id: 'DMMovie42', dataSet: 'dm-minimum-item-picking', profile: 'csbwin-11.014', save: null, end: 'won', player: 'Paul Hayes',
+    title: 'Dungeon Master, minimum item picking',
+    description: 'A CSBWin 11.017 recording, DMMovie42 of CSBWin\'s movies, played back in CSBweb.',
+    recordedAt: '2009-05-28',
+  },
 ];
 
 /**
@@ -106,15 +112,7 @@ export interface RunUnderWay extends CsbwinRun {
 }
 
 /** The runs under way, in the order the check plays them. */
-export const CSBWIN_RUNS_UNDER_WAY: readonly RunUnderWay[] = [
-  {
-    id: 'DMMovie42', dataSet: 'dm-minimum-item-picking', profile: 'csbwin-11.014', save: null, end: 'won', player: 'Paul Hayes',
-    title: 'Dungeon Master, minimum item picking',
-    description: 'A CSBWin 11.017 recording, DMMovie42 of CSBWin\'s movies, played back in CSBweb.',
-    recordedAt: '2009-05-28',
-    drifts: 7483,
-  },
-];
+export const CSBWIN_RUNS_UNDER_WAY: readonly RunUnderWay[] = [];
 
 /**
  * An entry of a save in a log, taken by the port's save menu that the log's disk icon

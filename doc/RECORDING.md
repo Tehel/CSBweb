@@ -327,15 +327,17 @@ plays, as one of a later level. The profiles are `csbwin-2023`, for the runs of 
 level 2: CSBWin's scents (`src/engine/PartyFootprints.ts`). `csbwin-11.014` plays
 `smartDiscardDrawnPriority` too, joined at level 1: 11.014's `SmartDiscard`, which ranks
 every object it scans by a priority drawn afresh at each comparison (`smartDiscard11014`,
-`src/engine/SmartDiscard.ts`), and `tag016426StatisticIgnored`, joined at level 3: 11.014's
-`TAG016426`, which reads every statistic as 0 (`ChampionDamage.attributeScaledReduction`).
+`src/engine/SmartDiscard.ts`), `tag016426StatisticIgnored`, joined at level 3: 11.014's
+`TAG016426`, which reads every statistic as 0 (`ChampionDamage.attributeScaledReduction`),
+and `missileRangeFromDexterity`, joined at level 4: a monster's missile's range from its
+dexterity (`MonsterAttack.fillAttackParameters`). At it, `DMMovie42` plays to its end.
 
 A run of an older version that does not play to its end yet is **under way**
 (`CSBWIN_RUNS_UNDER_WAY`, `tools/lib/csbwinRun.ts`): its log is kept beside the others',
 and `tools/checks/csbwin-runs.ts` plays it at its profile to the line where it first
 drifts, and fails where it drifts anywhere else. A flag that takes it further moves that
-line on in the same commit. The one under way is `DMMovie42`, at `csbwin-11.014`, over
-`dm-minimum-item-picking`, its own dungeon (`DEBT.md` F24, "The runs' data sets").
+line on in the same commit. None is under way: the next are the other 11.0xx runs
+(`DEBT.md` F24).
 
 Most games end with the page closed, not with a read, so `RecordingWriter`
 (`src/engine/RecordingWriter.ts`) writes the running recording while it runs: every five
@@ -395,8 +397,9 @@ digests against its set's, then plays it from the package alone over that set
 never rewritten: at its level, it proves the flags of every later level keep its
 behaviour.
 
-It holds CSBWin's three runs (`CSBWIN_RUNS`, below: forty minutes of Dungeon Master to
-its end each, and Chaos Strikes Back to Fulya Pit) and three of `tools/checks/replay.ts`'s
+It holds CSBWin's runs (`CSBWIN_RUNS`, below: forty minutes of Dungeon Master to its end
+each from 17.6, Chaos Strikes Back to Fulya Pit, and `DMMovie42`, 11.017's Dungeon Master
+to its end at `csbwin-11.014`) and three of `tools/checks/replay.ts`'s
 packages: F5 in the new game's branch, the Sleepsave inside a VBL in `csbgame7.dat`'s, and
 the lost game's end. The check asks for each run once, at any level (`--write` records
 each the corpus has at none; `replay.ts --corpus` keeps its own three the same way). A bump

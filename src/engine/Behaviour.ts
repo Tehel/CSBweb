@@ -30,7 +30,7 @@
  */
 
 /** The engine's level: what a recording made now carries (`Recording.level`). Recordings made before levels are 0. */
-export const ENGINE_LEVEL = 3;
+export const ENGINE_LEVEL = 4;
 
 /** A CSBWin version whose runs the engine plays by the flags that name it. */
 export interface BehaviourProfile {
@@ -106,6 +106,13 @@ export const BEHAVIOURS = [
         debt: 'R18',
         until: null,
         profiles: { 'csbwin-11.014': 3 },
+    },
+    {
+        name: 'missileRangeFromDexterity',
+        does: "CSBWin 11.014's range of a monster's missile, from `uByte8[4]/4 + 1`, its dexterity, which is also the missile's damage, where 2023 and the Atari take its attack (`MonsterAttack.fillAttackParameters`)",
+        debt: 'R18',
+        until: null,
+        profiles: { 'csbwin-11.014': 4 },
     },
 ] as const satisfies readonly BehaviourChange[];
 

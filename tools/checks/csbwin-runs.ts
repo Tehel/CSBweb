@@ -8,7 +8,7 @@
  * (`RecordingPackage`), at the game's end or at a save made at the log's end, read back,
  * and played by the port's player (`playPath`) to the same end without a drift.
  *
- * So every change to the engine answers to some 25,000 entries of CSBWin play.
+ * So every change to the engine answers to some 38,000 entries of CSBWin play.
  *
  * Then each run under way (`CSBWIN_RUNS_UNDER_WAY`), a run of an older CSBWin version
  * played at its profile (`doc/RECORDING.md` → "A recording's level"), to the line it

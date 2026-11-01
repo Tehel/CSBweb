@@ -4581,6 +4581,26 @@ RN. Nothing consumed one until the engine started restoring a timer's object at 
 `CsbwinSaveGame.resolveTimerObjects` is where the translation happens now, and without it
 a restored missile names whatever record our own numbering put at that slot.
 
+## A monster's missile's range is from its attack, its damage from its dexterity
+
+`MonsterAttacks` launches a monster's missile with a range of `attack10 / 4 + 1`, then
+twice `+= STRandom(range)`, held to 20..255, and a damage of `dexterity12`
+(`doc/CSBwin-src/Monster.cpp:1114-1124`, `:1204`), as the Atari's `F0207`, `(Attack >> 2)
++ 1`, `F0026_MAIN_GetBoundedValue(20, …, 255)` and `Dexterity`
+(`doc/ReDMCSB-src/GROUP.C:1764-1770`). CSBWin 11.014 and 11.056 begin the range from
+`uByte8[4]` (`doc/CSBwin-src-11.014/Monster.cpp:1108-1110`), byte 12 of the descriptor
+(`uByte8` begins at byte 8, `CSB.h:2268`), the dexterity it also takes for the damage
+(`:1118`); 2023 keeps the old reading in a comment beside its own (`// uByte8[4] / 4 +
+1`). The draws are the same, so a run of 11.0xx does not part from the port at the launch
+but where the shorter missile ends: in `DMMovie42`, a missile launched on level 5 at
+`d.Time` 0x2d0c of range 45 in 11.014 and 20 in the port ends at 0x2d10 instead of
+0x2d13, so 11.014 stamps more timers, and the timers of equal time on level 7 come out
+in another order at 0x3620 (their sequence numbers, `TIMER::operator <`,
+`doc/CSBwin-src-11.014/Timer.cpp:663-707`), which moves its groups, and its discard's
+scan, until a draw falls a tick apart at line 7483. The `csbwin-11.014` profile plays it
+(`missileRangeFromDexterity`, `tools/checks/monster-attack-filter.ts`, section 7), and
+`DMMovie42` plays to its end.
+
 ## A missile flying off the map meets the exterior wall
 
 When the cell a missile leaves its own for is off the map, `MissileTimer` sets its room to

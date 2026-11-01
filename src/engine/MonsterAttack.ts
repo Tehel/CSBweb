@@ -283,8 +283,18 @@ export class MonsterAttack {
     // knows (`G0243_as_Graphic559_CreatureInfo`, ReDMCSB `DUNGEON.C:439-499`).
     p.attackSoundOrdinal = this.ctx.tables.amigaSounds?.attackSoundOrdinals[monster.creatureType] ?? desc.attackSound;
 
-    // `attack10 / 4 + 1`, then two rounds of `+= Random(range)`.
-    let range = Math.trunc(desc.attack10 / 4) + 1;
+    // `attack10 / 4 + 1`, then two rounds of `+= Random(range)`
+    // (doc/CSBwin-src/Monster.cpp:1114-1119), as the Atari's
+    // `(P0398_ps_CreatureInfo->Attack >> 2) + 1` (doc/ReDMCSB-src/GROUP.C:1764). CSBWin
+    // 11.014 began from `uByte8[4]`, byte 12, the dexterity it takes for the damage too
+    // (doc/CSBwin-src-11.014/Monster.cpp:1108-1109), and its profile plays it
+    // (`missileRangeFromDexterity`).
+    let range: number;
+    if (this.ctx.behaviour.missileRangeFromDexterity) {
+      range = Math.trunc(desc.dexterity12 / 4) + 1;
+    } else {
+      range = Math.trunc(desc.attack10 / 4) + 1;
+    }
     range += this.random.below(range);
     range += this.random.below(range);
     p.missileRange = range;
