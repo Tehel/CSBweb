@@ -334,7 +334,8 @@ A run of an older version that does not play to its end yet is **under way**
 (`CSBWIN_RUNS_UNDER_WAY`, `tools/lib/csbwinRun.ts`): its log is kept beside the others',
 and `tools/checks/csbwin-runs.ts` plays it at its profile to the line where it first
 drifts, and fails where it drifts anywhere else. A flag that takes it further moves that
-line on in the same commit. The one under way is `DMMovie42`, at `csbwin-11.014`.
+line on in the same commit. The one under way is `DMMovie42`, at `csbwin-11.014`, over
+`dm-minimum-item-picking`, its own dungeon (`DEBT.md` F24, "The runs' data sets").
 
 Most games end with the page closed, not with a read, so `RecordingWriter`
 (`src/engine/RecordingWriter.ts`) writes the running recording while it runs: every five

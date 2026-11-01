@@ -18,6 +18,9 @@
  *   `dm-amiga`'s dungeon;
  * - CSBWin's DM and CSB packages and 3D2D1D, from Paul R. Stevens' site: `dm-windows`, the
  *   `graphics.dat` the Kids dungeon plays, `csb`'s files, and `3D2D1D`;
+ * - CSBWin's movies, the players' recordings and the files they were played on, as
+ *   dmweb.free.fr keeps them: the 11.0xx minimum item picking runs' `dungeon.dat`,
+ *   `dm-minimum-item-picking`'s, which plays with `dm-atari`'s `graphics.dat`, copied;
  * - his `CSBgraphics.dat`, the designers' library no set plays, a file of its own on his site:
  *   `csbgraphics/`, another folder that is not a set, which only the tools read;
  * - Conflux 3.5 beta 8 (his site, or the OneDrive), The Towers of Chaos 3.3 and the Kids
@@ -28,7 +31,8 @@
  * --write`); `dm-amiga`'s, `dm-atari`'s with the Amiga's credits, font, names, sounds and colours
  * (`tools/checks/amiga-graphics.ts --write`); `csb`'s `utility-portraits.dat`, from the
  * utility disk (`tools/gen-utility-portraits.ts`); and every set's thumbnail
- * (`tools/gen-thumbnails.ts`).
+ * (`tools/gen-thumbnails.ts`). Before the thumbnails, the files another of the folder's
+ * makes are copied: `dm-minimum-item-picking`'s `graphics.dat`, `dm-atari`'s.
  *
  * `7z` (or `7zz`, `7za`), which must be on the PATH, unpacks the archives. Nothing
  * extracted is run: the packages hold Windows programs, which are not read.
@@ -105,6 +109,12 @@ const ARCHIVES = {
     sha256: '0a32ed74079496e3e32ced793e6cc7fca62693f2cc4127cbf2aaa8dda733c4ab',
     sources: [`${PAUL}/Games/3D2D1D_CSBwin.zip`],
   },
+  csbwinMovies: {
+    file: 'Clone,CSBwin,Movies,Data.7z',
+    sha256: '3fc4b5ca642c90eb9f1d331f7e6e569d369cc68d9bd235f126fe9f8c379c4028',
+    sources: [`${DMWEB}/Clone,CSBwin,Movies,Data.7z`,
+      `https://web.archive.org/web/20260106191929id_/${DMWEB}/Clone,CSBwin,Movies,Data.7z`],
+  },
   csbGraphics: {
     file: 'CSBgraphics.dat',
     sha256: 'd9d181c622732ef7e82fc788c6fe03f8c1c1de0e8d93e28f00fe1d6741367adb',
@@ -133,14 +143,20 @@ const ARCHIVES = {
 
 type ArchiveName = keyof typeof ARCHIVES;
 
-/** Where a file comes from: a file of an archive, a file of a disk image in it (a Pasti image or an ADF, by its extension), or a step (`STEPS`). */
+/**
+ * Where a file comes from: a file of an archive, a file of a disk image in it (a Pasti image
+ * or an ADF, by its extension), a step (`STEPS`), or another file of the folder, copied
+ * once the steps before the thumbnails have written it.
+ */
 type Origin =
   | { archive: ArchiveName; path: string; disk?: string }
-  | { step: StepName };
+  | { step: StepName }
+  | { copy: string };
 
 const DM_STX = 'Floppy Disks STX/Dungeon Master for Atati ST';
 const DM_AMIGA_ADF = 'Floppy Disks ADF/Dungeon Master for Amiga v2.2 (English) Original (Not working).adf';
 const CSB_UTILITY_STX = 'Floppy Disks STX/Chaos Strikes Back for Atari ST Utility Disk v2.1 (English).stx';
+const MINIMUM_ITEM_PICKING = 'Dungeon Master minimum item picking/DMMovie42 - Paul Hayes - 42';
 
 /** Every file of the folder, by its path under it: its SHA-256 and where it comes from. */
 const FILES: Record<string, [sha256: string, origin: Origin]> = {
@@ -187,6 +203,9 @@ const FILES: Record<string, [sha256: string, origin: Origin]> = {
   'dm-atari-1.3-fr/dungeon.dat': ['e0f5696a5eb792b7ece238f5d5b49c3967ce64c268e0978b658d2bf67b54be3c', { archive: 'dmAtari', path: `${DM_STX} v1.3 (French).stx`, disk: 'DUNGEON.DAT' }],
   'dm-atari-1.3-fr/graphics.dat': ['b14e87bb2fb4a6ecc051e8e160b20d5244d6293e71e01bd754d6aaa6d8bdee1a', { archive: 'dmAtari', path: `${DM_STX} v1.3 (French).stx`, disk: 'GRAPHICS.DAT' }],
   'dm-atari-1.3-fr/dm-atari-1.3-fr-thumbnail.png': ['0449c5fd626d79618ac0f21a0a30ee992a56b6e890aee184c86579aa095b8ae1', { step: 'thumbnails' }],
+  'dm-minimum-item-picking/dungeon.dat': ['5bee1c9126495523f82e773c95cddf44bc68c2e4da9115ebc986177a774001b9', { archive: 'csbwinMovies', path: `${MINIMUM_ITEM_PICKING}/dungeon.dat` }],
+  'dm-minimum-item-picking/graphics.dat': ['b5f238d299207b11107881ffa113c362685362c00c9c109116fe872ce6531ac5', { copy: 'dm-atari/graphics.dat' }],
+  'dm-minimum-item-picking/dm-minimum-item-picking-thumbnail.png': ['0449c5fd626d79618ac0f21a0a30ee992a56b6e890aee184c86579aa095b8ae1', { step: 'thumbnails' }],
   'dm-windows/dungeon.dat': ['ac3f9a233a988c9ff7d8074a6736909ce13fc482555cd329b3a130f661f90da5', { archive: 'dmWindows', path: 'dungeon.dat' }],
   'dm-windows/graphics.dat': ['196cb349827e8926e2763fa61ecbe8e10810003045ef72a435b7da4dded56d8e', { archive: 'dmWindows', path: 'graphics.dat' }],
   'dm-windows/dm-windows-thumbnail.png': ['0449c5fd626d79618ac0f21a0a30ee992a56b6e890aee184c86579aa095b8ae1', { step: 'thumbnails' }],
@@ -295,13 +314,13 @@ if (!checkOnly && missing.length > 0) {
   const steps = new Set<StepName>();
   for (const [, [, origin]] of missing) {
     if ('step' in origin) steps.add(origin.step);
-    else archives.add(origin.archive);
+    else if ('archive' in origin) archives.add(origin.archive);
   }
   if (steps.has('utilityPortraits')) archives.add('csbAtari');
   for (const name of archives) await unpack(name);
 
   for (const [path, [, origin]] of missing) {
-    if ('step' in origin) continue;
+    if (!('archive' in origin)) continue;
     const source = unpacked(origin.archive, origin.path);
     let bytes: Uint8Array | undefined = readFileSync(source);
     if (origin.disk !== undefined) bytes = (origin.path.endsWith('.adf') ? adfFiles : stxFiles)(bytes).get(origin.disk);
@@ -310,6 +329,13 @@ if (!checkOnly && missing.length > 0) {
     writeFileSync(join(TREE, path), bytes);
   }
   for (const step of Object.keys(STEPS) as StepName[]) {
+    if (step === 'thumbnails') {
+      for (const [path, [, origin]] of missing) {
+        if (!('copy' in origin)) continue;
+        mkdirSync(dirname(join(TREE, path)), { recursive: true });
+        writeFileSync(join(TREE, path), readFileSync(join(TREE, origin.copy)));
+      }
+    }
     if (!steps.has(step)) continue;
     const args = STEPS[step](missing.map(([path]) => path));
     console.log(`npx tsx ${args.join(' ')}`);

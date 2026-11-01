@@ -580,8 +580,9 @@ set's byte for byte, whatever its id, and its package is played back over that s
 files; an instance with no such set is told so, and the run is not offered. The two races
 to fusion need CSBWin's mix, `tools/fixtures/gamefiles/dm-atari/`, published as a set of
 its own: the reference instance's `dm-atari` is the 1.2 disk's, on which they drift at the
-first Ant Men. A run whose title the instance already lists on its set is not offered
-again. The instance must run a
+first Ant Men. The minimum item picking runs need `dm-minimum-item-picking`, which
+`utils/install-official-sets.ts` installs (`DEBT.md` F24, "The runs' data sets"). A run
+whose title the instance already lists on its set is not offered again. The instance must run a
 build whose package reader takes the `playfile` change, the draws a CSBWin run carries; an
 older one refuses each.
 

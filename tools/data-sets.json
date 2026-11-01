@@ -12,6 +12,7 @@
     { "id": "csb", "name": "Chaos Strikes Back", "miniDat": true, "hintOracle": true, "official": true },
     { "id": "dm-atari", "name": "Dungeon Master", "dmRules": true, "hidden": true, "official": true },
     { "id": "dm-windows", "name": "Dungeon Master (CSBWin)", "hidden": true, "official": true },
+    { "id": "dm-minimum-item-picking", "name": "Dungeon Master, minimum item picking", "hidden": true, "official": true },
     { "id": "3d2d1d", "name": "3D2D1D", "dir": "3D2D1D", "hidden": true },
     { "id": "conflux-3.5", "name": "Conflux 3.5", "dir": "conflux-3.5-b8", "csbGraphics": true },
     { "id": "towers-of-chaos", "name": "The Towers of Chaos 3.3", "dir": "towers-of-chaos-3.3", "csbGraphics": true }

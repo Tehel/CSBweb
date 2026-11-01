@@ -108,7 +108,7 @@ export interface RunUnderWay extends CsbwinRun {
 /** The runs under way, in the order the check plays them. */
 export const CSBWIN_RUNS_UNDER_WAY: readonly RunUnderWay[] = [
   {
-    id: 'DMMovie42', dataSet: 'dm-atari', profile: 'csbwin-11.014', save: null, end: 'won', player: 'Paul Hayes',
+    id: 'DMMovie42', dataSet: 'dm-minimum-item-picking', profile: 'csbwin-11.014', save: null, end: 'won', player: 'Paul Hayes',
     title: 'Dungeon Master, minimum item picking',
     description: 'A CSBWin 11.017 recording, DMMovie42 of CSBWin\'s movies, played back in CSBweb.',
     recordedAt: '2009-05-28',
