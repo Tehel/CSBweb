@@ -28,6 +28,8 @@ export interface RecordingEntry {
     readonly build: string;
     /** The engine's level it was played at (`Recording.level`); absent from a row written before levels, which is 0. */
     readonly level?: number;
+    /** The CSBWin version's profile it was played at (`Recording.profile`); absent from a row written before profiles, which has none. */
+    readonly profile?: string | null;
     /**
      * The point it branches from (`Recording.parent`), `null` for a root, and for one the
      * store's version 7 wrote before the tree, which has none.
@@ -149,6 +151,7 @@ export function assembleRecording(entry: RecordingEntry, parts: readonly Recordi
         id: entry.id,
         build: entry.build,
         level: entry.level ?? 0,
+        profile: entry.profile ?? null,
         files: head.files ?? null,
         dataSet: entry.dataSet,
         start: head.start,

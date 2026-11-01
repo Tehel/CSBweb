@@ -567,7 +567,7 @@ behind a named switch, chosen by the recording.
    1. ✅ 11.014's and 11.056's sources fetched beside 2023's, and their diff measured.
    2. ✅ An 11.014 oracle: `oracle.sh build --version=11.014`, playing an 11.0xx run
       and listing its draws with their callers (`play --version=11.014`).
-   3. The profile itself: `Behaviour.ts`'s `csbwin-11.014` naming its flags, a recording
+   3. ✅ The profile itself: `Behaviour.ts`'s `csbwin-11.014` naming its flags, a recording
       carrying its profile beside its level, and `tools/play-csbwin-log.ts --profile=`.
    4. The flags, one per commit, each read from the diff, until `DMMovie42` plays further.
 6. Where a set's files mismatch, the page looking for the files a recording's signatures
@@ -634,7 +634,17 @@ profile parts from a run, the oracle says what 11.014 drew there.
 parent it is compared with (`:123-140`), where 2023's `AddObjectDecr` and `AddObjectIncr`
 compare the `m_priority` computed once (`doc/CSBwin-src/SmartDiscard.cpp:83`, `:153-195`).
 2023's oracle draws nothing in `SmartDiscard` at that tick: why the two differ there, from
-the diff of `SmartDiscard.cpp`, is 5.4's first flag. The next step is 5.3.
+the diff of `SmartDiscard.cpp`, is 5.4's first flag.
+
+Step 5.3 is paid: `PROFILES` (`src/engine/Behaviour.ts`) holds `csbwin-11.014`, which names
+no flag yet. A flag a profile plays lists it in its `profiles` with the level it joined it
+at, and one the port never had has no `until` (`doc/RECORDING.md` → "A recording's level",
+→ "The policy": a flag joining a profile bumps the level). A recording, the store's row and
+a package carry `profile` (`null` for none, and for one made before profiles); the player
+sets it with the level and refuses one it does not play (`tools/checks/replay.ts`). A run
+of `CSBWIN_RUNS` names its profile (`null` for the three) and `recordRun` plays at it;
+`tools/play-csbwin-log.ts --profile=csbwin-11.014` plays a log at it, and `DMMovie42`
+still parts at line 130. The next step is 5.4.
 
 Size L.
 
@@ -912,7 +922,7 @@ the game's draws since the entry before (`Recording.cpp:483-503`), and prints wh
 error" answered No does; `--fake` makes up a count the port falls short of with draws and
 goes on, printing each, which maps where the port draws too little; `--trace=<from>-<to>`
 prints each of the port's draws in that `d.Time` range with its callers, and the engine's
-AI trace between them. A log of 8000 entries
+AI trace between them; `--profile=<name>` plays at a CSBWin version's profile (R18). A log of 8000 entries
 plays in well under a second while it holds.
 
 **The oracle**, `tools/csbwin-oracle/oracle.sh`, is not evidence either: CSBWin 2023's

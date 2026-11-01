@@ -208,7 +208,7 @@ export class RecordingWriter {
         if (changes.length > written.changes) parts.push({ id, seq: seq++, changes: changes.slice(written.changes) });
         const playthrough = written.playthrough ??= playthroughOf(recording.start);
         const entry: RecordingEntry = {
-            id, dataSet: recording.dataSet, build: recording.build, level: recording.level, parent: written.parent, playthrough,
+            id, dataSet: recording.dataSet, build: recording.build, level: recording.level, profile: recording.profile, parent: written.parent, playthrough,
             recordedAt: written.recordedAt, writtenAt: this.deps.now(),
             vbls, ended, end, ...(end && written.ending), changes: changes.length, parts: seq,
         };

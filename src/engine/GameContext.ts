@@ -171,8 +171,9 @@ export interface GameContext {
   extras: Extras;
   /**
    * The engine's behaviour (`src/engine/Behaviour.ts`): `CURRENT_BEHAVIOUR`, every flag
-   * off, unless a recording of an earlier level is played (`RecordingPlayer`), which sets
-   * its own before each of its reads.
+   * off, unless a recording of an earlier level or of a profile is played
+   * (`RecordingPlayer`), which sets its own before each of its reads, or a CSBWin run is
+   * played at its version's profile (`recordRun`).
    */
   behaviour: Behaviour;
   /** What THROW and SHOOT sent off, for the extra that gathers it back (`ThrownWeapons`). */

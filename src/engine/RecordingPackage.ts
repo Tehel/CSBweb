@@ -14,7 +14,8 @@
  * the build, the engine's level, the set, the metadata, the path and the point. Each
  * recording is as the store holds it (`Recording`), a save's file in base64. A package of
  * version 1, written before levels, is still read: each recording of its path is of level
- * 0, and names no files. Where it starts, a new game or the
+ * 0, and names no files. A recording without a profile, written before profiles, has none
+ * (`Recording.profile`). Where it starts, a new game or the
  * save's level and champions, is read from the path's root, so a package's never
  * disagrees with its path.
  *
@@ -302,6 +303,7 @@ function recordingFromJson(json: unknown, what: string, leveled: boolean): Recor
         id: word(recording['id'], `${what}'s id`),
         build: word(recording['build'], `${what}'s build`),
         level: leveled ? count(recording['level'], `${what}'s level`) : 0,
+        profile: recording['profile'] === undefined || recording['profile'] === null ? null : word(recording['profile'], `${what}'s profile`),
         files: leveled && recording['files'] !== null ? digestsFromJson(recording['files'], `${what}'s files`) : null,
         dataSet: word(recording['dataSet'], `${what}'s set`),
         start: start['kind'] === 'new'

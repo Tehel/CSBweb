@@ -309,6 +309,19 @@ recording's own before its read (`behaviourAt`), each flag whose `until` is abov
 recording's level on. The level is 0 and no flag is kept yet. Recordings made before
 levels are of level 0.
 
+A CSBWin version other than 2023's is a **profile** of the same flags (`PROFILES`): what
+that version did where 2023's source, which the engine follows, does otherwise, each flag
+read from the diff of its source against 2023's (`DEBT.md` R18, step 5). A flag of a
+version's that the port never had has no `until`; a flag a profile plays names it with the
+level it joined it at, and is on for a recording of that profile at that level or above.
+A recording carries its profile beside its level (`Recording.profile`), as the store's row
+and a package do; a game the page plays has none, and a recording made before profiles
+neither. A CSBWin run is played at its version's profile (`CsbwinRun.profile`, `recordRun`;
+`tools/play-csbwin-log.ts --profile=`), and the player sets a recording's before its read,
+as its level. A path that holds a profile the engine does not play is refused before it
+plays, as one of a later level. The one profile is `csbwin-11.014`, for the 11.0xx runs,
+and it names no flag yet.
+
 Most games end with the page closed, not with a read, so `RecordingWriter`
 (`src/engine/RecordingWriter.ts`) writes the running recording while it runs: every five
 seconds (`RECORDING_WRITE_MS`, `src/main.ts`) and as the page is hidden, the row whenever
@@ -339,6 +352,10 @@ one: each counts, and "may" means a doubt is enough. The commit:
    since a recording plays it;
 3. bumps `ENGINE_LEVEL` by one, so that a game the page plays has the flag off and every
    recording made before it on.
+
+A flag that joins a profile owes the same bump: the profile's recordings made before it
+play it off, those made from its level on. It is named in the flag's `profiles`, with the
+level the commit makes, and changes nothing for a game of no profile.
 
 A change that only draws owes none, nor a new extra that is off by default; a change to an
 extra's behaviour does. A refactor of tiers D and E changes no behaviour, which its

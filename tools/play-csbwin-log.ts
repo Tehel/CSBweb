@@ -9,8 +9,11 @@
  * skipped, a waiting step put back (`PLAYFILE::Backspace`), the Reincarnate screen fed the
  * file's `0x4444` lines (`Code13ea4.cpp:86-108`), and `extraTicks` off (`CSBUI.cpp:985`).
  *
- *   npx tsx tools/play-csbwin-log.ts <playfile.log> [--extra-ticks] [--no-dm-rules]  [--resync] [--fake] [--trace=<from>-<to>]
+ *   npx tsx tools/play-csbwin-log.ts <playfile.log> [--extra-ticks] [--no-dm-rules]  [--resync] [--fake] [--trace=<from>-<to>] [--profile=<name>]
  *
+ * `--profile=<name>` plays at that CSBWin version's profile (`PROFILES`,
+ * `src/engine/Behaviour.ts`), `csbwin-11.014` for an 11.0xx run (`DEBT.md` R18, step 5),
+ * instead of 2023's source, which the engine follows.
  * `--set=<id>` plays on another data set than `dm-atari`; `--save=<file>` starts from that
  * CSBWin save instead of a new game, read at the log's first `0x6669` (a CSB run's
  * `csbgame.dat`, which the log's first clicks resume). A save the run's author cut out of
@@ -30,6 +33,7 @@ import { emptyDungeonData } from '../src/data/DungeonLoader';
 import { extractGraphicsTables } from '../src/data/tables/GraphicsTables';
 import { csbGraphicsOpener } from '../src/engine/FileSignatures';
 import { Game } from '../src/engine/Game';
+import { behaviourAt, ENGINE_LEVEL, knownProfile, PROFILES } from '../src/engine/Behaviour';
 import { applySaveBytes } from '../src/engine/SaveGameFile';
 import { applyPlayfileLine, PLAYFILE_LINES } from '../src/engine/PlayfileLine';
 import { readFileSync } from 'node:fs';
@@ -55,6 +59,8 @@ const extraTicks = args.includes('--extra-ticks');
 const dmRules = !args.includes('--no-dm-rules');
 const resync = args.includes('--resync');
 const fake = args.includes('--fake');
+const profileArg = args.find((a) => a.startsWith('--profile='))?.slice(10) ?? null;
+if (!knownProfile(profileArg)) throw new Error(`--profile=${profileArg}: not one of ${PROFILES.map((profile) => profile.name).join(', ')}`);
 const traceArg = args.find((a) => a.startsWith('--trace='))?.slice(8).split('-').map((n) => parseInt(n, 16));
 const { version, items } = readPlayfile(args[0]!);
 
@@ -149,6 +155,7 @@ game.onTick(() => {
   if (selectedCharacterIndex < 0 && !sleeping) renderView();
 });
 game.ctx.rules.dmRulesDesignOption = dmRules && set.dmRules;
+game.ctx.behaviour = behaviourAt(ENGINE_LEVEL, profileArg);
 const ctx = game.ctx;
 
 // --- PLAYFILE ---
@@ -258,7 +265,7 @@ gameRandom = (ctx as unknown as { random: CsbRandom }).random;
 if (saveArg) {
   applySaveBytes(game, new Uint8Array(readFileSync(saveArg)));
   at = items.findIndex((it) => 'num' in it && it.num === 0x6669) + 1;
-  console.log(`${version}: ${items.length} lines; extraTicks ${extraTicks}, DM rules ${dmRules}; ${saveArg} read, d.Time ${ctx.state.tickCount}, seed ${hx(ctx.random.getSeed(), 8)}`);
+  console.log(`${version}: ${items.length} lines; extraTicks ${extraTicks}, DM rules ${dmRules}, profile ${profileArg ?? 'none'}; ${saveArg} read, d.Time ${ctx.state.tickCount}, seed ${hx(ctx.random.getSeed(), 8)}`);
 } else {
   game.readDungeonDat(dungeonDat);
   const first = items.findIndex((it) => 'num' in it && it.num === 0x3333);
@@ -267,7 +274,7 @@ if (saveArg) {
   ctx.random.setSeed(((seedEntry.x << 16) | (seedEntry.y & 0xffff)) >>> 0);
   const d0 = ctx.random.next() & 0xffff, d1 = ctx.random.next() & 0xffff;
   ctx.state.block1.randomGameID = (d0 * d1) >>> 0;
-  console.log(`${version}: ${items.length} lines; extraTicks ${extraTicks}, DM rules ${dmRules}; seed ${hx(ctx.random.getSeed(), 8)}`);
+  console.log(`${version}: ${items.length} lines; extraTicks ${extraTicks}, DM rules ${dmRules}, profile ${profileArg ?? 'none'}; seed ${hx(ctx.random.getSeed(), 8)}`);
 }
 oldCallCount = gameCalls;
 const firstMove = items.slice(at).find((it) => 'num' in it) as PlayEntry;

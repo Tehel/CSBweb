@@ -27,6 +27,7 @@
  * a run that drifts stops there, and says where.
  */
 import { digestedFiles } from '../../src/data/DataSetFiles';
+import { behaviourAt, ENGINE_LEVEL, type ProfileName } from '../../src/engine/Behaviour';
 import { MOUSE_UNCLICK } from '../../src/engine/MouseQueue';
 import { PLAYFILE_LINES } from '../../src/engine/PlayfileLine';
 import { carriedStateOf, Recorder, type Recording, type RecordingPoint } from '../../src/engine/Recorder';
@@ -45,6 +46,11 @@ export interface CsbwinRun {
   readonly id: string;
   /** The data set it is played on (`DataSet.id`). */
   readonly dataSet: string;
+  /**
+   * The profile of the CSBWin version that recorded it (`PROFILES`, `src/engine/Behaviour.ts`),
+   * which it is played and recorded at; `null` for 2023's source, which the engine follows.
+   */
+  readonly profile: ProfileName | null;
   /** The CSBWin save its log's first read reads (`0x6669`), in its folder, or `null` for a new game. */
   readonly save: string | null;
   /** Where it ends: the game won, Lord Chaos fused; or its log's end, shared at a save made there. */
@@ -60,19 +66,19 @@ export interface CsbwinRun {
 /** The runs, in the order the check plays them. */
 export const CSBWIN_RUNS: readonly CsbwinRun[] = [
   {
-    id: 'DMMovie2615', dataSet: 'dm-atari', save: null, end: 'won', player: 'Anthony Bracegirdle',
+    id: 'DMMovie2615', dataSet: 'dm-atari', profile: null, save: null, end: 'won', player: 'Anthony Bracegirdle',
     title: 'Race to fusion in 26 min 15 s',
     description: 'Dungeon Master won in 9449 ticks with Halk, Stamm, Leyla and Gothmog. A CSBWin 17.6 recording, DMMovie2615 of CSBWin\'s movies, played back in CSBweb.',
     recordedAt: '2021-04-06',
   },
   {
-    id: 'DMMovie2823', dataSet: 'dm-atari', save: null, end: 'won', player: 'Anthony Bracegirdle',
+    id: 'DMMovie2823', dataSet: 'dm-atari', profile: null, save: null, end: 'won', player: 'Anthony Bracegirdle',
     title: 'Race to fusion in 28 min 23 s',
     description: 'Dungeon Master won in 10217 ticks with Halk, Stamm, Leyla and Gothmog. A CSBWin 17.6 recording, DMMovie2823 of CSBWin\'s movies, played back in CSBweb.',
     recordedAt: '2020-09-20',
   },
   {
-    id: 'CSBMovie0640', dataSet: 'csb', save: 'csbgame.dat', end: 'log', player: 'Anthony Bracegirdle',
+    id: 'CSBMovie0640', dataSet: 'csb', profile: null, save: 'csbgame.dat', end: 'log', player: 'Anthony Bracegirdle',
     title: 'Race to Fulya Pit in 6 min 40 s',
     description: 'Chaos Strikes Back from the prison to Fulya Pit with Buzzzz. A CSBWin 17.6 recording, CSBMovie0640 of CSBWin\'s movies, eleven recordings spliced at the saves made between them, played back in CSBweb.',
     recordedAt: '2021-04-30',
@@ -114,7 +120,7 @@ function drawsBetween(from: number, to: number, max = 100000): number | null {
 }
 
 /**
- * `run` played from its folder into a fresh page of its set, `build` naming its
+ * `run` played from its folder into a fresh page of its set at its profile, `build` naming its
  * recording's build and `dataSet` its set: the run's own, or the id a site gives the same
  * files (`utils/share-csbwin-runs.ts`).
  */
@@ -125,6 +131,7 @@ export async function recordRun(run: CsbwinRun, build: string, dataSet = run.dat
   const page = await standPage(set, files);
   const { game, screen } = page;
   const { ctx } = game;
+  ctx.behaviour = behaviourAt(ENGINE_LEVEL, run.profile);
   const recorder = new Recorder(game, build, dataSet, () => files.digests(), () => run.id);
   const { items } = readPlayfile(`${folder}/playfile.log`);
   const entries = items.filter((item): item is PlayEntry => 'num' in item);

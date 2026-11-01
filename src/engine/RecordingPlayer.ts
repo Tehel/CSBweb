@@ -36,7 +36,7 @@
  * told each such span as it ends (`onSkipped`), and stops at its end (`onEnd`).
  */
 import { VBL_FREQUENCY } from '../core/constants';
-import { behaviourAt, knownLevel } from './Behaviour';
+import { behaviourAt, knownLevel, knownProfile } from './Behaviour';
 import type { Game } from './Game';
 import { saveFileOf } from './GameSaves';
 import { applyExtras, type ClockHolder } from './InputBoundary';
@@ -115,7 +115,7 @@ export class RecordingPlayer {
         private readonly savedAtEnd: SavedAtEnd | null = null,
     ) {
         if (path.length === 0) throw new Error('a path holds a recording');
-        if (path.some((recording) => !knownLevel(recording.level))) throw new Error('A LATER VERSION OF THE SITE MADE THIS RECORDING');
+        if (path.some((recording) => !knownLevel(recording.level) || !knownProfile(recording.profile))) throw new Error('A LATER VERSION OF THE SITE MADE THIS RECORDING');
         if (savedAtEnd && path[path.length - 1]!.end) throw new Error('a path ends at a save or at the game\'s end');
         for (let n = 1; n < path.length; n++) {
             const { parent, start } = path[n]!;
@@ -158,7 +158,7 @@ export class RecordingPlayer {
         const { ctx } = this.game;
         this.started = this.game.input.vbls;
         if (root.start.kind === 'new') {
-            ctx.behaviour = behaviourAt(root.level);
+            ctx.behaviour = behaviourAt(root.level, root.profile);
             this.game.readDungeonDat(this.dungeonDat);
             ctx.random.setSeed(root.start.random);
             ctx.state.block1.randomGameID = root.start.randomGameID;
@@ -334,7 +334,7 @@ export class RecordingPlayer {
     private read(recording: Recording): void {
         const { start } = recording;
         if (start.kind !== 'save') throw new Error('a branch starts from a save');
-        this.game.ctx.behaviour = behaviourAt(recording.level);
+        this.game.ctx.behaviour = behaviourAt(recording.level, recording.profile);
         applySaveBytes(this.game, start.bytes);
         if (start.carried) setCarriedState(this.game, start.carried);
         this.begin(recording);

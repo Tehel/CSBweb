@@ -96,7 +96,7 @@
 import { readFileSync } from 'node:fs';
 
 import { digestedFiles, fileDigest } from '../../src/data/DataSetFiles';
-import { BEHAVIOURS, behaviourAt, CURRENT_BEHAVIOUR, ENGINE_LEVEL, knownLevel, type BehaviourChange } from '../../src/engine/Behaviour';
+import { BEHAVIOURS, behaviourAt, CURRENT_BEHAVIOUR, ENGINE_LEVEL, knownLevel, knownProfile, playsOld, PROFILES, type BehaviourChange } from '../../src/engine/Behaviour';
 import { VBL_FREQUENCY } from '../../src/core/constants';
 import { CsbRandom } from '../../src/core/random';
 import { OBJECT_ID_EOF, Position } from '../../src/core/types';
@@ -1171,10 +1171,11 @@ async function refusals(pkg: RecordingPackage): Promise<void> {
 }
 
 /**
- * A recording's level (`src/engine/Behaviour.ts`): the engine's behaviour by level, the
- * store's row and head of before levels, a package of version 1, and a path of a later
- * level refused before it plays. `pkg` is a path of two, each recording at the engine's
- * level, which the player sets before each read.
+ * A recording's level and profile (`src/engine/Behaviour.ts`): the engine's behaviour by
+ * level and profile, the store's row and head of before levels, a package of version 1,
+ * and a path of a later level or an unknown profile refused before it plays. `pkg` is a
+ * path of two, each recording at the engine's level and no profile, which the player sets
+ * before each read.
  */
 async function levels(pkg: RecordingPackage): Promise<void> {
   const behaviour = behaviourAt(ENGINE_LEVEL);
@@ -1182,6 +1183,25 @@ async function levels(pkg: RecordingPackage): Promise<void> {
   check(Object.isFrozen(behaviour) && JSON.stringify(behaviour) === JSON.stringify(CURRENT_BEHAVIOUR) && behaviour.level === ENGINE_LEVEL
     && knownLevel(0) && knownLevel(ENGINE_LEVEL) && !knownLevel(-1) && !knownLevel(ENGINE_LEVEL + 1) && !knownLevel(0.5),
     `the engine plays the levels 0 to ${ENGINE_LEVEL}, each by a frozen behaviour, ${kept.length} flag${kept.length === 1 ? '' : 's'} kept`);
+  const profile = PROFILES[0].name;
+  const profiled = behaviourAt(ENGINE_LEVEL, profile);
+  let unknown = '';
+  try {
+    behaviourAt(ENGINE_LEVEL, 'csbwin-0.1');
+  } catch (error) {
+    unknown = (error as Error).message;
+  }
+  check(CURRENT_BEHAVIOUR.profile === null && Object.isFrozen(profiled) && profiled.profile === profile && profiled.level === ENGINE_LEVEL
+    && kept.every((change) => (profiled as unknown as Record<string, unknown>)[change.name] === (change.profiles?.[profile] !== undefined))
+    && knownProfile(null) && knownProfile(profile) && !knownProfile('csbwin-0.1') && unknown === 'profile csbwin-0.1 is not one this engine plays',
+    `the engine plays ${PROFILES.map((known) => known.name).join(', ')} beside no profile, each by a frozen behaviour, its flags on: ${kept.filter((change) => change.profiles?.[profile] !== undefined).length}`);
+  // A flag of the port's own, before its level and not from it; of a profile, from the level it joined it at.
+  const own: BehaviourChange = { name: 'own', does: '', debt: '', until: 2 };
+  const version: BehaviourChange = { name: 'version', does: '', debt: '', until: null, profiles: { [profile]: 2 } };
+  const both: BehaviourChange = { name: 'both', does: '', debt: '', until: 2, profiles: { [profile]: 3 } };
+  const plays = (change: BehaviourChange): string => [0, 1, 2, 3].map((level) => `${+playsOld(change, level, null)}${+playsOld(change, level, profile)}`).join(' ');
+  check(plays(own) === '11 11 00 00' && plays(version) === '00 00 01 01' && plays(both) === '11 11 00 01',
+    `a flag is on below its until, and at a profile from the level it joined it at (${plays(own)} | ${plays(version)} | ${plays(both)})`);
   const read = digestedFiles(diskFiles(STOCK_DATA_SET));
   await read.read('dungeon.dat');
   await read.read('no such file');
@@ -1200,6 +1220,14 @@ async function levels(pkg: RecordingPackage): Promise<void> {
   }));
   check(v1.version === RECORDING_PACKAGE_VERSION && v1.level === 0 && v1.path.every((recording) => recording.level === 0 && recording.files === null),
     'a package of version 1, made before levels, reads as this version\'s: each recording of level 0, naming no files');
+  const atProfile: RecordingPackage = { ...pkg, path: pkg.path.map((recording) => ({ ...recording, profile })) };
+  const carried = (await readRecordingPackage(await writeRecordingPackage(atProfile))).path;
+  const unprofiled = (await readRecordingPackage(await edited(pkg, (json) => {
+    for (const recording of json.path) delete recording.profile;
+  }))).path;
+  check(pkg.path.every((recording) => recording.profile === null) && carried.every((recording) => recording.profile === profile)
+    && unprofiled.every((recording) => recording.profile === null) && v1.path.every((recording) => recording.profile === null),
+    `a package carries each recording's profile, ${profile} or none, and one written before profiles reads as none`);
 
   const store = memoryRecordingStore({ now: false });
   const [root] = pkg.path as [Recording, Recording];
@@ -1212,7 +1240,14 @@ async function levels(pkg: RecordingPackage): Promise<void> {
     { id: entry.id, seq: 1, changes: root.changes },
   ], null);
   const before = await store.read(entry.id);
-  check(before.level === 0 && before.files === null, 'a row and a head the store wrote before levels read as a recording of level 0, naming no files');
+  check(before.level === 0 && before.profile === null && before.files === null,
+    'a row and a head the store wrote before levels read as a recording of level 0, of no profile, naming no files');
+  const profiledStore = memoryRecordingStore({ now: false });
+  await profiledStore.write({ ...entry, id: 'profiled', level: ENGINE_LEVEL, profile }, [
+    { id: 'profiled', seq: 0, start: root.start, parent: null, rules: root.rules, extras: root.extras },
+    { id: 'profiled', seq: 1, changes: root.changes },
+  ], null);
+  check((await profiledStore.read('profiled')).profile === profile, `the store's row keeps a recording's profile, ${profile}`);
 
   const played = Page.replay(pkg.path);
   // The root has begun, the branch is yet to.
@@ -1232,6 +1267,24 @@ async function levels(pkg: RecordingPackage): Promise<void> {
     refused = (error as Error).message;
   }
   check(refused === 'A LATER VERSION OF THE SITE MADE THIS RECORDING', `a path that holds a later level is refused before it plays: "${refused}"`);
+
+  const profiledPlay = Page.replay(atProfile.path);
+  const seenProfiles = [profiledPlay.game.ctx.behaviour.profile];
+  profiledPlay.player!.onBegin((recording) => {
+    seenProfiles.push(profiledPlay.game.ctx.behaviour.profile);
+    profiledPlay.recorder.begin(recording.start, recording.parent);
+  });
+  profiledPlay.play();
+  check(profiledPlay.player!.drift === null && seenProfiles.length === 2 && seenProfiles.every((seen) => seen === profile) && profiledPlay.recording.profile === profile,
+    `the player sets each recording's profile before its read, and a recorder of the game played back records it (${seenProfiles.join(', ')})`);
+  const unknownProfile = pkg.path.map((recording, n) => (n === 1 ? { ...recording, profile: 'csbwin-0.1' } : recording));
+  refused = '';
+  try {
+    Page.replay(unknownProfile);
+  } catch (error) {
+    refused = (error as Error).message;
+  }
+  check(refused === 'A LATER VERSION OF THE SITE MADE THIS RECORDING', `a path that holds a profile the engine does not play is refused before it plays: "${refused}"`);
 }
 
 async function gzipped(text: string): Promise<Uint8Array> {

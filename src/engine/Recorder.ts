@@ -117,6 +117,12 @@ export interface Recording {
      */
     readonly level: number;
     /**
+     * The CSBWin version's profile it was played at (`ctx.behaviour.profile`), a run's of
+     * that version (`DEBT.md` F24), which a later engine plays it by (`behaviourAt`);
+     * `null` for a game the page plays, and for a recording made before profiles.
+     */
+    readonly profile: string | null;
+    /**
      * The MD5 of each file its set had read as it began (`DigestedFiles`); `null` for a
      * recording made before they were kept.
      */
@@ -194,7 +200,7 @@ export class Recorder {
         const { ctx } = this.game;
         this.current = {
             recording: {
-                id: this.newId(), build: this.build, level: ctx.behaviour.level, files: this.files(),
+                id: this.newId(), build: this.build, level: ctx.behaviour.level, profile: ctx.behaviour.profile, files: this.files(),
                 dataSet: this.dataSet, start, parent, rules: { ...ctx.rules }, extras: { ...ctx.extras },
             },
             changes: [],
