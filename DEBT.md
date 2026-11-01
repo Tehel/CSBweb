@@ -555,7 +555,8 @@ behind a named switch, chosen by the recording.
    (`doc/RECORDING.md` → "A recording's level", `tools/checks/replay.ts`, 12.)
 2. ✅ The corpus and its check in `npm test` (`doc/RECORDING.md` → "The corpus",
    `tools/checks/recording-corpus.ts`).
-3. The deploy's check refusing a drift.
+3. ✅ The deploy's check refusing a drift (`doc/DEPLOYMENT.md` → "Deploying",
+   `tools/checks/replay-recordings.ts`).
 4. The policy written down.
 5. The 11.0xx profile: 11.014's and 11.056's sources fetched beside 2023's, their diff
    measured, and the flags one 11.0xx run needs, until it plays further than it does now,
@@ -580,7 +581,15 @@ level. None of the author's own games from the site is in it: the four the site 
 three of these runs, played the same, and a test game that already drifts before its first
 input. A package the site serves names the site's set (`dungeon-master-csbwin` for
 `dm-atari`'s files), so it joins the corpus only once its set is read by its files'
-digests, step 6, or its `dataSet` is rewritten to the manifest's id. The next step is 3.
+digests, step 6, or its `dataSet` is rewritten to the manifest's id.
+
+Step 3 is paid: `utils/deploy.sh` runs `utils/replay-recordings.ts` against the local
+`.env`'s `DEPLOY_INSTANCE` as its moderator `DEPLOY_PLAYER` before it builds, and a
+recording that drifts, or whose package does not read or play, refuses the deploy
+(`--no-replay` for a first deploy, which has no site). `--break` keeps the old way, a yes
+per recording that drifts, for one no flag mends: made before levels by a build whose play
+had already changed. The site's test game that drifts before its first input is one: it
+must be broken, or deleted, before the first deploy the gate runs on. The next step is 4.
 
 Size L.
 

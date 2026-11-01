@@ -663,22 +663,35 @@ the file, and quoted in the remote command anyway.
 ```bash
 npm test                       # the gate, before the commit
 bash tools/check-image.sh      # optional: the golden frames against the image (Docker, Chrome)
-npx tsx utils/replay-recordings.ts --instance https://csbweb.example --player <playerId>
-npm run deploy                 # utils/deploy.sh
+npm run deploy                 # utils/deploy.sh: the site's recordings replayed, then the deploy
 ```
 
-`utils/replay-recordings.ts` replays the instance's shared recordings against the build
-about to be deployed, and marks those that drift as broken, which the list leaves out
-("Shared recordings", above). `--player` is a moderator's `playerId`, so that the lists
-hold every recording, pending and hidden ones included, and the break is allowed;
-`--dry-run` breaks none. Each recording that is not broken yet has its package fetched
-and played from it alone, in a page without the DOM (`tools/lib/playback.ts`) over the
-set's files as the instance serves them, with the working tree's engine: what the build
-made from it plays. Once all are played, it asks a yes for each one that drifts, or whose
-package does not read or play, and says why; a yes posts `{"action": "break"}`, which no
-action takes back. A behaviour change that makes recordings drift is a reason to look
-before deploying, not only to break them. `tools/checks/replay-recordings.ts` runs it
-against a scratch server.
+**The site's recordings refuse a build that does not play them.** Before it builds
+anything, `utils/deploy.sh` runs `utils/replay-recordings.ts` against `DEPLOY_INSTANCE`
+as the moderator `DEPLOY_PLAYER`, both the local `.env`'s, which replays every recording
+the site shares with the working tree's engine, what the image made from it plays. A
+recording plays by the engine's level it was made at (`doc/RECORDING.md` → "A recording's
+level"), so one that drifts is a change of play made without its flag, and the deploy is
+refused: the tool exits 1, and says which recording drifted and where. The instance must
+take `DEPLOY_PLAYER` for a moderator, so that the lists hold every recording, pending and
+hidden ones included, or the tool refuses before it plays. Each recording that is not
+broken has its package fetched and played from it alone, in a page without the DOM
+(`tools/lib/playback.ts`) over the set's files as the instance serves them; a package
+that does not read or play, a later level's among them, fails as a drift does.
+`npm run deploy -- --no-replay` deploys without it, for the first deploy, which has no
+site to ask (`doc/SETUP.md`).
+
+A recording that drifts for a reason no flag mends, one made before levels by a build
+whose play had already changed, is put out of the gate's way by hand:
+
+```bash
+npx tsx utils/replay-recordings.ts --instance https://csbweb.example --player <playerId> --break
+```
+
+replays them the same, then asks a yes for each one that did not pass, and says why; a yes
+posts `{"action": "break"}`, which no action takes back, and the list leaves a broken
+recording out but for its uploader and the moderators ("Shared recordings", above).
+`tools/checks/replay-recordings.ts` runs the gate and `--break` against a scratch server.
 
 `utils/deploy.sh` deploys a commit: it refuses a working tree that differs from it in what
 the image is built from, the build context (`.dockerignore`'s allowlist, untracked files
@@ -745,7 +758,7 @@ an edited set's old one included, since a snapshot still names it. The shared re
 packages, which never change either, are copied the same way into
 `stats/backups/recordings/<id>.gz`. It prints one JSON line, `backup_ok` with the folders and
 the packages copied and the number of each kept, and exits with 1 when the store cannot be read or a folder cannot be copied
-(`backup_failed`). The crontab line, `doc/SETUP.md` step 27's (`docker-compose` under Compose v1), deletes the
+(`backup_failed`). The crontab line, `doc/SETUP.md` step 28's (`docker-compose` under Compose v1), deletes the
 snapshots older than 14 days, and only them:
 
 ```

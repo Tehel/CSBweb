@@ -39,7 +39,7 @@ and `~/csbweb` as the stack's folder. Replace them with your own.
 5. **Check your uid:** `id -u` should print `1000`. The container runs as uid 1000 and
    writes to the stack's `stats/` and `gamefiles/` folders, which your login creates. On
    Ubuntu, the first user made has uid 1000. With another uid, give both folders to 1000
-   after step 22 (`sudo chown -R 1000:1000 ~/csbweb/stats ~/csbweb/gamefiles`).
+   after step 23 (`sudo chown -R 1000:1000 ~/csbweb/stats ~/csbweb/gamefiles`).
 
 6. **Install Docker and Compose.** Follow Docker's own instructions
    (<https://docs.docker.com/engine/install/>), or on Ubuntu run
@@ -50,7 +50,7 @@ and `~/csbweb` as the stack's folder. Replace them with your own.
    in. `docker ps` should answer without `sudo`.
 
 8. Optional: **Install SQLite's shell:** `sudo apt install sqlite3`. You use it to look at the
-   store by hand (step 23). The server itself needs nothing but Docker.
+   store by hand (step 24). The server itself needs nothing but Docker.
 
 9. **Check the disk space:** `df -h ~` should show at least 500 MB free. That covers the
    image, the game files, the players' uploads and two weeks of nightly backups.
@@ -113,11 +113,13 @@ and `~/csbweb` as the stack's folder. Replace them with your own.
 ## Back on your machine: the first deploy
 
 14. **Write the local `.env`:** `cp .env.template .env`, then set `DEPLOY_HOST`
-    (`you@csbweb.example.org`) and `DEPLOY_DIR` (the absolute path from step 10). Git
-    ignores this file.
+    (`you@csbweb.example.org`) and `DEPLOY_DIR` (the absolute path from step 10), and
+    `DEPLOY_INSTANCE` (`https://csbweb.example.org`). Git ignores this file.
 
-15. **Deploy:** `npm run deploy`. It builds the image, copies it and the compose file into
-    `DEPLOY_DIR`, and starts the stack. Later deploys are the same command.
+15. **Deploy:** `npm run deploy -- --no-replay`. It builds the image, copies it and the
+    compose file into `DEPLOY_DIR`, and starts the stack. A deploy first replays the
+    recordings the site shares, which needs the site and a moderator (step 22), so the
+    first one goes without.
 
 16. **Check that the server answers:**
 
@@ -164,9 +166,14 @@ and `~/csbweb` as the stack's folder. Replace them with your own.
 21. **Reload the welcome page.** A switch at its top right corner, shown to moderators
     only, says it worked.
 
+22. **Give the deploy your `playerId`:** set `DEPLOY_PLAYER` in the local `.env` to the id
+    from step 18. From now on `npm run deploy` replays every recording the site shares
+    with the build it is about to deploy, and refuses the deploy where one drifts
+    (`doc/DEPLOYMENT.md` → "Deploying").
+
 ## The official games
 
-22. **Install them.** On your machine, run:
+23. **Install them.** On your machine, run:
 
     ```bash
     npx tsx utils/install-official-sets.ts --dry-run   # what it would do
@@ -184,25 +191,25 @@ and `~/csbweb` as the stack's folder. Replace them with your own.
     becomes the one the welcome page selects on a first visit. A second run offers only
     what is not installed yet.
 
-23. **Look at the store**, if you like: on the server,
+24. **Look at the store**, if you like: on the server,
     `sqlite3 ~/csbweb/stats/stats.db 'SELECT id, name, status, official, hidden FROM data_sets'`.
 
-24. **Reload the welcome page.** The games are listed under "Official games", the six
+25. **Reload the welcome page.** The games are listed under "Official games", the six
     disks first. CSBWin's own two Dungeon Masters, `dm-atari` and `dm-windows`, are
     installed hidden.
     As a moderator you see them, their names in purple, and `?dungeon=<id>` plays them for
     anyone. The eye on a tile hides or shows it.
 
-25. **Polish them on the site.** The pen on a tile edits a set's name, description,
+26. **Polish them on the site.** The pen on a tile edits a set's name, description,
     authors and files. The book on a tile offers its files as a zip, and to a moderator
     its ADD attaches a document, such as a manual. Every change takes effect at once,
     with no restart.
 
-26. **Play.** Pick Dungeon Master ST 1.2, then PLAY.
+27. **Play.** Pick Dungeon Master ST 1.2, then PLAY.
 
 ## Keeping it
 
-27. **Back the store up every night.** On the server, `crontab -e`, and add this line, its
+28. **Back the store up every night.** On the server, `crontab -e`, and add this line, its
     paths yours:
 
     ```
@@ -214,11 +221,11 @@ and `~/csbweb` as the stack's folder. Replace them with your own.
     `< /dev/null` is not optional. Run the line by hand once, then check that
     `ls ~/csbweb/stats/backups/` shows the snapshot.
 
-28. **Copy the backups home**, now and then: `utils/pull-backups.sh` on your machine
+29. **Copy the backups home**, now and then: `utils/pull-backups.sh` on your machine
     copies `stats/backups/` with `rsync` to `../backups/csbweb/`, beside the checkout, or
     to `BACKUP_PULL_DIR`.
 
-29. **Update** whenever you like: `git pull && npm run deploy`. A deploy keeps the store,
+30. **Update** whenever you like: `git pull && npm run deploy`. A deploy keeps the store,
     the game files and the `.env`, and the page is down for a few seconds while the
     container is replaced.
 

@@ -2,8 +2,9 @@
 # Build the image, ship it to the server and restart the stack there (`doc/DEPLOYMENT.md`).
 # Its maintainer runs it by hand:
 #
-#   npm run deploy              # the commit, as it is
-#   npm run deploy -- --dirty   # the working tree, though it differs from its commit
+#   npm run deploy                  # the commit, as it is
+#   npm run deploy -- --dirty       # the working tree, though it differs from its commit
+#   npm run deploy -- --no-replay   # without replaying the site's recordings: the first deploy
 #
 # The target is read from a gitignored `.env` at the repository's root, so the repository
 # names no host, login or path:
@@ -11,6 +12,13 @@
 #   DEPLOY_HOST=<user>@<host>   the SSH destination
 #   DEPLOY_DIR=<path>           the stack's folder there, absolute: the compose file, its
 #                               .env, gamefiles/ and stats/ (`docker-compose.yaml`)
+#   DEPLOY_INSTANCE=<url>       the site, whose shared recordings the build must play
+#   DEPLOY_PLAYER=<playerId>    one of its moderators (`MODERATOR_PLAYER_IDS`)
+#
+# Before anything is built, the working tree's engine replays every recording the site
+# shares (`utils/replay-recordings.ts`), and one that drifts refuses the deploy: it is a
+# change of play made without its flag (`doc/RECORDING.md` → "A recording's level").
+# `--no-replay` skips it, for the first deploy, which has no site to ask yet.
 #
 # The image goes over as a file, and the stack is taken down and brought up again, since
 # Compose v1 cannot recreate a container there. `docker-compose` runs it where the
@@ -24,11 +32,14 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 
 dirty=0
-case "${1:-}" in
-  '') ;;
-  --dirty) dirty=1 ;;
-  *) echo "usage: utils/deploy.sh [--dirty]" >&2; exit 2 ;;
-esac
+replay=1
+for arg in "$@"; do
+  case "$arg" in
+    --dirty) dirty=1 ;;
+    --no-replay) replay=0 ;;
+    *) echo "usage: utils/deploy.sh [--dirty] [--no-replay]" >&2; exit 2 ;;
+  esac
+done
 
 [ -f "$root/.env" ] || { echo "no .env at $root: it names DEPLOY_HOST and DEPLOY_DIR" >&2; exit 1; }
 set -a
@@ -51,6 +62,14 @@ if [ -n "$changed" ]; then
     exit 1
   fi
   build="$build-dirty"
+fi
+
+# The site's recordings, played by the engine about to be built: a drift refuses the deploy.
+if [ "$replay" = 1 ]; then
+  : "${DEPLOY_INSTANCE:?DEPLOY_INSTANCE is not set in .env: the site whose recordings to replay (or --no-replay, for a first deploy)}"
+  : "${DEPLOY_PLAYER:?DEPLOY_PLAYER is not set in .env: the playerId of a moderator (or --no-replay, for a first deploy)}"
+  (cd "$root" && npx tsx utils/replay-recordings.ts --instance "$DEPLOY_INSTANCE" --player "$DEPLOY_PLAYER" < /dev/null) \
+    || { echo "not deployed: the build does not play every recording $DEPLOY_INSTANCE shares" >&2; exit 1; }
 fi
 
 echo "building csbweb:latest ($build)"

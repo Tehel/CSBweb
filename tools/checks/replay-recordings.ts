@@ -1,15 +1,17 @@
 /**
- * The replay tool (`utils/replay-recordings.ts`) against a scratch server
+ * The deploy's gate (`utils/replay-recordings.ts`) against a scratch server
  * (`server/app.ts`) that serves `dm-atari`'s files and shares three of its recordings: one
  * that plays to its point, approved (`quietPackage`); one whose changes' `d.Time` and
  * `d.RandomNumber` are no game's, pending (`packageOf`); and one such, broken already. The
- * tool runs as a moderator runs it, its own process, its answers piped.
+ * tool runs as `utils/deploy.sh` runs it, its own process, its answers piped.
  *
- * 1. A dry run replays the two that are not broken, says which one drifts and where,
- *    asks about it alone, and breaks nothing.
- * 2. A run answered yes breaks the one that drifts, and only it.
- * 3. Run again, it replays the one left, which plays, and asks nothing.
- * 4. A player who does not moderate is refused the break, and the run stops there.
+ * 1. The gate replays the two that are not broken, says which one drifts and where, asks
+ *    nothing, breaks nothing, and refuses the deploy: it exits 1.
+ * 2. `--break`, answered yes, breaks the one that drifts, and only it.
+ * 3. The gate again replays the one left, which plays, asks nothing, and lets the deploy
+ *    go on: it exits 0.
+ * 4. A player who does not moderate is refused before anything plays, by the gate and by
+ *    `--break`: the lists would leave recordings out.
  *
  * Usage: npm test -- --only=replay-recordings.ts
  */
@@ -95,35 +97,37 @@ try {
     console.log(`Shared: ${before}`);
     const show = (out: string) => console.log(out.replace(/^/gm, '  | ').replace(/[0-9A-F]{16}/g, '<id>').replace(/against [^.]*\./, 'against <build>.'));
 
-    console.log('\n1. A dry run:');
-    const dry = await runTool(instance, ['--player', MODERATOR, '--dry-run'], 'y\n');
-    show(dry.out);
-    check(dry.code === 0 && dry.out.includes(`✓ ${plays} 'Quiet' (build test): plays to its point`)
-        && dry.out.includes(`✗ ${drifts} 'Fake' (build test, pending): drifts at change 0 of root`) && !dry.out.includes(brokenAlready)
-        && dry.out.includes('2 recordings replayed, 1 that drifts.') && dry.out.includes('and 1 broken already'),
-        'a dry run replays the two not broken, the pending one included: the quiet game plays to its point, the fake drifts at its first change');
-    check((dry.out.match(/Mark it broken\?/g) ?? []).length === 1 && dry.out.includes('A dry run: not marked.') && states() === before,
-        'it asks about the one that drifts alone, and breaks nothing');
+    console.log('\n1. The gate:');
+    const gate = await runTool(instance, ['--player', MODERATOR], 'y\n');
+    show(gate.out);
+    check(gate.out.includes(`✓ ${plays} 'Quiet' (build test): plays to its point`)
+        && gate.out.includes(`✗ ${drifts} 'Fake' (build test, pending): drifts at change 0 of root`) && !gate.out.includes(brokenAlready)
+        && gate.out.includes('2 recordings replayed, 1 that drifts.') && gate.out.includes('and 1 broken already'),
+        'the gate replays the two not broken, the pending one included: the quiet game plays to its point, the fake drifts at its first change');
+    check(gate.code === 1 && gate.out.includes('The deploy is refused') && !gate.out.includes('Mark it broken?') && states() === before,
+        `it refuses the deploy, exit ${gate.code}, asks nothing and breaks nothing`);
 
-    console.log('\n2. A run, answered yes:');
-    const run = await runTool(instance, ['--player', MODERATOR], 'y\n');
+    console.log('\n2. --break, answered yes:');
+    const run = await runTool(instance, ['--player', MODERATOR, '--break'], 'y\n');
     show(run.out);
-    check(run.code === 0 && run.out.includes('Marked broken.') && run.out.includes('1 marked broken.')
-        && states() === 'Broken before pending broken, Fake pending broken, Quiet', `it breaks the one that drifts, and only it (${states()})`);
+    check(run.code === 0 && (run.out.match(/Mark it broken\?/g) ?? []).length === 1 && run.out.includes('Marked broken.') && run.out.includes('1 marked broken.')
+        && states() === 'Broken before pending broken, Fake pending broken, Quiet', `it asks about the one that drifts alone, and breaks it (${states()})`);
 
-    console.log('\n3. Run again:');
+    console.log('\n3. The gate again:');
     const again = await runTool(instance, ['--player', MODERATOR], '');
     show(again.out);
     check(again.code === 0 && again.out.includes('1 recording replayed, 0 that drift.') && again.out.includes('and 2 broken already')
-        && !again.out.includes('Mark it broken?'), 'run again, it replays the one left, which plays, and asks nothing');
+        && !again.out.includes('refused') && !again.out.includes('Mark it broken?'), 'it replays the one left, which plays, asks nothing, and lets the deploy go on');
 
     console.log('\n4. A player who does not moderate:');
     store.remove(plays);
     const fake = await share(await packageOf('dm-atari', 'Another fake'));
-    const refused = await runTool(instance, ['--player', PLAYER], 'y\n');
-    show(refused.out);
-    check(refused.code === 1 && refused.out.includes('--player is not one of its moderators') && !store.get(fake)!.broken,
-        'a player who does not moderate is refused the break, and the run stops');
+    for (const args of [[], ['--break']]) {
+        const refused = await runTool(instance, ['--player', PLAYER, ...args], 'y\n');
+        show(refused.out);
+        check(refused.code === 1 && refused.out.includes('--player is not one of its moderators') && !refused.out.includes('replayed')
+            && !store.get(fake)!.broken, `a player who does not moderate is refused before anything plays${args.length ? ', with --break' : ''}`);
+    }
 } finally {
     server.close();
     db.close();

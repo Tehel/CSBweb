@@ -349,6 +349,10 @@ A package the site serves (`recordings/<id>.gz`) names the site's set, whose id 
 `tools/data-sets.json`'s (`dungeon-master-csbwin` for `dm-atari`'s files), so the check
 cannot play it as it is: its `dataSet` must name the manifest's set.
 
+The site's own recordings are the deploy's corpus: `utils/deploy.sh` replays every one the
+site shares with the build it is about to deploy, each at its level, and refuses the
+deploy where one drifts (`utils/replay-recordings.ts`, `doc/DEPLOYMENT.md` → "Deploying").
+
 ### The tree
 
 A save made in a recording knows its place there, and a load of it carries the
@@ -582,8 +586,11 @@ kept, for a withdrawal.
 **A recording made by an older build** is listed with its build, and PLAY plays it all
 the same; a drift stops it and says another version of the site made it (`endLines`).
 Before a deploy, the replay tool (`utils/replay-recordings.ts`) plays every listed
-recording against the new build and marks those that drift as broken, which the list
-leaves out but for its uploader and the moderators.
+recording against the new build, and one that drifts refuses the deploy: each plays at its
+level, so a drift is a change of play made without its flag. A moderator may mark one
+broken that no flag mends, made before levels by a build whose play had already changed,
+which the list then leaves out but for its uploader and the moderators
+(`doc/DEPLOYMENT.md` → "Deploying").
 
 **The browser's points** (`src/engine/RecordingPoints.ts`) are what a player plays and
 shares of the store: each save whose recording the store holds up to its point
@@ -660,7 +667,7 @@ What sharing takes:
 - **The engine's level**, stored with each recording ("A recording's level", above): a
   behaviour change makes older recordings drift unless it keeps the old behaviour behind
   a flag, which their `random` values show at the first wrong entry. A shared recording
-  that drifts is marked broken, which the replay tool does before a deploy
+  that drifts refuses the deploy, which the replay tool plays them all before
   (`utils/replay-recordings.ts`).
 - **Speed**: fast-forward is free, as CSBWin's `#NoSpeedLimit` and `#FastVBLnn`; going
   back means replaying from the start, or from saves taken along the way.

@@ -1,17 +1,19 @@
 /**
- * Replay every recording a CSBweb instance shares against this checkout's build, before
- * it is deployed there, and mark those that drift as broken
- * (`doc/DEPLOYMENT.md` → "Shared recordings"): a behaviour change makes an older recording
- * drift (`doc/RECORDING.md` → "Shared recordings"), and the list leaves a broken one out
- * but for its uploader and the moderators.
+ * The deploy's gate (`doc/DEPLOYMENT.md` → "Deploying"): replay every recording a CSBweb
+ * instance shares against this checkout's engine, before it is deployed there, and refuse
+ * the deploy where one drifts. A recording plays by the engine's level it was made at
+ * (`doc/RECORDING.md` → "A recording's level"), so a drift is a change of play made
+ * without its flag, or a level bump forgotten, and the build that has it must not reach
+ * the site. `utils/deploy.sh` runs it first.
  *
  * Run:
  *
- *   npx tsx utils/replay-recordings.ts --instance https://csbweb.example --player <playerId> [--dry-run]
+ *   npx tsx utils/replay-recordings.ts --instance https://csbweb.example --player <playerId> [--break]
  *
  * `--player` is a moderator's `playerId` (`MODERATOR_PLAYER_IDS`), a UUID: the lists then
- * hold every recording of every set, pending and hidden ones included, and only a
- * moderator may break one. `--dry-run` replays them all and breaks none.
+ * hold every recording of every set, pending and hidden ones included. The manifest says
+ * whether the instance takes it for one (`DataSetManifest.moderator`), and a player it does
+ * not is refused before anything plays: the lists would leave recordings out.
  *
  * Each set the instance lists (`api/data-sets`) has its recordings listed
  * (`api/recordings?dataSet=<id>`), and each that is not broken yet has its package
@@ -19,15 +21,20 @@
  * played, from the package alone, in a page without the DOM over the set's files as the
  * instance serves them (`playPath`, `tools/lib/playback.ts`), with the engine of this
  * working tree: what the build deployed from it will play. A recording that plays to its
- * point, a save's file checked there or the game's end reached, is kept; one that drifts,
- * or whose package does not read or play, is shown with why, and once every one is played
- * the script asks, for each such:
+ * point, a save's file checked there or the game's end reached, passes; one that drifts,
+ * or whose package does not read or play (a later level's among them), is shown with why.
+ * The run exits 0 where every one passed, and 1 where one did not: the deploy refused.
+ *
+ * `--break` is for a recording that drifts for a reason no flag mends: one made before
+ * levels by a build whose play had already changed, a package that no longer reads. Once
+ * every one is played, it asks, for each that did not pass:
  *
  *   y  yes: mark it broken (`POST api/recordings/<id>`, `{"action": "break"}`)
  *   n  no, next
  *   q  quit
  *
- * A broken recording stays broken: no action takes it back.
+ * and exits 0. A broken recording stays broken: no action takes it back, and the gate
+ * plays it no more.
  */
 import { spawnSync } from 'node:child_process';
 import { stdin, stdout } from 'node:process';
@@ -52,7 +59,7 @@ function argument(name: string): string | null {
 const instance = (argument('--instance') ?? fail('--instance <url> is needed: the CSBweb instance whose recordings to replay')).replace(/\/+$/, '');
 const player = argument('--player') ?? fail('--player <playerId> is needed: a moderator of the instance');
 if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(player)) fail('--player is not a playerId, a lowercase UUID');
-const dryRun = process.argv.includes('--dry-run');
+const breaking = process.argv.includes('--break');
 const asPlayer = { [PLAYER_ID_HEADER]: player };
 
 const rl = createInterface({ input: stdin, output: stdout, terminal: stdin.isTTY });
@@ -126,8 +133,9 @@ async function replay(set: DataSet, files: ReturnType<typeof keptFiles>, recordi
 }
 
 async function main(): Promise<void> {
-    console.log(`Replaying ${instance}'s recordings against ${checkoutBuild()}${dryRun ? ', a dry run' : ''}.`);
+    console.log(`Replaying ${instance}'s recordings against ${checkoutBuild()}.`);
     const manifest = parseManifest(await (await fetchOk(`${instance}/${DATA_SETS_ROUTE}`, { headers: asPlayer })).text(), `${instance}/gamefiles`);
+    if (!manifest.moderator) fail(`${instance} refuses: --player is not one of its moderators, so its lists would leave recordings out.`);
     const drifted: Drifted[] = [];
     let played = 0;
     for (const set of manifest.dataSets) {
@@ -147,6 +155,12 @@ async function main(): Promise<void> {
         }
     }
     console.log(`\n${played} recording${played === 1 ? '' : 's'} replayed, ${drifted.length} that drift${drifted.length === 1 ? 's' : ''}.`);
+    if (!breaking) {
+        if (drifted.length === 0) return;
+        console.log(`The deploy is refused: a recording that drifts is a change of play made without its flag (doc/RECORDING.md → "A recording's level").`
+            + ' Keep the old behaviour behind a flag and bump ENGINE_LEVEL, or, for a recording no flag mends, run again with --break.');
+        process.exit(1);
+    }
 
     let broken = 0;
     for (const [i, { set, recording, why }] of drifted.entries()) {
@@ -154,10 +168,6 @@ async function main(): Promise<void> {
         const answer = await ask(`  Mark it broken? [y]es, [n]o, [q]uit: `);
         if (answer === 'q') break;
         if (answer !== 'y') continue;
-        if (dryRun) {
-            console.log('  A dry run: not marked.');
-            continue;
-        }
         const response = await fetch(`${instance}/${RECORDINGS_ROUTE}/${recording.id}`, {
             method: 'POST', headers: { ...asPlayer, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'break' }),
         });
