@@ -1268,7 +1268,11 @@ async function levels(pkg: RecordingPackage): Promise<void> {
   }
   check(refused === 'A LATER VERSION OF THE SITE MADE THIS RECORDING', `a path that holds a later level is refused before it plays: "${refused}"`);
 
-  const profiledPlay = Page.replay(atProfile.path);
+  // Played at the latest level where the profile turns every flag off, so that it plays as
+  // it was made, at no profile: before the profile's first flag joined it.
+  const quiet = [...Array(ENGINE_LEVEL + 1).keys()].reverse().find((level) => kept.every((change) => !playsOld(change, level, profile)));
+  check(quiet !== undefined, `a level plays ${profile} with every flag off: ${quiet}`);
+  const profiledPlay = Page.replay(atProfile.path.map((recording) => ({ ...recording, level: quiet ?? 0 })));
   const seenProfiles = [profiledPlay.game.ctx.behaviour.profile];
   profiledPlay.player!.onBegin((recording) => {
     seenProfiles.push(profiledPlay.game.ctx.behaviour.profile);

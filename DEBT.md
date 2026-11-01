@@ -575,7 +575,7 @@ behind a named switch, chosen by the recording.
 7. Recordings resumed (`src/ui/recordingsSwitch.ts`, `doc/RECORDING.md` → "Recordings are
    paused").
 
-**Where it stands:** step 1 is paid. `ENGINE_LEVEL` is 0 and `BEHAVIOURS` empty. A
+**Where it stands:** step 1 is paid. A
 recording carries `level` and `files` (`FileDigests`, the MD5 of each file the set had
 read as it began, through `digestedFiles`); the store keeps the level in the row and the
 digests in the head; a package is of version 2, and one of version 1 still reads, at level
@@ -625,26 +625,29 @@ source plays all four 11.0xx runs to their end with no sequence error**: `DMMovi
 is their version, near enough that no run's `.exe` is needed, and where the port at a
 profile parts from a run, the oracle says what 11.014 drew there.
 
-`DMMovie42` is the run to take first: its first drift is line 130, the step forward at
-`d.Time` 0x6b, which records two draws since line 129, where the port, as 2023, draws once
-(`CheckMoveFromMissile`). The oracle's other draw comes first, in the tick's
-`SmartDiscard(false)` (`doc/CSBwin-src-11.014/CSBCode.cpp:643`): 11.014's
-`SDOBJLIST::AddObject` calls `ComputePriority`, which draws
-(`doc/CSBwin-src-11.014/SmartDiscard.cpp:53-61`), for the object added and again for each
-parent it is compared with (`:123-140`), where 2023's `AddObjectDecr` and `AddObjectIncr`
-compare the `m_priority` computed once (`doc/CSBwin-src/SmartDiscard.cpp:83`, `:153-195`).
-2023's oracle draws nothing in `SmartDiscard` at that tick: why the two differ there, from
-the diff of `SmartDiscard.cpp`, is 5.4's first flag.
+`DMMovie42` is the run under way (`CSBWIN_RUNS_UNDER_WAY`, `tools/lib/csbwinRun.ts`): its
+log is `tools/fixtures/csbwin-runs/DMMovie42/`, played over `dm-atari` (the run's own
+`dungeon.dat` and `graphics.dat`, beside its log in CSBWin's movies, are not `dm-atari`'s
+bytes), and `tools/checks/csbwin-runs.ts` holds it at the line it drifts at, which each
+flag moves on. It drifts at **line 783**, `d.Time` 0x424, which records 29 draws since
+line 782 where the port makes 27. The oracle's 29, at 0x423, are a monster's attack;
+the port is two short inside `MonsterDamagesCharacter`, one of them in
+`IsCharacterLucky`, which draws three times in the oracle and twice in the port. The
+diff of `Character.cpp`'s and `Monster.cpp`'s versions of those two is the next flag.
 
-Step 5.3 is paid: `PROFILES` (`src/engine/Behaviour.ts`) holds `csbwin-11.014`, which names
-no flag yet. A flag a profile plays lists it in its `profiles` with the level it joined it
+Step 5.3 is paid: `PROFILES` (`src/engine/Behaviour.ts`) holds `csbwin-11.014`. A flag a profile plays lists it in its `profiles` with the level it joined it
 at, and one the port never had has no `until` (`doc/RECORDING.md` → "A recording's level",
 → "The policy": a flag joining a profile bumps the level). A recording, the store's row and
 a package carry `profile` (`null` for none, and for one made before profiles); the player
 sets it with the level and refuses one it does not play (`tools/checks/replay.ts`). A run
 of `CSBWIN_RUNS` names its profile (`null` for the three) and `recordRun` plays at it;
-`tools/play-csbwin-log.ts --profile=csbwin-11.014` plays a log at it, and `DMMovie42`
-still parts at line 130. The next step is 5.4.
+`tools/play-csbwin-log.ts --profile=csbwin-11.014` plays a log at it.
+
+Step 5.4 is under way. `ENGINE_LEVEL` is 1, and the one flag is the profile's:
+`smartDiscardDrawnPriority`, joined at level 1, 11.014's `SmartDiscard` whole
+(`smartDiscard11014`, `src/engine/SmartDiscard.ts`, checked at its profile by
+`tools/checks/watch-smart-discard.ts`), which took `DMMovie42` from line 130 to 783. The
+next is the flag at line 783, above.
 
 Size L.
 

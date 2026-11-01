@@ -10,17 +10,22 @@
  *
  * So every change to the engine answers to some 25,000 entries of CSBWin play.
  *
+ * Then each run under way (`CSBWIN_RUNS_UNDER_WAY`), a run of an older CSBWin version
+ * played at its profile (`doc/RECORDING.md` → "A recording's level"), to the line it
+ * drifts at and no other.
+ *
  *   npm test -- --only=csbwin-runs.ts [<run id>]
  */
 import { readRecordingPackage, writeRecordingPackage } from '../../src/engine/RecordingPackage';
 import { check, finish } from '../lib/check';
-import { CSBWIN_RUNS, recordRun, runPackage } from '../lib/csbwinRun';
+import { CSBWIN_RUNS, CSBWIN_RUNS_UNDER_WAY, recordRun, runPackage } from '../lib/csbwinRun';
 import { dataSetNamed, diskFiles } from '../lib/dataSets';
 import { playPath } from '../lib/playback';
 
 const only = process.argv[2];
 const runs = CSBWIN_RUNS.filter((run) => !only || run.id === only);
-check(runs.length > 0, `a run is named ${only}`);
+const underWay = CSBWIN_RUNS_UNDER_WAY.filter((run) => !only || run.id === only);
+check(runs.length + underWay.length > 0, `a run is named ${only}`);
 
 for (const run of runs) {
   console.log(`${run.id} (${run.dataSet}${run.save ? `, from ${run.save}` : ', a new game'}):`);
@@ -50,5 +55,13 @@ for (const run of runs) {
   check(played.game.ctx.state.tickCount === page.game.ctx.state.tickCount && played.game.ctx.random.getSeed() === page.game.ctx.random.getSeed(),
     `and leaves the game at the run's d.Time ${played.game.ctx.state.tickCount} and d.RandomNumber`);
   if (run.end === 'won') check(played.game.ctx.state.gameWon && played.game.mainLoopHasReturned(), '…with the game won and the credits shown');
+}
+
+for (const run of underWay) {
+  console.log(`${run.id} (${run.dataSet}, at ${run.profile}), under way:`);
+  const recorded = await recordRun(run, 'csbwin-runs');
+  console.log(`  played: ${recorded.entries} entries, d.Time ${recorded.page.game.ctx.state.tickCount}; drifts at ${recorded.drift}`);
+  check(recorded.drift !== null && recorded.drift.startsWith(`line ${run.drifts}:`),
+    `${run.id} plays at ${run.profile} to line ${run.drifts} of its log, where it drifts${recorded.drift?.startsWith(`line ${run.drifts}:`) ? '' : `, not ${recorded.drift === null ? 'at its end' : recorded.drift.split(':')[0]}: move its \`drifts\` on where it plays further`}`);
 }
 finish();

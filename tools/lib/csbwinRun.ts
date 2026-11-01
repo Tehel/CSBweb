@@ -85,6 +85,29 @@ export const CSBWIN_RUNS: readonly CsbwinRun[] = [
   },
 ];
 
+/**
+ * A run that does not play to its end yet, kept beside them: it plays at its profile to
+ * `drifts`, the line of its log where the port's random first parts from CSBWin's, and
+ * the check holds it there, so a change of play that undoes one of its profile's flags
+ * fails, and one that takes it further moves the line on (`doc/RECORDING.md` → "A
+ * recording's level").
+ */
+export interface RunUnderWay extends CsbwinRun {
+  /** The line of its log the port first drifts at. */
+  readonly drifts: number;
+}
+
+/** The runs under way, in the order the check plays them. */
+export const CSBWIN_RUNS_UNDER_WAY: readonly RunUnderWay[] = [
+  {
+    id: 'DMMovie42', dataSet: 'dm-atari', profile: 'csbwin-11.014', save: null, end: 'won', player: 'Paul Hayes',
+    title: 'Dungeon Master, minimum item picking',
+    description: 'A CSBWin 11.017 recording, DMMovie42 of CSBWin\'s movies, played back in CSBweb.',
+    recordedAt: '2009-05-28',
+    drifts: 783,
+  },
+];
+
 /** The folder a run's files are in. */
 export function runFolder(run: CsbwinRun): string {
   return `tools/fixtures/csbwin-runs/${run.id}`;

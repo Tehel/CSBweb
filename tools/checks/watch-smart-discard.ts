@@ -18,13 +18,20 @@
  *     only the six can be listed: the scan lists them, then four
  *     discards bring the count under 6000, highest priority first, each lifted out of
  *     its cell and its record freed.
+ *  4. At the `csbwin-11.014` profile, 11.014's (`smartDiscard11014`,
+ *     `doc/CSBwin-src-11.014/SmartDiscard.cpp`): the count never stops the cycle, so the
+ *     retail dungeon's weapons are scanned, and every `ComputePriority` draws, once per
+ *     object listed and again at each comparison. Weapons padded to 7003, four placed two
+ *     or more levels off and one on the party's: four discards, each a placed one off the
+ *     party's level, bring the count to 6999.
  *
  * Run: `npm test -- --only=checks/watch-smart-discard.ts`
  */
 
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../../src/core/types';
 import { getActuatorType } from '../../src/data/actuatorHelpers';
-import type { MiscRecord } from '../../src/data/dungeonTypes';
+import type { MiscRecord, WeaponRecord } from '../../src/data/dungeonTypes';
+import { behaviourAt, ENGINE_LEVEL } from '../../src/engine/Behaviour';
 import type { Game } from '../../src/engine/Game';
 import { SDObjList, scanOneCell, smartDiscard, SmartDiscardMode, type SDObj } from '../../src/engine/SmartDiscard';
 import { newGame, stockGraphics, stockDungeon } from '../lib/game';
@@ -248,6 +255,79 @@ function chainHas(game: Game, at: Position, rn: ObjectID): boolean {
   check(lifted.every((l) => !chainHas(game, l.at, l.object) && misc.records[l.index].nextObject === OBJECT_ID_NULL),
     'each is out of its cell, its record freed');
   check(misc.records[index(near1)].nextObject !== OBJECT_ID_NULL, 'the first one level off is kept');
+}
+
+/* ---------------------------------- 4. 11.014's, at the csbwin-11.014 profile ---- */
+{
+  const game = makeGame();
+  const ctx = game.ctx;
+  const s = ctx.smartDiscard;
+  ctx.behaviour = behaviourAt(ENGINE_LEVEL, 'csbwin-11.014');
+  let priorityDraws = 0;
+  wrapMember(ctx.random, 'below', (below) => (num) => {
+    if (num === 100000) priorityDraws++;
+    return below(num);
+  });
+  smartDiscard(ctx, true);
+  let steps = 0;
+  while (!(s.currentMode === SmartDiscardMode.Scan && s.currentDBNum === DBType.WEAPON) && steps < 1000) { smartDiscard(ctx, false); steps++; }
+  const counted = s.totalCount;
+  while (s.currentMode === SmartDiscardMode.Scan && steps < 100000) { smartDiscard(ctx, false); steps++; }
+  const listed = s.v11014.objlist.numEntry;
+  console.log(`4. 11.014's: weapons counted ${counted}, scanned into ${listed} entries with ${priorityDraws} priorities drawn`);
+  check(s.currentMode === SmartDiscardMode.Discard && counted < 7000 && listed > 0 && priorityDraws >= listed,
+    "the retail dungeon's weapons, far under 7000, are scanned all the same, each listed one's priority drawn");
+  smartDiscard(ctx, false);
+  check(s.currentMode === SmartDiscardMode.NewDB && s.currentDBNum === DBType.WEAPON, 'and under 7000 the cycle moves on, nothing discarded');
+}
+{
+  const game = makeGame();
+  const ctx = game.ctx;
+  const dungeon = ctx.dungeon;
+  const s = ctx.smartDiscard;
+  ctx.behaviour = behaviourAt(ENGINE_LEVEL, 'csbwin-11.014');
+  const weapons = dungeon.getData().databases.weapons;
+  const party = ctx.party.state.position;
+  const z = party.z | 0;
+  const emptyCell = (level: number): Position => {
+    const size = dungeon.getMapDimensions(level)!;
+    for (let x = 0; x < size.width; x++) {
+      for (let y = 0; y < size.height; y++) {
+        const at = new Position(x, y, level);
+        if (dungeon.findFirstObject(at) === OBJECT_ID_EOF) return at;
+      }
+    }
+    throw new Error(`no empty cell on level ${level}`);
+  };
+  const daggers = (at: Position, n: number): ObjectID[] => Array.from({ length: n }, () => {
+    const rec: WeaponRecord = { nextObject: OBJECT_ID_EOF, broken: false, charges: 0, litTorch: false, poisoned: false, cursed: false, important: false, weaponType: 8 };
+    const rn = dungeon.findEmptyDBEntry('weapons', rec);
+    dungeon.addObjectToCell(at, rn);
+    return rn;
+  });
+  const far = [...daggers(emptyCell(z + 5), 2), ...daggers(emptyCell(z + 2), 2)];
+  const [onParty] = daggers(emptyCell(z), 1);
+  // Free records first: 11.014's count ends its step at one, so the padding's are all in use.
+  const inUse = weapons.records.filter((r) => r.nextObject !== OBJECT_ID_NULL).length;
+  for (let i = inUse; i < 7003; i++) weapons.records.push({ nextObject: OBJECT_ID_EOF, broken: false, charges: 0, litTorch: false, poisoned: false, cursed: false, important: false, weaponType: 8 });
+  const lifted: { object: ObjectID; index: number; at: Position }[] = [];
+  wrapMember(ctx.systems.worldMove, 'moveObject', (moveObject) => (object, oldX, oldY, newX, newY, level) => {
+    if (newX < 0) lifted.push({ object, index: dungeon.rnMaps.idx(object), at: new Position(oldX, oldY, level) });
+    return moveObject(object, oldX, oldY, newX, newY, level);
+  });
+  smartDiscard(ctx, true);
+  let steps = 0;
+  while (!(s.currentMode === SmartDiscardMode.Discard && s.currentDBNum === DBType.WEAPON) && steps < 100000) { smartDiscard(ctx, false); steps++; }
+  const counted = s.totalCount;
+  let discardSteps = 0;
+  while (s.currentMode === SmartDiscardMode.Discard && discardSteps < 1000) { smartDiscard(ctx, false); discardSteps++; }
+  const idx = (rn: ObjectID): number => dungeon.rnMaps.idx(rn);
+  console.log(`   weapons padded to ${counted}: in ${discardSteps} steps, discarded ${lifted.map((l) => `weapon ${l.index} at ${l.at.z}:${l.at.x},${l.at.y}`).join(', ')}`);
+  check(counted === 7003 && lifted.length === 4 && s.totalCount === 6999 && s.currentMode === SmartDiscardMode.NewDB,
+    '7003 weapons: four discards bring the count to 6999, and the cycle moves on');
+  check(lifted.every((l) => far.includes(l.object) && l.at.z !== z && !chainHas(game, l.at, l.object) && weapons.records[l.index]!.nextObject === OBJECT_ID_NULL),
+    "each a dagger placed off the party's level, out of its cell, its record freed");
+  check(weapons.records[idx(onParty!)]!.nextObject !== OBJECT_ID_NULL, "the one on the party's level is kept: its priority is -1");
 }
 
 finish();

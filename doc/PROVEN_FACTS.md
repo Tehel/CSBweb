@@ -5907,6 +5907,29 @@ the object is still listed at a priority no lower (`:712-714`, `:345-356`). The 
 in chests and in monsters' hands, except three floor weapons. So what `SmartDiscard` can take
 is what play creates. Evidence: `tools/checks/watch-smart-discard.ts`.
 
+## CSBWin 11.014's `SmartDiscard` draws all game long
+
+11.014's `SmartDiscard` (`doc/CSBwin-src-11.014/SmartDiscard.cpp`), which the 11.0xx runs
+play, is another algorithm. Its count has no limit: when a database is counted, the scan
+always follows (`:516-525`), and a count step ends at the first free record, where 2023's
+skips it (`:532`). The scan reads a cell's chain up to its first actuator of a type other
+than 0 (`:328-332`) and lists each object of the database not important, as its `ObjDesc`
+index and its cell (`:39-42`, `:333-376`). Each entry's priority is `ComputePriority`'s
+(`:53-101`), which first draws `STRandom(100000)`, then computes the object's standing
+from `sdTable` (`y_intercept`, plus `level` two levels or more from the party, plus
+`slope` per object of its index past `minimum`; -1 at or under `minimum`, or on the
+party's level). The list, a heap of at most 1050 (`:127`), calls it afresh for every
+entry at every comparison: the one added and each parent in `AddObject` (`:123-140`),
+both children and the moved entry in `DeleteObject` (`:142-187`), and the top one before
+a discard (`TopPriority`, `:120`, `:394-397`). Only a count of 32000 misc objects or 7000
+of the others discards (`:576`). `sdTable` is the built-in `SmartDiscards[]`
+(`CSBUI.cpp:695-712`), read into `sdList` with each line at its head (`data.cpp:337-354`)
+and indexed by `ObjDesc` (`SmartDiscard.cpp:618-680`); 11.014's `config.txt` has no
+keyword that adds a line (`ReadConfigFile`, `CSBUI.cpp:733`). So every pass over a database draws once
+per object listed and more per comparison, where 2023 draws nothing. Evidence: the
+`csbwin-11.014` profile's `smartDiscardDrawnPriority` takes `DMMovie42` from line 130 to
+783 (`tools/checks/csbwin-runs.ts`); `tools/checks/watch-smart-discard.ts`, section 4.
+
 ## A full database throws one object out of the dungeon: `MakeMoreRoomInDB`
 
 Every `FindEmptyDB<n>Entry` (`doc/CSBwin-src/CSBCode.cpp:5007-5149`) falls back on

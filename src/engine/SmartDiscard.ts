@@ -14,12 +14,16 @@
  * are `ctx.smartDiscard` here.
  *
  * `tools/checks/watch-smart-discard.ts` pads a database past the limit.
+ *
+ * The `csbwin-11.014` profile plays CSBWin 11.014's instead, behind
+ * `smartDiscardDrawnPriority` (`src/engine/Behaviour.ts`): `smartDiscard11014`, below.
  */
 import { getActuatorType } from '../data/actuatorHelpers';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';
-import { databaseRecords } from '../data/dungeonTypes';
+import { databaseRecords, type ClothingRecord, type MiscRecord, type WeaponRecord } from '../data/dungeonTypes';
 import { dbMax } from './DungeonState';
 import type { GameContext } from './GameContext';
+import type { GameTables } from './GameTables';
 
 /** `SDListSize` (`doc/CSBwin-src/SmartDiscard.cpp:11`). */
 const SD_LIST_SIZE = 200;
@@ -205,6 +209,8 @@ export interface SmartDiscardState {
     currentMode: SmartDiscardMode;
     totalCount: number;
     objlist: SDObjList;
+    /** 11.014's own statics, which the `csbwin-11.014` profile plays (`smartDiscard11014`). */
+    readonly v11014: SmartDiscard11014State;
 }
 
 export function createSmartDiscardState(): SmartDiscardState {
@@ -218,6 +224,7 @@ export function createSmartDiscardState(): SmartDiscardState {
         currentMode: SmartDiscardMode.NotActive,
         totalCount: 0,
         objlist: new SDObjList(),
+        v11014: createSmartDiscard11014State(),
     };
 }
 
@@ -357,6 +364,10 @@ function discardObject(ctx: GameContext, s: SmartDiscardState): void {
 
 /** `SmartDiscard(Initialize)` (`doc/CSBwin-src/SmartDiscard.cpp:734-906`). */
 export function smartDiscard(ctx: GameContext, initialize: boolean): void {
+    if (ctx.behaviour.smartDiscardDrawnPriority) {
+        smartDiscard11014(ctx, initialize);
+        return;
+    }
     const s = ctx.smartDiscard;
     if (initialize) {
         s.currentDBNum = DBType.MISC;
@@ -415,6 +426,408 @@ export function smartDiscard(ctx: GameContext, initialize: boolean): void {
                 return;
             }
             discardObject(ctx, s);
+            return;
+    }
+}
+
+// ---------------------------------------------------------------------------
+
+/**
+ * CSBWin 11.014's `SmartDiscard` (`doc/CSBwin-src-11.014/SmartDiscard.cpp`), which the
+ * `csbwin-11.014` profile plays behind `smartDiscardDrawnPriority`
+ * (`src/engine/Behaviour.ts`, `doc/RECORDING.md` → "A recording's level") in the place
+ * of 2023's, above.
+ *
+ * The same cycle through the three databases, but each object is ranked by
+ * `ComputePriority`, which draws a random number every time it is called, and is called
+ * again for each entry at every comparison the list makes: adding an entry, taking the
+ * top one, and checking it before a discard. The count never stops the cycle: every
+ * object not important of the database is scanned into the list, on every pass, and only
+ * a count of 32000 (misc) or 7000 discards. So 11.014 draws in `SmartDiscard` all game
+ * long, where 2023 draws nothing.
+ *
+ * Its priorities are `float`s, computed as `Math.fround` computes them; its table is
+ * `SmartDiscards[]`, the built-in lines (`doc/CSBwin-src-11.014/CSBUI.cpp:695-712`):
+ * 11.014's `config.txt` has no keyword that adds one (`ReadConfigFile`, `:733`).
+ */
+
+const fround = Math.fround;
+
+/** `SDENT` (`doc/CSBwin-src-11.014/Data.h:257-263`). */
+interface SDEnt {
+    minimum: number;
+    level: number;
+    yIntercept: number;
+    slope: number;
+}
+
+/**
+ * `SmartDiscards[]` (`doc/CSBwin-src-11.014/CSBUI.cpp:695-712`), each line as
+ * `AddSmartDiscard` reads it (`:609-639`): its name upper-cased, minimum, level,
+ * y-intercept and slope.
+ */
+const SMART_DISCARDS: readonly (readonly [string, number, number, number, number])[] = [
+    ['DEFAULT', 30, 50, 20.0, 1.0],
+    ['WOODEN SHIELD', 10, 50, 20.0, 1.0],
+    ['ROCK', 10, 50, 20.0, 1.0],
+    ['SWORD', 10, 50, 20.0, 1.0],
+    ['DAGGER', 10, 50, 20.0, 1.0],
+    ['FALCHION', 10, 50, 20.0, 1.0],
+    ['CLUB', 10, 50, 20.0, 1.0],
+    ['STONE CLUB', 10, 50, 20.0, 1.0],
+    ['ARMET', 10, 50, 20.0, 1.0],
+    ['TORSO PLATE', 10, 50, 20.0, 1.0],
+    ['LEG PLATE', 10, 50, 20.0, 1.0],
+    ['FOOT PLATE', 10, 50, 20.0, 1.0],
+    ['BOULDER', 20, 50, 70.0, 1.0],
+    ['DRAGON STEAK', 150, 0, 20.0, 0.0],
+];
+
+/** `interimTable` (`doc/CSBwin-src-11.014/SmartDiscard.cpp:601-616`): a name's object type. */
+const INTERIM_TABLE: readonly (readonly [string, number])[] = [
+    ['DRAGON STEAK', 0xaf],
+    ['BOULDER', 0x80],
+    ['FOOT PLATE', 0x74],
+    ['LEG PLATE', 0x5d],
+    ['TORSO PLATE', 0x4d],
+    ['ARMET', 0x64],
+    ['STONE CLUB', 0x30],
+    ['CLUB', 0x2f],
+    ['DAGGER', 0x20],
+    ['SWORD', 0x22],
+    ['ROCK', 0x36],
+    ['WOODEN SHIELD', 0x6c],
+    ['FALCHION', 0x21],
+];
+
+const sdTables = new WeakMap<GameTables, readonly SDEnt[]>();
+
+/**
+ * `sdTable[199]`, as `BuildSmartDiscardTable` fills it from `sdList`
+ * (`doc/CSBwin-src-11.014/SmartDiscard.cpp:618-680`), indexed as `ObjDesc`. `newSD`
+ * puts each line at the list's head (`data.cpp:337-354`), so the list runs from the last
+ * line to `DEFAULT`, which fills what the named lines left.
+ */
+function sdTableOf(tables: GameTables): readonly SDEnt[] {
+    let table = sdTables.get(tables);
+    if (table !== undefined) return table;
+    const built: SDEnt[] = Array.from({ length: 199 }, () => ({ minimum: -1, level: 0, yIntercept: 0, slope: 0 }));
+    for (const [name, minimum, level, yIntercept, slope] of [...SMART_DISCARDS].reverse()) {
+        const set = (ent: SDEnt): void => {
+            ent.minimum = minimum;
+            ent.level = fround(level);
+            ent.yIntercept = fround(yIntercept);
+            ent.slope = fround(slope);
+        };
+        const interim = INTERIM_TABLE.find(([known]) => known === name);
+        if (interim !== undefined) {
+            let j = 0;
+            for (; j < 180; j++) {
+                if (tables.objDescObjectType[j] === interim[1]) break;
+            }
+            if (j === 180) j = 0; // "scroll...we don't use it"
+            set(built[j]!);
+            continue;
+        }
+        if (name === 'DEFAULT') {
+            for (const ent of built) {
+                if (ent.minimum === -1) set(ent);
+            }
+        }
+    }
+    table = built;
+    sdTables.set(tables, table);
+    return table;
+}
+
+/** `SDOBJ(level, x, y, objIndex)`'s `m_object` (`doc/CSBwin-src-11.014/SmartDiscard.cpp:39-42`). */
+const sdObj11014 = (level: number, x: number, y: number, objIndex: number): number => (((((level << 6) + x) << 6) + y) << 8) + objIndex;
+
+/** `SDOBJ::Get` (`:45-51`). */
+function sdObjGet11014(sd: number): { level: number; x: number; y: number; objIndex: number } {
+    return { level: (sd >> 20) & 0x3f, x: (sd >> 14) & 0x3f, y: (sd >> 8) & 0x3f, objIndex: sd & 0xff };
+}
+
+/** The file's own statics that 2023's dropped: `objcount` and `objlist` (`:25`, `:189`). */
+interface SmartDiscard11014State {
+    /** `objcount[180]`: how many of each `ObjDesc` index the count found. */
+    readonly objcount: Int32Array;
+    readonly objlist: SDObjList11014;
+}
+
+function createSmartDiscard11014State(): SmartDiscard11014State {
+    return { objcount: new Int32Array(180), objlist: new SDObjList11014() };
+}
+
+/** `ComputePriority` (`:53-101`): a draw, then the object's standing; -1 never discards it. */
+function computePriority(ctx: GameContext, s: SmartDiscardState, sd: number): number {
+    const { level, objIndex } = sdObjGet11014(sd);
+    const psdEnt = sdTableOf(ctx.tables)[objIndex]!;
+    const partyLevel = ctx.party.state.position.z | 0;
+    const objcount = s.v11014.objcount[objIndex]!;
+    let priority = psdEnt.yIntercept;
+    priority = fround(priority + fround(fround(ctx.random.below(100000)) / 100000)); // 0.0 to 0.99999
+    if (Math.abs(level - partyLevel) > 1) {
+        priority = fround(priority + psdEnt.level);
+    }
+    if (objcount > psdEnt.minimum) {
+        priority = fround(priority + fround(psdEnt.slope * (objcount - psdEnt.minimum)));
+    } else {
+        priority = -1.0;
+    }
+    if (level === partyLevel) priority = -1.0;
+    return priority;
+}
+
+/**
+ * `SDOBJLIST` (`:105-187`): a max-heap of at most 1050 entries whose every comparison
+ * computes both priorities afresh. `Clear` keeps the entries, which `TopPriority` reads
+ * even of an empty list, the last one taken.
+ */
+class SDObjList11014 {
+    numEntry = 0;
+    /** `SDOBJ m_sdobj[65536]`, each `m_object` 0 until written (`SDOBJ(void)`). */
+    readonly sdobj = new Int32Array(65536);
+
+    clear(): void {
+        this.numEntry = 0;
+    }
+
+    /** `AddObject` (`:123-140`). */
+    addObject(ctx: GameContext, s: SmartDiscardState, p: number): void {
+        if (this.numEntry > 1049) return; // ignore it.
+        const priority = computePriority(ctx, s, p);
+        let index = this.numEntry;
+        this.numEntry++;
+        while (index !== 0) {
+            const parent = Math.trunc((index - 1) / 2);
+            const parentPriority = computePriority(ctx, s, this.sdobj[parent]!);
+            if (parentPriority >= priority) break;
+            this.sdobj[index] = this.sdobj[parent]!;
+            index = parent;
+        }
+        this.sdobj[index] = p;
+    }
+
+    /** `DeleteObject` (`:142-187`): take the topmost. */
+    deleteObject(ctx: GameContext, s: SmartDiscardState, out: { sd?: number }): boolean {
+        if (this.numEntry === 0) return false;
+        out.sd = this.sdobj[0]!;
+        let index = 0; // entry to be replaced.
+        while (index < this.numEntry) {
+            const c1Index = 2 * index + 1;
+            const c2Index = c1Index + 1;
+            if (c1Index >= this.numEntry) break;
+            if (c2Index >= this.numEntry) {
+                this.sdobj[index] = this.sdobj[c1Index]!;
+                this.numEntry--;
+                return true;
+            }
+            const c1Priority = computePriority(ctx, s, this.sdobj[c1Index]!);
+            const c2Priority = computePriority(ctx, s, this.sdobj[c2Index]!);
+            if (c1Priority > c2Priority) {
+                this.sdobj[index] = this.sdobj[c1Index]!;
+                index = c1Index;
+            } else {
+                this.sdobj[index] = this.sdobj[c2Index]!;
+                index = c2Index;
+            }
+        }
+        this.numEntry--;
+        if (index === this.numEntry) return true;
+        const priority = computePriority(ctx, s, this.sdobj[this.numEntry]!);
+        while (index !== 0) {
+            const parent = Math.trunc((index - 1) / 2);
+            const parentPriority = computePriority(ctx, s, this.sdobj[parent]!);
+            if (parentPriority >= priority) break;
+            this.sdobj[index] = this.sdobj[parent]!;
+            index = parent;
+        }
+        this.sdobj[index] = this.sdobj[this.numEntry]!;
+        return true;
+    }
+
+    /** `TopPriority` (`:120`). */
+    topPriority(ctx: GameContext, s: SmartDiscardState): number {
+        return computePriority(ctx, s, this.sdobj[0]!);
+    }
+}
+
+/** The `ObjDesc` index of an object of the database being processed: its type plus the database's first index. */
+function objDescIndex(ctx: GameContext, dbNum: number, obj: ObjectID): { index: number; important: boolean } | null {
+    switch (dbNum) {
+        case DBType.MISC: {
+            const rec = ctx.dungeon.getMiscRecord(obj)!;
+            return { index: rec.miscType + 127, important: rec.important };
+        }
+        case DBType.WEAPON: {
+            const rec = ctx.dungeon.getWeaponRecord(obj)!;
+            return { index: rec.weaponType + 23, important: rec.important };
+        }
+        case DBType.CLOTHING: {
+            const rec = ctx.dungeon.getClothingRecord(obj)!;
+            return { index: rec.clothingType + 69, important: rec.important };
+        }
+    }
+    return null;
+}
+
+/**
+ * `ScanDungeon` (`:283-380`): one cell, or one step to the next column or level. Returns
+ * the objects examined, and 99999 once the last level is done. A cell's chain is read up
+ * to its first actuator of a type other than 0; each object of the database not important
+ * is listed.
+ */
+function scanDungeon11014(ctx: GameContext, s: SmartDiscardState): number {
+    let result = 0;
+    const numLevel = ctx.dungeon.getMapCount();
+    if (s.currentLevel >= numLevel) {
+        s.currentMode = SmartDiscardMode.Discard;
+        s.discardFailure = 0;
+        return 99999;
+    }
+    const size = ctx.dungeon.getMapDimensions(s.currentLevel)!;
+    if (s.currentX >= size.width) {
+        s.currentX = 0;
+        s.currentLevel++;
+        return 0;
+    }
+    if (s.currentY >= size.height) {
+        s.currentX++;
+        s.currentY = 0;
+        return 0;
+    }
+    for (let obj = ctx.dungeon.findFirstObject(new Position(s.currentX, s.currentY, s.currentLevel));
+        obj !== OBJECT_ID_EOF;
+        obj = ctx.dungeon.getDBRecordLink(obj)) {
+        result++;
+        const category = ctx.dungeon.rnMaps.decode(obj).category;
+        if (category === DBType.ACTUATOR) {
+            const actuator = ctx.dungeon.getActuatorRecord(obj);
+            if ((actuator ? getActuatorType(actuator) : 0) !== 0) break;
+        }
+        if (category !== s.currentDBNum) continue;
+        const desc = objDescIndex(ctx, s.currentDBNum, obj)!;
+        if (desc.important) continue;
+        s.v11014.objlist.addObject(ctx, s, sdObj11014(s.currentLevel, s.currentX, s.currentY, desc.index));
+    }
+    s.currentY++;
+    return result;
+}
+
+/**
+ * `DiscardObject` (`:382-443`): take the top entry; unless its priority, computed again,
+ * is negative or below the next one's, which puts it back, discard the first object of
+ * its index in its cell (`MoveObject(obj, x, y, -1, 0)` on its level) and free its
+ * record. The count drops by one either way.
+ */
+function discardObject11014(ctx: GameContext, s: SmartDiscardState): void {
+    const list = s.v11014.objlist;
+    const out: { sd?: number } = {};
+    if (!list.deleteObject(ctx, s, out)) {
+        s.currentMode = SmartDiscardMode.NewDB;
+        return;
+    }
+    const sd = out.sd!;
+    const priority = computePriority(ctx, s, sd);
+    if (priority < 0 || priority < list.topPriority(ctx, s)) {
+        s.discardFailure++;
+        list.addObject(ctx, s, sd);
+        if (s.discardFailure > 500) s.currentMode = SmartDiscardMode.NewDB;
+        return;
+    }
+    const { level, x, y, objIndex } = sdObjGet11014(sd);
+    for (let obj = ctx.dungeon.findFirstObject(new Position(x, y, level));
+        obj !== OBJECT_ID_EOF;
+        obj = ctx.dungeon.getDBRecordLink(obj)) {
+        if (ctx.dungeon.rnMaps.decode(obj).category !== s.currentDBNum) continue;
+        const desc = objDescIndex(ctx, s.currentDBNum, obj);
+        if (desc === null) {
+            // "Unknown DB type in SD"
+            s.currentMode = SmartDiscardMode.NotActive;
+            return;
+        }
+        if (objIndex !== desc.index) continue;
+        // It appears we can discard this object. `LoadLevel(level)` … `LoadLevel(oldLevel)`:
+        // the level is `moveObject`'s argument.
+        ctx.systems.worldMove.moveObject(obj, x, y, -1, 0, level);
+        ctx.dungeon.deleteDBEntry(obj);
+        s.discardFailure = 0;
+        s.totalCount--;
+        return;
+    }
+    s.discardFailure++;
+    s.totalCount--;
+}
+
+/** `SmartDiscard(Initialize)` (`doc/CSBwin-src-11.014/SmartDiscard.cpp:445-593`). */
+function smartDiscard11014(ctx: GameContext, initialize: boolean): void {
+    const s = ctx.smartDiscard;
+    if (initialize) {
+        s.currentDBNum = DBType.MISC;
+        s.currentMode = SmartDiscardMode.NewDB;
+        return;
+    }
+    switch (s.currentMode) {
+        case SmartDiscardMode.NotActive:
+            return;
+        case SmartDiscardMode.NewDB: {
+            // The loop over `currentDBNum+1 … 15` looks for `i == currentDBNum` and so
+            // always runs out (`:481-485`): the next database is the cycle's.
+            switch (s.currentDBNum) {
+                case DBType.MISC: s.currentDBNum = DBType.WEAPON; break;
+                case DBType.WEAPON: s.currentDBNum = DBType.CLOTHING; break;
+                case DBType.CLOTHING: s.currentDBNum = DBType.MISC; break;
+                default:
+                    s.currentMode = SmartDiscardMode.NotActive;
+                    return;
+            }
+            s.v11014.objcount.fill(0);
+            s.totalCount = 0;
+            s.currentIndex = 0;
+            s.currentMode = SmartDiscardMode.Count;
+            return;
+        }
+        case SmartDiscardMode.Count: {
+            const records = databaseRecords(ctx.dungeon.getData().databases, s.currentDBNum as DBType);
+            for (let repeat = 0; repeat < 50; repeat++) {
+                if (s.currentIndex >= records.length) {
+                    // We have finished counting
+                    s.currentLevel = 0;
+                    s.currentX = 0;
+                    s.currentY = 0;
+                    s.v11014.objlist.clear(); // Clear list of prioritized objects
+                    s.currentMode = SmartDiscardMode.Scan;
+                    return;
+                }
+                const record = records[s.currentIndex]!;
+                s.currentIndex++;
+                // A free record ends the step, where 2023's goes on to the next.
+                if (record.nextObject === OBJECT_ID_NULL) return;
+                let objIndex: number;
+                switch (s.currentDBNum) {
+                    case DBType.MISC: objIndex = (record as MiscRecord).miscType + 127; break;
+                    case DBType.WEAPON: objIndex = (record as WeaponRecord).weaponType + 23; break;
+                    case DBType.CLOTHING: objIndex = (record as ClothingRecord).clothingType + 69; break;
+                    default:
+                        // "SmartDiscard Unknown DB Type"
+                        s.currentMode = SmartDiscardMode.NotActive;
+                        return;
+                }
+                s.v11014.objcount[objIndex]!++;
+                s.totalCount++;
+            }
+            return;
+        }
+        case SmartDiscardMode.Scan:
+            for (let repeat = 50; repeat > 0; repeat -= scanDungeon11014(ctx, s));
+            return;
+        case SmartDiscardMode.Discard:
+            if (s.totalCount < (s.currentDBNum === DBType.MISC ? 32000 : 7000)) {
+                s.currentMode = SmartDiscardMode.NewDB;
+                return;
+            }
+            discardObject11014(ctx, s);
             return;
     }
 }

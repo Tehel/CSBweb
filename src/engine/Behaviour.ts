@@ -28,7 +28,7 @@
  */
 
 /** The engine's level: what a recording made now carries (`Recording.level`). Recordings made before levels are 0. */
-export const ENGINE_LEVEL = 0;
+export const ENGINE_LEVEL = 1;
 
 /** A CSBWin version whose runs the engine plays by the flags that name it. */
 export interface BehaviourProfile {
@@ -72,7 +72,15 @@ export interface BehaviourChange {
 }
 
 /** Every old behaviour the engine keeps, in the order of their levels. */
-export const BEHAVIOURS = [] as const satisfies readonly BehaviourChange[];
+export const BEHAVIOURS = [
+    {
+        name: 'smartDiscardDrawnPriority',
+        does: "CSBWin 11.014's SmartDiscard: every object not important is scanned into a list ranked by a priority drawn afresh at each comparison, so the discard draws all game long (`SmartDiscard11014.ts`)",
+        debt: 'R18',
+        until: null,
+        profiles: { 'csbwin-11.014': 1 },
+    },
+] as const satisfies readonly BehaviourChange[];
 
 export type BehaviourName = (typeof BEHAVIOURS)[number]['name'];
 

@@ -306,7 +306,7 @@ with what it does, the debt ID of the commit that changed it and the level that 
 made (`until`). The engine reads them from `ctx.behaviour`, frozen: a game the page plays
 is at `ENGINE_LEVEL`, every flag off (`CURRENT_BEHAVIOUR`), and the player sets each
 recording's own before its read (`behaviourAt`), each flag whose `until` is above the
-recording's level on. The level is 0 and no flag is kept yet. Recordings made before
+recording's level on. The level is 1, and the one flag kept is a profile's (below). Recordings made before
 levels are of level 0.
 
 A CSBWin version other than 2023's is a **profile** of the same flags (`PROFILES`): what
@@ -319,8 +319,16 @@ and a package do; a game the page plays has none, and a recording made before pr
 neither. A CSBWin run is played at its version's profile (`CsbwinRun.profile`, `recordRun`;
 `tools/play-csbwin-log.ts --profile=`), and the player sets a recording's before its read,
 as its level. A path that holds a profile the engine does not play is refused before it
-plays, as one of a later level. The one profile is `csbwin-11.014`, for the 11.0xx runs,
-and it names no flag yet.
+plays, as one of a later level. The one profile is `csbwin-11.014`, for the 11.0xx runs.
+Its one flag, `smartDiscardDrawnPriority`, joined it at level 1: 11.014's `SmartDiscard`,
+which ranks every object it scans by a priority drawn afresh at each comparison
+(`smartDiscard11014`, `src/engine/SmartDiscard.ts`).
+
+A run of an older version that does not play to its end yet is **under way**
+(`CSBWIN_RUNS_UNDER_WAY`, `tools/lib/csbwinRun.ts`): its log is kept beside the others',
+and `tools/checks/csbwin-runs.ts` plays it at its profile to the line where it first
+drifts, and fails where it drifts anywhere else. A flag that takes it further moves that
+line on in the same commit. The one under way is `DMMovie42`, at `csbwin-11.014`.
 
 Most games end with the page closed, not with a read, so `RecordingWriter`
 (`src/engine/RecordingWriter.ts`) writes the running recording while it runs: every five
