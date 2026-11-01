@@ -54,3 +54,29 @@ export function readPlayfile(path: string): { version: string; items: (PlayEntry
   }
   return { version, items };
 }
+
+/** Whether `option` is one of the two that set `DM_rules`. */
+function isRulesOption(option: string): boolean {
+  return option === '#DMRules' || option === '#NoDMRules';
+}
+
+/**
+ * `DM_rules` as the file's options leave it when play reaches `entry`: `PLAYFILE::Play`
+ * takes each `#` line as it meets it, `#DMRules` setting `DM_rules` and `#NoDMRules`
+ * clearing it (doc/CSBwin-src/Recording.cpp:289-299), so the last before `entry` wins,
+ * over what the game's read left (`SaveGame.cpp:398-400`) and the boot's force
+ * (`CSBCode.cpp:10796-10800`). `null` where none comes before it. A players' log records
+ * all three at its start, after its seed; one after `entry` would change the rules in play,
+ * which no player of these logs takes, so it throws.
+ */
+export function dmRulesBefore(items: readonly (PlayEntry | PlayLine)[], entry: PlayEntry): boolean | null {
+  const at = items.indexOf(entry);
+  if (at < 0) throw new Error(`line ${entry.line} is not one of the file's entries`);
+  let rules: boolean | null = null;
+  items.forEach((item, index) => {
+    if ('num' in item || !isRulesOption(item.option)) return;
+    if (index > at) throw new Error(`${item.option} after line ${entry.line}, in play, which no player of a log takes`);
+    rules = item.option === '#DMRules';
+  });
+  return rules;
+}

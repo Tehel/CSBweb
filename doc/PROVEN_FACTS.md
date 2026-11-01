@@ -4385,7 +4385,7 @@ and no group `CheckMonsters` changes. The committed saves and CSB's `mini.dat` a
 `csbgame7.dat` their slots' facing (2) comes back after the restore where the check
 wrote 0. CSB's `graphics.dat` gives the 27 monster types the same sizes as DM's.
 
-## `DM_rules` and `DMRulesDesignOption` are process-wide, and only a block sets them
+## `DM_rules` and `DMRulesDesignOption` are process-wide, and only a block or a log sets them
 
 `DM_rules` (`doc/CSBwin-src/data.cpp:252`) and `DMRulesDesignOption` (`CSBUI.cpp:148`) are
 plain globals, both `false` at start, outside `d.`. `DM_rules` is read in one place: the
@@ -4410,7 +4410,19 @@ They are assigned in four places:
   time. The menu's check mark is set from `DM_rules` each time the menu opens
   (`WM_INITMENUPOPUP`, `CSBwin.cpp:1120`, `:1166-1170`). The port has no such toggle
   (`DEBT.md` H).
-- Playback of a recording (`Recording.cpp:291`, `:297`).
+- Playback of a recording: `PLAYFILE::Play` takes each `#DMRules` or `#NoDMRules` line as it
+  meets it (`Recording.cpp:289-299`; 11.014's `data.cpp:2218-2229`), so the last before an
+  entry wins over what the read and the force left. A log records all three where its
+  recorder met them, after its seed: the read's (`SaveGame.cpp:400`), the read loop's
+  (`CSBCode.cpp:10767`) and the force's (`:10799`), and the players' DM runs here end with
+  `#DMRules`. Playback meets them after it has read the game, so a run's own `dungeon.dat`
+  does not undo them: DMMovie42's, whose block sets neither flag (`flags` 0xab,
+  `extendedFlags` 0x30), reincarnates P at `d.Time` 0x43 with `DM_rules` on and both
+  penalties unspent, strength 52 kept, in 11.014 (`tools/csbwin-oracle/`, a `TraceLine` in
+  `_ResurrectReincarnateCancel`). The port's log players set them the same way
+  (`dmRulesBefore`, `tools/lib/playfile.ts`); played with `DM_rules` off, P's strength is 46,
+  and DMMovie42 drifts at line 783 in the next `Quickness` test it fails
+  (`MonsterDamagesCharacter`, `Monster.cpp:4549-4556`).
 
 `SaveGame` writes both back (`SaveGame.cpp:975-980`). All eight committed saves carry
 both bits.
@@ -5927,8 +5939,8 @@ of the others discards (`:576`). `sdTable` is the built-in `SmartDiscards[]`
 and indexed by `ObjDesc` (`SmartDiscard.cpp:618-680`); 11.014's `config.txt` has no
 keyword that adds a line (`ReadConfigFile`, `CSBUI.cpp:733`). So every pass over a database draws once
 per object listed and more per comparison, where 2023 draws nothing. Evidence: the
-`csbwin-11.014` profile's `smartDiscardDrawnPriority` takes `DMMovie42` from line 130 to
-783 (`tools/checks/csbwin-runs.ts`); `tools/checks/watch-smart-discard.ts`, section 4.
+`csbwin-11.014` profile's `smartDiscardDrawnPriority` takes `DMMovie42` past line 130,
+where it drifts without it (`tools/checks/csbwin-runs.ts`); `tools/checks/watch-smart-discard.ts`, section 4.
 
 ## A full database throws one object out of the dungeon: `MakeMoreRoomInDB`
 

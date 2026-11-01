@@ -11,6 +11,10 @@
  *
  *   npx tsx tools/play-csbwin-log.ts <playfile.log> [--extra-ticks] [--no-dm-rules]  [--resync] [--fake] [--trace=<from>-<to>] [--profile=<name>]
  *
+ * The log's `#DMRules` and `#NoDMRules` set `DM_rules` where play meets them, as
+ * `PLAYFILE::Play` does (doc/CSBwin-src/Recording.cpp:289-299); `--no-dm-rules` ignores them
+ * and turns the set's `DMRulesDesignOption` off.
+ *
  * `--profile=<name>` plays at that CSBWin version's profile (`PROFILES`,
  * `src/engine/Behaviour.ts`), `csbwin-11.014` for an 11.0xx run (`DEBT.md` R18, step 5),
  * instead of 2023's source, which the engine follows.
@@ -173,7 +177,12 @@ function play(): PlayEntry | null {
     if (!pending) {
       const item = items[at++];
       if (!item) { ended ??= 'end of the playfile'; return null; }
-      if (!('num' in item)) { console.log(`  option ${item.option} at d.Time ${ctx.state.tickCount}`); continue; }
+      if (!('num' in item)) {
+        // `#DMRules` and `#NoDMRules` set `DM_rules` where play meets them (Recording.cpp:289-299).
+        if (dmRules && (item.option === '#DMRules' || item.option === '#NoDMRules')) ctx.rules.dmRules = item.option === '#DMRules';
+        console.log(`  option ${item.option} at d.Time ${ctx.state.tickCount}, DM rules ${ctx.rules.dmRules}`);
+        continue;
+      }
       pending = item;
     }
     const e = pending;

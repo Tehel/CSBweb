@@ -628,12 +628,21 @@ profile parts from a run, the oracle says what 11.014 drew there.
 `DMMovie42` is the run under way (`CSBWIN_RUNS_UNDER_WAY`, `tools/lib/csbwinRun.ts`): its
 log is `tools/fixtures/csbwin-runs/DMMovie42/`, played over `dm-atari` (the run's own
 `dungeon.dat` and `graphics.dat`, beside its log in CSBWin's movies, are not `dm-atari`'s
-bytes), and `tools/checks/csbwin-runs.ts` holds it at the line it drifts at, which each
-flag moves on. It drifts at **line 783**, `d.Time` 0x424, which records 29 draws since
-line 782 where the port makes 27. The oracle's 29, at 0x423, are a monster's attack;
-the port is two short inside `MonsterDamagesCharacter`, one of them in
-`IsCharacterLucky`, which draws three times in the oracle and twice in the port. The
-diff of `Character.cpp`'s and `Monster.cpp`'s versions of those two is the next flag.
+bytes), and `tools/checks/csbwin-runs.ts` holds it at the line it drifts or stalls at,
+which each flag moves on. Both log players take the log's `#DMRules` as CSBWin's playback
+does (`dmRulesBefore`, `doc/PROVEN_FACTS.md` → "`DM_rules` and `DMRulesDesignOption`…"),
+so the champion P reincarnates at `d.Time` 0x43 with strength 52, as in the oracle.
+
+It stalls at **line 1488**, `d.Time` 0x8f9: the run saves there, two `0x00d2` clicks (the
+log's "First Menu option", at (0x69,0x67) and (0x5c,0x69)), then the save's signature
+`0x6668` at line 1489, and the next entry, `0x000b` at 0x8fb. In `recordRun` the clock
+stays at 0x8f9 and the second click is never taken (the stall is `recordRun`'s, five
+minutes of VBLs without `d.Time` moving while an entry waits); `tools/play-csbwin-log.ts`
+takes both clicks and the signature and then stalls at line 1490. None of the three runs of
+`CSBWIN_RUNS` saves before its log's end, so this is the first save in play a log player
+meets (F24, "Not handled yet": a save inside a log). The next step is to find whether it
+is the players' gap (what CSBWin's disk menu did with those clicks, which the port's save
+dialog does otherwise) or 11.014's, by the oracle at 0x8f8-0x8fc, before any flag.
 
 Step 5.3 is paid: `PROFILES` (`src/engine/Behaviour.ts`) holds `csbwin-11.014`. A flag a profile plays lists it in its `profiles` with the level it joined it
 at, and one the port never had has no `until` (`doc/RECORDING.md` → "A recording's level",
@@ -646,8 +655,8 @@ of `CSBWIN_RUNS` names its profile (`null` for the three) and `recordRun` plays 
 Step 5.4 is under way. `ENGINE_LEVEL` is 1, and the one flag is the profile's:
 `smartDiscardDrawnPriority`, joined at level 1, 11.014's `SmartDiscard` whole
 (`smartDiscard11014`, `src/engine/SmartDiscard.ts`, checked at its profile by
-`tools/checks/watch-smart-discard.ts`), which took `DMMovie42` from line 130 to 783. The
-next is the flag at line 783, above.
+`tools/checks/watch-smart-discard.ts`), which takes `DMMovie42` past line 130. What
+stops it now is the stall at line 1488, above.
 
 Size L.
 
@@ -979,8 +988,10 @@ What it establishes:
   `Recording.cpp:734-761`; `DMMovie43a` and `45` stop on one), the `0xdddd` line
   that writes a word of `d.`, the annotations, the runs' own `graphics.dat`, and Chaos
   Strikes Back's runs, which need a CSB set. `extraTicks` is imitated by undoing the
-  step's `d.clockTick = 1`, and no run has shown a difference either way. DM rules are on,
-  as the `dm-atari` set reads them; no run has shown a difference with them off.
+  step's `d.clockTick = 1`, and no run has shown a difference either way. `DM_rules` is
+  the log's own, its `#DMRules` and `#NoDMRules` taken as CSBWin's playback takes them
+  (`dmRulesBefore`, `tools/lib/playfile.ts`): `DMMovie42`, whose champion reincarnates,
+  drifts at line 783 with them off.
 - **CSBWin 2023 plays the 17.6 runs to their end** with no sequence error (the oracle).
 - **Chaos Strikes Back's `CSBMovie0640` (17.6, the race to Fulya Pit in 6 min 40 s) plays
   to the end of its log**, in CSBWin 2023 and in the port alike: `--set=csb

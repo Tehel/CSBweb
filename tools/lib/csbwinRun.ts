@@ -24,7 +24,10 @@
  * which a run recorded in play has kept to, and `extraTicks`, which playback turns off
  * (`CSBUI.cpp:985`) and the port keeps on (`MovementSystem.moveParty`): none of the runs
  * draws otherwise for it. Each entry's random is checked as CSBWin's player checks it, so
- * a run that drifts stops there, and says where.
+ * a run that drifts stops there, and says where; so does one whose clock stands still while
+ * an entry waits, the game held where CSBWin's went on. `DM_rules` is the log's: its
+ * `#DMRules` and `#NoDMRules`, which CSBWin's playback takes after the game is read
+ * (`dmRulesBefore`), and which a player's DM runs end with `#DMRules`.
  */
 import { digestedFiles } from '../../src/data/DataSetFiles';
 import { behaviourAt, ENGINE_LEVEL, type ProfileName } from '../../src/engine/Behaviour';
@@ -38,7 +41,7 @@ import { searchMouseButtons } from '../../src/renderer/ui/Mouse';
 import { readFileSync } from 'node:fs';
 import { dataSetNamed, diskFiles } from './dataSets';
 import { standPage, type Page } from './playback';
-import { readPlayfile, type PlayEntry } from './playfile';
+import { dmRulesBefore, readPlayfile, type PlayEntry } from './playfile';
 
 /** A run of CSBWin's that plays to its end, kept in `tools/fixtures/csbwin-runs/<id>/`. */
 export interface CsbwinRun {
@@ -87,13 +90,14 @@ export const CSBWIN_RUNS: readonly CsbwinRun[] = [
 
 /**
  * A run that does not play to its end yet, kept beside them: it plays at its profile to
- * `drifts`, the line of its log where the port's random first parts from CSBWin's, and
+ * `drifts`, the line of its log where the port's random first parts from CSBWin's, or that
+ * is never taken while the port's clock is held, and
  * the check holds it there, so a change of play that undoes one of its profile's flags
  * fails, and one that takes it further moves the line on (`doc/RECORDING.md` → "A
  * recording's level").
  */
 export interface RunUnderWay extends CsbwinRun {
-  /** The line of its log the port first drifts at. */
+  /** The line of its log the port first drifts or stalls at. */
   readonly drifts: number;
 }
 
@@ -104,7 +108,7 @@ export const CSBWIN_RUNS_UNDER_WAY: readonly RunUnderWay[] = [
     title: 'Dungeon Master, minimum item picking',
     description: 'A CSBWin 11.017 recording, DMMovie42 of CSBWin\'s movies, played back in CSBweb.',
     recordedAt: '2009-05-28',
-    drifts: 783,
+    drifts: 1488,
   },
 ];
 
@@ -120,7 +124,7 @@ export interface RecordedRun {
   readonly recording: Recording;
   /** The entries taken, each its random checked. */
   readonly entries: number;
-  /** Where its random first differs, or `null` where it plays to its end. */
+  /** Where its random first differs, or its clock stalls, or `null` where it plays to its end. */
   readonly drift: string | null;
   /** The game's end, `d.Word11694`, or `null` where it did not end. */
   readonly won: boolean | null;
@@ -158,6 +162,17 @@ export async function recordRun(run: CsbwinRun, build: string, dataSet = run.dat
   const recorder = new Recorder(game, build, dataSet, () => files.digests(), () => run.id);
   const { items } = readPlayfile(`${folder}/playfile.log`);
   const entries = items.filter((item): item is PlayEntry => 'num' in item);
+  /**
+   * `DM_rules` as the log's options leave it at its first input, the entry at `at`, which
+   * CSBWin's playback reads after the game (`dmRulesBefore`), into the rules the recording
+   * begins with.
+   */
+  const applyRulesOptions = (at: number): void => {
+    const first = entries[at];
+    if (!first) throw new Error(`${run.id}: its log holds nothing after its start`);
+    const rules = dmRulesBefore(items, first);
+    if (rules !== null) ctx.rules.dmRules = rules;
+  };
 
   // The start: a CSB run's save, read where its log's first read was; or a new game, the
   // log's `0x3333` seed, then `ReadEntireGame`'s two draws for `d.RandomGameID`
@@ -166,8 +181,9 @@ export async function recordRun(run: CsbwinRun, build: string, dataSet = run.dat
   if (run.save) {
     const bytes = new Uint8Array(readFileSync(`${folder}/${run.save}`));
     applySaveBytes(game, bytes);
-    recorder.begin({ kind: 'save', bytes, carried: carriedStateOf(game) });
     at = entries.findIndex((entry) => entry.num === 0x6669) + 1;
+    applyRulesOptions(at);
+    recorder.begin({ kind: 'save', bytes, carried: carriedStateOf(game) });
   } else {
     game.readDungeonDat(page.dungeonDat);
     at = entries.findIndex((entry) => entry.num === 0x3333);
@@ -176,6 +192,7 @@ export async function recordRun(run: CsbwinRun, build: string, dataSet = run.dat
     const d0 = ctx.random.next() & 0xffff;
     const d1 = ctx.random.next() & 0xffff;
     ctx.state.block1.randomGameID = (d0 * d1) >>> 0;
+    applyRulesOptions(at);
     recorder.begin({ kind: 'new', random: ctx.random.getSeed(), randomGameID: ctx.state.block1.randomGameID });
   }
   if (at <= 0) throw new Error(`${run.id}: its log holds no start`);
@@ -240,11 +257,25 @@ export async function recordRun(run: CsbwinRun, build: string, dataSet = run.dat
 
   game.start(true);
   let pastLog = 0;
+  // The VBLs the clock has stood still for while an entry waits: as many as `VBLS_TO_END`
+  // are a stall, the game held where CSBWin's went on, and end the play as a drift does.
+  let held = 0;
+  let heldAt = ctx.state.tickCount;
   for (;;) {
     feed();
     if (drift || recorder.recording!.end) break;
     if (at >= entries.length && ctx.mouseQueue.count() === 0 && !screen.ui.reincarnate) {
       if (run.end === 'log' || ++pastLog > VBLS_TO_END) break;
+    }
+    const waiting = entries[at];
+    if (waiting && ctx.state.tickCount === heldAt) {
+      if (++held > VBLS_TO_END) {
+        drift = `line ${waiting.line}: d.Time ${hx(waiting.time, 8)} ${hx(waiting.x)} ${hx(waiting.y)} button ${hx(waiting.num)}: not taken, the clock held at ${hx(ctx.state.tickCount, 8)}; ${where()}`;
+        break;
+      }
+    } else {
+      held = 0;
+      heldAt = ctx.state.tickCount;
     }
     game.runFrame();
   }
