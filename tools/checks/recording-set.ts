@@ -1,6 +1,6 @@
 /**
  * The set a recording plays over, found by its files (`findRecordingSet`,
- * `src/data/RecordingSet.ts`; `DEBT.md` R18, `doc/RECORDING.md` → "The set a recording plays
+ * `src/data/RecordingSet.ts`, `doc/RECORDING.md` → "The set a recording plays
  * over"), against the repository's sets' files on disk, as the server's
  * `api/data-set-files` gives them (`diskSetDigests`), over the corpus's packages
  * (`tools/fixtures/recordings/`):

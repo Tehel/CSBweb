@@ -1,5 +1,5 @@
 #!/bin/bash
-# CSBWin as an oracle for `DEBT.md` F24 and R18: its Linux build, playing a `playfile.log`
+# CSBWin as an oracle for `DEBT.md` F24 and the older versions' profiles: its Linux build, playing a `playfile.log`
 # headless and as fast as it runs, and writing its own draws. Not evidence: what it prints is
 # compared by hand with `tools/play-csbwin-log.ts --trace`.
 #

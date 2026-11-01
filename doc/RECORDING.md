@@ -13,17 +13,6 @@ It also carries the engine's level it was played at, so that a later engine can 
 by the behaviour it was made with ("A recording's level", below), and the digest of each
 file its set had read.
 
-**Recordings are paused** until the engine keeps every behaviour a recording was made with
-(`DEBT.md` R18): until then a change of play could leave every recording made before it
-unplayable. So a page writes no recording to the store, and the welcome
-page's book has no RECORDINGS tab, a local set no book (`src/ui/recordingsSwitch.ts`). The
-recorder still runs in the page, and a save still names its point in the running
-recording, which the store does not hold, so that save is read as a root once recordings
-resume (`src/engine/RecordingWriter.ts`). A page opened with `?recordings`, which its links
-keep, records and lists them as before: the probes use it, and so does the work on
-recordings. A recording's link, `?recording=`, plays whatever the switch, and the server
-still lists and takes recordings, which the page no longer offers.
-
 ## CSBWin's recorder
 
 `RECORDFILE` (`doc/CSBwin-src/Recording.cpp:864-1300`), opened by the "Record" menu item
@@ -306,14 +295,14 @@ with what it does, the debt ID of the commit that changed it and the level that 
 made (`until`). The engine reads them from `ctx.behaviour`, frozen: a game the page plays
 is at `ENGINE_LEVEL`, every flag off (`CURRENT_BEHAVIOUR`), and the player sets each
 recording's own before its read (`behaviourAt`), each flag whose `until` is above the
-recording's level on. The level is 2. The one flag of the port's own is `releaseScentLoops`,
+recording's level on. The level is 4. The one flag of the port's own is `releaseScentLoops`,
 until 2: the release's scents, which what FTL meant replaced (`DEBT.md` H, "The scents are
 what FTL meant"). Recordings made before
 levels are of level 0.
 
 A CSBWin version is a **profile** of the same flags (`PROFILES`): what that version did
 where the engine does otherwise, where 2023's source does otherwise (each flag read from
-the diff of its source against 2023's, `DEBT.md` R18, step 5) or where the port parts from
+the diff of its source against 2023's, `doc/CSBWIN_REFERENCE_INDEX.md` → "The older trees") or where the port parts from
 CSBWin on purpose (`DEBT.md` H) and the version's runs need CSBWin's way. A flag of a
 version's that the port never had has no `until`; a flag a profile plays names it with the
 level it joined it at, and is on for a recording of that profile at that level or above.

@@ -16,7 +16,7 @@
  * and turns the set's `DMRulesDesignOption` off.
  *
  * `--profile=<name>` plays at that CSBWin version's profile (`PROFILES`,
- * `src/engine/Behaviour.ts`), `csbwin-11.014` for an 11.0xx run (`DEBT.md` R18, step 5);
+ * `src/engine/Behaviour.ts`), `csbwin-11.014` for an 11.0xx run (`doc/RECORDING.md` → "A recording's level");
  * `csbwin-2023`, a 17.6 run's, by default.
  * `--set=<id>` plays on another data set than `dm-atari`; `--save=<file>` starts from that
  * CSBWin save instead of a new game, read at the log's first `0x6669` (a CSB run's

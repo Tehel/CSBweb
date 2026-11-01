@@ -32,8 +32,19 @@ that 2023 changed.
 `CSBwin11_014Source.7z`'s and `CSBwin11_056src.zip`'s source into `doc/CSBwin-src-11.014/`
 and `doc/CSBwin-src-11.056/`, the same way, also git-ignored. They are not the
 specification: they are what the profiles of CSBWin's older versions are read from, so
-that a run recorded by one plays (`DEBT.md` R18, step 5, and F24). Nothing cites their
-lines but those profiles.
+that a run recorded by one plays (`DEBT.md` F24, `doc/RECORDING.md` → "A recording's
+level"). Nothing cites their lines but those profiles. The 11.0xx runs (`DMMovie42`, `43a`,
+`43b`, `45`, 11.017 and 11.018) lie between the two; 11.014's plays all four to their end
+in the oracle (`tools/csbwin-oracle/oracle.sh --version=11.014`). Over the engine's 21
+files (`Attack`, `Character`, the `Code*` files, `CSBCode`, `DSA`, `Magic`, `Monster`,
+`Mouse`, `MoveObject`, `SaveGame`, `SmartDiscard`, `Timer`, `Viewport`, `VBL`), whitespace
+ignored, 11.014 to 2023 changes 5993 lines, most in `CSBCode` (1454), `Code11f52` (828),
+`DSA` (607), `Timer` (571), `SmartDiscard` (558) and `Character` (441).
+
+Paul R. Stevens' site (`https://www.dianneandpaul.net/CSBwin/index`) keeps the sources of
+9.9.63 (`CSBwin9963src.zip`, 2006), 10.0, 10.056, 10.078, 11.0, 11.1, 11.014, 11.056,
+11.059, 11.067, 11.068, 12.0, 12.3, and the 2015 to 2023 snapshots. The 9.x runs (9.05 to
+9.6a) have none of their own; the nearest is 9.9.63's, later than them.
 
 ## Core CSBWin references
 

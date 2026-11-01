@@ -1,6 +1,6 @@
 /**
  * The corpus of the port's own recordings, each played at the engine's level it was made
- * at (`DEBT.md` R18, `doc/RECORDING.md` → "The corpus"): what makes a forgotten level, or
+ * at (`doc/RECORDING.md` → "The corpus"): what makes a forgotten level, or
  * a change of play without its flag, fail `npm test` rather than break the players'
  * recordings silently.
  *

@@ -4,7 +4,7 @@
  * ours to commit, so the tree is git-ignored and this tool rebuilds it.
  *
  * `--version=<v>` fetches an older source instead, into `doc/CSBwin-src-<v>/`: the sources
- * the profiles of the older CSBWin versions are read from (`DEBT.md` R18, step 5), never
+ * the profiles of the older CSBWin versions are read from (`doc/CSBWIN_REFERENCE_INDEX.md` → "The older trees"), never
  * cited as the specification. `11.014` is `CSBwin11_014Source.7z`, the last source before
  * the 11.017 and 11.018 runs, `11.056` is `CSBwin11_056src.zip`, the first after them.
  *

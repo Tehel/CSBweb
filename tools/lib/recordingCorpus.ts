@@ -1,6 +1,5 @@
 /**
- * The corpus of the port's own recordings (`DEBT.md` R18, `doc/RECORDING.md` → "The
- * corpus"): packages kept in `tools/fixtures/recordings/`, each named for what it plays
+ * The corpus of the port's own recordings (`doc/RECORDING.md` → "The corpus"): packages kept in `tools/fixtures/recordings/`, each named for what it plays
  * and the engine's level it was made at, `<name>.L<level>.gz`, which
  * `tools/checks/recording-corpus.ts` plays at their levels. A package written here is
  * never rewritten: at a level of its own, it is the proof that the flags of the levels

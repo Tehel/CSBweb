@@ -44,8 +44,6 @@
  *   refusal is said in the box beside CONTINUE.
  * - **The book** is on every tile, after the triangle. It opens a dialog titled with the
  *   set's name, in two tabs, DOCUMENTS and RECORDINGS; a local set's has RECORDINGS alone.
- *   While recordings are paused (`recordingsOn`), the book has DOCUMENTS alone, with no
- *   tab, and a local set has no book.
  *   DOCUMENTS says the set's description, if it has one, then its authors, "By: " and
  *   their names separated by commas, if it has any, and offers the set's files as one zip, `<name>.zip`, made in the page from the files the server serves
  *   (`src/data/DataSetArchive.ts`), so that the set can be played in CSBWin; then its
@@ -127,7 +125,6 @@ import {
     packageOfEnd, packageOfSave, playedWithDevMoves, RECORDING_TEXT_LIMITS, writeRecordingPackage,
     type RecordingPackageStart, type RecordingPackageText,
 } from '../engine/RecordingPackage';
-import { recordingsOn } from './recordingsSwitch';
 import type { Recording } from '../engine/Recorder';
 import { pruneRecordings } from '../engine/RecordingWriter';
 
@@ -339,7 +336,7 @@ export async function showWelcomePage(
         if (record) tile.classList.add('local');
         if (set.pending) tile.classList.add('pending');
         if (set.hidden) tile.classList.add('hidden');
-        const controls = record ? [...recordingsOn() ? [control('pick-documents', `Recordings of ${set.name}`, BOOK, () => openDocuments(set))] : [],
+        const controls = record ? [control('pick-documents', `Recordings of ${set.name}`, BOOK, () => openDocuments(set)),
             control('pick-edit', `Edit ${record.name}`, PEN, () => openForm({ record, saves }))]
             : [control('pick-documents', `Documents of ${set.name}`, BOOK, () => openDocuments(set)), ...moderation(set)];
         (set.official ? officialGrid : customGrid).append(withControls(tile, [playControl(set), ...controls]));
@@ -746,11 +743,7 @@ function showDocuments(
         status.textContent = '';
     };
     tabs.forEach((tab, n) => tab.addEventListener('click', () => showTab(n)));
-    if (!recordingsOn()) {
-        dialog.querySelector('.documents-tabs')!.remove();
-        panes[1]!.remove();
-        render();
-    } else if (isLocal) {
+    if (isLocal) {
         showRecordings(dialog, set, false, moderator, source, status);
         dialog.querySelector('.documents-tabs')!.remove();
         panes[0]!.remove();

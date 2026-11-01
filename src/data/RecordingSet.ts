@@ -1,5 +1,5 @@
 /**
- * The set a recording plays over, found by its files (`DEBT.md` R18, `doc/RECORDING.md` →
+ * The set a recording plays over, found by its files (`doc/RECORDING.md` →
  * "The set a recording plays over"). A recording carries the MD5 of each file its set had
  * read as it began (`Recording.files`, `FileDigests`), and names its set by id. A set's
  * files may change after it (a corrected `graphics.dat` item, a moderator's new

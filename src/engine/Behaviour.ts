@@ -20,7 +20,8 @@
  *
  * A CSBWin version's behaviour is a profile of the same flags (`PROFILES`): what that
  * version did where 2023's source, which the engine follows, does otherwise, read from a
- * diff of its source against 2023's (`DEBT.md` R18, step 5), and where the port parts
+ * diff of its source against 2023's (`doc/CSBWIN_REFERENCE_INDEX.md` → "The older
+ * trees"), and where the port parts
  * from CSBWin on purpose (`DEBT.md` H) and the version's runs need CSBWin's way, 2023's
  * among them (`csbwinScentLoops`). A run of that version
  * (`DEBT.md` F24) plays at a profile, which its recording carries beside its level
