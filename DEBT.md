@@ -561,10 +561,20 @@ behind a named switch, chosen by the recording.
    `tools/checks/replay-recordings.ts`).
 4. ✅ The policy written down (`doc/RECORDING.md` → "The policy", `CLAUDE.md`, the fix's
    list in `.claude/skills/playtest-bug/`).
-5. The 11.0xx profile: 11.014's and 11.056's sources fetched beside 2023's, their diff
-   measured, and the flags one 11.0xx run needs, until it plays further than it does now,
-   the three runs of `CSBWIN_RUNS` playing to their end all along (F24's step 2 for that
-   version).
+5. The 11.0xx profile: the flags one 11.0xx run needs, until it plays further than it does
+   now, the three runs of `CSBWIN_RUNS` playing to their end all along (F24's step 2 for
+   that version). In four:
+   1. ✅ 11.014's and 11.056's sources fetched beside 2023's, and their diff measured.
+   2. An 11.014 oracle: its Linux front-end (`LinCSBUI.cpp`, `CSBlinux.cpp`,
+      `LinScreen.cpp`, over SDL 1.2, GTK and ESD, `src/Makefile.am`) built headless and
+      unpaced, as `oracle.sh` builds 2023's, playing an 11.0xx run and listing its draws
+      with their callers. It is the nearest source, not the runs' own version: where it
+      and the run part, the run's `CSBwin11_017.exe` or `CSBwin11_018.exe` decides
+      (`wine` is on the author's machine; the site also has `CsbWinLinuxBin11_014.7z`,
+      11.014's own Linux binary).
+   3. The profile itself: `Behaviour.ts`'s `csbwin-11.014` naming its flags, a recording
+      carrying its profile beside its level, and `tools/play-csbwin-log.ts --profile=`.
+   4. The flags, one per commit, each read from the diff, until `DMMovie42` plays further.
 6. Where a set's files mismatch, the page looking for the files a recording's signatures
    name among the server's other sets, and saying which file matches none.
 7. Recordings resumed (`src/ui/recordingsSwitch.ts`, `doc/RECORDING.md` → "Recordings are
@@ -596,7 +606,28 @@ must be broken, or deleted, before the first deploy the gate runs on.
 
 Step 4 is paid: the policy is `doc/RECORDING.md` → "The policy", and `CLAUDE.md`, the
 fix's list (`.claude/skills/playtest-bug/`), `/pay-debt` and "How to work this list"
-point to it. The next step is 5.
+point to it.
+
+Step 5.1 is paid: `npm run fetch-csbwin-src -- --version=11.014` (or `11.056`) writes
+`CSBwin11_014Source.7z`'s or `CSBwin11_056src.zip`'s source into `doc/CSBwin-src-11.014/`
+or `doc/CSBwin-src-11.056/`, git-ignored, from the site or the Wayback Machine, by SHA-256.
+The 11.0xx runs' versions lie between the two. Over the engine's 21 files (`Attack`,
+`Character`, the `Code*` files, `CSBCode`, `DSA`, `Magic`, `Monster`, `Mouse`,
+`MoveObject`, `SaveGame`, `SmartDiscard`, `Timer`, `Viewport`, `VBL`), whitespace ignored,
+11.014 to 2023 changes 5993 lines, most in `CSBCode` (1454), `Code11f52` (828), `DSA`
+(607), `Timer` (571), `SmartDiscard` (558) and `Character` (441); 11.014 to 11.056 changes
+1904, most in `Code11f52` (691), `Timer` (425), `DSA` (309), `CSBCode` (183) and
+`SmartDiscard` (127): what of it the runs' builds already had, only their executables say.
+The draws themselves barely move: per file, 11.014 and 2023 call `STRandom` as often but
+in `Monster.cpp` (64 calls, 2023 66), and 11.014's recorder is in `data.cpp`, 2023's in
+`Recording.cpp`.
+
+`DMMovie42` (11.017) is the run to take first: its first drift is line 130, the step
+forward at `d.Time` 0x6b, which records two draws since line 129, the slide at 0x69 onto
+(11,15) of the Hall of Champions, where the port, as 2023, draws once
+(`CheckMoveFromMissile`). The move's draws in `Mouse.cpp` and `MoveObject.cpp` are the same
+in 11.014 as in 2023, so the second is elsewhere, for the oracle to find. The next step is
+5.2.
 
 Size L.
 

@@ -26,6 +26,15 @@ G21), the playfile, whose format the port's recorder does not use (`DEBT.md` H),
 deliberate divergences (`DEBT.md` H, and the exceptions `CLAUDE.md` names) is a code path
 that 2023 changed.
 
+## The older trees
+
+`npm run fetch-csbwin-src -- --version=11.014` and `--version=11.056` write
+`CSBwin11_014Source.7z`'s and `CSBwin11_056src.zip`'s source into `doc/CSBwin-src-11.014/`
+and `doc/CSBwin-src-11.056/`, the same way, also git-ignored. They are not the
+specification: they are what the profiles of CSBWin's older versions are read from, so
+that a run recorded by one plays (`DEBT.md` R18, step 5, and F24). Nothing cites their
+lines but those profiles.
+
 ## Core CSBWin references
 
 - `doc/CSBWIN_ARCHITECTURE.md` - High-level architecture and system overview (sourced from CSBWin code).
