@@ -1,0 +1,140 @@
+--- a/CSBCode.cpp
++++ b/CSBCode.cpp
+@@ -1131,12 +1131,34 @@
+   return (i16)x;
+ }
+ 
++// The oracle (tools/csbwin-oracle/): with CSB_DRAWS=<from>-<to>, in hex, every draw of
++// d.Time <from> to <to> is written to draws.txt with its callers, and TraceLine's lines
++// beside them.
++#include <execinfo.h>
++#include <stdarg.h>
++static int from = -2, to = 0; static FILE *f = NULL;
++static void TraceInit(void) { if (from == -2) { const char *e = getenv("CSB_DRAWS"); from = -1; if (e) { sscanf(e, "%x-%x", &from, &to); f = fopen("draws.txt", "w"); } } }
++void TraceLine(const char *fmt, ...)
++{
++  TraceInit(); if (from < 0 || (i32)d.Time < from || (i32)d.Time > to) return;
++  va_list a; va_start(a, fmt); fprintf(f, "line %x: ", d.Time); vfprintf(f, fmt, a); fprintf(f, "\n"); fflush(f); va_end(a);
++}
++static void TraceDraw(void)
++{
++  static i32 shown = -1; if ((i32)(d.Time >> 10) != shown) { shown = d.Time >> 10; printf("at d.Time %08x\n", d.Time); fflush(stdout); }
++  TraceInit(); if (from < 0 || (i32)d.Time < from || (i32)d.Time > to) return;
++  void *bt[12]; int n = backtrace(bt, 12); char **sym = backtrace_symbols(bt, n);
++  fprintf(f, "draw %x:", d.Time);
++  for (int i = 2; i < n; i++) { const char *a = strchr(sym[i], '('); const char *b = a ? strchr(a, '+') : NULL; if (a && b && b > a + 1) fprintf(f, " < %.*s", (int)(b - a - 1), a + 1); }
++  fprintf(f, "\n"); fflush(f); free(sym);
++}
++
+ ui32 numRandomCalls = 0;
+ 
+ i32 STRandom(void) //TAG001030
+ {
+   dReg D0;
+-  numRandomCalls++;
++  numRandomCalls++; TraceDraw();
+ //;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+   D0L = d.RandomNumber * ui32(0xbb40e62d) + 11;
+   d.RandomNumber = D0L;
+@@ -1155,7 +1177,7 @@
+ //  TAG001050
+ ui8 STRandomBool(void)
+ { // Zero or One
+-  numRandomCalls++;
++  numRandomCalls++; TraceDraw();
+ //;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+   d.RandomNumber = d.RandomNumber * (ui32)0xbb40e62d + 11;
+   return (UI8)((d.RandomNumber>>8) & 1);
+@@ -1164,7 +1186,7 @@
+ //  TAG001074
+ ui8 STRandom0_3(void)
+ {
+-  numRandomCalls++;
++  numRandomCalls++; TraceDraw();
+ //;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+   d.RandomNumber = d.RandomNumber * (ui32)0xbb40e62d + 11;
+   return (UI8)((d.RandomNumber>>8) & 3);
+--- a/CSBUI.cpp
++++ b/CSBUI.cpp
+@@ -1128,7 +1128,7 @@
+         //VBLs per UIM_TIMER.  Our stategy is to call CheckVBL.
+         //Then dispatch until nothing is left to do.  Then
+         //call CheckVBL again.  Repeat entire process 10 times
+-        CallCheckVBL = VBLperTimer*VBLMultiplier; // do it 10 times
++        CallCheckVBL = 3000; // oracle: many VBLs per timer message
+         if (trace >= 0) 
+         {
+           fprintf(GETFILE(trace),"UIM_TIMER\n");
+--- a/data.cpp
++++ b/data.cpp
+@@ -2192,6 +2192,7 @@
+       d.RandomNumber ^= 0xaa00;
+       RecordFile.Record(&tent);
+       Close();
++      printf("End of the playfile at d.Time %08x\n", d.Time); fflush(stdout); // oracle
+       if (!RepeatGame)
+       {
+         UI_MessageBox("End Of PlaybackFile","Info",MESSAGE_OK);
+@@ -2424,6 +2425,9 @@
+       )
+   {
+     i32 answer;
++    // oracle: where the play parts from the log
++    printf("Sequence/timing error at d.Time %08x: line %08x %04x %04x %04x %08x, d.RandomNumber %08x, %d draws since the entry before\n",
++           d.Time, m_time, m_x, m_y, m_num, m_ran, d.RandomNumber, numRandomCalls - m_oldCallCount); fflush(stdout);
+     answer = UI_MessageBox("Sequence/timing error\nShould we quit?",
+                            "Playback error",
+                            MESSAGE_YESNO);
+--- a/DSA.cpp
++++ b/DSA.cpp
+@@ -4648,7 +4648,7 @@
+       if (idx > 98) break;
+       location = 1024*pDSAparameters[1+0] + 32*pDSAparameters[1+1]+pDSAparameters[1+2];
+       pdsaDbank->Var(idx, location);
+-      distance = abs(pDSAparameters[1+1]-pDSAparameters[1+5]) + abs(pDSAparameters[1+2]-pDSAparameters[1+6]);
++      distance = abs((int)pDSAparameters[1+1]-(int)pDSAparameters[1+5]) + abs((int)pDSAparameters[1+2]-(int)pDSAparameters[1+6]);
+       pdsaDbank->Var(idx+1, distance-1);
+       if (pdsaDbank->tracing)
+       {
+--- a/LinCSBUI.cpp
++++ b/LinCSBUI.cpp
+@@ -419,6 +419,7 @@
+ #endif //USE_OLD_GTK
+ 
+ i32 UI_MessageBox(const char *msg, const char *title, i32 flags ) {
++  printf("   Message = %s\n", msg); fflush(stdout); // oracle: the message boxes, printed
+ #ifdef USE_OLD_GTK
+     printf("\nMessageBox: [%s] %s", title, msg);
+     GtkWidget *dialog;
+--- a/system.cpp
++++ b/system.cpp
+@@ -547,7 +547,7 @@
+   ui64 delta;
+   i32 pointX, pointY;
+   CheckVBLCount++;
+-  if ((NoSpeedLimit!=0) || NoClock)
++  if (true || (NoSpeedLimit!=0) || NoClock) // oracle: every VBL forced, unpaced
+   {
+     forceVBL = true;
+   }
+--- a/Viewport.cpp
++++ b/Viewport.cpp
+@@ -5381,13 +5381,13 @@
+   ui32 offset;
+   i32 idx;
+   idx = BackgroundGraphicExists(graphicID, 4, &actualSize, false);
+-  if (idx < 0) return false;
++  if (idx < 0) return NULL;
+   pGraphic = (ui32 *)backgroundGraphics[idx].data;
+-  if (*pGraphic <= masknum) return false;
+-  if (4*masknum + 8 > actualSize) return false; // No room for the offset!
++  if (*pGraphic <= masknum) return NULL;
++  if (4*masknum + 8 > actualSize) return NULL; // No room for the offset!
+   offset = pGraphic[masknum+1];
+-  if (offset == 0) return false;
+-  if (offset >= actualSize) return false;
++  if (offset == 0) return NULL;
++  if (offset >= actualSize) return NULL;
+   return (BACKGROUND_MASK *)((i8*)pGraphic + offset);
+ }
+ 

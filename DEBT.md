@@ -565,13 +565,8 @@ behind a named switch, chosen by the recording.
    now, the three runs of `CSBWIN_RUNS` playing to their end all along (F24's step 2 for
    that version). In four:
    1. ✅ 11.014's and 11.056's sources fetched beside 2023's, and their diff measured.
-   2. An 11.014 oracle: its Linux front-end (`LinCSBUI.cpp`, `CSBlinux.cpp`,
-      `LinScreen.cpp`, over SDL 1.2, GTK and ESD, `src/Makefile.am`) built headless and
-      unpaced, as `oracle.sh` builds 2023's, playing an 11.0xx run and listing its draws
-      with their callers. It is the nearest source, not the runs' own version: where it
-      and the run part, the run's `CSBwin11_017.exe` or `CSBwin11_018.exe` decides
-      (`wine` is on the author's machine; the site also has `CsbWinLinuxBin11_014.7z`,
-      11.014's own Linux binary).
+   2. ✅ An 11.014 oracle: `oracle.sh build --version=11.014`, playing an 11.0xx run
+      and listing its draws with their callers (`play --version=11.014`).
    3. The profile itself: `Behaviour.ts`'s `csbwin-11.014` naming its flags, a recording
       carrying its profile beside its level, and `tools/play-csbwin-log.ts --profile=`.
    4. The flags, one per commit, each read from the diff, until `DMMovie42` plays further.
@@ -622,12 +617,24 @@ The draws themselves barely move: per file, 11.014 and 2023 call `STRandom` as o
 in `Monster.cpp` (64 calls, 2023 66), and 11.014's recorder is in `data.cpp`, 2023's in
 `Recording.cpp`.
 
-`DMMovie42` (11.017) is the run to take first: its first drift is line 130, the step
-forward at `d.Time` 0x6b, which records two draws since line 129, the slide at 0x69 onto
-(11,15) of the Hall of Champions, where the port, as 2023, draws once
-(`CheckMoveFromMissile`). The move's draws in `Mouse.cpp` and `MoveObject.cpp` are the same
-in 11.014 as in 2023, so the second is elsewhere, for the oracle to find. The next step is
-5.2.
+Step 5.2 is paid: `tools/csbwin-oracle/oracle.sh`'s `--version=11.014` builds
+`doc/CSBwin-src-11.014/` with `oracle-11.014.patch` (`CMakeLists.txt`'s objects over
+sdl12-compat, 32-bit, the script's header says why and how) and plays a run on it. **11.014's
+source plays all four 11.0xx runs to their end with no sequence error**: `DMMovie42` and
+`43b` (11.017), `43a` and `45` (11.018), `DMMovie42` to Lord Chaos fused. So the oracle
+is their version, near enough that no run's `.exe` is needed, and where the port at a
+profile parts from a run, the oracle says what 11.014 drew there.
+
+`DMMovie42` is the run to take first: its first drift is line 130, the step forward at
+`d.Time` 0x6b, which records two draws since line 129, where the port, as 2023, draws once
+(`CheckMoveFromMissile`). The oracle's other draw comes first, in the tick's
+`SmartDiscard(false)` (`doc/CSBwin-src-11.014/CSBCode.cpp:643`): 11.014's
+`SDOBJLIST::AddObject` calls `ComputePriority`, which draws
+(`doc/CSBwin-src-11.014/SmartDiscard.cpp:53-61`), for the object added and again for each
+parent it is compared with (`:123-140`), where 2023's `AddObjectDecr` and `AddObjectIncr`
+compare the `m_priority` computed once (`doc/CSBwin-src/SmartDiscard.cpp:83`, `:153-195`).
+2023's oracle draws nothing in `SmartDiscard` at that tick: why the two differ there, from
+the diff of `SmartDiscard.cpp`, is 5.4's first flag. The next step is 5.3.
 
 Size L.
 
@@ -915,7 +922,8 @@ and unpaced (a whole run in about twenty seconds). `build` compiles it into
 `play <run folder> [<from>-<to>]` says whether CSBWin reaches the log's end and where it
 meets each "Sequence/timing error", and lists every draw of that `d.Time` range with its
 callers, to set against `--trace`'s. A drift the oracle does not have is the port's; one it
-has at the same place is the run's version's.
+has at the same place is the run's version's. With `--version=11.014` it is 11.014's
+source instead, which plays the four 11.0xx runs to their end (R18, step 5).
 
 What it establishes:
 
