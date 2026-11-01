@@ -26,6 +26,7 @@ import { decodeMissileTimerWord8 } from './missileHelpers';
 import type { TimerQueue } from './TimerQueue';
 import type { MmRecord } from './MmRecord';
 import { groupFacingsByte } from './monsterPosition';
+import { scentRule } from './PartyFootprints';
 
 /** `soundTELEPORT` (`doc/CSBwin-src/CSB.h:628`). */
 const SOUND_TELEPORT = 17;
@@ -122,7 +123,8 @@ export class WorldMove {
         if (party.facing === oldFacing) return;
       } else if (party.champions.length !== 0) {
         this.ctx.footprints.recordPartyMove(
-          this.ctx.state.tickCount, landed.z, landed.x, landed.y, party.magicFootprintsActive !== 0, oldX, oldY,
+          this.ctx.state.tickCount, landed.z, landed.x, landed.y, party.magicFootprintsActive !== 0, oldX, oldY, level,
+          scentRule(this.ctx.behaviour),
         );
       }
     }

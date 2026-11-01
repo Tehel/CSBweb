@@ -16,8 +16,8 @@
  * and turns the set's `DMRulesDesignOption` off.
  *
  * `--profile=<name>` plays at that CSBWin version's profile (`PROFILES`,
- * `src/engine/Behaviour.ts`), `csbwin-11.014` for an 11.0xx run (`DEBT.md` R18, step 5),
- * instead of 2023's source, which the engine follows.
+ * `src/engine/Behaviour.ts`), `csbwin-11.014` for an 11.0xx run (`DEBT.md` R18, step 5);
+ * `csbwin-2023`, a 17.6 run's, by default.
  * `--set=<id>` plays on another data set than `dm-atari`; `--save=<file>` starts from that
  * CSBWin save instead of a new game, read at the log's first `0x6669` (a CSB run's
  * `csbgame.dat`, which the log's first clicks resume). A save the run's author cut out of
@@ -65,7 +65,7 @@ const extraTicks = args.includes('--extra-ticks');
 const dmRules = !args.includes('--no-dm-rules');
 const resync = args.includes('--resync');
 const fake = args.includes('--fake');
-const profileArg = args.find((a) => a.startsWith('--profile='))?.slice(10) ?? null;
+const profileArg = args.find((a) => a.startsWith('--profile='))?.slice(10) ?? 'csbwin-2023';
 if (!knownProfile(profileArg)) throw new Error(`--profile=${profileArg}: not one of ${PROFILES.map((profile) => profile.name).join(', ')}`);
 const traceArg = args.find((a) => a.startsWith('--trace='))?.slice(8).split('-').map((n) => parseInt(n, 16));
 const { version, items } = readPlayfile(args[0]!);

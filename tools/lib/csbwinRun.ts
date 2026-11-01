@@ -55,7 +55,7 @@ export interface CsbwinRun {
   readonly dataSet: string;
   /**
    * The profile of the CSBWin version that recorded it (`PROFILES`, `src/engine/Behaviour.ts`),
-   * which it is played and recorded at; `null` for 2023's source, which the engine follows.
+   * which it is played and recorded at.
    */
   readonly profile: ProfileName | null;
   /** The CSBWin save its log's first read reads (`0x6669`), in its folder, or `null` for a new game. */
@@ -73,19 +73,19 @@ export interface CsbwinRun {
 /** The runs, in the order the check plays them. */
 export const CSBWIN_RUNS: readonly CsbwinRun[] = [
   {
-    id: 'DMMovie2615', dataSet: 'dm-atari', profile: null, save: null, end: 'won', player: 'Anthony Bracegirdle',
+    id: 'DMMovie2615', dataSet: 'dm-atari', profile: 'csbwin-2023', save: null, end: 'won', player: 'Anthony Bracegirdle',
     title: 'Race to fusion in 26 min 15 s',
     description: 'Dungeon Master won in 9449 ticks with Halk, Stamm, Leyla and Gothmog. A CSBWin 17.6 recording, DMMovie2615 of CSBWin\'s movies, played back in CSBweb.',
     recordedAt: '2021-04-06',
   },
   {
-    id: 'DMMovie2823', dataSet: 'dm-atari', profile: null, save: null, end: 'won', player: 'Anthony Bracegirdle',
+    id: 'DMMovie2823', dataSet: 'dm-atari', profile: 'csbwin-2023', save: null, end: 'won', player: 'Anthony Bracegirdle',
     title: 'Race to fusion in 28 min 23 s',
     description: 'Dungeon Master won in 10217 ticks with Halk, Stamm, Leyla and Gothmog. A CSBWin 17.6 recording, DMMovie2823 of CSBWin\'s movies, played back in CSBweb.',
     recordedAt: '2020-09-20',
   },
   {
-    id: 'CSBMovie0640', dataSet: 'csb', profile: null, save: 'csbgame.dat', end: 'log', player: 'Anthony Bracegirdle',
+    id: 'CSBMovie0640', dataSet: 'csb', profile: 'csbwin-2023', save: 'csbgame.dat', end: 'log', player: 'Anthony Bracegirdle',
     title: 'Race to Fulya Pit in 6 min 40 s',
     description: 'Chaos Strikes Back from the prison to Fulya Pit with Buzzzz. A CSBWin 17.6 recording, CSBMovie0640 of CSBWin\'s movies, eleven recordings spliced at the saves made between them, played back in CSBweb.',
     recordedAt: '2021-04-30',
@@ -112,7 +112,7 @@ export const CSBWIN_RUNS_UNDER_WAY: readonly RunUnderWay[] = [
     title: 'Dungeon Master, minimum item picking',
     description: 'A CSBWin 11.017 recording, DMMovie42 of CSBWin\'s movies, played back in CSBweb.',
     recordedAt: '2009-05-28',
-    drifts: 2664,
+    drifts: 6977,
   },
 ];
 

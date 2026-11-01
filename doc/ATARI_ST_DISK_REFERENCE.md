@@ -445,8 +445,8 @@ the flags, the larger of two signed words and the smaller. In 1.2 English, text 
 
 These are ReDMCSB's `MEDIA007` lines (`CHAMPION.C:1472-1525`, `:2311-2330`). The English,
 German and French disks, 1.0 to 1.3, hold the same two functions, only their addresses
-moved. CSBWin's two loops differ from them (`DEBT.md` H → "The scents' two loops are the
-Atari's, not CSBWin's").
+moved. CSBWin's two loops differ from them; the port plays them in a recording before level
+2, and from level 2 what FTL meant (`DEBT.md` H → "The scents are what FTL meant").
 
 ## CSBWin's files
 

@@ -20,7 +20,9 @@
  *
  * A CSBWin version's behaviour is a profile of the same flags (`PROFILES`): what that
  * version did where 2023's source, which the engine follows, does otherwise, read from a
- * diff of its source against 2023's (`DEBT.md` R18, step 5). A run of that version
+ * diff of its source against 2023's (`DEBT.md` R18, step 5), and where the port parts
+ * from CSBWin on purpose (`DEBT.md` H) and the version's runs need CSBWin's way, 2023's
+ * among them (`csbwinScentLoops`). A run of that version
  * (`DEBT.md` F24) plays at a profile, which its recording carries beside its level
  * (`Recording.profile`); a game the page plays has none. A flag a profile plays names it
  * with the level it joined the profile at, so that a flag added to a profile bumps
@@ -28,7 +30,7 @@
  */
 
 /** The engine's level: what a recording made now carries (`Recording.level`). Recordings made before levels are 0. */
-export const ENGINE_LEVEL = 1;
+export const ENGINE_LEVEL = 2;
 
 /** A CSBWin version whose runs the engine plays by the flags that name it. */
 export interface BehaviourProfile {
@@ -40,8 +42,13 @@ export interface BehaviourProfile {
     readonly source: string;
 }
 
-/** The CSBWin versions the engine plays besides 2023's. */
+/** The CSBWin versions whose runs the engine plays as they were recorded. */
 export const PROFILES = [
+    {
+        name: 'csbwin-2023',
+        does: "CSBWin's 2023 source, which the engine follows but where the port parts from it on purpose, for the runs of CSBWin 17.6 (DMMovie2615, DMMovie2823, CSBMovie0640)",
+        source: 'doc/CSBwin-src/',
+    },
     {
         name: 'csbwin-11.014',
         does: 'CSBWin 11.014, the nearest source to 11.017 and 11.018, which recorded the 11.0xx runs (DMMovie42, 43a, 43b, 45)',
@@ -79,6 +86,19 @@ export const BEHAVIOURS = [
         debt: 'R18',
         until: null,
         profiles: { 'csbwin-11.014': 1 },
+    },
+    {
+        name: 'releaseScentLoops',
+        does: "the release's scents: a step writes every strength with the square left's sum then the new print's 24 (the Amiga's tables, only the prints on each square), print k's strength written at N-1-k, 0 included, and the decay lowers the party's square's print too, but on the Amiga's (`PartyFootprints.ts`)",
+        debt: 'R18',
+        until: 2,
+    },
+    {
+        name: 'csbwinScentLoops',
+        does: "CSBWin's scents: the release's on the Atari, but `AddFootprintEntry` never writes strength 0 (`while (index-- != 1)`) and the decay stops after dropping the oldest print (`PartyFootprints.ts`)",
+        debt: 'R18',
+        until: null,
+        profiles: { 'csbwin-2023': 2, 'csbwin-11.014': 2 },
     },
 ] as const satisfies readonly BehaviourChange[];
 

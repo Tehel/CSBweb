@@ -388,7 +388,8 @@ does not run them.
   strength of a scent on that square (`CHAMPION.C:1505`), and the ten-second decay spares
   the scent on the party's square (`CHAMPION.C:2316`), where the Atari's comparisons are
   thrown away and every scent changes (`src/engine/PartyFootprints.ts`,
-  `tools/checks/amiga-scents.ts`). `dm` has it as ReDMCSB writes it. `F0317` is hunk 17 at
+  `tools/checks/scents.ts`). The port plays it in a recording before level 2: from level 2
+  every set plays what FTL meant (`DEBT.md` H, "The scents are what FTL meant"). `dm` has it as ReDMCSB writes it. `F0317` is hunk 17 at
   0x3066: its scent pointer walks up from the oldest while its index, tested before it is
   decremented, walks the strengths down from the newest to 0, so it compares scent `k` and
   writes strength `N-1-k`, strength 0 included, and the first strength it changes sets the

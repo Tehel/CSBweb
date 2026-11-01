@@ -24,6 +24,7 @@ import { GetBasicObjectType } from './objectIndex';
 import { settleMasteryGains } from './MasteryGains';
 import { ensureSkills } from './skills';
 import { isAlive, masteryOf } from './rules';
+import { scentRule } from './PartyFootprints';
 
 /** `(d.Time&511)==0` — the loop's test for `NinetySecondUpdate` (doc/CSBwin-src/CSBCode.cpp:690). */
 export function isNinetySecondTick(time: number): boolean {
@@ -104,7 +105,7 @@ export function tenSecondUpdate(ctx: GameContext): void {
     const sleeping = party.sleeping;
     if (party.champions.length === 0) return;
 
-    ctx.footprints.ageFootprints(party.position);
+    ctx.footprints.ageFootprints(party.position, scentRule(ctx.behaviour));
 
     const random112 = (time & 0x40)
         | ((time & 0x80) >> 2)

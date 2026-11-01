@@ -13,9 +13,9 @@ It also carries the engine's level it was played at, so that a later engine can 
 by the behaviour it was made with ("A recording's level", below), and the digest of each
 file its set had read.
 
-**Recordings are paused.** The port's behaviour is still changing (the monsters' scents,
-`DEBT.md` X18), and each change would leave every recording
-made before it unplayable. So a page writes no recording to the store, and the welcome
+**Recordings are paused** until the engine keeps every behaviour a recording was made with
+(`DEBT.md` R18): until then a change of play could leave every recording made before it
+unplayable. So a page writes no recording to the store, and the welcome
 page's book has no RECORDINGS tab, a local set no book (`src/ui/recordingsSwitch.ts`). The
 recorder still runs in the page, and a save still names its point in the running
 recording, which the store does not hold, so that save is read as a root once recordings
@@ -306,12 +306,15 @@ with what it does, the debt ID of the commit that changed it and the level that 
 made (`until`). The engine reads them from `ctx.behaviour`, frozen: a game the page plays
 is at `ENGINE_LEVEL`, every flag off (`CURRENT_BEHAVIOUR`), and the player sets each
 recording's own before its read (`behaviourAt`), each flag whose `until` is above the
-recording's level on. The level is 1, and the one flag kept is a profile's (below). Recordings made before
+recording's level on. The level is 2. The one flag of the port's own is `releaseScentLoops`,
+until 2: the release's scents, which what FTL meant replaced (`DEBT.md` H, "The scents are
+what FTL meant"). Recordings made before
 levels are of level 0.
 
-A CSBWin version other than 2023's is a **profile** of the same flags (`PROFILES`): what
-that version did where 2023's source, which the engine follows, does otherwise, each flag
-read from the diff of its source against 2023's (`DEBT.md` R18, step 5). A flag of a
+A CSBWin version is a **profile** of the same flags (`PROFILES`): what that version did
+where the engine does otherwise, where 2023's source does otherwise (each flag read from
+the diff of its source against 2023's, `DEBT.md` R18, step 5) or where the port parts from
+CSBWin on purpose (`DEBT.md` H) and the version's runs need CSBWin's way. A flag of a
 version's that the port never had has no `until`; a flag a profile plays names it with the
 level it joined it at, and is on for a recording of that profile at that level or above.
 A recording carries its profile beside its level (`Recording.profile`), as the store's row
@@ -319,10 +322,12 @@ and a package do; a game the page plays has none, and a recording made before pr
 neither. A CSBWin run is played at its version's profile (`CsbwinRun.profile`, `recordRun`;
 `tools/play-csbwin-log.ts --profile=`), and the player sets a recording's before its read,
 as its level. A path that holds a profile the engine does not play is refused before it
-plays, as one of a later level. The one profile is `csbwin-11.014`, for the 11.0xx runs.
-Its one flag, `smartDiscardDrawnPriority`, joined it at level 1: 11.014's `SmartDiscard`,
-which ranks every object it scans by a priority drawn afresh at each comparison
-(`smartDiscard11014`, `src/engine/SmartDiscard.ts`).
+plays, as one of a later level. The profiles are `csbwin-2023`, for the runs of CSBWin
+17.6, and `csbwin-11.014`, for the 11.0xx runs. Both play `csbwinScentLoops`, joined at
+level 2: CSBWin's scents (`src/engine/PartyFootprints.ts`). `csbwin-11.014` plays
+`smartDiscardDrawnPriority` too, joined at level 1: 11.014's `SmartDiscard`, which ranks
+every object it scans by a priority drawn afresh at each comparison (`smartDiscard11014`,
+`src/engine/SmartDiscard.ts`).
 
 A run of an older version that does not play to its end yet is **under way**
 (`CSBWIN_RUNS_UNDER_WAY`, `tools/lib/csbwinRun.ts`): its log is kept beside the others',

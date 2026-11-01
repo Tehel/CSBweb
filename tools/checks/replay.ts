@@ -1268,19 +1268,20 @@ async function levels(pkg: RecordingPackage): Promise<void> {
   }
   check(refused === 'A LATER VERSION OF THE SITE MADE THIS RECORDING', `a path that holds a later level is refused before it plays: "${refused}"`);
 
-  // Played at the latest level where the profile turns every flag off, so that it plays as
-  // it was made, at no profile: before the profile's first flag joined it.
-  const quiet = [...Array(ENGINE_LEVEL + 1).keys()].reverse().find((level) => kept.every((change) => !playsOld(change, level, profile)));
-  check(quiet !== undefined, `a level plays ${profile} with every flag off: ${quiet}`);
-  const profiledPlay = Page.replay(atProfile.path.map((recording) => ({ ...recording, level: quiet ?? 0 })));
+  // Played at its own level and the profile. Its flags on there (CSBWin's scents) play a
+  // game whose scents the two rules leave alike as it was made, at no profile, to the
+  // branch's end; where they part, the play parts at a change or at the join, the
+  // strengths being in the save, and what it played is still at the profile.
+  const profiledPlay = Page.replay(atProfile.path);
   const seenProfiles = [profiledPlay.game.ctx.behaviour.profile];
   profiledPlay.player!.onBegin((recording) => {
     seenProfiles.push(profiledPlay.game.ctx.behaviour.profile);
     profiledPlay.recorder.begin(recording.start, recording.parent);
   });
   profiledPlay.play();
-  check(profiledPlay.player!.drift === null && seenProfiles.length === 2 && seenProfiles.every((seen) => seen === profile) && profiledPlay.recording.profile === profile,
-    `the player sets each recording's profile before its read, and a recorder of the game played back records it (${seenProfiles.join(', ')})`);
+  const profiledDrift = profiledPlay.player!.drift;
+  check((profiledDrift === null ? seenProfiles.length === 2 : profiledDrift.kind === 'change' || profiledDrift.kind === 'join') && seenProfiles.every((seen) => seen === profile) && profiledPlay.recording.profile === profile,
+    `the player sets each recording's profile before its read, and a recorder of the game played back records it (${seenProfiles.join(', ')}${profiledDrift ? `, parting at ${JSON.stringify(profiledDrift)}` : ''})`);
   const unknownProfile = pkg.path.map((recording, n) => (n === 1 ? { ...recording, profile: 'csbwin-0.1' } : recording));
   refused = '';
   try {

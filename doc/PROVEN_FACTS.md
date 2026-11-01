@@ -1123,10 +1123,12 @@ It is nonetheless the only writer of `d.Byte13220`, the age bytes that
 value, the square it is given unused, and never reaches entry 0 (`while (index-- != 1)`,
 `:4394`). The square unused is the Atari's: every Atari DM program compares and throws the
 result away. The bound is not: those programs write entry 0, as ReDMCSB and the Amiga's
-`dm` do, and so does the port (`doc/ATARI_ST_DISK_REFERENCE.md` → "The scents in the
-program"; `DEBT.md` H). A set with the Amiga's tables plays A22E's
-`F0317_CHAMPION_AddScentStrength` instead (`doc/AMIGA_DISK_REFERENCE.md` → "A22E's own code,
-classed").
+`dm` do (`doc/ATARI_ST_DISK_REFERENCE.md` → "The scents in the program"), and so does the
+port's release rule, which a recording before level 2 plays, A22E's
+`F0317_CHAMPION_AddScentStrength` on a set with the Amiga's tables
+(`doc/AMIGA_DISK_REFERENCE.md` → "A22E's own code, classed"). From level 2 the port plays
+what FTL meant, and a CSBWin profile CSBWin's loops (`DEBT.md` H → "The scents are what FTL
+meant").
 
 ## A full trail is the last 24 squares walked: `MemMove` takes its source first
 

@@ -131,7 +131,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| R18 | A recording plays by the engine's behaviour as it was made | L | ⏳ step 5.4 waits on the author (the scents' loops) |
+| R18 | A recording plays by the engine's behaviour as it was made | L | ⏳ step 5.4 under way (`DMMovie42` drifts at line 6977) |
 | F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
 | C198 | A missile that cannot be made loses the object it was to carry | S | ⏳ |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
@@ -145,7 +145,6 @@ In payoff order: the first row is the next item.
 | X10 | The cells the party has seen, kept across a save for an automap | M | ⏸️ |
 | X16 | The map's info follows a DSA's program to the squares it names | M | ⏸️ |
 | X17 | The map's info names a Hall of Champions mirror's champion | S | ⏸️ |
-| X18 | The scents compared with a square on every set: the Atari's bug fixed | S | ⏸️ waits on the author |
 | E22 | Fullscreen filled by a fraction | M | ⏸️ waits on the author |
 | H | Deliberate divergences | — | 🚫 |
 
@@ -633,49 +632,35 @@ which each flag moves on. Both log players take the log's `#DMRules` as CSBWin's
 does (`dmRulesBefore`, `doc/PROVEN_FACTS.md` → "`DM_rules` and `DMRulesDesignOption`…"),
 so the champion P reincarnates at `d.Time` 0x43 with strength 52, as in the oracle.
 
-It drifts at **line 2664**, `d.Time` 0xf87, a step forward (`0x0003`) on level 1 at
-(6,28) whose recorded count is 12 draws where the port has made 10, in both log players.
+It drifts at **line 6977**, `d.Time` 0x33a3, an entry at x 0xf3, y 0x73, button `0x006f`, the
+party on level 7 at (7,8), whose recorded `d.RandomNumber` is not the port's; what 11.014 draws there is not read yet.
 On the way it saves at lines 1485-1489 (`d.Time` 0x8f9): the disk icon, "SAVE AND PLAY",
 the save's file, the signature `0x6668`. The oracle draws that save's
 `ProcessMonstersOnLevel` inside `_DisplayDiskMenu`, so the save was the log players' gap,
 not 11.014's; they now make it on the port's save menu (`diskMenuSave`,
 `tools/lib/csbwinRun.ts`, `doc/RECORDING.md` → "Recordings made in CSBWin"), and
-`tools/checks/csbwin-runs.ts` plays the recording, the save in it, back to the drift.
-
-**The drift at line 2664 is the scents' loops** (H, "The scents' two loops are the
-Atari's, not CSBWin's"), not 11.014. 11.014's `GetBestMonsterFacingP1`, `TenSecondUpdate`
-and `AddFootprintEntry` are 2023's, line for line. At 0xf86 group (0,21)'s B-group turn
-finds footprint 1. The oracle has its strength at 23 (the ten-second decay at 0xf80) and a
-roll of 3: 26 is not above `30 - 2 * 2`, no direction is preferred, and its random branch
-draws 11. The port's party step at 0xf85 has written strength 0 back to 24, as the Atari's
-`AddFootprintEntry` writes it and CSBWin's `while (index-- != 1)` does not. So it follows
-the print and draws 9. With CSBWin's two loops (`index-- != 1`, and `break` after the
-oldest print is dropped) in a scratch tree, `DMMovie42` plays on to **line 6977**
-(`d.Time` 0x33a3, level 7), and the three runs of `CSBWIN_RUNS` still play to their end.
-
-**The author's decision:** the scents become what FTL meant from level 2, on every set
-(X18's third choice, a divergence in H): on a step, only the prints on the square left
-change, each its own strength plus the time spent, up to 80, and the new print is at 24;
-every ten seconds every print but the newest and the party's square's loses one, the
-oldest at 0 is dropped and the walk goes on. The release's loops (the Atari's, the
-Amiga's on `dm-amiga`) stay behind a flag `until` 2; CSBWin's loops are a flag of the
-`csbwin-11.014` profile, joined at level 2, and of a `csbwin-2023` profile if the three
-runs of `CSBWIN_RUNS` need it to play to their end.
+`tools/checks/csbwin-runs.ts` plays the recording, the save in it, back to the drift. It
+plays past line 2664 on CSBWin's scents (`csbwinScentLoops`): there, at `d.Time` 0xf86,
+group (0,21)'s turn finds footprint 1 at strength 23 in the oracle, where the Atari's
+loops have written 24 back, and so parts from a run that plays them otherwise.
 
 Step 5.3 is paid: `PROFILES` (`src/engine/Behaviour.ts`) holds `csbwin-11.014`. A flag a profile plays lists it in its `profiles` with the level it joined it
 at, and one the port never had has no `until` (`doc/RECORDING.md` → "A recording's level",
 → "The policy": a flag joining a profile bumps the level). A recording, the store's row and
 a package carry `profile` (`null` for none, and for one made before profiles); the player
 sets it with the level and refuses one it does not play (`tools/checks/replay.ts`). A run
-of `CSBWIN_RUNS` names its profile (`null` for the three) and `recordRun` plays at it;
-`tools/play-csbwin-log.ts --profile=csbwin-11.014` plays a log at it.
+of `CSBWIN_RUNS` names its profile (`csbwin-2023` for the three) and `recordRun` plays at
+it; `tools/play-csbwin-log.ts --profile=csbwin-11.014` plays a log at it, `csbwin-2023` by
+default.
 
-Step 5.4 is under way. `ENGINE_LEVEL` is 1, and the one flag is the profile's:
-`smartDiscardDrawnPriority`, joined at level 1, 11.014's `SmartDiscard` whole
+Step 5.4 is under way. `ENGINE_LEVEL` is 2, and the profiles' flags are two:
+`smartDiscardDrawnPriority`, `csbwin-11.014`'s from level 1, 11.014's `SmartDiscard` whole
 (`smartDiscard11014`, `src/engine/SmartDiscard.ts`, checked at its profile by
-`tools/checks/watch-smart-discard.ts`), which takes `DMMovie42` past line 130. What
-stops it now is the drift at line 2664, the scents' loops, which waits on the author
-(above).
+`tools/checks/watch-smart-discard.ts`), which takes `DMMovie42` past line 130; and
+`csbwinScentLoops`, both profiles' from level 2, CSBWin's scents
+(`src/engine/PartyFootprints.ts`, `tools/checks/scents.ts`), which takes it past line 2664
+and keeps the three 17.6 runs playing to their end, now that a game plays what FTL meant
+(H, "The scents are what FTL meant"). What stops it now is the drift at line 6977.
 
 Size L.
 
@@ -1315,62 +1300,6 @@ encoded attributes and skills (`AZIZI JOHARI F AADNADACAAAH…`).
 - **The check**: `tools/checks/map-cell-info.ts` on a mirror of DM's Hall of Champions
   and the square before it.
 
-### X18 ⏸️ The scents compared with a square on every set: the Atari's bug fixed
-
-Not decided: whether the port should be faithful to the Atari's implementation, as it is
-now, or to what FTL meant, as its later releases are. The author decides; until then
-nothing changes.
-
-**The Atari's bug.** Every Atari program, DM 1.0 to 1.3 and, by ReDMCSB, CSB 2.0 and 2.1,
-compares each scent with the square and throws the result away, in
-`F0317_CHAMPION_AddScentStrength` and in the ten-second decay (ReDMCSB's `MEDIA007`,
-`BUG0_00`, `doc/ReDMCSB-src/CHAMPION.C:1497-1507`, `:2311-2330`;
-`doc/ATARI_ST_DISK_REFERENCE.md` → "The scents in the program"). `dm-atari` and every set
-but `dm-amiga` play it (`src/engine/PartyFootprints.ts`). What it does in play:
-
-- **Every strength is 24 after every move.** A move calls `F0317` twice
-  (`MOVESENS.C:772`, `:783`): first with the time spent on the square left, which sets the
-  whole trail to `min(80, strength + time)`, then with `0x8018`, whose first strength is the
-  new print's, 0, so the whole trail becomes `max(0, 24)`. The time the party spent
-  anywhere is lost; the first call does nothing that lasts.
-- **The decay lowers every print but the newest by one**, the party's square too. After
-  24 decays without a move the oldest reaches 0 and is dropped, and since the rest reach
-  0 in the same update, the trail falls to the newest print at once.
-- **What a monster smells** (`GetBestMonsterFacingP1`, `doc/CSBwin-src/Monster.cpp:613-625`,
-  `src/engine/MonsterPerception.ts`): out of direct reach, on a square of the trail, it
-  follows the trail when `Random(0..3) + strength > 30 - 2 * smellingDistance`, the
-  strength of its own square's print. With every strength 24 just after a move, a nose of
-  1 never follows, 2 follows one time in four, 3 three in four, 4 and more always; each
-  decay since the last move takes one from the strength, whatever the square.
-
-**What the later releases do.** The IIGS's and the Amiga's (`MEDIA353`) compare the
-location, the later ports' (`MEDIA529`) the whole scent word, which is the same thing:
-`F0317` changes only the strengths of the prints on the square it is given, and the
-decay spares the print on the party's square. `dm-amiga` plays it (`byLocation`,
-`GameContext.ts`: `tables.amigaSounds !== null`; `doc/AMIGA_DISK_REFERENCE.md` → "A22E's
-own code, classed"). It is not what FTL meant either: its pointer walks the prints up from
-the oldest while its index walks the strengths down from the newest, so it compares print
-`k` and writes strength `N-1-k`. A print's strength is its own only at the trail's middle;
-`tools/checks/amiga-scents.ts`'s walk S0, S1, S2, S1 leaves `24 0 24 0`, S1's two prints
-at 0 and the others at 24.
-
-**The choices**, each S:
-
-1. **Leave it**: every set plays its own release's code, the Atari's bug on the Atari's
-   sets. Nothing to do but delete this item.
-2. **The later releases' code on every set**: `byLocation` true for all. Faithful to an
-   FTL implementation, mirror included. Either a deliberate divergence (H), or an extra
-   (X), a setting off by default under the rules above.
-3. **What FTL meant**: print `k`'s strength written at `k`, the time spent on each square
-   kept. No release does it, so it is the port's own invention, and goes in as an extra if
-   at all.
-
-A save holds the strengths and not the rule, so a save read under another rule plays on.
-The check: `amiga-scents.ts` for the strengths, and a monster with a nose of 2 or 3 left
-on a trail the party walked slowly, followed or not as the rule says.
-
----
-
 ## H — Deliberate divergences (not debt)
 
 Recorded so that nobody "fixes" them.
@@ -1384,9 +1313,8 @@ Recorded so that nobody "fixes" them.
   from the Amiga's `dm`. Its colours are shown at the Atari's 3 bits a channel, which
   loses none of them: each of `dm`'s channels is twice an Atari intensity, or 15 for 7.
   Everything CSBWin has, the Amiga set does as CSBWin does, where A22E does it otherwise
-  too, but four things the author asked for: the wall bump asked for on the square bumped
-  into, the scents compared with a square, the ending's six explosions after its last
-  message and the dialogs' "V2.2". Kept as CSBWin has them: the couatl's picture is CSBWin's aspect, the click
+  too, but three things the author asked for: the wall bump asked for on the square bumped
+  into, the ending's six explosions after its last message and the dialogs' "V2.2". Kept as CSBWin has them: the couatl's picture is CSBWin's aspect, the click
   areas are the Atari's (A22E's RESURRECT, REINCARNATE and
   CANCEL are smaller, and its names open the inventory a pixel further left). An object
   held over the viewport keeps its colours, as A22E's pointer, a hardware sprite, shows
@@ -1498,19 +1426,26 @@ Recorded so that nobody "fixes" them.
   runs before the byte swap"). The two differ only for a type-47 actuator under either
   reading: DM has none, Conflux's file has the flag, and `tools/checks/dungeon-conversions.ts`
   fails for a dungeon that has one.
-- 🚫 **The scents' two loops are the Atari's, not CSBWin's.** CSBWin's `AddFootprintEntry`
-  walks the strengths `while (index-- != 1)` (`doc/CSBwin-src/Code11f52.cpp:4394`), so it
-  never writes strength 0, and its ten-second decay `break`s after dropping the oldest print
-  (`doc/CSBwin-src/Code17818.cpp:194`). ReDMCSB writes `while (L0954_i_ScentIndex--)` and
-  `continue` for every release, the Atari's among them (`doc/ReDMCSB-src/CHAMPION.C:1501`,
-  `:2323-2324`), and so does every Atari DM program, 1.0 to 1.3: 1.2 English tests the index
-  before decrementing it (`START.PAK` text `$169ac`) and branches back to the loop's test
-  after the deletion (`$1768a`), its helpers the larger and the smaller of two words
-  (`doc/ATARI_ST_DISK_REFERENCE.md` → "The scents in the program"). CSB's Atari program is
-  on no fixture; ReDMCSB's S20E and S21E share the lines. Every set plays the Atari's loops
-  (`src/engine/PartyFootprints.ts`, `tools/checks/amiga-scents.ts`,
-  `tools/checks/magic-footprints.ts`). The comparisons thrown away stay: they are the
-  Atari's, ReDMCSB's `BUG0_00`.
+- 🚫 **The scents are what FTL meant, on every set.** No release keeps the party's scents
+  as it means to. The Atari's `F0317_CHAMPION_AddScentStrength` and ten-second decay
+  compare each print with the square and throw the result away (ReDMCSB's `BUG0_00`,
+  `doc/ReDMCSB-src/CHAMPION.C:1497-1507`, `:2311-2330`; `doc/ATARI_ST_DISK_REFERENCE.md` →
+  "The scents in the program"), so every strength is 24 after every move and the time the
+  party spent anywhere is lost. The Amiga's compares, but its pointer walks the prints up
+  from the oldest while its index walks the strengths down from the newest, so it writes
+  print `k`'s strength at `N-1-k` (`doc/AMIGA_DISK_REFERENCE.md` → "A22E's own code,
+  classed"). CSBWin's is the Atari's, but never writes strength 0
+  (`doc/CSBwin-src/Code11f52.cpp:4394`) and its decay stops after a drop
+  (`doc/CSBwin-src/Code17818.cpp:194`). From level 2, the port does what they mean (the
+  author): a step adds the time spent on the square left to the strengths of its prints,
+  each its own, up to 80, and puts the new print at 24; the decay lowers every print but
+  the newest and the party's square's by one, drops the oldest at 0 and goes on. What a
+  monster smells then is how long ago, and how long, the party was on its square
+  (`GetBestMonsterFacingP1`, `doc/CSBwin-src/Monster.cpp:613-625`). A recording before
+  level 2 plays its set's release (`releaseScentLoops`), and a CSBWin profile CSBWin's
+  loops (`csbwinScentLoops`), which the 17.6 runs and `DMMovie42` need to play on
+  (`src/engine/PartyFootprints.ts`, `tools/checks/scents.ts`). A save holds the strengths
+  and not the rule, so a save read under another rule plays on.
 - 🚫 **The Atari's bugs that CSBWin fixes stay fixed.** ReDMCSB lists 93 bugs of the
   Atari releases (`doc/ReDMCSB-src/Documentation/BugsAndChanges.htm` → "Bugs"). Where an
   Atari release has one and CSBWin and the port do not, the port stays as it is,
