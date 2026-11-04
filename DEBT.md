@@ -131,7 +131,7 @@ In payoff order: the first row is the next item.
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
 | F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
-| R19 | The site's shared recordings are packages of version 2, which the page no longer reads | S | ⏳ the author runs the migration, then deploys |
+| R19 | The site's shared recordings are packages of versions 1 and 2, which the page no longer reads | S | ⏳ the author runs the migration, then deploys |
 | C198 | A missile that cannot be made loses the object it was to carry | S | ⏳ |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏸️ |
@@ -466,15 +466,16 @@ untrusted: they may stop the game with a message, as CSBWin dies, but never cras
 the tab, nor corrupt what is stored. Each item owes what a fix owes ("How to work this
 list", point 4), its check included.
 
-### R19 — The site's shared recordings are packages of version 2 ⏳ (S)
+### R19 — The site's shared recordings are packages of versions 1 and 2 ⏳ (S)
 
 The page, the server's reader and the deploy's gate read a recording's package of version 3
 alone (`src/engine/RecordingPackage.ts`, `doc/RECORDING.md` → "Shared recordings"): a
 branch's save file and the save shared named by their MD5, the changes' clock and stream
 kept every 64th change and at each recording's last. The corpus is converted. The reference
-instance's four packages, "Chani vs the world" (`96760E66F1547A2C`), the CSB race
-(`DC4402FB06A312A1`) and the two other CSBWin runs, are still of version 2, which this build
-cannot read, so its deploy's gate refuses it until they are converted.
+instance's four packages are not: "Chani vs the world" (`96760E66F1547A2C`) is of version 2,
+and the three CSBWin runs, the CSB race (`DC4402FB06A312A1`) and the two races to fusion
+(`B270466DCBBD1AA0`, `8401599B1F0E2FEB`), of version 1, written before levels. This build
+cannot read them, so its deploy's gate refuses it until they are converted.
 
 What is left is the author's, on the instance (`doc/DEPLOYMENT.md` → "Shared recordings"):
 from this build's commit, `npx tsx utils/migrate-recording-packages.ts`, a yes for each,

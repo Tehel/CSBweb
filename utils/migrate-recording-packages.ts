@@ -1,14 +1,15 @@
 /**
- * Migrate a CSBweb instance's shared recordings from the package of version 2 to version 3
+ * Migrate a CSBweb instance's shared recordings from the package of version 1 or 2 to version 3
  * (`DEBT.md` R19, `doc/RECORDING.md` → "Shared recordings"), which the page reads alone: each
  * package rewritten with the same content, its branches' save files and its save shared
  * named by their MD5, its changes' clock and stream kept every 64th change and at each
- * recording's last. It keeps a private copy of version 2's reader (`readVersion2`), which
+ * recording's last. It keeps a private copy of version 2's reader (`readOld`), which read
+ * version 1's too, written before levels, each recording of level 0 naming no files, and
  * the page no longer has.
  *
  * Run it from a commit whose build reads version 3, before that build is deployed: the
  * deploy's gate (`utils/replay-recordings.ts`) reads the instance's packages with it, and
- * refuses one of version 2.
+ * refuses one of an earlier version.
  *
  *   npx tsx utils/migrate-recording-packages.ts [--dry-run]
  *   npx tsx utils/migrate-recording-packages.ts --file <package.gz>…
@@ -30,9 +31,9 @@
  *   q  quit
  *
  * A package that is of version 3 already is left alone. One whose version 3 does not play
- * to its point is not replaced, and the run says whether its version 2 played; but a
+ * to its point is not replaced, and the run says whether its old version played; but a
  * recording broken already (`broken`), which the gate plays no more, is replaced once its
- * version 3 reads. The old file is kept in `<BACKUP_DIR>/recordings-v2/<id>.gz`, moved
+ * version 3 reads. The old file is kept in `<BACKUP_DIR>/recordings-old/<id>.gz`, moved
  * there from `<BACKUP_DIR>/recordings/` where the nightly backup had copied it, so that
  * the next backup copies the new one (`doc/DEPLOYMENT.md` → "Backups"). `--dry-run` does
  * everything but the replacement.
@@ -59,14 +60,14 @@ function fail(message: string): never {
     process.exit(1);
 }
 
-/* ------------------------------------------------------- version 2 ---- */
+/* ------------------------------------------------- versions 1 and 2 ---- */
 
 /**
- * A package of version 2 as its reader read it: the path whole, each recording as the
- * store holds it (a branch's start its save's file, each change with its clock and
- * stream), and the save shared as its file.
+ * A package of version 1 or 2 as version 2's reader read it: the path whole, each
+ * recording as the store holds it (a branch's start its save's file, each change with its
+ * clock and stream), and the save shared as its file.
  */
-interface Version2 {
+interface OldPackage {
     readonly build: string;
     readonly level: number;
     readonly dataSet: string;
@@ -76,33 +77,38 @@ interface Version2 {
 }
 
 /**
- * The package of version 2 `bytes` hold, or `null` where they hold another version. Its
- * fields are taken as version 2's writer wrote them, their files from base64: the form is
- * checked by version 3's writer and reader, which the converted package goes through.
+ * The package of version 1 or 2 `bytes` hold, or the version they hold where it is
+ * another. Its fields are taken as version 2's writer wrote them, their files from base64,
+ * and one of version 1's as version 2's reader took it: written before levels, the package
+ * and each recording of level 0, each naming no files. The form is checked by version 3's
+ * writer and reader, which the converted package goes through.
  */
-async function readVersion2(bytes: Uint8Array): Promise<Version2 | null> {
+async function readOld(bytes: Uint8Array): Promise<{ old: OldPackage } | { version: unknown }> {
     const text = await new Response(new Blob([new Uint8Array(bytes)]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
     const json: any = JSON.parse(text);
-    if (json?.version !== 2) return null;
+    if (json?.version !== 1 && json?.version !== 2) return { version: json?.version };
+    const leveled = json.version === 2;
     const startOf = (start: any): RecordingStart => (start.kind === 'save' ? { ...start, bytes: fromBase64(start.bytes) } : start);
-    return {
+    return { old: {
         build: json.build,
-        level: json.level,
+        level: leveled ? json.level : 0,
         dataSet: json.dataSet,
         info: json.info,
         // A recording written before profiles has none.
-        path: (json.path as any[]).map((recording): Recording => ({ ...recording, profile: recording.profile ?? null, start: startOf(recording.start) })),
+        path: (json.path as any[]).map((recording): Recording => ({
+            ...recording, level: leveled ? recording.level : 0, profile: recording.profile ?? null, files: leveled ? recording.files : null, start: startOf(recording.start),
+        })),
         shared: json.shared.kind === 'save' ? { kind: 'save', file: fromBase64(json.shared.file), inVbl: json.shared.inVbl } : { kind: 'end' },
-    };
+    } };
 }
 
 function fromBase64(encoded: string): Uint8Array {
     return new Uint8Array(Buffer.from(encoded, 'base64'));
 }
 
-/** `v2` as a package of version 3: its path as a package holds it (`packaged`), its save shared by its file's MD5. */
-function toVersion3(v2: Version2): RecordingPackage {
-    const { build, level, dataSet, info, path, shared } = v2;
+/** `old` as a package of version 3: its path as a package holds it (`packaged`), its save shared by its file's MD5. */
+function toVersion3(old: OldPackage): RecordingPackage {
+    const { build, level, dataSet, info, path, shared } = old;
     return {
         version: RECORDING_PACKAGE_VERSION, build, level, dataSet, info, path: packaged(path),
         shared: shared.kind === 'save' ? { kind: 'save', md5: fileDigest(shared.file), inVbl: shared.inVbl } : { kind: 'end' },
@@ -118,20 +124,22 @@ function samePackage(a: RecordingPackage, b: RecordingPackage): boolean {
 }
 
 /**
- * `bytes`, a package of version 2, as the file of version 3, which the page's reader
- * reads back as the package converted; or why not: a package of another version.
+ * `bytes`, a package of version 1 or 2, as the file of version 3, which the page's reader
+ * reads back as the package converted; or why not: a package of another version, which it
+ * names.
  */
-async function convert(bytes: Uint8Array): Promise<{ v2: Version2; v3: RecordingPackage; file: Uint8Array } | string> {
-    const v2 = await readVersion2(bytes);
-    if (!v2) {
-        const already = await readRecordingPackage(bytes).then(() => true, () => false);
-        return already ? `of version ${RECORDING_PACKAGE_VERSION} already` : 'of no version this script reads';
+async function convert(bytes: Uint8Array): Promise<{ old: OldPackage; v3: RecordingPackage; file: Uint8Array } | string> {
+    const read = await readOld(bytes);
+    if (!('old' in read)) {
+        if (read.version !== RECORDING_PACKAGE_VERSION) return `of version ${JSON.stringify(read.version)}, which this script does not read`;
+        const why = await readRecordingPackage(bytes).then(() => null, (error: unknown) => (error instanceof Error ? error.message : String(error)));
+        return why === null ? `of version ${RECORDING_PACKAGE_VERSION} already` : `of version ${RECORDING_PACKAGE_VERSION}, but refused: ${why}`;
     }
-    const v3 = toVersion3(v2);
+    const v3 = toVersion3(read.old);
     const file = await writeRecordingPackage(v3);
-    const read = await readRecordingPackage(file);
-    if (!samePackage(read, v3)) throw new Error('version 3 does not read back as written');
-    return { v2, v3: read, file };
+    const back = await readRecordingPackage(file);
+    if (!samePackage(back, v3)) throw new Error('version 3 does not read back as written');
+    return { old: read.old, v3: back, file };
 }
 
 const kb = (bytes: number): string => `${Math.round(bytes / 1024).toLocaleString('en')} KB`;
@@ -217,7 +225,7 @@ console.log(JSON.stringify(rows.map((row) => ({ id: row.id, dataSet: row.data_se
 
     /**
      * `file` in place of `id`'s package, which must still be the one whose MD5 is `was`;
-     * the old one kept in the backups' `recordings-v2/`, and its row's size set.
+     * the old one kept in the backups' `recordings-old/`, and its row's size set.
      */
     replace(id: string, was: string, file: Uint8Array): void {
         this.node(`
@@ -226,7 +234,7 @@ const live = path.join(dir, name);
 const md5 = (bytes) => require('node:crypto').createHash('md5').update(bytes).digest('hex');
 if (md5(fs.readFileSync(live)) !== ${JSON.stringify(was)}) throw new Error(name + ' changed since it was read');
 const bytes = fs.readFileSync(0);
-const kept = path.join(backups, 'recordings-v2');
+const kept = path.join(backups, 'recordings-old');
 fs.mkdirSync(kept, { recursive: true });
 const copied = path.join(backups, 'recordings', name);
 if (!fs.existsSync(path.join(kept, name))) {
@@ -258,11 +266,11 @@ async function ask(question: string): Promise<string> {
     return line.value.trim().toLowerCase();
 }
 
-/** Why `v2`'s path, played whole as version 2 held it, does not play to its point over the set version 3 was played over; `null` where it does. */
-async function playVersion2(instance: Instance, v2: Version2): Promise<string | null> {
-    const over = instance.served.get(v2.dataSet);
-    if (!over) return `its set, ${v2.dataSet}, is not listed`;
-    const played = await playPath(over.set, over.files, v2.path, v2.shared.kind === 'save' ? v2.shared : null);
+/** Why `old`'s path, played whole as its old version held it, does not play to its point over its own set; `null` where it does. */
+async function playOld(instance: Instance, old: OldPackage): Promise<string | null> {
+    const over = instance.served.get(old.dataSet);
+    if (!over) return `its set, ${old.dataSet}, is not listed`;
+    const played = await playPath(over.set, over.files, old.path, old.shared.kind === 'save' ? old.shared : null);
     return played.drift ? driftText(played.drift) : null;
 }
 
@@ -297,15 +305,15 @@ async function migrate(dryRun: boolean): Promise<void> {
             console.log(`  Left alone: ${converted}.`);
             continue;
         }
-        const { v2, v3, file } = converted;
+        const { old, v3, file } = converted;
         const changes = v3.path.reduce((sum, recording) => sum + recording.changes.length, 0);
         console.log(`  Version 3: ${kb(bytes.length)} → ${kb(file.length)}, ${v3.path.length} recording${v3.path.length === 1 ? '' : 's'}, ${changes} changes.`);
         const startedAt = Date.now();
         const { why, over } = await playOver(instance, row.dataSet, v3).catch((error: unknown) => ({ why: `does not play: ${error instanceof Error ? error.message : String(error)}`, over: null }));
         const seconds = ((Date.now() - startedAt) / 1000).toFixed(1);
         if (why) {
-            const before = await playVersion2(instance, v2).catch((error: unknown) => `does not play: ${error instanceof Error ? error.message : String(error)}`);
-            console.log(`  Version 3 ${why} (${seconds} s); version 2 ${before ?? 'plays to its point'}.`);
+            const before = await playOld(instance, old).catch((error: unknown) => `does not play: ${error instanceof Error ? error.message : String(error)}`);
+            console.log(`  Version 3 ${why} (${seconds} s); the old version ${before ?? 'plays to its point'}.`);
             if (!row.broken) {
                 console.log('  Not replaced.');
                 continue;
@@ -320,7 +328,7 @@ async function migrate(dryRun: boolean): Promise<void> {
         }
         remote.replace(row.id, fileDigest(bytes), file);
         replaced++;
-        console.log(`  Replaced; its row's size is ${file.length} bytes, and the old file is in the backups' recordings-v2/.`);
+        console.log(`  Replaced; its row's size is ${file.length} bytes, and the old file is in the backups' recordings-old/.`);
     }
     console.log(`\n${replaced} replaced.`);
 }

@@ -605,7 +605,7 @@ as the server finds it, converts it by a private copy of the old version's reade
 the new one back by the page's reader, plays it to its point with the working tree's
 engine over the instance's files, as the gate does, and only then puts it in place of the
 old file and sets its row's `size`. The old file is kept in
-`stats/backups/recordings-v2/<id>.gz`, moved there from `stats/backups/recordings/`, so
+`stats/backups/recordings-old/<id>.gz`, moved there from `stats/backups/recordings/`, so
 that the next backup copies the new one. A recording that does not play is not replaced,
 but for one broken already. `--dry-run` replaces nothing. Run it from the commit about to
 be deployed, then deploy at once: between the two, the deployed page cannot read the
@@ -786,7 +786,7 @@ once, through a `.partial` name renamed when whole, and kept for good, a deleted
 an edited set's old one included, since a snapshot still names it. The shared recordings'
 packages, which never change either but by a migration of their format, are copied the same way into
 `stats/backups/recordings/<id>.gz`; a migration moves the old copy to
-`stats/backups/recordings-v2/` (`utils/migrate-recording-packages.ts`, "Shared recordings", above). It prints one JSON line, `backup_ok` with the folders and
+`stats/backups/recordings-old/` (`utils/migrate-recording-packages.ts`, "Shared recordings", above). It prints one JSON line, `backup_ok` with the folders and
 the packages copied and the number of each kept, and exits with 1 when the store cannot be read or a folder cannot be copied
 (`backup_failed`). The crontab line, `doc/SETUP.md` step 28's (`docker-compose` under Compose v1), deletes the
 snapshots older than 14 days, and only them:
