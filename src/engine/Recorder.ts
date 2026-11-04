@@ -58,7 +58,7 @@ export function setCarriedState(game: Game, carried: CarriedState): void {
     Object.assign(ctx.loop, structuredClone(carried.loop));
 }
 
-/** Where a recording starts: a new game of its data set, or a save. */
+/** Where a recording starts: a new game of its data set, or a save, or, in a package, a join. */
 export type RecordingStart =
     /** A new game, its stream and `d.RandomGameID` as its read and its playthrough's draw left them. */
     | { readonly kind: 'new'; readonly random: number; readonly randomGameID: number }
@@ -66,7 +66,14 @@ export type RecordingStart =
      * A save's file, as it was read, and what the read left beside it. A recording the
      * store's version 7 wrote before the tree has no `carried`.
      */
-    | { readonly kind: 'save'; readonly bytes: Uint8Array; readonly carried?: CarriedState };
+    | { readonly kind: 'save'; readonly bytes: Uint8Array; readonly carried?: CarriedState }
+    /**
+     * A branch's in a package (`packaged`, `src/engine/RecordingPackage.ts`): the MD5 of
+     * the save's file it read, which its parent, played to its point (`Recording.parent`),
+     * makes again, and what the read left beside it. Only a branch of a path played whole
+     * starts so.
+     */
+    | { readonly kind: 'join'; readonly md5: string; readonly carried: CarriedState };
 
 /**
  * A point in a recording: its changes recorded before it, and its VBLs run. A save's,
@@ -95,15 +102,20 @@ export interface RecordingEnd {
     readonly word11694: boolean;
 }
 
-/** A change as the boundary told it, with the game's clock and stream as they stood. */
+/**
+ * A change as the boundary told it, with the game's clock and stream as they stood: on
+ * every change the recorder records and the store keeps, and where a package keeps them
+ * (`checkedChange`, `src/engine/RecordingPackage.ts`), the player checking them where
+ * they are.
+ */
 export interface RecordedChange {
     readonly change: InputChange;
     /** The VBLs the recording had run before it. */
     readonly vbl: number;
     /** `d.Time`. */
-    readonly time: number;
+    readonly time?: number;
     /** `d.RandomNumber`. */
-    readonly random: number;
+    readonly random?: number;
 }
 
 export interface Recording {

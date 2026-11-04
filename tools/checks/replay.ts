@@ -69,9 +69,14 @@
  *    F5's save in the branch, to the Sleepsave inside a VBL in the third, to the disk
  *    menu's save in each game, and to the lost game's end, each written, read back the
  *    same and played from the package alone, a save's path to the file its save holds,
- *    through its joins. A package whose save's
- *    file is not the path's drifts at its end; one whose form is wrong is refused. The
- *    replay tool's page (`tools/lib/playback.ts`) plays each the same, to the same game.
+ *    through its joins. A package keeps each change's clock and stream every 64th change
+ *    and at its recording's last, a branch's start as the MD5 of the file its parent
+ *    makes, and the save's file as its MD5. A package whose save's file is not the path's
+ *    drifts at its end, at the byte where the store's file is known and at none where its
+ *    MD5 alone is; one whose join's MD5 is not the parent's file drifts at the join; one
+ *    whose last change's stream is not the game's drifts there; one whose form is wrong
+ *    is refused. The replay tool's page (`tools/lib/playback.ts`) plays each the same, to
+ *    the same game.
  * 11. The viewer's RESTART (`rewindPage`, `src/renderer/ui/RecordingStrip.ts`): each
  *    package's path, stopped a second into its play in the replay tool's page, the page
  *    rewound and the path played again at ×8, paused a second in it, plays to the same
@@ -80,9 +85,9 @@
  *    it again to the same end.
  *
  * 12. A recording carries the engine's level and its set's files' digests, through the
- *    store and a package; a row, a head and a package of version 1, made before levels,
- *    read as level 0, naming no files. The player sets each recording's level before its
- *    read, and refuses a path of a later level before it plays.
+ *    store and a package; a row and a head made before levels read as level 0, naming no
+ *    files. The player sets each recording's level before its read, and refuses a path of
+ *    a later level before it plays.
  *
  * Run: `npm test -- --only=replay.ts`
  *
@@ -107,7 +112,7 @@ import { NO_EXTRAS } from '../../src/engine/GameContext';
 import { GameSaves } from '../../src/engine/GameSaves';
 import { Recorder, type Recording, type RecordingPoint } from '../../src/engine/Recorder';
 import {
-  packageOfEnd, packageOfSave, readRecordingPackage, RECORDING_PACKAGE_VERSION, RecordingPackageError, writeRecordingPackage, type RecordingPackage,
+  checkedChange, packageOfEnd, packageOfSave, readRecordingPackage, RecordingPackageError, writeRecordingPackage, type RecordingPackage,
 } from '../../src/engine/RecordingPackage';
 import { endLines, RecordingPlayer, skippedLine, type HeldSpan, type SavedAtEnd } from '../../src/engine/RecordingPlayer';
 import { RecordingWriter } from '../../src/engine/RecordingWriter';
@@ -829,7 +834,7 @@ async function replay(name: string, start: Start, script: (player: Player) => Pr
   if (begun.start.kind === 'new') {
     check(begun.start.random === recorded.game.ctx.random.getSeed() && begun.start.randomGameID === recorded.game.ctx.state.block1.randomGameID,
       `from the stream and the playthrough its read left (${begun.start.random.toString(16)}, ${begun.start.randomGameID.toString(16)})`);
-  } else {
+  } else if (begun.start.kind === 'save') {
     check(firstDifference(begun.start.bytes, start as Uint8Array) < 0, `from the save's file (${begun.start.bytes.length} bytes)`);
   }
   check(JSON.stringify(begun.extras) === JSON.stringify(START_EXTRAS) && JSON.stringify(begun.rules) === JSON.stringify(rules),
@@ -1122,12 +1127,38 @@ async function savePackage(recorded: Page, path: readonly Recording[], save: Sav
   const { drift, joins, point: at } = played.player!;
   check(drift === null && !played.player!.playing && joins === path.length - 1 && at.changes === point.changes && at.vbls === point.vbls,
     `played from the package to the save's point through ${joins} join${joins === 1 ? '' : 's'}, making the file the save holds${drift ? ` (drift ${JSON.stringify(drift)})` : ''}`);
+  const kept = pkg.path.every((recording) => recording.changes.every((entry, n) => (entry.time !== undefined) === checkedChange(n, recording.changes.length)));
+  check(kept && pkg.path.every((recording, n) => recording.start.kind === (n === 0 ? path[0]!.start.kind : 'join')) && pkg.shared.kind === 'save' && pkg.shared.md5 === fileDigest(file),
+    'its changes keep their clock and stream every 64th and at each recording\'s last, its branches start at a join, and its save is its file\'s MD5');
   const other = new Uint8Array(file);
   other[100] ^= 1;
   const tampered = Page.replay(pkg.path, null, { file: other, inVbl: point.inVbl === true });
   tampered.play();
   const parted = tampered.player!.drift;
-  check(parted?.kind === 'save' && parted.byte === 100, `and a package whose save's file is not the path's drifts at its end (${JSON.stringify(parted)})`);
+  check(parted?.kind === 'save' && parted.byte === 100, `and a path whose save's file is not the path's drifts at its end (${JSON.stringify(parted)})`);
+  const digested = Page.replay(pkg.path, null, { md5: fileDigest(other), inVbl: point.inVbl === true });
+  digested.play();
+  const unnamed = digested.player!.drift;
+  check(unnamed?.kind === 'save' && unnamed.byte === null, `and a package whose save's MD5 is not the path's file's drifts there, at no byte (${JSON.stringify(unnamed)})`);
+  const lastIndex = pkg.path.length - 1;
+  const lastChanges = pkg.path[lastIndex]!.changes;
+  if (lastChanges.length > 0) {
+    const restreamed = pkg.path.map((recording, n) => (n !== lastIndex ? recording : {
+      ...recording, changes: recording.changes.map((entry, i) => (i === lastChanges.length - 1 ? { ...entry, random: (entry.random! + 1) >>> 0 } : entry)),
+    }));
+    const restream = Page.replay(restreamed, null, pkg.shared.kind === 'save' ? pkg.shared : null);
+    restream.play();
+    const atChange = restream.player!.drift;
+    check(atChange?.kind === 'change' && atChange.change === lastChanges.length - 1, `and one whose last change's stream is not the game's drifts at that change (${JSON.stringify(atChange)})`);
+  }
+  if (pkg.path.length > 1) {
+    const rejoined = pkg.path.map((recording, n) => (n !== 1 || recording.start.kind !== 'join' ? recording : { ...recording, start: { ...recording.start, md5: fileDigest(other) } }));
+    const rejoin = Page.replay(rejoined, null, pkg.shared.kind === 'save' ? pkg.shared : null);
+    rejoin.play();
+    const atJoin = rejoin.player!.drift;
+    check(atJoin?.kind === 'join' && atJoin.recording === pkg.path[1]!.id && atJoin.byte === null,
+      `and one whose join's MD5 is not the file its parent makes drifts at the join, at no byte (${JSON.stringify(atJoin)})`);
+  }
   const ours = endLines(pkg.path, parted, 'replay', null);
   const theirs = endLines(pkg.path, parted, 'another', null);
   check(ours.length === 1 && theirs.length === 2 && theirs[1] === 'ANOTHER VERSION OF THE SITE MADE IT.' && endLines(pkg.path, null, 'replay', null)[0] === 'THE RECORDING ENDS HERE.',
@@ -1142,7 +1173,7 @@ async function refusals(pkg: RecordingPackage): Promise<void> {
   const wrong: [string, () => Promise<unknown>][] = [
     ['no gzip', () => readRecordingPackage(new TextEncoder().encode('{}'))],
     ['no JSON', async () => readRecordingPackage(await gzipped('{'))],
-    ['another version', async () => readRecordingPackage(await edited(pkg, (json) => { json.version = 3; }))],
+    ['another version', async () => readRecordingPackage(await edited(pkg, (json) => { json.version = 2; }))],
     ['a level not the last recording\'s', () => writeRecordingPackage({ ...pkg, level: pkg.level + 1 })],
     ['a negative level', async () => readRecordingPackage(await edited(pkg, (json) => { json.level = -1; json.path[1].level = -1; }))],
     ['a file\'s digest no MD5', async () => readRecordingPackage(await edited(pkg, (json) => { json.path[0].files['dungeon.dat'] = 'x'; }))],
@@ -1155,10 +1186,20 @@ async function refusals(pkg: RecordingPackage): Promise<void> {
     ['a parent played on past its child\'s point', () => writeRecordingPackage({ ...pkg, path: [{ ...root, vbls: root.vbls + 1 }, branch] })],
     ['a recording of another set', () => writeRecordingPackage({ ...pkg, path: [{ ...root, dataSet: 'other' }, branch] })],
     ['the game\'s end at a save\'s point', () => writeRecordingPackage({ ...pkg, path: [root, { ...branch, end: { word11694: false } }] })],
-    ['a read among its changes', async () => readRecordingPackage(await edited(pkg, (json) => { json.path[1].changes[0].change = { kind: 'read' }; }))],
+    ['a read among its changes', async () => readRecordingPackage(await edited(pkg, (json) => { json.path[1].changes[0] = [0, 'read']; }))],
+    ['a change with an argument too many', async () => readRecordingPackage(await edited(pkg, (json) => { json.path[1].changes[0].push(0); }))],
+    ['a change before the one before', async () => readRecordingPackage(await edited(pkg, (json) => { json.path[1].changes[0][0] = -1; }))],
+    ['a check out of order', async () => readRecordingPackage(await edited(pkg, (json) => { json.path[0].checks.push(json.path[0].checks[0]); }))],
+    ['a check of no change', async () => readRecordingPackage(await edited(pkg, (json) => { json.path[0].checks.push([json.path[0].changes.length, 0, 0]); }))],
+    ['a check without its stream', async () => readRecordingPackage(await edited(pkg, (json) => { json.path[0].checks[0].pop(); }))],
+    ['a clock checked without its stream', () => writeRecordingPackage({ ...pkg, path: [{ ...root, changes: root.changes.map((entry, n) => (n === 0 ? { change: entry.change, vbl: entry.vbl, time: 0 } : entry)) }, branch] })],
+    ['a branch from a save\'s file', async () => readRecordingPackage(await edited(pkg, (json) => { json.path[1].start = { kind: 'save', bytes: '' }; }))],
+    ['a root at a join', async () => readRecordingPackage(await edited(pkg, (json) => { json.path[0].start = json.path[1].start; }))],
+    ['a join\'s MD5 no MD5', async () => readRecordingPackage(await edited(pkg, (json) => { json.path[1].start.md5 = 'x'; }))],
+    ['a save shared as its file', async () => readRecordingPackage(await edited(pkg, (json) => { json.shared = { kind: 'save', file: '', inVbl: false }; }))],
     ['a rule too many', async () => readRecordingPackage(await edited(pkg, (json) => { json.path[0].rules.more = false; }))],
     ['a clock stopped by no dialog the page has', async () => readRecordingPackage(await edited(pkg, (json) => {
-      for (const recording of json.path) for (const entry of recording.changes) if (entry.change.kind === 'pause' && entry.change.paused) entry.change.dialog = 'other';
+      for (const recording of json.path) for (const row of recording.changes) if (row[1] === 'pause' && row[2]) row[3] = 'other';
     }))],
     ['a loop flag of another type', async () => readRecordingPackage(await edited(pkg, (json) => { json.path[1].start.carried.loop.moveHistory = [0]; }))],
   ];
@@ -1172,8 +1213,7 @@ async function refusals(pkg: RecordingPackage): Promise<void> {
 
 /**
  * A recording's level and profile (`src/engine/Behaviour.ts`): the engine's behaviour by
- * level and profile, the store's row and head of before levels, a package of version 1,
- * and a path of a later level or an unknown profile refused before it plays. `pkg` is a
+ * level and profile, the store's row and head of before levels, and a path of a later level or an unknown profile refused before it plays. `pkg` is a
  * path of two, each recording at the engine's level and no profile, which the player sets
  * before each read.
  */
@@ -1210,24 +1250,10 @@ async function levels(pkg: RecordingPackage): Promise<void> {
   const leveled = (await readRecordingPackage(await writeRecordingPackage(pkg))).path;
   check(pkg.level === ENGINE_LEVEL && leveled.every((recording) => recording.level === ENGINE_LEVEL && JSON.stringify(recording.files) === JSON.stringify(DIGESTS)),
     `a package carries the shared recording's level, ${pkg.level}, and each recording's own and its files' digests`);
-  const v1 = await readRecordingPackage(await edited(pkg, (json) => {
-    json.version = 1;
-    delete json.level;
-    for (const recording of json.path) {
-      delete recording.level;
-      delete recording.files;
-    }
-  }));
-  check(v1.version === RECORDING_PACKAGE_VERSION && v1.level === 0 && v1.path.every((recording) => recording.level === 0 && recording.files === null),
-    'a package of version 1, made before levels, reads as this version\'s: each recording of level 0, naming no files');
   const atProfile: RecordingPackage = { ...pkg, path: pkg.path.map((recording) => ({ ...recording, profile })) };
   const carried = (await readRecordingPackage(await writeRecordingPackage(atProfile))).path;
-  const unprofiled = (await readRecordingPackage(await edited(pkg, (json) => {
-    for (const recording of json.path) delete recording.profile;
-  }))).path;
-  check(pkg.path.every((recording) => recording.profile === null) && carried.every((recording) => recording.profile === profile)
-    && unprofiled.every((recording) => recording.profile === null) && v1.path.every((recording) => recording.profile === null),
-    `a package carries each recording's profile, ${profile} or none, and one written before profiles reads as none`);
+  check(pkg.path.every((recording) => recording.profile === null) && carried.every((recording) => recording.profile === profile),
+    `a package carries each recording's profile, ${profile} or none`);
 
   const store = memoryRecordingStore({ now: false });
   const [root] = pkg.path as [Recording, Recording];
@@ -1353,13 +1379,12 @@ async function measure(): Promise<void> {
     { recordedAt: store.entries.get(path[0]!.id)!.recordedAt, endedAt: save.savedAt, playTime: save.playTime });
   const file = await writeRecordingPackage(pkg);
   const changes = pkg.path.reduce((sum, recording) => sum + recording.changes.length, 0);
+  const checks = pkg.path.reduce((sum, recording) => sum + recording.changes.filter((entry) => entry.time !== undefined).length, 0);
   const branches = pkg.path.length - 1;
-  const unsaved = { ...pkg, path: pkg.path.map((recording, n) => (n === 0 || recording.start.kind !== 'save' ? recording : { ...recording, start: { ...recording.start, bytes: new Uint8Array(0) } })) };
-  const bare = (await writeRecordingPackage({ ...unsaved, shared: { kind: 'save', file: new Uint8Array(0), inVbl: false } })).length;
-  const json = new TextEncoder().encode(JSON.stringify(pkg, (_, value: unknown) => (value instanceof Uint8Array ? 'x'.repeat(Math.ceil(value.length / 3) * 4) : value))).length;
+  const json = (await new Response(new Blob([new Uint8Array(file)]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()).byteLength;
   console.log(`  played: ${recorded.game.input.vbls} VBLs, ${changes} changes on its path, ${branches} branches, in ${((Date.now() - began) / 1000).toFixed(1)} s`);
   console.log(`  package: ${file.length} bytes gzipped, ${json} bytes of JSON`);
-  console.log(`  a change: ${(bare / changes).toFixed(1)} bytes; a save's file: ${((file.length - bare) / (branches + 1)).toFixed(0)} bytes (${(await recorded.store.read(save.id)).length} bytes raw)`);
+  console.log(`  a change: ${(file.length / changes).toFixed(1)} bytes, ${checks} of them with their clock and stream; a save's file, ${(await recorded.store.read(save.id)).length} bytes, is none of it`);
   const playedAt = Date.now();
   const played = Page.replay(pkg.path, null, pkg.shared.kind === 'save' ? pkg.shared : null);
   played.play();

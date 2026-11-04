@@ -2,8 +2,9 @@
  * The corpus of the port's own recordings (`doc/RECORDING.md` → "The corpus"): packages kept in `tools/fixtures/recordings/`, each named for what it plays
  * and the engine's level it was made at, `<name>.L<level>.gz`, which
  * `tools/checks/recording-corpus.ts` plays at their levels. A package written here is
- * never rewritten: at a level of its own, it is the proof that the flags of the levels
- * after it keep its behaviour.
+ * never rewritten but by a migration of the package's format that keeps its content
+ * (`utils/migrate-recording-packages.ts --file`): at a level of its own, it is the proof
+ * that the flags of the levels after it keep its behaviour.
  */
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 

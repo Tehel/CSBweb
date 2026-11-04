@@ -17,9 +17,9 @@
  *
  * Each set the instance lists (`api/data-sets`) has its recordings listed
  * (`api/recordings?dataSet=<id>`), and each that is not broken yet has its package
- * fetched (`recordings/<id>.gz`), read by the page's reader (`readRecordingPackage`) and
+ * fetched (`recordingPackageUrl`), read by the page's reader (`readRecordingPackage`) and
  * played, from the package alone, in a page without the DOM over the files as the
- * instance serves them (`playPath`, `tools/lib/playback.ts`): those of the set the page
+ * instance serves them (`playOver`, `utils/lib/instanceRecordings.ts`): those of the set the page
  * would play it over, found by its files' digests (`findRecordingSet`, against
  * `api/data-set-files`; from an instance whose build predates that route, the digests of
  * the files it serves, which are those the route digests), its own or another whose files
@@ -43,12 +43,9 @@ import { spawnSync } from 'node:child_process';
 import { stdin, stdout } from 'node:process';
 import { createInterface } from 'node:readline/promises';
 
-import { fileDigest, folderFiles } from '../src/data/DataSetFiles';
-import { DATA_SET_FILES_ROUTE, DATA_SETS_ROUTE, GAME_FILES, parseManifest, PLAYER_ID_HEADER, RECORDING_FILES, RECORDINGS_ROUTE, SHARED_RECORDING_ID, type DataSet } from '../src/data/DataSets';
-import { findRecordingSet, parseSetDigests, type SetDigests } from '../src/data/RecordingSet';
-import { readRecordingPackage } from '../src/engine/RecordingPackage';
-import type { Drift } from '../src/engine/RecordingPlayer';
-import { keptFiles, playPath } from '../tools/lib/playback';
+import { PLAYER_ID_HEADER, RECORDINGS_ROUTE, SHARED_RECORDING_ID, type DataSet } from '../src/data/DataSets';
+import { readRecordingPackage, recordingPackageUrl } from '../src/engine/RecordingPackage';
+import { fetchOk, playOver, readInstance, type Instance } from './lib/instanceRecordings';
 
 function fail(message: string): never {
     console.error(message);
@@ -60,7 +57,7 @@ function argument(name: string): string | null {
     return at >= 0 ? process.argv[at + 1] ?? null : null;
 }
 
-const instance = (argument('--instance') ?? fail('--instance <url> is needed: the CSBweb instance whose recordings to replay')).replace(/\/+$/, '');
+const instanceUrl = (argument('--instance') ?? fail('--instance <url> is needed: the CSBweb instance whose recordings to replay')).replace(/\/+$/, '');
 const player = argument('--player') ?? fail('--player <playerId> is needed: a moderator of the instance');
 if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(player)) fail('--player is not a playerId, a lowercase UUID');
 const breaking = process.argv.includes('--break');
@@ -81,12 +78,6 @@ async function ask(question: string): Promise<string> {
     return line.value.trim().toLowerCase();
 }
 
-async function fetchOk(url: string, init: RequestInit = {}): Promise<Response> {
-    const response = await fetch(url, init);
-    if (!response.ok) throw new Error(`${url} answered HTTP ${response.status}`);
-    return response;
-}
-
 /** What the script reads of a recording the instance lists (`recordingsText`, `server/recordings.ts`). */
 interface Listed {
     id: string;
@@ -104,40 +95,6 @@ interface Drifted {
     why: string;
 }
 
-/** `drift` as a line says it. */
-function driftText(drift: Drift): string {
-    switch (drift.kind) {
-        case 'change': return `drifts at change ${drift.change} of ${drift.recording}: d.Time ${drift.time}, random ${drift.random}`;
-        case 'join': return `drifts at the join of ${drift.recording}: its file differs at byte ${drift.byte}`;
-        case 'save': return `drifts at the save shared: its file differs at byte ${drift.byte}`;
-        case 'end': return drift.word11694 === null
-            ? `drifts at the end of ${drift.recording}: the game did not end`
-            : `drifts at the end of ${drift.recording}: the game ended at VBL ${drift.vbls}, ${drift.word11694 ? 'won' : 'lost'}`;
-    }
-}
-
-/**
- * The digests of each game file of the sets `served` holds: the instance's
- * `api/data-set-files`, or, where it answers 404, a build from before that route, those
- * of the files it serves, which the route digests from the same folders.
- */
-async function setDigests(served: Served): Promise<SetDigests[]> {
-    const response = await fetch(`${instance}/${DATA_SET_FILES_ROUTE}`, { headers: asPlayer });
-    if (response.status !== 404) {
-        if (!response.ok) throw new Error(`${instance}/${DATA_SET_FILES_ROUTE} answered HTTP ${response.status}`);
-        return parseSetDigests(await response.text(), new Map([...served.values()].map(({ set }) => [set.id, set.name])));
-    }
-    console.log(`${instance} has no ${DATA_SET_FILES_ROUTE}, so the files it serves are digested here.`);
-    return Promise.all([...served.values()].map(async ({ set, files }) => {
-        const digests: Record<string, string> = {};
-        for (const name of GAME_FILES) {
-            const bytes = await files.read(name);
-            if (bytes) digests[name] = fileDigest(bytes);
-        }
-        return { id: set.id, name: set.name, files: digests };
-    }));
-}
-
 /** The commit this working tree is, as the deploy names its build. */
 function checkoutBuild(): string {
     const head = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf8' });
@@ -145,41 +102,29 @@ function checkoutBuild(): string {
     return `${head.stdout.trim() || 'an unknown commit'}${changed.stdout.trim() ? ', its src/ changed' : ''}`;
 }
 
-/** The sets the instance lists, by id: each with its files as the instance serves them, read once. */
-type Served = ReadonlyMap<string, { set: DataSet; files: ReturnType<typeof keptFiles> }>;
-
 /**
  * `recording` of `set` played from its package over the set the page would play it over
- * (`findRecordingSet`): why it does not play to its point, `null` where it does, and the
- * set it played over where that is another.
+ * (`playOver`): why it does not play to its point, `null` where it does, and the set it
+ * played over where that is another.
  */
-async function replay(set: DataSet, served: Served, digests: readonly SetDigests[], recording: Listed): Promise<{ why: string | null; over: string | null }> {
-    const result = (why: string | null, over: string | null = null) => ({ why, over });
+async function replay(instance: Instance, set: DataSet, recording: Listed): Promise<{ why: string | null; over: string | null }> {
     try {
-        const bytes = new Uint8Array(await (await fetchOk(`${instance}/${RECORDING_FILES}/${recording.id}.gz`)).arrayBuffer());
-        const pkg = await readRecordingPackage(bytes);
-        if (pkg.dataSet !== set.id) return result(`its package plays ${pkg.dataSet}, not ${set.id}`);
-        const found = findRecordingSet(pkg.path, digests);
-        if (found.kind === 'refused') return result(`is refused: ${found.why}`);
-        const over = served.get(found.id);
-        if (!over) return result(`plays over ${found.id}, which the instance does not list`);
-        const played = await playPath(over.set, over.files, pkg.path, pkg.shared.kind === 'save' ? pkg.shared : null);
-        return result(played.drift ? driftText(played.drift) : null, over.set.id === set.id ? null : over.set.id);
+        const bytes = new Uint8Array(await (await fetchOk(`${instance.url}/${recordingPackageUrl(recording.id)}`)).arrayBuffer());
+        return await playOver(instance, set.id, await readRecordingPackage(bytes));
     } catch (error) {
-        return result(`does not play: ${error instanceof Error ? error.message : String(error)}`);
+        return { why: `does not play: ${error instanceof Error ? error.message : String(error)}`, over: null };
     }
 }
 
 async function main(): Promise<void> {
-    console.log(`Replaying ${instance}'s recordings against ${checkoutBuild()}.`);
-    const manifest = parseManifest(await (await fetchOk(`${instance}/${DATA_SETS_ROUTE}`, { headers: asPlayer })).text(), `${instance}/gamefiles`);
-    if (!manifest.moderator) fail(`${instance} refuses: --player is not one of its moderators, so its lists would leave recordings out.`);
-    const served: Served = new Map(manifest.dataSets.map((set) => [set.id, { set, files: keptFiles(folderFiles(set.dir)) }]));
-    const digests = await setDigests(served);
+    console.log(`Replaying ${instanceUrl}'s recordings against ${checkoutBuild()}.`);
+    const instance = await readInstance(instanceUrl, asPlayer);
+    const { manifest } = instance;
+    if (!manifest.moderator) fail(`${instanceUrl} refuses: --player is not one of its moderators, so its lists would leave recordings out.`);
     const drifted: Drifted[] = [];
     let played = 0;
     for (const set of manifest.dataSets) {
-        const url = `${instance}/${RECORDINGS_ROUTE}?dataSet=${encodeURIComponent(set.id)}`;
+        const url = `${instanceUrl}/${RECORDINGS_ROUTE}?dataSet=${encodeURIComponent(set.id)}`;
         const listed = (JSON.parse(await (await fetchOk(url, { headers: asPlayer })).text()) as { recordings: Listed[] }).recordings;
         const toPlay = listed.filter((recording) => !recording.broken && SHARED_RECORDING_ID.test(recording.id));
         if (toPlay.length === 0) continue;
@@ -187,7 +132,7 @@ async function main(): Promise<void> {
             + `${listed.length > toPlay.length ? `, and ${listed.length - toPlay.length} broken already` : ''}`);
         for (const recording of toPlay) {
             const state = recording.status === 'pending' ? ', pending' : recording.hidden ? ', hidden' : '';
-            const { why, over } = await replay(set, served, digests, recording);
+            const { why, over } = await replay(instance, set, recording);
             played++;
             console.log(`  ${why ? '✗' : '✓'} ${recording.id} '${recording.title}' (build ${recording.build}${state}): ${why ?? 'plays to its point'}${over ? `, over ${over}'s files` : ''}`);
             if (why) drifted.push({ set, recording, why });
@@ -207,10 +152,10 @@ async function main(): Promise<void> {
         const answer = await ask(`  Mark it broken? [y]es, [n]o, [q]uit: `);
         if (answer === 'q') break;
         if (answer !== 'y') continue;
-        const response = await fetch(`${instance}/${RECORDINGS_ROUTE}/${recording.id}`, {
+        const response = await fetch(`${instanceUrl}/${RECORDINGS_ROUTE}/${recording.id}`, {
             method: 'POST', headers: { ...asPlayer, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'break' }),
         });
-        if (response.status === 403) fail(`  ${instance} refuses: --player is not one of its moderators.`);
+        if (response.status === 403) fail(`  ${instanceUrl} refuses: --player is not one of its moderators.`);
         if (!response.ok) {
             console.log(`  Not marked: HTTP ${response.status} ${await response.text()}`);
             continue;

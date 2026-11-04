@@ -20,7 +20,9 @@
  * `BACKUP_DIR`, through a `.partial` name renamed when whole, and kept: an older snapshot
  * needs the folders of its rows, a deleted set's and an edited set's old one included.
  * A recording's package, `<id>.gz`, is never changed either, and is copied once in the same
- * way, into `recordings/` under `BACKUP_DIR`.
+ * way, into `recordings/` under `BACKUP_DIR`. A migration of the package's format, the one
+ * change it may have, moves the copy aside first (`utils/migrate-recording-packages.ts`),
+ * so that the next run copies the new file.
  *
  * It prints one JSON line, and exits with 1 when the store cannot be read or a folder or a
  * package cannot be copied.

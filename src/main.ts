@@ -9,7 +9,7 @@ import { VBL_FREQUENCY } from './core/constants';
 import { CsbRandom } from './core/random';
 import { extractPresetHeroes } from './data/HeroExtractor';
 import {
-    DATA_SET_FILES_ROUTE, DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, dataSetNamed, parseManifest, PLAYER_ID_HEADER, RECORDING_FILES, SHARED_RECORDING_ID, THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH,
+    DATA_SET_FILES_ROUTE, DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, dataSetNamed, parseManifest, PLAYER_ID_HEADER, SHARED_RECORDING_ID, THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH,
     thumbnailPath, type DataSet, type DataSetManifest,
 } from './data/DataSets';
 import { digestedFiles, fileDigest, folderFiles, loadGameFiles, type DataSetFiles, type DigestedFiles, type GameFiles } from './data/DataSetFiles';
@@ -53,7 +53,7 @@ import { endLines, RecordingPlayer, skippedLine, type SavedAtEnd } from './engin
 import {
     drawRecordingStrip, nextPace, rewindPage, stripActionAt, stripKeyAction, timePlayed, type Pace, type StripAction, type StripState,
 } from './renderer/ui/RecordingStrip';
-import { packageOfSave, readRecordingPackage, writeRecordingPackage } from './engine/RecordingPackage';
+import { packageOfSave, readRecordingPackage, recordingPackageUrl, writeRecordingPackage } from './engine/RecordingPackage';
 import { pointPath, SAVE_POINT_PREFIX, storedPoints } from './engine/RecordingPoints';
 import type { Recording } from './engine/Recorder';
 import { applySaveBytes } from './engine/SaveGameFile';
@@ -856,12 +856,12 @@ async function readPlayedRecording(id: string): Promise<PlayedPath> {
 
 /**
  * The site's recording `id`, read from its package as the server serves it
- * (`RECORDING_FILES/<id>.gz`), its form checked (`readRecordingPackage`): its path, and
+ * (`recordingPackageUrl`), its form checked (`readRecordingPackage`): its path, and
  * the save its end makes where it was shared at a save's point. A package the server does
  * not serve, or whose form is wrong, ends the page as an error does.
  */
 async function fetchSharedRecording(id: string): Promise<PlayedPath> {
-    const url = `${RECORDING_FILES}/${id}.gz`;
+    const url = recordingPackageUrl(id);
     const response = await fetch(url).catch(() => null);
     if (!response?.ok) throw new Error(`Cannot read the recording '${url}'${response ? ` (HTTP ${response.status})` : ''}.`);
     const pkg = await readRecordingPackage(new Uint8Array(await response.arrayBuffer()));

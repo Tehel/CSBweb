@@ -362,7 +362,11 @@ function route({ distDir, gamefilesDir, filesDir }: ServerOptions, api: ApiOptio
     return serveFile(req, res, join(distDir, ...segments), segments[0] === 'assets' ? IMMUTABLE : NO_CACHE);
 }
 
-/** A shared recording's package, as `RECORDING_FILES/` serves it: never changed once written (`recordings.ts`). */
+/**
+ * A shared recording's package, as `RECORDING_FILES/` serves it: never changed once written
+ * but by a migration of its format, which the page's URL names (`recordings.ts`,
+ * `recordingPackageUrl`).
+ */
 const RECORDING_FILE = /^[0-9A-F]{16}\.gz$/;
 
 /** What `answerStats` needs of the API. */

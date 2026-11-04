@@ -551,13 +551,16 @@ refused ones included. The server reads it with the page's own reader, which che
 never replays it, refuses one that holds a move of `?dev`, and keeps it as
 `RECORDINGS_DIR/<id>.gz` under an id it draws, sixteen uppercase hexadecimal digits, with a
 row of the store's `recordings` table, pending, its metadata the package's and its
-uploader's `playerId` beside them. The packages may take 1 GiB together, some three
+uploader's `playerId` beside them. The packages may take 1 GiB together, some thirty
 thousand hours of play; past that a share is refused with 507. A recording is listed to
 everyone once a moderator approves it, unless one hid it or the replay tool broke it ("Deploying", below), and
 to its uploader and the moderators in every state. Its uploader deletes it whenever they
 like; a moderator approves, hides, shows, breaks and deletes it. Each change is notified
-("Notifications", above). A package never changes after: it is served `immutable`, and
-copied once by the backup (below).
+("Notifications", above). A package never changes after, but by a migration of its
+format that keeps its content (below): it is served `immutable`, and copied once by the
+backup (below). The page asks for it with the format's version, `recordings/<id>.gz?v=3`
+(`recordingPackageUrl`), which the server ignores, so that a browser holding a copy of
+another version under the same id asks anew; the id, and every link to it, stays.
 
 The dev server answers `api/recordings` and serves `recordings/<id>.gz` as the server does
 (`vite.config.mts`), with the page's own reader of a package, over a store of its own in
@@ -586,6 +589,27 @@ first Ant Men. The minimum item picking runs need `dm-minimum-item-picking`, whi
 whose title the instance already lists on its set is not offered again. The instance must run a
 build whose package reader takes the `playfile` change, the draws a CSBWin run carries; an
 older one refuses each.
+
+**A new version of the package's format** (`doc/RECORDING.md` → "Shared recordings") is met by
+migrating the site's packages before the build that reads it is deployed, since the deploy's
+gate reads them with it:
+
+```bash
+npx tsx utils/migrate-recording-packages.ts [--dry-run]
+```
+
+reads the local `.env`'s target, as `deploy.sh` does (`DEPLOY_HOST`, `DEPLOY_DIR`,
+`DEPLOY_INSTANCE`, `DEPLOY_PLAYER`), lists the store's recordings over SSH, and asks a yes
+for each. A yes downloads its package through the container's Node, from `RECORDINGS_DIR`
+as the server finds it, converts it by a private copy of the old version's reader, reads
+the new one back by the page's reader, plays it to its point with the working tree's
+engine over the instance's files, as the gate does, and only then puts it in place of the
+old file and sets its row's `size`. The old file is kept in
+`stats/backups/recordings-v2/<id>.gz`, moved there from `stats/backups/recordings/`, so
+that the next backup copies the new one. A recording that does not play is not replaced,
+but for one broken already. `--dry-run` replaces nothing. Run it from the commit about to
+be deployed, then deploy at once: between the two, the deployed page cannot read the
+packages migrated.
 
 ## The image and the stack
 
@@ -760,8 +784,9 @@ It then copies the folders the snapshot's sets live in, every set's, into
 any set a new folder, the site's too. A folder is whole before a row names it and never changes after, so each is copied
 once, through a `.partial` name renamed when whole, and kept for good, a deleted set's and
 an edited set's old one included, since a snapshot still names it. The shared recordings'
-packages, which never change either, are copied the same way into
-`stats/backups/recordings/<id>.gz`. It prints one JSON line, `backup_ok` with the folders and
+packages, which never change either but by a migration of their format, are copied the same way into
+`stats/backups/recordings/<id>.gz`; a migration moves the old copy to
+`stats/backups/recordings-v2/` (`utils/migrate-recording-packages.ts`, "Shared recordings", above). It prints one JSON line, `backup_ok` with the folders and
 the packages copied and the number of each kept, and exits with 1 when the store cannot be read or a folder cannot be copied
 (`backup_failed`). The crontab line, `doc/SETUP.md` step 28's (`docker-compose` under Compose v1), deletes the
 snapshots older than 14 days, and only them:

@@ -125,9 +125,13 @@ export async function pruneRecordings(
     for (const { id, point } of plan.cut) await store.cut(id, point);
 }
 
-/** `start`'s playthrough: a new game's `d.RandomGameID`, or the one its save's file holds. */
+/**
+ * `start`'s playthrough: a new game's `d.RandomGameID`, or the one its save's file holds;
+ * 0 for a package's join, whose file the page's recorder never begins at.
+ */
 function playthroughOf(start: RecordingStart): number {
-    return start.kind === 'new' ? start.randomGameID : readSaveFileFields(start.bytes)?.playthrough ?? 0;
+    if (start.kind === 'new') return start.randomGameID;
+    return start.kind === 'save' ? readSaveFileFields(start.bytes)?.playthrough ?? 0 : 0;
 }
 
 export class RecordingWriter {

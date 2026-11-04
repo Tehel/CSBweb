@@ -24,7 +24,9 @@
  * (`dataSets.ts`), so no answer holds one, and the package names its author by the name
  * the player gave, or by nobody.
  *
- * A package is never changed after: `backup.ts` copies each file once. Its id is drawn by
+ * A package is never changed after, but by a migration of the package's format that keeps
+ * its content (`utils/migrate-recording-packages.ts`, `doc/RECORDING.md` → "Shared recordings"):
+ * `backup.ts` copies each file once. Its id is drawn by
  * the server, sixteen uppercase hexadecimal digits (`SHARED_RECORDING_ID`), so whoever
  * holds a pending recording's file holds its id, which only its uploader and the
  * moderators are listed.
@@ -61,10 +63,10 @@ CREATE TABLE IF NOT EXISTS recordings (
 CREATE INDEX IF NOT EXISTS recordings_by_set ON recordings (data_set, uploaded_at);
 `;
 
-/** The largest package a recording is shared as, gzipped: an hour of a new game is 340 KB (`doc/RECORDING.md` → "What a package costs"). */
+/** The largest package a recording is shared as, gzipped: four hours of a new game are 143 KB (`doc/RECORDING.md` → "What a package costs"). */
 export const MAX_RECORDING_BYTES = 8 * 1024 * 1024;
 
-/** The most a package may unzip to: an hour's is 930 KB. */
+/** The most a package may unzip to: four hours' are 1 MB. */
 export const MAX_RECORDING_UNZIPPED_BYTES = 32 * 1024 * 1024;
 
 /** The largest request `POST RECORDINGS_ROUTE` reads: a package, and the form around it. */

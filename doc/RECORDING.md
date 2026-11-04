@@ -385,7 +385,10 @@ digests against the sets' files, to find the set it plays over ("The set a recor
 over", below), then plays it from the package alone over that set
 (`playPath`), each recording at its own level, to its point without a drift. A package is
 never rewritten: at its level, it proves the flags of every later level keep its
-behaviour.
+behaviour. A new version of the package's format is the one exception, since the page
+reads the latest alone: each package is converted in place, its name and its content kept
+(`utils/migrate-recording-packages.ts --file`), in the commit that changes the format,
+and plays to the same point, `d.Time`, `d.RandomNumber` and file before and after.
 
 It holds CSBWin's runs (`CSBWIN_RUNS`, below: forty minutes of Dungeon Master to its end
 each from 17.6, Chaos Strikes Back to Fulya Pit, and `DMMovie42`, 11.017's Dungeon Master
@@ -488,8 +491,10 @@ CSBWin's player can align an entry only with a tick, `d.Time`, so whatever the g
 in VBLs within a tick (the held-step test, the eye held, the attack menu's tick) must come
 out the same wherever in the tick the entry falls, and playback turns `extraTicks` off.
 Counted in VBLs, the game is a function of its start, its VBLs and the log, whatever
-happens within a tick. Each change still carries `d.Time` and `d.RandomNumber`, CSBWin's
-drift detector: a replay stops at the first that differs.
+happens within a tick. Each change the store keeps still carries `d.Time` and
+`d.RandomNumber`, CSBWin's drift detector, and a package keeps them every 64th change and
+at each recording's last ("Shared recordings", below): a replay stops at the first that
+differs.
 
 Logging the boundary rather than the entries the queue takes replays the queue itself: a
 click a full queue drops, and the button a click turns out to be when it is taken.
@@ -513,15 +518,19 @@ a root and the branches down to the one played, or a branch alone, from its own 
   runs them.
 - **The joins.** Where a parent reaches the point its child names, the child's file is
   read, its `CarriedState` set over it, its rules and extras set, and its changes follow.
+  A package's branch names the file by its MD5 alone (`RecordingStart`'s `join`): the
+  file the parent makes there is checked against it, then read.
 - **The drift detector.** Each change's `d.Time` and `d.RandomNumber` are checked before
-  it is applied, and at each join the file the parent makes now, as the recorded save
-  made it (`saveFileOf`, `src/engine/GameSaves.ts`), against the file the child read;
-  at a point taken inside a VBL, the file that VBL made (below); and a recording the
-  game's end ended is played to it, the game ending in its last VBL with its
+  it is applied, where the recording keeps them (a package, every 64th change and each
+  recording's last), and at each join the file the parent makes now, as the recorded save
+  made it (`saveFileOf`, `src/engine/GameSaves.ts`), against the file the child read, or
+  its MD5; at a point taken inside a VBL, the file that VBL made (below); and a recording
+  the game's end ended is played to it, the game ending in its last VBL with its
   `d.Word11694`, and a game that ends anywhere else drifts there; a path shared at a
   save's point is played to that point, and the file the game makes there checked
-  against the save's (`SavedAtEnd`), as a join's.
-  The first that differs stops the player (`RecordingPlayer.drift`).
+  against the save's, or a package's MD5 of it (`SavedAtEnd`), as a join's.
+  The first that differs stops the player (`RecordingPlayer.drift`), which names the
+  first byte that differs where it has the file, and none where it has its MD5.
 - **What the game opens in a VBL** does its game half alone while a recording plays
   (`InputBoundary.playing`), and shows nothing: the disk menu its icon opens, and the
   prison's question, `TAG02076e`, the video mode and the clock held (`openSaveMenu`); the
@@ -541,8 +550,8 @@ needs no `?dungeon=`, and one that names another set ends the page as an error. 
 store holds to its point, played to it and the save's file checked there, as a site's
 (`readSavePoint`). A site's, sixteen uppercase
 hexadecimal digits (`SHARED_RECORDING_ID`), is its package's path ("Shared recordings",
-below), read from the server (`recordings/<id>.gz`) and never put in the store, played to
-the point it was shared at, a save's file checked there. Every tick is drawn at
+below), read from the server (`recordings/<id>.gz?v=3`, `recordingPackageUrl`) and never
+put in the store, played to the point it was shared at, a save's file checked there. Every tick is drawn at
 the wall clock's pace, times the viewer's (below). A span the clock is held through (`RecordingPlayer.held`), from the
 change or the VBL that held it to the change that lets it run, is played at once and not
 drawn (`Game.runAtOnceWhile`): its VBLs cannot be dropped, since a held clock still counts
@@ -713,22 +722,51 @@ where the site would refuse it, and the panel says why: a local set, a pending o
 path that holds a move of `?dev` (`playedWithDevMoves`).
 
 **The package** (`RecordingPackage`, `src/engine/RecordingPackage.ts`) is one file,
-JSON gzipped by `CompressionStream`: the format's version, 2, the build and the level of
-the recording shared, its data set, the metadata, the path and the point shared. A
-package of version 1, written before levels, still reads: each recording of its path of
-level 0, naming no files. The point is a
-save's (`packageOfSave`): the path the store holds to the save's recording
-(`readRecordingPath`), the last recording cut at the save's point, and the save's file,
-which the path played to its end makes again, at a point taken inside a VBL as the
-Sleepsave's is too. Or the game's end (`packageOfEnd`): the path to a recording the end
-ended, which its replay reaches. Every recording before the last is cut at the point its
-child joins it, so the package holds what the player plays and nothing after it. Each
-recording is as the store holds it (`Recording`), a save's file in base64. The metadata
-are the player's title, which it needs, author and description, plain text as long as a
-set's name, authors and description may be (`RECORDING_TEXT_LIMITS`); when the path's
-root began, when its point was made, the game's play time there (`Game.playTime`); and
-where it starts, a new game or the save's level and champions, which is read from the
-root, so it cannot disagree with it.
+JSON gzipped by `CompressionStream`: the format's version, 3, the build and the level of
+the recording shared, its data set, the metadata, the path and the point shared. A package
+of another version is refused. The point is a save's (`packageOfSave`): the path the store
+holds to the save's recording (`readRecordingPath`), the last recording cut at the save's
+point, and the MD5 of the save's file, which the path played to its end makes again, at a
+point taken inside a VBL as the Sleepsave's is too (`{kind: 'save', md5, inVbl}`). Or the
+game's end (`packageOfEnd`, `{kind: 'end'}`): the path to a recording the end ended, which
+its replay reaches. Every recording before the last is cut at the point its child joins
+it, so the package holds what the player plays and nothing after it.
+
+A package holds what its replay needs, and nothing the replay makes again (`packaged`).
+Each recording of its path holds its `id`, `build`, `level`, `profile`, `files`, `start`,
+`rules`, `extras`, `vbls`, `end`, `changes` and `checks`. What the store keeps beside them
+is the path's own: the set is the package's, the parent is always the recording before at
+its end, and every recording is ended. Its `start` is a new game's stream and playthrough,
+`{kind: 'new', random, randomGameID}`, or a save's file in base64 with what its read left,
+`{kind: 'save', bytes, carried}`, for the root alone; a branch's is a join,
+`{kind: 'join', md5, carried, inVbl?}`: the MD5 of the file the recorded read read, which
+its parent, played to the point, makes again ("The joins", above), and whether that point
+was taken inside a VBL. Each change is a row, `[VBLs since the change before, kind,
+...arguments]`, its arguments in a fixed order the reader writes out (`changeRow`): a
+`click`'s `x, y, buttons`, a `key`'s `num`, a `panelKey`'s `action`, a `reincarnateKey`'s
+`key`, a `reincarnateClick`'s `x, y`, a `pause`'s `paused` and its `dialog` where it names
+one, an `extras`' extras, a `devLevel`'s `delta`, a `devMove`'s `map, x, y`, a `playfile`'s
+`num, y`, and none for the others. Its `checks` are `[change, d.Time, d.RandomNumber]`
+for every 64th change and its last (`checkedChange`), the indices increasing, each a
+change's. Read, the path is a path of `Recording`s again, as the player plays the store's:
+each change keeps its clock and its stream where a check names them, and the player checks
+them there alone (`RecordedChange`). The IndexedDB store keeps every recording whole, each
+change with its clock and its stream.
+
+The metadata are the player's title, which it needs, author and description, plain text
+as long as a set's name, authors and description may be (`RECORDING_TEXT_LIMITS`); when
+the path's root began, when its point was made, the game's play time there
+(`Game.playTime`); and where it starts, a new game or the save's level and champions,
+which is read from the root, so it cannot disagree with it.
+
+The server serves a package `immutable`, under its id, and the page asks for it with the
+format's version, `recordings/<id>.gz?v=3` (`recordingPackageUrl`): a browser that holds a
+copy of an earlier version under the same id asks anew, and the id, which every link to
+the recording names, stays. A package is never rewritten but by a migration of its
+format, which keeps its content: `utils/migrate-recording-packages.ts` converts the site's
+by a private copy of the old version's reader, before the build that reads the new one is
+deployed, plays each to its point, and keeps the old file in the backups
+(`doc/DEPLOYMENT.md` → "Shared recordings").
 
 **The server** keeps the packages shared, lists them by set, serves them and moderates
 them (`server/recordings.ts`, `doc/DEPLOYMENT.md` → "Shared recordings"). It reads a
@@ -736,17 +774,20 @@ package with the page's own reader, bundled for Node (`src/engine/PageReaders.ts
 
 `readRecordingPackage` checks a package's form alone, the server's check: it unzips,
 to no more than a limit its caller gives, parses, each field has its type (the rules,
-the extras and the loop's flags their keys, each change its kind's fields, a read none),
-the texts their limits, each recording its set and each branch its join at its parent's
-end, and the point its path's end. It does not replay it.
+the extras and the loop's flags their keys, each change its kind's arguments, a read
+none, each check a change's), the texts their limits, the root its start and each branch
+its join at its parent's end, and the point its path's end. It does not replay it.
 
 **What a package costs**, measured by `tools/checks/replay.ts --measure`: a new game
 played for an hour of its clock at a player's pace, a key or a click in the viewport
 every second or so, F5 every three minutes and F9 every nine, shared at a last F5. Its
-path is seven recordings and 3,883 changes; its package is 340 KB, 930 KB unzipped. A
-save's file, about 61 KB, costs about 42 KB of it, once for each branch's start and once
-for the save shared: a CSBWin file is scrambled, and gzip takes little off it. A change
-costs about 11 bytes. So a package's size is the loads in its path more than its length.
+path is seven recordings and 3,883 changes; its package is 14 KB, 105 KB unzipped, about
+3.6 bytes a change. A loaded save costs nothing, its file being its parent's to make, and
+neither does the save shared: only a root that starts from a save carries a file, about
+42 KB of a 61 KB CSBWin file, which is scrambled, so gzip takes little off it. "Chani vs
+the world", four hours of the Amiga's Dungeon Master to its end through eight loads,
+53,891 changes, is 143 KB, 1 MB unzipped. So a package's size is its changes, and a save
+it starts from.
 
 What sharing takes:
 

@@ -131,6 +131,7 @@ In payoff order: the first row is the next item.
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
 | F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
+| R19 | The site's shared recordings are packages of version 2, which the page no longer reads | S | ⏳ the author runs the migration, then deploys |
 | C198 | A missile that cannot be made loses the object it was to carry | S | ⏳ |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏸️ |
@@ -152,7 +153,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: A11 · C199 · D22 · E45 · F26 · G32 · P13 · R19 · U13 · W8 · X19. An ID recorded and paid in one commit has no
+Next free IDs: A11 · C199 · D22 · E45 · F26 · G32 · P13 · R20 · U13 · W8 · X19. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -464,6 +465,21 @@ takes untrusted data. A file the player drops on the page and a custom dungeon a
 untrusted: they may stop the game with a message, as CSBWin dies, but never crash or hang
 the tab, nor corrupt what is stored. Each item owes what a fix owes ("How to work this
 list", point 4), its check included.
+
+### R19 — The site's shared recordings are packages of version 2 ⏳ (S)
+
+The page, the server's reader and the deploy's gate read a recording's package of version 3
+alone (`src/engine/RecordingPackage.ts`, `doc/RECORDING.md` → "Shared recordings"): a
+branch's save file and the save shared named by their MD5, the changes' clock and stream
+kept every 64th change and at each recording's last. The corpus is converted. The reference
+instance's four packages, "Chani vs the world" (`96760E66F1547A2C`), the CSB race
+(`DC4402FB06A312A1`) and the two other CSBWin runs, are still of version 2, which this build
+cannot read, so its deploy's gate refuses it until they are converted.
+
+What is left is the author's, on the instance (`doc/DEPLOYMENT.md` → "Shared recordings"):
+from this build's commit, `npx tsx utils/migrate-recording-packages.ts`, a yes for each,
+then `npm run deploy` at once, since the deployed page cannot read a package migrated. The
+item is paid once the instance serves version 3 alone and this build is deployed.
 
 ---
 

@@ -5,19 +5,23 @@
  * It holds a recording's path, from its root to the point shared (`doc/RECORDING.md` →
  * "The tree"), each recording cut at the point its child joins it, as far as the path
  * plays, and the metadata a list shows. The point is a save's, which a player knows
- * by name: the path's last recording cut there, and the save's file ending the package, a
- * check of its own (`SavedAtEnd`, `src/engine/RecordingPlayer.ts`). Or the game's end,
- * won or lost, which no save can follow: the path's last recording ended by it
+ * by name: the path's last recording cut there, and the MD5 of the save's file ending the
+ * package, a check of its own (`SavedAtEnd`, `src/engine/RecordingPlayer.ts`). Or the
+ * game's end, won or lost, which no save can follow: the path's last recording ended by it
  * (`Recording.end`), which its replay must reach.
  *
- * The file is JSON, gzipped by the browser's own `CompressionStream`: the format's version,
- * the build, the engine's level, the set, the metadata, the path and the point. Each
- * recording is as the store holds it (`Recording`), a save's file in base64. A package of
- * version 1, written before levels, is still read: each recording of its path is of level
- * 0, and names no files. A recording without a profile, written before profiles, has none
- * (`Recording.profile`). Where it starts, a new game or the
- * save's level and champions, is read from the path's root, so a package's never
- * disagrees with its path.
+ * The file is JSON, gzipped by the browser's own `CompressionStream`, of version 3
+ * (`doc/RECORDING.md` → "Shared recordings"): the format's version, the build, the engine's
+ * level, the set, the metadata, the path and the point. A package holds what its replay
+ * needs and nothing its replay makes again (`packaged`): a branch starts at a join, the
+ * MD5 of the file its parent makes there in place of the file, and a change keeps its
+ * `d.Time` and `d.RandomNumber` only every `CHECK_INTERVAL` changes and at its recording's
+ * last (`checkedChange`). Each change is a row, its VBLs since the change before, its
+ * kind and its arguments in a fixed order (`changeRow`). Read, a package is a path of
+ * `Recording`s again, each with its set, its parent and its end as the store has them. A
+ * package of another version is refused. Where it starts, a new game or the save's level
+ * and champions, is read from the path's root, so a package's never disagrees with its
+ * path.
  *
  * Reading one checks its form alone, the server's check (`server/recordings.ts`): it parses, each
  * field has its type, the texts their limits, the path its joins. It does not replay it.
@@ -27,17 +31,37 @@
  * `server/recordings.ts`).
  */
 import { readCsbwinSaveInfo } from '../data/CsbwinSaveInfo';
-import type { FileDigests } from '../data/DataSetFiles';
-import { LOCAL_DATA_SET_TEXT_LIMITS } from '../data/DataSets';
+import { fileDigest, type FileDigests } from '../data/DataSetFiles';
+import { LOCAL_DATA_SET_TEXT_LIMITS, RECORDING_FILES } from '../data/DataSets';
 import { NO_EXTRAS, type Extras, type RulesOptions } from './GameContext';
 import { CLOCK_HOLDERS, type ClockHolder, type InputChange } from './InputBoundary';
 import { createLoopFlags, VIDEO_MODES } from './LoopState';
 import { PLAYFILE_LINES } from './PlayfileLine';
 import type { CarriedState, RecordedChange, Recording, RecordingEnd, RecordingPoint, RecordingStart } from './Recorder';
-import type { SavedAtEnd } from './RecordingPlayer';
 
-/** The format's version: a package of another is refused, but for version 1's, written before levels (`readRecordingPackage`). */
-export const RECORDING_PACKAGE_VERSION = 2;
+/** The format's version: a package of another is refused (`readRecordingPackage`). */
+export const RECORDING_PACKAGE_VERSION = 3;
+
+/**
+ * Where the page fetches a shared recording's package, relative to the page: its file,
+ * `RECORDING_FILES/<id>.gz`, which the server serves `immutable`, asked with the format's
+ * version, so that a browser holding a copy of another version under the same id asks
+ * anew (`doc/RECORDING.md` → "Shared recordings").
+ */
+export function recordingPackageUrl(id: string): string {
+    return `${RECORDING_FILES}/${id}.gz?v=${RECORDING_PACKAGE_VERSION}`;
+}
+
+/** A package keeps the `d.Time` and `d.RandomNumber` of one change in this many (`checkedChange`). */
+export const CHECK_INTERVAL = 64;
+
+/**
+ * Whether a package keeps the `d.Time` and `d.RandomNumber` of a recording's change
+ * `index` of `count`: every `CHECK_INTERVAL`th, and the last, what its replay checks.
+ */
+export function checkedChange(index: number, count: number): boolean {
+    return index % CHECK_INTERVAL === CHECK_INTERVAL - 1 || index === count - 1;
+}
 
 /**
  * The longest text the metadata takes in each field, in characters, as a set's: a title as
@@ -75,8 +99,11 @@ export interface RecordingPackageInfo extends RecordingPackageText {
 
 /** The point a path is shared at. */
 export type RecordingShared =
-    /** A save's: its file, which the path's end makes again. */
-    | ({ readonly kind: 'save' } & SavedAtEnd)
+    /**
+     * A save's: the MD5 of its file, which the path's end makes again, and whether its
+     * point was taken inside its last VBL (`RecordingPoint.inVbl`).
+     */
+    | { readonly kind: 'save'; readonly md5: string; readonly inVbl: boolean }
     /** The game's end, which ends the path's last recording (`Recording.end`). */
     | { readonly kind: 'end' };
 
@@ -89,7 +116,11 @@ export interface RecordingPackage {
     /** The data set every recording of the path was played on (`DataSet.id`). */
     readonly dataSet: string;
     readonly info: RecordingPackageInfo;
-    /** The root, then each branch the child of the one before, each ending at its child's point, the last at the point shared. */
+    /**
+     * The root, then each branch the child of the one before, each ending at its child's
+     * point, the last at the point shared; as a package holds them (`packaged`): each
+     * branch starting at a join, each change's clock and stream kept where it is checked.
+     */
     readonly path: readonly Recording[];
     readonly shared: RecordingShared;
 }
@@ -111,7 +142,7 @@ export function packageOfSave(
     path: readonly Recording[], point: RecordingPoint, file: Uint8Array, text: RecordingPackageText,
     times: Pick<RecordingPackageInfo, 'recordedAt' | 'endedAt' | 'playTime'>,
 ): RecordingPackage {
-    return checked(packageOf(pathAtSave(path, point), { kind: 'save', file, inVbl: point.inVbl === true }, text, times));
+    return checked(packageOf(pathAtSave(path, point), { kind: 'save', md5: fileDigest(file), inVbl: point.inVbl === true }, text, times));
 }
 
 /** The package of `path`, the store's path to a recording the game's end ended, shared at that end. */
@@ -140,6 +171,27 @@ export function pathAtEnd(path: readonly Recording[]): Recording[] {
 }
 
 /**
+ * `path` as a package holds it: each branch's start a join, the MD5 of the file its read
+ * read in place of the file, which its parent makes there again; and each change's
+ * `d.Time` and `d.RandomNumber` kept only where its replay checks them (`checkedChange`).
+ */
+export function packaged(path: readonly Recording[]): Recording[] {
+    return path.map((recording, n) => ({
+        ...recording,
+        start: n === 0 ? recording.start : joinOf(recording.start),
+        changes: recording.changes.map((entry, index, all): RecordedChange => (
+            checkedChange(index, all.length) ? entry : { change: entry.change, vbl: entry.vbl })),
+    }));
+}
+
+/** A branch's `start` as a package holds it: the MD5 of its save's file, and what its read left beside it. */
+function joinOf(start: RecordingStart): RecordingStart {
+    if (start.kind === 'join') return start;
+    if (start.kind !== 'save' || !start.carried) throw new RecordingPackageError('a branch starts from a save, with what its read left');
+    return { kind: 'join', md5: fileDigest(start.bytes), carried: start.carried };
+}
+
+/**
  * Whether a recording of `path` was played with an extra on: at its start, or turned on
  * by a change. The server's twin is `playedWithExtras` (`server/recordings.ts`), which
  * cannot import the page's sources.
@@ -165,7 +217,7 @@ function packageOf(
     const last = path[path.length - 1]!;
     const { title, author, description } = text;
     const info = { title, author, description, ...times, start: packageStart(path[0]!) };
-    return { version: RECORDING_PACKAGE_VERSION, build: last.build, level: last.level, dataSet: last.dataSet, info, path, shared };
+    return { version: RECORDING_PACKAGE_VERSION, build: last.build, level: last.level, dataSet: last.dataSet, info, path: packaged(path), shared };
 }
 
 /** `path` with each recording before the last cut at the point its child joins it. */
@@ -185,7 +237,7 @@ function cutAt(recording: Recording, point: Omit<RecordingPoint, 'recording'>): 
 /** Where `root` starts, as a list shows it. */
 export function packageStart(root: Recording): RecordingPackageStart {
     if (root.start.kind === 'new') return { kind: 'new' };
-    const save = readCsbwinSaveInfo(root.start.bytes);
+    const save = root.start.kind === 'save' ? readCsbwinSaveInfo(root.start.bytes) : null;
     if (!save) throw new RecordingPackageError('the path\'s root is no save the port reads');
     return { kind: 'save', level: save.level, champions: save.champions };
 }
@@ -193,18 +245,14 @@ export function packageStart(root: Recording): RecordingPackageStart {
 /** `pkg` as the file the server keeps: its JSON, gzipped. */
 export async function writeRecordingPackage(pkg: RecordingPackage): Promise<Uint8Array> {
     checked(pkg);
-    const json = {
-        ...pkg,
-        path: pkg.path.map((recording) => ({ ...recording, start: startToJson(recording.start) })),
-        shared: pkg.shared.kind === 'save' ? { ...pkg.shared, file: toBase64(pkg.shared.file) } : pkg.shared,
-    };
+    const { version, build, level, dataSet, info, path, shared } = pkg;
+    const json = { version, build, level, dataSet, info, path: path.map(recordingToJson), shared };
     return gzip(new TextEncoder().encode(JSON.stringify(json)));
 }
 
 /**
  * The package `bytes` hold, its form checked: refused with a `RecordingPackageError`, or
- * where it unzips to more than `limit` bytes. One of version 1 is read as this version's,
- * each recording of level 0 and naming no files.
+ * where it unzips to more than `limit` bytes.
  */
 export async function readRecordingPackage(bytes: Uint8Array, limit = Infinity): Promise<RecordingPackage> {
     let text: string;
@@ -225,7 +273,10 @@ export async function readRecordingPackage(bytes: Uint8Array, limit = Infinity):
 
 /* ------------------------------------------------------------ the form ---- */
 
-/** `pkg`, its form checked beyond its fields': the texts, the path's joins and its end. */
+/**
+ * `pkg`, its form checked beyond its fields': the texts, the path's roots and joins, each
+ * change's clock and stream kept with each other, and its end.
+ */
 function checked(pkg: RecordingPackage): RecordingPackage {
     const { info, path, shared } = pkg;
     for (const field of ['title', 'author', 'description'] as const) {
@@ -243,8 +294,10 @@ function checked(pkg: RecordingPackage): RecordingPackage {
     if (pkg.level !== last.level) throw new RecordingPackageError('the level is not the last recording\'s');
     path.forEach((recording, n) => {
         if (recording.dataSet !== pkg.dataSet) throw new RecordingPackageError(`recording ${n} is of another set`);
+        if (!recording.ended) throw new RecordingPackageError(`recording ${n} is not ended`);
         const parent = n === 0 ? null : path[n - 1]!;
-        if (parent && (recording.parent?.recording !== parent.id || recording.start.kind !== 'save'
+        if (!parent && (recording.parent !== null || recording.start.kind === 'join')) throw new RecordingPackageError('the path\'s root is a branch');
+        if (parent && (recording.parent?.recording !== parent.id || recording.start.kind !== 'join'
             || recording.parent.changes !== parent.changes.length || recording.parent.vbls !== parent.vbls)) {
             throw new RecordingPackageError(`recording ${n} is no branch of the one before, joining it at its end`);
         }
@@ -252,6 +305,7 @@ function checked(pkg: RecordingPackage): RecordingPackage {
         let vbl = 0;
         for (const change of recording.changes) {
             if (change.vbl < vbl || change.vbl > recording.vbls) throw new RecordingPackageError(`recording ${n}'s changes are out of order`);
+            if ((change.time === undefined) !== (change.random === undefined)) throw new RecordingPackageError(`recording ${n} checks a change's clock without its stream`);
             vbl = change.vbl;
         }
     });
@@ -263,17 +317,18 @@ function checked(pkg: RecordingPackage): RecordingPackage {
 /** The fields' types: what a JSON object must be to be a package. */
 function packageFromJson(json: unknown): RecordingPackage {
     const pkg = record(json, 'the package');
-    const version = pkg['version'];
-    if (version !== RECORDING_PACKAGE_VERSION && version !== 1) throw new RecordingPackageError(`not a package of version ${RECORDING_PACKAGE_VERSION}, nor 1`);
-    const leveled = version === RECORDING_PACKAGE_VERSION;
+    if (pkg['version'] !== RECORDING_PACKAGE_VERSION) throw new RecordingPackageError(`not a package of version ${RECORDING_PACKAGE_VERSION}`);
     const info = record(pkg['info'], 'the metadata');
     const start = record(info['start'], 'the metadata\'s start');
     const shared = record(pkg['shared'], 'the point');
+    const dataSet = word(pkg['dataSet'], 'the set');
+    const path: Recording[] = [];
+    array(pkg['path'], 'the path').forEach((recording, n) => path.push(recordingFromJson(recording, `recording ${n}`, dataSet, path[n - 1] ?? null)));
     return {
         version: RECORDING_PACKAGE_VERSION,
         build: word(pkg['build'], 'the build'),
-        level: leveled ? count(pkg['level'], 'the level') : 0,
-        dataSet: word(pkg['dataSet'], 'the set'),
+        level: count(pkg['level'], 'the level'),
+        dataSet,
         info: {
             title: string(info['title'], 'the title'),
             author: string(info['author'], 'the author'),
@@ -288,38 +343,54 @@ function packageFromJson(json: unknown): RecordingPackage {
                 }
                     : fail('where it starts'),
         },
-        path: array(pkg['path'], 'the path').map((recording, n) => recordingFromJson(recording, `recording ${n}`, leveled)),
+        path,
         shared: shared['kind'] === 'end' ? { kind: 'end' }
-            : shared['kind'] === 'save' ? { kind: 'save', file: bytes(shared['file'], 'the save\'s file'), inVbl: boolean(shared['inVbl'], 'the save\'s inVbl') }
+            : shared['kind'] === 'save' ? { kind: 'save', md5: digest(shared['md5'], 'the save\'s MD5'), inVbl: boolean(shared['inVbl'], 'the save\'s inVbl') }
                 : fail('the point'),
     };
 }
 
-/** A recording of a package; `leveled` for this version's, which carries its level and its files. */
-function recordingFromJson(json: unknown, what: string, leveled: boolean): Recording {
+/**
+ * A recording of a package of `dataSet`, the child of `parent`, `null` for the root: a
+ * root starts from a new game or a save, a branch at a join, its parent's end.
+ */
+function recordingFromJson(json: unknown, what: string, dataSet: string, parent: Recording | null): Recording {
     const recording = record(json, what);
     const start = record(recording['start'], `${what}'s start`);
+    let inVbl = false;
+    const begins = (): RecordingStart => {
+        const kind = start['kind'];
+        if ((kind === 'join') !== (parent !== null)) fail(`${what}'s start`);
+        switch (kind) {
+            case 'new': return { kind: 'new', random: uint32(start['random'], `${what}'s seed`), randomGameID: uint32(start['randomGameID'], `${what}'s playthrough`) };
+            case 'save': return {
+                kind: 'save', bytes: bytes(start['bytes'], `${what}'s save`),
+                ...(start['carried'] === undefined ? {} : { carried: carriedFromJson(start['carried'], `${what}'s carried state`) }),
+            };
+            case 'join': {
+                if (start['inVbl'] !== undefined && start['inVbl'] !== true) fail(`${what}'s join`);
+                inVbl = start['inVbl'] === true;
+                return { kind: 'join', md5: digest(start['md5'], `${what}'s join`), carried: carriedFromJson(start['carried'], `${what}'s carried state`) };
+            }
+            default: return fail(`${what}'s start`);
+        }
+    };
+    const begun = begins();
+    const changes = changesFromJson(recording['changes'], recording['checks'], what);
     return {
         id: word(recording['id'], `${what}'s id`),
         build: word(recording['build'], `${what}'s build`),
-        level: leveled ? count(recording['level'], `${what}'s level`) : 0,
-        profile: recording['profile'] === undefined || recording['profile'] === null ? null : word(recording['profile'], `${what}'s profile`),
-        files: leveled && recording['files'] !== null ? digestsFromJson(recording['files'], `${what}'s files`) : null,
-        dataSet: word(recording['dataSet'], `${what}'s set`),
-        start: start['kind'] === 'new'
-            ? { kind: 'new', random: uint32(start['random'], `${what}'s seed`), randomGameID: uint32(start['randomGameID'], `${what}'s playthrough`) }
-            : start['kind'] === 'save'
-                ? {
-                    kind: 'save', bytes: bytes(start['bytes'], `${what}'s save`),
-                    ...(start['carried'] === undefined ? {} : { carried: carriedFromJson(start['carried'], `${what}'s carried state`) }),
-                }
-                : fail(`${what}'s start`),
-        parent: recording['parent'] === null ? null : pointFromJson(recording['parent'], `${what}'s parent`),
+        level: count(recording['level'], `${what}'s level`),
+        profile: recording['profile'] === null ? null : word(recording['profile'], `${what}'s profile`),
+        files: recording['files'] === null ? null : digestsFromJson(recording['files'], `${what}'s files`),
+        dataSet,
+        start: begun,
+        parent: parent ? { recording: parent.id, changes: parent.changes.length, vbls: parent.vbls, ...(inVbl ? { inVbl: true } : {}) } : null,
         rules: shaped(recording['rules'], RULES, `${what}'s rules`),
         extras: shaped(recording['extras'], NO_EXTRAS, `${what}'s extras`),
-        changes: array(recording['changes'], `${what}'s changes`).map((change, n) => changeFromJson(change, `${what}'s change ${n}`)),
+        changes,
         vbls: count(recording['vbls'], `${what}'s VBLs`),
-        ended: boolean(recording['ended'], `${what}'s ended`),
+        ended: true,
         end: recording['end'] === null ? null : endFromJson(recording['end'], `${what}'s end`),
     };
 }
@@ -327,22 +398,11 @@ function recordingFromJson(json: unknown, what: string, leveled: boolean): Recor
 /** A file's name, and its MD5 in lower-case hex, each (`FileDigests`). */
 function digestsFromJson(json: unknown, what: string): FileDigests {
     const files = record(json, what);
-    for (const [name, digest] of Object.entries(files)) {
-        if (word(name, what) !== name || typeof digest !== 'string' || !/^[0-9a-f]{32}$/.test(digest)) fail(what);
+    for (const [name, value] of Object.entries(files)) {
+        if (word(name, what) !== name) fail(what);
+        digest(value, what);
     }
     return files as FileDigests;
-}
-
-function pointFromJson(json: unknown, what: string): RecordingPoint {
-    const point = record(json, what);
-    const inVbl = point['inVbl'];
-    if (inVbl !== undefined && inVbl !== true) fail(what);
-    return {
-        recording: word(point['recording'], what),
-        changes: count(point['changes'], what),
-        vbls: count(point['vbls'], what),
-        ...(inVbl ? { inVbl } : {}),
-    };
 }
 
 function endFromJson(json: unknown, what: string): RecordingEnd {
@@ -356,41 +416,78 @@ function carriedFromJson(json: unknown, what: string): CarriedState {
     return { paused: boolean(carried['paused'], what), loop };
 }
 
-function changeFromJson(json: unknown, what: string): RecordedChange {
-    const entry = record(json, what);
-    const change = record(entry['change'], what);
-    const kind = change['kind'];
-    const int = (key: string) => integer(change[key], what);
-    const read = (): InputChange => {
-        switch (kind) {
-            case 'click': return { kind, x: int('x'), y: int('y'), buttons: int('buttons') };
-            case 'unclick': case 'tag0207cc': case 'saveWritten': case 'forceDMRules': return { kind };
-            case 'key': return { kind, num: int('num') };
-            case 'panelKey': return { kind, action: word(change['action'], what) };
-            case 'reincarnateKey': return { kind, key: word(change['key'], what) };
-            case 'reincarnateClick': return { kind, x: int('x'), y: int('y') };
-            case 'pause': {
-                const paused = boolean(change['paused'], what);
-                const dialog = change['dialog'];
-                if (dialog === undefined) return { kind, paused };
-                return CLOCK_HOLDERS.includes(dialog as ClockHolder) ? { kind, paused, dialog: dialog as ClockHolder } : fail(what);
-            }
-            case 'extras': return { kind, extras: shaped(change['extras'], NO_EXTRAS, what) };
-            case 'devLevel': {
-                const delta = change['delta'];
-                return delta === 1 || delta === -1 ? { kind, delta } : fail(what);
-            }
-            case 'devMove': return { kind, map: int('map'), x: int('x'), y: int('y') };
-            case 'playfile': {
-                const num = int('num');
-                const y = int('y');
-                return PLAYFILE_LINES.has(num) && y >= 0 && y <= 0xffff ? { kind, num, y } : fail(what);
-            }
-            // A read ends its recording, which records nothing of it (`Recorder`).
-            default: return fail(what);
-        }
+/**
+ * A recording's changes, from its rows (`changeRow`), and its checks, `[change, d.Time,
+ * d.RandomNumber]` each, the changes' indices increasing, each of a change.
+ */
+function changesFromJson(rows: unknown, checks: unknown, what: string): RecordedChange[] {
+    let vbl = 0;
+    const changes: RecordedChange[] = array(rows, `${what}'s changes`).map((json, n) => {
+        const row = array(json, `${what}'s change ${n}`);
+        vbl += count(row[0], `${what}'s change ${n}`);
+        return { change: changeFromRow(row.slice(1), `${what}'s change ${n}`), vbl };
+    });
+    let after = -1;
+    for (const json of array(checks, `${what}'s checks`)) {
+        const check = array(json, `${what}'s checks`);
+        const index = count(check[0], `${what}'s checks`);
+        if (check.length !== 3 || index <= after || index >= changes.length) fail(`${what}'s checks`);
+        changes[index] = { ...changes[index]!, time: count(check[1], `${what}'s checks`), random: uint32(check[2], `${what}'s checks`) };
+        after = index;
+    }
+    return changes;
+}
+
+/** A change as a package's row holds it, after its VBLs: its kind, then its arguments in a fixed order. */
+function changeRow(change: InputChange): unknown[] {
+    switch (change.kind) {
+        case 'click': return [change.kind, change.x, change.y, change.buttons];
+        case 'unclick': case 'tag0207cc': case 'saveWritten': case 'forceDMRules': return [change.kind];
+        case 'key': return [change.kind, change.num];
+        case 'panelKey': return [change.kind, change.action];
+        case 'reincarnateKey': return [change.kind, change.key];
+        case 'reincarnateClick': return [change.kind, change.x, change.y];
+        case 'pause': return change.dialog === undefined ? [change.kind, change.paused] : [change.kind, change.paused, change.dialog];
+        case 'extras': return [change.kind, change.extras];
+        case 'devLevel': return [change.kind, change.delta];
+        case 'devMove': return [change.kind, change.map, change.x, change.y];
+        case 'playfile': return [change.kind, change.num, change.y];
+        // A read ends its recording, which records nothing of it (`Recorder`).
+        case 'read': throw new RecordingPackageError('a recording holds no read');
+    }
+}
+
+/** The change a row holds after its VBLs (`changeRow`). */
+function changeFromRow(row: unknown[], what: string): InputChange {
+    const [kind, a, b, c] = row;
+    const args = (n: number) => {
+        if (row.length !== n + 1) fail(what);
     };
-    return { change: read(), vbl: count(entry['vbl'], what), time: count(entry['time'], what), random: uint32(entry['random'], what) };
+    const int = (value: unknown) => integer(value, what);
+    switch (kind) {
+        case 'click': args(3); return { kind, x: int(a), y: int(b), buttons: int(c) };
+        case 'unclick': case 'tag0207cc': case 'saveWritten': case 'forceDMRules': args(0); return { kind };
+        case 'key': args(1); return { kind, num: int(a) };
+        case 'panelKey': args(1); return { kind, action: word(a, what) };
+        case 'reincarnateKey': args(1); return { kind, key: word(a, what) };
+        case 'reincarnateClick': args(2); return { kind, x: int(a), y: int(b) };
+        case 'pause': {
+            const paused = boolean(a, what);
+            if (row.length === 2) return { kind, paused };
+            args(2);
+            return CLOCK_HOLDERS.includes(b as ClockHolder) ? { kind, paused, dialog: b as ClockHolder } : fail(what);
+        }
+        case 'extras': args(1); return { kind, extras: shaped(a, NO_EXTRAS, what) };
+        case 'devLevel': args(1); return a === 1 || a === -1 ? { kind, delta: a } : fail(what);
+        case 'devMove': args(3); return { kind, map: int(a), x: int(b), y: int(c) };
+        case 'playfile': {
+            args(2);
+            const num = int(a);
+            const y = int(b);
+            return PLAYFILE_LINES.has(num) && y >= 0 && y <= 0xffff ? { kind, num, y } : fail(what);
+        }
+        default: return fail(what);
+    }
 }
 
 /** Every rule, each a flag: the keys a recording's rules must have. */
@@ -441,6 +538,11 @@ function word(json: unknown, what: string): string {
     return typeof json === 'string' && json !== '' && json.length <= 100 ? json : fail(what);
 }
 
+/** An MD5 in lower-case hex. */
+function digest(json: unknown, what: string): string {
+    return typeof json === 'string' && /^[0-9a-f]{32}$/.test(json) ? json : fail(what);
+}
+
 function boolean(json: unknown, what: string): boolean {
     return typeof json === 'boolean' ? json : fail(what);
 }
@@ -474,8 +576,32 @@ function fail(what: string): never {
 
 /* ------------------------------------------------------------ encoding ---- */
 
-function startToJson(start: RecordingStart): unknown {
-    return start.kind === 'save' ? { ...start, bytes: toBase64(start.bytes) } : start;
+/**
+ * `recording` as a package's JSON holds it: no set, the package's; no parent, the
+ * recording before; no `ended`, each being; its changes as rows of the VBLs since the one
+ * before, and its checks, `[change, d.Time, d.RandomNumber]`, where a change keeps them.
+ */
+function recordingToJson(recording: Recording): unknown {
+    const { id, build, level, profile, files, rules, extras, vbls, end } = recording;
+    let vbl = 0;
+    const changes = recording.changes.map((entry) => {
+        const row = [entry.vbl - vbl, ...changeRow(entry.change)];
+        vbl = entry.vbl;
+        return row;
+    });
+    const checks: [number, number, number][] = [];
+    recording.changes.forEach((entry, n) => {
+        if (entry.time !== undefined && entry.random !== undefined) checks.push([n, entry.time, entry.random]);
+    });
+    return { id, build, level, profile, files, start: startToJson(recording), rules, extras, vbls, end, changes, checks };
+}
+
+function startToJson({ start, parent }: Recording): unknown {
+    switch (start.kind) {
+        case 'new': return start;
+        case 'save': return { ...start, bytes: toBase64(start.bytes) };
+        case 'join': return parent?.inVbl ? { ...start, inVbl: true } : start;
+    }
 }
 
 function toBase64(bytes: Uint8Array): string {
