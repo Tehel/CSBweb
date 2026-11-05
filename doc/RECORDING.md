@@ -295,9 +295,13 @@ with what it does, the debt ID of the commit that changed it and the level that 
 made (`until`). The engine reads them from `ctx.behaviour`, frozen: a game the page plays
 is at `ENGINE_LEVEL`, every flag off (`CURRENT_BEHAVIOUR`), and the player sets each
 recording's own before its read (`behaviourAt`), each flag whose `until` is above the
-recording's level on. The level is 4. The one flag of the port's own is `releaseScentLoops`,
+recording's level on. The level is 5. The flags of the port's own are `releaseScentLoops`,
 until 2: the release's scents, which what FTL meant replaced (`DEBT.md` H, "The scents are
-what FTL meant"). Recordings made before
+what FTL meant"); and `magicDamageThroughArmour` and `skippedStepForgetsParty`, until 5:
+magic damage to a champion multiplied by the armour's product, and a skipped step back
+that forgets the party (`doc/PROVEN_FACTS.md` → "Magic damage to a champion skips the
+armour", "A skipped step back reads the last `PossibleMove`'s `moveOntoPartyPosition`").
+Recordings made before
 levels are of level 0.
 
 A CSBWin version is a **profile** of the same flags (`PROFILES`): what that version did
@@ -314,7 +318,7 @@ as its level. A path that holds a profile the engine does not play is refused be
 plays, as one of a later level. The profiles are `csbwin-2023`, for the runs of CSBWin
 17.6 and 2023.05.20, and `csbwin-11.014`, for the 11.0xx runs. Both play `csbwinScentLoops`, joined at
 level 2: CSBWin's scents (`src/engine/PartyFootprints.ts`), and
-`csbwinDoorsSidewaysToMonsters`, joined at level 4: CSBWin's `PossibleMove`, which reads
+`csbwinDoorsSidewaysToMonsters`, joined at level 5: CSBWin's `PossibleMove`, which reads
 every door as sideways (`MonsterPerception.possibleMove`, `DEBT.md` H). `csbwin-11.014` plays
 `smartDiscardDrawnPriority` too, joined at level 1: 11.014's `SmartDiscard`, which ranks
 every object it scans by a priority drawn afresh at each comparison (`smartDiscard11014`,

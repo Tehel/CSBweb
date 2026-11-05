@@ -68,6 +68,11 @@ export interface CsbwinRun {
   readonly description: string;
   /** When its log was written, its file's date: what the package says it began and ended at. */
   readonly recordedAt: string;
+  /**
+   * Where a level of the engine before the fixes it needs drifts: the line of its log it
+   * parts at played at `level`, which proves those fixes' flags give back that engine.
+   */
+  readonly before?: { readonly level: number; readonly drifts: number };
 }
 
 /** The runs, in the order the check plays them. */
@@ -101,6 +106,7 @@ export const CSBWIN_RUNS: readonly CsbwinRun[] = [
     title: 'Chaos Strikes Back in 2 h 25 min',
     description: 'Chaos Strikes Back from the prison to the end with Plague, Lor, Buzzz and Petal, resurrected with wizard training in the prison. A CSBWin 2023.05.20 recording, its saves spliced out, played back in CSBweb.',
     recordedAt: '2023-07-08',
+    before: { level: 4, drifts: 3851 },
   },
 ];
 
@@ -189,16 +195,16 @@ function drawsBetween(from: number, to: number, max = 100000): number | null {
 /**
  * `run` played from its folder into a fresh page of its set at its profile, `build` naming its
  * recording's build and `dataSet` its set: the run's own, or the id a site gives the same
- * files (`utils/share-csbwin-runs.ts`).
+ * files (`utils/share-csbwin-runs.ts`). At `ENGINE_LEVEL`, or at an earlier `level`.
  */
-export async function recordRun(run: CsbwinRun, build: string, dataSet = run.dataSet): Promise<RecordedRun> {
+export async function recordRun(run: CsbwinRun, build: string, dataSet = run.dataSet, level = ENGINE_LEVEL): Promise<RecordedRun> {
   const folder = runFolder(run);
   const set = dataSetNamed(run.dataSet);
   const files = digestedFiles(diskFiles(set));
   const page = await standPage(set, files);
   const { game, screen } = page;
   const { ctx } = game;
-  ctx.behaviour = behaviourAt(ENGINE_LEVEL, run.profile);
+  ctx.behaviour = behaviourAt(level, run.profile);
   const recorder = new Recorder(game, build, dataSet, () => files.digests(), () => run.id);
   const { items } = readPlayfile(`${folder}/playfile.log`);
   const entries = items.filter((item): item is PlayEntry => 'num' in item);

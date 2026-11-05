@@ -862,7 +862,10 @@ What it establishes:
   (`doc/PROVEN_FACTS.md` → "Magic damage to a champion skips the armour"), a step back
   skipped onto a stale `moveOntoPartyPosition` (→ "A skipped step back reads the last
   `PossibleMove`'s `moveOntoPartyPosition`") and an up-down door that CSBWin reads as
-  sideways (→ "CSBWin's `PossibleMove` reads every door as sideways", H).
+  sideways (→ "CSBWin's `PossibleMove` reads every door as sideways", H). The first two
+  are the port's fixes, their old behaviour kept until level 5 (`magicDamageThroughArmour`,
+  `skippedStepForgetsParty`): at level 4 the run drifts at line 3851, as that engine did,
+  which `tools/checks/csbwin-runs.ts` holds it to (`CsbwinRun.before`).
 
 Paying it, in steps:
 

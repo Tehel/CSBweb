@@ -9,7 +9,7 @@
  * skipped, a waiting step put back (`PLAYFILE::Backspace`), the Reincarnate screen fed the
  * file's `0x4444` lines (`Code13ea4.cpp:86-108`), and `extraTicks` off (`CSBUI.cpp:985`).
  *
- *   npx tsx tools/play-csbwin-log.ts <playfile.log> [--extra-ticks] [--no-dm-rules]  [--resync] [--fake] [--trace=<from>-<to>] [--profile=<name>]
+ *   npx tsx tools/play-csbwin-log.ts <playfile.log> [--extra-ticks] [--no-dm-rules]  [--resync] [--fake] [--trace=<from>-<to>] [--profile=<name>] [--level=<n>]
  *
  * The log's `#DMRules` and `#NoDMRules` set `DM_rules` where play meets them, as
  * `PLAYFILE::Play` does (doc/CSBwin-src/Recording.cpp:289-299); `--no-dm-rules` ignores them
@@ -17,7 +17,8 @@
  *
  * `--profile=<name>` plays at that CSBWin version's profile (`PROFILES`,
  * `src/engine/Behaviour.ts`), `csbwin-11.014` for an 11.0xx run (`doc/RECORDING.md` → "A recording's level");
- * `csbwin-2023`, a 17.6 run's, by default.
+ * `csbwin-2023`, a 17.6 run's, by default. `--level=<n>` plays at that level of the engine
+ * (`ENGINE_LEVEL` by default), its old behaviours on, as a recording of that level plays.
  * `--set=<id>` plays on another data set than `dm-atari`; `--save=<file>` starts from that
  * CSBWin save instead of a new game, read at the log's first `0x6669` (a CSB run's
  * `csbgame.dat`, which the log's first clicks resume). A save the run's author cut out of
@@ -38,7 +39,7 @@ import { emptyDungeonData } from '../src/data/DungeonLoader';
 import { extractGraphicsTables } from '../src/data/tables/GraphicsTables';
 import { csbGraphicsOpener } from '../src/engine/FileSignatures';
 import { Game } from '../src/engine/Game';
-import { behaviourAt, ENGINE_LEVEL, knownProfile, PROFILES } from '../src/engine/Behaviour';
+import { behaviourAt, ENGINE_LEVEL, knownLevel, knownProfile, PROFILES } from '../src/engine/Behaviour';
 import { applySaveBytes } from '../src/engine/SaveGameFile';
 import { applyPlayfileLine, PLAYFILE_LINES } from '../src/engine/PlayfileLine';
 import { readFileSync } from 'node:fs';
@@ -67,6 +68,8 @@ const resync = args.includes('--resync');
 const fake = args.includes('--fake');
 const profileArg = args.find((a) => a.startsWith('--profile='))?.slice(10) ?? 'csbwin-2023';
 if (!knownProfile(profileArg)) throw new Error(`--profile=${profileArg}: not one of ${PROFILES.map((profile) => profile.name).join(', ')}`);
+const levelArg = Number(args.find((a) => a.startsWith('--level='))?.slice(8) ?? ENGINE_LEVEL);
+if (!knownLevel(levelArg)) throw new Error(`--level=${levelArg}: not a level from 0 to ${ENGINE_LEVEL}`);
 const traceArg = args.find((a) => a.startsWith('--trace='))?.slice(8).split('-').map((n) => parseInt(n, 16));
 const { version, items } = readPlayfile(args[0]!);
 
@@ -161,7 +164,7 @@ game.onTick(() => {
   if (selectedCharacterIndex < 0 && !sleeping) renderView();
 });
 game.ctx.rules.dmRulesDesignOption = dmRules && set.dmRules;
-game.ctx.behaviour = behaviourAt(ENGINE_LEVEL, profileArg);
+game.ctx.behaviour = behaviourAt(levelArg, profileArg);
 const ctx = game.ctx;
 
 // --- PLAYFILE ---

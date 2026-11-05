@@ -130,13 +130,16 @@ export class ChampionDamage {
       if (kind === 6) {
         const margin = 115 - attributeCurrent(champ.attributes.stats[AttributeIndex.Wisdom]);
         dealt = margin <= 0 ? 0 : scaledMultiply(dealt, 6, margin);
-      } else if (kind === 5) {
+      } else if (kind === 5 && !this.ctx.behaviour.magicDamageThroughArmour) {
         // Magic: the anti-magic statistic and the spell shield, and no armour
         // (doc/CSBwin-src/Character.cpp:2770-2774, ReDMCSB CHAMPION.C:1877-1880, its
         // `goto T0321024` past the product).
         dealt = sw(this.attributeScaledReduction(champ, 5, dealt) - party.spellShield);
       } else {
-        if (kind === 1) {
+        if (kind === 5) {
+          // `magicDamageThroughArmour`: the armour's product below too.
+          dealt = sw(this.attributeScaledReduction(champ, 5, dealt) - party.spellShield);
+        } else if (kind === 1) {
           dealt = sw(this.attributeScaledReduction(champ, 6, dealt) - party.fireShield);
         } else if (kind === 2) {
           // `P4 == 2` halves the *armour*, not the damage

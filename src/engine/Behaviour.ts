@@ -31,7 +31,7 @@
  */
 
 /** The engine's level: what a recording made now carries (`Recording.level`). Recordings made before levels are 0. */
-export const ENGINE_LEVEL = 4;
+export const ENGINE_LEVEL = 5;
 
 /** A CSBWin version whose runs the engine plays by the flags that name it. */
 export interface BehaviourProfile {
@@ -116,11 +116,23 @@ export const BEHAVIOURS = [
         profiles: { 'csbwin-11.014': 4 },
     },
     {
+        name: 'magicDamageThroughArmour',
+        does: "the port's magic damage to a champion, multiplied by `130 - armour` over 64 as the other kinds are after its Antimagic and spell shield, about twice the blow on an unarmoured champion, where CSBWin and the Atari skip the armour (`ChampionDamage.damageCharacter`)",
+        debt: 'F24',
+        until: 5,
+    },
+    {
+        name: 'skippedStepForgetsParty',
+        does: "a step back the 1-in-4 roll skips goes on to the next direction, where CSBWin and the Atari read the last `PossibleMove`'s `moveOntoPartyPosition` and may attack or remember the party's square (`MonsterAI.tryDirectionsD5ToD4`)",
+        debt: 'F24',
+        until: 5,
+    },
+    {
         name: 'csbwinDoorsSidewaysToMonsters',
         does: "CSBWin's `PossibleMove`, which reads a door's up-down bit as `BITS5_5(mode())`, `mode()` being that bit already, so always 0: every door, up-down too, lets a monster by only open to state 1 or less, where the Atari lets one by an up-down door up to its height (`MonsterPerception.possibleMove`)",
         debt: 'F24',
         until: null,
-        profiles: { 'csbwin-2023': 4, 'csbwin-11.014': 4 },
+        profiles: { 'csbwin-2023': 5, 'csbwin-11.014': 5 },
     },
 ] as const satisfies readonly BehaviourChange[];
 

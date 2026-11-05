@@ -844,7 +844,10 @@ export class MonsterAI {
       // `tag00d36e`, where a skipped step jumps too: `d.moveOntoPartyPosition` is the
       // last `PossibleMove`'s, this direction's or, skipped, an earlier one's
       // (doc/CSBwin-src/Monster.cpp:2428, :2491-2493; ReDMCSB GROUP.C:2165-2188).
-      if (this.ctx.systems.monsterPerception.moveOntoPartyPosition) {
+      // `skippedStepForgetsParty` reads it only where this direction's call was made,
+      // the call's own answer then, as the old lines read the probe's.
+      const ontoParty = this.ctx.systems.monsterPerception.moveOntoPartyPosition;
+      if (this.ctx.behaviour.skippedStepForgetsParty ? !skip && ontoParty : ontoParty) {
         if (c.timerFunction !== TimerFunction.TT_M3) {
           // Reaching the party is as good as arriving. The `& 15 != 5` test throttles
           // how often a group re-forms (doc/CSBwin-src/Monster.cpp:2501-2517).

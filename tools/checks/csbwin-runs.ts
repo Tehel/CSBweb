@@ -8,14 +8,16 @@
  * (`RecordingPackage`), at the game's end or at a save made at the log's end, read back,
  * and played by the port's player (`playPath`) to the same end without a drift.
  *
- * So every change to the engine answers to some 73,000 entries of CSBWin play.
+ * So every change to the engine answers to some 73,000 entries of CSBWin play. A run that
+ * needed fixes of the engine is played again at the level before them (`CsbwinRun.before`),
+ * where it must drift at the line that engine did: the fixes' flags give that engine back.
  *
  * Then each run under way (`CSBWIN_RUNS_UNDER_WAY`), a run of an older CSBWin version
  * played at its profile (`doc/RECORDING.md` → "A recording's level"), to the line it
  * drifts at and no other, and its recording up to there, packaged at a save made there,
  * played back to the same `d.Time` and `d.RandomNumber`.
  *
- *   npm test -- --only=csbwin-runs.ts [<run id>]
+ *   npm test -- --only=csbwin-runs.ts [<run id> | --not=<run id>]
  */
 import type { Recording } from '../../src/engine/Recorder';
 import { readRecordingPackage, writeRecordingPackage } from '../../src/engine/RecordingPackage';
@@ -66,6 +68,13 @@ for (const run of runs) {
   check(played.game.ctx.state.tickCount === page.game.ctx.state.tickCount && played.game.ctx.random.getSeed() === page.game.ctx.random.getSeed(),
     `and leaves the game at the run's d.Time ${played.game.ctx.state.tickCount} and d.RandomNumber`);
   if (run.end === 'won') check(played.game.ctx.state.gameWon && played.game.mainLoopHasReturned(), '…with the game won and the credits shown');
+
+  if (run.before) {
+    const { level, drifts } = run.before;
+    const old = await recordRun(run, 'csbwin-runs', run.dataSet, level);
+    check(old.drift?.startsWith(`line ${drifts}:`) === true,
+      `${run.id} at level ${level}, its fixes' flags on, drifts where that engine did, line ${drifts}${old.drift?.startsWith(`line ${drifts}:`) ? '' : `, not ${old.drift === null ? 'nowhere' : old.drift.split(':')[0]}`}`);
+  }
 }
 
 for (const run of underWay) {
