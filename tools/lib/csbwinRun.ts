@@ -60,7 +60,7 @@ export interface CsbwinRun {
   readonly profile: ProfileName | null;
   /** The CSBWin save its log's first read reads (`0x6669`), in its folder, or `null` for a new game. */
   readonly save: string | null;
-  /** Where it ends: the game won, Lord Chaos fused; or its log's end, shared at a save made there. */
+  /** Where it ends: the game won, past its log's last entry; or its log's end, shared at a save made there. */
   readonly end: 'won' | 'log';
   /** What its package says of it: the run's player, a title and a description. */
   readonly player: string;
@@ -96,6 +96,12 @@ export const CSBWIN_RUNS: readonly CsbwinRun[] = [
     description: 'A CSBWin 11.017 recording, DMMovie42 of CSBWin\'s movies, played back in CSBweb.',
     recordedAt: '2009-05-28',
   },
+  {
+    id: 'CSBFullRecordingV4', dataSet: 'csb', profile: 'csbwin-2023', save: 'csbgame.dat', end: 'won', player: 'Anthony Bracegirdle',
+    title: 'Chaos Strikes Back in 2 h 25 min',
+    description: 'Chaos Strikes Back from the prison to the end with Plague, Lor, Buzzz and Petal, resurrected with wizard training in the prison. A CSBWin 2023.05.20 recording, its saves spliced out, played back in CSBweb.',
+    recordedAt: '2023-07-08',
+  },
 ];
 
 /**
@@ -114,11 +120,15 @@ export interface RunUnderWay extends CsbwinRun {
 /** The runs under way, in the order the check plays them. */
 export const CSBWIN_RUNS_UNDER_WAY: readonly RunUnderWay[] = [];
 
+/** The options `diskMenuSave` has taken of each opening of the save menu. */
+const diskMenuSteps = new WeakMap<object, number>();
+
 /**
  * An entry of a save in a log, taken by the port's save menu that the log's disk icon
  * opened, as `_DisplayDiskMenu` takes it (doc/CSBwin-src/SaveGame.cpp:825-1377): `true`
- * where the menu took it. The menu's two first options, `0xd2`, are "SAVE AND PLAY" and
- * the save's file (`SelectSaveGame`); the save's signature, `0x6668`, which CSBWin records
+ * where the menu took it. Its first option, `0xd2`, is "SAVE AND PLAY", and the next,
+ * `0xd2` to `0xd5`, the save's file, CSBGAME.DAT to CSBGAME4.DAT (`_SelectSaveGame`,
+ * doc/CSBwin-src/CSBCode.cpp:9862-9940); the save's signature, `0x6668`, which CSBWin records
  * once the file is written (`:1325-1332`), stands for the save the menu makes: its tail
  * (`Game.saveWritten`: `TAG00bd40`, `ProcessMonstersOnLevel`, `SmartDiscard(true)`,
  * `:1341-1343`, and `d.CanRestartFromSavegame = 1`, `:1358`), then the menu closed
@@ -127,7 +137,12 @@ export const CSBWIN_RUNS_UNDER_WAY: readonly RunUnderWay[] = [];
  * played yet: they throw.
  */
 export function diskMenuSave(game: Game, ui: UIState, num: number, line: number): boolean {
-  if (num === 0xd2) return true;
+  const menu = ui.saveMenu;
+  const step = (menu && diskMenuSteps.get(menu)) ?? 0;
+  if (menu && (num === 0xd2 || (step > 0 && num >= 0xd2 && num <= 0xd5))) {
+    diskMenuSteps.set(menu, step + 1);
+    return true;
+  }
   if (num === 0x6668) {
     game.saveWritten();
     closeSaveMenu(ui);

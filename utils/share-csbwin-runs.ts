@@ -22,7 +22,7 @@
  * recorder's own draws a CSBWin run carries (`PLAYFILE_LINES`), or it refuses each. A run
  * whose title the instance already lists on its set (to `--player`: pending, hidden and
  * its own included) is not offered again. For each other, the script plays it to its end
- * (Lord Chaos fused, or its log's last entry, where a save is made to share it at), plays
+ * (the game won, or its log's last entry, where a save is made to share it at), plays
  * its package back with the port's player (`playPath`) over the instance's files, shows
  * its title, its player, its description, its set and its size, and asks:
  *

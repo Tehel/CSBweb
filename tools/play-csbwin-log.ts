@@ -297,7 +297,7 @@ game.start(true);
 const VBL_MS = Math.ceil(1000 / VBL_FREQUENCY);
 const t0 = performance.now();
 let vbls = 0;
-while (!drift && !ended && vbls < 60 * 60 * 60 * 3) { clock.advance(VBL_MS); vbls++; }
+while (!drift && !ended && vbls < 60 * 60 * 60 * 8) { clock.advance(VBL_MS); vbls++; }
 console.log(`ran ${vbls} VBLs in ${((performance.now() - t0) / 1000).toFixed(1)} s; d.Time ${ctx.state.tickCount}; ${checked} entries checked (${absChecked} by d.RandomNumber, ${countChecked} by draw count), ${resyncs} resyncs, ${fakes} fakes`);
 console.log(`  line ${(items[Math.min(at, items.length) - 1] as PlayEntry | undefined)?.line ?? '?'} of the file; party ${where()}`);
 console.log(drift ? `DRIFT ${drift}` : `ENDED ${ended}`);

@@ -839,7 +839,13 @@ export class MonsterAI {
           this.processInvincibleAndFinish(frame, c, direction);
           return;
         }
-        if (probe.moveOntoPartyPosition && c.timerFunction !== TimerFunction.TT_M3) {
+      }
+
+      // `tag00d36e`, where a skipped step jumps too: `d.moveOntoPartyPosition` is the
+      // last `PossibleMove`'s, this direction's or, skipped, an earlier one's
+      // (doc/CSBwin-src/Monster.cpp:2428, :2491-2493; ReDMCSB GROUP.C:2165-2188).
+      if (this.ctx.systems.monsterPerception.moveOntoPartyPosition) {
+        if (c.timerFunction !== TimerFunction.TT_M3) {
           // Reaching the party is as good as arriving. The `& 15 != 5` test throttles
           // how often a group re-forms (doc/CSBwin-src/Monster.cpp:2501-2517).
           if (
@@ -858,7 +864,7 @@ export class MonsterAI {
             return;
           }
         }
-        if (probe.moveOntoPartyPosition) this.rememberPartyPosition(c.slot);
+        this.rememberPartyPosition(c.slot);
       }
 
       direction = (direction + 1) & 0x3;

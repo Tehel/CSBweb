@@ -128,6 +128,14 @@ export class MonsterPerception {
   private readonly random: CsbRandom;
   private readonly footprints: PartyFootprints;
 
+  /**
+   * `d.moveOntoPartyPosition` (doc/CSBwin-src/Monster.cpp:663, :746), ReDMCSB's
+   * `G0390_B_GroupMovementBlockedByParty`: what the last `possibleMove` found, kept
+   * until the next, which `Try_Directions_D5_To_D4` reads where the roll skips its own
+   * call (`MonsterAI.tryDirectionsD5ToD4`).
+   */
+  moveOntoPartyPosition = false;
+
   constructor(private readonly ctx: GameContext) {
     this.dungeon = ctx.dungeon;
     this.random = ctx.random;
@@ -401,6 +409,7 @@ export class MonsterPerception {
   ): MoveProbe {
     const dir = direction & 0x3;
     state.directionHasBeenTested[dir] = 1;
+    this.moveOntoPartyPosition = false;
 
     const probe: MoveProbe = {
       possible: false,
@@ -473,6 +482,7 @@ export class MonsterPerception {
 
     probe.moveOntoPartyPosition =
       level === this.ctx.party.state.position.z && step.x === state.partyX && step.y === state.partyY;
+    this.moveOntoPartyPosition = probe.moveOntoPartyPosition;
     if (probe.moveOntoPartyPosition) return probe;
 
     if (roomType === RoomType.DOOR) {
@@ -480,8 +490,12 @@ export class MonsterPerception {
       const doorRn = this.dungeon.findFirstDoor(target);
       const door = doorRn === OBJECT_ID_EOF ? null : this.dungeon.getDoorRecordByIndex(this.dungeon.rnMaps.idx(doorRn));
       // A vertical (up-down) door admits a monster up to its `verticalSize`; a
-      // sideways one only at position 1 or below.
-      const allowance = door && door.vertical ? monsterVerticalSize(desc) : 1;
+      // sideways one only at position 1 or below (ReDMCSB GROUP.C:1547). CSBWin's
+      // `BITS5_5(DB0A2->mode())` shifts the bit `mode()` already returns, and reads
+      // every door as sideways (doc/CSBwin-src/Monster.cpp:755), which its runs play by
+      // (`csbwinDoorsSidewaysToMonsters`, DEBT.md H).
+      const vertical = door !== null && door.vertical && !this.ctx.behaviour.csbwinDoorsSidewaysToMonsters;
+      const allowance = vertical ? monsterVerticalSize(desc) : 1;
       if (doorPosition > allowance && doorPosition !== 5 && !monsterNonMaterial(desc)) {
         probe.blockedByDoor = true;
         return probe;

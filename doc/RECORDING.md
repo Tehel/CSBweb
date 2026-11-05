@@ -312,8 +312,10 @@ neither. A CSBWin run is played at its version's profile (`CsbwinRun.profile`, `
 `tools/play-csbwin-log.ts --profile=`), and the player sets a recording's before its read,
 as its level. A path that holds a profile the engine does not play is refused before it
 plays, as one of a later level. The profiles are `csbwin-2023`, for the runs of CSBWin
-17.6, and `csbwin-11.014`, for the 11.0xx runs. Both play `csbwinScentLoops`, joined at
-level 2: CSBWin's scents (`src/engine/PartyFootprints.ts`). `csbwin-11.014` plays
+17.6 and 2023.05.20, and `csbwin-11.014`, for the 11.0xx runs. Both play `csbwinScentLoops`, joined at
+level 2: CSBWin's scents (`src/engine/PartyFootprints.ts`), and
+`csbwinDoorsSidewaysToMonsters`, joined at level 4: CSBWin's `PossibleMove`, which reads
+every door as sideways (`MonsterPerception.possibleMove`, `DEBT.md` H). `csbwin-11.014` plays
 `smartDiscardDrawnPriority` too, joined at level 1: 11.014's `SmartDiscard`, which ranks
 every object it scans by a priority drawn afresh at each comparison (`smartDiscard11014`,
 `src/engine/SmartDiscard.ts`), `tag016426StatisticIgnored`, joined at level 3: 11.014's
@@ -391,7 +393,8 @@ reads the latest alone: each package is converted in place, its name and its con
 and plays to the same point, `d.Time`, `d.RandomNumber` and file before and after.
 
 It holds CSBWin's runs (`CSBWIN_RUNS`, below: forty minutes of Dungeon Master to its end
-each from 17.6, Chaos Strikes Back to Fulya Pit, and `DMMovie42`, 11.017's Dungeon Master
+each from 17.6, Chaos Strikes Back to Fulya Pit, Chaos Strikes Back's whole game from
+2023.05.20, two and a half hours to its end, and `DMMovie42`, 11.017's Dungeon Master
 to its end at `csbwin-11.014`) and three of `tools/checks/replay.ts`'s
 packages: F5 in the new game's branch, the Sleepsave inside a VBL in `csbgame7.dat`'s, and
 the lost game's end. The check asks for each run once, at any level (`--write` records

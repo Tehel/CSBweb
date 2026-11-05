@@ -425,8 +425,10 @@ const CHECKS: Tool[] = [
   { tool: 'input-boundary.ts' },
   { tool: 'replay.ts' },
   { tool: 'recording-points.ts' },
-  // CSBWin's own runs, played to their end through the page's input and recorded.
-  { tool: 'csbwin-runs.ts' },
+  // CSBWin's own runs, played to their end through the page's input and recorded: the
+  // whole CSB game, two and a half hours, a job of its own, the others together.
+  { tool: 'csbwin-runs.ts', args: ['CSBFullRecordingV4'] },
+  { tool: 'csbwin-runs.ts', args: ['--not=CSBFullRecordingV4'] },
   // The corpus of the port's recordings, each played at the engine's level it was made at.
   { tool: 'recording-corpus.ts' },
   // The set a recording plays over, found by its files.
@@ -479,7 +481,7 @@ let failed = 0;
 // 'failure' (a type error is learnt before the tools' results, not ~150 s later).
 function record(name: string, r: Omit<JobResult, 'ms'>, ms: number, show?: Job['show']) {
   const ok = r.status === 0 && !r.error;
-  console.log(`  ${name.padEnd(34)}${ok ? 'ok  ' : 'FAIL'}  ${String(ms).padStart(6)} ms`);
+  console.log(`  ${name.padEnd(42)}${ok ? 'ok  ' : 'FAIL'}  ${String(ms).padStart(6)} ms`);
   const out = (r.error ? `${r.error}\n` : '') + r.out;
   const shown = show === 'always' || (show === 'failure' && !ok);
   if (shown && out.trim()) console.log(`\n${out.trimEnd()}\n`);
@@ -537,15 +539,17 @@ if (!existsSync(TSX)) {
 // end of `open-room-text.ts`.
 const names = new Set([...CHECKS, ...SMOKE].map(({ tool }) => tool));
 const wanted = ({ tool }: Tool) => !only || only.some((o) => (names.has(o) ? tool === o : tool.includes(o)));
-const checks = CHECKS.filter(wanted);
-const smoke = SMOKE.filter(wanted);
+// A tool listed twice, each with its arguments, is one job with the arguments given.
+const once = (list: Tool[]) => (toolArgs.length ? list.filter((t, i) => list.findIndex((u) => u.tool === t.tool) === i) : list);
+const checks = once(CHECKS.filter(wanted));
+const smoke = once(SMOKE.filter(wanted));
 const single = only && checks.length + smoke.length === 1;
 if (toolArgs.length && !single) {
   console.error(`${toolArgs.join(' ')}: a tool's arguments need --only to pick out one tool.`);
   process.exit(1);
 }
 const tool = ({ tool, dir = 'tools/checks', args = [] }: Tool): Job => ({
-  name: tool,
+  name: args.length && !toolArgs.length ? `${tool} ${args.join(' ')}` : tool,
   cmd: TSX,
   args: [resolve(ROOT, dir, tool), ...(toolArgs.length ? toolArgs : args)],
   show: single ? 'always' : undefined,

@@ -59,9 +59,11 @@ build)
   rm -rf "$build" && cp -r "$source" "$build"
   cd "$build"
   mkdir -p debs sysroot
+  # GLib's headers: `libgio-2.0-dev` on recent releases, `libglib2.0-dev` on older ones (Ubuntu 22.04).
+  gio=libgio-2.0-dev; apt-cache show $gio >/dev/null 2>&1 || gio=libglib2.0-dev
   if [ $version = 2023 ]; then
     patch -s -p1 < "$here/oracle.patch"
-    (cd debs && apt-get download -q libsdl2-dev libgio-2.0-dev >/dev/null)
+    (cd debs && apt-get download -q libsdl2-dev $gio >/dev/null)
     for deb in debs/*.deb; do dpkg -x "$deb" sysroot; done
     sr="$build/sysroot"
     inc=(-I"$sr/usr/include/SDL2" -I"$sr/usr/include/glib-2.0" -I"$sr/usr/lib/x86_64-linux-gnu/glib-2.0/include"
@@ -80,7 +82,7 @@ build)
     g++ -rdynamic "${objs[@]/%/.o}" -L. -lSDL2 -lglib-2.0 -o CSBwin-oracle
   else
     patch -s -p1 < "$here/oracle-$version.patch"
-    (cd debs && apt-get download -q libsdl1.2-dev:i386 libsdl1.2debian:i386 libgio-2.0-dev:i386 \
+    (cd debs && apt-get download -q libsdl1.2-dev:i386 libsdl1.2debian:i386 $gio:i386 \
        lib32stdc++-15-dev lib32gcc-15-dev lib32gcc-s1 lib32stdc++6 libc6-dev-i386 >/dev/null)
     for deb in debs/*.deb; do dpkg -x "$deb" sysroot; done
     sr="$build/sysroot" gcc32="$build/sysroot/usr/lib/gcc/x86_64-linux-gnu/15/32"

@@ -47,7 +47,7 @@ export interface BehaviourProfile {
 export const PROFILES = [
     {
         name: 'csbwin-2023',
-        does: "CSBWin's 2023 source, which the engine follows but where the port parts from it on purpose, for the runs of CSBWin 17.6 (DMMovie2615, DMMovie2823, CSBMovie0640)",
+        does: "CSBWin's 2023 source, which the engine follows but where the port parts from it on purpose, for the runs of CSBWin 17.6 (DMMovie2615, DMMovie2823, CSBMovie0640) and 2023.05.20 (CSBFullRecordingV4)",
         source: 'doc/CSBwin-src/',
     },
     {
@@ -114,6 +114,13 @@ export const BEHAVIOURS = [
         debt: 'R18',
         until: null,
         profiles: { 'csbwin-11.014': 4 },
+    },
+    {
+        name: 'csbwinDoorsSidewaysToMonsters',
+        does: "CSBWin's `PossibleMove`, which reads a door's up-down bit as `BITS5_5(mode())`, `mode()` being that bit already, so always 0: every door, up-down too, lets a monster by only open to state 1 or less, where the Atari lets one by an up-down door up to its height (`MonsterPerception.possibleMove`)",
+        debt: 'F24',
+        until: null,
+        profiles: { 'csbwin-2023': 4, 'csbwin-11.014': 4 },
     },
 ] as const satisfies readonly BehaviourChange[];
 

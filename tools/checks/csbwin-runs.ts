@@ -3,12 +3,12 @@
  * (`DEBT.md` F24): each run of `tools/fixtures/csbwin-runs/` (`CSBWIN_RUNS`) played
  * through the page's input boundary and recorded (`recordRun`, `tools/lib/csbwinRun.ts`),
  * every entry of its log taken at the `d.Time` and `d.RandomNumber` CSBWin recorded, to
- * its end: Lord Chaos fused and the game won for a race to fusion, the log's last entry
- * for the race to Fulya Pit. Then the recording packaged as the site shares it
+ * its end: the game won, Lord Chaos fused for a race to fusion and Chaos Strikes Back's
+ * end for its whole game, the log's last entry for the race to Fulya Pit. Then the recording packaged as the site shares it
  * (`RecordingPackage`), at the game's end or at a save made at the log's end, read back,
  * and played by the port's player (`playPath`) to the same end without a drift.
  *
- * So every change to the engine answers to some 38,000 entries of CSBWin play.
+ * So every change to the engine answers to some 73,000 entries of CSBWin play.
  *
  * Then each run under way (`CSBWIN_RUNS_UNDER_WAY`), a run of an older CSBWin version
  * played at its profile (`doc/RECORDING.md` → "A recording's level"), to the line it
@@ -31,10 +31,13 @@ function changeKinds(recording: Recording): Map<string, number> {
   return kinds;
 }
 
-const only = process.argv[2];
-const runs = CSBWIN_RUNS.filter((run) => !only || run.id === only);
-const underWay = CSBWIN_RUNS_UNDER_WAY.filter((run) => !only || run.id === only);
-check(runs.length + underWay.length > 0, `a run is named ${only}`);
+// A run's id plays that run alone, `--not=<id>` every run but that one.
+const arg = process.argv[2];
+const not = arg?.startsWith('--not=') ? arg.slice('--not='.length) : undefined;
+const picked = (run: { id: string }): boolean => (not !== undefined ? run.id !== not : !arg || run.id === arg);
+const runs = CSBWIN_RUNS.filter(picked);
+const underWay = CSBWIN_RUNS_UNDER_WAY.filter(picked);
+check(runs.length + underWay.length > 0, `a run is named ${not ?? arg}`);
 
 for (const run of runs) {
   console.log(`${run.id} (${run.dataSet}${run.save ? `, from ${run.save}` : ', a new game'}):`);
@@ -45,7 +48,7 @@ for (const run of runs) {
   console.log(`  ${[...kinds].map(([kind, n]) => `${kind} ${n}`).join(', ')}`);
   check(recorded.drift === null, `${run.id} plays to its end, every entry's random CSBWin's${recorded.drift ? `: drifts at ${recorded.drift}` : ''}`);
   if (run.end === 'won') {
-    check(recorded.won === true, `${run.id} fuses Lord Chaos: the game ends won`);
+    check(recorded.won === true, `${run.id} ends with the game won`);
   } else {
     check(recorded.won === null && recorded.saved !== null, `${run.id} plays to its log's end, where a save is made`);
   }

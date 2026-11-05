@@ -734,7 +734,10 @@ recording from it and submits it, and a log may be corrected where a run needs i
 **The runs** are in the author's collection, `../DMweb-extra/Clone,CSBwin,Movies,Data/`:
 Dungeon Master's in `Race to fusion/` (seventeen folders, `DMMovie1` to `DMMovie8`, made
 by CSBWin 8.0 to 17.6) and `Dungeon Master minimum item picking/`, Chaos Strikes Back's
-in `Race to Fulya Pit/` and `Chaos Strikes Back minimum item picking/`. Each folder holds
+in `Race to Fulya Pit/`, `Chaos Strikes Back minimum item picking/` and `Paul's CSB full
+recording v4/` (a whole game by 2023.05.20 from its `csbgame.dat`, at `d.Time` 19, its log
+`Playfile.log`; beside it `prison_playfile.log` is the prison's, a new game ending in SAVE
+AND QUIT at `d.Time` 0x2749, which is not played). Each folder holds
 its `playfile.log` (some name it `Playfile.log`, `DMMovie2823`'s annotated folder also has
 `record00000.log`), the `dungeon.dat` and `graphics.dat` it was played on, often the
 `CSBwin.exe`, and sometimes an `Annotation.txt`. The same collection is dmweb.free.fr's
@@ -756,7 +759,7 @@ gets a hidden set of its own, fetched from the movies' archive. Its `graphics.da
 | `DMMovie40` | 9.5 | `6c2d96…`, an older conversion: maps 0, 5 and 10 a column narrower (18x19, 31x32, 30x32), and a sling and two rocks marked important | CSBWin's DM | `dm-csbwin-9.0`, to add |
 | `DMMovie5` | 9.1 | `6c2d96…` | CSB's (`csb`'s) | `dm-csbwin-9.0` if CSB's `graphics.dat` plays DM as DM's does, else a set of its own |
 | `DMMovie1`, `3`, `4`, `6`, `7` | 9.05, 9.07 | `6c2d96…` (`DMMovie1`, a save only) | CSB's | none while CSBWin 2023 cannot read their logs (below) |
-| The CSB runs | 8.0 to 17.6 | each read from its own save | CSB's | `csb`, the save beside the log |
+| The CSB runs | 8.0 to 2023.05.20 | each read from its own save | CSB's | `csb`, the save beside the log |
 
 `dm-csbwin-9.0`, "Dungeon Master, CSBWin 9.0", is added with the 9.x profile, when
 the first of its runs is played: the `6c2d96…` `dungeon.dat` of `Race to fusion/DMMovie40`
@@ -850,12 +853,22 @@ What it establishes:
   eleven recordings spliced at the saves its author cut out (`0x2224`). On the way it
   passes the doors that bounce off a group (`doc/CSBWIN_TIMERS_REFERENCE.md`: two ticks).
   The other CSB runs are not checked yet.
+- **Chaos Strikes Back's whole game, `CSBFullRecordingV4` (2023.05.20, `Paul's CSB full
+  recording v4/`, 2 h 25 min), plays to its end won**, in CSBWin 2023 and in the port alike:
+  `--set=csb --save=<folder>/csbgame.dat`, every one of its 34989 entries by
+  `d.RandomNumber`, the game won at `d.Time` 52360, twenty ticks past its log's last entry.
+  Its log is 48 recordings spliced at the saves cut out (`0x2224`), and saves once more near
+  its end into CSBGAME2.DAT (`diskMenuSave`). On the way it passes magic damage to a champion
+  (`doc/PROVEN_FACTS.md` → "Magic damage to a champion skips the armour"), a step back
+  skipped onto a stale `moveOntoPartyPosition` (→ "A skipped step back reads the last
+  `PossibleMove`'s `moveOntoPartyPosition`") and an up-down door that CSBWin reads as
+  sideways (→ "CSBWin's `PossibleMove` reads every door as sideways", H).
 
 Paying it, in steps:
 
-1. **The 17.6 runs and `CSBMovie0640` through steps 3 to 5**, the author's request.
-   Steps 3 to 5 are done for the three of them: their check, their recordings and their
-   upload (below), which the author runs. Next, the other CSB runs through the oracle, and
+1. **The 17.6 runs, `CSBMovie0640` and `CSBFullRecordingV4` through steps 3 to 5**, the
+   author's request. Steps 3 to 5 are done for the four of them: their check, their
+   recordings and their upload (below), which the author runs. Next, the other CSB runs through the oracle, and
    Conflux's runs when the author has them. **The 9.x and 11.0xx runs play at their version's
    profile** of behaviour flags (`doc/RECORDING.md` → "A recording's level"): each version
    differs from CSBWin 2023 throughout (above), so corrections to the log cannot convert
@@ -881,10 +894,10 @@ Paying it, in steps:
      correction at every turn), the run is not convertible by corrections; it waits on
      its version's profile of behaviour flags, and the engine's default stays 2023's.
    Each tweak is listed beside its log with its reason and the version it answers.
-3. **The check**, done for the runs of `CSBWIN_RUNS`, the three 17.6 runs and `DMMovie42`: their logs in `tools/fixtures/csbwin-runs/`,
+3. **The check**, done for the runs of `CSBWIN_RUNS`, the three 17.6 runs, `CSBFullRecordingV4` and `DMMovie42`: their logs in `tools/fixtures/csbwin-runs/`,
    listed in `CSBWIN_RUNS` (`tools/lib/csbwinRun.ts`), and `tools/checks/csbwin-runs.ts`,
-   which plays each to its end (Lord Chaos fused for a race to fusion, the log's last
-   entry for the race to Fulya Pit), so every later change to the engine answers to them.
+   which plays each to its end (the game won for a race to fusion and a whole game, the
+   log's last entry for the race to Fulya Pit), so every later change to the engine answers to them.
    A run added is a row of `CSBWIN_RUNS` and its folder.
 4. **The recording**, done for the same runs: a log played into the port's `Recorder`
    through the page's input boundary (`recordRun`, `doc/RECORDING.md` → "Recordings made
@@ -1273,6 +1286,14 @@ Recorded so that nobody "fixes" them.
   runs before the byte swap"). The two differ only for a type-47 actuator under either
   reading: DM has none, Conflux's file has the flag, and `tools/checks/dungeon-conversions.ts`
   fails for a dungeon that has one.
+- 🚫 **An up-down door lets a monster by up to its height, as the Atari does.** CSBWin's
+  `PossibleMove` shifts the door's up-down bit twice, `BITS5_5(DB0A2->mode())`, so reads
+  every door as sideways: a group passes only a door shut to state 1 or less, whatever its
+  height (`doc/CSBwin-src/Monster.cpp:755`, 11.014's `:750`). The Atari passes a group of
+  height `h` under an up-down door shut to `h` (`doc/ReDMCSB-src/GROUP.C:1547`), and so does
+  the port. The CSBWin profiles play CSBWin's (`csbwinDoorsSidewaysToMonsters`,
+  `src/engine/MonsterPerception.ts`), which `CSBFullRecordingV4` needs to play on
+  (`doc/PROVEN_FACTS.md` → "CSBWin's `PossibleMove` reads every door as sideways").
 - 🚫 **The scents are what FTL meant, on every set.** No release keeps the party's scents
   as it means to. The Atari's `F0317_CHAMPION_AddScentStrength` and ten-second decay
   compare each print with the square and throw the result away (ReDMCSB's `BUG0_00`,

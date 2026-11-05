@@ -1475,6 +1475,42 @@ unless it is beyond the monster's smelling distance (`:1792`). A calm group that
 nothing and smells nothing reaches it with 0, and always turns, three draws or more
 (`tools/checks/standard-finish.ts`).
 
+## A skipped step back reads the last `PossibleMove`'s `moveOntoPartyPosition`
+
+`Try_Directions_D5_To_D4` draws `STRandom0_3()` for a direction that leads back to the
+square the group came from, and three times in four jumps to `tag00d36e`
+(`doc/CSBwin-src/Monster.cpp:2426-2428`) without calling `PossibleMove`. There it reads
+`d.moveOntoPartyPosition` (`:2491-2493`), which only `PossibleMove` writes, 0 at its top and
+the step onto the party at `:746`: so it is the last call's, the direction before or any
+earlier one, another group's included. Where it is set the group attacks or remembers the
+party's square, as for a step that found the party. The Atari does the same with
+`G0390_B_GroupMovementBlockedByParty` (`doc/ReDMCSB-src/GROUP.C:2165-2188`). Covered by
+`CSBFullRecordingV4` (`tools/checks/csbwin-runs.ts`), which drifts on level 6 at `d.Time`
+0x32a4 without it.
+
+## Magic damage to a champion skips the armour
+
+`DamageCharacter`'s magic, `P4 == 5`, takes the Antimagic statistic (`TAG016426(pcA3, 5,
+D7W)`) and the spell shield off the blow and nothing else
+(`doc/CSBwin-src/Character.cpp:2770-2774`): the product by `130 - armour`
+(`:2792-2795`) is in the branch of the other kinds, fire's included. ReDMCSB's
+`C5_ATTACK_MAGIC` jumps past it (`goto T0321024`, `doc/ReDMCSB-src/CHAMPION.C:1877-1880`).
+An unarmoured champion takes a Vexirk's spell once, not twice. Covered by
+`CSBFullRecordingV4`, which drifts on level 8 at `d.Time` 0x14ec without it.
+
+## CSBWin's `PossibleMove` reads every door as sideways
+
+`PossibleMove` lets a group through a door no further shut than `D1W`, the group's
+`verticalSize()` for an up-down door and 1 for a sideways one, with `D1W =
+BITS5_5(DB0A2->mode())` (`doc/CSBwin-src/Monster.cpp:755`). `mode()` already returns bit 5
+of `word2` shifted down (`doc/CSBwin-src/CSB.h:840`), and `BITS5_5` shifts it again
+(`CSB.h:699`), so `D1W` is always 1. 11.014 has the same line
+(`doc/CSBwin-src-11.014/Monster.cpp:750`). The Atari tests `Vertical`
+(`doc/ReDMCSB-src/GROUP.C:1547`), which the port follows; the CSBWin profiles play
+CSBWin's (`csbwinDoorsSidewaysToMonsters`, `DEBT.md` H). `CSBFullRecordingV4` meets it at
+the up-down door at (9,2) of CSB's map 8, at `d.Time` 0x23a7, opening at state 2 under a
+group of height 3.
+
 ## Only `MissileTimer` writes the missile filter's globals, and the timer copy outlives it
 
 `doc/CSBwin-src/Timer.cpp:176-177` declares `RN missileFilterObject = RNnul;` and
