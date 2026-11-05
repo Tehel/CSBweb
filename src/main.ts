@@ -35,7 +35,7 @@ import { NO_FULLSCREEN, createFullscreen, type PageFullscreen } from './lib/full
 import { GameScreen } from './renderer/GameScreen';
 import { NO_INPUT, type GameInput } from './renderer/GameInput';
 import { hostDrawing } from './renderer/ui/HostDrawing';
-import { bindSaveDrop, bindUIEvents, showFatalMessage, showWelcomePage, welcomePageQuery } from './ui';
+import { bindSaveDrop, bindUIEvents, RECORDING_STOPPED_HASH, showFatalMessage, showWelcomePage, welcomePageQuery } from './ui';
 import { ScrollingText } from './renderer/csbwin/ScrollingText';
 import { UIMode } from './renderer/ui/UIState';
 import { openReincarnateScreen } from './renderer/ui/ReIncarnate';
@@ -693,7 +693,8 @@ function applySettings({ game }: Built, sound: SoundManager, values: SettingsVal
  * The viewer's strip (`src/renderer/ui/RecordingStrip.ts`) has the input, and the screen
  * draws it over the message area: the time played, pause, the pace, RESTART, which plays
  * the path again from its start in this page (`rewindPage`), and stop, which goes back
- * to the welcome page. RESTART and stop end the message area played on alone. While the
+ * to the welcome page, the book's dialog as its PLAY left it where one played it
+ * (`RECORDING_STOPPED_HASH`). RESTART and stop end the message area played on alone. While the
  * loop does not run, paused or at the end, a move of the pointer is drawn at the
  * display's next frame (`Presenter.animate`), as the loop's VBL draws it while it runs.
  *
@@ -780,7 +781,8 @@ async function playRecording(built: Built, id: string, { path, savedAtEnd }: Pla
                 messagesAlone?.();
                 recordingPlayer?.stop();
                 game.stop();
-                window.location.assign(welcomePageQuery());
+                // The welcome page shows the dialog whose PLAY played it, where one did (`RECORDING_STOPPED_HASH`).
+                window.location.assign(welcomePageQuery() + RECORDING_STOPPED_HASH);
                 return;
         }
         refreshScreen();

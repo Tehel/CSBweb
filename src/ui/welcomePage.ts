@@ -76,7 +76,9 @@
  *   for a local set, a pending one, nor a path that holds a move of `?dev`, and the panel
  *   says why. On a game's end DELETE, the only way one leaves the store but its set's own
  *   deletion. Each delete and withdrawal asks first. CLOSE closes the dialog, and so does
- *   a click beside it (`closeOnBackdrop`), as it closes HOW TO PLAY's and ABOUT's.
+ *   a click beside it (`closeOnBackdrop`), as it closes HOW TO PLAY's and ABOUT's. The
+ *   recording player's STOP leads back to the page with the dialog as its PLAY left it,
+ *   the recording selected (`RECORDING_STOPPED_HASH`).
  * - **The moderator's switch**, at the page's top right corner, is offered to a moderator
  *   alone. Off, the page is the one a player sees (`playerView`): neither a hidden set nor
  *   a pending one, the moderator's own pending sets included since the page is not told
@@ -295,6 +297,7 @@ export async function showWelcomePage(
     help: HowToPlayHost,
     select: string | null = null,
 ): Promise<void> {
+    const back = takeReturn();
     const records = await localSets.list().catch(() => [] as LocalDataSetRecord[]);
     const local = records.map((record) => ({ set: localDataSet(record), record, thumbnail: record.files.thumbnail ?? null }));
     const moderating = manifest.moderator && moderationOn();
@@ -322,7 +325,7 @@ export async function showWelcomePage(
     const official = listed.filter((set) => set.official);
     const sets = [...official, ...tileOrder(listed.filter((set) => !set.official), rows)];
     officialSection.hidden = official.length === 0;
-    let selected: DataSet | null = sets.find((set) => set.id === select)
+    let selected: DataSet | null = sets.find((set) => set.id === (select ?? back?.selected))
         ?? (rows.length === 0 && viewed.defaultSet && sets.includes(viewed.defaultSet) ? viewed.defaultSet : null);
     const tiles = sets.map((set) => {
         const saves = rows.filter((row) => row.dataSet === set.id).length;
@@ -382,12 +385,12 @@ export async function showWelcomePage(
      * recordings alone; the page shown again as the server lists the sets once it is
      * closed, where a document was added or removed, the selection kept.
      */
-    function openDocuments(set: DataSet): void {
+    function openDocuments(set: DataSet, recording: string | null = null): void {
         const keep = selected?.id ?? null;
         const isLocal = local.some((l) => l.set === set);
         showDocuments(set, isLocal, viewed.moderator, loadManifest, { saves: store, recordings }, (asked) => {
             if (asked) again(keep, asked);
-        });
+        }, { recording, played: (played) => noteReturn({ set: set.id, recording: played, selected: keep }) });
     }
 
     /** The controls of a published `set` the viewer may use: the pen, and the tick and the cross, or the eye. */
@@ -462,6 +465,9 @@ export async function showWelcomePage(
         ]));
     }
     update();
+    // Back from a recording PLAY played, its dialog as PLAY left it.
+    const reopened = back && sets.find((set) => set.id === back.set);
+    if (reopened) openDocuments(reopened, back.recording);
     // The address at `#how-to-play` opens HOW TO PLAY, and at `#about` ABOUT, as the page is
     // shown and as the fragment changes on it. One handler, the last page's: the page is
     // shown anew often.
@@ -630,11 +636,12 @@ interface RecordingsSource {
  * (`pruneRecordings`). Each delete asks first. A local set, `isLocal`, has RECORDINGS
  * alone, and no site's list. `closed`
  * is called once it is closed, with the last manifest asked for, or `null` where nothing
- * changed.
+ * changed. Where `recordingsAt` names a recording, it opens on RECORDINGS, that one
+ * selected; each PLAY tells `recordingsAt` the recording it plays.
  */
 function showDocuments(
     shown: DataSet, isLocal: boolean, moderator: boolean, loadManifest: () => Promise<DataSetManifest>,
-    source: RecordingsSource, closed: (asked: DataSetManifest | null) => void,
+    source: RecordingsSource, closed: (asked: DataSetManifest | null) => void, recordingsAt: RecordingsAt,
 ): void {
     let set = shown;
     let asked: DataSetManifest | null = null;
@@ -749,15 +756,15 @@ function showDocuments(
     };
     tabs.forEach((tab, n) => tab.addEventListener('click', () => showTab(n)));
     if (isLocal) {
-        showRecordings(dialog, set, false, moderator, source, status);
+        showRecordings(dialog, set, false, moderator, source, status, recordingsAt);
         dialog.querySelector('.documents-tabs')!.remove();
         panes[0]!.remove();
         add.remove();
         panes[1]!.hidden = false;
     } else {
-        showRecordings(dialog, set, true, moderator, source, status);
+        showRecordings(dialog, set, true, moderator, source, status, recordingsAt);
         render();
-        showTab(0);
+        showTab(recordingsAt.recording === null ? 0 : 1);
     }
     document.body.append(dialog);
     dialog.showModal();
@@ -770,7 +777,9 @@ function showDocuments(
  * and the panel of the one selected, a single selection over the two lists, whose ids
  * differ in form (`SHARED_RECORDING_ID`). What goes wrong is said in `status`.
  */
-function showRecordings(dialog: HTMLElement, set: DataSet, published: boolean, moderator: boolean, source: RecordingsSource, status: HTMLElement): void {
+function showRecordings(
+    dialog: HTMLElement, set: DataSet, published: boolean, moderator: boolean, source: RecordingsSource, status: HTMLElement, at: RecordingsAt,
+): void {
     const siteList = dialog.querySelector<HTMLElement>('.recordings-site')!;
     const list = dialog.querySelector<HTMLElement>('.recordings-browser')!;
     const panel = dialog.querySelector<HTMLElement>('.recordings-panel')!;
@@ -780,7 +789,11 @@ function showRecordings(dialog: HTMLElement, set: DataSet, published: boolean, m
     let points: StoredPoint[] = [];
     // The site's, `null` until it answers first.
     let shared: SiteRecording[] | null = null;
-    let selected: string | null = null;
+    let selected: string | null = at.recording;
+    // The browser's points are read: a selection none of them is, nor the site's, is dropped.
+    let browserRead = false;
+    // The selection the dialog opened on, to bring into view once listed.
+    let reveal = at.recording !== null;
     // The browser's point whose UPLOAD form the panel holds, which a list asked anew keeps.
     let uploadFor: string | null = null;
     // Why the browser's points cannot be uploaded, where the site does not publish the set.
@@ -798,6 +811,7 @@ function showRecordings(dialog: HTMLElement, set: DataSet, published: boolean, m
             points = [];
             status.textContent = `This browser's recordings could not be read: ${error instanceof Error ? error.message : String(error)}`;
         }
+        browserRead = true;
         render();
     };
 
@@ -842,7 +856,9 @@ function showRecordings(dialog: HTMLElement, set: DataSet, published: boolean, m
     };
 
     const render = () => {
-        if (selected !== null && !points.some((point) => pointRecordingId(point) === selected) && !shared?.some((recording) => recording.id === selected)) {
+        // A selection is dropped once the list it would be in has been read without it.
+        const unread = selected !== null && (SHARED_RECORDING_ID.test(selected) ? published && shared === null : !browserRead);
+        if (selected !== null && !unread && !points.some((point) => pointRecordingId(point) === selected) && !shared?.some((recording) => recording.id === selected)) {
             selected = null;
         }
         if (published) {
@@ -851,6 +867,11 @@ function showRecordings(dialog: HTMLElement, set: DataSet, published: boolean, m
         }
         fill(list, points.map((point) => item(pointRecordingId(point), pointName(point), [], pointMadeAt(point))),
             'No recording of this dungeon on this browser yet: a save, or the end of a game, is one.');
+        const shownItem = selected === null ? null : dialog.querySelector<HTMLElement>(`.recordings-item[data-recording="${CSS.escape(selected)}"]`);
+        if (reveal && shownItem) {
+            reveal = false;
+            shownItem.scrollIntoView({ block: 'nearest' });
+        }
         const recording = shared?.find((one) => one.id === selected);
         const point = points.find((one) => pointRecordingId(one) === selected);
         if (recording) showShared(recording);
@@ -870,7 +891,7 @@ function showRecordings(dialog: HTMLElement, set: DataSet, published: boolean, m
     const showShared = (recording: SiteRecording) => {
         const buttons = document.createElement('div');
         buttons.className = 'add-set-buttons';
-        buttons.append(playLink(recordingQuery(recording.id)));
+        buttons.append(playLink(recordingQuery(recording.id), () => at.played(recording.id)));
         const act = async (action: RecordingAction, doing: string) => {
             status.textContent = doing;
             for (const button of panel.querySelectorAll('button')) button.disabled = true;
@@ -917,7 +938,7 @@ function showRecordings(dialog: HTMLElement, set: DataSet, published: boolean, m
         if (selected !== id) return;
         const buttons = document.createElement('div');
         buttons.className = 'add-set-buttons';
-        buttons.append(playLink(recordingQuery(id)));
+        buttons.append(playLink(recordingQuery(id), () => at.played(id)));
         const why = unpublished ?? (playedWithDevMoves(path) ? 'Not to upload: it holds a move of ?dev, which no game holds.' : null);
         if (why === null) {
             buttons.append(panelButton('recordings-upload', 'Upload', () => {
@@ -1023,13 +1044,68 @@ async function uploadPoint(
     return typeof id === 'string' && SHARED_RECORDING_ID.test(id) ? { id } : 'the server answered no id.';
 }
 
-/** The panel's PLAY: a link to `href`. */
-function playLink(href: string): HTMLElement {
+/** The panel's PLAY: a link to `href`, `played` told as it is followed. */
+function playLink(href: string, played: () => void): HTMLElement {
     const play = document.createElement('a');
     play.className = 'btn px recordings-play';
     play.textContent = 'Play';
     play.href = href;
+    play.addEventListener('click', played);
     return play;
+}
+
+/**
+ * Where the RECORDINGS tab opens, and what its PLAY tells: the recording to select, or
+ * `null` to open the dialog on DOCUMENTS with none selected; and `played`, told the
+ * recording each PLAY plays.
+ */
+interface RecordingsAt {
+    readonly recording: string | null;
+    readonly played: (recording: string) => void;
+}
+
+/**
+ * The fragment the recording player's STOP leads back to the welcome page with
+ * (`playRecording`, `src/main.ts`): the page then shows the dialog the last PLAY left
+ * (`RecordingsReturn`), and takes the fragment off the address.
+ */
+export const RECORDING_STOPPED_HASH = '#recording-stopped';
+
+/** Where PLAY notes the dialog it leaves, in `sessionStorage`: this tab's alone. */
+const RETURN_KEY = 'csbweb-recordings-return';
+
+/** The dialog a PLAY left: the set whose book it was, the recording played, and the tile selected on the page then. */
+interface RecordingsReturn {
+    readonly set: string;
+    readonly recording: string;
+    readonly selected: string | null;
+}
+
+/** `note` kept for the page STOP leads back to; nothing where the browser keeps nothing. */
+function noteReturn(note: RecordingsReturn): void {
+    try {
+        sessionStorage.setItem(RETURN_KEY, JSON.stringify(note));
+    } catch {
+        // No dialog to come back to.
+    }
+}
+
+/**
+ * The dialog the last PLAY left, where the address holds `RECORDING_STOPPED_HASH`, the
+ * fragment then taken off it; the note is read once, and `null` where there is none.
+ */
+function takeReturn(): RecordingsReturn | null {
+    if (window.location.hash !== RECORDING_STOPPED_HASH) return null;
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+    try {
+        const text = sessionStorage.getItem(RETURN_KEY);
+        sessionStorage.removeItem(RETURN_KEY);
+        const note = text === null ? null : JSON.parse(text) as Partial<RecordingsReturn> | null;
+        return note && typeof note.set === 'string' && typeof note.recording === 'string' && (note.selected === null || typeof note.selected === 'string')
+            ? { set: note.set, recording: note.recording, selected: note.selected } : null;
+    } catch {
+        return null;
+    }
 }
 
 /** A button of the panel, `className` naming what it does, `text` saying it. */

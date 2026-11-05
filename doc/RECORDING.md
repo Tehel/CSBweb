@@ -600,7 +600,11 @@ the time played flush right, the player's VBLs since the path's start
   it. `tools/checks/replay.ts` (point 11) restarts each package's path a second into its
   play, and again at its end, and plays it to the same end.
 - **Stop** (Esc): the player and the loop stopped, and the page left for the welcome
-  page.
+  page. Where the book's dialog played the recording, the page shows it as PLAY left
+  it: its RECORDINGS, the recording selected, the tile selected under it. PLAY notes
+  them in the tab's `sessionStorage`, and stop leads back with `#recording-stopped`
+  (`RECORDING_STOPPED_HASH`), which the page takes off the address; it reads the note
+  once, so another way back to the welcome page shows it as ever.
 - **The pace** (`+`, its key with or without Shift, and `-`, or a click, round from ×8 to ×1): the loop's VBLs to a VBL
   of the wall clock, 1, 2, 4 or 8 (`Game.setPace`). A span under a held clock is run at
   once at any pace.

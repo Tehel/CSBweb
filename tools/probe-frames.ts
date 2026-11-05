@@ -657,6 +657,8 @@ await clickOn('#about-close');
 check(await evaluate(`!document.querySelector('dialog.about') && location.hash === '' && /dungeon=nowhere/.test(location.search)`),
   'CLOSE closes it, and takes #about off the address');
 await clickOn('.welcome-footer nav a[href="#about"]');
+// The dialog opens at the `hashchange` the link makes, which may come after the click settles.
+await until(`!!document.querySelector('dialog.about')`, 'ABOUT opened by the footer', 5000).catch(() => {});
 const aboutAgain = await about();
 check(aboutAgain?.open === true && aboutAgain.hash === '#about', 'the footer\'s ABOUT opens it');
 await clickBeside();
@@ -1984,6 +1986,16 @@ const playedSavePoint = await evaluate(`(p => ({ drift: p.drift, point: [p.point
 console.log('  the save\'s point played:', JSON.stringify(playedSavePoint));
 check(playedSavePoint.drift === null && playedSavePoint.point === endWritten.point,
   'PLAY on the save plays the path the store holds to it, to its point, the file made there the save\'s');
+// STOP (Esc) leads back to the welcome page, the book's dialog as PLAY left it.
+await leave(() => key('Escape'), WELCOME);
+await until(`!!document.querySelector('dialog.documents .recordings-panel .recordings-play')`, 'the dialog PLAY left');
+const cameBack = await recordingsTab();
+const backAddress: string = await evaluate('location.hash');
+console.log('  back from the player:', JSON.stringify({ cameBack, backAddress }));
+check(cameBack?.title === 'Chaos Strikes Back' && cameBack.shown === 'documents-pane:false,recordings-pane:true'
+  && cameBack.items.includes(`${savePoint}|${endWritten.save}|true`) && cameBack.panel[0] === endWritten.save && backAddress === '',
+  'STOP leads back to the welcome page, the book\'s dialog as PLAY left it: RECORDINGS, the save selected, its panel shown, the address without its fragment');
+await clickBeside();
 
 // The site's recordings moderated from the book (`server/recordings.ts`), by the dev
 // server's moderator: a second share of the package above, pending and listed first to
