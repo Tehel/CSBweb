@@ -759,7 +759,8 @@ by CSBWin 8.0 to 17.6) and `Dungeon Master minimum item picking/`, Chaos Strikes
 in `Race to Fulya Pit/`, `Chaos Strikes Back minimum item picking/` and `Paul's CSB full
 recording v4/` (a whole game by 2023.05.20 from its `csbgame.dat`, at `d.Time` 19, its log
 `Playfile.log`; beside it `prison_playfile.log` is the prison's, a new game ending in SAVE
-AND QUIT at `d.Time` 0x2749, which is not played). Each folder holds
+AND QUIT at `d.Time` 0x2749, which is not played), and Conflux's in `Conflux_Without_Bug
+20180329/Files/` (below). Each folder holds
 its `playfile.log` (some name it `Playfile.log`, `DMMovie2823`'s annotated folder also has
 `record00000.log`), the `dungeon.dat` and `graphics.dat` it was played on, often the
 `CSBwin.exe`, and sometimes an `Annotation.txt`. The same collection is dmweb.free.fr's
@@ -888,13 +889,40 @@ What it establishes:
   are the port's fixes, their old behaviour kept until level 5 (`magicDamageThroughArmour`,
   `skippedStepForgetsParty`): at level 4 the run drifts at line 3851, as that engine did,
   which `tools/checks/csbwin-runs.ts` holds it to (`CsbwinRun.before`).
+- **Conflux's partial game** (`Conflux_Without_Bug 20180329/Files/`, CSBWin 15.8, a game
+  not won) is the first run through DSAs. Its `Playfile.log`, about 215,000 entries to
+  `d.Time` 0x5751c (16.5 hours), is 54 `record*.log` spliced by SpliceCSB 2.4
+  (`SpliceTrace.txt`): 43 joined at 42 saves cut out (`0x2224`), 11 abandoned branches
+  left out; the `record*.log` are not needed. It starts a new game, holds 204 saves made
+  on the disk menu, 5 `0x4444` lines, and neither `0x2223` nor `0xdddd`. Its files:
+  - **Its set** is a hidden one of its own, none of `conflux-3.5`'s three files being
+    the run's: `dungeon.bak1` as its `dungeon.dat` (the log's `0x6667` is that file's MD5),
+    the folder's `graphics.dat` (its `0x6666`), and Paul R. Stevens' `CSBgraphics.dat`,
+    `tools/fixtures/gamefiles/csbgraphics/`'s, without which CSBWin parts from the log at
+    `d.Time` 0x103. Whether the movies' archive holds the folder is not checked yet.
+  - **The folder's `dungeon.dat`** (and `dungeon.bak`, the same) is `dungeon.bak1` less the
+    "Wash footprints" DSA at 16(8,24), actuator `#8191`, a spell filter left as the
+    target of an AND gate's square: the forum's "Soap & Water DSA bug", which Paul R.
+    Stevens removed in 2018 (forum t=25152, p=154898). `conflux-3.5` has it; CSBWin
+    warns when it runs (`&PARAM@` past its parameters, its variables unset), the port
+    traces.
+  - **CSBWin 2023 plays it with no sequence error to `d.Time` 0x5726a**, eight ticks past
+    its last join, where `record00053` follows `record00051`, as `record00052` does: the
+    run ends at 0x57262, `record00051`'s end, its tail dropped. The DSA's warnings come
+    after that error.
+  - **The port plays its first 80 entries by `d.RandomNumber`**, through levels 0 to 4,
+    to line 125 (`d.Time` 0x91). There a DSA of an open room's timer (`ProcessDSATimer5`)
+    at 0x8f makes four draws in CSBWin that the port does not, between its first draw and
+    the `STRandom(n)` of a cell's position, which both make; CSBWin's backtrace names no
+    caller for the four, so the next step is a `TraceLine` in the oracle's copy.
 
 Paying it, in steps:
 
 1. **The 17.6 runs, `CSBMovie0640` and `CSBFullRecordingV4` through steps 3 to 5**, the
    author's request. Steps 3 to 5 are done for the four of them: their check, their
    recordings and their upload (below), which the author runs. Next, the other CSB runs through the oracle, and
-   Conflux's runs when the author has them. **The 9.x and 11.0xx runs play at their version's
+   Conflux's partial game (above): its set, its row of `CSBWIN_RUNS` held to its drift at
+   line 125, and its drifts, each the port's. **The 9.x and 11.0xx runs play at their version's
    profile** of behaviour flags (`doc/RECORDING.md` → "A recording's level"): each version
    differs from CSBWin 2023 throughout (above), so corrections to the log cannot convert
    them. Each flag is read from the diff of its version's source against 2023's
