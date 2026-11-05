@@ -110,7 +110,7 @@
 import './welcomePage.css';
 import logoUrl from '../assets/csbweb-logo.jpg';
 import { archiveName, dataSetArchive, type ReadArchiveFile } from '../data/DataSetArchive';
-import { folderFiles } from '../data/DataSetFiles';
+import { fileDigest, folderFiles } from '../data/DataSetFiles';
 import {
     chooserSets, DATA_SETS_ROUTE, DOCUMENT_EXTENSIONS, DOCUMENTS_SEGMENT, documentPath, isDocumentName, PLAYER_ID_HEADER, PNG_HEAD_BYTES, pngSize,
     RECORDING_ENDINGS, RECORDING_PACKAGE_FIELD, RECORDINGS_ROUTE, SHARED_RECORDING_ID, thumbnailPath, type RecordingEnding,
@@ -126,12 +126,17 @@ import {
     formatPlayTime, formatSaveDate, formatSaveTime, lastUsedSave,
     type BrowserDataSetStore, type RecordingEntry, type RecordingStore, type SaveEntry, type SaveStore,
 } from '../data/saves';
-import { pointInfo, pointMadeAt, pointPath, pointRecordingId, savesOnTheWay, shownPoints, storedPoints, type PointInfo, type StoredPoint } from '../engine/RecordingPoints';
 import {
-    packageOfEnd, packageOfSave, playedWithDevMoves, RECORDING_TEXT_LIMITS, writeRecordingPackage,
+    cutEnds, cutInfo, cutPointPath, cutStarts, pointInfo, pointMadeAt, pointPath, pointRecordingId, shownPoints, storedPoints,
+    type PointInfo, type StoredPoint, type StoredSave,
+} from '../engine/RecordingPoints';
+import {
+    packageOfEnd, packageOfPath, packageOfSave, playedWithDevMoves, readRecordingPackage, RECORDING_TEXT_LIMITS, writeRecordingPackage,
     type RecordingPackageStart, type RecordingPackageText,
 } from '../engine/RecordingPackage';
 import type { Recording } from '../engine/Recorder';
+import { cutDriftReason, playCut, type CutProgress } from '../engine/RecordingCut';
+import { cutPageOf, standInPage } from '../renderer/StandInPage';
 import { pruneRecordings } from '../engine/RecordingWriter';
 
 /** The page's static half: the logo, the places the grid and the buttons go, and the bottom. */
@@ -385,12 +390,12 @@ export async function showWelcomePage(
      * recordings alone; the page shown again as the server lists the sets once it is
      * closed, where a document was added or removed, the selection kept.
      */
-    function openDocuments(set: DataSet, recording: string | null = null): void {
+    function openDocuments(set: DataSet, recording: string | null = null, span: RecordingSpan = WHOLE): void {
         const keep = selected?.id ?? null;
         const isLocal = local.some((l) => l.set === set);
         showDocuments(set, isLocal, viewed.moderator, loadManifest, { saves: store, recordings }, (asked) => {
             if (asked) again(keep, asked);
-        }, { recording, played: (played) => noteReturn({ set: set.id, recording: played, selected: keep }) });
+        }, { recording, span, played: (played, chosen) => noteReturn({ set: set.id, recording: played, span: chosen, selected: keep }) });
     }
 
     /** The controls of a published `set` the viewer may use: the pen, and the tick and the cross, or the eye. */
@@ -467,7 +472,7 @@ export async function showWelcomePage(
     update();
     // Back from a recording PLAY played, its dialog as PLAY left it.
     const reopened = back && sets.find((set) => set.id === back.set);
-    if (reopened) openDocuments(reopened, back.recording);
+    if (reopened) openDocuments(reopened, back.recording, back.span);
     // The address at `#how-to-play` opens HOW TO PLAY, and at `#about` ABOUT, as the page is
     // shown and as the fragment changes on it. One handler, the last page's: the page is
     // shown anew often.
@@ -790,6 +795,8 @@ function showRecordings(
     // The site's, `null` until it answers first.
     let shared: SiteRecording[] | null = null;
     let selected: string | null = at.recording;
+    // The part of the selected browser's point its panel plays and uploads.
+    let span: RecordingSpan = at.span;
     // The browser's points are read: a selection none of them is, nor the site's, is dropped.
     let browserRead = false;
     // The selection the dialog opened on, to bring into view once listed.
@@ -838,6 +845,7 @@ function showRecordings(
         button.append(line('recordings-name', name), ...marks.map((mark) => line('recordings-mark', mark)),
             line('recordings-when', `${formatSaveDate(when)} ${formatSaveTime(when)}`));
         button.addEventListener('click', () => {
+            if (selected !== id) span = WHOLE;
             selected = id;
             uploadFor = null;
             render();
@@ -891,7 +899,7 @@ function showRecordings(
     const showShared = (recording: SiteRecording) => {
         const buttons = document.createElement('div');
         buttons.className = 'add-set-buttons';
-        buttons.append(playLink(recordingQuery(recording.id), () => at.played(recording.id)));
+        buttons.append(playLink(recordingQuery(recording.id), () => at.played(recording.id, WHOLE)));
         const act = async (action: RecordingAction, doing: string) => {
             status.textContent = doing;
             for (const button of panel.querySelectorAll('button')) button.disabled = true;
@@ -919,31 +927,62 @@ function showRecordings(
     };
 
     /**
-     * The panel of `point`: its metadata, once its path is read, then PLAY, UPLOAD, and DELETE
-     * on a game's end. Where the site does not publish the set, or the path holds a move of
-     * `?dev`, a line says why in UPLOAD's place.
+     * The panel of `point`: where it is played from and to (`span`), where the path passes
+     * a save it can start at (`cutStarts`) or end at (`cutEnds`); its metadata, once its
+     * path is read, as the part chosen would say them (`cutInfo`); then PLAY, UPLOAD, and
+     * DELETE on a game's end. Where the site does not publish the set, or the path holds a
+     * move of `?dev`, a line says why in UPLOAD's place.
      */
     const showPoint = async (point: StoredPoint) => {
         const id = pointRecordingId(point);
         panel.replaceChildren(line('recordings-reading', 'Reading the recording…'));
         let path: Recording[];
+        let starts: StoredSave[];
+        let start: StoredSave | null;
+        let ends: StoredPoint[];
+        let end: StoredPoint;
+        let endPath: Recording[];
         let info: PointInfo;
         try {
             path = await pointPath(source.recordings, point);
-            info = pointInfo(point, path, rows);
+            starts = cutStarts(point, path, all, rows);
+            start = starts.find((save) => save.save.id === span.from) ?? null;
+            ends = cutEnds(point, start, all, rows);
+            end = ends.find((one) => one.kind === 'save' && one.save.id === span.to) ?? point;
+            endPath = end === point ? path : await pointPath(source.recordings, end);
+            info = start ? cutInfo(end, start, endPath, rows) : pointInfo(end, endPath, rows);
         } catch (error) {
             if (selected === id) panel.replaceChildren(line('recordings-failure', `It could not be read: ${error instanceof Error ? error.message : String(error)}`));
             return;
         }
         if (selected !== id) return;
+        span = { from: start?.save.id ?? null, to: end.kind === 'save' && end !== point ? end.save.id : null };
+        const chosen = span;
+        const rechoose = (next: RecordingSpan) => {
+            span = next;
+            void showPoint(point);
+        };
+        const choices: HTMLElement[] = [];
+        if (starts.length > 0) {
+            choices.push(spanChoice('From', 'from', [
+                ['', path[0]!.start.kind === 'new' ? 'The beginning of the game' : 'The saved game it begins from'],
+                ...starts.map((save): [string, string] => [save.save.id, save.save.name]),
+            ], chosen.from ?? '', (value) => rechoose({ from: value || null, to: chosen.to })));
+        }
+        if (ends.length > 1) {
+            choices.push(spanChoice('To', 'to', [
+                ['', pointName(point)],
+                ...ends.slice(1).map((one): [string, string] => [one.kind === 'save' ? one.save.id : '', pointName(one)]),
+            ], chosen.to ?? '', (value) => rechoose({ from: chosen.from, to: value || null })));
+        }
         const buttons = document.createElement('div');
         buttons.className = 'add-set-buttons';
-        buttons.append(playLink(recordingQuery(id), () => at.played(id)));
-        const why = unpublished ?? (playedWithDevMoves(path) ? 'Not to upload: it holds a move of ?dev, which no game holds.' : null);
+        buttons.append(playLink(recordingQuery(pointRecordingId(end), chosen.from), () => at.played(id, chosen)));
+        const why = unpublished ?? (playedWithDevMoves(endPath) ? 'Not to upload: it holds a move of ?dev, which no game holds.' : null);
         if (why === null) {
             buttons.append(panelButton('recordings-upload', 'Upload', () => {
                 uploadFor = id;
-                showUpload(point, path, info);
+                showUpload(end, start, endPath, info);
             }));
         }
         if (point.kind === 'end') {
@@ -959,21 +998,24 @@ function showRecordings(
                     await refresh();
                 })())));
         }
-        const onTheWay = savesOnTheWay(point, all, rows).length;
+        // The saves the part chosen passes between its start and its end.
+        const onTheWay = cutEnds(end, start, all, rows).length - 1;
         panel.replaceChildren(
+            ...choices,
             ...detailLines({ title: pointName(point), author: '', description: '' }, info),
             line('recordings-info', onTheWay === 0 ? 'No save on the way' : onTheWay === 1 ? '1 save on the way' : `${onTheWay} saves on the way`),
             ...(why === null ? [] : [line('recordings-why', why)]), buttons);
     };
 
     /**
-     * The panel's UPLOAD form on `point`, whose path is `path` and metadata `info`: its
-     * title, which UPLOAD waits for, and its author and description, then CANCEL, back to
-     * its panel, and UPLOAD, which sends its package (`uploadPoint`). Once the site has it,
-     * the site's list is asked anew, the recording selected in it, pending; a refusal is
-     * said, and the form kept.
+     * The panel's UPLOAD form on the path to `end`, `path` (`pointPath`), from `start` where
+     * it starts at a save on its way, with the metadata `info`: its title, which UPLOAD
+     * waits for, and its author and description, then CANCEL, back to its panel, and
+     * UPLOAD, which sends its package (`uploadPoint`), saying how far a cut has gone. Once
+     * the site has it, the site's list is asked anew, the recording selected in it,
+     * pending; a refusal is said, and the form kept.
      */
-    const showUpload = (point: StoredPoint, path: readonly Recording[], info: PointInfo) => {
+    const showUpload = (end: StoredPoint, start: StoredSave | null, path: readonly Recording[], info: PointInfo) => {
         const fields = document.createElement('div');
         fields.className = 'recordings-upload-form';
         fields.innerHTML = UPLOAD;
@@ -993,7 +1035,7 @@ function showRecordings(
             const text = { title: title.value.trim(), author: author.value.trim(), description: description.value.trim() };
             status.textContent = `Uploading ${text.title}…`;
             editable(false);
-            const answer = await uploadPoint(point, path, info, text, source.saves);
+            const answer = await uploadPoint(set, end, start, path, info, text, source, (doing) => { status.textContent = doing; });
             if (typeof answer === 'string') {
                 status.textContent = `Uploading ${text.title} failed: ${answer}`;
                 editable(true);
@@ -1020,28 +1062,69 @@ function showRecordings(
 }
 
 /**
- * The package of `point`, whose path is `path` (`pointPath`) and metadata `info`, said by
- * `text`, written and uploaded (`POST RECORDINGS_ROUTE`) by the player whose `playerId`
- * this is, a save's file read from `saves`: the id the site gives it, or why not.
+ * The package of the path to `end`, `path` (`pointPath`), with the metadata `info`, said by
+ * `text`, written and uploaded (`POST RECORDINGS_ROUTE`) by the player whose `playerId` this
+ * is, the saves' files read from `source`: the id the site gives it, or why not. Where it
+ * starts at the save `start` on its way, the path is cut there in a page of `set`'s without
+ * the DOM (`cutPointPath`), and its package, read back, played to its end there before it
+ * is sent: where it drifts, nothing is sent. `say` is told how far each has gone.
  */
 async function uploadPoint(
-    point: StoredPoint, path: readonly Recording[], info: PointInfo, text: RecordingPackageText, saves: Pick<SaveStore, 'read'>,
+    set: DataSet, end: StoredPoint, start: StoredSave | null, path: readonly Recording[], info: PointInfo, text: RecordingPackageText,
+    source: RecordingsSource, say: (doing: string) => void,
 ): Promise<{ readonly id: string } | string> {
     let bytes: Uint8Array;
     try {
         const times = { recordedAt: info.recordedAt, endedAt: info.endedAt, playTime: info.playTime, ...(info.champions ? { champions: info.champions } : {}) };
-        bytes = await writeRecordingPackage(point.kind === 'save'
-            ? packageOfSave(path, point.save.recording, await saves.read(point.save.id), text, times)
-            : packageOfEnd(path, text, times));
+        if (start === null) {
+            bytes = await writeRecordingPackage(end.kind === 'save'
+                ? packageOfSave(path, end.save.recording, await source.saves.read(end.save.id), text, times)
+                : packageOfEnd(path, text, times));
+        } else {
+            const files = folderFiles(set.dir);
+            const stand = async () => cutPageOf(await standInPage(set, files));
+            const progress = (doing: string): CutProgress => ({
+                played: (vbls, of) => say(`${doing}: ${Math.min(99, Math.floor(vbls * 100 / Math.max(1, of)))}%`),
+                breathe: () => new Promise((resolve) => setTimeout(resolve, 0)),
+            });
+            say(`Cutting the recording at ${start.save.name}…`);
+            const cut = await cutPointPath(source.recordings, source.saves, end, start, stand, progress(`Cutting the recording at ${start.save.name}`));
+            const shared = end.kind === 'save'
+                ? { kind: 'save' as const, md5: fileDigest(await source.saves.read(end.save.id)), inVbl: end.save.recording.inVbl === true }
+                : { kind: 'end' as const };
+            bytes = await writeRecordingPackage(packageOfPath(cut, shared, text, times));
+            say('Playing the cut to its end…');
+            const read = await readRecordingPackage(bytes);
+            const drift = await playCut(read.path, read.shared.kind === 'save' ? read.shared : null, stand, progress('Playing the cut to its end'));
+            if (drift) return `nothing is sent: cut at ${start.save.name}, ${cutDriftReason(drift)}.`;
+        }
     } catch (error) {
         return `it could not be packed: ${error instanceof Error ? error.message : String(error)}.`;
     }
+    say(`Uploading ${text.title}…`);
     const form = new FormData();
     form.append(RECORDING_PACKAGE_FIELD, new Blob([bytes as Uint8Array<ArrayBuffer>], { type: 'application/gzip' }), 'recording.gz');
     const answer = await answerAsPlayer(RECORDINGS_ROUTE, {}, form);
     if (typeof answer === 'string') return answer;
     const id = (answer.json as { id?: unknown } | null)?.id;
     return typeof id === 'string' && SHARED_RECORDING_ID.test(id) ? { id } : 'the server answered no id.';
+}
+
+/**
+ * A choice of the panel's, where a browser's point is played from or to: `label` beside a
+ * list named `name` of `options`, each its value and its text, `value` chosen; `change`
+ * told the value chosen.
+ */
+function spanChoice(label: string, name: string, options: readonly [string, string][], value: string, change: (value: string) => void): HTMLElement {
+    const field = document.createElement('label');
+    field.className = 'recordings-span';
+    const select = document.createElement('select');
+    select.name = name;
+    for (const [option, text] of options) select.append(new Option(text, option));
+    select.value = value;
+    select.addEventListener('change', () => change(select.value));
+    field.append(line('px px2 recordings-span-label', label), select);
+    return field;
 }
 
 /** The panel's PLAY: a link to `href`, `played` told as it is followed. */
@@ -1061,8 +1144,23 @@ function playLink(href: string, played: () => void): HTMLElement {
  */
 interface RecordingsAt {
     readonly recording: string | null;
-    readonly played: (recording: string) => void;
+    /** Where the browser's point `recording` is played from and to: the save rows chosen, `null` for its start and itself. */
+    readonly span: RecordingSpan;
+    readonly played: (recording: string, span: RecordingSpan) => void;
 }
+
+/**
+ * The part of a browser's point a panel plays and uploads (`cutAtSave`,
+ * `src/engine/RecordingCut.ts`): the save row it starts at, `null` for its path's own
+ * start, and the save row it ends at, `null` for the point itself.
+ */
+interface RecordingSpan {
+    readonly from: string | null;
+    readonly to: string | null;
+}
+
+/** A point played whole. */
+const WHOLE: RecordingSpan = { from: null, to: null };
 
 /**
  * The fragment the recording player's STOP leads back to the welcome page with
@@ -1074,10 +1172,14 @@ export const RECORDING_STOPPED_HASH = '#recording-stopped';
 /** Where PLAY notes the dialog it leaves, in `sessionStorage`: this tab's alone. */
 const RETURN_KEY = 'csbweb-recordings-return';
 
-/** The dialog a PLAY left: the set whose book it was, the recording played, and the tile selected on the page then. */
+/**
+ * The dialog a PLAY left: the set whose book it was, the recording played, the part of it
+ * chosen, and the tile selected on the page then.
+ */
 interface RecordingsReturn {
     readonly set: string;
     readonly recording: string;
+    readonly span: RecordingSpan;
     readonly selected: string | null;
 }
 
@@ -1101,8 +1203,10 @@ function takeReturn(): RecordingsReturn | null {
         const text = sessionStorage.getItem(RETURN_KEY);
         sessionStorage.removeItem(RETURN_KEY);
         const note = text === null ? null : JSON.parse(text) as Partial<RecordingsReturn> | null;
-        return note && typeof note.set === 'string' && typeof note.recording === 'string' && (note.selected === null || typeof note.selected === 'string')
-            ? { set: note.set, recording: note.recording, selected: note.selected } : null;
+        const row = (value: unknown): value is string | null => value === null || typeof value === 'string';
+        const span = note?.span && row(note.span.from) && row(note.span.to) ? { from: note.span.from, to: note.span.to } : WHOLE;
+        return note && typeof note.set === 'string' && typeof note.recording === 'string' && row(note.selected)
+            ? { set: note.set, recording: note.recording, span, selected: note.selected } : null;
     } catch {
         return null;
     }
@@ -1462,19 +1566,23 @@ export function welcomePageQuery(): string {
     params.delete('dungeon');
     params.delete('save');
     params.delete('recording');
+    params.delete('from');
     const query = `${params}`;
     return query ? `?${query}` : window.location.pathname;
 }
 
 /**
- * The page's own query and the recording `recording` to play (`?recording=`), with no set
- * and no save: the page plays the set the recording names (`src/main.ts`).
+ * The page's own query and the recording `recording` to play (`?recording=`), from the
+ * save row `from` where it starts at one on its way (`?from=`), with no set and no save:
+ * the page plays the set the recording names (`src/main.ts`).
  */
-function recordingQuery(recording: string): string {
+function recordingQuery(recording: string, from: string | null = null): string {
     const params = new URLSearchParams(window.location.search);
     params.delete('dungeon');
     params.delete('save');
     params.set('recording', recording);
+    if (from === null) params.delete('from');
+    else params.set('from', from);
     return `?${params}`;
 }
 

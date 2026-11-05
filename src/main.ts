@@ -55,7 +55,9 @@ import {
 } from './renderer/ui/RecordingStrip';
 import { packageOfSave, readRecordingPackage, recordingPackageUrl, writeRecordingPackage } from './engine/RecordingPackage';
 import { pointPath, SAVE_POINT_PREFIX, storedPoints } from './engine/RecordingPoints';
-import type { Recording } from './engine/Recorder';
+import { cutAtSave } from './engine/RecordingCut';
+import { cutPageOf, standInPage } from './renderer/StandInPage';
+import type { Recording, RecordingPoint } from './engine/Recorder';
 import { applySaveBytes } from './engine/SaveGameFile';
 import { Settings, applyToGame, type SettingsValues } from './settings/Settings';
 import type { KeyboardLayoutMap } from './renderer/ui/KeyLabels';
@@ -96,6 +98,8 @@ let setThumbnail!: () => Promise<Blob | null>;
  * the store's (`playRecording`), on the set it names, or `null`. Its player, once it is begun.
  */
 const playedRecording = new URLSearchParams(window.location.search).get('recording');
+/** `?from=`: the save row a store's recording is played from, cut there (`cutPlayedPath`). */
+const playedFrom = new URLSearchParams(window.location.search).get('from');
 let recordingPlayer: RecordingPlayer | null = null;
 const gameCanvasEl = document.getElementById('game-canvas') as HTMLCanvasElement;
 if (!gameCanvasEl) console.log(`Couldn't find game canvas !`);
@@ -836,10 +840,15 @@ function runMessagesAlone(game: Game, messages: ScrollingText): () => void {
     return () => clearInterval(timer);
 }
 
-/** What `?recording=` plays: a path, and the save its end makes where it ends at a save's point. */
+/**
+ * What `?recording=` plays: a path, and the save its end makes where it ends at a save's
+ * point; and where `?from=` names a save on its way, that save, which the path is cut at
+ * once the set's files are known (`cutPlayedPath`).
+ */
 interface PlayedPath {
     readonly path: readonly Recording[];
     readonly savedAtEnd: SavedAtEnd | null;
+    readonly from?: { readonly name: string; readonly point: RecordingPoint; readonly file: Uint8Array };
 }
 
 /**
@@ -853,8 +862,53 @@ async function readPlayedRecording(id: string): Promise<PlayedPath> {
     const storeRandom = new CsbRandom();
     const draw: DrawPlaythrough = (rows) => drawPlaythrough(storeRandom, rows);
     const recordingStore = new BrowserRecordingStore(draw);
-    if (id.startsWith(SAVE_POINT_PREFIX)) return readSavePoint(new BrowserSaveStore(draw), recordingStore, id.slice(SAVE_POINT_PREFIX.length));
-    return { path: await readRecordingPath(recordingStore, id), savedAtEnd: null };
+    const saveStore = new BrowserSaveStore(draw);
+    const played = id.startsWith(SAVE_POINT_PREFIX) ? await readSavePoint(saveStore, recordingStore, id.slice(SAVE_POINT_PREFIX.length))
+        : { path: await readRecordingPath(recordingStore, id), savedAtEnd: null };
+    if (playedFrom === null) return played;
+    const start = (await saveStore.list(null)).find((entry) => entry.id === playedFrom);
+    if (!start?.recording) throw new Error(`No recording reaches the save '${playedFrom}'.`);
+    return { ...played, from: { name: start.name, point: start.recording, file: await saveStore.read(start.id) } };
+}
+
+/**
+ * `played`'s path cut at the save `?from=` names on its way (`cutAtSave`,
+ * `src/engine/RecordingCut.ts`), as UPLOAD cuts it (`src/ui/welcomePage.ts`): replayed
+ * headless up to it in a page of the set's without the DOM, the set's files read through
+ * `files`, a bar on the canvas meanwhile. A path that cannot start there, or drifts before
+ * it, ends the page as an error does.
+ */
+async function cutPlayedPath(played: PlayedPath, set: DataSet, files: DataSetFiles): Promise<PlayedPath> {
+    const { from } = played;
+    if (!from) return played;
+    const started = Date.now();
+    const shown = cutProgressShown(gameCanvasEl, `CUTTING THE RECORDING AT ${from.name}`.toUpperCase());
+    const path = await cutAtSave(played.path, from.point, from.file, async () => cutPageOf(await standInPage(set, files)), {
+        played: (vbls, of) => shown(vbls / Math.max(1, of)),
+        breathe: () => new Promise((resolve) => requestAnimationFrame(() => resolve())),
+    });
+    console.log(`✓ The recording cut at ${from.name}, in ${((Date.now() - started) / 1000).toFixed(1)}s`);
+    return { path, savedAtEnd: played.savedAtEnd };
+}
+
+/**
+ * What the canvas shows while a path is cut (`cutPlayedPath`), before the game's screen
+ * has it: `what`, and a bar as long as the part played, which the function returned draws.
+ */
+function cutProgressShown(canvas: HTMLCanvasElement, what: string): (fraction: number) => void {
+    const context = canvas.getContext('2d');
+    return (fraction) => {
+        if (!context) return;
+        context.fillStyle = '#000';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.fillStyle = '#ccc';
+        context.font = '8px monospace';
+        context.textAlign = 'center';
+        context.fillText(what.slice(0, 52), canvas.width / 2, 92);
+        context.strokeStyle = '#ccc';
+        context.strokeRect(60.5, 100.5, 199, 7);
+        context.fillRect(62, 102, Math.round(196 * Math.min(1, fraction)), 4);
+    };
 }
 
 /**
@@ -1035,6 +1089,8 @@ async function init() {
         ({ set: dataSet, thumbnail: setThumbnail } = chosen);
         // Each file read through them keeps its digest, which a recording carries (`Recording.files`).
         setFiles = digestedFiles(chosen.files);
+        // A recording played from a save on its way is cut there first, the canvas the game's screen has not taken yet.
+        const cut = played && await cutPlayedPath(played, dataSet, setFiles);
         console.log(`Loading ${dataSet.name}...`);
         const files = await loadGameFiles(dataSet, setFiles);
         console.log(`✓ Loaded graphics: ${files.graphicsLoader.getItemCount()} items${dataSet.csbGraphics ? ', and the CSBgraphics.dat overlay' : ''}`);
@@ -1062,7 +1118,7 @@ async function init() {
         // the dev server's, and a build's only with `CSBWEB_PROBE=1` (`vite.config.mts`),
         // so the handle cannot reach a deployed bundle.
         if (__CSBWEB_PROBE__) (window as unknown as Record<string, unknown>).__probe = probeHandle(built, sound);
-        if (playedRecording !== null && played && playedSet !== null) return await playRecording(built, playedRecording, played, playedSet);
+        if (playedRecording !== null && cut && playedSet !== null) return await playRecording(built, playedRecording, cut, playedSet);
         // Before the intro: the entrance's chooser takes a dropped save as the disk menu does.
         bindSaveDrop(built.screen.ui);
         await runIntro(built, sound);

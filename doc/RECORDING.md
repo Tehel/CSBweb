@@ -555,7 +555,10 @@ needs no `?dungeon=`, and one that names another set ends the page as an error. 
 (`readRecordingPath`, `src/data/saves/RecordingStore.ts`). A store's save,
 `save:<its row's id>` (`SAVE_POINT_PREFIX`, `src/engine/RecordingPoints.ts`), is the path the
 store holds to its point, played to it and the save's file checked there, as a site's
-(`readSavePoint`). A site's, sixteen uppercase
+(`readSavePoint`). Either, with `&from=<a save's row id>`, is played from that save on its
+way: the path is cut there first, as UPLOAD cuts it ("A path cut at a save", below), a bar
+on the canvas meanwhile (`cutPlayedPath`), and one that cannot start there, or drifts
+before it, ends the page as an error does. A site's, sixteen uppercase
 hexadecimal digits (`SHARED_RECORDING_ID`), is its package's path ("Shared recordings",
 below), read from the server (`recordings/<id>.gz?v=3`, `recordingPackageUrl`) and never
 put in the store, played to the point it was shared at, a save's file checked there. Every tick is drawn at
@@ -601,7 +604,8 @@ the time played flush right, the player's VBLs since the path's start
   play, and again at its end, and plays it to the same end.
 - **Stop** (Esc): the player and the loop stopped, and the page left for the welcome
   page. Where the book's dialog played the recording, the page shows it as PLAY left
-  it: its RECORDINGS, the recording selected, the tile selected under it. PLAY notes
+  it: its RECORDINGS, the recording selected, where it was played from and to, the tile
+  selected under it. PLAY notes
   them in the tab's `sessionStorage`, and stop leads back with `#recording-stopped`
   (`RECORDING_STOPPED_HASH`), which the page takes off the address; it reads the note
   once, so another way back to the welcome page shows it as ever.
@@ -771,18 +775,27 @@ recording's title (a browser's point's name), its author and description where i
 them, its party at its point where that is known, the time played, where its path starts,
 a new game or a saved one and its level, and where it ends, a save or the game's end,
 won or lost; then, of a site's recording, when it was shared and its state, and of a
-browser's point, the saves on its way. The server reads where a recording ends and its
+browser's point, the saves on its way. A browser's point is played and uploaded whole,
+or part of it: above its lines, FROM chooses where it starts, its path's own start or a
+save on its way it can start at (`cutStarts`, "A path cut at a save", above), and TO
+where it ends, the point or a save on its way past the start (`cutEnds`). Its lines then
+say what the part would: from a saved game and its level, the time played since that
+save, and the saves between (`cutInfo`). The server reads where a recording ends and its
 party from its package as it takes it, and, as it starts, for a row added before it kept
-them (`fillEndings`, `server/recordings.ts`). It offers PLAY, `?recording=<id>`; to a moderator,
+them (`fillEndings`, `server/recordings.ts`). It offers PLAY, `?recording=<id>`, and
+`&from=<row>` from a save on the way; to a moderator,
 APPROVE on a pending one, HIDE or SHOW on any other, and DELETE, and to its uploader,
 WITHDRAW (`POST api/recordings/<id>`). Each delete asks first, and the list is then the
 server's anew, a refusal said in the dialog. A local set's book has no site's list. The
 set's tile says how many the site lists to everyone, "N replays", which the manifest
 counts (`DataSet.recordings`, `RecordingStore.listed`).
 
-**UPLOAD** shares a browser's point: its form in the panel takes a title, which it needs,
-an author and a description (`RECORDING_TEXT_LIMITS`), then writes the point's package
-and sends it (`uploadPoint`, `POST api/recordings`); the site's list is then asked anew,
+**UPLOAD** shares a browser's point, the part FROM and TO chose: its form in the panel
+takes a title, which it needs, an author and a description (`RECORDING_TEXT_LIMITS`), then
+writes the package and sends it (`uploadPoint`, `POST api/recordings`). From a save on
+the way, the path is cut there first in the uploader's browser, and its package, read
+back, played to its end before it is sent, the dialog saying how far each has gone; where
+it drifts, nothing is sent, and the dialog says why. The viewer waits for nothing; the site's list is then asked anew,
 the recording selected in it, pending until a moderator approves it. It is not offered
 where the site would refuse it, and the panel says why: a local set, a pending one, or a
 path that holds a move of `?dev` (`playedWithDevMoves`).
@@ -823,8 +836,9 @@ change with its clock and its stream.
 
 The metadata are the player's title, which it needs, author and description, plain text
 as long as a set's name, authors and description may be (`RECORDING_TEXT_LIMITS`); when
-the path's root began, when its point was made, the game's play time there
-(`Game.playTime`); where it starts, a new game or the save's level and champions,
+the path's root began, a cut's when its save was made; when its point was made; the time
+played (`Game.playTime`), the game's at its point, and a cut's since its save, its
+point's less its save's, which is what its viewer watches; where it starts, a new game or the save's level and champions,
 which is read from the root, so it cannot disagree with it; and the party's champions at
 its point, the save's (`SaveEntry.champions`) or the game's end's
 (`RecordingEntry.champions`), which a package written before it kept them, or of a game's

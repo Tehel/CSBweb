@@ -1866,6 +1866,13 @@ await evaluate(`(async()=>{ const { saves } = window.__probe;
   return imported.kind; })()`);
 await vbls(TICK);
 await key('KeyL'); await vbls(TICK);
+// A save before the quick save, on its path, a few seconds of play on either side of it:
+// where the book's FROM starts it, and its TO ends it, each part played less than the whole.
+await vbls(180);
+const earlier: { id: string; name: string; changes: number; vbls: number } = await evaluate(`window.__probe.saves.save('running', 'new')
+  .then((e) => ({ id: e.id, name: e.name, changes: e.recording.changes, vbls: e.recording.vbls }))`);
+await vbls(180);
+await key('KeyL'); await vbls(TICK);
 await key('F5');
 await until(`window.__probe.saves.list().then((rows) => rows.some((e) => e.quick && e.recording))`, 'the quick save');
 const sharedRecording = await evaluate(`(async()=>{ const { saves, recordings, recordingStore, readRecordingPath, packageOfSave, writeRecordingPackage } = window.__probe;
@@ -1995,6 +2002,57 @@ console.log('  back from the player:', JSON.stringify({ cameBack, backAddress })
 check(cameBack?.title === 'Chaos Strikes Back' && cameBack.shown === 'documents-pane:false,recordings-pane:true'
   && cameBack.items.includes(`${savePoint}|${endWritten.save}|true`) && cameBack.panel[0] === endWritten.save && backAddress === '',
   'STOP leads back to the welcome page, the book\'s dialog as PLAY left it: RECORDINGS, the save selected, its panel shown, the address without its fragment');
+
+// FROM and TO (`cutStarts`, `cutEnds`, `src/engine/RecordingPoints.ts`): the quick save's
+// path passes the save made before it, which it can start at, and end at. FROM that save,
+// TO is gone, the save being the only one on the way, and the panel says the part: from a
+// saved game, the time played since the save. PLAY plays it, `?from=<row>`: the path cut at
+// the save (`cutPlayedPath`, `src/main.ts`), to the quick save's point, its file made there
+// the save's. STOP leads back with FROM kept. FROM its start again, TO the save: PLAY plays
+// the save's own point.
+const spanOf = () => evaluate(`(p=>p&&{ from: [...p.querySelectorAll('select[name=from] option')].map(o=>o.value+'='+o.textContent),
+  to: [...p.querySelectorAll('select[name=to] option')].map(o=>o.value+'='+o.textContent),
+  fromValue: p.querySelector('select[name=from]')?.value ?? null, toValue: p.querySelector('select[name=to]')?.value ?? null,
+  panel: [...p.querySelectorAll('.recordings-title, .recordings-info')].map(l=>l.textContent), play: p.querySelector('.recordings-play')?.getAttribute('href') ?? null })(document.querySelector('.recordings-panel'))`);
+const chooseSpan = async (name: 'from' | 'to', value: string, shown: string) => {
+  await evaluate(`(s => { s.value = ${JSON.stringify(value)}; s.dispatchEvent(new Event('change')); return 1; })(document.querySelector('.recordings-panel select[name=${name}]'))`);
+  await until(`(h => h !== null && ${shown})(document.querySelector('.recordings-panel .recordings-play')?.getAttribute('href') ?? null)`, `the panel ${name.toUpperCase()} ${value || 'its start'}`);
+};
+const hasFrom = (row: string) => `new URLSearchParams(h).get('from') === ${JSON.stringify(row)}`;
+const playTime = (panel: string[] | undefined) => (([, h, m, s]) => (Number(h) * 60 + Number(m)) * 60 + Number(s))(
+  /^Time played (\d+):(\d\d):(\d\d)$/.exec(panel?.find((line) => line.startsWith('Time played ')) ?? '') ?? ['', 'NaN', '0', '0']);
+const whole = await spanOf();
+await chooseSpan('from', earlier.id, hasFrom(earlier.id));
+const fromEarlier = await spanOf();
+console.log('  FROM and TO:', JSON.stringify({ earlier, whole, fromEarlier }));
+check(whole?.from.join() === `=The saved game it begins from,${earlier.id}=${earlier.name}` && whole.fromValue === ''
+  && whole.to.join() === `=${endWritten.save},${earlier.id}=${earlier.name}` && whole.toValue === '',
+  'the quick save\'s panel offers FROM its path\'s start or the save on its way, and TO itself or that save, the whole chosen');
+const cutQuery = new URLSearchParams(fromEarlier?.play ?? '');
+check(fromEarlier?.fromValue === earlier.id && fromEarlier.to.length === 0 && fromEarlier.panel[0] === endWritten.save
+  && fromEarlier.panel.some((line: string) => line.startsWith('From a saved game, level ')) && fromEarlier.panel.includes('To a saved game')
+  && playTime(fromEarlier.panel) < playTime(whole?.panel) && fromEarlier.panel.includes('No save on the way')
+  && cutQuery.get('recording') === savePoint && cutQuery.get('from') === earlier.id,
+  'FROM the save, TO is gone, and the panel says the part: from a saved game, less time played, no save on the way, PLAY ?recording=save:<row>&from=<row>');
+await leave(() => clickOn('.recordings-play', true), 'window.__probe?.player() != null');
+await until('!window.__probe.player().playing', 'the part played to its end');
+const [quickChanges, quickVbls] = endWritten.point.split(',').map(Number);
+const playedPart = await evaluate(`(p => ({ drift: p.drift, joins: p.joins, point: [p.point.changes, p.point.vbls].join(), vbls: p.vbls }))(window.__probe.player())`);
+console.log('  the part played:', JSON.stringify(playedPart));
+check(playedPart.drift === null && playedPart.joins === 0 && playedPart.point === `${quickChanges! - earlier.changes - 1},${quickVbls! - earlier.vbls}`
+  && playedPart.vbls === quickVbls! - earlier.vbls,
+  'PLAY plays the path cut at the save, from its tail to the quick save\'s point, the file made there the quick save\'s, its time played counted from the save');
+await leave(() => key('Escape'), WELCOME);
+await until(`document.querySelector('dialog.documents .recordings-panel select[name=from]')?.value === ${JSON.stringify(earlier.id)}`, 'the dialog PLAY left, FROM kept');
+const cameBackCut = await spanOf();
+check(cameBackCut?.fromValue === earlier.id && new URLSearchParams(cameBackCut.play ?? '').get('from') === earlier.id,
+  'STOP leads back to the dialog with FROM as PLAY left it');
+await chooseSpan('from', '', `!new URLSearchParams(h).has('from')`);
+await chooseSpan('to', earlier.id, `new URLSearchParams(h).get('recording') === ${JSON.stringify(`save:${earlier.id}`)}`);
+const toEarlier = await spanOf();
+check(toEarlier?.toValue === earlier.id && toEarlier.panel[0] === endWritten.save && playTime(toEarlier.panel) < playTime(whole?.panel)
+  && new URLSearchParams(toEarlier.play ?? '').get('recording') === `save:${earlier.id}` && !new URLSearchParams(toEarlier.play ?? '').has('from'),
+  'FROM its start again and TO the save, PLAY plays the save\'s own point, ?recording=save:<row>');
 await clickBeside();
 
 // The site's recordings moderated from the book (`server/recordings.ts`), by the dev
@@ -2138,6 +2196,37 @@ check(/^[0-9A-F]{16}$/.test(uploadedId ?? '') && uploaded?.site.join() === `${up
   'UPLOAD sends its package: the site has it pending, its text trimmed, listed to its uploader alone, selected, with WITHDRAW');
 check(uploadLeft?.site.join() === 'No recording of this dungeon on the site yet.' && !uploadLeft.items.some((item: string) => item.startsWith('probe-dev-end|')),
   'its uploader withdraws it, and the game\'s end with the ?dev move is deleted');
+
+// UPLOAD of a part (`uploadPoint`): the quick save FROM the save before it, the path cut
+// there in this browser, its package played to its end before it is sent. The site lists
+// it from a saved game, and its package, played, plays from the save's tail to the quick
+// save's point. Its uploader then withdraws it.
+await openCsbRecordings();
+await clickOn(`.recordings-item[data-recording="${savePoint}"]`);
+await chooseSpan('from', earlier.id, hasFrom(earlier.id));
+await clickOn('.recordings-upload');
+await evaluate(`(p=>{ const f = p.querySelector('[name=title]'); f.value = 'Probe part'; f.dispatchEvent(new Event('input')); return 1; })(document.querySelector('.recordings-panel'))`);
+await clickOn('.recordings-send');
+await until(`!document.querySelector('.recordings-panel .recordings-upload-form') && !!document.querySelector('.recordings-withdraw')`, 'the part uploaded and listed', 60000);
+const partUploaded = await recordingsTab();
+const partId: string | null = await evaluate(`document.querySelector('.recordings-site .recordings-item[aria-selected="true"]')?.dataset.recording ?? null`);
+await navigate(`${APP}?recording=${partId}&keepsaves&keepsettings`, 'window.__probe?.player() != null');
+await until('!window.__probe.player().playing', 'the part shared played to its end');
+const partPlayed = await evaluate(`(p => ({ drift: p.drift, joins: p.joins, point: [p.point.changes, p.point.vbls].join() }))(window.__probe.player())`);
+await navigate(`${APP}?dungeon=nowhere&keepsaves&keepsettings`, WELCOME);
+await openCsbRecordings();
+await clickOn(`.recordings-item[data-recording="${partId}"]`);
+await clickOn('.recordings-withdraw');
+await confirmDelete();
+const partLeft = await recordingsTab();
+await clickOn('#documents-close');
+console.log('  UPLOAD of a part:', JSON.stringify({ partUploaded, partId, partPlayed, partLeft: partLeft?.site }));
+check(/^[0-9A-F]{16}$/.test(partId ?? '') && partUploaded?.site.join() === `${partId}|Probe part|pending|yours|true` && partUploaded.status.startsWith('Probe part is uploaded: ')
+  && partUploaded.panel.some((line: string) => line.startsWith('From a saved game, level ')) && partUploaded.panel.includes('To a saved game'),
+  'UPLOAD FROM the save cuts the path there, plays it to its end, and sends it: the site lists it pending, from a saved game');
+check(partPlayed.drift === null && partPlayed.joins === 0 && partPlayed.point === `${quickChanges! - earlier.changes - 1},${quickVbls! - earlier.vbls}`,
+  'and its package, played from the site, plays from the save\'s tail to the quick save\'s point, the file made there the quick save\'s');
+check(partLeft?.site.join() === 'No recording of this dungeon on the site yet.', 'its uploader withdraws it');
 
 // A lost game's end played back (`playRecording`, `src/main.ts`): `csbgame7.dat`, every
 // champion at 1 HP, saved by F5 and read back, which begins a recording from it, then put

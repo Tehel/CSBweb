@@ -379,6 +379,19 @@ body.welcome {
 .recordings-failure { color: var(--p9); }
 .recordings-why { margin: 0; color: var(--p2); }
 .recordings-upload-form { display: flex; flex-direction: column; gap: 10px; }
+/* Where a browser's point is played from and to: a save on its way, or its own start and end. */
+.recordings-span { display: grid; grid-template-columns: 60px 1fr; align-items: center; gap: 12px; }
+.recordings-span-label { color: var(--p9); }
+.recordings-span select {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 4px 9px;
+    background: #0b0b16;
+    color: var(--p15);
+    border: 3px solid #1d1d30;
+    font: 17px/1.4 Spectral, Georgia, serif;
+}
+.recordings-span select:focus-visible { outline: none; border-color: var(--p9); }
 .add-set-columns { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 24px; }
 .add-set-give { display: flex; flex-direction: column; gap: 10px; }
 .add-set-field { display: grid; grid-template-columns: 150px 1fr; align-items: center; gap: 12px; }

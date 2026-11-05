@@ -1270,6 +1270,8 @@ export class Game implements MainLoop {
         // starts the gravity afresh").
         Object.assign(this.ctx.loop, createGravityState());
         this.ctx.loop.clockTick = true;
+        // A read starts the loop where `MainLoop` begins, unless a cut's state, set after it, says otherwise.
+        this.atSavePoint = false;
     }
 
     /**

@@ -8,15 +8,19 @@
  *
  * **Nothing in this file touches the DOM.**
  */
-import { readRecordingPath, type RecordingEntry, type RecordingStore, type SaveEntry } from '../data/saves';
+import { readRecordingPath, type RecordingEntry, type RecordingStore, type SaveEntry, type SaveStore } from '../data/saves';
 import { packageStart, pathAtEnd, pathAtSave, playedWithExtras, type RecordingPackageInfo } from './RecordingPackage';
 import type { RecordingEnding } from '../data/DataSets';
 import type { Recording, RecordingPoint } from './Recorder';
+import { cutAtSave, cutPlace, type CutPage, type CutProgress } from './RecordingCut';
 
 /** A point the store keeps: a save made in a recording it holds, or a game's end. */
 export type StoredPoint =
     | { readonly kind: 'save'; readonly save: SaveEntry & { readonly recording: NonNullable<SaveEntry['recording']> } }
     | { readonly kind: 'end'; readonly recording: RecordingEntry & { readonly end: NonNullable<RecordingEntry['end']> } };
+
+/** A save's point the store keeps. */
+export type StoredSave = Extract<StoredPoint, { kind: 'save' }>;
 
 /**
  * What `?recording=` names a save's point by: its row's id after this. No recording's id
@@ -150,8 +154,59 @@ export function pointInfo(point: StoredPoint, path: readonly Recording[], rows: 
  * store's: those `shownPoints` leaves out for it, F5's, a save F9 read, a Sleepsave the
  * game went on from; the earliest first.
  */
-export function savesOnTheWay(point: StoredPoint, points: readonly StoredPoint[], rows: readonly RecordingEntry[]): Extract<StoredPoint, { kind: 'save' }>[] {
+export function savesOnTheWay(point: StoredPoint, points: readonly StoredPoint[], rows: readonly RecordingEntry[]): StoredSave[] {
     const held = new Map(rows.map((row) => [row.id, row]));
-    return points.filter((other): other is Extract<StoredPoint, { kind: 'save' }> => other !== point && other.kind === 'save' && passes(point, other, held))
+    return points.filter((other): other is StoredSave => other !== point && other.kind === 'save' && passes(point, other, held))
         .sort((a, b) => pointMadeAt(a) - pointMadeAt(b));
+}
+
+/**
+ * The saves the path to `point`, `path` (`pointPath`), can start at (`cutPlace`,
+ * `src/engine/RecordingCut.ts`), of `points`, `rows` the store's: of those it passes on its
+ * way (`savesOnTheWay`), each whose tail is the next change of its recording, or that a
+ * branch on the path read; the earliest first.
+ */
+export function cutStarts(point: StoredPoint, path: readonly Recording[], points: readonly StoredPoint[], rows: readonly RecordingEntry[]): StoredSave[] {
+    return savesOnTheWay(point, points, rows).filter((save) => cutPlace(path, save.save.recording) !== null);
+}
+
+/**
+ * Where a path to `point` that starts at `start`, `null` for its own start, can end, of
+ * `points`, `rows` the store's: `point`, or a save the path passes on its way past
+ * `start`, not at its place; `point` first, then the latest made first.
+ */
+export function cutEnds(point: StoredPoint, start: StoredSave | null, points: readonly StoredPoint[], rows: readonly RecordingEntry[]): StoredPoint[] {
+    const held = new Map(rows.map((row) => [row.id, row]));
+    const after = savesOnTheWay(point, points, rows).filter((save) => start === null
+        || save !== start && passes(save, start, held) && placeOrder(placeOf(save), placeOf(start)) !== 0);
+    return [point, ...after.reverse()];
+}
+
+/**
+ * What a list shows of the path to `end`, `path` (`pointPath`), started at `start`
+ * (`cutAtSave`), `rows` the store's: as `pointInfo`, but begun when the save was made,
+ * the play time since it, and starting from it, its level and its party.
+ */
+export function cutInfo(end: StoredPoint, start: StoredSave, path: readonly Recording[], rows: readonly RecordingEntry[]): PointInfo {
+    const info = pointInfo(end, path, rows);
+    const { savedAt, playTime, level, champions } = start.save;
+    return {
+        ...info,
+        recordedAt: Math.min(savedAt, info.endedAt),
+        playTime: Math.max(0, info.playTime - playTime),
+        start: { kind: 'save', level, champions },
+    };
+}
+
+/**
+ * The path `store` holds to `end` (`pointPath`), cut at the save `start` on its way
+ * (`cutAtSave`), its file read from `saves`: replayed headless up to it in a page `stand`
+ * stands up, `progress` told as it goes. Refused, `RecordingCutError`, where the path
+ * cannot start there or drifts before it.
+ */
+export async function cutPointPath(
+    store: Pick<RecordingStore, 'list' | 'read'>, saves: Pick<SaveStore, 'read'>, end: StoredPoint, start: StoredSave,
+    stand: () => Promise<CutPage>, progress: CutProgress | null,
+): Promise<Recording[]> {
+    return cutAtSave(await pointPath(store, end), start.save.recording, await saves.read(start.save.id), stand, progress);
 }

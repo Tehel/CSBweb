@@ -92,11 +92,18 @@ export interface RecordingPackageText {
 
 /** What a list shows of a recording shared. */
 export interface RecordingPackageInfo extends RecordingPackageText {
-    /** Milliseconds since the epoch: when its root began (`RecordingEntry.recordedAt`). */
+    /**
+     * Milliseconds since the epoch: when its root began (`RecordingEntry.recordedAt`); a
+     * path cut at a save, when the save was made (`cutInfo`).
+     */
     readonly recordedAt: number;
     /** Milliseconds since the epoch: when its point was made, the save or the game's end. */
     readonly endedAt: number;
-    /** Milliseconds: the game's play time at its point (`Game.playTime`), as a save's row has it. */
+    /**
+     * Milliseconds: the time played, the game's play time at its point (`Game.playTime`), as
+     * a save's row has it; a path cut at a save, since the save, its point's less the
+     * save's (`cutInfo`), what its viewer watches.
+     */
     readonly playTime: number;
     readonly start: RecordingPackageStart;
     /**
