@@ -42,3 +42,4 @@ One line per memory in this directory. Committed with the project; never shared.
 - [Known failures on the WSL checkout](wsl-known-failures.md) — `data-set-archive.ts` (an "é" under /tmp) fails at HEAD there (2026-11-05); compare with HEAD before chasing anything else
 - [No semantic-memory](no-semantic-memory.md) — never post this project into the semantic-memory MCP; session-review memories go here
 - [Recording cut at a save](recording-cut-at-save.md) — a cut starts from the save's file plus `CutState`; what each drift lacked (game info, the opening tick, the attack menu) and how to diff one
+- [Levels count from 0](levels-count-from-0.md) — every level the player sees is numbered from 0, the Hall of Champions level 0; "map" and "level" are synonyms; never `+ 1` for display
