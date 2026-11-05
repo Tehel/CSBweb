@@ -36,4 +36,8 @@ One line per memory in this directory. Committed with the project; never shared.
 - [.dockerignore is an allowlist](dockerignore-allowlist.md) — a new root file the build reads (a Vite entry's `.html`) must be added there; only `check-image.sh` notices
 - [Frames on fresh ports](frames-on-fresh-ports.md) — a reused :9000 dev server keeps sets earlier probes published and fails the welcome page checks; `DEV_PORT=9310 CDP_PORT=9311 bash tools/check-frames.sh`
 - [Shared bugs stay](shared-bugs-stay.md) — the Atari bug-list audit was dropped; a bug CSBWin shares stays unless game-breaking, for CSBWin recordings (F24) and CSBWin-tested dungeons
-- [CSBWin oracle](csbwin-oracle.md) — `tools/csbwin-oracle/oracle.sh` builds CSBWin 2023 (or `--version=11.014`) headless: plays a `playfile.log` in ~20 s, lists its draws with callers; a drift it shares is the run's version's
+- [CSBWin oracle](csbwin-oracle.md) — `tools/csbwin-oracle/oracle.sh` builds CSBWin 2023 (or `--version=11.014`) headless: plays a `playfile.log` in ~20 s, lists its draws with callers; triage per-tick counts, then callers, then `#AITraceOn`; traces must only print
+- [PossibleMove globals outlive the call](possiblemove-globals-outlive-call.md) — CSBWin reads `d.moveOntoPartyPosition` & co. stale after a skipped call; the port's per-call `MoveProbe` loses that: check it first for a drift after a skipped `PossibleMove`
+- [Long runs and the job timeout](long-runs-job-timeout.md) — the gate's 16 workers slow a tool ~3×, a job dies at 300 s: a CSBWin run past ~100 s alone gets its own `csbwin-runs.ts` job (`<id>` / `--not=<id>`)
+- [Known failures on the WSL checkout](wsl-known-failures.md) — `data-set-archive.ts` (an "é" under /tmp) and the frames' ABOUT step fail at HEAD there (2026-11-05); compare with HEAD before chasing anything else
+- [No semantic-memory](no-semantic-memory.md) — never post this project into the semantic-memory MCP; session-review memories go here
