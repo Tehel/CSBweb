@@ -282,9 +282,9 @@ export class CellInfo {
 
   constructor(private readonly source: CellInfoSource) {}
 
-  /** A level as the player counts it, and a square on it: `L3 (12,7)`. */
+  /** A level, counted from 0 as the map's descriptor counts it, and a square on it: `L3 (12,7)`. */
   levelName(map: number): string {
-    return `L${(this.source.dungeon.getMap(map)?.descriptor.level ?? map) + 1}`;
+    return `L${this.source.dungeon.getMap(map)?.descriptor.level ?? map}`;
   }
 
   /** The info of the square `at`, a line at a time. */

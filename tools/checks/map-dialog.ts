@@ -72,7 +72,7 @@ console.log('=== 1. the layout ===');
   check(frames.every(([, f]) => inside(f, interior)), 'every frame of the title line inside the plate\'s interior');
   const clashes = frames.flatMap(([a, fa], i) => frames.slice(i + 1).filter(([, fb]) => overlap(fa, fb)).map(([b]) => `${a}/${b}`));
   check(clashes.length === 0, `no frame over another${clashes.length ? `: ${clashes.join(', ')}` : ''}`);
-  check('LEVEL 64  (31,31)'.length * CHAR_WIDTH <= TITLE_PANEL.x2 - TITLE_PANEL.x1 - 8, 'the highest level\'s title and a square fit its panel');
+  check('LEVEL 63  (31,31)'.length * CHAR_WIDTH <= TITLE_PANEL.x2 - TITLE_PANEL.x1 - 8, 'the highest level\'s title and a square fit its panel');
 
   const bad: string[] = [];
   let narrowest = Infinity;
@@ -169,7 +169,7 @@ console.log('\n=== 2. the drawing ===');
       `facing ${name}, the tip (${tip} pixels) on the ${name} edge of the party's ${size}-pixel square, the base across the other`);
     closeMapDialog(ui);
   });
-  check(mapTitle(start) === `LEVEL ${start.descriptor.level + 1}` && mapTitle(start) === 'LEVEL 1', 'the first level is LEVEL 1');
+  check(mapTitle(start) === `LEVEL ${start.descriptor.level}` && mapTitle(start) === 'LEVEL 0', 'the first level is LEVEL 0, counted from 0 as the map\'s descriptor counts it');
 
   // The outlines: the lock at (3,4) of level 2 shown, the door at (4,5) it opens named.
   party.position.z = 1;

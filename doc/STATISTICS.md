@@ -219,7 +219,7 @@ count of each on hover. Everything it shows is `api/stats`'s:
   fastest wins, each its rank, its game time as `H:MM:SS` of the game clock (a tick 15
   VBLs, as the game runs awake), its play time, its party, a champion who joined by
   REINCARNATE marked `*`, a solo win badged, and its day; its deaths per level, a row a
-  level from LEVEL 1 to the deepest died on, as the map dialog numbers them; its preferred
+  level from Level 0 to the deepest died on, counted from 0 as everywhere; its preferred
   champions, by their mirror's name, each their share of the games with a party, and their win rate once in 10
   games; and its sessions, games started and games won per week.
 

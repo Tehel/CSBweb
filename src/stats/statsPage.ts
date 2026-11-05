@@ -18,7 +18,7 @@
  *   now), each its rank, its game time as `H:MM:SS` of the game's clock, its play time, its
  *   party, a champion who joined by REINCARNATE marked, a solo win badged, and its day; the
  *   deaths per level, a row a level from the first to the deepest died on, as the dungeon
- *   descends, `LEVEL 1` its first as the map dialog counts (`mapTitle`); its preferred
+ *   descends, `Level 0` its first, counted from 0 as the map dialog counts (`mapTitle`); its preferred
  *   champions, by their mirror's name, a reincarnated one's too, each their share of the games with a party, and their win rate once they
  *   were in `WIN_RATE_GAMES`; the sessions, games started and games won per week.
  *
@@ -169,8 +169,8 @@ function deathsPerLevel(levels: SetStats['levels']): HTMLElement {
     const list = document.createElement('div');
     list.className = 'stats-rows stats-levels';
     counts.forEach((died, level) => {
-        const row = barRow(`Level ${level + 1}`, died / most, count(died), 'stats-bar-death');
-        row.title = `Level ${level + 1}: ${plural(died, 'death')}`;
+        const row = barRow(`Level ${level}`, died / most, count(died), 'stats-bar-death');
+        row.title = `Level ${level}: ${plural(died, 'death')}`;
         list.append(row);
     });
     return list;

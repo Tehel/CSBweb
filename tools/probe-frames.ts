@@ -1195,7 +1195,7 @@ const statsPage = () => evaluate(`(async()=>{const q=(s,r=document)=>[...r.query
     expectedWins: set?.fastest.length, expectedSolos: set?.fastest.filter(w=>w.champions.length===1).length,
     expectedReincarnated: set?.fastest.flatMap(w=>w.champions).filter(c=>c.reincarnated).length,
     levels: q('.stats-levels .stats-row',panel).map(r=>text(r.querySelector('.stats-row-label'))+'='+text(r.querySelector('.stats-row-value'))).join(),
-    expectedLevels: set&&(set.levels.length===0?'':Array.from({length:Math.max(...set.levels.map(l=>l.level))+1},(_,l)=>'Level '+(l+1)+'='+(set.levels.find(r=>r.level===l)?.count??0)).join()),
+    expectedLevels: set&&(set.levels.length===0?'':Array.from({length:Math.max(...set.levels.map(l=>l.level))+1},(_,l)=>'Level '+l+'='+(set.levels.find(r=>r.level===l)?.count??0)).join()),
     champions: q('.stats-champions .stats-row:not(.stats-row-head) .stats-row-label',panel).map(text).join(),
     expectedChampions: set?.champions.map(c=>c.name).join(),
     gameCode: performance.getEntriesByType('resource').map(e=>e.name).filter(n=>/\\/main(-[\\w-]+)?\\.(ts|js)(\\?|$)|\\.dat$/i.test(n)) };})()`);

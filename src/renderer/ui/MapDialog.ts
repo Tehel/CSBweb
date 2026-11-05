@@ -8,8 +8,8 @@
  * It takes the whole screen, 320x200, as the settings do. From the top:
  *
  * - **The title line**: `<` and `>`, the level before and after, dim at the first and the
- *   last; between them, on a panel, the level's number, LEVEL 1 the dungeon's first, as
- *   the player counts them (the map's descriptor counts from 0), and the square under the
+ *   last; between them, on a panel, the level's number, counted from 0 as the map's
+ *   descriptor counts them, LEVEL 0 the dungeon's first, and the square under the
  *   pointer, `(x,y)`; then the marks' toggles, G, M and I, at most one pressed; at the
  *   right, CLOSE.
  * - **The map**, on a panel at the left, as wide as the level needs: a square a cell, at
@@ -191,9 +191,9 @@ export const MARK_LABELS = ['G', 'M', 'I'] as const;
 /** A marked square's cross: lit, as its toggle's label is pressed. */
 export const MARK_COLOR = LIT_COLOR;
 
-/** The title: the level's number, counted from 1. */
+/** The title: the level's number, counted from 0, as the map's descriptor counts it. */
 export function mapTitle(map: MapData): string {
-  return `LEVEL ${map.descriptor.level + 1}`;
+  return `LEVEL ${map.descriptor.level}`;
 }
 
 /** What the info says before a square is shown. */

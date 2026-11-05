@@ -67,7 +67,7 @@ function main(): void {
   const lock = describe(1, 3, 4);
   check(!!line(lock, 'S side: Lock: a TOPAZ KEY, taken'), 'the lock at (3,4) takes a topaz key, on its south side');
   check(!!line(lock, 'Opens door (4,5)', { map: 1, x: 4, y: 5 }), 'it opens the door at (4,5), a link');
-  check(!!line(lock, 'L2 (1,9)', { map: 1, x: 1, y: 9 }) && !!line(lock, 'L12 (19,21)', { map: 11, x: 19, y: 21 }),
+  check(!!line(lock, 'L1 (1,9)', { map: 1, x: 1, y: 9 }) && !!line(lock, 'L11 (19,21)', { map: 11, x: 19, y: 21 }),
     'the topaz keys of level 2 (1,9) and level 12 (19,21) are links');
   const door = describe(1, 4, 5);
   check(door[0]?.text === '(4,5) Door, closed', 'the door at (4,5) is closed');
@@ -85,13 +85,13 @@ function main(): void {
   const party = ctx.party.state.position;
   const inHand = describe(1, 3, 4);
   check(!!line(inHand, 'the party has it', { map: party.z, x: party.x, y: party.y }), 'the key in hand is the party\'s, at its square');
-  check(!line(inHand, 'L2 (1,9)'), 'and no longer at (1,9)');
+  check(!line(inHand, 'L1 (1,9)'), 'and no longer at (1,9)');
 
   // 3. Where squares lead.
   const teleporter = describe(1, 30, 3);
-  check(!!line(teleporter, 'Sends everything to L2 (30,1)', { map: 1, x: 30, y: 1 }), 'the teleporter at (30,3) sends everything to (30,1)');
-  check(!!line(describe(1, 30, 1), 'L2 (30,3)', { map: 1, x: 30, y: 3 }), '(30,1) names the teleporter at (30,3) among its arrivals');
-  check(!!line(describe(1, 31, 1), 'Sends everything to L2 (29,4), facing E', { map: 1, x: 29, y: 4 }), 'the teleporter at (31,1) sends everything to (29,4), facing east');
+  check(!!line(teleporter, 'Sends everything to L1 (30,1)', { map: 1, x: 30, y: 1 }), 'the teleporter at (30,3) sends everything to (30,1)');
+  check(!!line(describe(1, 30, 1), 'L1 (30,3)', { map: 1, x: 30, y: 3 }), '(30,1) names the teleporter at (30,3) among its arrivals');
+  check(!!line(describe(1, 31, 1), 'Sends everything to L1 (29,4), facing E', { map: 1, x: 29, y: 4 }), 'the teleporter at (31,1) sends everything to (29,4), facing east');
   const right = describe(2, 3, 4);
   check(right[0]?.text === '(3,4) Rotator, on, invisible', 'the teleporter at (3,4) of level 3, to its own square, is a rotator');
   check(!!line(right, 'Turns everything right') && !line(right, 'Sends') && !line(right, 'Teleporters to here'),
@@ -99,10 +99,10 @@ function main(): void {
   check(!!line(describe(2, 5, 0), 'Turns everything left'), 'the one at (5,0) turns everything left');
   check(!!line(describe(2, 5, 4), 'Turns everything to face S'), 'the one at (5,4) turns everything to face south');
   const up = ctx.dungeon.incrementLevel(new Position(3, 1, 1), -1)!;
-  check(!!line(describe(1, 3, 1), 'Leads to L1', { map: up.z, x: up.x, y: up.y }), `the stairs up at (3,1) lead to IncrementLevel's (${up.x},${up.y}) of map ${up.z}`);
+  check(!!line(describe(1, 3, 1), 'Leads to L0', { map: up.z, x: up.x, y: up.y }), `the stairs up at (3,1) lead to IncrementLevel's (${up.x},${up.y}) of map ${up.z}`);
   const down = ctx.dungeon.incrementLevel(new Position(24, 5, 1), 1)!;
   const pit = describe(1, 24, 5);
-  check(!!line(pit, 'Falls to L3', { map: down.z, x: down.x, y: down.y }), `the pit at (24,5) falls to IncrementLevel's (${down.x},${down.y}) of map ${down.z}`);
+  check(!!line(pit, 'Falls to L2', { map: down.z, x: down.x, y: down.y }), `the pit at (24,5) falls to IncrementLevel's (${down.x},${down.y}) of map ${down.z}`);
 
   // 4. The held pad.
   check(!!line(pit, '(25,3): Pad: party, monster or item', { map: 1, x: 25, y: 3 }) && !!line(pit, 'Closes pit while pressed'),
