@@ -527,8 +527,8 @@ function dsaInfoFetch(machine: DsaOperationMachine, bank: DsaBank): void {
     if (rec && getActuatorType(rec) === 47) {
       dsaType = getActuatorDsaSelector(rec);
       dsaState = getActuatorDsaState(rec);
-      dsaPA = getActuatorParameterA(rec);
-      dsaPB = getActuatorParameterB(rec);
+      dsaPA = getActuatorParameterA(rec, machine.ctx.behaviour.actuatorWord8BigEndian);
+      dsaPB = getActuatorParameterB(rec, machine.ctx.behaviour.actuatorWord8BigEndian);
     }
   }
   bank.stack.push(dsaType);

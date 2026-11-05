@@ -153,31 +153,68 @@ export function getActuatorPosition(rec: ActuatorRecord): number {
   return (rec.word6 >> 12) & 0x3;
 }
 
-export function getActuatorDsaParameters(rec: ActuatorRecord): { paramA: number; paramB: number } {
-  const word8 = rec.word8 ?? 0;
-  const paramA = ((rec.word4 & 0xffff) | ((word8 & 0x03) << 16)) >>> 0;
-  const paramB = ((rec.word6 & 0xffff) | ((word8 & 0x0c) << 14)) >>> 0;
-  return { paramA, paramB };
+/**
+ * A big actuator's `word8` as CSBWin holds it. `DB3::swap` turns `word2`, `word4` and
+ * `word6` into the host's order but leaves `word8` as the file has it
+ * (`doc/CSBwin-src/data.cpp:1321-1327`), so the little-endian build reads its two bytes
+ * swapped, and writes them back so to a save. The record keeps the file's word read
+ * big-endian, as its other words, so the file and a save read and write unchanged.
+ */
+export function csbwinWord8(fileWord8: number): number {
+  return ((fileWord8 >> 8) | (fileWord8 << 8)) & 0xffff;
 }
 
-export function getActuatorParameterA(rec: ActuatorRecord): number {
-  return getActuatorDsaParameters(rec).paramA;
+/**
+ * `DB3::ParameterA` and `ParameterB` (`doc/CSBwin-src/data.cpp:1338-1346`): `word4` and
+ * `word6`, each with two bits of `word8` above it, read as CSBWin holds it (`csbwinWord8`).
+ * `word8BigEndian` (`Behaviour.actuatorWord8BigEndian`) reads the record's word as it is.
+ */
+export function getActuatorDsaParameters(rec: ActuatorRecord, word8BigEndian = false): { paramA: number; paramB: number } {
+  if (word8BigEndian) {
+    const word8 = rec.word8 ?? 0;
+    const paramA = ((rec.word4 & 0xffff) | ((word8 & 0x03) << 16)) >>> 0;
+    const paramB = ((rec.word6 & 0xffff) | ((word8 & 0x0c) << 14)) >>> 0;
+    return { paramA, paramB };
+  }
+  const word8 = csbwinWord8(rec.word8 ?? 0);
+  return {
+    paramA: ((rec.word4 & 0xffff) | ((word8 & 3) << 16)) >>> 0,
+    paramB: ((rec.word6 & 0xffff) | ((word8 & 0x0c) << 14)) >>> 0,
+  };
 }
 
-export function getActuatorParameterB(rec: ActuatorRecord): number {
-  return getActuatorDsaParameters(rec).paramB;
+export function getActuatorParameterA(rec: ActuatorRecord, word8BigEndian = false): number {
+  return getActuatorDsaParameters(rec, word8BigEndian).paramA;
 }
 
-export function setActuatorParameterA(rec: ActuatorRecord, value: number): void {
+export function getActuatorParameterB(rec: ActuatorRecord, word8BigEndian = false): number {
+  return getActuatorDsaParameters(rec, word8BigEndian).paramB;
+}
+
+/** `void DB3::ParameterA(ui32 v)` (`doc/CSBwin-src/data.cpp:1348-1352`), on `csbwinWord8`. */
+export function setActuatorParameterA(rec: ActuatorRecord, value: number, word8BigEndian = false): void {
+  if (word8BigEndian) {
+    const v = value >>> 0;
+    rec.word4 = v & 0xffff;
+    const word8 = rec.word8 ?? 0;
+    rec.word8 = (word8 & 0xfffc) | ((v >> 16) & 0x03);
+    return;
+  }
   const v = value >>> 0;
   rec.word4 = v & 0xffff;
-  const word8 = rec.word8 ?? 0;
-  rec.word8 = (word8 & 0xfffc) | ((v >> 16) & 0x03);
+  rec.word8 = csbwinWord8((csbwinWord8(rec.word8 ?? 0) & 0xfffc) | ((v >> 16) & 3));
 }
 
-export function setActuatorParameterB(rec: ActuatorRecord, value: number): void {
+/** `void DB3::ParameterB(ui32 v)` (`doc/CSBwin-src/data.cpp:1354-1358`), on `csbwinWord8`. */
+export function setActuatorParameterB(rec: ActuatorRecord, value: number, word8BigEndian = false): void {
+  if (word8BigEndian) {
+    const v = value >>> 0;
+    rec.word6 = v & 0xffff;
+    const word8 = rec.word8 ?? 0;
+    rec.word8 = (word8 & 0xfff3) | ((v >> 14) & 0x0c);
+    return;
+  }
   const v = value >>> 0;
   rec.word6 = v & 0xffff;
-  const word8 = rec.word8 ?? 0;
-  rec.word8 = (word8 & 0xfff3) | ((v >> 14) & 0x0c);
+  rec.word8 = csbwinWord8((csbwinWord8(rec.word8 ?? 0) & 0xfff3) | ((v >> 14) & 0x0c));
 }

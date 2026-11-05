@@ -172,7 +172,7 @@ export interface ActuatorRecord {
     word2: ui16;                // +0x02 raw actuator word2 (type + value)
     word4: ui16;                // +0x04 raw actuator word4 (behavior)
     word6: ui16;                // +0x06 raw actuator word6 (target/local)
-    word8?: ui16;               // +0x08 raw actuator word8 (BigActuators only)
+    word8?: ui16;               // +0x08 actuator word8 (BigActuators only), the file's word read big-endian; CSBWin holds it swapped (`csbwinWord8`)
 }
 
 /**

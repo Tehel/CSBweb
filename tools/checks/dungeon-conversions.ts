@@ -49,7 +49,7 @@ import {
   MakeBigActuators,
   convertScrolls,
 } from '../../src/data/CsbwinDungeonConversions';
-import { getActuatorType } from '../../src/data/actuatorHelpers';
+import { csbwinWord8, getActuatorType } from '../../src/data/actuatorHelpers';
 import { DBType, OBJECT_ID_NULL } from '../../src/core/types';
 import type { DungeonData } from '../../src/data/dungeonTypes';
 import { check, fail, finish } from '../lib/check';
@@ -245,10 +245,11 @@ function checkActuatorConversion(raw: DungeonData, converted: DungeonData, saves
   const dsa = probe.databases.actuators.records[0];
   // Transcribed, not simplified: `(word6 >> 12) & 0xc0` can only ever be 0, since
   // `word6` is sixteen bits — a CSBWin quirk `ParameterB` does not agree with, and one
-  // no dungeon this project holds can exercise.
+  // no dungeon this project holds can exercise. The record keeps CSBWin's word8 as a file
+  // holds it (`csbwinWord8`).
   const wantWord8 = (((0xf456 >> 12) & 0xc0) | ((0xc123 >> 14) & 0x03));
-  check(dsa.word8 === wantWord8,
-    `a type-47 record lifts its parameter bits into word8 (got ${dsa.word8}, want ${wantWord8})`);
+  check(csbwinWord8(dsa.word8 ?? 0) === wantWord8,
+    `a type-47 record lifts its parameter bits into word8 (got ${csbwinWord8(dsa.word8 ?? 0)}, want ${wantWord8})`);
   check(dsa.word4 === 0x0123 && dsa.word6 === 0x3456,
     'and masks both parameters down to 14 bits');
 

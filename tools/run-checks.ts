@@ -150,6 +150,7 @@ const CHECKS: Tool[] = [
   { tool: 'dsa-widths.ts' },
   { tool: 'dsa-limits.ts' },
   { tool: 'dsa-parameters.ts' },
+  { tool: 'dsa-actuator-parameters.ts' },
   { tool: 'dsa-cell-fetch.ts' },
   { tool: 'viewing-filter.ts' },
   { tool: 'open-chest.ts' },

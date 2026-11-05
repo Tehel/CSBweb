@@ -183,11 +183,12 @@ console.log('6. &THISDSAID and &DSAINFO@');
   const dungeon = game.ctx.dungeon;
   const rn = dungeon.findFirstObject(at);
   const rec = dungeon.getActuatorRecord(rn)!;
-  // Selector 5, state 3, A 0x2abcd and B 0x31234 through word8's high bits (`data.cpp:1338-1346`).
+  // Selector 5, state 3, A 0x2abcd and B 0x31234 through word8's high bits (`data.cpp:1338-1346`),
+  // CSBWin's word8 0x000e, which the record keeps as the file's word (`csbwinWord8`).
   rec.word2 = 47 | (5 << 7) | (3 << 12);
   rec.word4 = 0xabcd;
   rec.word6 = 0x1234;
-  rec.word8 = 0x02 | (0x03 << 2);
+  rec.word8 = (0x02 | (0x03 << 2)) << 8;
   dungeon.getData().dsaLevelIndex![at.z]![5] = 0;
   const g = again();
   console.log(`  this DSA ${g[0]} (actuator ${rn}): ${g.slice(1, 5).map((v) => signed(v).toString(16)).join(' ')}`);

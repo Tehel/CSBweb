@@ -4540,7 +4540,30 @@ assuming it, so a third-party dungeon that would expose the difference fails lou
 `word8 = ((word6 >> 12) & 0xc0) | ((word4 >> 14) & 0x03)` (`doc/CSBwin-src/data.cpp:1329-1336`)
 can never set bits 6-7, because `word6` is sixteen bits wide — yet `ParameterB` reads
 `(word8 & 0x0c) << 14`, a different pair of bits again (`:1343-1346`). No dungeon this
-project holds has a DSA actuator, so nothing here can tell which was intended.
+project holds converts a DSA actuator, every one with DSAs being a big-actuator file, so
+nothing here can tell which was intended. The port stores the `word8` it makes as a file
+holds it (`csbwinWord8`, below).
+
+## A big actuator's `word8` stays in the file's byte order
+
+`DB3::swap` turns `word2`, `word4` and `word6` into the host's order and leaves `word8`
+alone (`doc/CSBwin-src/data.cpp:1321-1327`), for a big-actuator file and for a save alike,
+and the save writes it back so. On the little-endian build, `word8` is therefore the
+file's two bytes read **swapped**, and `DB3::ParameterA`/`ParameterB` take bits 16-17 of
+a DSA's parameters from that: `(ui16)word4 | ((word8 & 3) << 16)` and
+`(ui16)word6 | ((word8 & 0x0c) << 14)` (`:1338-1358`). Conflux's file holds `0x23 0x00`
+for the wave DSA at 3(7,26) whose `word4` is 0x0d9b: parameter A is 0x30d9b, 3(12,27)
+corner 3, the corner its `&MESSAGE`s carry into the open room's timer and the DSA there
+reads as its message column (`inputMsgType = 3 * timerPosition + timerFunction`,
+`doc/CSBwin-src/DSA.cpp`, `ProcessDSATimer6`). The oracle's trace of `LOAD` showed
+200091 where the port, reading the word big-endian, had 3483. The editor and the game
+being the same author's, the file's bytes are meant as CSBWin reads them.
+
+The port's record keeps the file's word read big-endian, so a file and a save read and
+write unchanged, and reads CSBWin's through `csbwinWord8` (`src/data/actuatorHelpers.ts`).
+36 of Conflux 3.5's 1591 DSA actuators have a parameter the two readings part on
+(`tools/checks/dsa-actuator-parameters.ts`). The big-endian reading is kept for the
+recordings made before level 6 (`actuatorWord8BigEndian`).
 
 ## A converted scroll's `m_word4` upper bits are allocation debris
 

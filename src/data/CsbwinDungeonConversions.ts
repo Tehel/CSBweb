@@ -29,7 +29,7 @@
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, RoomType } from '../core/types';
 import type { ObjectID, ui16, ui32 } from '../core/types';
 import { sw } from '../core/intCast';
-import { getActuatorType } from './actuatorHelpers';
+import { csbwinWord8, getActuatorType } from './actuatorHelpers';
 import { databaseRecords, type DungeonData, type TimerRecord } from './dungeonTypes';
 
 /** Which of the three shapes a world is in. `true` means "already converted". */
@@ -129,7 +129,8 @@ export function ConvertToIndirectText(data: DungeonData): void {
  * The eight-byte record grows to ten. The two new bytes are not simply zero: for a DSA
  * actuator — type 47 — `MakeBig` lifts the top bits of `word4` and `word6` into the new
  * `word8` and masks them off, because the ten-byte form widens both parameters from 14
- * bits to 16 (`DB3::ParameterA`/`ParameterB`, `data.cpp:1339-1347`).
+ * bits to 16 (`DB3::ParameterA`/`ParameterB`, `data.cpp:1339-1347`). The `word8` it
+ * makes is CSBWin's, which the record keeps as a file holds it (`csbwinWord8`).
  *
  * **A knowing divergence, and why it cannot bite here.** CSBWin calls this *before*
  * `db.swap(dbACTUATOR)` (`SaveGame.cpp:2816-2820`), so on the little-endian build it
@@ -144,7 +145,8 @@ export function MakeBigActuators(data: DungeonData): void {
     for (const record of data.databases.actuators.records) {
         record.word8 = 0;
         if (getActuatorType(record) !== 47) continue;
-        record.word8 = (((record.word6 >> 12) & 0xc0) | ((record.word4 >> 14) & 0x03)) & 0xffff;
+        // CSBWin's `word8`, kept as a file holds it (`csbwinWord8`).
+        record.word8 = csbwinWord8((((record.word6 >> 12) & 0xc0) | ((record.word4 >> 14) & 0x03)) & 0xffff);
         record.word6 &= 0x3fff;
         record.word4 &= 0x3fff;
     }

@@ -403,8 +403,8 @@ export class DsaInterpreter {
             const targetType = (word >> 10) & 0x3;
             let delay = 0;
             const masterRec = this.getActuator(exPkt.rnMaster);
-            if (delayType === 1) delay = masterRec ? getActuatorParameterA(masterRec) : 0;
-            else if (delayType === 2) delay = masterRec ? getActuatorParameterB(masterRec) : 0;
+            if (delayType === 1) delay = masterRec ? getActuatorParameterA(masterRec, this.ctx.behaviour.actuatorWord8BigEndian) : 0;
+            else if (delayType === 2) delay = masterRec ? getActuatorParameterB(masterRec, this.ctx.behaviour.actuatorWord8BigEndian) : 0;
             else if (delayType === 3) {
               delay = cursor.word();
             }
@@ -735,12 +735,12 @@ export class DsaInterpreter {
     switch (targetType) {
       case TargetType.A: {
         const rec = this.getActuator(rnMaster);
-        target = rec ? getActuatorParameterA(rec) : 0;
+        target = rec ? getActuatorParameterA(rec, this.ctx.behaviour.actuatorWord8BigEndian) : 0;
         break;
       }
       case TargetType.B: {
         const rec = this.getActuator(rnMaster);
-        target = rec ? getActuatorParameterB(rec) : 0;
+        target = rec ? getActuatorParameterB(rec, this.ctx.behaviour.actuatorWord8BigEndian) : 0;
         break;
       }
       case TargetType.ABS: {
@@ -779,7 +779,8 @@ export class DsaInterpreter {
     if (rn === OBJECT_ID_EOF) return 0;
     const rec = this.getActuator(rn);
     if (!rec) return 0;
-    return slot === 0 ? getActuatorParameterA(rec) : getActuatorParameterB(rec);
+    const word8BigEndian = this.ctx.behaviour.actuatorWord8BigEndian;
+    return slot === 0 ? getActuatorParameterA(rec, word8BigEndian) : getActuatorParameterB(rec, word8BigEndian);
   }
 
   private storeParameter(where: number, rnMaster: ObjectID, value: number): void {
@@ -797,8 +798,9 @@ export class DsaInterpreter {
     if (rn === OBJECT_ID_EOF) return;
     const rec = this.getActuator(rn);
     if (!rec) return;
-    if (slot === 0) setActuatorParameterA(rec, value);
-    else setActuatorParameterB(rec, value);
+    const word8BigEndian = this.ctx.behaviour.actuatorWord8BigEndian;
+    if (slot === 0) setActuatorParameterA(rec, value, word8BigEndian);
+    else setActuatorParameterB(rec, value, word8BigEndian);
   }
 
   private copyTeleporter(src: LocationRel, dst: LocationRel): void {

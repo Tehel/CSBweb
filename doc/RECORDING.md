@@ -300,12 +300,15 @@ with what it does, the debt ID of the commit that changed it and the level that 
 made (`until`). The engine reads them from `ctx.behaviour`, frozen: a game the page plays
 is at `ENGINE_LEVEL`, every flag off (`CURRENT_BEHAVIOUR`), and the player sets each
 recording's own before its read (`behaviourAt`), each flag whose `until` is above the
-recording's level on. The level is 5. The flags of the port's own are `releaseScentLoops`,
+recording's level on. The level is 6. The flags of the port's own are `releaseScentLoops`,
 until 2: the release's scents, which what FTL meant replaced (`DEBT.md` H, "The scents are
-what FTL meant"); and `magicDamageThroughArmour` and `skippedStepForgetsParty`, until 5:
+what FTL meant"); `magicDamageThroughArmour` and `skippedStepForgetsParty`, until 5:
 magic damage to a champion multiplied by the armour's product, and a skipped step back
 that forgets the party (`doc/PROVEN_FACTS.md` → "Magic damage to a champion skips the
-armour", "A skipped step back reads the last `PossibleMove`'s `moveOntoPartyPosition`").
+armour", "A skipped step back reads the last `PossibleMove`'s `moveOntoPartyPosition`");
+and `actuatorWord8BigEndian`, until 6: a big actuator's `word8` read big-endian, which
+loses bits 16-17 of a DSA's parameters (→ "A big actuator's `word8` stays in the file's
+byte order").
 Recordings made before
 levels are of level 0.
 

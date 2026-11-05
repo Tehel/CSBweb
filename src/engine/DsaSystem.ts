@@ -360,7 +360,7 @@ export class DsaSystem {
       case 1:
         return dsa.state;
       case 2:
-        return getActuatorParameterB(rec);
+        return getActuatorParameterB(rec, this.ctx.behaviour.actuatorWord8BigEndian);
       default:
         this.ctx.host.trace(`Illegal DSA localState ${dsa.localState}`);
         return 0;
@@ -377,7 +377,7 @@ export class DsaSystem {
         dsa.state = state & 0xffff;
         break;
       case 2:
-        setActuatorParameterB(rec, state);
+        setActuatorParameterB(rec, state, this.ctx.behaviour.actuatorWord8BigEndian);
         break;
       default:
         this.ctx.host.trace(`Illegal DSA localState ${dsa.localState}`);
