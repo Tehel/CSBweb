@@ -296,7 +296,7 @@ function route({ distDir, gamefilesDir, filesDir }: ServerOptions, api: ApiOptio
             if (req.method !== 'GET' && req.method !== 'HEAD') return refuseMethod(res, 'GET, HEAD, POST');
             res.setHeader('Cache-Control', 'no-store');
             res.setHeader('Vary', PLAYER_ID_HEADER);
-            return send(res, 200, manifestText(api.dataSets.read(), dataSetViewer(api, req)), 'application/json; charset=utf-8');
+            return send(res, 200, manifestText(api.dataSets.read(), dataSetViewer(api, req), api.recordings.store.listed()), 'application/json; charset=utf-8');
         }
         if (segments.join('/') === DATA_SET_WALLS_ROUTE) {
             if (req.method !== 'GET' && req.method !== 'HEAD') return refuseMethod(res);

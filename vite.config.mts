@@ -155,7 +155,7 @@ function dataSetsRoute(): Plugin {
             await receivePublish(scratch, { checkDataSet, dataSets, moderators, publishRateLimit, now: Date.now, notify: NOBODY }, req, res);
           } else {
             res.setHeader('Vary', PLAYER_ID_HEADER);
-            json(200, manifestText(dataSets.read(), dataSetViewer({ moderators }, req)));
+            json(200, manifestText(dataSets.read(), dataSetViewer({ moderators }, req), recordingStore?.listed()));
           }
         } catch (error) {
           next(error);

@@ -73,6 +73,7 @@ export function localDataSet(record: LocalDataSetRecord): DataSet {
         official: record.official,
         pending: false,
         documents: [],
+        recordings: 0,
     };
 }
 

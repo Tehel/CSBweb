@@ -75,7 +75,7 @@ const FLAG_COLUMNS: readonly (readonly [Flag, string])[] = [
  * A row: the set, its folder relative to `GAMEFILES_DIR`, and who may see it: everyone, or
  * while it is `pending` (the `status` column's `'pending'`), its owner and the moderators.
  */
-export interface StoredDataSet extends DataSet {
+export interface StoredDataSet extends Omit<DataSet, 'recordings'> {
     /** Its uploader's `playerId`, `null` for the site's: the manifest's, uploaded by hand. */
     owner: string | null;
 }
@@ -360,17 +360,20 @@ export class DataSetStore {
  * the description, the authors and the documents where they are empty, as the repository's manifest does. A moderator's answer says `"moderator": true`, so that
  * the page shows them the hidden sets too: it tells them nothing they do not hold. A table
  * with no set answers an empty list, and one with no `data_set_defaults` row `null` for the
- * default, which the page takes (`parseManifest`).
+ * default, which the page takes (`parseManifest`). A set the site lists recordings of to
+ * everyone says how many, `"recordings"` (`RecordingStore.listed`), from `recordings`.
  */
-export function manifestText(stored: StoredDataSets, viewer: DataSetViewer): string {
+export function manifestText(stored: StoredDataSets, viewer: DataSetViewer, recordings: ReadonlyMap<string, number> = new Map()): string {
     const dataSets = visibleSets(stored, viewer).map((set) => {
-        const entry: Record<string, string | readonly string[] | boolean | readonly DataSetDocument[]> = { id: set.id, name: set.name };
+        const entry: Record<string, string | readonly string[] | boolean | number | readonly DataSetDocument[]> = { id: set.id, name: set.name };
         if (set.description !== '') entry.description = set.description;
         if (set.authors.length > 0) entry.authors = set.authors;
         if (set.dir !== set.id) entry.dir = set.dir;
         for (const [flag] of FLAG_COLUMNS) if (set[flag]) entry[flag] = true;
         if (set.pending) entry.status = 'pending';
         if (set.documents.length > 0) entry.documents = set.documents;
+        const listed = recordings.get(set.id) ?? 0;
+        if (listed > 0) entry.recordings = listed;
         return entry;
     });
     return JSON.stringify({ default: stored.defaultId, ...(viewer.moderator !== null ? { moderator: true } : {}), dataSets });

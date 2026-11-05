@@ -23,6 +23,9 @@
  *   which awaits a moderator (to its owner and the moderators, the only ones it is
  *   offered), purple for a hidden one (to a moderator, the only one it is listed for), and
  *   white otherwise. Red wins over purple.
+ * - **Under a tile's name**, how many recordings of the set the site lists to everyone
+ *   (`DataSet.recordings`), "N replays", where it lists any, then how many saves of it the
+ *   store holds, "N saves", where it holds any.
  * - **The triangle** is on every tile, first among the controls along its picture's top
  *   edge. It is a link that opens the set as PLAY does, without selecting it: its title,
  *   then its entrance, and never a save, which only CONTINUE opens.
@@ -327,6 +330,7 @@ export async function showWelcomePage(
         tile.className = saves > 0 ? 'pick' : 'pick dim';
         tile.dataset.set = set.id;
         tile.append(picture(thumbnails.get(set) ?? null), line('pick-name px px2', set.name));
+        if (set.recordings > 0) tile.append(line('pick-replays px px2', set.recordings === 1 ? '1 replay' : `${set.recordings} replays`));
         if (saves > 0) tile.append(line('pick-saves px px2', saves === 1 ? '1 save' : `${saves} saves`));
         tile.addEventListener('click', () => {
             selected = selected === set ? null : set;

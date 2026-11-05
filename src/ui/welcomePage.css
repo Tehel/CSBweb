@@ -152,6 +152,9 @@ body.welcome {
 .pick.hidden .pick-name { color: var(--purple); }
 .pick.pending .pick-name { color: var(--p8); }
 .pick-saves { color: var(--p7); padding: 0 3px 3px; }
+/* The site's recordings of the set, above its saves, in their colour. */
+.pick-replays { color: var(--p7); padding: 0 3px; }
+.pick-replays:last-child { padding-bottom: 3px; }
 
 /* The moderator's switch, at the window's top right corner, outside the page's column:
    gold on, grey off. */

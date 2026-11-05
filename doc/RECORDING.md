@@ -719,7 +719,9 @@ switch is off is listed them as a player is. The panel says its author, its desc
 its metadata and when it was shared, with PLAY, `?recording=<id>`; to a moderator,
 APPROVE on a pending one, HIDE or SHOW on any other, and DELETE, and to its uploader,
 WITHDRAW (`POST api/recordings/<id>`). Each delete asks first, and the list is then the
-server's anew, a refusal said in the dialog. A local set's book has no site's list.
+server's anew, a refusal said in the dialog. A local set's book has no site's list. The
+set's tile says how many the site lists to everyone, "N replays", which the manifest
+counts (`DataSet.recordings`, `RecordingStore.listed`).
 
 **UPLOAD** shares a browser's point: its form in the panel takes a title, which it needs,
 an author and a description (`RECORDING_TEXT_LIMITS`), then writes the point's package

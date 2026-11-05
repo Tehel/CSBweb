@@ -492,7 +492,7 @@ comma-separated `<playerId>[=<alias>]`, spaces around a comma or the `=` ignored
 | `/gamefiles/…` | `GAMEFILES_DIR/…` | `no-cache`, ETag and Last-Modified |
 | `/files/…` | `FILES_DIR/…`, the files shared by link, under their own policy | `no-cache`, ETag and Last-Modified |
 | `/recordings/<id>.gz` | `RECORDINGS_DIR/<id>.gz`, a shared recording's package | `immutable` |
-| `/api/data-sets` | the `data_sets` table's sets the `X-Player-Id` may see, as a manifest; POST: a set published | `no-store`, `Vary: X-Player-Id` |
+| `/api/data-sets` | the `data_sets` table's sets the `X-Player-Id` may see, as a manifest, each with how many shared recordings everyone is listed (`"recordings"`); POST: a set published | `no-store`, `Vary: X-Player-Id` |
 | `/api/data-sets/<id>` | POST: the set approved, rejected, hidden or shown by a moderator, or withdrawn by its owner; with a form, edited by a moderator | `no-store` |
 | `/api/data-sets/<id>/documents` | POST: a document added to the set by a moderator, with a form, or removed, with JSON | `no-store` |
 | `/api/data-set-walls` | the walls of those of the same sets that keep some: the published ones | `no-store`, `Vary: X-Player-Id` |

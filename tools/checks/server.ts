@@ -1277,6 +1277,9 @@ async function checkRecordings(scratch: string): Promise<void> {
             player === null ? {} : { [PLAYER_ID_HEADER]: player })).body) as { recordings: Listed[] }).recordings;
         const seen = async (player: string | null) => (await listed(player))
             .map((one) => `${one.title}${one.status ? ` ${one.status}` : ''}${one.hidden ? ' hidden' : ''}${one.broken ? ' broken' : ''}${one.extras ? ' extras' : ''}${one.mine ? ' mine' : ''}`).join();
+        /** How many of set `a`'s recordings the manifest says everyone is listed (`DataSet.recordings`), as `player` asks it. */
+        const counted = async (player: string | null = null) => parseManifest((await ask(port, `/${DATA_SETS_ROUTE}`, 'GET',
+            player === null ? {} : { [PLAYER_ID_HEADER]: player })).body, '').dataSets.find((set) => set.id === 'a')?.recordings;
         /** The folder and the table: compared before and after a refusal. */
         const kept = () => `${readdirSync(dir).sort().join()} | ${recordings.store.of('a').map((one) => `${one.id}:${one.pending}${one.hidden}${one.broken}`).join()}`;
 
@@ -1291,6 +1294,7 @@ async function checkRecordings(scratch: string): Promise<void> {
             && row.play_time === 500 && row.extras === 0 && row.size === won.length && row.start === '{"kind":"new"}', 'its row is pending, its uploader the sender, its metadata the package\'s');
         check(await seen(PLAYER) === 'My win pending mine' && await seen(MODERATORS[0]) === 'My win pending', 'it is listed, pending, to its uploader, said to be theirs, and to the moderators');
         check(await seen(null) === '' && await seen(OTHER) === '', 'and to nobody else');
+        check(await counted() === 0 && await counted(PLAYER) === 0 && await counted(MODERATORS[0]) === 0, 'the manifest counts no pending recording of the set, to anyone');
         const list = await ask(port, `/${RECORDINGS_ROUTE}?dataSet=a`, 'GET', { [PLAYER_ID_HEADER]: PLAYER });
         check(list.headers['cache-control'] === 'no-store' && list.headers.vary === PLAYER_ID_HEADER && !list.body.includes(PLAYER), 'the list is not cached, varies by player, and names no playerId');
         check((await listed(PLAYER, 'p')).length === 0, 'another set\'s list does not hold it');
@@ -1345,14 +1349,17 @@ async function checkRecordings(scratch: string): Promise<void> {
         check(await answered(id, 'approve', OTHER) === 403 && await answered(id, 'approve', PLAYER) === 403 && await answered(id, 'approve', null) === 403,
             'nobody but a moderator approves, its uploader neither');
         check(await answered(id, 'approve', MODERATORS[0]) === 200 && (await seen(null)).endsWith('My win'), 'a moderator approves it, and everyone has it listed');
+        check(await counted() === 1, 'the manifest counts it among the set\'s recordings');
         check(await answered(id, 'approve', MODERATORS[0]) === 409, 'approving it again is 409');
         check(await answered(id, 'show', MODERATORS[0]) === 409, 'showing one not hidden is 409');
         check(await answered(id, 'hide', MODERATORS[0]) === 200 && !(await seen(null)).includes('My win') && (await seen(PLAYER)).endsWith('My win hidden mine'),
             'hidden, it is listed to its uploader and the moderators only');
+        check(await counted() === 0, 'and the manifest no longer counts it');
         check(await answered(id, 'hide', MODERATORS[0]) === 409 && await answered(id, 'show', MODERATORS[0]) === 200 && (await seen(null)).endsWith('My win'), 'shown, everyone has it again');
         check(await answered(id, 'break', MODERATORS[0]) === 200 && !(await seen(null)).includes('My win') && (await seen(MODERATORS[0])).endsWith('My win broken'),
             'broken, it is listed to its uploader and the moderators only');
         check(await answered(id, 'break', MODERATORS[0]) === 409, 'breaking it again is 409');
+        check(await counted() === 0 && await counted(MODERATORS[0]) === 0, 'the manifest no longer counts it, broken, to anyone');
         const bad = await Promise.all([moderate(id, '{"action":"approve","x":1}', MODERATORS[0]), moderate(id, 'approve', MODERATORS[0])]);
         check(bad.every((answer) => answer.status === 400), 'a body that is not one action is 400');
         check((await moderate(id, ' '.repeat(MAX_RECORDING_MODERATION_BYTES + 1), MODERATORS[0])).status === 413, 'a body too large is 413');

@@ -123,6 +123,12 @@ export interface DataSet {
     pending: boolean;
     /** The documents its folder holds for its players, by name (`DataSetDocument`): none, or several. A local set has none. */
     documents: readonly DataSetDocument[];
+    /**
+     * How many recordings of it the site lists to everyone (`server/recordings.ts`): those
+     * approved, neither hidden nor broken; the manifest's `"recordings"`, 0 where it says
+     * none. The welcome page's tile says it. A local set has none.
+     */
+    recordings: number;
 }
 
 /**
@@ -338,11 +344,14 @@ export function parseManifest(text: string, base: string): DataSetManifest {
             && Number.isSafeInteger(document.size) && (document.size as number) >= 0)) {
             throw manifestError(`data set '${id}' has "documents" that are not a list of {"file", "size"}, each file a document's name`);
         }
+        const { recordings = 0 } = entry;
+        if (!Number.isSafeInteger(recordings) || (recordings as number) < 0) throw manifestError(`data set '${id}' has "recordings" that is not a count`);
         const files = documents.map((document) => (document as Record<string, unknown>).file as string);
         if (new Set(files).size !== files.length) throw manifestError(`data set '${id}' names a document twice`);
         return {
             id, name, description, authors, dir: under(base, dir), csbGraphics, miniDat, hintOracle, dmRules, thumbnailAsTitle, hidden, official,
             pending: status === 'pending', documents: documents.map((document) => ({ file: document.file as string, size: document.size as number })),
+            recordings: recordings as number,
         };
     });
     const twice = dataSets.find((set, i) => dataSets.findIndex((other) => other.id === set.id) !== i);
