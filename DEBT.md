@@ -137,6 +137,7 @@ In payoff order: the first row is the next item.
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏸️ |
 | E40 | The statistics page's heat map | M | ⏸️ |
 | E44 | The recording viewer seeks forward and back | M–L | ⏸️ |
+| E45 | FROM and TO on a timeline of the recording | M | ⏸️ if the author asks |
 | C150 | Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops | S | ⏸️ waits on the author |
 | G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
@@ -153,7 +154,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: A11 · C199 · D22 · E45 · F26 · G32 · P13 · R20 · U13 · W8 · X19. An ID recorded and paid in one commit has no
+Next free IDs: A11 · C199 · D22 · E46 · F26 · G32 · P13 · R20 · U13 · W8 · X19. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -581,6 +582,27 @@ do"). It is not measured.
 Paying it: the strip's new controls (a golden frame), the seeks checked in
 `tools/checks/replay.ts` (a seek forward and back each lands on the uninterrupted play's
 state, its file compared), and `doc/RECORDING.md`'s strip updated.
+
+### E45 ⏸️ FROM and TO on a timeline of the recording
+
+A browser's point is played and uploaded from a save on its way and to another
+(`doc/RECORDING.md` → "Shared recordings", the panel): FROM and TO are two lists in the
+panel (`spanChoice`, `src/ui/welcomePage.ts`), each save named by its play time, its level
+and its date (`spanLabel`). Nothing shows where the saves fall along the path, nor how long
+the part chosen is but the panel's time played. Wanted only if the author asks for it:
+
+- **A bar** of the path's play time, from its start to the point selected, each save on its
+  way a mark at its play time: one it can start at (`cutStarts`), and one it can only end
+  at (`cutEnds`), a Sleepsave inside a recording, set apart, a tooltip saying why.
+- **Two handles** that snap to the marks, a click moving the nearer, a drag either; the
+  part between them shaded, its length beside it. Marks closer than a few pixels grouped.
+- **The two lists stay** under it, the keyboard's and a screen reader's control, the two in
+  step. A save's row has all the bar needs (`SaveEntry.playTime`, `level`, `savedAt`), and
+  `cutPlace` needs no replay, so it is drawn at once.
+
+Paying it: the bar in the panel, checked in `tools/probe-frames.ts`'s FROM and TO block (a
+click on a mark moves FROM, the lists follow), and the panel's paragraph in
+`doc/RECORDING.md` updated.
 
 ### E22 ⏸️ Fullscreen filled by a fraction
 
