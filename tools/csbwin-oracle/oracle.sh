@@ -119,6 +119,7 @@ play)
   find "$folder" -maxdepth 1 -type f ! -iname '*.exe' -print0 |
     while IFS= read -r -d '' file; do
       b="$(basename "$file")"; cp "$file" "$run/${b,,}"; [ "${b^^}" = "${b,,}" ] || ln -sf "${b,,}" "$run/${b^^}"
+      [ "$b" = "${b,,}" ] || [ "$b" = "${b^^}" ] || ln -sf "${b,,}" "$run/$b"
     done
   log="$(cd "$run" && ls | grep -i '^playfile\.log$' | head -1)"
   [ -n "$log" ] || { echo "no playfile.log in $folder" >&2; exit 1; }
