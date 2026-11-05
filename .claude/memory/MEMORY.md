@@ -46,3 +46,4 @@ One line per memory in this directory. Committed with the project; never shared.
 - [The author's browser store](author-browser-store.md) — production's IndexedDB in Windows Chrome, read from WSL by parsing the LevelDB log with Node's V8 deserializer (version 16 → 15); match sets by digests, not ids
 - [Scratch set from its own cwd](scratch-set-cwd.md) — the tools read `tools/data-sets.json` and the gamefiles relative to cwd: try a run on a candidate set from a scratch folder, never a row in the served manifest
 - [Playfile signatures](playfile-signatures.md) — `0x6666`/`0x6667`/`0x666a` are the first 4 bytes of the file's MD5, little-endian: pick the run's `dungeon.dat` among `.bak`s with `md5sum`
+- [One level per deploy](one-level-per-deploy.md) — a series deployed together shares one ENGINE_LEVEL: join the undeployed level RECORDING.md's policy names (6, Conflux's F24 fixes), don't bump

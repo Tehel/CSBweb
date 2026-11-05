@@ -912,10 +912,11 @@ What it establishes:
     after that error.
   - **The port plays its first 4635 entries by `d.RandomNumber`**, to line 4684
     (`d.Time` 0x259c, party L1 (6,20)), past a big actuator's `word8`, which CSBWin reads
-    byte-swapped (the port's fix at level 6), and an actuator the wave DSA's `&ADD` puts
-    on an open pit, which stays there (at level 7; `doc/PROVEN_FACTS.md` → "A big
-    actuator's `word8` stays in the file's byte order", "A pit takes only the party, a
-    monster and what is above"). The drift at line 4684 is not looked at yet.
+    byte-swapped, and an actuator the wave DSA's `&ADD` puts on an open pit, which stays
+    there (`doc/PROVEN_FACTS.md` → "A big actuator's `word8` stays in the file's byte
+    order", "A pit takes only the party, a monster and what is above"). Both are the
+    port's fixes at level 6, which every fix for this run joins until it is deployed
+    (`doc/RECORDING.md` → "The policy"). The drift at line 4684 is not looked at yet.
 
 Paying it, in steps:
 

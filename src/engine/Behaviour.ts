@@ -31,7 +31,7 @@
  */
 
 /** The engine's level: what a recording made now carries (`Recording.level`). Recordings made before levels are 0. */
-export const ENGINE_LEVEL = 7;
+export const ENGINE_LEVEL = 6;
 
 /** A CSBWin version whose runs the engine plays by the flags that name it. */
 export interface BehaviourProfile {
@@ -144,7 +144,7 @@ export const BEHAVIOURS = [
         name: 'everyObjectFalls',
         does: "an open pit takes any object that does not levitate, an actuator a DSA's `&ADD` puts there among them, where CSBWin's `MoveObject` drops, as it teleports, only the party, a monster and what is above (`WorldMove.resolveCellEffects`)",
         debt: 'F24',
-        until: 7,
+        until: 6,
     },
 ] as const satisfies readonly BehaviourChange[];
 

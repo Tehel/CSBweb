@@ -4574,7 +4574,7 @@ party, a group, an item, a missile or a cloud (`doc/CSBwin-src/Code11f52.cpp:294
 moves one of those: Conflux's wave DSA `&ADD`s copies of its actuator onto the open pits
 at 3(19,3) and 3(20,25), where they stay and run. ReDMCSB's pit has no such test
 (`F0267_MOVE`, `doc/ReDMCSB-src/MOVESENS.C:538`), the Atari never moving one of those
-four. The port's `WorldMove` drops any object that does not levitate before level 7
+four. The port's `WorldMove` drops any object that does not levitate before level 6
 (`everyObjectFalls`; `tools/checks/dsa-add-delete.ts`).
 
 ## A converted scroll's `m_word4` upper bits are allocation debris

@@ -300,7 +300,7 @@ with what it does, the debt ID of the commit that changed it and the level that 
 made (`until`). The engine reads them from `ctx.behaviour`, frozen: a game the page plays
 is at `ENGINE_LEVEL`, every flag off (`CURRENT_BEHAVIOUR`), and the player sets each
 recording's own before its read (`behaviourAt`), each flag whose `until` is above the
-recording's level on. The level is 7. The flags of the port's own are `releaseScentLoops`,
+recording's level on. The level is 6. The flags of the port's own are `releaseScentLoops`,
 until 2: the release's scents, which what FTL meant replaced (`DEBT.md` H, "The scents are
 what FTL meant"); `magicDamageThroughArmour` and `skippedStepForgetsParty`, until 5:
 magic damage to a champion multiplied by the armour's product, and a skipped step back
@@ -308,7 +308,7 @@ that forgets the party (`doc/PROVEN_FACTS.md` → "Magic damage to a champion sk
 armour", "A skipped step back reads the last `PossibleMove`'s `moveOntoPartyPosition`");
 `actuatorWord8BigEndian`, until 6: a big actuator's `word8` read big-endian, which
 loses bits 16-17 of a DSA's parameters (→ "A big actuator's `word8` stays in the file's
-byte order"); and `everyObjectFalls`, until 7: an actuator a DSA puts on an open pit
+byte order"); and `everyObjectFalls`, until 6: an actuator a DSA puts on an open pit
 falling down it (→ "A pit takes only the party, a monster and what is above").
 Recordings made before
 levels are of level 0.
@@ -373,6 +373,13 @@ one: each counts, and "may" means a doubt is enough. The commit:
    since a recording plays it;
 3. bumps `ENGINE_LEVEL` by one, so that a game the page plays has the flag off and every
    recording made before it on.
+
+**A level not yet deployed is joined, not bumped.** Only a deployed build records a
+player's game, so a series of commits that will be deployed together shares one level: the
+first bumps it, and each later one adds its flag with that level as its `until` and bumps
+nothing. The level being built is named here until its deploy: **level 6, Conflux's
+partial game (`DEBT.md` F24), not deployed**. A recording of the author's dev server made
+between those commits may play differently, and is not kept.
 
 A flag that joins a profile owes the same bump: the profile's recordings made before it
 play it off, those made from its level on. It is named in the flag's `profiles`, with the

@@ -8,7 +8,7 @@
  * 1. a copy added on an open pit falls to the level below, in the corner its mask names;
  *    an actuator's stays on the pit, which takes only the party, a monster and what is
  *    above (`(objectDBTypeD4 < 0) || (objectDBTypeD4 >= dbMONSTER)`, `:3047-3053`), as
- *    Conflux's wave DSA leaves one (`DEBT.md` F24); at level 6 it fell (`everyObjectFalls`);
+ *    Conflux's wave DSA leaves one (`DEBT.md` F24); at level 5 it fell (`everyObjectFalls`);
  * 2. a copy added on an active teleporter is carried on to its destination;
  * 3. a copy added on the party's square presses its pads with `unchangedRoom` true
  *    (`Code11f52.cpp:3458-3473`), once it is in the cell; `&DEL` takes it off with
@@ -112,10 +112,10 @@ const spyPads = (game: Game): Press[] => {
     return holding(g2, pit, c) ? 'on the pit' : holding(g2, below, c) ? 'below' : 'gone';
   };
   const now = where(null);
-  const old = where(6);
-  console.log(`   &ADD of actuator ${actuator} on the pit: the copy is ${now}; at level 6, ${old}`);
+  const old = where(5);
+  console.log(`   &ADD of actuator ${actuator} on the pit: the copy is ${now}; at level 5, ${old}`);
   check(now === 'on the pit', 'an actuator copied onto the open pit stays on it');
-  check(old === 'below', 'at level 6 it fell (everyObjectFalls)');
+  check(old === 'below', 'at level 5 it fell (everyObjectFalls)');
 }
 
 /* ------------------------------------------------------ 2. a teleporter ---- */
