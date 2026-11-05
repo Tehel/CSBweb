@@ -9,10 +9,14 @@
  * **Nothing in this file touches the DOM.**
  */
 import { readRecordingPath, type RecordingEntry, type RecordingStore, type SaveEntry, type SaveStore } from '../data/saves';
-import { packageStart, pathAtEnd, pathAtSave, playedWithExtras, type RecordingPackageInfo } from './RecordingPackage';
+import { VBL_FREQUENCY } from '../core/constants';
+import { readCsbwinSaveInfo } from '../data/CsbwinSaveInfo';
+import { packageStart, pathAtEnd, pathAtSave, playedWithExtras, type RecordingPackageInfo, type RecordingPackageStart } from './RecordingPackage';
 import type { RecordingEnding } from '../data/DataSets';
+import type { SavedStamp } from './InputBoundary';
 import type { Recording, RecordingPoint } from './Recorder';
-import { cutAtSave, cutPlace, type CutPage, type CutProgress } from './RecordingCut';
+import { cutPlace } from './RecordingCut';
+import type { SavedAtEnd } from './RecordingPlayer';
 
 /** A point the store keeps: a save made in a recording it holds, or a game's end. */
 export type StoredPoint =
@@ -119,7 +123,9 @@ export async function pointPath(store: Pick<RecordingStore, 'list' | 'read'>, po
  * extra was on, and where its path ends, `null` where that is not known (a site's
  * recording the server has not read it of yet).
  */
-export interface PointInfo extends Omit<RecordingPackageInfo, 'title' | 'author' | 'description'> {
+export interface PointInfo extends Omit<RecordingPackageInfo, 'title' | 'author' | 'description' | 'start'> {
+    /** Where its path starts; a save's level `null` where it is not known before the cut is made (`wayInfo`). */
+    readonly start: RecordingPackageStart | { readonly kind: 'save'; readonly level: null };
     readonly build: string;
     readonly extras: boolean;
     readonly ending: RecordingEnding | null;
@@ -161,52 +167,146 @@ export function savesOnTheWay(point: StoredPoint, points: readonly StoredPoint[]
 }
 
 /**
- * The saves the path to `point`, `path` (`pointPath`), can start at (`cutPlace`,
- * `src/engine/RecordingCut.ts`), of `points`, `rows` the store's: of those it passes on its
- * way (`savesOnTheWay`), each whose tail is the next change of its recording, or that a
- * branch on the path read; the earliest first.
+ * A save the path to a point passes, which FROM and TO offer (`wayPoints`): one whose tail
+ * its recording logged (`saveWritten`), F5's and the disk menu's, or one a branch on the
+ * path read, at its join, whether or not the store still keeps its row; or one the store
+ * keeps a row of alone, the Sleepsave's, whose tail no change logs.
  */
-export function cutStarts(point: StoredPoint, path: readonly Recording[], points: readonly StoredPoint[], rows: readonly RecordingEntry[]): StoredSave[] {
-    return savesOnTheWay(point, points, rows).filter((save) => cutPlace(path, save.save.recording) !== null);
+export interface WayPoint {
+    /**
+     * What `?from=`, `&to=` and the dialog's note name it by: `<recording>:<change>` for a
+     * tail, its recording's id and the tail's index; `<branch>:join` for a join; `save:<row>`
+     * for a row alone.
+     */
+    readonly id: string;
+    /** It can start a path (`cutPlace`): a tail or a join, not a row alone. */
+    readonly start: boolean;
+    /**
+     * Where it is, which a path is cut at (`cutAtSave`, `pathToWay`): its row's point, or
+     * its tail's VBL, the file made there the save's (`cutPlace`).
+     */
+    readonly point: RecordingPoint;
+    /** Its place on the path: its recording's index, and its change's, -1 for a join. */
+    readonly order: readonly [number, number];
+    /** The VBLs from the path's start to it. */
+    readonly vbls: number;
+    /** The save's row, where the store still keeps it there. */
+    readonly row: StoredSave | null;
+    /** What is known of it: its row's, its tail's (`SavedStamp`), or a join's file's level alone. */
+    readonly said: { readonly savedAt: number | null; readonly playTime: number | null; readonly level: number | null };
 }
 
 /**
- * Where a path to `point` that starts at `start`, `null` for its own start, can end, of
- * `points`, `rows` the store's: `point`, or a save the path passes on its way past
- * `start`, not at its place; `point` first, then the latest made first.
+ * The saves the path to `point`, `path` (`pointPath`), passes (`WayPoint`), of `points`,
+ * `rows` the store's, in the path's order: each tail its recordings logged, each join of a
+ * branch on it, and each save of `points` it passes that is neither (`savesOnTheWay`).
  */
-export function cutEnds(point: StoredPoint, start: StoredSave | null, points: readonly StoredPoint[], rows: readonly RecordingEntry[]): StoredPoint[] {
-    const held = new Map(rows.map((row) => [row.id, row]));
-    const after = savesOnTheWay(point, points, rows).filter((save) => start === null
-        || save !== start && passes(save, start, held) && placeOrder(placeOf(save), placeOf(start)) !== 0);
-    return [point, ...after.reverse()];
-}
-
-/**
- * What a list shows of the path to `end`, `path` (`pointPath`), started at `start`
- * (`cutAtSave`), `rows` the store's: as `pointInfo`, but begun when the save was made,
- * the play time since it, and starting from it, its level and its party.
- */
-export function cutInfo(end: StoredPoint, start: StoredSave, path: readonly Recording[], rows: readonly RecordingEntry[]): PointInfo {
-    const info = pointInfo(end, path, rows);
-    const { savedAt, playTime, level, champions } = start.save;
-    return {
-        ...info,
-        recordedAt: Math.min(savedAt, info.endedAt),
-        playTime: Math.max(0, info.playTime - playTime),
-        start: { kind: 'save', level, champions },
+export function wayPoints(point: StoredPoint, path: readonly Recording[], points: readonly StoredPoint[], rows: readonly RecordingEntry[]): WayPoint[] {
+    const saves = savesOnTheWay(point, points, rows);
+    const used = new Set<StoredSave>();
+    const rowAt = (at: RecordingPoint, exact: boolean) => {
+        const found = saves.find((save) => !used.has(save) && save.save.recording.recording === at.recording && save.save.recording.changes === at.changes
+            && (exact ? save.save.recording.vbls === at.vbls && (save.save.recording.inVbl === true) === (at.inVbl === true) : save.save.recording.inVbl !== true)) ?? null;
+        if (found) used.add(found);
+        return found;
     };
+    const said = (row: StoredSave | null, stamp: SavedStamp | undefined, level: number | null = null): WayPoint['said'] => row
+        ? { savedAt: row.save.savedAt, playTime: row.save.playTime, level: row.save.level }
+        : { savedAt: stamp?.savedAt ?? null, playTime: stamp?.playTime ?? null, level: stamp?.level ?? level };
+    const ways: WayPoint[] = [];
+    let before = 0;
+    path.forEach((recording, n) => {
+        const join = recording.parent;
+        if (n > 0 && join) {
+            const row = rowAt(join, true);
+            const level = recording.start.kind === 'save' ? readCsbwinSaveInfo(recording.start.bytes)?.level ?? null : null;
+            ways.push({ id: `${recording.id}:join`, start: true, point: join, order: [n, -1], vbls: before, row, said: said(row, undefined, level) });
+        }
+        recording.changes.forEach((entry, change) => {
+            if (entry.change.kind !== 'saveWritten') return;
+            const row = rowAt({ recording: recording.id, changes: change, vbls: entry.vbl }, false);
+            const at = row?.save.recording ?? { recording: recording.id, changes: change, vbls: entry.vbl };
+            ways.push({
+                id: `${recording.id}:${change}`, start: cutPlace(path, at) !== null, point: at, order: [n, change],
+                vbls: before + entry.vbl, row, said: said(row, entry.change.saved),
+            });
+        });
+        before += recording.vbls;
+    });
+    for (const save of saves) {
+        if (used.has(save)) continue;
+        const at = save.save.recording;
+        const n = path.findIndex((recording) => recording.id === at.recording);
+        if (n < 0) continue;
+        const into = path.slice(0, n).reduce((sum, recording) => sum + recording.vbls, 0) + at.vbls;
+        ways.push({ id: `${SAVE_POINT_PREFIX}${save.save.id}`, start: false, point: at, order: [n, at.changes], vbls: into, row: save, said: said(save, undefined) });
+    }
+    return ways.sort((a, b) => a.order[0] - b.order[0] || a.order[1] - b.order[1] || a.vbls - b.vbls);
 }
 
 /**
- * The path `store` holds to `end` (`pointPath`), cut at the save `start` on its way
- * (`cutAtSave`), its file read from `saves`: replayed headless up to it in a page `stand`
- * stands up, `progress` told as it goes. Refused, `RecordingCutError`, where the path
- * cannot start there or drifts before it.
+ * Where a path to a point that starts at `start`, `null` for its own start, can end, of
+ * `ways` (`wayPoints`): each after `start`, not at its place, the latest first; the point
+ * itself, which is not among them, is the first choice.
  */
-export async function cutPointPath(
-    store: Pick<RecordingStore, 'list' | 'read'>, saves: Pick<SaveStore, 'read'>, end: StoredPoint, start: StoredSave,
-    stand: () => Promise<CutPage>, progress: CutProgress | null,
-): Promise<Recording[]> {
-    return cutAtSave(await pointPath(store, end), start.save.recording, await saves.read(start.save.id), stand, progress);
+export function wayEnds(ways: readonly WayPoint[], start: WayPoint | null): WayPoint[] {
+    return ways.filter((way) => start === null || way.order[0] > start.order[0]
+        || way.order[0] === start.order[0] && way.order[1] > start.order[1] && way.vbls > start.vbls).reverse();
+}
+
+/**
+ * The path a package holds to `way` on `path` (`pointPath`'s to a later point): cut at its
+ * point (`pathAtSave`), or, a join, its parent's to the join.
+ */
+export function pathToWay(path: readonly Recording[], way: WayPoint): Recording[] {
+    const n = way.order[0];
+    if (way.order[1] < 0) return path.slice(0, n);
+    return pathAtSave(path.slice(0, n + 1), way.point);
+}
+
+/**
+ * The save a path to `way` ends at (`SavedAtEnd`), where its file is known: its row's,
+ * read from `saves`, or the file the branch at a join read, or its MD5 a package's names;
+ * `null` where only a play to it makes it (`fileAtEnd`).
+ */
+export async function savedAtWay(way: WayPoint, path: readonly Recording[], saves: Pick<SaveStore, 'read'>): Promise<SavedAtEnd | null> {
+    const inVbl = way.point.inVbl === true;
+    if (way.row) return { file: await saves.read(way.row.save.id), inVbl };
+    const start = way.order[1] < 0 ? path[way.order[0]]?.start : undefined;
+    if (start?.kind === 'save') return { file: start.bytes, inVbl };
+    if (start?.kind === 'join') return { md5: start.md5, inVbl };
+    return null;
+}
+
+/**
+ * What a list shows of the path to `end`, `point` itself or one of its ways, from
+ * `start`, `null` for its own start, `path` the path to `point` (`pointPath`), `endPath`
+ * the path to `end`, `rows` the store's: as `pointInfo` says `point`; a way's when it was
+ * made and its play time where they are known, else as far as the VBLs tell; a path
+ * started at a save, begun when it was made, the time played since it, from its level
+ * where it is known.
+ */
+export function wayInfo(
+    point: StoredPoint, end: WayPoint | null, start: WayPoint | null, path: readonly Recording[], endPath: readonly Recording[], rows: readonly RecordingEntry[],
+): PointInfo {
+    const whole = pointInfo(point, endPath, rows);
+    const vblMs = (vbls: number) => Math.round(vbls * 1000 / VBL_FREQUENCY);
+    const madeAt = (way: WayPoint) => way.said.savedAt ?? rows.find((row) => row.id === way.point.recording)?.recordedAt ?? whole.recordedAt;
+    const { champions: _, ...known } = whole;
+    const endInfo: PointInfo = end === null ? whole : {
+        ...known,
+        endedAt: Math.max(madeAt(end), whole.recordedAt),
+        playTime: end.said.playTime ?? vblMs(end.vbls),
+        ending: 'save',
+        ...(end.row ? { champions: end.row.save.champions } : {}),
+    };
+    if (!start) return endInfo;
+    const endVbls = end?.vbls ?? path.reduce((sum, recording) => sum + recording.vbls, 0);
+    const endPlay = end ? end.said.playTime : whole.playTime;
+    return {
+        ...endInfo,
+        recordedAt: Math.min(madeAt(start), endInfo.endedAt),
+        playTime: start.said.playTime !== null && endPlay !== null ? Math.max(0, endPlay - start.said.playTime) : vblMs(endVbls - start.vbls),
+        start: start.said.level === null ? { kind: 'save', level: null } : { kind: 'save', level: start.said.level, champions: start.row?.save.champions ?? [] },
+    };
 }

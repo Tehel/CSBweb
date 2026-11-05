@@ -555,10 +555,11 @@ needs no `?dungeon=`, and one that names another set ends the page as an error. 
 (`readRecordingPath`, `src/data/saves/RecordingStore.ts`). A store's save,
 `save:<its row's id>` (`SAVE_POINT_PREFIX`, `src/engine/RecordingPoints.ts`), is the path the
 store holds to its point, played to it and the save's file checked there, as a site's
-(`readSavePoint`). Either, with `&from=<a save's row id>`, is played from that save on its
-way: the path is cut there first, as UPLOAD cuts it ("A path cut at a save", below), a bar
-on the canvas meanwhile (`cutPlayedPath`), and one that cannot start there, or drifts
-before it, ends the page as an error does. A site's, sixteen uppercase
+(`readSavePoint`). Either, with `&from=` and `&to=` naming saves on its way (`WayPoint.id`,
+below), is played from the one and to the other: the path is cut at `from` first, as
+UPLOAD cuts it ("A path cut at a save", below), a bar on the canvas meanwhile
+(`cutPlayedPath`), and ends at `to`, its file checked there where the store keeps its row;
+one that cannot start there, or drifts before it, ends the page as an error does. A site's, sixteen uppercase
 hexadecimal digits (`SHARED_RECORDING_ID`), is its package's path ("Shared recordings",
 below), read from the server (`recordings/<id>.gz?v=3`, `recordingPackageUrl`) and never
 put in the store, played to the point it was shared at, a save's file checked there. Every tick is drawn at
@@ -655,11 +656,14 @@ Where it can start (`cutPlace`): at a save whose tail is the next change of its
 recording, F5's and the disk menu's under a held clock. F5's tail is at the save's VBL;
 the disk menu's comes once the store has written the file, VBLs later in a browser, the
 menu's clock held through them, so the path is replayed to the tail's VBL and the file
-made there must still be the save's; or at a join, a branch that read
+made there must still be the save's, where the store keeps its file; a save whose row was
+written over has its tail all the same, and the cut takes the file the game makes there;
+or at a join, a branch that read
 the save, where the cut is the branch's own start, which plays alone ("The tree"). The
 Sleepsave's tail is made inside the VBL of its click, which logs none, so a Sleepsave
 starts a cut only at the join of a branch that read it. The path's end, a save or the
-game's end, is cut as a package's is (`pointPath`).
+game's end, is cut as a package's is (`pointPath`), or at a save on its way
+(`pathToWay`).
 
 The state is the game's at the save: the path replayed headless up to it, undrawn but
 for the tick's `DrawViewport`, in a page without the DOM (`standInPage`,
@@ -780,14 +784,23 @@ a new game or a saved one and its level, and where it ends, a save or the game's
 won or lost; then, of a site's recording, when it was shared and its state, and of a
 browser's point, the saves on its way. A browser's point is played and uploaded whole,
 or part of it: above its lines, FROM chooses where it starts, its path's own start or a
-save on its way it can start at (`cutStarts`, "A path cut at a save", above), and TO
-where it ends, the point or a save on its way past the start (`cutEnds`), each named by
-its play time, its level and when it was made (`spanLabel`). Its lines then
-say what the part would: from a saved game and its level, the time played since that
-save, and the saves between (`cutInfo`). The server reads where a recording ends and its
+save on its way, and TO where it ends, the point or a save on its way past the start
+(`wayPoints`, `wayEnds`). The saves on the way are the path's own, its row kept or
+written over, as a player saves over the same slot and F5 always does: each tail a
+recording logged (`saveWritten`), F5's and the disk menu's, and each join of a branch,
+which can start a part ("A path cut at a save", above); and a save only its row names,
+the Sleepsave's, which can only end one. Each is named by `<recording>:<change>`,
+`<branch>:join` or `save:<row>` (`WayPoint.id`), and shown by its play time, its level and
+when it was made (`wayLabel`): its row's where the store keeps it, else the tail's, which
+the page's saves stamp with them (`SavedStamp`, kept in the store, dropped from a
+package); a tail older than the stamp shows its time on the path alone, `≈`. Its lines
+then say what the part would: from a saved game and its level where it is known, the
+time played since that save, and the saves between (`wayInfo`). UPLOAD to a save whose row
+is gone makes its file again, by playing the path to it (`fileAtEnd`), for its package's
+MD5. The server reads where a recording ends and its
 party from its package as it takes it, and, as it starts, for a row added before it kept
 them (`fillEndings`, `server/recordings.ts`). It offers PLAY, `?recording=<id>`, and
-`&from=<row>` from a save on the way; to a moderator,
+`&from=` and `&to=` for a part; to a moderator,
 APPROVE on a pending one, HIDE or SHOW on any other, and DELETE, and to its uploader,
 WITHDRAW (`POST api/recordings/<id>`). Each delete asks first, and the list is then the
 server's anew, a refusal said in the dialog. A local set's book has no site's list. The

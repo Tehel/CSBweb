@@ -43,7 +43,7 @@ import { smartDiscard } from './SmartDiscard';
 import { applyPlayfileLine } from './PlayfileLine';
 import { isNinetySecondTick, isTenSecondTick, ninetySecondUpdate, tenSecondUpdate } from './PeriodicUpdates';
 import { DsaSystem } from './DsaSystem';
-import { InputBoundary, applyExtras, type GameChange } from './InputBoundary';
+import { InputBoundary, applyExtras, type GameChange, type SavedStamp } from './InputBoundary';
 import { tag0207cc } from './ShowHideInventory';
 import { CursorFilterType } from './dsa/DsaTypes';
 import { OBJECT_ID_NULL, Position } from '../core/types';
@@ -1182,10 +1182,11 @@ export class Game implements MainLoop {
      * (`MonsterSystem.reattachAfterSave`). A save that fails skips it: CSBWin's
      * `goto tag01e4f0` jumps past it (`doc/CSBwin-src/SaveGame.cpp:1361`). The same tail
      * starts `SmartDiscard` over (`:1343`), and ends in `d.CanRestartFromSavegame = 1`
-     * (`:1358`).
+     * (`:1358`). `saved` is what the page's save's row says of it, which its recording keeps
+     * on the tail (`SavedStamp`).
      */
-    saveWritten(): void {
-        this.input.apply({ kind: 'saveWritten' });
+    saveWritten(saved?: SavedStamp): void {
+        this.input.apply(saved ? { kind: 'saveWritten', saved } : { kind: 'saveWritten' });
     }
 
     /**

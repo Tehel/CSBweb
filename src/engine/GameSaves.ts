@@ -354,8 +354,10 @@ export class GameSaves {
         const playTime = this.game.playTime();
         const fields = readSaveFileFields(bytes);
         if (!fields) throw new Error('the save file does not read back');
+        // The tail keeps what the row says of the save, which a row written over loses.
+        const stamp = { savedAt, playTime, level: fields.level };
         if (target === 'sleep') this.game.sleepSaveWritten();
-        else if (clock === 'running') this.game.saveWritten();
+        else if (clock === 'running') this.game.saveWritten(stamp);
         await this.marked;
         const rows = typeof target === 'string' ? await this.store.list(null) : [];
         const over = typeof target !== 'string' ? target
@@ -368,7 +370,7 @@ export class GameSaves {
             unofficial: this.unofficial, recording: point, ...fields,
         };
         await this.store.write(entry, bytes);
-        if (clock === 'stopped' && target !== 'sleep') this.game.saveWritten();
+        if (clock === 'stopped' && target !== 'sleep') this.game.saveWritten(stamp);
         if (over) this.rowGone();
         return entry;
     }

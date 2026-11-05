@@ -35,8 +35,9 @@ import { saveFileOf } from '../../src/engine/GameSaves';
 import { applySaveBytes } from '../../src/engine/SaveGameFile';
 import type { Recording, RecordingPoint } from '../../src/engine/Recorder';
 import { cutStateOf, type CutState } from '../../src/engine/CutState';
-import { cutAtSave, cutPlace } from '../../src/engine/RecordingCut';
-import { packageOfPath, readRecordingPackage, writeRecordingPackage, type RecordingPackage } from '../../src/engine/RecordingPackage';
+import { cutAtSave, cutPlace, fileAtEnd } from '../../src/engine/RecordingCut';
+import { packageOfPath, pathAtSave, readRecordingPackage, writeRecordingPackage, type RecordingPackage } from '../../src/engine/RecordingPackage';
+import { fileDigest } from '../../src/data/DataSetFiles';
 import type { SavedAtEnd } from '../../src/engine/RecordingPlayer';
 import { cutPageOf, standInPage } from '../../src/renderer/StandInPage';
 import { check, finish } from '../lib/check';
@@ -184,6 +185,29 @@ for (const file of files) {
       console.log(`    without ${less}: ${drifted.drift ? `drifts, ${JSON.stringify(drifted.drift)}` : 'plays to its end'}`);
     }
   }
+}
+
+// A part that ends at a save whose row is gone, written over (`fileAtEnd`): the
+// Sleepsave package FROM its root's F5, through the join, TO the F5 in its branch, the
+// file that save made made again by playing to it, its package's MD5, then played from
+// the package alone to it.
+if (named.length === 0) {
+  const pkg = await readRecordingPackage(new Uint8Array(readFileSync(`${CORPUS_DIR}/replay-csbgame7-sleepsave.L0.gz`)));
+  const set = DATA_SETS.find((one) => one.id === pkg.dataSet)!;
+  const setFiles = diskFiles(set);
+  const stand = async () => cutPageOf(await standInPage(set, setFiles));
+  const [first, second] = pkg.path;
+  const fromTail = first!.changes.findIndex((entry) => entry.change.kind === 'saveWritten');
+  const toTail = second!.changes.findIndex((entry) => entry.change.kind === 'saveWritten');
+  const endPath = pathAtSave(pkg.path, { recording: second!.id, changes: toTail, vbls: second!.changes[toTail]!.vbl });
+  const file = await fileAtEnd(endPath, stand);
+  const cut = await cutAtSave(endPath, { recording: first!.id, changes: fromTail, vbls: first!.changes[fromTail]!.vbl }, null, stand);
+  const part = await readRecordingPackage(await writeRecordingPackage(packageOfPath(cut, { kind: 'save', md5: fileDigest(file), inVbl: false }, pkg.info,
+    { recordedAt: 0, endedAt: 0, playTime: 0 })));
+  const played = await playPath(set, setFiles, part.path, part.shared.kind === 'save' ? part.shared : null);
+  console.log(`a part to a save written over: ${cut.length} recordings, ${played.drift ? `drifts, ${JSON.stringify(played.drift)}` : 'plays to its end'}`);
+  check(cut.length === 2 && played.drift === null && played.joins === 1,
+    'a part from a save to one whose row is gone plays through its join to that save, its file made again there');
 }
 
 // What is no start: a save whose next change is not its tail, and a point taken inside a

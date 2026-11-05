@@ -29,6 +29,20 @@ import type { Extras, GameContext } from './GameContext';
 import { LONG_MOUSEQLEN, MOUSEQLEN } from './MouseQueue';
 
 /** A change the page makes to the game, as the boundary logs and applies it. */
+/**
+ * What a save's row says of it, kept on its tail in the store's recording (`saveWritten`):
+ * where a row written over has lost it, the recording still names the save by it, as
+ * FROM and TO show a save on a path's way (`wayPoints`, `src/engine/RecordingPoints.ts`).
+ */
+export interface SavedStamp {
+    /** Milliseconds since the epoch: when it was made (`SaveEntry.savedAt`). */
+    readonly savedAt: number;
+    /** Milliseconds: the game's play time then (`SaveEntry.playTime`). */
+    readonly playTime: number;
+    /** The party's level, counted from 0 (`SaveEntry.level`). */
+    readonly level: number;
+}
+
 export type InputChange =
     /** A click queued, untranslated (`Game.onMouseClick`). */
     | { readonly kind: 'click'; readonly x: number; readonly y: number; readonly buttons: number }
@@ -54,8 +68,12 @@ export type InputChange =
     | { readonly kind: 'tag0207cc' }
     /** The settings' extras, and the mouse queue's length they choose (`applyExtras`). */
     | { readonly kind: 'extras'; readonly extras: Extras }
-    /** A save's tail, once its file is made (`Game.saveWritten`). */
-    | { readonly kind: 'saveWritten' }
+    /**
+     * A save's tail, once its file is made (`Game.saveWritten`); and, as the page's saves
+     * tell it, what the save's row says of it (`SavedStamp`), which the store keeps and a
+     * package drops (`changeRow`).
+     */
+    | { readonly kind: 'saveWritten'; readonly saved?: SavedStamp }
     /** A game read over the running one: told, not applied, since the read has done it (`readGame`). */
     | { readonly kind: 'read' }
     /** The boot's `DM_rules`, forced once the game is read (`Game.forceDMRulesAtBoot`). */

@@ -54,7 +54,7 @@ import {
     drawRecordingStrip, nextPace, rewindPage, stripActionAt, stripKeyAction, timePlayed, type Pace, type StripAction, type StripState,
 } from './renderer/ui/RecordingStrip';
 import { packageOfSave, readRecordingPackage, recordingPackageUrl, writeRecordingPackage } from './engine/RecordingPackage';
-import { pointPath, SAVE_POINT_PREFIX, storedPoints } from './engine/RecordingPoints';
+import { pathToWay, pointPath, pointRecordingId, SAVE_POINT_PREFIX, savedAtWay, storedPoints, wayPoints } from './engine/RecordingPoints';
 import { cutAtSave } from './engine/RecordingCut';
 import { cutPageOf, standInPage } from './renderer/StandInPage';
 import type { Recording, RecordingPoint } from './engine/Recorder';
@@ -98,8 +98,12 @@ let setThumbnail!: () => Promise<Blob | null>;
  * the store's (`playRecording`), on the set it names, or `null`. Its player, once it is begun.
  */
 const playedRecording = new URLSearchParams(window.location.search).get('recording');
-/** `?from=`: the save row a store's recording is played from, cut there (`cutPlayedPath`). */
+/**
+ * `?from=` and `&to=`: the saves on the way a store's point is played from, cut there
+ * (`cutPlayedPath`), and to (`WayPoint.id`, `src/engine/RecordingPoints.ts`).
+ */
 const playedFrom = new URLSearchParams(window.location.search).get('from');
+const playedTo = new URLSearchParams(window.location.search).get('to');
 let recordingPlayer: RecordingPlayer | null = null;
 const gameCanvasEl = document.getElementById('game-canvas') as HTMLCanvasElement;
 if (!gameCanvasEl) console.log(`Couldn't find game canvas !`);
@@ -848,14 +852,16 @@ function runMessagesAlone(game: Game, messages: ScrollingText): () => void {
 interface PlayedPath {
     readonly path: readonly Recording[];
     readonly savedAtEnd: SavedAtEnd | null;
-    readonly from?: { readonly name: string; readonly point: RecordingPoint; readonly file: Uint8Array };
+    readonly from?: { readonly point: RecordingPoint; readonly file: Uint8Array | null };
 }
 
 /**
  * The path `?recording=<id>` names (`playRecording`), read before anything of the game is
  * built, so that its root names the set the page plays: the site's package, or the store's
- * save or recording, through stores of its own, as the welcome page opens them. One that
- * neither the site nor the store holds ends the page as an error does.
+ * save or recording, through stores of its own, as the welcome page opens them; with
+ * `&to=`, to that save on its way (`pathToWay`), and with `&from=`, the save it is cut at
+ * once the set is known (`cutPlayedPath`). One that neither the site nor the store holds, or
+ * that passes no such save, ends the page as an error does.
  */
 async function readPlayedRecording(id: string): Promise<PlayedPath> {
     if (SHARED_RECORDING_ID.test(id)) return fetchSharedRecording(id);
@@ -865,10 +871,25 @@ async function readPlayedRecording(id: string): Promise<PlayedPath> {
     const saveStore = new BrowserSaveStore(draw);
     const played = id.startsWith(SAVE_POINT_PREFIX) ? await readSavePoint(saveStore, recordingStore, id.slice(SAVE_POINT_PREFIX.length))
         : { path: await readRecordingPath(recordingStore, id), savedAtEnd: null };
-    if (playedFrom === null) return played;
-    const start = (await saveStore.list(null)).find((entry) => entry.id === playedFrom);
-    if (!start?.recording) throw new Error(`No recording reaches the save '${playedFrom}'.`);
-    return { ...played, from: { name: start.name, point: start.recording, file: await saveStore.read(start.id) } };
+    if (playedFrom === null && playedTo === null) return played;
+    // The saves on the way: the point's, as the book's dialog lists them.
+    const rows = await recordingStore.list();
+    const points = storedPoints(await saveStore.list(null), rows, played.path[0]?.dataSet ?? '');
+    const point = points.find((one) => pointRecordingId(one) === id);
+    const ways = point ? wayPoints(point, played.path, points, rows) : [];
+    const way = (wayId: string) => {
+        const found = ways.find((one) => one.id === wayId);
+        if (!found) throw new Error(`The recording '${id}' passes no save '${wayId}'.`);
+        return found;
+    };
+    let ended: PlayedPath = played;
+    if (playedTo !== null) {
+        const end = way(playedTo);
+        ended = { path: pathToWay(played.path, end), savedAtEnd: await savedAtWay(end, played.path, saveStore) };
+    }
+    if (playedFrom === null) return ended;
+    const start = way(playedFrom);
+    return { ...ended, from: { point: start.point, file: start.row ? await saveStore.read(start.row.save.id) : null } };
 }
 
 /**
@@ -882,12 +903,12 @@ async function cutPlayedPath(played: PlayedPath, set: DataSet, files: DataSetFil
     const { from } = played;
     if (!from) return played;
     const started = Date.now();
-    const shown = cutProgressShown(gameCanvasEl, `CUTTING THE RECORDING AT ${from.name}`.toUpperCase());
+    const shown = cutProgressShown(gameCanvasEl, 'CUTTING THE RECORDING AT THE SAVE');
     const path = await cutAtSave(played.path, from.point, from.file, async () => cutPageOf(await standInPage(set, files)), {
         played: (vbls, of) => shown(vbls / Math.max(1, of)),
         breathe: () => new Promise((resolve) => requestAnimationFrame(() => resolve())),
     });
-    console.log(`✓ The recording cut at ${from.name}, in ${((Date.now() - started) / 1000).toFixed(1)}s`);
+    console.log(`✓ The recording cut at the save ${playedFrom}, in ${((Date.now() - started) / 1000).toFixed(1)}s`);
     return { path, savedAtEnd: played.savedAtEnd };
 }
 

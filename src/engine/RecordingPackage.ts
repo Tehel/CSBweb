@@ -94,7 +94,7 @@ export interface RecordingPackageText {
 export interface RecordingPackageInfo extends RecordingPackageText {
     /**
      * Milliseconds since the epoch: when its root began (`RecordingEntry.recordedAt`); a
-     * path cut at a save, when the save was made (`cutInfo`).
+     * path cut at a save, when the save was made (`wayInfo`).
      */
     readonly recordedAt: number;
     /** Milliseconds since the epoch: when its point was made, the save or the game's end. */
@@ -102,7 +102,7 @@ export interface RecordingPackageInfo extends RecordingPackageText {
     /**
      * Milliseconds: the time played, the game's play time at its point (`Game.playTime`), as
      * a save's row has it; a path cut at a save, since the save, its point's less the
-     * save's (`cutInfo`), what its viewer watches.
+     * save's (`wayInfo`), what its viewer watches, or the VBLs between where a save's play time is not known.
      */
     readonly playTime: number;
     readonly start: RecordingPackageStart;
@@ -207,15 +207,19 @@ export function pathAtEnd(path: readonly Recording[]): Recording[] {
 
 /**
  * `path` as a package holds it: each branch's start a join, the MD5 of the file its read
- * read in place of the file, which its parent makes there again; and each change's
- * `d.Time` and `d.RandomNumber` kept only where its replay checks them (`checkedChange`).
+ * read in place of the file, which its parent makes there again; each change's `d.Time`
+ * and `d.RandomNumber` kept only where its replay checks them (`checkedChange`); and a
+ * save's tail without the stamp the store keeps on it (`SavedStamp`).
  */
 export function packaged(path: readonly Recording[]): Recording[] {
     return path.map((recording, n) => ({
         ...recording,
         start: n === 0 ? recording.start : joinOf(recording.start),
-        changes: recording.changes.map((entry, index, all): RecordedChange => (
-            checkedChange(index, all.length) ? entry : { change: entry.change, vbl: entry.vbl })),
+        changes: recording.changes.map((entry, index, all): RecordedChange => {
+            // A tail's stamp is the store's, for FROM and TO (`SavedStamp`): no replay reads it.
+            const change: InputChange = entry.change.kind === 'saveWritten' ? { kind: 'saveWritten' } : entry.change;
+            return checkedChange(index, all.length) ? { ...entry, change } : { change, vbl: entry.vbl };
+        }),
     }));
 }
 

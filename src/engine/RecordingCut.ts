@@ -221,6 +221,19 @@ export async function playCut(
     return (await playIn(await stand(), path, savedAtEnd, progress)).drift;
 }
 
+/**
+ * The file the game makes at the end of `path`, played in a page `stand` stands up: a save
+ * on a path's way whose row is gone, written over, made again, as its package's MD5 is.
+ * Refused, `RecordingCutError`, where the path drifts before it.
+ */
+export async function fileAtEnd(path: readonly Recording[], stand: () => Promise<CutPage>, progress: CutProgress | null = null): Promise<Uint8Array> {
+    const page = await stand();
+    const player = await playIn(page, path, null, progress);
+    if (player.drift) throw new RecordingCutError(`it cannot end there: ${driftReason(player.drift)} before it`);
+    const { game } = page;
+    return saveFileOf(game, game.ctx.state.paused ? 'stopped' : 'running', (champion) => game.ctx.host.portraitOf(champion));
+}
+
 /** Why a cut's play drifted, as the page says it. */
 export function cutDriftReason(drift: Drift): string {
     return driftReason(drift);

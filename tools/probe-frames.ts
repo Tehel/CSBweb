@@ -1868,13 +1868,19 @@ await vbls(TICK);
 await key('KeyL'); await vbls(TICK);
 // A save before the quick save, on its path, a few seconds of play on either side of it:
 // where the book's FROM starts it, and its TO ends it, each part played less than the whole.
+// Then F5, which the last F5 writes over: its slot's row gone, the recording still names it.
 await vbls(180);
 const earlier: { id: string; name: string; changes: number; vbls: number } = await evaluate(`window.__probe.saves.save('running', 'new')
   .then((e) => ({ id: e.id, name: e.name, changes: e.recording.changes, vbls: e.recording.vbls }))`);
 await vbls(180);
+await key('F5');
+await until(`window.__probe.saves.list().then((rows) => rows.some((e) => e.quick && e.recording))`, 'the first quick save');
+const overwritten: { changes: number; vbls: number } = await evaluate(`window.__probe.saves.list()
+  .then((rows) => (e => ({ changes: e.recording.changes, vbls: e.recording.vbls }))(rows.find((e) => e.quick)))`);
+await vbls(120);
 await key('KeyL'); await vbls(TICK);
 await key('F5');
-await until(`window.__probe.saves.list().then((rows) => rows.some((e) => e.quick && e.recording))`, 'the quick save');
+await until(`window.__probe.saves.list().then((rows) => rows.some((e) => e.quick && e.recording && e.recording.changes !== ${overwritten.changes}))`, 'the quick save, written over');
 const sharedRecording = await evaluate(`(async()=>{ const { saves, recordings, recordingStore, readRecordingPath, packageOfSave, writeRecordingPackage } = window.__probe;
   await recordings.flush();
   const entry = (await saves.list()).find((e) => e.quick && e.recording);
@@ -2003,13 +2009,16 @@ check(cameBack?.title === 'Chaos Strikes Back' && cameBack.shown === 'documents-
   && cameBack.items.includes(`${savePoint}|${endWritten.save}|true`) && cameBack.panel[0] === endWritten.save && backAddress === '',
   'STOP leads back to the welcome page, the book\'s dialog as PLAY left it: RECORDINGS, the save selected, its panel shown, the address without its fragment');
 
-// FROM and TO (`cutStarts`, `cutEnds`, `src/engine/RecordingPoints.ts`): the quick save's
-// path passes the save made before it, which it can start at, and end at. FROM that save,
-// TO is gone, the save being the only one on the way, and the panel says the part: from a
-// saved game, the time played since the save. PLAY plays it, `?from=<row>`: the path cut at
-// the save (`cutPlayedPath`, `src/main.ts`), to the quick save's point, its file made there
-// the save's. STOP leads back with FROM kept. FROM its start again, TO the save: PLAY plays
-// the save's own point.
+// FROM and TO (`wayPoints`, `src/engine/RecordingPoints.ts`): the quick save's path passes
+// the save made before it and the F5 it wrote over, each a start and an end, named by
+// `<recording>:<change>`, the F5 by its tail's stamp, its row gone. FROM the save, TO offers
+// the point or the F5, and the panel says the part: from a saved game, the time played since
+// the save, the F5 on its way. PLAY plays it, `?from=`: the path cut at the save
+// (`cutPlayedPath`, `src/main.ts`), to the quick save's point, its file made there the
+// save's. STOP leads back with FROM kept. TO the F5 written over, PLAY plays to it,
+// `&to=`. FROM its start again, TO the save: PLAY plays to the save.
+const earlierWay = `${endWritten.recording}:${earlier.changes}`;
+const overwrittenWay = `${endWritten.recording}:${overwritten.changes}`;
 const spanOf = () => evaluate(`(p=>p&&{ from: [...p.querySelectorAll('select[name=from] option')].map(o=>o.value+'='+o.textContent),
   to: [...p.querySelectorAll('select[name=to] option')].map(o=>o.value+'='+o.textContent),
   fromValue: p.querySelector('select[name=from]')?.value ?? null, toValue: p.querySelector('select[name=to]')?.value ?? null,
@@ -2018,45 +2027,60 @@ const chooseSpan = async (name: 'from' | 'to', value: string, shown: string) => 
   await evaluate(`(s => { s.value = ${JSON.stringify(value)}; s.dispatchEvent(new Event('change')); return 1; })(document.querySelector('.recordings-panel select[name=${name}]'))`);
   await until(`(h => h !== null && ${shown})(document.querySelector('.recordings-panel .recordings-play')?.getAttribute('href') ?? null)`, `the panel ${name.toUpperCase()} ${value || 'its start'}`);
 };
-const hasFrom = (row: string) => `new URLSearchParams(h).get('from') === ${JSON.stringify(row)}`;
+const hasParam = (name: string, way: string) => `new URLSearchParams(h).get('${name}') === ${JSON.stringify(way)}`;
 const playTime = (panel: string[] | undefined) => (([, h, m, s]) => (Number(h) * 60 + Number(m)) * 60 + Number(s))(
   /^Time played (\d+):(\d\d):(\d\d)$/.exec(panel?.find((line) => line.startsWith('Time played ')) ?? '') ?? ['', 'NaN', '0', '0']);
+/** The player, once its page has played the part to its end: its drift, joins and point. */
+const playedSpan = async () => {
+  await until('!window.__probe.player().playing', 'the part played to its end');
+  return evaluate(`(p => ({ drift: p.drift, joins: p.joins, point: [p.point.changes, p.point.vbls].join(), vbls: p.vbls }))(window.__probe.player())`);
+};
 const whole = await spanOf();
-await chooseSpan('from', earlier.id, hasFrom(earlier.id));
+await chooseSpan('from', earlierWay, hasParam('from', earlierWay));
 const fromEarlier = await spanOf();
-console.log('  FROM and TO:', JSON.stringify({ earlier, whole, fromEarlier }));
+console.log('  FROM and TO:', JSON.stringify({ earlier, overwritten, whole, fromEarlier }));
 // A save is named by where it is in the game, its play time and its level, and when it was made.
 const SPAN_LABEL = /^\d+:\d\d:\d\d · level \d+ · \d{4}-\d\d-\d\d \d\d:\d\d$/;
 /** Whether `option`, `value=text`, has `value`, and its text the label of a save. */
 const savedAs = (option: string | undefined, value: string) => option?.startsWith(`${value}=`) === true && SPAN_LABEL.test(option.slice(value.length + 1));
-check(whole?.from.length === 2 && whole.from[0] === '=The saved game it begins from' && savedAs(whole.from[1], earlier.id) && whole.fromValue === ''
-  && whole.to.length === 2 && savedAs(whole.to[0], '') && savedAs(whole.to[1], earlier.id) && whole.to[0] !== whole.to[1] && whole.toValue === '',
-  'the quick save\'s panel offers FROM its path\'s start or the save on its way, and TO itself or that save, each save by its play time, its level and its date, the whole chosen');
+check(whole?.from.length === 3 && whole.from[0] === '=The saved game it begins from' && savedAs(whole.from[1], earlierWay) && savedAs(whole.from[2], overwrittenWay)
+  && whole.fromValue === '' && whole.to.length === 3 && savedAs(whole.to[0], '') && savedAs(whole.to[1], overwrittenWay) && savedAs(whole.to[2], earlierWay)
+  && whole.toValue === '',
+  'the quick save\'s panel offers FROM its path\'s start, the save on its way or the F5 it wrote over, and TO itself or either, the latest first, each by its play time, its level and its date, the F5\'s from its tail');
 const cutQuery = new URLSearchParams(fromEarlier?.play ?? '');
-check(fromEarlier?.fromValue === earlier.id && fromEarlier.to.length === 0 && fromEarlier.panel[0] === endWritten.save
+check(fromEarlier?.fromValue === earlierWay && fromEarlier.to.length === 2 && savedAs(fromEarlier.to[1], overwrittenWay) && fromEarlier.panel[0] === endWritten.save
   && fromEarlier.panel.some((line: string) => line.startsWith('From a saved game, level ')) && fromEarlier.panel.includes('To a saved game')
-  && playTime(fromEarlier.panel) < playTime(whole?.panel) && fromEarlier.panel.includes('No save on the way')
-  && cutQuery.get('recording') === savePoint && cutQuery.get('from') === earlier.id,
-  'FROM the save, TO is gone, and the panel says the part: from a saved game, less time played, no save on the way, PLAY ?recording=save:<row>&from=<row>');
+  && playTime(fromEarlier.panel) < playTime(whole?.panel) && fromEarlier.panel.includes('1 save on the way')
+  && cutQuery.get('recording') === savePoint && cutQuery.get('from') === earlierWay && !cutQuery.has('to'),
+  'FROM the save, TO offers the point or the F5 after it, and the panel says the part: from a saved game, less time played, the F5 on its way, PLAY ?recording=save:<row>&from=<way>');
 await leave(() => clickOn('.recordings-play', true), 'window.__probe?.player() != null');
-await until('!window.__probe.player().playing', 'the part played to its end');
 const [quickChanges, quickVbls] = endWritten.point.split(',').map(Number);
-const playedPart = await evaluate(`(p => ({ drift: p.drift, joins: p.joins, point: [p.point.changes, p.point.vbls].join(), vbls: p.vbls }))(window.__probe.player())`);
+const playedPart = await playedSpan();
 console.log('  the part played:', JSON.stringify(playedPart));
 check(playedPart.drift === null && playedPart.joins === 0 && playedPart.point === `${quickChanges! - earlier.changes - 1},${quickVbls! - earlier.vbls}`
   && playedPart.vbls === quickVbls! - earlier.vbls,
   'PLAY plays the path cut at the save, from its tail to the quick save\'s point, the file made there the quick save\'s, its time played counted from the save');
 await leave(() => key('Escape'), WELCOME);
-await until(`document.querySelector('dialog.documents .recordings-panel select[name=from]')?.value === ${JSON.stringify(earlier.id)}`, 'the dialog PLAY left, FROM kept');
+await until(`document.querySelector('dialog.documents .recordings-panel select[name=from]')?.value === ${JSON.stringify(earlierWay)}`, 'the dialog PLAY left, FROM kept');
 const cameBackCut = await spanOf();
-check(cameBackCut?.fromValue === earlier.id && new URLSearchParams(cameBackCut.play ?? '').get('from') === earlier.id,
+check(cameBackCut?.fromValue === earlierWay && new URLSearchParams(cameBackCut.play ?? '').get('from') === earlierWay,
   'STOP leads back to the dialog with FROM as PLAY left it');
+await chooseSpan('to', overwrittenWay, hasParam('to', overwrittenWay));
+const toOverwritten = await spanOf();
+await leave(() => clickOn('.recordings-play', true), 'window.__probe?.player() != null');
+const playedToOverwritten = await playedSpan();
+console.log('  to the F5 written over:', JSON.stringify({ toOverwritten, playedToOverwritten }));
+check(toOverwritten?.toValue === overwrittenWay && toOverwritten.panel.includes('No save on the way') && playTime(toOverwritten.panel) < playTime(fromEarlier?.panel)
+  && playedToOverwritten.drift === null && playedToOverwritten.point === `${overwritten.changes - earlier.changes - 1},${overwritten.vbls - earlier.vbls}`,
+  'TO the F5 written over, PLAY plays from the save to it, &to=<way>, though its row is gone');
+await leave(() => key('Escape'), WELCOME);
+await until(`document.querySelector('dialog.documents .recordings-panel select[name=to]')?.value === ${JSON.stringify(overwrittenWay)}`, 'the dialog PLAY left, TO kept');
 await chooseSpan('from', '', `!new URLSearchParams(h).has('from')`);
-await chooseSpan('to', earlier.id, `new URLSearchParams(h).get('recording') === ${JSON.stringify(`save:${earlier.id}`)}`);
+await chooseSpan('to', earlierWay, hasParam('to', earlierWay));
 const toEarlier = await spanOf();
-check(toEarlier?.toValue === earlier.id && toEarlier.panel[0] === endWritten.save && playTime(toEarlier.panel) < playTime(whole?.panel)
-  && new URLSearchParams(toEarlier.play ?? '').get('recording') === `save:${earlier.id}` && !new URLSearchParams(toEarlier.play ?? '').has('from'),
-  'FROM its start again and TO the save, PLAY plays the save\'s own point, ?recording=save:<row>');
+check(toEarlier?.toValue === earlierWay && toEarlier.panel[0] === endWritten.save && playTime(toEarlier.panel) < playTime(whole?.panel)
+  && new URLSearchParams(toEarlier.play ?? '').get('recording') === savePoint && !new URLSearchParams(toEarlier.play ?? '').has('from'),
+  'FROM its start again and TO the save, PLAY plays to the save, ?recording=save:<row>&to=<way>');
 await clickBeside();
 
 // The site's recordings moderated from the book (`server/recordings.ts`), by the dev
@@ -2202,12 +2226,14 @@ check(uploadLeft?.site.join() === 'No recording of this dungeon on the site yet.
   'its uploader withdraws it, and the game\'s end with the ?dev move is deleted');
 
 // UPLOAD of a part (`uploadPoint`): the quick save FROM the save before it, the path cut
-// there in this browser, its package played to its end before it is sent. The site lists
-// it from a saved game, and its package, played, plays from the save's tail to the quick
-// save's point. Its uploader then withdraws it.
+// there in this browser, TO the F5 the last wrote over, its file made again by playing to
+// it, its package played to its end before it is sent. The site lists it from a saved game
+// to a saved game, and its package, played, plays from the save's tail to the F5's point.
+// Its uploader then withdraws it.
 await openCsbRecordings();
 await clickOn(`.recordings-item[data-recording="${savePoint}"]`);
-await chooseSpan('from', earlier.id, hasFrom(earlier.id));
+await chooseSpan('from', earlierWay, hasParam('from', earlierWay));
+await chooseSpan('to', overwrittenWay, hasParam('to', overwrittenWay));
 await clickOn('.recordings-upload');
 await evaluate(`(p=>{ const f = p.querySelector('[name=title]'); f.value = 'Probe part'; f.dispatchEvent(new Event('input')); return 1; })(document.querySelector('.recordings-panel'))`);
 await clickOn('.recordings-send');
@@ -2227,9 +2253,9 @@ await clickOn('#documents-close');
 console.log('  UPLOAD of a part:', JSON.stringify({ partUploaded, partId, partPlayed, partLeft: partLeft?.site }));
 check(/^[0-9A-F]{16}$/.test(partId ?? '') && partUploaded?.site.join() === `${partId}|Probe part|pending|yours|true` && partUploaded.status.startsWith('Probe part is uploaded: ')
   && partUploaded.panel.some((line: string) => line.startsWith('From a saved game, level ')) && partUploaded.panel.includes('To a saved game'),
-  'UPLOAD FROM the save cuts the path there, plays it to its end, and sends it: the site lists it pending, from a saved game');
-check(partPlayed.drift === null && partPlayed.joins === 0 && partPlayed.point === `${quickChanges! - earlier.changes - 1},${quickVbls! - earlier.vbls}`,
-  'and its package, played from the site, plays from the save\'s tail to the quick save\'s point, the file made there the quick save\'s');
+  'UPLOAD FROM the save TO the F5 written over cuts the path, makes the F5\'s file again, plays it to its end, and sends it: the site lists it pending, from a saved game');
+check(partPlayed.drift === null && partPlayed.joins === 0 && partPlayed.point === `${overwritten.changes - earlier.changes - 1},${overwritten.vbls - earlier.vbls}`,
+  'and its package, played from the site, plays from the save\'s tail to the F5\'s point, the file made there the one its package names');
 check(partLeft?.site.join() === 'No recording of this dungeon on the site yet.', 'its uploader withdraws it');
 
 // A lost game's end played back (`playRecording`, `src/main.ts`): `csbgame7.dat`, every
