@@ -43,3 +43,4 @@ One line per memory in this directory. Committed with the project; never shared.
 - [No semantic-memory](no-semantic-memory.md) — never post this project into the semantic-memory MCP; session-review memories go here
 - [Recording cut at a save](recording-cut-at-save.md) — a cut starts from the save's file plus `CutState`; what each drift lacked (game info, the opening tick, the attack menu) and how to diff one
 - [Levels count from 0](levels-count-from-0.md) — every level the player sees is numbered from 0, the Hall of Champions level 0; "map" and "level" are synonyms; never `+ 1` for display
+- [The author's browser store](author-browser-store.md) — production's IndexedDB in Windows Chrome, read from WSL by parsing the LevelDB log with Node's V8 deserializer (version 16 → 15); match sets by digests, not ids

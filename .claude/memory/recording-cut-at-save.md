@@ -13,6 +13,8 @@ A path cut at a save (`src/engine/RecordingCut.ts`, `CutState.ts`, `doc/RECORDIN
 - **The opening tick and `TAG0138ec`**: `Game.start` makes a tick due and runs the cursor filter, right for a boot read, wrong mid-loop: an F5 cut ran one tick ahead (a `change` drift at a change with no recorded clock, i.e. a VBL mismatch). `Game.resumeAtSavePoint`, set by `setCutState`, skips both.
 - `lastInputTime` (one entry a tick) is zeroed by a read; carried though no corpus case needed it.
 - The Sleepsave's tail is made inside its VBL and never logged: it can start a cut only at the join of a branch that read it.
+- **The player makes each save's file at its tail** (`saveWritten`), as the save did: making a file writes the running world's EXPOOL, so a replay that skipped it made another file later (a kept save's TO drifted, FROM refused) while play matched. `replay-saves-written-over` in the corpus is the author's game that showed it.
+- **A new game's start keeps `totalMoveCount`** where not 0 (after a game lost at the entrance), which every file holds.
 - **FROM/TO come from the path, not the save rows** (`wayPoints`): players save over the same slot, and F5 always does, so the rows are mostly gone; each logged `saveWritten` tail and each join is a save, labelled by its row, else its tail's `SavedStamp`, else `≈` its time on the path. The disk menu's tail lands VBLs after its point in a browser (written after the async store write), never in tools' in-memory stores.
 
 **Why:** the user rejected a viewer-side fast-forward; the cut is made once, at upload (and PLAY `&from=`), checked by replaying the cut package to its end.
