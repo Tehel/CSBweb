@@ -37,7 +37,11 @@ import { NO_EXTRAS, type Extras, type RulesOptions } from './GameContext';
 import { CLOCK_HOLDERS, type ClockHolder, type InputChange } from './InputBoundary';
 import { createLoopFlags, VIDEO_MODES } from './LoopState';
 import { PLAYFILE_LINES } from './PlayfileLine';
+import { createInterfaceState } from './InterfaceState';
+import { LONG_MOUSEQLEN, MOUSEQLEN, type MouseQueueState } from './MouseQueue';
 import type { CarriedState, RecordedChange, Recording, RecordingEnd, RecordingPoint, RecordingStart } from './Recorder';
+import type { CutState } from './CutState';
+import type { SmartDiscardSnapshot } from './SmartDiscard';
 
 /** The format's version: a package of another is refused (`readRecordingPackage`). */
 export const RECORDING_PACKAGE_VERSION = 3;
@@ -164,6 +168,17 @@ export function packageOfEnd(
     times: RecordingPackageTimes,
 ): RecordingPackage {
     return checked(packageOf(pathAtEnd(path), { kind: 'end' }, text, times));
+}
+
+/**
+ * The package of `path`, cut at its point as `pointPath` gives it, and where it starts at
+ * a save on the way, there too (`cutAtSave`, `src/engine/RecordingCut.ts`), shared at
+ * `shared`.
+ */
+export function packageOfPath(
+    path: readonly Recording[], shared: RecordingShared, text: RecordingPackageText, times: RecordingPackageTimes,
+): RecordingPackage {
+    return checked(packageOf(path, shared, text, times));
 }
 
 /**
@@ -384,7 +399,7 @@ function recordingFromJson(json: unknown, what: string, dataSet: string, parent:
             case 'new': return { kind: 'new', random: uint32(start['random'], `${what}'s seed`), randomGameID: uint32(start['randomGameID'], `${what}'s playthrough`) };
             case 'save': return {
                 kind: 'save', bytes: bytes(start['bytes'], `${what}'s save`),
-                ...(start['carried'] === undefined ? {} : { carried: carriedFromJson(start['carried'], `${what}'s carried state`) }),
+                ...(start['carried'] === undefined ? {} : { carried: carriedFromJson(start['carried'], `${what}'s carried state`, true) }),
             };
             case 'join': {
                 if (start['inVbl'] !== undefined && start['inVbl'] !== true) fail(`${what}'s join`);
@@ -428,11 +443,90 @@ function endFromJson(json: unknown, what: string): RecordingEnd {
     return { word11694: boolean(record(json, what)['word11694'], what) };
 }
 
-function carriedFromJson(json: unknown, what: string): CarriedState {
+/**
+ * What a read left beside a save's file (`CarriedState`): and, where `cut` allows it, a
+ * path's root cut at a save, what the read lost (`CutState`), which a package written
+ * before cuts does not hold.
+ */
+function carriedFromJson(json: unknown, what: string, cut = false): CarriedState {
     const carried = record(json, what);
     const loop = shaped(carried['loop'], LOOP_FLAGS, what);
     if (!(VIDEO_MODES as readonly string[]).includes(loop.videoMode)) fail(what);
-    return { paused: boolean(carried['paused'], what), loop };
+    if (Object.keys(carried).length !== (carried['cut'] === undefined ? 2 : 3) || (!cut && carried['cut'] !== undefined)) fail(what);
+    const paused = boolean(carried['paused'], what);
+    return carried['cut'] === undefined ? { paused, loop } : { paused, loop, cut: cutFromJson(carried['cut'], `${what}'s cut`) };
+}
+
+/** The interface's fields but the open chest's object, the keys and the types a cut's must have (`InterfaceSnapshot`). */
+const INTERFACE_FIELDS = (({ openChestId: _, ...rest }) => ({
+    ...rest, openChestContents: [...rest.openChestContents], possibleAttackTypes: [...rest.possibleAttackTypes], byte20256: [...rest.byte20256],
+}))(createInterfaceState());
+
+/** What a path's root cut at a save carries of what the read lost (`CutState`), each field in its range. */
+function cutFromJson(json: unknown, what: string): CutState {
+    const cut = record(json, what);
+    if (Object.keys(cut).length !== 8) fail(what);
+    const face = record(cut['interface'], what);
+    const { openChestId, ...fields } = face;
+    if (!('openChestId' in face)) fail(what);
+    const rest = shaped(fields, INTERFACE_FIELDS, what);
+    const within = (values: readonly number[], low: number, high: number) => values.every((value) => value >= low && value <= high) || fail(what);
+    within(rest.openChestContents, 0, 0xffff);
+    within(rest.possibleAttackTypes, -128, 127);
+    within(rest.byte20256, 0, 0xff);
+    const selected = integer(cut['selected'], what);
+    const loads = array(cut['loads'], what).map((load) => count(load, what));
+    if (selected < -1 || selected > 3 || loads.length > PARTY_LIMITS.champions) fail(what);
+    return {
+        interface: { ...rest, openChestId: openChestId === null ? null : uint16(openChestId, what) },
+        selected,
+        loads,
+        smartDiscard: smartDiscardFromJson(cut['smartDiscard'], what),
+        watchdogTime: uint32(cut['watchdogTime'], what),
+        mouseQueue: mouseQueueFromJson(cut['mouseQueue'], what),
+        lastInputTime: count(cut['lastInputTime'], what),
+        noGameInfo: boolean(cut['noGameInfo'], what),
+    };
+}
+
+/** SmartDiscard's statics (`SmartDiscardSnapshot`): 2023's list of at most 200 entries, 11.014's of 65,536, sparse. */
+function smartDiscardFromJson(json: unknown, what: string): SmartDiscardSnapshot {
+    const s = record(json, what);
+    const { objlist, v11014, ...fields } = s;
+    const counts = shaped(fields, SMART_DISCARD_FIELDS, what);
+    const list = record(objlist, what);
+    const old = record(v11014, what);
+    if (Object.keys(list).length !== 2 || Object.keys(old).length !== 3) fail(what);
+    const sdobj = array(list['sdobj'], what).map((entry) => {
+        const [key, object, priority] = array(entry, what);
+        if (array(entry, what).length !== 3 || typeof priority !== 'number' || !Number.isFinite(priority)) fail(what);
+        return [uint32(key, what), uint16(object, what), priority as number] as const;
+    });
+    const objcount = array(old['objcount'], what).map((value) => integer(value, what));
+    let after = -1;
+    const sparse = array(old['sdobj'], what).map((entry) => {
+        const [index, object] = array(entry, what);
+        const at = count(index, what);
+        if (array(entry, what).length !== 2 || at <= after || at > 0xffff) fail(what);
+        after = at;
+        return [at, integer(object, what)] as const;
+    });
+    const numEntry = count(list['numEntry'], what);
+    const oldEntries = count(old['numEntry'], what);
+    if (sdobj.length > 200 || numEntry > sdobj.length || objcount.length !== 180 || oldEntries > 1050) fail(what);
+    return { ...counts, objlist: { numEntry, sdobj }, v11014: { objcount, numEntry: oldEntries, sdobj: sparse } };
+}
+
+/** The mouse queue (`MouseQueueState`): CSBWin's length or the extra's, its indices in the ring. */
+function mouseQueueFromJson(json: unknown, what: string): MouseQueueState {
+    const queue = record(json, what);
+    if (Object.keys(queue).length !== 4) fail(what);
+    const length = count(queue['length'], what);
+    const start = count(queue['start'], what);
+    const end = count(queue['end'], what);
+    const entries = array(queue['entries'], what).map((entry) => shaped(entry, { num: 0, x: 0, y: 0, buttons: 0 }, what));
+    if ((length !== MOUSEQLEN && length !== LONG_MOUSEQLEN) || start >= length || end >= length || entries.length !== length) fail(what);
+    return { length, start, end, entries };
 }
 
 /**
@@ -515,6 +609,11 @@ const RULES: Record<keyof RulesOptions, boolean> = {
     simpleEncipher: false, supressDSAWarningOption: false, bGravityGame: false, bThreeDMovements: false,
 };
 
+/** SmartDiscard's statics but its lists, the keys a cut's must have. */
+const SMART_DISCARD_FIELDS = {
+    currentDBNum: 0, currentLevel: 0, currentX: 0, currentY: 0, currentIndex: 0, discardFailure: 0, currentMode: 0, totalCount: 0,
+};
+
 /** The main loop's flags, the keys and the types a carried state's must have. */
 const LOOP_FLAGS = createLoopFlags();
 
@@ -573,6 +672,11 @@ function integer(json: unknown, what: string): number {
 function count(json: unknown, what: string): number {
     const value = integer(json, what);
     return value >= 0 ? value : fail(what);
+}
+
+function uint16(json: unknown, what: string): number {
+    const value = count(json, what);
+    return value <= 0xffff ? value : fail(what);
 }
 
 function uint32(json: unknown, what: string): number {

@@ -59,6 +59,8 @@
  * 8. A Sleepsave's point says it was taken inside a VBL, and F9's read of it begins a
  *    branch there, which replays from its root through both joins: the join is checked
  *    against the file the replayed VBL made where the recorded one made the Sleepsave.
+ *    A path cut at the Sleepsave (`src/engine/RecordingCut.ts`) starts at that join, the
+ *    branch's own start, and plays alone to the same game.
  * 9. The game's end is a point of its own: `csbgame7.dat` with every champion at 1 HP,
  *    put before the Stone Golem, which kills them. The recording ends in the VBL that
  *    asked for the credits, with `d.Word11694`, records nothing after it, and the store
@@ -114,6 +116,7 @@ import { Recorder, type Recording, type RecordingPoint } from '../../src/engine/
 import {
   checkedChange, packageOfEnd, packageOfSave, readRecordingPackage, RecordingPackageError, writeRecordingPackage, type RecordingPackage,
 } from '../../src/engine/RecordingPackage';
+import { cutAtSave, cutPlace } from '../../src/engine/RecordingCut';
 import { endLines, RecordingPlayer, skippedLine, type HeldSpan, type SavedAtEnd } from '../../src/engine/RecordingPlayer';
 import { partyNames, RecordingWriter } from '../../src/engine/RecordingWriter';
 import { applySaveBytes, buildSaveFile } from '../../src/engine/SaveGameFile';
@@ -130,7 +133,7 @@ import { UIMode, type UIState } from '../../src/renderer/ui/UIState';
 import { VIEWPORT_X, VIEWPORT_Y } from '../../src/renderer/ViewportGraphics';
 import { Settings, applyToGame } from '../../src/settings/Settings';
 import { check, finish } from '../lib/check';
-import { ManualClock } from '../lib/clock';
+import { ManualClock } from '../../src/engine/ManualClock';
 import { STOCK_DATA_SET, diskFiles } from '../lib/dataSets';
 import { STOCK_DIR, gameTablesOf, graphicsTablesOf, stockGraphics } from '../lib/game';
 import { playPath } from '../lib/playback';
@@ -810,6 +813,14 @@ async function sleepBranch(recorded: Page, home: Position): Promise<void> {
   check(joins === 2 && drift?.kind !== 'join',
     `the branch replayed up to the Sleepsave's point makes the file it made inside the VBL${drift?.kind === 'join' ? ` (first difference at ${drift.byte})` : ', byte-identical'}`);
   sameGame(recorded, path, await store.read(third.id), 'and the Sleepsave\'s branch replayed from its root through both joins');
+  // A path cut at the Sleepsave (`src/engine/RecordingCut.ts`) starts at its read's join: the
+  // branch's own start, its file the store's, which plays alone.
+  const cut = await cutAtSave(read, sleep.recording!, await recorded.store.read(sleep.id), async () => { throw new Error('a join the store holds is cut without a replay'); });
+  check(cutPlace(read, sleep.recording!)?.kind === 'join' && cut.length === 1 && cut[0]!.id === third.id && cut[0]!.parent === null,
+    'a path cut at the Sleepsave starts at the join of its read, the branch\'s own start');
+  const alone = Page.replay(cut);
+  alone.play();
+  sameGame(recorded, alone, await store.read(third.id), 'and the branch cut there plays alone');
   await savePackage(recorded, read.slice(0, 2), sleep, 'the Sleepsave');
 }
 

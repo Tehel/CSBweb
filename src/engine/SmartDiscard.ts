@@ -831,3 +831,48 @@ function smartDiscard11014(ctx: GameContext, initialize: boolean): void {
             return;
     }
 }
+
+/**
+ * `ctx.smartDiscard` as plain data, which a path cut at a save carries (`CutState`,
+ * `src/engine/RecordingCut.ts`): the file's statics, which no save holds and a read starts
+ * over, so a game read from the save's file has others than the game that made it. The
+ * lists keep every entry, those past `numEntry` too, which 11.014's `TopPriority` reads;
+ * 11.014's, 65,536 entries most of them 0, as `[index, m_object]` for each not 0.
+ */
+export interface SmartDiscardSnapshot {
+    readonly currentDBNum: number;
+    readonly currentLevel: number;
+    readonly currentX: number;
+    readonly currentY: number;
+    readonly currentIndex: number;
+    readonly discardFailure: number;
+    readonly currentMode: number;
+    readonly totalCount: number;
+    readonly objlist: { readonly numEntry: number; readonly sdobj: readonly (readonly [key: number, object: number, priority: number])[] };
+    readonly v11014: { readonly objcount: readonly number[]; readonly numEntry: number; readonly sdobj: readonly (readonly [index: number, object: number])[] };
+}
+
+/** `s` as plain data (`SmartDiscardSnapshot`). */
+export function smartDiscardSnapshot(s: SmartDiscardState): SmartDiscardSnapshot {
+    const { currentDBNum, currentLevel, currentX, currentY, currentIndex, discardFailure, currentMode, totalCount, objlist, v11014 } = s;
+    const sparse: [number, number][] = [];
+    v11014.objlist.sdobj.forEach((object, index) => { if (object !== 0) sparse.push([index, object]); });
+    return {
+        currentDBNum, currentLevel, currentX, currentY, currentIndex, discardFailure, currentMode, totalCount,
+        objlist: { numEntry: objlist.numEntry, sdobj: objlist.sdobj.map((sd) => [sd.key, sd.object, sd.priority] as const) },
+        v11014: { objcount: [...v11014.objcount], numEntry: v11014.objlist.numEntry, sdobj: sparse },
+    };
+}
+
+/** `s` set as `snapshot` holds it (`smartDiscardSnapshot`). */
+export function setSmartDiscardSnapshot(s: SmartDiscardState, snapshot: SmartDiscardSnapshot): void {
+    const { objlist, v11014, ...fields } = snapshot;
+    Object.assign(s, fields);
+    s.objlist.numEntry = objlist.numEntry;
+    s.objlist.sdobj.length = 0;
+    for (const [key, object, priority] of objlist.sdobj) s.objlist.sdobj.push({ key, object: object as ObjectID, priority });
+    s.v11014.objcount.set(v11014.objcount);
+    s.v11014.objlist.numEntry = v11014.numEntry;
+    s.v11014.objlist.sdobj.fill(0);
+    for (const [index, object] of v11014.sdobj) s.v11014.objlist.sdobj[index] = object;
+}

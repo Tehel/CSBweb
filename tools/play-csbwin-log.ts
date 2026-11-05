@@ -55,7 +55,7 @@ import { openReincarnateScreen, reincarnateClick, reincarnateKey } from '../src/
 import { askBeginAdventure } from '../src/renderer/ui/SaveMenu';
 import { UIMode } from '../src/renderer/ui/UIState';
 import { Settings, applyToGame } from '../src/settings/Settings';
-import { ManualClock } from './lib/clock';
+import { ManualClock } from '../src/engine/ManualClock';
 import { STOCK_DATA_SET, dataSetNamed, diskFiles } from './lib/dataSets';
 import { diskMenuSave } from './lib/csbwinRun';
 import { memoryStore } from './lib/saves';

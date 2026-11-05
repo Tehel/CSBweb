@@ -40,6 +40,7 @@
 import { VBL_FREQUENCY } from '../core/constants';
 import { fileDigest } from '../data/DataSetFiles';
 import { behaviourAt, knownLevel, knownProfile } from './Behaviour';
+import { setCutState } from './CutState';
 import type { Game } from './Game';
 import { saveFileOf } from './GameSaves';
 import { applyExtras, type ClockHolder } from './InputBoundary';
@@ -100,6 +101,8 @@ export class RecordingPlayer {
      * that point was taken inside the VBL (`RecordingPoint.inVbl`): what the join checks.
      */
     private savedAtJoin: Uint8Array | null = null;
+    /** The file the last check was made against (`made`), or `null`. */
+    private madeLast: Uint8Array | null = null;
     /** The game's end, with `d.Word11694`, once the game has told it. */
     private gameEnd: boolean | null = null;
     /** The boundary's VBLs as the span the clock is held through began, and what held it. */
@@ -209,6 +212,15 @@ export class RecordingPlayer {
         return this.parted;
     }
 
+    /**
+     * The file the game made at the last check: at the last join, or at the save the path
+     * ends at, which it was checked against; `null` before any. What a cut at a package's
+     * join starts from (`cutAtSave`, `src/engine/RecordingCut.ts`).
+     */
+    get lastMade(): Uint8Array | null {
+        return this.madeLast;
+    }
+
     /** The joins played, each checked. */
     get joins(): number {
         return this.joined;
@@ -309,6 +321,7 @@ export class RecordingPlayer {
         const made = inVbl ? this.savedAtJoin ?? new Uint8Array(0)
             : saveFileOf(this.game, ctx.state.paused ? 'stopped' : 'running', (champion) => ctx.host.portraitOf(champion));
         this.savedAtJoin = null;
+        this.madeLast = made;
         return made;
     }
 
@@ -353,6 +366,8 @@ export class RecordingPlayer {
         this.game.ctx.behaviour = behaviourAt(recording.level, recording.profile);
         applySaveBytes(this.game, bytes);
         if (start.carried) setCarriedState(this.game, start.carried);
+        // A path cut at a save: what the read lost of the game that made it.
+        if (start.carried?.cut) setCutState(this.game, start.carried.cut);
         this.begin(recording);
     }
 

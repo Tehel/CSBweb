@@ -431,6 +431,11 @@ const CHECKS: Tool[] = [
   { tool: 'csbwin-runs.ts', args: ['--not=CSBFullRecordingV4'] },
   // The corpus of the port's recordings, each played at the engine's level it was made at.
   { tool: 'recording-corpus.ts' },
+  // The corpus cut at each save on its way, each cut played to its end: DMMovie42's nine
+  // saves each replay its whole game, in two jobs, the others together.
+  { tool: 'recording-cut.ts', args: ['DMMovie42', '--saves=0-4'] },
+  { tool: 'recording-cut.ts', args: ['DMMovie42', '--saves=5-8'] },
+  { tool: 'recording-cut.ts', args: ['--not=DMMovie42'] },
   // The set a recording plays over, found by its files.
   { tool: 'recording-set.ts' },
   // The replay tool, its own process, against a scratch server.

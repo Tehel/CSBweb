@@ -11,7 +11,7 @@
 
 import { createGameHost } from '../../src/engine/GameHost';
 import { check, finish } from '../lib/check';
-import { ManualClock } from '../lib/clock';
+import { ManualClock } from '../../src/engine/ManualClock';
 import { newGame, stockGraphics, stockDungeon } from '../lib/game';
 import { standIn } from '../lib/standIn';
 

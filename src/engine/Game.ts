@@ -172,6 +172,8 @@ export class Game implements MainLoop {
      * from a save (`savedGameRead`), not from `dungeon.dat` (`readNewGame`).
      */
     private resumedSavedGame = false;
+    /** The next `start` resumes at a save's point (`resumeAtSavePoint`). */
+    private atSavePoint = false;
     /**
      * The player's time in this game, in VBLs: every VBL of the loop but the frozen
      * game's and the save menu's (`playTime`).
@@ -221,6 +223,17 @@ export class Game implements MainLoop {
         this.installWorld(dungeonData);
     }
 
+    /**
+     * The next `start` resumes the loop where a save's point left it, not where `MainLoop`
+     * begins: a path cut at a save (`src/engine/RecordingCut.ts`), whose game read from the
+     * save's file stands for the game that made it, in the middle of its loop. Its loop's
+     * flags are the carried ones (`setCarriedState`), so no tick is made due, and nothing
+     * of `TAG0138ec` runs, which the game that made the save did not run there.
+     */
+    resumeAtSavePoint(): void {
+        this.atSavePoint = true;
+    }
+
     /** Pin `d.RandomNumber`. For tools and, eventually, save-game restore. */
     setRandomSeed(seed: number): void {
         this.ctx.random.setSeed(seed);
@@ -240,9 +253,13 @@ export class Game implements MainLoop {
             return;
         }
 
+        // A path cut at a save resumes the loop as the save's point left it
+        // (`resumeAtSavePoint`): neither `TAG0138ec` nor the opening tick.
+        const atSavePoint = this.atSavePoint;
+        this.atSavePoint = false;
         // `_TAG021028` ends in `TAG0138ec()` and `d.ClockRunning = 1`, and `MainLoop` follows
         // (doc/CSBwin-src/CSBCode.cpp:10672-10673, `:11555`).
-        this.tag0138ec();
+        if (!atSavePoint) this.tag0138ec();
         if (enterDungeon && !this.resumedSavedGame) {
             const { x, y } = this.ctx.party.state.position;
             this.systems.monsters.loadPartyLevelIfChanged();
@@ -255,7 +272,7 @@ export class Game implements MainLoop {
         // (doc/CSBwin-src/CSBCode.cpp:596-611): the first thing a started game does is
         // `ProcessTimers`, `DrawViewport`, `d.Time++`. The port's tick is a pass's, so one
         // is made due, and the first VBL's pass runs it and draws the game's first view.
-        this.ctx.loop.clockTick = true;
+        if (!atSavePoint) this.ctx.loop.clockTick = true;
 
         // Start game loop
         this.gameLoop();

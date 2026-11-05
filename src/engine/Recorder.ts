@@ -32,6 +32,7 @@ import type { Extras, RulesOptions } from './GameContext';
 import type { Game } from './Game';
 import type { InputChange } from './InputBoundary';
 import type { LoopFlags } from './LoopState';
+import type { CutState } from './CutState';
 
 /**
  * What a read leaves of the game that the save's file does not hold, and the game reads
@@ -43,6 +44,12 @@ import type { LoopFlags } from './LoopState';
 export interface CarriedState {
     readonly paused: boolean;
     readonly loop: LoopFlags;
+    /**
+     * A path cut at a save's root's (`src/engine/RecordingCut.ts`): what the read loses of
+     * the game that made the save, which its player sets over it too (`setCutState`).
+     * Absent from a read the recorded game made, which lost it.
+     */
+    readonly cut?: CutState;
 }
 
 /** `game`'s `CarriedState` now. */

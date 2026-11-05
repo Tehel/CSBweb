@@ -621,6 +621,51 @@ inside the VBL of its click, before the rest of it, its tick among them, and say
 same place (`InputBoundary.savedInVbl`), not one made after it. The recorded read came
 after the VBL, so the branch is read after it too.
 
+### A path cut at a save
+
+A player plays and shares part of a path too: from a save it passes on its way, not from
+its root (`src/engine/RecordingCut.ts`). A save's file read into a fresh game is not the
+game that made it at any VBL: the read detaches and re-attaches every monster, which
+re-makes their timers at `d.Time`. At a save's point, once its tail has run (`saveWritten`,
+`MonsterSystem.reattachAfterSave`), the world, the monsters and the timers are a fresh
+read's, and what the read loses is little (`CutState`, carried as `CarriedState.cut`):
+
+- the attack menu and the rest of `ctx.interface`, which the read gives a new game's;
+- the champion selected, and each champion's `load`, which the port keeps of its own;
+- SmartDiscard's statics (`smartDiscardSnapshot`), 11.014's lists among them;
+- `d.watchdogTime`, the mouse queue and the tick its last entry was taken at
+  (`Game.lastInputTime`), which the read discards and zeroes;
+- a game from a `dungeon.dat` without game information has none, and saves a size of 0,
+  which a read turns into "No game information was provided"
+  (`doc/CSBwin-src/SaveGame.cpp:256`), so that the next save is another file.
+
+A cut starts there: the save's file read, its `CarriedState` and that state set over it,
+and the changes after the save's tail, which the read stands in for, its VBLs counted from
+the save. The game it starts resumes its loop where the save's point left it
+(`Game.resumeAtSavePoint`): no tick is made due as `_MainLoop` opens, and no `TAG0138ec`,
+which a read at the boot runs and the game that made the save did not. Without the attack
+menu, or the champion selected, DMMovie42's saves drift; without the last, so does F5's
+in the first recording of a new game, at the next file checked.
+
+Where it can start (`cutPlace`): at a save whose tail is the next change of its
+recording, F5's and the disk menu's under a held clock; or at a join, a branch that read
+the save, where the cut is the branch's own start, which plays alone ("The tree"). The
+Sleepsave's tail is made inside the VBL of its click, which logs none, so a Sleepsave
+starts a cut only at the join of a branch that read it. The path's end, a save or the
+game's end, is cut as a package's is (`pointPath`).
+
+The state is the game's at the save: the path replayed headless up to it, undrawn but
+for the tick's `DrawViewport`, in a page without the DOM (`standInPage`,
+`src/renderer/StandInPage.ts`), the file made there checked against the save's
+(`cutAtSave`); a branch whose file the store holds needs no replay. A drift before the
+save refuses the cut. Replayed so, an hour of play takes a few seconds.
+
+`tools/checks/recording-cut.ts` cuts every corpus package at every save on its path,
+DMMovie42's nine disk menu saves among them, writes and reads back each cut's package, and
+plays it to its end; and plays some without the attack menu, the champion selected or the
+want of game information, which drift. `tools/checks/replay.ts` (point 8) cuts at a
+branch that read a Sleepsave.
+
 ## Recordings made in CSBWin
 
 Playing back CSBWin's own recordings needs, beyond the above, the port's random draws to
@@ -759,7 +804,9 @@ Each recording of its path holds its `id`, `build`, `level`, `profile`, `files`,
 is the path's own: the set is the package's, the parent is always the recording before at
 its end, and every recording is ended. Its `start` is a new game's stream and playthrough,
 `{kind: 'new', random, randomGameID}`, or a save's file in base64 with what its read left,
-`{kind: 'save', bytes, carried}`, for the root alone; a branch's is a join,
+`{kind: 'save', bytes, carried}`, for the root alone, and, for a root cut at a save, what
+the read lost, `carried.cut` ("A path cut at a save", above), which a package written
+before cuts does not hold; a branch's is a join,
 `{kind: 'join', md5, carried, inVbl?}`: the MD5 of the file the recorded read read, which
 its parent, played to the point, makes again ("The joins", above), and whether that point
 was taken inside a VBL. Each change is a row, `[VBLs since the change before, kind,

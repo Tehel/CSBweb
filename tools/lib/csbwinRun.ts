@@ -44,7 +44,7 @@ import { closeSaveMenu } from '../../src/renderer/ui/SaveMenu';
 import type { UIState } from '../../src/renderer/ui/UIState';
 import { readFileSync } from 'node:fs';
 import { dataSetNamed, diskFiles } from './dataSets';
-import { standPage, type Page } from './playback';
+import { standInPage, type StandInPage } from '../../src/renderer/StandInPage';
 import { dmRulesBefore, readPlayfile, type PlayEntry } from './playfile';
 
 /** A run of CSBWin's that plays to its end, kept in `tools/fixtures/csbwin-runs/<id>/`. */
@@ -165,7 +165,7 @@ export function runFolder(run: CsbwinRun): string {
 
 /** A run played into the port and recorded. */
 export interface RecordedRun {
-  readonly page: Page;
+  readonly page: StandInPage;
   /** Its recording, ended by the game's end or running at the log's end. */
   readonly recording: Recording;
   /** The entries taken, each its random checked. */
@@ -201,7 +201,7 @@ export async function recordRun(run: CsbwinRun, build: string, dataSet = run.dat
   const folder = runFolder(run);
   const set = dataSetNamed(run.dataSet);
   const files = digestedFiles(diskFiles(set));
-  const page = await standPage(set, files);
+  const page = await standInPage(set, files);
   const { game, screen } = page;
   const { ctx } = game;
   ctx.behaviour = behaviourAt(level, run.profile);

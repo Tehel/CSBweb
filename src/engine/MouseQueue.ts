@@ -42,6 +42,14 @@ export const UNTRANSLATED_CLICK = 0xfffe;
  */
 export interface MouseQueueEntry { num: number; x: number; y: number; buttons: number }
 
+/** The ring's whole state (`MouseQueue.state`). */
+export interface MouseQueueState {
+  readonly length: number;
+  readonly start: number;
+  readonly end: number;
+  readonly entries: readonly MouseQueueEntry[];
+}
+
 export class MouseQueue {
   /** `MOUSEQLEN`, or `LONG_MOUSEQLEN` with the extra on (`setLength`). */
   private length = MOUSEQLEN;
@@ -111,6 +119,20 @@ export class MouseQueue {
   /** `MouseQStart++`, wrapped: the head is taken. */
   take(): void {
     this.start = (this.start + 1) % this.length;
+  }
+
+  /** The ring as it stands: its length, its entries and its two indices (`CutState`, `src/engine/RecordingCut.ts`). */
+  state(): MouseQueueState {
+    return { length: this.length, start: this.start, end: this.end, entries: this.entries.map((entry) => ({ ...entry })) };
+  }
+
+  /** The ring set as `state` holds it, as `state()` took it. */
+  setState(state: MouseQueueState): void {
+    if (state.entries.length !== state.length || state.start >= state.length || state.end >= state.length) throw new Error('no mouse queue');
+    this.length = state.length;
+    this.start = state.start;
+    this.end = state.end;
+    this.entries = state.entries.map((entry) => ({ ...entry }));
   }
 
   /**

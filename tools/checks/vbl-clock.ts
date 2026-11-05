@@ -24,7 +24,7 @@
 import type { Game } from '../../src/engine/Game';
 import { freeze, thaw, VBL_PER_TICK, type LoopScript } from '../../src/engine/LoopState';
 import { wakeUp } from '../../src/engine/MouseSystem';
-import { ManualClock } from '../lib/clock';
+import { ManualClock } from '../../src/engine/ManualClock';
 import { newGame, stockGraphics, stockDungeon } from '../lib/game';
 import { check, finish } from '../lib/check';
 

@@ -1,9 +1,10 @@
 /**
- * A `GameHost.clock` a tool moves itself, so a tool that runs the page's loop
- * (`Game.gameLoop`) reads no wall clock and waits for no timer: its time is `time`, and
- * the call the loop asked for runs when the tool moves the time on.
+ * A `GameHost.clock` its owner moves itself, so that whoever runs the page's loop
+ * (`Game.gameLoop`) without a page, a tool or a path played headless
+ * (`src/renderer/StandInPage.ts`), reads no wall clock and waits for no timer: its time
+ * is `time`, and the call the loop asked for runs when the owner moves the time on.
  */
-import type { LoopClock } from '../../src/engine/GameHost';
+import type { LoopClock } from './GameHost';
 
 export class ManualClock implements LoopClock {
   time = 1_000_000;
