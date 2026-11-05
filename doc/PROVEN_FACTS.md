@@ -4589,6 +4589,20 @@ Conflux's partial game (`DEBT.md` F24) a champion carrying one paid 2 a step in 
 in CSBWin. The port kept the 50 before level 6 (`chestWeighsFifty`;
 `tools/checks/chest-weight.ts`).
 
+## An object picked up at the party's feet leaves the pad down
+
+A pick-up from the floor ends in `MoveObject(objD4, D6W, D5W, -1, 0)`
+(`doc/CSBwin-src/Mouse.cpp:837`), the square the party's own or the one ahead (`:804-812`).
+`MoveObject` removes an object that does not levitate through `PlaceOrRemoveObjectInRoom`
+with `unchangedRoom` = `d.LoadedLevel == d.partyLevel && oldX == d.partyX && oldY ==
+d.partyY` (`doc/CSBwin-src/Code11f52.cpp:3311-3329`), and a pad of type 1 ("anything") or 2
+does nothing on a move with `unchangedRoom` (`:3773`, `:3787`). So an object picked up from
+under the party leaves the pad pressed; one picked up from the square ahead lifts it. In
+Conflux's partial game (`DEBT.md` F24) a champion takes an item off the pad at 1(21,18),
+which holds the pit at 1(20,18) shut, and the pit stays shut. The port lifted the pad in
+both cases before level 6 (`pickUpLiftsPad`; `tools/checks/pick-up-pad.ts`), and its extra
+`gatherThrownWeapons`, which takes weapons off the party's square as a pick-up does, with it.
+
 ## A converted scroll's `m_word4` upper bits are allocation debris
 
 `convertScrolls` writes `pScroll->open(openFlag==0)` — bit 0 of the new `m_word4` — over

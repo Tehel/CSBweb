@@ -152,6 +152,12 @@ export const BEHAVIOURS = [
         debt: 'F24',
         until: 6,
     },
+    {
+        name: 'pickUpLiftsPad',
+        does: "an object picked up from the floor of the party's own square lifting the pad under it as from a square the party is not on, where CSBWin's `MoveObject` removes it with `unchangedRoom`, the party standing there, which a pad ignores: the pad under the party stays down, Conflux's pit at 1(20,18) staying shut (`ViewportPicking.tryPickViewportObject`, and the extra `gatherThrownWeapons`)",
+        debt: 'F24',
+        until: 6,
+    },
 ] as const satisfies readonly BehaviourChange[];
 
 export type BehaviourName = (typeof BEHAVIOURS)[number]['name'];

@@ -91,11 +91,11 @@ function takes(ctx: GameContext, champion: Champion, slot: number, object: Objec
 /**
  * The party has arrived on `at` and its pads have fired: with the extra on, every tagged
  * object lying there goes back to its thrower. It comes off the floor as a pick-up by
- * hand does (`tryPickViewportObject`), so a pad under it feels it go. Each goes first into
- * the slot it left, if that is free; then the rest, the one the fewest free slots take
- * first, each into the first free one that takes it (`fallbackSlots`), so a club is not
- * left out of the quiver by the daggers gathered with it. A dead thrower, or one with no
- * room, leaves it where it lies, still tagged.
+ * hand does (`tryPickViewportObject`): the party stands there, so a pad under it stays
+ * down. Each goes first into the slot it left, if that is free; then the rest, the one the
+ * fewest free slots take first, each into the first free one that takes it
+ * (`fallbackSlots`), so a club is not left out of the quiver by the daggers gathered with
+ * it. A dead thrower, or one with no room, leaves it where it lies, still tagged.
  */
 export function gatherThrownWeapons(ctx: GameContext, at: Position): void {
   if (!ctx.extras.gatherThrownWeapons || ctx.thrownWeapons.size === 0) return;
@@ -109,7 +109,12 @@ export function gatherThrownWeapons(ctx: GameContext, at: Position): void {
   }
   const take = (object: ObjectID, chIdx: number, slot: number): void => {
     if (!dungeon.removeObjectFromCell(at, object)) return;
-    ctx.systems.actuators.triggerObjectMove(at, object, false, false, party.facing & 0x3);
+    if (ctx.behaviour.pickUpLiftsPad) {
+      ctx.systems.actuators.triggerObjectMove(at, object, false, false, party.facing & 0x3);
+    } else {
+      // The party stands on `at`, so the pad under it stays down, as for a pick-up by hand.
+      ctx.systems.actuators.triggerObjectMove(at, object, false, true, party.facing & 0x3);
+    }
     forgetThrownWeapon(ctx, object);
     ctx.systems.character.addCharacterPossession(chIdx, object, slot);
   };

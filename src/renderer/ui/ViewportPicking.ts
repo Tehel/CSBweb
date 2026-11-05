@@ -88,7 +88,17 @@ export function tryPickViewportObject(ui: UIState, x: number, y: number): boolea
   // its returns for no cursor owner, a monster in the way and a cancel skip.
   setClockTick(ui.ctx, 1);
   if (!ui.ctx.dungeon.removeObjectFromCell(target, hit.rn)) return false;
-  ui.ctx.systems.mouse.triggerObjectMove(target, hit.rn, false, false, ui.partyState.facing & 0x3);
+  if (ui.ctx.behaviour.pickUpLiftsPad) {
+    ui.ctx.systems.mouse.triggerObjectMove(target, hit.rn, false, false, ui.partyState.facing & 0x3);
+  } else {
+    // `MoveObject(objD4, D6W, D5W, -1, 0)` (`doc/CSBwin-src/Mouse.cpp:837`) removes an object
+    // that does not levitate with `unchangedRoom` = "the party stands there"
+    // (`doc/CSBwin-src/Code11f52.cpp:3311-3329`), which a pad takes as no change: an object
+    // picked up from the party's own square leaves the pad under the party pressed.
+    const party = ui.partyState.position;
+    const partyThere = target.z === party.z && target.x === party.x && target.y === party.y;
+    ui.ctx.systems.mouse.triggerObjectMove(target, hit.rn, false, partyThere, ui.partyState.facing & 0x3);
+  }
 
   ui.partyState.objectInHand = hit.rn;
   forgetThrownWeapon(ui.ctx, hit.rn);
