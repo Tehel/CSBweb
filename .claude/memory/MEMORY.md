@@ -41,3 +41,4 @@ One line per memory in this directory. Committed with the project; never shared.
 - [Long runs and the job timeout](long-runs-job-timeout.md) — the gate's 16 workers slow a tool ~3×, a job dies at 300 s: a CSBWin run past ~100 s alone gets its own `csbwin-runs.ts` job (`<id>` / `--not=<id>`)
 - [Known failures on the WSL checkout](wsl-known-failures.md) — `data-set-archive.ts` (an "é" under /tmp) fails at HEAD there (2026-11-05); compare with HEAD before chasing anything else
 - [No semantic-memory](no-semantic-memory.md) — never post this project into the semantic-memory MCP; session-review memories go here
+- [Recording cut at a save](recording-cut-at-save.md) — a recording starts exactly at a save on its path from its file plus the attack menu, the selected champion and a little loop state; never at an arbitrary VBL (monster timers re-made); DMMovie42 measured
