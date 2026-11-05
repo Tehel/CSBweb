@@ -18,7 +18,8 @@
  * party dies without its attack menu); so does a game from `dungeon.dat` given the game
  * information a read gives it (`noGameInfo`), its next save another file; and a save
  * whose next change is not its tail, or taken inside a VBL away from a join, the
- * Sleepsave's, is no start.
+ * Sleepsave's, is no start. A disk menu's save taken VBLs before its tail, as the page's is,
+ * the clock held between, is one, the file made at the tail still the save's.
  *
  *   npm test -- --only=recording-cut.ts                         every package, every save
  *   npm test -- --only=recording-cut.ts DMMovie42 --saves=0-4    one package's saves 0 to 4
@@ -30,6 +31,7 @@
 import { readFileSync } from 'node:fs';
 
 import { findRecordingSet } from '../../src/data/RecordingSet';
+import { saveFileOf } from '../../src/engine/GameSaves';
 import { applySaveBytes } from '../../src/engine/SaveGameFile';
 import type { Recording, RecordingPoint } from '../../src/engine/Recorder';
 import { cutStateOf, type CutState } from '../../src/engine/CutState';
@@ -66,6 +68,13 @@ const LESS: Record<string, Record<number, Less[]>> = {
   'CSBFullRecordingV4': { 0: ['selected'] },
   'replay-new-game-branch': { 0: ['noGameInfo'] },
 };
+
+/**
+ * The package's save cut again from a point `LATE_VBLS` before its tail, as the page's disk
+ * menu takes it, its tail run once the store has written the file (`GameSaves.save`).
+ */
+const LATE_TAIL: Record<string, number> = { 'DMMovie42': 0 };
+const LATE_VBLS = 3;
 
 const digests = await diskSetDigests();
 const files = corpusFiles().filter((file) => {
@@ -139,6 +148,28 @@ for (const file of files) {
     check(played.drift === null, `${what}'s cut plays to the package's ${pkg.shared.kind === 'save' ? 'save' : 'end'}${played.drift ? `: it drifts, ${JSON.stringify(played.drift)}` : ''}`);
     console.log(`  ${what}: ${root.changes.length} changes and ${root.vbls} VBLs from it, ${Math.round(written.length / 1024)} KB, `
       + `cut in ${((cutAt - started) / 1000).toFixed(1)} s, played in ${((Date.now() - cutAt) / 1000).toFixed(1)} s${played.drift ? ', DRIFTS' : ''}`);
+
+    // The browser's disk menu: its point taken VBLs before its tail, the clock held between.
+    if (kind === 'tail' && LATE_TAIL[name] === index) {
+      const tail = point.vbls;
+      const early: RecordingPoint = { ...point, vbls: tail - LATE_VBLS };
+      const at = pkg.path.find((one) => one.id === point.recording)!;
+      const { game } = await playPath(set, setFiles, [...pkg.path.slice(0, pkg.path.indexOf(at)),
+        { ...at, changes: at.changes.slice(0, point.changes), vbls: early.vbls, ended: true, end: null }]);
+      const held = game.ctx.state.paused;
+      const file = saveFileOf(game, 'stopped', (champion) => game.ctx.host.portraitOf(champion));
+      let lateCut: Recording[] | null = null;
+      try {
+        lateCut = await cutAtSave(pkg.path, early, file, stand);
+      } catch (error) {
+        check(false, `${what}, its point ${LATE_VBLS} VBLs before its tail, cuts: ${(error as Error).message}`);
+      }
+      const lateRoot = lateCut?.[0];
+      const latePlayed = lateCut && await playPath(set, setFiles, lateCut, savedAtEnd);
+      check(held && cutPlace(pkg.path, early)?.kind === 'tail' && lateRoot?.changes.length === root.changes.length && lateRoot.vbls === root.vbls
+        && latePlayed?.drift === null,
+      `${what}, its point taken ${LATE_VBLS} VBLs before its tail under the menu's held clock, as a browser's disk menu takes it, is a start: the file made at the tail still the save's, the cut the same, played to its end`);
+    }
 
     for (const less of LESS[name]?.[index] ?? []) {
       const carried = root.start.carried;

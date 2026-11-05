@@ -652,7 +652,10 @@ menu, or the champion selected, DMMovie42's saves drift; without the last, so do
 in the first recording of a new game, at the next file checked.
 
 Where it can start (`cutPlace`): at a save whose tail is the next change of its
-recording, F5's and the disk menu's under a held clock; or at a join, a branch that read
+recording, F5's and the disk menu's under a held clock. F5's tail is at the save's VBL;
+the disk menu's comes once the store has written the file, VBLs later in a browser, the
+menu's clock held through them, so the path is replayed to the tail's VBL and the file
+made there must still be the save's; or at a join, a branch that read
 the save, where the cut is the branch's own start, which plays alone ("The tree"). The
 Sleepsave's tail is made inside the VBL of its click, which logs none, so a Sleepsave
 starts a cut only at the join of a branch that read it. The path's end, a save or the

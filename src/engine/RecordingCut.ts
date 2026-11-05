@@ -51,7 +51,8 @@ export type CutPlace =
  * Where `path`, as a package holds it or `pointPath` gives it, each recording cut at its
  * child's join and the last at its point, can start at the save made at `save`: at the
  * join of a branch that read it, or after its tail where that is the next change, inside
- * the path, not its last; `null` where it cannot. A save taken inside a VBL, the
+ * the path, not its last, at the save's VBL or, the disk menu's, some VBLs after it under
+ * the menu's held clock; `null` where it cannot. A save taken inside a VBL, the
  * Sleepsave's, has no tail of its own, and starts a path at a join alone.
  */
 export function cutPlace(path: readonly Recording[], save: RecordingPoint): CutPlace | null {
@@ -63,9 +64,11 @@ export function cutPlace(path: readonly Recording[], save: RecordingPoint): CutP
     const index = path.findIndex((recording) => recording.id === save.recording);
     if (index < 0 || save.inVbl) return null;
     const tail = path[index]!.changes[save.changes];
-    if (tail?.change.kind !== 'saveWritten' || tail.vbl !== save.vbls) return null;
+    // The disk menu's SAVE runs the tail once the store has written the file, VBLs later
+    // in a browser, under the menu's held clock (`GameSaves.save`).
+    if (tail?.change.kind !== 'saveWritten' || tail.vbl < save.vbls) return null;
     // The tail ends the path: the cut would hold nothing to play.
-    if (index === path.length - 1 && save.changes === path[index]!.changes.length - 1 && save.vbls === path[index]!.vbls) return null;
+    if (index === path.length - 1 && save.changes === path[index]!.changes.length - 1 && tail.vbl === path[index]!.vbls) return null;
     return { kind: 'tail', index, change: save.changes };
 }
 
@@ -188,7 +191,9 @@ export async function cutAtSave(
         if (!bytes) throw new Error('the path made no file at its end');
         return cutPathAt(path, place, { bytes, carried: start.carried, rules: at.rules, extras: at.extras });
     }
-    const upTo: Recording = { ...at, changes: at.changes.slice(0, save.changes), vbls: save.vbls, ended: true, end: null };
+    // Up to the tail's VBL: where it comes VBLs after the save, the clock held through them,
+    // the file made there is still the save's, which the play checks.
+    const upTo: Recording = { ...at, changes: at.changes.slice(0, save.changes), vbls: at.changes[save.changes]!.vbl, ended: true, end: null };
     const page = await stand();
     const { game } = page;
     const player = await playIn(page, [...path.slice(0, place.index), upTo], file ? { file, inVbl: false } : null, progress);
