@@ -172,6 +172,8 @@ export class RecordingPlayer {
             this.game.readDungeonDat(this.dungeonDat);
             ctx.random.setSeed(root.start.random);
             ctx.state.block1.randomGameID = root.start.randomGameID;
+            // The global the new game counted on from the page's last game (`RecordingStart`).
+            ctx.state.block1.totalMoveCount = root.start.totalMoveCount ?? 0;
             this.begin(root);
         } else {
             this.read(root);

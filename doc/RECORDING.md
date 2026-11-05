@@ -515,9 +515,14 @@ a root and the branches down to the one played, or a branch alone, from its own 
   stale tab, is refused before it plays: "A LATER VERSION OF THE SITE MADE THIS
   RECORDING". Each recording's behaviour is set before its read, the root's and each
   join's ("A recording's level", above).
-- **The start.** The path's first start is read: a new game's world, its stream and
-  playthrough set over the read's (`Game.readNewGame` draws from a stream of its own), or
-  a save's file and its `CarriedState`; then its rules and its extras. The game is
+- **The start.** The path's first start is read: a new game's world, its stream,
+  playthrough and `totalMoveCount` set over the read's (`Game.readNewGame` draws from a
+  stream of its own), or a save's file and its `CarriedState`; then its rules and its
+  extras. `totalMoveCount` is a global, not `d.`'s, which a new game counts on from the
+  page's last game, one lost at the entrance before it, and every save file holds: the
+  recorder keeps it beside the stream, where it is not 0, and a recording made before it
+  did assumes 0, as a page's first game has it; such a recording's files made after a game
+  lost in its page differ there, its play the same. The game is
   started by its owner, as after any read.
 - **The feed.** The boundary calls the player after every VBL, outside it
   (`InputBoundary.play`), and the player applies the changes logged before the next, so
@@ -598,10 +603,8 @@ the time played flush right, the player's VBLs since the path's start
   stopped, its state a new loop's (`Game.resumeMainLoop`), the message area empty, the
   screen's play state its first, the clock running, and `totalMoveCount` 0. The clock is
   the page's: a path shared at a save the disk menu made ends under the menu's held clock,
-  and a new game's read does not set it going. `totalMoveCount` is a global, not `d.`'s,
-  which a new game's read counts on from and a saved game's sets: a page reads a new game
-  at its boot alone, so a recording from one assumes 0, and the file a join checks holds
-  it. `tools/checks/replay.ts` (point 11) restarts each package's path a second into its
+  and a new game's read does not set it going. `totalMoveCount` is set by the start
+  itself ("The start", above). `tools/checks/replay.ts` (point 11) restarts each package's path a second into its
   play, and again at its end, and plays it to the same end.
 - **Stop** (Esc): the player and the loop stopped, and the page left for the welcome
   page. Where the book's dialog played the recording, the page shows it as PLAY left
@@ -833,7 +836,7 @@ Each recording of its path holds its `id`, `build`, `level`, `profile`, `files`,
 `rules`, `extras`, `vbls`, `end`, `changes` and `checks`. What the store keeps beside them
 is the path's own: the set is the package's, the parent is always the recording before at
 its end, and every recording is ended. Its `start` is a new game's stream and playthrough,
-`{kind: 'new', random, randomGameID}`, or a save's file in base64 with what its read left,
+`{kind: 'new', random, randomGameID, totalMoveCount?}`, or a save's file in base64 with what its read left,
 `{kind: 'save', bytes, carried}`, for the root alone, and, for a root cut at a save, what
 the read lost, `carried.cut` ("A path cut at a save", above), which a package written
 before cuts does not hold; a branch's is a join,

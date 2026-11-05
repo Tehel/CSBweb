@@ -67,8 +67,13 @@ export function setCarriedState(game: Game, carried: CarriedState): void {
 
 /** Where a recording starts: a new game of its data set, or a save, or, in a package, a join. */
 export type RecordingStart =
-    /** A new game, its stream and `d.RandomGameID` as its read and its playthrough's draw left them. */
-    | { readonly kind: 'new'; readonly random: number; readonly randomGameID: number }
+    /**
+     * A new game, its stream and `d.RandomGameID` as its read and its playthrough's draw left
+     * them; and `totalMoveCount`, the global its file holds (`Block1`), which a new game
+     * counts on from the page's last game, one lost before it at the entrance. Absent from a
+     * recording made before it was kept, which assumes 0, as a page's first game has it.
+     */
+    | { readonly kind: 'new'; readonly random: number; readonly randomGameID: number; readonly totalMoveCount?: number }
     /**
      * A save's file, as it was read, and what the read left beside it. A recording the
      * store's version 7 wrote before the tree has no `carried`.

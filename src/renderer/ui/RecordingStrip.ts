@@ -111,10 +111,9 @@ export function nextPace(pace: Pace, step: 'up' | 'down' | 'round'): Pace {
  * (RESTART): the loop stopped, the message area empty, the screen's play state its first
  * (`GameScreen.initializePlayState`), the loop's state a new loop's
  * (`Game.resumeMainLoop`), the clock running, which a path ended at a save the disk menu
- * made leaves held (`ctx.state.paused`), and `totalMoveCount` 0. That one is a global of CSBWin's, not
- * `d.`'s, which a new game's read counts on from (`Game.readNewGame`) and a saved game's
- * sets: a page reads a new game at its boot alone, so a recording that starts from one
- * starts from 0, and the file a join checks holds it. The caller then plays the path with
+ * made leaves held (`ctx.state.paused`), and `totalMoveCount` 0, a global of CSBWin's,
+ * not `d.`'s, which a new game's read counts on from (`Game.readNewGame`) until the
+ * player sets the recording's own (`RecordingStart`). The caller then plays the path with
  * a new player, as the page began it.
  */
 export function rewindPage(game: Game, screen: Pick<GameScreen, 'initializePlayState'>, messages: ScrollingText): void {

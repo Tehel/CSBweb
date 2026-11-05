@@ -407,7 +407,10 @@ function recordingFromJson(json: unknown, what: string, dataSet: string, parent:
         const kind = start['kind'];
         if ((kind === 'join') !== (parent !== null)) fail(`${what}'s start`);
         switch (kind) {
-            case 'new': return { kind: 'new', random: uint32(start['random'], `${what}'s seed`), randomGameID: uint32(start['randomGameID'], `${what}'s playthrough`) };
+            case 'new': return {
+                kind: 'new', random: uint32(start['random'], `${what}'s seed`), randomGameID: uint32(start['randomGameID'], `${what}'s playthrough`),
+                ...(start['totalMoveCount'] === undefined ? {} : { totalMoveCount: uint32(start['totalMoveCount'], `${what}'s move count`) }),
+            };
             case 'save': return {
                 kind: 'save', bytes: bytes(start['bytes'], `${what}'s save`),
                 ...(start['carried'] === undefined ? {} : { carried: carriedFromJson(start['carried'], `${what}'s carried state`, true) }),

@@ -27,8 +27,10 @@
  * `?dev`'s move, F5 with the clock running, the Sleepsave as the party lies down and
  * wakes, and the disk menu's SAVE with the clock stopped.
  *
- * 1. A read begins a recording: a new game's from its stream and playthrough, a save's
- *    from its file, with the rules and the extras, and the boot's DM rules its first change.
+ * 1. A read begins a recording: a new game's from its stream and playthrough, and the
+ *    `totalMoveCount` it counts on from, a game its page lost before it, which its files
+ *    hold; a save's from its file, with the rules and the extras, and the boot's DM rules
+ *    its first change.
  * 2. Every change is recorded at the same VBL, with the same `d.Time` and `d.RandomNumber`,
  *    in both games: what the recorded page composes and the replay does not takes nothing
  *    from the game's stream, and changes nothing the game reads.
@@ -144,6 +146,11 @@ import { memoryRecordingStore, memoryStore, savePath } from '../lib/saves';
 type Start = 'new' | Uint8Array;
 
 /** The recorded new game's stream, pinned once its world is read, so its run is the same every time. */
+/**
+ * The `totalMoveCount` a new game's page had counted before it, a game lost at the
+ * entrance: the new game counts on from it, its files hold it, and its recording keeps it.
+ */
+const CARRIED_MOVE_COUNT = 4321;
 const NEW_GAME_SEED = 0x2b5a1c07;
 
 /** The extras the recorded games begin with, which only their recordings give the replays. */
@@ -318,11 +325,17 @@ class Page {
    * extras `START_EXTRAS`, then the read, which begins the recording (`GameSaves`), then
    * the boot's DM rules and the loop.
    */
+  /**
+   * A fresh page recording a game from `start`: a new game, after one its page lost, which
+   * it counts `totalMoveCount` on from (`CARRIED_MOVE_COUNT`); or a save, read.
+   */
   static async record(start: Start): Promise<Page> {
     const page = new Page(true);
     const { game, saves } = page;
     page.settings.update({ extras: START_EXTRAS });
     if (start === 'new') {
+      // A page's game after one lost at the entrance: `totalMoveCount` counts on from it.
+      game.ctx.state.block1.totalMoveCount = CARRIED_MOVE_COUNT;
       game.readDungeonDat(DUNGEON);
       game.ctx.random.setSeed(NEW_GAME_SEED);
       await saves.newGameRead();
@@ -840,6 +853,8 @@ async function replay(name: string, start: Start, script: (player: Player) => Pr
   const { rules } = recorded.game.ctx;
   check(begun.start.kind === (start === 'new' ? 'new' : 'save') && begun.dataSet === STOCK_DATA_SET.id && begun.build === 'replay',
     `the read begins a recording of the ${begun.start.kind === 'new' ? 'new game' : 'save'}, its set's and its build's`);
+  check(begun.start.kind !== 'new' || begun.start.totalMoveCount === CARRIED_MOVE_COUNT,
+    `a new game's recording keeps the totalMoveCount it counts on from, the page's last game's (${CARRIED_MOVE_COUNT}), which its files hold`);
   check(begun.level === ENGINE_LEVEL && recorded.game.ctx.behaviour === CURRENT_BEHAVIOUR && JSON.stringify(begun.files) === JSON.stringify(DIGESTS),
     `at the engine's level, ${ENGINE_LEVEL}, the game played by its behaviour, and with its set's files' digests (dungeon.dat ${DIGESTS['dungeon.dat']})`);
   if (begun.start.kind === 'new') {

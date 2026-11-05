@@ -293,7 +293,10 @@ export class GameSaves {
         } catch (error) {
             this.log('New game: the saves could not be listed', error);
         }
-        this.recorder?.begin({ kind: 'new', random: this.game.ctx.random.getSeed(), randomGameID: block1.randomGameID });
+        this.recorder?.begin({
+            kind: 'new', random: this.game.ctx.random.getSeed(), randomGameID: block1.randomGameID,
+            ...(block1.totalMoveCount === 0 ? {} : { totalMoveCount: block1.totalMoveCount }),
+        });
     }
 
     /** A listed save out of the store, to be read into the game (`read`). */
