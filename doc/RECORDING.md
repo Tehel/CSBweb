@@ -548,8 +548,11 @@ a root and the branches down to the one played, or a branch alone, from its own 
   prison's question, `TAG02076e`, the video mode and the clock held (`openSaveMenu`); the
   Hint Oracle's button, `TAG02076e` and the clock held (`stopForHintOracle`). The
   recording's logged `pause` and `tag0207cc` undo them, as their close did.
-- **No save is written.** A save the page made is its logged tail (`saveWritten`). The
-  Sleepsave's file and tail are made inside the VBL of its click, which the boundary does
+- **No save is written.** A save the page made is its logged tail (`saveWritten`). Its
+  file is made again before the tail and dropped: making it writes the running world's
+  EXPOOL, the DSA globals and the overlay palette's records (`buildSaveFile`), as the
+  recorded save did, and every later file holds what it wrote, so a game that saved
+  before makes another file there than one that did not. The Sleepsave's file and tail are made inside the VBL of its click, which the boundary does
   not log, so the player's game makes them again there and writes nothing
   (`GameSaves.sleepSave`); the file goes to the player (`InputBoundary.savedInVbl`).
 

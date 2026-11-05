@@ -286,6 +286,10 @@ export class RecordingPlayer {
                     return;
                 }
                 this.next++;
+                // The save the recorded game made before its tail: its file, made again and
+                // dropped, writes the world's EXPOOL as the save's did (`buildSaveFile`), which
+                // every later file holds.
+                if (entry.change.kind === 'saveWritten') this.makeFile();
                 this.game.input.apply(entry.change);
             }
             if (this.next < until.changes || vbls < until.vbls) return;
@@ -313,15 +317,19 @@ export class RecordingPlayer {
         if (ahead?.inVbl && ahead.changes === changes && ahead.vbls === vbls) this.savedAtJoin = file;
     }
 
+    /** A file made as the recorded save made it, the clock stopped where the disk menu held it. */
+    private makeFile(): Uint8Array {
+        const { ctx } = this.game;
+        return saveFileOf(this.game, ctx.state.paused ? 'stopped' : 'running', (champion) => ctx.host.portraitOf(champion));
+    }
+
     /**
      * The file the game makes at the point played to, as the recorded save made it, the
      * clock stopped where the disk menu held it; at a point taken inside a VBL, the file
      * that VBL saved, and an empty one where it saved none.
      */
     private made(inVbl: boolean | undefined): Uint8Array {
-        const { ctx } = this.game;
-        const made = inVbl ? this.savedAtJoin ?? new Uint8Array(0)
-            : saveFileOf(this.game, ctx.state.paused ? 'stopped' : 'running', (champion) => ctx.host.portraitOf(champion));
+        const made = inVbl ? this.savedAtJoin ?? new Uint8Array(0) : this.makeFile();
         this.savedAtJoin = null;
         this.madeLast = made;
         return made;
