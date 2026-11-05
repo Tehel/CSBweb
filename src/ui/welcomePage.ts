@@ -966,13 +966,13 @@ function showRecordings(
         if (starts.length > 0) {
             choices.push(spanChoice('From', 'from', [
                 ['', path[0]!.start.kind === 'new' ? 'The beginning of the game' : 'The saved game it begins from'],
-                ...starts.map((save): [string, string] => [save.save.id, save.save.name]),
+                ...starts.map((save): [string, string] => [save.save.id, spanLabel(save)]),
             ], chosen.from ?? '', (value) => rechoose({ from: value || null, to: chosen.to })));
         }
         if (ends.length > 1) {
             choices.push(spanChoice('To', 'to', [
-                ['', pointName(point)],
-                ...ends.slice(1).map((one): [string, string] => [one.kind === 'save' ? one.save.id : '', pointName(one)]),
+                ['', spanLabel(point)],
+                ...ends.slice(1).map((one): [string, string] => [one.kind === 'save' ? one.save.id : '', spanLabel(one)]),
             ], chosen.to ?? '', (value) => rechoose({ from: chosen.from, to: value || null })));
         }
         const buttons = document.createElement('div');
@@ -1108,6 +1108,18 @@ async function uploadPoint(
     if (typeof answer === 'string') return answer;
     const id = (answer.json as { id?: unknown } | null)?.id;
     return typeof id === 'string' && SHARED_RECORDING_ID.test(id) ? { id } : 'the server answered no id.';
+}
+
+/**
+ * What FROM and TO name `point` by: where it is in the game, its play time and its level,
+ * and when it was made, `0:47:12 · level 4 · 2026-11-05 14:02`; a game's end, won or lost,
+ * in the level's place. Its file's name says nothing of that.
+ */
+function spanLabel(point: StoredPoint): string {
+    const made = pointMadeAt(point);
+    const where = point.kind === 'save' ? `level ${point.save.level}` : pointName(point).toLowerCase();
+    const playTime = point.kind === 'save' ? point.save.playTime : point.recording.playTime ?? 0;
+    return `${formatPlayTime(playTime)} · ${where} · ${formatSaveDate(made)} ${formatSaveTime(made)}`;
 }
 
 /**

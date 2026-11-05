@@ -2025,9 +2025,13 @@ const whole = await spanOf();
 await chooseSpan('from', earlier.id, hasFrom(earlier.id));
 const fromEarlier = await spanOf();
 console.log('  FROM and TO:', JSON.stringify({ earlier, whole, fromEarlier }));
-check(whole?.from.join() === `=The saved game it begins from,${earlier.id}=${earlier.name}` && whole.fromValue === ''
-  && whole.to.join() === `=${endWritten.save},${earlier.id}=${earlier.name}` && whole.toValue === '',
-  'the quick save\'s panel offers FROM its path\'s start or the save on its way, and TO itself or that save, the whole chosen');
+// A save is named by where it is in the game, its play time and its level, and when it was made.
+const SPAN_LABEL = /^\d+:\d\d:\d\d · level \d+ · \d{4}-\d\d-\d\d \d\d:\d\d$/;
+/** Whether `option`, `value=text`, has `value`, and its text the label of a save. */
+const savedAs = (option: string | undefined, value: string) => option?.startsWith(`${value}=`) === true && SPAN_LABEL.test(option.slice(value.length + 1));
+check(whole?.from.length === 2 && whole.from[0] === '=The saved game it begins from' && savedAs(whole.from[1], earlier.id) && whole.fromValue === ''
+  && whole.to.length === 2 && savedAs(whole.to[0], '') && savedAs(whole.to[1], earlier.id) && whole.to[0] !== whole.to[1] && whole.toValue === '',
+  'the quick save\'s panel offers FROM its path\'s start or the save on its way, and TO itself or that save, each save by its play time, its level and its date, the whole chosen');
 const cutQuery = new URLSearchParams(fromEarlier?.play ?? '');
 check(fromEarlier?.fromValue === earlier.id && fromEarlier.to.length === 0 && fromEarlier.panel[0] === endWritten.save
   && fromEarlier.panel.some((line: string) => line.startsWith('From a saved game, level ')) && fromEarlier.panel.includes('To a saved game')

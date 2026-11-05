@@ -778,7 +778,8 @@ won or lost; then, of a site's recording, when it was shared and its state, and 
 browser's point, the saves on its way. A browser's point is played and uploaded whole,
 or part of it: above its lines, FROM chooses where it starts, its path's own start or a
 save on its way it can start at (`cutStarts`, "A path cut at a save", above), and TO
-where it ends, the point or a save on its way past the start (`cutEnds`). Its lines then
+where it ends, the point or a save on its way past the start (`cutEnds`), each named by
+its play time, its level and when it was made (`spanLabel`). Its lines then
 say what the part would: from a saved game and its level, the time played since that
 save, and the saves between (`cutInfo`). The server reads where a recording ends and its
 party from its package as it takes it, and, as it starts, for a row added before it kept
