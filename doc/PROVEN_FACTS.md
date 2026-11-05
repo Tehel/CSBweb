@@ -4577,6 +4577,18 @@ at 3(19,3) and 3(20,25), where they stay and run. ReDMCSB's pit has no such test
 four. The port's `WorldMove` drops any object that does not levitate before level 6
 (`everyObjectFalls`; `tools/checks/dsa-add-delete.ts`).
 
+## A chest weighs what the dungeon says
+
+`GetObjectWeight` gives a chest the first longword of the pool's
+`(EDT_Database << 24) + (EDBT_ObjectWeights << 16) + 0` record where `Locate` finds one of a
+longword or more, else 50, then adds each object inside (`doc/CSBwin-src/Mouse.cpp:63-81`,
+`EDBT_ObjectWeights` = 0, `doc/CSBwin-src/CSB.h:1556`). No FTL dungeon has the record;
+Conflux's sets 10, a chest of 1.0 kg. As the load's part, the chest's weight sets what a
+step costs, `(3 * load) / MaxLoad + 1` stamina (`doc/CSBwin-src/CSBCode.cpp:8180-8182`): in
+Conflux's partial game (`DEBT.md` F24) a champion carrying one paid 2 a step in the port, 1
+in CSBWin. The port kept the 50 before level 6 (`chestWeighsFifty`;
+`tools/checks/chest-weight.ts`).
+
 ## A converted scroll's `m_word4` upper bits are allocation debris
 
 `convertScrolls` writes `pScroll->open(openFlag==0)` — bit 0 of the new `m_word4` — over

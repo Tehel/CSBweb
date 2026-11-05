@@ -308,8 +308,10 @@ that forgets the party (`doc/PROVEN_FACTS.md` → "Magic damage to a champion sk
 armour", "A skipped step back reads the last `PossibleMove`'s `moveOntoPartyPosition`");
 `actuatorWord8BigEndian`, until 6: a big actuator's `word8` read big-endian, which
 loses bits 16-17 of a DSA's parameters (→ "A big actuator's `word8` stays in the file's
-byte order"); and `everyObjectFalls`, until 6: an actuator a DSA puts on an open pit
-falling down it (→ "A pit takes only the party, a monster and what is above").
+byte order"); `everyObjectFalls`, until 6: an actuator a DSA puts on an open pit
+falling down it (→ "A pit takes only the party, a monster and what is above"); and
+`chestWeighsFifty`, until 6: a chest of 5.0 kg in a dungeon that sets its weight (→ "A
+chest weighs what the dungeon says").
 Recordings made before
 levels are of level 0.
 

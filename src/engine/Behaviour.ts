@@ -146,6 +146,12 @@ export const BEHAVIOURS = [
         debt: 'F24',
         until: 6,
     },
+    {
+        name: 'chestWeighsFifty',
+        does: "a chest weighing 5.0 kg before its contents in every dungeon, where CSBWin's `GetObjectWeight` takes the weight the dungeon's `EDBT_ObjectWeights` record gives, where it has one: Conflux's chest of 1.0 kg, a laden champion's step costing more stamina (`CharacterStats.getObjectWeight`)",
+        debt: 'F24',
+        until: 6,
+    },
 ] as const satisfies readonly BehaviourChange[];
 
 export type BehaviourName = (typeof BEHAVIOURS)[number]['name'];

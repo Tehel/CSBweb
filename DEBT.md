@@ -910,13 +910,16 @@ What it establishes:
     its last join, where `record00053` follows `record00051`, as `record00052` does: the
     run ends at 0x57262, `record00051`'s end, its tail dropped. The DSA's warnings come
     after that error.
-  - **The port plays its first 4635 entries by `d.RandomNumber`**, to line 4684
-    (`d.Time` 0x259c, party L1 (6,20)), past a big actuator's `word8`, which CSBWin reads
-    byte-swapped, and an actuator the wave DSA's `&ADD` puts on an open pit, which stays
-    there (`doc/PROVEN_FACTS.md` → "A big actuator's `word8` stays in the file's byte
-    order", "A pit takes only the party, a monster and what is above"). Both are the
-    port's fixes at level 6, which every fix for this run joins until it is deployed
-    (`doc/RECORDING.md` → "The policy"). The drift at line 4684 is not looked at yet.
+  - **The port plays its first 10272 entries by `d.RandomNumber`**, to line 10327
+    (`d.Time` 0x4ef4, party L1 (11,26)), past a big actuator's `word8`, which CSBWin reads
+    byte-swapped, an actuator the wave DSA's `&ADD` puts on an open pit, which stays
+    there, and Conflux's chest of 1.0 kg, which a laden champion's steps pay for in
+    stamina (`doc/PROVEN_FACTS.md` → "A big actuator's `word8` stays in the file's byte
+    order", "A pit takes only the party, a monster and what is above", "A chest weighs
+    what the dungeon says"). All three are the port's fixes at level 6, which every fix
+    for this run joins until it is deployed (`doc/RECORDING.md` → "The policy"). At line
+    10327 the draws per tick first differ at 0x4eee, CSBWin's 221 to the port's 216,
+    among monster turns and DSAs; not looked at further yet.
 
 Paying it, in steps:
 
@@ -924,7 +927,7 @@ Paying it, in steps:
    author's request. Steps 3 to 5 are done for the four of them: their check, their
    recordings and their upload (below), which the author runs. Next, the other CSB runs through the oracle, and
    Conflux's partial game (above): its set, its row of `CSBWIN_RUNS` held to its drift at
-   line 4684, and its drifts, each the port's. **The 9.x and 11.0xx runs play at their version's
+   line 10327, and its drifts, each the port's. **The 9.x and 11.0xx runs play at their version's
    profile** of behaviour flags (`doc/RECORDING.md` → "A recording's level"): each version
    differs from CSBWin 2023 throughout (above), so corrections to the log cannot convert
    them. Each flag is read from the diff of its version's source against 2023's

@@ -108,6 +108,7 @@ const CHECKS: Tool[] = [
   { tool: 'extended-wall-button.ts' },
   { tool: 'fountain.ts' },
   { tool: 'item-properties.ts' },
+  { tool: 'chest-weight.ts' },
   { tool: 'queue-sound.ts' },
   { tool: 'crack-switch.ts' },
   { tool: 'dm-atari-graphics.ts' },

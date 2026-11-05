@@ -169,6 +169,14 @@ export class DungeonState {
         return new Expool(this.data).locate(key);
     }
 
+    /**
+     * `expool.Locate(key, &p)` and `p[index]`: the record's size and the longword, or null
+     * where `Locate` returns -1 (`Expool.locateAt`).
+     */
+    locateExpoolWord(key: number, index: number): { size: number; value: number } | null {
+        return new Expool(this.data).locateAt(key, index);
+    }
+
     /** `Locate`'s pointer written through: longword `index` of `key`'s first record. */
     writeLocatedExpoolWord(key: number, index: number, value: number): void {
         new Expool(this.data).writeLocated(key, index, value);

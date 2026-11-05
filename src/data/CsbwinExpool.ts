@@ -93,6 +93,8 @@ export function globalTextBytes(record: readonly number[]): number[] {
 const MONSTER_MOVE_FILTER_LEVELS = 64;
 /** `EDT_Database` (`doc/CSBwin-src/CSB.h:1555`). */
 const EDT_DATABASE = 5;
+/** `EDBT_ObjectWeights` (`doc/CSBwin-src/CSB.h:1556`). */
+const EDBT_OBJECT_WEIGHTS = 0;
 /** `EDBT_DeleteDuplicateTimers` (`doc/CSBwin-src/CSB.h:1557`). */
 const EDBT_DELETE_DUPLICATE_TIMERS = 1;
 /** `EDBT_RuntimeFileSignatures` (`doc/CSBwin-src/CSB.h:1558`). */
@@ -144,6 +146,14 @@ function globalVariablesKey(i: number): number {
 export function altMonGraphicsKey(level: number, mt: number): number {
     return ((EDT_DATABASE << 24) | (EDBT_ALT_MON_GRAPHICS << 16) | (level << 8) | mt) >>> 0;
 }
+
+/**
+ * `(EDT_Database << 24) + (EDBT_ObjectWeights << 16) + 0`, the key of the record whose first
+ * longword is a chest's own weight, in tenths of a kilogram (`GetObjectWeight`,
+ * `doc/CSBwin-src/Mouse.cpp:68`). A dungeon file carries it (Conflux's, 10); nothing in
+ * CSBWin writes one.
+ */
+export const CHEST_WEIGHT_KEY = ((EDT_DATABASE << 24) + (EDBT_OBJECT_WEIGHTS << 16) + 0) >>> 0;
 
 /** `(EDT_Database << 24) | (EDBT_DisableSaves << 16)`, the key of the record that disables saves. */
 const DISABLE_SAVES_KEY = ((EDT_DATABASE << 24) | (EDBT_DISABLE_SAVES << 16)) >>> 0;

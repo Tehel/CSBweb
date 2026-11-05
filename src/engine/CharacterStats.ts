@@ -29,14 +29,14 @@ import { OBJNI_BOOTS_OF_SPEED, OBJNI_ELVEN_BOOTS } from '../core/objectNameIndex
 import type { WeaponDesc } from '../data/tables/ObjectTables';
 import { AttributeIndex, championAttribute } from './attributes';
 import { PotionType } from '../core/constants';
+import { CHEST_WEIGHT_KEY } from '../data/CsbwinExpool';
 
 /** `potion_EmptyFlask`. */
 /** `misc_WaterSkin` — the one misc type whose weight depends on how full it is. */
 const MISC_WATERSKIN = 1;
 /**
- * The chest's own weight before its contents. CSBWin reads it from the expansion pool
- * (`EDBT_ObjectWeights`) and falls back to 50 when a dungeon does not override it
- * (`doc/CSBwin-src/Mouse.cpp:65-68`); the shipped DM dungeon does not override it.
+ * The chest's own weight before its contents where the dungeon does not set it: no record
+ * `CHEST_WEIGHT_KEY` in its pool, as in every FTL dungeon (`doc/CSBwin-src/Mouse.cpp:68-69`).
  */
 const DEFAULT_CHEST_WEIGHT = 50;
 
@@ -77,7 +77,16 @@ export class CharacterStats {
       }
       case DBType.CHEST: {
         const rec = this.ctx.dungeon.getContainerRecord(rn);
-        let total = DEFAULT_CHEST_WEIGHT;
+        // The dungeon's own weight for a chest, its `EDBT_ObjectWeights` record's first
+        // longword where `Locate` finds one of a longword or more, else 50
+        // (`doc/CSBwin-src/Mouse.cpp:65-70`).
+        let total: number;
+        if (this.ctx.behaviour.chestWeighsFifty) {
+          total = DEFAULT_CHEST_WEIGHT;
+        } else {
+          const record = this.ctx.dungeon.locateExpoolWord(CHEST_WEIGHT_KEY, 0);
+          total = record === null || record.size < 1 ? DEFAULT_CHEST_WEIGHT : record.value | 0;
+        }
         let obj = rec?.containedObject ?? OBJECT_ID_EOF;
         while (obj !== OBJECT_ID_EOF && obj !== OBJECT_ID_NULL) {
           total += this.getObjectWeight(obj, visited);
