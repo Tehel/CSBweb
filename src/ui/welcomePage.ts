@@ -63,10 +63,11 @@
  *   is. Then this browser's points of the set, the latest made first: its saves whose
  *   recording the store holds up to them, by name, and its games' ends, won or lost, but
  *   for those another passes on its way, as a Sleepsave the game went on from
- *   (`src/engine/RecordingPoints.ts`). A click selects one, and the panel under the lists
- *   says where its path starts, when it began and ended, the time played, its build and
- *   whether an extra was on, a site's its author, its description and when it was shared
- *   too, with PLAY, a link that plays it (`?recording=`). On a site's, to a moderator,
+ *   (`src/engine/RecordingPoints.ts`). A click selects one, and the panel under the lists,
+ *   a frame of its own, says its title, a site's author and description, its party at
+ *   its point where that is known, the time played, where its path starts and where it
+ *   ends, a save or the game won or lost, and a site's when it was shared, a browser's the
+ *   saves on its way, with PLAY, a link that plays it (`?recording=`). On a site's, to a moderator,
  *   APPROVE on a pending one, HIDE or SHOW on any other, and DELETE, and to its uploader
  *   WITHDRAW, after which the list is the server's anew, a refusal said in the dialog. On
  *   a browser's, UPLOAD, which opens its form in the panel, a title, which it needs, an
@@ -110,7 +111,7 @@ import { archiveName, dataSetArchive, type ReadArchiveFile } from '../data/DataS
 import { folderFiles } from '../data/DataSetFiles';
 import {
     chooserSets, DATA_SETS_ROUTE, DOCUMENT_EXTENSIONS, DOCUMENTS_SEGMENT, documentPath, isDocumentName, PLAYER_ID_HEADER, PNG_HEAD_BYTES, pngSize,
-    RECORDING_PACKAGE_FIELD, RECORDINGS_ROUTE, SHARED_RECORDING_ID, thumbnailPath,
+    RECORDING_ENDINGS, RECORDING_PACKAGE_FIELD, RECORDINGS_ROUTE, SHARED_RECORDING_ID, thumbnailPath, type RecordingEnding,
     type DataSet, type DataSetManifest, type ModerationAction, type RecordingAction,
 } from '../data/DataSets';
 import { localDataSet, type LocalDataSetFile, type LocalDataSetRecord } from '../data/LocalDataSets';
@@ -123,7 +124,7 @@ import {
     formatPlayTime, formatSaveDate, formatSaveTime, lastUsedSave,
     type BrowserDataSetStore, type RecordingEntry, type RecordingStore, type SaveEntry, type SaveStore,
 } from '../data/saves';
-import { pointInfo, pointMadeAt, pointPath, pointRecordingId, shownPoints, storedPoints, type PointInfo, type StoredPoint } from '../engine/RecordingPoints';
+import { pointInfo, pointMadeAt, pointPath, pointRecordingId, savesOnTheWay, shownPoints, storedPoints, type PointInfo, type StoredPoint } from '../engine/RecordingPoints';
 import {
     packageOfEnd, packageOfSave, playedWithDevMoves, RECORDING_TEXT_LIMITS, writeRecordingPackage,
     type RecordingPackageStart, type RecordingPackageText,
@@ -619,7 +620,7 @@ interface RecordingsSource {
  * RECORDINGS: the site's recordings of the set (`siteRecordings`), the latest shared
  * first, then the browser's points of it (`storedPoints`) but those another passes
  * (`shownPoints`), the latest made first; a click
- * selects one, and the panel under the lists shows its metadata (`pointInfo`) and PLAY,
+ * selects one, and the panel under the lists shows what it is (`detailLines`) and PLAY,
  * which plays it (`?recording=`, `pointRecordingId`). On a site's, to a `moderator`,
  * APPROVE, HIDE or SHOW, and DELETE, and to its uploader WITHDRAW (`POST
  * RECORDINGS_ROUTE/<id>`), after which the site's list is asked anew. On a browser's,
@@ -774,6 +775,8 @@ function showRecordings(dialog: HTMLElement, set: DataSet, published: boolean, m
     const list = dialog.querySelector<HTMLElement>('.recordings-browser')!;
     const panel = dialog.querySelector<HTMLElement>('.recordings-panel')!;
     let rows: RecordingEntry[] = [];
+    // Every point of the set the store keeps, and those the list shows (`shownPoints`).
+    let all: StoredPoint[] = [];
     let points: StoredPoint[] = [];
     // The site's, `null` until it answers first.
     let shared: SiteRecording[] | null = null;
@@ -787,9 +790,11 @@ function showRecordings(dialog: HTMLElement, set: DataSet, published: boolean, m
     const refresh = async () => {
         try {
             rows = await source.recordings.list();
-            points = shownPoints(storedPoints(await source.saves.list(null), rows, set.id), rows);
+            all = storedPoints(await source.saves.list(null), rows, set.id);
+            points = shownPoints(all, rows);
         } catch (error) {
             rows = [];
+            all = [];
             points = [];
             status.textContent = `This browser's recordings could not be read: ${error instanceof Error ? error.message : String(error)}`;
         }
@@ -886,9 +891,7 @@ function showRecordings(dialog: HTMLElement, set: DataSet, published: boolean, m
         }
         const state = recording.pending ? ', awaiting a moderator' : recording.hidden ? ', hidden by a moderator' : '';
         panel.replaceChildren(
-            ...(recording.author ? [line('recordings-info', `By: ${recording.author}`)] : []),
-            ...(recording.description ? [line('recordings-description', recording.description)] : []),
-            ...pointLines(recording).map((text) => line('recordings-info', text)),
+            ...detailLines(recording, recording),
             line('recordings-info', `Shared ${formatSaveDate(recording.uploadedAt)} ${formatSaveTime(recording.uploadedAt)}${state}`),
             ...(recording.broken ? [line('recordings-failure', 'It drifts on the site\'s version: it plays, and stops where it drifts.')] : []),
             buttons);
@@ -935,7 +938,11 @@ function showRecordings(dialog: HTMLElement, set: DataSet, published: boolean, m
                     await refresh();
                 })())));
         }
-        panel.replaceChildren(...pointLines(info).map((text) => line('recordings-info', text)), ...(why === null ? [] : [line('recordings-why', why)]), buttons);
+        const onTheWay = savesOnTheWay(point, all, rows).length;
+        panel.replaceChildren(
+            ...detailLines({ title: pointName(point), author: '', description: '' }, info),
+            line('recordings-info', onTheWay === 0 ? 'No save on the way' : onTheWay === 1 ? '1 save on the way' : `${onTheWay} saves on the way`),
+            ...(why === null ? [] : [line('recordings-why', why)]), buttons);
     };
 
     /**
@@ -1001,7 +1008,7 @@ async function uploadPoint(
 ): Promise<{ readonly id: string } | string> {
     let bytes: Uint8Array;
     try {
-        const times = { recordedAt: info.recordedAt, endedAt: info.endedAt, playTime: info.playTime };
+        const times = { recordedAt: info.recordedAt, endedAt: info.endedAt, playTime: info.playTime, ...(info.champions ? { champions: info.champions } : {}) };
         bytes = await writeRecordingPackage(point.kind === 'save'
             ? packageOfSave(path, point.save.recording, await saves.read(point.save.id), text, times)
             : packageOfEnd(path, text, times));
@@ -1088,8 +1095,11 @@ function siteRecording(row: unknown): SiteRecording | null {
     if (typeof id !== 'string' || !SHARED_RECORDING_ID.test(id) || typeof build !== 'string' || typeof title !== 'string'
         || typeof author !== 'string' || typeof description !== 'string' || typeof recordedAt !== 'number' || typeof endedAt !== 'number'
         || typeof playTime !== 'number' || typeof uploadedAt !== 'number' || start === null) return null;
+    const champions = Array.isArray(r.champions) && r.champions.every((name) => typeof name === 'string') ? r.champions as string[] : null;
     return {
         id, build, title, author, description, recordedAt, endedAt, playTime, uploadedAt, start,
+        ending: (RECORDING_ENDINGS as readonly unknown[]).includes(r.ending) ? r.ending as RecordingEnding : null,
+        ...(champions ? { champions } : {}),
         extras: r.extras === true, pending: r.status === 'pending', hidden: r.hidden === true, broken: r.broken === true, mine: r.mine === true,
     };
 }
@@ -1108,15 +1118,23 @@ function pointName(point: StoredPoint): string {
     return point.kind === 'save' ? point.save.name : point.recording.end.word11694 ? 'The game won' : 'The game lost';
 }
 
-/** The panel's lines of a point's metadata `info`. */
-function pointLines(info: PointInfo): string[] {
-    const { start } = info;
-    const party = start.kind === 'save' ? start.champions.map((name) => name.trim()).filter((name) => name !== '').join(' · ') : '';
+/**
+ * The panel's lines of a recording said by `text` with the metadata `info`: its title, its
+ * author and its description where it has them, its party at its point where it is known,
+ * the time played, where its path starts, a new game or a saved one, and where it ends,
+ * the game won or lost or a save, where that is known.
+ */
+function detailLines(text: RecordingPackageText, info: PointInfo): HTMLElement[] {
+    const { start, ending } = info;
+    const party = (info.champions ?? []).map((name) => name.trim()).filter((name) => name !== '');
     return [
-        start.kind === 'new' ? 'From a new game' : `From a saved game, level ${start.level}${party ? `: ${party}` : ''}`,
-        `Began ${formatSaveDate(info.recordedAt)} ${formatSaveTime(info.recordedAt)}, ended ${formatSaveDate(info.endedAt)} ${formatSaveTime(info.endedAt)}`,
-        `Time played ${formatPlayTime(info.playTime)}`,
-        `Build ${info.build}${info.extras ? ', played with an extra on' : ''}`,
+        line('recordings-title', text.title),
+        ...(text.author ? [line('recordings-info', `By: ${text.author}`)] : []),
+        ...(text.description ? [line('recordings-description', text.description)] : []),
+        ...(party.length > 0 ? [line('recordings-info', `Party: ${party.join(' · ')}`)] : []),
+        line('recordings-info', `Time played ${formatPlayTime(info.playTime)}`),
+        line('recordings-info', start.kind === 'new' ? 'From the beginning of a new game' : `From a saved game, level ${start.level}`),
+        ...(ending === null ? [] : [line('recordings-info', ending === 'save' ? 'To a saved game' : `To the end of the game, ${ending}`)]),
     ];
 }
 

@@ -334,7 +334,7 @@ body.welcome {
 .documents-status:empty { display: none; }
 /* Its two tabs, DOCUMENTS and RECORDINGS, the one shown underlined; and RECORDINGS' lists of
    the site's recordings and the browser's points, a line each, a site's with its marks, the
-   selected one framed, then the panel of its metadata. */
+   selected one framed, then the panel of the one selected, a frame of its own under them. */
 .documents-tabs { display: flex; gap: 24px; border-bottom: 3px solid #1d1d30; }
 .documents-tab { appearance: none; margin: 0 0 -3px; padding: 0 0 6px; background: none; border: 0; border-bottom: 3px solid transparent; font: inherit; color: var(--p2); cursor: pointer; }
 .documents-tab:hover { color: var(--p9); }
@@ -362,8 +362,18 @@ body.welcome {
 .recordings-name { overflow-wrap: anywhere; }
 .recordings-mark { font-size: 15px; color: var(--p9); white-space: nowrap; }
 .recordings-when { margin-left: auto; font-size: 15px; color: var(--p2); white-space: nowrap; }
-.recordings-panel { display: flex; flex-direction: column; gap: 6px; font-size: 17px; }
+.recordings-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 15px;
+    background: #0b0b16;
+    border: 1px solid var(--p1);
+    font-size: 17px;
+}
 .recordings-panel:empty { display: none; }
+.recordings-title { color: var(--p11); font-size: 19px; overflow-wrap: anywhere; }
+.recordings-panel .add-set-buttons { margin-top: 6px; }
 .recordings-info, .recordings-reading { color: var(--p13); }
 .recordings-description { color: var(--p13); white-space: pre-line; overflow-wrap: anywhere; }
 .recordings-failure { color: var(--p9); }

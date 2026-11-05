@@ -10,6 +10,7 @@
  */
 import { readRecordingPath, type RecordingEntry, type RecordingStore, type SaveEntry } from '../data/saves';
 import { packageStart, pathAtEnd, pathAtSave, playedWithExtras, type RecordingPackageInfo } from './RecordingPackage';
+import type { RecordingEnding } from '../data/DataSets';
 import type { Recording, RecordingPoint } from './Recorder';
 
 /** A point the store keeps: a save made in a recording it holds, or a game's end. */
@@ -109,17 +110,23 @@ export async function pointPath(store: Pick<RecordingStore, 'list' | 'read'>, po
         : pathAtEnd(await readRecordingPath(store, point.recording.id));
 }
 
-/** What a list shows of a point: what its package would say of it, its build, and whether an extra was on. */
+/**
+ * What a list shows of a point: what its package would say of it, its build, whether an
+ * extra was on, and where its path ends, `null` where that is not known (a site's
+ * recording the server has not read it of yet).
+ */
 export interface PointInfo extends Omit<RecordingPackageInfo, 'title' | 'author' | 'description'> {
     readonly build: string;
     readonly extras: boolean;
+    readonly ending: RecordingEnding | null;
 }
 
 /**
  * What a list shows of `point`, whose path is `path` (`pointPath`), `rows` the store's:
  * when its path's root began, when it was made, the game's play time then, where its
- * path starts, the build that made it and whether an extra was on. A game's end the store
- * wrote before it kept its play time has 0.
+ * path starts, the build that made it, whether an extra was on, its party, and where it
+ * ends. A game's end the store wrote before it kept its play time has 0, and before it
+ * kept its party none.
  */
 export function pointInfo(point: StoredPoint, path: readonly Recording[], rows: readonly RecordingEntry[]): PointInfo {
     const root = path[0]!;
@@ -132,5 +139,19 @@ export function pointInfo(point: StoredPoint, path: readonly Recording[], rows: 
         start: packageStart(root),
         build: last.build,
         extras: playedWithExtras(path),
+        ending: point.kind === 'save' ? 'save' : point.recording.end.word11694 ? 'won' : 'lost',
+        ...(point.kind === 'save' ? { champions: point.save.champions }
+            : point.recording.champions ? { champions: point.recording.champions } : {}),
     };
+}
+
+/**
+ * The saves of `points` the path to `point` passes on its way (`passes`), `rows` the
+ * store's: those `shownPoints` leaves out for it, F5's, a save F9 read, a Sleepsave the
+ * game went on from; the earliest first.
+ */
+export function savesOnTheWay(point: StoredPoint, points: readonly StoredPoint[], rows: readonly RecordingEntry[]): Extract<StoredPoint, { kind: 'save' }>[] {
+    const held = new Map(rows.map((row) => [row.id, row]));
+    return points.filter((other): other is Extract<StoredPoint, { kind: 'save' }> => other !== point && other.kind === 'save' && passes(point, other, held))
+        .sort((a, b) => pointMadeAt(a) - pointMadeAt(b));
 }

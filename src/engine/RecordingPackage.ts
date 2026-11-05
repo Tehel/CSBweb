@@ -30,7 +30,7 @@
  * plays packages, and the server reads them, built for Node (`PageReaders.ts`,
  * `server/recordings.ts`).
  */
-import { readCsbwinSaveInfo } from '../data/CsbwinSaveInfo';
+import { CHARDESC_NAME_SIZE, readCsbwinSaveInfo } from '../data/CsbwinSaveInfo';
 import { fileDigest, type FileDigests } from '../data/DataSetFiles';
 import { LOCAL_DATA_SET_TEXT_LIMITS, RECORDING_FILES } from '../data/DataSets';
 import { NO_EXTRAS, type Extras, type RulesOptions } from './GameContext';
@@ -95,7 +95,20 @@ export interface RecordingPackageInfo extends RecordingPackageText {
     /** Milliseconds: the game's play time at its point (`Game.playTime`), as a save's row has it. */
     readonly playTime: number;
     readonly start: RecordingPackageStart;
+    /**
+     * The party's champions' names at its point, in its order, none empty: the save's
+     * (`SaveEntry.champions`), or the game's end's (`RecordingEntry.champions`). Absent from
+     * a package written before packages said it, and from one of a game's end the store
+     * wrote before it kept them.
+     */
+    readonly champions?: readonly string[];
 }
+
+/** What a package says of its times and its party (`RecordingPackageInfo`), beside its text. */
+export type RecordingPackageTimes = Pick<RecordingPackageInfo, 'recordedAt' | 'endedAt' | 'playTime' | 'champions'>;
+
+/** The most champions a party holds, and the longest name one has, as `CHARDESC`'s field (`CHARDESC_NAME_SIZE`). */
+const PARTY_LIMITS = { champions: 4, name: CHARDESC_NAME_SIZE } as const;
 
 /** The point a path is shared at. */
 export type RecordingShared =
@@ -140,7 +153,7 @@ export class RecordingPackageError extends Error {
  */
 export function packageOfSave(
     path: readonly Recording[], point: RecordingPoint, file: Uint8Array, text: RecordingPackageText,
-    times: Pick<RecordingPackageInfo, 'recordedAt' | 'endedAt' | 'playTime'>,
+    times: RecordingPackageTimes,
 ): RecordingPackage {
     return checked(packageOf(pathAtSave(path, point), { kind: 'save', md5: fileDigest(file), inVbl: point.inVbl === true }, text, times));
 }
@@ -148,7 +161,7 @@ export function packageOfSave(
 /** The package of `path`, the store's path to a recording the game's end ended, shared at that end. */
 export function packageOfEnd(
     path: readonly Recording[], text: RecordingPackageText,
-    times: Pick<RecordingPackageInfo, 'recordedAt' | 'endedAt' | 'playTime'>,
+    times: RecordingPackageTimes,
 ): RecordingPackage {
     return checked(packageOf(pathAtEnd(path), { kind: 'end' }, text, times));
 }
@@ -212,11 +225,12 @@ export function playedWithDevMoves(path: readonly Recording[]): boolean {
 
 function packageOf(
     path: readonly Recording[], shared: RecordingShared, text: RecordingPackageText,
-    times: Pick<RecordingPackageInfo, 'recordedAt' | 'endedAt' | 'playTime'>,
+    times: RecordingPackageTimes,
 ): RecordingPackage {
     const last = path[path.length - 1]!;
     const { title, author, description } = text;
-    const info = { title, author, description, ...times, start: packageStart(path[0]!) };
+    const { champions, ...rest } = times;
+    const info = { title, author, description, ...rest, start: packageStart(path[0]!), ...(champions ? { champions } : {}) };
     return { version: RECORDING_PACKAGE_VERSION, build: last.build, level: last.level, dataSet: last.dataSet, info, path: packaged(path), shared };
 }
 
@@ -288,6 +302,10 @@ function checked(pkg: RecordingPackage): RecordingPackage {
     }
     if (info.title.trim() === '') throw new RecordingPackageError('the title is empty');
     if (info.endedAt < info.recordedAt) throw new RecordingPackageError('it ends before it begins');
+    if (info.champions && (info.champions.length > PARTY_LIMITS.champions
+        || info.champions.some((name) => name === '' || name.length > PARTY_LIMITS.name || /[\x00-\x1f\x7f]/.test(name)))) {
+        throw new RecordingPackageError('its party is no party of champions');
+    }
     const last = path[path.length - 1];
     if (!last) throw new RecordingPackageError('the path is empty');
     if (pkg.build !== last.build) throw new RecordingPackageError('the build is not the last recording\'s');
@@ -342,6 +360,7 @@ function packageFromJson(json: unknown): RecordingPackage {
                     champions: array(start['champions'], 'the start\'s champions').map((name) => string(name, 'a champion')),
                 }
                     : fail('where it starts'),
+            ...(info['champions'] === undefined ? {} : { champions: array(info['champions'], 'its party').map((name) => string(name, 'a champion')) }),
         },
         path,
         shared: shared['kind'] === 'end' ? { kind: 'end' }

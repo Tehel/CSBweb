@@ -48,7 +48,7 @@ import { Die } from './core/Die';
 import { csbGraphicsOpener } from './engine/FileSignatures';
 import type { PrisonDoorChoice } from './renderer/intro/PrisonDoor';
 import { Recorder } from './engine/Recorder';
-import { RecordingWriter } from './engine/RecordingWriter';
+import { partyNames, RecordingWriter } from './engine/RecordingWriter';
 import { endLines, RecordingPlayer, skippedLine, type SavedAtEnd } from './engine/RecordingPlayer';
 import {
     drawRecordingStrip, nextPace, rewindPage, stripActionAt, stripKeyAction, timePlayed, type Pace, type StripAction, type StripState,
@@ -375,6 +375,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     const recordings = new RecordingWriter(recorder, recordingStore, saveStore, {
         now: () => Date.now(),
         playTime: () => game.playTime(),
+        champions: () => partyNames(game),
     });
     const writeRecording = (): void => { recordings.flush().catch(() => {}); };
     setInterval(writeRecording, RECORDING_WRITE_MS);

@@ -130,7 +130,7 @@ import { NOBODY, notificationText } from '../../server/notify.ts';
 import { DOCUMENT_FIELD } from '../../server/documents.ts';
 import { MAX_MODERATION_BYTES } from '../../server/moderate.ts';
 import { MAX_PUBLISH_BYTES, MAX_PUBLISHED_FILE_BYTES } from '../../server/publish.ts';
-import { MAX_RECORDING_BYTES, MAX_RECORDING_MODERATION_BYTES, MAX_SHARE_BYTES, RecordingStore } from '../../server/recordings.ts';
+import { fillEndings, MAX_RECORDING_BYTES, MAX_RECORDING_MODERATION_BYTES, MAX_SHARE_BYTES, RecordingStore } from '../../server/recordings.ts';
 import { StatsStore } from '../../server/stats.ts';
 import { openStore } from '../../server/store.ts';
 import {
@@ -145,7 +145,7 @@ import { parsePublishedDungeons } from '../../src/data/DungeonSignature.ts';
 import { indexedPng, indexedPngRows } from '../../src/core/png.ts';
 import { check, finish as verdict } from '../lib/check.ts';
 import { dataSetNamed, GAMEFILES_DIR, MANIFEST_FILE } from '../lib/dataSets.ts';
-import { packageOf } from '../lib/recordingPackages.ts';
+import { PACKAGE_PARTY, packageOf } from '../lib/recordingPackages.ts';
 
 const ROOT = resolve(import.meta.dirname, '../..');
 
@@ -1272,7 +1272,7 @@ async function checkRecordings(scratch: string): Promise<void> {
             form.append(RECORDING_PACKAGE_FIELD, fileOf(bytes, 'recording.gz', 'application/gzip'));
             return post(form, player);
         };
-        type Listed = { id: string; title: string; status?: string; hidden?: boolean; broken?: boolean; mine?: boolean; extras?: boolean };
+        type Listed = { id: string; title: string; status?: string; hidden?: boolean; broken?: boolean; mine?: boolean; extras?: boolean; ending?: string; champions?: string[] };
         const listed = async (player: string | null, set = 'a') => (JSON.parse((await ask(port, `/${RECORDINGS_ROUTE}?dataSet=${set}`, 'GET',
             player === null ? {} : { [PLAYER_ID_HEADER]: player })).body) as { recordings: Listed[] }).recordings;
         const seen = async (player: string | null) => (await listed(player))
@@ -1292,6 +1292,25 @@ async function checkRecordings(scratch: string): Promise<void> {
         console.log(`  its row: ${JSON.stringify({ ...row, id: '<id>', uploader: row.uploader === PLAYER ? '<the player>' : row.uploader, uploaded_at: '<now>' })}`);
         check(row.status === 'pending' && row.uploader === PLAYER && row.data_set === 'a' && row.title === 'My win' && row.author === 'A Player'
             && row.play_time === 500 && row.extras === 0 && row.size === won.length && row.start === '{"kind":"new"}', 'its row is pending, its uploader the sender, its metadata the package\'s');
+        check(row.ending === 'won' && row.party === JSON.stringify(PACKAGE_PARTY), 'and where it ends, the game won, and its party there, as its package says');
+        const forUploader = (await listed(PLAYER))[0];
+        check(forUploader?.ending === 'won' && forUploader.champions?.join() === PACKAGE_PARTY.join(), 'the list says where it ends and its party');
+        db.prepare("UPDATE recordings SET ending = '', party = NULL WHERE id = ?").run(id);
+        check((await listed(PLAYER))[0]?.ending === undefined, 'a row added before its ending was kept says none');
+        const endings = await fillEndings(recordings.store, dir, recordings.readPackage);
+        const filledRow = recordings.store.get(id);
+        check(endings.filled.join() === id && endings.failed.length === 0 && filledRow?.ending === 'won' && filledRow.party?.join() === PACKAGE_PARTY.join(),
+            'and the server, starting, reads its ending and its party from its package (fillEndings)');
+        const older = new DatabaseSync(':memory:');
+        older.exec(`CREATE TABLE recordings (id TEXT PRIMARY KEY, data_set TEXT NOT NULL, build TEXT NOT NULL, title TEXT NOT NULL, author TEXT NOT NULL,
+            description TEXT NOT NULL, recorded_at INTEGER NOT NULL, ended_at INTEGER NOT NULL, play_time INTEGER NOT NULL, start TEXT NOT NULL,
+            extras INTEGER NOT NULL, size INTEGER NOT NULL, uploader TEXT NOT NULL, uploaded_at INTEGER NOT NULL,
+            status TEXT NOT NULL CHECK (status IN ('approved', 'pending')), hidden INTEGER NOT NULL DEFAULT 0, broken INTEGER NOT NULL DEFAULT 0);
+            INSERT INTO recordings VALUES ('0123456789ABCDEF', 'a', 'b', 't', '', '', 1, 2, 3, '{"kind":"new"}', 0, 4, 'u', 5, 'approved', 0, 0);`);
+        const altered = new RecordingStore(older, 1024);
+        check(altered.endingsUnknown().join() === '0123456789ABCDEF' && altered.get('0123456789ABCDEF')?.party === null,
+            'a table made before the ending and the party is altered to hold them, its rows\' unknown');
+        older.close();
         check(await seen(PLAYER) === 'My win pending mine' && await seen(MODERATORS[0]) === 'My win pending', 'it is listed, pending, to its uploader, said to be theirs, and to the moderators');
         check(await seen(null) === '' && await seen(OTHER) === '', 'and to nobody else');
         check(await counted() === 0 && await counted(PLAYER) === 0 && await counted(MODERATORS[0]) === 0, 'the manifest counts no pending recording of the set, to anyone');

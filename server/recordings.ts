@@ -32,11 +32,11 @@
  * moderators are listed.
  */
 import { randomBytes } from 'node:crypto';
-import { rename, rm, writeFile } from 'node:fs/promises';
+import { readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { DatabaseSync, StatementSync } from 'node:sqlite';
 
-import { RECORDING_ACTIONS as ACTIONS, RECORDING_PACKAGE_FIELD as PACKAGE_FIELD, SHARED_RECORDING_ID, type RecordingAction } from '../src/data/DataSets.ts';
+import { RECORDING_ACTIONS as ACTIONS, RECORDING_PACKAGE_FIELD as PACKAGE_FIELD, SHARED_RECORDING_ID, type RecordingAction, type RecordingEnding } from '../src/data/DataSets.ts';
 import { samePlayerId, type DataSetStore, type DataSetViewer } from './dataSets.ts';
 import type { DataSetActivity, Notify } from './notify.ts';
 
@@ -62,6 +62,18 @@ CREATE TABLE IF NOT EXISTS recordings (
 );
 CREATE INDEX IF NOT EXISTS recordings_by_set ON recordings (data_set, uploaded_at);
 `;
+
+/**
+ * The columns `recordings` gained after its first deployment, which a table made before
+ * them is altered to add (`ALTER TABLE … ADD COLUMN`), and a new one is too, so that both
+ * are the same table. A row added before them is filled from its package as the server
+ * starts (`fillEndings`).
+ */
+const ADDED_COLUMNS: readonly (readonly [string, string])[] = [
+    ['ending', "TEXT NOT NULL DEFAULT ''"],  // where its path ends (`RecordingEnding`), '' until read from its package
+    ['party', 'TEXT'],                       // a JSON list of its party's names at its point, NULL where its package says none
+];
+
 
 /** The largest package a recording is shared as, gzipped: four hours of a new game are 143 KB (`doc/RECORDING.md` → "What a package costs"). */
 export const MAX_RECORDING_BYTES = 8 * 1024 * 1024;
@@ -92,12 +104,23 @@ export interface SharedPackage {
         readonly endedAt: number;
         readonly playTime: number;
         readonly start: { readonly kind: string };
+        readonly champions?: readonly string[];
     };
     readonly path: readonly {
         /** Its extras at its start, each a flag (`Extras`). */
         readonly extras: object;
         readonly changes: readonly { readonly change: { readonly kind: string; readonly extras?: object } }[];
+        /** The game's end that ends it, `d.Word11694` the game won (`RecordingEnd`). */
+        readonly end: { readonly word11694: boolean } | null;
     }[];
+    /** The point shared: a save's, or the game's end (`RecordingShared`). */
+    readonly shared: { readonly kind: string };
+}
+
+/** Where `pkg`'s path ends: at the save shared, or at the game's end its last recording ends at, won or lost. */
+function endingOf(pkg: SharedPackage): RecordingEnding {
+    const end = pkg.path[pkg.path.length - 1]?.end;
+    return pkg.shared.kind !== 'end' || !end ? 'save' : end.word11694 ? 'won' : 'lost';
 }
 
 /**
@@ -120,6 +143,10 @@ export interface StoredRecording {
     playTime: number;
     /** Where it starts, as its package says (`RecordingPackageStart`). */
     start: unknown;
+    /** Where it ends (`endingOf`), `null` for a row added before the column, until `fillEndings` reads its package. */
+    ending: RecordingEnding | null;
+    /** Its party's names at its point, as its package says (`RecordingPackageInfo.champions`), `null` where it says none. */
+    party: string[] | null;
     extras: boolean;
     size: number;
     uploader: string;
@@ -144,11 +171,17 @@ export class RecordingStore {
     private readonly updateHidden: StatementSync;
     private readonly updateBroken: StatementSync;
     private readonly deleteRow: StatementSync;
+    private readonly unknownEndings: StatementSync;
+    private readonly updateEnding: StatementSync;
 
     constructor(db: DatabaseSync, diskBytes: number) {
         this.diskBytes = diskBytes;
         db.exec(SCHEMA);
-        const columns = 'id, data_set, build, title, author, description, recorded_at, ended_at, play_time, start, extras, size, uploader, uploaded_at, status, hidden, broken';
+        const present = new Set((db.prepare('PRAGMA table_info(recordings)').all() as { name: string }[]).map((column) => column.name));
+        for (const [column, type] of ADDED_COLUMNS) {
+            if (!present.has(column)) db.exec(`ALTER TABLE recordings ADD COLUMN ${column} ${type}`);
+        }
+        const columns = 'id, data_set, build, title, author, description, recorded_at, ended_at, play_time, start, extras, size, uploader, uploaded_at, status, hidden, broken, ending, party';
         this.rowsOf = db.prepare(`SELECT ${columns} FROM recordings WHERE data_set = ? ORDER BY uploaded_at DESC, id`);
         this.row = db.prepare(`SELECT ${columns} FROM recordings WHERE id = ?`);
         this.listedOf = db.prepare("SELECT data_set, COUNT(*) AS listed FROM recordings WHERE status = 'approved' AND hidden = 0 AND broken = 0 GROUP BY data_set");
@@ -158,11 +191,13 @@ export class RecordingStore {
         this.updateHidden = db.prepare('UPDATE recordings SET hidden = ? WHERE id = ?');
         this.updateBroken = db.prepare('UPDATE recordings SET broken = 1 WHERE id = ?');
         this.deleteRow = db.prepare('DELETE FROM recordings WHERE id = ?');
+        this.unknownEndings = db.prepare("SELECT id FROM recordings WHERE ending = '' ORDER BY id");
+        this.updateEnding = db.prepare('UPDATE recordings SET ending = ?, party = ? WHERE id = ?');
     }
 
     /** The recordings of the set `dataSet`, the latest shared first. */
     of(dataSet: string): StoredRecording[] {
-        return (this.rowsOf.all(dataSet) as Record<string, string | number>[]).map(recordingOf);
+        return (this.rowsOf.all(dataSet) as Record<string, string | number | null>[]).map(recordingOf);
     }
 
     /** How many recordings of each set everyone is listed (`recordingsText`): approved, neither hidden nor broken. A set of none is absent. */
@@ -171,7 +206,7 @@ export class RecordingStore {
     }
 
     get(id: string): StoredRecording | null {
-        const row = this.row.get(id) as Record<string, string | number> | undefined;
+        const row = this.row.get(id) as Record<string, string | number | null> | undefined;
         return row ? recordingOf(row) : null;
     }
 
@@ -182,9 +217,19 @@ export class RecordingStore {
 
     /** `recording` added, pending. */
     share(recording: SharedRecording): void {
-        const { id, dataSet, build, title, author, description, recordedAt, endedAt, playTime, start, extras, size, uploader, uploadedAt } = recording;
+        const { id, dataSet, build, title, author, description, recordedAt, endedAt, playTime, start, extras, size, uploader, uploadedAt, ending, party } = recording;
         this.insert.run(id, dataSet, build, title, author, description, recordedAt, endedAt, playTime, JSON.stringify(start), extras ? 1 : 0, size,
-            uploader, uploadedAt, 'pending', 0, 0);
+            uploader, uploadedAt, 'pending', 0, 0, ending ?? '', party === null ? null : JSON.stringify(party));
+    }
+
+    /** The ids of the rows added before the ending was kept, whose ending is unknown (`fillEndings`). */
+    endingsUnknown(): string[] {
+        return (this.unknownEndings.all() as { id: string }[]).map((row) => row.id);
+    }
+
+    /** `id`'s ending and party, as its package says them. */
+    setEnding(id: string, ending: RecordingEnding, party: readonly string[] | null): void {
+        this.updateEnding.run(ending, party === null ? null : JSON.stringify(party), id);
     }
 
     approve(id: string): void {
@@ -205,13 +250,15 @@ export class RecordingStore {
     }
 }
 
-function recordingOf(row: Record<string, string | number>): StoredRecording {
+function recordingOf(row: Record<string, string | number | null>): StoredRecording {
     return {
         id: row.id as string, dataSet: row.data_set as string, build: row.build as string, title: row.title as string,
         author: row.author as string, description: row.description as string, recordedAt: row.recorded_at as number,
         endedAt: row.ended_at as number, playTime: row.play_time as number, start: JSON.parse(row.start as string) as unknown,
         extras: row.extras === 1, size: row.size as number, uploader: row.uploader as string, uploadedAt: row.uploaded_at as number,
         pending: row.status === 'pending', hidden: row.hidden === 1, broken: row.broken === 1,
+        ending: row.ending === '' ? null : row.ending as RecordingEnding,
+        party: row.party === null ? null : JSON.parse(row.party as string) as string[],
     };
 }
 
@@ -225,7 +272,8 @@ function sharedBy(recording: StoredRecording, viewer: DataSetViewer): boolean {
  * set's recordings they may see, the latest shared first. Everyone sees the approved ones
  * neither hidden nor broken, their uploader every one of theirs, and a moderator every
  * one. Each says its id, its build, its text, its times, where it starts, its package's
- * size and when it was shared; `"extras": true` where an extra was on, its state where it
+ * size and when it was shared; where it ends, `"ending"` (`RecordingEnding`), once known, and
+ * its party at its point, `"champions"`, where its package says it; `"extras": true` where an extra was on, its state where it
  * is pending, hidden or broken, and `"mine": true` to its uploader, who may withdraw it.
  * None says its uploader.
  */
@@ -234,9 +282,11 @@ export function recordingsText(recordings: readonly StoredRecording[], viewer: D
         || (!recording.pending && !recording.hidden && !recording.broken));
     return JSON.stringify({
         recordings: visible.map((recording) => {
-            const { id, build, title, author, description, recordedAt, endedAt, playTime, start, size, uploadedAt } = recording;
+            const { id, build, title, author, description, recordedAt, endedAt, playTime, start, size, uploadedAt, ending, party } = recording;
             return {
                 id, build, title, author, description, recordedAt, endedAt, playTime, start, size, uploadedAt,
+                ...(ending !== null ? { ending } : {}),
+                ...(party !== null ? { champions: party } : {}),
                 ...(recording.extras ? { extras: true } : {}),
                 ...(recording.pending ? { status: 'pending' } : {}),
                 ...(recording.hidden ? { hidden: true } : {}),
@@ -245,6 +295,26 @@ export function recordingsText(recordings: readonly StoredRecording[], viewer: D
             };
         }),
     });
+}
+
+/**
+ * The ending, and the party, of each row of `store` added before they were kept, read from
+ * its package in `dir` (`readPackage`), as the server starts: the ids filled, and those
+ * whose package does not read, whose ending stays unknown.
+ */
+export async function fillEndings(store: RecordingStore, dir: string, readPackage: ReadRecordingPackage): Promise<{ filled: string[]; failed: string[] }> {
+    const filled: string[] = [];
+    const failed: string[] = [];
+    for (const id of store.endingsUnknown()) {
+        try {
+            const pkg = await readPackage(new Uint8Array(await readFile(join(dir, `${id}.gz`))), MAX_RECORDING_UNZIPPED_BYTES);
+            store.setEnding(id, endingOf(pkg), pkg.info.champions ? [...pkg.info.champions] : null);
+            filled.push(id);
+        } catch {
+            failed.push(id);
+        }
+    }
+    return { filled, failed };
 }
 
 /** The status and the JSON body a recording's route answers with. */
@@ -325,9 +395,10 @@ export async function shareRecording(form: FormData, playerId: string, sharer: s
         await rm(partial, { force: true });
         throw error;
     }
-    const { title, author, description, recordedAt, endedAt, playTime, start } = pkg.info;
+    const { title, author, description, recordedAt, endedAt, playTime, start, champions } = pkg.info;
     options.recordings.share({
         id, dataSet: pkg.dataSet, build: pkg.build, title, author, description, recordedAt, endedAt, playTime, start,
+        ending: endingOf(pkg), party: champions ? [...champions] : null,
         extras: playedWithExtras(pkg), size: bytes.length, uploader: playerId, uploadedAt: options.now(),
     });
     console.log(`recording ${id} of '${pkg.dataSet}' added`);

@@ -19,8 +19,8 @@ const RULES_OFF: RulesOptions = {
 };
 
 /**
- * A package of a game of `dataSet`'s won at its hundredth VBL, titled `title`: played with an
- * extra on where `extras`, and moved by `?dev` where `dev`.
+ * A package of a game of `dataSet`'s won at its hundredth VBL, titled `title`, by a party of
+ * two, `PACKAGE_PARTY`: played with an extra on where `extras`, and moved by `?dev` where `dev`.
  */
 export async function packageOf(dataSet: string, title: string, { extras = false, dev = false } = {}): Promise<Uint8Array<ArrayBuffer>> {
     const changes: RecordedChange[] = [{ change: { kind: 'key', num: 1 }, vbl: 10, time: 0, random: 0 }];
@@ -29,9 +29,12 @@ export async function packageOf(dataSet: string, title: string, { extras = false
         id: 'root', build: 'test', level: 0, profile: null, files: null, dataSet, start: { kind: 'new', random: 1, randomGameID: 2 }, parent: null, rules: RULES_OFF,
         extras: { ...NO_EXTRAS, drinkAtFountain: extras }, changes, vbls: 100, ended: true, end: { word11694: true },
     };
-    const pkg = packageOfEnd([recording], { title, author: 'A Player', description: 'Won.' }, { recordedAt: 1000, endedAt: 2000, playTime: 500 });
+    const pkg = packageOfEnd([recording], { title, author: 'A Player', description: 'Won.' }, { recordedAt: 1000, endedAt: 2000, playTime: 500, champions: PACKAGE_PARTY });
     return new Uint8Array(await writeRecordingPackage(pkg));
 }
+
+/** The party `packageOf`'s package says it was won by. */
+export const PACKAGE_PARTY: readonly string[] = ['HALK', 'SYRA'];
 
 /**
  * A package of a new game of `set`'s, whose files `files` reads, left alone for `vbls`

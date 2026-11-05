@@ -115,7 +115,7 @@ import {
   checkedChange, packageOfEnd, packageOfSave, readRecordingPackage, RecordingPackageError, writeRecordingPackage, type RecordingPackage,
 } from '../../src/engine/RecordingPackage';
 import { endLines, RecordingPlayer, skippedLine, type HeldSpan, type SavedAtEnd } from '../../src/engine/RecordingPlayer';
-import { RecordingWriter } from '../../src/engine/RecordingWriter';
+import { partyNames, RecordingWriter } from '../../src/engine/RecordingWriter';
 import { applySaveBytes, buildSaveFile } from '../../src/engine/SaveGameFile';
 import { NO_FULLSCREEN } from '../../src/lib/fullscreen';
 import { GameInput, type KeyPress } from '../../src/renderer/GameInput';
@@ -229,7 +229,7 @@ class Page {
       paint: () => { if (this.recorded) this.refreshScreen(); },
     });
     this.recorder = new Recorder(game, 'replay', STOCK_DATA_SET.id, () => DIGESTS, () => `recording-${++recordingIds}`);
-    this.recordings = new RecordingWriter(this.recorder, this.recordingStore, this.store, { now: () => this.clock.time, playTime: () => game.playTime() });
+    this.recordings = new RecordingWriter(this.recorder, this.recordingStore, this.store, { now: () => this.clock.time, playTime: () => game.playTime(), champions: () => partyNames(game) });
     saves = new GameSaves(game, STOCK_DATA_SET, diskFiles(STOCK_DATA_SET), this.store, {
       portraitOf: drawing.portraitOf,
       askBeginAdventure: () => { throw new Error('no prison in this dungeon'); },

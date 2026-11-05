@@ -44,7 +44,7 @@ import { checkFiles, createAppServer, fillWalls, loadPageReaders, type PageReade
 import { DataSetStore, parseModerators, type Moderator } from './dataSets.ts';
 import { RateLimit } from './events.ts';
 import { NOBODY, ntfyNotifier, type Notify } from './notify.ts';
-import { RecordingStore } from './recordings.ts';
+import { fillEndings, RecordingStore } from './recordings.ts';
 import { StatsStore } from './stats.ts';
 import { openStore } from './store.ts';
 
@@ -108,6 +108,9 @@ try {
 const walls = await fillWalls(options.gamefilesDir, dataSets, readers.readDungeonWalls);
 if (walls.filled.length > 0) console.log(`Read the walls of ${walls.filled.join(', ')}`);
 if (walls.failed.length > 0) console.error(`No walls for ${walls.failed.join(', ')}: their dungeon.dat does not read`);
+const endings = await fillEndings(recordings, recordingsDir, readers.readRecordingPackage);
+if (endings.filled.length > 0) console.log(`Read the endings of ${endings.filled.length} shared recording(s)`);
+if (endings.failed.length > 0) console.error(`No ending for the recordings ${endings.failed.join(', ')}: their package does not read`);
 
 const server = createAppServer(options, {
     checkDataSet: readers.checkDataSet,

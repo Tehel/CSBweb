@@ -1904,11 +1904,12 @@ check(playedShared.recordings === sharedRecording.recordings && playedShared.sav
   'and the shared recording enters no store');
 
 // The book's RECORDINGS (`src/ui/welcomePage.ts`): first the site's recordings of CSB, the
-// one shared above, approved, which a click selects, its panel offering a player PLAY,
-// `?recording=<id>`, alone. Then the browser's points of CSB, the latest
+// one shared above, approved, which a click selects, its panel, a frame of its own (a 1-pixel
+// border, a background other than the dialog's), offering a player PLAY, `?recording=<id>`, alone. Then the browser's points of CSB, the latest
 // made first, among them the quick save above, by its name, and a game's end, a copy of
 // its recording the game's end ended, written here. A click selects one, and the panel
-// says where its path starts, its times, its build, with PLAY, and on the game's end
+// says its name, its party, the time played, where its path starts and ends, and the saves
+// on its way, with PLAY, and on the game's end
 // DELETE: it asks first, then the end leaves the list and the store. PLAY on the quick
 // save plays the path the store holds to it, `?recording=save:<row>`, to its point, the
 // file made there the save's.
@@ -1916,9 +1917,10 @@ const endWritten = await evaluate(`(async()=>{ const { recordingStore, saves } =
   const entry = (await saves.list()).find((e) => e.quick && e.recording);
   const row = (await recordingStore.list()).find((r) => r.id === entry.recording.recording);
   const recording = await recordingStore.read(row.id), id = 'probe-end', now = Date.now();
-  await recordingStore.write({ ...row, id, parent: null, ended: true, end: { word11694: true }, endedAt: now, playTime: 754000, parts: 2 },
+  await recordingStore.write({ ...row, id, parent: null, ended: true, end: { word11694: true }, endedAt: now, playTime: 754000, champions: ['PROBE'], parts: 2 },
     [{ id, seq: 0, start: recording.start, parent: null, rules: recording.rules, extras: recording.extras }, { id, seq: 1, changes: recording.changes }], null);
-  return { save: entry.name, saveId: entry.id, recording: entry.recording.recording, point: [entry.recording.changes, entry.recording.vbls].join(), level: entry.level }; })()`);
+  return { save: entry.name, saveId: entry.id, recording: entry.recording.recording, point: [entry.recording.changes, entry.recording.vbls].join(), level: entry.level,
+    party: entry.champions.map((name) => name.trim()).filter((name) => name !== '').join(' · ') }; })()`);
 await navigate(`${APP}?dungeon=nowhere&keepsaves`, WELCOME);
 await clickOn('.pick-cell:has(.pick[data-set="csb"]) .pick-documents');
 await clickOn('#documents-tab-recordings');
@@ -1927,7 +1929,8 @@ const recordingsTab = () => evaluate(`(d=>d&&{ title: d.querySelector('h2').text
   shown: [...d.querySelectorAll('.documents-pane')].map(p=>p.id+':'+!p.hidden).join(), add: d.querySelector('#documents-add')?.checkVisibility() ?? false,
   site: [...d.querySelectorAll('.recordings-site li')].map(l=>(b=>b ? [b.dataset.recording, ...[...b.children].slice(0, -1).map(c=>c.textContent), b.getAttribute('aria-selected')].join('|') : l.textContent)(l.querySelector('.recordings-item'))),
   items: [...d.querySelectorAll('.recordings-browser .recordings-item')].map(b=>b.dataset.recording+'|'+b.querySelector('.recordings-name').textContent+'|'+b.getAttribute('aria-selected')),
-  panel: [...d.querySelectorAll('.recordings-info, .recordings-description, .recordings-panel .recordings-failure')].map(l=>l.textContent), play: d.querySelector('.recordings-play')?.getAttribute('href') ?? null,
+  panel: [...d.querySelectorAll('.recordings-title, .recordings-info, .recordings-description, .recordings-panel .recordings-failure')].map(l=>l.textContent),
+  frame: (p=>p && p.checkVisibility() ? (s=>s.borderTopWidth+' '+s.borderTopStyle+' '+(s.backgroundColor!==getComputedStyle(d).backgroundColor))(getComputedStyle(p)) : null)(d.querySelector('.recordings-panel')), play: d.querySelector('.recordings-play')?.getAttribute('href') ?? null,
   buttons: [...d.querySelectorAll('.recordings-panel .btn')].map(b=>b.textContent).join(), status: d.querySelector('.documents-status').textContent,
   remove: !!d.querySelector('.recordings-delete') })(document.querySelector('dialog.documents'))`);
 const listed = await recordingsTab();
@@ -1936,10 +1939,12 @@ const siteSelected = await recordingsTab();
 console.log('  the site\'s recordings:', JSON.stringify({ listed: listed?.site, siteSelected }));
 check(listed?.site.join() === `${sharedRecording.id}|Probe|false`, 'RECORDINGS lists the site\'s recording of the set first, by its title, unmarked to a player');
 const siteQuery = new URLSearchParams(siteSelected?.play ?? '');
-check(siteSelected?.site.join() === `${sharedRecording.id}|Probe|true` && siteSelected.panel[0]?.startsWith('From a saved game, level ')
+check(siteSelected?.site.join() === `${sharedRecording.id}|Probe|true` && siteSelected.panel[0] === 'Probe'
+  && siteSelected.panel.some((line: string) => line.startsWith('From a saved game, level ')) && siteSelected.panel.includes('To a saved game')
   && siteSelected.panel.some((line: string) => /^Time played \d+:\d\d:\d\d$/.test(line)) && siteSelected.panel.some((line: string) => /^Shared \d{4}-\d\d-\d\d \d\d:\d\d$/.test(line))
+  && siteSelected.frame === '1px solid true'
   && siteSelected.buttons === 'Play' && siteQuery.get('dungeon') === null && siteQuery.get('recording') === sharedRecording.id,
-  'a click selects it, and the panel says where it starts, its times and when it was shared, with PLAY alone, ?recording=<id>');
+  'a click selects it, and the panel, framed, says its title, the time played, where it starts and ends and when it was shared, with PLAY alone, ?recording=<id>');
 const savePoint = `save:${endWritten.saveId}`;
 await clickOn(`.recordings-item[data-recording="${savePoint}"]`);
 const saveSelected = await recordingsTab();
@@ -1961,13 +1966,16 @@ check(listed?.tabs === 'Documents:false,Recordings:true' && listed.shown === 'do
 check(listed?.items[0] === 'probe-end|The game won|false' && listed.items.includes(`${savePoint}|${endWritten.save}|false`) && listed.panel.length === 0,
   'it lists the browser\'s points of the set, the latest made first, a game\'s end and the quick save by its name, none selected');
 const playQuery = new URLSearchParams(saveSelected?.play ?? '');
-check(saveSelected?.items.includes(`${savePoint}|${endWritten.save}|true`) && saveSelected.panel[0]?.startsWith('From a saved game, level ')
-  && saveSelected.panel.some((line: string) => /^Time played \d+:\d\d:\d\d$/.test(line)) && saveSelected.panel.some((line: string) => line.startsWith('Build '))
+check(saveSelected?.items.includes(`${savePoint}|${endWritten.save}|true`) && saveSelected.panel[0] === endWritten.save
+  && saveSelected.panel.includes(`Party: ${endWritten.party}`) && saveSelected.panel.some((line: string) => line.startsWith('From a saved game, level '))
+  && saveSelected.panel.includes('To a saved game') && saveSelected.panel.some((line: string) => /^Time played \d+:\d\d:\d\d$/.test(line))
+  && saveSelected.panel.some((line: string) => /^(No save|1 save|\d+ saves) on the way$/.test(line)) && saveSelected.frame === '1px solid true'
   && playQuery.get('dungeon') === null && playQuery.get('recording') === savePoint && playQuery.has('keepsaves') && !saveSelected.remove,
-  'a click selects the save, and the panel says where it starts, the time played and its build, with PLAY, ?recording=save:<row>, and no DELETE');
+  'a click selects the save, and the panel says its name, its party, the time played, where it starts and ends and the saves on its way, with PLAY, ?recording=save:<row>, and no DELETE');
 const endQuery = new URLSearchParams(endSelected?.play ?? '');
-check(endSelected?.panel.includes('Time played 0:12:34') && endQuery.get('dungeon') === null && endQuery.get('recording') === 'probe-end' && endSelected.remove,
-  'the game\'s end selected, the panel says the play time its row keeps, with PLAY and DELETE');
+check(endSelected?.panel[0] === 'The game won' && endSelected.panel.includes('Time played 0:12:34') && endSelected.panel.includes('To the end of the game, won')
+  && endSelected.panel.includes('Party: PROBE') && endQuery.get('dungeon') === null && endQuery.get('recording') === 'probe-end' && endSelected.remove,
+  'the game\'s end selected, the panel says the play time and the party its row keeps, the game won, with PLAY and DELETE');
 check(askedDelete?.button === 'Delete' && afterDelete?.items.every((item: string) => !item.startsWith('probe-end|')) && afterDelete.items.length === listed!.items.length - 1 && !endInStore,
   'DELETE asks first, then the game\'s end leaves the list and the store');
 await leave(() => clickOn(`.recordings-item[data-recording="${savePoint}"]`).then(() => clickOn('.recordings-play', true)), 'window.__probe?.player() != null');

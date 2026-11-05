@@ -266,6 +266,13 @@ export const RECORDING_ACTIONS = ['approve', 'hide', 'show', 'break', 'delete'] 
 export type RecordingAction = (typeof RECORDING_ACTIONS)[number];
 
 /**
+ * Where a recording's path ends, as the site lists a shared one (`server/recordings.ts`)
+ * and the welcome page says it: at a save, or at the game's end, won or lost.
+ */
+export const RECORDING_ENDINGS = ['save', 'won', 'lost'] as const;
+export type RecordingEnding = (typeof RECORDING_ENDINGS)[number];
+
+/**
  * The segment below `DATA_SETS_ROUTE/<id>` where a moderator adds a document to the set,
  * by a form, and removes one, by `{"remove": "<file>"}` (`server/documents.ts`).
  */

@@ -30,12 +30,20 @@ import {
     type RecordingEntry, type RecordingPart, type RecordingStore, type SaveStore,
 } from '../data/saves';
 import type { Recorder, Recording, RecordingPoint, RecordingStart } from './Recorder';
+import type { Game } from './Game';
 
 export interface RecordingWriterDeps {
     /** Milliseconds since the epoch. */
     now(): number;
     /** The game's play time (`Game.playTime`). */
     playTime(): number;
+    /** The party's champions' names, in its order, none empty. */
+    champions(): string[];
+}
+
+/** The names of `game`'s party's champions, in its order, as a save's row lists them (`SaveEntry.champions`): none empty. */
+export function partyNames(game: Pick<Game, 'ctx'>): string[] {
+    return game.ctx.party.state.champions.map((champion) => champion.name.trim()).filter((name) => name !== '');
 }
 
 /** What the store has of a recording. */
@@ -52,8 +60,8 @@ interface Written {
     parts: number;
     vbls: number;
     ended: boolean;
-    /** When the game's end ended it, and the game's play time then (`Recorder.onEnd`); `null` before. */
-    ending: { readonly endedAt: number; readonly playTime: number } | null;
+    /** When the game's end ended it, the game's play time and its party then (`Recorder.onEnd`); `null` before. */
+    ending: { readonly endedAt: number; readonly playTime: number; readonly champions: readonly string[] } | null;
 }
 
 /** How far a recording is reached: its changes and its VBLs, up to a point. */
@@ -159,7 +167,7 @@ export class RecordingWriter {
             };
         });
         recorder.onEnd(() => {
-            if (this.current) this.current.ending = { endedAt: deps.now(), playTime: deps.playTime() };
+            if (this.current) this.current.ending = { endedAt: deps.now(), playTime: deps.playTime(), champions: deps.champions() };
         });
     }
 

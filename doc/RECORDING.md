@@ -704,9 +704,9 @@ shares of the store: each save whose recording the store holds up to its point
 a set's in its RECORDINGS tab (`src/ui/welcomePage.ts`), but those another passes on its
 way (`shownPoints`): a Sleepsave the game went on from, a save F9 read, a save its game's
 end followed, each at or before a place the path to a later point goes through, which
-plays it whole. Of two at one place, the latest made is listed. It lists them the latest
-made first, each with what its package would say of it (`pointInfo`), its build and
-whether an extra was on; it plays one by `?recording=`, and deletes a game's end, then
+plays it whole (`savesOnTheWay`). Of two at one place, the latest made is listed. It lists
+them the latest made first, each with what its package would say of it (`pointInfo`);
+it plays one by `?recording=`, and deletes a game's end, then
 prunes the store
 (`pruneRecordings`, `src/engine/RecordingWriter.ts`), which is how one leaves it but by
 its set's own deletion.
@@ -715,8 +715,16 @@ its set's own deletion.
 them to the player (`siteRecordings`, `GET api/recordings?dataSet=<id>`), by title, the
 latest shared first, each marked where an extra was on and with its state to whom the
 server tells it: pending, hidden, broken, and "yours" to its uploader. A moderator whose
-switch is off is listed them as a player is. The panel says its author, its description,
-its metadata and when it was shared, with PLAY, `?recording=<id>`; to a moderator,
+switch is off is listed them as a player is.
+
+**The panel** of the one selected is a frame of its own under the lists. It says the
+recording's title (a browser's point's name), its author and description where it has
+them, its party at its point where that is known, the time played, where its path starts,
+a new game or a saved one and its level, and where it ends, a save or the game's end,
+won or lost; then, of a site's recording, when it was shared and its state, and of a
+browser's point, the saves on its way. The server reads where a recording ends and its
+party from its package as it takes it, and, as it starts, for a row added before it kept
+them (`fillEndings`, `server/recordings.ts`). It offers PLAY, `?recording=<id>`; to a moderator,
 APPROVE on a pending one, HIDE or SHOW on any other, and DELETE, and to its uploader,
 WITHDRAW (`POST api/recordings/<id>`). Each delete asks first, and the list is then the
 server's anew, a refusal said in the dialog. A local set's book has no site's list. The
@@ -765,8 +773,11 @@ change with its clock and its stream.
 The metadata are the player's title, which it needs, author and description, plain text
 as long as a set's name, authors and description may be (`RECORDING_TEXT_LIMITS`); when
 the path's root began, when its point was made, the game's play time there
-(`Game.playTime`); and where it starts, a new game or the save's level and champions,
-which is read from the root, so it cannot disagree with it.
+(`Game.playTime`); where it starts, a new game or the save's level and champions,
+which is read from the root, so it cannot disagree with it; and the party's champions at
+its point, the save's (`SaveEntry.champions`) or the game's end's
+(`RecordingEntry.champions`), which a package written before it kept them, or of a game's
+end the store wrote before, does not say.
 
 The server serves a package `immutable`, under its id, and the page asks for it with the
 format's version, `recordings/<id>.gz?v=3` (`recordingPackageUrl`): a browser that holds a

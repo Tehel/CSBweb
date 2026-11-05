@@ -62,6 +62,12 @@ export interface RecordingEntry {
      * `endedAt`, for a row with an `end`.
      */
     readonly playTime?: number;
+    /**
+     * The party's champions' names as its end ended it, in its order, which a game's end
+     * shared says (`RecordingPackageInfo.champions`), as a save's row has its own; as
+     * `endedAt`, for a row with an `end`, and absent from one written before the store kept it.
+     */
+    readonly champions?: readonly string[];
     /** Its changes, every part's. */
     readonly changes: number;
     /** Its parts: the head and the changes' parts. */
@@ -197,7 +203,7 @@ export function cutRecording(
         last = { ...part, changes: part.changes.slice(0, point.changes - changes) };
         changes = point.changes;
     }
-    const { endedAt: _endedAt, playTime: _playTime, ...row } = entry;
+    const { endedAt: _endedAt, playTime: _playTime, champions: _champions, ...row } = entry;
     return {
         entry: { ...row, changes, vbls: Math.min(entry.vbls, point.vbls), ended: true, end: null, parts: kept },
         last,
