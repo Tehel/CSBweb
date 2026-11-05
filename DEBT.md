@@ -920,9 +920,12 @@ What it establishes:
     chest weighs what the dungeon says", "An object picked up at the party's feet leaves
     the pad down"). All four are the port's fixes at level 6, which every fix for this
     run joins until it is deployed (`doc/RECORDING.md` → "The policy"). At line 37667 the
-    draws per tick first differ at 0xf355, CSBWin's 105 to the port's 106: in a run of
-    monster turns, one group's `InitialChecks` draws once more in the port; not looked at
-    further yet.
+    draws per tick first differ at 0xf355, CSBWin's 105 to the port's 106, among monster
+    turns. The `#AITraceOn` diff of that tick parts at the group on L3 (23,25): CSBWin's
+    is RN 0x4f38, a slot last a group's on L0 at `d.Time` 62067, then another timer there
+    finding no group (0xfffe); the port's is 0x4fd7, and no second timer. The groups made
+    around L3 (23,24) take other RNs in the port; where the slot allocation first parts is
+    not looked at yet.
 
 Paying it, in steps:
 
