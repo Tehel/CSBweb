@@ -910,14 +910,12 @@ What it establishes:
     its last join, where `record00053` follows `record00051`, as `record00052` does: the
     run ends at 0x57262, `record00051`'s end, its tail dropped. The DSA's warnings come
     after that error.
-  - **The port plays its first 81 entries by `d.RandomNumber`**, through levels 0 to 4,
-    to line 126 (`d.Time` 0x95), past a big actuator's `word8`, which CSBWin reads
-    byte-swapped (`doc/PROVEN_FACTS.md` → "A big actuator's `word8` stays in the file's
-    byte order", the port's fix at level 6). At 0x93 the wave DSA's `&ADD` copies a DSA
-    actuator onto the open pits at 3(19,3) and 3(20,25): CSBWin's `MoveObject` drops
-    only the party, a monster and what is above (`objectDBTypeD4 >= dbMONSTER`,
-    `doc/CSBwin-src/Code11f52.cpp:3047-3053`), so the copy stays and runs there at 0x94;
-    the port's `WorldMove` drops any object that does not levitate.
+  - **The port plays its first 4635 entries by `d.RandomNumber`**, to line 4684
+    (`d.Time` 0x259c, party L1 (6,20)), past a big actuator's `word8`, which CSBWin reads
+    byte-swapped (the port's fix at level 6), and an actuator the wave DSA's `&ADD` puts
+    on an open pit, which stays there (at level 7; `doc/PROVEN_FACTS.md` → "A big
+    actuator's `word8` stays in the file's byte order", "A pit takes only the party, a
+    monster and what is above"). The drift at line 4684 is not looked at yet.
 
 Paying it, in steps:
 
@@ -925,7 +923,7 @@ Paying it, in steps:
    author's request. Steps 3 to 5 are done for the four of them: their check, their
    recordings and their upload (below), which the author runs. Next, the other CSB runs through the oracle, and
    Conflux's partial game (above): its set, its row of `CSBWIN_RUNS` held to its drift at
-   line 126, and its drifts, each the port's. **The 9.x and 11.0xx runs play at their version's
+   line 4684, and its drifts, each the port's. **The 9.x and 11.0xx runs play at their version's
    profile** of behaviour flags (`doc/RECORDING.md` → "A recording's level"): each version
    differs from CSBWin 2023 throughout (above), so corrections to the log cannot convert
    them. Each flag is read from the diff of its version's source against 2023's

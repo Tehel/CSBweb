@@ -31,7 +31,7 @@
  */
 
 /** The engine's level: what a recording made now carries (`Recording.level`). Recordings made before levels are 0. */
-export const ENGINE_LEVEL = 6;
+export const ENGINE_LEVEL = 7;
 
 /** A CSBWin version whose runs the engine plays by the flags that name it. */
 export interface BehaviourProfile {
@@ -139,6 +139,12 @@ export const BEHAVIOURS = [
         does: "a big actuator's `word8`, bits 16-17 of a DSA's parameters A and B, read big-endian as the record's other words, where CSBWin's `DB3::swap` leaves it as the file has it, which its little-endian build reads swapped: a location's corner in parameter A lost, Conflux's wave DSA messaging corner 0 (`actuatorHelpers.getActuatorDsaParameters`)",
         debt: 'F24',
         until: 6,
+    },
+    {
+        name: 'everyObjectFalls',
+        does: "an open pit takes any object that does not levitate, an actuator a DSA's `&ADD` puts there among them, where CSBWin's `MoveObject` drops, as it teleports, only the party, a monster and what is above (`WorldMove.resolveCellEffects`)",
+        debt: 'F24',
+        until: 7,
     },
 ] as const satisfies readonly BehaviourChange[];
 

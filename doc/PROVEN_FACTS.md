@@ -4565,6 +4565,18 @@ write unchanged, and reads CSBWin's through `csbwinWord8` (`src/data/actuatorHel
 (`tools/checks/dsa-actuator-parameters.ts`). The big-endian reading is kept for the
 recordings made before level 6 (`actuatorWord8BigEndian`).
 
+## A pit takes only the party, a monster and what is above
+
+`MoveObject` sends an object through an active teleporter, and down an open pit that
+leads somewhere, only when `(objectDBTypeD4 < 0) || (objectDBTypeD4 >= dbMONSTER)`: the
+party, a group, an item, a missile or a cloud (`doc/CSBwin-src/Code11f52.cpp:2946-2948`,
+`:3047-3053`). A door, a teleporter, a text or an actuator stays on the square. Only a DSA
+moves one of those: Conflux's wave DSA `&ADD`s copies of its actuator onto the open pits
+at 3(19,3) and 3(20,25), where they stay and run. ReDMCSB's pit has no such test
+(`F0267_MOVE`, `doc/ReDMCSB-src/MOVESENS.C:538`), the Atari never moving one of those
+four. The port's `WorldMove` drops any object that does not levitate before level 7
+(`everyObjectFalls`; `tools/checks/dsa-add-delete.ts`).
+
 ## A converted scroll's `m_word4` upper bits are allocation debris
 
 `convertScrolls` writes `pScroll->open(openFlag==0)` — bit 0 of the new `m_word4` — over

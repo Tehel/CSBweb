@@ -6,6 +6,9 @@
  * `DsaSystem` on `csbgame7.dat`:
  *
  * 1. a copy added on an open pit falls to the level below, in the corner its mask names;
+ *    an actuator's stays on the pit, which takes only the party, a monster and what is
+ *    above (`(objectDBTypeD4 < 0) || (objectDBTypeD4 >= dbMONSTER)`, `:3047-3053`), as
+ *    Conflux's wave DSA leaves one (`DEBT.md` F24); at level 6 it fell (`everyObjectFalls`);
  * 2. a copy added on an active teleporter is carried on to its destination;
  * 3. a copy added on the party's square presses its pads with `unchangedRoom` true
  *    (`Code11f52.cpp:3458-3473`), once it is in the cell; `&DEL` takes it off with
@@ -21,6 +24,7 @@
 import {
   DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, locationRelToInteger, type ObjectID,
 } from '../../src/core/types';
+import { behaviourAt } from '../../src/engine/Behaviour';
 import type { Game } from '../../src/engine/Game';
 import { TimerFunction } from '../../src/engine/TimerQueue';
 import { StkOp } from '../../src/engine/dsa/DsaTypes';
@@ -90,6 +94,28 @@ const spyPads = (game: Game): Press[] => {
   check(copy !== weapon && game.ctx.dungeon.rnMaps.dbType(copy) === DBType.WEAPON, 'the weapon is copied');
   check(!holding(game, pit, copy) && holding(game, below, copy), 'the copy falls down the open pit');
   check(game.ctx.dungeon.rnMaps.pos(copy) === 2, 'and lies in the corner its mask names');
+
+  let actuator: ObjectID | null = null;
+  findSquare(base, (p) => {
+    for (let r = dungeon.findFirstObject(p); r !== OBJECT_ID_EOF; r = dungeon.getDBRecordLink(r)) {
+      if (dungeon.rnMaps.dbType(r) === DBType.ACTUATOR) { actuator = r; return true; }
+    }
+    return false;
+  });
+  if (actuator === null) throw new Error('no actuator');
+  const where = (level: number | null): string => {
+    const { game: g2, g: globals } = run(add(actuator!, pit, 1), (game) => {
+      if (level !== null) game.ctx.behaviour = behaviourAt(level);
+    });
+    const c = globals[0]! as ObjectID;
+    if (g2.ctx.dungeon.rnMaps.dbType(c) !== DBType.ACTUATOR) return 'not copied';
+    return holding(g2, pit, c) ? 'on the pit' : holding(g2, below, c) ? 'below' : 'gone';
+  };
+  const now = where(null);
+  const old = where(6);
+  console.log(`   &ADD of actuator ${actuator} on the pit: the copy is ${now}; at level 6, ${old}`);
+  check(now === 'on the pit', 'an actuator copied onto the open pit stays on it');
+  check(old === 'below', 'at level 6 it fell (everyObjectFalls)');
 }
 
 /* ------------------------------------------------------ 2. a teleporter ---- */

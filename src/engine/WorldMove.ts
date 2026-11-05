@@ -376,7 +376,14 @@ export class WorldMove {
         continue;
       }
 
-      if (allowFall && this.isActivePitAt(position)) {
+      // A pit takes, as a teleporter does, only the party, a monster and what is above,
+      // never a door, a teleporter, a text or an actuator, which only a DSA moves:
+      // `(objectDBTypeD4 < 0) || (objectDBTypeD4 >= dbMONSTER)`
+      // (`doc/CSBwin-src/Code11f52.cpp:3047-3053`).
+      const falls = this.ctx.behaviour.everyObjectFalls
+        ? allowFall && this.isActivePitAt(position)
+        : allowFall && canTeleport && this.isActivePitAt(position);
+      if (falls) {
         // `PitGoesSomewhere` (`doc/CSBwin-src/Code11f52.cpp:2812`) is exactly this
         // test: a pit with nothing under it is not a pit.
         const next = this.dungeon.incrementLevel(position, 1);
