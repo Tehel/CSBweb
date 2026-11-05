@@ -169,7 +169,7 @@ export class RecordingPlayer {
         this.started = this.game.input.vbls;
         if (root.start.kind === 'new') {
             ctx.behaviour = behaviourAt(root.level, root.profile);
-            this.game.readDungeonDat(this.dungeonDat);
+            this.game.readDungeonDat(this.dungeonDat, root.start.seed);
             ctx.random.setSeed(root.start.random);
             ctx.state.block1.randomGameID = root.start.randomGameID;
             // The global the new game counted on from the page's last game (`RecordingStart`).

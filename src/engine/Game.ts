@@ -172,6 +172,13 @@ export class Game implements MainLoop {
      * from a save (`savedGameRead`), not from `dungeon.dat` (`readNewGame`).
      */
     private resumedSavedGame = false;
+    /**
+     * `d.RandomNumber` as the last new game's read began (`readNewGame`): what CSBWin's
+     * record writes in its `0x3333` line before the read's draws, and its playback sets
+     * there (doc/CSBwin-src/SaveGame.cpp:1605-1636). A recording keeps it, so that its
+     * replay's read draws what the recorded one drew.
+     */
+    newGameSeed: number | null = null;
     /** The next `start` resumes at a save's point (`resumeAtSavePoint`). */
     private atSavePoint = false;
     /**
@@ -325,14 +332,21 @@ export class Game implements MainLoop {
      * before `ReadDatabases` sets the `EXPOOL` up (`:2986`), and every path to the read
      * has emptied it first (doc/PROVEN_FACTS.md → "The cursor filter's `ReadGame` runs no
      * DSA"). So the port sends neither.
+     *
+     * The read draws from `seed`, `d.RandomNumber` as it begins, or from a stream of its
+     * own, seeded by `Math.random`, as CSBWin's from its host's `rand()`: `d.RandomGameID`
+     * first (`SaveGame.cpp:1637-1645`), then the party's level as `LoadPartyLevel` loads it,
+     * whose groups' `ProcessMonstersOnLevel` draws for (`startReadState`). The seed is kept
+     * (`newGameSeed`).
      */
-    readNewGame(data: DungeonData): void {
+    readNewGame(data: DungeonData, seed?: number): void {
         readGame(this, {
             world: data,
             extendedFeatures: data.extendedFeatures,
             simpleEncipher: data.simpleEncipher,
             state: () => {
-                const random = new CsbRandom();
+                const random = new CsbRandom(seed);
+                this.newGameSeed = random.getSeed();
                 const newGame = newGameState(data, this.ctx.tables, random, (line) => this.ctx.host.trace(line));
                 return {
                     party: newGame.party.state,
@@ -364,15 +378,16 @@ export class Game implements MainLoop {
     }
 
     /**
-     * `_ReadEntireGame` for a new game from the bytes of `dungeon.dat`. Where
+     * `_ReadEntireGame` for a new game from the bytes of `dungeon.dat`, its stream from
+     * `seed` where it is given (`readNewGame`). Where
      * `ReadDatabases` fails (doc/CSBwin-src/SaveGame.cpp:1910-1912) CSBWin's read ends at
      * `tag01efee`, and at the boot in `die(0xbad)`. The author's decision is that a game
      * file that does not read ends the game wherever it is read (`DEBT.md` H): `die(0xbad)`,
      * whose message says why: the parse, or the read built over it (`readGame`).
      */
-    readDungeonDat(bytes: Uint8Array): void {
+    readDungeonDat(bytes: Uint8Array, seed?: number): void {
         try {
-            this.readNewGame(new DungeonLoader().loadDungeonDat(bytes));
+            this.readNewGame(new DungeonLoader().loadDungeonDat(bytes), seed);
         } catch (error) {
             if (error instanceof Die) throw error;
             die(this.ctx.host, 0xbad, `SAVED GAME DAMAGED!\ndungeon.dat: ${error instanceof Error ? error.message : error}`);

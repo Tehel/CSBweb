@@ -123,7 +123,8 @@ What holds:
   comes from `Math.random()` once, at the first draw (`random.ts:47`). A new game's stream
   also depends on the player's saves: `GameSaves.newGameRead` draws `d.RandomGameID` again
   while a save of the set holds it (`src/engine/GameSaves.ts:257-267`). So a recording
-  starts from the stream as that leaves it, not from the seed alone.
+  starts from the stream as that leaves it, not from the seed alone, and from the seed
+  too: the read draws for the groups of the party's level (below).
 - **Drawing has its own stream**, `viewportRandom`, as CSBWin's `DrawViewport` does
   (`src/renderer/bytecode/ViewportDrawState.ts:24-33`); nothing under `src/renderer` or `src/ui` draws from
   the game's.
@@ -184,10 +185,14 @@ asserts every change recorded at the same VBL with the same `d.Time` and
   holds the clock with nothing shown, until the logged `pause` lets it run.
 - **The doors it plays are the boundary's**: clicks, the button-up, keys, panel keys, the
   dialogs' clock, `TAG0207cc`, the extras, a save's tail and `?dev`'s move.
-- **A recording's start is enough**: a new game's stream and playthrough as the read
-  leaves them (the read draws from a stream of its own, seeded by `Math.random`,
-  `Game.readNewGame`, which the replay's own read seeds anew, and the two are set over
-  it), or the save's file; and the rules and the extras.
+- **A recording's start is enough**: a new game's seed, the stream its read began from,
+  and its stream and playthrough as the read leaves them, or the save's file; and the
+  rules and the extras. The read draws `d.RandomGameID`, then for the groups of the party's
+  level as `ProcessMonstersOnLevel` loads them (`Game.readNewGame`), so the replay's read
+  takes the seed, and the stream and playthrough are set over it
+  (`tools/checks/new-game-seed.ts`, on Conflux, whose level 0 has groups). A recording made
+  before the seed was kept reads from a stream of its own, which plays the same only where
+  that level has no group, Dungeon Master's Hall of Champions among them.
 - **A read ends a recording**, and F9's begins the next from the save it reads.
 - **The game's end ends one too, a point of its own**: a party the Stone Golem kills,
   every champion of `csbgame7.dat` at 1 HP. The recording ends in the VBL that asks for
@@ -515,9 +520,8 @@ a root and the branches down to the one played, or a branch alone, from its own 
   stale tab, is refused before it plays: "A LATER VERSION OF THE SITE MADE THIS
   RECORDING". Each recording's behaviour is set before its read, the root's and each
   join's ("A recording's level", above).
-- **The start.** The path's first start is read: a new game's world, its stream,
-  playthrough and `totalMoveCount` set over the read's (`Game.readNewGame` draws from a
-  stream of its own), or a save's file and its `CarriedState`; then its rules and its
+- **The start.** The path's first start is read: a new game's world, read from its seed,
+  its stream, playthrough and `totalMoveCount` set over the read's, or a save's file and its `CarriedState`; then its rules and its
   extras. `totalMoveCount` is a global, not `d.`'s, which a new game counts on from the
   page's last game, one lost at the entrance before it, and every save file holds: the
   recorder keeps it beside the stream, where it is not 0, and a recording made before it
@@ -702,8 +706,9 @@ reads where it has one, and its readme, and listed in `CSBWIN_RUNS`
 **A run becomes a recording of the port's** (`recordRun`) by being played into a page
 without the DOM through its input boundary, the port's `Recorder` listening, as a player's
 page would have changed the game: the port's recording format is kept, and the port's
-player plays it. Its start is a new game whose stream is the log's `0x3333` seed after
-`ReadEntireGame`'s two draws, or the run's save. CSBWin's player puts an entry in the queue
+player plays it. Its start is a new game read from the log's `0x3333` seed, the stream
+`ReadEntireGame` begins its draws from (`doc/CSBwin-src/SaveGame.cpp:1605-1645`), or the
+run's save. CSBWin's player puts an entry in the queue
 at the top of `HandleMouseEvents`, which the port's pass reads before its VBL's tick, so the
 game between two VBLs is the game that pass sees, and each entry due is applied there as a
 change: a click at its point where the screen has the entry's button there, its key
@@ -839,7 +844,7 @@ Each recording of its path holds its `id`, `build`, `level`, `profile`, `files`,
 `rules`, `extras`, `vbls`, `end`, `changes` and `checks`. What the store keeps beside them
 is the path's own: the set is the package's, the parent is always the recording before at
 its end, and every recording is ended. Its `start` is a new game's stream and playthrough,
-`{kind: 'new', random, randomGameID, totalMoveCount?}`, or a save's file in base64 with what its read left,
+`{kind: 'new', seed?, random, randomGameID, totalMoveCount?}`, or a save's file in base64 with what its read left,
 `{kind: 'save', bytes, carried}`, for the root alone, and, for a root cut at a save, what
 the read lost, `carried.cut` ("A path cut at a save", above), which a package written
 before cuts does not hold; a branch's is a join,

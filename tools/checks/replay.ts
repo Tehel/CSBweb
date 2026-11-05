@@ -860,6 +860,8 @@ async function replay(name: string, start: Start, script: (player: Player) => Pr
   if (begun.start.kind === 'new') {
     check(begun.start.random === recorded.game.ctx.random.getSeed() && begun.start.randomGameID === recorded.game.ctx.state.block1.randomGameID,
       `from the stream and the playthrough its read left (${begun.start.random.toString(16)}, ${begun.start.randomGameID.toString(16)})`);
+    check(begun.start.seed !== undefined && begun.start.seed === recorded.game.newGameSeed,
+      `and the seed its read began from (${begun.start.seed?.toString(16)})`);
   } else if (begun.start.kind === 'save') {
     check(firstDifference(begun.start.bytes, start as Uint8Array) < 0, `from the save's file (${begun.start.bytes.length} bytes)`);
   }

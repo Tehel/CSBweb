@@ -4248,6 +4248,15 @@ not open is `die(50)` with "Cannot open dungeon file", not `tag01efee`, and then
 `rand()` and draws nothing (`CSBCode.cpp:360-361`); `d.RandomGameID`'s two draws are the
 read's (`SaveGame.cpp:1638-1647`).
 
+A playfile's `0x3333` line is `d.RandomNumber` as the read begins those draws: the record
+writes it there, and the playback sets it there (`SaveGame.cpp:1605-1636`). The party's
+level is loaded after the read (`_TAG021028`, `CSBCode.cpp:10615`), and
+`LoadPartyLevel` gives each of its groups an `ITEM16` with `ProcessMonstersOnLevel`
+(`:828`), which draws for it, on the same stream. So the seed decides the groups' first
+turns wherever the party's level has some: on Conflux's level 0, 270 draws, which the
+oracle lists after `_ReadEntireGame`'s two for the run of `DEBT.md` F24; on Dungeon
+Master's, none.
+
 The port's boot runs `tag01efee` in `src/renderer/intro/BootSequence.ts`, reached from
 the load-only chooser (`restoreChosenSave`, `src/renderer/ui/SaveMenu.ts`). At the boot,
 the line is a one-button menu and its click goes back to the title (`DEBT.md` H). The

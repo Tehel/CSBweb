@@ -220,9 +220,10 @@ export async function recordRun(run: CsbwinRun, build: string, dataSet = run.dat
     if (rules !== null) ctx.rules.dmRules = rules;
   };
 
-  // The start: a CSB run's save, read where its log's first read was; or a new game, the
-  // log's `0x3333` seed, then `ReadEntireGame`'s two draws for `d.RandomGameID`
-  // (doc/CSBwin-src/SaveGame.cpp:1606-1645).
+  // The start: a CSB run's save, read where its log's first read was; or a new game read
+  // from the log's `0x3333` seed, `d.RandomNumber` as `ReadEntireGame` begins its draws,
+  // `d.RandomGameID`'s and then the groups' of the party's level
+  // (doc/CSBwin-src/SaveGame.cpp:1605-1645, `Game.readNewGame`).
   let at: number;
   if (run.save) {
     const bytes = new Uint8Array(readFileSync(`${folder}/${run.save}`));
@@ -231,15 +232,12 @@ export async function recordRun(run: CsbwinRun, build: string, dataSet = run.dat
     applyRulesOptions(at);
     recorder.begin({ kind: 'save', bytes, carried: carriedStateOf(game) });
   } else {
-    game.readDungeonDat(page.dungeonDat);
     at = entries.findIndex((entry) => entry.num === 0x3333);
-    const seed = entries[at++]!;
-    ctx.random.setSeed(((seed.x << 16) | (seed.y & 0xffff)) >>> 0);
-    const d0 = ctx.random.next() & 0xffff;
-    const d1 = ctx.random.next() & 0xffff;
-    ctx.state.block1.randomGameID = (d0 * d1) >>> 0;
+    const line = entries[at++]!;
+    const seed = ((line.x << 16) | (line.y & 0xffff)) >>> 0;
+    game.readDungeonDat(page.dungeonDat, seed);
     applyRulesOptions(at);
-    recorder.begin({ kind: 'new', random: ctx.random.getSeed(), randomGameID: ctx.state.block1.randomGameID });
+    recorder.begin({ kind: 'new', seed, random: ctx.random.getSeed(), randomGameID: ctx.state.block1.randomGameID });
   }
   if (at <= 0) throw new Error(`${run.id}: its log holds no start`);
 

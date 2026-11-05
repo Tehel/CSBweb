@@ -275,7 +275,7 @@ g.handleMouseEvents = (delta: number): number => {
   return result;
 };
 
-// --- the start: a new game, the playfile's 0x3333 seed, then ReadEntireGame's two draws;
+// --- the start: a new game read from the playfile's 0x3333 seed (`Game.readNewGame`);
 // or, with --save=, that file read (a CSB run's csbgame.dat) once the log's menu clicks
 // have chosen it, at its first 0x6669 ---
 gameRandom = (ctx as unknown as { random: CsbRandom }).random;
@@ -284,13 +284,10 @@ if (saveArg) {
   at = items.findIndex((it) => 'num' in it && it.num === 0x6669) + 1;
   console.log(`${version}: ${items.length} lines; extraTicks ${extraTicks}, DM rules ${dmRules}, profile ${profileArg ?? 'none'}; ${saveArg} read, d.Time ${ctx.state.tickCount}, seed ${hx(ctx.random.getSeed(), 8)}`);
 } else {
-  game.readDungeonDat(dungeonDat);
   const first = items.findIndex((it) => 'num' in it && it.num === 0x3333);
   const seedEntry = items[first] as PlayEntry;
   at = first + 1;
-  ctx.random.setSeed(((seedEntry.x << 16) | (seedEntry.y & 0xffff)) >>> 0);
-  const d0 = ctx.random.next() & 0xffff, d1 = ctx.random.next() & 0xffff;
-  ctx.state.block1.randomGameID = (d0 * d1) >>> 0;
+  game.readDungeonDat(dungeonDat, ((seedEntry.x << 16) | (seedEntry.y & 0xffff)) >>> 0);
   console.log(`${version}: ${items.length} lines; extraTicks ${extraTicks}, DM rules ${dmRules}, profile ${profileArg ?? 'none'}; seed ${hx(ctx.random.getSeed(), 8)}`);
 }
 oldCallCount = gameCalls;

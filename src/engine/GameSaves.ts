@@ -294,7 +294,8 @@ export class GameSaves {
             this.log('New game: the saves could not be listed', error);
         }
         this.recorder?.begin({
-            kind: 'new', random: this.game.ctx.random.getSeed(), randomGameID: block1.randomGameID,
+            kind: 'new', ...(this.game.newGameSeed === null ? {} : { seed: this.game.newGameSeed }),
+            random: this.game.ctx.random.getSeed(), randomGameID: block1.randomGameID,
             ...(block1.totalMoveCount === 0 ? {} : { totalMoveCount: block1.totalMoveCount }),
         });
     }

@@ -408,7 +408,9 @@ function recordingFromJson(json: unknown, what: string, dataSet: string, parent:
         if ((kind === 'join') !== (parent !== null)) fail(`${what}'s start`);
         switch (kind) {
             case 'new': return {
-                kind: 'new', random: uint32(start['random'], `${what}'s seed`), randomGameID: uint32(start['randomGameID'], `${what}'s playthrough`),
+                kind: 'new',
+                ...(start['seed'] === undefined ? {} : { seed: uint32(start['seed'], `${what}'s seed`) }),
+                random: uint32(start['random'], `${what}'s stream`), randomGameID: uint32(start['randomGameID'], `${what}'s playthrough`),
                 ...(start['totalMoveCount'] === undefined ? {} : { totalMoveCount: uint32(start['totalMoveCount'], `${what}'s move count`) }),
             };
             case 'save': return {

@@ -180,6 +180,7 @@ const CHECKS: Tool[] = [
   { tool: 'wall-decoration-art.ts' },
   { tool: 'virtual-graphics.ts' },
   { tool: 'watch-conflux-start.ts' },
+  { tool: 'new-game-seed.ts' },
   { tool: 'watch-3d2d1d-vertical.ts' },
   { tool: 'watch-3d2d1d-gravity.ts' },
   { tool: 'dsa-overlay.ts' },
