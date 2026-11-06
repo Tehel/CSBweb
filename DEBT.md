@@ -895,11 +895,14 @@ What it establishes:
   (`SpliceTrace.txt`): 43 joined at 42 saves cut out (`0x2224`), 11 abandoned branches
   left out; the `record*.log` are not needed. It starts a new game, holds 204 saves made
   on the disk menu, 5 `0x4444` lines, and neither `0x2223` nor `0xdddd`. Its files:
-  - **Its set** is a hidden one of its own, none of `conflux-3.5`'s three files being
-    the run's: `dungeon.bak1` as its `dungeon.dat` (the log's `0x6667` is that file's MD5),
-    the folder's `graphics.dat` (its `0x6666`), and Paul R. Stevens' `CSBgraphics.dat`,
-    `tools/fixtures/gamefiles/csbgraphics/`'s, without which CSBWin parts from the log at
-    `d.Time` 0x103. Whether the movies' archive holds the folder is not checked yet.
+  - **Its set is `conflux-wip`**, hidden, on the deployed site. None of `conflux-3.5`'s
+    three files is the run's, and played on them the port parts from the log at line 140
+    (`d.Time` 0xbe). Its files are `dungeon.bak1` as its `dungeon.dat` (the log's `0x6667`
+    is that file's MD5), the folder's `graphics.dat` (its `0x6666`), and Paul R. Stevens'
+    `CSBgraphics.dat`, `tools/fixtures/gamefiles/csbgraphics/`'s, without which CSBWin parts
+    from the log at `d.Time` 0x103. The repository's manifest and `fetch-gamefiles` do not
+    have it yet: they get it with the run's row of `CSBWIN_RUNS`. Whether the movies'
+    archive holds the folder is not checked yet.
   - **The folder's `dungeon.dat`** (and `dungeon.bak`, the same) is `dungeon.bak1` less the
     "Wash footprints" DSA at 16(8,24), actuator `#8191`, a spell filter left as the
     target of an AND gate's square: the forum's "Soap & Water DSA bug", which Paul R.
