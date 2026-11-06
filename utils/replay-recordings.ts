@@ -28,6 +28,10 @@
  * or whose package does not read or play (a later level's among them), is shown with why.
  * The run exits 0 where every one passed, and 1 where one did not: the deploy refused.
  *
+ * A recording titled as a run of `CSBWIN_RUNS_UNCHECKED` (`tools/lib/csbwinRun.ts`) is not
+ * played: CSBWin's runs shared once and checked by nothing, which take the port too long to
+ * play (`DEBT.md` F24). A change of their play shows only in a run by hand.
+ *
  * `--break` is for a recording that drifts for a reason no flag mends: one made before
  * levels by a build whose play had already changed, a package that no longer reads. Once
  * every one is played, it asks, for each that did not pass:
@@ -45,6 +49,7 @@ import { createInterface } from 'node:readline/promises';
 
 import { PLAYER_ID_HEADER, RECORDINGS_ROUTE, SHARED_RECORDING_ID, type DataSet } from '../src/data/DataSets';
 import { readRecordingPackage, recordingPackageUrl } from '../src/engine/RecordingPackage';
+import { CSBWIN_RUNS_UNCHECKED } from '../tools/lib/csbwinRun';
 import { fetchOk, playOver, readInstance, type Instance } from './lib/instanceRecordings';
 
 function fail(message: string): never {
@@ -62,6 +67,8 @@ const player = argument('--player') ?? fail('--player <playerId> is needed: a mo
 if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(player)) fail('--player is not a playerId, a lowercase UUID');
 const breaking = process.argv.includes('--break');
 const asPlayer = { [PLAYER_ID_HEADER]: player };
+/** The titles of the recordings the gate passes over (`CSBWIN_RUNS_UNCHECKED`). */
+const unchecked = new Set(CSBWIN_RUNS_UNCHECKED.map((run) => run.title));
 
 const rl = createInterface({ input: stdin, output: stdout, terminal: stdin.isTTY });
 const lines = rl[Symbol.asyncIterator]();
@@ -126,10 +133,14 @@ async function main(): Promise<void> {
     for (const set of manifest.dataSets) {
         const url = `${instanceUrl}/${RECORDINGS_ROUTE}?dataSet=${encodeURIComponent(set.id)}`;
         const listed = (JSON.parse(await (await fetchOk(url, { headers: asPlayer })).text()) as { recordings: Listed[] }).recordings;
-        const toPlay = listed.filter((recording) => !recording.broken && SHARED_RECORDING_ID.test(recording.id));
-        if (toPlay.length === 0) continue;
+        const playable = listed.filter((recording) => !recording.broken && SHARED_RECORDING_ID.test(recording.id));
+        const toPlay = playable.filter((recording) => !unchecked.has(recording.title));
+        if (playable.length === 0) continue;
         console.log(`\n${set.name} (${set.id}): ${toPlay.length} recording${toPlay.length === 1 ? '' : 's'}`
-            + `${listed.length > toPlay.length ? `, and ${listed.length - toPlay.length} broken already` : ''}`);
+            + `${listed.length > playable.length ? `, and ${listed.length - playable.length} broken already` : ''}`);
+        for (const recording of playable) {
+            if (unchecked.has(recording.title)) console.log(`  - ${recording.id} '${recording.title}': not played, a CSBWin run checked by nothing`);
+        }
         for (const recording of toPlay) {
             const state = recording.status === 'pending' ? ', pending' : recording.hidden ? ', hidden' : '';
             const { why, over } = await replay(instance, set, recording);

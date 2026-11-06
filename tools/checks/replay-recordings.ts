@@ -1,12 +1,14 @@
 /**
  * The deploy's gate (`utils/replay-recordings.ts`) against a scratch server
- * (`server/app.ts`) that serves `dm-atari`'s files and shares three of its recordings: one
+ * (`server/app.ts`) that serves `dm-atari`'s files and shares four of its recordings: one
  * that plays to its point, approved (`quietPackage`); one whose changes' `d.Time` and
- * `d.RandomNumber` are no game's, pending (`packageOf`); and one such, broken already. The
- * tool runs as `utils/deploy.sh` runs it, its own process, its answers piped.
+ * `d.RandomNumber` are no game's, pending (`packageOf`); one such, broken already; and one
+ * such titled as a CSBWin run checked by nothing (`CSBWIN_RUNS_UNCHECKED`). The tool runs
+ * as `utils/deploy.sh` runs it, its own process, its answers piped.
  *
- * 1. The gate replays the two that are not broken, says which one drifts and where, asks
- *    nothing, breaks nothing, and refuses the deploy: it exits 1.
+ * 1. The gate replays the two that are not broken nor titled as a run checked by nothing,
+ *    passes over that one, says which one drifts and where, asks nothing, breaks nothing,
+ *    and refuses the deploy: it exits 1.
  * 2. `--break`, answered yes, breaks the one that drifts, and only it.
  * 3. The gate again replays the one left, which plays, asks nothing, and lets the deploy
  *    go on: it exits 0.
@@ -37,6 +39,7 @@ import { DATA_SET_FILES_ROUTE, parseManifest, PLAYER_ID_HEADER, RECORDING_PACKAG
 import { checkLocalDataSet } from '../../src/engine/LocalDataSetCheck.ts';
 import { readRecordingPackage } from '../../src/engine/RecordingPackage.ts';
 import { check, finish } from '../lib/check.ts';
+import { CSBWIN_RUNS_UNCHECKED } from '../lib/csbwinRun.ts';
 import { dataSetNamed, diskFiles } from '../lib/dataSets.ts';
 import { packageOf, quietPackage } from '../lib/recordingPackages.ts';
 
@@ -98,6 +101,8 @@ try {
     const drifts = await share(await packageOf('dm-atari', 'Fake'));
     const brokenAlready = await share(await packageOf('dm-atari', 'Broken before'));
     store.setBroken(brokenAlready);
+    const uncheckedTitle = CSBWIN_RUNS_UNCHECKED[0]!.title;
+    const unchecked = await share(await packageOf('dm-atari', uncheckedTitle));
     const states = () => store.of('dm-atari').map((one) => `${one.title}${one.pending ? ' pending' : ''}${one.broken ? ' broken' : ''}`).sort().join(', ');
     const before = states();
     console.log(`Shared: ${before}`);
@@ -110,6 +115,8 @@ try {
         && gate.out.includes(`✗ ${drifts} 'Fake' (build test, pending): drifts at change 0 of root`) && !gate.out.includes(brokenAlready)
         && gate.out.includes('2 recordings replayed, 1 that drifts.') && gate.out.includes('and 1 broken already'),
         'the gate replays the two not broken, the pending one included: the quiet game plays to its point, the fake drifts at its first change');
+    check(gate.out.includes(`- ${unchecked} '${uncheckedTitle}': not played, a CSBWin run checked by nothing`) && !gate.out.includes(`✗ ${unchecked}`),
+        `it passes over the one titled as a CSBWin run checked by nothing, which would drift`);
     check(gate.code === 1 && gate.out.includes('The deploy is refused') && !gate.out.includes('Mark it broken?') && states() === before,
         `it refuses the deploy, exit ${gate.code}, asks nothing and breaks nothing`);
 
@@ -117,7 +124,7 @@ try {
     const run = await runTool(instance, ['--player', MODERATOR, '--break'], 'y\n');
     show(run.out);
     check(run.code === 0 && (run.out.match(/Mark it broken\?/g) ?? []).length === 1 && run.out.includes('Marked broken.') && run.out.includes('1 marked broken.')
-        && states() === 'Broken before pending broken, Fake pending broken, Quiet', `it asks about the one that drifts alone, and breaks it (${states()})`);
+        && states() === `Broken before pending broken, ${uncheckedTitle} pending, Fake pending broken, Quiet`, `it asks about the one that drifts alone, and breaks it (${states()})`);
 
     console.log('\n3. The gate again:');
     const again = await runTool(instance, ['--player', MODERATOR], '');

@@ -5,6 +5,12 @@
  * boundary and recorded (`recordRun`), its package written as the welcome page's UPLOAD
  * writes one, and submitted to `POST api/recordings`, pending a moderator's approval.
  *
+ * The runs checked by nothing (`CSBWIN_RUNS_UNCHECKED`) are offered too, each once: their
+ * sets and logs are not the repository's, so the script is run for one from a working
+ * directory whose `tools/data-sets.json` names its set and whose `tools/fixtures/` holds
+ * the set's files and the run's log (`DEBT.md` F24). A run whose set the working
+ * directory's manifest does not name is not offered.
+ *
  * A recording names its set by the instance's id, which need not be the checkout's: the
  * run is shared on the instance's set whose files are the run's set's, byte for byte
  * (`gameFiles`), an official one first. An instance with none is told so, and the run is
@@ -35,14 +41,15 @@
  * `tools/checks/csbwin-runs.ts` says first.
  */
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { stdin, stdout } from 'node:process';
 import { createInterface } from 'node:readline/promises';
 
 import { folderFiles } from '../src/data/DataSetFiles';
 import { DATA_SETS_ROUTE, parseManifest, PLAYER_ID_HEADER, RECORDING_PACKAGE_FIELD, RECORDINGS_ROUTE, type DataSet } from '../src/data/DataSets';
 import { readRecordingPackage, writeRecordingPackage } from '../src/engine/RecordingPackage';
-import { CSBWIN_RUNS, recordRun, runPackage, type CsbwinRun } from '../tools/lib/csbwinRun';
-import { dataSetNamed, diskFiles } from '../tools/lib/dataSets';
+import { CSBWIN_RUNS, CSBWIN_RUNS_UNCHECKED, recordRun, runPackage, type CsbwinRun } from '../tools/lib/csbwinRun';
+import { DATA_SETS, dataSetNamed, diskFiles } from '../tools/lib/dataSets';
 import { playPath } from '../tools/lib/playback';
 
 function fail(message: string): never {
@@ -60,9 +67,10 @@ const player = argument('--player') ?? fail('--player <playerId> is needed: the 
 if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(player)) fail('--player is not a playerId, a lowercase UUID');
 const dryRun = process.argv.includes('--dry-run');
 const named = process.argv.slice(2).filter((arg, n, args) => !arg.startsWith('--') && args[n - 1] !== '--instance' && args[n - 1] !== '--player');
-const unknown = named.filter((id) => !CSBWIN_RUNS.some((run) => run.id === id));
-if (unknown.length > 0) fail(`No such run: ${unknown.join(', ')}. The runs: ${CSBWIN_RUNS.map((run) => run.id).join(', ')}`);
-const runs = CSBWIN_RUNS.filter((run) => named.length === 0 || named.includes(run.id));
+const allRuns = [...CSBWIN_RUNS, ...CSBWIN_RUNS_UNCHECKED];
+const unknown = named.filter((id) => !allRuns.some((run) => run.id === id));
+if (unknown.length > 0) fail(`No such run: ${unknown.join(', ')}. The runs: ${allRuns.map((run) => run.id).join(', ')}`);
+const runs = allRuns.filter((run) => named.length === 0 || named.includes(run.id));
 const asPlayer = { [PLAYER_ID_HEADER]: player };
 
 const rl = createInterface({ input: stdin, output: stdout, terminal: stdin.isTTY });
@@ -80,9 +88,13 @@ async function ask(question: string): Promise<string> {
     return line.value.trim().toLowerCase();
 }
 
-/** The commit this working tree is, as the deploy names its build: the recordings' build. */
+/**
+ * The commit this working tree is, as the deploy names its build: the recordings' build.
+ * The repository's, whatever the working directory.
+ */
 function checkoutBuild(): string {
-    const head = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf8' });
+    const repository = fileURLToPath(new URL('..', import.meta.url));
+    const head = spawnSync('git', ['-C', repository, 'rev-parse', '--short', 'HEAD'], { encoding: 'utf8' });
     return head.stdout.trim() || 'unknown';
 }
 
@@ -157,6 +169,10 @@ async function main(): Promise<void> {
     let shared = 0;
     for (const [i, run] of runs.entries()) {
         console.log(`\n[${i + 1}/${runs.length}] ${run.id}, recorded on the files of ${run.dataSet}`);
+        if (!DATA_SETS.some((local) => local.id === run.dataSet)) {
+            console.log(`  Not offered: this working directory's tools/data-sets.json has no set ${run.dataSet}.`);
+            continue;
+        }
         const set = await siteSetOf(run, sets);
         if (!set) {
             console.log(`  Not offered: no set of ${instance} holds ${run.dataSet}'s ${gameFiles(dataSetNamed(run.dataSet)).join(', ')}, byte for byte.`);

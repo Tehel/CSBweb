@@ -900,8 +900,14 @@ What it establishes:
     (`d.Time` 0xbe). Its files are `dungeon.bak1` as its `dungeon.dat` (the log's `0x6667`
     is that file's MD5), the folder's `graphics.dat` (its `0x6666`), and Paul R. Stevens'
     `CSBgraphics.dat`, `tools/fixtures/gamefiles/csbgraphics/`'s, without which CSBWin parts
-    from the log at `d.Time` 0x103. Until the repository's manifest holds it (step 1,
-    below), the run is played from a scratch folder (`.claude/memory/scratch-set-cwd.md`).
+    from the log at `d.Time` 0x103. The movies' archive does not hold the run's folder;
+    the forum's `Conflux_Without_Bug 20180329.7z` does, whole
+    (`https://drive.google.com/file/d/1PMb2cTVO39XGqLLqIBEernsrhhXnnoeF`, SHA-256
+    `dcfe2956…`), and its `Playfile.log` is the collection's. The set is not in the
+    repository's manifest nor in `fetch-gamefiles`, the author's decision: the run is
+    shared once, from a scratch folder (`.claude/memory/scratch-set-cwd.md`) whose
+    manifest names `conflux-wip` and whose `tools/fixtures/` holds its files and the
+    run's log, the first 217437 lines of the archive's.
   - **The folder's `dungeon.dat`** (and `dungeon.bak`, the same) is `dungeon.bak1` less the
     "Wash footprints" DSA at 16(8,24), actuator `#8191`, a spell filter left as the
     target of an AND gate's square: the forum's "Soap & Water DSA bug", which Paul R.
@@ -946,14 +952,14 @@ Paying it, in steps:
    recordings and their upload (below), which the author runs. Next, the other CSB runs through the oracle.
    Conflux's partial game (above) plays to its stop, and is shared on the site but checked
    by neither `npm test` nor the deploy, the author's decision: the port takes about 24
-   minutes to play it. Its steps: a list of its own beside `CSBWIN_RUNS`, which
-   `utils/share-csbwin-runs.ts` offers and `csbwin-runs.ts` and `recording-corpus.ts` do
-   not read, its log cut at line 217437 in `tools/fixtures/csbwin-runs/`; its set in the
-   repository's manifest, hidden, and in `fetch-gamefiles` (whether the movies' archive
-   holds its folder, first); `utils/replay-recordings.ts` passing over its recording, by
-   its title, from a list in the repository; then its share, once, which the author runs.
-   Nothing checks it after that: a later change of its play without a flag shows only in
-   a run by hand. **The 9.x and 11.0xx runs play at their version's
+   minutes to play it. Its row is `CSBWIN_RUNS_UNCHECKED` (`tools/lib/csbwinRun.ts`),
+   which `utils/share-csbwin-runs.ts` offers and `csbwin-runs.ts` and
+   `recording-corpus.ts` do not read, and the deploy's gate passes over its recording by
+   its title (`utils/replay-recordings.ts`). What is left is its share, once, which the
+   author runs from the scratch folder (above) **after level 6 is deployed**: a fix
+   joining level 6 before then could change the play of a recording made at it, and
+   nothing checks this one (a level-5 page refuses it anyway). Nothing checks it after
+   that: a later change of its play without a flag shows only in a run by hand. **The 9.x and 11.0xx runs play at their version's
    profile** of behaviour flags (`doc/RECORDING.md` → "A recording's level"): each version
    differs from CSBWin 2023 throughout (above), so corrections to the log cannot convert
    them. Each flag is read from the diff of its version's source against 2023's

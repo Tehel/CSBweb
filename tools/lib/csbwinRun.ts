@@ -126,6 +126,26 @@ export interface RunUnderWay extends CsbwinRun {
 /** The runs under way, in the order the check plays them. */
 export const CSBWIN_RUNS_UNDER_WAY: readonly RunUnderWay[] = [];
 
+/**
+ * The runs shared once and checked by nothing: each plays to its end as a run of
+ * `CSBWIN_RUNS` does, but takes too long for `npm test`, whose `csbwin-runs.ts` and
+ * `recording-corpus.ts` read only that list, and for the deploy's gate, which passes over
+ * their recordings by their titles (`utils/replay-recordings.ts`). Their sets and logs are
+ * not the repository's: `utils/share-csbwin-runs.ts` shares one from a working directory
+ * whose `tools/data-sets.json` names its set and whose `tools/fixtures/` holds its set's
+ * files and its log (`DEBT.md` F24).
+ */
+export const CSBWIN_RUNS_UNCHECKED: readonly CsbwinRun[] = [
+  {
+    // Its log is the first 217437 lines of `Files/Playfile.log` in the forum's
+    // `Conflux_Without_Bug 20180329.7z`: the next joins two recordings CSBWin parts at too.
+    id: 'ConfluxWithoutBug', dataSet: 'conflux-wip', profile: 'csbwin-2023', save: null, end: 'log', player: 'Anthony Bracegirdle',
+    title: 'Conflux WIP 007, 16 h 31 min of a game',
+    description: 'Conflux WIP 007 from a new game, through its DSAs, to the last of its recordings that joins, the game not won. A CSBWin 15.8 recording, 43 recordings spliced at the saves made between them, played back in CSBweb.',
+    recordedAt: '2020-09-02',
+  },
+];
+
 /** The options `diskMenuSave` has taken of each opening of the save menu. */
 const diskMenuSteps = new WeakMap<object, number>();
 

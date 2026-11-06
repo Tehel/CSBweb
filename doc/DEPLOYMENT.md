@@ -590,6 +590,13 @@ whose title the instance already lists on its set is not offered again. The inst
 build whose package reader takes the `playfile` change, the draws a CSBWin run carries; an
 older one refuses each.
 
+The runs checked by nothing (`CSBWIN_RUNS_UNCHECKED`), which take the port too long to play
+for the deploy's gate, are offered by the same script and shared once. Their sets and logs
+are not the repository's, so it is run for one from a working directory whose
+`tools/data-sets.json` names its set and whose `tools/fixtures/` holds its set's files and
+its log; elsewhere the run is not offered. Conflux's partial game is the one, on
+`conflux-wip` (`DEBT.md` F24).
+
 **A new version of the package's format** (`doc/RECORDING.md` → "Shared recordings") is met by
 migrating the site's packages before the build that reads it is deployed, since the deploy's
 gate reads them with it:
@@ -706,7 +713,8 @@ broken has its package fetched and played from it alone, in a page without the D
 it over, found by their digests (`api/data-set-files`, `doc/RECORDING.md` → "The set a
 recording plays over", or, from a site whose build predates that route, the digests of the
 files it serves, the same ones); a package that does not read or play, a later level's among them,
-or whose files no set has, fails as a drift does.
+or whose files no set has, fails as a drift does. A recording titled as a run of
+`CSBWIN_RUNS_UNCHECKED` is not played: a change of its play shows only in a run by hand.
 `npm run deploy -- --no-replay` deploys without it, for the first deploy, which has no
 site to ask (`doc/SETUP.md`).
 
