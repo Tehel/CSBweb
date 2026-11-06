@@ -900,9 +900,8 @@ What it establishes:
     (`d.Time` 0xbe). Its files are `dungeon.bak1` as its `dungeon.dat` (the log's `0x6667`
     is that file's MD5), the folder's `graphics.dat` (its `0x6666`), and Paul R. Stevens'
     `CSBgraphics.dat`, `tools/fixtures/gamefiles/csbgraphics/`'s, without which CSBWin parts
-    from the log at `d.Time` 0x103. The repository's manifest and `fetch-gamefiles` do not
-    have it yet: they get it with the run's row of `CSBWIN_RUNS`. Whether the movies'
-    archive holds the folder is not checked yet.
+    from the log at `d.Time` 0x103. The repository's manifest does not hold it: the run is
+    played from a scratch folder (`.claude/memory/scratch-set-cwd.md`).
   - **The folder's `dungeon.dat`** (and `dungeon.bak`, the same) is `dungeon.bak1` less the
     "Wash footprints" DSA at 16(8,24), actuator `#8191`, a spell filter left as the
     target of an AND gate's square: the forum's "Soap & Water DSA bug", which Paul R.
@@ -944,9 +943,10 @@ Paying it, in steps:
 
 1. **The 17.6 runs, `CSBMovie0640` and `CSBFullRecordingV4` through steps 3 to 5**, the
    author's request. Steps 3 to 5 are done for the four of them: their check, their
-   recordings and their upload (below), which the author runs. Next, the other CSB runs through the oracle, and
-   Conflux's partial game (above): its set, and its row of `CSBWIN_RUNS` held to its stop
-   at line 217438, where CSBWin stops too. **The 9.x and 11.0xx runs play at their version's
+   recordings and their upload (below), which the author runs. Next, the other CSB runs through the oracle.
+   Conflux's partial game (above) plays to its stop and stays out of `CSBWIN_RUNS`, the
+   author's decision: the port takes about 24 minutes to play it, too long for `npm test`, whose
+   `csbwin-runs.ts` and `recording-corpus.ts` play every run of that list. **The 9.x and 11.0xx runs play at their version's
    profile** of behaviour flags (`doc/RECORDING.md` → "A recording's level"): each version
    differs from CSBWin 2023 throughout (above), so corrections to the log cannot convert
    them. Each flag is read from the diff of its version's source against 2023's
