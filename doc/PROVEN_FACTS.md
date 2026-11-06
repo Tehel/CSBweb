@@ -4599,6 +4599,20 @@ at 3(19,3) and 3(20,25), where they stay and run. ReDMCSB's pit has no such test
 four. The port's `WorldMove` drops any object that does not levitate before level 6
 (`everyObjectFalls`; `tools/checks/dsa-add-delete.ts`).
 
+## A group a dying group carries waits for the square
+
+A group's possessions can hold another group: in Conflux's partial game (`DEBT.md` F24),
+group 0x04b9 dies at 5(16,3) carrying group 0x117e, and the oracle's trace of
+`DropMonsterRemains`' chain shows it there as the port's does. `DropMonsterRemains` drops
+every possession with `MoveObject(objD5, -1, 0, x, y, NULL, NULL)` whatever its type
+(`doc/CSBwin-src/Code11f52.cpp:939-948`), and `MoveObject` places a monster through its
+monster branch (`:3362-3459`). The dying group is still on the square, `DeleteMonster`
+coming after the remains (`:1145-1152`), so `FindFirstMonster` finds it, and the carried
+group goes into abeyance: `CreateMovementTimer` for the square, a `TT_60` or `TT_61`
+retrying it, and `MoveObject` returns 1 (`:3374-3392`). The port's world `moveObject`
+refused to place a monster, an error that ended the game, before level 6
+(`placingMonsterThrows`; `tools/checks/drop-move-object.ts`).
+
 ## A chest weighs what the dungeon says
 
 `GetObjectWeight` gives a chest the first longword of the pool's

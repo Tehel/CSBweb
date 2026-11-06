@@ -21,6 +21,11 @@
  * relic on that: Gigglers fall to their death on item teleporters, which carry their armour
  * into a block of alcoves.
  *
+ * A group can carry another among its possessions (Conflux's group at 5(16,3)), and
+ * `DropMonsterRemains` drops it as any other. `MoveObject` places it as a monster
+ * (`:3362-3459`): the dying group still holds the square, so it waits on a movement timer
+ * for it (`:3374-3392`), where the port's `moveObject` refused to place a monster at all.
+ *
  * The teleporter is a real record from `dungeon.dat`, rigged by `tools/lib/teleporter.ts`.
  *
  * Run: `npm test -- --only=drop-move-object.ts`
@@ -31,6 +36,7 @@ import { Game } from '../../src/engine/Game';
 import { MonsterType } from '../../src/engine/monsterTypes';
 import { MovementAction } from '../../src/engine/gameTypes';
 import { TimerFunction } from '../../src/engine/TimerQueue';
+import { behaviourAt } from '../../src/engine/Behaviour';
 import type { Champion } from '../../src/engine/gameTypes';
 import { newGame, stockDungeon, stockGraphics } from '../lib/game';
 import { wrapMember } from '../lib/standIn';
@@ -133,6 +139,32 @@ function monster(game: Game, type: MonsterType, possession: ObjectID): ObjectID 
   record.numMonM1 = 0;
   record.possession = possession;
   return game.ctx.dungeon.rnMaps.rn(DBType.CREATURE, 0);
+}
+
+/** Creature record `index`, lifted from wherever it lies, a lone `type` carrying `possession`. */
+function takeGroup(game: Game, index: number, type: MonsterType, possession: ObjectID): ObjectID {
+  const dungeon = game.ctx.dungeon;
+  const rn = dungeon.rnMaps.rn(DBType.CREATURE, index);
+  for (let z = 0; z < dungeon.getMapCount(); z++) {
+    const map = dungeon.getMap(z)!;
+    for (let x = 0; x < map.descriptor.width; x++) {
+      for (let y = 0; y < map.descriptor.height; y++) {
+        const at = new Position(x, y, z);
+        for (let o = dungeon.findFirstObject(at); o !== OBJECT_ID_EOF; o = dungeon.getDBRecordLink(o)) {
+          if (dungeon.rnMaps.dbType(o) === DBType.CREATURE && dungeon.rnMaps.idx(o) === index) {
+            dungeon.removeObjectFromCell(at, o);
+            break;
+          }
+        }
+      }
+    }
+  }
+  dungeon.setDBRecordLink(rn, OBJECT_ID_EOF);
+  const record = dungeon.getData().databases.creatures.records[index]!;
+  record.creatureType = type;
+  record.numMonM1 = 0;
+  record.possession = possession;
+  return rn;
 }
 
 const countOf = (game: Game, at: Position, category: DBType): number => {
@@ -294,6 +326,43 @@ function main(): void {
     const left = countOf(game, front, DBType.MISC);
     console.log(`7. a Screamer dies on the teleporter: ${arrived} slice(s) at the destination, ${left} on the teleporter`);
     check(arrived > 0 && left === 0, 'the droppings are carried to the destination (CreateAndDropObject, Code11f52.cpp:832)');
+  }
+
+  /* ------- 8. a monster dies carrying a group: the group waits for the square ---------- */
+  for (const level of [5, 6]) {
+    const game = makeGame();
+    game.ctx.behaviour = behaviourAt(level);
+    const { dest: at } = stage(game, 0);
+    // Level 0, the Hall of Champions, allows no monster: a group placed there dies (`:3182-3211`).
+    const map = game.ctx.dungeon.getMap(0)!;
+    map.monsterTypes = [...(map.monsterTypes ?? []), MonsterType.mon_Giggler];
+    const last = game.ctx.dungeon.getData().databases.creatures.records.length - 1;
+    const carried = takeGroup(game, last, MonsterType.mon_Giggler, OBJECT_ID_EOF);
+    const dying = takeGroup(game, 0, MonsterType.mon_Giggler, carried);
+    game.ctx.dungeon.addObjectToCell(at, dying);
+    let error: string | null = null;
+    try {
+      game.systems.monsterDamage.dropMonsterRemains(0, at.x, at.y, dying, 2, 0, true);
+    } catch (e) {
+      error = (e as Error).message;
+    }
+    const waiting = game.ctx.timers.getTimers().filter((t) => t.function === TimerFunction.TT_60);
+    const timer = waiting.find((t) => game.ctx.dungeon.rnMaps.idx(t.object as ObjectID) === last
+      && game.ctx.dungeon.rnMaps.dbType(t.object as ObjectID) === DBType.CREATURE);
+    let onSquare = 0;
+    for (let rn = game.ctx.dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
+      if (game.ctx.dungeon.rnMaps.dbType(rn) === DBType.CREATURE) onSquare++;
+    }
+    console.log(`8. level ${level}: a Giggler dies at (${at.x},${at.y}) carrying group ${last}: error ${error}, `
+      + `TT_60 for it ${timer ? `at (${timer.uByte6},${timer.uByte7}) L${timer.level}` : 'none'}, groups on the square ${onSquare}`);
+    if (level === 5) {
+      check(error !== null, 'level 5: placing the carried group throws (placingMonsterThrows)');
+    } else {
+      check(error === null, 'the carried group is placed as a monster (MoveObject, Code11f52.cpp:3362)');
+      check(timer !== undefined && timer.uByte6 === at.x && timer.uByte7 === at.y && timer.level === at.z,
+        'the dying group still holds the square: the carried one waits on a TT_60 timer for it (Code11f52.cpp:3374-3392)');
+      check(onSquare === 1, 'only the dying group is on the square');
+    }
   }
 
   finish();

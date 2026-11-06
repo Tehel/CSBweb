@@ -176,6 +176,12 @@ export const BEHAVIOURS = [
         debt: 'F24',
         until: 6,
     },
+    {
+        name: 'placingMonsterThrows',
+        does: "a group placed by the world `MoveObject` refused with an error that ends the game, where CSBWin's `MoveObject` takes a monster's placement as any other: a group a dying group carries among its possessions, which `DropMonsterRemains` drops, waiting on a movement timer for the square the dying group holds, Conflux's group 0x117e at 5(16,3) (`WorldMove.moveObject`)",
+        debt: 'F24',
+        until: 6,
+    },
 ] as const satisfies readonly BehaviourChange[];
 
 export type BehaviourName = (typeof BEHAVIOURS)[number]['name'];

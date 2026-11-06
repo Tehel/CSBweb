@@ -158,9 +158,11 @@ export class WorldMove {
    * level `level` (`d.LoadedLevel`, CSBWin's `AttachedLevel_4`). `oldX < 0` places an
    * object that lies nowhere, `newX < 0` lifts one without placing it.
    *
-   * A monster is `MonsterSystem.moveMonster`'s, which a lift here is handed to. *Placing*
-   * one is the monster branch (`:3362-3459`), which its callers call directly; it is
-   * refused here.
+   * A monster, lifted or placed, is handed to `MonsterSystem.moveMonster`, CSBWin's monster
+   * branch (`:3362-3459`), and only its code comes back, as `removed`. A placement comes
+   * here from `DropMonsterRemains`, whose group can carry another among its possessions
+   * (Conflux's group at 5(16,3), `Code11f52.cpp:939-948`): placed from nowhere on the square
+   * the dying group still holds, it waits on a movement timer (`:3374-3392`).
    *
    * What is placed goes through the teleporter / pit loop (`resolveCellEffects`); a
    * levitating thing — a missile, a flying monster — neither falls nor presses a pad
@@ -190,7 +192,9 @@ export class WorldMove {
     const decoded = this.dungeon.rnMaps.decode(object);
     const type = decoded.category;
     if (type === DBType.CREATURE) {
-      if (newX >= 0) throw new Error('moveObject: placing a monster is MonsterSystem.moveMonster');
+      if (this.ctx.behaviour.placingMonsterThrows) {
+        if (newX >= 0) throw new Error('moveObject: placing a monster is MonsterSystem.moveMonster');
+      }
       const { code } = this.ctx.systems.monsters.moveMonster(object, oldX, oldY, newX, newY, level);
       return { removed: code !== 0, placed: null, position: null };
     }

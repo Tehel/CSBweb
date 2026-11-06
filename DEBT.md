@@ -910,25 +910,26 @@ What it establishes:
     its last join, where `record00053` follows `record00051`, as `record00052` does: the
     run ends at 0x57262, `record00051`'s end, its tail dropped. The DSA's warnings come
     after that error.
-  - **The port plays to line 62861 and throws there** (`d.Time` 0x18d85, party L5 (16,2)):
-    a group dying at 5(16,3) carries another group, RN 0x117e, among its possessions, and
-    `DropMonsterRemains`' `MoveObject` of it (`MonsterDamage.dropMonsterRemains`) reaches
-    the world `moveObject`'s refusal to place a monster (`WorldMove.moveObject`). Whether
-    CSBWin's group carries it too, and how it got there, is not looked at yet. Before it
-    the port plays the run by `d.RandomNumber`, past a big actuator's `word8`, which
+  - **The port plays to line 116788 and drifts there** (`d.Time` 0x2e14a, party L7 (6,22)):
+    CSBWin's random is 7 draws ahead of the port's, 1284 draws after the line before. Its
+    cause is not looked at yet. Before it the port plays the run by `d.RandomNumber`, past a
+    big actuator's `word8`, which
     CSBWin reads byte-swapped, an actuator the wave DSA's `&ADD` puts on an open pit,
     which stays there, Conflux's chest of 1.0 kg, which a laden champion's steps pay for
     in stamina, an item picked up at the party's feet off the pad that holds the pit at
     1(20,18) shut, which stays down, a group the DSA's `&ADD` copies with its possessions,
     which takes its RN before theirs, a switch whose ornament is wall decoration 0, which
-    the port took for an alcove, and a group that strikes a random champion, which reads
-    the slot of a candidate the Hall of Champions' Cancel turned away (`doc/PROVEN_FACTS.md`
+    the port took for an alcove, a group that strikes a random champion, which reads
+    the slot of a candidate the Hall of Champions' Cancel turned away, and a group dying at
+    5(16,3) with another among its possessions, which waits on a movement timer for the
+    square (`doc/PROVEN_FACTS.md`
     → "A big actuator's `word8` stays in the file's byte order", "A pit takes only the
     party, a monster and what is above", "A chest weighs what the dungeon says", "An
     object picked up at the party's feet leaves the pad down", "The DSA's `&ADD` of a
     group takes the group's record before its possessions'", "Three wall decorations are
     alcoves, not four", "A `CHARDESC` slot past the party holds zeros, or the champion
-    who left it"). All seven are the port's fixes at level 6, which every fix for this run
+    who left it", "A group a dying group carries waits for the square"). All eight are the
+    port's fixes at level 6, which every fix for this run
     joins until it is deployed (`doc/RECORDING.md` → "The policy"). Every RN slot taken
     and freed agrees with CSBWin's to `d.Time` 0x11d75 (a log of each on both sides,
     `RnMaps` against `data.cpp`'s `RN::RN`, `FindEmptyDBEntry`, `DeleteDBEntry` and
@@ -940,7 +941,7 @@ Paying it, in steps:
    author's request. Steps 3 to 5 are done for the four of them: their check, their
    recordings and their upload (below), which the author runs. Next, the other CSB runs through the oracle, and
    Conflux's partial game (above): its set, its row of `CSBWIN_RUNS` held to its stop at
-   line 62861, and its drifts, each the port's. **The 9.x and 11.0xx runs play at their version's
+   line 116788, and its drifts, each the port's. **The 9.x and 11.0xx runs play at their version's
    profile** of behaviour flags (`doc/RECORDING.md` → "A recording's level"): each version
    differs from CSBWin 2023 throughout (above), so corrections to the log cannot convert
    them. Each flag is read from the diff of its version's source against 2023's

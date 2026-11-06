@@ -139,12 +139,17 @@ const diskMenuSteps = new WeakMap<object, number>();
  * (`Game.saveWritten`: `TAG00bd40`, `ProcessMonstersOnLevel`, `SmartDiscard(true)`,
  * `:1341-1343`, and `d.CanRestartFromSavegame = 1`, `:1358`), then the menu closed
  * (`TAG0207cc`, `:1375`), as the menu's own save and close make them. The file itself is
- * not made: nothing in the log reads it. "SAVE AND QUIT", "CANCEL" and the rest are not
- * played yet: they throw.
+ * not made: nothing in the log reads it. `0xd4` as the first option is "CANCEL", the
+ * menu's third (`:891-915`): the menu closed and nothing saved (`tag01e52c`, `TAG0207cc`,
+ * `:1372-1376`). "SAVE AND QUIT" and the rest are not played yet: they throw.
  */
 export function diskMenuSave(game: Game, ui: UIState, num: number, line: number): boolean {
   const menu = ui.saveMenu;
   const step = (menu && diskMenuSteps.get(menu)) ?? 0;
+  if (menu && step === 0 && num === 0xd4) {
+    closeSaveMenu(ui);
+    return true;
+  }
   if (menu && (num === 0xd2 || (step > 0 && num >= 0xd2 && num <= 0xd5))) {
     diskMenuSteps.set(menu, step + 1);
     return true;
