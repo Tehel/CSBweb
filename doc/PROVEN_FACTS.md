@@ -3490,7 +3490,7 @@ The port: `src/data/FileSignature.ts`, `readRuntimeFileSignatures`
 
 `AddCharacter` clears 800 bytes of the slot before it fills it
 (`doc/CSBwin-src/Character.cpp:482`), and so does `GetFromWings`, which copies a whole
-record in. Three readers reach such a slot. `&CHPOSS` bounds its index to 0-3 and no
+record in. Four readers reach such a slot. `&CHPOSS` bounds its index to 0-3 and no
 further (`DSA.cpp:3343-3348`); on a never-filled slot it pushes 0, since it pushes -1
 only for `RNnul` (`:3354-3355`). `CharacterAdd` and `CharacterSwap` look for a free
 corner with a loop that, when nobody in the party stands in it, compares
@@ -3501,10 +3501,17 @@ high byte of `d.PartyFootprints[7]` on the little-endian build (`Data.h:781-793`
 with no corner left the champion stands in corner 5. And `RemoveCharacter`, with no
 other champion living, hands the cursor and the magic tab to slot `d.NumCharacter`,
 which `SetHandOwner` and `SelectMagicCaster` refuse only if its HP is 0
-(`Character.cpp:5343-5360`). The port keeps the slots as
-`PartyState.vacantCharacters`; `tools/checks/dsa-characters.ts` (3b, 3c),
+(`Character.cpp:5343-5360`). A group that strikes a random champion (`word2Bit4`) draws a
+slot and passes over each whose `HP()` is 0, four slots whatever `d.NumCharacter` is
+(`Monster.cpp:1086-1096`): a candidate a Cancel turned away is struck, and the blow reaches
+no one, `MonsterDamagesCharacter` refusing a slot past the party (`:4541`). Conflux's
+partial game does so at `d.Time` 0x147ee (`DEBT.md` F24), where the port, reading the
+party's champions only before level 6 (`randomTargetInParty`), struck champion 0 instead.
+The port keeps the slots as
+`PartyState.vacantCharacters`; `tools/checks/monster-attack-filter.ts` (8),
+`tools/checks/dsa-characters.ts` (3b, 3c),
 `tools/checks/hall-of-champions.ts` (Cancel), `tools/checks/character-block.ts` (5) and
-`tools/checks/swap-character.ts` (2, 4) check the four ways in and the corner search.
+`tools/checks/swap-character.ts` (2, 4) check the four ways in, the corner search and the attack.
 
 ## `CHARDESC.incantation` is a C string, and a cast leaves the rest of it behind
 

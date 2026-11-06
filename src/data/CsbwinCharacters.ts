@@ -513,4 +513,14 @@ export function vacantPossession(vacant: VacantCharacter, index: number): Object
   return getChampionPossession(vacant, index);
 }
 
+/**
+ * `HP()` of a slot past the party, the record's own word at 52, as CSBWin reads it: a
+ * candidate the Hall of Champions' Cancel left there keeps theirs (`CSBCode.cpp:6699`), a
+ * champion `CharacterDelete` moved down leaves 0 (`Character.cpp:5413`).
+ */
+export function vacantHealth(vacant: VacantCharacter): number {
+  if (vacant instanceof Uint8Array) return readI16BE(vacant, 52);
+  return vacant.attributes.health;
+}
+
 export type { PartyState };

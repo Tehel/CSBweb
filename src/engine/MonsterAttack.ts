@@ -19,6 +19,7 @@ import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
 import { getChampionPossession } from '../core/charDesc';
 import { getPartyChampion } from './Party';
+import { vacantHealth } from '../data/CsbwinCharacters';
 import { MonsterType, StateOfFear } from './monsterTypes';
 import { adjustSkills, AdjustSkillsWhy } from './skills';
 import { isAlive, levelDifficulty, masteryOf } from './rules';
@@ -264,11 +265,22 @@ export class MonsterAttack {
     p.missileType = this.chooseMissile(monster.creatureType);
     p.monsterShouldSteal = monster.creatureType === MonsterType.mon_Giggler ? 1 : 0;
 
-    // `word2Bit4` monsters hit a *random* live champion rather than the nearest.
+    // `word2Bit4` monsters hit a *random* live champion rather than the nearest, found by
+    // `d.CH16482[heroToDamage].HP() == 0` over the four slots (`doc/CSBwin-src/Monster.cpp:1086-1096`):
+    // a slot past `d.NumCharacter` is read from the record left there, and one a candidate
+    // the Hall of Champions' Cancel left keeps their HP (`CSBCode.cpp:6699`), which no blow
+    // then reaches (`MonsterDamagesCharacter`, `Monster.cpp:4541`).
     if (monsterWord2Bit4(desc)) {
+      const party = this.ctx.party.state;
+      const slotDead = (i: number): boolean => {
+        const champ = getPartyChampion(party, i);
+        if (champ || this.ctx.behaviour.randomTargetInParty) return !isAlive(champ);
+        const vacant = party.vacantCharacters[i];
+        return vacant === undefined || vacantHealth(vacant) === 0;
+      };
       let target = this.random.zeroTo3();
       let tries = 0;
-      while (tries < 4 && !isAlive(getPartyChampion(this.ctx.party.state, target))) {
+      while (tries < 4 && slotDead(target)) {
         target = (target + 1) & 0x3;
         tries++;
       }

@@ -170,6 +170,12 @@ export const BEHAVIOURS = [
         debt: 'F24',
         until: 6,
     },
+    {
+        name: 'randomTargetInParty',
+        does: "a group that strikes a random champion (`word2Bit4`) looking for a live one among the party's champions only, where CSBWin reads all four slots' `HP()`, past `d.NumCharacter` too: a candidate the Hall of Champions' Cancel left in a slot with their HP is struck, and the blow hurts no one, Conflux's group at 0x147ee (`MonsterAttack.fillAttackParameters`)",
+        debt: 'F24',
+        until: 6,
+    },
 ] as const satisfies readonly BehaviourChange[];
 
 export type BehaviourName = (typeof BEHAVIOURS)[number]['name'];

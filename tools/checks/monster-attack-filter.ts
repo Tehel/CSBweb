@@ -24,6 +24,14 @@
  *    draws of `+= Random(range)` (`:1114-1119`, ReDMCSB's `GROUP.C:1764`); at
  *    `csbwin-11.014`'s profile from level 4 it begins from the dexterity, `uByte8[4]`
  *    (`doc/CSBwin-src-11.014/Monster.cpp:1108-1113`, `missileRangeFromDexterity`).
+ * 8. **A group that strikes a random champion** (`word2Bit4`, `:1086-1096`) looks for a
+ *    live one over the four slots' `HP()`, past `d.NumCharacter` too. A party of one with a
+ *    candidate the Hall of Champions' Cancel left in slot 1, 171 HP and all
+ *    (`CSBCode.cpp:6699`): a draw of 1 strikes slot 1, and the blow reaches no one
+ *    (`MonsterDamagesCharacter`, `:4541`); a draw of 2 passes the empty slots 2 and 3 to
+ *    champion 0. At level 5 the port read the party's champions only
+ *    (`randomTargetInParty`), and a draw of 1 struck champion 0: Conflux's partial game
+ *    (`DEBT.md` F24) drifted at line 51958.
  *
  * Run: `npm test -- --only=monster-attack-filter.ts`
  */
@@ -34,6 +42,7 @@ import type { Game } from '../../src/engine/Game';
 import { behaviourAt, ENGINE_LEVEL } from '../../src/engine/Behaviour';
 import { attackParametersToWords } from '../../src/engine/filterParameters';
 import { MonsterType } from '../../src/engine/monsterTypes';
+import { monsterWord14_12_15, monsterWord2Bit4 } from '../../src/data/tables/MonsterDesc';
 import { UNSET, freshGame, globalStore, int, op, varFetch, varStore, withFilterDsas } from '../lib/dsa';
 import { check, finish } from '../lib/check';
 
@@ -53,8 +62,8 @@ const setWord = (index: number, value: number): number[] => [
   ...int(value), varStore(10 + index), ...int(WORDS), ...int(10), op(StkOp.PARAM_STORE),
 ];
 
-/** A group on the party's level that neither throws nor steals: its RN and square. */
-function group(game: Game): { rn: ObjectID; at: Position } {
+/** A group on the party's level that neither throws nor steals, made a `type`: its RN and square. */
+function group(game: Game, type: MonsterType = MonsterType.mon_Mummy): { rn: ObjectID; at: Position } {
   const dungeon = game.ctx.dungeon;
   const z = game.ctx.party.state.position.z;
   for (const slot of dungeon.getItem16Pool()) {
@@ -64,15 +73,15 @@ function group(game: Game): { rn: ObjectID; at: Position } {
     const rn = dungeon.rnMaps.rn(DBType.CREATURE, slot.word0);
     const at = new Position(slot.uByte10, slot.uByte11, z);
     // A Mummy hits and throws nothing (`word14_12_15` 1), and picks the nearest champion.
-    rec.creatureType = MonsterType.mon_Mummy;
+    rec.creatureType = type;
     return { rn, at };
   }
   throw new Error('no group on the party\'s level');
 }
 
 /** The group attacks the party north of it; the attack's result and the missiles it threw. */
-function attack(game: Game): { attacked: boolean; thrown: ObjectID[] } {
-  const { rn, at } = group(game);
+function attack(game: Game, type?: MonsterType): { attacked: boolean; thrown: ObjectID[] } {
+  const { rn, at } = group(game, type);
   const dungeon = game.ctx.dungeon;
   const position = game.ctx.party.state.position;
   position.x = at.x;
@@ -212,6 +221,48 @@ for (const missile of [RN_FIREBALL, -128]) {
   check(drawnFrom(fromDexterity, old) && !drawnFrom(fromAttack, old),
     `at csbwin-11.014 it begins from the dexterity, ${fromDexterity} (missileRangeFromDexterity)`);
   check(drawnFrom(fromAttack, before) && !drawnFrom(fromDexterity, before), 'and a recording of its profile before level 4 from the attack, as it was made');
+}
+
+/* ------------------------------- 8. a random target past the party --------------- */
+{
+  const probe = freshGame();
+  const type = Array.from(probe.ctx.tables.monsterDesc).findIndex((desc, t) =>
+    desc !== undefined && monsterWord2Bit4(desc) && monsterWord14_12_15(desc) <= 1 && t !== MonsterType.mon_Giggler);
+  /** The attack at `level` with a party of one, slot 1 a cancelled candidate's: the champion drawn, the one struck, and whether the party was hit. */
+  const strike = (level: number, drawn: number): { target: number; hit: string } => {
+    const game = freshGame();
+    game.ctx.behaviour = behaviourAt(level);
+    const party = game.ctx.party.state;
+    const [first, candidate, third, fourth] = party.champions;
+    candidate!.attributes.health = 171;
+    third!.attributes.health = 0;
+    fourth!.attributes.health = 0;
+    party.vacantCharacters[1] = candidate!;
+    party.vacantCharacters[2] = third!;
+    party.vacantCharacters[3] = fourth!;
+    party.champions.length = 1;
+    party.cursorOwner = 0;
+    first!.attributes.health = Math.max(first!.attributes.health, 1);
+    const random = game.ctx.random;
+    const zeroTo3 = random.zeroTo3.bind(random);
+    let once = true;
+    random.zeroTo3 = (): number => (once ? ((once = false), drawn) : zeroTo3());
+    try {
+      attack(game, type);
+    } finally {
+      random.zeroTo3 = zeroTo3;
+    }
+    return { target: game.systems.monsterAttack.attackParameters.heroToDamage, hit: hit(game).join(', ') || 'nobody' };
+  };
+  const one = strike(ENGINE_LEVEL, 1);
+  const two = strike(ENGINE_LEVEL, 2);
+  const before = strike(5, 1);
+  console.log(`8. creature type ${type}: a draw of 1 strikes slot ${one.target}, hitting ${one.hit}; a draw of 2 slot ${two.target}, hitting ${two.hit}; `
+    + `at level 5 a draw of 1 slot ${before.target}, hitting ${before.hit}`);
+  check(type >= 0, 'a creature that strikes a random champion and throws nothing');
+  check(one.target === 1 && one.hit === 'nobody', 'a draw of 1 strikes the candidate left in slot 1, and the blow reaches no one');
+  check(two.target === 0 && two.hit === '0', 'a draw of 2 passes the empty slots 2 and 3 to champion 0');
+  check(before.target === 0 && before.hit === '0', 'at level 5 a draw of 1 struck champion 0 (randomTargetInParty)');
 }
 
 finish();
