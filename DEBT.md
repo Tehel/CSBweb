@@ -910,25 +910,27 @@ What it establishes:
     its last join, where `record00053` follows `record00051`, as `record00052` does: the
     run ends at 0x57262, `record00051`'s end, its tail dropped. The DSA's warnings come
     after that error.
-  - **The port plays to line 116788 and drifts there** (`d.Time` 0x2e14a, party L7 (6,22)):
-    CSBWin's random is 7 draws ahead of the port's, 1284 draws after the line before. Its
-    cause is not looked at yet. Before it the port plays the run by `d.RandomNumber`, past a
-    big actuator's `word8`, which
+  - **The port plays it to the same place**, line 217438 (`d.Time` 0x5726a), where the
+    join above parts CSBWin from the log too: 214,992 entries agree by `d.RandomNumber`,
+    and there CSBWin's random is 35 draws ahead of the port's. On the way the port plays
+    past a big actuator's `word8`, which
     CSBWin reads byte-swapped, an actuator the wave DSA's `&ADD` puts on an open pit,
     which stays there, Conflux's chest of 1.0 kg, which a laden champion's steps pay for
     in stamina, an item picked up at the party's feet off the pad that holds the pit at
     1(20,18) shut, which stays down, a group the DSA's `&ADD` copies with its possessions,
     which takes its RN before theirs, a switch whose ornament is wall decoration 0, which
     the port took for an alcove, a group that strikes a random champion, which reads
-    the slot of a candidate the Hall of Champions' Cancel turned away, and a group dying at
+    the slot of a candidate the Hall of Champions' Cancel turned away, a group dying at
     5(16,3) with another among its possessions, which waits on a movement timer for the
-    square (`doc/PROVEN_FACTS.md`
+    square, and a potion spell cast with an empty flask in each hand, which fills the
+    action hand's (`doc/PROVEN_FACTS.md`
     → "A big actuator's `word8` stays in the file's byte order", "A pit takes only the
     party, a monster and what is above", "A chest weighs what the dungeon says", "An
     object picked up at the party's feet leaves the pad down", "The DSA's `&ADD` of a
     group takes the group's record before its possessions'", "Three wall decorations are
     alcoves, not four", "A `CHARDESC` slot past the party holds zeros, or the champion
-    who left it", "A group a dying group carries waits for the square"). All eight are the
+    who left it", "A group a dying group carries waits for the square", "A potion spell
+    fills the flask in the action hand first"). All nine are the
     port's fixes at level 6, which every fix for this run
     joins until it is deployed (`doc/RECORDING.md` → "The policy"). Every RN slot taken
     and freed agrees with CSBWin's to `d.Time` 0x11d75 (a log of each on both sides,
@@ -940,8 +942,8 @@ Paying it, in steps:
 1. **The 17.6 runs, `CSBMovie0640` and `CSBFullRecordingV4` through steps 3 to 5**, the
    author's request. Steps 3 to 5 are done for the four of them: their check, their
    recordings and their upload (below), which the author runs. Next, the other CSB runs through the oracle, and
-   Conflux's partial game (above): its set, its row of `CSBWIN_RUNS` held to its stop at
-   line 116788, and its drifts, each the port's. **The 9.x and 11.0xx runs play at their version's
+   Conflux's partial game (above): its set, and its row of `CSBWIN_RUNS` held to its stop
+   at line 217438, where CSBWin stops too. **The 9.x and 11.0xx runs play at their version's
    profile** of behaviour flags (`doc/RECORDING.md` → "A recording's level"): each version
    differs from CSBWin 2023 throughout (above), so corrections to the log cannot convert
    them. Each flag is read from the diff of its version's source against 2023's

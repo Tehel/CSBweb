@@ -420,8 +420,14 @@ export class MagicSystem {
     return ((position.z & 0x3f) << 10) | ((position.x & 0x1f) << 5) | (position.y & 0x1f);
   }
 
+  /**
+   * `GetFlaskInHand` (`doc/CSBwin-src/Magic.cpp:1038-1052`): the first empty flask in the
+   * caster's hands, `for (D6W=2; (--D6W)>=0; )`, the action hand (slot 1) before the
+   * ready hand (slot 0). `readyHandFlaskFirst` looks in the ready hand first.
+   */
   private getFlaskInHand(champion: Champion): ObjectID | null {
-    for (let slot = 0; slot < 2; slot += 1) {
+    const slots = this.ctx.behaviour.readyHandFlaskFirst ? [0, 1] : [1, 0];
+    for (const slot of slots) {
       const obj = getChampionPossession(champion, slot);
       if (obj === OBJECT_ID_NULL) continue;
       if (GetBasicObjectType(this.dungeon, this.ctx.tables.objDescObjectType, obj) === OBJNI_EMPTY_FLASK) return obj;

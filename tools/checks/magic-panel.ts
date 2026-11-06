@@ -11,7 +11,9 @@
  *    pick nobody; `clickX` 512-515 name a champion; `SelectMagicCaster` refuses a dead one
  *    (`:727`), and a click past the last champion does nothing (`:695`).
  * 3. The cast button acts whenever `incantation[0]` is not zero (`:559-570`), and
- *    `CastMagic` clears the runes unless `CastSpell` returned 3 (`:952-958`).
+ *    `CastMagic` clears the runes unless `CastSpell` returned 3 (`:952-958`). A potion
+ *    spell fills the empty flask in the action hand before the ready hand's
+ *    (`GetFlaskInHand`, `:1038-1052`).
  * 4. The two deliberate divergences (`DEBT.md` → H): a fifth rune is refused, and a champion
  *    with no mana has no tab to click.
  * 5. Where the runes and the incantation are drawn: `DrawSpellMenuCharacters` from
@@ -21,6 +23,9 @@
  *
  * Run: `npm test -- --only=magic-panel.ts`
  */
+import { PotionType } from '../../src/core/constants';
+import { DBType } from '../../src/core/types';
+import { behaviourAt, ENGINE_LEVEL } from '../../src/engine/Behaviour';
 import { type Champion } from '../../src/engine/gameTypes';
 import { ensureSkills } from '../../src/engine/skills';
 import { createPaletteIndexViewportBuffer } from '../../src/renderer/csbwin/CanvasBlitter';
@@ -143,6 +148,33 @@ async function main(): Promise<void> {
   check(lo.result === 0 && lo.left === '', 'a lone power rune is cast, names no spell, and is cleared');
   check(loFul.result === 1 && loFul.left === '', 'LO FUL is cast and cleared');
   check(loVi.result === 3 && loVi.left === '60,67', 'LO VI with no flask is CastSpell\'s 3, and the runes stay');
+
+  // An empty flask in each hand: `GetFlaskInHand` fills the action hand's, slot 1, first
+  // (`doc/CSBwin-src/Magic.cpp:1038-1052`); below level 6, the ready hand's
+  // (`readyHandFlaskFirst`).
+  const potionIndexes = game.ctx.dungeon.getData().databases.potions.records
+    .flatMap((record, index) => (record ? [index] : [])).slice(0, 2);
+  const engineBehaviour = game.ctx.behaviour;
+  const castIntoFlasks = (level: number): string => {
+    game.ctx.behaviour = behaviourAt(level);
+    reset(1);
+    const flasks = potionIndexes.map((index) => game.ctx.dungeon.rnMaps.rn(DBType.POTION, index));
+    flasks.forEach((flask, slot) => {
+      game.ctx.dungeon.getPotionRecord(flask)!.potionType = PotionType.EMPTY_FLASK;
+      party.champions[0]!.possessions[slot] = flask;
+    });
+    button(101);
+    button(102);
+    button(108);
+    game.ctx.behaviour = engineBehaviour;
+    return flasks.map((flask) => game.ctx.dungeon.getPotionRecord(flask)!.potionType).join(',');
+  };
+  const filled = castIntoFlasks(ENGINE_LEVEL);
+  const filledAt5 = castIntoFlasks(5);
+  console.log(`LO VI, a flask in each hand: potion types ready,action ${filled}; at level 5 ${filledAt5}`);
+  check(potionIndexes.length === 2, 'the dungeon has two potion records to make flasks of');
+  check(filled === `${PotionType.EMPTY_FLASK},${PotionType.VI_POTION}`, 'LO VI fills the action hand\'s flask, the ready hand\'s stays empty');
+  check(filledAt5 === `${PotionType.VI_POTION},${PotionType.EMPTY_FLASK}`, 'at level 5 it filled the ready hand\'s (readyHandFlaskFirst)');
 
   // ---- 4. Backspace, and the fifth rune (`DEBT.md` → H, "A fifth rune is refused").
   reset(1);

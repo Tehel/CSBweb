@@ -4599,6 +4599,17 @@ at 3(19,3) and 3(20,25), where they stay and run. ReDMCSB's pit has no such test
 four. The port's `WorldMove` drops any object that does not levitate before level 6
 (`everyObjectFalls`; `tools/checks/dsa-add-delete.ts`).
 
+## A potion spell fills the flask in the action hand first
+
+`GetFlaskInHand` looks for the caster's empty flask with `for (D6W=2; (--D6W)>=0; )`,
+slot 1, the action hand, before slot 0, the ready hand, and returns the first it finds
+(`doc/CSBwin-src/Magic.cpp:1038-1052`). A potion spell turns that one into its potion
+(`:1244`). With an empty flask in each hand the action hand's is filled. In Conflux's
+partial game (`DEBT.md` F24), the spell panel is clicked at 0x2e132 and 0x2e134, and
+champion 0 drinks object 0x11e1 at 0x2e13b. The feeding filter's block shows an Anti-Venin
+potion of strength 250 in the oracle and an empty flask in the port. The port looked in the ready hand first before level 6 (`readyHandFlaskFirst`;
+`tools/checks/magic-panel.ts`).
+
 ## A group a dying group carries waits for the square
 
 A group's possessions can hold another group: in Conflux's partial game (`DEBT.md` F24),

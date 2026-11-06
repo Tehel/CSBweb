@@ -182,6 +182,12 @@ export const BEHAVIOURS = [
         debt: 'F24',
         until: 6,
     },
+    {
+        name: 'readyHandFlaskFirst',
+        does: "a potion spell filling the empty flask in the caster's ready hand when both hands hold one, where CSBWin's `GetFlaskInHand` looks in the action hand first: the other flask filled, Conflux's champion drinking an empty flask at 0x2e13b (`MagicSystem.getFlaskInHand`)",
+        debt: 'F24',
+        until: 6,
+    },
 ] as const satisfies readonly BehaviourChange[];
 
 export type BehaviourName = (typeof BEHAVIOURS)[number]['name'];
