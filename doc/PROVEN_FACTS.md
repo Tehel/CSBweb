@@ -4842,6 +4842,18 @@ group leaves the other whole. `&COPY` of an actuator is `memcpy(((ui8 *)pDst)+2,
 ((ui8 *)pSrc)+2, sizeof(*pSrc)-2)` (`:4717`): every word past the link, a big actuator's
 `word8` (`CSB.h:1025`) with them. Covered by `tools/checks/dsa-objects.ts`.
 
+## The DSA's `&ADD` of a group takes the group's record before its possessions'
+
+`CopyItem` takes the copy's record first, `FindEmptyDB4Entry(true)`
+(`doc/CSBwin-src/DSA.cpp:1869`), copies the original into it (`:1877-1880`), and only then
+copies the possessions, `CopyItemList(pDB4->possession())`, into the copy (`:1884-1887`).
+Each copy takes the first slot of the RN index that is free or names a free record of its
+database (`DATABASES::FindEmptyDBEntry`, `doc/CSBwin-src/data.cpp:936-955`), so the group
+takes its slot before its possessions take theirs. In Conflux's partial game (`DEBT.md` F24), at `d.Time` 1026, that order
+decides which of slots 0x348e and 0x348f the group gets, and every RN taken after it
+depends on that. Before level 6 the port copied the possessions first
+(`possessionsCopiedFirst`; `tools/checks/dsa-add-delete.ts`).
+
 ## The DSA's `&ADD` and `&DEL` on a square are `MoveObject`'s
 
 `&DEL` lifts an actuator, a misc object, a potion, a weapon or clothing off its square

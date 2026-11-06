@@ -158,6 +158,12 @@ export const BEHAVIOURS = [
         debt: 'F24',
         until: 6,
     },
+    {
+        name: 'possessionsCopiedFirst',
+        does: "a DSA's `&ADD` of a group copying its possessions before taking the group's own record, where CSBWin's `CopyItem` takes the group's first and copies the possessions into it: the new objects' RNs in the other order, every slot taken after them shifting, Conflux's group on L3 (23,25) taking another RN (`dsa/ops/objects.copyItem`)",
+        debt: 'F24',
+        until: 6,
+    },
 ] as const satisfies readonly BehaviourChange[];
 
 export type BehaviourName = (typeof BEHAVIOURS)[number]['name'];

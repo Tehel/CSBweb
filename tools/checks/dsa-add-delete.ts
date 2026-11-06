@@ -18,6 +18,11 @@
  * 5. `CopyItem` copies no group while the ITEM16 pool is full and the DSA runs on the
  *    party's level (`DSA.cpp:1866-1868`): `&OBJECTID` then reads `RNeof`. Off the
  *    party's level it does.
+ * 6. `CopyItem` takes a group's own record before it copies its possessions
+ *    (`DSA.cpp:1869`, `:1884-1885`), so the copy's RN is taken first and its
+ *    possession's after; at level 5 the possessions were copied first
+ *    (`possessionsCopiedFirst`), which in Conflux's partial game (`DEBT.md` F24) handed
+ *    out the two slots the other way round and shifted every RN taken after them.
  *
  * Run: `npm test -- --only=dsa-add-delete.ts`
  */
@@ -30,6 +35,7 @@ import { TimerFunction } from '../../src/engine/TimerQueue';
 import { StkOp } from '../../src/engine/dsa/DsaTypes';
 import { freshGame, globalStore, int, op, run } from '../lib/dsa';
 import { check, finish } from '../lib/check';
+import { wrapMember } from '../lib/standIn';
 
 const base = freshGame();
 const weapon = base.ctx.party.state.champions[0]!.possessions[12]!;
@@ -216,6 +222,34 @@ const spyPads = (game: Game): Press[] => {
     + `a group there ${groupAt(away.game, away.at)}, groupIndex ${away.game.ctx.dungeon.getCreatureRecord(awayCopy)?.groupIndex}`);
   check(awayCopy !== OBJECT_ID_EOF && groupAt(away.game, away.at) === awayCopy,
     'off the party\'s level it copies the group');
+
+  /** The databases `findEmptyDBEntry` is asked for, in order, the group given a possession first. */
+  const takes = (level: number | null): { order: string[]; copy: ObjectID; possession: ObjectID; misc: boolean } => {
+    const order: string[] = [];
+    const { game, g } = run((_game, at) => add(group, at, 1), (game) => {
+      if (level !== null) game.ctx.behaviour = behaviourAt(level);
+      const d = game.ctx.dungeon;
+      const misc = d.getData().databases.misc.records;
+      misc.push({ nextObject: OBJECT_ID_EOF, specialState: 0, important: false, miscType: 0 });
+      d.getCreatureRecord(group)!.possession = d.rnMaps.rn(DBType.MISC, misc.length - 1);
+      wrapMember(d, 'findEmptyDBEntry', (real) => (db, record, important) => {
+        order.push(db);
+        return real(db, record, important);
+      });
+    });
+    const copy = g[0]! as ObjectID;
+    const possession = game.ctx.dungeon.getCreatureRecord(copy)?.possession ?? OBJECT_ID_NULL;
+    const misc = possession !== OBJECT_ID_EOF && possession !== OBJECT_ID_NULL
+      && game.ctx.dungeon.rnMaps.dbType(possession) === DBType.MISC;
+    return { order, copy, possession, misc };
+  };
+  const now = takes(null);
+  const old = takes(5);
+  console.log(`6. &ADD of group ${group} carrying an object: records taken ${now.order.join(', ')}, `
+    + `copy ${now.copy} carrying ${now.possession}; at level 5, ${old.order.join(', ')}, copy ${old.copy} carrying ${old.possession}`);
+  check(now.order.join() === 'creatures,misc', "the group's record is taken before its possession's");
+  check(now.misc && now.possession > now.copy, 'and the copy carries its possession\'s copy, a later slot');
+  check(old.order.join() === 'misc,creatures', 'at level 5 the possession was copied first (possessionsCopiedFirst)');
 }
 
 finish();

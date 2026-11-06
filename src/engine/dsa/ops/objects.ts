@@ -200,19 +200,38 @@ function copyItem(machine: DsaOperationMachine, objectId: number, loadedLevel: n
       if (monsters.isItem16PoolFull(loadedLevel)) return null;
       const rec = data.databases.creatures.records[index];
       if (!rec) return null;
-      const copiedPossessions = copyItemList(machine, rec.possession, loadedLevel);
-      // The copy must not inherit the original's ITEM16 slot. CSBWin parks it at
-      // 0xd8, or 0xff for a monster that fills the whole cell, so that every
-      // `groupIndex() < d.MaxITEM16` test reads it as unattached
-      // (doc/CSBwin-src/DSA.cpp:1885-1888).
-      return placed(dungeon.findEmptyDBEntry('creatures', {
+      if (ctx.behaviour.possessionsCopiedFirst) {
+        const copiedPossessions = copyItemList(machine, rec.possession, loadedLevel);
+        // The copy must not inherit the original's ITEM16 slot. CSBWin parks it at
+        // 0xd8, or 0xff for a monster that fills the whole cell, so that every
+        // `groupIndex() < d.MaxITEM16` test reads it as unattached
+        // (doc/CSBwin-src/DSA.cpp:1885-1888).
+        return placed(dungeon.findEmptyDBEntry('creatures', {
+          ...rec,
+          // The record byte by byte (`DSA.cpp:1879-1882`): the copy's hit points its own.
+          hp: [...rec.hp],
+          nextObject: OBJECT_ID_EOF,
+          possession: copiedPossessions,
+          groupIndex: detachedGroupIndex(ctx.tables.monsterDesc, rec),
+        }, true));
+      }
+      // The group's record first, `FindEmptyDB4Entry(true)` (`DSA.cpp:1869`), copied byte
+      // by byte, the original's possessions with it (`:1877-1880`): the copy's hit points
+      // its own. Then the possessions are copied, read from the original once the record
+      // is taken, and the copy given them (`:1884-1887`). It must not inherit the
+      // original's ITEM16 slot: CSBWin parks it at 0xd8, or 0xff for a monster that fills
+      // the whole cell, so that every `groupIndex() < d.MaxITEM16` test reads it as
+      // unattached (`:1888-1889`).
+      const copy: CreatureRecord = {
         ...rec,
-        // The record byte by byte (`DSA.cpp:1879-1882`): the copy's hit points its own.
         hp: [...rec.hp],
         nextObject: OBJECT_ID_EOF,
-        possession: copiedPossessions,
         groupIndex: detachedGroupIndex(ctx.tables.monsterDesc, rec),
-      }, true));
+      };
+      const rn = dungeon.findEmptyDBEntry('creatures', copy, true);
+      if (rn === OBJECT_ID_NULL) return null;
+      copy.possession = copyItemList(machine, rec.possession, loadedLevel);
+      return placed(rn);
     }
     default:
       ctx.host.trace(`DSA &ADD unsupported object type ${category}`);
