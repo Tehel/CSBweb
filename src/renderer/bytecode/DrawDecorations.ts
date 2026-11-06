@@ -9,7 +9,7 @@
 
 import { OBJECT_ID_EOF, type ObjectID } from '../../core/types';
 import { getExternalPortraitAddress, type CSBGraphicsLoader, type ExtendedFloorDecoration } from '../../data/CSBGraphicsLoader';
-import type { ObjectTables } from '../../data/tables/ObjectTables';
+import { isAlcoveDecoration } from '../../data/tables/ObjectTables';
 import type { RectPos } from '../../data/tables/UITables';
 import { bltShapeToViewportIndex, cropBitmap, tag0088b2Explicit, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import type { ViewportDraw } from './ViewportDraw';
@@ -78,7 +78,7 @@ function drawWallDecorationGraphic(
   if (graphicIndex < 0 || graphicIndex > numWallDecoration) return false;
 
   const decorationIndex = graphicIndex === numWallDecoration ? 0 : (map.wallDecorationTOC[graphicIndex] ?? 0);
-  const isAlcove = isAlcoveDecorationIndex(decorationIndex, tables);
+  const isAlcove = isAlcoveDecoration(tables, decorationIndex, draw.context.behaviour?.().alcovePadByte ?? false);
   const rectSetId = tables.wallDecorationRectSetIndex[decorationIndex] ?? 0;
   const rectSetIndex = rectSetId & 0xff;
   if (rectSetIndex >= tables.wallDecorationRectSets.length) return isAlcove;
@@ -254,14 +254,6 @@ function drawChampionPortrait(draw: ViewportDraw, championPortraitOrdinal: numbe
     },
     1,
   );
-}
-
-function isAlcoveDecorationIndex(decorationIndex: number, tables: ObjectTables): boolean {
-  const alcoves = tables.alcoveDecorationIndices;
-  for (let i = 0; i < alcoves.length; i++) {
-    if ((alcoves[i] ?? 0xff) === decorationIndex) return true;
-  }
-  return false;
 }
 
 function drawExtendedWallDecoration(

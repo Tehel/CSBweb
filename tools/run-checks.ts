@@ -106,6 +106,7 @@ const CHECKS: Tool[] = [
   { tool: 'expool.ts' },
   { tool: 'viewport-click.ts' },
   { tool: 'extended-wall-button.ts' },
+  { tool: 'alcove-indices.ts' },
   { tool: 'fountain.ts' },
   { tool: 'item-properties.ts' },
   { tool: 'chest-weight.ts' },

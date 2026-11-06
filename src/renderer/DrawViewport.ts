@@ -87,7 +87,7 @@ export function DrawViewport(
 
     // Gather room information for this cell
     summarizeRoomInfoCsbwin(room, dungeonState, position, facing, context.objectTables, context.footprints,
-      context.gameState?.tickCount);
+      context.gameState?.tickCount, context.behaviour?.().alcovePadByte ?? false);
     if (cellNum === 17) context.picking.cellTypeJustAhead = room.roomType;
   }
 

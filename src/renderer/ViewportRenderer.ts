@@ -23,6 +23,7 @@ import type { DungeonState } from '../engine/DungeonState';
 import type { PartyFootprints } from '../engine/PartyFootprints';
 import type { GameState } from '../engine/gameTypes';
 import type { MonsterDesignOptions } from '../engine/monsterTypes';
+import type { Behaviour } from '../engine/Behaviour';
 import type { InterpreterContext } from './bytecode/BytecodeInterpreter';
 import { ViewportDrawState } from './bytecode/ViewportDrawState';
 import { emptyViewportPicking, type ViewportPicking } from './bytecode/Types';
@@ -65,6 +66,8 @@ interface ViewportRendererDeps {
   gameState?: GameState;
   /** The monster design options, `GameContext.rules`; without them both are off. */
   rules?: MonsterDesignOptions;
+  /** `GameContext.behaviour`, read at each frame; without it, the current one. */
+  behaviour?: () => Behaviour;
   csbGraphicsLoader?: CSBGraphicsLoader;
   /** Graphic `0x22e`'s rectangles, from the game's one `GraphicsTables`. */
   viewportTables: ViewportTables;
@@ -151,6 +154,7 @@ export class ViewportRenderer {
       footprints: deps.footprints,
       gameState: deps.gameState,
       rules: deps.rules,
+      behaviour: deps.behaviour,
       frameFacing: 0,
       frameMapIndex: 0,
       doorGraphics: [],

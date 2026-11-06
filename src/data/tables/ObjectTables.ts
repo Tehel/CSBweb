@@ -171,8 +171,11 @@ export interface ObjectTables {
   /** `d.WallDecorationDerivedGraphicOffset[12]`: which of five distances a relative position is. */
   wallDecorationDerivedGraphicOffset: Uint8Array;
 
-  // Wall decoration alcove markers (CSBCode.cpp:215-229, Data.h:1189-1192)
-  alcoveDecorationIndices: Uint8Array; // d.Byte4038[4]
+  /**
+   * `d.Byte4038[4]` (`Data.h:1190`): the three wall decorations that are alcoves, then a
+   * pad byte, 0, which CSBWin never reads (`isAlcoveDecoration`).
+   */
+  alcoveDecorationIndices: Uint8Array;
   fountainDecorationIndex: number; // d.Word4040[0]
 
   // Door switch helpers (DrawDoorSwitch, CSBCode.cpp:4130+)
@@ -1022,4 +1025,20 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     floorColorMapFar,
     textDecode,
   };
+}
+
+/**
+ * Whether wall decoration `decorationIndex` (a global one, a level's `wallDecorationTOC`
+ * entry) is an alcove: one of `d.Byte4038`'s first three. `ReadGraphicsForLevel` reads three
+ * (`for (LOCAL_16=0; LOCAL_16<3; ...)`, `doc/CSBwin-src/Code390e.cpp:209-221`) into the
+ * level's `d.AlcoveGraphicIndices[3]`, which `IsAlcove` searches (`CSBCode.cpp:4621-4632`);
+ * the fourth byte, 0, is no alcove. `withPadByte` reads it too, decoration 0 an alcove, as
+ * the port did before level 6 (`Behaviour.alcovePadByte`).
+ */
+export function isAlcoveDecoration(tables: ObjectTables, decorationIndex: number, withPadByte = false): boolean {
+  const count = withPadByte ? tables.alcoveDecorationIndices.length : 3;
+  for (let i = 0; i < count; i++) {
+    if ((tables.alcoveDecorationIndices[i] ?? 0xff) === decorationIndex) return true;
+  }
+  return false;
 }

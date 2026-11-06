@@ -776,6 +776,21 @@ a MACE) and then a DSA that draws an extended decoration over it, 0x22, 0x1f, 0x
 have taken their item, the combination at (23,27) opens the door at (22,27).
 Evidence: `tools/checks/extended-wall-button.ts`.
 
+## Three wall decorations are alcoves, not four
+
+`d.Byte4038[4]` (`doc/CSBwin-src/Data.h:1190`), item `0x22e`'s alcove table, is `[1, 2, 3,
+0]`: three decorations and a pad byte. `ReadGraphicsForLevel` reads three (`for
+(LOCAL_16=0; LOCAL_16<3; ...)`, `doc/CSBwin-src/Code390e.cpp:209-221`) into the level's
+`d.AlcoveGraphicIndices[3]`, the level's own indices of its alcoves, which `IsAlcove`
+searches (`CSBCode.cpp:4621-4632`): for the front wall's `d.FacingAlcove`, which makes a
+click on button 5 an alcove's instead of a touch of the wall (`:3279`, `:3359-3361`), and for the random
+decorations a false wall or a square past the map's edge drops (`:5817`). Decoration 0 is
+no alcove. Conflux 3.5's map 4 lists it third, the ornament of the two switches on the west
+face of (15,9), under "FURS TRADER"; the first sends its message to the DSA at (12,8), which
+teleports the party to 34(5,15), as Conflux's partial game does at `d.Time` 0x11d74
+(`DEBT.md` F24). The port read the pad byte too before level 6 (`alcovePadByte`), and the
+click touched nothing. Evidence: `tools/checks/alcove-indices.ts`.
+
 ## Blocked movement has no message
 
 CSBWin answers a blocked move with a **sound only**. Verified by grep over the whole of

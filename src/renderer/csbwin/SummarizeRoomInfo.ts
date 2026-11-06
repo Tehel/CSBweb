@@ -10,7 +10,7 @@ import {
   getActuatorValue,
   getActuatorWallGraphicOrdinal,
 } from '../../data/actuatorHelpers';
-import type { ObjectTables } from '../../data/tables/ObjectTables';
+import { isAlcoveDecoration, type ObjectTables } from '../../data/tables/ObjectTables';
 
 const RN_EOF = OBJECT_ID_EOF;
 const PORTRAIT_HIDE_PORTRAIT = 2;
@@ -131,21 +131,18 @@ function randomFloorDecorationCsbwin(
   return 0;
 }
 
+/** `IsAlcove(sw(rslt->decorations[i-2]-1))` (`doc/CSBwin-src/CSBCode.cpp:5817`), through the level's list. */
 function isAlcoveDecorationOrdinal(
   tables: ObjectTables | undefined,
   mapWallDecorationTOC: ui8[] | undefined,
-  decorationOrdinal: number
+  decorationOrdinal: number,
+  alcovePadByte: boolean,
 ): boolean {
   if (!tables || !mapWallDecorationTOC) return false;
   if (decorationOrdinal <= 0) return false;
   const index = decorationOrdinal - 1;
   if (index < 0 || index >= mapWallDecorationTOC.length) return false;
-  const decorationIndex = mapWallDecorationTOC[index] ?? 0xff;
-  for (let i = 0; i < tables.alcoveDecorationIndices.length; i++) {
-    const alcoveIndex = tables.alcoveDecorationIndices[i] ?? 0xff;
-    if (decorationIndex === alcoveIndex) return true;
-  }
-  return false;
+  return isAlcoveDecoration(tables, mapWallDecorationTOC[index] ?? 0xff, alcovePadByte);
 }
 
 
@@ -155,7 +152,8 @@ function summarizeStoneRoom(
   position: Position,
   facing: number,
   falseStoneWall: boolean,
-  tables?: ObjectTables
+  tables: ObjectTables | undefined,
+  alcovePadByte: boolean,
 ): void {
   const { x, y, z } = position;
   const map = dungeon.getMap(z);
@@ -253,7 +251,7 @@ function summarizeStoneRoom(
       rslt.y >= mapHeight
     ) {
       for (let i = 0; i < 3; i++) {
-        if (isAlcoveDecorationOrdinal(tables, map.wallDecorationTOC, rslt.decorations[i] ?? 0)) {
+        if (isAlcoveDecorationOrdinal(tables, map.wallDecorationTOC, rslt.decorations[i] ?? 0, alcovePadByte)) {
           rslt.decorations[i] = 0;
         }
       }
@@ -337,6 +335,7 @@ export function summarizeRoomInfoCsbwin(
   tables?: ObjectTables,
   footprints?: PartyFootprints,
   time = 0,
+  alcovePadByte = false,
 ): void {
   const { z } = position;
   rslt.text = [RN_EOF, RN_EOF, RN_EOF];
@@ -364,7 +363,7 @@ export function summarizeRoomInfoCsbwin(
 
   switch (baseRoomType) {
     case RoomType.STONE: {
-      summarizeStoneRoom(rslt, dungeon, position, facing, false, tables);
+      summarizeStoneRoom(rslt, dungeon, position, facing, false, tables, alcovePadByte);
       rslt.graphicRoomType = graphicRoomTypes[rslt.roomType] as GraphicRoomType;
       return;
     }
@@ -386,7 +385,7 @@ export function summarizeRoomInfoCsbwin(
     case RoomType.FALSEWALL: {
       // Codea59a.cpp:278-297
       if ((cellFlags & 4) === 0) {
-        summarizeStoneRoom(rslt, dungeon, position, facing, true, tables);
+        summarizeStoneRoom(rslt, dungeon, position, facing, true, tables, alcovePadByte);
         rslt.graphicRoomType = graphicRoomTypes[rslt.roomType] as GraphicRoomType;
         return;
       }

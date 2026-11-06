@@ -7,6 +7,7 @@
 
 import { Opcode } from './Opcodes';
 import type { SummarizeRoomData, ViewportPicking } from './Types';
+import type { Behaviour } from '../../engine/Behaviour';
 import { ViewportDraw } from './ViewportDraw';
 import type { ViewportDrawState } from './ViewportDrawState';
 import { DrawFloorDecorations, DrawWallDecoration, drawWallText } from './DrawDecorations';
@@ -125,6 +126,12 @@ export interface InterpreterContext {
    * read (`doc/CSBwin-src/Code51a4.cpp:2205`, `:420`). Absent, both are off, as at CSBWin's start.
    */
   rules?: MonsterDesignOptions;
+  /**
+   * The engine's behaviour, `GameContext.behaviour`, read as it is now: a recording played
+   * changes it. The front wall's decoration is the viewport's picking, which a recording
+   * of an earlier level makes as that level did. Absent, the current one.
+   */
+  behaviour?: () => Behaviour;
   frameFacing: number;
   frameMapIndex: number;
   doorGraphics: number[][]; // d.DoorGraphic[3][2] resolved for current level (Code390e.cpp:180+)

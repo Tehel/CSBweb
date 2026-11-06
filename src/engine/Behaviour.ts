@@ -164,6 +164,12 @@ export const BEHAVIOURS = [
         debt: 'F24',
         until: 6,
     },
+    {
+        name: 'alcovePadByte',
+        does: "wall decoration 0 an alcove, `d.Byte4038`'s pad byte read as a fourth alcove index, where CSBWin reads three (`ReadGraphicsForLevel`, `IsAlcove`): a switch whose ornament is decoration 0 refusing a click on it, Conflux's switch on 4(15,9) leaving its DSA unrun, and a false wall dropping a random decoration 0 (`ObjectTables.isAlcoveDecoration`)",
+        debt: 'F24',
+        until: 6,
+    },
 ] as const satisfies readonly BehaviourChange[];
 
 export type BehaviourName = (typeof BEHAVIOURS)[number]['name'];

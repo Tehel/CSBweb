@@ -46,6 +46,7 @@ export function createScreenUI(deps: ScreenUIDeps, hooks: UIHooks): { ui: UIStat
     footprints: ctx.footprints,
     gameState: ctx.state,
     rules: ctx.rules,
+    behaviour: () => ctx.behaviour,
     csbGraphicsLoader: deps.csbGraphicsLoader,
     viewportTables: tables.viewport,
     objectTables: tables.objects,
