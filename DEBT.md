@@ -136,7 +136,8 @@ In payoff order: the first row is the next item.
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏸️ |
 | E40 | The statistics page's heat map | M | ⏸️ |
-| E44 | The recording viewer seeks back | M–L | ⏸️ |
+| E44 | The recording viewer's rewind, to checkpoints kept in memory | L | ⏸️ |
+| E46 | The recording viewer goes back a minute or ten, to the VBL | M | ⏸️ after E44 |
 | E45 | FROM and TO on a timeline of the recording | M | ⏸️ if the author asks |
 | C150 | Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops | S | ⏸️ waits on the author |
 | G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
@@ -154,7 +155,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: A11 · C199 · D22 · E46 · F26 · G32 · P13 · R20 · U13 · W8 · X19. An ID recorded and paid in one commit has no
+Next free IDs: A11 · C199 · D22 · E47 · F26 · G32 · P13 · R20 · U13 · W8 · X19. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -510,7 +511,7 @@ New state-representation debt goes here, and jumps the queue.
 
 New architecture debt goes here, and jumps the queue. Every E item is a refactor: the rules
 of "How to work this list", point 3, apply, byte-identical tool output included. What the
-page redesign adds is the exception: E40's heat map, E44's seeking, and E22's fill.
+page redesign adds is the exception: E40's heat map, E44's and E46's seeking, and E22's fill.
 
 The structure need no longer follow CSBWin's files (the author's decision): a module may
 gather or split CSBWin's functions as the code's concerns ask. What still follows CSBWin is
@@ -532,53 +533,76 @@ map, as designed with the author:
 Paying it: the heat map, checked in `tools/probe-frames.ts`'s statistics block (a level
 opens its map) and by a screenshot over the dev server's fortnight.
 
-### E44 ⏸️ The recording viewer seeks back
+### E44 ⏸️ The recording viewer's rewind, to checkpoints kept in memory
 
 The viewer's strip (`doc/RECORDING.md` → "The port's player") pauses, sets the pace, loops,
-stops at the start, and runs a minute or ten forward at once (`Game.forward`); its rewind is
-drawn, inactive. Wanted: back by a minute, as designed with the author. Steps of 10 s,
-in the first design, are on neither. Size M for step 1, L with step 2.
+stops at the start, and runs a minute or ten forward at once (`Game.forward`); its rewind
+(←) is drawn, inactive (`enabled`, `src/renderer/ui/RecordingStrip.ts`).
+Wanted, as designed with the author:
 
-**What the engine costs.** Forward runs five seconds of the game a slice, the tick's
-`DrawViewport` drawn as a player must (a click in the viewport is resolved through the
-tick's picking, `doc/RECORDING.md` → "What a player must do"): a game minute in 160 to
-300 ms in Node, over the corpus's `DMMovie2615`, `DMMovie42` and `CSBMovie0640`. Read from
-`csbgame7.dat`, `saveFileOf` builds the 63 KB file in 1.8 ms and `applySaveBytes` reads
-it back in 2.9 ms.
+- **Checkpoints**: the player takes one in memory every 30 s of the game (its VBLs,
+  `RecordingPlayer.vbls`), playing or forwarding, and keeps the latest ten.
+- **Rewind** reads the latest checkpoint at least 5 s of the game behind the play, and
+  drops the checkpoints after it, which the play takes again as it passes them. It is
+  inactive while no checkpoint is that far behind.
 
-1. **Back, without checkpoints**: stop's rewind (`rewindPage`), then forward to the
-   target. A path's joins are checkpoints already, proven by `tools/checks/replay.ts`
-   (a branch's file and `CarriedState` set over its read play on byte for byte), so the
-   play may begin from the last join before the target. Measure a long recording's
-   seek in the browser before step 2: at the rate above, back from an hour in is about
-   fifteen seconds.
-2. **Checkpoints, only if step 1 is too slow**: taken by the player in memory every N
-   VBLs as it plays, each a save's file (`saveFileOf`, with no save's tail:
-   `saveWritten` changes the game), its `CarriedState` and the player's cursor (its
-   recording, next change and VBL counts); back is the latest checkpoint before the
-   target read, then forward. Port-only and never written, so the saves' compatibility
-   with CSBWin does not reach them. A join is proven only at a save's point, after its
-   tail has re-attached the monsters and run `SmartDiscard`; at any other VBL the file
-   may not hold all the game reads on. To find out, in this order:
-   - **The tool first**: over a long path, a checkpoint every N VBLs, each read into a
-     fresh page and played to the end, with no drift and the final file the uninterrupted
-     play's. Each failure names a field the checkpoint adds beyond `CarriedState`.
-   - **The candidates**, none checked: the monsters' ITEM16s, which a read attaches anew
-     where the play never detached them; the mouse queue's waiting clicks; a `LoopScript`
-     in its `VBLDelay` (`Game.script`, `scriptDelay`) and `Game`'s other private state;
-     the attack menu's flash; `viewportRandom`; and, for the screen alone, the message
-     strip and the interface's state (an inventory open). Taking checkpoints only at
-     quiet VBLs (just after a tick, the queue empty, no script, the clock running) narrows
-     them.
-   - **At run time**, the player's drift stops a seek that a checkpoint misled: the
-     checkpoint is dropped and the seek begins again from an earlier one or a join.
-   - **Memory**: one every 30 s of game is 600 × 63 KB, about 38 MB, over five hours;
-     dense near the play and sparse behind it (one every five minutes), or compressed,
-     the files being mostly zeros.
+**Why checkpoints, not a replay from the start.** A downloaded package holds no save's
+file, only each join's MD5 (`RecordingStart`'s `join`, `src/engine/RecordingPackage.ts`),
+so a replay to the target always starts at the path's start, and the site's recordings
+run to hours. Forward runs five seconds of the game a slice, the tick's `DrawViewport`
+drawn as a player must (a click in the viewport is resolved through the tick's picking,
+`doc/RECORDING.md` → "What a player must do"): a game minute in 160 to 300 ms in Node,
+over the corpus's `DMMovie2615`, `DMMovie42` and `CSBMovie0640`, so back from an hour in
+is ten to eighteen seconds.
 
-Paying it: the strip's new controls (a golden frame), the seeks checked in
-`tools/checks/replay.ts` (a seek forward and back each lands on the uninterrupted play's
-state, its file compared), and `doc/RECORDING.md`'s strip updated.
+**A checkpoint** is a save's file (`saveFileOf`, with no save's tail: `saveWritten`
+changes the game), its `CarriedState`, what else the proof below finds the game reads on,
+and the player's cursor (its recording, next change and VBL counts). Read from
+`csbgame7.dat`, `saveFileOf` builds the 63 KB file in 1.8 ms and `applySaveBytes` reads it
+back in 2.9 ms: ten are under a megabyte. Port-only and never written, so the saves'
+compatibility with CSBWin does not reach them.
+
+**The risk is fidelity, not cost.** A join is proven only at a save's point, after its
+tail has re-attached the monsters and run `SmartDiscard`; at any other VBL the file may
+not hold all the game reads on, and a checkpoint that misses something plays on into a
+game nobody played, unseen until the next join or save. In this order:
+
+1. **The tool first**: over a long path, a checkpoint every N VBLs, each read into a fresh
+   page and played to the end, with no drift and the final file the uninterrupted play's.
+   Each failure names a field the checkpoint adds beyond `CarriedState`.
+2. **The candidates**, none checked: the monsters' ITEM16s, which a read attaches anew
+   where the play never detached them; the mouse queue's waiting clicks; a `LoopScript`
+   in its `VBLDelay` (`Game.script`, `scriptDelay`) and `Game`'s other private state; the
+   attack menu's flash; `viewportRandom`; and, for the screen alone, the message strip
+   and the interface's state (an inventory open). Taking a checkpoint at the first quiet
+   VBL after its mark (just after a tick, the queue empty, no script, the clock running)
+   narrows them.
+3. **At run time**, the player's drift after a rewind drops the checkpoint that misled it.
+
+Paying it: the checkpoint tool above in `npm test`, the rewind checked in
+`tools/checks/replay.ts` (a rewind lands on the uninterrupted play's state at the
+checkpoint's VBL, its file compared, and plays on to the same end), the strip's active
+rewind (a golden frame), and `doc/RECORDING.md`'s strip updated. Size L: the tool's rounds
+are not known until it runs.
+
+### E46 ⏸️ The recording viewer goes back a minute or ten, to the VBL
+
+After E44, whose checkpoints it starts from. Back a minute or ten minutes of the game
+exactly, as forward goes forward (`FORWARD_VBLS`): the latest checkpoint at or before the
+target read, then forward to the target (`Game.forward`, `runAtOnce` in `src/main.ts`),
+unheard. At most 30 s of the game run at once, under 150 ms at forward's rate.
+
+To settle with the author before paying it:
+
+- **The controls**: two more on the strip, mirroring forward and ten minutes forward, or
+  rewind's own behaviour replaced by back a minute.
+- **Ten minutes back** reaches past ten checkpoints 30 s apart, which hold five minutes:
+  the older ones spaced wider (every 30 s for the last five minutes, then every two), or
+  the control inactive where no checkpoint reaches.
+
+Paying it: the seeks checked in `tools/checks/replay.ts` (each lands on the
+uninterrupted play's state at the target VBL, its file compared), the strip's controls (a
+golden frame), and `doc/RECORDING.md`'s strip updated. Size M.
 
 ### E45 ⏸️ FROM and TO on a timeline of the recording
 
