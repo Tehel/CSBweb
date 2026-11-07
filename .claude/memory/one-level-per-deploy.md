@@ -1,6 +1,6 @@
 ---
 name: one-level-per-deploy
-description: a series of behaviour changes deployed together shares one ENGINE_LEVEL; the level being built is named in RECORDING.md's policy (level 6, Conflux's F24 fixes)
+description: a series of behaviour changes deployed together shares one ENGINE_LEVEL; the level being built, if any, is named in RECORDING.md's policy (none: level 6 deployed 2026-11-07, the next fix bumps to 7)
 metadata:
   type: feedback
 ---
@@ -9,4 +9,4 @@ Only a deployed build records players' games, so a series of commits the author 
 
 **Why:** the author asked for it (2026-11-05) while Conflux's partial game (`DEBT.md` F24) turned up DSA fixes one after another; three players had played DSA dungeons since recording was re-enabled, so a flag per fix is still owed, a level per fix is not. The author does not deploy until the series is done.
 
-**How to apply:** before bumping, read the policy's "level being built" line: if it names an undeployed level for the same series, join it. A flag's old-behaviour check then tests the level below it.
+**How to apply:** before bumping, read the policy's "level being built" line: if it names an undeployed level for the same series, join it; if it says none, bump, and name the new level there. A flag's old-behaviour check then tests the level below it.

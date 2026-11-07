@@ -379,9 +379,9 @@ one: each counts, and "may" means a doubt is enough. The commit:
 **A level not yet deployed is joined, not bumped.** Only a deployed build records a
 player's game, so a series of commits that will be deployed together shares one level: the
 first bumps it, and each later one adds its flag with that level as its `until` and bumps
-nothing. The level being built is named here until its deploy: **level 6, Conflux's
-partial game (`DEBT.md` F24), not deployed**. A recording of the author's dev server made
-between those commits may play differently, and is not kept.
+nothing. The level being built is named here until its deploy: **none**, level 6 being
+deployed, so the next commit that changes a tick bumps the level to 7. A recording of the
+author's dev server made between those commits may play differently, and is not kept.
 
 A flag that joins a profile owes the same bump: the profile's recordings made before it
 play it off, those made from its level on. It is named in the flag's `profiles`, with the

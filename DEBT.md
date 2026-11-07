@@ -939,8 +939,8 @@ What it establishes:
     alcoves, not four", "A `CHARDESC` slot past the party holds zeros, or the champion
     who left it", "A group a dying group carries waits for the square", "A potion spell
     fills the flask in the action hand first"). All nine are the
-    port's fixes at level 6, which every fix for this run
-    joins until it is deployed (`doc/RECORDING.md` → "The policy"). Every RN slot taken
+    port's fixes at level 6, which is deployed: a fix for this run now bumps the level
+    (`doc/RECORDING.md` → "The policy"). Every RN slot taken
     and freed agrees with CSBWin's to `d.Time` 0x11d75 (a log of each on both sides,
     `RnMaps` against `data.cpp`'s `RN::RN`, `FindEmptyDBEntry`, `DeleteDBEntry` and
     `SaveGame.cpp`'s `AllocateIndirectIndex`).
@@ -956,10 +956,9 @@ Paying it, in steps:
    which `utils/share-csbwin-runs.ts` offers and `csbwin-runs.ts` and
    `recording-corpus.ts` do not read, and the deploy's gate passes over its recording by
    its title (`utils/replay-recordings.ts`). What is left is its share, once, which the
-   author runs from the scratch folder (above) **after level 6 is deployed**: a fix
-   joining level 6 before then could change the play of a recording made at it, and
-   nothing checks this one (a level-5 page refuses it anyway). Nothing checks it after
-   that: a later change of its play without a flag shows only in a run by hand. **The 9.x and 11.0xx runs play at their version's
+   author runs from the scratch folder (above): it is made at a deployed level, 6, which
+   no later fix joins. Nothing checks it after that: a later change of its play without
+   a flag shows only in a run by hand. **The 9.x and 11.0xx runs play at their version's
    profile** of behaviour flags (`doc/RECORDING.md` → "A recording's level"): each version
    differs from CSBWin 2023 throughout (above), so corrections to the log cannot convert
    them. Each flag is read from the diff of its version's source against 2023's
