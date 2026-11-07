@@ -614,8 +614,9 @@ stays the page's, the strip over it as everywhere.
 a recording plays, drawn over the message area's top row, whose lines are then drawn a
 row lower while its bottom row is empty, so the three rows shown hold the newest. From
 the left, it shows its controls, which a click or a key works, each an icon on a face of
-its own between darker columns, in three groups: eject; stop, rewind, play and pause,
-and forward; the pace and loop. Then, flush right, the time played, the player's VBLs
+its own between darker columns, in three groups with black between them: eject; stop,
+rewind, play and pause, forward and ten minutes forward; slower, the pace, faster and
+loop. Then, after black, flush right, the time played, the player's VBLs
 since the path's start (`RecordingPlayer.vbls`) over sixty, over the path's length
 (`RecordingPlayer.length`), which the time played reaches at its end:
 
@@ -639,16 +640,18 @@ since the path's start (`RecordingPlayer.vbls`) over sixty, over the path's leng
 - **Rewind** (←): not yet; drawn darker, it does nothing.
 - **Play and pause** (Space): the loop held where it is (`Game.setPace(0)`), and on
   again. At the path's end, play is stop and play.
-- **Forward** (→): a minute of the path's VBLs run at once (`Game.forward`), five seconds
+- **Forward** (→, and Shift+→ ten minutes): a minute of the path's VBLs run at once (`Game.forward`), five seconds
   of them a slice, the page let run and the screen drawn between, and none heard
   (`SoundManager.setMuted`); a span under a held clock it ends in is run to its end. A
-  forward while one runs adds a minute to it; paused, it stays paused. It runs past no
+  forward while one runs adds its minute or ten to it; paused, it stays paused. It runs past no
   end: the path's end or a drift stops it as it stops the loop. `tools/checks/replay.ts`
   (point 11) runs each package's path at once from its start to the same end.
-- **The pace** (`+`, its key with or without Shift, and `-`, or a click, round from ×8 to ×1): the loop's VBLs to a VBL
-  of the wall clock, 1, 2, 4 or 8 (`Game.setPace`). A span under a held clock is run at
+- **Slower and faster** (`-`, and `+`, its key with or without Shift), the pace between
+  them, which a click does not change: the loop's VBLs to a VBL of the wall clock, /4,
+  /2, ×1, ×2, ×4 or ×8 (`Game.setPace`), a step a press, slower darker at /4 and faster
+  at ×8. A span under a held clock is run at
   once at any pace.
-- **Loop** (L): the path played again from its start five seconds after its end
+- **Loop** (L): the path played again from its start two seconds after its end
   (`LOOP_DELAY_MS`), whatever ended it, as long as it is on; its face darker while it is.
 
 Stop and eject end the message area played on alone.

@@ -535,7 +535,7 @@ opens its map) and by a screenshot over the dev server's fortnight.
 ### E44 ⏸️ The recording viewer seeks back
 
 The viewer's strip (`doc/RECORDING.md` → "The port's player") pauses, sets the pace, loops,
-stops at the start, and runs a minute forward at once (`Game.forward`); its rewind is
+stops at the start, and runs a minute or ten forward at once (`Game.forward`); its rewind is
 drawn, inactive. Wanted: back by a minute, as designed with the author. Steps of 10 s,
 in the first design, are on neither. Size M for step 1, L with step 2.
 

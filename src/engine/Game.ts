@@ -530,7 +530,7 @@ export class Game implements MainLoop {
      * A VBL that throws is CSBWin's `die`: the game dies (`die`), and the host reports it.
      *
      * At a pace other than 1 (`setPace`) the wall clock lets that many VBLs pass to its
-     * own, and at 0 none, the loop then waiting for a pace.
+     * own, a fraction of one at a pace under 1, and at 0 none, the loop then waiting for a pace.
      */
     private gameLoop = (): void => {
         if (!this.running || this.pace === 0 || this.forwarding) {
@@ -572,7 +572,7 @@ export class Game implements MainLoop {
 
     /**
      * The loop's VBLs to a VBL of the wall clock from now on (`gameLoop`): a recording's
-     * viewer's pace, 1, 2, 4 or 8, or 0, which holds the loop where it is until a pace is
+     * viewer's pace, from 1/4 to 8, or 0, which holds the loop where it is until a pace is
      * given again. Not CSBWin's, whose VBLs are the machine's. The wall clock counts on
      * from now, so no VBL is owed for the time before.
      */

@@ -99,6 +99,8 @@ export interface KeyPress {
   ctrlKey: boolean;
   metaKey: boolean;
   altKey: boolean;
+  /** Shift held: only the recording viewer's strip reads it (`RecordingStrip.ts`). */
+  shiftKey?: boolean;
   /** The key held down, repeating. */
   repeat?: boolean;
 }

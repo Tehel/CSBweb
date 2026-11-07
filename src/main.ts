@@ -85,7 +85,7 @@ const RECORDING_LINE_COLOR = 15;
 /** How often the running recording is written to the store (`RecordingWriter`), in milliseconds. */
 const RECORDING_WRITE_MS = 5000;
 /** The time a recording's viewer stays at its end before loop plays it again (`playRecording`). */
-const LOOP_DELAY_MS = 5000;
+const LOOP_DELAY_MS = 2000;
 /**
  * The game this page plays, chosen from the manifest before anything else is loaded
  * (`?dungeon=<id>`, `chooseDataSet`).
@@ -705,8 +705,8 @@ function applySettings({ game }: Built, sound: SoundManager, values: SettingsVal
  * dialog as its PLAY left it where one played it (`RECORDING_STOPPED_HASH`); stop, which
  * plays the path again from its start in this page (`rewindPage`), paused once its first
  * tick has drawn the game; play and pause, play at the end being stop and play; a minute
- * forward, run at once in slices, unheard, the screen drawn after each (`Game.forward`);
- * the pace; and loop, which plays the path again from its start `LOOP_DELAY_MS` after its
+ * or ten forward, run at once in slices, unheard, the screen drawn after each
+ * (`Game.forward`); slower and faster, the pace between them; and loop, which plays the path again from its start `LOOP_DELAY_MS` after its
  * end, whatever ended it. Then the time played over the path's length. Stop and eject
  * end the message area played on alone. While the loop does not run, paused or at the
  * end, a move of the pointer is drawn at the display's next frame (`Presenter.animate`),
@@ -822,25 +822,25 @@ async function playRecording(built: Built, sound: SoundManager, id: string, { pa
         pace = next;
         if (!paused) game.setPace(pace);
     };
-    const act = (action: StripAction | 'faster' | 'slower'): void => {
+    const act = (action: StripAction): void => {
         switch (action) {
             case 'play':
                 if (!recordingPlayer?.playing) return restart(false);
                 paused = !paused;
                 game.setPace(paused ? 0 : pace);
                 break;
-            case 'forward': {
+            case 'forward':
+            case 'forward10': {
                 const player = recordingPlayer;
                 if (!player?.playing) return;
-                if (forwardTo !== null) forwardTo += FORWARD_VBLS;
+                if (forwardTo !== null) forwardTo += FORWARD_VBLS[action];
                 else if (!game.isForwarding) {
-                    forwardTo = player.vbls + FORWARD_VBLS;
+                    forwardTo = player.vbls + FORWARD_VBLS[action];
                     // A span under a held clock is run to its end, as the loop runs it.
                     runAtOnce(() => player.vbls < (forwardTo ?? 0) || player.held);
                 }
                 break;
             }
-            case 'pace': setPace(nextPace(pace, 'round')); break;
             case 'faster': setPace(nextPace(pace, 'up')); break;
             case 'slower': setPace(nextPace(pace, 'down')); break;
             case 'loop':
