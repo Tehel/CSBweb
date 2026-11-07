@@ -138,6 +138,7 @@ In payoff order: the first row is the next item.
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏸️ |
 | E40 | The statistics page's heat map | M | ⏸️ |
 | E45 | FROM and TO on a timeline of the recording | M | ⏸️ if the author asks |
+| E47 | The viewer paused hands the game to the player, from a save made there | M | ⏸️ if players ask |
 | C150 | Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops | S | ⏸️ waits on the author |
 | G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
@@ -154,7 +155,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: A11 · C199 · D22 · E47 · F26 · G32 · P13 · R21 · U13 · W8 · X19. An ID recorded and paid in one commit has no
+Next free IDs: A11 · C199 · D22 · E48 · F26 · G32 · P13 · R21 · U13 · W8 · X19. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -574,6 +575,46 @@ the part chosen is but the panel's time played. Wanted only if the author asks f
 Paying it: the bar in the panel, checked in `tools/probe-frames.ts`'s FROM and TO block (a
 click on a mark moves FROM, the lists follow), and the panel's paragraph in
 `doc/RECORDING.md` updated.
+
+### E47 ⏸️ The viewer paused hands the game to the player, from a save made there
+
+A player watching one of their own recordings pauses it and plays on from there as a
+game, not as the recording: a branch of it at that point. Asked for once (Antman); taken
+if more players ask.
+
+- **Through a save, never the viewer's game.** The player plays a recording at its own
+  level and profile (`behaviourAt`), so the game it holds runs old behaviours; and a
+  branch starts from a file and its `CarriedState`, which a checkpoint is not. So the
+  pause makes a save there, its row linked to the recording at that point
+  (`SaveEntry.recording`: the changes before it, the VBLs run, not `inVbl`), and the
+  page reads it as CONTINUE does, at `ENGINE_LEVEL`. The read is F9's at that moment:
+  monster timers re-made at `d.Time`, a sleeping party woken.
+- **What the tree gives**: the read of a linked save begins a branch of the recording
+  (`doc/RECORDING.md` → "The tree"), its join checked by the parent replayed to the point
+  making the same file, a cut place, pruning and sharing as any branch's. No tick
+  changes, so no level.
+- **The file made as a checkpoint makes it**: making a file writes the world's `EXPOOL`,
+  so a viewer that goes on watching after the save drifts unless the pool is put back
+  (`src/engine/Checkpoint.ts`). Offered only where a checkpoint can be taken: after a
+  VBL's feed, no `LoopScript` holding the loop.
+- **A save row of its own**, named for its play time, not F5's slot, so the point
+  outlives pruning and the player can come back to it. With the seek back
+  (`doc/RECORDING.md` → "Checkpoints"), it is
+  "go back twenty minutes and play it otherwise".
+- **Only the browser's own recordings**, never the site's: a branch of a shared path,
+  shared again, would carry another player's game under the sharer's name; its file
+  holds another player's `RandomGameID`; and a won game near its end would count as the
+  taker's in the statistics.
+- **To decide with the author**: the branch is the same playthrough, so its F5 writes
+  over the playthrough's quick-save, which prunes the original line back to its last
+  other save, as a load of an older save does today. Warn where the original runs past
+  its last kept save, or leave it.
+
+Paying it: the strip's button while paused (`?recording=` of a browser's point), the
+save and the read, checked in `tools/probe-frames.ts`'s viewer block (the game played on
+from the save, its recording a branch of the one watched) and in a `tools/checks/` tool
+that makes the save at a paused VBL, watches on without drift, and plays the branch's
+path through its join.
 
 ### E22 ⏸️ Fullscreen filled by a fraction
 
