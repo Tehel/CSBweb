@@ -41,7 +41,7 @@ One line per memory in this directory. Committed with the project; never shared.
 - [Long runs and the job timeout](long-runs-job-timeout.md) — the gate's 16 workers slow a tool ~3×, a job dies at 300 s: a CSBWin run past ~100 s alone gets its own `csbwin-runs.ts` job (`<id>` / `--not=<id>`)
 - [Known failures on the WSL checkout](wsl-known-failures.md) — `data-set-archive.ts` (an "é" under /tmp) fails at HEAD there (2026-11-05); compare with HEAD before chasing anything else
 - [No semantic-memory](no-semantic-memory.md) — never post this project into the semantic-memory MCP; session-review memories go here
-- [Recording cut at a save](recording-cut-at-save.md) — a cut starts from the save's file plus `CutState`; what each drift lacked (game info, the opening tick, the attack menu) and how to diff one
+- [Recording cut at a save](recording-cut-at-save.md) — a cut starts from the save's file plus `CutState`; what each drift lacked (game info, the opening tick, the attack menu) and how to diff one; only at a save's point, not an arbitrary VBL
 - [Levels count from 0](levels-count-from-0.md) — every level the player sees is numbered from 0, the Hall of Champions level 0; "map" and "level" are synonyms; never `+ 1` for display
 - [The author's browser store](author-browser-store.md) — production's IndexedDB in Windows Chrome, read from WSL by parsing the LevelDB log with Node's V8 deserializer (version 16 → 15); match sets by digests, not ids
 - [Scratch set from its own cwd](scratch-set-cwd.md) — the tools read `tools/data-sets.json` and the gamefiles relative to cwd: try a run on a candidate set from a scratch folder, never a row in the served manifest
@@ -58,3 +58,5 @@ One line per memory in this directory. Committed with the project; never shared.
 - [Frame PNGs hold their palettes](frame-png-holds-palettes.md) — `info['csbweb-frame']` lists the `0RGB` palettes, pixels are slots; the interface's 3 `0310`, 5 `0420` panel, 9 `0750` text, 11 `0770` lit
 - [ManualClock keeps one timer](manual-clock-one-timer.md) — a second `setTimeout` replaces the first in the tools: new `Game` scheduling shares `loopTimer` (as `Game.forward` does)
 - [Frames' first navigation flake](frames-first-navigation-flake.md) — a timeout on `?intro=0&dungeon=dm-atari` at `probe-frames.ts:363`: rerun once on new ports before chasing it
+- [EXPOOL absent in DM](expool-absent-in-dm.md) — `buildSaveFile` creates and writes the EXPOOL: a throwaway file puts it back (or deletes it) and copies it, never aliases it
+- [Scratch engine experiment](scratch-engine-experiment.md) — `.mts` with absolute imports from the repo's cwd, a hook between VBLs through `game.input.play`, a recursive state diff from `game` and its skip list
