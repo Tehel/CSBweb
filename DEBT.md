@@ -130,14 +130,14 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
+| E44 | The recording viewer's rewind, to checkpoints kept in memory | L | ⏳ |
+| E46 | The recording viewer goes back a minute or ten, to the VBL | M | ⏳ after E44 |
 | F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
 | R19 | The site's shared recordings are packages of versions 1 and 2, which the page no longer reads | S | ⏳ the author runs the migration, then deploys |
 | C198 | A missile that cannot be made loses the object it was to carry | S | ⏳ |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏸️ |
 | E40 | The statistics page's heat map | M | ⏸️ |
-| E44 | The recording viewer's rewind, to checkpoints kept in memory | L | ⏸️ |
-| E46 | The recording viewer goes back a minute or ten, to the VBL | M | ⏸️ after E44 |
 | E45 | FROM and TO on a timeline of the recording | M | ⏸️ if the author asks |
 | C150 | Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops | S | ⏸️ waits on the author |
 | G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
@@ -533,15 +533,16 @@ map, as designed with the author:
 Paying it: the heat map, checked in `tools/probe-frames.ts`'s statistics block (a level
 opens its map) and by a screenshot over the dev server's fortnight.
 
-### E44 ⏸️ The recording viewer's rewind, to checkpoints kept in memory
+### E44 ⏳ The recording viewer's rewind, to checkpoints kept in memory
 
 The viewer's strip (`doc/RECORDING.md` → "The port's player") pauses, sets the pace, loops,
 stops at the start, and runs a minute or ten forward at once (`Game.forward`); its rewind
 (←) is drawn, inactive (`enabled`, `src/renderer/ui/RecordingStrip.ts`).
 Wanted, as designed with the author:
 
-- **Checkpoints**: the player takes one in memory every 30 s of the game (its VBLs,
-  `RecordingPlayer.vbls`), playing or forwarding, and keeps the latest ten.
+- **Checkpoints**: the player takes one in memory every minute of the game (its VBLs,
+  `RecordingPlayer.vbls`), playing or forwarding, and keeps the latest 21, so that the
+  play can always go back twenty minutes (E46).
 - **Rewind** reads the latest checkpoint at least 5 s of the game behind the play, and
   drops the checkpoints after it, which the play takes again as it passes them. It is
   inactive while no checkpoint is that far behind.
@@ -559,7 +560,7 @@ is ten to eighteen seconds.
 changes the game), its `CarriedState`, what else the proof below finds the game reads on,
 and the player's cursor (its recording, next change and VBL counts). Read from
 `csbgame7.dat`, `saveFileOf` builds the 63 KB file in 1.8 ms and `applySaveBytes` reads it
-back in 2.9 ms: ten are under a megabyte. Port-only and never written, so the saves'
+back in 2.9 ms: 21 are about 1.3 MB. Port-only and never written, so the saves'
 compatibility with CSBWin does not reach them.
 
 **The risk is fidelity, not cost.** A join is proven only at a save's point, after its
@@ -585,20 +586,18 @@ checkpoint's VBL, its file compared, and plays on to the same end), the strip's 
 rewind (a golden frame), and `doc/RECORDING.md`'s strip updated. Size L: the tool's rounds
 are not known until it runs.
 
-### E46 ⏸️ The recording viewer goes back a minute or ten, to the VBL
+### E46 ⏳ The recording viewer goes back a minute or ten, to the VBL
 
 After E44, whose checkpoints it starts from. Back a minute or ten minutes of the game
 exactly, as forward goes forward (`FORWARD_VBLS`): the latest checkpoint at or before the
 target read, then forward to the target (`Game.forward`, `runAtOnce` in `src/main.ts`),
-unheard. At most 30 s of the game run at once, under 150 ms at forward's rate.
+unheard. At most a minute of the game runs at once, under 300 ms at forward's rate. The
+21 checkpoints a minute apart reach twenty minutes back from any VBL; a target before the
+path's start is the start (`rewindPage`).
 
-To settle with the author before paying it:
-
-- **The controls**: two more on the strip, mirroring forward and ten minutes forward, or
-  rewind's own behaviour replaced by back a minute.
-- **Ten minutes back** reaches past ten checkpoints 30 s apart, which hold five minutes:
-  the older ones spaced wider (every 30 s for the last five minutes, then every two), or
-  the control inactive where no checkpoint reaches.
+To settle with the author before paying it: **the controls**, two more on the strip,
+mirroring forward and ten minutes forward, or rewind's own behaviour replaced by back a
+minute.
 
 Paying it: the seeks checked in `tools/checks/replay.ts` (each lands on the
 uninterrupted play's state at the target VBL, its file compared), the strip's controls (a
