@@ -3,9 +3,9 @@
  * `?recording=` plays (`playRecording`, `src/main.ts`; `doc/RECORDING.md` → "The port's
  * player"). From the left, its controls, which a click or a key works, each an icon on a
  * face of its own between darker columns, in three groups with black between them: eject
- * (Esc), which leaves for the welcome page; stop (Backspace), rewind, which does nothing
- * yet, play and pause (Space), a minute forward (→) and ten minutes forward (Shift+→);
- * slower (`-`), the pace, /4, /2, ×1, ×2, ×4 or ×8, which a click does not change, faster
+ * (Esc), which leaves for the welcome page; stop (Backspace), ten minutes back (Shift+←), a
+ * minute back (←), play and pause (Space), a minute forward (→) and ten minutes forward
+ * (Shift+→); slower (`-`), the pace, /4, /2, ×1, ×2, ×4 or ×8, which a click does not change, faster
  * (`+`), and loop (L), which plays the recording again from its start at its end. Then,
  * after black, flush right, the time played over the recording's length.
  *
@@ -17,11 +17,14 @@
  * Stop plays the recording again from its start in the same page, the game and the
  * screen first put back as a new page has them (`rewindPage`), as the restart after a lost
  * game puts them back (`showEndOfGame`, `src/renderer/intro/EndOfGame.ts`), and pauses it
- * at its first tick.
+ * at its first tick. Back reads a checkpoint the page has kept of the path in the same page
+ * (`seekBack`), and runs on to its target at once (`seekLanded`).
  */
 import { VBL_FREQUENCY } from '../../core/constants';
 import type { Rect } from '../../data/tables/UITables';
+import type { Checkpoint, KeptCheckpoints } from '../../engine/Checkpoint';
 import type { Game } from '../../engine/Game';
+import type { RecordingPlayer } from '../../engine/RecordingPlayer';
 import type { ScrollingText } from '../csbwin/ScrollingText';
 import { fillRectIndex } from '../csbwin/CanvasBlitter';
 import type { GameScreen } from '../GameScreen';
@@ -36,9 +39,11 @@ export type Pace = (typeof PACES)[number];
 
 /** The VBLs forward runs at once: a minute of the game's, or ten (`forward10`). */
 export const FORWARD_VBLS = { forward: 60 * VBL_FREQUENCY, forward10: 600 * VBL_FREQUENCY } as const;
+/** The VBLs back goes back: a minute of the game's, or ten (`back10`). */
+export const BACK_VBLS = { back: 60 * VBL_FREQUENCY, back10: 600 * VBL_FREQUENCY } as const;
 
 /** What a control of the strip does. */
-export type StripAction = 'eject' | 'stop' | 'rewind' | 'play' | 'forward' | 'forward10' | 'slower' | 'faster' | 'loop';
+export type StripAction = 'eject' | 'stop' | 'back10' | 'back' | 'play' | 'forward' | 'forward10' | 'slower' | 'faster' | 'loop';
 /** A face of the strip: a control's, or the pace's, which only shows it. */
 type Face = StripAction | 'pace';
 
@@ -68,14 +73,25 @@ const DARK_COLOR = 3;
 /** The UI palette's `0000`: the gaps between the groups, the message area's own black. */
 const GAP_COLOR = 0;
 
-/** A face's width, the darker column's between two, and the black gap's after a group. */
+/**
+ * A face's width, slower's and faster's, whose icons are narrower, the darker column's
+ * between two, and the black gap's after a group: the faces and the black after them end
+ * at x 199, before the time of a recording of ten hours or more, `HH:MM:SS / HH:MM:SS`,
+ * which begins at x 202.
+ */
 const FACE_WIDTH = 16;
-const COLUMN_WIDTH = 2;
+const NARROW_FACE_WIDTH = 9;
+const COLUMN_WIDTH = 1;
 const GROUP_GAP = 8;
 /** The faces in their groups, from the left. */
 const GROUPS: ReadonlyArray<readonly Face[]> = [
-  ['eject'], ['stop', 'rewind', 'play', 'forward', 'forward10'], ['slower', 'pace', 'faster', 'loop'],
+  ['eject'], ['stop', 'back10', 'back', 'play', 'forward', 'forward10'], ['slower', 'pace', 'faster', 'loop'],
 ];
+
+/** A face's width. */
+function faceWidth(face: Face): number {
+  return face === 'slower' || face === 'faster' ? NARROW_FACE_WIDTH : FACE_WIDTH;
+}
 
 /** Each face, the strip's height, a darker column on either side of it. */
 const FACES: ReadonlyArray<{ face: Face; rect: Rect }> = (() => {
@@ -84,8 +100,8 @@ const FACES: ReadonlyArray<{ face: Face; rect: Rect }> = (() => {
   for (const group of GROUPS) {
     x += COLUMN_WIDTH;
     for (const face of group) {
-      faces.push({ face, rect: { x1: x, y1: STRIP_RECT.y1, x2: x + FACE_WIDTH - 1, y2: STRIP_RECT.y2 } });
-      x += FACE_WIDTH + COLUMN_WIDTH;
+      faces.push({ face, rect: { x1: x, y1: STRIP_RECT.y1, x2: x + faceWidth(face) - 1, y2: STRIP_RECT.y2 } });
+      x += faceWidth(face) + COLUMN_WIDTH;
     }
     x += GROUP_GAP;
   }
@@ -96,7 +112,7 @@ const GAPS: readonly Rect[] = (() => {
   const gaps: Rect[] = [];
   let x = 0;
   for (const group of GROUPS) {
-    x += COLUMN_WIDTH + group.length * (FACE_WIDTH + COLUMN_WIDTH);
+    x += COLUMN_WIDTH + group.reduce((width, face) => width + faceWidth(face) + COLUMN_WIDTH, 0);
     gaps.push({ x1: x, y1: STRIP_RECT.y1, x2: x + GROUP_GAP - 1, y2: STRIP_RECT.y2 });
     x += GROUP_GAP;
   }
@@ -107,7 +123,8 @@ const GAPS: readonly Rect[] = (() => {
 const ICONS = {
   eject: ['..#..', '.###.', '#####', '.....', '#####'],
   stop: ['#####', '#####', '#####', '#####', '#####'],
-  rewind: ['..#..#', '.##.##', '######', '.##.##', '..#..#'],
+  back10: ['..#..#..#', '.##.##.##', '#########', '.##.##.##', '..#..#..#'],
+  back: ['..#..#', '.##.##', '######', '.##.##', '..#..#'],
   play: ['#...', '###.', '####', '###.', '#...'],
   pause: ['##.##', '##.##', '##.##', '##.##', '##.##'],
   forward: ['#..#..', '##.##.', '######', '##.##.', '#..#..'],
@@ -118,11 +135,12 @@ const ICONS = {
 } as const satisfies Record<string, readonly string[]>;
 
 /**
- * Whether a control does something now: rewind is not yet, forward only while the
- * recording plays, and slower and faster short of the slowest and the fastest pace.
+ * Whether a control does something now: back once the path has run a VBL, forward only
+ * while the recording plays, and slower and faster short of the slowest and the fastest
+ * pace.
  */
 function enabled(action: StripAction, state: StripState): boolean {
-  if (action === 'rewind') return false;
+  if (action === 'back' || action === 'back10') return state.vbls > 0;
   if (action === 'forward' || action === 'forward10') return !state.ended;
   if (action === 'slower') return state.pace !== PACES[0];
   if (action === 'faster') return state.pace !== PACES[PACES.length - 1];
@@ -146,7 +164,7 @@ export function timePlayed(vbls: number): string {
 /** An icon drawn in `color`, centred across `face`. */
 function drawIcon(ui: UIState, icon: readonly string[], face: Rect, color: number): void {
   const { pixels, width } = ui.screenIndexBuffer;
-  const x = face.x1 + Math.floor((FACE_WIDTH - icon[0]!.length) / 2);
+  const x = face.x1 + Math.floor((face.x2 - face.x1 + 1 - icon[0]!.length) / 2);
   icon.forEach((row, dy) => {
     for (let dx = 0; dx < row.length; dx++) if (row[dx] === '#') pixels[(ICON_TOP + dy) * width + x + dx] = color;
   });
@@ -196,7 +214,7 @@ function keyAction(press: KeyPress): StripAction | null {
   if (press.code === 'Backspace') return 'stop';
   if (press.code === 'Escape') return 'eject';
   if (press.code === 'ArrowRight') return press.shiftKey ? 'forward10' : 'forward';
-  if (press.code === 'ArrowLeft') return 'rewind';
+  if (press.code === 'ArrowLeft') return press.shiftKey ? 'back10' : 'back';
   if (press.code === 'KeyL') return 'loop';
   if (press.key === '+' || press.code === 'Equal' || press.code === 'NumpadAdd') return 'faster';
   if (press.key === '-' || press.code === 'NumpadSubtract') return 'slower';
@@ -226,4 +244,34 @@ export function rewindPage(game: Game, screen: Pick<GameScreen, 'initializePlayS
   game.resumeMainLoop();
   game.ctx.state.paused = false;
   game.ctx.state.block1.totalMoveCount = 0;
+}
+
+/**
+ * A seek back to `target` VBLs of the path (back, back10), by `player`, a new player of
+ * it in this page, once the one that played has stopped: the page put back as stop puts
+ * it back (`rewindPage`), and the latest checkpoint kept at or before the target read
+ * (`KeptCheckpoints.before`, `RecordingPlayer.resume`), those after it dropped, or the
+ * path played again from its start where none is. Returns the checkpoint read, or `null`.
+ * The caller then starts the game where the player plays, at its pace, and runs the loop
+ * at once until the seek has landed (`seekLanded`).
+ */
+export function seekBack(
+  game: Game, screen: Pick<GameScreen, 'initializePlayState'>, messages: ScrollingText, kept: KeptCheckpoints, target: number, player: RecordingPlayer,
+): Checkpoint | null {
+  rewindPage(game, screen, messages);
+  const read = kept.before(target);
+  if (read) player.resume(read);
+  else player.start();
+  return read;
+}
+
+/**
+ * Whether a seek back to `target` by `player` has landed (`seekBack`): the target reached,
+ * a span under a held clock it ends in run to its end, as forward runs it, and a tick run
+ * since the read (`ticked`), which draws the viewport, the screen's share a read leaves as
+ * it was; or the player stopped, at the path's end or a drift. A target within a tick of
+ * the checkpoint read is passed, then, to that tick.
+ */
+export function seekLanded(player: RecordingPlayer, target: number, ticked: boolean): boolean {
+  return !player.playing || (player.vbls >= target && !player.held && ticked);
 }

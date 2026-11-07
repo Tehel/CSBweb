@@ -1,8 +1,9 @@
 /**
  * A checkpoint of a recording played back (`doc/RECORDING.md` → "The port's player"): the
  * game between two VBLs, kept in memory, which a fresh page reads to play on from there
- * as the game played on (`RecordingPlayer.resume`). What the viewer goes back to
- * (`DEBT.md` E46), one a minute of the game, the latest 21 (`KeptCheckpoints`).
+ * as the game played on (`RecordingPlayer.resume`). What the viewer's back goes back to
+ * (`seekBack`, `src/renderer/ui/RecordingStrip.ts`), one a minute of the game, the latest
+ * 21 (`KeptCheckpoints`).
  *
  * It starts from what a path cut at a save starts from (`src/engine/RecordingCut.ts`): a
  * save's file made at the point, what its read leaves beside it (`CarriedState`) and what

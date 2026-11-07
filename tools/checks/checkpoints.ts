@@ -13,7 +13,7 @@
  *    start's flag (`EXPECTED`), so a field added later that a checkpoint misses fails
  *    here. The game read plays on to the next checkpoint, and so on: each checkpoint read plays on as the game it was taken
  *    from, and the last to the path's end, with no drift and the same file.
- * 4. **Back, in the same page**, as the viewer goes back (`DEBT.md` E46): the play keeps
+ * 4. **Back, in the same page**, as the viewer goes back (`seekBack`): the play keeps
  *    its checkpoints as the page does (`KeptCheckpoints`, the latest 21), is stopped at
  *    nine tenths of the path, the page rewound (`rewindPage`), and the latest checkpoint
  *    at or before half of it, or twenty minutes back where that is later, read by a new player (`tools/lib/playback.ts`, `SeekBack`):

@@ -130,7 +130,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E46 | The recording viewer goes back a minute or ten, to the VBL | M | ⏳ |
 | F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
 | R19 | The site's shared recordings are packages of versions 1 and 2, which the page no longer reads | S | ⏳ the author runs the migration, then deploys |
 | R20 | A path cut at a save carries less than a checkpoint: the screen's play state, the picking, the state no file holds | S | ⏳ |
@@ -533,7 +532,7 @@ New state-representation debt goes here, and jumps the queue.
 
 New architecture debt goes here, and jumps the queue. Every E item is a refactor: the rules
 of "How to work this list", point 3, apply, byte-identical tool output included. What the
-page redesign adds is the exception: E40's heat map, E46's seeking, and E22's fill.
+page redesign adds is the exception: E40's heat map and E22's fill.
 
 The structure need no longer follow CSBWin's files (the author's decision): a module may
 gather or split CSBWin's functions as the code's concerns ask. What still follows CSBWin is
@@ -554,36 +553,6 @@ map, as designed with the author:
 
 Paying it: the heat map, checked in `tools/probe-frames.ts`'s statistics block (a level
 opens its map) and by a screenshot over the dev server's fortnight.
-
-### E46 ⏳ The recording viewer goes back a minute or ten, to the VBL
-
-It starts from the checkpoints the page keeps of the path it plays, one a minute of the
-game, the latest 21 (`KeptCheckpoints`, `src/engine/Checkpoint.ts`; `doc/RECORDING.md` →
-"Checkpoints"). Back a minute or ten minutes of the game exactly, as forward goes forward
-(`FORWARD_VBLS`): the page rewound (`rewindPage`), the latest checkpoint at or before the
-target read by a new player (`KeptCheckpoints.before`, `RecordingPlayer.resume`, as
-`tools/lib/playback.ts`'s `SeekBack` does), then forward to the target (`Game.forward`,
-`runAtOnce` in `src/main.ts`), unheard. At most a minute of the game runs at once, under
-300 ms at forward's rate. The 21 checkpoints a minute apart reach twenty minutes back from
-any VBL; a target before the oldest is the path's start (`restart`, `src/main.ts`). What
-the read leaves of the page as it was is the screen's alone, the message strip and the
-viewport, which the next tick draws: what a seek shows until then is this item's.
-
-**The controls**, as designed with the author: the strip's rewind (`<<`, ←) becomes back a
-minute, and a new face beside it back ten minutes (`<<<`, Shift+←), mirroring forward and
-ten minutes forward around play: `stop, back10, back, play, forward, forward10`.
-
-**The strip's width.** Its eleven faces in three groups are 228 px at today's 16-px faces
-and 2-px columns (`FACE_WIDTH`, `COLUMN_WIDTH`, `src/renderer/ui/RecordingStrip.ts`), past
-x 214, where the time flush right begins (`H:MM:SS / H:MM:SS`). Narrowed, as the author
-allows, slower and faster first, whose icons are 5 px: at 9 px they make 214 px, which
-fits. A recording of ten hours or more has a time two characters longer, from x 202, and
-overlaps today's ten faces (210 px) already; 1-px columns as well make 200 px, which fits
-it too.
-
-Paying it: the seeks checked in `tools/checks/replay.ts` (each lands on the
-uninterrupted play's state at the target VBL, its file compared), the strip's controls (a
-golden frame), and `doc/RECORDING.md`'s strip updated. Size M.
 
 ### E45 ⏸️ FROM and TO on a timeline of the recording
 

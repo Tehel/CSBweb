@@ -91,8 +91,10 @@
  *    time there is the path's length (`RecordingPlayer.length`). And the checkpoints the
  *    page keeps (`KeptCheckpoints`, `src/engine/Checkpoint.ts`), here one each fifth of
  *    the path, the latest two: the path stopped at nine tenths, the page rewound, and the
- *    latest at or before seven tenths read by a new player, those after it dropped; the
- *    game read makes the file the game that took it made, plays to the same end, and
+ *    latest at or before seven tenths read by a new player, those after it dropped, as the
+ *    viewer's back reads it (`seekBack`); the game read makes the file the game that took
+ *    it made, runs on at once to seven tenths, where it lands on the game the
+ *    uninterrupted play has at that VBL (`seekLanded`), plays to the same end, and
  *    keeps the same checkpoints again on its way, or, where the package drifts, none from
  *    the one read on.
  *
@@ -1168,7 +1170,8 @@ function marks(checkpoints: readonly Checkpoint[]): number[] {
  * the latest `keep.most`, and a seek back to one, as `alone` played it, its end's file
  * `file`: the play stopped at nine tenths of the path, the page rewound, the latest
  * checkpoint at or before seven tenths read by a new player, those after it dropped; the
- * game read lands on the one that took it, and plays to the same end, keeping the same
+ * game read lands on the one that took it, runs on at once to seven tenths, where it is
+ * the uninterrupted play's game there, and plays to the same end, keeping the same
  * checkpoints again, or, where it drifts, none from the one read on.
  */
 async function seekBack(path: readonly Recording[], savedAtEnd: SavedAtEnd | null, keep: Keep, alone: Played, file: Uint8Array): Promise<void> {
@@ -1185,6 +1188,13 @@ async function seekBack(path: readonly Recording[], savedAtEnd: SavedAtEnd | nul
   const latest = before.filter((checkpoint) => checkpoint.cursor.played <= to).pop() ?? null;
   check(read === latest && marks(after).join() === marks(before.filter((checkpoint) => checkpoint.cursor.played <= to)).join(),
     `back to ${to} reads the latest at or before it (${read ? read.cursor.played : 'the start'}), those after it dropped (${marks(after).join(', ')} kept)`);
+  // The game where the seek landed, against the uninterrupted play's at that VBL.
+  const taken = back.taken;
+  const plainThere = taken ? (await playPath(STOCK_DATA_SET, diskFiles(STOCK_DATA_SET), path, savedAtEnd, { stopAt: taken.cursor.played })).taken : null;
+  check(taken !== null && plainThere !== null && taken.cursor.played >= to && firstDifference(taken.file, plainThere.file) < 0
+    && JSON.stringify({ ...taken.cursor, lastMade: null }) === JSON.stringify({ ...plainThere.cursor, lastMade: null })
+    && (taken.cursor.lastMade === null) === (plainThere.cursor.lastMade === null),
+    `the seek runs on at once to ${to} and lands at ${taken?.cursor.played} on the game the uninterrupted play has there, its file and the player's place`);
   if (read) {
     check(landed !== null && firstDifference(landed.file, read.file) < 0 && JSON.stringify({ ...landed.cursor, lastMade: null }) === JSON.stringify({ ...read.cursor, lastMade: null })
       && (landed.cursor.lastMade === null) === (read.cursor.lastMade === null),

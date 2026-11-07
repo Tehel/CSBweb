@@ -11,7 +11,8 @@
  * What the replay tool (`utils/replay-recordings.ts`) plays a shared recording with. A
  * play may be restarted as the viewer's stop restarts it (`Restart`), run at once
  * from its start as the viewer's forward runs it (`'forward'`), or keep checkpoints as the
- * page keeps them (`KeptCheckpoints`), and go back to one (`SeekBack`).
+ * page keeps them (`KeptCheckpoints`), and go back as the viewer's back goes back
+ * (`SeekBack`), or stop at a VBL of the path (`StopAt`).
  */
 import { VBL_FREQUENCY } from '../../src/core/constants';
 import type { DataSetFiles } from '../../src/data/DataSetFiles';
@@ -19,7 +20,7 @@ import { KeptCheckpoints, type Checkpoint } from '../../src/engine/Checkpoint';
 import type { DataSet } from '../../src/data/DataSets';
 import type { Recording, RecordingPoint } from '../../src/engine/Recorder';
 import { RecordingPlayer, type Drift, type SavedAtEnd } from '../../src/engine/RecordingPlayer';
-import { rewindPage, type Pace } from '../../src/renderer/ui/RecordingStrip';
+import { rewindPage, seekBack, seekLanded, type Pace } from '../../src/renderer/ui/RecordingStrip';
 import { standInPage } from '../../src/renderer/StandInPage';
 import type { Game } from '../../src/engine/Game';
 
@@ -50,6 +51,8 @@ export interface Played {
   readonly kept: readonly Checkpoint[];
   /** Where it went back (`SeekBack`). */
   readonly seek: Seeked | null;
+  /** The game's checkpoint where it stopped (`StopAt`), or where its seek back landed (`SeekBack`). */
+  readonly taken: Checkpoint | null;
 }
 
 /** The checkpoints a play keeps (`KeptCheckpoints`): one each `every` VBLs of the path, the latest `most`. */
@@ -59,14 +62,19 @@ export interface Keep {
 }
 
 /**
- * The viewer's seek back, less the forward to its target: the play stopped once it has
- * run `at` VBLs of the path, the page rewound (`rewindPage`), and the latest checkpoint
- * kept at or before `to` read by a new player (`RecordingPlayer.resume`), or the path
- * played again from its start where none is; then played to its end.
+ * The viewer's seek back: the play stopped once it has run `at` VBLs of the path, the
+ * page rewound and the latest checkpoint kept at or before `to` read by a new player, or
+ * the path played again from its start where none is (`seekBack`), run at once until it
+ * lands (`seekLanded`), its checkpoint taken there (`Played.taken`), then played to its end.
  */
 export interface SeekBack {
   readonly at: number;
   readonly to: number;
+}
+
+/** The play run at once to `stopAt` VBLs of the path (`Game.forward`), its checkpoint taken there (`Played.taken`). */
+export interface StopAt {
+  readonly stopAt: number;
 }
 
 /** Where a play went back (`SeekBack`). */
@@ -118,14 +126,18 @@ export function keptFiles(files: DataSetFiles): DataSetFiles {
  */
 export async function playPath(
   set: DataSet, files: DataSetFiles, path: readonly Recording[], savedAtEnd: SavedAtEnd | null = null,
-  restart: Restart | 'forward' | SeekBack | null = null, keep: Keep | null = null,
+  restart: Restart | 'forward' | SeekBack | StopAt | null = null, keep: Keep | null = null,
 ): Promise<Played> {
   const { game, screen, messages, clock, dungeonDat } = await standInPage(set, files);
   const kept = keep ? new KeptCheckpoints(keep.every, keep.most) : null;
   let player!: RecordingPlayer;
+  /** Whether a tick has run since the player began, as the page counts it for a seek. */
+  let ticked = false;
+  game.onTick(() => { ticked = true; });
   const newPlayer = (): void => {
     player = new RecordingPlayer(game, path, dungeonDat, savedAtEnd, kept);
     player.onEnd(() => game.stop());
+    ticked = false;
   };
   const play = (): void => {
     newPlayer();
@@ -140,9 +152,9 @@ export async function playPath(
   };
   game.runAtOnceWhile(() => player.held);
   play();
-  const ended = (restarted: Played['restarted'], slices: number | null = null, seek: Seeked | null = null): Played => ({
+  const ended = (restarted: Played['restarted'], slices: number | null = null, seek: Seeked | null = null, taken: Checkpoint | null = null): Played => ({
     drift: player.drift, point: player.point, joins: player.joins, game, restarted, vbls: player.vbls, length: player.length, slices,
-    kept: [...(kept?.checkpoints ?? [])], seek,
+    kept: [...(kept?.checkpoints ?? [])], seek, taken,
   });
   if (!restart) {
     run();
@@ -156,6 +168,14 @@ export async function playPath(
     }
     return ended(null, slices);
   }
+  if ('stopAt' in restart) {
+    // Run at once, a VBL at a time: the clock's VBLs may come two at once.
+    game.forward(() => player.vbls < restart.stopAt, () => {});
+    while (game.isForwarding) {
+      if (!clock.advance(0)) throw new Error('the loop stopped while the player plays');
+    }
+    return ended(null, null, null, player.checkpoint());
+  }
   if ('at' in restart) {
     if (!kept) throw new Error('a seek back reads the checkpoints kept');
     while (player.playing && player.vbls < restart.at) {
@@ -163,20 +183,20 @@ export async function playPath(
     }
     const before = [...kept.checkpoints];
     player.stop();
-    rewindPage(game, screen, messages);
-    const read = kept.before(restart.to);
+    newPlayer();
+    const read = seekBack(game, screen, messages, kept, restart.to, player);
+    // The read's checkpoint, before the game starts: what the read landed on.
+    const landed = read ? player.checkpoint() : null;
+    if (player.playing) game.start(true);
     const after = [...kept.checkpoints];
-    let landed: Checkpoint | null = null;
-    if (read) {
-      newPlayer();
-      player.resume(read);
-      landed = player.checkpoint();
-      game.start(true);
-    } else {
-      play();
+    // As the page's back runs it (`runAtOnce`, `src/main.ts`).
+    game.forward(() => !seekLanded(player, restart.to, ticked), () => {});
+    while (game.isForwarding) {
+      if (!clock.advance(0)) throw new Error('the loop stopped while the seek runs');
     }
+    const taken = player.checkpoint();
     run();
-    return ended(null, null, { before, read, after, landed });
+    return ended(null, null, { before, read, after, landed }, taken);
   }
   run(restart.afterMs);
   player.stop();

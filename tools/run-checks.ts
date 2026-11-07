@@ -437,9 +437,11 @@ const CHECKS: Tool[] = [
   // The corpus of the port's recordings, each played at the engine's level it was made at.
   { tool: 'recording-corpus.ts' },
   // The corpus cut at each save on its way, each cut played to its end: DMMovie42's nine
-  // saves each replay its whole game, in two jobs, the others together.
-  { tool: 'recording-cut.ts', args: ['DMMovie42', '--saves=0-4'] },
-  { tool: 'recording-cut.ts', args: ['DMMovie42', '--saves=5-8'] },
+  // saves each replay its whole game, in three jobs (five saves came within 20 s of the
+  // job's 300), the others together.
+  { tool: 'recording-cut.ts', args: ['DMMovie42', '--saves=0-2'] },
+  { tool: 'recording-cut.ts', args: ['DMMovie42', '--saves=3-5'] },
+  { tool: 'recording-cut.ts', args: ['DMMovie42', '--saves=6-8'] },
   { tool: 'recording-cut.ts', args: ['--not=DMMovie42'] },
   // The player's checkpoints, read and played on: the whole CSB game, in two jobs, each of
   // its parts, then DMMovie42, then the others together.

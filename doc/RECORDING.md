@@ -615,8 +615,11 @@ a recording plays, drawn over the message area's top row, whose lines are then d
 row lower while its bottom row is empty, so the three rows shown hold the newest. From
 the left, it shows its controls, which a click or a key works, each an icon on a face of
 its own between darker columns, in three groups with black between them: eject; stop,
-rewind, play and pause, forward and ten minutes forward; slower, the pace, faster and
-loop. Then, after black, flush right, the time played, the player's VBLs
+ten minutes back and back, play and pause, forward and ten minutes forward; slower, the
+pace, faster and loop. Slower's and faster's faces are 9 px wide to the others' 16, and
+the columns 1 px, so that the faces and the black after them end at x 199, before the
+time of a recording of ten hours or more, which begins at x 202. Then, after black,
+flush right, the time played, the player's VBLs
 since the path's start (`RecordingPlayer.vbls`) over sixty, over the path's length
 (`RecordingPlayer.length`), which the time played reaches at its end:
 
@@ -637,7 +640,19 @@ since the path's start (`RecordingPlayer.vbls`) over sixty, over the path's leng
   draws the game, and paused there. `tools/checks/replay.ts` (point 11) restarts each
   package's path a second into its play, and again at its end, and plays it to the same
   end.
-- **Rewind** (←): not yet; drawn darker, it does nothing.
+- **Back** (←, and Shift+← ten minutes): a minute of the path's VBLs back from where it
+  stands, or from where a forward or a seek runs to, the path's start at most. The page
+  is put back as stop puts it back, and the latest checkpoint the page keeps at or before
+  the target ("Checkpoints", below) read by a new player, or the path played again from
+  its start where none is (`seekBack`, `src/renderer/ui/RecordingStrip.ts`); then the path
+  is run at once to the target as forward runs it, unheard, on through a span under a held
+  clock it ends in, and on to a tick where none has run since the read, which draws the
+  viewport (`seekLanded`): the read leaves the screen's viewport as it was, and drawing it
+  outside a tick would draw from the game's random streams. Paused, it stays paused; at
+  the path's end, it plays on unless paused; a forward while it runs adds to its target.
+  Its faces are darker until the path has run a VBL. The checkpoints reach twenty minutes
+  back from any VBL, and within them a seek runs about a minute of the game at most. `tools/checks/replay.ts` (point 11) goes back in each package's play and lands on
+  the game the uninterrupted play has at the target, its file and the player's place.
 - **Play and pause** (Space): the loop held where it is (`Game.setPace(0)`), and on
   again. At the path's end, play is stop and play.
 - **Forward** (→, and Shift+→ ten minutes): a minute of the path's VBLs run at once (`Game.forward`), five seconds
@@ -716,7 +731,7 @@ branch that read a Sleepsave.
 ### Checkpoints
 
 A checkpoint (`src/engine/Checkpoint.ts`) is the game between two VBLs as a path plays it,
-kept in memory, never written: what the viewer is to go back to (`DEBT.md` E46). The
+kept in memory, never written: what the viewer's back goes back to (`seekBack`). The
 player takes one (`RecordingPlayer.checkpoint`) after a VBL's feed (`onFed`), where no
 `LoopScript` holds the loop (a generator cannot be kept), and a fresh page's player plays
 on from it (`resume`) in place of `start`: the game read from it, at the behaviour of the
@@ -762,7 +777,7 @@ target (`KeptCheckpoints.before`) by a new player in the same page once it is re
 (`rewindPage`), and drops those after it, which the play takes again as it passes their
 minutes; a drift in that play drops the checkpoint it was read from, which misled it, and
 those it took after. Stop, which plays the path again from its start, drops them all. The
-strip's rewind does nothing yet (`DEBT.md` E46).
+strip's back is such a seek.
 
 `tools/checks/checkpoints.ts` plays each corpus package four times: without
 checkpoints; taking one a minute, which ends on the same file; in a chain, each

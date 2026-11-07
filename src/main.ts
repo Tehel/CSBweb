@@ -52,7 +52,8 @@ import { partyNames, RecordingWriter } from './engine/RecordingWriter';
 import { endLines, RecordingPlayer, skippedLine, type SavedAtEnd } from './engine/RecordingPlayer';
 import { KeptCheckpoints } from './engine/Checkpoint';
 import {
-    FORWARD_VBLS, drawRecordingStrip, nextPace, rewindPage, stripActionAt, stripKeyAction, type Pace, type StripAction, type StripState,
+    BACK_VBLS, FORWARD_VBLS, drawRecordingStrip, nextPace, rewindPage, seekBack, seekLanded, stripActionAt, stripKeyAction, type Pace,
+    type StripAction, type StripState,
 } from './renderer/ui/RecordingStrip';
 import { packageOfSave, readRecordingPackage, recordingPackageUrl, writeRecordingPackage } from './engine/RecordingPackage';
 import { pathToWay, pointPath, pointRecordingId, SAVE_POINT_PREFIX, savedAtWay, storedPoints, wayPoints } from './engine/RecordingPoints';
@@ -708,7 +709,9 @@ function applySettings({ game }: Built, sound: SoundManager, values: SettingsVal
  * draws it over the message area: eject, which goes back to the welcome page, the book's
  * dialog as its PLAY left it where one played it (`RECORDING_STOPPED_HASH`); stop, which
  * plays the path again from its start in this page (`rewindPage`), paused once its first
- * tick has drawn the game; play and pause, play at the end being stop and play; a minute
+ * tick has drawn the game; ten minutes or a minute back, from a checkpoint the page keeps
+ * of the path (`KeptCheckpoints`) read in this page, or the path's start, then run at once
+ * to the target (`seekBack`); play and pause, play at the end being stop and play; a minute
  * or ten forward, run at once in slices, unheard, the screen drawn after each
  * (`Game.forward`); slower and faster, the pace between them; and loop, which plays the path again from its start `LOOP_DELAY_MS` after its
  * end, whatever ended it. Then the time played over the path's length. Stop and eject
@@ -732,9 +735,9 @@ async function playRecording(built: Built, sound: SoundManager, id: string, { pa
     let pace: Pace = 1;
     let loop = false;
     let hover: StripAction | null = null;
-    /** Where a minute forward runs to, while it runs (`Game.forward`). */
+    /** Where a minute forward, or a seek back, runs to, while it runs (`Game.forward`). */
     let forwardTo: number | null = null;
-    /** Whether a tick has run since the path began playing: what stop runs to before it pauses. */
+    /** Whether a tick has run since the player began: what stop and back run to before they land. */
     let ticked = false;
     /** The path played again, `LOOP_DELAY_MS` after its end, while loop is on. */
     let loopTimer: ReturnType<typeof setTimeout> | null = null;
@@ -771,7 +774,8 @@ async function playRecording(built: Built, sound: SoundManager, id: string, { pa
             refreshScreen();
         }, refreshScreen);
     };
-    const play = (): void => {
+    /** A new player of the path, the page's, which `play` or `seek` begins. */
+    const newPlayer = (): RecordingPlayer => {
         const player = new RecordingPlayer(game, path, dungeonDat, savedAtEnd, kept);
         recordingPlayer = player;
         player.onSkipped((span) => print(skippedLine(span)));
@@ -788,8 +792,22 @@ async function playRecording(built: Built, sound: SoundManager, id: string, { pa
             else console.log(`✓ Recording ${id} played to its end`);
         });
         ticked = false;
+        return player;
+    };
+    const play = (): void => {
+        const player = newPlayer();
         player.start();
         if (player.playing) game.start(true);
+    };
+    /** What stop and back end first: the loop's timer, the message area played on alone, the player and a forward. */
+    const leavePlay = (): void => {
+        cancelLoop();
+        messagesAlone?.();
+        messagesAlone = null;
+        recordingPlayer?.stop();
+        forwardTo = null;
+        sound.setMuted(false);
+        framePending = false;
     };
     /**
      * The path played again from its start, the page put back as a new page has it
@@ -797,22 +815,35 @@ async function playRecording(built: Built, sound: SoundManager, id: string, { pa
      * at the end, and loop).
      */
     const restart = (pauseAtStart: boolean): void => {
-        cancelLoop();
-        messagesAlone?.();
-        messagesAlone = null;
-        recordingPlayer?.stop();
-        forwardTo = null;
-        sound.setMuted(false);
+        leavePlay();
         // The screen's play state put back drops every animation (`Presenter.cancel`).
         rewindPage(game, screen, messages);
         // Every checkpoint is after the start, which the play takes again.
         kept.clear();
-        framePending = false;
         paused = pauseAtStart;
         game.setPace(paused ? 0 : pace);
         play();
         if (paused) runAtOnce(() => !ticked);
         refreshScreen();
+    };
+    /**
+     * Back a minute or ten of the path from where it stands, or where a forward or a seek
+     * runs to: the latest checkpoint kept at or before the target read in this page by a
+     * new player, or the path played again from its start (`seekBack`), then run at once,
+     * unheard, until it lands (`seekLanded`), paused or playing as it was.
+     */
+    const seek = (by: number): void => {
+        const from = forwardTo ?? recordingPlayer?.vbls ?? 0;
+        const target = Math.max(0, from - by);
+        leavePlay();
+        game.setPace(paused ? 0 : pace);
+        const player = newPlayer();
+        seekBack(game, screen, messages, kept, target, player);
+        if (!player.playing) return;
+        game.start(true);
+        forwardTo = target;
+        // A forward while it runs adds its minute or ten to the target (`forwardTo`).
+        runAtOnce(() => !seekLanded(player, forwardTo ?? target, ticked));
     };
     const looping = (): boolean => !paused && (recordingPlayer?.playing ?? false) && !game.isForwarding;
     /** The screen composed at the display's next frame, once however many moves ask before. */
@@ -856,7 +887,10 @@ async function playRecording(built: Built, sound: SoundManager, id: string, { pa
                 if (loop) loopLater();
                 else cancelLoop();
                 break;
-            case 'rewind': return;
+            case 'back':
+            case 'back10':
+                seek(BACK_VBLS[action]);
+                break;
             case 'stop': return restart(true);
             case 'eject':
                 cancelLoop();

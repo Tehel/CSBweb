@@ -57,6 +57,6 @@ One line per memory in this directory. Committed with the project; never shared.
 - [Port throw: trace CSBWin first](port-throw-trace-csbwin-first.md) — a port throw where CSBWin plays on: `TraceLine` the same function; equal state means an unported branch behind a refusal, not a drift
 - [Frame PNGs hold their palettes](frame-png-holds-palettes.md) — `info['csbweb-frame']` lists the `0RGB` palettes, pixels are slots; the interface's 3 `0310`, 5 `0420` panel, 9 `0750` text, 11 `0770` lit
 - [ManualClock keeps one timer](manual-clock-one-timer.md) — a second `setTimeout` replaces the first in the tools: new `Game` scheduling shares `loopTimer` (as `Game.forward` does)
-- [Frames' first navigation flake](frames-first-navigation-flake.md) — a timeout on `?intro=0&dungeon=dm-atari` at `probe-frames.ts:363`: rerun once on new ports before chasing it
+- [Frames' first navigation flake](frames-first-navigation-flake.md) — a timeout on `?intro=0&dungeon=dm-atari` at `probe-frames.ts:363` is a cold Vite: run against a dev server started and `curl`-warmed beforehand
 - [EXPOOL absent in DM](expool-absent-in-dm.md) — `buildSaveFile` creates and writes the EXPOOL: a throwaway file puts it back (or deletes it) and copies it, never aliases it
 - [Scratch engine experiment](scratch-engine-experiment.md) — `.mts` with absolute imports from the repo's cwd, a hook between VBLs through `game.input.play`, a recursive state diff from `game` and its skip list

@@ -1795,7 +1795,8 @@ check(recordingPruned.healed, "the running recording removed, as another tab's p
 // loop stopped; and the message area says what was skipped, the settings' span, and that
 // the recording ends, a frame of it with the strip over it. Backspace stops it, the
 // message area emptied, the path paused at its first tick, a click on play plays it on,
-// and → runs it at once to the same end. Esc goes back to the welcome page.
+// and → runs it at once to the same end, from which ← goes back to its start and plays on.
+// Esc goes back to the welcome page.
 await key('KeyL'); await vbls(TICK);
 await key('Escape'); await vbls(30);
 await key('Escape'); await vbls(SHOWN);
@@ -1817,7 +1818,7 @@ const paused = await evaluate(`(({ screen }) => ({ vbls: window.__probe.player()
   dialog: screen.ui.dialog !== null }))(window.__probe)`);
 await key('+');
 await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown',{key:'=',code:'Equal',bubbles:true})),1`);
-await canvasClick(72, 175);
+await canvasClick(88, 175);
 const paced = await evaluate(`window.__probe.game.pace`);
 await until('!window.__probe.player().playing', 'the recording played to its end');
 await until(`window.__probe.game.ctx.host.messages.snapshot().includes('THE RECORDING ENDS HERE.')`, 'the line at its end');
@@ -1851,12 +1852,17 @@ const stoppedLater = await evaluate(stopped);
 check(!restartedLines.includes('THE RECORDING ENDS HERE.') && stoppedAt.playing && stoppedAt.pace === 0 && stoppedAt.vbls > 0
   && stoppedAt.vbls < 60 && JSON.stringify(stoppedLater) === JSON.stringify(stoppedAt),
   `Backspace stops it: the message area emptied, the path played again from its start to its first tick and paused there (${JSON.stringify(stoppedAt)})`);
-await canvasClick(72, 175);
+await canvasClick(88, 175);
 await key('ArrowRight');
 await until('!window.__probe.player().playing', 'the recording run at once to its end');
 const replayedGame = await evaluate(playedState);
 check(replayedGame.drift === null && replayedGame.state === recordedGame.state,
   'a click on play plays it on, and → runs it at once to the same end');
+await key('ArrowLeft');
+const backLines: string[] = await evaluate(`window.__probe.game.ctx.host.messages.snapshot()`);
+const wentBack = await evaluate(`(({ game }) => ({ vbls: window.__probe.player().vbls, playing: window.__probe.player().playing, pace: game.pace }))(window.__probe)`);
+check(!backLines.includes('THE RECORDING ENDS HERE.') && wentBack.playing && wentBack.pace > 0 && wentBack.vbls < 120,
+  `and ← at its end, a minute back from it, plays it on from its start, shorter than a minute (${JSON.stringify(wentBack)})`);
 await leave(() => key('Escape'), WELCOME);
 check(await evaluate(`!new URLSearchParams(location.search).has('recording')`), 'and Esc goes back to the welcome page');
 
