@@ -130,7 +130,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E44 | The recording player's checkpoints, kept in memory | L | ⏳ |
+| E44 | The recording player's checkpoints, kept in memory | L | ⏳ step 1 of 2 next |
 | E46 | The recording viewer goes back a minute or ten, to the VBL | M | ⏳ after E44 |
 | F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
 | R19 | The site's shared recordings are packages of versions 1 and 2, which the page no longer reads | S | ⏳ the author runs the migration, then deploys |
@@ -552,34 +552,72 @@ drawn as a player must (a click in the viewport is resolved through the tick's p
 over the corpus's `DMMovie2615`, `DMMovie42` and `CSBMovie0640`, so back from an hour in
 is ten to eighteen seconds.
 
-**A checkpoint** is a save's file (`saveFileOf`, with no save's tail: `saveWritten`
-changes the game), its `CarriedState`, what else the proof below finds the game reads on,
-and the player's cursor (its recording, next change and VBL counts). Read from
-`csbgame7.dat`, `saveFileOf` builds the 63 KB file in 1.8 ms and `applySaveBytes` reads it
-back in 2.9 ms: 21 are about 1.3 MB. Port-only and never written, so the saves'
-compatibility with CSBWin does not reach them.
+**A checkpoint** is taken between two VBLs, in the player's feed (`afterVbl`), at the
+first VBL past its mark where no `LoopScript` holds the loop (`Game.script`: a generator
+cannot be copied). It holds what a path cut at a save starts from (a save's file,
+`CarriedState`, `CutState`), the runtime state taken beside it (`getRuntimeSaveState`,
+`src/engine/RuntimeSave.ts`), what no read restores (below), and the player's cursor (its
+recording, next change and VBL counts). Port-only and never written, so the saves'
+compatibility with CSBWin does not reach them. A file builds in 3 to 7 ms, a page's first
+in 20 to 50.
 
-**The risk is fidelity, not cost.** A join is proven only at a save's point, after its
-tail has re-attached the monsters and run `SmartDiscard`; at any other VBL the file may
-not hold all the game reads on, and a checkpoint that misses something plays on into a
-game nobody played, unseen until the next join or save. In this order:
+**What is known**, from a throwaway experiment over the corpus (a checkpoint every 3600
+VBLs, each read into a fresh page and played to the path's end, its end's file compared):
 
-1. **The tool first**: over a long path, a checkpoint every N VBLs, each read into a fresh
-   page and played to the end, with no drift and the final file the uninterrupted play's.
-   Each failure names a field the checkpoint adds beyond `CarriedState`.
-2. **The candidates**, none checked: the monsters' ITEM16s, which a read attaches anew
-   where the play never detached them; the mouse queue's waiting clicks; a `LoopScript`
-   in its `VBLDelay` (`Game.script`, `scriptDelay`) and `Game`'s other private state; the
-   attack menu's flash; `viewportRandom`; and, for the screen alone, the message strip
-   and the interface's state (an inventory open). Taking a checkpoint at the first quiet
-   VBL after its mark (just after a tick, the queue empty, no script, the clock running)
-   narrows them.
-3. **At run time**, the player's drift after a rewind drops the checkpoint that misled it.
+- **A file read alone drifts at every checkpoint** (DMMovie2615, 0 of 19), as at any VBL
+  but a save's after its tail (`doc/RECORDING.md` → "A path cut at a save"): the read
+  re-attaches the party level's monsters (`reloadAfterSaveGame`), drawing and making timers.
+- **The runtime state installed over the read, without its re-attach**, mends most:
+  `applySnapshot`, `prepareRuntimeState` and `installRuntimeState` from the checkpoint's
+  state, the champions' `load` and the champion selected put back after, and
+  `MonsterSystem`'s `item16QueLen` and `loadedLevel` set to the game's; then `CutState`.
+  So DMMovie2615 plays 18 of 19 to its end, DMMovie42 62 of 63, CSBMovie0640 3 of 4,
+  DMMovie2823 20 of 20.
+- **Building the file changes the game**: `buildSaveFile` writes the DSA globals and the
+  overlay palette into the EXPOOL, and creates one where the dungeon has none (DM's
+  `dungeon.dat`). With the pool and `header.objectCounts[11]` put back, or the pool deleted
+  where there was none, the play that takes checkpoints ends on the file of the play that
+  takes none.
+- **What no read restores**, from the whole engine diffed recursively from `Game`, the live
+  game at the checkpoint against the restored one, at DMMovie2615's drifting checkpoint: the
+  monster AI's `lastMonsterMoved`, `lastPairTurnTime` and `lastPairTurnSlot`
+  (`MonsterAI.scratch`), `AttackSystem`'s `monsterUnderAttack`, `HallOfChampions`'
+  `reincarnationSource`, `TimerQueue`'s `missileFilterTimer` and `missileFilterObject`
+  (read by every missile encounter, `MissileEncounter.ts`), the timers' bytes 8-9 as the
+  game holds them (a file's form collapses them, `buildTimerRecords`: keep the live
+  `TimerEntry`s), and `Game`'s `playedVbls`, `resumedSavedGame`, `newGameSeed` and
+  `canRestart`. Which of them the three drifts need is not yet known.
+- **A lead, not a fact**: with those set before the game's start, four more of DMMovie42's
+  checkpoints ended on another file. `start(true)` moves the party onto its square where
+  `resumedSavedGame` is false, as in a new game's play: `Game`'s own state is set after
+  the start, or the start is told.
+- **What else differs**, not yet shown harmless: the per-call scratch (the DSA's
+  `parameters`, `MonsterAttack.attackParameters`, the actuators' `delayedActionX/Y/Z/Pos`
+  with `delayedAction` at -1), the DSA filters' caches (`actionNameDsa`,
+  `monsterMoveFilterLocations`), the skin cache, `party.generation`, and `rnMaps`' length.
+  And outside the engine, which the diff did not reach: the renderer's `viewportRandom`,
+  and for the screen alone, the message strip and the interface's state (an inventory
+  open).
 
-Paying it: the checkpoint tool above in `npm test`, a checkpoint's read checked in
-`tools/checks/replay.ts` (it lands on the uninterrupted play's state at the checkpoint's
-VBL, its file compared, and plays on to the same end), and `doc/RECORDING.md`'s player
-updated. Size L: the tool's rounds are not known until it runs.
+**The steps:**
+
+1. **The checkpoint and its tool.** `src/engine/Checkpoint.ts`, taken and read as above;
+   `RecordingPlayer` resumes from one (its cursor set, the game started at the point,
+   `resumeAtSavePoint`); `tools/checks/checkpoints.ts` over the corpus: each package's
+   checkpoint a minute read into a fresh page, the restored engine equal to the live one
+   by a recursive diff but for a named list of per-call scratch (so a field added later
+   fails it), and played to the path's end with no drift and the uninterrupted play's
+   file; and the play that takes checkpoints ending as the play that takes none. Each
+   field the checkpoint adds is one the diff named. The long packages are gate jobs of
+   their own (`.claude/memory/long-runs-job-timeout.md`).
+2. **The player keeps them**: one a game minute, playing or forwarding, the latest 21; a
+   seek back reads the latest at or before its target and drops those after it, which the
+   play takes again as it passes them; a drift after a read drops the checkpoint that
+   misled it. Checked in `tools/checks/replay.ts` (a read lands on the uninterrupted
+   play's state at the checkpoint's VBL, its file compared, and plays on to the same
+   end), and `doc/RECORDING.md`'s player updated. Then E46.
+
+Size L: step 1 is about a session, step 2 less.
 
 ### E46 ⏳ The recording viewer goes back a minute or ten, to the VBL
 
