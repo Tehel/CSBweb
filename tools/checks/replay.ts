@@ -1179,7 +1179,7 @@ async function seekBack(path: readonly Recording[], savedAtEnd: SavedAtEnd | nul
   const at = Math.floor(length * 0.9);
   const to = Math.floor(length * 0.7);
   const back = await playPath(STOCK_DATA_SET, diskFiles(STOCK_DATA_SET), path, savedAtEnd, { at, to }, keep);
-  const { before, read, after, landed } = back.seek!;
+  const { before, read, after, landed, reaches } = back.seek!;
   console.log(`    kept ${marks(before).join(', ') || 'none'} at ${at} of ${length} VBLs, back to ${to}: ${read ? `read ${read.cursor.played}` : 'the start'}, ${marks(back.kept).join(', ') || 'none'} kept at the end${back.drift ? `, its drift (${back.drift.kind})` : ''}`);
   const spaced = (checkpoints: readonly Checkpoint[]) => checkpoints.length <= keep.most
     && checkpoints.every((checkpoint, n) => checkpoint.cursor.played >= (n === 0 ? keep.every : marks(checkpoints)[n - 1]! + keep.every));
@@ -1188,6 +1188,10 @@ async function seekBack(path: readonly Recording[], savedAtEnd: SavedAtEnd | nul
   const latest = before.filter((checkpoint) => checkpoint.cursor.played <= to).pop() ?? null;
   check(read === latest && marks(after).join() === marks(before.filter((checkpoint) => checkpoint.cursor.played <= to)).join(),
     `back to ${to} reads the latest at or before it (${read ? read.cursor.played : 'the start'}), those after it dropped (${marks(after).join(', ')} kept)`);
+  const oldest = before[0]?.cursor.played ?? null;
+  check(reaches.to === (latest !== null || to < keep.every)
+    && (oldest === null || reaches.beforeOldest === (oldest - 1 < keep.every)),
+    `the strip gives back to ${to} (${reaches.to}), and back to before the oldest kept only within a mark of the start (${oldest === null ? 'none kept' : `${oldest - 1}: ${reaches.beforeOldest}`})`);
   // The game where the seek landed, against the uninterrupted play's at that VBL.
   const taken = back.taken;
   const plainThere = taken ? (await playPath(STOCK_DATA_SET, diskFiles(STOCK_DATA_SET), path, savedAtEnd, { stopAt: taken.cursor.played })).taken : null;

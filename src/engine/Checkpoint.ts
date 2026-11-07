@@ -255,6 +255,16 @@ export class KeptCheckpoints {
         return this.read;
     }
 
+    /**
+     * Whether a seek back to `vbls` of the path has somewhere near to start from, which the
+     * viewer's back needs to be given: a checkpoint kept at or before it, or the path's
+     * start within a mark of it. Past the oldest checkpoint kept, the play from the start
+     * would run for as long as the path had run to the target, hours of it in a long path.
+     */
+    reaches(vbls: number): boolean {
+        return vbls < this.every || this.kept.some((checkpoint) => checkpoint.cursor.played <= vbls);
+    }
+
     /** The play read from a checkpoint drifted: that checkpoint dropped, and those its play took after it. */
     drifted(): void {
         if (!this.read) return;

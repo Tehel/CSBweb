@@ -87,6 +87,11 @@ export interface Seeked {
   readonly after: readonly Checkpoint[];
   /** The game's checkpoint taken at once after the read, before any VBL: what the read landed on. */
   readonly landed: Checkpoint | null;
+  /**
+   * Whether the strip allows the seek (`KeptCheckpoints.reaches`), before it: to its
+   * target, and to the VBL before the oldest checkpoint kept (`null` where none is).
+   */
+  readonly reaches: { readonly to: boolean; readonly beforeOldest: boolean | null };
 }
 
 /**
@@ -182,6 +187,8 @@ export async function playPath(
       if (!clock.advance(VBL_MS)) throw new Error('the loop stopped while the player plays');
     }
     const before = [...kept.checkpoints];
+    // What the strip allows (`KeptCheckpoints.reaches`): the target, and the VBL before the oldest kept.
+    const reaches = { to: kept.reaches(restart.to), beforeOldest: before[0] ? kept.reaches(before[0].cursor.played - 1) : null };
     player.stop();
     newPlayer();
     const read = seekBack(game, screen, messages, kept, restart.to, player);
@@ -196,7 +203,7 @@ export async function playPath(
     }
     const taken = player.checkpoint();
     run();
-    return ended(null, null, { before, read, after, landed }, taken);
+    return ended(null, null, { before, read, after, landed, reaches }, taken);
   }
   run(restart.afterMs);
   player.stop();

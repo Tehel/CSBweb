@@ -650,8 +650,11 @@ since the path's start (`RecordingPlayer.vbls`) over sixty, over the path's leng
   viewport (`seekLanded`): the read leaves the screen's viewport as it was, and drawing it
   outside a tick would draw from the game's random streams. Paused, it stays paused; at
   the path's end, it plays on unless paused; a forward while it runs adds to its target.
-  Its faces are darker until the path has run a VBL. The checkpoints reach twenty minutes
-  back from any VBL, and within them a seek runs about a minute of the game at most. `tools/checks/replay.ts` (point 11) goes back in each package's play and lands on
+  Its faces are darker, and do nothing, where the target has nowhere near to start from:
+  no checkpoint kept at or before it, and the path's start more than a minute before it
+  (`KeptCheckpoints.reaches`), so that a seek never plays a long path again from its
+  start. The checkpoints reach twenty minutes back from any VBL the play has passed, and
+  within them a seek runs about a minute of the game at most. `tools/checks/replay.ts` (point 11) goes back in each package's play and lands on
   the game the uninterrupted play has at the target, its file and the player's place.
 - **Play and pause** (Space): the loop held where it is (`Game.setPace(0)`), and on
   again. At the path's end, play is stop and play.

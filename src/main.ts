@@ -710,8 +710,8 @@ function applySettings({ game }: Built, sound: SoundManager, values: SettingsVal
  * dialog as its PLAY left it where one played it (`RECORDING_STOPPED_HASH`); stop, which
  * plays the path again from its start in this page (`rewindPage`), paused once its first
  * tick has drawn the game; ten minutes or a minute back, from a checkpoint the page keeps
- * of the path (`KeptCheckpoints`) read in this page, or the path's start, then run at once
- * to the target (`seekBack`); play and pause, play at the end being stop and play; a minute
+ * of the path (`KeptCheckpoints`) read in this page, or the path's start within a minute of
+ * the target, then run at once to the target (`seekBack`), and darker where neither is; play and pause, play at the end being stop and play; a minute
  * or ten forward, run at once in slices, unheard, the screen drawn after each
  * (`Game.forward`); slower and faster, the pace between them; and loop, which plays the path again from its start `LOOP_DELAY_MS` after its
  * end, whatever ended it. Then the time played over the path's length. Stop and eject
@@ -746,9 +746,14 @@ async function playRecording(built: Built, sound: SoundManager, id: string, { pa
     /** The checkpoints kept of the path, one a minute of it, which its players share. */
     const kept = new KeptCheckpoints();
     let messagesAlone: (() => void) | null = null;
+    /** Whether back by `by` VBLs from where the path stands, or a forward or a seek runs to, has a checkpoint to start from. */
+    const canGoBack = (by: number): boolean => {
+        const from = forwardTo ?? recordingPlayer?.vbls ?? 0;
+        return from > 0 && kept.reaches(Math.max(0, from - by));
+    };
     const strip = (): StripState => ({
         vbls: recordingPlayer?.vbls ?? 0, length: recordingPlayer?.length ?? 0, paused, ended: !(recordingPlayer?.playing ?? false),
-        pace, loop, hover,
+        back: canGoBack(BACK_VBLS.back), back10: canGoBack(BACK_VBLS.back10), pace, loop, hover,
     });
     const shown = (state: StripState): string => JSON.stringify(state);
     screen.composer.overlay = (ui) => {
@@ -830,7 +835,8 @@ async function playRecording(built: Built, sound: SoundManager, id: string, { pa
      * Back a minute or ten of the path from where it stands, or where a forward or a seek
      * runs to: the latest checkpoint kept at or before the target read in this page by a
      * new player, or the path played again from its start (`seekBack`), then run at once,
-     * unheard, until it lands (`seekLanded`), paused or playing as it was.
+     * unheard, until it lands (`seekLanded`), paused or playing as it was. The strip gives it
+     * only where that start is near (`canGoBack`).
      */
     const seek = (by: number): void => {
         const from = forwardTo ?? recordingPlayer?.vbls ?? 0;

@@ -18,7 +18,9 @@
  * screen first put back as a new page has them (`rewindPage`), as the restart after a lost
  * game puts them back (`showEndOfGame`, `src/renderer/intro/EndOfGame.ts`), and pauses it
  * at its first tick. Back reads a checkpoint the page has kept of the path in the same page
- * (`seekBack`), and runs on to its target at once (`seekLanded`).
+ * (`seekBack`), and runs on to its target at once (`seekLanded`); where none is kept at or
+ * before its target, nor the path's start within a minute of it, back is darker and does
+ * nothing (`KeptCheckpoints.reaches`).
  */
 import { VBL_FREQUENCY } from '../../core/constants';
 import type { Rect } from '../../data/tables/UITables';
@@ -49,13 +51,16 @@ type Face = StripAction | 'pace';
 
 /**
  * What the strip shows: the VBLs played and the recording's, whether it is paused or has
- * ended, its pace, whether it loops, and the control under the pointer.
+ * ended, whether back and ten minutes back have a checkpoint to go back to
+ * (`KeptCheckpoints.reaches`), its pace, whether it loops, and the control under the pointer.
  */
 export interface StripState {
   readonly vbls: number;
   readonly length: number;
   readonly paused: boolean;
   readonly ended: boolean;
+  readonly back: boolean;
+  readonly back10: boolean;
   readonly pace: Pace;
   readonly loop: boolean;
   readonly hover: StripAction | null;
@@ -135,12 +140,12 @@ const ICONS = {
 } as const satisfies Record<string, readonly string[]>;
 
 /**
- * Whether a control does something now: back once the path has run a VBL, forward only
- * while the recording plays, and slower and faster short of the slowest and the fastest
- * pace.
+ * Whether a control does something now: back and ten minutes back where a checkpoint kept
+ * reaches their target (`StripState.back`), forward only while the recording plays, and
+ * slower and faster short of the slowest and the fastest pace.
  */
 function enabled(action: StripAction, state: StripState): boolean {
-  if (action === 'back' || action === 'back10') return state.vbls > 0;
+  if (action === 'back' || action === 'back10') return state[action];
   if (action === 'forward' || action === 'forward10') return !state.ended;
   if (action === 'slower') return state.pace !== PACES[0];
   if (action === 'faster') return state.pace !== PACES[PACES.length - 1];
@@ -251,7 +256,8 @@ export function rewindPage(game: Game, screen: Pick<GameScreen, 'initializePlayS
  * it in this page, once the one that played has stopped: the page put back as stop puts
  * it back (`rewindPage`), and the latest checkpoint kept at or before the target read
  * (`KeptCheckpoints.before`, `RecordingPlayer.resume`), those after it dropped, or the
- * path played again from its start where none is. Returns the checkpoint read, or `null`.
+ * path played again from its start where none is, which the strip allows only within a
+ * minute of the start (`KeptCheckpoints.reaches`). Returns the checkpoint read, or `null`.
  * The caller then starts the game where the player plays, at its pace, and runs the loop
  * at once until the seek has landed (`seekLanded`).
  */
