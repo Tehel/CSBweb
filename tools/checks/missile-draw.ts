@@ -22,6 +22,11 @@
  *     adds them `if (!drawingMissiles)`, `:1907`), and is mirrored on the right side of
  *     the cell when its class's `byte4 & 1` says so, `LOCAL_34` being 0 (`:1810-1816`,
  *     `:2572-2578`).
+ *  6. a shrunk missile's colours go through `d.Pointer1864[distanceFromUs >> 1]`
+ *     (`:2499-2507`), a one-pointer array CSBWin reads past into the next members
+ *     (`Data.h:1396-1399`, set at `CSBCode.cpp:10468-10470`): D3 `d.Byte5728`, D2
+ *     `d.Pointer1860` = `d.Byte5744`, D1 and D0 the identity. ReDMCSB's
+ *     `G0075_apuc_PaletteChanges_Projectile` is the same (`STARTUP2.C:818-822`).
  *
  * Run: `npm test -- --only=missile-draw.ts`
  */
@@ -32,7 +37,7 @@ import { DungeonState, NO_GAME } from '../../src/engine/DungeonState';
 import { GetBasicObjectType } from '../../src/engine/objectIndex';
 import { drawMissilesAtPosition, GetGraphicClass } from '../../src/renderer/bytecode/DrawRoomObjects';
 import { ViewportDraw } from '../../src/renderer/bytecode/ViewportDraw';
-import { createPaletteIndexViewportBuffer } from '../../src/renderer/csbwin/CanvasBlitter';
+import { createPaletteIndexViewportBuffer, IDENTITY_COLOR_MAP } from '../../src/renderer/csbwin/CanvasBlitter';
 import { check, finish } from '../lib/check';
 import { standIn, standInOf } from '../lib/standIn';
 import { viewportContextOf } from '../lib/viewportContext';
@@ -187,6 +192,38 @@ async function main(): Promise<void> {
       `x1 ${x1} y2 ${y2}, viewport x ${vp.x}, left edge colour ${edge}`);
     check(y2 === Math.min(135, 47) && x1 === Math.max(0, vp.x - gc.widthBytes + 1), 'it lies where its position says, no small offset added');
     check(edge === 6, 'and on the right side of the cell it is mirrored');
+  }
+
+  // --- 6. a fireball's colours by distance ---------------------------------------
+  // One colour the two maps and the identity all tell apart, the transparent 10 aside.
+  // A map's entries are ten times the colour (`switch (D5W/10)`).
+  const far = tables.colorMapFar, medium = tables.colorMapMedium, identity = IDENTITY_COLOR_MAP;
+  const to = (map: Uint8Array, c: number): number => Math.floor(map[c]! / 10);
+  const colour = [...Array(16).keys()].find((c) => c !== 10 && new Set([to(far, c), to(medium, c), c]).size === 3);
+  check(colour !== undefined, 'a colour D3, D2 and D1 draw differently');
+  if (colour !== undefined) {
+    const fireball = standInOf<MissileRecord>({ projectileObject: RN_FIREBALL, timerIndex: 0, rangeRemaining: 255 });
+    standIn(view, 'getMissileRecord', () => fireball);
+    const fmd = tables.missileGraphics[-GetGraphicClass(dungeon, tables, RN_FIREBALL)! - 1]!;
+    const drawnColours = (relativeCell: number, relativeLocation: number): number[] => {
+      const viewportIndexBuffer = createPaletteIndexViewportBuffer(224, 136, 99);
+      const context = viewportContextOf({
+        viewportIndexBuffer, objectTables: tables, dungeonState: view,
+        getGraphicBitmap: () => {
+          const w = fmd.widthBytes * 2;
+          return { width: w, height: fmd.height, pixels: new Uint8Array(w * fmd.height).fill(colour) };
+        },
+      });
+      drawMissilesAtPosition(new ViewportDraw(context), view, tables,
+        dungeon.rnMaps.setPos(dungeon.rnMaps.rn(DBType.MISSILE, 0), relativeLocation), relativeLocation, 0, 0, 0, relativeCell, relativeLocation, 1);
+      return [...new Set(viewportIndexBuffer.pixels)].filter((c) => c !== 99);
+    };
+    for (const [cell, row, map] of [[0, 'D3', far], [3, 'D2', medium], [6, 'D1', identity]] as const) {
+      const location = [2, 3, 0, 1].find((l) => (tables.viewportPosition[0]?.[cell]?.[l]?.x ?? 0) !== 0)!;
+      const got = drawnColours(cell, location);
+      console.log(`fireball of colour ${colour} at ${row} (cell ${cell} pos ${location}): drawn in ${got.join(',')}`);
+      check(got.length === 1 && got[0] === to(map, colour), `a fireball at ${row} is drawn in colour ${to(map, colour)} (got ${got.join(',')})`);
+    }
   }
 
   weapon.weaponType = savedType;

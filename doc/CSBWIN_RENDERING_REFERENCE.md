@@ -679,6 +679,7 @@ rectpos.w.x2 = 270;  // Right edge of viewport on screen
 **Location**: `Code51a4.cpp`
 
 - Missile drawing switches on `(w124 & 1) != (facing & 1)` (parity test) to choose mirror/flip and graphic offset; it does not compare full facing.
+- A shrunk missile's colour map is `d.Pointer1864[distanceFromUs >> 1]`: `d.Byte5728` at D3, `d.Byte5744` at D2, the identity at D1 and D0 (`doc/PROVEN_FACTS.md` → "A shrunk missile is dimmed at D3 and D2 only").
 
 ---
 

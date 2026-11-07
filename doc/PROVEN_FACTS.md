@@ -1054,6 +1054,19 @@ the swords, the axes, the clubs, the dagger, the arrow (`n = 1`, so class `-1` i
 missile graphic), the Slayer, the poison dart and the throwing star. The torch, the bow,
 the staffs and the rest fly as their floor picture. `tools/checks/missile-draw.ts` checks it.
 
+## A shrunk missile is dimmed at D3 and D2 only
+
+A missile graphic shrunk for its distance goes through `d.Pointer1864[distanceFromUs >> 1]`
+(`doc/CSBwin-src/Code51a4.cpp:2497-2507`), `distanceFromUs` being
+`2 * (RelativeCellNumber / 3) + position / 2` (`:2339`): 0-1 at D3, 2-3 at D2, 4-5 at D1.
+`Pointer1864` is declared with one element (`doc/CSBwin-src/Data.h:1396`) and read past
+into the members after it, set together (`doc/CSBwin-src/CSBCode.cpp:10468-10470`):
+`[0]` is `d.Byte5728` (the far map), `[1]` `d.Pointer1860` = `d.Byte5744` (the medium
+map), `[2]` and `[3]` `d.Pointer1856` and `d.Pointer1852`, the identity. So a fireball is
+darkened at D3, less at D2, and drawn in its own colours at D1 and in the party's square.
+ReDMCSB's Atari table is the same (`doc/ReDMCSB-src/STARTUP2.C:818-822`, read at
+`DUNVIEW.C:5825`). `tools/checks/missile-draw.ts` checks it.
+
 ## `movementTicks06 == 255` means the monster never moves
 
 `doc/CSBwin-src/Monster.cpp:669`: `if (pmtDesc->timePerMove() == 255) return 0;` — the first

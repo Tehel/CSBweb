@@ -845,7 +845,10 @@ export function drawMissilesAtPosition(
       widthBytes = Math.max(1, (md.widthBytes * scale + (scale >> 1)) >> 5);
       height = Math.max(1, (md.height * scale + (scale >> 1)) >> 5);
       const dstWidth = widthBytes * 2;
-      const colorMap = distanceFromUs >= 2 ? tables.colorMapFar : tables.colorMapMedium;
+      // `d.Pointer1864[distanceFromUs >> 1]` (`Code51a4.cpp:2497-2507`): a one-pointer
+      // array read past into the next members (`Data.h:1396-1399`, `CSBCode.cpp:10468-10470`),
+      // D3 `d.Byte5728`, D2 `d.Pointer1860` = `d.Byte5744`, D1 and D0 the identity.
+      const colorMap = [tables.colorMapFar, tables.colorMapMedium][distanceFromUs >> 1] ?? IDENTITY_COLOR_MAP;
       src = shrinkBlt(base, base.width, base.height, dstWidth, height, colorMap);
     }
 
