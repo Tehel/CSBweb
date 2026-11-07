@@ -105,6 +105,9 @@ export interface AiConst {
   mmr: MmRecord;
 }
 
+/** What a checkpoint keeps of the AI (`MonsterAI.checkpointState`): its globals, whole. */
+export type AiCheckpointState = Readonly<AiScratch>;
+
 /**
  * The `d.` globals the AI threads through its call chain.
  *
@@ -169,6 +172,20 @@ function halfMoveRemaining(frame: AiFrame): number {
 
 export class MonsterAI {
   private scratch = makeAiScratch();
+
+  /**
+   * What a checkpoint keeps of the AI (`src/engine/Checkpoint.ts`), which no read
+   * restores: its `d.` globals, a copy, those that outlive a turn and those a call may read
+   * stale (`PossibleMove`'s) alike.
+   */
+  checkpointState(): AiCheckpointState {
+    return structuredClone(this.scratch);
+  }
+
+  /** `state`, a checkpoint's, set over a read of its file, a copy. */
+  setCheckpointState(state: AiCheckpointState): void {
+    this.scratch = structuredClone(state);
+  }
 
   private readonly dungeon: DungeonState;
   private readonly random: CsbRandom;

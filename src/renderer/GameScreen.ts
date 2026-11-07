@@ -16,9 +16,11 @@ import type { IndexedBitmap } from './csbwin/CanvasBlitter';
 import { SCREEN_WIDTH, SCREEN_HEIGHT } from './ViewportGraphics';
 import { Position } from '../core/types';
 import type { ViewportRenderer } from './ViewportRenderer';
+import type { ViewportPicking } from './bytecode/Types';
+import type { KeptDrawState } from './bytecode/ViewportDrawState';
 import { ScreenComposer, type ScreenComposerDeps, type ScreenHooks } from './ScreenComposer';
 import type { Presenter } from './Presenter';
-import { initializePlayState, UIMode, type UIState } from './ui/UIState';
+import { initializePlayState, playStateOf, setPlayState, UIMode, type PlayState, type UIState } from './ui/UIState';
 import {
   marchingOrderPointerMoved,
   handleMouseButton,
@@ -31,6 +33,13 @@ import {
 } from './ui/Mouse';
 import { openSaveMenu } from './ui/SaveMenu';
 import type { DialogPoint } from './ui/Dialog';
+
+/** What a checkpoint keeps of the screen (`GameScreen.keptView`). */
+export interface KeptView {
+  readonly play: PlayState;
+  readonly picking: ViewportPicking;
+  readonly drawState: KeptDrawState;
+}
 
 export class GameScreen {
   /**
@@ -248,6 +257,27 @@ export class GameScreen {
     this.ui.picking = this.viewport.draw(position, facing, this.seeThroughWalls(), word1868);
     this.composer.viewportWasDrawn();
     if (!this.ui.hintOracleUp) this.composer.presentViewport();
+  }
+
+  /**
+   * What a checkpoint keeps of the screen (`GameHost.keptView`): the screen's share of `d`
+   * (`PlayState`: the mode, an inventory's, the attack menu's names), whose button lists a
+   * click goes through; the last `DrawViewport`'s picking, which a click is resolved
+   * through until the next; and the drawing's statics, which the next reads.
+   */
+  keptView(): KeptView {
+    return { play: playStateOf(this.ui), picking: structuredClone(this.ui.picking), drawState: this.viewport.context.drawState.kept() };
+  }
+
+  /**
+   * `view`, a checkpoint's, as `keptView` gave it, put back over its read
+   * (`GameHost.setKeptView`), and the button lists of its mode.
+   */
+  setKeptView(view: KeptView): void {
+    setPlayState(this.ui, view.play);
+    setUIMode(this.ui, this.ui.uiMode);
+    this.ui.picking = structuredClone(view.picking);
+    this.viewport.context.drawState.setKept(view.drawState);
   }
 
   /** `d.SeeThruWalls`, as `ViewportRenderer.draw` reads it. */

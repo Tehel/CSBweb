@@ -57,6 +57,16 @@ export class HallOfChampions {
    */
   private reincarnationSource: HeroText | null = null;
 
+  /** What a checkpoint keeps of the Hall (`src/engine/Checkpoint.ts`), which no read restores: the hero text a candidate was read from. */
+  checkpointState(): HeroText | null {
+    return structuredClone(this.reincarnationSource);
+  }
+
+  /** `source`, a checkpoint's, set over a read of its file. */
+  setCheckpointState(source: HeroText | null): void {
+    this.reincarnationSource = structuredClone(source);
+  }
+
   constructor(private readonly ctx: GameContext) {
     this.addCharacterTables = { objDescWord4: ctx.tables.objDescWord4, carryLocation: ctx.tables.carryLocation };
   }

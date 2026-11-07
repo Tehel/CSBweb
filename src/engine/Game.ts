@@ -113,6 +113,15 @@ const BUTTON_MOVEMENT: Record<number, MovementAction> = Object.fromEntries(
 /**
  * Game class - main game controller
  */
+/** What a checkpoint keeps of `Game` itself (`Game.checkpointState`). */
+export interface GameCheckpointState {
+    readonly playedVbls: number;
+    readonly resumedSavedGame: boolean;
+    readonly newGameSeed: number | null;
+    readonly canRestart: boolean;
+    readonly paintIsHeld: boolean;
+}
+
 export class Game implements MainLoop {
     /**
      * Where `HandleMouseEvents` sends every button that is not its own (the turns and the
@@ -238,11 +247,29 @@ export class Game implements MainLoop {
      * The next `start` resumes the loop where a save's point left it, not where `MainLoop`
      * begins: a path cut at a save (`src/engine/RecordingCut.ts`), whose game read from the
      * save's file stands for the game that made it, in the middle of its loop. Its loop's
-     * flags are the carried ones (`setCarriedState`), so no tick is made due, and nothing
-     * of `TAG0138ec` runs, which the game that made the save did not run there.
+     * flags are the carried ones (`setCarriedState`), so no tick is made due, nothing
+     * of `TAG0138ec` runs, which the game that made the save did not run there, and the
+     * party is not moved onto its square, which a new game's start does: a checkpoint of
+     * a new game's play (`src/engine/Checkpoint.ts`) is not a resumed save's.
      */
     resumeAtSavePoint(): void {
         this.atSavePoint = true;
+    }
+
+    /** What a checkpoint keeps of this object, which no read restores (`src/engine/Checkpoint.ts`). */
+    checkpointState(): GameCheckpointState {
+        return {
+            playedVbls: this.playedVbls, resumedSavedGame: this.resumedSavedGame, newGameSeed: this.newGameSeed, canRestart: this.canRestart,
+            paintIsHeld: this.paintIsHeld,
+        };
+    }
+
+    /** `state`, a checkpoint's, set over a read of its file. */
+    setCheckpointState(state: GameCheckpointState): void {
+        ({
+            playedVbls: this.playedVbls, resumedSavedGame: this.resumedSavedGame, newGameSeed: this.newGameSeed, canRestart: this.canRestart,
+            paintIsHeld: this.paintIsHeld,
+        } = state);
     }
 
     /** Pin `d.RandomNumber`. For tools and, eventually, save-game restore. */
@@ -271,7 +298,8 @@ export class Game implements MainLoop {
         // `_TAG021028` ends in `TAG0138ec()` and `d.ClockRunning = 1`, and `MainLoop` follows
         // (doc/CSBwin-src/CSBCode.cpp:10672-10673, `:11555`).
         if (!atSavePoint) this.tag0138ec();
-        if (enterDungeon && !this.resumedSavedGame) {
+        // A save's point is in the middle of the game: its party is on its square already.
+        if (enterDungeon && !this.resumedSavedGame && !atSavePoint) {
             const { x, y } = this.ctx.party.state.position;
             this.systems.monsters.loadPartyLevelIfChanged();
             this.ctx.systems.worldMove.moveParty(-1, 0, x, y);

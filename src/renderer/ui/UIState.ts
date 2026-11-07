@@ -366,7 +366,7 @@ export interface UIState {
 }
 
 /** The fields of `UIState` that a game in play sets, and a restart clears. */
-type PlayState = Pick<UIState,
+export type PlayState = Pick<UIState,
   | 'uiMode' | 'modeBeforeFreeze' | 'shadedByTag02076e' | 'arrowCursorShape' | 'reincarnate' | 'diskMenuNeeded' | 'hintOracleNeeded' | 'sleepSaveNeeded'
   | 'describedObject' | 'weaponHandScroll' | 'word23144' | 'word23118' | 'pointer23178' | 'pointer23182'
   | 'attackOptionCount' | 'attackOptionNames' | 'closedAttackMenuOrdinal' | 'attackFlashValue'
@@ -424,6 +424,22 @@ export function initializePlayState(ui: UIState): void {
  */
 export function savedGameRead(ui: UIState): void {
   Object.assign(ui, initialPlayState());
+  ui.partyGeneration = ui.ctx.party.generation;
+}
+
+/** The screen's share of `d` now, a copy: what a checkpoint keeps of it (`GameScreen.keptView`). */
+export function playStateOf(ui: UIState): PlayState {
+  const state = initialPlayState();
+  for (const key of Object.keys(state) as (keyof PlayState)[]) Object.assign(state, { [key]: structuredClone(ui[key]) });
+  return state;
+}
+
+/**
+ * `state`, as `playStateOf` gave it, put back over a checkpoint's read, its party's
+ * generation the screen's. The caller sets the button lists for `uiMode`.
+ */
+export function setPlayState(ui: UIState, state: PlayState): void {
+  Object.assign(ui, structuredClone(state));
   ui.partyGeneration = ui.ctx.party.generation;
 }
 

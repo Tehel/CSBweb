@@ -9,6 +9,16 @@
 import { CsbRandom } from '../../core/random';
 import type { ObjectID } from '../../core/types';
 
+/** What `ViewportDrawState` keeps, as plain data (`ViewportDrawState.kept`). */
+export interface KeptDrawState {
+  readonly stack: Uint16Array;
+  readonly rstack: Uint16Array;
+  readonly sp: number;
+  readonly rsp: number;
+  readonly viewportRandom: number;
+  readonly graphicRandom: number;
+}
+
 export class ViewportDrawState {
   /**
    * CSBWin's `stack` and `rstack` (`doc/CSBwin-src/Viewport.cpp:2215-2247`): static rings of
@@ -39,6 +49,24 @@ export class ViewportDrawState {
    * replay the same jitter and the effect would render frozen. A tool seeds it here.
    */
   graphicRandom = 12345;
+
+  /** What it keeps, as plain data: a checkpoint's (`GameScreen.keptView`). */
+  kept(): KeptDrawState {
+    return {
+      stack: this.stack.slice(), rstack: this.rstack.slice(), sp: this.sp, rsp: this.rsp,
+      viewportRandom: this.viewportRandom.getSeed(), graphicRandom: this.graphicRandom,
+    };
+  }
+
+  /** `kept`, as `kept` gave it, put back. */
+  setKept(kept: KeptDrawState): void {
+    this.stack.set(kept.stack);
+    this.rstack.set(kept.rstack);
+    this.sp = kept.sp;
+    this.rsp = kept.rsp;
+    this.viewportRandom.setSeed(kept.viewportRandom);
+    this.graphicRandom = kept.graphicRandom;
+  }
 
   pop(): number {
     const v = this.stack[this.sp]!;

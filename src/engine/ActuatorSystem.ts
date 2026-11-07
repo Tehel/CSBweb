@@ -62,6 +62,16 @@ export class ActuatorSystem {
   private delayedActionZ = 0;
   private delayedActionPos = -1;
 
+  /** What a checkpoint keeps of it (`src/engine/Checkpoint.ts`): the delayed action and its square. */
+  checkpointState(): readonly number[] {
+    return [this.delayedAction, this.delayedActionX, this.delayedActionY, this.delayedActionZ, this.delayedActionPos];
+  }
+
+  /** `state`, a checkpoint's, set over a read of its file. */
+  setCheckpointState(state: readonly number[]): void {
+    [this.delayedAction, this.delayedActionX, this.delayedActionY, this.delayedActionZ, this.delayedActionPos] = state as [number, number, number, number, number];
+  }
+
   constructor(private readonly ctx: GameContext) {
     this.dungeon = ctx.dungeon;
     this.timers = ctx.timers;

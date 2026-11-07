@@ -40,6 +40,7 @@
 import { VBL_FREQUENCY } from '../core/constants';
 import { fileDigest } from '../data/DataSetFiles';
 import { behaviourAt, knownLevel, knownProfile } from './Behaviour';
+import { readCheckpoint, takeCheckpoint, type Checkpoint, type PlayerCursor } from './Checkpoint';
 import { setCutState } from './CutState';
 import type { Game } from './Game';
 import { saveFileOf } from './GameSaves';
@@ -111,6 +112,7 @@ export class RecordingPlayer {
     private beginListener: ((recording: Recording) => void) | null = null;
     private skipListener: ((span: HeldSpan) => void) | null = null;
     private endListener: ((drift: Drift | null) => void) | null = null;
+    private fedListener: (() => void) | null = null;
 
     /**
      * `path`, each recording after the first the child of the one before, played into
@@ -150,6 +152,14 @@ export class RecordingPlayer {
     }
 
     /**
+     * Told after each VBL's feed, between two VBLs, while it plays: where a checkpoint is
+     * taken (`checkpoint`).
+     */
+    onFed(listener: () => void): void {
+        this.fedListener = listener;
+    }
+
+    /**
      * Told each span the clock was held through (`held`) as it ends, at the change that
      * lets the clock run, or at the path's end or a drift inside it: the page's line that
      * says what it ran at once.
@@ -184,6 +194,54 @@ export class RecordingPlayer {
             ended: (word11694) => { this.gameEnd = word11694; },
         });
         this.feedAndWatch();
+    }
+
+    /**
+     * The path played on from `checkpoint`, one of this path's (`checkpoint`), in place of
+     * `start`: the game read from it, at the behaviour of the recording it was taken in,
+     * and the player where it stood; then the boundary fed after every VBL. The game is
+     * started by its owner, as after `start`, and resumes its loop at the point.
+     */
+    resume(checkpoint: Checkpoint): void {
+        const { cursor } = checkpoint;
+        const recording = this.path[cursor.segment];
+        if (!recording) throw new Error('the checkpoint is not of this path');
+        this.game.ctx.behaviour = behaviourAt(recording.level, recording.profile);
+        readCheckpoint(this.game, checkpoint);
+        const now = this.game.input.vbls;
+        this.segment = cursor.segment;
+        this.next = cursor.changes;
+        this.from = now - cursor.vbls;
+        this.started = now - cursor.played;
+        this.joined = cursor.joins;
+        this.madeLast = cursor.lastMade;
+        this.heldSince = cursor.held ? now - cursor.held.vbls : null;
+        this.heldBy = cursor.held?.holder ?? null;
+        this.game.input.play({
+            afterVbl: () => this.feedAndWatch(),
+            savedInVbl: (file) => this.savedInVbl(file),
+            ended: (word11694) => { this.gameEnd = word11694; },
+        });
+    }
+
+    /**
+     * The game's checkpoint here, between two VBLs (`takeCheckpoint`), which `resume` plays
+     * on from; `null` where it cannot be taken: a `LoopScript` holds the loop, or the player
+     * has stopped.
+     */
+    checkpoint(): Checkpoint | null {
+        if (this.finished || this.savedAtJoin !== null) return null;
+        const now = this.game.input.vbls;
+        const cursor: PlayerCursor = {
+            segment: this.segment,
+            changes: this.next,
+            vbls: now - this.from,
+            played: now - this.started,
+            joins: this.joined,
+            lastMade: this.madeLast,
+            held: this.heldSince === null ? null : { vbls: now - this.heldSince, holder: this.heldBy },
+        };
+        return takeCheckpoint(this.game, cursor);
     }
 
     /** Stop playing: the boundary is fed no more. */
@@ -248,7 +306,7 @@ export class RecordingPlayer {
         return { recording: this.path[this.segment]!.id, changes: this.next, vbls: this.game.input.vbls - this.from };
     }
 
-    /** The feed (`feed`), then a span under a held clock begun or ended there (`onSkipped`). */
+    /** The feed (`feed`), then a span under a held clock begun or ended there (`onSkipped`), then `onFed`. */
     private feedAndWatch(): void {
         this.feed();
         const held = this.held;
@@ -258,6 +316,7 @@ export class RecordingPlayer {
         } else if (!held) {
             this.endSpan();
         }
+        if (!this.finished) this.fedListener?.();
     }
 
     /** The span under a held clock, if one runs, ended here and told. */

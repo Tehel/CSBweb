@@ -218,6 +218,16 @@ export interface GameHost {
    */
   portraitOf(champion: Champion): number[] | undefined;
   /**
+   * What the screen keeps from one `DrawViewport` to the next that the game reads: the
+   * picking a click is resolved through (`d.FacingAlcove`, `d.CellTypeJustAhead`, the
+   * viewport's buttons) and the drawing's statics, its two stacks and its two random
+   * streams (`GameScreen.keptView`), opaque to the engine. A checkpoint keeps it
+   * (`src/engine/Checkpoint.ts`). Left out, `null`.
+   */
+  keptView(): unknown;
+  /** `view`, as `keptView` gave it, put back. Left out, nothing. */
+  setKeptView(view: unknown): void;
+  /**
    * `die(errorNum, msg)` (`doc/CSBwin-src/CSBCode.cpp:96-122`): a frame threw — the engine
    * throws where CSBWin calls `die` — and the loop has stopped (`Game.gameLoop`), or a
    * check of a game file failed (`die`, `src/engine/Die.ts`), which tells the host before
@@ -287,6 +297,8 @@ export function createGameHost(host: Partial<GameHost> = {}): GameHost {
     tag011366: host.tag011366 ?? (() => {}),
     drawCharacterState: host.drawCharacterState ?? (() => {}),
     portraitOf: host.portraitOf ?? (() => undefined),
+    keptView: host.keptView ?? (() => null),
+    setKeptView: host.setKeptView ?? (() => {}),
     die: host.die ?? ((error) => { throw error; }),
     clock: host.clock ?? WALL_CLOCK,
   };

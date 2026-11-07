@@ -273,6 +273,16 @@ export class AttackSystem {
    */
   private monsterUnderAttack: ObjectID = OBJECT_ID_EOF;
 
+  /** What a checkpoint keeps of the attack (`src/engine/Checkpoint.ts`), which no read restores: `d.MonsterUnderAttack`. */
+  checkpointState(): ObjectID {
+    return this.monsterUnderAttack;
+  }
+
+  /** `monster`, a checkpoint's, set over a read of its file. */
+  setCheckpointState(monster: ObjectID): void {
+    this.monsterUnderAttack = monster;
+  }
+
   /** `d.attackDamageToDisplay` — what `FlashAttackDamage` shows next. */
   attackDamageToDisplay = 0;
 

@@ -57,6 +57,16 @@ export class MonsterAttack {
    * (`doc/CSBwin-src/Monster.cpp:921-942`), zeroes before the first attack. An attack
    * writes every field again but `disableTime`, which no C++ reads.
    */
+  /** What a checkpoint keeps of it (`src/engine/Checkpoint.ts`): `attackParameters`, a copy. */
+  checkpointState(): AttackParameters {
+    return { ...this.attackParameters };
+  }
+
+  /** `parameters`, a checkpoint's, set over a read of its file. */
+  setCheckpointState(parameters: AttackParameters): void {
+    Object.assign(this.attackParameters, parameters);
+  }
+
   readonly attackParameters: AttackParameters = {
     monsterID: 0, monsterType: 0, monsterIndex: 0, monsterLevel: 0, monsterX: 0, monsterY: 0,
     monsterPos: 0, missileOriginPosition: 0, missileRange: 0, missileDamage: 0, missileDecayRate: 0,

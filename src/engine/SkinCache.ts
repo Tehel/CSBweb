@@ -30,6 +30,14 @@ function copyBytes(dest: Int8Array | Uint8Array, record: readonly number[], size
     for (let i = 0; i < size; i++) dest[i] = record[i >> 2]! >>> (8 * (i & 3));
 }
 
+/** What `SkinCache` keeps, as plain data (`SkinCache.kept`). */
+export interface KeptSkinCache {
+    readonly level: number;
+    readonly columns: readonly Int8Array[];
+    readonly size: Int8Array;
+    readonly defaultSkins: Uint8Array | null;
+}
+
 export class SkinCache {
     /** -1 if the cache is empty. */
     private m_level = -1;
@@ -40,6 +48,23 @@ export class SkinCache {
     private defaultSkins: Uint8Array | null = null;
 
     constructor(private readonly data: DungeonData) {}
+
+    /**
+     * What a checkpoint keeps of it (`src/engine/Checkpoint.ts`), a copy: a refill from
+     * the pool is not always the same, since `SetSkin` can leave a byte the pool's record
+     * does not hold.
+     */
+    kept(): KeptSkinCache {
+        return { level: this.m_level, columns: this.m_columns.map((column) => column.slice()), size: this.m_size.slice(), defaultSkins: this.defaultSkins?.slice() ?? null };
+    }
+
+    /** `kept`, as `kept` gave it, put back. */
+    setKept(kept: KeptSkinCache): void {
+        this.m_level = kept.level;
+        kept.columns.forEach((column, n) => this.m_columns[n]!.set(column));
+        this.m_size.set(kept.size);
+        this.defaultSkins = kept.defaultSkins?.slice() ?? null;
+    }
 
     /** `SKIN_CACHE::Load` (`data.cpp:2065-2090`): the column pair of `x` on `level`, read. */
     private Load(level: number, x: number): number {

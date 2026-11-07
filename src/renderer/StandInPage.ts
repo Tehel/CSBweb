@@ -25,7 +25,7 @@ import type { CutPage } from '../engine/RecordingCut';
 import { NO_FULLSCREEN } from '../lib/fullscreen';
 import { Settings, applyToGame } from '../settings/Settings';
 import { GameInput } from './GameInput';
-import { GameScreen } from './GameScreen';
+import { GameScreen, type KeptView } from './GameScreen';
 import { Presenter } from './Presenter';
 import { ScrollingText } from './csbwin/ScrollingText';
 import { hostDrawing } from './ui/HostDrawing';
@@ -73,6 +73,8 @@ export async function standInPage(set: DataSet, files: DataSetFiles): Promise<St
     },
     openReincarnateScreen: (chIdx) => { if (screen) openReincarnateScreen(screen.ui, chIdx); },
     ...drawing,
+    keptView: () => screen?.keptView() ?? null,
+    setKeptView: (view) => screen?.setKeptView(view as KeptView),
     championJoined: () => saves.championJoined(),
     die: (error) => { throw error; },
     drawViewport: renderView,

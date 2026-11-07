@@ -107,7 +107,7 @@ function filterTimer(position: Position): TimerEntry {
  * when there is no record; `filterObj` is the first type-47 actuator at `locr`, or
  * `OBJECT_ID_EOF`.
  */
-interface MonsterMoveFilterLocation {
+export interface MonsterMoveFilterLocation {
   locr: LocationRel;
   maxDistance: number;
   partyLevelOnly: number;
@@ -121,6 +121,14 @@ interface MonsterMoveFilterLocation {
  * others keep a DSA found once (the action name, the monster move and the party attack
  * filters), or walk the square their own way (the sound, equip and viewing filters).
  */
+/** What a checkpoint keeps of `DsaFilters` (`DsaFilters.checkpointState`). */
+export interface DsaFiltersCheckpointState {
+  readonly monsterMoveFilterLocations: ReadonlyMap<number, MonsterMoveFilterLocation>;
+  readonly monsterMoveFilterGlobal: MonsterMoveFilterLocation | null;
+  readonly actionNameDsa: ObjectID;
+  readonly actionNameFilterPos: { readonly x: number; readonly y: number; readonly z: number } | null;
+}
+
 export class DsaFilters {
   private readonly dungeon: DungeonState;
   /**
@@ -146,6 +154,31 @@ export class DsaFilters {
    */
   private actionNameDsa: ObjectID = OBJECT_ID_NULL;
   private actionNameFilterPos: Position | null = null;
+
+  /**
+   * What a checkpoint keeps of the filters (`src/engine/Checkpoint.ts`): the caches that
+   * live as long as the system, a copy. A fresh lookup is not the same: each holds the DSA
+   * found when it first looked, and the world may have changed since.
+   */
+  checkpointState(): DsaFiltersCheckpointState {
+    return structuredClone({
+      monsterMoveFilterLocations: this.monsterMoveFilterLocations,
+      monsterMoveFilterGlobal: this.monsterMoveFilterGlobal,
+      actionNameDsa: this.actionNameDsa,
+      actionNameFilterPos: this.actionNameFilterPos && { x: this.actionNameFilterPos.x, y: this.actionNameFilterPos.y, z: this.actionNameFilterPos.z },
+    });
+  }
+
+  /** `state`, a checkpoint's, set over a read of its file. */
+  setCheckpointState(state: DsaFiltersCheckpointState): void {
+    const copy = structuredClone(state);
+    this.monsterMoveFilterLocations.clear();
+    for (const [level, location] of copy.monsterMoveFilterLocations) this.monsterMoveFilterLocations.set(level, location);
+    this.monsterMoveFilterGlobal = copy.monsterMoveFilterGlobal;
+    this.actionNameDsa = copy.actionNameDsa;
+    const at = copy.actionNameFilterPos;
+    this.actionNameFilterPos = at && new Position(at.x, at.y, at.z);
+  }
   /** The phrases `&DESCRIBE` changes, while a viewing filter's DSAs run; null otherwise. */
   viewingFilterContext: ViewingFilterContext | null = null;
 

@@ -713,6 +713,56 @@ plays it to its end; and plays some without the attack menu, the champion select
 want of game information, which drift. `tools/checks/replay.ts` (point 8) cuts at a
 branch that read a Sleepsave.
 
+### Checkpoints
+
+A checkpoint (`src/engine/Checkpoint.ts`) is the game between two VBLs as a path plays it,
+kept in memory, never written: what the viewer is to go back to (`DEBT.md` E44, E46). The
+player takes one (`RecordingPlayer.checkpoint`) after a VBL's feed (`onFed`), where no
+`LoopScript` holds the loop (a generator cannot be kept), and a fresh page's player plays
+on from it (`resume`) in place of `start`: the game read from it, at the behaviour of the
+recording it was taken in, and the player's cursor where it stood, its recording, next
+change, VBLs, joins and a span under a held clock. The game's next start resumes at the
+point (`Game.resumeAtSavePoint`), which, besides what a cut skips, does not move a new
+game's party onto its square again.
+
+It starts from what a cut starts from, a save's file made at the point with its
+`CarriedState` and `CutState`. At an arbitrary VBL that is not the game: the read
+re-attaches the party level's monsters, drawing and making timers, and wakes a party
+asleep, as CSBWin saves no sleep. So over the read go the runtime state taken beside the
+file and its world (`getRuntimeSaveState`), the live timers as the game holds them (a
+file's form collapses bytes 8-9), and what no file holds:
+
+- `Game`'s own: the play time, whether the game was read from a save, the new game's seed,
+  `d.CanRestartFromSavegame` and the paint held;
+- the missile filter's timer and object, which every missile encounter reads, and
+  `monsterDamageResult`;
+- the monster AI's `d.` globals, whole, those that outlive a turn and those a call reads
+  stale alike; `d.MonsterUnderAttack`; the monster attack's parameter block; the pool's
+  count and the level whose monsters hold it; the party's generation;
+- the DSAs' parameter blocks, and the filters' caches, which live as long as the system and
+  hold the DSA found when each first looked, so that a fresh lookup is not the same;
+- the actuators' delayed action, the hero text a candidate was read from, the skin cache
+  (`SetSkin` can leave a byte its pool record does not hold) and a new game's Extended
+  Features block, which a save's read leaves off the world;
+- the screen's, which the page keeps for it (`GameHost.keptView`, `GameScreen.keptView`):
+  the screen's share of `d` (`PlayState`: the mode, an inventory's, the attack menu's
+  names), whose button lists a click goes through; the last `DrawViewport`'s picking, which
+  a click in the viewport is resolved through until the next; and the drawing's statics,
+  its two stacks and two random streams, which the next reads.
+
+Making the file writes the world's `EXPOOL`, and makes one where the dungeon has none: the
+take puts the pool back, so taking a checkpoint changes nothing, and the read puts it back
+over the file's. A checkpoint takes 3 to 12 ms, and its read as long.
+
+`tools/checks/checkpoints.ts` plays each corpus package three times: without
+checkpoints; taking one a minute, which ends on the same file; and in a chain, each
+checkpoint read into a fresh page, the engine read compared with the one that took it by a
+recursive walk from `Game` (every field equal but the start's flag, so a field added
+later that a checkpoint misses fails there), then played on to the next, and the last to
+the path's end, with no drift and the same file. A package shorter than four minutes takes
+one each quarter of its length. The player does not keep checkpoints yet, and the strip's
+rewind does nothing (`DEBT.md` E44, step 2).
+
 ## Recordings made in CSBWin
 
 Playing back CSBWin's own recordings needs, beyond the above, the port's random draws to

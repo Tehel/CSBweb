@@ -26,7 +26,7 @@ import { messageParametersKey, readGlobalVariables } from '../data/CsbwinExpool'
 import { DsaBank, DsaInterpreter, DsaOverride, type ExecutionPacket, type GearJump } from './dsa/DsaMachine';
 import { DSA_OPERATIONS, type DsaOperationMachine } from './dsa/DsaOperations';
 import { globalText } from './dsa/ops/messages';
-import { DsaFilters } from './dsa/DsaFilters';
+import { DsaFilters, type DsaFiltersCheckpointState } from './dsa/DsaFilters';
 import { DsaVars } from './dsa/DsaTypes';
 
 /**
@@ -39,6 +39,13 @@ const PARTY_ATTACK_PARAM_SIZEOF = 124;
 /** The `ATTACKPARAMETERS` words, `sizeof(ATTACKPARAMETERS) / 4`. */
 const PARTY_ATTACK_PARAM_WORDS = PARTY_ATTACK_PARAM_SIZEOF / 4;
 
+/** What a checkpoint keeps of `DsaSystem` (`DsaSystem.checkpointState`). */
+export interface DsaCheckpointState {
+  readonly parameters: Int32Array;
+  readonly adjustSkillsParameters: Int32Array;
+  readonly filters: DsaFiltersCheckpointState;
+}
+
 export class DsaSystem {
   private readonly dungeon: DungeonState;
   private readonly timers: TimerQueue;
@@ -48,6 +55,21 @@ export class DsaSystem {
   /** The filter sites, which hand a dungeon's DSAs a block and read back what they leave. */
   readonly filters: DsaFilters;
   private adjustSkillsParameters = new Int32Array(5);
+
+  /**
+   * What a checkpoint keeps of the DSAs (`src/engine/Checkpoint.ts`) beside the globals a
+   * file holds: the parameter blocks a filter is handed, and the filters' caches.
+   */
+  checkpointState(): DsaCheckpointState {
+    return { parameters: this.parameters.slice(), adjustSkillsParameters: this.adjustSkillsParameters.slice(), filters: this.filters.checkpointState() };
+  }
+
+  /** `state`, a checkpoint's, set over a read of its file. */
+  setCheckpointState(state: DsaCheckpointState): void {
+    this.parameters = state.parameters.slice();
+    this.adjustSkillsParameters = state.adjustSkillsParameters.slice();
+    this.filters.setCheckpointState(state.filters);
+  }
   /**
    * `globalVariables` — where a dungeon's DSAs keep their puzzle progress, so a read
    * has to carry them (`getGlobalVariables` / `setGlobalVariables`). Its length is

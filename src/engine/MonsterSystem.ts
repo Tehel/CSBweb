@@ -62,6 +62,12 @@ const SOUND_ORDINAL_TELEPORT = 17;
 /** The out-of-range `groupIndex` sentinel for a monster with no `ITEM16`. */
 const GROUP_INDEX_DETACHED = 0xd8;
 
+/** What a checkpoint keeps of `MonsterSystem` (`MonsterSystem.checkpointState`). */
+export interface MonsterCheckpointState {
+  readonly item16QueLen: number;
+  readonly loadedLevel: number | null;
+}
+
 export class MonsterSystem {
   /** `d.ITEM16QueLen` — how many slots are in use. */
   private item16QueLen = 0;
@@ -81,6 +87,20 @@ export class MonsterSystem {
   /** The same level, read; public so that `tools/` can see a level change land. */
   getLoadedLevel(): number | null {
     return this.loadedLevel;
+  }
+
+  /**
+   * What a checkpoint keeps of the pool's bookkeeping (`src/engine/Checkpoint.ts`): set
+   * over a read of its file, whose re-attach (`reloadAfterSaveGame`) the checkpoint's own
+   * pool and timers undo.
+   */
+  checkpointState(): MonsterCheckpointState {
+    return { item16QueLen: this.item16QueLen, loadedLevel: this.loadedLevel };
+  }
+
+  /** `state`, a checkpoint's, set over a read of its file. */
+  setCheckpointState(state: MonsterCheckpointState): void {
+    ({ item16QueLen: this.item16QueLen, loadedLevel: this.loadedLevel } = state);
   }
 
   private readonly dungeon: DungeonState;

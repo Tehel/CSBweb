@@ -32,7 +32,7 @@ import swooshSoundUrl from './assets/swoosh.wav?url';
 import { createCrtEffect, type CrtEffect } from './lib/crt';
 import { Presenter } from './renderer/Presenter';
 import { NO_FULLSCREEN, createFullscreen, type PageFullscreen } from './lib/fullscreen';
-import { GameScreen } from './renderer/GameScreen';
+import { GameScreen, type KeptView } from './renderer/GameScreen';
 import { NO_INPUT, type GameInput } from './renderer/GameInput';
 import { hostDrawing } from './renderer/ui/HostDrawing';
 import { bindSaveDrop, bindUIEvents, RECORDING_STOPPED_HASH, showFatalMessage, showWelcomePage, welcomePageQuery } from './ui';
@@ -332,7 +332,10 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // What the attack menu, `ShowHideInventory`, `TAG02076e`, `TAG0207cc`, a save read
         // in play, `KillCharacter` and the damage shown draw, and a champion's portrait
         // pixels, which only the screen holds.
-        ...drawing,
+            ...drawing,
+            // What a checkpoint keeps of the screen (`src/engine/Checkpoint.ts`).
+            keptView: () => screen?.keptView() ?? null,
+            setKeptView: (view) => screen?.setKeptView(view as KeptView),
         // The prison's fourth champion asks whether the adventure begins, and every
         // champion is reported.
         championJoined: (joined) => {
