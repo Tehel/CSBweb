@@ -9,7 +9,8 @@
  * package as its own page does (point 10).
  *
  * What the replay tool (`utils/replay-recordings.ts`) plays a shared recording with. A
- * play may be restarted as the viewer's RESTART restarts it (`Restart`).
+ * play may be restarted as the viewer's stop restarts it (`Restart`), or run at once
+ * from its start as the viewer's forward runs it (`'forward'`).
  */
 import { VBL_FREQUENCY } from '../../src/core/constants';
 import type { DataSetFiles } from '../../src/data/DataSetFiles';
@@ -38,10 +39,15 @@ export interface Played {
    * run in the play again, its second's pause left out, and the VBLs run in the pause.
    */
   readonly restarted: { readonly ms: number; readonly vbls: number; readonly pausedVbls: number } | null;
+  /** The VBLs the player ran, and the path's length (`RecordingPlayer.length`). */
+  readonly vbls: number;
+  readonly length: number;
+  /** Where the path was run at once (`'forward'`): the slices it ran in, the page let run between. */
+  readonly slices: number | null;
 }
 
 /**
- * RESTART, as the viewer's strip does it (`playRecording`, `src/main.ts`): the first play
+ * The viewer's stop, as its strip does it (`playRecording`, `src/main.ts`), less the pause at the first tick: the first play
  * stopped once it has played `afterMs` of the clock, or at its end, the page rewound
  * (`rewindPage`) and the path played again with a new player at `pace`, paused for a
  * second of the clock once it has played `afterMs` again.
@@ -70,11 +76,12 @@ export function keptFiles(files: DataSetFiles): DataSetFiles {
 /**
  * `path` played from its first recording's start in a fresh page of `set`, whose files
  * `files` reads, to its end or its first drift; `savedAtEnd`, the save a path shared at a
- * save's point ends at; `restart`, a RESTART in it. A frame that throws, CSBWin's `die`,
- * throws.
+ * save's point ends at; `restart`, a stop in it, or `'forward'`, the whole path run at
+ * once (`Game.forward`), its slices on the clock's zero-delay calls. A frame that throws,
+ * CSBWin's `die`, throws.
  */
 export async function playPath(
-  set: DataSet, files: DataSetFiles, path: readonly Recording[], savedAtEnd: SavedAtEnd | null = null, restart: Restart | null = null,
+  set: DataSet, files: DataSetFiles, path: readonly Recording[], savedAtEnd: SavedAtEnd | null = null, restart: Restart | 'forward' | null = null,
 ): Promise<Played> {
   const { game, screen, messages, clock, dungeonDat } = await standInPage(set, files);
   let player!: RecordingPlayer;
@@ -92,9 +99,20 @@ export async function playPath(
   };
   game.runAtOnceWhile(() => player.held);
   play();
+  const ended = (restarted: Played['restarted'], slices: number | null = null): Played => ({
+    drift: player.drift, point: player.point, joins: player.joins, game, restarted, vbls: player.vbls, length: player.length, slices,
+  });
   if (!restart) {
     run();
-    return { drift: player.drift, point: player.point, joins: player.joins, game, restarted: null };
+    return ended(null);
+  }
+  if (restart === 'forward') {
+    let slices = 1;
+    game.forward(() => player.playing, () => { throw new Error('the path ran at once ends with the player'); }, () => slices++);
+    while (player.playing) {
+      if (!clock.advance(0)) throw new Error('the loop stopped while the player plays');
+    }
+    return ended(null, slices);
   }
   run(restart.afterMs);
   player.stop();
@@ -109,8 +127,5 @@ export async function playPath(
   const pausedVbls = player.vbls - before;
   game.setPace(restart.pace);
   run();
-  return {
-    drift: player.drift, point: player.point, joins: player.joins, game,
-    restarted: { ms: clock.time - from - 1000, vbls: player.vbls, pausedVbls },
-  };
+  return ended({ ms: clock.time - from - 1000, vbls: player.vbls, pausedVbls });
 }

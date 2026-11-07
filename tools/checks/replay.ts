@@ -81,12 +81,14 @@
  *    whose last change's stream is not the game's drifts there; one whose form is wrong
  *    is refused. The replay tool's page (`tools/lib/playback.ts`) plays each the same, to
  *    the same game.
- * 11. The viewer's RESTART (`rewindPage`, `src/renderer/ui/RecordingStrip.ts`): each
+ * 11. The viewer's stop (`rewindPage`, `src/renderer/ui/RecordingStrip.ts`): each
  *    package's path, stopped a second into its play in the replay tool's page, the page
  *    rewound and the path played again at ×8, paused a second in it, plays to the same
  *    end; the loop runs eight VBLs to one of the clock, and none in the pause. And the
  *    page rewound at the path's end, under the disk menu's held clock among them, plays
- *    it again to the same end.
+ *    it again to the same end. And its forward (`Game.forward`): the path run at once
+ *    from its start, in slices of five seconds, plays to the same end, and the player's
+ *    time there is the path's length (`RecordingPlayer.length`).
  *
  * 12. A recording carries the engine's level and its set's files' digests, through the
  *    store and a package; a row and a head made before levels read as level 0, naming no
@@ -1136,6 +1138,14 @@ async function samePlayback(played: Page, path: readonly Recording[], savedAtEnd
   check(JSON.stringify(atEnd.drift) === JSON.stringify(alone.drift) && JSON.stringify(atEnd.point) === JSON.stringify(alone.point)
     && atEnd.joins === alone.joins && firstDifference(atEndFile, file) < 0,
     `and RESTART at its end plays it again to the same end${JSON.stringify(atEnd.drift) !== JSON.stringify(alone.drift) ? ` (drift ${JSON.stringify(atEnd.drift)})` : ''}`);
+  const forwarded = await playPath(STOCK_DATA_SET, diskFiles(STOCK_DATA_SET), path, savedAtEnd, 'forward');
+  const forwardedFile = buildSaveFile(forwarded.game, { portraitOf: (champion) => forwarded.game.ctx.host.portraitOf(champion) });
+  check(JSON.stringify(forwarded.drift) === JSON.stringify(alone.drift) && JSON.stringify(forwarded.point) === JSON.stringify(alone.point)
+    && forwarded.joins === alone.joins && firstDifference(forwardedFile, file) < 0
+    && forwarded.slices === Math.max(1, Math.ceil(forwarded.vbls / (5 * VBL_FREQUENCY))),
+    `and run at once from its start, in slices of five seconds (${forwarded.slices} for ${forwarded.vbls} VBLs), to the same end${JSON.stringify(forwarded.drift) !== JSON.stringify(alone.drift) ? ` (drift ${JSON.stringify(forwarded.drift)})` : ''}`);
+  check(alone.drift !== null || alone.vbls === alone.length,
+    `the player's time at the end is the path's length (${alone.vbls} VBLs of ${alone.length})`);
 }
 
 /**

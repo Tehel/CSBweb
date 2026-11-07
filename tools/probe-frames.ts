@@ -1790,12 +1790,12 @@ check(recordingPruned.healed, "the running recording removed, as another tab's p
 // loop stopped and the recording written. `?recording=` plays it to its end, at the wall
 // clock's pace times the viewer's and the held clock at once: the game's keys reach
 // nothing; the viewer's strip (`src/renderer/ui/RecordingStrip.ts`) pauses on Space, no
-// VBL running, sets the pace on `+`, and plays on at a click on it; the store's
+// VBL running, sets the pace on `+`, and plays on at a click on its play; the store's
 // recordings and saves are as they were; the game ends as the recorded one stood, its
 // loop stopped; and the message area says what was skipped, the settings' span, and that
-// the recording ends, a frame of it with the strip over it. Backspace plays it again from
-// its start, the message area emptied, to the same end, and Esc goes back to the welcome
-// page.
+// the recording ends, a frame of it with the strip over it. Backspace stops it, the
+// message area emptied, the path paused at its first tick, a click on play plays it on,
+// and → runs it at once to the same end. Esc goes back to the welcome page.
 await key('KeyL'); await vbls(TICK);
 await key('Escape'); await vbls(30);
 await key('Escape'); await vbls(SHOWN);
@@ -1817,7 +1817,7 @@ const paused = await evaluate(`(({ screen }) => ({ vbls: window.__probe.player()
   dialog: screen.ui.dialog !== null }))(window.__probe)`);
 await key('+');
 await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown',{key:'=',code:'Equal',bubbles:true})),1`);
-await canvasClick(14, 175);
+await canvasClick(72, 175);
 const paced = await evaluate(`window.__probe.game.pace`);
 await until('!window.__probe.player().playing', 'the recording played to its end');
 await until(`window.__probe.game.ctx.host.messages.snapshot().includes('THE RECORDING ENDS HERE.')`, 'the line at its end');
@@ -1835,7 +1835,7 @@ check(recordedGame.pauses === 2 && playedGame.drift === null && playedGame.state
   `?recording= plays the store's recording to its end, the settings' held clock among it, the game as the recorded one stood, and stops (${recordedGame.vbls} VBLs, ${recordedGame.changes} changes)`);
 check(!paused.dialog && !playedGame.dialog, 'the game\'s keys reach nothing while it plays: its turn turns nothing, F5 saves nothing, and no dialog opens');
 check(paused.playing && paused.vbls === pausedAt && paced === 4,
-  `Space pauses it, no VBL running for 300 ms (${pausedAt} VBLs played), +, then its key unshifted, sets the pace to x4, and a click on PLAY plays on`);
+  `Space pauses it, no VBL running for 300 ms (${pausedAt} VBLs played), +, then its key unshifted, sets the pace to x4, and a click on play plays on`);
 check(playedLines.some((line) => /^SKIPPED \d+S ON THE SETTINGS$/.test(line)),
   `a line in the message area says what was run at once, and another the end: ${JSON.stringify(playedLines.filter((line) => line))}`);
 check(playedGame.recordings === recordedGame.recordings && playedGame.saves === recordedGame.saves,
@@ -1843,10 +1843,20 @@ check(playedGame.recordings === recordedGame.recordings && playedGame.saves === 
 await shot('32-recording-ended');
 await key('Backspace');
 const restartedLines: string[] = await evaluate(`window.__probe.game.ctx.host.messages.snapshot()`);
-await until('!window.__probe.player().playing', 'the recording played again to its end');
+const stopped = `(({ game }) => ({ vbls: window.__probe.player().vbls, playing: window.__probe.player().playing, pace: game.pace,
+  tick: game.ctx.state.tickCount }))(window.__probe)`;
+const stoppedAt = await evaluate(stopped);
+await wait(300);
+const stoppedLater = await evaluate(stopped);
+check(!restartedLines.includes('THE RECORDING ENDS HERE.') && stoppedAt.playing && stoppedAt.pace === 0 && stoppedAt.vbls > 0
+  && stoppedAt.vbls < 60 && JSON.stringify(stoppedLater) === JSON.stringify(stoppedAt),
+  `Backspace stops it: the message area emptied, the path played again from its start to its first tick and paused there (${JSON.stringify(stoppedAt)})`);
+await canvasClick(72, 175);
+await key('ArrowRight');
+await until('!window.__probe.player().playing', 'the recording run at once to its end');
 const replayedGame = await evaluate(playedState);
-check(!restartedLines.includes('THE RECORDING ENDS HERE.') && replayedGame.drift === null && replayedGame.state === recordedGame.state,
-  'Backspace plays it again from its start, the message area emptied, to the same end');
+check(replayedGame.drift === null && replayedGame.state === recordedGame.state,
+  'a click on play plays it on, and → runs it at once to the same end');
 await leave(() => key('Escape'), WELCOME);
 check(await evaluate(`!new URLSearchParams(location.search).has('recording')`), 'and Esc goes back to the welcome page');
 
@@ -2262,8 +2272,8 @@ check(partLeft?.site.join() === 'No recording of this dungeon on the site yet.',
 // champion at 1 HP, saved by F5 and read back, which begins a recording from it, then put
 // before the Stone Golem by `?dev`, which kills the party, at x8. `?recording=` plays it to
 // its end as to any other point: no credits, the line saying the game is lost there, a
-// frame of it with the strip over it, and Backspace, which the credits' host would take,
-// playing it again.
+// frame of it with the strip over it; and the strip's keys, which the credits' host would
+// take, playing it again: L, loop, five seconds after its end, then Space, play at its end.
 await navigate(`${APP}?intro=0&dungeon=csb`, GAME);
 const lostBytes = readFileSync(new URL('fixtures/csbgame7.dat', import.meta.url)).toString('base64');
 const lostRecorded = await evaluate(`(async()=>{
@@ -2297,13 +2307,22 @@ check(lostPlayed.lines.includes('THE GAME IS LOST HERE.') && !lostPlayed.lines.i
   `the message area says the game is lost there: ${JSON.stringify(lostPlayed.lines)}`);
 await leaveCanvas(); await wait(100);
 await shot('33-recording-lost');
-await key('Backspace');
-const lostRestarted = await evaluate(`window.__probe.player().playing && !window.__probe.game.mainLoopHasReturned()`);
+const lostEnded = `(({ game }) => ({ drift: window.__probe.player().drift, returned: game.mainLoopHasReturned(),
+  lines: game.ctx.host.messages.snapshot().filter((line) => line) }))(window.__probe)`;
+await key('KeyL');
+await until('window.__probe.player().playing', 'the lost game looped', 10_000);
+const lostLooped = await evaluate(`!window.__probe.game.mainLoopHasReturned() && window.__probe.game.pace === 8`);
+await key('KeyL');
 await until('!window.__probe.player().playing', 'the lost game played again to its end');
-const lostAgain = await evaluate(`(({ game }) => ({ drift: window.__probe.player().drift, returned: game.mainLoopHasReturned(),
-  lines: game.ctx.host.messages.snapshot().filter((line) => line) }))(window.__probe)`);
-check(lostRestarted && lostAgain.drift === null && lostAgain.returned,
-  `and Backspace plays it again from its start, to the same end (${JSON.stringify(lostAgain)})`);
+const lostAgain = await evaluate(lostEnded);
+check(lostLooped && lostAgain.drift === null && lostAgain.returned,
+  `and L, its end reached, plays it again from its start at its pace, to the same end (${JSON.stringify(lostAgain)})`);
+await key('Space');
+const lostRestarted = await evaluate(`window.__probe.player().playing && !window.__probe.game.mainLoopHasReturned()`);
+await until('!window.__probe.player().playing', 'the lost game played a third time to its end');
+const lostThird = await evaluate(lostEnded);
+check(lostRestarted && lostThird.drift === null && lostThird.returned,
+  `and Space at its end plays it again from its start, to the same end (${JSON.stringify(lostThird)})`);
 await leave(() => key('Escape'), WELCOME);
 
 // The map dialog (`src/renderer/ui/MapDialog.ts`), over CSB's `csbgame2.dat`, its party

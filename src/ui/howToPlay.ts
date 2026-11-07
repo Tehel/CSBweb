@@ -98,12 +98,14 @@ const DIALOG = `
   <div class="how-sheet"></div>
   <section class="how-section how-replay">
     <h3 class="px">Watching a recording</h3>
-    <p>The strip over the messages shows the time played, and a click on it pauses, starts again, stops or changes the pace. So do these keys:</p>
+    <p>The strip over the messages shows the time played and the recording's length, and its buttons eject, stop, play and pause, go a minute forward, change the pace and loop. So do these keys:</p>
     <dl class="how-list">
       <dt><span class="how-key px px2">Space</span></dt><dd>Pause, and play on</dd>
-      <dt><span class="how-key px px2">Backspace</span></dt><dd>Start again from the beginning</dd>
-      <dt><span class="how-key px px2">Esc</span></dt><dd>Stop, and come back to this page</dd>
+      <dt><span class="how-key px px2">Backspace</span></dt><dd>Stop: back to the beginning, paused</dd>
+      <dt><span class="how-key px px2">Right</span></dt><dd>A minute forward</dd>
       <dt><span class="how-key px px2">+</span><span class="how-key px px2">-</span></dt><dd>Faster and slower: once, twice, four or eight times the game's pace</dd>
+      <dt><span class="how-key px px2">L</span></dt><dd>Loop: play it again from the beginning at its end</dd>
+      <dt><span class="how-key px px2">Esc</span></dt><dd>Eject, and come back to this page</dd>
     </dl>
   </section>
 </form>`;

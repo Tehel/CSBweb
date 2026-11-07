@@ -613,35 +613,45 @@ stays the page's, the strip over it as everywhere.
 **The viewer's strip** (`src/renderer/ui/RecordingStrip.ts`) has the page's input while
 a recording plays, drawn over the message area's top row, whose lines are then drawn a
 row lower while its bottom row is empty, so the three rows shown hold the newest. From
-the left, it shows four controls, which a click or a key works, in the order below, then
-the time played flush right, the player's VBLs since the path's start
-(`RecordingPlayer.vbls`) over sixty:
+the left, it shows its controls, which a click or a key works, each an icon on a face of
+its own between darker columns, in three groups: eject; stop, rewind, play and pause,
+and forward; the pace and loop. Then, flush right, the time played, the player's VBLs
+since the path's start (`RecordingPlayer.vbls`) over sixty, over the path's length
+(`RecordingPlayer.length`), which the time played reaches at its end:
 
-- **Pause** (Space): the loop held where it is (`Game.setPace(0)`), and on again.
-- **RESTART** (Backspace): the path played again from its start in the same page, by a
+- **Eject** (Esc): the player and the loop stopped, and the page left for the welcome
+  page. Where the book's dialog played the recording, the page shows it as PLAY left
+  it: its RECORDINGS, the recording selected, where it was played from and to, the tile
+  selected under it. PLAY notes
+  them in the tab's `sessionStorage`, and eject leads back with `#recording-stopped`
+  (`RECORDING_STOPPED_HASH`), which the page takes off the address; it reads the note
+  once, so another way back to the welcome page shows it as ever.
+- **Stop** (Backspace): the path played again from its start in the same page, by a
   new player, once the page is put back as a new page has it (`rewindPage`): the loop
   stopped, its state a new loop's (`Game.resumeMainLoop`), the message area empty, the
   screen's play state its first, the clock running, and `totalMoveCount` 0. The clock is
   the page's: a path shared at a save the disk menu made ends under the menu's held clock,
   and a new game's read does not set it going. `totalMoveCount` is set by the start
-  itself ("The start", above). `tools/checks/replay.ts` (point 11) restarts each package's path a second into its
-  play, and again at its end, and plays it to the same end.
-- **Stop** (Esc): the player and the loop stopped, and the page left for the welcome
-  page. Where the book's dialog played the recording, the page shows it as PLAY left
-  it: its RECORDINGS, the recording selected, where it was played from and to, the tile
-  selected under it. PLAY notes
-  them in the tab's `sessionStorage`, and stop leads back with `#recording-stopped`
-  (`RECORDING_STOPPED_HASH`), which the page takes off the address; it reads the note
-  once, so another way back to the welcome page shows it as ever.
+  itself ("The start", above). The path is then run at once to its first tick, which
+  draws the game, and paused there. `tools/checks/replay.ts` (point 11) restarts each
+  package's path a second into its play, and again at its end, and plays it to the same
+  end.
+- **Rewind** (←): not yet; drawn darker, it does nothing.
+- **Play and pause** (Space): the loop held where it is (`Game.setPace(0)`), and on
+  again. At the path's end, play is stop and play.
+- **Forward** (→): a minute of the path's VBLs run at once (`Game.forward`), five seconds
+  of them a slice, the page let run and the screen drawn between, and none heard
+  (`SoundManager.setMuted`); a span under a held clock it ends in is run to its end. A
+  forward while one runs adds a minute to it; paused, it stays paused. It runs past no
+  end: the path's end or a drift stops it as it stops the loop. `tools/checks/replay.ts`
+  (point 11) runs each package's path at once from its start to the same end.
 - **The pace** (`+`, its key with or without Shift, and `-`, or a click, round from ×8 to ×1): the loop's VBLs to a VBL
   of the wall clock, 1, 2, 4 or 8 (`Game.setPace`). A span under a held clock is run at
   once at any pace.
+- **Loop** (L): the path played again from its start five seconds after its end
+  (`LOOP_DELAY_MS`), whatever ended it, as long as it is on; its face darker while it is.
 
-RESTART and stop end the message area played on alone. While the loop does not run,
-paused or at the end, a move of the pointer is drawn at the display's next frame
-(`Presenter.animate`); the viewer's pointer is the cursor's place alone
-(`GameScreen.setCursorPoint`), never the recorded game's, which the interface keeps
-something of (`marchingOrderPointerMoved`).
+Stop and eject end the message area played on alone.
 
 **A branch of a Sleepsave** joins as any other, once the VBL has run. Its point is taken
 inside the VBL of its click, before the rest of it, its tick among them, and says so

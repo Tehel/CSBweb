@@ -85,6 +85,8 @@ export const WON_GAME_VBLS = 300;
  * with. A longer gap (a tab held longer, a machine asleep) is not made up.
  */
 const MAX_VBLS_PER_CALL = VBL_FREQUENCY;
+/** The VBLs a slice of `forward` runs before the page is let run: five seconds of the game's. */
+const FORWARD_SLICE = 5 * VBL_FREQUENCY;
 
 /**
  * The movement buttons, as `MoveParty` numbers them (doc/CSBwin-src/CSBCode.cpp:8033-8038):
@@ -151,6 +153,8 @@ export class Game implements MainLoop {
     private atOnce: (() => boolean) | null = null;
     /** The loop's VBLs to a VBL of the wall clock, 0 holding it (`setPace`). */
     private pace = 1;
+    /** While the loop runs VBLs at once, unpaced, in slices (`forward`): whether it runs on. */
+    private forwarding: (() => boolean) | null = null;
     /** `MainLoop` has returned, on the tick of a lost game (see `gameTick`), or won. */
     private mainLoopReturned = false;
     /** An error has ended the game (`die`): it never runs again, and nothing saves it. */
@@ -290,6 +294,7 @@ export class Game implements MainLoop {
      */
     stop(): void {
         this.running = false;
+        this.forwarding = null;
 
         if (this.loopTimer !== null) {
             this.ctx.host.clock.clearTimeout(this.loopTimer);
@@ -528,7 +533,7 @@ export class Game implements MainLoop {
      * own, and at 0 none, the loop then waiting for a pace.
      */
     private gameLoop = (): void => {
-        if (!this.running || this.pace === 0) {
+        if (!this.running || this.pace === 0 || this.forwarding) {
             return;
         }
 
@@ -573,6 +578,8 @@ export class Game implements MainLoop {
      */
     setPace(pace: number): void {
         this.pace = pace;
+        // Forwarding, the pace is taken up where it ends (`forward`).
+        if (this.forwarding) return;
         if (this.loopTimer !== null) {
             this.ctx.host.clock.clearTimeout(this.loopTimer);
             this.loopTimer = null;
@@ -583,6 +590,48 @@ export class Game implements MainLoop {
             const clock = this.ctx.host.clock;
             this.loopTimer = clock.setTimeout(this.gameLoop, 1000 / (VBL_FREQUENCY * pace));
         }
+    }
+
+    /**
+     * The loop's VBLs run at once while `more` holds, unpaced: a recording's viewer's
+     * fast-forward. They run `FORWARD_SLICE` at a time, the page let run between, and then
+     * the loop takes up its pace from now (`setPace`), at 0 holding it, and `done` is told.
+     * `sliced` is told after each slice but the last: the page's chance to show how far it
+     * has run. The loop stopped meanwhile (`stop`) ends it, untold. Not CSBWin's: what a
+     * VBL does is the same at any pace.
+     */
+    forward(more: () => boolean, done: () => void, sliced: () => void = () => {}): void {
+        if (!this.running || this.forwarding) return;
+        if (this.loopTimer !== null) {
+            this.ctx.host.clock.clearTimeout(this.loopTimer);
+            this.loopTimer = null;
+        }
+        this.forwarding = more;
+        const slice = (): void => {
+            this.loopTimer = null;
+            try {
+                for (let n = 0; n < FORWARD_SLICE && this.running && more(); n++) this.runFrame();
+            } catch (error) {
+                this.die();
+                this.ctx.host.die(error);
+                return;
+            }
+            if (!this.running) return;
+            if (more()) {
+                sliced();
+                this.loopTimer = this.ctx.host.clock.setTimeout(slice, 0);
+                return;
+            }
+            this.forwarding = null;
+            this.setPace(this.pace);
+            done();
+        };
+        slice();
+    }
+
+    /** Whether the loop runs VBLs at once (`forward`). */
+    get isForwarding(): boolean {
+        return this.forwarding !== null;
     }
 
     /**

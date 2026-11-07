@@ -136,7 +136,7 @@ In payoff order: the first row is the next item.
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏸️ |
 | E40 | The statistics page's heat map | M | ⏸️ |
-| E44 | The recording viewer seeks forward and back | M–L | ⏸️ |
+| E44 | The recording viewer seeks back | M–L | ⏸️ |
 | E45 | FROM and TO on a timeline of the recording | M | ⏸️ if the author asks |
 | C150 | Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops | S | ⏸️ waits on the author |
 | G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
@@ -532,30 +532,27 @@ map, as designed with the author:
 Paying it: the heat map, checked in `tools/probe-frames.ts`'s statistics block (a level
 opens its map) and by a screenshot over the dev server's fortnight.
 
-### E44 ⏸️ The recording viewer seeks forward and back
+### E44 ⏸️ The recording viewer seeks back
 
-The viewer's strip (`doc/RECORDING.md` → "The port's player") pauses, sets the pace, restarts
-and stops; nothing moves the play to a time of the path. Wanted: forward and back by 10 s
-and by a minute, as designed with the author. Size M for steps 1 and 2, L with step 3.
+The viewer's strip (`doc/RECORDING.md` → "The port's player") pauses, sets the pace, loops,
+stops at the start, and runs a minute forward at once (`Game.forward`); its rewind is
+drawn, inactive. Wanted: back by a minute, as designed with the author. Steps of 10 s,
+in the first design, are on neither. Size M for step 1, L with step 2.
 
-**What the engine costs.** Read from `csbgame7.dat` with an idle party in Node, 36000 VBLs
-(ten minutes of game) run in 83 ms without a view drawn; `saveFileOf` builds the 63 KB
-file in 1.8 ms and `applySaveBytes` reads it back in 2.9 ms. What a seek pays beyond that is
-`DrawViewport`, which a player runs at every tick, four a second, since a click in the
-viewport is resolved through the tick's picking (`doc/RECORDING.md` → "What a player must
-do"). It is not measured.
+**What the engine costs.** Forward runs five seconds of the game a slice, the tick's
+`DrawViewport` drawn as a player must (a click in the viewport is resolved through the
+tick's picking, `doc/RECORDING.md` → "What a player must do"): a game minute in 160 to
+300 ms in Node, over the corpus's `DMMovie2615`, `DMMovie42` and `CSBMovie0640`. Read from
+`csbgame7.dat`, `saveFileOf` builds the 63 KB file in 1.8 ms and `applySaveBytes` reads
+it back in 2.9 ms.
 
-1. **Forward**: the player run to a VBL at once, as a span under a held clock is
-   (`Game.runAtOnceWhile`), in slices of about 10 ms an animation frame so the strip still
-   answers and can show the progress; the sound silent and the screen composed only at
-   the arrival. The drift checks and the joins play as ever. A target inside a held span
-   moves to its end, one past the path's end to the end.
-2. **Back, without checkpoints**: RESTART's rewind (`rewindPage`), then forward to the
+1. **Back, without checkpoints**: stop's rewind (`rewindPage`), then forward to the
    target. A path's joins are checkpoints already, proven by `tools/checks/replay.ts`
    (a branch's file and `CarriedState` set over its read play on byte for byte), so the
    play may begin from the last join before the target. Measure a long recording's
-   seek in the browser before step 3: a few seconds to go back an hour may be enough.
-3. **Checkpoints, only if step 2 is too slow**: taken by the player in memory every N
+   seek in the browser before step 2: at the rate above, back from an hour in is about
+   fifteen seconds.
+2. **Checkpoints, only if step 1 is too slow**: taken by the player in memory every N
    VBLs as it plays, each a save's file (`saveFileOf`, with no save's tail:
    `saveWritten` changes the game), its `CarriedState` and the player's cursor (its
    recording, next change and VBL counts); back is the latest checkpoint before the

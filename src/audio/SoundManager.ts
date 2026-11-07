@@ -77,6 +77,7 @@ export class SoundManager {
   private gainNode: GainNode | null = null;
   private cache = new Map<number, SoundVariant[]>();
   private enabled = true;
+  private muted = false;
   private volume = 0.8;
   private soundCatalog: Record<number, SoundInfo> = buildSoundCatalog();
   private recordings = new Map<string, AudioBuffer>();
@@ -115,6 +116,14 @@ export class SoundManager {
     if (this.gainNode) {
       this.gainNode.gain.value = enabled ? this.volume : 0;
     }
+  }
+
+  /**
+   * Whether the game's sounds are dropped, whatever the setting: while a recording's
+   * viewer runs a minute at once (`Game.forward`), whose sounds would all sound together.
+   */
+  setMuted(muted: boolean): void {
+    this.muted = muted;
   }
 
   getVolume(): number {
@@ -201,7 +210,7 @@ export class SoundManager {
    * its right on the right, each at its volume of Paula's 64.
    */
   playAmigaSound(soundIndex: number, period: number, volume: SoundVolume): void {
-    if (!this.audioContext || !this.enabled) return;
+    if (!this.audioContext || !this.enabled || this.muted) return;
     const sound = this.amigaTables?.sounds[soundIndex];
     if (!sound) return;
     this.playOnVoice(this.amigaVariant(this.audioContext, sound.graphicIndex, period).buffer, volume);
@@ -247,7 +256,7 @@ export class SoundManager {
    */
   playSound(id: number, rateIdx = 0, highVolume = 1): void {
     if (!this.audioContext) return;
-    if (!this.enabled) return;
+    if (!this.enabled || this.muted) return;
 
     if (!this.cache.has(id)) {
       const info = this.soundCatalog[id] ?? { name: `Sound ${id}` };
@@ -278,7 +287,7 @@ export class SoundManager {
    * at its 11025 Hz.
    */
   playCustomSound(sound: Uint8Array, volume: number): void {
-    if (!this.audioContext || !this.gainNode || !this.enabled) return;
+    if (!this.audioContext || !this.gainNode || !this.enabled || this.muted) return;
     if (sound.length === 0) return;
     const samples = soundDataDecode(sound, volume);
     const buffer = this.audioContext.createBuffer(1, samples.length, CUSTOM_SOUND_RATE);

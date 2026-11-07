@@ -233,6 +233,16 @@ export class RecordingPlayer {
         return this.game.input.vbls - this.started;
     }
 
+    /**
+     * The VBLs the whole path runs, which `vbls` reaches at its end: each recording's to
+     * its child's point, and the last's own. A join's read runs none.
+     */
+    get length(): number {
+        let vbls = this.path[this.path.length - 1]!.vbls;
+        for (let n = 1; n < this.path.length; n++) vbls += this.path[n]!.parent!.vbls;
+        return vbls;
+    }
+
     /** Where it stands in the recording it plays: its changes applied, and its VBLs run. */
     get point(): RecordingPoint {
         return { recording: this.path[this.segment]!.id, changes: this.next, vbls: this.game.input.vbls - this.from };

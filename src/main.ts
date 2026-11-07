@@ -51,7 +51,7 @@ import { Recorder } from './engine/Recorder';
 import { partyNames, RecordingWriter } from './engine/RecordingWriter';
 import { endLines, RecordingPlayer, skippedLine, type SavedAtEnd } from './engine/RecordingPlayer';
 import {
-    drawRecordingStrip, nextPace, rewindPage, stripActionAt, stripKeyAction, timePlayed, type Pace, type StripAction, type StripState,
+    FORWARD_VBLS, drawRecordingStrip, nextPace, rewindPage, stripActionAt, stripKeyAction, type Pace, type StripAction, type StripState,
 } from './renderer/ui/RecordingStrip';
 import { packageOfSave, readRecordingPackage, recordingPackageUrl, writeRecordingPackage } from './engine/RecordingPackage';
 import { pathToWay, pointPath, pointRecordingId, SAVE_POINT_PREFIX, savedAtWay, storedPoints, wayPoints } from './engine/RecordingPoints';
@@ -84,6 +84,8 @@ const GAMEFILES_DIR = 'gamefiles';
 const RECORDING_LINE_COLOR = 15;
 /** How often the running recording is written to the store (`RecordingWriter`), in milliseconds. */
 const RECORDING_WRITE_MS = 5000;
+/** The time a recording's viewer stays at its end before loop plays it again (`playRecording`). */
+const LOOP_DELAY_MS = 5000;
 /**
  * The game this page plays, chosen from the manifest before anything else is loaded
  * (`?dungeon=<id>`, `chooseDataSet`).
@@ -699,18 +701,22 @@ function applySettings({ game }: Built, sound: SoundManager, values: SettingsVal
  * game's dying sound alone, and the line says the game is won or lost there.
  *
  * The viewer's strip (`src/renderer/ui/RecordingStrip.ts`) has the input, and the screen
- * draws it over the message area: the time played, pause, the pace, RESTART, which plays
- * the path again from its start in this page (`rewindPage`), and stop, which goes back
- * to the welcome page, the book's dialog as its PLAY left it where one played it
- * (`RECORDING_STOPPED_HASH`). RESTART and stop end the message area played on alone. While the
- * loop does not run, paused or at the end, a move of the pointer is drawn at the
- * display's next frame (`Presenter.animate`), as the loop's VBL draws it while it runs.
+ * draws it over the message area: eject, which goes back to the welcome page, the book's
+ * dialog as its PLAY left it where one played it (`RECORDING_STOPPED_HASH`); stop, which
+ * plays the path again from its start in this page (`rewindPage`), paused once its first
+ * tick has drawn the game; play and pause, play at the end being stop and play; a minute
+ * forward, run at once in slices, unheard, the screen drawn after each (`Game.forward`);
+ * the pace; and loop, which plays the path again from its start `LOOP_DELAY_MS` after its
+ * end, whatever ended it. Then the time played over the path's length. Stop and eject
+ * end the message area played on alone. While the loop does not run, paused or at the
+ * end, a move of the pointer is drawn at the display's next frame (`Presenter.animate`),
+ * as the loop's VBL draws it while it runs.
  *
  * The path is read before the page is built (`readPlayedRecording`), and plays over `set`,
  * the set its files were found in (`playedSetOf`), or the one `?dungeon=` names, which must
  * be the same: a recording of another data set ends the page as an error does.
  */
-async function playRecording(built: Built, id: string, { path, savedAtEnd }: PlayedPath, set: string): Promise<void> {
+async function playRecording(built: Built, sound: SoundManager, id: string, { path, savedAtEnd }: PlayedPath, set: string): Promise<void> {
     const { game, screen, messages, input } = built;
     if (dataSet.id !== set) throw new Error(`RECORDING ${id} IS NOT OF ${dataSet.name}`);
     const dungeonDat = await readDungeonFile();
@@ -720,35 +726,87 @@ async function playRecording(built: Built, id: string, { path, savedAtEnd }: Pla
     };
     let paused = false;
     let pace: Pace = 1;
+    let loop = false;
     let hover: StripAction | null = null;
+    /** Where a minute forward runs to, while it runs (`Game.forward`). */
+    let forwardTo: number | null = null;
+    /** Whether a tick has run since the path began playing: what stop runs to before it pauses. */
+    let ticked = false;
+    /** The path played again, `LOOP_DELAY_MS` after its end, while loop is on. */
+    let loopTimer: ReturnType<typeof setTimeout> | null = null;
     /** The strip as last drawn, to tell a change (`Viewer.takeChanged`). */
     let drawn = '';
     let messagesAlone: (() => void) | null = null;
-    const strip = (): StripState => ({ vbls: recordingPlayer?.vbls ?? 0, paused, pace, hover });
-    const shown = (state: StripState): string => `${timePlayed(state.vbls)} ${state.paused} ${state.pace} ${state.hover}`;
+    const strip = (): StripState => ({
+        vbls: recordingPlayer?.vbls ?? 0, length: recordingPlayer?.length ?? 0, paused, ended: !(recordingPlayer?.playing ?? false),
+        pace, loop, hover,
+    });
+    const shown = (state: StripState): string => JSON.stringify(state);
     screen.composer.overlay = (ui) => {
         const state = strip();
         drawn = shown(state);
         drawRecordingStrip(ui, state);
     };
+    game.onTick(() => { ticked = true; });
 
+    const cancelLoop = (): void => {
+        if (loopTimer !== null) clearTimeout(loopTimer);
+        loopTimer = null;
+    };
+    const loopLater = (): void => {
+        if (loop && loopTimer === null && !(recordingPlayer?.playing ?? false)) loopTimer = setTimeout(() => restart(false), LOOP_DELAY_MS);
+    };
+    /** The VBLs run at once while `more` holds, unheard, the screen drawn after each slice and at the end. */
+    const runAtOnce = (more: () => boolean): void => {
+        sound.setMuted(true);
+        game.forward(more, () => {
+            sound.setMuted(false);
+            forwardTo = null;
+            refreshScreen();
+        }, refreshScreen);
+    };
     const play = (): void => {
         const player = new RecordingPlayer(game, path, dungeonDat, savedAtEnd);
         recordingPlayer = player;
         player.onSkipped((span) => print(skippedLine(span)));
         player.onEnd((drift) => {
             game.stop();
+            forwardTo = null;
+            sound.setMuted(false);
             const gameEnd = game.mainLoopHasReturned() ? game.ctx.state.gameWon : null;
             for (const line of endLines(path, drift, __CSBWEB_BUILD__, gameEnd)) print(line);
             messagesAlone = runMessagesAlone(game, messages);
+            loopLater();
             refreshScreen();
             if (drift) console.warn(`Recording ${id} drifted, in a recording of build ${path.find((recording) => recording.id === drift.recording)?.build}:`, drift);
             else console.log(`✓ Recording ${id} played to its end`);
         });
+        ticked = false;
         player.start();
         if (player.playing) game.start(true);
     };
-    const looping = (): boolean => !paused && (recordingPlayer?.playing ?? false);
+    /**
+     * The path played again from its start, the page put back as a new page has it
+     * (`rewindPage`): paused once its first tick has drawn the game (stop), or playing (play
+     * at the end, and loop).
+     */
+    const restart = (pauseAtStart: boolean): void => {
+        cancelLoop();
+        messagesAlone?.();
+        messagesAlone = null;
+        recordingPlayer?.stop();
+        forwardTo = null;
+        sound.setMuted(false);
+        // The screen's play state put back drops every animation (`Presenter.cancel`).
+        rewindPage(game, screen, messages);
+        framePending = false;
+        paused = pauseAtStart;
+        game.setPace(paused ? 0 : pace);
+        play();
+        if (paused) runAtOnce(() => !ticked);
+        refreshScreen();
+    };
+    const looping = (): boolean => !paused && (recordingPlayer?.playing ?? false) && !game.isForwarding;
     /** The screen composed at the display's next frame, once however many moves ask before. */
     let framePending = false;
     const drawAtNextFrame = (): void => {
@@ -766,26 +824,34 @@ async function playRecording(built: Built, id: string, { path, savedAtEnd }: Pla
     };
     const act = (action: StripAction | 'faster' | 'slower'): void => {
         switch (action) {
-            case 'pause':
-                if (!recordingPlayer?.playing) return;
+            case 'play':
+                if (!recordingPlayer?.playing) return restart(false);
                 paused = !paused;
                 game.setPace(paused ? 0 : pace);
                 break;
+            case 'forward': {
+                const player = recordingPlayer;
+                if (!player?.playing) return;
+                if (forwardTo !== null) forwardTo += FORWARD_VBLS;
+                else if (!game.isForwarding) {
+                    forwardTo = player.vbls + FORWARD_VBLS;
+                    // A span under a held clock is run to its end, as the loop runs it.
+                    runAtOnce(() => player.vbls < (forwardTo ?? 0) || player.held);
+                }
+                break;
+            }
             case 'pace': setPace(nextPace(pace, 'round')); break;
             case 'faster': setPace(nextPace(pace, 'up')); break;
             case 'slower': setPace(nextPace(pace, 'down')); break;
-            case 'restart':
-                messagesAlone?.();
-                messagesAlone = null;
-                recordingPlayer?.stop();
-                // The screen's play state put back drops every animation (`Presenter.cancel`).
-                rewindPage(game, screen, messages);
-                framePending = false;
-                paused = false;
-                game.setPace(pace);
-                play();
+            case 'loop':
+                loop = !loop;
+                if (loop) loopLater();
+                else cancelLoop();
                 break;
-            case 'stop':
+            case 'rewind': return;
+            case 'stop': return restart(true);
+            case 'eject':
+                cancelLoop();
                 messagesAlone?.();
                 recordingPlayer?.stop();
                 game.stop();
@@ -813,13 +879,13 @@ async function playRecording(built: Built, id: string, { path, savedAtEnd }: Pla
         },
         wheel: () => false,
         keyDown: (press) => {
-            const action = stripKeyAction(press);
+            const action = stripKeyAction(press, strip());
             if (action) act(action);
             return action !== null;
         },
     });
     game.runAtOnceWhile(() => recordingPlayer?.held ?? false);
-    wire(built, { held: () => recordingPlayer?.held ?? false, takeChanged: () => shown(strip()) !== drawn });
+    wire(built, { held: () => (recordingPlayer?.held ?? false) || game.isForwarding, takeChanged: () => shown(strip()) !== drawn });
     play();
     console.log(`✓ Playing recording ${id}, from ${path.length > 1 ? `its root through ${path.length - 1} joins` : 'its start'}`);
 }
@@ -828,7 +894,7 @@ async function playRecording(built: Built, id: string, { path, savedAtEnd }: Pla
  * The message area played on alone once the loop has stopped at a recording's end, until
  * what it was given is shown: its scroll a VBL, and a queued line placed a pass, as the
  * loop plays them (`Game.runFrame`), at the `d.Time` the loop stopped at, so nothing
- * shown expires. Returns what ends it sooner: RESTART's and stop's.
+ * shown expires. Returns what ends it sooner: stop's and eject's.
  */
 function runMessagesAlone(game: Game, messages: ScrollingText): () => void {
     const time = game.ctx.state.tickCount;
@@ -1139,7 +1205,7 @@ async function init() {
         // the dev server's, and a build's only with `CSBWEB_PROBE=1` (`vite.config.mts`),
         // so the handle cannot reach a deployed bundle.
         if (__CSBWEB_PROBE__) (window as unknown as Record<string, unknown>).__probe = probeHandle(built, sound);
-        if (playedRecording !== null && cut && playedSet !== null) return await playRecording(built, playedRecording, cut, playedSet);
+        if (playedRecording !== null && cut && playedSet !== null) return await playRecording(built, sound, playedRecording, cut, playedSet);
         // Before the intro: the entrance's chooser takes a dropped save as the disk menu does.
         bindSaveDrop(built.screen.ui);
         await runIntro(built, sound);
