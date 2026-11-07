@@ -595,9 +595,18 @@ unheard. At most a minute of the game runs at once, under 300 ms at forward's ra
 21 checkpoints a minute apart reach twenty minutes back from any VBL; a target before the
 path's start is the start (`rewindPage`).
 
-To settle with the author before paying it: **the controls**, two more on the strip,
-mirroring forward and ten minutes forward, or rewind's own behaviour replaced by back a
-minute.
+**The controls**, as designed with the author: two more faces on the strip, mirroring
+forward and ten minutes forward around play, `stop, rewind, back10, back, play, forward,
+forward10`, their icons forward's turned left (`<<`, and `<<<` for ten minutes); keys ←
+and Shift+←, as → and Shift+→ go forward, rewind taking another. Rewind's own icon is
+already `<<`, so it takes another, to settle with the author.
+
+**The strip's width.** Its twelve faces in three groups are 246 px at today's 16-px faces
+and 2-px columns (`FACE_WIDTH`, `COLUMN_WIDTH`, `src/renderer/ui/RecordingStrip.ts`), past
+x 214, where the time flush right begins (`H:MM:SS / H:MM:SS`). Narrowed, as the author
+allows, columns first: 1-px columns make 230 px, then 14-px faces 205 px, which fit (the
+widest icon, ten minutes', is 9 px). A recording of ten hours or more has a time two
+characters longer, from x 202, and overlaps today's ten faces (210 px) already.
 
 Paying it: the seeks checked in `tools/checks/replay.ts` (each lands on the
 uninterrupted play's state at the target VBL, its file compared), the strip's controls (a
