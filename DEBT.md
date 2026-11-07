@@ -130,7 +130,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E44 | The recording viewer's rewind, to checkpoints kept in memory | L | ⏳ |
+| E44 | The recording player's checkpoints, kept in memory | L | ⏳ |
 | E46 | The recording viewer goes back a minute or ten, to the VBL | M | ⏳ after E44 |
 | F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
 | R19 | The site's shared recordings are packages of versions 1 and 2, which the page no longer reads | S | ⏳ the author runs the migration, then deploys |
@@ -533,19 +533,15 @@ map, as designed with the author:
 Paying it: the heat map, checked in `tools/probe-frames.ts`'s statistics block (a level
 opens its map) and by a screenshot over the dev server's fortnight.
 
-### E44 ⏳ The recording viewer's rewind, to checkpoints kept in memory
+### E44 ⏳ The recording player's checkpoints, kept in memory
 
 The viewer's strip (`doc/RECORDING.md` → "The port's player") pauses, sets the pace, loops,
 stops at the start, and runs a minute or ten forward at once (`Game.forward`); its rewind
-(←) is drawn, inactive (`enabled`, `src/renderer/ui/RecordingStrip.ts`).
-Wanted, as designed with the author:
-
-- **Checkpoints**: the player takes one in memory every minute of the game (its VBLs,
-  `RecordingPlayer.vbls`), playing or forwarding, and keeps the latest 21, so that the
-  play can always go back twenty minutes (E46).
-- **Rewind** reads the latest checkpoint at least 5 s of the game behind the play, and
-  drops the checkpoints after it, which the play takes again as it passes them. It is
-  inactive while no checkpoint is that far behind.
+(←) is drawn, inactive (`enabled`, `src/renderer/ui/RecordingStrip.ts`). Going back (E46)
+starts from checkpoints, as designed with the author: the player takes one in memory
+every minute of the game (its VBLs, `RecordingPlayer.vbls`), playing or forwarding, and
+keeps the latest 21, so that the play can always go back twenty minutes. A seek back
+drops the checkpoints after the one it read, which the play takes again as it passes them.
 
 **Why checkpoints, not a replay from the start.** A downloaded package holds no save's
 file, only each join's MD5 (`RecordingStart`'s `join`, `src/engine/RecordingPackage.ts`),
@@ -580,11 +576,10 @@ game nobody played, unseen until the next join or save. In this order:
    narrows them.
 3. **At run time**, the player's drift after a rewind drops the checkpoint that misled it.
 
-Paying it: the checkpoint tool above in `npm test`, the rewind checked in
-`tools/checks/replay.ts` (a rewind lands on the uninterrupted play's state at the
-checkpoint's VBL, its file compared, and plays on to the same end), the strip's active
-rewind (a golden frame), and `doc/RECORDING.md`'s strip updated. Size L: the tool's rounds
-are not known until it runs.
+Paying it: the checkpoint tool above in `npm test`, a checkpoint's read checked in
+`tools/checks/replay.ts` (it lands on the uninterrupted play's state at the checkpoint's
+VBL, its file compared, and plays on to the same end), and `doc/RECORDING.md`'s player
+updated. Size L: the tool's rounds are not known until it runs.
 
 ### E46 ⏳ The recording viewer goes back a minute or ten, to the VBL
 
@@ -595,18 +590,17 @@ unheard. At most a minute of the game runs at once, under 300 ms at forward's ra
 21 checkpoints a minute apart reach twenty minutes back from any VBL; a target before the
 path's start is the start (`rewindPage`).
 
-**The controls**, as designed with the author: two more faces on the strip, mirroring
-forward and ten minutes forward around play, `stop, rewind, back10, back, play, forward,
-forward10`, their icons forward's turned left (`<<`, and `<<<` for ten minutes); keys ←
-and Shift+←, as → and Shift+→ go forward, rewind taking another. Rewind's own icon is
-already `<<`, so it takes another, to settle with the author.
+**The controls**, as designed with the author: the strip's rewind (`<<`, ←) becomes back a
+minute, and a new face beside it back ten minutes (`<<<`, Shift+←), mirroring forward and
+ten minutes forward around play: `stop, back10, back, play, forward, forward10`.
 
-**The strip's width.** Its twelve faces in three groups are 246 px at today's 16-px faces
+**The strip's width.** Its eleven faces in three groups are 228 px at today's 16-px faces
 and 2-px columns (`FACE_WIDTH`, `COLUMN_WIDTH`, `src/renderer/ui/RecordingStrip.ts`), past
 x 214, where the time flush right begins (`H:MM:SS / H:MM:SS`). Narrowed, as the author
-allows, columns first: 1-px columns make 230 px, then 14-px faces 205 px, which fit (the
-widest icon, ten minutes', is 9 px). A recording of ten hours or more has a time two
-characters longer, from x 202, and overlaps today's ten faces (210 px) already.
+allows, slower and faster first, whose icons are 5 px: at 9 px they make 214 px, which
+fits. A recording of ten hours or more has a time two characters longer, from x 202, and
+overlaps today's ten faces (210 px) already; 1-px columns as well make 200 px, which fits
+it too.
 
 Paying it: the seeks checked in `tools/checks/replay.ts` (each lands on the
 uninterrupted play's state at the target VBL, its file compared), the strip's controls (a
