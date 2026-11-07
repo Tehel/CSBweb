@@ -60,3 +60,5 @@ One line per memory in this directory. Committed with the project; never shared.
 - [Frames' first navigation flake](frames-first-navigation-flake.md) — a timeout on `?intro=0&dungeon=dm-atari` at `probe-frames.ts:363` is a cold Vite: run against a dev server started and `curl`-warmed beforehand
 - [EXPOOL absent in DM](expool-absent-in-dm.md) — `buildSaveFile` creates and writes the EXPOOL: a throwaway file puts it back (or deletes it) and copies it, never aliases it
 - [Scratch engine experiment](scratch-engine-experiment.md) — `.mts` with absolute imports from the repo's cwd, a hook between VBLs through `game.input.play`, a recursive state diff from `game` and its skip list
+- [ReDMCSB names CSBWin's tables](redmcsb-names-csbwin-tables.md) — an anonymous `d.PointerNNNN` is a named `G0…` in `doc/ReDMCSB-src/` (`Pointer1864` = `G0075_apuc_PaletteChanges_Projectile`, `STARTUP2.C:818`): grep there first
+- [Gate output to a file](gate-output-to-file.md) — `npm test -- --frames > scratch/gate.log`, never `| tail`: the frames' result scrolls away and the exit code is tail's
