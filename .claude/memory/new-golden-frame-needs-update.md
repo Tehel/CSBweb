@@ -1,6 +1,6 @@
 ---
 name: new-golden-frame-needs-update
-description: check-frames.sh compares only the frames already in tools/frames/; a new shot() passes unseen until --update writes it
+description: check-frames.sh compares only the frames already in tools/frames/; a new shot() passes unseen until --update writes it; a changed one is accepted by copying its DIFF PNG
 metadata:
   type: project
 ---
@@ -13,6 +13,11 @@ To add frames: run `bash tools/check-frames.sh` once to see every existing frame
 `same`, then `bash tools/check-frames.sh --update`, then `git status --short tools/frames`:
 only the new PNGs may appear (`??`), none modified. Look at them with `Read` before
 committing. Update the frame count in `CLAUDE.md` ("compares N live screen states").
+
+To accept a changed frame, one already in the baseline: the `DIFF` line names the new
+rendering under `/tmp/tmp.*/`; copying that PNG into `tools/frames/` is what `--update`
+writes, without another four-minute run. Look at it with `Read` first. A new frame still
+needs `--update`, which the comparison does not write.
 
 **Why:** a new frame that was never written is evidence of nothing, and the run says
 nothing about it.

@@ -19,7 +19,7 @@ One line per memory in this directory. Committed with the project; never shared.
 - [Monster groups in tools](monster-groups-in-tools.md) — `csbgame7.dat`'s groups of several are on levels 5 and 7; `loadPartyLevelIfChanged` gives them an ITEM16; `getAttachedItem16` alone lies off the party's level
 - [UI hook plumbing](ui-hook-plumbing.md) — a new page→interface hook touches four places: `UIState`, `UIHooks`, `main.ts`, `tools/lib/ui.ts`
 - [Probe storage flags](probe-frames-storage-flags.md) — `probe-frames.ts` wipes localStorage/IndexedDB per load unless `keepsettings`/`keepsaves`, and hides the keyboard layout (KEYS shows KEY LABELS, unlike `probe-ui`); new blocks go before the CRT section, with their own helpers
-- [New golden frame needs --update](new-golden-frame-needs-update.md) — `check-frames.sh` ignores frames not in the baseline; `--update`, then only `??` PNGs in `git status`
+- [New golden frame needs --update](new-golden-frame-needs-update.md) — `check-frames.sh` ignores frames not in the baseline; `--update`, then only `??` PNGs in `git status`; a changed frame: copy the PNG its `DIFF` line names
 - [Headless fullscreen](headless-fullscreen.md) — only CDP input grants activation, a touch only at its lift; the fullscreen viewport is the metrics override; a CDP Esc never leaves fullscreen; no `display-mode` emulation, but element fullscreen matches `display-mode: fullscreen`
 - [Text changes, no tests](text-changes-no-tests.md) — Markdown docs and welcome-page copy need no `npm test` nor frames; the gate is for code
 - [Dialog layout moves probe clicks](dialog-layout-moves-probe-clicks.md) — a dialog's new geometry, or a settings tab reordered (buttons at x 85/236, y 65/86/107), breaks `probe-frames.ts`'s hard-coded clicks, some in the CRT section; a failed probe leaves no frames, reproduce in `probe-ui`
@@ -55,3 +55,6 @@ One line per memory in this directory. Committed with the project; never shared.
 - [Renderer picking and behaviour](renderer-picking-behaviour.md) — picking is set while drawing: flag it, read `draw.context.behaviour?.()`; `Data.h` tables can carry pad bytes (`Byte4038[4]` is three)
 - [Play tool stops](play-tool-stops.md) — only `DRIFT` is a drift: `ENDED null` is the 24-hour VBL limit, a `diskMenuSave` throw an unplayed disk-menu option (0xd4 first = Cancel)
 - [Port throw: trace CSBWin first](port-throw-trace-csbwin-first.md) — a port throw where CSBWin plays on: `TraceLine` the same function; equal state means an unported branch behind a refusal, not a drift
+- [Frame PNGs hold their palettes](frame-png-holds-palettes.md) — `info['csbweb-frame']` lists the `0RGB` palettes, pixels are slots; the interface's 3 `0310`, 5 `0420` panel, 9 `0750` text, 11 `0770` lit
+- [ManualClock keeps one timer](manual-clock-one-timer.md) — a second `setTimeout` replaces the first in the tools: new `Game` scheduling shares `loopTimer` (as `Game.forward` does)
+- [Frames' first navigation flake](frames-first-navigation-flake.md) — a timeout on `?intro=0&dungeon=dm-atari` at `probe-frames.ts:363`: rerun once on new ports before chasing it
