@@ -2,7 +2,7 @@
  * A checkpoint of a recording played back (`doc/RECORDING.md` → "The port's player"): the
  * game between two VBLs, kept in memory, which a fresh page reads to play on from there
  * as the game played on (`RecordingPlayer.resume`). What the viewer goes back to
- * (`DEBT.md` E44, E46).
+ * (`DEBT.md` E46), one a minute of the game, the latest 21 (`KeptCheckpoints`).
  *
  * It starts from what a path cut at a save starts from (`src/engine/RecordingCut.ts`): a
  * save's file made at the point, what its read leaves beside it (`CarriedState`) and what
@@ -24,6 +24,7 @@
  *
  * **Nothing in this file touches the DOM.**
  */
+import { VBL_FREQUENCY } from '../core/constants';
 import type { ObjectID } from '../core/types';
 import type { DungeonData } from '../data/dungeonTypes';
 import type { HeroText } from '../data/HeroExtractor';
@@ -197,4 +198,72 @@ function putPoolBack(game: Game, expool: Uint8Array | null, count: number): void
     if (expool) world.expool = expool.slice();
     else delete world.expool;
     world.header.objectCounts[11] = count;
+}
+
+/** A minute of the game, in VBLs: the player keeps a checkpoint each (`KeptCheckpoints`). */
+export const CHECKPOINT_VBLS = 60 * VBL_FREQUENCY;
+
+/** The checkpoints kept, a minute apart: twenty minutes back from any VBL. */
+export const KEPT_CHECKPOINTS = 21;
+
+/**
+ * The checkpoints a page keeps of the path it plays (`RecordingPlayer`'s `kept`), across
+ * its players: one taken at the first feed at or past each mark `every` VBLs of the path
+ * after the latest kept (`RecordingPlayer.vbls`), playing or forwarding, where it can be
+ * taken, and the latest `most` kept. A seek back reads the latest at or before its target
+ * (`before`) and drops those after it, which the play from there takes again as it passes
+ * their marks. A drift in that play drops the checkpoint read (`drifted`), which misled it,
+ * and those its play took.
+ */
+export class KeptCheckpoints {
+    private kept: Checkpoint[] = [];
+    /** The checkpoint the play was read from (`before`), or `null`: the path's start. */
+    private read: Checkpoint | null = null;
+
+    constructor(readonly every = CHECKPOINT_VBLS, readonly most = KEPT_CHECKPOINTS) {}
+
+    /** The checkpoints kept, oldest first. */
+    get checkpoints(): readonly Checkpoint[] {
+        return this.kept;
+    }
+
+    /**
+     * After a VBL's feed, `vbls` into the path: a checkpoint taken (`take`) where a mark
+     * has been reached since the latest kept, and the oldest dropped past `most`. `take`
+     * gives `null` where none can be taken here, and the next feed tries again.
+     */
+    passed(vbls: number, take: () => Checkpoint | null): void {
+        const latest = this.kept[this.kept.length - 1];
+        const due = latest ? (Math.floor(latest.cursor.played / this.every) + 1) * this.every : this.every;
+        if (vbls < due) return;
+        const checkpoint = take();
+        if (!checkpoint) return;
+        this.kept.push(checkpoint);
+        if (this.kept.length > this.most) this.kept.shift();
+    }
+
+    /**
+     * The latest checkpoint at or before `vbls` of the path, which a seek back there reads
+     * (`RecordingPlayer.resume`), those after it dropped; `null` where none is, the path's
+     * start, every checkpoint then dropped.
+     */
+    before(vbls: number): Checkpoint | null {
+        const keep = this.kept.filter((checkpoint) => checkpoint.cursor.played <= vbls);
+        this.kept = keep;
+        this.read = keep[keep.length - 1] ?? null;
+        return this.read;
+    }
+
+    /** The play read from a checkpoint drifted: that checkpoint dropped, and those its play took after it. */
+    drifted(): void {
+        if (!this.read) return;
+        this.kept = this.kept.filter((checkpoint) => checkpoint.cursor.played < this.read!.cursor.played);
+        this.read = null;
+    }
+
+    /** Every checkpoint dropped: the path played again from its start. */
+    clear(): void {
+        this.kept = [];
+        this.read = null;
+    }
 }

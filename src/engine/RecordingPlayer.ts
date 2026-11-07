@@ -36,11 +36,14 @@
  * It runs no VBL. Whoever runs the game's VBLs plays it: a tool's loop, or the page's,
  * which runs a span the clock is held through at once (`held`, `Game.runAtOnceWhile`),
  * told each such span as it ends (`onSkipped`), and stops at its end (`onEnd`).
+ *
+ * Given the page's `KeptCheckpoints`, it takes one there each minute of the path it plays
+ * (`checkpoint`), and a player that plays on from one (`resume`) drops it at a drift.
  */
 import { VBL_FREQUENCY } from '../core/constants';
 import { fileDigest } from '../data/DataSetFiles';
 import { behaviourAt, knownLevel, knownProfile } from './Behaviour';
-import { readCheckpoint, takeCheckpoint, type Checkpoint, type PlayerCursor } from './Checkpoint';
+import { readCheckpoint, takeCheckpoint, type Checkpoint, type KeptCheckpoints, type PlayerCursor } from './Checkpoint';
 import { setCutState } from './CutState';
 import type { Game } from './Game';
 import { saveFileOf } from './GameSaves';
@@ -117,13 +120,15 @@ export class RecordingPlayer {
     /**
      * `path`, each recording after the first the child of the one before, played into
      * `game` from `start`. `dungeonDat` is the data set's, which a new game reads.
-     * `savedAtEnd`, for a path shared at a save's point: the save its end makes.
+     * `savedAtEnd`, for a path shared at a save's point: the save its end makes. `kept`,
+     * the checkpoints the page keeps of the path, which its players share.
      */
     constructor(
         private readonly game: Game,
         private readonly path: readonly Recording[],
         private readonly dungeonDat: Uint8Array,
         private readonly savedAtEnd: SavedAtEnd | null = null,
+        private readonly kept: KeptCheckpoints | null = null,
     ) {
         if (path.length === 0) throw new Error('a path holds a recording');
         if (path[0]!.start.kind === 'join') throw new Error('a path starts from a new game or a save');
@@ -296,9 +301,7 @@ export class RecordingPlayer {
      * its child's point, and the last's own. A join's read runs none.
      */
     get length(): number {
-        let vbls = this.path[this.path.length - 1]!.vbls;
-        for (let n = 1; n < this.path.length; n++) vbls += this.path[n]!.parent!.vbls;
-        return vbls;
+        return pathLength(this.path);
     }
 
     /** Where it stands in the recording it plays: its changes applied, and its VBLs run. */
@@ -306,7 +309,10 @@ export class RecordingPlayer {
         return { recording: this.path[this.segment]!.id, changes: this.next, vbls: this.game.input.vbls - this.from };
     }
 
-    /** The feed (`feed`), then a span under a held clock begun or ended there (`onSkipped`), then `onFed`. */
+    /**
+     * The feed (`feed`), then a span under a held clock begun or ended there (`onSkipped`),
+     * then the checkpoint kept where one is due (`KeptCheckpoints.passed`), then `onFed`.
+     */
     private feedAndWatch(): void {
         this.feed();
         const held = this.held;
@@ -316,7 +322,9 @@ export class RecordingPlayer {
         } else if (!held) {
             this.endSpan();
         }
-        if (!this.finished) this.fedListener?.();
+        if (this.finished) return;
+        this.kept?.passed(this.vbls, () => this.checkpoint());
+        this.fedListener?.();
     }
 
     /** The span under a held clock, if one runs, ended here and told. */
@@ -426,9 +434,10 @@ export class RecordingPlayer {
         return true;
     }
 
-    /** Stopped of itself, at the path's end or a drift, and its listener told. */
+    /** Stopped of itself, at the path's end or a drift, the checkpoints kept told a drift, and its listener told. */
     private end(): void {
         this.stop();
+        if (this.parted) this.kept?.drifted();
         this.endSpan();
         this.endListener?.(this.parted);
     }
@@ -459,6 +468,16 @@ export class RecordingPlayer {
         this.from = this.game.input.vbls;
         this.beginListener?.(recording);
     }
+}
+
+/**
+ * The VBLs `path` runs, which a player's `vbls` reaches at its end: each recording's to its
+ * child's point, and the last's own. A join's read runs none.
+ */
+export function pathLength(path: readonly Recording[]): number {
+    let vbls = path[path.length - 1]!.vbls;
+    for (let n = 1; n < path.length; n++) vbls += path[n]!.parent!.vbls;
+    return vbls;
 }
 
 /** The first byte two files differ at, or -1. */

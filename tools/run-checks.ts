@@ -445,6 +445,7 @@ const CHECKS: Tool[] = [
   // its parts, then DMMovie42, then the others together.
   { tool: 'checkpoints.ts', args: ['CSBFullRecordingV4', '--part=taking'] },
   { tool: 'checkpoints.ts', args: ['CSBFullRecordingV4', '--part=chain'] },
+  { tool: 'checkpoints.ts', args: ['CSBFullRecordingV4', '--part=seek'] },
   { tool: 'checkpoints.ts', args: ['DMMovie42'] },
   { tool: 'checkpoints.ts', args: ['--not=CSBFullRecordingV4', '--not=DMMovie42'] },
   // The set a recording plays over, found by its files.

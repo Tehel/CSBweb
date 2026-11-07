@@ -9,11 +9,13 @@
  * package as its own page does (point 10).
  *
  * What the replay tool (`utils/replay-recordings.ts`) plays a shared recording with. A
- * play may be restarted as the viewer's stop restarts it (`Restart`), or run at once
- * from its start as the viewer's forward runs it (`'forward'`).
+ * play may be restarted as the viewer's stop restarts it (`Restart`), run at once
+ * from its start as the viewer's forward runs it (`'forward'`), or keep checkpoints as the
+ * page keeps them (`KeptCheckpoints`), and go back to one (`SeekBack`).
  */
 import { VBL_FREQUENCY } from '../../src/core/constants';
 import type { DataSetFiles } from '../../src/data/DataSetFiles';
+import { KeptCheckpoints, type Checkpoint } from '../../src/engine/Checkpoint';
 import type { DataSet } from '../../src/data/DataSets';
 import type { Recording, RecordingPoint } from '../../src/engine/Recorder';
 import { RecordingPlayer, type Drift, type SavedAtEnd } from '../../src/engine/RecordingPlayer';
@@ -44,6 +46,39 @@ export interface Played {
   readonly length: number;
   /** Where the path was run at once (`'forward'`): the slices it ran in, the page let run between. */
   readonly slices: number | null;
+  /** The checkpoints kept at its end (`Keep`), oldest first; none where it kept none. */
+  readonly kept: readonly Checkpoint[];
+  /** Where it went back (`SeekBack`). */
+  readonly seek: Seeked | null;
+}
+
+/** The checkpoints a play keeps (`KeptCheckpoints`): one each `every` VBLs of the path, the latest `most`. */
+export interface Keep {
+  readonly every: number;
+  readonly most: number;
+}
+
+/**
+ * The viewer's seek back, less the forward to its target: the play stopped once it has
+ * run `at` VBLs of the path, the page rewound (`rewindPage`), and the latest checkpoint
+ * kept at or before `to` read by a new player (`RecordingPlayer.resume`), or the path
+ * played again from its start where none is; then played to its end.
+ */
+export interface SeekBack {
+  readonly at: number;
+  readonly to: number;
+}
+
+/** Where a play went back (`SeekBack`). */
+export interface Seeked {
+  /** The checkpoints kept where it stopped, oldest first. */
+  readonly before: readonly Checkpoint[];
+  /** The checkpoint read, or `null` where the path played again from its start. */
+  readonly read: Checkpoint | null;
+  /** The checkpoints kept once it was read. */
+  readonly after: readonly Checkpoint[];
+  /** The game's checkpoint taken at once after the read, before any VBL: what the read landed on. */
+  readonly landed: Checkpoint | null;
 }
 
 /**
@@ -76,18 +111,24 @@ export function keptFiles(files: DataSetFiles): DataSetFiles {
 /**
  * `path` played from its first recording's start in a fresh page of `set`, whose files
  * `files` reads, to its end or its first drift; `savedAtEnd`, the save a path shared at a
- * save's point ends at; `restart`, a stop in it, or `'forward'`, the whole path run at
- * once (`Game.forward`), its slices on the clock's zero-delay calls. A frame that throws,
- * CSBWin's `die`, throws.
+ * save's point ends at; `restart`, a stop in it, `'forward'`, the whole path run at
+ * once (`Game.forward`), its slices on the clock's zero-delay calls, or a seek back to a
+ * checkpoint `keep` has kept; `keep`, the checkpoints its players keep, as the page's do.
+ * A frame that throws, CSBWin's `die`, throws.
  */
 export async function playPath(
-  set: DataSet, files: DataSetFiles, path: readonly Recording[], savedAtEnd: SavedAtEnd | null = null, restart: Restart | 'forward' | null = null,
+  set: DataSet, files: DataSetFiles, path: readonly Recording[], savedAtEnd: SavedAtEnd | null = null,
+  restart: Restart | 'forward' | SeekBack | null = null, keep: Keep | null = null,
 ): Promise<Played> {
   const { game, screen, messages, clock, dungeonDat } = await standInPage(set, files);
+  const kept = keep ? new KeptCheckpoints(keep.every, keep.most) : null;
   let player!: RecordingPlayer;
-  const play = (): void => {
-    player = new RecordingPlayer(game, path, dungeonDat, savedAtEnd);
+  const newPlayer = (): void => {
+    player = new RecordingPlayer(game, path, dungeonDat, savedAtEnd, kept);
     player.onEnd(() => game.stop());
+  };
+  const play = (): void => {
+    newPlayer();
     player.start();
     if (player.playing) game.start(true);
   };
@@ -99,8 +140,9 @@ export async function playPath(
   };
   game.runAtOnceWhile(() => player.held);
   play();
-  const ended = (restarted: Played['restarted'], slices: number | null = null): Played => ({
+  const ended = (restarted: Played['restarted'], slices: number | null = null, seek: Seeked | null = null): Played => ({
     drift: player.drift, point: player.point, joins: player.joins, game, restarted, vbls: player.vbls, length: player.length, slices,
+    kept: [...(kept?.checkpoints ?? [])], seek,
   });
   if (!restart) {
     run();
@@ -113,6 +155,28 @@ export async function playPath(
       if (!clock.advance(0)) throw new Error('the loop stopped while the player plays');
     }
     return ended(null, slices);
+  }
+  if ('at' in restart) {
+    if (!kept) throw new Error('a seek back reads the checkpoints kept');
+    while (player.playing && player.vbls < restart.at) {
+      if (!clock.advance(VBL_MS)) throw new Error('the loop stopped while the player plays');
+    }
+    const before = [...kept.checkpoints];
+    player.stop();
+    rewindPage(game, screen, messages);
+    const read = kept.before(restart.to);
+    const after = [...kept.checkpoints];
+    let landed: Checkpoint | null = null;
+    if (read) {
+      newPlayer();
+      player.resume(read);
+      landed = player.checkpoint();
+      game.start(true);
+    } else {
+      play();
+    }
+    run();
+    return ended(null, null, { before, read, after, landed });
   }
   run(restart.afterMs);
   player.stop();

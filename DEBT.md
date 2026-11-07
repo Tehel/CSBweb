@@ -130,8 +130,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E44 | The recording player's checkpoints, kept in memory | L | ⏳ step 2 of 2 next |
-| E46 | The recording viewer goes back a minute or ten, to the VBL | M | ⏳ after E44 |
+| E46 | The recording viewer goes back a minute or ten, to the VBL | M | ⏳ |
 | F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
 | R19 | The site's shared recordings are packages of versions 1 and 2, which the page no longer reads | S | ⏳ the author runs the migration, then deploys |
 | R20 | A path cut at a save carries less than a checkpoint: the screen's play state, the picking, the state no file holds | S | ⏳ |
@@ -534,7 +533,7 @@ New state-representation debt goes here, and jumps the queue.
 
 New architecture debt goes here, and jumps the queue. Every E item is a refactor: the rules
 of "How to work this list", point 3, apply, byte-identical tool output included. What the
-page redesign adds is the exception: E40's heat map, E44's and E46's seeking, and E22's fill.
+page redesign adds is the exception: E40's heat map, E46's seeking, and E22's fill.
 
 The structure need no longer follow CSBWin's files (the author's decision): a module may
 gather or split CSBWin's functions as the code's concerns ask. What still follows CSBWin is
@@ -556,47 +555,19 @@ map, as designed with the author:
 Paying it: the heat map, checked in `tools/probe-frames.ts`'s statistics block (a level
 opens its map) and by a screenshot over the dev server's fortnight.
 
-### E44 ⏳ The recording player's checkpoints, kept in memory
-
-The viewer's strip (`doc/RECORDING.md` → "The port's player") pauses, sets the pace, loops,
-stops at the start, and runs a minute or ten forward at once (`Game.forward`); its rewind
-(←) is drawn, inactive (`enabled`, `src/renderer/ui/RecordingStrip.ts`). Going back (E46)
-starts from checkpoints, as designed with the author: the player takes one in memory
-every minute of the game (its VBLs, `RecordingPlayer.vbls`), playing or forwarding, and
-keeps the latest 21, so that the play can always go back twenty minutes. A seek back
-drops the checkpoints after the one it read, which the play takes again as it passes them.
-
-**Why checkpoints, not a replay from the start.** A downloaded package holds no save's
-file, only each join's MD5 (`RecordingStart`'s `join`, `src/engine/RecordingPackage.ts`),
-so a replay to the target always starts at the path's start, and the site's recordings
-run to hours. Forward runs five seconds of the game a slice, the tick's `DrawViewport`
-drawn as a player must: a game minute in 160 to 300 ms in Node over the corpus, so back
-from an hour in is ten to eighteen seconds.
-
-**Step 1 is in**: the checkpoint, taken (`RecordingPlayer.checkpoint`, after a VBL's feed,
-`onFed`) and played on from (`RecordingPlayer.resume`), and `tools/checks/checkpoints.ts`,
-which reads every corpus package's checkpoints back into an engine equal to the one that
-took them and plays them on to the same end (`doc/RECORDING.md` → "Checkpoints").
-
-**Step 2, next: the player keeps them**: one a game minute, playing or forwarding, the
-latest 21; a seek back reads the latest at or before its target and drops those after it,
-which the play takes again as it passes them; a drift after a read drops the checkpoint
-that misled it. The page's other state a read leaves as it was is the screen's alone (the
-message strip, the viewport drawn at the next tick): what a seek shows until then is
-E46's. Checked in `tools/checks/replay.ts` (a read lands on the uninterrupted play's state
-at the checkpoint's VBL, its file compared, and plays on to the same end), and
-`doc/RECORDING.md`'s player and "Checkpoints" updated. Then E46.
-
-Size L: step 2 is less than a session.
-
 ### E46 ⏳ The recording viewer goes back a minute or ten, to the VBL
 
-After E44, whose checkpoints it starts from. Back a minute or ten minutes of the game
-exactly, as forward goes forward (`FORWARD_VBLS`): the latest checkpoint at or before the
-target read, then forward to the target (`Game.forward`, `runAtOnce` in `src/main.ts`),
-unheard. At most a minute of the game runs at once, under 300 ms at forward's rate. The
-21 checkpoints a minute apart reach twenty minutes back from any VBL; a target before the
-path's start is the start (`rewindPage`).
+It starts from the checkpoints the page keeps of the path it plays, one a minute of the
+game, the latest 21 (`KeptCheckpoints`, `src/engine/Checkpoint.ts`; `doc/RECORDING.md` →
+"Checkpoints"). Back a minute or ten minutes of the game exactly, as forward goes forward
+(`FORWARD_VBLS`): the page rewound (`rewindPage`), the latest checkpoint at or before the
+target read by a new player (`KeptCheckpoints.before`, `RecordingPlayer.resume`, as
+`tools/lib/playback.ts`'s `SeekBack` does), then forward to the target (`Game.forward`,
+`runAtOnce` in `src/main.ts`), unheard. At most a minute of the game runs at once, under
+300 ms at forward's rate. The 21 checkpoints a minute apart reach twenty minutes back from
+any VBL; a target before the oldest is the path's start (`restart`, `src/main.ts`). What
+the read leaves of the page as it was is the screen's alone, the message strip and the
+viewport, which the next tick draws: what a seek shows until then is this item's.
 
 **The controls**, as designed with the author: the strip's rewind (`<<`, ←) becomes back a
 minute, and a new face beside it back ten minutes (`<<<`, Shift+←), mirroring forward and

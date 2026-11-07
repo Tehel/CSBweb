@@ -88,7 +88,13 @@
  *    page rewound at the path's end, under the disk menu's held clock among them, plays
  *    it again to the same end. And its forward (`Game.forward`): the path run at once
  *    from its start, in slices of five seconds, plays to the same end, and the player's
- *    time there is the path's length (`RecordingPlayer.length`).
+ *    time there is the path's length (`RecordingPlayer.length`). And the checkpoints the
+ *    page keeps (`KeptCheckpoints`, `src/engine/Checkpoint.ts`), here one each fifth of
+ *    the path, the latest two: the path stopped at nine tenths, the page rewound, and the
+ *    latest at or before seven tenths read by a new player, those after it dropped; the
+ *    game read makes the file the game that took it made, plays to the same end, and
+ *    keeps the same checkpoints again on its way, or, where the package drifts, none from
+ *    the one read on.
  *
  * 12. A recording carries the engine's level and its set's files' digests, through the
  *    store and a package; a row and a head made before levels read as level 0, naming no
@@ -121,7 +127,8 @@ import {
   checkedChange, packageOfEnd, packageOfSave, readRecordingPackage, RecordingPackageError, writeRecordingPackage, type RecordingPackage,
 } from '../../src/engine/RecordingPackage';
 import { cutAtSave, cutPlace } from '../../src/engine/RecordingCut';
-import { endLines, RecordingPlayer, skippedLine, type HeldSpan, type SavedAtEnd } from '../../src/engine/RecordingPlayer';
+import { endLines, pathLength, RecordingPlayer, skippedLine, type HeldSpan, type SavedAtEnd } from '../../src/engine/RecordingPlayer';
+import type { Checkpoint } from '../../src/engine/Checkpoint';
 import { partyNames, RecordingWriter } from '../../src/engine/RecordingWriter';
 import { applySaveBytes, buildSaveFile } from '../../src/engine/SaveGameFile';
 import { NO_FULLSCREEN } from '../../src/lib/fullscreen';
@@ -140,7 +147,7 @@ import { check, finish } from '../lib/check';
 import { ManualClock } from '../../src/engine/ManualClock';
 import { STOCK_DATA_SET, diskFiles } from '../lib/dataSets';
 import { STOCK_DIR, gameTablesOf, graphicsTablesOf, stockGraphics } from '../lib/game';
-import { playPath } from '../lib/playback';
+import { playPath, type Keep, type Played } from '../lib/playback';
 import { keepInCorpus } from '../lib/recordingCorpus';
 import { memoryRecordingStore, memoryStore, savePath } from '../lib/saves';
 
@@ -1119,7 +1126,9 @@ async function playPackage(pkg: RecordingPackage, what: string): Promise<Page> {
  * the same game.
  */
 async function samePlayback(played: Page, path: readonly Recording[], savedAtEnd: SavedAtEnd | null): Promise<void> {
-  const alone = await playPath(STOCK_DATA_SET, diskFiles(STOCK_DATA_SET), path, savedAtEnd);
+  const length = pathLength(path);
+  const keep = { every: Math.max(1, Math.floor(length / 5)), most: 2 };
+  const alone = await playPath(STOCK_DATA_SET, diskFiles(STOCK_DATA_SET), path, savedAtEnd, null, keep);
   const player = played.player!;
   const file = buildSaveFile(alone.game, { portraitOf: (champion) => alone.game.ctx.host.portraitOf(champion) });
   check(JSON.stringify(alone.drift) === JSON.stringify(player.drift) && JSON.stringify(alone.point) === JSON.stringify(player.point)
@@ -1146,6 +1155,52 @@ async function samePlayback(played: Page, path: readonly Recording[], savedAtEnd
     `and run at once from its start, in slices of five seconds (${forwarded.slices} for ${forwarded.vbls} VBLs), to the same end${JSON.stringify(forwarded.drift) !== JSON.stringify(alone.drift) ? ` (drift ${JSON.stringify(forwarded.drift)})` : ''}`);
   check(alone.drift !== null || alone.vbls === alone.length,
     `the player's time at the end is the path's length (${alone.vbls} VBLs of ${alone.length})`);
+  await seekBack(path, savedAtEnd, keep, alone, file);
+}
+
+/** The marks of `checkpoints`, the VBLs of the path each was taken at. */
+function marks(checkpoints: readonly Checkpoint[]): number[] {
+  return checkpoints.map((checkpoint) => checkpoint.cursor.played);
+}
+
+/**
+ * The checkpoints the page keeps (`KeptCheckpoints`), one each `keep.every` VBLs of `path`,
+ * the latest `keep.most`, and a seek back to one, as `alone` played it, its end's file
+ * `file`: the play stopped at nine tenths of the path, the page rewound, the latest
+ * checkpoint at or before seven tenths read by a new player, those after it dropped; the
+ * game read lands on the one that took it, and plays to the same end, keeping the same
+ * checkpoints again, or, where it drifts, none from the one read on.
+ */
+async function seekBack(path: readonly Recording[], savedAtEnd: SavedAtEnd | null, keep: Keep, alone: Played, file: Uint8Array): Promise<void> {
+  const length = pathLength(path);
+  const at = Math.floor(length * 0.9);
+  const to = Math.floor(length * 0.7);
+  const back = await playPath(STOCK_DATA_SET, diskFiles(STOCK_DATA_SET), path, savedAtEnd, { at, to }, keep);
+  const { before, read, after, landed } = back.seek!;
+  console.log(`    kept ${marks(before).join(', ') || 'none'} at ${at} of ${length} VBLs, back to ${to}: ${read ? `read ${read.cursor.played}` : 'the start'}, ${marks(back.kept).join(', ') || 'none'} kept at the end${back.drift ? `, its drift (${back.drift.kind})` : ''}`);
+  const spaced = (checkpoints: readonly Checkpoint[]) => checkpoints.length <= keep.most
+    && checkpoints.every((checkpoint, n) => checkpoint.cursor.played >= (n === 0 ? keep.every : marks(checkpoints)[n - 1]! + keep.every));
+  check(spaced(alone.kept) && spaced(before) && (alone.drift !== null || alone.kept.length === Math.min(keep.most, Math.floor(length / keep.every))),
+    `the play keeps a checkpoint each ${keep.every} VBLs, the latest ${keep.most} (${marks(alone.kept).join(', ')} at the end, ${marks(before).join(', ')} at ${at})`);
+  const latest = before.filter((checkpoint) => checkpoint.cursor.played <= to).pop() ?? null;
+  check(read === latest && marks(after).join() === marks(before.filter((checkpoint) => checkpoint.cursor.played <= to)).join(),
+    `back to ${to} reads the latest at or before it (${read ? read.cursor.played : 'the start'}), those after it dropped (${marks(after).join(', ')} kept)`);
+  if (read) {
+    check(landed !== null && firstDifference(landed.file, read.file) < 0 && JSON.stringify({ ...landed.cursor, lastMade: null }) === JSON.stringify({ ...read.cursor, lastMade: null })
+      && (landed.cursor.lastMade === null) === (read.cursor.lastMade === null),
+      `the game read there makes the file the game that took it made, the player where it stood`);
+  }
+  const backFile = buildSaveFile(back.game, { portraitOf: (champion) => back.game.ctx.host.portraitOf(champion) });
+  check(JSON.stringify(back.drift) === JSON.stringify(alone.drift) && JSON.stringify(back.point) === JSON.stringify(alone.point)
+    && back.joins === alone.joins && firstDifference(backFile, file) < 0,
+    `and plays from there to the same end${JSON.stringify(back.drift) !== JSON.stringify(alone.drift) ? ` (drift ${JSON.stringify(back.drift)})` : ''}`);
+  const same = marks(back.kept).join() === marks(alone.kept).join() && back.kept.every((checkpoint, n) => firstDifference(checkpoint.file, alone.kept[n]!.file) < 0);
+  // A drift after the start read drops nothing: the play from the start keeps what the first did.
+  const misled = back.drift !== null && read !== null;
+  check(!misled ? same : back.kept.every((checkpoint) => checkpoint.cursor.played < read.cursor.played),
+    !misled
+      ? `keeping the same checkpoints again on its way (${marks(back.kept).join(', ')})`
+      : `its drift dropping the checkpoint read and those after it (${marks(back.kept).join(', ') || 'none'} kept)`);
 }
 
 /**

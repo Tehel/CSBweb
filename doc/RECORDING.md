@@ -716,7 +716,7 @@ branch that read a Sleepsave.
 ### Checkpoints
 
 A checkpoint (`src/engine/Checkpoint.ts`) is the game between two VBLs as a path plays it,
-kept in memory, never written: what the viewer is to go back to (`DEBT.md` E44, E46). The
+kept in memory, never written: what the viewer is to go back to (`DEBT.md` E46). The
 player takes one (`RecordingPlayer.checkpoint`) after a VBL's feed (`onFed`), where no
 `LoopScript` holds the loop (a generator cannot be kept), and a fresh page's player plays
 on from it (`resume`) in place of `start`: the game read from it, at the behaviour of the
@@ -754,14 +754,29 @@ Making the file writes the world's `EXPOOL`, and makes one where the dungeon has
 take puts the pool back, so taking a checkpoint changes nothing, and the read puts it back
 over the file's. A checkpoint takes 3 to 12 ms, and its read as long.
 
-`tools/checks/checkpoints.ts` plays each corpus package three times: without
-checkpoints; taking one a minute, which ends on the same file; and in a chain, each
+**The page keeps them** (`KeptCheckpoints`), across the players of the path it plays: one
+at the first feed at or past each minute of the path (`RecordingPlayer.vbls`) after the
+latest kept, playing or forwarding, where one can be taken, and the latest 21, so that the
+play can always go back twenty minutes. A seek back reads the latest at or before its
+target (`KeptCheckpoints.before`) by a new player in the same page once it is rewound
+(`rewindPage`), and drops those after it, which the play takes again as it passes their
+minutes; a drift in that play drops the checkpoint it was read from, which misled it, and
+those it took after. Stop, which plays the path again from its start, drops them all. The
+strip's rewind does nothing yet (`DEBT.md` E46).
+
+`tools/checks/checkpoints.ts` plays each corpus package four times: without
+checkpoints; taking one a minute, which ends on the same file; in a chain, each
 checkpoint read into a fresh page, the engine read compared with the one that took it by a
 recursive walk from `Game` (every field equal but the start's flag, so a field added
 later that a checkpoint misses fails there), then played on to the next, and the last to
-the path's end, with no drift and the same file. A package shorter than four minutes takes
-one each quarter of its length. The player does not keep checkpoints yet, and the strip's
-rewind does nothing (`DEBT.md` E44, step 2).
+the path's end, with no drift and the same file; and back in the same page, as the viewer
+goes back: the play keeping its 21, stopped at nine tenths of the path, rewound, and the
+checkpoint at or before half of it, or twenty minutes back where that is later, read by a
+new player, which lands on the file the game that took it made and plays to the same end.
+A package shorter than four minutes takes one each quarter of its length.
+`tools/checks/replay.ts` (point 11) keeps two of them in each package's play, a fifth of
+it apart, goes back the same way, and finds the same checkpoints kept at the end, or, where
+the package drifts, none from the one read on.
 
 ## Recordings made in CSBWin
 

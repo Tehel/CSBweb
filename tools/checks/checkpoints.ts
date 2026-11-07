@@ -1,6 +1,6 @@
 /**
- * The recording player's checkpoints (`src/engine/Checkpoint.ts`, `DEBT.md` E44): each
- * corpus package (`tools/lib/recordingCorpus.ts`) played three times.
+ * The recording player's checkpoints (`src/engine/Checkpoint.ts`): each corpus package
+ * (`tools/lib/recordingCorpus.ts`) played four times.
  *
  * 1. **Without checkpoints**, to its end: the end's file, which the two others must make.
  * 2. **Taking a checkpoint a minute** (3600 VBLs, a quarter of a package shorter than four
@@ -13,12 +13,18 @@
  *    start's flag (`EXPECTED`), so a field added later that a checkpoint misses fails
  *    here. The game read plays on to the next checkpoint, and so on: each checkpoint read plays on as the game it was taken
  *    from, and the last to the path's end, with no drift and the same file.
+ * 4. **Back, in the same page**, as the viewer goes back (`DEBT.md` E46): the play keeps
+ *    its checkpoints as the page does (`KeptCheckpoints`, the latest 21), is stopped at
+ *    nine tenths of the path, the page rewound (`rewindPage`), and the latest checkpoint
+ *    at or before half of it, or twenty minutes back where that is later, read by a new player (`tools/lib/playback.ts`, `SeekBack`):
+ *    the game read makes the file the game that took it made, and plays on to the same
+ *    end with no drift.
  *
  *   npm test -- --only=checkpoints.ts                        every package
  *   npm test -- --only=checkpoints.ts DMMovie42              one package
  *   npm test -- --only=checkpoints.ts --not=DMMovie42        every other package (`--not=` again for more)
  *   npm test -- --only=checkpoints.ts DMMovie2615 --every=600
- *   npm test -- --only=checkpoints.ts CSBFullRecordingV4 --part=chain   plays 1 and 3 only
+ *   npm test -- --only=checkpoints.ts CSBFullRecordingV4 --part=chain   plays 1 and 3 only (`taking`, `seek`: 2, 4)
  *
  * The gate runs the long packages as jobs of their own (`tools/run-checks.ts`).
  */
@@ -29,7 +35,7 @@ import { findRecordingSet } from '../../src/data/RecordingSet';
 import { fileDigest } from '../../src/data/DataSetFiles';
 import type { DataSet } from '../../src/data/DataSets';
 import type { DataSetFiles } from '../../src/data/DataSetFiles';
-import type { Checkpoint } from '../../src/engine/Checkpoint';
+import { KEPT_CHECKPOINTS, type Checkpoint } from '../../src/engine/Checkpoint';
 import type { Game } from '../../src/engine/Game';
 import { saveFileOf } from '../../src/engine/GameSaves';
 import type { Recording } from '../../src/engine/Recorder';
@@ -38,7 +44,7 @@ import { RecordingPlayer, type Drift, type SavedAtEnd } from '../../src/engine/R
 import { standInPage, type StandInPage } from '../../src/renderer/StandInPage';
 import { check, finish } from '../lib/check';
 import { DATA_SETS, diskFiles, diskSetDigests } from '../lib/dataSets';
-import { keptFiles } from '../lib/playback';
+import { keptFiles, playPath } from '../lib/playback';
 import { CORPUS_DIR, CORPUS_FILE, corpusFiles } from '../lib/recordingCorpus';
 
 const args = process.argv.slice(2);
@@ -46,7 +52,7 @@ const named = args.filter((arg) => !arg.startsWith('--'));
 /** The packages `--not=` leaves out, one name each. */
 const not = args.filter((arg) => arg.startsWith('--not=')).map((arg) => arg.slice('--not='.length));
 const part = args.find((arg) => arg.startsWith('--part='))?.slice('--part='.length) ?? null;
-if (part !== null && part !== 'taking' && part !== 'chain') throw new Error('--part= is taking or chain');
+if (part !== null && part !== 'taking' && part !== 'chain' && part !== 'seek') throw new Error('--part= is taking, chain or seek');
 const every = args.find((arg) => arg.startsWith('--every='))?.slice('--every='.length);
 /** A minute of the game, the player's interval; or a quarter of a package shorter than four. */
 const MINUTE = 3600;
@@ -217,8 +223,9 @@ for (const file of corpusFiles()) {
   console.log(`${file}: ${set.id}, ${plain.vbls} VBLs, ends ${plain.drift ? `in a drift ${JSON.stringify(plain.drift)}` : 'with no drift'}`);
   check(plain.drift === null, `${name} plays to its end`);
   const take = every ? Number(every) : Math.min(MINUTE, Math.floor(plain.vbls / 4));
-  if (part !== 'chain') await checkTaking(name, set, files, pkg.path, savedAtEnd, take, plain);
-  if (part !== 'taking') await checkChain(name, set, files, pkg.path, savedAtEnd, take, plain);
+  if (part === null || part === 'taking') await checkTaking(name, set, files, pkg.path, savedAtEnd, take, plain);
+  if (part === null || part === 'chain') await checkChain(name, set, files, pkg.path, savedAtEnd, take, plain);
+  if (part === null || part === 'seek') await checkSeek(name, set, files, pkg.path, savedAtEnd, take, plain);
   console.log(`  in ${Date.now() - started} ms in all`);
 }
 finish();
@@ -242,4 +249,18 @@ async function checkChain(name: string, set: DataSet, files: DataSetFiles, path:
   console.log(`  the chain of ${chain.reads.length} reads ends ${chain.drift ? `in a drift ${JSON.stringify(chain.drift)}` : 'with no drift'}, ${chain.file === plain.file ? 'the same' : 'ANOTHER'} file`);
   check(chain.reads.length > 0, `${name}: the chain reads checkpoints`);
   check(chain.drift === null && chain.file === plain.file && chain.vbls === plain.vbls, `${name}: the chain plays to the same end`);
+}
+
+/** Play 4 checked against play 1. */
+async function checkSeek(name: string, set: DataSet, files: DataSetFiles, path: readonly Recording[], savedAtEnd: SavedAtEnd | null, take: number, plain: Ended): Promise<void> {
+  const at = Math.floor(plain.vbls * 0.9);
+  // Half the path, or as far back as the checkpoints kept reach, twenty marks.
+  const to = Math.max(Math.floor(plain.vbls / 2), at - (KEPT_CHECKPOINTS - 1) * take);
+  const back = await playPath(set, files, path, savedAtEnd, { at, to }, { every: take, most: KEPT_CHECKPOINTS });
+  const { before, read, landed } = back.seek!;
+  const file = endFile(back.game);
+  console.log(`  back from ${at} to ${to}, ${before.length} kept: ${read ? `read ${read.cursor.played}` : 'the start'}, ends ${back.drift ? `in a drift ${JSON.stringify(back.drift)}` : 'with no drift'}, ${file === plain.file ? 'the same' : 'ANOTHER'} file`);
+  check(read !== null && before.length === Math.min(KEPT_CHECKPOINTS, Math.floor(at / take)), `${name}: the play keeps its checkpoints, the latest ${KEPT_CHECKPOINTS}, and back to ${to} reads one`);
+  check(read !== null && landed !== null && fileDigest(landed.file) === fileDigest(read.file), `${name}: the game read in the same page makes the file the game that took it made`);
+  check(back.drift === null && file === plain.file && back.vbls === plain.vbls, `${name}: back in the same page plays to the same end`);
 }

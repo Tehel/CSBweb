@@ -50,6 +50,7 @@ import type { PrisonDoorChoice } from './renderer/intro/PrisonDoor';
 import { Recorder } from './engine/Recorder';
 import { partyNames, RecordingWriter } from './engine/RecordingWriter';
 import { endLines, RecordingPlayer, skippedLine, type SavedAtEnd } from './engine/RecordingPlayer';
+import { KeptCheckpoints } from './engine/Checkpoint';
 import {
     FORWARD_VBLS, drawRecordingStrip, nextPace, rewindPage, stripActionAt, stripKeyAction, type Pace, type StripAction, type StripState,
 } from './renderer/ui/RecordingStrip';
@@ -739,6 +740,8 @@ async function playRecording(built: Built, sound: SoundManager, id: string, { pa
     let loopTimer: ReturnType<typeof setTimeout> | null = null;
     /** The strip as last drawn, to tell a change (`Viewer.takeChanged`). */
     let drawn = '';
+    /** The checkpoints kept of the path, one a minute of it, which its players share. */
+    const kept = new KeptCheckpoints();
     let messagesAlone: (() => void) | null = null;
     const strip = (): StripState => ({
         vbls: recordingPlayer?.vbls ?? 0, length: recordingPlayer?.length ?? 0, paused, ended: !(recordingPlayer?.playing ?? false),
@@ -769,7 +772,7 @@ async function playRecording(built: Built, sound: SoundManager, id: string, { pa
         }, refreshScreen);
     };
     const play = (): void => {
-        const player = new RecordingPlayer(game, path, dungeonDat, savedAtEnd);
+        const player = new RecordingPlayer(game, path, dungeonDat, savedAtEnd, kept);
         recordingPlayer = player;
         player.onSkipped((span) => print(skippedLine(span)));
         player.onEnd((drift) => {
@@ -802,6 +805,8 @@ async function playRecording(built: Built, sound: SoundManager, id: string, { pa
         sound.setMuted(false);
         // The screen's play state put back drops every animation (`Presenter.cancel`).
         rewindPage(game, screen, messages);
+        // Every checkpoint is after the start, which the play takes again.
+        kept.clear();
         framePending = false;
         paused = pauseAtStart;
         game.setPace(paused ? 0 : pace);
