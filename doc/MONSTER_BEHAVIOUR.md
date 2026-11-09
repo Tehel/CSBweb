@@ -1,20 +1,18 @@
 # How Dungeon Master's monsters think
 
-This is a plain-language account of monster behaviour, written after porting
-`Monster.cpp` and its neighbours. It deliberately avoids CSBWin's variable names; if
-you want those, `doc/CSBWIN_MONSTERS_REFERENCE.md` has the mapping and
-`doc/PROVEN_FACTS.md` has the citations.
+A plain-language account of the decision-making behind the creatures of FTL's Dungeon
+Master on the Atari ST, read from ReDMCSB, the Atari program's source reconstructed, and
+Paul R. Stevens' CSBWin, and observed in CSBweb. It avoids CSBWin's variable names:
+`doc/CSBWIN_MONSTERS_REFERENCE.md` has the mapping and `doc/PROVEN_FACTS.md` the
+citations. `doc/monster-behaviour.html` is the same text as a formatted page.
 
-Everything here is behaviour I traced in the C++ and then watched happen in the port.
-Where I could not work out *why* something is the way it is, it goes in
-[Unsolved](#unsolved) at the end rather than being smoothed over, and what has since
-been explained is under [Solved](#solved). The code is checked against ReDMCSB, the
-reconstruction of the Atari's own code, as well as CSBWin.
+This is the game as the Atari program plays it. Where the program does something odd,
+the oddity is described in [Coding quirks](#coding-quirks) at the end: the actual bugs,
+what is strange but harmless, and what is still a mystery.
 
-**One machine, many parameters.** I had expected each monster type to have its own
-logic and found the opposite: there is a single decision procedure, and the twenty-odd
-creature types differ almost entirely by the numbers fed into it. So this is one
-document rather than several. The exceptions — the giggler, Lord Chaos, and the
+**One machine, many parameters.** The monster types do not each have their own logic:
+there is a single decision procedure, and the twenty-odd creature types differ almost
+entirely by the numbers fed into it. The exceptions — the giggler, Lord Chaos, and the
 handful of creatures that throw things — are called out in
 [Where types actually differ](#where-types-actually-differ).
 
@@ -77,23 +75,26 @@ If sight fails, a monster can still find you two ways.
 hiding behind a closed door unreliable: it stops them seeing you, not smelling you.
 
 **Your trail.** The game remembers the last 24 squares the party stood on, each with a
-scent strength. The square you step onto starts at 24; leaving a square adds the time
-you spent there, up to 80; and every ten seconds every scent but the one under you
-fades by one, the oldest going when it reaches nothing. A monster standing on one of
-those squares may follow it. The test is a random roll plus the scent's strength
-against a threshold — and the threshold **falls as the creature's nose improves**, so a
-keen-nosed monster will follow fainter, older trails. A worm has by far the best nose
-in the game and can scarcely see at all.
+scent strength. Every step sets all of them to 24, and every ten seconds each but the
+newest fades by one: walking keeps the whole trail fresh, and standing still lets it
+fade, until after four minutes all of it but the newest scent is gone at once. The
+program means to do better — the time spent on a square was to count, up to 80 — but a
+bug undoes it ("The scents never compare their square", under
+[Coding quirks](#coding-quirks)).
 
-That is the design. No release of the game ever kept the strengths that way: see "The
-footprint trail" under [Solved](#solved).
+A monster standing on a square of the trail may follow it towards the square the party
+went to next: it does when a roll of 0 to 3 plus the scent's strength beats 30 less
+twice its sense of smell. A fresh trail is therefore always followed by a creature whose
+smell is 4 or more, three times in four at 3, one time in four at 2, and never at 1. A
+worm, whose nose is the best in the game at 10, follows it for over two minutes after
+the party stops — and can scarcely see at all.
 
 ---
 
 ## Four moods
 
-Behaviour is dominated by a single small state I will call the group's **mood**. There
-are four in use:
+Behaviour is dominated by a single small state, here called the group's **mood**. Four
+occur in play:
 
 | Mood | What it means | What it does |
 | --- | --- | --- |
@@ -102,10 +103,9 @@ are four in use:
 | **Engaged** | In your face | Formation breaks — each member acts alone |
 | **Charging** | Coming for you | Heads for where it last knew you to be |
 
-The code knows more. It tests in several places for two other moods — call them *Wary*,
-whose monster only pauses when it sees you, and *Alert*, whose monster charges — and
-resets a group to Calm from anything "at or above" a value no mood reaches. Nothing in
-the game ever puts a group in either, so those branches never run.
+The code tests for more: a *Wary* monster would only pause on seeing you, an *Alert*
+one would charge. Nothing ever puts a group in either ("Four moods are never used",
+under [Coding quirks](#coding-quirks)).
 
 The transitions are the interesting part:
 
@@ -215,9 +215,10 @@ Two touches that make movement feel less mechanical:
 A step is refused by walls, stairs, open pits (unless the creature floats), closed
 false walls, doors too far shut for a creature of that height, another monster, and by
 the party. Some creatures recognise *illusory* pits and false walls and will walk onto
-them; most are fooled. Every creature walks into an open teleporter, but a few wary
-types — the vexirk, zytaz, demon, dragon and the Lords — refuse one that would carry
-them to a level their kind is not allowed on, which would kill them.
+them; most are fooled. Every creature walks into an open teleporter, but a few types —
+the vexirk, zytaz, demon, dragon and the Lords, whose "wariness" is 10 or more — refuse
+one that would carry them to a level their kind is not allowed on, where arriving would
+kill them.
 
 **Speed is mood-dependent**: fleeing is a quarter faster than normal, and charging is
 twice as fast. A cornered monster that turns to fight is genuinely slower than the
@@ -249,10 +250,9 @@ Can it see the party?          ── no ──▶ can the group see them?
 
 Before a melee attack — reach 1 only — a monster standing in an awkward corner of its
 cell will often **sidestep** to a better one first, and that shuffle can walk it onto a
-missile you left lying there. Alone in its group, the Atari's monster half the time
-takes the centre of the cell instead; CSBWin's never does, and the port follows CSBWin
-there for now. The vexirk, which may strike any champion, skips the shuffle three times
-in four and strikes from the back corner.
+missile you left lying there. Alone in its group, it takes the centre of the cell
+instead one time in two. The vexirk skips the shuffle three times in four and strikes
+from the back of its cell (below).
 
 The attack itself is not a single decision but a **filled-in form**: who to hit,
 whether to throw something instead, what to throw, how far, how hard, which sound. The
@@ -262,6 +262,9 @@ That is why custom dungeons can make monsters behave in ways the original never 
 **Who gets hit** is either the nearest reachable champion — determined by which side of
 the cell the blow comes from, then a fixed order per side — or, for the creature types
 with a "strike anyone" flag, a *randomly chosen* living champion regardless of position.
+A second flag lets a quarter-cell creature strike from the back of its cell, but only
+together with the first; the vexirk is the one creature with both, so it steps forward
+one time in four and strikes from where it stands the other three.
 
 **Whether it lands** has two independent escapes before damage is even rolled: being
 quicker than the attacker (and still needing to win a 3-in-4 roll), and being lucky.
@@ -295,7 +298,7 @@ Almost all variation is numeric. From the shipped data:
 | Demon | 10 | 4 | 3 | 4 | max | Breathes fire |
 | Rive | 11 | 3 | 4 | 1 | 6 | Passes through walls and doors; sees invisible |
 | Lord Chaos | 12 | 9 | 3 | 6 | 3 | Invincible; see below |
-| Lord Order | 12 | 9 | 3 | 6 | 3 | Unnamed in CSBWin; appears only mid-fusion |
+| Lord Order | 12 | 9 | 3 | 6 | 3 | Appears only mid-fusion |
 | Grey Lord | 12 | 9 | 3 | 6 | 3 | The endgame. Never acts |
 | Ant Man | 13 | 3 | 3 | 1 | 4 | |
 | Dragon | 13 | 5 | 6 | 2 | 7 | Fills a cell; breathes fire |
@@ -317,8 +320,8 @@ Four genuine behavioural differences, rather than numeric ones:
 
 **The giggler** does not damage you. It steals what the champion holds in the ready hand,
 and nothing else (`doc/PROVEN_FACTS.md` → "A giggler's blow steals only from the ready
-hand"), and then, one time in eight or on a coin toss when it took something, is put into
-fear state 5 and runs. It is also the only creature in the game with zero bravery, so it
+hand"), and then, one time in eight or on a coin toss when it took something, turns
+*Fleeing* and runs. It is also the only creature in the game with zero bravery, so it
 flees at the slightest provocation.
 
 **The throwers** — slime devil, flying eye, vexirk, zytaz, demon, dragon, Lord Chaos —
@@ -335,8 +338,7 @@ why all three share a single identical set of statistics. The endgame is a
 transformation between them, and it explains a great deal about how they are written.
 
 Lord Chaos alone is a creature you can meet and fight. Fusing him with Lord Order — the
-being CSBWin leaves unnamed, and the aspect representing pure order — produces the
-Grey Lord, and the Grey Lord is not an opponent at all. It appears, the game is won,
+aspect representing pure order — produces the Grey Lord, and the Grey Lord is not an opponent at all. It appears, the game is won,
 and it ends.
 
 The fusion sequence bears that out step for step: the game-won flag is set at the very
@@ -371,113 +373,98 @@ dragons in a cell — and two-corner creatures must turn both halves together.
 
 ---
 
-## Unsolved
+## Coding quirks
 
-Things nobody has explained yet. Christophe, of the Dungeon Master Encyclopaedia and the
-author of ReDMCSB, checked this section against the Atari's own code and explained most
-of what it held; that is under [Solved](#solved), below. Paul Stevens' comments show he
-hit several of the same walls, and I have quoted him where he did.
+The program has its oddities. Some are bugs, with consequences in play; some only look
+wrong; and two are still unexplained.
 
-**A flag on creatures it cannot affect.** One per-type flag lets a quarter-cell creature
-strike from the back of its cell, and only together with the "strike anyone" flag; the
-vexirk alone has both. The screamer has it without the other, where it does nothing, and
-so do the water elemental, the dragon and all three aspects of the Lord, which fill
-their cell, where the code never looks at it. Christophe's guess is that the flag once
-meant something else and the data was never cleared.
+### Bugs
 
-**Why wariness is a number.** Whether a creature refuses a teleporter that would kill it
-is decided by a per-type number, which ReDMCSB calls wariness, being at least 10: the
-vexirk, zytaz, demon, dragon and the Lords pass. Nothing else reads the field, so a
-simple flag would have done. FTL perhaps meant it for more, and never used it.
+**The scents never compare their square.** A step is meant to add the time the party
+spent on the square it leaves to that square's scents, up to 80, and to set the square
+it enters to at least 24; the ten-second fade is meant to spare every scent of the
+square the party stands on. Each of those compares a scent's square with the party's,
+as one structure with another. Megamax C, the compiler FTL used, accepted such
+comparisons and threw their result away. So every step sets every strength along the
+trail to the same value, which ends at 24, the time spent anywhere is lost, and the
+fade spares only the newest scent. Paul Stevens, translating the program into C++ for
+CSBWin, called the routine "much hogwash".
 
-## Solved
+**The scent strengths are written backwards.** The loop that changes the strengths
+walks the squares up from the oldest while it walks the strengths down from the newest,
+so where square *n* matches, it changes the strength of square *k* − 1 − *n*, *k* being
+the trail's length. On the Atari the bug above hides it; the Amiga's program, whose
+compiler does compare, shows it.
+
+**A fall onto another level leaves two scents.** A pit, or a teleporter to another
+level, records the square the party lands on; loading the new level places the party
+again and records it a second time. Two of the trail's 24 places hold one square.
+Stairs record it once.
+
+**The footprint spell's two ends are swapped.** YA BRO ROS shows the squares of the
+trail between two indices. The code means a weak spell to show the squares walked from
+the cast, and a strong one — power 3 or more — to show the whole trail. Its two indices
+are set the wrong way round, so every power shows only what is walked from the cast.
+
+**A value read before it is written.** When a missile hits a group, the reaction falls
+through into the code for a group hurt by a cloud or a closing door, and if the group
+cannot move at once, it reads the distance to the party, which nothing on that path has
+set, to decide whether to turn. For the cloud or the door the same test is false
+whatever the value; for the missile it is not. What it reads is whatever the stack
+held, usually part of an address, a large number: the group does not turn. A real bug,
+and in practice probably without effect.
+
+### Strange but harmless
 
 **The condition that cannot fail.** One branch tests whether the mood is Calm or Alert
 *and* not Charging — but the first test already excludes Charging. Stevens wrote: "The
 following line makes no sense. But I have studied the original machine language over
-and over again. This is what it did." It is redundant, not unreachable, and harmless:
-Alert never occurs, so the real test is just "Calm". ReDMCSB marks it as useless code,
-most likely a leftover from the many rounds of tuning the creatures' behaviour.
+and over again. This is what it did." It is redundant, and since Alert never occurs,
+the real test is just "Calm": most likely a leftover of many rounds of tuning the
+creatures.
 
-**The footprint trail.** The routine that writes the scent strengths gets Stevens'
-bluntest comment: "I think this is much hogwash. Does nothing useful. Is full of
-errors. Perhaps an old, abandoned debug trace." It is broken in four ways, all in the
-original:
+**Four moods are never used.** The mood has eight possible values. One never appears in
+the code. Three more do — Wary, Alert, and the value at which a "reset anything at or
+above this" cleanup starts — but nothing ever sets them, so their branches never run.
+Only four moods occur in play.
 
-- **On the Atari, the square is never compared.** The compiler FTL used, Megamax C,
-  accepted comparisons of whole structures and threw their result away. So every step
-  sets every strength along the trail to 24, the time spent anywhere is lost, and the
-  ten-second fade spares only the newest scent, not every scent of the square you stand
-  on.
-- **The strengths are written backwards.** The loop walks the squares up from the
-  oldest while it walks the strengths down from the newest, so it changes the strength
-  of square *n* at *k − 1 − n*. On the Atari the first bug hides it; the Amiga, whose
-  compiler compares, shows it.
-- **A pit or a teleporter to another level records the arrival twice**: once by the
-  fall, once as the new level is loaded. Two of the 24 places for one square. Stairs
-  record it once.
-- **The footprint spell's two ends are swapped.** The code means a weak YA BRO ROS to
-  show the squares walked from the cast, and a strong one to show the whole trail.
-  Every power shows only what is walked from the cast.
+**One number, two jobs.** In the corner-shuffling code one value is a random number
+and, a few lines later, a corner. Stevens: "I think there is something wrong with D5
+here." There is not; it saves a register. The random bits tested and the corner stored
+never overlap, and storing the corner clears the bits tested next. When a lone monster
+shuffles, one off the centre goes to the centre seven times in eight, or to the next or
+previous corner; one already in the centre goes to a random corner one time in eight.
 
-CSBWin adds two of its own: it never writes the oldest scent's strength, and its fade
-stops for the tick after dropping a scent. And the routine that drops a scent, which I
-first called wrong as well, is fine: CSBWin's copy routine takes its source first, and
-I had read it the other way round.
+### Still a mystery
 
-The port plays what the code means: the time spent counts, an arrival is recorded once,
-and a strong spell shows the whole trail. It plays CSBWin's loops only for CSBWin's own
-recordings, which need them to play on.
+**A flag on creatures it cannot affect.** The flag that lets the vexirk strike from the
+back of its cell is also set on the screamer, which lacks the "strike anyone" flag it
+needs, and on the water elemental, the dragon and all three aspects of the Lord, which
+fill their cell, where the code never looks at it. Perhaps it once meant something else
+and the data was never cleared.
 
-**A branch that seemed to do nothing but consume randomness.** In the pre-melee
-sidestep there is a 50% branch whose only statement is commented out in CSBWin. In the
-original it is not empty: the commented line, written with the old name of the byte
-that holds each member's corner, moves a lone monster to the centre of its cell, and the
-Atari's does just that. Stevens left no note on why he took it out; it is already out in
-CSBWin 11.014, an older source than the one the port follows. The port follows CSBWin
-there for now, and will do the Atari's for its own games (`DEBT.md` C199).
+**Why wariness is a number.** Whether a creature refuses a teleporter that would kill it
+is decided by a per-type number being at least 10. Nothing else reads it, so a simple
+flag would have done. FTL perhaps meant it for more, and never used it.
 
-**Four moods are never used.** Of eight possible values, one never appears in the code
-at all. Three more appear — Wary, Alert, and the value of the "reset anything at or
-above this" cleanup — but nothing ever sets them. Only four moods occur in play.
+### CSBWin and CSBweb
 
-**Undocumented flags that turned out to matter.** Two per-type flags are marked only
-"????" in CSBWin. One lets a creature strike any champion: it picks a living one at
-random, where any other strikes the champion the side of its cell faces. The other lets
-a quarter-cell creature strike from the back of its cell, but only with the first: the
-vexirk, the one creature with both, steps forward one time in four and strikes from
-where it stands the other three. Why the other types carry it is still
-[unsolved](#unsolved).
+CSBWin, Paul Stevens' C++ translation, differs here in three ways: a lone monster never
+takes the centre of its cell before a blow (the line is commented out), its scent loops
+never write the oldest scent's strength and stop fading for the tick after dropping one,
+and it gives the unset distance a fixed value as large as the Atari's usual one.
 
-**A value read before it is written.** Stevens patched the Atari binary to give a
-variable a fixed value, noting that the uninitialised value was usually "part of an
-address" and that leaving it made the two builds impossible to compare. When a cloud or
-a closing door hurts a group, the value is read in a test that the same event makes
-false anyway. When a missile hits one, the event falls through into the same code, and
-if the group cannot move at once, the leftover value decides whether it turns. Being
-part of an address, it is large, and the group does not turn — exactly what Stevens'
-fixed value gives, which the port uses. A real bug, but in practice probably without
-effect.
-
-**A number reused as two different things.** In the corner-shuffling code one value is
-used as both a position and a bitfield within a few lines. Stevens: "I think there is
-something wrong with D5 here." There is not. It saves a register: the random bits
-tested and the corner stored never overlap, and storing the corner clears the bits
-tested next. A lone monster off the centre goes to the centre seven times in eight, or
-to the next or previous corner; one already in the centre goes to a random corner one
-time in eight.
-
-**What wariness decides.** I had it as whether a creature will step into a teleporter
-at all. Every creature does. A creature whose wariness is at least 10 only refuses an
-open teleporter that carries creatures to a level its kind is not allowed on, where
-arriving would kill it. Why that field is a number is still [unsolved](#unsolved).
+CSBweb fixes the four scent bugs: the time spent counts, an arrival is recorded once,
+and a strong YA BRO ROS shows the whole trail (`DEBT.md` H, "The scents are what FTL
+meant"). It plays CSBWin's loops for CSBWin's own recordings, and follows CSBWin on the
+lone monster's centring for now (`DEBT.md` C199).
 
 ---
 
 ## What this adds up to
 
-The impression from outside is that Dungeon Master's monsters are cunning. Having read
-the code, I would say the effect comes from four cheap tricks layered well:
+The impression from outside is that Dungeon Master's monsters are cunning. The code
+shows the effect comes from four cheap tricks layered well:
 
 1. **Senses that fail differently.** Sight is blocked by doors and darkness, smell is
    not. So a monster that has lost you often still knows roughly where you went, and
