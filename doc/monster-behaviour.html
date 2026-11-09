@@ -800,19 +800,6 @@ look wrong; and two are still unexplained.</p>
   done. FTL perhaps meant it for more, and never used it.</p>
 </div>
 
-<div class="note">
-  <span class="label">CSBWin and CSBweb</span>
-  <p>CSBWin, Paul Stevens' C++ translation, differs here in three ways: a lone monster
-  never takes the centre of its cell before a blow (the line is commented out), its
-  scent loops never write the oldest scent's strength and stop fading for the tick after
-  dropping one, and it gives the unset distance a fixed value as large as the Atari's
-  usual one.</p>
-  <p>CSBweb fixes the four scent bugs: the time spent counts, an arrival is recorded
-  once, and a strong YA BRO ROS shows the whole trail. It plays CSBWin's loops for
-  CSBWin's own recordings, and follows CSBWin on the lone monster's centring for
-  now.</p>
-</div>
-
 <h2>What this adds up to</h2>
 
 <p>The impression from outside is that Dungeon Master's monsters are cunning. The code
@@ -837,15 +824,6 @@ shows the effect comes from four cheap tricks layered well:</p>
 towards you simply tries four directions and gives up. Put a pillar between you and a
 rock pile and it will lose you completely. But the failure modes are quiet, and the
 successes are legible, which is the whole trick.</p>
-
-<footer class="colophon">
-  <p>The same text in Markdown is <code>doc/MONSTER_BEHAVIOUR.md</code> in CSBweb's
-  repository. The mapping to CSBWin's own names is in
-  <code>doc/CSBWIN_MONSTERS_REFERENCE.md</code>, the line-level citations in
-  <code>doc/PROVEN_FACTS.md</code>.</p>
-  <p>Self-contained: no external fonts, scripts or stylesheets. Open it straight from
-  disk.</p>
-</footer>
 
 </div>
 </body>

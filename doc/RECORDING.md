@@ -380,7 +380,7 @@ one: each counts, and "may" means a doubt is enough. The commit:
 player's game, so a series of commits that will be deployed together shares one level: the
 first bumps it, and each later one adds its flag with that level as its `until` and bumps
 nothing. The level being built is named here until its deploy: **7**, which the scents'
-fixes make (`DEBT.md` C200 and on); level 6 is deployed. A recording of the
+fixes and the lone monster's sidestep make (`DEBT.md` C199 to C201); level 6 is deployed. A recording of the
 author's dev server made between those commits may play differently, and is not kept.
 
 A flag that joins a profile owes the same bump: the profile's recordings made before it

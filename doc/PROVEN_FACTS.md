@@ -1672,8 +1672,9 @@ if ( (indexOfLastMonster == 0) && (STRandomBool() != 0) )
 `uByte3` is the byte CSBWin now calls `positions()` (`pos_3`, `doc/CSBwin-src/CSB.h:2259`,
 `:2288`), and the Atari's sets it there, `Cells = C0xFF_SINGLE_CENTERED_CREATURE`
 (`doc/ReDMCSB-src/GROUP.C:2394-2395`): its lone monster takes the centre of the square.
-CSBWin's stays in its corner (`DEBT.md` C199). Either way the branch consumes its
-`STRandomBool()`, which CSBWin's random stream needs.
+CSBWin's stays in its corner. Either way the branch consumes its `STRandomBool()`. The
+port takes the centre from level 7 (`DEBT.md` H, "A lone monster's sidestep takes the
+centre…"). Evidence: `tools/checks/missile-monster.ts`, scenario 8.
 
 ## `MonsterAttacks` decides *how* to attack before it attacks
 

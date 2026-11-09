@@ -686,8 +686,15 @@ export class MonsterAI {
     if (pos === ((preferredDirection + 1) & 0x3)) return false;
 
     if (c.indexOfLastMonster === 0 && this.random.bool() !== 0) {
-      // CSBWin has the assignment `pI16A2->uByte3 = 0xff` commented out here, the
-      // Atari's move to the centre (`DEBT.md` C199), so this branch only consumes the roll.
+      if (this.ctx.behaviour.loneSidestepStaysInCorner) {
+        // CSBWin has the assignment `pI16A2->uByte3 = 0xff` commented out here
+        // (`doc/CSBwin-src/Monster.cpp:3946-3950`), so this branch only consumes the roll.
+      } else {
+        // A lone monster takes the centre of its cell, `Cells =
+        // C0xFF_SINGLE_CENTERED_CREATURE` (`doc/ReDMCSB-src/GROUP.C:2394-2395`): CSBWin's
+        // commented line, `uByte3` being its first name for `positions()` (`CSB.h:2259`).
+        c.slot.positions = 0xff;
+      }
     } else {
       pos = ((preferredDirection & 1) === (pos & 1) ? pos - 1 : pos + 1) & 0x3;
       let ordinal = ordinalOfMonsterAtPosition(this.ctx, c.monster, c.level, pos);

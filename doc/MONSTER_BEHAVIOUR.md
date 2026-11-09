@@ -456,8 +456,8 @@ and it gives the unset distance a fixed value as large as the Atari's usual one.
 
 CSBweb fixes the four scent bugs: the time spent counts, an arrival is recorded once,
 and a strong YA BRO ROS shows the whole trail (`DEBT.md` H, "The scents are what FTL
-meant"). It plays CSBWin's loops for CSBWin's own recordings, and follows CSBWin on the
-lone monster's centring for now (`DEBT.md` C199).
+meant"). A lone monster takes the centre of its cell as on the Atari. CSBWin's own
+recordings play by CSBWin's ways, which they need to play on.
 
 ---
 

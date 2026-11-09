@@ -38,6 +38,11 @@
  * `MonsterPositionByte` at `d.LoadedLevel` (`Code11f52.cpp:211-231`, `:654-660`), never the
  * `ITEM16` that number happens to index.
  *
+ * Scenario 8: a lone monster's sidestep, on its coin toss, takes the centre of its cell,
+ * as the Atari's does (`doc/ReDMCSB-src/GROUP.C:2394-2395`); at level 6 and at the
+ * `csbwin-2023` profile it stays in its corner, CSBWin's line being commented out
+ * (`doc/CSBwin-src/Monster.cpp:3946-3950`, `loneSidestepStaysInCorner`).
+ *
  * Run: `npm test -- --only=missile-monster.ts`
  */
 import { PotionType } from '../../src/core/constants';
@@ -46,6 +51,7 @@ import { RN_FIREBALL } from '../../src/core/spellRn';
 import { DBType, OBJECT_ID_EOF, Position, RoomType } from '../../src/core/types';
 import type { ObjectID } from '../../src/core/types';
 import type { CreatureRecord, Database } from '../../src/data/dungeonTypes';
+import { behaviourAt, ENGINE_LEVEL } from '../../src/engine/Behaviour';
 import { Game } from '../../src/engine/Game';
 import type { Champion } from '../../src/engine/gameTypes';
 import { MonsterType } from '../../src/engine/monsterTypes';
@@ -470,6 +476,44 @@ function main(): void {
     console.log(`DamageMonster: ${JSON.stringify(log.hits)}   hp now [${group.hp.slice(0, 2)}]`);
     check(log.hits.length === 1 && log.hits[0]?.index === 1,
       'member 1, in the corner the missile reached by groupIndex, is hit: the ITEM16 it indexes is not read');
+  }
+
+  /* ----------------------- 8. a lone monster's sidestep takes the centre ----------- */
+  console.log('');
+  console.log('=== 8. a lone monster in corner 2, facing the party north, wins the sidestep\'s coin toss ===');
+  // The Atari's takes the centre of its cell (`doc/ReDMCSB-src/GROUP.C:2394-2395`); CSBWin's
+  // line is commented out (`doc/CSBwin-src/Monster.cpp:3946-3950`), which level 6 and the
+  // `csbwin-2023` profile play (`loneSidestepStaysInCorner`).
+  for (const [level, profile] of [[ENGINE_LEVEL, null], [6, null], [ENGINE_LEVEL, 'csbwin-2023']] as const) {
+    const arena = makeArena(1)!;
+    const { game, group, desc, target } = arena;
+    game.ctx.behaviour = behaviourAt(level, profile);
+    const slot = game.ctx.dungeon.getAttachedItem16(group)!;
+    slot.positions = 2;
+    wrapMember(game.ctx.random, 'bool', () => () => 1);
+    const frame: AiFrame = {
+      timer: {
+        index: -1, time: game.ctx.state.tickCount, level: target.z, function: TimerFunction.TT_MONSTER_B0,
+        uByte5: 0, uByte6: target.x, uByte7: target.y, uByte8: 0, uByte9: 0, sequence: 0,
+        timerWord8: 0, timerWord6: 0,
+      },
+      i60: 0, sinceLastUpdate: 0, timePerMove: 0, bool36: false, d5: 0, secondaryDirection: 0,
+    };
+    const c: AiConst = {
+      monsterRn: game.ctx.dungeon.findFirstMonster(target), monster: group, slot,
+      slotIndex: group.groupIndex, desc, mapX: target.x, mapY: target.y, level: target.z,
+      timeUntilAlternateUpdate: 0, indexOfLastMonster: 0, horizSize: 0, invincible: false,
+      xDistance: 0, yDistance: 1, attackDistance: 1, timerFunction: TimerFunction.TT_MONSTER_B0,
+      fearFactorIs6: false, processingATimer: true, mmr: new MmRecord(),
+    };
+    const startedAt = frame.timer.time;
+    const turnOver = game.ctx.systems.monsterAI.sidestepBeforeMeleeing(frame, c, 0, 0);
+    const label = `level ${level}${profile ? `, ${profile}` : ''}`;
+    const centred = level >= 7 && profile === null;
+    console.log(`${label}: positions ${slot.positions}, timer +${frame.timer.time - startedAt}`);
+    check(turnOver && frame.timer.time > startedAt, `${label}: the sidestep ends the turn and waits half a move`);
+    check(slot.positions === (centred ? 0xff : 2),
+      `${label}: ${centred ? 'the monster takes the centre of its cell (255)' : 'the monster stays in corner 2'}`);
   }
 
   finish();

@@ -202,6 +202,13 @@ export const BEHAVIOURS = [
         until: 7,
         profiles: { 'csbwin-2023': 7, 'csbwin-11.014': 7 },
     },
+    {
+        name: 'loneSidestepStaysInCorner',
+        does: "a lone monster's pre-melee sidestep, on its coin toss, staying in its corner and only waiting out half its move time, as CSBWin's commented-out `pI16A2->uByte3 = 0xff` leaves it, where the Atari's takes the centre of the cell (`MonsterAI.sidestepBeforeMeleeing`)",
+        debt: 'C199',
+        until: 7,
+        profiles: { 'csbwin-2023': 7, 'csbwin-11.014': 7 },
+    },
 ] as const satisfies readonly BehaviourChange[];
 
 export type BehaviourName = (typeof BEHAVIOURS)[number]['name'];
