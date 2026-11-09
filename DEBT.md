@@ -134,6 +134,7 @@ In payoff order: the first row is the next item.
 | R19 | The site's shared recordings are packages of versions 1 and 2, which the page no longer reads | S | ⏳ the author runs the migration, then deploys |
 | R20 | A path cut at a save carries less than a checkpoint: the screen's play state, the picking, the state no file holds | S | ⏳ |
 | C198 | A missile that cannot be made loses the object it was to carry | S | ⏳ |
+| C199 | A lone monster's sidestep never moves it to the centre of its square, as the Atari's does | S | ⏳ |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏸️ |
 | E40 | The statistics page's heat map | M | ⏸️ |
@@ -155,7 +156,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: A11 · C199 · D22 · E48 · F26 · G32 · P13 · R21 · U13 · W8 · X19. An ID recorded and paid in one commit has no
+Next free IDs: A11 · C200 · D22 · E48 · F26 · G32 · P13 · R21 · U13 · W8 · X19. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -714,6 +715,26 @@ It goes in `launchMissile`, for every caller, and the cursor's put-back goes. A
 `tools/checks/` tool fills the missile database to its maximum around the party, then
 throws, shoots and launches, and finds each object on the floor. Then the H entry, as
 for `BUG0_20`.
+
+### C199 ⏳ A lone monster's sidestep never moves it to the centre of its square, as the Atari's does
+
+Before a melee blow, a quarter-square monster with reach 1 that stands in a corner neither
+facing the party nor beside that corner moves to another cell first. When it is alone in
+its group, the Atari's takes the centre of the square one time in two
+(`if (!L0460_ui_CreatureCount && M005_RANDOM(2)) Cells = C0xFF_SINGLE_CENTERED_CREATURE`,
+`doc/ReDMCSB-src/GROUP.C:2394-2395`, in every release). CSBWin draws the same
+`STRandomBool()` but has the assignment commented out, `//pI16A2->uByte3 = 0xff;`
+(`doc/CSBwin-src/Monster.cpp:3946-3950`, and 11.014's `:3903`). `uByte3` is CSBWin's
+first name for the byte it now calls `positions()` (`pos_3`, `CSB.h:2259`, `:2288`), so
+the line is the Atari's. Its monster stays in its corner and only waits out half its move
+time. The port does what CSBWin does (`MonsterAI.ts`, the branch after `random.bool()`).
+
+Paying it: the Atari's assignment, behind a flag of `src/engine/Behaviour.ts` whose
+`until` is the level it makes, and which both CSBWin profiles play from that level, so
+CSBWin's recordings keep their monsters in their corners. A `tools/checks/` tool stands a
+lone screamer in a back corner beside the party, draws the branch, and finds it centred.
+Then the H entry, with both citations, and `doc/PROVEN_FACTS.md` → "The pre-melee
+sidestep…" rewritten.
 
 ### C150 ⏸️ Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops
 

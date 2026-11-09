@@ -686,8 +686,8 @@ export class MonsterAI {
     if (pos === ((preferredDirection + 1) & 0x3)) return false;
 
     if (c.indexOfLastMonster === 0 && this.random.bool() !== 0) {
-      // CSBWin has the assignment `pI16A2->uByte3 = 0xff` commented out here, so this
-      // branch deliberately does nothing but consume the die roll.
+      // CSBWin has the assignment `pI16A2->uByte3 = 0xff` commented out here, the
+      // Atari's move to the centre (`DEBT.md` C199), so this branch only consumes the roll.
     } else {
       pos = ((preferredDirection & 1) === (pos & 1) ? pos - 1 : pos + 1) & 0x3;
       let ordinal = ordinalOfMonsterAtPosition(this.ctx, c.monster, c.level, pos);

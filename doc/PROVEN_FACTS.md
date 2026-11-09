@@ -1636,9 +1636,9 @@ Delete the call as dead and Lord Chaos stops noticing Fluxcages.
 An invincible monster also moves **two squares at a time** — `PossibleDoubleMove`, and
 `mapX + 2*DeltaX` — and buzzes on arrival with sound ordinal 17.
 
-## The pre-melee sidestep has a deliberately dead branch
+## The pre-melee sidestep's empty branch is the Atari's move to the centre
 
-`doc/CSBwin-src/Monster.cpp:3970-3974`: a lone monster about to melee has a 50% chance to
+`doc/CSBwin-src/Monster.cpp:3946-3950`: a lone monster about to melee has a 50% chance to
 take a branch whose only statement is commented out in CSBWin:
 
 ```cpp
@@ -1648,8 +1648,11 @@ if ( (indexOfLastMonster == 0) && (STRandomBool() != 0) )
 }
 ```
 
-The branch still consumes its `STRandomBool()`, so removing it would desynchronise the random
-stream from CSBWin's even though no state changes. Ported as written.
+`uByte3` is the byte CSBWin now calls `positions()` (`pos_3`, `doc/CSBwin-src/CSB.h:2259`,
+`:2288`), and the Atari's sets it there, `Cells = C0xFF_SINGLE_CENTERED_CREATURE`
+(`doc/ReDMCSB-src/GROUP.C:2394-2395`): its lone monster takes the centre of the square.
+CSBWin's stays in its corner (`DEBT.md` C199). Either way the branch consumes its
+`STRandomBool()`, which CSBWin's random stream needs.
 
 ## `MonsterAttacks` decides *how* to attack before it attacks
 
