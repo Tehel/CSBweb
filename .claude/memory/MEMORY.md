@@ -62,3 +62,4 @@ One line per memory in this directory. Committed with the project; never shared.
 - [Scratch engine experiment](scratch-engine-experiment.md) — `.mts` with absolute imports from the repo's cwd, a hook between VBLs through `game.input.play`, a recursive state diff from `game` and its skip list
 - [ReDMCSB names CSBWin's tables](redmcsb-names-csbwin-tables.md) — an anonymous `d.PointerNNNN` is a named `G0…` in `doc/ReDMCSB-src/` (`Pointer1864` = `G0075_apuc_PaletteChanges_Projectile`, `STARTUP2.C:818`): grep there first
 - [Gate output to a file](gate-output-to-file.md) — `npm test -- --frames > scratch/gate.log`, never `| tail`: the frames' result scrolls away and the exit code is tail's
+- [Public pages voice](public-pages-voice.md) — player-facing essays study the Atari game, say "CSBweb" not "the port", no journal tone; oddities go in "Coding quirks": bugs, harmless, mysteries
