@@ -156,7 +156,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: A11 · C200 · D22 · E48 · F26 · G32 · P13 · R21 · U13 · W8 · X19. An ID recorded and paid in one commit has no
+Next free IDs: A11 · C201 · D22 · E48 · F26 · G32 · P13 · R21 · U13 · W8 · X19. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -1429,7 +1429,12 @@ Recorded so that nobody "fixes" them.
   (`doc/CSBwin-src/Code17818.cpp:194`). From level 2, the port does what they mean (the
   author): a step adds the time spent on the square left to the strengths of its prints,
   each its own, up to 80, and puts the new print at 24; the decay lowers every print but
-  the newest and the party's square's by one, drops the oldest at 0 and goes on. What a
+  the newest and the party's square's by one, drops the oldest at 0 and goes on. From
+  level 7, a party a pit or a teleporter takes onto another level leaves one print of its
+  arrival, where every release and CSBWin print it again as the level's load places the
+  party (`F0002_MAIN_GameLoop_CPSDF`, `doc/ReDMCSB-src/GAMELOOP.C:59-62`;
+  `doc/CSBwin-src/CSBCode.cpp:631-632`), two of the 24 prints for one square
+  (`arrivalPrintedTwice`, `WorldMove.arrivesOnItsPrint`, `tools/checks/party-move.ts`). What a
   monster smells then is how long ago, and how long, the party was on its square
   (`GetBestMonsterFacingP1`, `doc/CSBwin-src/Monster.cpp:613-625`). A recording before
   level 2 plays its set's release (`releaseScentLoops`), and a CSBWin profile CSBWin's

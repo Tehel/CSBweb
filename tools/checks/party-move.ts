@@ -10,11 +10,14 @@
  * the old square's pads (`:3293-3303`); then on its level the new square's pads
  * (`:3344-3352`), and on another nothing more until the top of the next tick, which
  * makes the arrival, `LoadPartyLevel` and `MoveObject(RNnul, -1, 0, x, y)`
- * (`d.newPartyLevel`, `CSBCode.cpp:628-633`), which leaves a second footprint and presses
- * the pads there. Each case records those steps, runs the top of the tick (`tick` in the
+ * (`d.newPartyLevel`, `CSBCode.cpp:628-633`), which presses the pads there and leaves a
+ * footprint, a second one after a pit in CSBWin and before level 7, only after the stairs
+ * from it (`WorldMove.arrivesOnItsPrint`). Each case records those steps, runs the top of the tick (`tick` in the
  * record), and compares them with that order:
  *
- *  1. the step onto a pit (`CSBCode.cpp:8411`), past a fireball in the square it leaves;
+ *  1. the step onto a pit (`CSBCode.cpp:8411`), past a fireball in the square it leaves,
+ *     and the same step at level 6, and at the `csbwin-2023` profile, where the arrival is
+ *     printed twice;
  *  2. the climb down (`Attack.cpp:2034`), which passes the pit, not the square below, so
  *     the second half-step meets a fireball in the pit's square;
  *  3. the DSA teleport onto the pit (`DSA.cpp:4605`), which passes the party's square twice;
@@ -34,6 +37,7 @@ import {
   DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID,
 } from '../../src/core/types';
 import { RN_FIREBALL } from '../../src/core/spellRn';
+import { behaviourAt, ENGINE_LEVEL } from '../../src/engine/Behaviour';
 import type { Game } from '../../src/engine/Game';
 import { teleportParty } from '../../src/engine/dsa/ops/dungeon';
 import { MovementAction, type Champion } from '../../src/engine/gameTypes';
@@ -56,9 +60,10 @@ const at = (p: Position): string => `${p.z}(${p.x},${p.y})`;
  * A game with four champions, one per corner, and a log of the party move's steps. Each
  * loads its own `dungeon.dat`: the engine changes the data it is given.
  */
-function makeGame(): { game: Game; log: string[] } {
+function makeGame(level = ENGINE_LEVEL, profile: string | null = null): { game: Game; log: string[] } {
   const data = stockDungeon();
   const game = newGame(data, stockGraphics());
+  game.ctx.behaviour = behaviourAt(level, profile);
   game.setRandomSeed(0x12345678);
   for (let i = 0; i < 4; i++) game.systems.hallOfChampions.addChampion(champion(i));
   const log: string[] = [];
@@ -184,10 +189,10 @@ function compare(label: string, log: string[], expected: string[]): void {
   check(log.join('|') === expected.join('|'), `${label}: in MoveObject's order (expected ${expected.join(', ') || 'nothing'})`);
 }
 
-/** What the fall onto the square below does, arrival included. */
-const fallTail = (old: Position, below: Position): string[] => [
+/** What the fall onto the square below does, arrival included, its print `twice` before level 7. */
+const fallTail = (old: Position, below: Position, twice = false): string[] => [
   `fall at ${at(below)}`, `footprint ${at(below)}`, `remove ${at(old)} moved`,
-  'tick', `load ${below.z}`, `footprint ${at(below)}`, `place ${at(below)} moved`,
+  'tick', `load ${below.z}`, ...(twice ? [`footprint ${at(below)}`] : []), `place ${at(below)} moved`,
 ];
 
 const probe = makeGame().game;
@@ -204,6 +209,14 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
   tick(game, log);
   compare('1. the step onto the pit', log, [`missile ${at(from)}->${at(pit)}`, ...fallTail(from, below)]);
   check(!inCell(game, from, fireball), 'the fireball in the square the party leaves is met');
+}
+for (const [level, profile] of [[6, null], [ENGINE_LEVEL, 'csbwin-2023']] as const) {
+  const { game, log } = makeGame(level, profile);
+  stand(game, log, from, facing);
+  game.move(MovementAction.MOVE_FORWARD);
+  tick(game, log);
+  compare(`1. the step onto the pit at level ${level}${profile ? `, ${profile}` : ''}`, log,
+    [`missile ${at(from)}->${at(pit)}`, ...fallTail(from, below, true)]);
 }
 
 /* ------------------------------------------------ 2. the climb down ------------- */

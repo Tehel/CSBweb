@@ -1,6 +1,6 @@
 ---
 name: one-level-per-deploy
-description: a series of behaviour changes deployed together shares one ENGINE_LEVEL; the level being built, if any, is named in RECORDING.md's policy (none: level 6 deployed 2026-11-07, the next fix bumps to 7)
+description: a series of behaviour changes deployed together shares one ENGINE_LEVEL; the level being built, if any, is named in RECORDING.md's policy (7, being built since 2026-11-09 for the scents' fixes: join it)
 metadata:
   type: feedback
 ---

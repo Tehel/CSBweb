@@ -94,7 +94,8 @@ export class WorldMove {
    * - the party set on the new square and taken through the teleporter and pit loop,
    *   its square and facing following every jump and fall (`:2889-3170`);
    * - nothing more when it is back on its square facing the same way (`:3229-3236`);
-   * - a footprint when it left its square (`:3259-3282`);
+   * - a footprint when it left its square (`:3259-3282`), but on the square the newest
+   *   print holds (`arrivesOnItsPrint`);
    * - the old square's pads (`:3293-3303`), a monster where it landed deleted
    *   (`:3333-3343`), then the new square's pads (`:3344-3352`).
    *
@@ -121,7 +122,7 @@ export class WorldMove {
       unchangedRoom = landed.z === level && landed.x === oldX && landed.y === oldY;
       if (unchangedRoom) {
         if (party.facing === oldFacing) return;
-      } else if (party.champions.length !== 0) {
+      } else if (party.champions.length !== 0 && !this.arrivesOnItsPrint(landed)) {
         this.ctx.footprints.recordPartyMove(
           this.ctx.state.tickCount, landed.z, landed.x, landed.y, party.magicFootprintsActive !== 0, oldX, oldY, level,
           scentRule(this.ctx.behaviour),
@@ -149,6 +150,24 @@ export class WorldMove {
       // `LoadLevel(AttachedLevel_4); d.newPartyLevel = sw(curLevel);` (`:3356-3358`).
       party.position = new Position(at.x, at.y, level);
       this.ctx.loop.newPartyLevel = at.z;
+    }
+  }
+
+  /**
+   * Whether the party lands on the square the trail's newest print already holds: the
+   * arrival on another level by a pit or a teleporter, which the move has printed, when the
+   * level's load places the party again (`Game.loadNewPartyLevel`). CSBWin prints it a
+   * second time, as every release does (`MoveObject(RN(RNnul), -1, 0, d.partyX, d.partyY)`
+   * after `LoadPartyLevel`, `doc/CSBwin-src/CSBCode.cpp:631-632`; ReDMCSB's
+   * `F0002_MAIN_GameLoop_CPSDF`, `GAMELOOP.C:59-62`), two of the 24 prints for one square;
+   * the port prints it once (`DEBT.md` H, "The scents are what FTL meant"). The stairs'
+   * arrival is printed only by the load (`TraverseStairway` lifts the party, `newX < 0`).
+   */
+  private arrivesOnItsPrint(landed: Position): boolean {
+    if (this.ctx.behaviour.arrivalPrintedTwice) {
+      return false;
+    } else {
+      return this.ctx.footprints.isNewestPrint(landed.z, landed.x, landed.y);
     }
   }
 

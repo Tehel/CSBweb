@@ -1186,6 +1186,23 @@ party with champions makes stores print 0. CSBWin's own saves show it:
 `csbgame-early-1hero.dat` has `NumFootprintEnt` 0 and `csbgame-early-2hero-renamed.dat`,
 later in the same game, 1.
 
+## An arrival on another level by a pit or a teleporter is printed twice
+
+`MoveObject`'s footprint block runs for any party move that leaves its square, the
+`oldX == -1` placement among them (`doc/CSBwin-src/Code11f52.cpp:3262-3281`). A pit or a
+teleporter that takes the party onto another level prints the square it lands on there,
+then sets `d.newPartyLevel` (`:3354-3359`); the top of the next tick runs
+`LoadPartyLevel` and `MoveObject(RN(RNnul), -1, 0, d.partyX, d.partyY)`
+(`doc/CSBwin-src/CSBCode.cpp:628-633`), which prints the same square again. Every release
+does the same: `F0267_MOVE_GetMoveResult_CPSCE` prints the arrival and sets
+`G0327_i_NewPartyMapIndex` after it (`doc/ReDMCSB-src/MOVESENS.C:770-785`, `:821`), and
+`F0002_MAIN_GameLoop_CPSDF` calls it again from `CM1_MAPX_NOT_ON_A_SQUARE`
+(`GAMELOOP.C:59-62`). Stairs print once: `TraverseStairway` lifts the party (`newX` -1,
+`CSBCode.cpp:7861`, ReDMCSB's `F0364_COMMAND_TakeStairs`, `CLIKMENU.C:134`), which reaches
+no print, and only the load's placement prints. The port prints the arrival once from
+level 7 (`DEBT.md` H, "The scents are what FTL meant"). Evidence:
+`tools/checks/party-move.ts`.
+
 ## YA BRO ROS marks the trail from the cast onwards
 
 The magic footprints are a range of the one trail, `[d.IndexOfFirstMagicFootprint,

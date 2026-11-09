@@ -31,7 +31,7 @@
  */
 
 /** The engine's level: what a recording made now carries (`Recording.level`). Recordings made before levels are 0. */
-export const ENGINE_LEVEL = 6;
+export const ENGINE_LEVEL = 7;
 
 /** A CSBWin version whose runs the engine plays by the flags that name it. */
 export interface BehaviourProfile {
@@ -187,6 +187,13 @@ export const BEHAVIOURS = [
         does: "a potion spell filling the empty flask in the caster's ready hand when both hands hold one, where CSBWin's `GetFlaskInHand` looks in the action hand first: the other flask filled, Conflux's champion drinking an empty flask at 0x2e13b (`MagicSystem.getFlaskInHand`)",
         debt: 'F24',
         until: 6,
+    },
+    {
+        name: 'arrivalPrintedTwice',
+        does: "a party a pit or a teleporter takes onto another level leaving two prints of its arrival square, the move's and the level's load's, as CSBWin's `MoveObject(RNnul, -1, 0, …)` after `LoadPartyLevel` and every release's game loop do: two of the trail's 24 prints for one square (`WorldMove.arrivesOnItsPrint`)",
+        debt: 'C200',
+        until: 7,
+        profiles: { 'csbwin-2023': 7, 'csbwin-11.014': 7 },
     },
 ] as const satisfies readonly BehaviourChange[];
 

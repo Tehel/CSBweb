@@ -1075,8 +1075,9 @@ export class Game implements MainLoop {
      * `tag0006a4` (doc/CSBwin-src/CSBCode.cpp:625-633): `if (d.newPartyLevel != -1)`,
      * `LoadPartyLevel(d.newPartyLevel)`, whose `SetPartyLevel` moves `d.partyLevel` on
      * (`:5858`), then `MoveObject(RN(RNnul), -1, 0, d.partyX, d.partyY)`, which takes the
-     * party through the square it stands on again, leaves a second footprint and presses
-     * the pads, then `d.newPartyLevel = -1; DiscardAllInput();`. A party put on another
+     * party through the square it stands on again, prints its square a second time after a
+     * pit or a teleporter (the port, only after the stairs: `WorldMove.arrivesOnItsPrint`)
+     * and presses the pads, then `d.newPartyLevel = -1; DiscardAllInput();`. A party put on another
      * level by hand, as a tool does, has that level loaded and the input discarded
      * (`loadPartyLevelIfChanged`). Says whether it ran. Public so that `tools/` can run
      * the top of a tick alone.

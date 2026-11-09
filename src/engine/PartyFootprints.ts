@@ -21,7 +21,8 @@
  * - `'meant'`, what FTL meant, on every set (`DEBT.md` H, "The scents are what FTL
  *   meant"): a step adds the time spent on the square left to the strengths of its prints,
  *   each its own, up to 80, and the new print is at 24; the ten-second decay spares the
- *   newest print and the party's square's.
+ *   newest print and the party's square's. From level 7, an arrival on another level is
+ *   printed once (`WorldMove.arrivesOnItsPrint`).
  * - `'release'`, the release's own code, before level 2 (`releaseScentLoops`). The Atari's
  *   program throws its comparisons with the square away, so every strength changes; with
  *   the Amiga's tables the trail is A22E's (`doc/AMIGA_DISK_REFERENCE.md` → "A22E's own
@@ -129,6 +130,11 @@ export class PartyFootprints {
       if (this.prints[index] === searchValue) return index + 1;
     }
     return 0;
+  }
+
+  /** Whether the trail's newest print is the square `level` (`mapX`, `mapY`). */
+  isNewestPrint(level: number, mapX: number, mapY: number): boolean {
+    return this.count !== 0 && this.prints[this.count - 1] === packLocation(level, mapX, mapY);
   }
 
   /**
