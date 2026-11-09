@@ -7,7 +7,9 @@ you want those, `doc/CSBWIN_MONSTERS_REFERENCE.md` has the mapping and
 
 Everything here is behaviour I traced in the C++ and then watched happen in the port.
 Where I could not work out *why* something is the way it is, it goes in
-[Unsolved](#unsolved) at the end rather than being smoothed over.
+[Unsolved](#unsolved) at the end rather than being smoothed over, and what has since
+been explained is under [Solved](#solved). The code is checked against ReDMCSB, the
+reconstruction of the Atari's own code, as well as CSBWin.
 
 **One machine, many parameters.** I had expected each monster type to have its own
 logic and found the opposite: there is a single decision procedure, and the twenty-odd
@@ -74,28 +76,36 @@ If sight fails, a monster can still find you two ways.
 **ignores doors**, it simply knows where you are. This is the mechanic that makes
 hiding behind a closed door unreliable: it stops them seeing you, not smelling you.
 
-**Your trail.** The game remembers the last two dozen squares the party stood on, each
-with a staleness value. A monster standing on one of those squares may follow it. The
-test is a random roll plus the print's staleness against a threshold — and the
-threshold **falls as the creature's nose improves**, so a keen-nosed monster will
-follow older, colder trails. A worm has by far the best nose in the game and can
-scarcely see at all.
+**Your trail.** The game remembers the last 24 squares the party stood on, each with a
+scent strength. The square you step onto starts at 24; leaving a square adds the time
+you spent there, up to 80; and every ten seconds every scent but the one under you
+fades by one, the oldest going when it reaches nothing. A monster standing on one of
+those squares may follow it. The test is a random roll plus the scent's strength
+against a threshold — and the threshold **falls as the creature's nose improves**, so a
+keen-nosed monster will follow fainter, older trails. A worm has by far the best nose
+in the game and can scarcely see at all.
+
+That is the design. No release of the game ever kept the strengths that way: see "The
+footprint trail" under [Solved](#solved).
 
 ---
 
-## Six moods
+## Four moods
 
 Behaviour is dominated by a single small state I will call the group's **mood**. There
-are six in use:
+are four in use:
 
 | Mood | What it means | What it does |
 | --- | --- | --- |
 | **Calm** | Nothing is happening | Wanders; hunts by smell if it catches your trail |
-| **Wary** | Aware, unbothered | Seeing you only makes it pause |
-| **Alert** | Suspicious | Seeing you at range flips it to Charging |
 | **Fleeing** | Panicking | Runs away, faster than it hunts |
 | **Engaged** | In your face | Formation breaks — each member acts alone |
 | **Charging** | Coming for you | Heads for where it last knew you to be |
+
+The code knows more. It tests in several places for two other moods — call them *Wary*,
+whose monster only pauses when it sees you, and *Alert*, whose monster charges — and
+resets a group to Calm from anything "at or above" a value no mood reaches. Nothing in
+the game ever puts a group in either, so those branches never run.
 
 The transitions are the interesting part:
 
@@ -104,8 +114,7 @@ The transitions are the interesting part:
 - **It takes damage** → if already Fleeing or Engaged, nothing changes. Otherwise it
   checks whether it can see you; if it cannot, it just turns on the spot, and if it
   can, it tries to move.
-- **Calm or Alert, and it sees you at range** → *Charging*. Note *Wary* is the
-  exception: a wary monster that sees you merely waits.
+- **Calm, and it sees you at range** → *Charging*.
 - **It reaches the square where it last saw you and you are not there** → *Calm*. The
   trail has gone cold.
 - **A group member dies while Engaged** → the survivors may drop to *Fleeing*, and are
@@ -163,17 +172,14 @@ Mood?
 │               ├─ yes, and close enough, and lined up ──▶ break formation
 │               ├─ yes, otherwise ──▶ close in at double speed
 │               └─ no  ──▶ head for where I last saw them
-├─ Wary/Alert/Calm ──▶ can I see them?
-│    ├─ yes, close enough and lined up ──▶ break formation
-│    ├─ yes, and I am Wary             ──▶ wait one move interval
-│    ├─ yes, otherwise                 ──▶ become Charging, act next tick
-│    └─ no:
-│         ├─ Wary or Alert ──▶ wait one move interval
-│         └─ Calm ──▶ can I smell them or their trail?
-│                      ├─ yes ──▶ move that way
-│                      └─ no  ──▶ coin flip:
-│                                  ├─ wander in a random direction
-│                                  └─ try all four directions from a random start
+├─ Calm     ──▶ can I see them?
+│               ├─ yes, close enough and lined up ──▶ break formation
+│               ├─ yes, otherwise ──▶ become Charging, act next tick
+│               └─ no  ──▶ can I smell them or their trail?
+│                          ├─ yes ──▶ move that way
+│                          └─ no  ──▶ coin flip:
+│                                      ├─ wander in a random direction
+│                                      └─ try all four directions from a random start
 └─ Engaged ──▶ (the group as a whole does little; members act on their own turns)
 ```
 
@@ -209,7 +215,9 @@ Two touches that make movement feel less mechanical:
 A step is refused by walls, stairs, open pits (unless the creature floats), closed
 false walls, doors too far shut for a creature of that height, another monster, and by
 the party. Some creatures recognise *illusory* pits and false walls and will walk onto
-them; most are fooled. Only a few types are willing to use teleporters at all.
+them; most are fooled. Every creature walks into an open teleporter, but a few wary
+types — the vexirk, zytaz, demon, dragon and the Lords — refuse one that would carry
+them to a level their kind is not allowed on, which would kill them.
 
 **Speed is mood-dependent**: fleeing is a quarter faster than normal, and charging is
 twice as fast. A cornered monster that turns to fight is genuinely slower than the
@@ -241,7 +249,10 @@ Can it see the party?          ── no ──▶ can the group see them?
 
 Before a melee attack — reach 1 only — a monster standing in an awkward corner of its
 cell will often **sidestep** to a better one first, and that shuffle can walk it onto a
-missile you left lying there.
+missile you left lying there. Alone in its group, the Atari's monster half the time
+takes the centre of the cell instead; CSBWin's never does, and the port follows CSBWin
+there for now. The vexirk, which may strike any champion, skips the shuffle three times
+in four and strikes from the back corner.
 
 The attack itself is not a single decision but a **filled-in form**: who to hit,
 whether to throw something instead, what to throw, how far, how hard, which sound. The
@@ -249,8 +260,8 @@ form is handed to a dungeon script that may rewrite any field, and only then act
 That is why custom dungeons can make monsters behave in ways the original never did.
 
 **Who gets hit** is either the nearest reachable champion — determined by which side of
-the cell the blow comes from, then a fixed order per side — or, for a handful of
-creature types, a *randomly chosen* living champion regardless of position.
+the cell the blow comes from, then a fixed order per side — or, for the creature types
+with a "strike anyone" flag, a *randomly chosen* living champion regardless of position.
 
 **Whether it lands** has two independent escapes before damage is even rolled: being
 quicker than the attacker (and still needing to win a 3-in-4 roll), and being lucky.
@@ -362,55 +373,104 @@ dragons in a cell — and two-corner creatures must turn both halves together.
 
 ## Unsolved
 
-Things I could not explain, in rough order of how much they bother me. Paul Stevens'
-comments show he hit several of the same walls, and I have quoted him where he did.
+Things nobody has explained yet. Christophe, of the Dungeon Master Encyclopaedia and the
+author of ReDMCSB, checked this section against the Atari's own code and explained most
+of what it held; that is under [Solved](#solved), below. Paul Stevens' comments show he
+hit several of the same walls, and I have quoted him where he did.
+
+**A flag on creatures it cannot affect.** One per-type flag lets a quarter-cell creature
+strike from the back of its cell, and only together with the "strike anyone" flag; the
+vexirk alone has both. The screamer has it without the other, where it does nothing, and
+so do the water elemental, the dragon and all three aspects of the Lord, which fill
+their cell, where the code never looks at it. Christophe's guess is that the flag once
+meant something else and the data was never cleared.
+
+**Why wariness is a number.** Whether a creature refuses a teleporter that would kill it
+is decided by a per-type number, which ReDMCSB calls wariness, being at least 10: the
+vexirk, zytaz, demon, dragon and the Lords pass. Nothing else reads the field, so a
+simple flag would have done. FTL perhaps meant it for more, and never used it.
+
+## Solved
 
 **The condition that cannot fail.** One branch tests whether the mood is Calm or Alert
 *and* not Charging — but the first test already excludes Charging. Stevens wrote: "The
 following line makes no sense. But I have studied the original machine language over
-and over again. This is what it did." He suggests it may have been written backwards.
-My compiler independently flagged it as unreachable, which is a strange kind of
-corroboration across thirty years.
+and over again. This is what it did." It is redundant, not unreachable, and harmless:
+Alert never occurs, so the real test is just "Calm". ReDMCSB marks it as useless code,
+most likely a leftover from the many rounds of tuning the creatures' behaviour.
 
-**The footprint trail is acknowledged broken and still load-bearing.** The routine that
-writes trail staleness gets Stevens' bluntest comment: "I think this is much hogwash.
-Does nothing useful. Is full of errors. Perhaps an old, abandoned debug trace." He is
-right that it is wrong — it overwrites every entry it walks past with a single value.
-But it is the only thing that writes the staleness values that smelling reads. Whatever it does, the
-game's tracking behaviour depends on it, and it cannot simply be repaired without
-changing how monsters hunt.
+**The footprint trail.** The routine that writes the scent strengths gets Stevens'
+bluntest comment: "I think this is much hogwash. Does nothing useful. Is full of
+errors. Perhaps an old, abandoned debug trace." It is broken in four ways, all in the
+original:
 
-**A branch that does nothing but consume randomness.** In the pre-melee sidestep there
-is a 50% branch whose only statement is commented out in CSBWin. It still draws a
-random number, so it still shifts everything downstream. I ported it as written. It
-looks like a behaviour that was removed and whose removal was never finished.
+- **On the Atari, the square is never compared.** The compiler FTL used, Megamax C,
+  accepted comparisons of whole structures and threw their result away. So every step
+  sets every strength along the trail to 24, the time spent anywhere is lost, and the
+  ten-second fade spares only the newest scent, not every scent of the square you stand
+  on.
+- **The strengths are written backwards.** The loop walks the squares up from the
+  oldest while it walks the strengths down from the newest, so it changes the strength
+  of square *n* at *k − 1 − n*. On the Atari the first bug hides it; the Amiga, whose
+  compiler compares, shows it.
+- **A pit or a teleporter to another level records the arrival twice**: once by the
+  fall, once as the new level is loaded. Two of the 24 places for one square. Stairs
+  record it once.
+- **The footprint spell's two ends are swapped.** The code means a weak YA BRO ROS to
+  show the squares walked from the cast, and a strong one to show the whole trail.
+  Every power shows only what is walked from the cast.
 
-**Two moods are never used.** Of eight possible values only six appear. One of the
-unused ones shows up solely in a "reset anything at or above this" cleanup, which
-suggests there were once more states than survive in the shipped game.
+CSBWin adds two of its own: it never writes the oldest scent's strength, and its fade
+stops for the tick after dropping a scent. And the routine that drops a scent, which I
+first called wrong as well, is fine: CSBWin's copy routine takes its source first, and
+I had read it the other way round.
+
+The port plays what the code means: the time spent counts, an arrival is recorded once,
+and a strong spell shows the whole trail. It plays CSBWin's loops only for CSBWin's own
+recordings, which need them to play on.
+
+**A branch that seemed to do nothing but consume randomness.** In the pre-melee
+sidestep there is a 50% branch whose only statement is commented out in CSBWin. In the
+original it is not empty: the commented line, written with the old name of the byte
+that holds each member's corner, moves a lone monster to the centre of its cell, and the
+Atari's does just that. Stevens left no note on why he took it out; it is already out in
+CSBWin 11.014, an older source than the one the port follows. The port follows CSBWin
+there for now, and will do the Atari's for its own games (`DEBT.md` C199).
+
+**Four moods are never used.** Of eight possible values, one never appears in the code
+at all. Three more appear — Wary, Alert, and the value of the "reset anything at or
+above this" cleanup — but nothing ever sets them. Only four moods occur in play.
 
 **Undocumented flags that turned out to matter.** Two per-type flags are marked only
-"????" in CSBWin. I worked out that one of them selects random targeting over nearest
-targeting — that is why some creatures hit the back rank seemingly at random. The other
-appears only in the sidestep condition and I still do not know what it means; the types
-that have it (screamer, vexirk, water elemental, dragon, and all three aspects of the
-Lord) do not obviously have anything in common.
+"????" in CSBWin. One lets a creature strike any champion: it picks a living one at
+random, where any other strikes the champion the side of its cell faces. The other lets
+a quarter-cell creature strike from the back of its cell, but only with the first: the
+vexirk, the one creature with both, steps forward one time in four and strikes from
+where it stands the other three. Why the other types carry it is still
+[unsolved](#unsolved).
 
-**A value read before it is written.** On rare paths a variable reaches the movement
-code uninitialised. Stevens patched the Atari binary to force it to a fixed number,
-noting that the uninitialised value was usually "part of an address" and that leaving
-it made the two builds impossible to compare. So the original game had a real bug here,
-and its effect was "slightly erratic behaviour" that nobody ever noticed.
+**A value read before it is written.** Stevens patched the Atari binary to give a
+variable a fixed value, noting that the uninitialised value was usually "part of an
+address" and that leaving it made the two builds impossible to compare. When a cloud or
+a closing door hurts a group, the value is read in a test that the same event makes
+false anyway. When a missile hits one, the event falls through into the same code, and
+if the group cannot move at once, the leftover value decides whether it turns. Being
+part of an address, it is large, and the group does not turn — exactly what Stevens'
+fixed value gives, which the port uses. A real bug, but in practice probably without
+effect.
 
 **A number reused as two different things.** In the corner-shuffling code one value is
 used as both a position and a bitfield within a few lines. Stevens: "I think there is
-something wrong with D5 here." I ported it as written because I could not determine
-what the correct version would even be.
+something wrong with D5 here." There is not. It saves a register: the random bits
+tested and the corner stored never overlap, and storing the corner clears the bits
+tested next. A lone monster off the centre goes to the centre seven times in eight, or
+to the next or previous corner; one already in the centre goes to a random corner one
+time in eight.
 
-**Why the willingness-to-teleport threshold is what it is.** Whether a creature will
-step into a teleporter is decided by a per-type number being at least 10. The types
-that pass are vexirk, zytaz, demon, dragon and the three aspects of the Lord. Why that field, and why 10, I
-have no idea — the same field is not obviously used for anything else.
+**What wariness decides.** I had it as whether a creature will step into a teleporter
+at all. Every creature does. A creature whose wariness is at least 10 only refuses an
+open teleporter that carries creatures to a level its kind is not allowed on, where
+arriving would kill it. Why that field is a number is still [unsolved](#unsolved).
 
 ---
 
