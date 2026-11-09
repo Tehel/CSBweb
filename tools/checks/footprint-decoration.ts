@@ -11,8 +11,9 @@
  * and so on to `cfD4 = 1` (`:296-308`), whatever its bit 8.
  *
  * The trail is a real `PartyFootprints` walked over real cells of level 0 of
- * `dm-atari/dungeon.dat`: one print before YA BRO ROS's mark (`markMagicFootprints`,
- * `Magic.cpp:1335-1344`), the rest after it, as `MoveObject` records them.
+ * `dm-atari/dungeon.dat`: one print before a weak YA BRO ROS's mark (`markMagicFootprints`,
+ * `Magic.cpp:1335-1344`), which marks only what follows, the rest after it, as
+ * `MoveObject` records them.
  *
  * The same bit is set where prints can show by the cell's extended cell flag
  * `ECF_FOOTPRINTS` (bit 0), once `d.Time > 0` (`:419-425`): `GetExtendedCellFlag`
@@ -72,7 +73,7 @@ function main(): void {
     footprints.recordPartyMove((time += 5), 0, p.x, p.y, magicActive);
   };
   walk(plain, false);
-  footprints.markMagicFootprints(4);
+  footprints.markMagicFootprints(2, false);
   for (const p of [magic, door, stair, falseWall]) walk(p, true);
   console.log(`  trail of ${footprints.getCount()}, magic [${footprints.getIndexOfFirstMagicFootprint()}, ${footprints.getIndexOfLastMagicFootprint()})`);
 
@@ -213,7 +214,7 @@ function drawing(): void {
   check(toc.length > 0 && toc.length < 16 && toc.every((d, i) => slots[i]![0] === 247 + 6 * d && slots[i]![1] === tables.objects.floorDecorationRectSetIndex[d]),
     `the level's ${toc.length} slots are 247 + 6 * its FloorDecorationTOC, in Byte4110's set`);
   // The party casts, steps on the cell ahead, then back to where the frame is seen from.
-  footprints.markMagicFootprints(4);
+  footprints.markMagicFootprints(4, false);
   footprints.recordPartyMove(100, 0, at.x, at.y - 1, true);
   footprints.recordPartyMove(105, 0, at.x, at.y, true);
   const withPrint = frame();

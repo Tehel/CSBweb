@@ -338,7 +338,7 @@ export class MagicSystem {
           }
           case 6: {
             this.ctx.party.state.magicFootprintsActive = sb(this.ctx.party.state.magicFootprintsActive + 1);
-            this.ctx.footprints.markMagicFootprints(spellPower);
+            this.ctx.footprints.markMagicFootprints(spellPower, this.ctx.behaviour.magicFootprintsFromCast);
             const duration = d6 * d6;
             this.queueUtilityTimer(TimerFunction.TT_79, duration);
             break;

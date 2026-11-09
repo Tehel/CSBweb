@@ -195,6 +195,13 @@ export const BEHAVIOURS = [
         until: 7,
         profiles: { 'csbwin-2023': 7, 'csbwin-11.014': 7 },
     },
+    {
+        name: 'magicFootprintsFromCast',
+        does: "YA BRO ROS marking only the squares walked from the cast, at every power, as CSBWin and every release do: the range starts at the trail's end, and a strong spell's end of 0 is raised to the count by the first move, where the port's strong spell starts it at 0, the whole trail (`PartyFootprints.markMagicFootprints`)",
+        debt: 'C201',
+        until: 7,
+        profiles: { 'csbwin-2023': 7, 'csbwin-11.014': 7 },
+    },
 ] as const satisfies readonly BehaviourChange[];
 
 export type BehaviourName = (typeof BEHAVIOURS)[number]['name'];

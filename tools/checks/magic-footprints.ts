@@ -5,14 +5,18 @@
  *
  * - the spell starts the range at the trail's end, `d.IndexOfFirstMagicFootprint =
  *   d.NumFootprintEnt`, and closes it there for a spell power under 3 or sets its end to
- *   0 otherwise (`doc/CSBwin-src/Magic.cpp:1333-1344`);
+ *   0 otherwise (`doc/CSBwin-src/Magic.cpp:1333-1344`); the port, from level 7, swaps the
+ *   two ends, so a spell of power 3 or more starts the range at 0 (`DEBT.md` H, "The scents
+ *   are what FTL meant"), and before it, or at a CSBWin profile, does CSBWin's
+ *   (`magicFootprintsFromCast`);
  * - each party move while `d.MagicFootprintsActive` raises the end to the new count
  *   (`Code11f52.cpp:3272-3276`);
  * - the save writes the count and both ends into the party tail beside the trail.
  *
- * So a party that casts, then walks four squares, saves the range from the count at the
- * cast to the count after the walk, whatever the spell's power, and a game loaded from
- * that save reads the same range back.
+ * So a party that casts, then walks four squares, saves the range to the count after the
+ * walk, from the count at the cast, whatever the power in CSBWin, and from 0 for a strong
+ * spell in the port, which marks the prints walked before the cast too; and a game loaded
+ * from that save reads the same range back.
  *
  * The parties are two genuine CSBWin saves', and the walk leaves the ring short of its 24:
  *
@@ -34,6 +38,7 @@ import { readFileSync } from 'node:fs';
 
 import { Position, RoomType } from '../../src/core/types';
 import { readCsbwinPartyTail } from '../../src/data/CsbwinCharacters';
+import { behaviourAt, ENGINE_LEVEL } from '../../src/engine/Behaviour';
 import { applyCsbwinSave } from '../../src/engine/CsbwinSaveGame';
 import { readSaveFile } from '../../src/data/SaveFile';
 import type { Game } from '../../src/engine/Game';
@@ -64,9 +69,11 @@ function openNeighbour(game: Game): { x: number; y: number } {
   throw new Error('no open square beside the party');
 }
 
-function scenario(save: string, power: number): void {
-  const label = `${save}, power ${power}`;
+function scenario(save: string, power: number, level = ENGINE_LEVEL): void {
+  const label = `${save}, power ${power}, level ${level}`;
+  const fromCast = level < 7;
   const game = loadWorld();
+  game.ctx.behaviour = behaviourAt(level);
   applyCsbwinSave(game, new Uint8Array(readFileSync(savePath(save))));
   const prints = game.ctx.footprints;
   const party = game.ctx.party.state;
@@ -82,9 +89,15 @@ function scenario(save: string, power: number): void {
   console.log(`${label}: cast=${cast} active=${party.magicFootprintsActive} count=${atCast} ` +
     `range=[${first},${lastAtCast})`);
   check(cast === 1 && party.magicFootprintsActive === 1, `${label}: the spell is cast and its counter runs`);
-  check(first === atCast, `${label}: the range starts at the trail's end, ${atCast}`);
-  check(lastAtCast === (power < 3 ? atCast : 0),
-    `${label}: the range ends at ${power < 3 ? 'the trail\'s end' : '0'} until the party moves`);
+  if (fromCast) {
+    check(first === atCast, `${label}: the range starts at the trail's end, ${atCast}`);
+    check(lastAtCast === (power < 3 ? atCast : 0),
+      `${label}: the range ends at ${power < 3 ? 'the trail\'s end' : '0'} until the party moves`);
+  } else {
+    check(lastAtCast === atCast, `${label}: the range ends at the trail's end, ${atCast}`);
+    check(first === (power < 3 ? atCast : 0),
+      `${label}: the range starts at ${power < 3 ? 'the trail\'s end' : '0, the whole trail'}`);
+  }
 
   const home = { x: party.position.x, y: party.position.y };
   const away = openNeighbour(game);
@@ -100,6 +113,7 @@ function scenario(save: string, power: number): void {
   console.log(`${label}: after ${route.length} moves count=${count} range=[${prints.getIndexOfFirstMagicFootprint()},${last})`);
   check(count === atCast + route.length, `${label}: each move adds a print (${count})`);
   check(last === count, `${label}: each move while the spell runs raises the range's end to the count`);
+  check(prints.getIndexOfFirstMagicFootprint() === first, `${label}: and leaves its start where the cast put it, ${first}`);
 
   const file = buildSaveFile(game);
   const tail = readCsbwinPartyTail(readSaveFile(file).blocks.characters);
@@ -133,7 +147,7 @@ function ring(): void {
   check(trail.getCount() === 24 && held().join() === lastOf(40, 24).join(),
     'ring: a full trail is the last 24 squares walked, oldest first');
 
-  trail.markMagicFootprints(4);
+  trail.markMagicFootprints(4, true);
   walk(40, 45, true);
   const first = trail.getIndexOfFirstMagicFootprint();
   const last = trail.getIndexOfLastMagicFootprint();
@@ -162,10 +176,32 @@ function ring(): void {
     'ring: the ten-second update drops the oldest print and keeps the rest in order');
   check(trail.getIndexOfFirstMagicFootprint() === 18 && trail.getIndexOfLastMagicFootprint() === 23,
     'ring: and the magic range follows them down');
+
+  // The port's strong spell on a full trail: the range starts at 0 and stays there as the
+  // ring drops its oldest, so the whole trail is magic; the weak one keeps only what follows.
+  for (const power of [4, 2]) {
+    const full = new PartyFootprints();
+    for (let i = 0; i < 40; i++) full.recordPartyMove(100 + 5 * i, 3, cell(i).x, cell(i).y, false);
+    full.markMagicFootprints(power, false);
+    for (let i = 40; i < 45; i++) full.recordPartyMove(100 + 5 * i, 3, cell(i).x, cell(i).y, true);
+    const from = full.getIndexOfFirstMagicFootprint();
+    const to = full.getIndexOfLastMagicFootprint();
+    const magic = (i: number): boolean => {
+      const found = full.searchFootprints(3, cell(i).x, cell(i).y) - 1;
+      return found >= from && found < to;
+    };
+    const walked = Array.from({ length: 24 }, (_, k) => 21 + k);
+    console.log(`ring, the port's power ${power}: cast at move 40, 5 moves on: range=[${from},${to})`);
+    check(power < 3
+      ? from === 19 && to === 24 && walked.filter(magic).join() === '40,41,42,43,44'
+      : from === 0 && to === 24 && walked.every(magic),
+    `ring, the port's power ${power}: ${power < 3 ? 'the five squares walked since the cast are magic' : 'all 24 squares of the trail are magic'}`);
+  }
 }
 
 ring();
 scenario('csbgame-early-3hero-nospace.dat', 2);
 scenario('csbgame-early-3hero-nospace.dat', 4);
 scenario('csbgame-early-1hero.dat', 4);
+scenario('csbgame-early-3hero-nospace.dat', 4, 6);
 finish();

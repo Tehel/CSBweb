@@ -166,7 +166,7 @@ function main(): void {
     return floorRenderer.buffer.pixels.slice();
   };
   const without = frame();
-  footprints.markMagicFootprints(4);
+  footprints.markMagicFootprints(4, false);
   footprints.recordPartyMove(100, 0, at.x, at.y - 1, true);
   footprints.recordPartyMove(105, 0, at.x, at.y, true);
   const withPrint = frame();

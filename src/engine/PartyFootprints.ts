@@ -22,7 +22,8 @@
  *   meant"): a step adds the time spent on the square left to the strengths of its prints,
  *   each its own, up to 80, and the new print is at 24; the ten-second decay spares the
  *   newest print and the party's square's. From level 7, an arrival on another level is
- *   printed once (`WorldMove.arrivesOnItsPrint`).
+ *   printed once (`WorldMove.arrivesOnItsPrint`), and a strong YA BRO ROS marks the
+ *   whole trail (`markMagicFootprints`).
  * - `'release'`, the release's own code, before level 2 (`releaseScentLoops`). The Atari's
  *   program throws its comparisons with the square away, so every strength changes; with
  *   the Amiga's tables the trail is A22E's (`doc/AMIGA_DISK_REFERENCE.md` → "A22E's own
@@ -322,16 +323,27 @@ export class PartyFootprints {
   }
 
   /**
-   * YA BRO ROS's mark (`doc/CSBwin-src/Magic.cpp:1335-1344`): the magic range starts at
-   * the trail's end, and a weak spell closes it there too. A spell of power 3 or more
-   * sets the end to 0, which only the next party move (`recordPartyMove`) raises.
+   * YA BRO ROS's mark. CSBWin's, every release's (`fromCastOnly`,
+   * `doc/CSBwin-src/Magic.cpp:1335-1344`, ReDMCSB's `F0412_MENUS_GetChampionSpellCastResult`):
+   * the magic range starts at the trail's end, and a weak spell closes it there too; a
+   * spell of power 3 or more sets the end to 0, which the next party move
+   * (`recordPartyMove`) raises to the count, so every power marks only the squares walked
+   * from the cast. The port's swaps the two ends, as the code means (`DEBT.md` H, "The
+   * scents are what FTL meant"): the range ends at the trail's end, and starts there for a
+   * weak spell, or at 0 for a spell of power 3 or more, which marks the whole trail, the
+   * squares walked before the cast too.
    */
-  markMagicFootprints(spellPower: number): void {
-    this.indexOfFirstMagic = this.count;
-    if (spellPower < 3) {
-      this.indexOfLastMagic = this.indexOfFirstMagic;
+  markMagicFootprints(spellPower: number, fromCastOnly: boolean): void {
+    if (fromCastOnly) {
+      this.indexOfFirstMagic = this.count;
+      if (spellPower < 3) {
+        this.indexOfLastMagic = this.indexOfFirstMagic;
+      } else {
+        this.indexOfLastMagic = 0;
+      }
     } else {
-      this.indexOfLastMagic = 0;
+      this.indexOfLastMagic = this.count;
+      this.indexOfFirstMagic = spellPower < 3 ? this.indexOfLastMagic : 0;
     }
   }
 

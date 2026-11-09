@@ -1223,6 +1223,10 @@ range (`doc/CSBwin-src/Codea59a.cpp:406-416`). The spell's power therefore matte
 until the party's first move: an end of 0 marks nothing, the weak spell's empty range
 marks nothing either, and the first move makes both the same. The timer's end,
 `TT_79`, only decrements the counter (`CSBCode.cpp:6631`), so a range outlives the spell.
+Every release has the same lines (ReDMCSB's `F0412_MENUS_GetChampionSpellCastResult`, with
+`FirstScentIndex` and `LastScentIndex`). The port, from level 7, swaps the two ends: the
+range ends at the trail's end, and a spell of power 3 or more starts it at 0, so it marks
+the whole trail (`DEBT.md` H, "The scents are what FTL meant").
 
 `SummarizeRoomInfo` tests only a cell whose `cfD4` the room-type switch left non-zero
 (`doc/CSBwin-src/Codea59a.cpp:401`): an open floor, a teleporter and a door set it to 1

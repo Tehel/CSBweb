@@ -156,7 +156,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: A11 · C201 · D22 · E48 · F26 · G32 · P13 · R21 · U13 · W8 · X19. An ID recorded and paid in one commit has no
+Next free IDs: A11 · C202 · D22 · E48 · F26 · G32 · P13 · R21 · U13 · W8 · X19. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -1434,7 +1434,13 @@ Recorded so that nobody "fixes" them.
   arrival, where every release and CSBWin print it again as the level's load places the
   party (`F0002_MAIN_GameLoop_CPSDF`, `doc/ReDMCSB-src/GAMELOOP.C:59-62`;
   `doc/CSBwin-src/CSBCode.cpp:631-632`), two of the 24 prints for one square
-  (`arrivalPrintedTwice`, `WorldMove.arrivesOnItsPrint`, `tools/checks/party-move.ts`). What a
+  (`arrivalPrintedTwice`, `WorldMove.arrivesOnItsPrint`, `tools/checks/party-move.ts`). And
+  YA BRO ROS of power 3 or more marks the whole trail, the squares walked before the cast
+  too: every release and CSBWin start the range at the trail's end and set its end to 0,
+  which the first move raises to the count, so every power marks only what is walked from
+  the cast (`F0412_MENUS_GetChampionSpellCastResult`; `doc/CSBwin-src/Magic.cpp:1335-1344`),
+  and the port swaps the two ends, as the code means (`magicFootprintsFromCast`,
+  `PartyFootprints.markMagicFootprints`, `tools/checks/magic-footprints.ts`). What a
   monster smells then is how long ago, and how long, the party was on its square
   (`GetBestMonsterFacingP1`, `doc/CSBwin-src/Monster.cpp:613-625`). A recording before
   level 2 plays its set's release (`releaseScentLoops`), and a CSBWin profile CSBWin's
