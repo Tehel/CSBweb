@@ -21,6 +21,7 @@ import {
   getActuatorDisableTime,
   getActuatorDsaSelector,
   getActuatorDsaState,
+  getActuatorState,
   getActuatorTargetPos,
   getActuatorTargetX,
   getActuatorTargetY,
@@ -29,7 +30,9 @@ import {
   isActuatorLocalActionOnly,
   isActuatorNormallyClosed,
   isActuatorOnceOnly,
+  PORTRAIT_INACTIVE,
 } from '../data/actuatorHelpers';
+import { readHeroText, type HeroText } from '../data/HeroExtractor';
 import type {
   ActuatorRecord, ContainerRecord, CreatureRecord, DoorRecord, TeleporterRecord, TextRecord,
 } from '../data/dungeonTypes';
@@ -326,8 +329,12 @@ export class CellInfo {
     for (const rn of objects) {
       if (dungeon.rnMaps.dbType(rn) === DBType.ACTUATOR) this.actuator(at, rn, room, out);
     }
+    const record = room === RoomType.STONE ? undefined : objects.find((rn) => dungeon.rnMaps.dbType(rn) === DBType.TEXT);
+    const mirrors = record === undefined ? [] : this.mirrorsFacing(at);
     for (const rn of objects) {
-      if (dungeon.rnMaps.dbType(rn) === DBType.TEXT) this.text(rn, room, out);
+      if (dungeon.rnMaps.dbType(rn) !== DBType.TEXT) continue;
+      if (rn === record && mirrors.length) this.record(at, mirrors, out);
+      else this.text(rn, room, out);
     }
     const things: InfoLine[] = [];
     for (const rn of objects) this.thing(rn, 1, things);
@@ -444,6 +451,10 @@ export class CellInfo {
       out.push({ text: `${where}${this.dsaWords(at.map, a)}`, indent: 0 });
       return;
     }
+    if (room === RoomType.STONE && getActuatorType(a) === 127) {
+      this.mirror(at, rn, a, where, out);
+      return;
+    }
     const trigger = actuatorTrigger(a, room, (objNI) => this.objectName(objNI));
     if (!trigger) return;
     out.push({ text: `${where}${trigger.words}`, indent: 0 });
@@ -470,6 +481,83 @@ export class CellInfo {
     const dsa = index === null ? null : dungeon.getData().dsaIndex?.entries[index] ?? null;
     const description = dsa?.description.trim();
     return `Script${description ? ` "${description}"` : ''}, state ${getActuatorDsaState(a)}`;
+  }
+
+  /**
+   * A Hall of Champions mirror: the champion it gives, read as `AddCharacter` reads them,
+   * from the square before it (`heroAt`), and whether it is active: one whose state has
+   * `PORTRAIT_InActive` gives no one (`doc/CSBwin-src/Mouse.cpp:515-517`). A mirror that
+   * has given its champion is type 0, with every actuator of its wall
+   * (`doc/CSBwin-src/CSBCode.cpp:6750-6795`), and is not shown.
+   */
+  private mirror(at: CellRef, rn: ObjectID, a: ActuatorRecord, where: string, out: InfoLine[]): void {
+    const front = this.front(at, this.source.dungeon.rnMaps.pos(rn));
+    const hero = this.heroAt(front);
+    out.push({ text: `${where}Champion mirror: ${heroWords(hero)}`, indent: 0 });
+    out.push({ text: (getActuatorState(a) & PORTRAIT_INACTIVE) !== 0 ? 'Inactive' : 'Active', indent: 1 });
+    if (front) out.push({ text: `Record at (${front.x},${front.y})`, indent: 1, link: front });
+  }
+
+  /** The record of the champions of `mirrors`, the first text of `at`, which faces them. */
+  private record(at: CellRef, mirrors: readonly { x: number; y: number; side: number }[], out: InfoLine[]): void {
+    out.push({ text: `Champion record: ${heroWords(this.heroAt(at))}`, indent: 0 });
+    for (const m of mirrors) {
+      out.push({ text: `For the mirror at (${m.x},${m.y}) ${SIDES[m.side]} side`, indent: 1, link: { map: at.map, x: m.x, y: m.y } });
+    }
+  }
+
+  /**
+   * The square a wall's side faces, where the party stands to click it: one step from the
+   * wall the way the side looks (`d.DeltaX`, `d.DeltaY`): `_ResurrectReincarnateCancel`
+   * finds the mirror one step ahead of the party, on the side facing it
+   * (`doc/CSBwin-src/CSBCode.cpp:6722-6731`, `:6749`). Null off the map.
+   */
+  private front(at: CellRef, side: number): CellRef | null {
+    const { tables, dungeon } = this.source;
+    const x = at.x + tables.deltaX[side & 3]!;
+    const y = at.y + tables.deltaY[side & 3]!;
+    const level = dungeon.getMap(at.map);
+    if (!level || x < 0 || y < 0 || x >= level.descriptor.width || y >= level.descriptor.height) return null;
+    return { map: at.map, x, y };
+  }
+
+  /** The type-127 actuators on the walls around `at` whose side faces it. */
+  private mirrorsFacing(at: CellRef): { x: number; y: number; side: number }[] {
+    const { dungeon } = this.source;
+    const level = dungeon.getMap(at.map);
+    const found: { x: number; y: number; side: number }[] = [];
+    if (!level) return found;
+    for (let direction = 0; direction < 4; direction++) {
+      const wall = this.front(at, direction);
+      if (!wall || getRoomType(level.cellFlags[wall.x]![wall.y]!) !== RoomType.STONE) continue;
+      const side = (direction + 2) & 3;
+      for (const rn of this.chain(dungeon.findFirstObject(new Position(wall.x, wall.y, at.map)))) {
+        if (dungeon.rnMaps.dbType(rn) !== DBType.ACTUATOR || (dungeon.rnMaps.pos(rn) & 3) !== side) continue;
+        const a = dungeon.getActuatorRecord(rn);
+        if (a && getActuatorType(a) === 127) {
+          found.push({ x: wall.x, y: wall.y, side });
+          break;
+        }
+      }
+    }
+    return found;
+  }
+
+  /**
+   * The champion `AddCharacter` reads standing on `at` (`doc/CSBwin-src/Character.cpp:536-550`):
+   * the square's first text, at any corner, as `DecodeText(…, 0x8002, 990)` makes it, or
+   * `legalHero` for none (`readHeroText`, as `HallOfChampions` reads it).
+   */
+  private heroAt(at: CellRef | null): HeroText {
+    const { dungeon, tables } = this.source;
+    if (at) {
+      for (const rn of this.chain(dungeon.findFirstObject(new Position(at.x, at.y, at.map)))) {
+        if (dungeon.rnMaps.dbType(rn) !== DBType.TEXT) continue;
+        const t = dungeon.getTextRecord(rn);
+        return readHeroText(t ? dungeon.decodeTextBytes(t, 0x8002, 990, tables.textDecode) : null);
+      }
+    }
+    return readHeroText(null);
   }
 
   /** A text: a wall's inscription, or a message on a floor, and whether it is hidden. */
@@ -737,6 +825,16 @@ const SCOPES = ['items', 'monsters', 'items and party', 'everything'];
 
 /** A relative teleporter's quarter turns, clockwise as the facings count (N, E, S, W). */
 const TURNS = ['', 'right', 'around', 'left'];
+
+/**
+ * A champion as a mirror gives them: the name and the title, as the game prints them
+ * ("HALK THE BARBARIAN"), or, for a record that fails `AddCharacter`'s checks or a square
+ * with none, `legalHero`'s, said so.
+ */
+function heroWords(hero: HeroText): string {
+  const words = hero.title ? `${hero.name} ${hero.title}` : hero.name;
+  return hero.illegal ? `${words} (no valid record)` : words;
+}
 
 /** A name with its indefinite article: "a gold key", "an iron key". */
 function withArticle(name: string): string {

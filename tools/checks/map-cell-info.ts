@@ -24,6 +24,11 @@
  *    resting, its `TT_ReactivateGenerator` 512 ticks away: still listed whole, the ticks
  *    left counting down, and still marked; once the timer has fired, ready again
  *    (`doc/CSBwin-src/Timer.cpp:1835-1874`).
+ * 9. **A mirror**: DM's Hall of Champions mirror at (7,17) of map 0, its north side, gives
+ *    AZIZI JOHARI, read from the first text of (7,16) before it
+ *    (`doc/CSBwin-src/Character.cpp:536-550`); that square shows the text as her record,
+ *    not as a message. With `PORTRAIT_InActive` in its state, the mirror is inactive
+ *    (`doc/CSBwin-src/Mouse.cpp:515-517`).
  *
  * Run: `npm test -- --only=map-cell-info.ts`
  */
@@ -37,7 +42,7 @@ import { CellInfo, actuatorHasTarget, type CellRef, type InfoLine } from '../../
 import { DungeonState, NO_GAME } from '../../src/engine/DungeonState';
 import { nameIndexOf } from '../../src/engine/GameContext';
 import { TimerFunction } from '../../src/engine/TimerQueue';
-import { getActuatorType } from '../../src/data/actuatorHelpers';
+import { PORTRAIT_INACTIVE, getActuatorState, getActuatorType, setActuatorState } from '../../src/data/actuatorHelpers';
 import { check, finish } from '../lib/check';
 import { gameTablesOf, graphicsTablesOf, processTimersAt, stockGame, stockGraphics } from '../lib/game';
 
@@ -160,6 +165,21 @@ function main(): void {
   check(info().marked(9, 'generator').has(5 * 32 + 12), 'and G still marks it');
   processTimersAt(game, fired + 512);
   check(getActuatorType(generator()!) === 6 && !!line(describe(9, 5, 12), 'Ready'), 'its timer fired, it is type 6 and ready again');
+
+  // 9. A mirror.
+  const mirror = describe(0, 7, 17);
+  check(!!line(mirror, 'N side: Champion mirror: AZIZI JOHARI') && !!line(mirror, 'Active'), 'the mirror at (7,17) gives AZIZI JOHARI, and is active');
+  check(!!line(mirror, 'Record at (7,16)', { map: 0, x: 7, y: 16 }), 'it names the square its record is read from, a link');
+  const record = describe(0, 7, 16);
+  check(!!line(record, 'Champion record: AZIZI JOHARI') && !line(record, 'Message'), '(7,16) shows the text as her record, not as a message');
+  check(!!line(record, 'For the mirror at (7,17) N side', { map: 0, x: 7, y: 17 }), 'and names the mirror, a link');
+  let portrait: ActuatorRecord | null = null;
+  for (let rn = ctx.dungeon.findFirstObject(new Position(7, 17, 0)); rn !== OBJECT_ID_EOF; rn = ctx.dungeon.getDBRecordLink(rn)) {
+    const a = ctx.dungeon.getActuatorRecord(rn);
+    if (a && getActuatorType(a) === 127) portrait = a;
+  }
+  setActuatorState(portrait!, getActuatorState(portrait!) | PORTRAIT_INACTIVE);
+  check(!!line(describe(0, 7, 17), 'Inactive'), 'with PORTRAIT_InActive in its state, the mirror is inactive');
 
   finish();
 }

@@ -144,7 +144,6 @@ In payoff order: the first row is the next item.
 | X9 | Thrown weapons' tags kept across a save | M | ⏸️ |
 | X10 | The cells the party has seen, kept across a save for an automap | M | ⏸️ |
 | X16 | The map's info follows a DSA's program to the squares it names | M | ⏸️ |
-| X17 | The map's info names a Hall of Champions mirror's champion | S | ⏸️ |
 | X19 | The map's info names a spent once-only actuator | S | ⏸️ |
 | E22 | Fullscreen filled by a fraction | M | ⏸️ waits on the author |
 | H | Deliberate divergences | — | 🚫 |
@@ -417,8 +416,9 @@ the MAP key, which no preset binds, or a long press on the message area opens it
 draws a level whole, the party's first, its columns and rows numbered, `<` and `>`
 for the others, and G, M or I marks the squares with a monster generator, monsters or an
 item; beside it, a square's info (`src/engine/CellInfo.ts`): what it is, where
-it leads, what lies on it, what its actuators need and act on, what acts on it, and where
-the objects its locks need are, each square it names a link. A click on a square shows
+it leads, what lies on it, what its actuators need and act on, whether a generator is
+ready or resting, the champion a mirror gives, what acts on it, and where the objects its
+locks need are, each square it names a link. A click on a square shows
 it; a page opened with `?dev` moves the party by a press held on one. A DSA's program
 names no link yet (X16).
 
@@ -1228,22 +1228,6 @@ least where it is most wanted.
   not followed, and the info says so rather than guess.
 - **The check**: `tools/checks/map-cell-info.ts` on a Conflux DSA whose program names a
   square, both ways.
-
-### X17 ⏸️ The map's info names a Hall of Champions mirror's champion
-
-A champion's record is a hidden text on the floor before its mirror, which the mirror
-(actuator type 127) reads when the party recruits. The map's info shows the mirror as
-"Champion mirror" and the record as a hidden message, its raw words: the name, then the
-encoded attributes and skills (`AZIZI JOHARI F AADNADACAAAH…`).
-
-- **What it should say**: the mirror, its champion's name and title, and whether the
-  mirror is spent (`PORTRAIT_InActive`, `src/data/actuatorHelpers.ts`); the record
-  under the floor square not as a message but as that champion's, or left out.
-- **What to read**: where CSBWin finds the record for a mirror (the square, the text),
-  and how it splits the name from the rest, from `AddCharacter`
-  (`src/engine/AddCharacter.ts`, `HeroExtractor`), cited there.
-- **The check**: `tools/checks/map-cell-info.ts` on a mirror of DM's Hall of Champions
-  and the square before it.
 
 ### X19 ⏸️ The map's info names a spent once-only actuator
 
