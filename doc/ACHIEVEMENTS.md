@@ -17,8 +17,8 @@ below).
 ("Watching the engine"), and the page's half: the tracker on a game the player plays, its
 history in each save's row, the store of the unlocks, the banner, the dialog and the
 welcome page's tab ("The page"); and the players' identities, the public name and its key,
-on the server and in the welcome page's PROFILE ("Identity"). An unlock is still only the
-browser's, `unverified`. The rest of this document is the design that `PLAN.md` phase 18
+on the server and in the welcome page's PROFILE ("Identity"); and the server's half of the
+proofs, a package sent with its claims and queued ("Proofs"). The rest of this document is the design that `PLAN.md` phase 18
 builds, step by step, and each step rewrites its section here to say what was built.
 
 ## The file
@@ -372,8 +372,8 @@ The server's half is `server/identity.ts`, in the store's SQLite file beside the
   how many browsers share it; the sets they published and the state of each; the recordings
   they shared, the state of each, and how many the site lists as replays; their games the
   statistics' log holds, games started, won and lost, by set (`StatsStore.playerCounts`,
-  through the log's `events_by_player`); and their achievements by set, none until the
-  proofs are sent (phase 18.5). A session, which the log keeps no row of, is nobody's.
+  through the log's `events_by_player`); and their achievements by set, those the replays of
+  their proofs verified ("Proofs"). A session, which the log keeps no row of, is nobody's.
 
 **PROFILE** (`src/ui/profile.ts`) is the welcome page's header's first button, at its
 top right corner, beside the moderator's switch, and `#profile` in the address. Its dialog,
@@ -396,31 +396,54 @@ its uniqueness regardless of case, the key linking a second browser and the dump
 both, a wrong key refused, a new key, a moderator's reset, the dump's authorship and
 counts, the limits, and no `playerId` in any answer.
 
-## Proofs and the Hall of Fame
-
-*Designed (phases 18.5 and 18.6).*
+## Proofs
 
 **The proof is the recording.** A player who has chosen a public name sends the package of
 a point the store keeps, a save or the game's end (`doc/RECORDING.md` → "Shared
-recordings"), with the unlocks it claims. A package is sent at the game's end when the
-game unlocked anything, and at a save after a new unlock, at most every ten minutes per
-playthrough. The claimed unlocks are listed at once as unverified.
+recordings"), with the unlocks it claims. The claimed unlocks are listed at once as
+unverified.
 
-A **verifier** service, a second container from the same image, given half a CPU and a low
-priority, replays one queued package at a time with the tracker attached. It finds the
-set's files by their digests and plays at the package's own engine level. What the replay
-unlocks becomes verified, and a claim the replay does not make is dropped. A package that
-drifts stays unverified.
+**The server's half** is `server/proofs.ts`, in the store's SQLite file: `proofs`, a row per
+package sent, with its sender's `playerId`, its set, its build and level, and how far it
+has got (`queued`, `checked` or `drifted`), and `claims`, a row per achievement it claims,
+each `unverified`, `verified` or `dropped` (`ClaimState`, `src/data/DataSets.ts`). The
+package is kept in `PROOFS_DIR` (`proofs/` beside the store), never served.
+
+- **`POST api/proofs`** takes a form of two fields (`PROOF_FIELDS`): the package, read with
+  the page's own reader as a shared recording is (`readRecordingPackage`), which checks its
+  form alone, and the claims, a JSON list of 1 to 64 distinct ids (`CLAIM_ID`, `MAX_CLAIMS`).
+  Only a browser whose identity has a public name sends one; a set the site does not
+  publish, a package that does not read and one holding a move of `?dev`, which earns
+  nothing, are refused; an identity's browsers have at most 8 proofs queued at once
+  (`MAX_QUEUED_PER_IDENTITY`), and the packages kept take at most 1 GiB. It answers
+  `{"id": …}`, sixteen hexadecimal digits the page keeps beside the unlocks it claims, at
+  20 proofs an hour per address, refused ones included (`PROOFS_PER_HOUR`,
+  `server/server.ts`), a body of 8 MiB and 64 KB at most (`MAX_PROOF_BYTES`).
+- **`GET api/proofs?ids=<id>,…`** answers the verdicts of those of the asker's identity's
+  proofs (`ProofVerdict`): the state, why a drifted one drifted, and each claim's state.
+  Another's proof is left out. Neither route's answer holds a `playerId` or a playthrough.
+- **The profile** (`GET api/profile`) lists the achievements the replays verified, by set,
+  each once, the first verified first (`ProofStore.verifiedBy`).
+
+`tools/checks/server-proofs.ts` proves the routes: the name required, the form's refusals,
+a proof queued with its claims unverified and its verdicts answered to its identity's
+browsers alone, the limits, and no `playerId` or playthrough in any answer.
+
+*Designed, the rest of phase 18.5:* a **verifier** service, a second container from the
+same image, given half a CPU and a low priority, replays one queued package at a time with
+the tracker attached. It finds the set's files by their digests and plays at the package's
+own engine level. What the replay unlocks becomes verified, and a claim the replay does not
+make is dropped. A package that drifts stays unverified. A package that granted nothing of
+its own is deleted once it has been checked. The page sends a package at the game's end when
+the game unlocked anything, and at a save after a new unlock, at most every ten minutes per
+playthrough, and shows the verdicts.
 
 An unlock on a branch that the player later reloaded away from is on no path they can send,
 so it stays in the browser.
 
-**The packages are kept** on the server, privately, about 14 KB an hour of play. When a set
-gains an achievement, its kept games can be replayed at idle priority, and the new unlocks
-granted to them. A moderator can watch a run that looks suspicious. Its player may publish
-it as a replay, through the shared recordings' moderation. A package that granted nothing
-of its own is deleted once it has been checked.
+## The Hall of Fame
 
-**The Hall of Fame** (`fame.html`) shows each set's achievements with how many players of
-the Hall have unlocked each, the share that is, and who unlocked it first; and each player's
-page of badges. Its answers, like `api/stats`, never hold a `playerId` or a playthrough.
+*Designed (phase 18.6).* **The Hall of Fame** (`fame.html`) shows each set's achievements
+with how many players of the Hall have unlocked each, the share that is, and who unlocked it
+first; and each player's page of badges. Its answers, like `api/stats`, never hold a
+`playerId` or a playthrough.

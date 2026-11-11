@@ -39,6 +39,7 @@ import { createAppServer } from '../../server/app.ts';
 import { DataSetStore, parseModerators } from '../../server/dataSets.ts';
 import { RateLimit } from '../../server/events.ts';
 import { IdentityStore, MAX_PROFILE_BYTES } from '../../server/identity.ts';
+import { ProofStore } from '../../server/proofs.ts';
 import { RecordingStore } from '../../server/recordings.ts';
 import { StatsStore } from '../../server/stats.ts';
 import { openStore } from '../../server/store.ts';
@@ -107,6 +108,7 @@ async function main(): Promise<void> {
         publishRateLimit: new RateLimit(100, 60_000), now: Date.now,
         recordings: { store: recordings, dir: recordingsDir, readPackage: readRecordingPackage, shareRateLimit: new RateLimit(100, 60_000) },
         identities: { store: identities, rateLimit: new RateLimit(CHANGES_PER_WINDOW, 60_000) },
+        proofs: { store: new ProofStore(db, 1 << 30), dir: join(scratch, 'proofs'), rateLimit: new RateLimit(100, 60_000) },
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
     const port = (server.address() as AddressInfo).port;

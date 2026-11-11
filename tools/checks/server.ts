@@ -131,6 +131,7 @@ import { NOBODY, notificationText } from '../../server/notify.ts';
 import { DOCUMENT_FIELD } from '../../server/documents.ts';
 import { MAX_MODERATION_BYTES } from '../../server/moderate.ts';
 import { MAX_PUBLISH_BYTES, MAX_PUBLISHED_FILE_BYTES } from '../../server/publish.ts';
+import { ProofStore } from '../../server/proofs.ts';
 import { fillEndings, MAX_RECORDING_BYTES, MAX_RECORDING_MODERATION_BYTES, MAX_SHARE_BYTES, RecordingStore } from '../../server/recordings.ts';
 import { StatsStore } from '../../server/stats.ts';
 import { openStore } from '../../server/store.ts';
@@ -189,6 +190,14 @@ function recordingsApi(db: DatabaseSync, dir: string, diskBytes = RECORDINGS_DIS
 /** A scratch server's identities, kept in `db`, the rate of changes a scratch server's events'. */
 function identitiesApi(db: DatabaseSync): ApiOptions['identities'] {
     return { store: new IdentityStore(db), rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000) };
+}
+
+/**
+ * A scratch server's proofs, kept in `db`, their folder never made: this tool sends none,
+ * `tools/checks/server-proofs.ts` does.
+ */
+function proofsApi(db: DatabaseSync): ApiOptions['proofs'] {
+    return { store: new ProofStore(db, 1 << 30), dir: join(tmpdir(), 'csbweb-no-proofs'), rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000) };
 }
 
 /** A store in memory, its tables empty. */
@@ -616,7 +625,7 @@ async function checkEventBudget(scratch: string): Promise<void> {
         checkDataSet: checkLocalDataSet, dataSets, moderators: [], store, notify: NOBODY,
         rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000), eventBudget: new RateLimit(4, 86_400_000),
         publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now, recordings: recordingsApi(db, join(scratch, 'budget', 'recordings')),
-        identities: identitiesApi(db),
+        identities: identitiesApi(db), proofs: proofsApi(db),
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
     const port = (server.address() as AddressInfo).port;
@@ -686,7 +695,7 @@ async function checkPublish(scratch: string): Promise<void> {
         notify: (event) => told.push(`${event.name}: ${event.activity} by ${event.by}`),
         rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000), eventBudget: new RateLimit(EVENTS_A_DAY, 86_400_000),
         publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now, recordings: recordingsApi(db, join(root, 'recordings')),
-        identities: identitiesApi(db),
+        identities: identitiesApi(db), proofs: proofsApi(db),
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
     const port = (server.address() as AddressInfo).port;
@@ -1016,7 +1025,7 @@ async function checkModeration(scratch: string): Promise<void> {
         checkDataSet: checkLocalDataSet, dataSets, moderators: parseModerators(MODERATORS.join()), notify: NOBODY, store: new StatsStore(db),
         rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000), eventBudget: new RateLimit(EVENTS_A_DAY, 86_400_000),
         publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now, recordings: recordingsApi(db, join(root, 'recordings')),
-        identities: identitiesApi(db),
+        identities: identitiesApi(db), proofs: proofsApi(db),
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
     const port = (server.address() as AddressInfo).port;
@@ -1134,7 +1143,7 @@ async function checkDocuments(scratch: string): Promise<void> {
         notify: (event) => told.push(notificationText({ ...event, at: 0 }).split('\n')[0]!),
         rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000), eventBudget: new RateLimit(EVENTS_A_DAY, 86_400_000),
         publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now, recordings: recordingsApi(db, join(root, 'recordings')),
-        identities: identitiesApi(db),
+        identities: identitiesApi(db), proofs: proofsApi(db),
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
     const port = (server.address() as AddressInfo).port;
@@ -1264,7 +1273,7 @@ async function checkRecordings(scratch: string): Promise<void> {
         notify: (event) => told.push(notificationText(event).split('\n')[0]!), rules: { hasSet: (id) => dataSets.hasSet(id) },
         rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000), eventBudget: new RateLimit(EVENTS_A_DAY, 86_400_000),
         publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now, recordings,
-        identities: identitiesApi(db),
+        identities: identitiesApi(db), proofs: proofsApi(db),
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
     const port = (server.address() as AddressInfo).port;
@@ -1676,7 +1685,7 @@ async function main(): Promise<void> {
             publishRateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000),
             now: Date.now,
             recordings: recordingsApi(db, join(scratch, 'recordings')),
-            identities: identitiesApi(db),
+            identities: identitiesApi(db), proofs: proofsApi(db),
         };
         server = createAppServer(options, api);
         await new Promise<void>((done) => server!.listen(0, '127.0.0.1', done));

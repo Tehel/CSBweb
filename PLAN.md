@@ -68,7 +68,9 @@ At the author's request, beside the debt. The design is `doc/ACHIEVEMENTS.md`.
   until the Hall of Fame shows the names (18.6); and a name chosen is not notified to the
   moderators (`server/notify.ts` tells only of the sets and their recordings). No unlock
   is sent yet: each stays `unverified` until 18.5.
-- ⏳ 18.5 The proofs: the upload, the queue, the verifier service, and the unlocks.
+- ⏳ 18.5 The proofs (`doc/ACHIEVEMENTS.md` → "Proofs"). Done: the server's upload and
+  queue (`server/proofs.ts`, `api/proofs`), proved by `tools/checks/server-proofs.ts`.
+  Left: the verifier service, and the page's sending, verdicts and their display.
 - ⏳ 18.6 The Hall of Fame page.
 - ⏳ 18.7 A player's own set's `achievements.txt`: its row in the form, and its check at
   publish. The FTL sets' own files.

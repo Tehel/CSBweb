@@ -288,6 +288,49 @@ export const PROFILE_ROUTE = 'api/profile';
 export const PROFILE_ACTIONS = ['name', 'link', 'key'] as const;
 export type ProfileAction = (typeof PROFILE_ACTIONS)[number];
 
+/**
+ * Where the page sends the proof of its unlocks, `POST` with a form of `PROOF_FIELDS`, and
+ * asks for their verdicts, `GET ?ids=<id>,<id>…`, naming its player as `DATA_SETS_ROUTE`
+ * does (`server/proofs.ts`, `doc/ACHIEVEMENTS.md` → "Proofs").
+ */
+export const PROOFS_ROUTE = 'api/proofs';
+
+/** The form `POST PROOFS_ROUTE` takes: the package's file, and the ids of the achievements it claims, a JSON list. */
+export const PROOF_FIELDS = { package: 'package', claims: 'claims' } as const;
+
+/** A proof's id, which the server draws and answers once: sixteen uppercase hexadecimal digits. */
+export const PROOF_ID = /^[0-9A-F]{16}$/;
+
+/**
+ * An achievement's id as a claim names it: an id of the file's form (`AchievementFile.ts`),
+ * at most 64 characters.
+ */
+export const CLAIM_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
+
+/** The most achievements one proof claims, and the most proofs one `GET PROOFS_ROUTE` asks for. */
+export const MAX_CLAIMS = 64;
+
+/**
+ * How far a proof has got on the server: `queued` until the verifier replays it, `checked`
+ * once it played to its point, `drifted` where it did not, its claims then left unverified.
+ */
+export type ProofState = 'queued' | 'checked' | 'drifted';
+
+/**
+ * A claim's verdict: `unverified` until its proof is checked, and for good where it drifts;
+ * `verified` where the replay unlocked it; `dropped` where the replay did not.
+ */
+export type ClaimState = 'unverified' | 'verified' | 'dropped';
+
+/** What `GET PROOFS_ROUTE` answers of one proof: its state, why it drifted, and each claim's verdict. */
+export interface ProofVerdict {
+    id: string;
+    state: ProofState;
+    /** Why it drifted, where it did. */
+    reason?: string;
+    claims: Record<string, ClaimState>;
+}
+
 /** Where a moderator resets a public name: `POST IDENTITIES_ROUTE/<public id>`, `{"action": "reset"}`. */
 export const IDENTITIES_ROUTE = 'api/identities';
 
@@ -355,7 +398,7 @@ export interface PlayerProfile {
     replays: number;
     /** Their games the statistics hold, by set. */
     statistics: { dataSet: string; name: string; started: number; won: number; lost: number }[];
-    /** Their achievements by set: none until the proofs are sent (phase 18.5). */
+    /** Their achievements by set, those a replay of their proofs verified, each once, the first verified first. */
     achievements: { dataSet: string; name: string; unlocked: string[] }[];
 }
 

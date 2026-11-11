@@ -3,7 +3,8 @@
  * on Node 24, which strips the types. No dependency: `node:http` serves the page, the game
  * files and the API (`app.ts`), and `node:sqlite` keeps the store (`store.ts`): the
  * statistics (`stats.ts`), the data sets (`dataSets.ts`), the shared recordings
- * (`recordings.ts`) and the players' identities (`identity.ts`).
+ * (`recordings.ts`), the players' identities (`identity.ts`) and the proofs of their
+ * achievements (`proofs.ts`), which the verifier replays (`verifier.ts`).
  *
  *   PORT            the port to listen on (8085; 0 picks a free one)
  *   DIST_DIR        the built page (the checkout's `dist/`), and the page's readers built for
@@ -11,6 +12,8 @@
  *   GAMEFILES_DIR   the data sets (the checkout's `tools/fixtures/gamefiles/`)
  *   RECORDINGS_DIR  the shared recordings' packages (`recordings/` beside the store), made
  *                   when missing
+ *   PROOFS_DIR      the proofs' packages (`proofs/` beside the store), made when missing,
+ *                   never served
  *   FILES_DIR       the files shared by link, under `files/` (the checkout's `files/`, which
  *                   git ignores): a folder that is not there is not checked, and serves nothing
  *   STATS_DB        the store's SQLite file (the checkout's `stats/stats.db`), created
@@ -45,6 +48,7 @@ import { DataSetStore, parseModerators, type Moderator } from './dataSets.ts';
 import { RateLimit } from './events.ts';
 import { IdentityStore } from './identity.ts';
 import { NOBODY, ntfyNotifier, type Notify } from './notify.ts';
+import { ProofStore } from './proofs.ts';
 import { fillEndings, RecordingStore } from './recordings.ts';
 import { StatsStore } from './stats.ts';
 import { openStore } from './store.ts';
@@ -70,6 +74,15 @@ const SHARES_PER_HOUR = 5;
  */
 const PROFILE_CHANGES_PER_HOUR = 30;
 
+/**
+ * Proofs sent per address and hour, refused ones included: a player sends one at most every
+ * ten minutes of a playthrough, and one at its end.
+ */
+const PROOFS_PER_HOUR = 20;
+
+/** The most the proofs' packages kept may take on the disk: some seventy thousand hours of play, at 14 KB an hour. */
+const PROOFS_DISK_BYTES = 1024 * 1024 * 1024;
+
 /** The most the shared recordings' packages may take on the disk: some three thousand hours of play (`recordings.ts`). */
 const RECORDINGS_DISK_BYTES = 1024 * 1024 * 1024;
 
@@ -86,12 +99,14 @@ const port = Number(process.env.PORT ?? 8085);
 const statsDb = process.env.STATS_DB ?? join(ROOT, 'stats', 'stats.db');
 const ntfyUrl = process.env.NTFY_URL ?? '';
 const recordingsDir = process.env.RECORDINGS_DIR ?? join(dirname(statsDb), 'recordings');
+const proofsDir = process.env.PROOFS_DIR ?? join(dirname(statsDb), 'proofs');
 
 let db: DatabaseSync;
 let dataSets: DataSetStore;
 let store: StatsStore;
 let recordings: RecordingStore;
 let identities: IdentityStore;
+let proofs: ProofStore;
 let ids: string[];
 let readers: PageReaders;
 let moderators: Moderator[];
@@ -106,7 +121,9 @@ try {
     store = new StatsStore(db);
     recordings = new RecordingStore(db, RECORDINGS_DISK_BYTES);
     identities = new IdentityStore(db);
+    proofs = new ProofStore(db, PROOFS_DISK_BYTES);
     mkdirSync(recordingsDir, { recursive: true });
+    mkdirSync(proofsDir, { recursive: true });
     ids = checkFiles(options, dataSets);
     readers = await loadPageReaders(options.distDir);
 } catch (error) {
@@ -134,11 +151,12 @@ const server = createAppServer(options, {
     notify,
     recordings: { store: recordings, dir: recordingsDir, readPackage: readers.readRecordingPackage, shareRateLimit: new RateLimit(SHARES_PER_HOUR, 3_600_000) },
     identities: { store: identities, rateLimit: new RateLimit(PROFILE_CHANGES_PER_HOUR, 3_600_000) },
+    proofs: { store: proofs, dir: proofsDir, rateLimit: new RateLimit(PROOFS_PER_HOUR, 3_600_000) },
 });
 server.listen(port, () => {
     const address = server.address();
     const bound = typeof address === 'object' && address !== null ? address.port : port;
-    console.log(`Listening on port ${bound}: ${options.distDir}, and ${options.gamefilesDir} (${ids.join(', ') || 'no set'}, from the data_sets table); store in ${statsDb}; recordings in ${recordingsDir}; shared files in ${options.filesDir}`);
+    console.log(`Listening on port ${bound}: ${options.distDir}, and ${options.gamefilesDir} (${ids.join(', ') || 'no set'}, from the data_sets table); store in ${statsDb}; recordings in ${recordingsDir}; proofs in ${proofsDir}; shared files in ${options.filesDir}`);
 });
 
 function shutDown(signal: string): void {

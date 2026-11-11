@@ -35,6 +35,7 @@ import {
     type PlayerProfile, type ProfileAction, type ProfileIdentity, type ProfileState,
 } from '../src/data/DataSets.ts';
 import { samePlayerId, type DataSetStore, type DataSetViewer } from './dataSets.ts';
+import type { ProofStore } from './proofs.ts';
 import type { RecordingStore } from './recordings.ts';
 import type { StatsStore } from './stats.ts';
 
@@ -185,6 +186,7 @@ export interface ProfileSources {
     dataSets: DataSetStore;
     recordings: RecordingStore;
     stats: StatsStore;
+    proofs: ProofStore;
 }
 
 /** The `playerId`s `player` speaks for: their identity's, or theirs alone. */
@@ -198,10 +200,11 @@ function playersOf(identities: IdentityStore, player: string): { identity: Ident
  * of them and of the other browsers their identity links (`PlayerProfile`). Their identity;
  * the sets they published, whatever their state; the recordings they shared, and how many
  * of them are listed; their `started`, `won` and `lost` events by set, which the statistics
- * log keeps with their `playerId` (`StatsStore.playerCounts`); and their achievements, none
- * until the proofs are sent (phase 18.5). A set the table no longer holds goes by its id.
+ * log keeps with their `playerId` (`StatsStore.playerCounts`); and their achievements, those
+ * a replay of their proofs verified (`ProofStore.verifiedBy`), by set, each once, the first
+ * verified first. A set the table no longer holds goes by its id.
  */
-export function profileText(player: string, { identities, dataSets, recordings, stats }: ProfileSources): string {
+export function profileText(player: string, { identities, dataSets, recordings, stats, proofs }: ProfileSources): string {
     const { identity, players } = playersOf(identities, player);
     const theirs = (owner: string | null) => owner !== null && players.some((one) => samePlayerId(one, owner));
     const sets = dataSets.read().dataSets;
@@ -217,9 +220,20 @@ export function profileText(player: string, { identities, dataSets, recordings, 
         })),
         replays: shared.filter((recording) => !recording.pending && !recording.hidden && !recording.broken).length,
         statistics: stats.playerCounts(players).map((row) => ({ ...row, name: nameOf(row.dataSet) })),
-        achievements: [],
+        achievements: achievementsBySet(proofs.verifiedBy(players), nameOf),
     };
     return JSON.stringify(profile);
+}
+
+/** `verified`, the achievements of a player's proofs verified, grouped by set, each set at its first. */
+function achievementsBySet(verified: readonly { dataSet: string; achievement: string }[], nameOf: (id: string) => string): PlayerProfile['achievements'] {
+    const bySet = new Map<string, string[]>();
+    for (const { dataSet, achievement } of verified) {
+        const unlocked = bySet.get(dataSet) ?? [];
+        unlocked.push(achievement);
+        bySet.set(dataSet, unlocked);
+    }
+    return [...bySet].map(([dataSet, unlocked]) => ({ dataSet, name: nameOf(dataSet), unlocked }));
 }
 
 /** The status and the JSON body `POST PROFILE_ROUTE` and `POST IDENTITIES_ROUTE/<id>` answer with. */

@@ -8,19 +8,21 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { DatabaseSync } from 'node:sqlite';
 
 import {
-  answerProfile, answerRecordings, answerStats, contentType, dataSetViewer, pathSegments, receiveDocument, receiveEdit, receiveModeration,
-  receiveNameReset, receiveProfileChange, receivePublish, receiveRecordingModeration, receiveShare,
+  answerProfile, answerProofs, answerRecordings, answerStats, contentType, dataSetViewer, pathSegments, receiveDocument, receiveEdit, receiveModeration,
+  receiveNameReset, receiveProfileChange, receiveProof, receivePublish, receiveRecordingModeration, receiveShare,
 } from './server/app.ts';
 import { DataSetStore, manifestText, parseModerators, wallsText } from './server/dataSets.ts';
 import { FileDigestCache, filesText } from './server/setFiles.ts';
 import { RateLimit } from './server/events.ts';
 import { IdentityStore } from './server/identity.ts';
 import { NOBODY } from './server/notify.ts';
+import { ProofStore } from './server/proofs.ts';
 import type { CheckDataSet } from './server/publish.ts';
 import { RecordingStore, type ReadRecordingPackage } from './server/recordings.ts';
 import { AnswerCache, StatsStore } from './server/stats.ts';
 import {
-  DATA_SET_FILES_ROUTE, DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, IDENTITIES_ROUTE, PLAYER_ID_HEADER, PROFILE_ROUTE, RECORDING_FILES, RECORDINGS_ROUTE,
+  DATA_SET_FILES_ROUTE, DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, IDENTITIES_ROUTE, PLAYER_ID_HEADER, PROFILE_ROUTE, PROOFS_ROUTE, RECORDING_FILES,
+  RECORDINGS_ROUTE,
   SHARED_RECORDING_ID, parseManifest,
 } from './src/data/DataSets.ts';
 import { fillFortnight } from './tools/lib/statsFortnight.ts';
@@ -79,6 +81,11 @@ const DEV_MODERATOR_PLAYER_ID = '00000000-0000-4000-8000-000000000001';
  * `receiveNameReset`, over a store of the identities of its own, in memory, kept while the
  * dev server runs, and the same sets, recordings and statistics. Without `node:sqlite`, it
  * is 501.
+ *
+ * `api/proofs` is `receiveProof` and `answerProofs` over a store of the proofs beside the
+ * identities, with the page's reader of a package, each package in a scratch folder of its
+ * own, made at start and removed at the end. No verifier replays them: a proof stays
+ * queued. Without `node:sqlite`, it is 501.
  *
  * `api/stats` is `answerStats` over the same store's public sets, and over statistics made
  * once, at start, of `checks/stats`' fortnight (`tools/lib/statsFortnight.ts`), which names
@@ -315,7 +322,12 @@ function dataSetsRoute(): Plugin {
 
       const identitiesDb = sqlite ? new sqlite.DatabaseSync(':memory:') : null;
       const identities = identitiesDb ? { store: new IdentityStore(identitiesDb), rateLimit: new RateLimit(1000, 60_000) } : null;
-      server.httpServer?.once('close', () => identitiesDb?.close());
+      const proofsDir = mkdtempSync(join(tmpdir(), 'csbweb-proofs-'));
+      const proofs = identitiesDb ? { store: new ProofStore(identitiesDb, 1024 * 1024 * 1024), dir: proofsDir, rateLimit: new RateLimit(1000, 60_000) } : null;
+      server.httpServer?.once('close', () => {
+        identitiesDb?.close();
+        rmSync(proofsDir, { recursive: true, force: true });
+      });
       server.middlewares.use(`/${PROFILE_ROUTE}`, async (req, res, next) => {
         if (req.url !== '/' && !req.url?.startsWith('/?')) return next();
         if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'POST') {
@@ -323,14 +335,14 @@ function dataSetsRoute(): Plugin {
           res.setHeader('Allow', 'GET, HEAD, POST');
           return res.end();
         }
-        if (!sqlite || !identities || !recordingStore || !stats) {
+        if (!sqlite || !identities || !proofs || !recordingStore || !stats) {
           res.statusCode = 501;
           return res.end();
         }
         const db = new sqlite.DatabaseSync(':memory:');
         try {
           if (req.method === 'POST') await receiveProfileChange({ now: Date.now, identities }, req, res);
-          else answerProfile({ dataSets: openStore(db), store: stats, recordings: { store: recordingStore }, identities }, req, res);
+          else answerProfile({ dataSets: openStore(db), store: stats, recordings: { store: recordingStore }, identities, proofs }, req, res);
         } catch (error) {
           next(error);
         } finally {
@@ -349,6 +361,28 @@ function dataSetsRoute(): Plugin {
           await receiveNameReset(id[0]!, { moderators, identities }, req, res);
         } catch (error) {
           next(error);
+        }
+      });
+
+      server.middlewares.use(`/${PROOFS_ROUTE}`, async (req, res, next) => {
+        if (req.url !== '/' && !req.url?.startsWith('/?')) return next();
+        if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'POST') {
+          res.statusCode = 405;
+          res.setHeader('Allow', 'GET, HEAD, POST');
+          return res.end();
+        }
+        if (!sqlite || !identities || !proofs) {
+          res.statusCode = 501;
+          return res.end();
+        }
+        const db = new sqlite.DatabaseSync(':memory:');
+        try {
+          if (req.method === 'POST') await receiveProof({ dataSets: openStore(db), now: Date.now, proofs, recordings: { readPackage }, identities }, req, res);
+          else answerProofs({ proofs, identities }, req, res);
+        } catch (error) {
+          next(error);
+        } finally {
+          db.close();
         }
       });
 

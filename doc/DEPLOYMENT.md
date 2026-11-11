@@ -21,8 +21,9 @@ behind the host's nginx, and a deploy by `docker save`, `scp` and `docker load`.
 image      dist/ (the built page, and the server's check in dist/server/) + server/ (run by
            Node 24 as is) + src/data/DataSets.ts
 mounts     /data/gamefiles        the data sets, and players' uploads
-           /data/stats            stats.db (SQLite, WAL: the statistics, the data sets and the
-                                  recordings), recordings/, backups/
+           /data/stats            stats.db (SQLite, WAL: the statistics, the data sets, the
+                                  recordings, the identities and the proofs), recordings/,
+                                  proofs/, backups/
            /data/files            the files shared by link (below), read-only
 env        PORT (8085), DIST_DIR, GAMEFILES_DIR, FILES_DIR, STATS_DB, MODERATOR_PLAYER_IDS,
            NTFY_URL, NTFY_USER, NTFY_PASS, TZ
@@ -42,6 +43,7 @@ On the VPS, everything is in one folder, `DEPLOY_DIR` (`~/csbweb`):
 └── stats/                written by the container (uid 1000)
     ├── stats.db, stats.db-wal, stats.db-shm
     ├── recordings/       the shared recordings' packages, `<id>.gz`, written by the server
+    ├── proofs/           the proofs' packages, `<id>.gz`, written by the server, never served
     ├── backups/          the nightly snapshots, 14 days of them, gamefiles/: the
     │                     sets' folders, and recordings/: the packages, each copied once and kept
     └── backup.log
@@ -476,7 +478,8 @@ It reads `PORT` (8085), `DIST_DIR` and `GAMEFILES_DIR` (the checkout's `dist/` a
 `tools/fixtures/gamefiles/`), `FILES_DIR` (the checkout's `files/`, which git ignores), `STATS_DB` (the
 checkout's `stats/stats.db`, which git ignores), and `RECORDINGS_DIR`, the shared
 recordings' packages (`recordings/` beside the store, so the image's is in the mounted
-`stats/`), `MODERATOR_PLAYER_IDS`, the moderators,
+`stats/`), `PROOFS_DIR`, the proofs' packages (`proofs/` beside the store, likewise, and
+never served), `MODERATOR_PLAYER_IDS`, the moderators,
 comma-separated `<playerId>[=<alias>]`, spaces around a comma or the `=` ignored, to whom
 `api/data-sets` offers every set (unset or empty, no one; an entry that is not a
 `playerId`, or whose alias is empty, stops the start), and `NTFY_URL`, `NTFY_USER`,
@@ -501,6 +504,7 @@ comma-separated `<playerId>[=<alias>]`, spaces around a comma or the `=` ignored
 | `/api/recordings/<id>` | POST: the recording approved, hidden, shown, broken or deleted by a moderator, or withdrawn by its uploader | `no-store` |
 | `/api/profile` | what the server holds of the `X-Player-Id` and the other browsers its identity links, PROFILE's dump (`doc/ACHIEVEMENTS.md` → "Identity"); POST: a public name chosen, a browser linked by its identity key, a new key drawn | `no-store`, `Vary: X-Player-Id` |
 | `/api/identities/<id>` | POST: a public name reset by a moderator | `no-store` |
+| `/api/proofs?ids=<id>,…` | the verdicts of those proofs the `X-Player-Id`'s identity sent (`doc/ACHIEVEMENTS.md` → "Proofs"); POST: a proof sent, queued | `no-store`, `Vary: X-Player-Id` |
 | `/api/health` | `{"ok":true}`, for the healthcheck | `no-store` |
 | `/api/event` | POST: one of the page's events (`doc/STATISTICS.md`) | |
 | `/api/stats` | the public sets' statistics (`doc/STATISTICS.md`) | `public, max-age=30`, kept as long |
@@ -509,8 +513,8 @@ comma-separated `<playerId>[=<alias>]`, spaces around a comma or the `=` ignored
 
 Every file answers a conditional GET with 304, and only GET and HEAD are allowed, except on
 `api/event`, `api/data-sets`'s POST, `api/data-sets/<id>`, `api/data-sets/<id>/documents`,
-`api/recordings`'s POST, `api/recordings/<id>`, `api/profile`'s POST and
-`api/identities/<id>`, POST only. A POST a
+`api/recordings`'s POST, `api/recordings/<id>`, `api/profile`'s POST, `api/proofs`'s POST
+and `api/identities/<id>`, POST only. A POST a
 browser says another site's page sent, by its `Sec-Fetch-Site` or its `Origin`, is refused
 with 403 (`isCrossSite`, `doc/STATISTICS.md`). A path with a segment that starts with `.`, or holds a `/`, a `\` or a NUL once
 decoded, is refused with 400 before it reaches the disk. A folder is 404, never a listing.

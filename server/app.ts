@@ -37,6 +37,10 @@
  *                     name chosen, their browser linked, their key drawn again (`changeProfile`,
  *                     `identity.ts`)
  *   /api/identities/<id>  POST: a public name reset by a moderator (`resetName`)
+ *   /api/proofs       POST: the package of a player with a public name sent with the
+ *                     unlocks it claims, queued for the verifier (`sendProof`, `proofs.ts`);
+ *                     GET `?ids=<id>,<id>…`: the verdicts of those of the player's
+ *                     (`proofsText`)
  *   /api/health       200, for the compose healthcheck
  *   /api/event        POST: a game's event, checked (`events.ts`) and stored (`stats.ts`)
  *   /api/stats        the public sets' statistics, as JSON (`StatsStore.summary`)  max-age 30 s
@@ -58,7 +62,8 @@ import { pipeline } from 'node:stream';
 import { pathToFileURL } from 'node:url';
 
 import {
-    DATA_SET_FILES_ROUTE, DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, IDENTITIES_ROUTE, PLAYER_ID_HEADER, PROFILE_ROUTE, RECORDING_FILES, RECORDINGS_ROUTE,
+    DATA_SET_FILES_ROUTE, DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, IDENTITIES_ROUTE, PLAYER_ID_HEADER, PROFILE_ROUTE, PROOFS_ROUTE, RECORDING_FILES,
+    RECORDINGS_ROUTE,
 } from '../src/data/DataSets.ts';
 import type { StatsSet } from './answers.ts';
 import { manifestText, samePlayerId, wallsText, type DataSetStore, type DataSetViewer, type Moderator } from './dataSets.ts';
@@ -66,6 +71,7 @@ import { addDocument, removeDocument } from './documents.ts';
 import { editDataSet } from './edit.ts';
 import { addressBucket, checkEvent, isPlayerId, MAX_EVENT_BYTES, type EventRules, type RateLimit } from './events.ts';
 import { changeProfile, MAX_PROFILE_BYTES, profileText, resetName, type IdentityStore, type ProfileAnswer } from './identity.ts';
+import { MAX_PROOF_BYTES, proofsText, sendProof, type ProofAnswer, type ProofStore } from './proofs.ts';
 import { MAX_MODERATION_BYTES, moderateDataSet, type ModerationAnswer } from './moderate.ts';
 import type { Notify } from './notify.ts';
 import { FileDigestCache, filesText } from './setFiles.ts';
@@ -161,6 +167,17 @@ export interface ApiOptions {
     recordings: RecordingsApi;
     /** The players' identities (`identity.ts`). */
     identities: IdentitiesApi;
+    /** The proofs of the achievements (`proofs.ts`). */
+    proofs: ProofsApi;
+}
+
+/** What the API needs of the proofs. */
+export interface ProofsApi {
+    store: ProofStore;
+    /** `PROOFS_DIR`: the packages, `<id>.gz` each, never served. */
+    dir: string;
+    /** Proofs sent per address, refused ones included. */
+    rateLimit: RateLimit;
 }
 
 /** What the API needs of the identities. */
@@ -354,6 +371,11 @@ function route({ distDir, gamefilesDir, filesDir }: ServerOptions, api: ApiOptio
         if (segments.length === 3 && segments.slice(0, 2).join('/') === IDENTITIES_ROUTE) {
             if (req.method !== 'POST') return refuseMethod(res, 'POST');
             return receiveNameReset(segments[2]!, api, req, res);
+        }
+        if (segments.join('/') === PROOFS_ROUTE) {
+            if (req.method === 'POST') return receiveProof(api, req, res);
+            if (req.method !== 'GET' && req.method !== 'HEAD') return refuseMethod(res, 'GET, HEAD, POST');
+            return answerProofs(api, req, res);
         }
         const name = segments.length === 2 ? segments[1] : undefined;
         if (name === 'event') {
@@ -724,7 +746,9 @@ export async function receiveRecordingModeration(id: string, api: RecordingShare
 }
 
 /** What `answerProfile` needs of the API. */
-export type ProfileApi = Pick<ApiOptions, 'dataSets' | 'store'> & { recordings: Pick<RecordingsApi, 'store'>; identities: Pick<IdentitiesApi, 'store'> };
+export type ProfileApi = Pick<ApiOptions, 'dataSets' | 'store'> & {
+    recordings: Pick<RecordingsApi, 'store'>; identities: Pick<IdentitiesApi, 'store'>; proofs: Pick<ProofsApi, 'store'>;
+};
 
 /**
  * `GET PROFILE_ROUTE`: what the server holds of the player the request names, as
@@ -737,7 +761,7 @@ export function answerProfile(api: ProfileApi, req: IncomingMessage, res: Server
     if (!isPlayerId(header)) return send(res, 400, JSON.stringify({ error: `No player: ${PLAYER_ID_HEADER} is not a playerId.` }), 'application/json; charset=utf-8');
     res.setHeader('Vary', PLAYER_ID_HEADER);
     send(res, 200, profileText(header, {
-        identities: api.identities.store, dataSets: api.dataSets, recordings: api.recordings.store, stats: api.store,
+        identities: api.identities.store, dataSets: api.dataSets, recordings: api.recordings.store, stats: api.store, proofs: api.proofs.store,
     }), 'application/json; charset=utf-8');
 }
 
@@ -773,6 +797,50 @@ export async function receiveNameReset(id: string, api: Pick<ApiOptions, 'modera
         : resetName(id, body.toString('utf8'), dataSetViewer(api, req), api.identities.store);
     res.setHeader('Cache-Control', 'no-store');
     send(res, reply.status, JSON.stringify(reply.body), 'application/json; charset=utf-8');
+}
+
+/** What `receiveProof` and `answerProofs` need of the API. */
+export type ProofApi = Pick<ApiOptions, 'dataSets' | 'now' | 'proofs'> & { recordings: Pick<RecordingsApi, 'readPackage'>; identities: Pick<IdentitiesApi, 'store'> };
+
+/**
+ * `POST PROOFS_ROUTE`: the rate limit first, then the player, a `multipart/form-data` body
+ * of at most `MAX_PROOF_BYTES`, and its form, before `sendProof` decides. Every answer is
+ * JSON (`ProofAnswer`). The dev server answers the route with it too (`vite.config.mts`),
+ * as it does `answerProofs`.
+ */
+export async function receiveProof(api: ProofApi, req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const answer = (status: number, error: string): ProofAnswer => ({ status, body: { error } });
+    const header = req.headers[PLAYER_ID_HEADER.toLowerCase()];
+    let reply: ProofAnswer | null = null;
+    if (!api.proofs.rateLimit.allow(clientAddress(req), api.now())) reply = answer(429, 'Too many proofs sent from here: try again in an hour.');
+    else if (!isPlayerId(header)) reply = answer(400, `No player: ${PLAYER_ID_HEADER} is not a playerId.`);
+    else if (!isForm(req)) reply = answer(400, 'The body is not multipart/form-data.');
+    if (reply !== null) req.resume();
+    else {
+        const form = await readForm(req, MAX_PROOF_BYTES);
+        reply = typeof form === 'string' ? answer(form === 'large' ? 413 : 400, form === 'large' ? `The request is larger than ${MAX_PROOF_BYTES} bytes.` : FORM_REFUSALS.broken)
+            : await sendProof(form, header as string, {
+                proofs: api.proofs.store, dir: api.proofs.dir, dataSets: api.dataSets, identities: api.identities.store,
+                readPackage: api.recordings.readPackage, now: api.now,
+            });
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    send(res, reply.status, JSON.stringify(reply.body), 'application/json; charset=utf-8');
+}
+
+/**
+ * `GET PROOFS_ROUTE?ids=<id>,<id>…`: the verdicts of the proofs of the player the request
+ * names among those asked, as `proofsText` gives them, not cached; 400 without a player or
+ * with ids that are not proofs' ids.
+ */
+export function answerProofs(api: Pick<ProofApi, 'proofs' | 'identities'>, req: IncomingMessage, res: ServerResponse): void {
+    const header = req.headers[PLAYER_ID_HEADER.toLowerCase()];
+    res.setHeader('Cache-Control', 'no-store');
+    if (!isPlayerId(header)) return send(res, 400, JSON.stringify({ error: `No player: ${PLAYER_ID_HEADER} is not a playerId.` }), 'application/json; charset=utf-8');
+    const text = proofsText(new URL(req.url ?? '', 'http://localhost').searchParams.get('ids') ?? '', header, api.proofs.store, api.identities.store);
+    if (text === null) return send(res, 400, JSON.stringify({ error: 'ids is not a list of proofs\' ids, a comma apart.' }), 'application/json; charset=utf-8');
+    res.setHeader('Vary', PLAYER_ID_HEADER);
+    send(res, 200, text, 'application/json; charset=utf-8');
 }
 
 /**

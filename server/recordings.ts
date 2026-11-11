@@ -95,6 +95,8 @@ export const MAX_RECORDING_MODERATION_BYTES = 1024;
  */
 export interface SharedPackage {
     readonly build: string;
+    /** The engine's level the shared recording was played at (`RecordingPackage.level`). */
+    readonly level: number;
     readonly dataSet: string;
     readonly info: {
         readonly title: string;
