@@ -145,6 +145,7 @@ In payoff order: the first row is the next item.
 | X10 | The cells the party has seen, kept across a save for an automap | M | ⏸️ |
 | X16 | The map's info follows a DSA's program to the squares it names | M | ⏸️ |
 | X17 | The map's info names a Hall of Champions mirror's champion | S | ⏸️ |
+| X19 | The map's info names a spent once-only actuator | S | ⏸️ |
 | E22 | Fullscreen filled by a fraction | M | ⏸️ waits on the author |
 | H | Deliberate divergences | — | 🚫 |
 
@@ -154,7 +155,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: A11 · C202 · D22 · E48 · F26 · G32 · P13 · R21 · U13 · W8 · X19. An ID recorded and paid in one commit has no
+Next free IDs: A11 · C202 · D22 · E48 · F26 · G32 · P13 · R21 · U13 · W8 · X20. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -1243,6 +1244,23 @@ encoded attributes and skills (`AZIZI JOHARI F AADNADACAAAH…`).
   (`src/engine/AddCharacter.ts`, `HeroExtractor`), cited there.
 - **The check**: `tools/checks/map-cell-info.ts` on a mirror of DM's Hall of Champions
   and the square before it.
+
+### X19 ⏸️ The map's info names a spent once-only actuator
+
+A once-only pad, switch, launcher or generator that has fired is type 0 for good
+(`QueueSwitchAction`, `doc/CSBwin-src/Code11f52.cpp:3613`; `doc/CSBwin-src/Timer.cpp:1802`,
+`:2364`), and so is every actuator of a mirror's wall once its champion is recruited
+(`doc/CSBwin-src/CSBCode.cpp:6762`, `:6791`). Type 0 is also a wall's ornament, and DM's
+own `dungeon.dat` ships one once-only, so nothing in the state tells a spent actuator from
+an inert one: the map's info (`src/engine/CellInfo.ts`) lists neither. A resting
+generator, whose timer names it, is listed.
+
+- **What to read**: the data set's `dungeon.dat` as it ships, beside the game's dungeon.
+  A type-0 actuator of the game whose every other word equals an actuator of the same
+  square in the shipped dungeon, there of another type, is that actuator spent.
+- **What it gives**: "Spent:" and the shipped actuator's words; a spent generator still
+  marked G.
+- **The check**: `tools/checks/map-cell-info.ts` on a once-only pad of DM pressed.
 
 ## H — Deliberate divergences (not debt)
 

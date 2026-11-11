@@ -20,6 +20,10 @@
  * 7. **A DSA**: Conflux 3.5's (4,0) of map 1 shows its description and state.
  * 8. **A generator**: DM's (5,12) of map 9 makes 1 to 4 flying eyes, its delay 12 (bit 3
  *    and 4), then rests 512 ticks, its disable time 134 (`doc/CSBwin-src/Timer.cpp:1771-1820`).
+ *    It is ready, and G marks it. Fired by a `TT_OPENROOM` on its square, it is type 0 and
+ *    resting, its `TT_ReactivateGenerator` 512 ticks away: still listed whole, the ticks
+ *    left counting down, and still marked; once the timer has fired, ready again
+ *    (`doc/CSBwin-src/Timer.cpp:1835-1874`).
  *
  * Run: `npm test -- --only=map-cell-info.ts`
  */
@@ -32,8 +36,10 @@ import { DungeonLoader } from '../../src/data/DungeonLoader';
 import { CellInfo, actuatorHasTarget, type CellRef, type InfoLine } from '../../src/engine/CellInfo';
 import { DungeonState, NO_GAME } from '../../src/engine/DungeonState';
 import { nameIndexOf } from '../../src/engine/GameContext';
+import { TimerFunction } from '../../src/engine/TimerQueue';
+import { getActuatorType } from '../../src/data/actuatorHelpers';
 import { check, finish } from '../lib/check';
-import { gameTablesOf, graphicsTablesOf, stockGame, stockGraphics } from '../lib/game';
+import { gameTablesOf, graphicsTablesOf, processTimersAt, stockGame, stockGraphics } from '../lib/game';
 
 const CONFLUX = 'tools/fixtures/gamefiles/conflux-3.5-b8/dungeon.dat';
 
@@ -55,7 +61,10 @@ function main(): void {
   const game = stockGame();
   const { ctx } = game;
   const objectNames = graphicsTablesOf(stockGraphics()).objects.objectNames;
-  const info = (): CellInfo => new CellInfo({ dungeon: ctx.dungeon, tables: ctx.tables, objectNames, party: ctx.party.state });
+  const info = (): CellInfo => new CellInfo({
+    dungeon: ctx.dungeon, tables: ctx.tables, objectNames, party: ctx.party.state,
+    clock: { timers: ctx.timers.getTimers(), time: ctx.state.tickCount },
+  });
   const describe = (map: number, x: number, y: number): InfoLine[] => {
     const at = { map, x, y };
     const lines = info().describe(at);
@@ -127,8 +136,30 @@ function main(): void {
   check(!!line(lines, 'E side: Script "Decoration AB", state 0'), 'Conflux\'s DSA at (4,0) of map 1 shows its description and state');
 
   // 8. A generator.
-  check(!!line(describe(9, 5, 12), 'Generator: 1 to 4 x Flying eye, then off 512 ticks'),
-    'the generator at (5,12) of map 9 makes 1 to 4 flying eyes, then rests 512 ticks');
+  const ready = describe(9, 5, 12);
+  check(!!line(ready, 'Generator: 1 to 4 x Flying eye, then off 512 ticks') && !!line(ready, 'Ready'),
+    'the generator at (5,12) of map 9 makes 1 to 4 flying eyes, then rests 512 ticks, and is ready');
+  check(info().marked(9, 'generator').has(5 * 32 + 12), 'G marks it');
+
+  const square = new Position(5, 12, 9);
+  const generator = (): ActuatorRecord | null => {
+    for (let rn = ctx.dungeon.findFirstObject(square); rn !== OBJECT_ID_EOF; rn = ctx.dungeon.getDBRecordLink(rn)) {
+      const a = ctx.dungeon.getActuatorRecord(rn);
+      if (a) return a;
+    }
+    return null;
+  };
+  const fired = ctx.state.tickCount + 1;
+  ctx.timers.createTimer({ function: TimerFunction.TT_OPENROOM, time: fired, level: 9, uByte5: 0, uByte6: 5, uByte7: 12, uByte8: 0, uByte9: 0 });
+  processTimersAt(game, fired);
+  check(getActuatorType(generator()!) === 0, 'fired, the generator is type 0 while it rests');
+  processTimersAt(game, fired + 100);
+  const resting = describe(9, 5, 12);
+  check(!!line(resting, 'Generator: 1 to 4 x Flying eye, then off 512 ticks') && !!line(resting, 'Resting, 412 ticks to go'),
+    'resting, it is still listed whole, 412 ticks to go 100 ticks after it fired');
+  check(info().marked(9, 'generator').has(5 * 32 + 12), 'and G still marks it');
+  processTimersAt(game, fired + 512);
+  check(getActuatorType(generator()!) === 6 && !!line(describe(9, 5, 12), 'Ready'), 'its timer fired, it is type 6 and ready again');
 
   finish();
 }

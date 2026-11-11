@@ -128,6 +128,8 @@ class Namer {
       tables: this.tables,
       objectNames: this.objectNames,
       party: { position: new Position(p.x, p.y, p.level), facing: p.facing, champions: [], objectInHand: OBJECT_ID_NULL },
+      // A save's timer keeps its object in its word 8 (`timerObj8`, `doc/CSBwin-src/Timer.cpp:1853`).
+      clock: { timers: world.timers.map((t) => ({ ...t, object: t.timerWord8 as ObjectID })), time: world.time },
     });
   }
 

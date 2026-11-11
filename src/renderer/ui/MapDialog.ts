@@ -253,7 +253,10 @@ export function openMapDialog(ui: UIState): boolean {
     rows: [],
     scrollTop: 0,
     wheelDelta: 0,
-    info: new CellInfo({ dungeon: ui.ctx.dungeon, tables: ui.ctx.tables, objectNames: ui.objectTables.objectNames, party }),
+    info: new CellInfo({
+      dungeon: ui.ctx.dungeon, tables: ui.ctx.tables, objectNames: ui.objectTables.objectNames, party,
+      clock: { timers: ui.ctx.timers.getTimers(), time: ui.ctx.state.tickCount },
+    }),
     mark: ui.mapDialogMark,
     press: null,
   };

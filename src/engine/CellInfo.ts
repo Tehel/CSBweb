@@ -37,6 +37,7 @@ import type { DungeonState } from './DungeonState';
 import type { GameTables } from './GameTables';
 import { MonsterType } from './monsterTypes';
 import { GetBasicObjectType, NameIndex } from './objectIndex';
+import { TimerFunction, type TimerEntry } from './TimerQueue';
 
 /** A square: its map's index, its column and its row. */
 export interface CellRef {
@@ -66,6 +67,18 @@ export interface CellInfoSource {
   /** The objects' names, by `OBJ_NAME_INDEX`. */
   readonly objectNames: readonly string[];
   readonly party: CellInfoParty | null;
+  /**
+   * The game's clock: its live timers and `d.Time` (`ctx.state.tickCount`), which tell a
+   * resting generator from a ready one. None for a dungeon read alone, whose generators
+   * are all ready.
+   */
+  readonly clock?: CellInfoClock;
+}
+
+/** What the info reads of the timers: a timer's square, its time and its object. */
+export interface CellInfoClock {
+  readonly timers: readonly Pick<TimerEntry, 'function' | 'time' | 'level' | 'uByte6' | 'uByte7' | 'object'>[];
+  readonly time: number;
 }
 
 /**
@@ -278,6 +291,7 @@ export class CellInfo {
   private readonly senders = new Map<number, Map<number, Sender[]>>();
   private places: Map<number, Place[]> | null = null;
   private arrivals: Map<string, CellRef[]> | null = null;
+  private resting: Map<number, number> | null = null;
   private readonly marks = new Map<string, Set<number>>();
 
   constructor(private readonly source: CellInfoSource) {}
@@ -324,8 +338,8 @@ export class CellInfo {
   }
 
   /**
-   * The squares of `map` that hold what `mark` names, by `x * 32 + y`: a generator, the
-   * floor actuator `actuatorTrigger` calls one; a group of monsters; an item, what `thing`
+   * The squares of `map` that hold what `mark` names, by `x * 32 + y`: a generator, ready
+   * or resting (`isGenerator`); a group of monsters; an item, what `thing`
    * names, on a floor or in a wall's alcove, a chest with what it holds, but not an item a
    * monster carries, nor a champion's in the wall of the mirror that holds them.
    */
@@ -346,7 +360,7 @@ export class CellInfo {
       for (let y = 0; y < level.descriptor.height; y++) {
         const room = getRoomType(level.cellFlags[x]![y]!);
         const objects = [...this.chain(dungeon.findFirstObject(new Position(x, y, map)))];
-        const holds = mark === 'generator' ? room === RoomType.OPEN && objects.some((rn) => actuatorType(rn) === 6)
+        const holds = mark === 'generator' ? room === RoomType.OPEN && objects.some((rn) => this.isGenerator(rn, room))
           : mark === 'monster' ? objects.some((rn) => dungeon.rnMaps.dbType(rn) === DBType.CREATURE)
           : !(room === RoomType.STONE && objects.some((rn) => actuatorType(rn) === 127))
             && objects.some((rn) => dungeon.rnMaps.dbType(rn) !== DBType.CREATURE && this.itemName(rn) !== null);
@@ -420,6 +434,12 @@ export class CellInfo {
     const a = dungeon.getActuatorRecord(rn);
     if (!a) return;
     const where = room === RoomType.STONE ? `${SIDES[dungeon.rnMaps.pos(rn) & 3]} side: ` : '';
+    if (this.isGenerator(rn, room)) {
+      const rest = this.restingOf().get(rn);
+      out.push({ text: generatorWords(a), indent: 0 });
+      out.push({ text: rest === undefined ? 'Ready' : `Resting, ${rest} ticks to go`, indent: 1 });
+      return;
+    }
     if (getActuatorType(a) === 47) {
       out.push({ text: `${where}${this.dsaWords(at.map, a)}`, indent: 0 });
       return;
@@ -614,6 +634,50 @@ export class CellInfo {
       }
     }
     return places;
+  }
+
+  /**
+   * A floor actuator that is a generator: one of type 6, ready, or one resting, which a
+   * generator that fired with a disable time is, its type 0 until its timer turns it back
+   * (`doc/CSBwin-src/Timer.cpp:1805-1820`). Every other word of it is kept, so it is shown
+   * whole. A once-only generator that fired is type 0 for good, and nothing tells it from
+   * any other actuator of type 0, a wall's ornament or a spent pad: it is not shown.
+   */
+  private isGenerator(rn: ObjectID, room: number): boolean {
+    if (room !== RoomType.OPEN) return false;
+    const a = this.source.dungeon.getActuatorRecord(rn);
+    return !!a && (getActuatorType(a) === 6 || this.restingOf().has(rn));
+  }
+
+  /**
+   * The resting generators, by RN, and the ticks left until each is ready. Each
+   * `TT_ReactivateGenerator` timer names the actuator it will turn back into a generator
+   * as `ProcessTT_ReactivateGenerator` finds it (`doc/CSBwin-src/Timer.cpp:1835-1874`):
+   * among its square's actuators of type 0, the one the timer's object names, else the
+   * first; at the timer's time, `d.Time` then being at least that.
+   */
+  private restingOf(): Map<number, number> {
+    if (this.resting) return this.resting;
+    const resting = new Map<number, number>();
+    this.resting = resting;
+    const { dungeon, clock } = this.source;
+    for (const t of clock?.timers ?? []) {
+      if (t.function !== TimerFunction.TT_REACTIVATE_GENERATOR) continue;
+      let first: ObjectID | null = null;
+      let found: ObjectID | null = null;
+      for (const rn of this.chain(dungeon.findFirstObject(new Position(t.uByte6, t.uByte7, t.level)))) {
+        if (dungeon.rnMaps.dbType(rn) !== DBType.ACTUATOR) continue;
+        const a = dungeon.getActuatorRecord(rn);
+        if (!a || getActuatorType(a) !== 0) continue;
+        first ??= rn;
+        if (rn === t.object) { found = rn; break; }
+      }
+      const rn = found ?? first;
+      if (rn === null) continue;
+      const left = Math.max(0, t.time - clock!.time);
+      resting.set(rn, Math.min(left, resting.get(rn) ?? left));
+    }
+    return resting;
   }
 
   /** The teleporters of the dungeon by their destination, `map,x,y`. */
