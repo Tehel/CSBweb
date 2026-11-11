@@ -1,5 +1,5 @@
 /**
- * A snapshot of the store (`store.ts`), the statistics', the data sets' and the recordings'
+ * A snapshot of the store (`store.ts`), the statistics', the data sets', the recordings' and the identities'
  * tables, taken while the server keeps serving, and a copy of the folders players' sets
  * were uploaded to and of the recordings' packages (`doc/DEPLOYMENT.md` → "Backups"). The server's cron runs it in the container:
  *

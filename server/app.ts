@@ -32,6 +32,11 @@
  *                     shared, pending (`shareRecording`, `recordings.ts`)
  *   /api/recordings/<id>  POST: the recording approved, hidden, shown or broken by a
  *                     moderator, or deleted by one or by its uploader (`moderateRecording`)
+ *   /api/profile      what the server holds of the player its `X-Player-Id` names, and the
+ *                     other browsers their identity links (`profileText`); POST: their public
+ *                     name chosen, their browser linked, their key drawn again (`changeProfile`,
+ *                     `identity.ts`)
+ *   /api/identities/<id>  POST: a public name reset by a moderator (`resetName`)
  *   /api/health       200, for the compose healthcheck
  *   /api/event        POST: a game's event, checked (`events.ts`) and stored (`stats.ts`)
  *   /api/stats        the public sets' statistics, as JSON (`StatsStore.summary`)  max-age 30 s
@@ -52,12 +57,15 @@ import { extname, join } from 'node:path';
 import { pipeline } from 'node:stream';
 import { pathToFileURL } from 'node:url';
 
-import { DATA_SET_FILES_ROUTE, DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, PLAYER_ID_HEADER, RECORDING_FILES, RECORDINGS_ROUTE } from '../src/data/DataSets.ts';
+import {
+    DATA_SET_FILES_ROUTE, DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, IDENTITIES_ROUTE, PLAYER_ID_HEADER, PROFILE_ROUTE, RECORDING_FILES, RECORDINGS_ROUTE,
+} from '../src/data/DataSets.ts';
 import type { StatsSet } from './answers.ts';
 import { manifestText, samePlayerId, wallsText, type DataSetStore, type DataSetViewer, type Moderator } from './dataSets.ts';
 import { addDocument, removeDocument } from './documents.ts';
 import { editDataSet } from './edit.ts';
 import { addressBucket, checkEvent, isPlayerId, MAX_EVENT_BYTES, type EventRules, type RateLimit } from './events.ts';
+import { changeProfile, MAX_PROFILE_BYTES, profileText, resetName, type IdentityStore, type ProfileAnswer } from './identity.ts';
 import { MAX_MODERATION_BYTES, moderateDataSet, type ModerationAnswer } from './moderate.ts';
 import type { Notify } from './notify.ts';
 import { FileDigestCache, filesText } from './setFiles.ts';
@@ -151,6 +159,15 @@ export interface ApiOptions {
     notify: Notify;
     /** The shared recordings (`recordings.ts`). */
     recordings: RecordingsApi;
+    /** The players' identities (`identity.ts`). */
+    identities: IdentitiesApi;
+}
+
+/** What the API needs of the identities. */
+export interface IdentitiesApi {
+    store: IdentityStore;
+    /** Changes asked of `PROFILE_ROUTE` per address, refused ones included. */
+    rateLimit: RateLimit;
 }
 
 /** What the API needs of the shared recordings. */
@@ -328,6 +345,15 @@ function route({ distDir, gamefilesDir, filesDir }: ServerOptions, api: ApiOptio
         if (segments.length === 3 && segments.slice(0, 2).join('/') === RECORDINGS_ROUTE) {
             if (req.method !== 'POST') return refuseMethod(res, 'POST');
             return receiveRecordingModeration(segments[2]!, api, req, res);
+        }
+        if (segments.join('/') === PROFILE_ROUTE) {
+            if (req.method === 'POST') return receiveProfileChange(api, req, res);
+            if (req.method !== 'GET' && req.method !== 'HEAD') return refuseMethod(res, 'GET, HEAD, POST');
+            return answerProfile(api, req, res);
+        }
+        if (segments.length === 3 && segments.slice(0, 2).join('/') === IDENTITIES_ROUTE) {
+            if (req.method !== 'POST') return refuseMethod(res, 'POST');
+            return receiveNameReset(segments[2]!, api, req, res);
         }
         const name = segments.length === 2 ? segments[1] : undefined;
         if (name === 'event') {
@@ -693,6 +719,58 @@ export async function receiveRecordingModeration(id: string, api: RecordingShare
     const body = await readBody(req, MAX_RECORDING_MODERATION_BYTES);
     const reply: RecordingAnswer = body === null ? { status: 413, body: { error: `The body is larger than ${MAX_RECORDING_MODERATION_BYTES} bytes.` } }
         : await moderateRecording(id, body.toString('utf8'), dataSetViewer(api, req), recordingOptions(api));
+    res.setHeader('Cache-Control', 'no-store');
+    send(res, reply.status, JSON.stringify(reply.body), 'application/json; charset=utf-8');
+}
+
+/** What `answerProfile` needs of the API. */
+export type ProfileApi = Pick<ApiOptions, 'dataSets' | 'store'> & { recordings: Pick<RecordingsApi, 'store'>; identities: Pick<IdentitiesApi, 'store'> };
+
+/**
+ * `GET PROFILE_ROUTE`: what the server holds of the player the request names, as
+ * `profileText` gives it, not cached; 400 without a player. The dev server answers the
+ * route with it too (`vite.config.mts`), as it does the two below.
+ */
+export function answerProfile(api: ProfileApi, req: IncomingMessage, res: ServerResponse): void {
+    const header = req.headers[PLAYER_ID_HEADER.toLowerCase()];
+    res.setHeader('Cache-Control', 'no-store');
+    if (!isPlayerId(header)) return send(res, 400, JSON.stringify({ error: `No player: ${PLAYER_ID_HEADER} is not a playerId.` }), 'application/json; charset=utf-8');
+    res.setHeader('Vary', PLAYER_ID_HEADER);
+    send(res, 200, profileText(header, {
+        identities: api.identities.store, dataSets: api.dataSets, recordings: api.recordings.store, stats: api.store,
+    }), 'application/json; charset=utf-8');
+}
+
+/**
+ * `POST PROFILE_ROUTE`: the rate limit first, then the player and a body of at most
+ * `MAX_PROFILE_BYTES`, before `changeProfile` decides. Every answer is JSON (`ProfileAnswer`).
+ */
+export async function receiveProfileChange(api: Pick<ApiOptions, 'now' | 'identities'>, req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const answer = (status: number, error: string): ProfileAnswer => ({ status, body: { error } });
+    const header = req.headers[PLAYER_ID_HEADER.toLowerCase()];
+    let reply: ProfileAnswer;
+    if (!api.identities.rateLimit.allow(clientAddress(req), api.now())) {
+        req.resume();
+        reply = answer(429, 'Too many changes from here: try again in an hour.');
+    } else if (!isPlayerId(header)) {
+        req.resume();
+        reply = answer(400, `No player: ${PLAYER_ID_HEADER} is not a playerId.`);
+    } else {
+        const body = await readBody(req, MAX_PROFILE_BYTES);
+        reply = body === null ? answer(413, `The body is larger than ${MAX_PROFILE_BYTES} bytes.`) : changeProfile(body.toString('utf8'), header, api.identities.store);
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    send(res, reply.status, JSON.stringify(reply.body), 'application/json; charset=utf-8');
+}
+
+/**
+ * `POST IDENTITIES_ROUTE/<id>`: its asker and a body of at most `MAX_PROFILE_BYTES`, before
+ * `resetName` decides. Every answer is JSON (`ProfileAnswer`).
+ */
+export async function receiveNameReset(id: string, api: Pick<ApiOptions, 'moderators' | 'identities'>, req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const body = await readBody(req, MAX_PROFILE_BYTES);
+    const reply: ProfileAnswer = body === null ? { status: 413, body: { error: `The body is larger than ${MAX_PROFILE_BYTES} bytes.` } }
+        : resetName(id, body.toString('utf8'), dataSetViewer(api, req), api.identities.store);
     res.setHeader('Cache-Control', 'no-store');
     send(res, reply.status, JSON.stringify(reply.body), 'application/json; charset=utf-8');
 }

@@ -8,18 +8,20 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { DatabaseSync } from 'node:sqlite';
 
 import {
-  answerRecordings, answerStats, contentType, dataSetViewer, pathSegments, receiveDocument, receiveEdit, receiveModeration, receivePublish,
-  receiveRecordingModeration, receiveShare,
+  answerProfile, answerRecordings, answerStats, contentType, dataSetViewer, pathSegments, receiveDocument, receiveEdit, receiveModeration,
+  receiveNameReset, receiveProfileChange, receivePublish, receiveRecordingModeration, receiveShare,
 } from './server/app.ts';
 import { DataSetStore, manifestText, parseModerators, wallsText } from './server/dataSets.ts';
 import { FileDigestCache, filesText } from './server/setFiles.ts';
 import { RateLimit } from './server/events.ts';
+import { IdentityStore } from './server/identity.ts';
 import { NOBODY } from './server/notify.ts';
 import type { CheckDataSet } from './server/publish.ts';
 import { RecordingStore, type ReadRecordingPackage } from './server/recordings.ts';
 import { AnswerCache, StatsStore } from './server/stats.ts';
 import {
-  DATA_SET_FILES_ROUTE, DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, PLAYER_ID_HEADER, RECORDING_FILES, RECORDINGS_ROUTE, SHARED_RECORDING_ID, parseManifest,
+  DATA_SET_FILES_ROUTE, DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, IDENTITIES_ROUTE, PLAYER_ID_HEADER, PROFILE_ROUTE, RECORDING_FILES, RECORDINGS_ROUTE,
+  SHARED_RECORDING_ID, parseManifest,
 } from './src/data/DataSets.ts';
 import { fillFortnight } from './tools/lib/statsFortnight.ts';
 
@@ -72,6 +74,11 @@ const DEV_MODERATOR_PLAYER_ID = '00000000-0000-4000-8000-000000000001';
  * store of the recordings of its own, in memory, kept while the dev server runs: a
  * recording shared is a row of it and a package in a scratch folder, made at start and
  * removed at the end, served under `recordings/<id>.gz`. Without `node:sqlite`, it is 501.
+ *
+ * `api/profile` is `answerProfile` and `receiveProfileChange`, and `api/identities/<id>`
+ * `receiveNameReset`, over a store of the identities of its own, in memory, kept while the
+ * dev server runs, and the same sets, recordings and statistics. Without `node:sqlite`, it
+ * is 501.
  *
  * `api/stats` is `answerStats` over the same store's public sets, and over statistics made
  * once, at start, of `checks/stats`' fortnight (`tools/lib/statsFortnight.ts`), which names
@@ -304,6 +311,45 @@ function dataSetsRoute(): Plugin {
         res.setHeader('Cache-Control', 'no-cache');
         if (req.method === 'HEAD') return res.end();
         createReadStream(path).pipe(res);
+      });
+
+      const identitiesDb = sqlite ? new sqlite.DatabaseSync(':memory:') : null;
+      const identities = identitiesDb ? { store: new IdentityStore(identitiesDb), rateLimit: new RateLimit(1000, 60_000) } : null;
+      server.httpServer?.once('close', () => identitiesDb?.close());
+      server.middlewares.use(`/${PROFILE_ROUTE}`, async (req, res, next) => {
+        if (req.url !== '/' && !req.url?.startsWith('/?')) return next();
+        if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'POST') {
+          res.statusCode = 405;
+          res.setHeader('Allow', 'GET, HEAD, POST');
+          return res.end();
+        }
+        if (!sqlite || !identities || !recordingStore || !stats) {
+          res.statusCode = 501;
+          return res.end();
+        }
+        const db = new sqlite.DatabaseSync(':memory:');
+        try {
+          if (req.method === 'POST') await receiveProfileChange({ now: Date.now, identities }, req, res);
+          else answerProfile({ dataSets: openStore(db), store: stats, recordings: { store: recordingStore }, identities }, req, res);
+        } catch (error) {
+          next(error);
+        } finally {
+          db.close();
+        }
+      });
+      server.middlewares.use(`/${IDENTITIES_ROUTE}`, async (req, res, next) => {
+        const id = pathSegments(req.url ?? '');
+        if (id?.length !== 1) return next();
+        if (req.method !== 'POST' || !identities) {
+          res.statusCode = req.method !== 'POST' ? 405 : 501;
+          if (req.method !== 'POST') res.setHeader('Allow', 'POST');
+          return res.end();
+        }
+        try {
+          await receiveNameReset(id[0]!, { moderators, identities }, req, res);
+        } catch (error) {
+          next(error);
+        }
       });
 
       // A set's files: a published one's from the scratch folder, a site's from the fixtures.

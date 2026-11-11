@@ -33,6 +33,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { createAppServer, type ServerOptions } from '../../server/app.ts';
 import { DataSetStore, parseModerators } from '../../server/dataSets.ts';
 import { RateLimit } from '../../server/events.ts';
+import { IdentityStore } from '../../server/identity.ts';
 import { RecordingStore } from '../../server/recordings.ts';
 import { StatsStore } from '../../server/stats.ts';
 import { DATA_SET_FILES_ROUTE, parseManifest, PLAYER_ID_HEADER, RECORDING_PACKAGE_FIELD, RECORDINGS_ROUTE } from '../../src/data/DataSets.ts';
@@ -83,6 +84,7 @@ const server = createAppServer(options, {
     notify: () => {}, rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(100, 60_000), eventBudget: new RateLimit(100, 60_000),
     publishRateLimit: new RateLimit(100, 60_000), now: Date.now,
     recordings: { store, dir: recordingsDir, readPackage: readRecordingPackage, shareRateLimit: new RateLimit(100, 60_000) },
+    identities: { store: new IdentityStore(db), rateLimit: new RateLimit(100, 60_000) },
 });
 await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
 const instance = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;

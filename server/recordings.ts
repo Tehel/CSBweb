@@ -163,6 +163,7 @@ export class RecordingStore {
     /** The most the packages may take on the disk together, in bytes. */
     readonly diskBytes: number;
     private readonly rowsOf: StatementSync;
+    private readonly rowsBy: StatementSync;
     private readonly listedOf: StatementSync;
     private readonly row: StatementSync;
     private readonly total: StatementSync;
@@ -184,6 +185,7 @@ export class RecordingStore {
         const columns = 'id, data_set, build, title, author, description, recorded_at, ended_at, play_time, start, extras, size, uploader, uploaded_at, status, hidden, broken, ending, party';
         this.rowsOf = db.prepare(`SELECT ${columns} FROM recordings WHERE data_set = ? ORDER BY uploaded_at DESC, id`);
         this.row = db.prepare(`SELECT ${columns} FROM recordings WHERE id = ?`);
+        this.rowsBy = db.prepare(`SELECT ${columns} FROM recordings WHERE uploader IN (SELECT value FROM json_each(?)) ORDER BY uploaded_at DESC, id`);
         this.listedOf = db.prepare("SELECT data_set, COUNT(*) AS listed FROM recordings WHERE status = 'approved' AND hidden = 0 AND broken = 0 GROUP BY data_set");
         this.total = db.prepare('SELECT COALESCE(SUM(size), 0) AS bytes FROM recordings');
         this.insert = db.prepare(`INSERT INTO recordings (${columns}) VALUES (${columns.split(', ').map(() => '?').join(', ')})`);
@@ -198,6 +200,11 @@ export class RecordingStore {
     /** The recordings of the set `dataSet`, the latest shared first. */
     of(dataSet: string): StoredRecording[] {
         return (this.rowsOf.all(dataSet) as Record<string, string | number | null>[]).map(recordingOf);
+    }
+
+    /** The recordings `uploaders` shared, every set's, the latest shared first: a player's own (`server/identity.ts`). */
+    uploadedBy(uploaders: readonly string[]): StoredRecording[] {
+        return (this.rowsBy.all(JSON.stringify(uploaders)) as Record<string, string | number | null>[]).map(recordingOf);
     }
 
     /** How many recordings of each set everyone is listed (`recordingsText`): approved, neither hidden nor broken. A set of none is absent. */

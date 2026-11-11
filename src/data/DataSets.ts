@@ -273,6 +273,100 @@ export const RECORDING_ENDINGS = ['save', 'won', 'lost'] as const;
 export type RecordingEnding = (typeof RECORDING_ENDINGS)[number];
 
 /**
+ * Where the page asks what the server knows of its player, `GET`, and chooses its public
+ * name or links its browser to one, `POST` with `{"action": …}` (`PROFILE_ACTIONS`),
+ * naming its player as `DATA_SETS_ROUTE` does (`server/identity.ts`, `doc/ACHIEVEMENTS.md`
+ * → "Identity"): the welcome page's PROFILE (`src/ui/profile.ts`).
+ */
+export const PROFILE_ROUTE = 'api/profile';
+
+/**
+ * What `POST PROFILE_ROUTE` does: `name` chooses or changes the public name, `{"name": …}`;
+ * `link` links the browser to the identity whose key it gives, `{"key": …}`; `key` draws
+ * the identity a new key, the old one refused from then on.
+ */
+export const PROFILE_ACTIONS = ['name', 'link', 'key'] as const;
+export type ProfileAction = (typeof PROFILE_ACTIONS)[number];
+
+/** Where a moderator resets a public name: `POST IDENTITIES_ROUTE/<public id>`, `{"action": "reset"}`. */
+export const IDENTITIES_ROUTE = 'api/identities';
+
+/** The shortest and the longest public name, in characters. */
+export const PUBLIC_NAME_LIMITS = { min: 3, max: 16 } as const;
+
+/**
+ * A public name's characters: ASCII letters, digits, `-`, `_` and `.`, in words a single
+ * space apart, so that no two names differ by spaces a list does not show.
+ */
+const PUBLIC_NAME = /^[A-Za-z0-9._-]+(?: [A-Za-z0-9._-]+)*$/;
+
+/** Why `name` is not a public name, or `null` where it is one. Whether it is taken is the server's to say. */
+export function publicNameProblem(name: string): string | null {
+    if (name.length < PUBLIC_NAME_LIMITS.min || name.length > PUBLIC_NAME_LIMITS.max) {
+        return `A name is ${PUBLIC_NAME_LIMITS.min} to ${PUBLIC_NAME_LIMITS.max} characters long.`;
+    }
+    if (!PUBLIC_NAME.test(name)) return 'A name is made of letters, digits, - _ and ., and single spaces between them.';
+    return null;
+}
+
+/**
+ * The alphabet of a public id and an identity key: Crockford's base 32, which has no I,
+ * L, O or U, so that a key read aloud or copied by hand is read back.
+ */
+export const IDENTITY_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+/** A public id: ten characters of `IDENTITY_ALPHABET`, in lowercase, drawn by the server. */
+export const PUBLIC_ID = /^[0-9a-hjkmnp-tv-z]{10}$/;
+
+/** The characters of an identity key, `IDENTITY_ALPHABET`'s, shown in groups of `IDENTITY_KEY_GROUP` (`identityKeyText`). */
+export const IDENTITY_KEY_LENGTH = 25;
+export const IDENTITY_KEY_GROUP = 5;
+
+/** `key`, `IDENTITY_KEY_LENGTH` characters of `IDENTITY_ALPHABET`, in groups a `-` apart. */
+export function identityKeyText(key: string): string {
+    return key.match(new RegExp(`.{1,${IDENTITY_KEY_GROUP}}`, 'g'))?.join('-') ?? key;
+}
+
+/**
+ * The identity key `text` holds, as the server hashes it, or `null` where it holds none:
+ * any case, the spaces and the `-` dropped, and an `O` read as `0` and an `I` or an `L` as
+ * `1`, as Crockford's base 32 reads them.
+ */
+export function identityKeyOf(text: string): string | null {
+    const key = text.toUpperCase().replace(/[\s-]/g, '').replace(/O/g, '0').replace(/[IL]/g, '1');
+    return key.length === IDENTITY_KEY_LENGTH && [...key].every((c) => IDENTITY_ALPHABET.includes(c)) ? key : null;
+}
+
+/** A set's state, as the profile says it: awaiting a moderator, listed, or hidden by one. */
+export type ProfileState = 'pending' | 'approved' | 'hidden';
+
+/**
+ * `GET PROFILE_ROUTE`'s answer: what the server holds of the player who asks and of the
+ * other browsers their identity links, and never a `playerId` (`server/identity.ts`).
+ */
+export interface PlayerProfile {
+    /** Their public name and its public id, `null` before a name is chosen; the name `null` once a moderator reset it. */
+    identity: { name: string | null; id: string; browsers: number } | null;
+    /** The sets they published, in the list's order. */
+    dataSets: { id: string; name: string; state: ProfileState }[];
+    /** The recordings they shared, the latest first, each with its set's name. */
+    recordings: { id: string; dataSet: string; name: string; title: string; state: ProfileState; broken: boolean; uploadedAt: number }[];
+    /** How many of those the site lists as replays: approved, neither hidden nor broken. */
+    replays: number;
+    /** Their games the statistics hold, by set. */
+    statistics: { dataSet: string; name: string; started: number; won: number; lost: number }[];
+    /** Their achievements by set: none until the proofs are sent (phase 18.5). */
+    achievements: { dataSet: string; name: string; unlocked: string[] }[];
+}
+
+/** `POST PROFILE_ROUTE`'s answer once done: the identity, and its key where one was drawn, shown this once. */
+export interface ProfileIdentity {
+    name: string | null;
+    id: string;
+    key?: string;
+}
+
+/**
  * The segment below `DATA_SETS_ROUTE/<id>` where a moderator adds a document to the set,
  * by a form, and removes one, by `{"remove": "<file>"}` (`server/documents.ts`).
  */

@@ -499,6 +499,8 @@ comma-separated `<playerId>[=<alias>]`, spaces around a comma or the `=` ignored
 | `/api/data-set-files` | the MD5 of each game file of the same sets, which a recording is matched against (`doc/RECORDING.md` → "The set a recording plays over") | `no-store`, `Vary: X-Player-Id` |
 | `/api/recordings?dataSet=<id>` | the set's shared recordings the `X-Player-Id` may see; POST: a package shared ("Shared recordings", below) | `no-store`, `Vary: X-Player-Id` |
 | `/api/recordings/<id>` | POST: the recording approved, hidden, shown, broken or deleted by a moderator, or withdrawn by its uploader | `no-store` |
+| `/api/profile` | what the server holds of the `X-Player-Id` and the other browsers its identity links, PROFILE's dump (`doc/ACHIEVEMENTS.md` → "Identity"); POST: a public name chosen, a browser linked by its identity key, a new key drawn | `no-store`, `Vary: X-Player-Id` |
+| `/api/identities/<id>` | POST: a public name reset by a moderator | `no-store` |
 | `/api/health` | `{"ok":true}`, for the healthcheck | `no-store` |
 | `/api/event` | POST: one of the page's events (`doc/STATISTICS.md`) | |
 | `/api/stats` | the public sets' statistics (`doc/STATISTICS.md`) | `public, max-age=30`, kept as long |
@@ -507,7 +509,8 @@ comma-separated `<playerId>[=<alias>]`, spaces around a comma or the `=` ignored
 
 Every file answers a conditional GET with 304, and only GET and HEAD are allowed, except on
 `api/event`, `api/data-sets`'s POST, `api/data-sets/<id>`, `api/data-sets/<id>/documents`,
-`api/recordings`'s POST and `api/recordings/<id>`, POST only. A POST a
+`api/recordings`'s POST, `api/recordings/<id>`, `api/profile`'s POST and
+`api/identities/<id>`, POST only. A POST a
 browser says another site's page sent, by its `Sec-Fetch-Site` or its `Origin`, is refused
 with 403 (`isCrossSite`, `doc/STATISTICS.md`). A path with a segment that starts with `.`, or holds a `/`, a `\` or a NUL once
 decoded, is refused with 400 before it reaches the disk. A folder is 404, never a listing.
@@ -783,8 +786,8 @@ that set.
 
 The host's cron runs `server/backup.ts` in the container every night. It snapshots the
 store with `node:sqlite`'s `backup` while the server keeps serving, WAL included, into one
-self-contained file, `stats/backups/stats-<date>.db`, the data sets' tables with the
-events. A `cp` of the live file would be unsafe: its WAL holds events the main file does
+self-contained file, `stats/backups/stats-<date>.db`, the data sets', the recordings' and
+the identities' tables with the events. A `cp` of the live file would be unsafe: its WAL holds events the main file does
 not have yet.
 
 It then copies the folders the snapshot's sets live in, every set's, into

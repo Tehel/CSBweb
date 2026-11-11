@@ -2,8 +2,8 @@
  * The deployed game's server (`doc/DEPLOYMENT.md`, `doc/STATISTICS.md`): `node server/server.ts`,
  * on Node 24, which strips the types. No dependency: `node:http` serves the page, the game
  * files and the API (`app.ts`), and `node:sqlite` keeps the store (`store.ts`): the
- * statistics (`stats.ts`), the data sets (`dataSets.ts`) and the shared recordings
- * (`recordings.ts`).
+ * statistics (`stats.ts`), the data sets (`dataSets.ts`), the shared recordings
+ * (`recordings.ts`) and the players' identities (`identity.ts`).
  *
  *   PORT            the port to listen on (8085; 0 picks a free one)
  *   DIST_DIR        the built page (the checkout's `dist/`), and the page's readers built for
@@ -43,6 +43,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { checkFiles, createAppServer, fillWalls, loadPageReaders, type PageReaders, type ServerOptions } from './app.ts';
 import { DataSetStore, parseModerators, type Moderator } from './dataSets.ts';
 import { RateLimit } from './events.ts';
+import { IdentityStore } from './identity.ts';
 import { NOBODY, ntfyNotifier, type Notify } from './notify.ts';
 import { fillEndings, RecordingStore } from './recordings.ts';
 import { StatsStore } from './stats.ts';
@@ -62,6 +63,12 @@ const PUBLISHES_PER_HOUR = 5;
 
 /** Recordings shared per address and hour, refused ones included, as publishes are. */
 const SHARES_PER_HOUR = 5;
+
+/**
+ * Changes asked of `api/profile` per address and hour, refused ones included: a player
+ * chooses a name, and may try a few that are taken, once.
+ */
+const PROFILE_CHANGES_PER_HOUR = 30;
 
 /** The most the shared recordings' packages may take on the disk: some three thousand hours of play (`recordings.ts`). */
 const RECORDINGS_DISK_BYTES = 1024 * 1024 * 1024;
@@ -84,6 +91,7 @@ let db: DatabaseSync;
 let dataSets: DataSetStore;
 let store: StatsStore;
 let recordings: RecordingStore;
+let identities: IdentityStore;
 let ids: string[];
 let readers: PageReaders;
 let moderators: Moderator[];
@@ -97,6 +105,7 @@ try {
     dataSets = new DataSetStore(db);
     store = new StatsStore(db);
     recordings = new RecordingStore(db, RECORDINGS_DISK_BYTES);
+    identities = new IdentityStore(db);
     mkdirSync(recordingsDir, { recursive: true });
     ids = checkFiles(options, dataSets);
     readers = await loadPageReaders(options.distDir);
@@ -124,6 +133,7 @@ const server = createAppServer(options, {
     now: Date.now,
     notify,
     recordings: { store: recordings, dir: recordingsDir, readPackage: readers.readRecordingPackage, shareRateLimit: new RateLimit(SHARES_PER_HOUR, 3_600_000) },
+    identities: { store: identities, rateLimit: new RateLimit(PROFILE_CHANGES_PER_HOUR, 3_600_000) },
 });
 server.listen(port, () => {
     const address = server.address();

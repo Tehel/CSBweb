@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS events (
     payload     TEXT    NOT NULL   -- JSON, as events.ts rebuilt it
 );
 CREATE INDEX IF NOT EXISTS events_by_type ON events (type, data_set, playthrough);
+CREATE INDEX IF NOT EXISTS events_by_player ON events (player);
 `;
 
 /**
@@ -49,8 +50,8 @@ CREATE UNIQUE INDEX events_once ON events (type, data_set, playthrough) WHERE ty
 export const TIME_GRAIN = 10_000;
 
 /**
- * The rows the log holds at most, past which only a `session` is kept: about 300 bytes
- * each, the aggregates included (`tools/checks/stats.ts`), so some 150 MB, in each of the
+ * The rows the log holds at most, past which only a `session` is kept: about 330 bytes
+ * each, the aggregates and indexes included (`tools/checks/stats.ts`), so some 165 MB, in each of the
  * nightly backups too (`doc/DEPLOYMENT.md`), on a disk the server may share.
  */
 export const MAX_EVENTS = 500_000;
@@ -209,6 +210,18 @@ export class StatsStore {
         });
         this.rows += added;
         return true;
+    }
+
+    /**
+     * The `started`, `won` and `lost` events of `players` the log keeps, by set, in the
+     * sets' ids' order: a player's own, answered to them alone (`server/identity.ts`,
+     * `profileText`), through `events_by_player`. A `session` is no row, so no player's.
+     */
+    playerCounts(players: readonly string[]): { dataSet: string; started: number; won: number; lost: number }[] {
+        return this.db.prepare(`
+            SELECT data_set AS dataSet, SUM(type = 'started') AS started, SUM(type = 'won') AS won, SUM(type = 'lost') AS lost FROM events
+            WHERE player IN (SELECT value FROM json_each(?)) AND type IN ('started', 'won', 'lost') GROUP BY 1 ORDER BY 1`)
+            .all(JSON.stringify(players)) as { dataSet: string; started: number; won: number; lost: number }[];
     }
 
     /** The answer to `api/stats` for `sets`, the public ones: nothing of any other set. */

@@ -310,6 +310,9 @@ const CHECKS: Tool[] = [
   // The deployed server: its start-up check, caching, preconditions, refused paths, the
   // statistics' API, and server.ts itself, run as Node runs it, stopped by SIGTERM.
   { tool: 'server.ts' },
+  // The players' identities: the public name's rules, the key linking a second browser,
+  // the dump of what the server holds of a player, a moderator's reset.
+  { tool: 'server-identity.ts' },
   // The statistics: what api/event accepts and rebuilds, the SQLite store, its aggregates.
   { tool: 'stats.ts' },
   // utils/install-official-sets.ts's test of what an instance holds: a set by its files,
