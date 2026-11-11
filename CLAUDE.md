@@ -237,7 +237,9 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
             page: that check, and the reader of a shared recording), Die (CSBWin's `die`), RelativeXY (a square counted in steps
             through `d.DeltaX`), skills, rules (what the systems all read of the
             party: a champion alive, a mastery, the level's difficulty), AddCharacter, objectIndex
-            (the one DescIndex / GetBasicObjectType / NameIndex)
+            (the one DescIndex / GetBasicObjectType / NameIndex), Happening (what the
+            engine tells its host for the achievements, `GameHost.observe`), achievements/
+            (their file, its evaluator, and the tracker over the happenings)
 renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens),
             ScreenUI (the interface and its viewport, built together: the screen's and the tools'),
             ScreenComposer (the screen composed without the DOM: the panels' order and the

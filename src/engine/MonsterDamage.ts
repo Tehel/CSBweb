@@ -514,6 +514,9 @@ export class MonsterDamage {
     }
 
     // This member has died.
+    if (this.ctx.host.observing) {
+      this.ctx.host.observe({ k: 'monster-died', type: monster.creatureType, alternateGraphics: monster.alternateGraphics });
+    }
     const positions = this.monsterPositionByte(monster, level, noItem16);
     const deadPosition = positions === 255 ? 255 : (positions >> (2 * indexInGroup)) & 0x3;
     const numMonM1 = monster.numMonM1 & 0x3;

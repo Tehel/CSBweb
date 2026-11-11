@@ -26,6 +26,7 @@ import { CHARFLAG_PORTRAIT_CHANGED } from '../core/charDesc';
 import type { Champion } from './gameTypes';
 import { drawCharacterState } from './Party';
 import type { FeedParameters } from './filterParameters';
+import { BLOW_END } from './Happening';
 
 /** `MAXMANA` (`doc/CSBwin-src/Character.cpp:4413`). */
 const MAX_MANA = 900;
@@ -264,6 +265,12 @@ export function applyFeedParameters(
   // and, above all, cannot be killed by a bad potion.
   if (party.potentialChampionIndex !== chIdx) {
     champ.attributes.mana = limit(0, (champ.attributes.mana | 0) + fp.manaAdjust, MAX_MANA);
+    // Observed, what a meal takes off is a potion's blow (`doc/ACHIEVEMENTS.md`).
+    const hurt = fp.hitpointAdjust < 0 && ctx.host.observing;
+    if (hurt) {
+      ctx.host.observe({ k: 'blow', by: 'potion', party: false });
+      ctx.host.observe({ k: 'champion-hurt', chIdx, damage: -fp.hitpointAdjust });
+    }
     if ((champ.attributes.health | 0) + fp.hitpointAdjust <= 0) {
       // `KillCharacter` (`doc/CSBwin-src/Character.cpp:2531`).
       ctx.systems.championDamage.killCharacter(chIdx);
@@ -272,6 +279,7 @@ export function applyFeedParameters(
       // `STRandom()` — the whole 16-bit word, which the wound heal masks with.
       healWounds(champ, fp.healCount, () => ctx.random.next() & 0xffff);
     }
+    if (hurt) ctx.host.observe(BLOW_END);
   }
 
   champ.water = limit(FOOD_WATER_MIN, (champ.water | 0) + fp.waterValue, FOOD_WATER_MAX);

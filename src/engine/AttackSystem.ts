@@ -50,6 +50,7 @@ import {
 import { AdjustSkillsWhy } from './skills';
 import { adjustSkillsOnPartyLevel, isAlive, levelDifficulty, masteryOf } from './rules';
 import type { MonsterDesc } from '../data/tables/MonsterDesc';
+import { BLOW_END } from './Happening';
 import {
   monsterBravery,
   monsterNonMaterial,
@@ -380,6 +381,10 @@ export class AttackSystem {
 
     const monster = this.ctx.dungeon.getCreatureRecord(monsterRn);
     if (!monster) return;
+    if (this.ctx.host.observing) this.ctx.host.observe({
+      k: 'blow', by: 'melee', champion: params.charIdx, party: true,
+      item: getPartyChampion(this.ctx.party.state, params.charIdx)?.possessions[1],
+    });
     const result = this.ctx.systems.monsterDamage.damageMonster(
       monster,
       phys.attackedMonsterOrdinal - 1,
@@ -390,6 +395,7 @@ export class AttackSystem {
       true,
       false,
     );
+    if (this.ctx.host.observing) this.ctx.host.observe(BLOW_END);
     if (this.ctx.host.tracing) this.trace(`w_2 = DamageMonster() --> ${phys.monsterDamage}`);
     if (result !== MonsterDamageResult.NO_MONSTER_DIED) {
       // Deliberately deferred to the end of `_Attack`: activating the group here would

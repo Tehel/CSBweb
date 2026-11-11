@@ -17,6 +17,7 @@ import type { GameContext } from './GameContext';
 import { flashButton, setClockTick } from './LoopState';
 import { TimerFunction } from './TimerQueue';
 import type { PartyMoveData } from './filterParameters';
+import { BLOW_END } from './Happening';
 
 /** `PARTYMOVE_CONSTANTS` (doc/CSBwin-src/CSB.h:4316-4325): the move types, then the flags. */
 export const PM_BEGINTURN = 1;
@@ -448,10 +449,12 @@ export class MovementSystem {
         if (this.party.state.champions.length !== 0) {
             const direction = relDirection + ((this.party.state.facing & 3) + 2);
             const local8 = this.ctx.systems.championDamage.getCharacterToDamage(newPosition.x, newPosition.y, direction & 3);
+            if (this.ctx.host.observing) this.ctx.host.observe({ k: 'blow', by: 'wall', party: false });
             k = sw(this.ctx.systems.championDamage.damageCharacter(local8, 1, 24, 2));
             const local10 = this.ctx.systems.championDamage.getCharacterToDamage(newPosition.x, newPosition.y, (direction + 1) & 3);
             const local30 = local10 & 0xffff;
             if (local8 !== local30) k |= this.ctx.systems.championDamage.damageCharacter(local10, 1, 24, 2);
+            if (this.ctx.host.observing) this.ctx.host.observe(BLOW_END);
             if (k !== 0) {
                 const square = this.ctx.tables.amigaSounds ? newPosition : this.party.state.position;
                 this.ctx.sounds.queueSound(18, square.x, square.y, 0, this.party.state.position.z);

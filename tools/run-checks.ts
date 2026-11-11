@@ -451,6 +451,10 @@ const CHECKS: Tool[] = [
   { tool: 'checkpoints.ts', args: ['CSBFullRecordingV4', '--part=seek'] },
   { tool: 'checkpoints.ts', args: ['DMMovie42'] },
   { tool: 'checkpoints.ts', args: ['--not=CSBFullRecordingV4', '--not=DMMovie42'] },
+  // The achievements' tracker on the corpus: the whole CSB game, a job of its own, the
+  // others together.
+  { tool: 'achievements-tracker.ts', args: ['CSBFullRecordingV4'] },
+  { tool: 'achievements-tracker.ts', args: ['--not=CSBFullRecordingV4'] },
   // The set a recording plays over, found by its files.
   { tool: 'recording-set.ts' },
   // The replay tool, its own process, against a scratch server.

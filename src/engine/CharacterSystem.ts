@@ -120,6 +120,12 @@ export class CharacterSystem {
     const champion = this.ctx.party.state.champions[chIdx];
     if (!champion) return;
     this.setPossession(chIdx, place, object);
+    // Observed (`doc/ACHIEVEMENTS.md`): an object put on a worn place, the head, the torso,
+    // the legs, the feet (2 to 5) or the neck (10), but not a mirror's champion's own.
+    if (((place >= 2 && place <= 5) || place === 10) && this.ctx.host.observing
+      && this.ctx.party.state.potentialChampionIndex !== chIdx) {
+      this.ctx.host.observe({ k: 'wear', chIdx, slot: place, object });
+    }
     const objNID4 = nameIndexOf(this.ctx, object);
     this.adjustStatsForItemCarried(champion, place, 1, object);
     if (place < 2) {

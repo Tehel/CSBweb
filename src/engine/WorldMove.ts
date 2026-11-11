@@ -27,6 +27,7 @@ import type { TimerQueue } from './TimerQueue';
 import type { MmRecord } from './MmRecord';
 import { groupFacingsByte } from './monsterPosition';
 import { scentRule } from './PartyFootprints';
+import { BLOW_END } from './Happening';
 
 /** `soundTELEPORT` (`doc/CSBwin-src/CSB.h:628`). */
 const SOUND_TELEPORT = 17;
@@ -543,7 +544,9 @@ export class WorldMove {
         this.ctx.systems.championDamage.adjustStamina(chIdx, cost);
       }
     } else {
+      if (this.ctx.host.observing) this.ctx.host.observe({ k: 'blow', by: 'pit', party: false });
       const hurt = this.ctx.systems.championDamage.damageAllCharacters(20, 48, 2);
+      if (this.ctx.host.observing) this.ctx.host.observe(BLOW_END);
       if (hurt !== 0) {
         this.ctx.sounds.queueSound(6, party.position.x, party.position.y, 0, party.position.z);
       }
@@ -560,9 +563,12 @@ export class WorldMove {
    * is hurt at `(-1, 0)`, so its death clouds are not made (`CreateCloud`, `:1435`).
    */
   private monsterFallsIntoPit(monster: MonsterMove): number {
-    return this.ctx.systems.monsterDamage.damageMonsterGroup(
+    if (this.ctx.host.observing) this.ctx.host.observe({ k: 'blow', by: 'pit', party: false });
+    const result = this.ctx.systems.monsterDamage.damageMonsterGroup(
       monster.record, monster.attachedLevel, monster.oldX, monster.oldY, 20, false, monster.noItem16, monster.mmr,
     );
+    if (this.ctx.host.observing) this.ctx.host.observe(BLOW_END);
+    return result;
   }
 
   private isActivePitAt(position: Position): boolean {

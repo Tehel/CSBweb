@@ -13,9 +13,9 @@ game: nothing in a tick changes because a player is earning one ("Watching the e
 below).
 
 **What exists**: the file format, its reader and its evaluator
-(`src/engine/achievements/`), and the common file. The rest of this document is the design
-that `PLAN.md` phase 18 builds, step by step, and each step rewrites its section here to
-say what was built.
+(`src/engine/achievements/`), the common file, and the tracker that watches the engine
+("Watching the engine"). The rest of this document is the design that `PLAN.md` phase 18
+builds, step by step, and each step rewrites its section here to say what was built.
 
 ## The file
 
@@ -124,12 +124,20 @@ compare without regard to case.
 | `wear` | an object is put on a worn place | `champion`; `slot`: `head` `neck` `torso` `legs` `feet`; `item` |
 | `join` | a champion joins the party | `champion`; `how`: `resurrect` `reincarnate` |
 
-An `item` is the object's name as the game shows it, from the set's own `graphics.dat`.
+An `item` is the object's name as the game shows it (`RN::NameIndex`), from the set's own
+`graphics.dat`.
 A name that a set's objects do not have matches nothing. The common file names FTL's
 objects, so in a set that renamed one of them, that name simply matches nothing. In a set's
 own file, such a name is an error, which the set's check reports (`unknownItems`).
-A `monster` is named by its type (the names are set in phase 18.2). A `champion` is the
-name the champion carries.
+A `monster` is named by its type, with CSBWin's own names for the types, `monsterNames`
+(`doc/CSBwin-src/Statistics.cpp:16-44`): `Scorpion`, `SlimeDevil`, `Giggler`, `FlyingEye`,
+`Hellhound`, `5`, `Screamer`, `RockPile`, `Rive`, `StoneGolem`, `Mummy`, `BlackFlame`,
+`Skeleton`, `Couatl`, `Vexirk`, `Worm`, `AntMan`, `Muncher`, `DethKnight`, `Zytaz`,
+`WaterElemental`, `Oitu`, `Demon`, `LordChaos`, `Dragon`, `25`, `GreyLord`. No game file
+names a monster; CSBWin's statistics name the dead by these, unless the dungeon's `EXPOOL`
+names them (`GetMonsterName`, `:48-89`), which the tracker does not read yet. A `champion`
+is the name the champion carries. A `spell` is the runes after the power rune, by the
+manual's names (`src/core/runes.ts`), which no game file holds either.
 
 ### When an achievement unlocks
 
@@ -149,37 +157,118 @@ history goes back to its start. The reader decides this from the condition's for
 
 ## Watching the engine
 
-*Designed (phase 18.2).* The engine tells its host what happened through one new
-`GameHost` member, `observe(happening)`. Like `trace` and `tracing`, it comes with a flag,
-`observing`, so that nothing is built when nobody is listening. A call changes no state,
-draws no random number and changes no path through the code. So it changes nothing in a
-tick, and needs no `ENGINE_LEVEL` (`doc/RECORDING.md` → "The policy"). The replay corpus,
-which plays the same with or without a listener, proves it.
+The engine tells its host what happened through one `GameHost` member,
+`observe(happening)` (`src/engine/Happening.ts`). Like `trace` and `tracing`, it comes
+with a flag, `observing`, tested before a happening is built, so nothing is built when
+nobody listens. A call changes no state, draws no random number and changes no path
+through the code, so it changes nothing in a tick and needs no `ENGINE_LEVEL`
+(`doc/RECORDING.md` → "The policy"). `tools/checks/achievements-tracker.ts` plays the
+whole replay corpus with the tracker attached, and every package plays to its point.
 
-The calls go where the engine knows what happened:
+### The happenings
 
-- **The kills** are where `damageMonster` is called (`MonsterDamage.ts`): melee, missiles,
-  clouds, doors, pits and Fusion.
-- **The damage to a champion** is where `damageCharacter` is called. The damage is only
-  pending until the tick applies it, so the tracker keeps each champion's last cause, and
-  `killCharacter` reports the death with it. Damage from `adjustStamina` while the food or
-  the water is below −512 is starvation or thirst; any other is fatigue.
-- **The meals** are at `handleMouthPress` and at the fountain. The stand-in page runs that
-  code in a replay too.
-- **The spells** are at `castSpell`.
-- **A missile records nobody as its owner.** The tracker tags each missile the party
-  launches by its RN, and follows that RN into the explosion it makes. That is what
-  `party: yes` means. The missile's whole life must be read in CSBWin before these calls
-  are placed.
+- **A blow** is told around the call that deals it: `blow`, with its cause, then
+  `blow-end`. What dies or is hurt inside is the blow's. Blows nest, and one that names no
+  side of its own takes the side of the blow around it. The blows are where
+  `damageMonster`, `damageMonsterGroup`, `damageCharacter` and `damageAllCharacters` are
+  called: a melee blow (`AttackSystem`, the weapon in the action hand), a missile meeting
+  a monster or a champion and its explosion (`MissileEncounter`), the blast of a fireball
+  or a lightning bolt as its cloud appears (`createCloud`), a poison or dispel cloud's
+  tick (`TimerSystem`'s `TT_25`), a door closing (`TT_DOOR`), a pit (`WorldMove`), a wall
+  run into (`MovementSystem`), a monster's blow (`MonsterAttack`), poison
+  (`poisonCharacter`), a potion that takes health off (`applyFeedParameters`), and Lord
+  Chaos fused (`_FusionSequence`, his type as the sequence finds him: it flips it to the
+  mon_25 graphic and back before the Grey Lord).
+- **The stamina's damage** (`adjustStamina`) is starvation while the champion's food is
+  below −512, else thirst while the water is, else fatigue: the thresholds below which
+  `TenSecondUpdate` takes stamina for them (`doc/CSBwin-src/Code17818.cpp:289`, `:313`).
+- **A monster dies** where `DamageMonster` finds a member's death, whether the group is
+  removed then or by the move it was hurt in (`apply` false): once a member. A member at
+  0 HP that `ProcessTimers29to41` removes (`MonsterAI`) dies inside no blow, and is
+  nobody's kill. `DeleteMonster` and `DeleteMonsterInGroup` alone kill nobody: a group
+  the party lands on, the monsters Fusion clears from the level, a DSA's, a full
+  database's.
+- **A champion is hurt** where `DamageCharacter` adds to the pending damage, and **dies**
+  at `KillCharacter`. The damage is pending till the tick's `DisplayCharacterDamage`, so
+  the tracker keeps each champion's last cause, and a death outside any blow takes it.
+- **The meals** are at `handleMouthPress`: a meal chewed is eaten, a waterskin's or a
+  potion drunk. Drinking at a fountain (an extra) is `FOUNTAIN`. The stand-in page runs
+  that code in a replay too.
+- **The spells** are at `CastMagic`, around `castSpell`: the runes it reads, the
+  champion's or a spell filter's, and whether it returned 1. A DSA's `&CAST` and a
+  weapon's spell are not the player's cast.
+- **A worn object** is at `AddCharacterPossession` into the head, the torso, the legs or
+  the feet (slots 2 to 5) or the neck (10), the slots whose `CarryLocation` is those
+  places' masks (`doc/CSBwin-src/CSB.h:1682-1687`, which the check reads in
+  `graphics.dat`). A mirror's champion's own possessions are not put on by the player.
+- **A join** is at the end of `_ResurrectReincarnateCancel`, beside
+  `GameHost.championJoined`.
+- **The game's boundaries**: each VBL of the player's time (`Game.playTime`'s), each main
+  loop tick's end, `MainLoop`'s return (won or lost), a new game read, a save's file made
+  (`saveFileOf`) and a save's file read (`applySaveBytes`).
 
-**The tracker** (`AchievementTracker`) turns what it observes into the evaluator's events
-and samples. It is a function of what it observes and of the VBLs run, and of nothing else,
-so a live game and its replay give the same unlocks. Its state is saved beside each save, in
-the save's row in the store (`SaveEntry`), never in the CSBWin file. A replay restores that
-state at each join from the state its parent had at the save. A save without that state
-starts a history of its own ("Some conditions need the whole game", above). A playthrough moved with `?dev`'s teleport
-earns nothing, as its statistics count nothing. A recording played back in the viewer
-earns nothing either.
+### A missile's owner
+
+CSBWin records nobody as a missile's launcher. `LaunchMissile` (`doc/CSBwin-src/Magic.cpp:17`)
+is the only place a missile is made: it takes a `DB14` record (`:33`), which holds the
+object flying, its range and damage left, and its timer (`:37-39`, `:72`,
+`doc/CSBwin-src/CSB.h:1301-1321`), and nothing else. The party launches through
+`ThrowByCharacter` (`doc/CSBwin-src/Mouse.cpp:744`), reached from the hand and from the
+THROW attack (`doc/CSBwin-src/Attack.cpp:2107`), and through `LaunchObject`
+(`doc/CSBwin-src/Magic.cpp:452-466`), reached from `CharacterThrowsSpell` (`:473`), that is
+a spell cast (`:1281`) or a weapon's spell attack (`doc/CSBwin-src/Attack.cpp:1329`), and
+from SHOOT (`:1908`). Monsters (`doc/CSBwin-src/Monster.cpp:1198`), wall shooters
+(`doc/CSBwin-src/Timer.cpp:1985`, `:1997`) and a DSA's throw (`:2067`) launch the rest.
+
+So the port's `launchMissile` takes the launching champion, given only by those two party
+paths, and tells it with the missile's RN. The RN is the missile's while it flies: a
+teleporter turns it and keeps it (`doc/CSBwin-src/Code11f52.cpp:3029`, `:2427`), a pit
+does not take it (`:3043-3046`), and stairs stop it (`:3147`). It is freed when the missile
+ends (`ProcessObjectFromMissile`, `doc/CSBwin-src/Timer.cpp:165`), or by `MakeMoreRoomInDB`
+(`doc/CSBwin-src/Character.cpp:292-301`), and `FindEmptyDBEntry`
+(`doc/CSBwin-src/data.cpp:921`) may give it at once to any other record. The tracker tags it
+at each launch, which overwrites what an earlier record of that RN left.
+
+Every meeting goes through `ProcessMissileEncounter`
+(`doc/CSBwin-src/Code11f52.cpp:1746`), which has the missile's RN and its object in hand
+where it calls `DamageMonster` (`:2051`) and `DamageCharacter` (`:2081`), and where it makes
+the explosion, `CreateCloud` (`:2134`), before the record is deleted (`:2169`). `CreateCloud`
+(`:1411`) makes a `DB15` record that holds only the spell's type and size (`CSB.h:1333`),
+and deals a fireball's or a lightning bolt's blast itself (`:1526`, `:1544`), with no
+missile in hand. A poison cloud hurts on each of its ticks (`ProcessTT_25`,
+`doc/CSBwin-src/Timer.cpp:572`, `:580`). So the explosion is a blow inside the missile's,
+the cloud made there takes the missile's side when it is told, and its blast and its ticks
+are blows of the cloud's. That is what `party: yes` means: the party's own throw, cast or
+shot, or the explosion or cloud it made. A missile or cloud in flight when a save is made
+keeps its side in the tracker's state kept with it.
+
+### The tracker
+
+`AchievementTracker` (`src/engine/achievements/AchievementTracker.ts`) turns the
+happenings into the evaluator's events and samples (`AchievementState`). It is a function of
+what it observes, and of nothing else, so a live game and its replay give the same unlocks.
+It reads the game only to name things: a champion, an object, the samples.
+
+- At each tick's end it takes the samples: `party` and `alive` leave out a mirror's
+  champion; `coins` counts every object whose name ends in `COIN` in the party's
+  possessions, inside the chests they carry (an open chest's slots for the open one) and
+  under the pointer. It sets the clock, adds the VBLs counted, and tests the conditions.
+  At `MainLoop`'s return it does the same and says the game ended.
+- It keeps its state by the MD5 of each save's file it sees made, and when a file is read
+  it takes up the state kept for it: a replay's joins read the files their parents made, so
+  each branch goes on with its parent's history. A file read with no state kept starts a
+  history of its own ("Some conditions need the whole game"); a new game starts one from
+  its start.
+- `snapshot` and `keep` give the page the state to store beside a save and to give back
+  at a read; storing it in the save's row (`SaveEntry`) is phase 18.3's, with the rest of
+  the page: a playthrough moved with `?dev`'s teleport earning nothing, and the viewer,
+  which attaches no tracker.
+
+`tools/checks/achievements-tracker.ts` proves it on the corpus: each join reads its
+parent's state, a path from a new game keeps its whole history and one from a CSBWin save
+does not (Speed Runner stays locked in the whole CSB game), and the kills, the deaths and
+their causes, the joins, the meals, the worn objects and the unlocks of Dungeon Master won
+(DMMovie2615), a lost game and the whole CSB game.
 
 ## The page
 

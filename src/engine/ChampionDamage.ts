@@ -30,6 +30,7 @@ import { isAlive } from './rules';
 import { wakeUp } from './MouseSystem';
 import { releaseEyeOrMouth, showHideInventory } from './ShowHideInventory';
 import { TimerFunction } from './TimerQueue';
+import { BLOW_END } from './Happening';
 
 export class ChampionDamage {
   private readonly dungeon: DungeonState;
@@ -71,6 +72,11 @@ export class ChampionDamage {
    * is converted into real damage at half rate — `DamageCharacter(chIdx, over/2, 0, 0)`,
    * with mask and kind both zero, so it bypasses armour and cannot wound. That is how
    * exhaustion kills. The top simply clamps to `MaxStamina`.
+   *
+   * Observed (`doc/ACHIEVEMENTS.md` → "Watching the engine"), that damage is starvation
+   * while the food is below -512, else thirst while the water is, else fatigue: the
+   * thresholds below which `TenSecondUpdate` takes stamina for them
+   * (`doc/CSBwin-src/Code17818.cpp:289`, `:313`), food first where both are.
    */
   adjustStamina(chIdx: number, decrement: number): void {
     if (chIdx === -1) return;
@@ -80,8 +86,13 @@ export class ChampionDamage {
     const newStamina = (champ.attributes.stamina | 0) - (decrement | 0);
     if (newStamina <= 0) {
       champ.attributes.stamina = 0;
+      const host = this.ctx.host;
+      if (host.observing) {
+        host.observe({ k: 'blow', by: champ.food < -512 ? 'starvation' : champ.water < -512 ? 'thirst' : 'fatigue', party: false });
+      }
       // `absStamina/2` — C truncation, and `absStamina` is `-newStamina`.
       this.damageCharacter(chIdx, Math.trunc(-newStamina / 2), 0, 0);
+      if (host.observing) host.observe(BLOW_END);
       return;
     }
     const maxStamina = champ.attributes.maxStamina | 0;
@@ -182,6 +193,7 @@ export class ChampionDamage {
     // `DisplayCharacterDamage`, which takes the sum off, kills, and shows it over the
     // portrait.
     party.pendingDamage[chIdx] = sw(party.pendingDamage[chIdx]! + dealt);
+    if (dealt > 0 && this.ctx.host.observing) this.ctx.host.observe({ k: 'champion-hurt', chIdx, damage: dealt });
     return dealt;
   }
 
@@ -260,6 +272,7 @@ export class ChampionDamage {
     const party = this.ctx.party.state;
     const champ = getPartyChampion(this.ctx.party.state, chIdx);
     if (!champ) return;
+    if (this.ctx.host.observing) this.ctx.host.observe({ k: 'champion-died', chIdx });
 
     champ.attributes.health = 0;
     champ.incantation = [];
@@ -536,7 +549,11 @@ export class ChampionDamage {
     const champ = getPartyChampion(this.ctx.party.state, chIdx);
     if (!champ) return;
 
+    // Observed, a poison's blow takes its side from the blow it came with, if any.
+    const host = this.ctx.host;
+    if (host.observing) host.observe({ k: 'blow', by: 'poison' });
     this.damageCharacter(chIdx, Math.max(1, Math.trunc(strength / 64)), 0, 0);
+    if (host.observing) host.observe(BLOW_END);
     // `CHARFLAG_statsChanged` has no counterpart: the panels are drawn from live state.
     if (chIdx === party.selectedCharacterIndex && this.ctx.interface.displayResurrectChestOrScroll === 0) {
       champ.charFlags |= CHARFLAG_CHEST_OR_SCROLL;

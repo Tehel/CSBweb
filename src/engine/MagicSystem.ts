@@ -57,10 +57,12 @@ export class MagicSystem {
     decayRate: number,
     startTime: number,
     missileDelay: boolean,
+    launcher = -1,
   ): boolean {
     const rn = this.createMissileRecord(projectileObject, rangeRemaining, damageRemaining, 0xffff, position);
     if (rn === null) return false;
     if (!this.dungeon.addObjectToCell(new Position(launchX, launchY, level), rn)) return false;
+    if (this.ctx.host.observing) this.ctx.host.observe({ k: 'missile', missile: rn, launcher });
     const functionType = missileDelay ? TimerFunction.TT_MISSILE : TimerFunction.TT_MISSILE0;
     const timerWord8 = encodeMissileTimerWord8(launchX, launchY, direction, decayRate);
     const entry = this.timers.createTimer({
@@ -78,7 +80,10 @@ export class MagicSystem {
     return true;
   }
 
-  /** `LaunchMissile` from a `Position`, with no delay: what a throw and a spell launch. */
+  /**
+   * `LaunchMissile` from a `Position`, with no delay: what a throw and a spell launch.
+   * `launcher` is the champion who threw or cast it, which only an observer is told.
+   */
   launchThrownMissile(
     projectileObject: ObjectID,
     position: Position,
@@ -88,6 +93,7 @@ export class MagicSystem {
     damageRemaining: number,
     decayRate: number,
     startTime: number,
+    launcher = -1,
   ): boolean {
     return this.launchMissile(
       projectileObject,
@@ -101,6 +107,7 @@ export class MagicSystem {
       decayRate,
       startTime,
       false,
+      launcher,
     );
   }
 
@@ -137,8 +144,18 @@ export class MagicSystem {
     if (!champion) return 0;
     if (champion.incantation.length === 0) return 0;
     const params = this.fillSpellParameters(casterIdx, champion.incantation, party);
-    const filtered = this.ctx.systems.dsa.filters.processSpellFilter(params);
-    return this.castSpell(casterIdx, filtered ?? params);
+    const filtered = this.ctx.systems.dsa.filters.processSpellFilter(params) ?? params;
+    // Observed, the runes `castSpell` reads: the champion's, or the filter's own.
+    const host = this.ctx.host;
+    const runes = host.observing
+      ? (filtered.incantation !== -1 ? this.decodeIncantationOverride(filtered.incantation) : [...champion.incantation])
+      : null;
+    const result = this.castSpell(casterIdx, filtered);
+    if (runes !== null) {
+      const chIdx = filtered.chIdx !== -1 ? filtered.chIdx & 0xffff : casterIdx;
+      host.observe({ k: 'cast', chIdx, runes, ok: result === 1 });
+    }
+    return result;
   }
 
   /**
@@ -579,6 +596,7 @@ export class MagicSystem {
       damage,
       decayRate,
       this.ctx.state.tickCount,
+      chIdx,
     );
     return launched ? 1 : 0;
   }

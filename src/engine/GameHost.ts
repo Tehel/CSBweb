@@ -9,6 +9,7 @@
  */
 import type { SoundVolume } from '../data/tables/AmigaSoundTables';
 import type { Champion } from './gameTypes';
+import type { Happening } from './Happening';
 
 /** A champion who has joined (`GameHost.championJoined`), by RESURRECT or REINCARNATE. */
 export interface JoinedChampion {
@@ -87,6 +88,17 @@ export interface GameHost {
    * gives a `trace`.
    */
   tracing: boolean;
+  /**
+   * What happened, for the achievements (`src/engine/Happening.ts`, `doc/ACHIEVEMENTS.md`
+   * → "Watching the engine"). Not CSBWin's. Telling it changes nothing in the game.
+   */
+  observe(happening: Happening): void;
+  /**
+   * Whether `observe` goes anywhere, tested before a happening is built, as `tracing` is.
+   * `createGameHost` sets it when the host gives an `observe`; a tracker attached later
+   * sets both (`AchievementTracker.attach`).
+   */
+  observing: boolean;
   /**
    * The message area, CSBWin's `PrintLinefeed()` / `QuePrintLines(color, text)`
    * (`doc/CSBWIN_MESSAGES_REFERENCE.md`).
@@ -268,6 +280,8 @@ export function createGameHost(host: Partial<GameHost> = {}): GameHost {
     playCustomSound: host.playCustomSound ?? (() => {}),
     trace: host.trace ?? (() => {}),
     tracing: host.tracing ?? host.trace !== undefined,
+    observe: host.observe ?? (() => {}),
+    observing: host.observing ?? host.observe !== undefined,
     messages: host.messages ?? {
       printLinefeed: () => {},
       quePrintLines: () => {},

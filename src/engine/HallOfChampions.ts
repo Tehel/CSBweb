@@ -248,6 +248,9 @@ export class HallOfChampions {
     setClockTick(this.ctx, 1);
     this.ctx.mouseQueue.discardAllInput();
     tag0207cc(this.ctx);
+    if (this.ctx.host.observing) {
+      this.ctx.host.observe({ k: 'joined', chIdx: party.champions.indexOf(champion), reincarnated: button === 161 });
+    }
     this.ctx.host.championJoined({ champion, reincarnated: button === 161, hero: this.reincarnationSource?.name ?? champion.name });
   }
 

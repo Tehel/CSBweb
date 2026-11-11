@@ -53,6 +53,12 @@ import { CharacterStats } from './CharacterStats';
 import { PartyFootprints } from './PartyFootprints';
 import { CsbRandom } from '../core/random';
 import type { GameTables } from './GameTables';
+import type { Happening } from './Happening';
+
+/** A tick's end, observed: one object, so that telling it builds nothing. */
+const TICK: Happening = { k: 'tick' };
+/** A VBL of the player's time (`playTime`), observed. */
+const PLAYED_VBL: Happening = { k: 'vbl' };
 
 /**
  * Game event callback types
@@ -408,6 +414,7 @@ export class Game implements MainLoop {
         this.canRestart = false;
         this.resumedSavedGame = false;
         this.playedVbls = 0;
+        if (this.ctx.host.observing) this.ctx.host.observe({ k: 'new-game' });
     }
 
     /**
@@ -686,7 +693,10 @@ export class Game implements MainLoop {
         if (this.mainLoopReturned) return;
         // The player's time in the game (`playTime`): not the frozen game's VBLs, nor the
         // save menu's.
-        if (!this.ctx.loop.gameFrozen && !this.ctx.state.paused) this.playedVbls++;
+        if (!this.ctx.loop.gameFrozen && !this.ctx.state.paused) {
+            this.playedVbls++;
+            if (this.ctx.host.observing) this.ctx.host.observe(PLAYED_VBL);
+        }
         this.paintIsHeld = false;
         // The VBL handler runs on every VBL, held in a script or not (`vblInterrupt`,
         // doc/CSBwin-src/CSBCode.cpp:1013-1087): the message strip's scroll moves on
@@ -834,6 +844,8 @@ export class Game implements MainLoop {
         }
         // `d.clockTick=0;` (doc/CSBwin-src/CSBCode.cpp:714).
         this.ctx.loop.clockTick = false;
+        // Not CSBWin's: the tick's end, where the achievements take their samples.
+        if (this.ctx.host.observing) this.ctx.host.observe(TICK);
     }
 
     /**
@@ -868,6 +880,7 @@ export class Game implements MainLoop {
         this.mainLoopReturned = true;
         this.stop();
         this.input.ended(this.ctx.state.gameWon);
+        if (this.ctx.host.observing) this.ctx.host.observe({ k: 'ended', won: this.ctx.state.gameWon });
         this.ctx.host.showCredits(this.ctx.state.gameWon);
     }
 

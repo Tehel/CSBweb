@@ -256,5 +256,6 @@ export function applySaveBytes(game: Game, bytes: Uint8Array): void {
         if (error instanceof Die) throw error;
         throw new SaveFileError(`CSBWIN SAVE: ${(error as Error).message}`.toUpperCase());
     }
+    if (game.ctx.host.observing) game.ctx.host.observe({ k: 'read', file: bytes });
     game.savedGameRead(inventoryWasOpen);
 }

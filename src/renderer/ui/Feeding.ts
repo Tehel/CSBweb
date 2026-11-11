@@ -136,6 +136,11 @@ export function handleMouthPress(ui: UIState): void {
   const objNID6 = derived.objectType;
   const fp = ui.ctx.systems.dsa.filters.feedingFilter(derived);
   if (!applyFeedParameters(ui.ctx, selected, fp)) return;
+  // Observed (`doc/ACHIEVEMENTS.md`): a meal chewed is eaten, a waterskin's or a potion drunk.
+  if (ui.ctx.host.observing) {
+    const drunk = (objNID6 >= OBJNI_WATERSKIN && objNID6 <= OBJNI_WATER) || ui.ctx.dungeon.rnMaps.dbType(objectId) === DBType.POTION;
+    if (fp.chew || drunk) ui.ctx.host.observe({ k: 'meal', chIdx: selected, nameIndex: objNID6, eat: fp.chew });
+  }
 
   if (fp.chew) {
     startMouthChewAnimation(ui);
@@ -191,6 +196,7 @@ export function drinkAtWaterFountain(ui: UIState): void {
   fp.gulp = SOUND_GULP;
   fp.performFeeding = true;
   if (!applyFeedParameters(ui.ctx, chIdx, fp)) return;
+  if (ui.ctx.host.observing) ui.ctx.host.observe({ k: 'meal', chIdx, nameIndex: -1, eat: false });
   const pos = ui.partyState.position;
   ui.ctx.sounds.queueSound(fp.gulp, pos.x, pos.y, 0, pos.z);
 }

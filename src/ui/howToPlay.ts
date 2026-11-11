@@ -24,6 +24,7 @@
  */
 import type { Settings } from '../settings/Settings';
 import { closeOnBackdrop } from './backdropClose';
+import { RUNE_NAMES } from '../core/runes';
 import { type KeyAction, type KeyBindings, type KeyPreset } from '../renderer/ui/Keyboard';
 import { keyLabel, type KeyboardLayoutMap } from '../renderer/ui/KeyLabels';
 
@@ -71,12 +72,8 @@ const PARTY_KEYS: ReadonlyArray<{ actions: KeyAction[]; label: string }> = [
 ];
 
 /** The manual's runes: its four rows, each with the six names, in the order the panel shows them. */
-const RUNE_ROWS: ReadonlyArray<{ row: string; names: readonly string[] }> = [
-    { row: 'Power', names: ['LO', 'UM', 'ON', 'EE', 'PAL', 'MON'] },
-    { row: 'Element', names: ['YA', 'VI', 'OH', 'FUL', 'DES', 'ZO'] },
-    { row: 'Form', names: ['VEN', 'EW', 'KATH', 'IR', 'BRO', 'GOR'] },
-    { row: 'Alignment', names: ['KU', 'ROS', 'DAIN', 'NETA', 'RA', 'SAR'] },
-];
+const RUNE_ROWS: ReadonlyArray<{ row: string; names: readonly string[] }> = ['Power', 'Element', 'Form', 'Alignment']
+    .map((row, r) => ({ row, names: RUNE_NAMES.slice(6 * r, 6 * r + 6) }));
 
 /** The font's code point of row `row`'s rune `n`: U+E000 plus the game's code, `96 + 6 * row + n`. */
 function runeGlyph(row: number, n: number): string {

@@ -21,7 +21,7 @@ import type { DataSet } from '../../src/data/DataSets';
 import type { Recording, RecordingPoint } from '../../src/engine/Recorder';
 import { RecordingPlayer, type Drift, type SavedAtEnd } from '../../src/engine/RecordingPlayer';
 import { rewindPage, seekBack, seekLanded, type Pace } from '../../src/renderer/ui/RecordingStrip';
-import { standInPage } from '../../src/renderer/StandInPage';
+import { standInPage, type StandInPage } from '../../src/renderer/StandInPage';
 import type { Game } from '../../src/engine/Game';
 
 /** A VBL of the wall clock, rounded up, as the loop is woken. */
@@ -127,13 +127,17 @@ export function keptFiles(files: DataSetFiles): DataSetFiles {
  * save's point ends at; `restart`, a stop in it, `'forward'`, the whole path run at
  * once (`Game.forward`), its slices on the clock's zero-delay calls, or a seek back to a
  * checkpoint `keep` has kept; `keep`, the checkpoints its players keep, as the page's do.
+ * `onPage`, given the page before anything plays, may attach to it.
  * A frame that throws, CSBWin's `die`, throws.
  */
 export async function playPath(
   set: DataSet, files: DataSetFiles, path: readonly Recording[], savedAtEnd: SavedAtEnd | null = null,
   restart: Restart | 'forward' | SeekBack | StopAt | null = null, keep: Keep | null = null,
+  onPage: ((page: StandInPage) => void) | null = null,
 ): Promise<Played> {
-  const { game, screen, messages, clock, dungeonDat } = await standInPage(set, files);
+  const page = await standInPage(set, files);
+  onPage?.(page);
+  const { game, screen, messages, clock, dungeonDat } = page;
   const kept = keep ? new KeptCheckpoints(keep.every, keep.most) : null;
   let player!: RecordingPlayer;
   /** Whether a tick has run since the player began, as the page counts it for a seek. */

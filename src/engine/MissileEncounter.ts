@@ -40,6 +40,7 @@ import { TimerFunction, type TimerQueue } from './TimerQueue';
 import type { MmRecord } from './MmRecord';
 import { getPrimaryAndSecondaryDirection } from './MonsterPerception';
 import { setDoorState, type MissileDropTarget } from './TimerSystem';
+import { BLOW_END } from './Happening';
 
 const WEAPON_DAGGER = 8;
 const WEAPON_ARROW = 27;
@@ -372,12 +373,14 @@ export class MissileEncounter {
         // at `:2079` a party-only `DamageCharacter`.
         const magic = this.determineMagicDamage(missile, projectile);
         if (magic.damage !== 0) {
+          if (this.ctx.host.observing) this.ctx.host.observe({ k: 'blow', by: 'missile', missile: missileRn, item: projectile });
           this.applyMissileDamageToParty({
             chIdx,
             damage: magic.damage,
             kind: magic.kind,
             poisonStrength: magic.poisonStrength,
           });
+          if (this.ctx.host.observing) this.ctx.host.observe(BLOW_END);
         }
         // The missile is spent either way: a dispel missile does a champion no damage
         // at all (`DetermineMagicDamage` returns 0 for it) and still lands.
@@ -428,9 +431,11 @@ export class MissileEncounter {
           // `DeterminePoisonDamage(mt_60, d.Word12962)` — the poison strength the
           // `DetermineMagicDamage` call above just set.
           const poison = sw(this.ctx.systems.monsterDamage.determinePoisonDamage(monsterType, magic.poisonStrength));
+          if (this.ctx.host.observing) this.ctx.host.observe({ k: 'blow', by: 'missile', missile: missileRn, item: projectile });
           const result = this.ctx.systems.monsterDamage.damageMonster(
             monster, monsterOrdinal - 1, position.z, objX, objY, blow + poison, true, false, mmr,
           );
+          if (this.ctx.host.observing) this.ctx.host.observe(BLOW_END);
           // "At least one monster in group remains": the survivors react.
           if (result !== MonsterDamageResult.ALL_MONSTERS_DIED) {
             this.ctx.systems.monsterAI.processTimers29to41({
@@ -573,7 +578,9 @@ export class MissileEncounter {
         }
       }
       const cloudPos = projectile === RN_POISON_CLOUD ? 255 : objectPos & 0xff;
+      if (this.ctx.host.observing) this.ctx.host.observe({ k: 'blow', by: 'explosion', missile: missileRn });
       this.createCloud(projectile, size, objX, objY, position, cloudPos, mmr);
+      if (this.ctx.host.observing) this.ctx.host.observe(BLOW_END);
     } else {
       this.playMissileImpactSound(projectile, position);
     }
@@ -684,6 +691,7 @@ export class MissileEncounter {
     // `P1.GetSpellType()` (doc/CSBwin-src/Code11f52.cpp:1463).
     const rn = this.createCloudRecord(projectile & 0x7f, size, posInCell);
     if (rn === null) return;
+    if (this.ctx.host.observing) this.ctx.host.observe({ k: 'cloud', cloud: rn });
     this.playCloudSound(projectile, size, position);
     this.dungeon.addObjectToCell(position, rn);
 
@@ -711,7 +719,9 @@ export class MissileEncounter {
 
     const party = this.ctx.party.state;
     if (position.z === party.position.z && objX === party.position.x && objY === party.position.y) {
+      if (this.ctx.host.observing) this.ctx.host.observe({ k: 'blow', by: 'explosion', cloud: rn });
       this.ctx.systems.championDamage.damageAllCharacters(damage, 63, 1);
+      if (this.ctx.host.observing) this.ctx.host.observe(BLOW_END);
       return;
     }
 
@@ -726,8 +736,10 @@ export class MissileEncounter {
     if (monsterNonMaterial(desc)) damage >>= 2;
     damage -= this.random.below(2 * fireResistance + 1);
     if (damage <= 0) return;
+    if (this.ctx.host.observing) this.ctx.host.observe({ k: 'blow', by: 'explosion', cloud: rn });
     this.monsterDamageResult =
       this.ctx.systems.monsterDamage.damageMonsterGroup(monster, position.z, objX, objY, damage, true, false, mmr);
+    if (this.ctx.host.observing) this.ctx.host.observe(BLOW_END);
   }
 
   private createCloudRecord(cloudType: number, size: number, posInCell: number): ObjectID | null {

@@ -27,6 +27,7 @@ import type { MonsterDesc } from '../data/tables/MonsterDesc';
 import { monsterWord14_12_15, monsterWord16_8_11, monsterWord2Bit4 } from '../data/tables/MonsterDesc';
 import { wakeUp } from './MouseSystem';
 import type { AttackParameters } from './filterParameters';
+import { BLOW_END } from './Happening';
 
 /**
  * The missile "projectile" RNs a monster can throw (`doc/CSBwin-src/CSBTypes.h`, used
@@ -421,7 +422,9 @@ export class MonsterAttack {
       damage = damage - (this.random.below(Math.trunc(damage / 2) + 1) - 1);
     }
 
+    if (this.ctx.host.observing) this.ctx.host.observe({ k: 'blow', by: 'monster', party: false });
     const dealt = this.ctx.systems.championDamage.damageCharacter(chIdx, damage, woundMask, desc.uByte22[2] ?? 0);
+    if (this.ctx.host.observing) this.ctx.host.observe(BLOW_END);
     if (dealt === 0) return 0;
 
     // Sound ordinal `chIdx + 9` names *which* champion was hurt.

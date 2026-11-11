@@ -98,6 +98,7 @@ export function saveFileOf(game: Game, clock: SaveClock, portraitOf: (champion: 
     if (openChest !== null) repackChest(game.ctx);
     const bytes = buildSaveFile(game, { portraitOf });
     if (openChest !== null) showChestContents(game.ctx, openChest);
+    if (game.ctx.host.observing) game.ctx.host.observe({ k: 'saved', file: bytes });
     return bytes;
 }
 

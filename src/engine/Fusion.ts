@@ -15,6 +15,7 @@ import { waitForButtonFlashScript, type LoopScript } from './LoopState';
 import { MonsterType } from './monsterTypes';
 import { CloudType } from './cloudTypes';
 import { RN_DISPELL_MISSILE, RN_FIREBALL } from '../core/spellRn';
+import { BLOW_END } from './Happening';
 
 /** `testdelay` (`doc/CSBwin-src/Attack.cpp:19`): every `if (testdelay) VBLDelay(MS2VBL(testdelay))`. */
 const TEST_DELAY = 500;
@@ -194,6 +195,8 @@ function* fusionSequence(ctx: GameContext): LoopScript {
   const w6 = sw(party.position.y + ctx.tables.deltaY[party.facing & 3]!);
   const monster = ctx.dungeon.getCreatureRecord(findFirstMonsterAt(ctx, w4, w6));
   if (!monster) throw new Error('_FusionSequence: no monster in front of the party');
+  // Lord Chaos, whose type the sequence flips below: what the achievements name the fused.
+  const fused = monster.creatureType;
   monster.hp[0] = 10000;
   const monsterDamage = ctx.systems.monsterDamage;
   monsterDamage.setMonsterPositionByte(monster, 255, level, false);
@@ -236,6 +239,12 @@ function* fusionSequence(ctx: GameContext): LoopScript {
   encounter.createCloud(RN_DISPELL_MISSILE, 0xff, w4, w6, at, 255);
   yield* mainLoop.processTimersViewportAndSound();
   yield ms2vbl(800);
+  // Observed, Lord Chaos fused is the party's kill (`doc/ACHIEVEMENTS.md` → "Watching the engine").
+  if (ctx.host.observing) {
+    ctx.host.observe({ k: 'blow', by: 'fusion', party: true });
+    ctx.host.observe({ k: 'monster-died', type: fused, alternateGraphics: monster.alternateGraphics });
+    ctx.host.observe(BLOW_END);
+  }
   monster.creatureType = MonsterType.mon_GreyLord;
   yield* mainLoop.processTimersViewportAndSound();
   yield ms2vbl(TEST_DELAY);

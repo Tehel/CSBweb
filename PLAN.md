@@ -42,10 +42,15 @@ At the author's request, beside the debt. The design is `doc/ACHIEVEMENTS.md`.
 
 - ✅ 18.1 The file format: its reader, its evaluator, the common file
   (`src/engine/achievements/`), proved by `tools/checks/achievements-format.ts`.
-- ⏳ 18.2 `GameHost.observe` and the tracker. The calls go at the kills, the damage, the
-  deaths, the meals, the spells and the missiles' launches, with the champions' and the
-  monsters' names. The tracker's state is saved with each save and restored at each join.
-  Its proof is the replay corpus, which must play unchanged, and the unlocks it finds there.
+- ✅ 18.2 `GameHost.observe` and the tracker (`src/engine/Happening.ts`,
+  `src/engine/achievements/AchievementTracker.ts`): the blows around every damage call,
+  the deaths, the meals, the spells, the worn objects, the joins, the missiles' launchers
+  and the clouds they make, the monsters named by CSBWin's `monsterNames`. The tracker
+  keeps its state by each save's MD5 and takes it up at each read, so a replay's joins go
+  on with their parents' histories. Proved by `tools/checks/achievements-tracker.ts`, the
+  whole corpus played with it attached. Left: the state stored in the save's row, the
+  teleport and the viewer earning nothing (18.3, the page's); a dungeon's own monster
+  names in its `EXPOOL` (`GetMonsterName`, `doc/CSBwin-src/Statistics.cpp:48`), not read.
 - ⏳ 18.3 The page: the store, the banner, the dialog, and the welcome page's tab.
 - ⏳ 18.4 Identity: the public name, its public id, the identity key, and PROFILE.
 - ⏳ 18.5 The proofs: the upload, the queue, the verifier service, and the unlocks.

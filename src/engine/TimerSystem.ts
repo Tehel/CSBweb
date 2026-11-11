@@ -50,6 +50,7 @@ import { MSG_COLOR_ROOM_TEXT } from './ActuatorSystem';
 import { MonsterDamageResult } from './MonsterDamage';
 import { monsterNonMaterial, monsterVerticalSize } from '../data/tables/MonsterDesc';
 import { constructPredefinedMissile, decodeMissileTimerWord8, encodeMissileTimerWord8, spellObjectId } from './missileHelpers';
+import { BLOW_END } from './Happening';
 
 /**
  * `soundDOOROPENING` (doc/CSBwin-src/CSB.h:629) — what the party hears when a closing
@@ -736,7 +737,9 @@ export class TimerSystem {
       if (this.isPartyAt(target) && doorState !== 0) {
         if (this.ctx.party.state.champions.length > 0) {
           setDoorState(map, x, y, 0);
+          if (this.ctx.host.observing) this.ctx.host.observe({ k: 'blow', by: 'door', party: false });
           const hurt = this.ctx.systems.championDamage.damageAllCharacters(5, 4, 2);
+          if (this.ctx.host.observing) this.ctx.host.observe(BLOW_END);
           if (hurt !== 0) this.ctx.sounds.queueSound(SOUND_DOOR_OPENING, x, y, 1, timer.level);
         }
         // A second `Time + 1` before the timer goes back (`:1309-1310`): two ticks.
@@ -762,7 +765,9 @@ export class TimerSystem {
         if (creature && desc && !monsterNonMaterial(desc)) {
           const needed = upDown ? monsterVerticalSize(desc) : 1;
           if (doorState >= needed) {
+            if (this.ctx.host.observing) this.ctx.host.observe({ k: 'blow', by: 'door', party: false });
             const result = this.ctx.systems.monsterDamage.damageMonsterGroup(creature, timer.level, x, y, 5, true, false);
+            if (this.ctx.host.observing) this.ctx.host.observe(BLOW_END);
             if (result !== MonsterDamageResult.ALL_MONSTERS_DIED) {
               this.ctx.systems.monsterAI.processTimers29to41({
                 mapX: x,
@@ -1643,7 +1648,9 @@ export class TimerSystem {
       case RN_DISPELL_MISSILE:
         // Dispell only touches what is not really there.
         if (monster && desc && monsterNonMaterial(desc)) {
+          if (this.ctx.host.observing) this.ctx.host.observe({ k: 'blow', by: 'cloud', cloud: cloudRn });
           this.ctx.systems.monsterDamage.damageMonsterGroup(monster, timer.level, x, y, damage, true, false);
+          if (this.ctx.host.observing) this.ctx.host.observe(BLOW_END);
         }
         break;
 
@@ -1662,11 +1669,15 @@ export class TimerSystem {
 
       case RN_POISON_CLOUD: {
         if (partyHere) {
+          if (this.ctx.host.observing) this.ctx.host.observe({ k: 'blow', by: 'cloud', cloud: cloudRn });
           this.ctx.systems.championDamage.damageAllCharacters(damage, 0, 0);
+          if (this.ctx.host.observing) this.ctx.host.observe(BLOW_END);
         } else if (monster) {
           const poison = this.ctx.systems.monsterDamage.determinePoisonDamage(monsterType, damage);
           if (poison !== 0) {
+            if (this.ctx.host.observing) this.ctx.host.observe({ k: 'blow', by: 'cloud', cloud: cloudRn });
             const result = this.ctx.systems.monsterDamage.damageMonsterGroup(monster, timer.level, x, y, poison, true, false);
+            if (this.ctx.host.observing) this.ctx.host.observe(BLOW_END);
             // Survivors notice: TT_M3 is CSBWin's "damaged by a cloud or a door".
             if (result !== 2 && poison > 2) {
               this.ctx.systems.monsterAI.processTimers29to41({

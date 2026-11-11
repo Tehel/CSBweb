@@ -249,6 +249,7 @@ export class MouseSystem {
       overrides && overrides.damage >= 0 ? overrides.damage : damage,
       overrides && overrides.decayRate >= 0 ? overrides.decayRate : decayRate,
       this.ctx.state.tickCount,
+      chIdx,
     );
     // `d.Word11712 = 4; d.Word11714 = d.partyFacing;` (doc/CSBwin-src/Mouse.cpp:754-755):
     // for 4 ticks the party cannot step after what it threw.
