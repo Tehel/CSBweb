@@ -143,6 +143,7 @@ In payoff order: the first row is the next item.
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
 | X9 | Thrown weapons' tags kept across a save | M | ⏸️ |
 | X10 | The cells the party has seen, kept across a save for an automap | M | ⏸️ |
+| X20 | More achievements, from the author's choice among the proposals | M | ⏸️ waits on the author |
 | E22 | Fullscreen filled by a fraction | M | ⏸️ waits on the author |
 | H | Deliberate divergences | — | 🚫 |
 
@@ -152,7 +153,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: A11 · C202 · D22 · E48 · F26 · G32 · P13 · R21 · U13 · W8 · X20. An ID recorded and paid in one commit has no
+Next free IDs: A11 · C202 · D22 · E48 · F26 · G32 · P13 · R21 · U13 · W8 · X21. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -1210,6 +1211,26 @@ drawing a map from them is a separate item, entered when the author names it.
   prints each level's codes as a map. It asserts a fake wall seen as stone and a hidden
   pit seen as floor, saves, loads, and compares every code. The same file with the
   records deleted loads with every cell unknown.
+
+### X20 ⏸️ More achievements, from the author's choice among the proposals
+
+The achievements are `src/engine/achievements/defs/common.txt`'s 19, and no FTL set has a
+file of its own (`doc/ACHIEVEMENTS.md`). A list of proposals waits on the author's
+comments: [CSBweb: more achievements](https://claude.ai/artifact/DPvNkHtYJEnGef1W4iegF4),
+about 70, generic, tuned per set, Dungeon Master's, Chaos Strikes Back's and across
+games, each marked as expressible today or with the event or sample it needs. The item
+is not a setting, unlike the other extras: an achievement only watches the game.
+
+- **Waits on the author**, who comments on each proposal and hands the list back.
+- **The ones kept that the language expresses** become blocks of `common.txt`,
+  `dm-atari.txt` and `csb.txt`. A duration or a count that only fits one dungeon (Speed
+  Runner's three hours, the 500 and 1000 kills, Scrooge's coins) moves out of `common.txt`
+  into each set's file. A set reads `defs/<set id>.txt` (`src/ui/achievementFiles.ts`),
+  so Dungeon Master's achievements need one file read by every DM set: the Atari versions,
+  the Amiga's and the hidden ones.
+- **The ones kept that need a new event or sample** each add it to the tracker
+  (`doc/ACHIEVEMENTS.md` → "Watching the engine"), with its proof in
+  `tools/checks/achievements-tracker.ts`, and change no tick.
 
 ## H — Deliberate divergences (not debt)
 
