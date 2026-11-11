@@ -143,7 +143,6 @@ In payoff order: the first row is the next item.
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
 | X9 | Thrown weapons' tags kept across a save | M | ⏸️ |
 | X10 | The cells the party has seen, kept across a save for an automap | M | ⏸️ |
-| X19 | The map's info names a spent once-only actuator | S | ⏸️ |
 | E22 | Fullscreen filled by a fraction | M | ⏸️ waits on the author |
 | H | Deliberate divergences | — | 🚫 |
 
@@ -1211,23 +1210,6 @@ drawing a map from them is a separate item, entered when the author names it.
   prints each level's codes as a map. It asserts a fake wall seen as stone and a hidden
   pit seen as floor, saves, loads, and compares every code. The same file with the
   records deleted loads with every cell unknown.
-
-### X19 ⏸️ The map's info names a spent once-only actuator
-
-A once-only pad, switch, launcher or generator that has fired is type 0 for good
-(`QueueSwitchAction`, `doc/CSBwin-src/Code11f52.cpp:3613`; `doc/CSBwin-src/Timer.cpp:1802`,
-`:2364`), and so is every actuator of a mirror's wall once its champion is recruited
-(`doc/CSBwin-src/CSBCode.cpp:6762`, `:6791`). Type 0 is also a wall's ornament, and DM's
-own `dungeon.dat` ships one once-only, so nothing in the state tells a spent actuator from
-an inert one: the map's info (`src/engine/CellInfo.ts`) lists neither. A resting
-generator, whose timer names it, is listed.
-
-- **What to read**: the data set's `dungeon.dat` as it ships, beside the game's dungeon.
-  A type-0 actuator of the game whose every other word equals an actuator of the same
-  square in the shipped dungeon, there of another type, is that actuator spent.
-- **What it gives**: "Spent:" and the shipped actuator's words; a spent generator still
-  marked G.
-- **The check**: `tools/checks/map-cell-info.ts` on a once-only pad of DM pressed.
 
 ## H — Deliberate divergences (not debt)
 

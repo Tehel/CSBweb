@@ -14,5 +14,8 @@ for `FAIL`, `DIFF` and the closing `N/M passed` line.
 `check-frames.sh` run to establish it.
 
 **How to apply:** `npm test -- --frames > "$SCRATCH/gate.log" 2>&1; echo exit $?`, run in
-the background (the gate passes 400 s on WSL), then grep the log. A known failure on this
+the background (the gate passes 400 s on WSL), then grep the log. `$SCRATCH` is the
+session's scratchpad, outside the repository: with an untracked `scratch/` folder of `.ts`
+files in the repository's root, the frames' CRT check "a present is drawn" failed twice
+(2026-11-11), and passed once it was moved out. A known failure on this
 checkout is [[wsl-known-failures]]; fresh ports are [[frames-on-fresh-ports]].
