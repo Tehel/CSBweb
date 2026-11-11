@@ -30,7 +30,7 @@
 import { CsbRandom } from '../core/random';
 import { loadCsbwinWorld } from '../data/CsbwinDungeonImage';
 import type { DataSet } from '../data/DataSets';
-import type { DataSetFiles } from '../data/DataSetFiles';
+import { fileDigest, type DataSetFiles } from '../data/DataSetFiles';
 import { DungeonLoader } from '../data/DungeonLoader';
 import { checkDungeon, dungeonWalls, KNOWN_DUNGEONS, type DungeonCheck, type DungeonWalls, type KnownDungeon } from '../data/DungeonSignature';
 import { readsGameBlock1, stampRandomGameID } from '../data/SaveFile';
@@ -46,6 +46,14 @@ import { drawRandomGameID } from './GameContext';
 import { carriedStateOf, type Recorder } from './Recorder';
 import { SaveFileError, applySaveBytes, buildSaveFile } from './SaveGameFile';
 import type { Champion } from './gameTypes';
+import type { AchievementTracker } from './achievements/AchievementTracker';
+
+/**
+ * What the saves ask of the achievements' tracker: the history it kept as a save's file
+ * was made, which the save's row stores, and the history a row stored, handed back before
+ * the row's file is read (`doc/ACHIEVEMENTS.md` → "The page").
+ */
+export type SaveAchievements = Pick<AchievementTracker, 'snapshotOf' | 'keep'>;
 
 /**
  * How `_ReadEntireGame` came out on the chooser's path: 1 once a save is in, -1 when the
@@ -218,6 +226,8 @@ export class GameSaves {
     private unofficial = false;
     /** The data set's own dungeons as its files read, once an import has asked (`ownDungeons`). */
     private own: Promise<DungeonWalls[]> | null = null;
+    /** The achievements' tracker of the game the player plays (`trackAchievements`), or none. */
+    private achievements: SaveAchievements | null = null;
 
     constructor(
         private readonly game: Game,
@@ -257,6 +267,14 @@ export class GameSaves {
      */
     onRowGone(listener: () => void): void {
         this.rowGone = listener;
+    }
+
+    /**
+     * The achievements' tracker, attached to the game: each save's row stores the history
+     * it kept as the file was made, and each read hands the row's back to it first.
+     */
+    trackAchievements(tracker: SaveAchievements): void {
+        this.achievements = tracker;
     }
 
     /**
@@ -346,7 +364,8 @@ export class GameSaves {
      * and is when the save was last used too (`SaveEntry.usedAt`). The play time is the
      * row's as well, the game's count as the file is made (`Game.playTime`), and so is
      * whether the world is a modified dungeon's (`SaveEntry.unofficial`), which the game
-     * has from the save it was read from.
+     * has from the save it was read from. So is the achievements' history the tracker kept
+     * as the file was made (`SaveEntry.achievements`), `null` with no tracker.
      *
      * A game an error has ended (`Game.die`) is never saved, by the menu, F5 or the
      * Sleepsave: the error may have left its world half-updated.
@@ -354,6 +373,7 @@ export class GameSaves {
     async save(clock: SaveClock, target: SaveTarget): Promise<SaveEntry> {
         if (this.game.isDead()) throw new Error('an error has ended the game');
         const bytes = saveFileOf(this.game, clock, (champion) => this.screen.portraitOf(champion));
+        const achievements = this.achievements?.snapshotOf(fileDigest(bytes)) ?? null;
         const point = this.recorder?.point() ?? null;
         const savedAt = Date.now();
         const playTime = this.game.playTime();
@@ -372,7 +392,7 @@ export class GameSaves {
         const entry: SaveEntry = {
             id, name, dataSet: this.dataSet.id, quick: target === 'quick', sleep: target === 'sleep',
             savedAt, usedAt: savedAt, playTime,
-            unofficial: this.unofficial, recording: point, ...fields,
+            unofficial: this.unofficial, recording: point, achievements, ...fields,
         };
         await this.store.write(entry, bytes);
         if (clock === 'stopped' && target !== 'sleep') this.game.saveWritten(stamp);
@@ -402,12 +422,17 @@ export class GameSaves {
      * The game's world is the file's, a modified dungeon's when the row says so
      * (`SaveEntry.unofficial`).
      *
+     * The achievements' history the row stored (`SaveEntry.achievements`) is handed to the
+     * tracker before the file is read, under the file's MD5, so the read takes it up. A row
+     * with none leaves the tracker what it kept of the file in this page, if anything.
+     *
      * A save read begins a recording from its file (`Recorder`), as a new game's
      * playthrough drawn begins one from its stream (`newGameRead`), and from what the
      * read left beside the file (`CarriedState`). A save made in a recording begins a
      * branch of it, at the point the row names (`SaveEntry.recording`).
      */
     read(save: OpenedSave): void {
+        if (save.entry.achievements) this.achievements?.keep(fileDigest(save.bytes), save.entry.achievements);
         applySaveBytes(this.game, save.bytes);
         this.recorder?.begin({ kind: 'save', bytes: save.bytes, carried: carriedStateOf(this.game) }, save.entry.recording);
         this.game.setPlayTime(save.entry.playTime);
@@ -484,7 +509,7 @@ export class GameSaves {
         const entry: SaveEntry = {
             id: name, name, dataSet: this.dataSet.id, quick: false, sleep: false,
             savedAt: file.modifiedAt ?? now, usedAt: now, playTime: 0,
-            unofficial: check.kind === 'different', recording: null, ...fields,
+            unofficial: check.kind === 'different', recording: null, achievements: null, ...fields,
         };
         let { bytes } = file;
         if (entry.playthrough === 0) {
@@ -563,7 +588,7 @@ export class GameSaves {
         const now = Date.now();
         const entry: SaveEntry = {
             id: name, name, dataSet: this.dataSet.id, quick: false, sleep: false,
-            savedAt: now, usedAt: now, playTime: 0, unofficial: false, recording: null, ...fields,
+            savedAt: now, usedAt: now, playTime: 0, unofficial: false, recording: null, achievements: null, ...fields,
         };
         await this.store.write(entry, bytes);
         return { entry, bytes };

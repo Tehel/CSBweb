@@ -14,9 +14,11 @@ import { CsbRandom } from '../core/random';
 import { loadGameFiles, type DataSetFiles } from '../data/DataSetFiles';
 import type { DataSet } from '../data/DataSets';
 import { emptyDungeonData } from '../data/DungeonLoader';
-import { sortSaveEntries, type SaveEntry, type SaveStore } from '../data/saves';
+import { memoryAchievementStore, sortSaveEntries, type AchievementStore, type SaveEntry, type SaveStore } from '../data/saves';
 import { extractGraphicsTables } from '../data/tables/GraphicsTables';
 import { csbGraphicsOpener } from '../engine/FileSignatures';
+import type { AchievementDef } from '../engine/achievements/AchievementFile';
+import { PageAchievements, type TouchedPlaythroughs } from '../engine/achievements/PageAchievements';
 import { Game } from '../engine/Game';
 import { GameSaves } from '../engine/GameSaves';
 import { buildGameTables } from '../engine/GameTables';
@@ -41,14 +43,22 @@ export interface StandInPage {
   readonly clock: ManualClock;
   /** The set's `dungeon.dat`, which a new game reads. */
   readonly dungeonDat: Uint8Array;
+  /** Its saves, over the store `standInPage` was given, or one in memory. */
+  readonly saves: GameSaves;
+  /**
+   * The achievements of `defs` tracked as the page tracks a game the player plays
+   * (`PageAchievements`), over `store` and the playthroughs `touched`; the page's own
+   * builds none, as a recording's viewer has none.
+   */
+  track(defs: readonly AchievementDef[], store?: AchievementStore, touched?: TouchedPlaythroughs): PageAchievements;
 }
 
 /**
  * A fresh page of `set`, whose files `files` reads: the engine, its screen over a stand-in
- * canvas, the page's input path and its saves over a store in memory. A frame that
- * throws, CSBWin's `die`, throws.
+ * canvas, the page's input path and its saves over `store`, one in memory by default. A
+ * frame that throws, CSBWin's `die`, throws.
  */
-export async function standInPage(set: DataSet, files: DataSetFiles): Promise<StandInPage> {
+export async function standInPage(set: DataSet, files: DataSetFiles, store: SaveStore = memorySaves()): Promise<StandInPage> {
   const loaded = await loadGameFiles(set, files);
   const dungeonDat = await files.read('dungeon.dat');
   if (!dungeonDat) throw new Error(`Cannot open dungeon file '${files.where('dungeon.dat')}'`);
@@ -83,7 +93,7 @@ export async function standInPage(set: DataSet, files: DataSetFiles): Promise<St
   game.ctx.sounds.csbGraphics = loaded.csbGraphicsLoader;
   game.ctx.overlay.csbGraphics = loaded.csbGraphicsLoader;
   loaded.csbGraphicsLoader.cannotOpen = () => { game.ctx.overlay.active = false; };
-  const saves = new GameSaves(game, set, files, memorySaves(), {
+  const saves = new GameSaves(game, set, files, store, {
     portraitOf: drawing.portraitOf,
     askBeginAdventure: (source) => { if (screen) askBeginAdventure(screen.ui, source); },
   }, () => {}, new CsbRandom());
@@ -137,7 +147,9 @@ export async function standInPage(set: DataSet, files: DataSetFiles): Promise<St
   });
   game.ctx.rules.dmRulesDesignOption = set.dmRules;
 
-  return { game, screen, messages, clock, dungeonDat };
+  const track = (defs: readonly AchievementDef[], achievementStore = memoryAchievementStore(), touched: TouchedPlaythroughs = { has: () => false }) =>
+    new PageAchievements(game, set.id, defs, screen!.ui.objectTables.objectNames, achievementStore, saves, touched);
+  return { game, screen, messages, clock, dungeonDat, saves, track };
 }
 
 /** `page` as a cut plays a path in it (`CutPage`): its clock moved by its owner. */

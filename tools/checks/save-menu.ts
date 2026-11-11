@@ -542,6 +542,7 @@ function entry(over: Partial<SaveEntry>): SaveEntry {
     champions: [],
     unofficial: false,
     recording: null,
+    achievements: null,
     ...over,
     // A row not used since it was saved, unless the caller says otherwise.
     usedAt: over.usedAt ?? over.savedAt ?? 0,

@@ -13,8 +13,9 @@ game: nothing in a tick changes because a player is earning one ("Watching the e
 below).
 
 **What exists**: the file format, its reader and its evaluator
-(`src/engine/achievements/`), the common file, and the tracker that watches the engine
-("Watching the engine"). The rest of this document is the design that `PLAN.md` phase 18
+(`src/engine/achievements/`), the common file, the tracker that watches the engine
+("Watching the engine"), and the page's half: the tracker on a game the player plays, its
+history in each save's row, and the store of the unlocks ("The page"). The rest of this document is the design that `PLAN.md` phase 18
 builds, step by step, and each step rewrites its section here to say what was built.
 
 ## The file
@@ -260,9 +261,7 @@ It reads the game only to name things: a champion, an object, the samples.
   history of its own ("Some conditions need the whole game"); a new game starts one from
   its start.
 - `snapshot` and `keep` give the page the state to store beside a save and to give back
-  at a read; storing it in the save's row (`SaveEntry`) is phase 18.3's, with the rest of
-  the page: a playthrough moved with `?dev`'s teleport earning nothing, and the viewer,
-  which attaches no tracker.
+  at a read ("The page").
 
 `tools/checks/achievements-tracker.ts` proves it on the corpus: each join reads its
 parent's state, a path from a new game keeps its whole history and one from a CSBWin save
@@ -272,17 +271,49 @@ their causes, the joins, the meals, the worn objects and the unlocks of Dungeon 
 
 ## The page
 
-*Designed (phase 18.3).*
+The page tracks the achievements of a game the player plays (`PageAchievements`,
+`src/engine/achievements/PageAchievements.ts`), and of no other.
 
-- An `achievements` store in the IndexedDB database keeps one row per set, achievement and
-  playthrough: when the achievement was unlocked, the play time, and how far its proof has
-  got.
+- **Its achievements** are the common file's merged with the set's own file, where the
+  project has one (`setAchievementDefs`, read from the build by `src/main.ts`). A file
+  that does not read leaves the game without achievements, and the console says why.
+  The objects are named by the screen's `objectTables`.
+- **The recording's viewer** (`?recording=`) builds no tracker, and nothing observes its
+  engine: a recording played back is no game of the player's.
+- **A teleport earns nothing.** A playthrough that `?dev`'s teleport has moved, by the map
+  dialog or by the level keys, is kept in `localStorage` (`keptTeleportedPlaythroughs`,
+  `src/ui/gameEvents.ts`) and sends no statistics; the same list refuses its unlocks: the
+  tracker goes on, but nothing is stored or shown.
+- **The history is kept in the save's row.** Each save that `GameSaves` writes (the disk
+  menu's SAVE, F5, the Sleepsave, and the quick-save that begins CSB's adventure) stores
+  in its row the tracker's state as the file was made (`SaveEntry.achievements`). Each
+  read (LOAD, F9, CONTINUE at the boot) hands the row's state to the tracker under the
+  file's MD5 before the file is read (`AchievementTracker.keep`), so the game goes on
+  with the save's history: what was unlocked after the save is forgotten, and unlocks
+  again if it is earned again. A row with none (an import, a row made before rows held
+  one, a new adventure made by RISE) starts a history of its own, which is not the whole
+  game's. The history is the store's alone: an export carries the CSBWin file and nothing
+  else, and CSBWin reads every export (`doc/SAVES.md`).
+- **The `achievements` store** in the saves' IndexedDB database (version 8,
+  `BrowserAchievementStore`) keeps one row per set, achievement id and playthrough
+  (`AchievementRow`): when it was unlocked, the player's time then (the tracker's VBLs),
+  the game's clock, the party's names, and how far its proof has got, only `unverified`
+  until the proofs are sent (phase 18.5). A row is written as the tracker unlocks, unless
+  one of the same key is there: the first unlock stays when a branch loaded since unlocks
+  it again.
+
+`tools/checks/achievements-page.ts` proves the history through F5, F9 and a fresh page's
+read, a new game's whole and an import's not, the store's rows, and the teleport earning
+nothing, on the stand-in page (`StandInPage.track`); `tools/probe-frames.ts` that the
+viewer tracks nothing.
+
+Still to come in phase 18.3:
+
 - An unlock shows for three seconds as a banner over the viewport, drawn after the game,
   never in the message area, which is the engine's. A setting, ACHIEVEMENT NOTICES, turns
   it off.
 - A dialog drawn in the canvas lists the set's achievements.
-- The welcome page's book has an ACHIEVEMENTS tab, and PROFILE holds the public name and
-  the identity key.
+- The welcome page's book has an ACHIEVEMENTS tab.
 
 ## Proofs and the Hall of Fame
 

@@ -105,6 +105,7 @@ function upgradeSaveRecord(old: unknown, dataSet: string): SaveRecord | null {
         playTime: 0,
         unofficial: false,
         recording: null,
+        achievements: null,
         ...fields,
         // A copy of the file alone, not a view of the JSON's buffer.
         bytes: file.slice().buffer,

@@ -1714,9 +1714,10 @@ const stagedV5 = await evaluate(`(async()=>{
 await navigate(`${APP}?dungeon=nowhere&keepsaves`, WELCOME);
 const upgradedV5 = await evaluate(rawSaves);
 console.log('  version 5 upgraded:', JSON.stringify(upgradedV5));
-check(upgradedV5.version === 7 && upgradedV5.rows === 'probe-v5.dat' && upgradedV5.files === stagedV5,
+check(upgradedV5.version === 8 && upgradedV5.rows === 'probe-v5.dat' && upgradedV5.files === stagedV5,
   "the upgrade to version 6 keeps a row without its file, and its file byte for byte in saveFiles under the row's id");
-check(upgradedV5.stores === 'dataSets,recordingParts,recordings,saveFiles,saves', `and to version 7 adds the recordings' two stores (${upgradedV5.stores})`);
+check(upgradedV5.stores === 'achievements,dataSets,recordingParts,recordings,saveFiles,saves',
+  `and to version 7 adds the recordings' two stores, and to version 8 the achievements' (${upgradedV5.stores})`);
 await navigate(`${APP}?intro=0&dungeon=csb&keepsaves`, GAME);
 const filesApart = await evaluate(`(async()=>{ const { saves } = window.__probe;
   const listed = await saves.list(), entry = listed.find((e) => e.id === 'probe-v5.dat');
@@ -1806,6 +1807,7 @@ const recordedGame = await evaluate(`(async()=>{ const { game, recorder, recordi
   await recordings.flush();
   const { ctx } = game, { position, facing } = ctx.party.state, { id, changes, vbls } = recorder.recording;
   return { id, changes: changes.length, pauses: changes.filter((c) => c.change.kind === 'pause').length, vbls,
+    achievements: window.__probe.achievements !== null,
     state: JSON.stringify([ctx.state.tickCount, ctx.random.getSeed(), position, facing]),
     recordings: (await recordingStore.list()).length, saves: (await saves.list()).length }; })()`);
 await navigate(`${APP}?dungeon=csb&recording=${recordedGame.id}&keepsaves`, 'window.__probe?.player() != null');
@@ -1828,12 +1830,15 @@ const playedLines: string[] = await evaluate(`window.__probe.game.ctx.host.messa
 const playedState = `(async()=>{ const { game, recordingStore, saves, screen } = window.__probe, player = window.__probe.player();
   const { ctx } = game, { position, facing } = ctx.party.state;
   return { drift: player.drift, running: game.running, dialog: screen.ui.dialog !== null || screen.ui.saveMenu !== null,
+    achievements: window.__probe.achievements !== null, observing: ctx.host.observing,
     state: JSON.stringify([ctx.state.tickCount, ctx.random.getSeed(), position, facing]),
     recordings: (await recordingStore.list()).length, saves: (await saves.list()).length }; })()`;
 const playedGame = await evaluate(playedState);
 console.log('  recording played:', JSON.stringify({ recordedGame, playedGame, pausedAt, paused, paced }));
 check(recordedGame.pauses === 2 && playedGame.drift === null && playedGame.state === recordedGame.state && !playedGame.running,
   `?recording= plays the store's recording to its end, the settings' held clock among it, the game as the recorded one stood, and stops (${recordedGame.vbls} VBLs, ${recordedGame.changes} changes)`);
+check(recordedGame.achievements && !playedGame.achievements && !playedGame.observing,
+  'the game the player played tracks its achievements, and the recording\'s viewer tracks none: nothing observes its engine');
 check(!paused.dialog && !playedGame.dialog, 'the game\'s keys reach nothing while it plays: its turn turns nothing, F5 saves nothing, and no dialog opens');
 check(paused.playing && paused.vbls === pausedAt && paced === 4,
   `Space pauses it, no VBL running for 300 ms (${pausedAt} VBLs played), +, then its key unshifted, sets the pace to x4, and a click on play plays on`);

@@ -4,3 +4,5 @@ export { BrowserSaveStore } from './BrowserSaveStore';
 export { downloadSaveFile } from './downloadSaveFile';
 export * from './RecordingStore';
 export { BrowserRecordingStore } from './BrowserRecordingStore';
+export * from './AchievementStore';
+export { BrowserAchievementStore } from './BrowserAchievementStore';

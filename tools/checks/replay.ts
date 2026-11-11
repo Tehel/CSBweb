@@ -353,7 +353,7 @@ class Page {
     } else {
       const entry: SaveEntry = {
         id: 'start.dat', name: 'start.dat', dataSet: STOCK_DATA_SET.id, quick: false, sleep: false,
-        savedAt: 1000, usedAt: 1000, playTime: 1234, unofficial: false, recording: null, ...readSaveFileFields(start)!,
+        savedAt: 1000, usedAt: 1000, playTime: 1234, unofficial: false, recording: null, achievements: null, ...readSaveFileFields(start)!,
       };
       await page.store.write(entry, start);
       saves.read(await saves.open(entry));

@@ -36,7 +36,7 @@ function row(id: string, parent: RecordingPoint | null, end = false): RecordingE
 function save(id: string, point: RecordingPoint, savedAt: number): SaveEntry {
     return {
         id, name: id, dataSet: SET, playthrough: 1, quick: false, sleep: point.inVbl === true, savedAt, usedAt: savedAt,
-        playTime: 0, level: 1, champions: [], unofficial: false, recording: point,
+        playTime: 0, level: 1, champions: [], unofficial: false, recording: point, achievements: null,
     };
 }
 

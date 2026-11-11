@@ -18,13 +18,15 @@ import { isLocalDataSetId, localDataSet, recordFiles } from './data/LocalDataSet
 import { findRecordingSet, parseSetDigests, type SetDigests } from './data/RecordingSet';
 import { emptyDungeonData } from './data/DungeonLoader';
 import { GraphicsLoader } from './data/GraphicsLoader';
-import { BrowserDataSetStore, BrowserRecordingStore, BrowserSaveStore, downloadSaveFile, readRecordingPath, type DrawPlaythrough, type OpenedSave, type SaveStore } from './data/saves';
+import { BrowserAchievementStore, BrowserDataSetStore, BrowserRecordingStore, BrowserSaveStore, downloadSaveFile, readRecordingPath, type DrawPlaythrough, type OpenedSave, type SaveStore } from './data/saves';
 import { UTILITY_PORTRAITS_FILE, readUtilityPortraits, type UtilityPortraits } from './data/UtilityPortraits';
 import { Game } from './engine/Game';
 import { buildGameTables, type GameTables } from './engine/GameTables';
 import { extractGraphicsTables, type GraphicsTables } from './data/tables/GraphicsTables';
 import { UtilityDiskMessages, UtilityError } from './engine/Chaos';
 import { GameSaves, drawPlaythrough } from './engine/GameSaves';
+import type { AchievementDef } from './engine/achievements/AchievementFile';
+import { PageAchievements, setAchievementDefs } from './engine/achievements/PageAchievements';
 import { loadSwoosh, type Swoosh } from './data/SwooshLoader';
 // A file, never inlined as a `data:` URL, which the server's policy does not fetch (`SECURITY_HEADERS`).
 import swooshImageUrl from './assets/swoosh.img?url&no-inline';
@@ -102,6 +104,28 @@ let setThumbnail!: () => Promise<Blob | null>;
  * the store's (`playRecording`), on the set it names, or `null`. Its player, once it is begun.
  */
 const playedRecording = new URLSearchParams(window.location.search).get('recording');
+
+/**
+ * The achievements' files the project writes: the common file, and the FTL sets' own,
+ * `defs/<set id>.txt` (`doc/ACHIEVEMENTS.md` → "The file").
+ */
+const ACHIEVEMENT_FILES = import.meta.glob<string>('./engine/achievements/defs/*.txt', { query: '?raw', import: 'default', eager: true });
+
+/**
+ * The achievements of the set the page plays: the common file's merged with the set's own
+ * file where the project has one. `null`, and the console says why, where a file does not
+ * read: the game plays on with none.
+ */
+function achievementDefs(setId: string): AchievementDef[] | null {
+    try {
+        const common = ACHIEVEMENT_FILES['./engine/achievements/defs/common.txt'];
+        if (common === undefined) throw new Error('the common achievements are not in the build');
+        return setAchievementDefs(common, ACHIEVEMENT_FILES[`./engine/achievements/defs/${setId}.txt`] ?? null);
+    } catch (error) {
+        console.error('No achievements:', error);
+        return null;
+    }
+}
 /**
  * `?from=` and `&to=`: the saves on the way a store's point is played from, cut there
  * (`cutPlayedPath`), and to (`WayPoint.id`, `src/engine/RecordingPoints.ts`).
@@ -405,6 +429,8 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     // What a save deleted or written over alone reached of the recordings goes with it.
     saves.onRowGone(() => { recordings.prune().catch(() => {}); });
 
+    // The playthroughs a `?dev` teleport has touched, which neither send statistics nor earn achievements.
+    const teleported = keptTeleportedPlaythroughs(pageStorage);
     // The statistics' events: sent by a production build only, and shown on the console
     // otherwise; neither when the player has turned them off, nor of a recording played
     // back, no game of the player's.
@@ -415,7 +441,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         player: playerId,
         enabled: () => settings.values.statistics && playedRecording === null,
         send: import.meta.env.PROD ? sendBeacon : (event) => console.debug('Event, not sent:', event),
-        teleported: keptTeleportedPlaythroughs(pageStorage),
+        teleported,
     });
     // RISE's new adventure, which a read then makes the running game.
     let adventure: OpenedSave | null = null;
@@ -511,7 +537,14 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         } : null,
     });
     const playInput = input.take(NO_INPUT);
-    return { game, screen, saves, recorder, recordings, recordingStore, messages, events, input, playInput };
+
+    // The achievements of a game the player plays: none for a recording played back, whose
+    // game is not the player's (`doc/ACHIEVEMENTS.md` → "The page").
+    const defs = playedRecording === null ? achievementDefs(dataSet.id) : null;
+    const achievements = defs && new PageAchievements(game, dataSet.id, defs, screen.ui.objectTables.objectNames,
+        new BrowserAchievementStore((rows) => drawPlaythrough(storeRandom, rows)), saves, teleported,
+        (message, error) => console.warn(message, error));
+    return { game, screen, saves, recorder, recordings, recordingStore, messages, events, input, playInput, achievements };
 }
 
 /** What `construct` builds, which the boot, the play and the end of the game share. */
@@ -527,6 +560,8 @@ interface Built {
     input: GameInput;
     /** Hands the input, held by nobody while the page loads, to play. */
     playInput: () => void;
+    /** The achievements of the game the player plays, or `null` for a recording played back. */
+    achievements: PageAchievements | null;
 }
 
 /**
@@ -537,7 +572,7 @@ interface Built {
  */
 function probeHandle(built: Built, sound: SoundManager) {
     const presetHeroes = () => extractPresetHeroes(built.game.ctx.dungeon.getData(), built.game.ctx.tables.textDecode, built.game.ctx.tables);
-    return { game: built.game, screen: built.screen, sound, saves: built.saves,
+    return { game: built.game, screen: built.screen, sound, saves: built.saves, achievements: built.achievements,
         recorder: built.recorder, recordings: built.recordings, recordingStore: built.recordingStore, player: () => recordingPlayer,
         readRecordingPath, packageOfSave, writeRecordingPackage, renderView, refreshScreen, presetHeroes, applySaveBytes, intro: introProbe };
 }

@@ -34,9 +34,12 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   file is read only to be loaded or exported. The level, the champions' names and the
   playthrough (below) are read from the file's own blocks when the row is written; the
   data set, the date, when the save was last used, the play time, whether it is F5's
-  or the Sleepsave, and the recording it was made in with its point there
-  (`SaveEntry.recording`, `doc/RECORDING.md` → "The tree") are the row's own. Nothing is JSON, and no row holds anything a `.dat` could not be
-  listed without.
+  or the Sleepsave, the recording it was made in with its point there
+  (`SaveEntry.recording`, `doc/RECORDING.md` → "The tree"), and the achievements'
+  history as the file was made (`SaveEntry.achievements`, `doc/ACHIEVEMENTS.md` → "The
+  page") are the row's own. Nothing is JSON, and no row holds anything a `.dat` could not be
+  listed without. An export carries the file alone, so an import's row has no
+  achievements' history, as a row made before rows held one has none.
 - **The store upgrades its older rows** (`src/data/saves/legacyRows.ts`, run once by
   `idb.ts`). To version 2, it keeps of each older row the CSBWin file alone, out of its
   `.dmweb.json` when it is one, and reads the row again from that file. An older row
@@ -58,7 +61,9 @@ store (the disk menu's SAVE, F5 and the Sleepsave) and where a save's bytes are 
   each row's file goes to `saveFiles`, under the row's id, and the row is kept without
   it (`splitSaveRecord`); a store at version 6 is not read at all. Version 7 adds two
   object stores, `recordings` and `recordingParts`, the game's recordings
-  (`doc/RECORDING.md` → "The port's recorder"), and changes no row. The steps after version 2's
+  (`doc/RECORDING.md` → "The port's recorder"), and changes no row. Version 8 adds one
+  more, `achievements`, the achievements unlocked (`BrowserAchievementStore`), and changes
+  no row. The steps after version 2's
   keep a row they cannot read as it is: the store is a save's only copy, and a reader
   made stricter must not delete it.
   Nothing else in `src/` reads JSON. A

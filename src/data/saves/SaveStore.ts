@@ -12,6 +12,7 @@
 import { csbwinSaveInfoOf, readCsbwinSaveInfo, type CsbwinSaveInfo } from '../CsbwinSaveInfo';
 import type { SaveFile } from '../SaveFile';
 import type { RecordingPoint } from '../../engine/Recorder';
+import type { TrackerSnapshot } from '../../engine/achievements/AchievementTracker';
 
 /** One row of the list: what a save is listed by, without its bytes. */
 export interface SaveEntry {
@@ -65,6 +66,13 @@ export interface SaveEntry {
      * imported, a new adventure, or one made before rows held it.
      */
     recording: RecordingPoint | null;
+    /**
+     * The achievements' history as the save's file was made (`AchievementTracker.snapshot`),
+     * which a read of the save takes up (`doc/ACHIEVEMENTS.md` → "The page"). The store's
+     * alone: no file holds it, so an export leaves it behind, and an import, like a row
+     * made before rows held it, has `null`, and its game starts a history of its own.
+     */
+    achievements: TrackerSnapshot | null;
 }
 
 /** A row and its CSBWin file, as the store's earlier versions held them in one (`legacyRows.ts`). */
@@ -74,10 +82,11 @@ export interface SaveRecord extends SaveEntry {
 
 /**
  * A row as a store may hold it: one written before rows held `usedAt`, `playTime`,
- * `unofficial`, `sleep` or `recording` has none of them.
+ * `unofficial`, `sleep`, `recording` or `achievements` has none of them.
  */
-export type StoredSaveEntry = Omit<SaveEntry, 'usedAt' | 'playTime' | 'unofficial' | 'sleep' | 'recording'>
-    & { usedAt?: number; playTime?: number; unofficial?: boolean; sleep?: boolean; recording?: RecordingPoint | null };
+export type StoredSaveEntry = Omit<SaveEntry, 'usedAt' | 'playTime' | 'unofficial' | 'sleep' | 'recording' | 'achievements'>
+    & { usedAt?: number; playTime?: number; unofficial?: boolean; sleep?: boolean; recording?: RecordingPoint | null;
+        achievements?: TrackerSnapshot | null };
 
 /** A row and its file in one, as a store before the files had their own held it. */
 export type StoredSaveRecord = StoredSaveEntry & { bytes: ArrayBuffer };
@@ -97,7 +106,8 @@ export interface SaveFileRecord {
  * `playTime` counts no time played; one written before they held `unofficial` is of its
  * data set's own dungeon, since no file came in from outside then; one written before
  * they held `sleep` is no Sleepsave, since no build wrote one then; one written before
- * they held `recording` was made in no recording the store links.
+ * they held `recording` was made in no recording the store links; one written before they
+ * held `achievements` keeps no history of them.
  */
 export function saveEntryOf(record: StoredSaveEntry): SaveEntry {
     return {
@@ -114,6 +124,7 @@ export function saveEntryOf(record: StoredSaveEntry): SaveEntry {
         champions: record.champions,
         unofficial: record.unofficial ?? false,
         recording: record.recording ?? null,
+        achievements: record.achievements ?? null,
     };
 }
 
