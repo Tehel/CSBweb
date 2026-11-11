@@ -148,7 +148,7 @@ In payoff order: the first row is the next item.
 | E22 | Fullscreen filled by a fraction | M | ⏸️ waits on the author |
 | H | Deliberate divergences | — | 🚫 |
 
-The rows above E40 are the active list. A new row takes its tier's place above it. The F
+The rows above F21 are the active list. A new row takes its tier's place above it. The F
 rows are independent of the rest ("Priority", point 5), so they can be taken anywhere.
 The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
@@ -523,7 +523,7 @@ gather or split CSBWin's functions as the code's concerns ask. What still follow
 the behaviour, the names of ported functions, which keep the two codebases greppable
 against each other, and the file formats.
 
-### E40 ⏳ The statistics page's heat map
+### E40 ⏸️ The statistics page's heat map
 
 The statistics page is built (`doc/STATISTICS.md` → "The page"), all but a level's heat
 map, as designed with the author:
@@ -723,7 +723,7 @@ in CSBWin 20230608, and if the game goes on there, ports what that binary draws.
 
 New verification debt goes here; it can be taken anywhere ("Priority", point 5).
 
-### F21 ⏳ 3D2D1D's walkthrough is not replayed through `Game`
+### F21 ⏸️ 3D2D1D's walkthrough is not replayed through `Game`
 
 `doc/3D2D1D_WALKTHROUGH.md` is a full route through 3D2D1D, computed by
 `tools/solve-3d2d1d.ts` from a model of CSBWin's moves, gravity, teleporters and four DSA
@@ -950,10 +950,10 @@ Paying it, in steps:
    minutes to play it. Its row is `CSBWIN_RUNS_UNCHECKED` (`tools/lib/csbwinRun.ts`),
    which `utils/share-csbwin-runs.ts` offers and `csbwin-runs.ts` and
    `recording-corpus.ts` do not read, and the deploy's gate passes over its recording by
-   its title (`utils/replay-recordings.ts`). What is left is its share, once, which the
-   author runs from the scratch folder (above): it is made at a deployed level, 6, which
-   no later fix joins. Nothing checks it after that: a later change of its play without
-   a flag shows only in a run by hand. **The 9.x and 11.0xx runs play at their version's
+   its title (`utils/replay-recordings.ts`). It is shared, "Conflux WIP 007, 16 h 31 min
+   of a game" (`7EFAE5F05CA1B171` on `conflux-wip`), made at level 6, which is deployed.
+   Nothing checks it: a later change of its play without a flag shows only in a run by
+   hand. **The 9.x and 11.0xx runs play at their version's
    profile** of behaviour flags (`doc/RECORDING.md` → "A recording's level"): each version
    differs from CSBWin 2023 throughout (above), so corrections to the log cannot convert
    them. Each flag is read from the diff of its version's source against 2023's
