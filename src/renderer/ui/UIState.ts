@@ -6,6 +6,7 @@
  * modules take it as their first argument, which keeps each of them a thin, greppable
  * translation of its C++ counterpart instead of another method on a god object.
  */
+import type { BannerState } from './AchievementBanner';
 import type { GraphicsLoader } from '../../data/GraphicsLoader';
 import type { OpenedSave, SaveEntry } from '../../data/saves';
 import type { ImportAnswer, ImportResult, ImportedFile } from '../../engine/GameSaves';
@@ -137,6 +138,8 @@ export interface UIState {
   mapDialogMark: CellMark | null;
   /** The champion dialog's state while it is the dialog (`src/renderer/ui/ChampionDialog.ts`). */
   championDialog: ChampionDialogState | null;
+  /** The achievements' banner: the unlocks waiting and the one shown (`src/renderer/ui/AchievementBanner.ts`). */
+  banner: BannerState;
   /**
    * `DiskMenuNeeded` (`doc/CSBwin-src/Data.h:159`). The disk icon's handler cannot open
    * the menu itself — CSBWin because that would recurse into `HandleMouseEvents`
@@ -468,6 +471,7 @@ export function createUIState(sources: UISources, hooks: UIHooks): UIState {
     mapDialog: null,
     mapDialogMark: null,
     championDialog: null,
+    banner: { waiting: [], shown: null, changed: false },
     hintOracle: null,
     hintOracleUp: false,
     hoverPoint: null,

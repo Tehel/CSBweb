@@ -48,6 +48,8 @@ export interface SettingsValues {
   readonly mapView: boolean;
   /** The champions' table: the champion dialog opens (`ChampionDialog.ts`). */
   readonly championView: boolean;
+  /** An achievement unlocked shows a banner over the view (`AchievementBanner.ts`). */
+  readonly achievementNotices: boolean;
   /** The extras (`DEBT.md` X), each off by default: with all off, the game is CSBWin's. */
   readonly extras: Extras;
   /** The key table's preset, or `custom` for one changed by hand. */
@@ -72,6 +74,7 @@ export const DEFAULT_SETTINGS: SettingsValues = {
   statistics: true,
   mapView: false,
   championView: false,
+  achievementNotices: true,
   extras: {
     gatherThrownWeapons: false, drinkAtFountain: false, colourNewMastery: false, showItemProperties: false,
     unlimitedKeyQueue: false,
@@ -179,6 +182,7 @@ function parseSettings(raw: unknown): SettingsValues {
     statistics: bool(record.statistics, defaults.statistics),
     mapView: bool(record.mapView, defaults.mapView),
     championView: bool(record.championView, defaults.championView),
+    achievementNotices: bool(record.achievementNotices, defaults.achievementNotices),
     extras: {
       gatherThrownWeapons: bool(extras.gatherThrownWeapons, defaults.extras.gatherThrownWeapons),
       drinkAtFountain: bool(extras.drinkAtFountain, defaults.extras.drinkAtFountain),

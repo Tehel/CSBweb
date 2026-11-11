@@ -2393,6 +2393,38 @@ check((await selected()) === -1, 'a tap on the bars: nothing while it is down');
 await cdpMouse('mouseReleased', 55, 14); await vbls(TICK);
 check((await selected()) === 0 && (await championsUp()) === null, 'and at its release, the champion\'s inventory, and no champions');
 
+// The achievements (`doc/ACHIEVEMENTS.md` → "The page"), over the same party, its
+// inventory closed by a tap on the bars: an unlock, as the tracker tells the page's
+// `PageAchievements`, is a row of the IndexedDB store, of the playthrough and unverified,
+// and a banner over the view, a frame of it; the banner goes three seconds after it is
+// first drawn. GAME's ACHIEVEMENT NOTICES (85,149) turns it off, and an unlock then is
+// stored and shows nothing.
+const banner = () => evaluate(`window.__probe.screen.ui.banner.shown?.notice.name ?? null`);
+const unlock = (id: string) => evaluate(`window.__probe.achievements.unlocked([{ id: '${id}',
+  gameTime: window.__probe.game.ctx.state.tickCount, vbls: 3600 }]), 1`);
+const achievementRows = () => evaluate(`(async()=>{ const a = window.__probe.achievements; await a.settled();
+  return (await a.rows()).map((r) => [r.id, r.playthrough === a.playthrough, r.playTime, r.proof, r.champions.length > 0].join('|')); })()`);
+await cdpMouse('mousePressed', 55, 14); await wait(100); await cdpMouse('mouseReleased', 55, 14); await vbls(TICK);
+check((await selected()) === -1, 'a tap on the bars closes the inventory');
+await unlock('first-blood'); await leaveCanvas(); await vbls(SHOWN);
+check(await banner() === 'First Blood', 'an unlock shows its banner');
+console.log('state: achievement banner'); await shot('34-achievement-banner');
+const firstRows = await achievementRows();
+console.log('  achievement rows:', JSON.stringify(firstRows));
+check(JSON.stringify(firstRows) === JSON.stringify(['first-blood|true|60000|unverified|true']),
+  'and is a row of the store: the set\'s, the playthrough\'s, its play time the tracker\'s, the party named, unverified');
+await wait(3200); await vbls(SHOWN);
+check(await banner() === null, 'the banner goes three seconds after it is first drawn');
+await key('Escape'); await vbls(SHOWN);
+await canvasClick(45, 45, 0); await vbls(SHOWN);
+await canvasClick(85, 149, 0); await vbls(SHOWN);
+check((await settingsValues()).achievementNotices === false, 'GAME\'s ACHIEVEMENT NOTICES, clicked, turns the notices off');
+await key('Escape'); await vbls(SHOWN);
+await unlock('pest-control'); await vbls(SHOWN);
+check(await banner() === null && (await achievementRows()).some((row: string) => row.startsWith('pest-control|true|')),
+  'an unlock then is stored, and shows nothing');
+await evaluate(`window.__probe.screen.ui.settings.update({ achievementNotices: true }), 1`);
+
 // Fullscreen (`src/lib/fullscreen.ts`), DISPLAY's FULLSCREEN. A finger's press is no
 // gesture a browser enters fullscreen at, only its lift: a tap enters it, on a page no
 // mouse has pressed yet. With the scanlines and the curve on, a mouse's press leaves it and enters it

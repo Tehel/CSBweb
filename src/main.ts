@@ -42,6 +42,7 @@ import { ScrollingText } from './renderer/csbwin/ScrollingText';
 import { UIMode } from './renderer/ui/UIState';
 import { openReincarnateScreen } from './renderer/ui/ReIncarnate';
 import { askBeginAdventure } from './renderer/ui/SaveMenu';
+import { showAchievementNotice, takeBannerChanged } from './renderer/ui/AchievementBanner';
 import { introProbe, openHintOracle, runBootSequence, type BootSequenceDeps } from './renderer/intro/BootSequence';
 import { reduceTitlePicture } from './renderer/intro/TitlePicture';
 import type { TitleFrame } from './renderer/intro/TitleThumbnail';
@@ -544,6 +545,8 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     const achievements = defs && new PageAchievements(game, dataSet.id, defs, screen.ui.objectTables.objectNames,
         new BrowserAchievementStore((rows) => drawPlaythrough(storeRandom, rows)), saves, teleported,
         (message, error) => console.warn(message, error));
+    // Each unlock a banner over the view, with ACHIEVEMENT NOTICES on.
+    achievements?.onShown(({ def }) => showAchievementNotice(screen.ui, { name: def.name, tier: def.tier }));
     return { game, screen, saves, recorder, recordings, recordingStore, messages, events, input, playInput, achievements };
 }
 
@@ -690,7 +693,8 @@ function wire({ game, screen, messages, events, playInput }: Built, viewer: View
     // unless its tick holds the paint until the put-back (`Game.paintHeld`). And so is one
     // the pointer has moved before: the VBL handler alone draws the cursor (`:1050-1053`),
     // and a move of the pointer draws nothing itself (`GameInput.mouseMove`), nor does
-    // the wheel in a dialog (`GameScreen.handleDialogWheel`).
+    // the wheel in a dialog (`GameScreen.handleDialogWheel`). And so is one in which the
+    // achievements' banner showed or went (`takeBannerChanged`).
     let heldThrough = false;
     game.onFrame(() => {
         if (viewer?.held()) {
@@ -703,7 +707,8 @@ function wire({ game, screen, messages, events, playInput }: Built, viewer: View
         const moved = screen.takeCursorMoved();
         const wheeled = screen.takeWheelTurned();
         const stripped = viewer?.takeChanged() ?? false;
-        if (scrolled || flashed || moved || wheeled || stripped || heldThrough) {
+        const bannered = takeBannerChanged(screen.ui);
+        if (scrolled || flashed || moved || wheeled || stripped || bannered || heldThrough) {
             heldThrough = false;
             refreshScreen();
         }

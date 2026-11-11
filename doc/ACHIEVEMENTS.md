@@ -302,16 +302,23 @@ The page tracks the achievements of a game the player plays (`PageAchievements`,
   one of the same key is there: the first unlock stays when a branch loaded since unlocks
   it again.
 
+- **The banner** (`src/renderer/ui/AchievementBanner.ts`): an unlock shows ACHIEVEMENT
+  UNLOCKED, its tier and its name on a panel across the top of the viewport, drawn after
+  the game and under any dialog, never in the message area, which is the engine's. It
+  stays three seconds from its first drawing, and a dialog up holds it back; two unlocks
+  at once show one after the other. The screen shows it through the interface's palette,
+  as it shows an object in hand, so a dark level does not hide it. GAME's ACHIEVEMENT
+  NOTICES, on by default, turns it off; the unlock is stored all the same. Each tier has
+  its colour (`TIER_COLORS`): easy orange, silly cyan, weird green, hard yellow.
+
 `tools/checks/achievements-page.ts` proves the history through F5, F9 and a fresh page's
-read, a new game's whole and an import's not, the store's rows, and the teleport earning
-nothing, on the stand-in page (`StandInPage.track`); `tools/probe-frames.ts` that the
-viewer tracks nothing.
+read, a new game's whole and an import's not, the store's rows, the teleport earning
+nothing, and the banner's turns, on the stand-in page (`StandInPage.track`);
+`tools/probe-frames.ts` that the viewer tracks nothing, and an unlock's IndexedDB row,
+its banner (frame 34) and ACHIEVEMENT NOTICES.
 
 Still to come in phase 18.3:
 
-- An unlock shows for three seconds as a banner over the viewport, drawn after the game,
-  never in the message area, which is the engine's. A setting, ACHIEVEMENT NOTICES, turns
-  it off.
 - A dialog drawn in the canvas lists the set's achievements.
 - The welcome page's book has an ACHIEVEMENTS tab.
 

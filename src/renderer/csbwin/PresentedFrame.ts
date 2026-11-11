@@ -54,6 +54,7 @@ export class PresentedFrame {
   private overlaySpan: Span | null = null;
   private footprint: Footprint | null = null;
   private footprintClear = 0;
+  private uiSpan: Span | null = null;
 
   constructor(private readonly width: number, private readonly height: number) {
     this.pixels = new Uint8Array(width * height);
@@ -62,7 +63,8 @@ export class PresentedFrame {
   /**
    * Called as the screen is presented, with what the conversion did: `viewportPalette`
    * over `viewportSpan`, the overlay's pixels over `overlaySpan`, and the object in hand
-   * through the interface palette where `footprint` is not colour `footprintClear`.
+   * through the interface palette where `footprint` is not colour `footprintClear`, and
+   * `uiSpan`, the achievements' banner, through the interface palette whole.
    */
   record(
     screen: Uint8Array,
@@ -71,6 +73,7 @@ export class PresentedFrame {
     overlaySpan: Span | null,
     footprint: Footprint | null,
     footprintClear: number,
+    uiSpan: Span | null = null,
   ): void {
     this.pixels.set(screen);
     this.uiPalette = uiPalette.slice();
@@ -79,6 +82,7 @@ export class PresentedFrame {
     this.overlaySpan = overlaySpan ? { ...overlaySpan } : null;
     this.footprint = footprint;
     this.footprintClear = footprintClear;
+    this.uiSpan = uiSpan ? { ...uiSpan } : null;
   }
 
   /**
@@ -97,7 +101,9 @@ export class PresentedFrame {
       for (let x = 0; x < width; x++) {
         const i = y * width + x;
         const slot = pixels[i]! & 0x0f;
-        if (inside(this.overlaySpan, x, y)) {
+        if (inside(this.uiSpan, x, y)) {
+          codes[i] = slot;
+        } else if (inside(this.overlaySpan, x, y)) {
           const o = i * 4;
           const rgb555 = ((rgba[o]! >> 3) << 10) | ((rgba[o + 1]! >> 3) << 5) | (rgba[o + 2]! >> 3);
           let code = overlayCode.get(rgb555);

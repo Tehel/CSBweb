@@ -508,6 +508,27 @@ export function forEachFootprintPixel(
 }
 
 /**
+ * Converts again, through `palette`, the pixels of `src` in `rect`, ends inclusive: a
+ * banner drawn over the viewport (`AchievementBanner.ts`), shown in the interface's
+ * palette rather than the light level's.
+ */
+export function reconvertRectThroughPalette(
+  imageData: RgbaImage,
+  src: PaletteIndexViewportBuffer,
+  rect: Rect,
+  palette: number[]
+): void {
+  checkConversionSizes(imageData, src);
+  const out = rgbaPixels(imageData);
+  const lookup = rgbaLookup(palette);
+  const x1 = clampInt(rect.x1, 0, src.width - 1);
+  const x2 = clampInt(rect.x2, 0, src.width - 1);
+  for (let y = clampInt(rect.y1, 0, src.height - 1); y <= clampInt(rect.y2, 0, src.height - 1); y++) {
+    convertRun(out, src.pixels, y * src.width + x1, y * src.width + x2 + 1, lookup);
+  }
+}
+
+/**
  * Converts again, through `palette`, the pixels of `src` that `bitmap` covers at (`x`, `y`)
  * where it is not colour `transparentColor`: a cursor drawn over the viewport, shown in
  * the palette it was drawn for rather than the viewport's.

@@ -211,7 +211,7 @@ export const TABS: ReadonlyArray<{
   {
     tab: 'game',
     label: 'GAME',
-    help: 'THE EXTRAS, THE VIEWS AND THE STATISTICS',
+    help: 'THE EXTRAS, THE VIEWS, STATISTICS, ACHIEVEMENTS',
     buttons: true,
     settings: [
       { name: 'DRINK AT FOUNTAINS', help: 'AN EMPTY HAND ON A FOUNTAIN DRINKS FROM IT', ...extra('drinkAtFountain') },
@@ -239,6 +239,13 @@ export const TABS: ReadonlyArray<{
         kind: 'toggle',
         get: (values) => values.mapView,
         set: (_values, on) => ({ mapView: on }),
+      },
+      {
+        name: 'ACHIEVEMENT NOTICES',
+        help: 'A BANNER OVER THE VIEW AT EACH ACHIEVEMENT',
+        kind: 'toggle',
+        get: (values) => values.achievementNotices,
+        set: (_values, on) => ({ achievementNotices: on }),
       },
     ],
   },

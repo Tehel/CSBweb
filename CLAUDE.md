@@ -120,7 +120,7 @@ was hiding among the type errors.
 There is still **no test framework** (`PLAN.md` → "The evidence") — `npm test` is a runner
 (`tools/run-checks.ts`) over two standing forms of evidence, and both must pass:
 
-- `tools/check-frames.sh` compares thirty-three live screen states against `tools/frames/` — the
+- `tools/check-frames.sh` compares thirty-four live screen states against `tools/frames/` — the
   cheapest way to prove a renderer or UI change kept every pixel. It starts its own dev
   server and headless Chrome, so it needs no setup. It is
   out of the default run only because it costs a browser and ~80s. Run it before any renderer or UI commit. A frame is
@@ -131,7 +131,8 @@ There is still **no test framework** (`PLAN.md` → "The evidence") — `npm tes
   and the keys reaching a save menu, at the entrance as in play, a move of the pointer
   painting nothing until the VBL's frame, the download its EXPORT starts, a delete failed when its transaction aborts, a file
   dropped on it, a finger on a touch screen: a tap one click and the sound unlocked by it, the eye held while it
-  is down, and the eye let go by a mouse released off the canvas; and the settings dialog
+  is down, and the eye let go by a mouse released off the canvas; and an achievement's
+  banner, its row in the store and ACHIEVEMENT NOTICES; the settings dialog
   opened by Esc and by a double click, the clock held under it, a setting kept across a
   reload, its slider dragged off the canvas, and its EXIT leading to the welcome
   page, a click on the left-handed screen landing where it is shown, the map dialog opened by a long

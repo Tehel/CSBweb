@@ -14,6 +14,9 @@
  * 3. **The store's rows**: an unlock is a row of the set, the playthrough and the party,
  *    `unverified`, shown once; unlocked again after F9, the first row stays.
  * 4. **The teleport**: a playthrough a teleport has touched writes and shows nothing.
+ * 5. **The banner** (`AchievementBanner.ts`): two unlocks at once show one after the
+ *    other, each from its first drawing, none under a dialog, and none with ACHIEVEMENT
+ *    NOTICES off. `tools/probe-frames.ts` takes its frame.
  *
  * The viewer's page builds no tracker: `tools/probe-frames.ts` asserts it on
  * `?recording=`.
@@ -28,6 +31,7 @@ import { DungeonLoader } from '../../src/data/DungeonLoader';
 import { memoryAchievementStore, readSaveFileFields, saveEntryOf, type SaveEntry, type StoredSaveEntry } from '../../src/data/saves';
 import { setAchievementDefs, type ShownUnlock } from '../../src/engine/achievements/PageAchievements';
 import { standInPage, type StandInPage } from '../../src/renderer/StandInPage';
+import { BANNER_RECT, drawAchievementBanner, showAchievementNotice, takeBannerChanged } from '../../src/renderer/ui/AchievementBanner';
 import { check, finish } from '../lib/check';
 import { STOCK_DATA_SET, diskFiles } from '../lib/dataSets';
 import { memoryStore, savePath } from '../lib/saves';
@@ -162,5 +166,26 @@ await a.achievements.settled();
 check(a.achievements.tracker.unlocked.has('t-four'), 'the tracker unlocks Four Seconds in the touched playthrough');
 check(!(await achievementStore.list(set.id)).some((r) => r.id === 't-four'), 'no row is written for it');
 check(a.shown.length === before, 'nor is it shown');
+
+// 5. The banner.
+console.log('=== the banner ===');
+const { ui } = a.screen;
+showAchievementNotice(ui, { name: 'One', tier: 'easy' });
+showAchievementNotice(ui, { name: 'Two', tier: 'hard' });
+check(takeBannerChanged(ui) && !takeBannerChanged(ui), 'an unlock shown is a change a frame draws, once');
+check(ui.banner.shown?.notice.name === 'One' && ui.banner.shown.until === null && ui.banner.waiting.length === 1,
+  'the first shows, its time not begun, the second waits');
+ui.dialog = { name: 'settings' } as typeof ui.dialog;
+check(drawAchievementBanner(ui) === null && ui.banner.shown?.until === null, 'under a dialog it is not drawn, and its time does not begin');
+ui.dialog = null;
+check(drawAchievementBanner(ui) === BANNER_RECT && ui.banner.shown?.until !== null, 'drawn, over the view, its three seconds begin');
+check(!takeBannerChanged(ui), 'and it stays for them');
+ui.banner.shown!.until = 0;
+check(takeBannerChanged(ui) && ui.banner.shown?.notice.name === 'Two', 'at their end, the next takes its place');
+ui.banner.shown!.until = 0;
+check(takeBannerChanged(ui) && ui.banner.shown === null && drawAchievementBanner(ui) === null, 'and then the banner is gone');
+ui.settings.update({ achievementNotices: false });
+showAchievementNotice(ui, { name: 'Three', tier: 'easy' });
+check(ui.banner.shown === null && !takeBannerChanged(ui), 'with ACHIEVEMENT NOTICES off, an unlock shows nothing');
 
 finish();

@@ -15,6 +15,7 @@ import {
   createPaletteIndexViewportBuffer,
   updateImageDataFromIndex,
   updateImageDataFromIndexWithViewportPalette,
+  reconvertRectThroughPalette,
   reconvertThroughPalette,
   type RgbaImage,
 } from './csbwin/CanvasBlitter';
@@ -36,6 +37,7 @@ import { LEFT_HANDED_VIEWPORT, leftHandedLayout, leftHandedX, makeLeftHanded, ri
 import type { ScreenIndexBuffer, UIHooks, UIState } from './ui/UIState';
 import { drawStaticUIFrame } from './ui/Draw';
 import { drawCursorItem } from './ui/Mouse';
+import { drawAchievementBanner } from './ui/AchievementBanner';
 import { drawSpellControls, drawSpellPanel } from './ui/MagicPanel';
 import { drawAttackPanel } from './ui/Attack';
 import { drawReincarnateScreen } from './ui/ReIncarnate';
@@ -204,6 +206,8 @@ export class ScreenComposer {
       shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word12, 0);
       shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word20, 0);
     }
+    // The achievements' banner over the viewport, the port's own, under any dialog (`ui/AchievementBanner.ts`).
+    const banner = drawAchievementBanner(this.ui);
     // The dialog over the game (`ui/Dialog.ts`). The save menu takes the whole screen,
     // cleared, where `_DoMenu` with `I1 == 0` would leave the picture around the viewport.
     this.ui.dialog?.draw(this.ui);
@@ -237,6 +241,11 @@ export class ScreenComposer {
       updateImageDataFromIndex(image, this.screen, uiPalette);
     }
     const overlaid = !uiPaletteOnly && this.isAdventureVideoMode() && this.drawViewportThroughOverlay(viewportPalette, viewportSpan.x1);
+    // The banner, moved with the viewport on the left-handed screen, through the interface's palette.
+    const bannerShown = banner && (throughViewportPalette || overlaid)
+      ? { ...banner, x1: banner.x1 + viewportSpan.x1 - VIEWPORT_SPAN.x1, x2: banner.x2 + viewportSpan.x1 - VIEWPORT_SPAN.x1 }
+      : null;
+    if (bannerShown) reconvertRectThroughPalette(image, this.screen, bannerShown, uiPalette);
     this.presented.record(
       this.screen.pixels,
       uiPalette,
@@ -244,6 +253,7 @@ export class ScreenComposer {
       overlaid ? viewportSpan : null,
       throughViewportPalette || overlaid ? footprint : null,
       12,
+      bannerShown,
     );
     this.output.show(true);
   }

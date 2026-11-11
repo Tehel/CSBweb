@@ -50,8 +50,8 @@ console.log('=== the defaults ===');
   check(JSON.stringify(values) === JSON.stringify(DEFAULT_SETTINGS), 'an empty storage gives the defaults');
   check(values.sound && values.volume === 0.8 && !values.scanlines && !values.curve && values.aspectRatio === '16:10' && values.startupAnimations,
     'sound on at 0.8, no scanlines nor curve, the screen 16:10, the startup animations shown');
-  check(values.statistics && !values.mapView && !values.championView,
-    'the statistics sent; the map and the champions off');
+  check(values.statistics && !values.mapView && !values.championView && values.achievementNotices,
+    'the statistics sent; the map and the champions off; the achievements\' notices on');
   check(JSON.stringify(values.extras) === JSON.stringify(NO_EXTRAS), 'every extra off');
   check(values.keyPreset === 'csbwin' && values.keyBindings === DEFAULT_KEY_BINDINGS, "the keys are CSBWIN's preset");
   check(new Settings(null).values === DEFAULT_SETTINGS, 'no storage at all gives the defaults');

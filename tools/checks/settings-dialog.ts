@@ -211,13 +211,15 @@ console.log('\n=== 3. the controls ===');
   check(!values().statistics, 'SEND STATISTICS\', pressed, on the fourth line, turns them off');
   click(ui, settingButtonFrame(7));
   check(values().mapView, 'MAP VIEW\'s, beside it, turns the map on');
+  click(ui, settingButtonFrame(8));
+  check(!values().achievementNotices, 'ACHIEVEMENT NOTICES\', pressed, on the fifth line, turns them off');
   const gaps = [
     { x: settingButtonFrame(0).x2 + 4, y: centre(settingButtonFrame(0)).y },
-    { x: centre(settingButtonFrame(8)).x, y: centre(settingButtonFrame(8)).y },
+    { x: centre(settingButtonFrame(9)).x, y: centre(settingButtonFrame(9)).y },
   ];
   updates = 0;
   for (const at of gaps) settingsDialogClick(ui, at.x, at.y, 2);
-  check(updates === 0, 'a click between two buttons, or where no ninth setting is, changes nothing');
+  check(updates === 0, 'a click between two buttons, or where no tenth setting is, changes nothing');
 
   click(ui, TAB_FRAMES[2]);
   check(state.tab === 'sound', 'SOUND\'s tab selects it');
