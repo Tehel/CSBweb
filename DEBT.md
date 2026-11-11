@@ -143,7 +143,6 @@ In payoff order: the first row is the next item.
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
 | X9 | Thrown weapons' tags kept across a save | M | ⏸️ |
 | X10 | The cells the party has seen, kept across a save for an automap | M | ⏸️ |
-| X16 | The map's info follows a DSA's program to the squares it names | M | ⏸️ |
 | X19 | The map's info names a spent once-only actuator | S | ⏸️ |
 | E22 | Fullscreen filled by a fraction | M | ⏸️ waits on the author |
 | H | Deliberate divergences | — | 🚫 |
@@ -419,8 +418,10 @@ item; beside it, a square's info (`src/engine/CellInfo.ts`): what it is, where
 it leads, what lies on it, what its actuators need and act on, whether a generator is
 ready or resting, the champion a mirror gives, what acts on it, and where the objects its
 locks need are, each square it names a link. A click on a square shows
-it; a page opened with `?dev` moves the party by a press held on one. A DSA's program
-names no link yet (X16).
+it; a page opened with `?dev` moves the party by a press held on one. A DSA shows the
+squares its programs name, read without running them (`src/engine/DsaTargets.ts`), and a
+square the DSAs naming it; a location a DSA computes as it runs is said to be there, not
+followed.
 
 The champion dialog (`src/renderer/ui/ChampionDialog.ts`) is the third: with GAME's
 CHAMPION VIEW on, the CHAMPIONS key, which no preset binds, or a long press on a
@@ -1210,24 +1211,6 @@ drawing a map from them is a separate item, entered when the author names it.
   prints each level's codes as a map. It asserts a fake wall seen as stone and a hidden
   pit seen as floor, saves, loads, and compares every code. The same file with the
   records deleted loads with every cell unknown.
-
-### X16 ⏸️ The map's info follows a DSA's program to the squares it names
-
-The map dialog's info (`src/engine/CellInfo.ts`) shows a DSA by its description and
-state, and follows an actuator's target to its square, but not a DSA's: a DSA acts on
-the squares its program names, and the info names none of them, in either direction.
-Conflux and the fans' dungeons do most of their work in DSAs, so there the info says
-least where it is most wanted.
-
-- **What to read**: a program's location constants, the words an operation takes as a
-  location (`LOCATIONREL`, `LOCATIONABS`, `doc/CSBWIN_DSA_REFERENCE.md`), told from any
-  other constant by the operation that pops them, over the census's decoder
-  (`decode`, `src/engine/DungeonCensus.ts`), which knows each command's operands.
-- **What it gives**: under a DSA, the squares it acts on, as links; under a square, the
-  DSAs whose programs name it, under "Acted on by". A location computed at run time is
-  not followed, and the info says so rather than guess.
-- **The check**: `tools/checks/map-cell-info.ts` on a Conflux DSA whose program names a
-  square, both ways.
 
 ### X19 ⏸️ The map's info names a spent once-only actuator
 

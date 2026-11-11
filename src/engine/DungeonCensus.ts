@@ -200,20 +200,31 @@ function signedField(word: number, shift: number, bits: number): number {
   return (value & (sign - 1)) - (value & sign);
 }
 
-/** Decode one program: false when a word is no command or the operands overrun it. */
-function decode(program: Uint16Array, commands: Map<string, number>, operations: Map<number, number>): boolean {
+/**
+ * Each command of `program` in turn: its name, its word, and where its operands start,
+ * past the extra state word of a `MAXSTATE` field. False when a word is no command or the
+ * operands overrun the program.
+ */
+export function walkProgram(program: Uint16Array, visit: (name: string, word: number, at: number) => void): boolean {
   let pc = 0;
   while (pc < program.length) {
     const word = program[pc++] ?? 0;
     const layout = COMMANDS[word & 0x3f];
     if (!layout) return false;
-    commands.set(layout.name, (commands.get(layout.name) ?? 0) + 1);
     if (signedField(word, layout.stateShift, layout.stateBits) === -layout.maxState) pc++;
-    if (layout.name === 'AMPERSAND' || layout.name === 'AMPERSAND2') {
-      const subcode = ((word >> 6) & 0x7f) + (layout.name === 'AMPERSAND2' ? 128 : 0);
-      operations.set(subcode, (operations.get(subcode) ?? 0) + 1);
-    }
+    visit(layout.name, word, pc);
     pc += layout.operands(word, program, pc);
   }
   return pc === program.length;
+}
+
+/** Decode one program: false when a word is no command or the operands overrun it. */
+function decode(program: Uint16Array, commands: Map<string, number>, operations: Map<number, number>): boolean {
+  return walkProgram(program, (name, word) => {
+    commands.set(name, (commands.get(name) ?? 0) + 1);
+    if (name === 'AMPERSAND' || name === 'AMPERSAND2') {
+      const subcode = ((word >> 6) & 0x7f) + (name === 'AMPERSAND2' ? 128 : 0);
+      operations.set(subcode, (operations.get(subcode) ?? 0) + 1);
+    }
+  });
 }

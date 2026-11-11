@@ -13,7 +13,9 @@
  * The text is in sentence case; the map dialog folds it to the font's capitals.
  */
 import { OBJNI_NOT_AN_OBJECT } from '../core/objectNameIndex';
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, getRoomType, type ObjectID } from '../core/types';
+import {
+  DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, getRoomType, locationRelFromInteger, type ObjectID,
+} from '../core/types';
 import {
   ActuatorAction,
   getActuatorAction,
@@ -21,6 +23,8 @@ import {
   getActuatorDisableTime,
   getActuatorDsaSelector,
   getActuatorDsaState,
+  getActuatorParameterA,
+  getActuatorParameterB,
   getActuatorState,
   getActuatorTargetPos,
   getActuatorTargetX,
@@ -36,6 +40,7 @@ import { readHeroText, type HeroText } from '../data/HeroExtractor';
 import type {
   ActuatorRecord, ContainerRecord, CreatureRecord, DoorRecord, TeleporterRecord, TextRecord,
 } from '../data/dungeonTypes';
+import { dsaTargets, type DsaTargets, type DsaValue } from './DsaTargets';
 import type { DungeonState } from './DungeonState';
 import type { GameTables } from './GameTables';
 import { MonsterType } from './monsterTypes';
@@ -280,6 +285,19 @@ interface Sender {
   readonly room: number;
 }
 
+/** A square a DSA's programs name, and what they do there. */
+interface DsaUse {
+  readonly words: string;
+  readonly at: CellRef;
+}
+
+/** A DSA naming a square: where it is, its words, and what it does to that square. */
+interface DsaSender extends CellRef {
+  readonly side: string;
+  readonly script: string;
+  readonly words: string[];
+}
+
 /** Where an object lies, and in what. */
 interface Place extends CellRef {
   readonly where: string;
@@ -295,6 +313,8 @@ export class CellInfo {
   private places: Map<number, Place[]> | null = null;
   private arrivals: Map<string, CellRef[]> | null = null;
   private resting: Map<number, number> | null = null;
+  private readonly dsaPrograms = new Map<number, DsaTargets>();
+  private dsaSenders: Map<string, DsaSender[]> | null = null;
   private readonly marks = new Map<string, Set<number>>();
 
   constructor(private readonly source: CellInfoSource) {}
@@ -449,6 +469,7 @@ export class CellInfo {
     }
     if (getActuatorType(a) === 47) {
       out.push({ text: `${where}${this.dsaWords(at.map, a)}`, indent: 0 });
+      this.dsaNames(at.map, rn, a, out);
       return;
     }
     if (room === RoomType.STONE && getActuatorType(a) === 127) {
@@ -481,6 +502,77 @@ export class CellInfo {
     const dsa = index === null ? null : dungeon.getData().dsaIndex?.entries[index] ?? null;
     const description = dsa?.description.trim();
     return `Script${description ? ` "${description}"` : ''}, state ${getActuatorDsaState(a)}`;
+  }
+
+  /**
+   * The squares a DSA's programs name (`DsaTargets`), each a link, at most `MAX_PLACES`,
+   * and whether it computes others as it runs, which are not followed.
+   */
+  private dsaNames(map: number, rn: ObjectID, a: ActuatorRecord, out: InfoLine[]): void {
+    const { uses, computed } = this.dsaUses(map, rn, a);
+    for (const u of uses.slice(0, MAX_PLACES)) out.push({ text: `${u.words} ${this.place(u.at)}`, indent: 1, link: u.at });
+    if (uses.length > MAX_PLACES) out.push({ text: `and ${uses.length - MAX_PLACES} more`, indent: 1 });
+    if (computed) out.push({ text: 'And squares it computes as it runs', indent: 1 });
+  }
+
+  /**
+   * What the DSA actuator `rn` on `map` names: its DSA's programs read
+   * (`dsaTargets`), once a DSA, and their parameters read off `rn`. A location off the
+   * dungeon's levels names nothing.
+   */
+  private dsaUses(map: number, rn: ObjectID, a: ActuatorRecord): { uses: DsaUse[]; computed: boolean } {
+    const { dungeon } = this.source;
+    const index = dungeon.getDsaLevelIndex(map, getActuatorDsaSelector(a));
+    const dsa = index === null ? null : dungeon.getData().dsaIndex?.entries[index] ?? null;
+    if (index === null || !dsa) return { uses: [], computed: false };
+    let targets = this.dsaPrograms.get(index);
+    if (!targets) {
+      targets = dsaTargets(dsa.states.flatMap((state) => (state?.actions ?? []).map((action) => action.program)));
+      this.dsaPrograms.set(index, targets);
+    }
+    let computed = targets.computed;
+    const uses: DsaUse[] = [];
+    const seen = new Set<string>();
+    for (const u of targets.uses) {
+      const value = this.dsaValue(u.from, rn, targets);
+      if (value === null) {
+        computed = true;
+        continue;
+      }
+      const locr = locationRelFromInteger(value);
+      const level = dungeon.getMap(locr.l);
+      if (!level || locr.x >= level.descriptor.width || locr.y >= level.descriptor.height) continue;
+      const key = `${u.words}|${locr.l},${locr.x},${locr.y}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      uses.push({ words: u.words, at: { map: locr.l, x: locr.x, y: locr.y } });
+    }
+    return { uses, computed };
+  }
+
+  /**
+   * A value a program reads as a location, or null when it is not known: a parameter its
+   * DSA stores is a variable. A parameter is read as `loadParameter` reads it
+   * (`src/engine/dsa/DsaMachine.ts`, `doc/CSBwin-src/DSA.cpp:1139-1180`): `where` 0 and 1
+   * the actuator's A and B, each two more a DSA further along its square's chain.
+   */
+  private dsaValue(from: DsaValue, rn: ObjectID, targets: DsaTargets): number | null {
+    if (from.kind === 'constant') return from.value;
+    if (from.kind === 'self' || targets.storesAnyParameter || targets.stored.has(from.where)) return null;
+    const { dungeon } = this.source;
+    let r = rn;
+    let slot = from.where;
+    while (slot > 1) {
+      r = dungeon.getDBRecordLink(r);
+      if (r === OBJECT_ID_EOF) return null;
+      if (dungeon.rnMaps.dbType(r) !== DBType.ACTUATOR) continue;
+      const next = dungeon.getActuatorRecord(r);
+      if (!next || getActuatorType(next) !== 47) continue;
+      slot -= 2;
+    }
+    const rec = dungeon.getActuatorRecord(r);
+    if (!rec) return null;
+    return slot === 0 ? getActuatorParameterA(rec) : getActuatorParameterB(rec);
   }
 
   /**
@@ -590,11 +682,20 @@ export class CellInfo {
     }
   }
 
-  /** The actuators on `at`'s map aimed at it, each a link to its square. */
+  /**
+   * The actuators on `at`'s map aimed at it, and the DSAs of any level whose programs
+   * name it, each a link to its square.
+   */
   private actedOnBy(at: CellRef, out: InfoLine[]): void {
     const senders = this.sendersOf(at.map).get(at.x * 32 + at.y) ?? [];
-    if (!senders.length) return;
+    const scripts = this.dsaSendersOf().get(`${at.map},${at.x},${at.y}`) ?? [];
+    if (!senders.length && !scripts.length) return;
     out.push({ text: 'Acted on by:', indent: 0 });
+    for (const s of scripts) {
+      const where = s.map === at.map ? `(${s.x},${s.y})` : this.place(s);
+      out.push({ text: `${where}${s.side}: ${s.script}`, indent: 1, link: { map: s.map, x: s.x, y: s.y } });
+      for (const words of s.words) out.push({ text: `${words} (${at.x},${at.y})`, indent: 2 });
+    }
     const { dungeon } = this.source;
     for (const s of senders) {
       const a = dungeon.getActuatorRecord(s.rn)!;
@@ -664,6 +765,39 @@ export class CellInfo {
         }
       }
     }
+    return index;
+  }
+
+  /** The DSAs of the dungeon by the squares their programs name, `map,x,y` (`dsaUses`). */
+  private dsaSendersOf(): Map<string, DsaSender[]> {
+    if (this.dsaSenders) return this.dsaSenders;
+    const index = new Map<string, DsaSender[]>();
+    this.dsaSenders = index;
+    const { dungeon } = this.source;
+    dungeon.getData().maps.forEach((level, map) => {
+      for (let x = 0; x < level.descriptor.width; x++) {
+        for (let y = 0; y < level.descriptor.height; y++) {
+          const room = getRoomType(level.cellFlags[x]![y]!);
+          for (const rn of this.chain(dungeon.findFirstObject(new Position(x, y, map)))) {
+            if (dungeon.rnMaps.dbType(rn) !== DBType.ACTUATOR) continue;
+            const a = dungeon.getActuatorRecord(rn);
+            if (!a || getActuatorType(a) !== 47) continue;
+            const side = room === RoomType.STONE ? ` ${SIDES[dungeon.rnMaps.pos(rn) & 3]} side` : '';
+            const named = new Map<string, DsaSender>();
+            for (const u of this.dsaUses(map, rn, a).uses) {
+              const key = `${u.at.map},${u.at.x},${u.at.y}`;
+              let sender = named.get(key);
+              if (!sender) {
+                sender = { map, x, y, side, script: this.dsaWords(map, a), words: [] };
+                named.set(key, sender);
+                index.set(key, [...(index.get(key) ?? []), sender]);
+              }
+              sender.words.push(u.words);
+            }
+          }
+        }
+      }
+    });
     return index;
   }
 

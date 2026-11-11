@@ -17,7 +17,12 @@
  * 5. **A door's button**.
  * 6. **What has no target**: a local action, a generator and the launchers are no
  *    sender (`doc/CSBwin-src/CSB.h:1014-1023`).
- * 7. **A DSA**: Conflux 3.5's (4,0) of map 1 shows its description and state.
+ * 7. **A DSA**: Conflux 3.5's (4,0) of map 1 shows its description and state. The squares
+ *    its programs name (`src/engine/DsaTargets.ts`), both ways: the "Feeding filter" at
+ *    (2,29) of map 1 says the text of (31,15) of map 18, a word of its program, and that
+ *    square names it under what acts on it; the "Uncurse" at (19,15) of map 2 sends TOGGLE
+ *    to (2,29), its parameter, and (2,29) names it; a location the filter computes as it
+ *    runs is said to be there, not followed.
  * 8. **A generator**: DM's (5,12) of map 9 makes 1 to 4 flying eyes, its delay 12 (bit 3
  *    and 4), then rests 512 ticks, its disable time 134 (`doc/CSBwin-src/Timer.cpp:1771-1820`).
  *    It is ready, and G marks it. Fired by a `TT_OPENROOM` on its square, it is type 0 and
@@ -139,6 +144,21 @@ function main(): void {
   const lines = dsa.describe(at);
   show(at, lines);
   check(!!line(lines, 'E side: Script "Decoration AB", state 0'), 'Conflux\'s DSA at (4,0) of map 1 shows its description and state');
+  const confluxAt = (map: number, x: number, y: number): InfoLine[] => {
+    const lines = dsa.describe({ map, x, y });
+    show({ map, x, y }, lines);
+    return lines;
+  };
+  const filter = confluxAt(1, 2, 29);
+  check(!!line(filter, 'Says the text of L18 (31,15)', { map: 18, x: 31, y: 15 }), 'the feeding filter at (2,29) of map 1 says the text of (31,15) of map 18, a link');
+  check(!!line(filter, 'And squares it computes as it runs'), 'and computes other squares as it runs, which are not followed');
+  check(!!line(filter, 'L2 (19,15) N side: Script "Uncurse", state 0', { map: 2, x: 19, y: 15 }) && !!line(filter, 'Sends TOGGLE to (2,29)'),
+    '(2,29) is acted on by the Uncurse DSA at (19,15) of map 2, which sends it TOGGLE');
+  const uncurse = confluxAt(2, 19, 15);
+  check(!!line(uncurse, 'Sends TOGGLE to L1 (2,29)', { map: 1, x: 2, y: 29 }), 'the Uncurse DSA names (2,29) of map 1, its parameter, a link');
+  const said = confluxAt(18, 31, 15);
+  check(!!line(said, 'L1 (2,29) N side: Script "Feeding filter ABCDEF"', { map: 1, x: 2, y: 29 }) && !!line(said, 'Says the text of (31,15)'),
+    '(31,15) of map 18 names the feeding filter whose text it holds');
 
   // 8. A generator.
   const ready = describe(9, 5, 12);
