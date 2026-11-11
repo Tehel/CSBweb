@@ -155,7 +155,7 @@ screen = new GameScreen(canvas as unknown as ConstructorParameters<typeof GameSc
   isPrison: () => saves.inPrison(), onExportSave: no, onDeleteSave: no, onImportSave: no,
   onRestoreSave: no, onRestoreFailed: (e) => { throw e; }, onOpenHintOracle: no, onSleepSave: () => {},
   onExit: () => {}, settings, isCrtAvailable: () => false, fullscreen: NO_FULLSCREEN,
-  keyboardLayout: () => null, onTeleport: null,
+  keyboardLayout: () => null, onTeleport: null, achievements: () => null,
 }, presenter, () => {});
 new GameInput({ game, screen, refreshScreen: () => {}, onQuickSave: no, onQuickLoad: no, onDevLevel: null }).install();
 settings.subscribe((values) => applyToGame(game, values));

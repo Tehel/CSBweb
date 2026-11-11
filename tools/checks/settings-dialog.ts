@@ -219,7 +219,8 @@ console.log('\n=== 3. the controls ===');
   ];
   updates = 0;
   for (const at of gaps) settingsDialogClick(ui, at.x, at.y, 2);
-  check(updates === 0, 'a click between two buttons, or where no tenth setting is, changes nothing');
+  check(updates === 0 && ui.dialog?.name === 'settings',
+    'a click between two buttons, or on ACHIEVEMENTS, inert where the page tracks none, changes nothing');
 
   click(ui, TAB_FRAMES[2]);
   check(state.tab === 'sound', 'SOUND\'s tab selects it');

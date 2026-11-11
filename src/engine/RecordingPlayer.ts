@@ -495,6 +495,7 @@ const HOLDER_NAMES: Record<ClockHolder, string> = {
     settings: 'THE SETTINGS',
     map: 'THE MAP',
     champions: 'THE CHAMPIONS',
+    achievements: 'THE ACHIEVEMENTS',
     saveMenu: 'THE SAVE MENU',
     hintOracle: 'THE HINT ORACLE',
 };

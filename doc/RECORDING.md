@@ -596,7 +596,7 @@ mouse queue's pass. The player tells the page each span as it ends (`onSkipped`)
 a line in the message area says what was run at once: "SKIPPED 12S ON THE SAVE MENU",
 its VBLs over sixty, rounded (`skippedLine`). What held the clock is what the stop that
 began the span named (`InputBoundary.holder`): a dialog's logged `pause` names it
-(`settings`, `map`, `champions`, `Dialog.name`), and so does the stop the disk menu and
+(`settings`, `map`, `champions`, `achievements`, `Dialog.name`), and so does the stop the disk menu and
 the Hint Oracle make in a VBL (`saveMenu`, `hintOracle`); a logged stop recorded before
 the name says "A MENU". The page's input reaches nothing of the game, and the page
 records nothing, saves nothing and sends no statistic. At the path's end, or at a drift, the loop stops,

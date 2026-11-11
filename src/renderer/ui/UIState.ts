@@ -7,6 +7,7 @@
  * translation of its C++ counterpart instead of another method on a god object.
  */
 import type { BannerState } from './AchievementBanner';
+import type { AchievementsDialogState, AchievementsView } from './AchievementsDialog';
 import type { GraphicsLoader } from '../../data/GraphicsLoader';
 import type { OpenedSave, SaveEntry } from '../../data/saves';
 import type { ImportAnswer, ImportResult, ImportedFile } from '../../engine/GameSaves';
@@ -138,6 +139,8 @@ export interface UIState {
   mapDialogMark: CellMark | null;
   /** The champion dialog's state while it is the dialog (`src/renderer/ui/ChampionDialog.ts`). */
   championDialog: ChampionDialogState | null;
+  /** The achievements dialog's state while it is the dialog (`src/renderer/ui/AchievementsDialog.ts`). */
+  achievementsDialog: AchievementsDialogState | null;
   /** The achievements' banner: the unlocks waiting and the one shown (`src/renderer/ui/AchievementBanner.ts`). */
   banner: BannerState;
   /**
@@ -356,6 +359,11 @@ export interface UIState {
    * let a press held on the map dialog do it: only a page opened with `?dev` does.
    */
   readonly onTeleport: ((map: number, x: number, y: number) => void) | null;
+  /**
+   * The achievements of the game the player plays, as the tracker has them now, or `null`
+   * where the page tracks none, a recording played back: the achievements dialog's.
+   */
+  readonly achievements: () => AchievementsView | null;
 
   /* ---- back into the renderer ---- */
   getGraphicBitmap(graphicNum: number): IndexedBitmap | null;
@@ -455,7 +463,7 @@ type UISources = Pick<UIState,
 export type UIHooks = Pick<UIState,
   | 'getGraphicBitmap' | 'renderLastFrame' | 'animate'
   | 'onReincarnated' | 'onListSaves' | 'onListEverySave' | 'onReadSave' | 'onMakeNewAdventure' | 'onHasNewFaces' | 'onSaveGame' | 'isPrison' | 'onExportSave' | 'onDeleteSave' | 'onImportSave' | 'onRestoreSave' | 'onRestoreFailed' | 'onOpenHintOracle' | 'onSleepSave' | 'onExit'
-  | 'settings' | 'isCrtAvailable' | 'fullscreen' | 'keyboardLayout' | 'onTeleport'>;
+  | 'settings' | 'isCrtAvailable' | 'fullscreen' | 'keyboardLayout' | 'onTeleport' | 'achievements'>;
 
 export function createUIState(sources: UISources, hooks: UIHooks): UIState {
   return {
@@ -471,6 +479,7 @@ export function createUIState(sources: UISources, hooks: UIHooks): UIState {
     mapDialog: null,
     mapDialogMark: null,
     championDialog: null,
+    achievementsDialog: null,
     banner: { waiting: [], shown: null, changed: false },
     hintOracle: null,
     hintOracleUp: false,

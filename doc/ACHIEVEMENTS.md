@@ -311,15 +311,29 @@ The page tracks the achievements of a game the player plays (`PageAchievements`,
   NOTICES, on by default, turns it off; the unlock is stored all the same. Each tier has
   its colour (`TIER_COLORS`): easy orange, silly cyan, weird green, hard yellow.
 
+- **The dialog** (`src/renderer/ui/AchievementsDialog.ts`) lists the set's achievements
+  in the canvas, for the playthrough being played: the tracker's history, so a save
+  loaded shows what that save had unlocked. It opens from the settings: GAME's
+  ACHIEVEMENTS button puts it up in the settings' place, and is inert where the page
+  tracks none. No key opens it: the settings are a click or Esc away on every screen,
+  touch screens included, and a key of its own would be one more for the KEYS tab. Its
+  title says how many are unlocked; a row an achievement, in the file's order, its name
+  and its tier, in the tier's colour once unlocked and grey until then; a panel at the
+  foot says whether the selected one is unlocked and its text, and, for one that needs
+  the whole game in a game from a save that kept no history, that it needs a game played
+  from its start. A click selects a row, the wheel, the scrollbar's arrows and the up
+  and down keys move through the list, and Esc, CLOSE or a right click close it. It
+  holds the clock as every dialog does, its stop named `achievements` in a recording.
+
 `tools/checks/achievements-page.ts` proves the history through F5, F9 and a fresh page's
 read, a new game's whole and an import's not, the store's rows, the teleport earning
-nothing, and the banner's turns, on the stand-in page (`StandInPage.track`);
-`tools/probe-frames.ts` that the viewer tracks nothing, and an unlock's IndexedDB row,
-its banner (frame 34) and ACHIEVEMENT NOTICES.
+nothing, the banner's turns and the dialog's, on the stand-in page
+(`StandInPage.track`); `tools/probe-frames.ts` that the viewer tracks nothing, and an
+unlock's IndexedDB row, its banner (frame 34), ACHIEVEMENT NOTICES and the dialog
+(frame 35).
 
 Still to come in phase 18.3:
 
-- A dialog drawn in the canvas lists the set's achievements.
 - The welcome page's book has an ACHIEVEMENTS tab.
 
 ## Proofs and the Hall of Fame

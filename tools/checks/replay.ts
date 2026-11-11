@@ -287,6 +287,7 @@ class Page {
       fullscreen: NO_FULLSCREEN,
       keyboardLayout: () => null,
       onTeleport: null,
+      achievements: () => null,
     }, presenter, () => {});
     this.game = game;
     this.screen = screen;

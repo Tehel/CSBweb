@@ -68,6 +68,7 @@ export function newUIState(graphics: GraphicsLoader, ctx: GameContext, hooks: Pa
     fullscreen: NO_FULLSCREEN,
     keyboardLayout: () => null,
     onTeleport: null,
+    achievements: () => null,
     ...hooks,
     getGraphicBitmap,
   });

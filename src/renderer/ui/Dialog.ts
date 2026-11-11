@@ -1,7 +1,8 @@
 /**
  * The dialog over the game: the one slot a dialog fills while it is up (`UIState.dialog`).
  * The save menu (`SaveMenu.ts`), the settings (`SettingsDialog.ts`), the map
- * (`MapDialog.ts`) and the champions (`ChampionDialog.ts`) use it.
+ * (`MapDialog.ts`), the champions (`ChampionDialog.ts`) and the achievements
+ * (`AchievementsDialog.ts`) use it.
  *
  * A dialog is drawn into the screen over what the screen composed, under the button
  * flash and the cursor (`GameScreen`), and it is modal the way `_WaitForMenuSelect` is
@@ -29,7 +30,7 @@ export const BARS_LONG_PRESS_MS = MESSAGE_LONG_PRESS_MS;
 
 export interface Dialog {
   /** What it is, as the stop of the clock it opens with names it (`ClockHolder`). */
-  readonly name: Extract<ClockHolder, 'settings' | 'map' | 'champions' | 'saveMenu'>;
+  readonly name: Extract<ClockHolder, 'settings' | 'map' | 'champions' | 'achievements' | 'saveMenu'>;
   /**
    * Shown through the interface's palette whole, the viewport's lines too, which the
    * screen otherwise shows through the light level's palette, as CSBWin shows its menus

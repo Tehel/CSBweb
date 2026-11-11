@@ -17,6 +17,11 @@
  * 5. **The banner** (`AchievementBanner.ts`): two unlocks at once show one after the
  *    other, each from its first drawing, none under a dialog, and none with ACHIEVEMENT
  *    NOTICES off. `tools/probe-frames.ts` takes its frame.
+ * 6. **The dialog** (`AchievementsDialog.ts`): GAME's ACHIEVEMENTS opens it in the
+ *    settings' place, the clock held; its rows are the set's, in the file's order, those
+ *    unlocked in their tier's colour; a click selects a row and the detail says it, and
+ *    one needing the whole game says so in a game from a save; the wheel and the arrows
+ *    scroll; Esc closes it. `tools/probe-frames.ts` takes its frame.
  *
  * The viewer's page builds no tracker: `tools/probe-frames.ts` asserts it on
  * `?recording=`.
@@ -31,7 +36,12 @@ import { DungeonLoader } from '../../src/data/DungeonLoader';
 import { memoryAchievementStore, readSaveFileFields, saveEntryOf, type SaveEntry, type StoredSaveEntry } from '../../src/data/saves';
 import { setAchievementDefs, type ShownUnlock } from '../../src/engine/achievements/PageAchievements';
 import { standInPage, type StandInPage } from '../../src/renderer/StandInPage';
-import { BANNER_RECT, drawAchievementBanner, showAchievementNotice, takeBannerChanged } from '../../src/renderer/ui/AchievementBanner';
+import { BANNER_RECT, TIER_COLORS, drawAchievementBanner, showAchievementNotice, takeBannerChanged } from '../../src/renderer/ui/AchievementBanner';
+import {
+  DETAIL_CHARS, LIST, achievementsDialogClick, achievementsDialogKey, achievementsDialogWheel, detailLines, rowText, wrapText,
+} from '../../src/renderer/ui/AchievementsDialog';
+import { listRowRect } from '../../src/renderer/ui/Widgets';
+import { openSettingsDialog, settingButtonFrame, settingsDialogClick } from '../../src/renderer/ui/SettingsDialog';
 import { check, finish } from '../lib/check';
 import { STOCK_DATA_SET, diskFiles } from '../lib/dataSets';
 import { memoryStore, savePath } from '../lib/saves';
@@ -187,5 +197,37 @@ check(takeBannerChanged(ui) && ui.banner.shown === null && drawAchievementBanner
 ui.settings.update({ achievementNotices: false });
 showAchievementNotice(ui, { name: 'Three', tier: 'easy' });
 check(ui.banner.shown === null && !takeBannerChanged(ui), 'with ACHIEVEMENT NOTICES off, an unlock shows nothing');
+
+// 6. The dialog.
+console.log('=== the dialog ===');
+openSettingsDialog(ui);
+const achievementsButton = settingButtonFrame(9);
+settingsDialogClick(ui, (achievementsButton.x1 + achievementsButton.x2) >> 1, (achievementsButton.y1 + achievementsButton.y2) >> 1, 2);
+const state = ui.achievementsDialog;
+const dialogName = (): string | undefined => (ui as { dialog: { name: string } | null }).dialog?.name;
+check(dialogName() === 'achievements' && ui.settingsDialog === null && state !== null && a.game.ctx.state.paused,
+  'GAME\'s ACHIEVEMENTS opens the achievements in the settings\' place, the clock held');
+const view = ui.achievements()!;
+check(view.defs.map((def) => def.id).join() === defs.map((def) => def.id).join(), 'its rows are the set\'s achievements, in the file\'s order');
+check(view.unlocked.has('t-two') && view.unlocked.has('t-four') && !view.whole, 'what the game\'s history unlocked, not the whole game\'s');
+const firstRow = rowText(defs.find((def) => def.id === 'first-blood')!);
+console.log(`  "${firstRow}"`);
+check(firstRow.startsWith('FIRST BLOOD ') && firstRow.endsWith(' EASY'), 'a row: the name, and the tier at its end');
+const wholeOne = defs.findIndex((def) => def.whole);
+console.log(`  ${defs[wholeOne]!.id}: ${JSON.stringify(detailLines(view, defs[wholeOne]!))}`);
+check(detailLines(view, defs[wholeOne]!)[0] === 'LOCKED: NEEDS A GAME PLAYED FROM ITS START',
+  'one that needs the whole game says it cannot be unlocked in a game from a save');
+const two = defs.findIndex((def) => def.id === 't-two');
+check(detailLines(view, defs[two]!)[0] === 'UNLOCKED' && TIER_COLORS.easy !== TIER_COLORS.hard, 'one unlocked says so');
+check(JSON.stringify(wrapText('Kill your first monster with a very long word', 12)) === JSON.stringify(['Kill your', 'first', 'monster with', 'a very long', 'word'])
+  && wrapText('x'.repeat(25), 10).length === 3 && DETAIL_CHARS >= 48, 'the text is cut at its words, a line of the panel\'s width');
+const rowRect = listRowRect(LIST, 3);
+achievementsDialogClick(ui, rowRect.x1 + 10, rowRect.y1 + 3, 2);
+check(state?.selected === 3, 'a click on a row selects it');
+check(achievementsDialogWheel(ui, 100) && state?.scrollTop === 3, 'a notch of the wheel scrolls three rows');
+achievementsDialogKey(ui, 'ArrowUp');
+check(state?.selected === 2 && state.scrollTop === 2, 'the up arrow selects the row above, the list scrolled to it');
+achievementsDialogKey(ui, 'Escape');
+check(dialogName() === undefined && ui.achievementsDialog === null && !a.game.ctx.state.paused, 'Esc closes it, and lets the clock run');
 
 finish();

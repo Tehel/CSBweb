@@ -85,6 +85,11 @@ export class PageAchievements {
     return this.touched.has(this.playthrough);
   }
 
+  /** What the achievements dialog shows (`AchievementsView`): the set's, and what the game's history has unlocked. */
+  view(): { readonly defs: readonly AchievementDef[]; readonly unlocked: ReadonlySet<string>; readonly whole: boolean } {
+    return { defs: this.defs, unlocked: this.tracker.unlocked, whole: this.tracker.whole };
+  }
+
   /** The set's rows in the store, every playthrough's. */
   rows(): Promise<AchievementRow[]> {
     return this.store.list(this.dataSet);

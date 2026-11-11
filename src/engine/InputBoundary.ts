@@ -93,10 +93,10 @@ export type InputChange =
  * What holds the clock: a dialog the page opens (`openDialog`), whose stop it logs, or
  * what the game opens in a VBL, the disk menu and the Hint Oracle.
  */
-export type ClockHolder = 'settings' | 'map' | 'champions' | 'saveMenu' | 'hintOracle';
+export type ClockHolder = 'settings' | 'map' | 'champions' | 'achievements' | 'saveMenu' | 'hintOracle';
 
 /** Every `ClockHolder`, for a reader checking one. */
-export const CLOCK_HOLDERS: readonly ClockHolder[] = ['settings', 'map', 'champions', 'saveMenu', 'hintOracle'];
+export const CLOCK_HOLDERS: readonly ClockHolder[] = ['settings', 'map', 'champions', 'achievements', 'saveMenu', 'hintOracle'];
 
 /** The changes the interface applies. */
 type ScreenChange = Extract<InputChange, { kind: 'panelKey' | 'reincarnateKey' | 'reincarnateClick' }>;

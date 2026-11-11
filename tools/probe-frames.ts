@@ -2424,6 +2424,20 @@ await unlock('pest-control'); await vbls(SHOWN);
 check(await banner() === null && (await achievementRows()).some((row: string) => row.startsWith('pest-control|true|')),
   'an unlock then is stored, and shows nothing');
 await evaluate(`window.__probe.screen.ui.settings.update({ achievementNotices: true }), 1`);
+// The achievements dialog (`src/renderer/ui/AchievementsDialog.ts`): GAME's ACHIEVEMENTS
+// (236,149) opens it in the settings' place; a click selects the sixth row, Own Goal, and
+// a frame of it with the pointer off the canvas; Esc closes it.
+await key('Escape'); await vbls(SHOWN);
+await canvasClick(45, 45, 0); await vbls(SHOWN);
+await canvasClick(236, 149, 0); await vbls(SHOWN);
+check(await evaluate(`window.__probe.screen.ui.dialog?.name === 'achievements' && window.__probe.screen.ui.settingsDialog === null`),
+  'GAME\'s ACHIEVEMENTS opens the achievements in the settings\' place');
+await canvasClick(100, 85, 0); await leaveCanvas(); await vbls(SHOWN);
+check(await evaluate(`window.__probe.screen.ui.achievementsDialog.selected`) === 5, 'a click on the sixth row selects it');
+console.log('state: achievements');      await shot('35-achievements');
+await key('Escape'); await vbls(SHOWN);
+check(await evaluate(`window.__probe.screen.ui.dialog === null`), 'Esc closes the achievements');
+
 
 // Fullscreen (`src/lib/fullscreen.ts`), DISPLAY's FULLSCREEN. A finger's press is no
 // gesture a browser enters fullscreen at, only its lift: a tap enters it, on a page no

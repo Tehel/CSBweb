@@ -98,6 +98,7 @@ export async function standInPage(set: DataSet, files: DataSetFiles, store: Save
     askBeginAdventure: (source) => { if (screen) askBeginAdventure(screen.ui, source); },
   }, () => {}, new CsbRandom());
   const settings = new Settings(null);
+  let tracked: PageAchievements | null = null;
   const presenter = new Presenter(() => screen?.animationFrame(game.mainLoopHasReturned()));
   const image = { width: 320, height: 200, data: new Uint8ClampedArray(320 * 200 * 4) };
   const canvas = { getContext: () => ({ createImageData: () => image, putImageData: () => {} }) };
@@ -131,6 +132,7 @@ export async function standInPage(set: DataSet, files: DataSetFiles, store: Save
     fullscreen: NO_FULLSCREEN,
     keyboardLayout: () => null,
     onTeleport: null,
+    achievements: () => tracked?.view() ?? null,
   }, presenter, () => {});
   new GameInput({
     game,
@@ -148,7 +150,7 @@ export async function standInPage(set: DataSet, files: DataSetFiles, store: Save
   game.ctx.rules.dmRulesDesignOption = set.dmRules;
 
   const track = (defs: readonly AchievementDef[], achievementStore = memoryAchievementStore(), touched: TouchedPlaythroughs = { has: () => false }) =>
-    new PageAchievements(game, set.id, defs, screen!.ui.objectTables.objectNames, achievementStore, saves, touched);
+    (tracked = new PageAchievements(game, set.id, defs, screen!.ui.objectTables.objectNames, achievementStore, saves, touched));
   return { game, screen, messages, clock, dungeonDat, saves, track };
 }
 

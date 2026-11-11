@@ -509,6 +509,8 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
             events.teleported();
             refreshScreen();
         } : null,
+        // The achievements dialog's: the tracker's, where the page tracks any.
+        achievements: () => achievements?.view() ?? null,
         // The Hint Oracle's button: the screen has stopped the clock and shaded the
         // interface, and the Oracle has the canvas until it closes.
         onOpenHintOracle: (square) => {
