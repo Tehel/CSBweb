@@ -342,6 +342,26 @@ body.welcome {
 .documents-pane { display: flex; flex-direction: column; gap: 18px; }
 .documents-pane[hidden] { display: none; }
 .recordings-heading { margin: 0; color: var(--p9); }
+/* ACHIEVEMENTS: how many are unlocked, then a block an achievement, its name and its tier
+   in the tier's colour (the banner's, `TIER_COLORS`), its text, and the playthroughs that
+   unlocked it; one not unlocked is dim. */
+.achievements-summary { margin: 0; color: var(--p9); }
+.achievements-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px; max-height: 360px; overflow-y: auto; font-size: 17px; }
+.achievements-item { display: flex; flex-direction: column; gap: 3px; color: var(--p2); }
+.achievements-item.unlocked { color: var(--p13); }
+.achievements-head { display: flex; gap: 12px; }
+.achievements-name { overflow-wrap: anywhere; }
+.achievements-item.unlocked .achievements-name { color: var(--p15); }
+.achievements-tier { margin-left: auto; font-size: 15px; text-transform: uppercase; white-space: nowrap; }
+.achievements-item.unlocked .tier-easy { color: var(--p9); }
+.achievements-item.unlocked .tier-silly { color: var(--p4); }
+.achievements-item.unlocked .tier-weird { color: var(--p7); }
+.achievements-item.unlocked .tier-hard { color: var(--p11); }
+.achievements-text { margin: 0; font-size: 15px; }
+.achievements-unlocks { margin: 0; padding: 0 0 0 15px; list-style: none; display: flex; flex-direction: column; gap: 3px; font-size: 15px; }
+.achievements-unlocks li { display: flex; gap: 12px; }
+.achievements-party { overflow-wrap: anywhere; }
+.achievements-when { margin-left: auto; color: var(--p2); white-space: nowrap; }
 .recordings-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow-y: auto; font-size: 18px; }
 .recordings-item {
     appearance: none;

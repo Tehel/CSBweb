@@ -46,7 +46,8 @@
  *   asks for the sets anew and shows them, the selection kept but for a set gone. A
  *   refusal is said in the box beside CONTINUE.
  * - **The book** is on every tile, after the triangle. It opens a dialog titled with the
- *   set's name, in two tabs, DOCUMENTS and RECORDINGS; a local set's has RECORDINGS alone.
+ *   set's name, in three tabs, DOCUMENTS, RECORDINGS and ACHIEVEMENTS; a local set's has
+ *   RECORDINGS and ACHIEVEMENTS alone.
  *   DOCUMENTS says the set's description, if it has one, then its authors, "By: " and
  *   their names separated by commas, if it has any, and offers the set's files as one zip, `<name>.zip`, made in the page from the files the server serves
  *   (`src/data/DataSetArchive.ts`), so that the set can be played in CSBWin; then its
@@ -75,7 +76,11 @@
  *   the site's list is asked anew, the recording selected in it, pending; it is not offered
  *   for a local set, a pending one, nor a path that holds a move of `?dev`, and the panel
  *   says why. On a game's end DELETE, the only way one leaves the store but its set's own
- *   deletion. Each delete and withdrawal asks first. CLOSE closes the dialog, and so does
+ *   deletion. Each delete and withdrawal asks first. ACHIEVEMENTS lists the set's
+ *   achievements (`achievementDefs`) in the file's order, how many this browser has
+ *   unlocked over them, and each with its name, its tier in its colour, its text, and the
+ *   playthroughs that unlocked it (`AchievementStore`), the first first: the party then,
+ *   the day and the time played (`showAchievements`). CLOSE closes the dialog, and so does
  *   a click beside it (`closeOnBackdrop`), as it closes HOW TO PLAY's and ABOUT's. The
  *   recording player's STOP leads back to the page with the dialog as its PLAY left it,
  *   the recording selected (`RECORDING_STOPPED_HASH`).
@@ -124,8 +129,9 @@ import { HOW_TO_PLAY_HASH, openHowToPlay, type HowToPlayHost } from './howToPlay
 import { playerId } from './gameEvents';
 import {
     formatPlayTime, formatSaveDate, formatSaveTime, lastUsedSave,
-    type BrowserDataSetStore, type RecordingEntry, type RecordingStore, type SaveEntry, type SaveStore,
+    type AchievementRow, type AchievementStore, type BrowserDataSetStore, type RecordingEntry, type RecordingStore, type SaveEntry, type SaveStore,
 } from '../data/saves';
+import { achievementDefs } from './achievementFiles';
 import {
     pathToWay, pointMadeAt, pointPath, pointRecordingId, savedAtWay, shownPoints, storedPoints, wayEnds, wayInfo, wayPoints,
     type PointInfo, type StoredPoint, type WayPoint,
@@ -229,9 +235,10 @@ const CONFIRMATION = (prefix: string) => `
 </form>`;
 
 /**
- * The dialog the book opens: the set's name, then its two tabs, DOCUMENTS, the set's
- * description, its authors and the documents, and RECORDINGS, the site's recordings of the
- * set, then the browser's points of it, and the panel of the one selected; then a
+ * The dialog the book opens: the set's name, then its three tabs, DOCUMENTS, the set's
+ * description, its authors and the documents, RECORDINGS, the site's recordings of the
+ * set, then the browser's points of it, and the panel of the one selected, and
+ * ACHIEVEMENTS, the set's achievements and the playthroughs that unlocked them; then a
  * moderator's ADD, on DOCUMENTS alone, and CLOSE.
  */
 const DOCUMENTS = `
@@ -240,6 +247,7 @@ const DOCUMENTS = `
   <div class="documents-tabs px px2" role="tablist">
     <button type="button" role="tab" class="documents-tab" id="documents-tab-documents" aria-controls="documents-pane">Documents</button>
     <button type="button" role="tab" class="documents-tab" id="documents-tab-recordings" aria-controls="recordings-pane">Recordings</button>
+    <button type="button" role="tab" class="documents-tab" id="documents-tab-achievements" aria-controls="achievements-pane">Achievements</button>
   </div>
   <div class="documents-pane" id="documents-pane" role="tabpanel" aria-labelledby="documents-tab-documents">
     <p class="documents-description"></p>
@@ -252,6 +260,10 @@ const DOCUMENTS = `
     <h3 class="px px2 recordings-heading">On this browser</h3>
     <ul class="recordings-list recordings-browser" role="listbox" aria-label="Recordings on this browser"></ul>
     <div class="recordings-panel" aria-live="polite"></div>
+  </div>
+  <div class="documents-pane" id="achievements-pane" role="tabpanel" aria-labelledby="documents-tab-achievements">
+    <p class="achievements-summary"></p>
+    <ul class="achievements-list"></ul>
   </div>
   <p class="documents-status" aria-live="polite"></p>
   <div class="add-set-buttons">
@@ -300,6 +312,7 @@ export async function showWelcomePage(
     store: Pick<SaveStore, 'list' | 'read'>,
     localSets: Pick<BrowserDataSetStore, 'list' | 'put' | 'remove'>,
     recordings: RecordingStore,
+    achievements: Pick<AchievementStore, 'list'>,
     loadManifest: () => Promise<DataSetManifest>,
     help: HowToPlayHost,
     select: string | null = null,
@@ -367,7 +380,7 @@ export async function showWelcomePage(
 
     /** The page shown again, `select` selected, for the manifest `shown`. */
     function again(select: string | null, shown = manifest): void {
-        void showWelcomePage(body, shown, store, localSets, recordings, loadManifest, help, select);
+        void showWelcomePage(body, shown, store, localSets, recordings, achievements, loadManifest, help, select);
     }
 
     /** The form that adds a set, or edits `edited`'s, with its `saves`; the page shown again after it. */
@@ -395,7 +408,7 @@ export async function showWelcomePage(
     function openDocuments(set: DataSet, recording: string | null = null, span: RecordingSpan = WHOLE): void {
         const keep = selected?.id ?? null;
         const isLocal = local.some((l) => l.set === set);
-        showDocuments(set, isLocal, viewed.moderator, loadManifest, { saves: store, recordings }, (asked) => {
+        showDocuments(set, isLocal, viewed.moderator, loadManifest, { saves: store, recordings, achievements }, (asked) => {
             if (asked) again(keep, asked);
         }, { recording, span, played: (played, chosen) => noteReturn({ set: set.id, recording: played, span: chosen, selected: keep }) });
     }
@@ -618,14 +631,15 @@ function confirmation(prefix: string, title: string, text: string, verb: string,
     dialog.showModal();
 }
 
-/** The stores the RECORDINGS tab reads: the saves and the recordings. */
+/** The stores the book's tabs read: the saves and the recordings RECORDINGS', the achievements ACHIEVEMENTS'. */
 interface RecordingsSource {
     readonly saves: Pick<SaveStore, 'list' | 'read'>;
     readonly recordings: RecordingStore;
+    readonly achievements: Pick<AchievementStore, 'list'>;
 }
 
 /**
- * The dialog the book opens on `set`, titled with its name, in two tabs. DOCUMENTS, the
+ * The dialog the book opens on `set`, titled with its name, in three tabs. DOCUMENTS, the
  * first shown: its archive, `<name>.zip`, which is made and downloaded once clicked, then
  * its documents, each a link, with its size; to a `moderator`, a cross on each, which
  * removes it once confirmed, and ADD, which sends the file chosen on the drive. After a
@@ -640,8 +654,9 @@ interface RecordingsSource {
  * UPLOAD, its form in the panel, which sends its package (`uploadPoint`), but where the
  * site does not publish the set or the path holds a move of `?dev`. On a game's end
  * DELETE, which deletes it, then what no other point reaches of the recordings before it
- * (`pruneRecordings`). Each delete asks first. A local set, `isLocal`, has RECORDINGS
- * alone, and no site's list. `closed`
+ * (`pruneRecordings`). Each delete asks first. ACHIEVEMENTS: the set's achievements and
+ * the playthroughs that unlocked them (`showAchievements`). A local set, `isLocal`, has
+ * RECORDINGS and ACHIEVEMENTS alone, and no site's list. `closed`
  * is called once it is closed, with the last manifest asked for, or `null` where nothing
  * changed. Where `recordingsAt` names a recording, it opens on RECORDINGS, that one
  * selected; each PLAY tells `recordingsAt` the recording it plays.
@@ -755,26 +770,78 @@ function showDocuments(
 
     const tabs = [...dialog.querySelectorAll<HTMLButtonElement>('.documents-tab')];
     const panes = [...dialog.querySelectorAll<HTMLElement>('.documents-pane')];
+    if (isLocal) {
+        // No DOCUMENTS: a local set's files are the player's own.
+        tabs.shift()!.remove();
+        panes.shift()!.remove();
+        add.remove();
+    }
     const showTab = (shownTab: number) => {
         tabs.forEach((tab, n) => tab.setAttribute('aria-selected', String(n === shownTab)));
         panes.forEach((pane, n) => { pane.hidden = n !== shownTab; });
-        add.hidden = shownTab !== 0;
+        add.hidden = isLocal || shownTab !== 0;
         status.textContent = '';
     };
     tabs.forEach((tab, n) => tab.addEventListener('click', () => showTab(n)));
+    showRecordings(dialog, set, !isLocal, moderator, source, status, recordingsAt);
+    showAchievements(dialog, set, source.achievements);
     if (isLocal) {
-        showRecordings(dialog, set, false, moderator, source, status, recordingsAt);
-        dialog.querySelector('.documents-tabs')!.remove();
-        panes[0]!.remove();
-        add.remove();
-        panes[1]!.hidden = false;
+        showTab(0);
     } else {
-        showRecordings(dialog, set, true, moderator, source, status, recordingsAt);
         render();
         showTab(recordingsAt.recording === null ? 0 : 1);
     }
     document.body.append(dialog);
     dialog.showModal();
+}
+
+/**
+ * The ACHIEVEMENTS tab of `dialog`, on `set`: its achievements (`achievementDefs`), in the
+ * file's order, and over them how many this browser has unlocked. Each with its name, its
+ * tier in its colour, its text, and under them the playthroughs that unlocked it, from
+ * `store`, the first first: the party then, the day and the time played. A row whose
+ * achievement the file no longer has is not listed, and the store keeps it.
+ */
+function showAchievements(dialog: HTMLElement, set: DataSet, store: Pick<AchievementStore, 'list'>): void {
+    const summary = dialog.querySelector<HTMLElement>('.achievements-summary')!;
+    const list = dialog.querySelector<HTMLElement>('.achievements-list')!;
+    const defs = achievementDefs(set.id) ?? [];
+    const show = (rows: readonly AchievementRow[]): void => {
+        const unlocks = new Map<string, AchievementRow[]>();
+        for (const row of rows) unlocks.set(row.id, [...(unlocks.get(row.id) ?? []), row]);
+        const unlocked = defs.filter((def) => unlocks.has(def.id)).length;
+        summary.textContent = defs.length === 0 ? 'This dungeon has no achievements.'
+            : `${unlocked} of ${defs.length} unlocked in this browser.`;
+        list.replaceChildren(...defs.map((def) => {
+            const item = document.createElement('li');
+            const own = unlocks.get(def.id) ?? [];
+            item.className = `achievements-item${own.length > 0 ? ' unlocked' : ''}`;
+            item.dataset.achievement = def.id;
+            const head = document.createElement('div');
+            head.className = 'achievements-head';
+            head.append(line('achievements-name', def.name), line(`achievements-tier tier-${def.tier}`, def.tier));
+            const text = document.createElement('p');
+            text.className = 'achievements-text';
+            text.textContent = def.text;
+            item.append(head, text);
+            if (own.length > 0) {
+                const by = document.createElement('ul');
+                by.className = 'achievements-unlocks';
+                by.replaceChildren(...own.map((row) => {
+                    const unlock = document.createElement('li');
+                    unlock.append(line('achievements-party', row.champions.join(' ') || 'No party'),
+                        line('achievements-when', `${formatSaveDate(row.unlockedAt)}, played ${formatPlayTime(row.playTime)}`));
+                    return unlock;
+                }));
+                item.append(by);
+            }
+            return item;
+        }));
+    };
+    show([]);
+    void store.list(set.id).then(show, (error: unknown) => {
+        summary.textContent = `This browser's achievements could not be read: ${error instanceof Error ? error.message : String(error)}`;
+    });
 }
 
 /**

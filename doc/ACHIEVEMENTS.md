@@ -15,7 +15,8 @@ below).
 **What exists**: the file format, its reader and its evaluator
 (`src/engine/achievements/`), the common file, the tracker that watches the engine
 ("Watching the engine"), and the page's half: the tracker on a game the player plays, its
-history in each save's row, and the store of the unlocks ("The page"). The rest of this document is the design that `PLAN.md` phase 18
+history in each save's row, the store of the unlocks, the banner, the dialog and the
+welcome page's tab ("The page"). The rest of this document is the design that `PLAN.md` phase 18
 builds, step by step, and each step rewrites its section here to say what was built.
 
 ## The file
@@ -325,16 +326,20 @@ The page tracks the achievements of a game the player plays (`PageAchievements`,
   and down keys move through the list, and Esc, CLOSE or a right click close it. It
   holds the clock as every dialog does, its stop named `achievements` in a recording.
 
+- **The welcome page's book** has an ACHIEVEMENTS tab beside DOCUMENTS and RECORDINGS
+  (`showAchievements`, `src/ui/welcomePage.ts`), a local set's too: the set's
+  achievements in the file's order, how many this browser has unlocked, and each with
+  its name, its tier in its colour, its text, and the playthroughs that unlocked it, the
+  first first, each by the party then, the day and the time played. A row whose
+  achievement the file no longer has is not listed; the store keeps it. PROFILE, the
+  public name and the identity key, is phase 18.4's.
+
 `tools/checks/achievements-page.ts` proves the history through F5, F9 and a fresh page's
 read, a new game's whole and an import's not, the store's rows, the teleport earning
 nothing, the banner's turns and the dialog's, on the stand-in page
 (`StandInPage.track`); `tools/probe-frames.ts` that the viewer tracks nothing, and an
-unlock's IndexedDB row, its banner (frame 34), ACHIEVEMENT NOTICES and the dialog
-(frame 35).
-
-Still to come in phase 18.3:
-
-- The welcome page's book has an ACHIEVEMENTS tab.
+unlock's IndexedDB row, its banner (frame 34), ACHIEVEMENT NOTICES, the dialog
+(frame 35) and the book's tab.
 
 ## Proofs and the Hall of Fame
 

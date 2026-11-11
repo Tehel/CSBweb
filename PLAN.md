@@ -50,15 +50,17 @@ At the author's request, beside the debt. The design is `doc/ACHIEVEMENTS.md`.
   on with their parents' histories. Proved by `tools/checks/achievements-tracker.ts`, the
   whole corpus played with it attached. Left: a dungeon's own monster names in its
   `EXPOOL` (`GetMonsterName`, `doc/CSBwin-src/Statistics.cpp:48`), not read.
-- ⏳ 18.3 The page: the store, the banner, the dialog, and the welcome page's tab.
-  Done: the tracker on a game the player plays (`PageAchievements`), none in the
-  viewer, a teleported playthrough earning nothing, the history in each save's row and
-  taken up at each read, the `achievements` store (IndexedDB version 8), proved by
-  `tools/checks/achievements-page.ts`; the banner and ACHIEVEMENT NOTICES (frame 34);
-  the dialog, from the settings' GAME tab (frame 35). Left: the welcome page's tab. Deferred: CSB's adventure, made by RISE from the
-  prison's save, starts a history that is not the whole game's, as its recording begins
-  at a save the replay holds no state for, so no needs-the-whole-game achievement unlocks
-  in CSB; giving it the prison's history needs the verifier to agree (18.5).
+- ✅ 18.3 The page (`doc/ACHIEVEMENTS.md` → "The page"): the tracker on a game the
+  player plays (`PageAchievements`), none in the viewer, a teleported playthrough
+  earning nothing, the history in each save's row and taken up at each read, the
+  `achievements` store (IndexedDB version 8), the banner and ACHIEVEMENT NOTICES
+  (frame 34), the dialog from the settings' GAME tab (frame 35), and the book's
+  ACHIEVEMENTS tab. Proved by `tools/checks/achievements-page.ts` and
+  `tools/probe-frames.ts`. Deferred: CSB's adventure, made by RISE from the prison's
+  save, starts a history that is not the whole game's, as its recording begins at a save
+  the replay holds no state for, so no needs-the-whole-game achievement unlocks in CSB;
+  giving it the prison's history needs the verifier to agree (18.5). A set's own
+  `achievements.txt` is read by neither the page nor the book until 18.7.
 - ⏳ 18.4 Identity: the public name, its public id, the identity key, and PROFILE.
 - ⏳ 18.5 The proofs: the upload, the queue, the verifier service, and the unlocks.
 - ⏳ 18.6 The Hall of Fame page.

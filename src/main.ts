@@ -25,8 +25,8 @@ import { buildGameTables, type GameTables } from './engine/GameTables';
 import { extractGraphicsTables, type GraphicsTables } from './data/tables/GraphicsTables';
 import { UtilityDiskMessages, UtilityError } from './engine/Chaos';
 import { GameSaves, drawPlaythrough } from './engine/GameSaves';
-import type { AchievementDef } from './engine/achievements/AchievementFile';
-import { PageAchievements, setAchievementDefs } from './engine/achievements/PageAchievements';
+import { PageAchievements } from './engine/achievements/PageAchievements';
+import { achievementDefs } from './ui/achievementFiles';
 import { loadSwoosh, type Swoosh } from './data/SwooshLoader';
 // A file, never inlined as a `data:` URL, which the server's policy does not fetch (`SECURITY_HEADERS`).
 import swooshImageUrl from './assets/swoosh.img?url&no-inline';
@@ -105,28 +105,6 @@ let setThumbnail!: () => Promise<Blob | null>;
  * the store's (`playRecording`), on the set it names, or `null`. Its player, once it is begun.
  */
 const playedRecording = new URLSearchParams(window.location.search).get('recording');
-
-/**
- * The achievements' files the project writes: the common file, and the FTL sets' own,
- * `defs/<set id>.txt` (`doc/ACHIEVEMENTS.md` → "The file").
- */
-const ACHIEVEMENT_FILES = import.meta.glob<string>('./engine/achievements/defs/*.txt', { query: '?raw', import: 'default', eager: true });
-
-/**
- * The achievements of the set the page plays: the common file's merged with the set's own
- * file where the project has one. `null`, and the console says why, where a file does not
- * read: the game plays on with none.
- */
-function achievementDefs(setId: string): AchievementDef[] | null {
-    try {
-        const common = ACHIEVEMENT_FILES['./engine/achievements/defs/common.txt'];
-        if (common === undefined) throw new Error('the common achievements are not in the build');
-        return setAchievementDefs(common, ACHIEVEMENT_FILES[`./engine/achievements/defs/${setId}.txt`] ?? null);
-    } catch (error) {
-        console.error('No achievements:', error);
-        return null;
-    }
-}
 /**
  * `?from=` and `&to=`: the saves on the way a store's point is played from, cut there
  * (`cutPlayedPath`), and to (`WayPoint.id`, `src/engine/RecordingPoints.ts`).
@@ -1251,7 +1229,8 @@ async function fetchThumbnail(set: DataSet): Promise<Blob | null> {
 function openWelcomePage(manifest: DataSetManifest): Promise<void> {
     const storeRandom = new CsbRandom();
     const draw: DrawPlaythrough = (rows) => drawPlaythrough(storeRandom, rows);
-    return showWelcomePage(document.body, manifest, new BrowserSaveStore(draw), new BrowserDataSetStore(draw), new BrowserRecordingStore(draw), loadManifest,
+    return showWelcomePage(document.body, manifest, new BrowserSaveStore(draw), new BrowserDataSetStore(draw), new BrowserRecordingStore(draw),
+        new BrowserAchievementStore(draw), loadManifest,
         { settings, keyboardLayout: () => keyboardLayout });
 }
 

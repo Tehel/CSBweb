@@ -847,14 +847,16 @@ const pen = await evaluate(`(()=>{const pens=[...document.querySelectorAll('.pic
 check(pen.count === 1 && pen.of === `local:${MINE}` && pen.label === 'Edit My Own Dungeon' && pen.corner,
   "only a local set's tile has the pen, over its picture's top right corner");
 console.log('  tile heights by row:', pen.rows);
-// The local set's book opens RECORDINGS alone: no tab, no document, no ADD, and no site's list.
+// The local set's book opens on RECORDINGS, beside ACHIEVEMENTS: no DOCUMENTS, no ADD, and no site's list.
 await clickOn(`.pick-cell:has(.pick[data-set="local:${MINE}"]) .pick-documents`);
-const localBook = await evaluate(`(d=>d&&{ title: d.querySelector('h2').textContent, tabs: d.querySelectorAll('.documents-tab').length,
+const localBook = await evaluate(`(d=>d&&{ title: d.querySelector('h2').textContent,
+  tabs: [...d.querySelectorAll('.documents-tab')].map(t=>t.textContent+':'+t.getAttribute('aria-selected')).join(),
   documents: !!d.querySelector('#documents-pane'), recordings: !d.querySelector('#recordings-pane').hidden, add: !!d.querySelector('#documents-add'),
   site: !!d.querySelector('.recordings-site, .recordings-site-heading') })(document.querySelector('dialog.documents'))`);
 await clickOn('#documents-close');
-check(localBook?.title === 'My Own Dungeon' && localBook.tabs === 0 && !localBook.documents && localBook.recordings && !localBook.add && !localBook.site,
-  "a local set's book opens its recordings alone, titled with its name: no tab, no document, no ADD and no site's list");
+check(localBook?.title === 'My Own Dungeon' && localBook.tabs === 'Recordings:true,Achievements:false' && !localBook.documents
+  && localBook.recordings && !localBook.add && !localBook.site,
+  "a local set's book opens on its recordings, titled with its name, beside its achievements: no document, no ADD and no site's list");
 check(pen.rows.split(',').every((row: string) => !row.includes('/')), "a local set's tile is as tall as the others on its row");
 check(pen.names.split('|').every((name: string) => name.endsWith(name.startsWith('local:') ? ' rgb(0, 216, 216)' : ' rgb(252, 252, 252)')),
   "a local set's name is in cyan, palette entry 4, the others' in white");
@@ -1997,7 +1999,8 @@ const endInStore = await evaluate(`new Promise((resolve) => { const open = index
     tx.oncomplete = () => { open.result.close(); resolve(!!row.result || parts.result.some((k) => k[0] === 'probe-end')); }; }; })`);
 console.log('  the browser\'s recordings:', JSON.stringify({ endWritten, listed, saveSelected, endSelected, askedDelete, afterDelete, endInStore }));
 check(listed?.title === 'Chaos Strikes Back', 'the book\'s dialog is titled with the set\'s name');
-check(listed?.tabs === 'Documents:false,Recordings:true' && listed.shown === 'documents-pane:false,recordings-pane:true' && !listed.add,
+check(listed?.tabs === 'Documents:false,Recordings:true,Achievements:false'
+  && listed.shown === 'documents-pane:false,recordings-pane:true,achievements-pane:false' && !listed.add,
   'its RECORDINGS tab, clicked, is shown in DOCUMENTS\' place, without ADD');
 check(listed?.items[0] === 'probe-end|The game won|false' && listed.items.includes(`${savePoint}|${endWritten.save}|false`) && listed.panel.length === 0,
   'it lists the browser\'s points of the set, the latest made first, a game\'s end and the quick save by its name, none selected');
@@ -2026,7 +2029,7 @@ await until(`!!document.querySelector('dialog.documents .recordings-panel .recor
 const cameBack = await recordingsTab();
 const backAddress: string = await evaluate('location.hash');
 console.log('  back from the player:', JSON.stringify({ cameBack, backAddress }));
-check(cameBack?.title === 'Chaos Strikes Back' && cameBack.shown === 'documents-pane:false,recordings-pane:true'
+check(cameBack?.title === 'Chaos Strikes Back' && cameBack.shown === 'documents-pane:false,recordings-pane:true,achievements-pane:false'
   && cameBack.items.includes(`${savePoint}|${endWritten.save}|true`) && cameBack.panel[0] === endWritten.save && backAddress === '',
   'STOP leads back to the welcome page, the book\'s dialog as PLAY left it: RECORDINGS, the save selected, its panel shown, the address without its fragment');
 
@@ -2437,6 +2440,31 @@ check(await evaluate(`window.__probe.screen.ui.achievementsDialog.selected`) ===
 console.log('state: achievements');      await shot('35-achievements');
 await key('Escape'); await vbls(SHOWN);
 check(await evaluate(`window.__probe.screen.ui.dialog === null`), 'Esc closes the achievements');
+// The welcome page's book (`showAchievements`, `src/ui/welcomePage.ts`): CSB's ACHIEVEMENTS
+// tab lists the set's achievements, the two the store holds unlocked, by this playthrough's party.
+const playedParty: string = await evaluate(`window.__probe.game.ctx.party.state.champions.map((c) => c.name).join(' ')`);
+await navigate(`${APP}?dungeon=nowhere&keepsaves`, WELCOME);
+await clickOn('.pick-cell:has(.pick[data-set="csb"]) .pick-documents');
+await clickOn('#documents-tab-achievements');
+await until(`/^2 of /.test(document.querySelector('dialog.documents .achievements-summary').textContent)`, 'the store\'s rows listed');
+const achievementsTab = await evaluate(`(d=>({
+  tabs: [...d.querySelectorAll('.documents-tab')].map(t=>t.textContent+':'+t.getAttribute('aria-selected')).join(),
+  shown: [...d.querySelectorAll('.documents-pane')].map(p=>p.id+':'+!p.hidden).join(),
+  summary: d.querySelector('.achievements-summary').textContent,
+  items: [...d.querySelectorAll('.achievements-item')].map(i=>[i.dataset.achievement, i.classList.contains('unlocked'),
+    i.querySelector('.achievements-tier').textContent, [...i.querySelectorAll('.achievements-party')].map(p=>p.textContent).join('/')].join('|')),
+  colour: getComputedStyle(d.querySelector('.achievements-item.unlocked .achievements-tier')).color }))(document.querySelector('dialog.documents'))`);
+console.log('  the book\'s achievements:', JSON.stringify(achievementsTab));
+check(achievementsTab.tabs === 'Documents:false,Recordings:false,Achievements:true'
+  && achievementsTab.shown === 'documents-pane:false,recordings-pane:false,achievements-pane:true',
+  'the book\'s ACHIEVEMENTS tab, clicked, is shown in DOCUMENTS\' place');
+check(achievementsTab.summary === `2 of ${achievementsTab.items.length} unlocked in this browser.` && achievementsTab.items.length >= 18,
+  'it says how many of the set\'s achievements this browser has unlocked');
+check(achievementsTab.items[0] === `first-blood|true|easy|${playedParty}` && achievementsTab.items[1] === `pest-control|true|easy|${playedParty}`
+  && achievementsTab.items.slice(2).every((item: string) => /\|false\|[a-z]+\|$/.test(item)),
+  'it lists them in the file\'s order, the two unlocked by the party that played, the others not');
+check(achievementsTab.colour === 'rgb(252, 180, 0)', 'an unlocked one\'s tier in its colour, easy\'s orange, palette entry 9');
+await clickOn('#documents-close');
 
 
 // Fullscreen (`src/lib/fullscreen.ts`), DISPLAY's FULLSCREEN. A finger's press is no
