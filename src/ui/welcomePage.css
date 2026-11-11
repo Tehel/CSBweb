@@ -156,13 +156,17 @@ body.welcome {
 .pick-replays { color: var(--p7); padding: 0 3px; }
 .pick-replays:last-child { padding-bottom: 3px; }
 
-/* The moderator's switch, at the window's top right corner, outside the page's column:
-   gold on, grey off. */
-.welcome-moderation {
-    appearance: none;
+/* PROFILE, then the moderator's switch, at the window's top right corner, outside the
+   page's column. The switch is gold on, grey off. */
+.welcome-header {
     position: absolute;
     top: 12px;
     right: 12px;
+    display: flex;
+    gap: 9px;
+}
+.welcome-profile, .welcome-moderation {
+    appearance: none;
     padding: 6px 9px;
     background: #0b0b16;
     border: 3px solid #1d1d30;
@@ -170,8 +174,9 @@ body.welcome {
     cursor: pointer;
 }
 .welcome-moderation[aria-checked="false"] { color: var(--p1); }
-.welcome-moderation:hover { border-color: var(--p9); }
-.welcome-moderation:focus-visible { outline: 3px solid var(--p11); outline-offset: 3px; }
+.welcome-profile { color: var(--p15); }
+.welcome-profile:hover, .welcome-moderation:hover { border-color: var(--p9); }
+.welcome-profile:focus-visible, .welcome-moderation:focus-visible { outline: 3px solid var(--p11); outline-offset: 3px; }
 
 /* PLAY and HOW TO PLAY, then CONTINUE and the save it reads, above the grid. */
 .welcome-actions {
@@ -530,6 +535,23 @@ body.welcome {
 .about-question a { color: var(--p13); }
 .about-question a:hover { color: var(--p11); }
 
+/* PROFILE (`src/ui/profile.ts`): ABOUT's sections, a field and its button on a row, and the
+   dump's parts, each a heading and a list. */
+.profile { width: min(820px, calc(100vw - 32px)); }
+.profile-row { display: flex; align-items: center; gap: 12px; }
+.profile-row input { flex: 1; min-width: 0; }
+.profile-key-text { flex: 1; color: var(--p11); font: 22px/1.4 monospace; letter-spacing: 1px; user-select: all; }
+.profile-name-status:empty, .profile-link-status:empty, .profile-copy-status:empty { display: none; }
+.profile-name-status, .profile-link-status, .profile-copy-status, .profile-public-id { color: var(--p9) !important; }
+.profile-key { display: flex; flex-direction: column; gap: 9px; padding: 9px 12px; border: 3px solid var(--p9); }
+.profile-key[hidden], .profile-new-key[hidden], .profile-public-id[hidden] { display: none; }
+.profile-new-key .btn { width: auto; padding: 0 9px; }
+.profile-part h4 { margin: 0 0 6px; color: var(--p9); font-weight: normal; }
+.profile-part ul { margin: 0; padding-left: 21px; font-size: 17px; line-height: 1.5; color: #bdbac8; }
+.profile-dump { display: flex; flex-direction: column; gap: 15px; }
+.profile-dump p { margin: 0; font-size: 17px; line-height: 1.5; color: #bdbac8; }
+.profile-dump .profile-failure { color: var(--p8); }
+
 /* HOW TO PLAY (`src/ui/howToPlay.ts`): the chooser of the moves' keys, then the sheet, its
    sections on a grid. A key is a cap in the game's font, a rune its glyph in the same font
    over its name. */
@@ -644,7 +666,7 @@ body.welcome {
     .welcome-page { padding: 24px 16px 0; }
     .welcome-logo { margin-bottom: 24px; }
     /* Above the logo, which a phone's width leaves no room beside. */
-    .welcome-moderation { position: static; align-self: flex-end; margin-bottom: 12px; }
+    .welcome-header { position: static; align-self: flex-end; margin-bottom: 12px; }
     .welcome-preview { min-width: 0; width: 100%; }
     .welcome-lead { font-size: 22px; }
     .add-set-form { padding: 16px; }

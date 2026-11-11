@@ -35,7 +35,9 @@ reincarnated, and the name their mirror's text gives them (`JoinedChampion.hero`
 that is accepted: the id is for counting players, not for knowing who they are. There is no
 `visit` event: the player id appears only with a game. It is also what says who owns a
 set uploaded to the site (`doc/DEPLOYMENT.md` → "The game files and the manifest"), so it
-is a secret: the server returns none and logs none.
+is a secret: the server returns none and logs none. The player sees what the log holds of
+it, their games started, won and lost by set, in the welcome page's PROFILE
+(`doc/ACHIEVEMENTS.md` → "Identity"), answered to them alone.
 
 **A game is its playthrough** (`doc/SAVES.md` → "A playthrough"), `d.RandomGameID`, so one
 game's events link up across loads, sessions and imports. Each event is
@@ -118,8 +120,8 @@ takes every event the engine makes as the page sent it.
    (`EVENTS_PER_DAY`, `server/server.ts`; 429), so that no number of addresses grows the
    store by more than a few MB a day.
 6. **A full log** refuses the event (507): at 500,000 rows (`MAX_EVENTS`,
-   `server/stats.ts`), about 140 MB at the 280 bytes an event `tools/checks/stats.ts`
-   measures, aggregates included, kept in every nightly backup. A `session`, which is no
+   `server/stats.ts`), about 165 MB at the 325 bytes an event `tools/checks/stats.ts`
+   measures, aggregates and indexes included, kept in every nightly backup. A `session`, which is no
    row of it, still counts.
 
 An event taken answers 204, and so does a game's second `started` or `won` (below).
@@ -135,7 +137,8 @@ container's writable layer, which every deploy's `down` loses. It runs in WAL mo
 server closes it on SIGTERM, which checkpoints the WAL into the file. A store that cannot be
 opened stops the server before it listens. Its nightly backup is `doc/DEPLOYMENT.md`'s.
 
-The `events` table is the log. What `api/stats` answers is kept beside it as the events
+The `events` table is the log, indexed by player (`events_by_player`) for PROFILE's
+counts alone, which no public answer reads. What `api/stats` answers is kept beside it as the events
 arrive, in the event's own transaction, so that no answer reads the log:
 
 **A game's `started` and `won` are kept once each**, the first: a later one, a save of the

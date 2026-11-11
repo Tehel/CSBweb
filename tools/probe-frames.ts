@@ -34,7 +34,7 @@
 // straight into play, its form adding, editing, publishing and deleting a player's own set, the
 // tiles' controls moderating a published one, the book listing its documents, a moderator adding
 // and removing them, and each tile's name in its set's state's colour,
-// to a moderator, its ABOUT, the statistics page its footer links to, and, against a page whose server sends a content security policy
+// to a moderator, its ABOUT, its PROFILE (a name chosen, a browser linked by its key, the dump), the statistics page its footer links to, and, against a page whose server sends a content security policy
 // (`check-image.sh`), nothing it refuses. See `check` below.
 // A failure there exits 1.
 //
@@ -1959,6 +1959,76 @@ const endWritten = await evaluate(`(async()=>{ const { recordingStore, saves } =
     [{ id, seq: 0, start: recording.start, parent: null, rules: recording.rules, extras: recording.extras }, { id, seq: 1, changes: recording.changes }], null);
   return { save: entry.name, saveId: entry.id, recording: entry.recording.recording, point: [entry.recording.changes, entry.recording.vbls].join(), level: entry.level,
     party: entry.champions.map((name) => name.trim()).filter((name) => name !== '').join(' · ') }; })()`);
+// PROFILE (`src/ui/profile.ts`), the welcome page's header's first button, against the dev
+// server's `api/profile` (`server/identity.ts`). The browser that published the set above
+// opens it: no name yet, the set among what it published. A name too short is refused, one
+// another browser holds, in another case, is taken, both said beside SAVE; the run's own is
+// saved, its public id shown, and its identity key, shown this once, with COPY. Then the
+// browser that shared the recording above opens it: its recording, listed, and a replay; a
+// wrong key is refused, and the key links it, its dump then the identity's, both browsers'
+// set and recording, the name known in two browsers.
+const PROFILE_RUN = Date.now().toString(36).slice(-6);
+const profileShown = () => evaluate(`(d=>d&&{ open: d.open, hash: location.hash, name: d.querySelector('#profile-name').value,
+  nameStatus: d.querySelector('.profile-name-status').textContent, linkStatus: d.querySelector('.profile-link-status').textContent,
+  publicId: d.querySelector('.profile-public-id').hidden ? null : d.querySelector('.profile-public-id').textContent,
+  key: d.querySelector('.profile-key').hidden ? null : d.querySelector('.profile-key-text').textContent,
+  dump: Object.fromEntries([...d.querySelectorAll('.profile-part')].map(p=>[p.querySelector('h4').textContent.replace(/,.*$/, ''),
+    [...p.querySelectorAll('li, .profile-none')].map(l=>l.textContent)])) })(document.querySelector('dialog.profile'))`);
+const openProfileDialog = async () => {
+  await clickOn('.welcome-profile');
+  await until(`!!document.querySelector('dialog.profile .profile-part')`, 'PROFILE\'s dump');
+};
+/** `value` typed into the dialog's `field`, then its button clicked, and the dialog once `status` changed. */
+const profileEntered = async (field: string, button: string, value: string, status: string) => {
+  const before = await evaluate(`document.querySelector('dialog.profile ${status}').textContent`);
+  await evaluate(`(f=>{ f.value = ${JSON.stringify(value)}; f.dispatchEvent(new Event('input')); return 1; })(document.querySelector('dialog.profile ${field}'))`);
+  await clickOn(`dialog.profile ${button}`);
+  await until(`(t => t !== ${JSON.stringify(before)} && t !== '')(document.querySelector('dialog.profile ${status}').textContent)`, `PROFILE's ${button}`);
+  await until(`!!document.querySelector('dialog.profile .profile-part')`, 'PROFILE\'s dump');
+  return profileShown();
+};
+const takenElsewhere: number = await evaluate(`fetch('api/profile', { method: 'POST', headers: { 'X-Player-Id': crypto.randomUUID(), 'Content-Type': 'application/json' },
+  body: JSON.stringify({ action: 'name', name: 'Taken ${PROFILE_RUN}' }) }).then((r) => r.status)`);
+const mineName: string = await evaluate(`fetch('api/data-sets').then((r) => r.json()).then((m) => m.dataSets.find((s) => s.id === ${JSON.stringify(MINE)}).name)`);
+await asPlayer(owner);
+const profileButton = await evaluate(`(b=>b&&{ text: b.textContent, corner: (r=>Math.round(document.documentElement.clientWidth-r.right)+','+Math.round(r.top))(b.getBoundingClientRect()),
+  switch: !!document.querySelector('.welcome-moderation') })(document.querySelector('.welcome-header .welcome-profile'))`);
+await openProfileDialog();
+const profileFirst = await profileShown();
+const profileShort = await profileEntered('#profile-name', '#profile-save', 'ab', '.profile-name-status');
+const profileTaken = await profileEntered('#profile-name', '#profile-save', `taken ${PROFILE_RUN}`, '.profile-name-status');
+const profileSaved = await profileEntered('#profile-name', '#profile-save', `Probe ${PROFILE_RUN}`, '.profile-name-status');
+await clickOn('#profile-copy');
+await until(`document.querySelector('.profile-copy-status').textContent !== ''`, 'COPY said');
+const profileCopied: string = await evaluate(`document.querySelector('.profile-copy-status').textContent`);
+await clickOn('#profile-close');
+const profileClosed = await evaluate(`!document.querySelector('dialog.profile') && location.hash === ''`);
+await asPlayer(SHARER);
+await openProfileDialog();
+const sharerAlone = await profileShown();
+const profileWrongKey = await profileEntered('#profile-link-key', '#profile-link', 'ZZZZZ-ZZZZZ-ZZZZZ-ZZZZZ-ZZZZZ', '.profile-link-status');
+const profileLinked = await profileEntered('#profile-link-key', '#profile-link', profileSaved?.key ?? '', '.profile-link-status');
+await clickOn('#profile-close');
+console.log('  PROFILE:', JSON.stringify({ takenElsewhere, profileButton, profileFirst, profileShort: profileShort?.nameStatus, profileTaken: profileTaken?.nameStatus,
+  profileSaved: profileSaved && { ...profileSaved, key: profileSaved.key && '<key>' }, profileCopied, sharerAlone: sharerAlone?.dump,
+  profileWrongKey: profileWrongKey?.linkStatus, profileLinked }));
+const published = `${mineName}: listed`;
+const sharedRow = 'Probe, of Chaos Strikes Back: listed';
+check(profileButton?.text === 'Profile' && profileButton.corner === '12,12' && !profileButton.switch,
+  'PROFILE, at the welcome page\'s top right corner, to a player beside no moderator\'s switch');
+check(profileFirst?.open === true && profileFirst.hash === '#profile' && profileFirst.name === '' && profileFirst.publicId === null && profileFirst.key === null
+  && profileFirst.dump['Your name']?.join() === 'None chosen.' && profileFirst.dump['Dungeons you published']?.join() === published,
+  'it opens PROFILE at #profile: no name, and what the server knows, the set this browser published, listed');
+check(takenElsewhere === 201 && /^Refused: A name is 3 to 16/.test(profileShort?.nameStatus ?? '') && profileTaken?.nameStatus === 'Taken: This name is taken.',
+  'a name too short is refused, and another\'s, in another case, taken, each said beside SAVE');
+check(profileSaved?.nameStatus === 'Saved.' && /^Your public id: [0-9a-z]{10}$/.test(profileSaved.publicId ?? '') && /^([0-9A-Z]{5}-){4}[0-9A-Z]{5}$/.test(profileSaved.key ?? '')
+  && profileSaved.dump['Your name']?.[0]?.startsWith(`Probe ${PROFILE_RUN}, public id `) && ['Copied.', 'Selected: copy it with your keyboard.'].includes(profileCopied) && profileClosed,
+  'the run\'s name is saved: its public id, its key shown once, COPY said, and the dump\'s name; CLOSE takes #profile off');
+check(sharerAlone?.dump['Recordings you shared']?.includes(sharedRow) && profileWrongKey?.linkStatus === 'Refused: This key is no name\'s.'
+  && profileLinked?.linkStatus === `Linked: this browser is Probe ${PROFILE_RUN} too.` && profileLinked.name === `Probe ${PROFILE_RUN}`
+  && profileLinked.dump['Your name']?.[1] === 'Known in 2 browsers.' && profileLinked.dump['Dungeons you published']?.join() === published
+  && profileLinked.dump['Recordings you shared']?.includes(sharedRow),
+  'the sharer\'s browser: its recording listed; a wrong key refused, the key linking it, the dump then both browsers\' set and recording');
 await navigate(`${APP}?dungeon=nowhere&keepsaves`, WELCOME);
 await clickOn('.pick-cell:has(.pick[data-set="csb"]) .pick-documents');
 await clickOn('#documents-tab-recordings');

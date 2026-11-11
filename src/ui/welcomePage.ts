@@ -84,7 +84,9 @@
  *   a click beside it (`closeOnBackdrop`), as it closes HOW TO PLAY's and ABOUT's. The
  *   recording player's STOP leads back to the page with the dialog as its PLAY left it,
  *   the recording selected (`RECORDING_STOPPED_HASH`).
- * - **The moderator's switch**, at the page's top right corner, is offered to a moderator
+ * - **PROFILE**, at the page's top right corner, opens its dialog (`src/ui/profile.ts`):
+ *   the player's public name, their identity key, and what the server knows of them.
+ * - **The moderator's switch**, beside PROFILE, at the corner, is offered to a moderator
  *   alone. Off, the page is the one a player sees (`playerView`): neither a hidden set nor
  *   a pending one, the moderator's own pending sets included since the page is not told
  *   who owns a set, and no control a player is not offered. The page is shown again, the
@@ -126,6 +128,7 @@ import { openAddDataSetForm, openPublishedSetForm, type EditedPublishedSet } fro
 import { ABOUT_HASH, openAbout } from './about';
 import { closeOnBackdrop } from './backdropClose';
 import { HOW_TO_PLAY_HASH, openHowToPlay, type HowToPlayHost } from './howToPlay';
+import { openProfile, PROFILE_HASH } from './profile';
 import { playerId } from './gameEvents';
 import {
     formatPlayTime, formatSaveDate, formatSaveTime, lastUsedSave,
@@ -371,12 +374,21 @@ export async function showWelcomePage(
         return { set, tile };
     });
     customGrid.append(addTile(() => openForm(null)));
+    const header = document.createElement('div');
+    header.className = 'welcome-header';
+    const profile = document.createElement('button');
+    profile.type = 'button';
+    profile.className = 'welcome-profile px px2';
+    profile.textContent = 'Profile';
+    profile.addEventListener('click', () => openProfile());
+    header.append(profile);
     if (manifest.moderator) {
-        body.querySelector('.welcome-page')!.prepend(moderationSwitch(moderating, () => {
+        header.append(moderationSwitch(moderating, () => {
             keepModeration(!moderating);
             again(selected?.id ?? null);
         }));
     }
+    body.querySelector('.welcome-page')!.prepend(header);
 
     /** The page shown again, `select` selected, for the manifest `shown`. */
     function again(select: string | null, shown = manifest): void {
@@ -488,13 +500,14 @@ export async function showWelcomePage(
     // Back from a recording PLAY played, its dialog as PLAY left it.
     const reopened = back && sets.find((set) => set.id === back.set);
     if (reopened) openDocuments(reopened, back.recording, back.span);
-    // The address at `#how-to-play` opens HOW TO PLAY, and at `#about` ABOUT, as the page is
+    // The address at `#how-to-play` opens HOW TO PLAY, at `#about` ABOUT and at `#profile` PROFILE, as the page is
     // shown and as the fragment changes on it. One handler, the last page's: the page is
     // shown anew often.
     const dialogAsked = () => {
         const { hash } = window.location;
         if (hash === HOW_TO_PLAY_HASH && !document.querySelector('dialog.how-to-play')) openHowToPlay(help);
         if (hash === ABOUT_HASH && !document.querySelector('dialog.about')) openAbout();
+        if (hash === PROFILE_HASH && !document.querySelector('dialog.profile')) openProfile();
     };
     window.onhashchange = dialogAsked;
     dialogAsked();

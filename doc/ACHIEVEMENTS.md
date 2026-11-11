@@ -16,7 +16,9 @@ below).
 (`src/engine/achievements/`), the common file, the tracker that watches the engine
 ("Watching the engine"), and the page's half: the tracker on a game the player plays, its
 history in each save's row, the store of the unlocks, the banner, the dialog and the
-welcome page's tab ("The page"). The rest of this document is the design that `PLAN.md` phase 18
+welcome page's tab ("The page"); and the players' identities, the public name and its key,
+on the server and in the welcome page's PROFILE ("Identity"). An unlock is still only the
+browser's, `unverified`. The rest of this document is the design that `PLAN.md` phase 18
 builds, step by step, and each step rewrites its section here to say what was built.
 
 ## The file
@@ -331,8 +333,7 @@ The page tracks the achievements of a game the player plays (`PageAchievements`,
   achievements in the file's order, how many this browser has unlocked, and each with
   its name, its tier in its colour, its text, and the playthroughs that unlocked it, the
   first first, each by the party then, the day and the time played. A row whose
-  achievement the file no longer has is not listed; the store keeps it. PROFILE, the
-  public name and the identity key, is phase 18.4's.
+  achievement the file no longer has is not listed; the store keeps it.
 
 `tools/checks/achievements-page.ts` proves the history through F5, F9 and a fresh page's
 read, a new game's whole and an import's not, the store's rows, the teleport earning
@@ -341,9 +342,63 @@ nothing, the banner's turns and the dialog's, on the stand-in page
 unlock's IndexedDB row, its banner (frame 34), ACHIEVEMENT NOTICES, the dialog
 (frame 35) and the book's tab.
 
+## Identity
+
+The server's half is `server/identity.ts`, in the store's SQLite file beside the statistics
+(`doc/DEPLOYMENT.md`), so the nightly backup holds it.
+
+- **A public name** is 3 to 16 ASCII letters, digits, `-`, `_` and `.`, in words a single
+  space apart, so that no two names differ by spaces a list does not show
+  (`publicNameProblem`, `src/data/DataSets.ts`, which the page and the server share). It
+  is unique regardless of case: the `identities` table's `name` is `COLLATE NOCASE`. A
+  name is chosen and changed as often as its player likes.
+- **Its public id** is ten characters of Crockford's base 32 (`PUBLIC_ID`), drawn by the
+  server when the name is first chosen, and never changed: the Hall's pages will link by it.
+- **Several `playerId`s share one identity** (`identity_players`): the browser that chose the
+  name, and every one linked to it since. Each answer speaks for them all.
+- **The identity key** is 25 characters of the same alphabet, some 125 bits, drawn with the
+  identity and answered once. The server keeps only its SHA-256, which needs no salt nor a
+  slow hash against a key so drawn. Given in another browser, or in the same one after its
+  data was cleared, it links that browser's `playerId` to the identity, which it leaves any
+  other for. The key is read in any case, its `-` and spaces dropped, an `O` as `0` and an
+  `I` or `L` as `1` (`identityKeyOf`). A key drawn again refuses the old one.
+- **A moderator resets a name** (`POST api/identities/<public id>`, `{"action": "reset"}`):
+  the identity keeps its id, its key and its browsers, and has no name until its player
+  chooses another. The name is retired (`retired_names`), refused to everyone from then on.
+  No page offers the reset yet; the Hall of Fame (phase 18.6) is where a moderator will see
+  the names.
+- **What the server knows about you**, `GET api/profile`, answers the `playerId` that asks
+  and its identity's other browsers (`PlayerProfile`): the identity, its name, its id and
+  how many browsers share it; the sets they published and the state of each; the recordings
+  they shared, the state of each, and how many the site lists as replays; their games the
+  statistics' log holds, games started, won and lost, by set (`StatsStore.playerCounts`,
+  through the log's `events_by_player`); and their achievements by set, none until the
+  proofs are sent (phase 18.5). A session, which the log keeps no row of, is nobody's.
+
+**PROFILE** (`src/ui/profile.ts`) is the welcome page's header's first button, at its
+top right corner, beside the moderator's switch, and `#profile` in the address. Its dialog,
+in ABOUT's look, starts with "I shall be known on the server as:", the name's field and
+SAVE, which says beside it whether the name is refused (checked in the page first), taken
+or saved; then, once there is a name, its public id; when a name is first chosen, or NEW
+KEY draws another, the identity key, shown this once, with COPY; and a field that takes a
+key from another browser, with LINK. Under it, "What the server knows about you": the
+dump, each part a heading and its rows, asked again after each change. A browser that
+keeps no `playerId` asks nothing and is told the server holds nothing of it; choosing a
+name or linking draws one. `tools/probe-frames.ts` proves it against the dev server's
+`api/profile`: the button, a name refused, taken and saved, the key and COPY, a wrong key
+refused, the key linking the browser that shared a recording to the one that published a
+set, and the dump listing both.
+
+No answer holds a `playerId`. `POST api/profile` takes a body of 1 KB at most, at 30
+changes an hour per address, refused ones included (`PROFILE_CHANGES_PER_HOUR`,
+`server/server.ts`). `tools/checks/server-identity.ts` proves the routes: the name's rules,
+its uniqueness regardless of case, the key linking a second browser and the dump answering
+both, a wrong key refused, a new key, a moderator's reset, the dump's authorship and
+counts, the limits, and no `playerId` in any answer.
+
 ## Proofs and the Hall of Fame
 
-*Designed (phases 18.4 to 18.6).*
+*Designed (phases 18.5 and 18.6).*
 
 **The proof is the recording.** A player who has chosen a public name sends the package of
 a point the store keeps, a save or the game's end (`doc/RECORDING.md` → "Shared
@@ -365,13 +420,6 @@ gains an achievement, its kept games can be replayed at idle priority, and the n
 granted to them. A moderator can watch a run that looks suspicious. Its player may publish
 it as a replay, through the shared recordings' moderation. A package that granted nothing
 of its own is deleted once it has been checked.
-
-**Identity.** A public name is 3 to 16 ASCII letters, digits, spaces, `-`, `_` and `.`,
-unique regardless of case. A moderator may reset one. Each name has a public id, ten random
-characters, which the Hall's pages link by. The server keeps its players' `playerId`s
-apart, and several of them can share one identity. An **identity key**, a random secret
-that the server keeps only as a hash, links another browser's `playerId` to the identity,
-or links a browser again after its data has been cleared. No `playerId` ever travels.
 
 **The Hall of Fame** (`fame.html`) shows each set's achievements with how many players of
 the Hall have unlocked each, the share that is, and who unlocked it first; and each player's

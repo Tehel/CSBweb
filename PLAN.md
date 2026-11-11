@@ -61,7 +61,13 @@ At the author's request, beside the debt. The design is `doc/ACHIEVEMENTS.md`.
   the replay holds no state for, so no needs-the-whole-game achievement unlocks in CSB;
   giving it the prison's history needs the verifier to agree (18.5). A set's own
   `achievements.txt` is read by neither the page nor the book until 18.7.
-- ⏳ 18.4 Identity: the public name, its public id, the identity key, and PROFILE.
+- ✅ 18.4 Identity (`doc/ACHIEVEMENTS.md` → "Identity"): the public name, its public id
+  and the identity key on the server (`server/identity.ts`), what it knows of a player
+  (`GET api/profile`), and the welcome page's PROFILE (`src/ui/profile.ts`). Deferred: a
+  moderator resets a name by `POST api/identities/<id>` alone, with no page's control,
+  until the Hall of Fame shows the names (18.6); and a name chosen is not notified to the
+  moderators (`server/notify.ts` tells only of the sets and their recordings). No unlock
+  is sent yet: each stays `unverified` until 18.5.
 - ⏳ 18.5 The proofs: the upload, the queue, the verifier service, and the unlocks.
 - ⏳ 18.6 The Hall of Fame page.
 - ⏳ 18.7 A player's own set's `achievements.txt`: its row in the form, and its check at

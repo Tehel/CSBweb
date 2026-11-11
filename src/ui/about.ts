@@ -3,7 +3,8 @@
  * PLAY is (`src/ui/howToPlay.ts`), with the questions a player asks of the site rather
  * than of the game. The statistics' answer says what `doc/STATISTICS.md` → "Pseudonymous"
  * says: what is sent and why, what links one player's games, how to reset the id and how
- * to send none, and the access log the times are rounded against.
+ * to send none, and the access log the times are rounded against; and that PROFILE
+ * (`src/ui/profile.ts`) shows what the server keeps of the player.
  *
  * `#about` in the page's address opens it, and the footer's ABOUT is a link to it.
  */
@@ -42,6 +43,7 @@ const DIALOG = `
     <h3 class="px">What are the statistics?</h3>
     <p>As you play, the page tells the server a few things about your game: that it started, the party once a champion joins, where the party dies, and whether it wins. They answer three questions: whether the game is actually played, which champions players prefer, and where parties die most often. The <a href="stats">statistics page</a> shows what they add up to.</p>
     <p>They hold no name, no IP address and nothing about your browser, and champions go by the names they carry, which you can type yourself. But a random id, drawn in your browser and used only to count players, links your games together: the statistics are pseudonymous rather than anonymous. Clearing this site's data in your browser draws you a new id, and SEND STATISTICS, in the GAME tab of the settings that Esc opens in the game, sends nothing at all. The web server's access log keeps every request's address, as any site's does, so every time the statistics keep is rounded to ten seconds, never the second of one request.</p>
+    <p>PROFILE, at the top of this page, shows everything the server keeps of you: the dungeons you published, the recordings you shared and your games it counted. There you may also choose a public name, which links your browsers together on the server through a key only you are shown. Nothing public ever shows your random id.</p>
   </section>
   <section class="about-question">
     <h3 class="px">Is it free? Is it legal?</h3>
