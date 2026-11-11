@@ -36,6 +36,23 @@ files on the welcome page, played, then published and moderated (`DEBT.md` → "
 (`DEBT.md` G22), CSBWin's debugging features (G14, the ASCII dump), comparing frames
 against CSBWin's own screenshots, and the extras (X). No dungeon the port plays needs them.
 
+## Phase 18: Achievements and the Hall of Fame
+
+At the author's request, beside the debt. The design is `doc/ACHIEVEMENTS.md`.
+
+- ✅ 18.1 The file format: its reader, its evaluator, the common file
+  (`src/engine/achievements/`), proved by `tools/checks/achievements-format.ts`.
+- ⏳ 18.2 `GameHost.observe` and the tracker. The calls go at the kills, the damage, the
+  deaths, the meals, the spells and the missiles' launches, with the champions' and the
+  monsters' names. The tracker's state is saved with each save and restored at each join.
+  Its proof is the replay corpus, which must play unchanged, and the unlocks it finds there.
+- ⏳ 18.3 The page: the store, the banner, the dialog, and the welcome page's tab.
+- ⏳ 18.4 Identity: the public name, its public id, the identity key, and PROFILE.
+- ⏳ 18.5 The proofs: the upload, the queue, the verifier service, and the unlocks.
+- ⏳ 18.6 The Hall of Fame page.
+- ⏳ 18.7 A player's own set's `achievements.txt`: its row in the form, and its check at
+  publish. The FTL sets' own files.
+
 ## Ground rules
 
 1. **The build must stay clean.** `npm run build` runs `tsc && vite build && vite build --ssr`; `tsc --noEmit`

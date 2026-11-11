@@ -1,0 +1,258 @@
+/**
+ * The achievements file (`doc/ACHIEVEMENTS.md` → "The file"): the common file read, its
+ * names against the real `graphics.dat`, the reader's errors, which conditions need the
+ * whole game, and the evaluator over a game made of events.
+ *
+ * None of it is CSBWin's, and none of it shows on a frame. What to look for in the output:
+ * each common achievement with its tier, whether it needs the whole game (`whole`), and
+ * the aggregates it keeps by their keys. Every name the common file gives an item must be
+ * one of FTL's objects, which is the canary: a name misspelt there would match nothing,
+ * silently, in every set.
+ *
+ * Run: `npm test -- --only=achievements-format.ts`
+ */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import {
+  mergeAchievements, needsWholeGame, parseCondition, readAchievementFile, unknownItems,
+  type AchievementDef, type AchievementFile,
+} from '../../src/engine/achievements/AchievementFile';
+import { AchievementState, type AchievementEvent } from '../../src/engine/achievements/AchievementState';
+import { check, fail, finish } from '../lib/check';
+import { graphicsTablesOf, stockGraphics } from '../lib/game';
+
+const COMMON = resolve(import.meta.dirname, '../../src/engine/achievements/defs/common.txt');
+
+function read(text: string): AchievementFile {
+  const r = readAchievementFile(text);
+  if (!r.ok) {
+    for (const e of r.errors) console.log(`  line ${e.line}: ${e.message}`);
+    throw new Error('the file did not read');
+  }
+  return r.file;
+}
+
+/** The common file: read, printed, its whole-game flags and its names. */
+function commonFile(): AchievementFile {
+  console.log('--- common.txt');
+  const r = readAchievementFile(readFileSync(COMMON, 'utf8'));
+  check(r.ok, 'common.txt reads');
+  if (!r.ok) {
+    for (const e of r.errors) console.log(`  line ${e.line}: ${e.message}`);
+    throw new Error('common.txt did not read');
+  }
+  for (const d of r.file.defs) {
+    console.log(`  ${d.id.padEnd(20)} ${d.tier.padEnd(5)} ${d.whole ? 'whole' : '     '}  ${d.name}`);
+    for (const a of d.aggregates) console.log(`      ${a.key}`);
+  }
+  const whole = new Set(['five-a-day', 'leather-is-enough', 'minimalist-mage', 'lone-wolf', 'buddy-cop', 'speed-runner']);
+  for (const d of r.file.defs) {
+    check(d.whole === whole.has(d.id), `${d.id} ${whole.has(d.id) ? 'needs' : 'does not need'} the whole game`);
+  }
+  check(r.file.disabled.length === 0, 'common.txt disables nothing');
+
+  const names = new Set(graphicsTablesOf(stockGraphics()).objects.objectNames);
+  console.log(`--- common.txt's item names against graphics.dat's ${names.size} names`);
+  for (const d of r.file.defs) {
+    const unknown = unknownItems(d, names);
+    check(unknown.length === 0, `${d.id} names only FTL's objects (not ${unknown.join(', ')})`);
+  }
+  const leather = r.file.defs.find(d => d.id === 'leather-is-enough');
+  check(leather !== undefined && unknownItems(leather, new Set(['HELMET'])).includes('PLATE OF DARC'),
+    'unknownItems lists a name the set lacks');
+  return r.file;
+}
+
+/** Each bad file is refused, its error on the right line. */
+function errors(): void {
+  console.log('--- errors');
+  const H = '# CSBweb achievements 1\n';
+  const block = (when: string): string => `${H}[a]\nname: A\ntext: T\nwhen: ${when}\n`;
+  const cases: [string, string, number, RegExp][] = [
+    ['no header', '[a]\nname: A\n', 1, /first line/],
+    ['a bad id', `${H}[Bad_Id]\nname: A\ntext: T\nwhen: won\n`, 2, /no id/],
+    ['an id used twice', `${H}[a]\nname: A\ntext: T\nwhen: won\n[a]\nname: B\ntext: T\nwhen: won\n`, 6, /twice/],
+    ['no name', `${H}[a]\ntext: T\nwhen: won\n`, 2, /needs a name/],
+    ['no condition', `${H}[a]\nname: A\ntext: T\n`, 2, /needs a condition/],
+    ['an unknown field', `${H}[a]\ncolour: red\n`, 3, /no field/],
+    ['a field before any id', `${H}name: A\n`, 2, /must follow an \[id\]/],
+    ['a continuation with nothing before', `${H}[a]\n  won\n`, 3, /continued line/],
+    ['a bad tier', `${H}[a]\nname: A\ntext: T\ntier: epic\nwhen: won\n`, 5, /tier/],
+    ['a name too long', `${H}[a]\nname: ${'X'.repeat(33)}\ntext: T\nwhen: won\n`, 3, /over 32/],
+    ['non-ASCII', `${H}[a]\nname: Café\ntext: T\nwhen: won\n`, 3, /ASCII/],
+    ['disabled with fields', `${H}[a]\ndisabled\nname: A\n`, 2, /nothing else/],
+    ['an unknown event', block('count(hug) > 1'), 5, /expected an event/],
+    ['an unknown attribute', block('count(kill where colour = red) > 1'), 5, /no attribute "colour"/],
+    ['a value outside its list', block('ever(kill where by = karate)'), 5, /one of melee/],
+    ['yes or no', block('ever(kill where party = maybe)'), 5, /yes or no/],
+    ['a number for a condition', block('count(kill)'), 5, /yes or a no/],
+    ['a number joined by and', block('won and count(kill)'), 5, /joins/],
+    ['a duration against a count', block('count(kill) > 3h'), 5, /duration/],
+    ['play time against a number', block('playTime < 3'), 5, /duration/],
+    ['a yes compared', block('won > 1'), 5, /compares numbers/],
+    ['a quote not closed', block('ever(eat where item = "APPLE)'), 5, /not closed/],
+    ['a pattern on an enum', block('ever(kill where by ~ "m*")'), 5, /compares names/],
+    ['max of an event', block('max(kill) > 1'), 5, /takes a sample/],
+    ['something left over', block('won won'), 5, /unexpected/],
+    ['an unknown word', block('victory'), 5, /no fact/],
+  ];
+  for (const [what, text, line, message] of cases) {
+    const r = readAchievementFile(text);
+    if (r.ok) { fail(`${what}: refused`); continue; }
+    const e = r.errors[0];
+    console.log(`  ${what.padEnd(36)} line ${e?.line}: ${e?.message}`);
+    check(e !== undefined && e.line === line && message.test(e.message), `${what}: refused on line ${line} saying ${message}`);
+  }
+  const continued = readAchievementFile(`${H}[a]\nname: A # a comment\ntext: "#" is kept in quotes\nwhen: won and\n  ever(eat where item = "A#B")\n`);
+  check(continued.ok && continued.file.defs[0]?.name === 'A', 'a comment ends a field');
+  check(continued.ok && continued.file.defs[0]?.aggregates[0]?.key === 'count(eat where item="A#B")',
+    'a continued condition reads, a # inside quotes kept');
+}
+
+/** Which conditions need the whole game. */
+function wholeGame(): void {
+  console.log('--- needsWholeGame');
+  const cases: [string, boolean][] = [
+    ['count(kill) >= 100', false],
+    ['count(kill) > 0', false],
+    ['100 <= count(kill)', false],
+    ['count(kill) = 0', true],
+    ['count(kill) < 5', true],
+    ['5 > count(kill)', true],
+    ['not count(kill) >= 5', true],
+    ['not count(kill) < 5', false],
+    ['ever(kill)', false],
+    ['never(kill)', true],
+    ['not ever(kill)', true],
+    ['not never(kill)', false],
+    ['max(coins) > 10', false],
+    ['max(party) = 1', true],
+    ['min(alive) < 2', false],
+    ['min(alive) > 2', true],
+    ['party = 1', false],
+    ['won', false],
+    ['won and playTime < 3h', true],
+    ['playTime >= 10h', false],
+    ['gameTime < 1000', false],
+    ['distinct(cast.spell) <= 3', true],
+    ['distinct(cast.spell) >= 10', false],
+    ['count(kill) > count(eat)', true],
+    ['won or never(eat)', true],
+  ];
+  for (const [text, expected] of cases) {
+    const got = needsWholeGame(parseCondition(text));
+    console.log(`  ${got ? 'whole' : '     '}  ${text}`);
+    check(got === expected, `${text} ${expected ? 'needs' : 'does not need'} the whole game`);
+  }
+}
+
+const kill = (item = 'SWORD', party = 'yes'): AchievementEvent => ({ kind: 'kill', attrs: { monster: 'MUMMY', by: 'melee', item, champion: 'HALK', party } });
+const eat = (item: string): AchievementEvent => ({ kind: 'eat', attrs: { champion: 'HALK', item } });
+
+/** A game played out of events: what unlocks, when. */
+function evaluator(common: AchievementFile): void {
+  console.log('--- the evaluator');
+  const defs = common.defs;
+  const state = new AchievementState(defs, true);
+  state.sample('party', 1);
+  state.sample('alive', 1);
+  state.sample('coins', 0);
+  check(state.evaluate().length === 0, 'nothing unlocks before anything happens');
+
+  state.record(kill('SWORD', 'no'));
+  check(state.evaluate().length === 0, 'a kill not the party\'s unlocks nothing');
+  state.record(kill());
+  check(sameIds(state.evaluate(), ['first-blood']), 'the first kill unlocks first-blood');
+  check(state.evaluate().length === 0, 'nothing changed, nothing tested');
+  for (let i = 0; i < 9; i++) state.record(kill());
+  check(sameIds(state.evaluate(), ['pest-control']), 'the tenth kill unlocks pest-control');
+  state.record(kill('DRUMSTICK'));
+  check(sameIds(state.evaluate(), ['death-by-drumstick']), 'a kill with a drumstick unlocks death-by-drumstick');
+
+  state.sample('coins', 11);
+  state.sample('coins', 3);
+  check(sameIds(state.evaluate(), ['scrooge']), 'eleven coins carried once unlock scrooge, though fewer now');
+
+  state.record(eat('apple'));
+  state.record(eat('CORN'));
+  state.addVbls(60 * 60 * 60 * 2);
+  state.setGameTime(1234);
+  check(state.evaluate().length === 0, 'meals and time unlock nothing before the end');
+
+  // A save, and a branch: the state goes on in both the same.
+  const saved = JSON.parse(JSON.stringify(state.snapshot())) as ReturnType<AchievementState['snapshot']>;
+  const restored = AchievementState.restore(defs, saved);
+  check(JSON.stringify(restored.snapshot()) === JSON.stringify(state.snapshot()), 'a state saved and restored is the same');
+
+  state.ended(true);
+  const won = state.evaluate();
+  console.log(`  won, all apples and corn, two hours, one champion: ${won.join(', ')}`);
+  check(sameIds(won, ['five-a-day', 'leather-is-enough', 'minimalist-mage', 'roll-the-credits', 'lone-wolf', 'speed-runner']),
+    'the win unlocks the diet, the leather, the spells, the credits, the lone wolf and the speed');
+
+  restored.record(eat('BREAD'));
+  restored.sample('party', 3);
+  restored.addVbls(60 * 60 * 60 * 2);
+  restored.ended(true);
+  const branch = restored.evaluate();
+  console.log(`  the branch, bread, three champions, four hours: ${branch.join(', ')}`);
+  check(sameIds(branch, ['leather-is-enough', 'minimalist-mage', 'roll-the-credits']),
+    'the branch that ate bread with three champions in four hours wins none of those');
+
+  // A game whose history starts at a save that held none.
+  const partial = new AchievementState(defs, false);
+  partial.sample('party', 1);
+  partial.record(kill());
+  partial.record(eat('APPLE'));
+  partial.ended(true);
+  const fromSave = partial.evaluate();
+  console.log(`  a win from a save with no history: ${fromSave.join(', ')}`);
+  check(sameIds(fromSave, ['first-blood', 'roll-the-credits']), 'a history from a save earns only what needs no whole game');
+
+  // The conditions change between a save and its read: the new aggregate is unknown.
+  const before = read('# CSBweb achievements 1\n[a]\nname: A\ntext: T\nwhen: count(kill) >= 1\n');
+  const after = read('# CSBweb achievements 1\n[a]\nname: A\ntext: T\nwhen: count(kill) >= 1\n[b]\nname: B\ntext: T\nwhen: won and never(eat)\n[c]\nname: C\ntext: T\nwhen: count(eat) >= 1\n');
+  const old = new AchievementState(before.defs, true);
+  const next = AchievementState.restore(after.defs, old.snapshot());
+  next.record(eat('APPLE'));
+  next.ended(true);
+  check(sameIds(next.evaluate(), ['c']),
+    'an aggregate a condition added after the save is unknown: never(eat) is not trusted, count(eat) >= 1 is');
+
+  // Patterns and case.
+  const like = read('# CSBweb achievements 1\n[l]\nname: L\ntext: T\nwhen: ever(wear where item ~ "leather*" and slot = torso)\n');
+  const worn = new AchievementState(like.defs, true);
+  worn.record({ kind: 'wear', attrs: { champion: 'HALK', slot: 'legs', item: 'LEATHER PANTS' } });
+  check(worn.evaluate().length === 0, 'a pattern with another slot does not match');
+  worn.record({ kind: 'wear', attrs: { champion: 'HALK', slot: 'torso', item: 'LEATHER JERKIN' } });
+  check(sameIds(worn.evaluate(), ['l']), 'a pattern matches regardless of case');
+}
+
+/** A set's file over the common one. */
+function merging(common: AchievementFile): void {
+  console.log('--- merging');
+  const own = read('# CSBweb achievements 1\n[lone-wolf]\ndisabled\n[no-such]\ndisabled\n[first-blood]\nname: Blooded\ntext: Kill.\nwhen: count(kill) >= 1\n[mine]\nname: Mine\ntext: T\nwhen: won\n');
+  const merged = mergeAchievements(common, own);
+  const ids = merged.map((d: AchievementDef) => d.id);
+  check(!ids.includes('lone-wolf'), 'a disabled common achievement is left out');
+  check(merged.find(d => d.id === 'first-blood')?.name === 'Blooded', 'a set\'s block replaces the common one of its id');
+  check(ids.indexOf('first-blood') === 0, 'the replaced one keeps its place');
+  check(ids[ids.length - 1] === 'mine', 'the set\'s own come after the common ones');
+  check(merged.length === common.defs.length, 'disabling an id the common file lacks does nothing');
+  check(mergeAchievements(common, null).length === common.defs.length, 'a set with no file has the common ones');
+}
+
+function sameIds(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && [...a].sort().join() === [...b].sort().join();
+}
+
+function main(): void {
+  const common = commonFile();
+  errors();
+  wholeGame();
+  evaluator(common);
+  merging(common);
+  finish();
+}
+
+main();

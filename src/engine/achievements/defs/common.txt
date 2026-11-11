@@ -1,0 +1,126 @@
+# CSBweb achievements 1
+#
+# The achievements every data set has (doc/ACHIEVEMENTS.md). A set's own achievements.txt
+# adds to them, replaces one by giving its id, or switches one off with "disabled".
+# The names are FTL's objects; one a set's objects do not have matches nothing there.
+
+# The kill ladder.
+
+[first-blood]
+name: First Blood
+text: Kill your first monster.
+tier: easy
+when: count(kill where party = yes) >= 1
+
+[pest-control]
+name: Pest Control
+text: Kill 10 monsters.
+tier: easy
+when: count(kill where party = yes) >= 10
+
+[exterminator]
+name: Exterminator
+text: Kill 100 monsters.
+tier: easy
+when: count(kill where party = yes) >= 100
+
+[dungeon-janitor]
+name: Dungeon Janitor
+text: Kill 500 monsters.
+tier: hard
+when: count(kill where party = yes) >= 500
+
+[hr-problem]
+name: Lord Chaos's HR Problem
+text: Kill 1000 monsters.
+tier: hard
+when: count(kill where party = yes) >= 1000
+
+# Silly.
+
+[own-goal]
+name: Own Goal
+text: Hurt your own party with your own spell or missile.
+tier: silly
+when: ever(hurt where party = yes)
+
+[forgot-lunch]
+name: Forgot to Pack Lunch
+text: Let a champion starve to death.
+tier: silly
+when: ever(death where cause = starvation)
+
+[bone-dry]
+name: Bone Dry
+text: Let a champion die of thirst.
+tier: silly
+when: ever(death where cause = thirst)
+
+[worked-to-death]
+name: Worked to Death
+text: Let a champion die of exhaustion.
+tier: silly
+when: ever(death where cause = fatigue)
+
+# Weird.
+
+[death-by-drumstick]
+name: Death by Drumstick
+text: Kill a monster with food.
+tier: weird
+when: ever(kill where party = yes and item in (APPLE, CORN, BREAD, CHEESE,
+        "SCREAMER SLICE", "WORM ROUND", DRUMSTICK, "DRAGON STEAK"))
+
+[scrooge]
+name: Scrooge
+text: Carry more than 10 coins at once.
+tier: weird
+when: max(coins) > 10
+
+[five-a-day]
+name: Five a Day
+text: Win having eaten nothing but apples and corn.
+tier: weird
+when: won and ever(eat) and never(eat where not item in (APPLE, CORN))
+
+[leather-is-enough]
+name: Leather Is Enough
+text: Win without ever wearing armour heavier than leather.
+tier: weird
+when: won and never(wear where item in (
+        "MAIL AKETON", "MITHRAL AKETON", "TORSO PLATE", "PLATE OF LYTE", "PLATE OF DARC",
+        "LEG MAIL", "MITHRAL MAIL", "LEG PLATE", "POLEYN OF LYTE", "POLEYN OF DARC",
+        HELMET, BASINET, "CASQUE 'N COIF", ARMET, "HELM OF LYTE", "HELM OF DARC",
+        "BEZERKER HELM", DEXHELM, "FOOT PLATE", "GREAVE OF LYTE", "GREAVE OF DARC"))
+
+[minimalist-mage]
+name: Minimalist Mage
+text: Win having cast no more than three different spells.
+tier: weird
+when: won and distinct(cast.spell where ok = yes) <= 3
+
+# Hard.
+
+[roll-the-credits]
+name: Roll the Credits
+text: Win the game.
+tier: hard
+when: won
+
+[lone-wolf]
+name: Lone Wolf
+text: Win with a single champion.
+tier: hard
+when: won and max(party) = 1
+
+[buddy-cop]
+name: Buddy Cop
+text: Win with a party of two.
+tier: hard
+when: won and max(party) = 2
+
+[speed-runner]
+name: Speed Runner
+text: Win in less than three hours of play.
+tier: hard
+when: won and playTime < 3h

@@ -55,6 +55,7 @@ Corollaries:
 | `doc/PROVEN_FACTS.md` | Verified facts with `File.cpp:line` citations. |
 | `doc/SAVES.md` | The port's own save design: the store, the playthrough, the dialog, F5 and F9. |
 | `doc/DEPLOYMENT.md` | The deployed game: the server, the image, the VPS, deploying and backups. `doc/SETUP.md`: a new instance, step by step. `doc/STATISTICS.md`: what it counts. |
+| `doc/ACHIEVEMENTS.md` | The achievements: their file, what they watch of the engine, their proofs and the Hall of Fame. |
 | `doc/CSBWIN_SYMBOL_INDEX.tsv` | Every CSBWin symbol → `File.cpp:line`. Grep this before grepping the tree. |
 | `doc/CSBwin-src/` | The C++ reference (not ours, git-ignored, fetched by `npm run fetch-csbwin-src`): `CSBwin_SRC_20230608`, CSBWin's last source and the build the author plays. |
 | `doc/ReDMCSB-src/` | The Atari's and the Amiga's reference (not ours, git-ignored, fetched by `npm run fetch-redmcsb-src`): ReDMCSB's C source, which wins where it and CSBWin behave differently, and the reference for what only the Amiga release does. |
