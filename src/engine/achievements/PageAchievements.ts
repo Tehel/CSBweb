@@ -8,7 +8,7 @@
  *
  * **Nothing in this file touches the DOM.**
  */
-import type { AchievementRow, AchievementStore } from '../../data/saves/AchievementStore';
+import type { AchievementProof, AchievementRow, AchievementStore } from '../../data/saves/AchievementStore';
 import type { Game } from '../Game';
 import type { GameSaves } from '../GameSaves';
 import { mergeAchievements, readAchievementFile, type AchievementDef } from './AchievementFile';
@@ -49,6 +49,8 @@ export class PageAchievements {
   private readonly shownListeners: ((shown: ShownUnlock) => void)[] = [];
   /** The writes under way, which `settled` awaits. */
   private writes: Promise<unknown> = Promise.resolve();
+  /** The proof of each row of the set, by playthrough and id, as the store last said (`readProofs`). */
+  private proofs = new Map<string, AchievementProof>();
 
   constructor(
     private readonly game: Game,
@@ -68,6 +70,20 @@ export class PageAchievements {
     this.tracker.onUnlock((unlocks) => this.unlocked(unlocks));
     this.tracker.attach();
     saves.trackAchievements(this.tracker);
+    void this.readProofs();
+  }
+
+  /**
+   * The proofs of the set's rows read again from the store, for the dialog: at the start,
+   * and once the page has written their verdicts (`PageProofs.refresh`).
+   */
+  async readProofs(): Promise<void> {
+    try {
+      const rows = await this.store.list(this.dataSet);
+      this.proofs = new Map(rows.map((row) => [`${row.playthrough}|${row.id}`, row.proof]));
+    } catch (error) {
+      this.log('The achievements could not be read', error);
+    }
   }
 
   /** Told each unlock the page shows: the banner's (`AchievementBanner`). */
@@ -85,9 +101,19 @@ export class PageAchievements {
     return this.touched.has(this.playthrough);
   }
 
-  /** What the achievements dialog shows (`AchievementsView`): the set's, and what the game's history has unlocked. */
-  view(): { readonly defs: readonly AchievementDef[]; readonly unlocked: ReadonlySet<string>; readonly whole: boolean } {
-    return { defs: this.defs, unlocked: this.tracker.unlocked, whole: this.tracker.whole };
+  /**
+   * What the achievements dialog shows (`AchievementsView`): the set's, what the game's
+   * history has unlocked, and how far the proof of each unlock of the playthrough has got.
+   */
+  view(): {
+    readonly defs: readonly AchievementDef[]; readonly unlocked: ReadonlySet<string>; readonly whole: boolean;
+    readonly proof: (id: string) => AchievementProof | null;
+  } {
+    const playthrough = this.playthrough;
+    return {
+      defs: this.defs, unlocked: this.tracker.unlocked, whole: this.tracker.whole,
+      proof: (id) => this.proofs.get(`${playthrough}|${id}`) ?? null,
+    };
   }
 
   /** The set's rows in the store, every playthrough's. */
@@ -120,6 +146,7 @@ export class PageAchievements {
         playTime: Math.round((unlock.vbls * 1000) / VBLS_PER_SECOND), gameTime: unlock.gameTime,
         champions, proof: 'unverified',
       };
+      this.proofs.set(`${playthrough}|${def.id}`, this.proofs.get(`${playthrough}|${def.id}`) ?? 'unverified');
       this.writes = this.writes.then(() => this.store.unlock(row))
         .catch((error) => this.log(`The achievement ${def.id} could not be stored`, error));
       for (const listener of this.shownListeners) listener({ def, unlock });

@@ -37,7 +37,9 @@ that is accepted: the id is for counting players, not for knowing who they are. 
 set uploaded to the site (`doc/DEPLOYMENT.md` → "The game files and the manifest"), so it
 is a secret: the server returns none and logs none. The player sees what the log holds of
 it, their games started, won and lost by set, in the welcome page's PROFILE
-(`doc/ACHIEVEMENTS.md` → "Identity"), answered to them alone.
+(`doc/ACHIEVEMENTS.md` → "Identity"), answered to them alone. With a public name, it also
+says whose the proofs of the achievements are (`doc/ACHIEVEMENTS.md` → "Proofs"), a table of
+their own that the statistics never read; the ABOUT dialog tells the player they are sent.
 
 **A game is its playthrough** (`doc/SAVES.md` → "A playthrough"), `d.RandomGameID`, so one
 game's events link up across loads, sessions and imports. Each event is

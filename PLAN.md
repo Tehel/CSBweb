@@ -68,13 +68,16 @@ At the author's request, beside the debt. The design is `doc/ACHIEVEMENTS.md`.
   until the Hall of Fame shows the names (18.6); and a name chosen is not notified to the
   moderators (`server/notify.ts` tells only of the sets and their recordings). No unlock
   is sent yet: each stays `unverified` until 18.5.
-- ⏳ 18.5 The proofs (`doc/ACHIEVEMENTS.md` → "Proofs"). Done: the server's upload and
-  queue (`server/proofs.ts`, `api/proofs`); the verifier service (`server/verifier.ts`,
-  `replayProof`, `dist/server/VerifierReaders.js`, the compose file's `verifier`), proved by
-  `tools/checks/server-proofs.ts`, `build.ts` and `tools/check-image.sh`. Settled: CSB's
-  adventure keeps a history of its own, as the verifier gives it. Deferred: re-verifying the
-  kept proofs when a set gains an achievement (18.7), a moderator watching a proof (18.6).
-  Left: the page's sending, verdicts and their display.
+- ✅ 18.5 The proofs (`doc/ACHIEVEMENTS.md` → "Proofs"): the server's upload and queue
+  (`server/proofs.ts`, `api/proofs`), the verifier service (`server/verifier.ts`,
+  `replayProof`, `dist/server/VerifierReaders.js`, the compose file's `verifier`), and the
+  page's sending, verdicts and display (`PageProofs`). Proved by
+  `tools/checks/server-proofs.ts`, `achievement-proofs.ts`, `build.ts`,
+  `tools/check-image.sh` and `tools/probe-frames.ts`. Settled: CSB's adventure keeps a
+  history of its own, as the verifier gives it; a verified run is shared through the book's
+  UPLOAD. Deferred: re-verifying the kept proofs when a set gains an achievement (18.7), a
+  moderator watching a proof (18.6), and an unlock the replay grants unclaimed, which the
+  server keeps but the page adds no row for.
 - ⏳ 18.6 The Hall of Fame page.
 - ⏳ 18.7 A player's own set's `achievements.txt`: its row in the form, and its check at
   publish. The FTL sets' own files.

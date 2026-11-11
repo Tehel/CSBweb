@@ -32,6 +32,7 @@
  * whole, as the settings are.
  */
 import type { Rect, UIButton } from '../../data/tables/UITables';
+import type { AchievementProof } from '../../data/saves/AchievementStore';
 import type { AchievementDef } from '../../engine/achievements/AchievementFile';
 import { TIER_COLORS } from './AchievementBanner';
 import { closeDialog, openDialog, type Dialog, type DialogPoint } from './Dialog';
@@ -71,7 +72,12 @@ export interface AchievementsView {
   readonly unlocked: ReadonlySet<string>;
   /** Whether the history goes back to the game's start, so a needs-the-whole-game one can unlock. */
   readonly whole: boolean;
+  /** How far the proof of the playthrough's unlock `id` has got on the server (`doc/ACHIEVEMENTS.md` → "Proofs"), `null` for none stored. */
+  readonly proof: (id: string) => AchievementProof | null;
 }
+
+/** What the detail says of an unlock by its proof: verified by the server's replay, or a replay that did not unlock it. */
+const PROOF_STATUS: Record<AchievementProof, string> = { unverified: 'UNLOCKED', verified: 'UNLOCKED, VERIFIED', dropped: 'UNLOCKED, NOT VERIFIED' };
 
 /* ------------------------------------------------------------------ geometry ---- */
 
@@ -179,9 +185,9 @@ export function wrapText(text: string, width: number): string[] {
   return lines;
 }
 
-/** What the detail says of `def`: whether it is unlocked, and its text. */
+/** What the detail says of `def`: whether it is unlocked, and the server's verdict on it, and its text. */
 export function detailLines(view: AchievementsView, def: AchievementDef): string[] {
-  const status = view.unlocked.has(def.id) ? 'UNLOCKED'
+  const status = view.unlocked.has(def.id) ? PROOF_STATUS[view.proof(def.id) ?? 'unverified']
     : def.whole && !view.whole ? 'LOCKED: NEEDS A GAME PLAYED FROM ITS START' : 'LOCKED';
   return [status, ...wrapText(def.text.toUpperCase(), DETAIL_CHARS)].slice(0, DETAIL_LINES);
 }

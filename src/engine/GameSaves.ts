@@ -218,6 +218,8 @@ export class GameSaves {
     private marked: Promise<void> = Promise.resolve();
     /** Told when a row is deleted or written over (`onRowGone`). */
     private rowGone: () => void = () => {};
+    /** Told each save written (`onSaved`). */
+    private savedListener: (entry: SaveEntry) => void = () => {};
     /**
      * Whether the running game's world is a modified version of the data set's dungeon:
      * the row's of the save it was read from (`SaveEntry.unofficial`), which its own
@@ -267,6 +269,15 @@ export class GameSaves {
      */
     onRowGone(listener: () => void): void {
         this.rowGone = listener;
+    }
+
+    /**
+     * Told each save written to the store, by the disk menu, F5, the Sleepsave or the
+     * adventure's quick-save, with its row: the page sends the proof of its unlocks then
+     * (`PageProofs.saved`).
+     */
+    onSaved(listener: (entry: SaveEntry) => void): void {
+        this.savedListener = listener;
     }
 
     /**
@@ -397,6 +408,7 @@ export class GameSaves {
         await this.store.write(entry, bytes);
         if (clock === 'stopped' && target !== 'sleep') this.game.saveWritten(stamp);
         if (over) this.rowGone();
+        this.savedListener(entry);
         return entry;
     }
 

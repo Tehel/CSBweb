@@ -17,8 +17,9 @@ below).
 ("Watching the engine"), and the page's half: the tracker on a game the player plays, its
 history in each save's row, the store of the unlocks, the banner, the dialog and the
 welcome page's tab ("The page"); and the players' identities, the public name and its key,
-on the server and in the welcome page's PROFILE ("Identity"); and the server's half of the
-proofs, a package sent with its claims and queued ("Proofs"). The rest of this document is the design that `PLAN.md` phase 18
+on the server and in the welcome page's PROFILE ("Identity"); and the proofs: a game's
+recording sent with the unlocks it claims, replayed by the verifier service, and its
+verdicts shown ("Proofs"). The rest of this document is the design that `PLAN.md` phase 18
 builds, step by step, and each step rewrites its section here to say what was built.
 
 ## The file
@@ -300,8 +301,8 @@ The page tracks the achievements of a game the player plays (`PageAchievements`,
 - **The `achievements` store** in the saves' IndexedDB database (version 8,
   `BrowserAchievementStore`) keeps one row per set, achievement id and playthrough
   (`AchievementRow`): when it was unlocked, the player's time then (the tracker's VBLs),
-  the game's clock, the party's names, and how far its proof has got, only `unverified`
-  until the proofs are sent (phase 18.5). A row is written as the tracker unlocks, unless
+  the game's clock, the party's names, and how far its proof has got, `unverified`,
+  `verified` or `dropped`, with the proofs that claim it ("Proofs"). A row is written as the tracker unlocks, unless
   one of the same key is there: the first unlock stays when a branch loaded since unlocks
   it again.
 
@@ -479,9 +480,40 @@ moderation ("Shared recordings", `doc/RECORDING.md`): nothing links the two.
 that looks suspicious, which needs the Hall of Fame's moderation (18.6), where the names
 are shown; a kept package stays on the server for it.
 
-The page sends a package at the game's end when the game unlocked anything, and at a save
-after a new unlock, at most every ten minutes per playthrough, and shows the verdicts
-(*designed, the rest of phase 18.5*).
+**The page's half** is `PageProofs` (`src/engine/achievements/PageProofs.ts`), built beside
+`PageAchievements` for a game the player plays, never for a recording's viewer, over the
+server's routes (`src/ui/proofRoutes.ts`). Only a browser whose player has a public name, as
+`api/profile` says, sends anything.
+
+- **What a proof claims** is the playthrough's rows that its history holds and no replay
+  has judged (`claimableRows`): an unlock of a branch the game left is on no path it can
+  send, and one a replay dropped the same game's later path would not unlock either. A
+  playthrough a teleport touched has no rows, so it claims nothing.
+- **When it is sent**: at a save (`GameSaves.onSaved`), the history its row kept as its
+  file was made (`SaveEntry.achievements`), when it claims an unlock no proof has claimed
+  yet and this page sent none of the playthrough for ten minutes (`PROOF_INTERVAL_MS`); and
+  at the game's end, when it claims anything. The package is the store's point, packed as
+  the book's UPLOAD packs it, titled `Proof` (`storedPackage`): the save's, its recording
+  written to the store first, or the set's latest game's end.
+- **Each row claimed keeps the proof's id** (`AchievementRow.proofs`). The page asks for the
+  verdicts its rows await at its start and every two minutes (`refreshVerdicts`), the book's
+  ACHIEVEMENTS tab as it opens, and writes them (`judgedRows`): a row is `verified` once a
+  proof verified it, `dropped` once every proof that claimed it was replayed and none did,
+  and keeps the reason where one drifted. An unlock a replay granted unclaimed is the
+  server's alone: PROFILE lists it, and the browser adds no row for it. The store's shape
+  is the same, so IndexedDB's version stays 8.
+- **Shown**: the dialog's detail says UNLOCKED, VERIFIED or UNLOCKED, NOT VERIFIED; the
+  book's tab says of each playthrough's unlock "verified", "not verified", "awaiting the
+  server" or "its replay drifted", and nothing where no proof claimed it; PROFILE's "Your
+  achievements, verified" lists the server's by name. ABOUT tells the player the
+  recordings are sent, kept and replayed.
+
+The dev server is its own verifier: it replays each proof as it is queued, in its own
+process (`vite.config.mts`). `tools/checks/achievement-proofs.ts` proves the verdicts, the
+claims, when the page sends, and the package of a save the store keeps, replayed to First
+Blood by the verifier's replay; `tools/probe-frames.ts` a proof the live page sends with a
+name, replayed by the dev server, First Blood verified and Pest Control dropped, and the
+book saying so.
 
 An unlock on a branch that the player later reloaded away from is on no path they can send,
 so it stays in the browser.

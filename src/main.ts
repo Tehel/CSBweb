@@ -26,6 +26,7 @@ import { extractGraphicsTables, type GraphicsTables } from './data/tables/Graphi
 import { UtilityDiskMessages, UtilityError } from './engine/Chaos';
 import { GameSaves, drawPlaythrough } from './engine/GameSaves';
 import { PageAchievements } from './engine/achievements/PageAchievements';
+import { PageProofs, storedPackage } from './engine/achievements/PageProofs';
 import { achievementDefs } from './ui/achievementFiles';
 import { loadSwoosh, type Swoosh } from './data/SwooshLoader';
 // A file, never inlined as a `data:` URL, which the server's policy does not fetch (`SECURITY_HEADERS`).
@@ -67,6 +68,7 @@ import { applySaveBytes } from './engine/SaveGameFile';
 import { Settings, applyToGame, type SettingsValues } from './settings/Settings';
 import type { KeyboardLayoutMap } from './renderer/ui/KeyLabels';
 import { GameEvents, keptPlayerId, keptTeleportedPlaythroughs, playerId, sendBeacon } from './ui/gameEvents';
+import { askVerdicts, hasPublicName, sendProof } from './ui/proofRoutes';
 
 console.log('Dungeon Master Web - Initializing...');
 
@@ -89,6 +91,8 @@ const GAMEFILES_DIR = 'gamefiles';
 const RECORDING_LINE_COLOR = 15;
 /** How often the running recording is written to the store (`RecordingWriter`), in milliseconds. */
 const RECORDING_WRITE_MS = 5000;
+/** How often the page asks for the verdicts its proofs await (`PageProofs.refresh`): nothing is asked while none does. */
+const VERDICTS_MS = 2 * 60 * 1000;
 /** The time a recording's viewer stays at its end before loop plays it again (`playRecording`). */
 const LOOP_DELAY_MS = 2000;
 /**
@@ -355,6 +359,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
             // The adventure's animations end with it: a chew draws nothing over the credits.
             presenter.cancel();
             events.ended(word11694);
+            void proofs?.ended();
             // A recording played back ends at the game's end as at any other point, with
             // no credits: a lost game's dying sound alone (`playRecording`).
             if (playedRecording !== null) {
@@ -522,12 +527,25 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     // The achievements of a game the player plays: none for a recording played back, whose
     // game is not the player's (`doc/ACHIEVEMENTS.md` → "The page").
     const defs = playedRecording === null ? achievementDefs(dataSet.id) : null;
-    const achievements = defs && new PageAchievements(game, dataSet.id, defs, screen.ui.objectTables.objectNames,
-        new BrowserAchievementStore((rows) => drawPlaythrough(storeRandom, rows)), saves, teleported,
+    const achievementStore = new BrowserAchievementStore((rows) => drawPlaythrough(storeRandom, rows));
+    const achievements = defs && new PageAchievements(game, dataSet.id, defs, screen.ui.objectTables.objectNames, achievementStore, saves, teleported,
         (message, error) => console.warn(message, error));
     // Each unlock a banner over the view, with ACHIEVEMENT NOTICES on.
     achievements?.onShown(({ def }) => showAchievementNotice(screen.ui, { name: def.name, tier: def.tier }));
-    return { game, screen, saves, recorder, recordings, recordingStore, messages, events, input, playInput, achievements };
+    // The proofs of the unlocks, sent by a player with a public name at a save and at the
+    // game's end, and their verdicts asked at the start and every few minutes
+    // (`doc/ACHIEVEMENTS.md` → "Proofs").
+    const sources = { flush: () => recordings.flush(), recordings: recordingStore, saves: saveStore };
+    const proofs = achievements && new PageProofs(achievements, dataSet.id, achievementStore, {
+        named: hasPublicName, send: sendProof, ask: askVerdicts, packageOf: (point) => storedPackage(point, dataSet.id, sources),
+        now: () => Date.now(), log: (message, error) => console.warn(message, error),
+    });
+    if (proofs) {
+        saves.onSaved((entry) => { void proofs.saved(entry); });
+        void proofs.refresh();
+        setInterval(() => { void proofs.refresh(); }, VERDICTS_MS);
+    }
+    return { game, screen, saves, recorder, recordings, recordingStore, messages, events, input, playInput, achievements, proofs };
 }
 
 /** What `construct` builds, which the boot, the play and the end of the game share. */
@@ -545,6 +563,8 @@ interface Built {
     playInput: () => void;
     /** The achievements of the game the player plays, or `null` for a recording played back. */
     achievements: PageAchievements | null;
+    /** Their proofs, sent and judged, where the page tracks them. */
+    proofs: PageProofs | null;
 }
 
 /**
@@ -555,7 +575,7 @@ interface Built {
  */
 function probeHandle(built: Built, sound: SoundManager) {
     const presetHeroes = () => extractPresetHeroes(built.game.ctx.dungeon.getData(), built.game.ctx.tables.textDecode, built.game.ctx.tables);
-    return { game: built.game, screen: built.screen, sound, saves: built.saves, achievements: built.achievements,
+    return { game: built.game, screen: built.screen, sound, saves: built.saves, achievements: built.achievements, proofs: built.proofs,
         recorder: built.recorder, recordings: built.recordings, recordingStore: built.recordingStore, player: () => recordingPlayer,
         readRecordingPath, packageOfSave, writeRecordingPackage, renderView, refreshScreen, presetHeroes, applySaveBytes, intro: introProbe };
 }

@@ -135,6 +135,8 @@ import {
     type AchievementRow, type AchievementStore, type BrowserDataSetStore, type RecordingEntry, type RecordingStore, type SaveEntry, type SaveStore,
 } from '../data/saves';
 import { achievementDefs } from './achievementFiles';
+import { askVerdicts } from './proofRoutes';
+import { refreshVerdicts } from '../engine/achievements/PageProofs';
 import {
     pathToWay, pointMadeAt, pointPath, pointRecordingId, savedAtWay, shownPoints, storedPoints, wayEnds, wayInfo, wayPoints,
     type PointInfo, type StoredPoint, type WayPoint,
@@ -315,7 +317,7 @@ export async function showWelcomePage(
     store: Pick<SaveStore, 'list' | 'read'>,
     localSets: Pick<BrowserDataSetStore, 'list' | 'put' | 'remove'>,
     recordings: RecordingStore,
-    achievements: Pick<AchievementStore, 'list'>,
+    achievements: Pick<AchievementStore, 'list' | 'update'>,
     loadManifest: () => Promise<DataSetManifest>,
     help: HowToPlayHost,
     select: string | null = null,
@@ -648,7 +650,7 @@ function confirmation(prefix: string, title: string, text: string, verb: string,
 interface RecordingsSource {
     readonly saves: Pick<SaveStore, 'list' | 'read'>;
     readonly recordings: RecordingStore;
-    readonly achievements: Pick<AchievementStore, 'list'>;
+    readonly achievements: Pick<AchievementStore, 'list' | 'update'>;
 }
 
 /**
@@ -812,10 +814,12 @@ function showDocuments(
  * The ACHIEVEMENTS tab of `dialog`, on `set`: its achievements (`achievementDefs`), in the
  * file's order, and over them how many this browser has unlocked. Each with its name, its
  * tier in its colour, its text, and under them the playthroughs that unlocked it, from
- * `store`, the first first: the party then, the day and the time played. A row whose
- * achievement the file no longer has is not listed, and the store keeps it.
+ * `store`, the first first: the party then, the day and the time played, and what the
+ * server's replay said of it (`PROOF_WORDS`). A row whose achievement the file no longer
+ * has is not listed, and the store keeps it. The verdicts its rows await are asked of the
+ * server first (`refreshVerdicts`), and listed again once written.
  */
-function showAchievements(dialog: HTMLElement, set: DataSet, store: Pick<AchievementStore, 'list'>): void {
+function showAchievements(dialog: HTMLElement, set: DataSet, store: Pick<AchievementStore, 'list' | 'update'>): void {
     const summary = dialog.querySelector<HTMLElement>('.achievements-summary')!;
     const list = dialog.querySelector<HTMLElement>('.achievements-list')!;
     const defs = achievementDefs(set.id) ?? [];
@@ -844,6 +848,8 @@ function showAchievements(dialog: HTMLElement, set: DataSet, store: Pick<Achieve
                     const unlock = document.createElement('li');
                     unlock.append(line('achievements-party', row.champions.join(' ') || 'No party'),
                         line('achievements-when', `${formatSaveDate(row.unlockedAt)}, played ${formatPlayTime(row.playTime)}`));
+                    const proof = proofWords(row);
+                    if (proof !== null) unlock.append(line(`achievements-proof proof-${row.proof}`, proof));
                     return unlock;
                 }));
                 item.append(by);
@@ -851,10 +857,25 @@ function showAchievements(dialog: HTMLElement, set: DataSet, store: Pick<Achieve
             return item;
         }));
     };
-    show([]);
-    void store.list(set.id).then(show, (error: unknown) => {
+    const failed = (error: unknown) => {
         summary.textContent = `This browser's achievements could not be read: ${error instanceof Error ? error.message : String(error)}`;
-    });
+    };
+    show([]);
+    void store.list(set.id).then(show, failed);
+    void refreshVerdicts(store, askVerdicts, set.id).then((changed) => changed.length > 0 ? store.list(set.id).then(show, failed) : undefined,
+        (error: unknown) => console.warn('The proofs\' verdicts could not be asked', error));
+}
+
+/**
+ * What the book says of an unlock's proof (`doc/ACHIEVEMENTS.md` → "Proofs"): verified by the
+ * server's replay, not unlocked by it, awaiting it, or drifted; nothing where no proof
+ * claimed it, a browser with no public name.
+ */
+function proofWords(row: AchievementRow): string | null {
+    if (row.proof === 'verified') return 'verified';
+    if (row.proof === 'dropped') return 'not verified';
+    if (!row.proofs?.length) return null;
+    return row.drift === undefined ? 'awaiting the server' : 'its replay drifted';
 }
 
 /**

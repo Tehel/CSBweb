@@ -16,7 +16,7 @@ import { FileDigestCache, filesText } from './server/setFiles.ts';
 import { RateLimit } from './server/events.ts';
 import { IdentityStore } from './server/identity.ts';
 import { NOBODY } from './server/notify.ts';
-import { ProofStore } from './server/proofs.ts';
+import { ProofStore, verifyNext, type BuiltReplayProof, type VerifierReaders } from './server/proofs.ts';
 import type { CheckDataSet } from './server/publish.ts';
 import { RecordingStore, type ReadRecordingPackage } from './server/recordings.ts';
 import { AnswerCache, StatsStore } from './server/stats.ts';
@@ -84,8 +84,10 @@ const DEV_MODERATOR_PLAYER_ID = '00000000-0000-4000-8000-000000000001';
  *
  * `api/proofs` is `receiveProof` and `answerProofs` over a store of the proofs beside the
  * identities, with the page's reader of a package, each package in a scratch folder of its
- * own, made at start and removed at the end. No verifier replays them: a proof stays
- * queued. Without `node:sqlite`, it is 501.
+ * own, made at start and removed at the end. The dev server is its own verifier: once a
+ * proof is queued, it replays the queue in its own process (`verifyNext`), with the page's
+ * `replayProof` and the build's achievements (`ssrLoadModule`), over the sets it serves.
+ * Without `node:sqlite`, it is 501.
  *
  * `api/stats` is `answerStats` over the same store's public sets, and over statistics made
  * once, at start, of `checks/stats`' fortnight (`tools/lib/statsFortnight.ts`), which names
@@ -364,6 +366,37 @@ function dataSetsRoute(): Plugin {
         }
       });
 
+      const replay: VerifierReaders['replay'] = async (bytes, limit, sets) => {
+        const { replayProof } = (await server.ssrLoadModule('/src/engine/achievements/ProofReplay.ts')) as { replayProof: BuiltReplayProof };
+        const { achievementDefs } = (await server.ssrLoadModule('/src/ui/achievementFiles.ts')) as { achievementDefs: (setId: string) => unknown };
+        return replayProof(bytes, limit, sets, achievementDefs);
+      };
+      // The queue replayed, one proof at a time, until it is empty; a proof queued meanwhile is replayed by the same run.
+      let verifying = false;
+      const verifyQueue = (): void => {
+        if (verifying || !sqlite || !proofs || !identities) return;
+        verifying = true;
+        void (async () => {
+          try {
+            for (;;) {
+              const db = new sqlite.DatabaseSync(':memory:');
+              try {
+                const done = await verifyNext({
+                  proofs: proofs.store, identities: identities.store, dataSets: openStore(db), dir: proofsDir, gamefilesDir: scratch, digests, replay, now: Date.now,
+                });
+                if (done === null) break;
+                console.log(`proof ${done.id} ${done.state}: ${done.state === 'drifted' ? done.reason : `verified ${done.verified.join(', ') || 'nothing'}`}`);
+              } finally {
+                db.close();
+              }
+            }
+          } catch (error) {
+            console.error('The dev server\'s verifier failed:', error);
+          } finally {
+            verifying = false;
+          }
+        })();
+      };
       server.middlewares.use(`/${PROOFS_ROUTE}`, async (req, res, next) => {
         if (req.url !== '/' && !req.url?.startsWith('/?')) return next();
         if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'POST') {
@@ -377,8 +410,10 @@ function dataSetsRoute(): Plugin {
         }
         const db = new sqlite.DatabaseSync(':memory:');
         try {
-          if (req.method === 'POST') await receiveProof({ dataSets: openStore(db), now: Date.now, proofs, recordings: { readPackage }, identities }, req, res);
-          else answerProofs({ proofs, identities }, req, res);
+          if (req.method === 'POST') {
+            await receiveProof({ dataSets: openStore(db), now: Date.now, proofs, recordings: { readPackage }, identities }, req, res);
+            if (res.statusCode === 201) verifyQueue();
+          } else answerProofs({ proofs, identities }, req, res);
         } catch (error) {
           next(error);
         } finally {

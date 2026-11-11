@@ -35,4 +35,17 @@ export class BrowserAchievementStore implements AchievementStore {
         if (kept) askToPersist();
         return kept;
     }
+
+    /** One transaction; a row another tab deleted meanwhile is not written back. */
+    async update(rows: readonly AchievementRow[]): Promise<void> {
+        if (rows.length === 0) return;
+        const tx = (await this.db()).transaction(ACHIEVEMENTS_STORE, 'readwrite');
+        const done = idbDone(tx);
+        const store = tx.objectStore(ACHIEVEMENTS_STORE);
+        for (const row of rows) {
+            const held = store.getKey([row.dataSet, row.id, row.playthrough]);
+            held.onsuccess = () => { if (held.result !== undefined) store.put(row); };
+        }
+        await done;
+    }
 }

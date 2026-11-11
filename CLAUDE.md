@@ -132,7 +132,8 @@ There is still **no test framework** (`PLAN.md` → "The evidence") — `npm tes
   painting nothing until the VBL's frame, the download its EXPORT starts, a delete failed when its transaction aborts, a file
   dropped on it, a finger on a touch screen: a tap one click and the sound unlocked by it, the eye held while it
   is down, and the eye let go by a mouse released off the canvas; and an achievement's
-  banner, its row in the store, ACHIEVEMENT NOTICES and the dialog the settings open; the settings dialog
+  banner, its row in the store, ACHIEVEMENT NOTICES and the dialog the settings open, and its
+  proof sent with a public name and verified by the dev server's replay; the settings dialog
   opened by Esc and by a double click, the clock held under it, a setting kept across a
   reload, its slider dragged off the canvas, and its EXIT leading to the welcome
   page, a click on the left-handed screen landing where it is shown, the map dialog opened by a long

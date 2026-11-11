@@ -2510,6 +2510,32 @@ check(await evaluate(`window.__probe.screen.ui.achievementsDialog.selected`) ===
 console.log('state: achievements');      await shot('35-achievements');
 await key('Escape'); await vbls(SHOWN);
 check(await evaluate(`window.__probe.screen.ui.dialog === null`), 'Esc closes the achievements');
+// The proofs (`doc/ACHIEVEMENTS.md` → "Proofs"): the player chooses a public name, and the
+// page sends a proof claiming First Blood (`PageProofs.send`), the corpus recording that
+// unlocks it, which the dev server's verifier replays; the page asks for the verdict
+// (`PageProofs.refresh`), and the playthrough's row is verified, which the dialog reads.
+const corpusProof = readFileSync('tools/fixtures/recordings/replay-saves-written-over.L5.gz').toString('base64');
+const proofSent = await evaluate(`(async()=>{
+  const key = 'csbweb_player_v1';
+  if (!localStorage.getItem(key)) localStorage.setItem(key, crypto.randomUUID());
+  const named = await fetch('api/profile', { method: 'POST', headers: { 'X-Player-Id': localStorage.getItem(key), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'name', name: 'Prover ' + Math.random().toString(36).slice(2, 8) }) });
+  const before = window.__probe.achievements.view().proof('first-blood');
+  const bytes = Uint8Array.from(atob('${corpusProof}'), (c) => c.charCodeAt(0));
+  const id = await window.__probe.proofs.send(bytes, ['first-blood', 'pest-control']);
+  return { named: named.status, before, id };
+})()`);
+console.log('  proof sent:', JSON.stringify(proofSent));
+check(proofSent.named === 201 && proofSent.before === 'unverified' && /^[0-9A-F]{16}$/.test(proofSent.id ?? ''),
+  'with a public name, a proof sent claiming First Blood and Pest Control, unverified until then');
+let proofVerdict: string | null = null;
+for (let i = 0; i < 120 && proofVerdict !== 'verified'; i++) {
+  if (i > 0) await wait(500);
+  proofVerdict = await evaluate(`window.__probe.proofs.refresh().then(() => window.__probe.achievements.view().proof('first-blood'))`);
+}
+const pestVerdict = await evaluate(`window.__probe.achievements.view().proof('pest-control')`);
+check(proofVerdict === 'verified' && pestVerdict === 'dropped',
+  `the dev server's verifier replays it: First Blood verified, Pest Control dropped (${proofVerdict}, ${pestVerdict})`);
 // The welcome page's book (`showAchievements`, `src/ui/welcomePage.ts`): CSB's ACHIEVEMENTS
 // tab lists the set's achievements, the two the store holds unlocked, by this playthrough's party.
 const playedParty: string = await evaluate(`window.__probe.game.ctx.party.state.champions.map((c) => c.name).join(' ')`);
@@ -2534,6 +2560,9 @@ check(achievementsTab.items[0] === `first-blood|true|easy|${playedParty}` && ach
   && achievementsTab.items.slice(2).every((item: string) => /\|false\|[a-z]+\|$/.test(item)),
   'it lists them in the file\'s order, the two unlocked by the party that played, the others not');
 check(achievementsTab.colour === 'rgb(252, 180, 0)', 'an unlocked one\'s tier in its colour, easy\'s orange, palette entry 9');
+const proofWords = await evaluate(`[...document.querySelectorAll('dialog.documents .achievements-item.unlocked')]
+  .map((i) => i.dataset.achievement + ':' + [...i.querySelectorAll('.achievements-proof')].map((p) => p.textContent).join('/')).join()`);
+check(proofWords === 'first-blood:verified,pest-control:not verified', `each unlock says what the server's replay said of it (${proofWords})`);
 await clickOn('#documents-close');
 
 

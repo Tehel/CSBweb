@@ -367,6 +367,8 @@ body.welcome {
 .achievements-unlocks li { display: flex; gap: 12px; }
 .achievements-party { overflow-wrap: anywhere; }
 .achievements-when { margin-left: auto; color: var(--p2); white-space: nowrap; }
+.achievements-proof { color: var(--p2); white-space: nowrap; }
+.achievements-proof.proof-verified { color: var(--p11); }
 .recordings-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow-y: auto; font-size: 18px; }
 .recordings-item {
     appearance: none;

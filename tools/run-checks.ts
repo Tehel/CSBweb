@@ -461,6 +461,7 @@ const CHECKS: Tool[] = [
   { tool: 'achievements-tracker.ts', args: ['--not=CSBFullRecordingV4'] },
   // The achievements of a game the player plays: the save's row, F9, the store, the teleport.
   { tool: 'achievements-page.ts' },
+  { tool: 'achievement-proofs.ts' },
   // The set a recording plays over, found by its files.
   { tool: 'recording-set.ts' },
   // The replay tool, its own process, against a scratch server.
