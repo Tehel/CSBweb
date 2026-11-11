@@ -4,7 +4,7 @@
   "description": "Dungeon Master for web browser",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && vite build --ssr",
+    "build": "tsc && vite build && vite build --ssr && vite build --ssr --mode verifier",
     "test": "node tools/run-checks.ts",
     "fetch-csbwin-src": "tsx tools/fetch-csbwin-src.ts",
     "fetch-gamefiles": "tsx tools/fetch-gamefiles.ts",

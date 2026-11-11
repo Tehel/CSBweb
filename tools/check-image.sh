@@ -15,7 +15,12 @@
 # (`server/store.ts`) update many rows in a transaction, in a scratch file beside the stats,
 # as a migration of a deployed store does: on the read-only file system, the statement's
 # temporary journal has nowhere to go but memory. The throwaway store, which holds no event,
-# never needs one.
+# never needs one. Then it runs the verifier (`server/verifier.ts`) beside it, a second
+# container from the same image with the same limits and half a CPU, as
+# `docker-compose.yaml` runs it: a named player sends a corpus recording as a proof
+# claiming First Blood, which it unlocks, and Roll the Credits, which it does not, and the
+# verifier's verdicts, asked of the server, must say the first verified and the second
+# dropped.
 #
 #   bash tools/check-image.sh
 #
@@ -31,7 +36,7 @@ mounts=()
 for entry in "$root"/tools/fixtures/gamefiles/*; do mounts+=(-v "$entry:/data/gamefiles/$(basename "$entry"):ro"); done
 
 cleanup() {
-  docker rm -f "$name" >/dev/null 2>&1
+  docker rm -f "$name" "$name-verifier" >/dev/null 2>&1
   rm -rf "$stats" "$gamefiles"
 }
 trap cleanup EXIT
@@ -88,4 +93,26 @@ docker exec "$name" node --input-type=module -e '
     for (const file of [path, `${path}-wal`, `${path}-shm`]) rmSync(file, { force: true });
   }
 ' || exit 1
+docker run -d --name "$name-verifier" \
+  --memory 512m --pids-limit 100 --read-only --cap-drop ALL --security-opt no-new-privileges:true --cpus 0.5 --cpu-shares 256 \
+  -v "$gamefiles:/data/gamefiles:ro" "${mounts[@]}" -v "$stats:/data/stats" \
+  csbweb:probe node --disable-warning=ExperimentalWarning server/verifier.ts >/dev/null || exit 1
+api="http://127.0.0.1:$port/api"
+player=00000000-0000-4000-8000-0000000000c1
+curl -sf -o /dev/null -X POST -H "X-Player-Id: $player" -d '{"action":"name","name":"Image Check"}' "$api/profile" || { echo "the check's name was refused" >&2; exit 1; }
+sent="$(curl -sf -X POST -H "X-Player-Id: $player" -F "package=@$root/tools/fixtures/recordings/replay-saves-written-over.L5.gz" \
+  -F 'claims=["first-blood","roll-the-credits"]' "$api/proofs")" || { echo "the proof was refused" >&2; exit 1; }
+proof="$(printf '%s' "$sent" | sed -n 's/.*"id":"\([0-9A-F]\{16\}\)".*/\1/p')"
+i=0
+until verdict="$(curl -sf -H "X-Player-Id: $player" "$api/proofs?ids=$proof")" && [[ "$verdict" != *'"state":"queued"'* ]]; do
+  i=$((i + 1))
+  if [ "$i" -ge 120 ]; then echo "the verifier did not check the proof:" >&2; docker logs "$name-verifier" >&2; exit 1; fi
+  sleep 1
+done
+docker logs "$name-verifier"
+if [[ "$verdict" != *'"first-blood":"verified"'* || "$verdict" != *'"roll-the-credits":"dropped"'* ]]; then
+  echo "the verifier's verdicts: $verdict" >&2
+  exit 1
+fi
+echo "the verifier: $verdict"
 bash "$root/tools/check-frames.sh" --url "http://localhost:$port/"

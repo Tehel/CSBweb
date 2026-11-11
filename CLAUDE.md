@@ -100,7 +100,7 @@ page instead, HTML where the player chooses a game (`src/ui/welcomePage.ts`).
 
 ```bash
 npm run dev            # Vite dev server on :9000
-npm run build          # tsc && vite build, and the server's module (--ssr)
+npm run build          # tsc && vite build, and the server's and the verifier's modules (--ssr)
 npm test               # the gate: tsc + every asserting tool  (~75s, a worker per core)
 npm test -- --only=dsa,save  # tsc + the tools whose name holds any of these
 npm test -- --frames   # …and the golden frames               (~80s more)

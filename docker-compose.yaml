@@ -7,7 +7,9 @@
 #                            and the folders of the sets players publish, written by the
 #                            container (uid 1000), hence read-write
 #   <DEPLOY_DIR>/stats/      stats.db, the statistics and the data sets (their rows written
-#                            by hand, or published), which a deploy's `down` leaves alone
+#                            by hand, or published), the recordings, the identities and the
+#                            proofs, which a deploy's `down` leaves alone; recordings/ and
+#                            proofs/, their packages
 #   <DEPLOY_DIR>/files/      the files shared by link, served under `files/`, put there by
 #                            hand; read-only in the container
 #
@@ -45,6 +47,36 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+  # The verifier (`server/verifier.ts`, `doc/ACHIEVEMENTS.md` → "Proofs"): the same image,
+  # replaying the proofs the server queues, one at a time, into the same store. A replay
+  # takes a CPU while it runs, so it gets half of one, a low weight beside the others, and
+  # lowers its own priority to the lowest: the game's server comes first. It serves
+  # nothing, reads the game files only, and writes only to /data/stats, with the server's
+  # limits. A replay stopped by a deploy leaves its proof queued, replayed at the next start.
+  verifier:
+    image: csbweb:latest
+    container_name: csbweb-verifier
+    env_file: .env
+    command: ['node', '--disable-warning=ExperimentalWarning', 'server/verifier.ts']
+    volumes:
+      - ./gamefiles:/data/gamefiles:ro
+      - ./stats:/data/stats
+    cpus: 0.5
+    cpu_shares: 256
+    mem_limit: 512m
+    pids_limit: 100
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    stop_grace_period: 10s
     logging:
       driver: json-file
       options:

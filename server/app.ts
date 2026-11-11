@@ -71,7 +71,7 @@ import { addDocument, removeDocument } from './documents.ts';
 import { editDataSet } from './edit.ts';
 import { addressBucket, checkEvent, isPlayerId, MAX_EVENT_BYTES, type EventRules, type RateLimit } from './events.ts';
 import { changeProfile, MAX_PROFILE_BYTES, profileText, resetName, type IdentityStore, type ProfileAnswer } from './identity.ts';
-import { MAX_PROOF_BYTES, proofsText, sendProof, type ProofAnswer, type ProofStore } from './proofs.ts';
+import { MAX_PROOF_BYTES, proofsText, sendProof, type BuiltReplayProof, type ProofAnswer, type ProofStore, type VerifierReaders } from './proofs.ts';
 import { MAX_MODERATION_BYTES, moderateDataSet, type ModerationAnswer } from './moderate.ts';
 import type { Notify } from './notify.ts';
 import { FileDigestCache, filesText } from './setFiles.ts';
@@ -104,6 +104,28 @@ export interface PageReaders {
     checkDataSet: CheckDataSet;
     readDungeonWalls: ReadDungeonWalls;
     readRecordingPackage: ReadRecordingPackage;
+}
+
+/**
+ * The verifier's module built for Node (`src/engine/VerifierReaders.ts`), under `distDir`:
+ * the replay of a proof, which only the verifier service loads (`verifier.ts`).
+ */
+export const VERIFIER_MODULE = `${SERVER_DIR}/VerifierReaders.js`;
+
+/** What `VERIFIER_MODULE` exports, loaded from `distDir`; throws, saying why, where it is not built. */
+export async function loadVerifierReaders(distDir: string): Promise<VerifierReaders> {
+    const file = join(distDir, VERIFIER_MODULE);
+    let module: { replayProof?: unknown; achievementDefs?: unknown };
+    try {
+        module = await import(pathToFileURL(file).href);
+    } catch (error) {
+        throw new Error(`${file} does not load (${error instanceof Error ? error.message : String(error)}): is the verifier's module built?`);
+    }
+    if (typeof module.replayProof !== 'function') throw new Error(`${file} exports no replayProof`);
+    if (typeof module.achievementDefs !== 'function') throw new Error(`${file} exports no achievementDefs`);
+    const replayProof = module.replayProof as BuiltReplayProof;
+    const achievementDefs = module.achievementDefs as (setId: string) => unknown;
+    return { replay: (bytes, limit, sets) => replayProof(bytes, limit, sets, achievementDefs) };
 }
 
 /** What `READERS_MODULE` exports, loaded from `distDir`; throws, saying why, where it is not built. */

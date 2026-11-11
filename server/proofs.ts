@@ -8,6 +8,9 @@
  *   POST PROOFS_ROUTE                 a package sent with the unlocks it claims, queued (`sendProof`)
  *   GET  PROOFS_ROUTE?ids=<id>,<id>…  the verdicts of the asker's proofs among them (`proofsText`)
  *
+ * and the verifier's step, the oldest queued proof replayed and its verdict kept
+ * (`verifyNext`).
+ *
  * A package is a shared recording's (`doc/RECORDING.md` → "Shared recordings"), read with
  * the page's own reader (`readRecordingPackage`), which checks its form alone: the verifier,
  * a service of its own (`verifier.ts`), replays it later. Only a player with a public name
@@ -20,16 +23,17 @@
  * the page keeps beside the unlocks it claims.
  */
 import { randomBytes } from 'node:crypto';
-import { rename, rm, writeFile } from 'node:fs/promises';
+import { readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { DatabaseSync, StatementSync } from 'node:sqlite';
 
 import {
-    CLAIM_ID, MAX_CLAIMS, PROOF_FIELDS, PROOF_ID, type ClaimState, type ProofState, type ProofVerdict,
+    CLAIM_ID, GAME_FILES, MAX_CLAIMS, parseManifest, PROOF_FIELDS, PROOF_ID, type ClaimState, type DataSet, type ProofState, type ProofVerdict,
 } from '../src/data/DataSets.ts';
-import type { DataSetStore } from './dataSets.ts';
+import { manifestText, type DataSetStore } from './dataSets.ts';
 import type { IdentityStore } from './identity.ts';
 import { MAX_RECORDING_BYTES, MAX_RECORDING_UNZIPPED_BYTES, type ReadRecordingPackage, type SharedPackage } from './recordings.ts';
+import type { FileDigestCache } from './setFiles.ts';
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS proofs (
@@ -352,4 +356,119 @@ export function proofsText(ids: string, player: string, proofs: ProofStore, iden
         verdicts.push({ id, state: proof.state, ...(proof.state === 'drifted' ? { reason: proof.reason } : {}), claims });
     }
     return JSON.stringify({ proofs: verdicts });
+}
+
+/**
+ * A set the verifier may play a proof over, as the page's replay takes it (`ProofSet`,
+ * `src/engine/achievements/ProofReplay.ts`): typed here by its shape, as `SharedPackage` is.
+ */
+export interface VerifierSet {
+    readonly set: DataSet;
+    readonly files: { read(name: string): Promise<Uint8Array | null>; where(name: string): string };
+    readonly digests: { readonly id: string; readonly name: string; readonly files: Readonly<Record<string, string>> };
+}
+
+/** What the page's replay says of a proof (`ProofReplayed`). */
+export type ProofReplayed =
+    | { readonly kind: 'checked'; readonly dataSet: string; readonly over: string; readonly playthrough: number; readonly unlocked: readonly string[] }
+    | { readonly kind: 'drifted'; readonly reason: string };
+
+/** The page's replay of a proof, `replayProof`, as `VERIFIER_MODULE` exports it, its achievements given by `defsOf` (`app.ts`). */
+export type BuiltReplayProof = (bytes: Uint8Array, limit: number, sets: readonly VerifierSet[], defsOf: (setId: string) => unknown) => Promise<ProofReplayed>;
+
+/** What the verifier replays a proof with: the page's replay, over the build's achievements (`loadVerifierReaders`, `app.ts`). */
+export interface VerifierReaders {
+    replay(bytes: Uint8Array, limit: number, sets: readonly VerifierSet[]): Promise<ProofReplayed>;
+}
+
+/**
+ * Every set the store holds, as the page reads its manifest, each with its files in its
+ * folder under `gamefilesDir` and their digests (`cache`): those a proof may be played over,
+ * its own or another whose files have its digests (`findRecordingSet`).
+ */
+export async function verifierSets(dataSets: DataSetStore, gamefilesDir: string, cache: FileDigestCache): Promise<VerifierSet[]> {
+    const viewer = { playerId: null, moderator: { playerId: '', name: 'the verifier' } };
+    const manifest = parseManifest(manifestText(dataSets.read(), viewer), gamefilesDir);
+    const sets: VerifierSet[] = [];
+    for (const set of manifest.dataSets) {
+        const files: Record<string, string> = {};
+        for (const name of [...GAME_FILES].sort()) {
+            const digest = await cache.digest(join(set.dir, name));
+            if (digest !== null) files[name] = digest;
+        }
+        sets.push({
+            set,
+            files: {
+                read: (name) => readFile(join(set.dir, name)).then((bytes) => new Uint8Array(bytes), () => null),
+                where: (name) => join(set.dir, name),
+            },
+            digests: { id: set.id, name: set.name, files },
+        });
+    }
+    return sets;
+}
+
+/** What `verifyNext` needs. */
+export interface VerifyOptions {
+    proofs: ProofStore;
+    identities: IdentityStore;
+    dataSets: DataSetStore;
+    /** `PROOFS_DIR`. */
+    dir: string;
+    gamefilesDir: string;
+    digests: FileDigestCache;
+    replay: VerifierReaders['replay'];
+    now: () => number;
+}
+
+/** What `verifyNext` did: the proof, its state, what its replay verified, and whether its file was kept. */
+export interface Verified {
+    id: string;
+    state: Exclude<ProofState, 'queued'>;
+    reason: string;
+    verified: string[];
+    dropped: string[];
+    /** The verified that no earlier proof of its identity's verified in its playthrough. */
+    own: string[];
+    kept: boolean;
+}
+
+/**
+ * The verifier's step: the oldest queued proof replayed (`replay`) and its verdict kept, or
+ * `null` where none is queued. Played to its point, it is `checked`: each claim the replay
+ * unlocked verified and each other dropped, an unlock it did not claim granted, verified,
+ * and its file deleted where it verified nothing of its own, nothing that an earlier proof of
+ * its identity's browsers had not in the same playthrough. Where it drifts, or its file is
+ * gone, it is `drifted`, the reason kept, its claims unverified and its file kept.
+ */
+export async function verifyNext(options: VerifyOptions): Promise<Verified | null> {
+    const { proofs } = options;
+    const proof = proofs.next();
+    if (proof === null) return null;
+    const path = join(options.dir, `${proof.id}.gz`);
+    let replayed: ProofReplayed;
+    try {
+        const bytes = new Uint8Array(await readFile(path));
+        replayed = await options.replay(bytes, MAX_RECORDING_UNZIPPED_BYTES, await verifierSets(options.dataSets, options.gamefilesDir, options.digests));
+    } catch (error) {
+        replayed = { kind: 'drifted', reason: `it does not play: ${error instanceof Error ? error.message : String(error)}` };
+    }
+    if (replayed.kind === 'checked' && replayed.dataSet !== proof.dataSet) {
+        replayed = { kind: 'drifted', reason: `its package plays ${replayed.dataSet}, not ${proof.dataSet}` };
+    }
+    if (replayed.kind === 'drifted') {
+        proofs.drifted(proof.id, options.now(), replayed.reason);
+        return { id: proof.id, state: 'drifted', reason: replayed.reason, verified: [], dropped: [], own: [], kept: true };
+    }
+    const { playthrough } = replayed;
+    const unlocked = new Set(replayed.unlocked);
+    const players = playersOf(options.identities, proof.player);
+    const own = replayed.unlocked.filter((achievement) => !proofs.verifiedBefore(achievement, proof.dataSet, playthrough, proof.id, players));
+    proofs.checked(proof.id, options.now(), playthrough, unlocked);
+    const dropped = proofs.claims(proof.id).filter((claim) => claim.state === 'dropped').map((claim) => claim.achievement);
+    if (own.length === 0) {
+        await rm(path, { force: true });
+        proofs.dropFile(proof.id);
+    }
+    return { id: proof.id, state: 'checked', reason: '', verified: [...replayed.unlocked], dropped, own, kept: own.length > 0 };
 }

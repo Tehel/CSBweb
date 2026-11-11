@@ -17,11 +17,22 @@
  *   - the limits: `MAX_QUEUED_PER_IDENTITY` queued per identity, then 429; a body over
  *     `MAX_PROOF_BYTES` 413; the disk the packages may take, 507; the rate per address,
  *     429; a POST from another site 403;
- *   - no answer of any route holds a `playerId` or a playthrough.
+ *   - no answer of any route holds a `playerId` or a playthrough;
+ *   - the verifier (`verifyNext`, with the page's `replayProof` and the common
+ *     achievements), over the repository's sets: nothing queued, nothing done; a genuine
+ *     corpus recording (`replay-saves-written-over`, First Blood) claiming only an
+ *     achievement it does not unlock, the forged claim dropped and First Blood granted
+ *     unclaimed, verified, its file kept; the same proof again claiming First Blood,
+ *     verified but not its own, its file deleted; a new game left alone and saved
+ *     (`quietPackage`) claiming First Blood, dropped, its file deleted; the same package
+ *     whose save shared differs, drifted, its claims unverified and the reason answered,
+ *     its file kept; a package made by hand that the game does not play as it says,
+ *     drifted; the verdicts answered as the page asks them, and the
+ *     profile listing First Blood once.
  *
  * Usage: npm test -- --only=server-proofs.ts
  */
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -30,7 +41,8 @@ import { createAppServer } from '../../server/app.ts';
 import { DataSetStore, parseModerators } from '../../server/dataSets.ts';
 import { RateLimit } from '../../server/events.ts';
 import { IdentityStore } from '../../server/identity.ts';
-import { MAX_PROOF_BYTES, MAX_QUEUED_PER_IDENTITY, ProofStore } from '../../server/proofs.ts';
+import { MAX_PROOF_BYTES, MAX_QUEUED_PER_IDENTITY, ProofStore, verifyNext, type VerifyOptions } from '../../server/proofs.ts';
+import { FileDigestCache } from '../../server/setFiles.ts';
 import { RecordingStore } from '../../server/recordings.ts';
 import { StatsStore } from '../../server/stats.ts';
 import { openStore } from '../../server/store.ts';
@@ -38,9 +50,16 @@ import {
     MAX_CLAIMS, parseManifest, PLAYER_ID_HEADER, PROFILE_ROUTE, PROOF_FIELDS, PROOF_ID, PROOFS_ROUTE, type ProofVerdict,
 } from '../../src/data/DataSets.ts';
 import { checkLocalDataSet } from '../../src/engine/LocalDataSetCheck.ts';
-import { readRecordingPackage } from '../../src/engine/RecordingPackage.ts';
+import { replayProof } from '../../src/engine/achievements/ProofReplay.ts';
+import { setAchievementDefs } from '../../src/engine/achievements/PageAchievements.ts';
+import { readRecordingPackage, writeRecordingPackage } from '../../src/engine/RecordingPackage.ts';
 import { check, finish } from '../lib/check.ts';
-import { packageOf } from '../lib/recordingPackages.ts';
+import { dataSetNamed, diskFiles, GAMEFILES_DIR, MANIFEST_FILE } from '../lib/dataSets.ts';
+import { CORPUS_DIR } from '../lib/recordingCorpus.ts';
+import { packageOf, quietPackage } from '../lib/recordingPackages.ts';
+
+/** The common achievements, as the build holds them (`achievementFiles.ts`), which `tsx` cannot glob. */
+const COMMON = setAchievementDefs(readFileSync(join(import.meta.dirname, '../../src/engine/achievements/defs/common.txt'), 'utf8'), null);
 
 const PLAYER = '00000000-0000-4000-8000-000000000000';
 const LINKED = '11111111-1111-4111-8111-111111111111';
@@ -233,9 +252,112 @@ async function main(): Promise<void> {
             small.close();
         }
 
-        // No playerId, no playthrough.
-        const leaks = bodies.filter((body) => PLAYER_IDS.some((player) => body.includes(player)) || body.includes('playthrough'));
-        check(leaks.length === 0, `no answer of ${bodies.length} holds a playerId or a playthrough`);
+    } finally {
+        server.close();
+        db.close();
+        rmSync(scratch, { recursive: true, force: true });
+    }
+}
+
+/** The verifier over the repository's sets, as the deployed one runs it, the replay the page's source. */
+async function verifier(): Promise<void> {
+    console.log('\nThe verifier:');
+    const scratch = mkdtempSync(join(tmpdir(), 'csbweb-verifier-'));
+    const distDir = join(scratch, 'dist');
+    mkdirSync(distDir, { recursive: true });
+    writeFileSync(join(distDir, 'index.html'), '<!doctype html><title>page</title>');
+    const proofsDir = join(scratch, 'proofs');
+    mkdirSync(proofsDir);
+    const gamefilesDir = join(process.cwd(), GAMEFILES_DIR);
+    const db = openStore(join(scratch, 'store.db'));
+    const dataSets = new DataSetStore(db);
+    dataSets.fill(parseManifest(readFileSync(MANIFEST_FILE, 'utf8'), ''));
+    const identities = new IdentityStore(db);
+    const proofs = new ProofStore(db, 1 << 30);
+    const api = {
+        checkDataSet: checkLocalDataSet, dataSets, moderators: [], store: new StatsStore(db), notify: () => {},
+        rules: { hasSet: (id: string) => dataSets.hasSet(id) }, rateLimit: new RateLimit(100, 60_000), eventBudget: new RateLimit(1000, 60_000),
+        publishRateLimit: new RateLimit(100, 60_000), now: Date.now,
+        recordings: { store: new RecordingStore(db, 1 << 30), dir: join(scratch, 'recordings'), readPackage: readRecordingPackage, shareRateLimit: new RateLimit(100, 60_000) },
+        identities: { store: identities, rateLimit: new RateLimit(100, 60_000) },
+        proofs: { store: proofs, dir: proofsDir, rateLimit: new RateLimit(100, 60_000) },
+    };
+    const server = createAppServer({ distDir, gamefilesDir }, api);
+    await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+    const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    const options: VerifyOptions = {
+        proofs, identities, dataSets, dir: proofsDir, gamefilesDir, digests: new FileDigestCache(), now: Date.now,
+        replay: (bytes, limit, sets) => replayProof(bytes, limit, sets, () => COMMON),
+    };
+    try {
+        await fetch(`${base}/${PROFILE_ROUTE}`, { method: 'POST', headers: { [PLAYER_ID_HEADER]: PLAYER }, body: JSON.stringify({ action: 'name', name: 'Tehel' }) });
+        const send = async (pkg: Uint8Array<ArrayBuffer>, claims: string[]): Promise<string> => {
+            const form = new FormData();
+            form.append(PROOF_FIELDS.package, new File([pkg], 'proof.gz'));
+            form.append(PROOF_FIELDS.claims, JSON.stringify(claims));
+            const answer = await fetch(`${base}/${PROOFS_ROUTE}`, { method: 'POST', body: form, headers: { [PLAYER_ID_HEADER]: PLAYER } });
+            const body = await answer.text();
+            bodies.push(body);
+            if (answer.status !== 201) throw new Error(`a proof refused: ${answer.status} ${body}`);
+            return (JSON.parse(body) as { id: string }).id;
+        };
+        const verdictsOf = async (ids: string[]): Promise<ProofVerdict[]> => {
+            const answer = await fetch(`${base}/${PROOFS_ROUTE}?ids=${ids.join(',')}`, { headers: { [PLAYER_ID_HEADER]: PLAYER } });
+            const body = await answer.text();
+            bodies.push(body);
+            return (JSON.parse(body) as { proofs: ProofVerdict[] }).proofs;
+        };
+        const corpus = (name: string) => new Uint8Array(readFileSync(join(CORPUS_DIR, name)));
+
+        check(await verifyNext(options) === null, 'nothing queued: nothing done');
+        const genuine = corpus('replay-saves-written-over.L5.gz');
+        const forged = await send(genuine, ['roll-the-credits']);
+        const again = await send(genuine, ['first-blood']);
+        const set = dataSetNamed('dm-atari');
+        const quietBytes = await quietPackage(set, diskFiles(set), 'Quiet', 600);
+        const lost = await send(quietBytes, ['first-blood']);
+        const quiet = await readRecordingPackage(quietBytes);
+        if (quiet.shared.kind !== 'save') throw new Error('quietPackage is no longer shared at a save');
+        const drifting = await send(new Uint8Array(await writeRecordingPackage({ ...quiet, shared: { ...quiet.shared, md5: '0'.repeat(32) } })), ['first-blood']);
+        const elsewhere = await send(await packageOf('dm-atari', 'Elsewhere'), ['first-blood']);
+
+        const done = [];
+        for (let step = await verifyNext(options); step !== null; step = await verifyNext(options)) {
+            console.log(`  ${JSON.stringify(step)}`);
+            done.push(step);
+        }
+        check(JSON.stringify(done.map((step) => step.id)) === JSON.stringify([forged, again, lost, drifting, elsewhere]), 'each queued proof replayed once, the oldest first');
+        const [first, second, third, fourth, fifth] = done;
+        check(first?.state === 'checked' && JSON.stringify(first.verified) === '["first-blood"]' && JSON.stringify(first.dropped) === '["roll-the-credits"]'
+            && JSON.stringify(first.own) === '["first-blood"]' && first.kept && existsSync(join(proofsDir, `${forged}.gz`)),
+            'a genuine recording claiming what it does not unlock: the claim dropped, First Blood granted unclaimed, its file kept');
+        check(proofs.get(forged)?.playthrough !== null && JSON.stringify(proofs.claims(forged))
+            === '[{"achievement":"first-blood","state":"verified","claimed":false},{"achievement":"roll-the-credits","state":"dropped","claimed":true}]',
+            'its playthrough read by the replay, its claims verdicts');
+        check(second?.state === 'checked' && JSON.stringify(second.verified) === '["first-blood"]' && second.own.length === 0 && !second.kept
+            && !existsSync(join(proofsDir, `${again}.gz`)) && proofs.get(again)?.kept === false,
+            'the same game claiming First Blood: verified, but not its own, its file deleted');
+        check(third?.state === 'checked' && third.verified.length === 0 && JSON.stringify(third.dropped) === '["first-blood"]' && !third.kept,
+            'a new game left alone claiming First Blood: dropped, its file deleted');
+        check(fourth?.state === 'drifted' && fourth.reason !== '' && fourth.kept && existsSync(join(proofsDir, `${drifting}.gz`))
+            && proofs.claims(drifting).every((claim) => claim.state === 'unverified'),
+            `a package whose save differs: drifted, "${fourth?.reason}", its claims unverified, its file kept`);
+        check(fifth?.state === 'drifted' && fifth.reason.length > 0, `a package made by hand: drifted, "${fifth?.reason}"`);
+
+        const verdicts = await verdictsOf([forged, again, lost, drifting]);
+        console.log(`  the verdicts: ${JSON.stringify(verdicts)}`);
+        check(JSON.stringify(verdicts) === JSON.stringify([
+            { id: forged, state: 'checked', claims: { 'first-blood': 'verified', 'roll-the-credits': 'dropped' } },
+            { id: again, state: 'checked', claims: { 'first-blood': 'verified' } },
+            { id: lost, state: 'checked', claims: { 'first-blood': 'dropped' } },
+            { id: drifting, state: 'drifted', reason: fourth?.reason, claims: { 'first-blood': 'unverified' } },
+        ]), 'the verdicts as the page asks them: verified, dropped, and the drift\'s reason');
+        const profile = await fetch(`${base}/${PROFILE_ROUTE}`, { headers: { [PLAYER_ID_HEADER]: PLAYER } }).then((answer) => answer.text());
+        bodies.push(profile);
+        const achievements = (JSON.parse(profile) as { achievements: unknown }).achievements;
+        console.log(`  the profile's achievements: ${JSON.stringify(achievements)}`);
+        check(JSON.stringify(achievements) === JSON.stringify([{ dataSet: 'dm-atari-1.2', name: dataSets.read().dataSets.find((set) => set.id === 'dm-atari-1.2')?.name, unlocked: ['first-blood'] }]),
+            'the profile lists First Blood once, by its set');
     } finally {
         server.close();
         db.close();
@@ -244,4 +366,7 @@ async function main(): Promise<void> {
 }
 
 await main();
+await verifier();
+const leaks = bodies.filter((body) => PLAYER_IDS.some((player) => body.includes(player)) || body.includes('playthrough'));
+check(leaks.length === 0, `no answer of ${bodies.length} holds a playerId or a playthrough`);
 finish();

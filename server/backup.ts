@@ -8,6 +8,7 @@
  *   STATS_DB        the store (the checkout's `stats/stats.db`), as `server.ts` reads it
  *   GAMEFILES_DIR   the data sets (the checkout's `tools/fixtures/gamefiles/`), as `server.ts` reads it
  *   RECORDINGS_DIR  the recordings' packages (`recordings/` beside the store), as `server.ts` reads it
+ *   PROOFS_DIR      the proofs' packages (`proofs/` beside the store), as `server.ts` reads it
  *   BACKUP_DIR      where the snapshot goes (`backups/` beside the store), made when missing
  *
  * A `cp` of the live file is unsafe: its WAL holds committed events the file does not yet,
@@ -22,7 +23,9 @@
  * A recording's package, `<id>.gz`, is never changed either, and is copied once in the same
  * way, into `recordings/` under `BACKUP_DIR`. A migration of the package's format, the one
  * change it may have, moves the copy aside first (`utils/migrate-recording-packages.ts`),
- * so that the next run copies the new file.
+ * so that the next run copies the new file. A proof's package (`proofs.ts`) is copied once
+ * too, into `proofs/` under `BACKUP_DIR`, once the verifier has checked it and kept it, as
+ * it never deletes it then; a queued one, which it may yet delete, is not.
  *
  * It prints one JSON line, and exits with 1 when the store cannot be read or a folder or a
  * package cannot be copied.
@@ -35,6 +38,7 @@ const ROOT = join(import.meta.dirname, '..');
 const statsDb = process.env.STATS_DB ?? join(ROOT, 'stats', 'stats.db');
 const gamefilesDir = process.env.GAMEFILES_DIR ?? join(ROOT, 'tools', 'fixtures', 'gamefiles');
 const recordingsDir = process.env.RECORDINGS_DIR ?? join(dirname(statsDb), 'recordings');
+const proofsDir = process.env.PROOFS_DIR ?? join(dirname(statsDb), 'proofs');
 const dir = process.env.BACKUP_DIR ?? join(dirname(statsDb), 'backups');
 
 const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -59,11 +63,15 @@ try {
     const snapshot = new DatabaseSync(target, { readOnly: true });
     let uploaded: string[];
     let packages: string[];
+    let proofs: string[];
     try {
         uploaded = (snapshot.prepare('SELECT dir FROM data_sets ORDER BY position').all() as { dir: string }[]).map((row) => row.dir);
         // A store the server has not opened since it kept recordings has no such table.
         const recordings = snapshot.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'recordings'").get() !== undefined;
         packages = recordings ? (snapshot.prepare('SELECT id FROM recordings ORDER BY uploaded_at').all() as { id: string }[]).map((row) => `${row.id}.gz`) : [];
+        const proofTable = snapshot.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'proofs'").get() !== undefined;
+        proofs = proofTable ? (snapshot.prepare("SELECT id FROM proofs WHERE state = 'checked' AND kept = 1 ORDER BY sent_at").all() as { id: string }[])
+            .map((row) => `${row.id}.gz`) : [];
     } finally {
         snapshot.close();
     }
@@ -81,20 +89,28 @@ try {
         renameSync(partial, copy);
         copied.push(set);
     }
+    /** Each of `files` in `from` copied once into `to`, through a `.partial` name: how many were. */
+    const copyOnce = (files: readonly string[], from: string, to: string): number => {
+        mkdirSync(to, { recursive: true });
+        let count = 0;
+        for (const file of files) {
+            const copy = inside(to, file);
+            if (existsSync(copy)) continue;
+            const partial = join(to, `.${file}.partial`);
+            cpSync(inside(from, file), partial);
+            renameSync(partial, copy);
+            count++;
+        }
+        return count;
+    };
     const recordingsCopy = join(dir, 'recordings');
-    mkdirSync(recordingsCopy, { recursive: true });
-    let recordingsCopied = 0;
-    for (const file of packages) {
-        const copy = inside(recordingsCopy, file);
-        if (existsSync(copy)) continue;
-        const partial = join(recordingsCopy, `.${file}.partial`);
-        cpSync(inside(recordingsDir, file), partial);
-        renameSync(partial, copy);
-        recordingsCopied++;
-    }
+    const recordingsCopied = copyOnce(packages, recordingsDir, recordingsCopy);
+    const proofsCopy = join(dir, 'proofs');
+    const proofsCopied = copyOnce(proofs, proofsDir, proofsCopy);
     console.log(JSON.stringify({
         msg: 'backup_ok', target, bytes: statSync(target).size, folders, copied, kept: uploaded.length - copied.length,
         recordings: recordingsCopy, recordingsCopied, recordingsKept: packages.length - recordingsCopied,
+        proofs: proofsCopy, proofsCopied, proofsKept: proofs.length - proofsCopied,
     }));
 } catch (error) {
     console.error(JSON.stringify({ msg: 'backup_failed', error: error instanceof Error ? error.message : String(error) }));

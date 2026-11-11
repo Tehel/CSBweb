@@ -69,15 +69,19 @@ At the author's request, beside the debt. The design is `doc/ACHIEVEMENTS.md`.
   moderators (`server/notify.ts` tells only of the sets and their recordings). No unlock
   is sent yet: each stays `unverified` until 18.5.
 - ⏳ 18.5 The proofs (`doc/ACHIEVEMENTS.md` → "Proofs"). Done: the server's upload and
-  queue (`server/proofs.ts`, `api/proofs`), proved by `tools/checks/server-proofs.ts`.
-  Left: the verifier service, and the page's sending, verdicts and their display.
+  queue (`server/proofs.ts`, `api/proofs`); the verifier service (`server/verifier.ts`,
+  `replayProof`, `dist/server/VerifierReaders.js`, the compose file's `verifier`), proved by
+  `tools/checks/server-proofs.ts`, `build.ts` and `tools/check-image.sh`. Settled: CSB's
+  adventure keeps a history of its own, as the verifier gives it. Deferred: re-verifying the
+  kept proofs when a set gains an achievement (18.7), a moderator watching a proof (18.6).
+  Left: the page's sending, verdicts and their display.
 - ⏳ 18.6 The Hall of Fame page.
 - ⏳ 18.7 A player's own set's `achievements.txt`: its row in the form, and its check at
   publish. The FTL sets' own files.
 
 ## Ground rules
 
-1. **The build must stay clean.** `npm run build` runs `tsc && vite build && vite build --ssr`; `tsc --noEmit`
+1. **The build must stay clean.** `npm run build` runs `tsc && vite build && vite build --ssr` (twice: the server's module and the verifier's); `tsc --noEmit`
    must pass with zero errors before any commit. Note that `vite build` alone will happily
    succeed on broken code — esbuild strips types without checking them — so `tsc` is the
    only real gate. (The project sat with a broken `tsc` and a genuine runtime bug hidden

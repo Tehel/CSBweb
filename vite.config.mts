@@ -450,7 +450,14 @@ function webAppManifest(): Plugin {
  */
 const SERVER_ENTRY = resolve(import.meta.dirname, 'src', 'engine', 'PageReaders.ts');
 
-export default defineConfig(({ command, isSsrBuild }) => ({
+/**
+ * The verifier's (`src/engine/VerifierReaders.ts`): the replay of a proof, the whole engine.
+ * `vite build --ssr --mode verifier`, after the server's, another self-contained module
+ * beside it, so that neither imports a chunk of the other (`VERIFIER_MODULE`).
+ */
+const VERIFIER_ENTRY = resolve(import.meta.dirname, 'src', 'engine', 'VerifierReaders.ts');
+
+export default defineConfig(({ command, isSsrBuild, mode }) => ({
   // The server's module is no page, and has no manifest.
   plugins: [dataSetsRoute(), ...(isSsrBuild ? [] : [webAppManifest()])],
   root: '.',
@@ -468,9 +475,10 @@ export default defineConfig(({ command, isSsrBuild }) => ({
   },
   build: {
     outDir: isSsrBuild ? 'dist/server' : 'dist',
-    emptyOutDir: true,
+    // The verifier's module is built beside the server's, which it leaves.
+    emptyOutDir: mode !== 'verifier',
     rollupOptions: {
-      input: isSsrBuild ? SERVER_ENTRY : {
+      input: isSsrBuild ? (mode === 'verifier' ? VERIFIER_ENTRY : SERVER_ENTRY) : {
         main: resolve(import.meta.dirname, 'index.html'),
         // The statistics page, `/stats` (`server/app.ts`): none of the game's code.
         stats: resolve(import.meta.dirname, 'stats.html'),

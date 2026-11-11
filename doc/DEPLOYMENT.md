@@ -18,8 +18,10 @@ behind the host's nginx, and a deploy by `docker save`, `scp` and `docker load`.
 ## What runs where
 
 ```
-image      dist/ (the built page, and the server's check in dist/server/) + server/ (run by
-           Node 24 as is) + src/data/DataSets.ts
+image      dist/ (the built page, and the server's and the verifier's modules in dist/server/)
+           + server/ (run by Node 24 as is) + src/data/DataSets.ts
+services   csbweb, the server; verifier, the proofs' replays (`server/verifier.ts`), from the
+           same image, the game files read-only
 mounts     /data/gamefiles        the data sets, and players' uploads
            /data/stats            stats.db (SQLite, WAL: the statistics, the data sets, the
                                   recordings, the identities and the proofs), recordings/,
@@ -45,7 +47,8 @@ On the VPS, everything is in one folder, `DEPLOY_DIR` (`~/csbweb`):
     ├── recordings/       the shared recordings' packages, `<id>.gz`, written by the server
     ├── proofs/           the proofs' packages, `<id>.gz`, written by the server, never served
     ├── backups/          the nightly snapshots, 14 days of them, gamefiles/: the
-    │                     sets' folders, and recordings/: the packages, each copied once and kept
+    │                     sets' folders, recordings/: the packages, and proofs/: the proofs
+    │                     checked and kept, each copied once and kept
     └── backup.log
 ```
 
@@ -427,7 +430,7 @@ with the players' saves in reach. Share those zipped.
 
 ## The build
 
-`npm run build` is `tsc && vite build && vite build --ssr`. `static/` is Vite's `publicDir` for the dev server
+`npm run build` is `tsc && vite build && vite build --ssr && vite build --ssr --mode verifier`. `static/` is Vite's `publicDir` for the dev server
 only (`vite.config.mts`), so a build ships none of the game files, the manuals or anything
 else there. The page's own files are under `src/assets/`: `favicon.ico`, named by
 `index.html`, the welcome page's logo, `csbweb-logo.jpg`, imported by
@@ -449,6 +452,14 @@ into one module that imports nothing, `dist/server/PageReaders.js` (`vite.config
 The server cannot import the page's sources as it imports `DataSets.ts`, since they are not
 erasable syntax and the image has no `node_modules`, so it loads this module instead and
 reads a set and a package with the page's own readers. It is never served.
+
+**The verifier's module** is the third, `--ssr --mode verifier`: the replay of a proof
+(`src/engine/VerifierReaders.ts`, `replayProof`), the whole engine and a page without the
+DOM, with the build's achievements, bundled into another module that imports nothing,
+`dist/server/VerifierReaders.js`, about 2 MB, which only the verifier service loads
+(`server/verifier.ts`, `doc/ACHIEVEMENTS.md` → "Proofs"). A build of its own, so that neither
+module imports a chunk of the other's. `build.ts` asserts it imports nothing and replays a
+corpus recording as the source does.
 
 `tools/checks/build.ts` builds both into a scratch folder and asserts them: only the page's own file
 types, nothing of `static/`, every file `index.html` and `stats.html` name present, the manifest's icons too, the
@@ -672,6 +683,20 @@ Moving it on moves all four at once. The digest is the index's, which
   (busybox's `wget`), and `json-file` logs rotated at 3 × 10 MB.
 - `version: '3.8'`, for Compose v1, which the reference instance runs; v2 ignores it, with a warning.
 
+It runs the same image a second time as the container `csbweb-verifier`, the service
+`verifier`, whose command is `node server/verifier.ts`: the proofs' replays
+(`doc/ACHIEVEMENTS.md` → "Proofs"). It publishes no port, mounts `./gamefiles` read-only and
+`./stats` read-write, where it writes the store beside the server, waiting for the
+server's writes (`busy_timeout`, `server/store.ts`), and deletes the packages that proved
+nothing of their own. A replay takes a CPU while it runs, so it gets `cpus: 0.5` and
+`cpu_shares: 256`, a quarter of the server's weight, and lowers its own priority to nice 19
+at start-up, which needs no capability. Its limits are the server's: `mem_limit: 512m`,
+`pids_limit: 100`, `read_only`, `cap_drop: [ALL]`, `no-new-privileges`. It has no
+healthcheck, since it serves nothing; `docker compose logs verifier` shows a line per
+proof replayed. A deploy's `down` stops a replay under way, which leaves its proof queued,
+replayed at the next start. `tools/check-image.sh` runs it so beside the server's, and has
+it check a proof the server took.
+
 **`.env` on the server** is the stack's, beside the compose file, and `deploy.sh` does not copy
 it. Compose reads it twice over: for `${CSBWEB_PORT}` in the compose file, and as the
 container's `env_file`. So it must exist, even empty, or Compose refuses to start the
@@ -801,7 +826,9 @@ once, through a `.partial` name renamed when whole, and kept for good, a deleted
 an edited set's old one included, since a snapshot still names it. The shared recordings'
 packages, which never change either but by a migration of their format, are copied the same way into
 `stats/backups/recordings/<id>.gz`; a migration moves the old copy to
-`stats/backups/recordings-old/` (`utils/migrate-recording-packages.ts`, "Shared recordings", above). It prints one JSON line, `backup_ok` with the folders and
+`stats/backups/recordings-old/` (`utils/migrate-recording-packages.ts`, "Shared recordings", above). So are
+the proofs' packages the verifier checked and kept, which it never deletes then, into
+`stats/backups/proofs/<id>.gz`; a queued one, which it may yet delete, is not. It prints one JSON line, `backup_ok` with the folders and
 the packages copied and the number of each kept, and exits with 1 when the store cannot be read or a folder cannot be copied
 (`backup_failed`). The crontab line, `doc/SETUP.md` step 28's (`docker-compose` under Compose v1), deletes the
 snapshots older than 14 days, and only them:
@@ -832,6 +859,7 @@ cp stats/backups/stats-<date>.db stats/stats.db
 rm -f stats/stats.db-wal stats/stats.db-shm   # stale sidecars would bring the old state back
 cp -rn stats/backups/gamefiles/. gamefiles/   # the players' folders a lost gamefiles/ lacks
 cp -n stats/backups/recordings/*.gz stats/recordings/   # the packages a lost recordings/ lacks
+cp -n stats/backups/proofs/*.gz stats/proofs/   # the proofs kept that a lost proofs/ lacks
 docker-compose up -d
 ```
 

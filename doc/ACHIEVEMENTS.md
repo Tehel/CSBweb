@@ -429,14 +429,59 @@ package is kept in `PROOFS_DIR` (`proofs/` beside the store), never served.
 a proof queued with its claims unverified and its verdicts answered to its identity's
 browsers alone, the limits, and no `playerId` or playthrough in any answer.
 
-*Designed, the rest of phase 18.5:* a **verifier** service, a second container from the
-same image, given half a CPU and a low priority, replays one queued package at a time with
-the tracker attached. It finds the set's files by their digests and plays at the package's
-own engine level. What the replay unlocks becomes verified, and a claim the replay does not
-make is dropped. A package that drifts stays unverified. A package that granted nothing of
-its own is deleted once it has been checked. The page sends a package at the game's end when
-the game unlocked anything, and at a save after a new unlock, at most every ten minutes per
-playthrough, and shows the verdicts.
+**The verifier** (`server/verifier.ts`) is a service of its own, a second container from
+the same image (`docker-compose.yaml`), given half a CPU and a low weight beside the others,
+which lowers its own priority to the lowest at start-up: the game's server comes first. It
+replays one queued proof at a time, the oldest first (`verifyNext`, `server/proofs.ts`),
+with the page's replay built for Node (`replayProof`,
+`src/engine/achievements/ProofReplay.ts`): the server bundles it as a second module,
+`dist/server/VerifierReaders.js` (`src/engine/VerifierReaders.ts`, `vite build --ssr
+--mode verifier`), with the whole engine, a page without the DOM and the build's
+achievements, beside the main server's readers (`PageReaders.js`), which never load it.
+
+- The package is read with the page's reader, its set found by its files' digests among
+  every set the store holds (`findRecordingSet`, the digests of each set's folder, as
+  `api/data-set-files` digests them), and its path played to its point as the page plays a
+  cut before it uploads it (`playCut`), each recording at its own engine level
+  (`RecordingPlayer`, `Behaviour`), the tracker attached with the build's achievements of
+  the package's set.
+- **Played to its point**, the proof is `checked`, and its playthrough is the one the replay
+  read there (`d.RandomGameID`). Each claim the replay's history holds is `verified`, each
+  other `dropped`, and an unlock it holds that the page did not claim is granted,
+  `verified`, all the same: the replay is the authority, not the claim.
+- **Where it does not**, it drifts, a later level's, a package that does not read and one
+  whose files no set has among them, the proof is `drifted`, the reason kept and answered,
+  its claims `unverified`, and its file kept.
+- **A proof that verified nothing of its own**, nothing an earlier proof of its identity's
+  browsers had not verified in the same playthrough, has its file deleted once checked
+  (`ProofStore.dropFile`); its row and its claims stay. A proof that did is kept, and the
+  nightly backup copies its package once (`server/backup.ts`, `doc/DEPLOYMENT.md` →
+  "Backups").
+
+`tools/checks/server-proofs.ts` proves the verifier over the repository's sets, with the
+page's source: a genuine corpus recording (`replay-saves-written-over`) whose forged claim is
+dropped and whose First Blood is granted, the same game again verified but not its own and
+its file deleted, a game unlocking nothing whose claim is dropped, a package whose save
+differs and one made by hand left unverified with their reasons, the verdicts as the page
+asks them and the profile. `tools/checks/build.ts` proves the built module replays as the
+source does, and `tools/check-image.sh` runs the verifier in its own container beside the
+server's, a proof sent to the server checked by it.
+
+**Settled:** CSB's adventure, made by RISE from the prison's save (`Chaos.ts`), begins its
+recording at a save no replay holds a state for, so the verifier gives it a history of its
+own from there, as the page does: the two agree, and no needs-the-whole-game achievement
+unlocks in CSB's adventure. Giving it the prison's history would need the package to carry
+the prison's path, which the store does not link to the adventure. A player who wants a
+verified run seen shares the same point through the book's UPLOAD, the shared recordings'
+moderation ("Shared recordings", `doc/RECORDING.md`): nothing links the two.
+**Deferred:** replaying the kept proofs again when a set gains an achievement, which phase
+18.7's sets' own files make possible without a deploy; and a moderator watching a proof
+that looks suspicious, which needs the Hall of Fame's moderation (18.6), where the names
+are shown; a kept package stays on the server for it.
+
+The page sends a package at the game's end when the game unlocked anything, and at a save
+after a new unlock, at most every ten minutes per playthrough, and shows the verdicts
+(*designed, the rest of phase 18.5*).
 
 An unlock on a branch that the player later reloaded away from is on no path they can send,
 so it stays in the browser.

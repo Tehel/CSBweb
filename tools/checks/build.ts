@@ -21,7 +21,11 @@
  *     base set's `graphics.dat`, read from the set's folder, the same with Chaos Strikes Back's
  *     own `graphics.dat`, and a `dungeon.dat` that does not read; and of a package what the
  *     page's `readRecordingPackage` says: one read, one past the limit it unzips to, and
- *     bytes that are no package.
+ *     bytes that are no package;
+ *   - the verifier's module (`VERIFIER_MODULE`, `--ssr --mode verifier`) imports nothing,
+ *     loads through the verifier's loader (`loadVerifierReaders`), and replays a proof as
+ *     the page's `replayProof` does, with the build's achievements: a genuine corpus
+ *     recording (`replay-saves-written-over`, First Blood), and bytes that are no package.
  *
  * Usage: npm test -- --only=build.ts
  */
@@ -30,12 +34,20 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:f
 import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 
-import { READERS_MODULE, loadPageReaders } from '../../server/app.ts';
+import { READERS_MODULE, VERIFIER_MODULE, loadPageReaders, loadVerifierReaders } from '../../server/app.ts';
+import { DataSetStore } from '../../server/dataSets.ts';
+import { verifierSets } from '../../server/proofs.ts';
+import { FileDigestCache } from '../../server/setFiles.ts';
+import { openStore } from '../../server/store.ts';
+import { parseManifest } from '../../src/data/DataSets.ts';
+import { replayProof } from '../../src/engine/achievements/ProofReplay.ts';
+import { setAchievementDefs } from '../../src/engine/achievements/PageAchievements.ts';
 import type { DataSetDraft, DataSetFolder } from '../../server/publish.ts';
 import { checkLocalDataSet, readDungeonWalls } from '../../src/engine/LocalDataSetCheck.ts';
 import { readRecordingPackage } from '../../src/engine/RecordingPackage.ts';
 import { check, finish } from '../lib/check.ts';
-import { dataSetNamed } from '../lib/dataSets.ts';
+import { dataSetNamed, GAMEFILES_DIR, MANIFEST_FILE } from '../lib/dataSets.ts';
+import { CORPUS_DIR } from '../lib/recordingCorpus.ts';
 import { packageOf } from '../lib/recordingPackages.ts';
 
 const ROOT = resolve(import.meta.dirname, '../..');
@@ -51,10 +63,10 @@ const WEB_MANIFEST = 'manifest.webmanifest';
 /** The FTL logo, the page's own asset (`src/main.ts`, `loadSwooshFiles`). */
 const SWOOSH_IMAGE = 'src/assets/swoosh.img';
 
-/** `vite build` with `args`, into `outDir`, as `npm run build` runs it. */
-function viteBuild(outDir: string, args: string[]): void {
+/** `vite build` with `args`, into `outDir`, emptied first unless `keep`, as `npm run build` runs it. */
+function viteBuild(outDir: string, args: string[], keep = false): void {
     const vite = spawnSync(resolve(ROOT, 'node_modules/.bin/vite'),
-        ['build', ...args, '--outDir', outDir, '--emptyOutDir', '--logLevel', 'error'],
+        ['build', ...args, '--outDir', outDir, ...(keep ? [] : ['--emptyOutDir']), '--logLevel', 'error'],
         { cwd: ROOT, encoding: 'utf8', env: { ...process.env, CSBWEB_PROBE: undefined } });
     if (vite.status !== 0) throw new Error(`vite build ${args.join(' ')} failed:\n${vite.stdout}${vite.stderr}`);
 }
@@ -93,6 +105,7 @@ async function main(): Promise<void> {
     try {
         viteBuild(outDir, []);
         viteBuild(join(outDir, 'server'), ['--ssr']);
+        viteBuild(join(outDir, 'server'), ['--ssr', '--mode', 'verifier'], true);
 
         const files = listFiles(outDir).map((f) => relative(outDir, f)).sort();
         let total = 0;
@@ -105,8 +118,8 @@ async function main(): Promise<void> {
         console.log(`  ${String(total).padStart(8)}  in all`);
 
         console.log('\nChecks:');
-        const strays = files.filter((f) => f !== 'index.html' && f !== STATS_PAGE && f !== WEB_MANIFEST && !f.startsWith('assets/') && f !== READERS_MODULE);
-        check(strays.length === 0, `every file is index.html, ${STATS_PAGE}, ${WEB_MANIFEST}, under assets/ or ${READERS_MODULE}${strays.length ? `: not ${strays.join(', ')}` : ''}`);
+        const strays = files.filter((f) => f !== 'index.html' && f !== STATS_PAGE && f !== WEB_MANIFEST && !f.startsWith('assets/') && f !== READERS_MODULE && f !== VERIFIER_MODULE);
+        check(strays.length === 0, `every file is index.html, ${STATS_PAGE}, ${WEB_MANIFEST}, under assets/, ${READERS_MODULE} or ${VERIFIER_MODULE}${strays.length ? `: not ${strays.join(', ')}` : ''}`);
         const foreign = files.filter((f) => !PAGE_TYPES.has(f.slice(f.lastIndexOf('.'))) && !PRINTED_SHEET.test(f));
         check(foreign.length === 0, `every file is of the page's own types${foreign.length ? `: not ${foreign.join(', ')}` : ''}`);
         check(!files.some((f) => f.includes('gamefiles')), 'no game files');
@@ -180,6 +193,28 @@ async function main(): Promise<void> {
             console.log(`  ${what}: ${fromBuild.startsWith('throws') ? fromBuild : `${fromBuild.length} characters of JSON`}`);
             check(fromBuild === await read(readRecordingPackage), `${what}: the built reader of a package says what the source's does`);
         }
+
+        console.log('\nThe verifier\'s module:');
+        const verifier = readFileSync(join(outDir, VERIFIER_MODULE), 'utf8');
+        const verifierImports = verifier.match(/^\s*(?:import|export\s.*\sfrom)\s.*$|\bimport\(|\brequire\(/gm) ?? [];
+        check(verifierImports.length === 0, `${VERIFIER_MODULE} imports nothing${verifierImports.length ? `: not ${verifierImports.join(', ')}` : ''}`);
+        const { replay } = await loadVerifierReaders(outDir);
+        const db = openStore(':memory:');
+        const dataSets = new DataSetStore(db);
+        dataSets.fill(parseManifest(readFileSync(MANIFEST_FILE, 'utf8'), ''));
+        const sets = await verifierSets(dataSets, resolve(ROOT, GAMEFILES_DIR), new FileDigestCache());
+        const common = setAchievementDefs(readFileSync(resolve(ROOT, 'src/engine/achievements/defs/common.txt'), 'utf8'), null);
+        const proofs: [string, Uint8Array][] = [
+            ['a genuine recording', new Uint8Array(readFileSync(join(CORPUS_DIR, 'replay-saves-written-over.L5.gz')))],
+            ['bytes that are no package', new Uint8Array([1, 2, 3])],
+        ];
+        for (const [what, bytes] of proofs) {
+            const fromBuild = JSON.stringify(await replay(bytes, 1 << 25, sets));
+            console.log(`  ${what}: ${fromBuild}`);
+            check(fromBuild === JSON.stringify(await replayProof(bytes, 1 << 25, sets, () => common)), `${what}: the built replay says what the source's does`);
+        }
+        check(JSON.parse(JSON.stringify(await replay(proofs[0]![1], 1 << 25, sets))).unlocked?.includes('first-blood') === true, 'the built replay of the genuine recording unlocks First Blood');
+        db.close();
     } finally {
         rmSync(outDir, { recursive: true, force: true });
     }

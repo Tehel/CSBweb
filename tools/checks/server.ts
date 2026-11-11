@@ -104,8 +104,10 @@
  *     still in the WAL and the data sets, the server serving throughout, and exit 1 on a
  *     missing store; the folder of every set, with an owner or not, copied whole into
  *     `backups/gamefiles/`, and every shared recording's package, from the `recordings/`
- *     the server made beside the store, into `backups/recordings/`, each kept by the next
- *     run rather than copied again, and exit 1 on a set whose folder is not there.
+ *     the server made beside the store, into `backups/recordings/`, and every proof's
+ *     package checked and kept, from `proofs/`, into `backups/proofs/`, a queued one not,
+ *     each kept by the next run rather than copied again, and exit 1 on a set whose folder
+ *     is not there.
  *
  * The scratch build's readers (`READERS_MODULE`) are a stand-in that exports the functions:
  * `tools/checks/build.ts` builds the real one and checks sets and packages through it. The
@@ -1501,6 +1503,8 @@ function finish(child: ChildProcess, onLine: (line: string) => void = () => {}):
 
 /** The recording `checkEntry` shares beside the server. */
 const SHARED_ID = '0123456789ABCDEF';
+const PROOF_KEPT = '00000000000000AA';
+const PROOF_QUEUED = '00000000000000BB';
 
 /** What `checkEntry` learnt of the first `backup.ts` run beside the server. */
 interface Backup {
@@ -1596,6 +1600,11 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
             writeFileSync(join(scratch, 'stats', 'recordings', `${SHARED_ID}.gz`), Buffer.from([8, 9]));
             store.prepare('INSERT INTO recordings (id, data_set, build, title, author, description, recorded_at, ended_at, play_time, start, extras, size, uploader, uploaded_at, status) '
                 + "VALUES (?, 'a', 'test', 'T', '', '', 0, 0, 0, '{\"kind\":\"new\"}', 0, 2, ?, 0, 'pending')").run(SHARED_ID, PLAYER);
+            // And two proofs: one checked and kept, one queued, which the verifier may yet delete.
+            for (const [id, state] of [[PROOF_KEPT, 'checked'], [PROOF_QUEUED, 'queued']] as const) {
+                writeFileSync(join(scratch, 'stats', 'proofs', `${id}.gz`), Buffer.from([10, 11]));
+                store.prepare("INSERT INTO proofs (id, data_set, player, build, level, size, sent_at, state) VALUES (?, 'a', ?, 'test', 0, 2, 0, ?)").run(id, PLAYER, state);
+            }
             store.close();
             const run = await finish(startEntry(app, { STATS_DB: statsDb, GAMEFILES_DIR: options.gamefilesDir }, 'backup.ts'));
             const target = /"target":"([^"]+)"/.exec(run.out)?.[1];
@@ -1636,9 +1645,13 @@ async function checkEntry(scratch: string, options: ServerOptions): Promise<void
     const recordingCopy = join(scratch, 'stats', 'backups', 'recordings', `${SHARED_ID}.gz`);
     check((backup?.out ?? '').includes('"recordingsCopied":1,"recordingsKept":0') && existsSync(recordingCopy) && readFileSync(recordingCopy).equals(Buffer.from([8, 9])),
         'a shared recording\'s package is copied into backups/recordings/, from the folder the server made beside the store');
+    const proofs = join(scratch, 'stats', 'backups', 'proofs');
+    check((backup?.out ?? '').includes('"proofsCopied":1,"proofsKept":0') && readFileSync(join(proofs, `${PROOF_KEPT}.gz`)).equals(Buffer.from([10, 11]))
+        && !existsSync(join(proofs, `${PROOF_QUEUED}.gz`)), 'a proof checked and kept is copied into backups/proofs/, a queued one not');
     const second = again as { code: number | null; out: string } | null;
     console.log(`  backup.ts again: ${shown(second)}`);
-    check(second?.code === 0 && second.out.includes('"copied":[],"kept":2') && second.out.includes('"recordingsCopied":0,"recordingsKept":1'),
+    check(second?.code === 0 && second.out.includes('"copied":[],"kept":2') && second.out.includes('"recordingsCopied":0,"recordingsKept":1')
+        && second.out.includes('"proofsCopied":0,"proofsKept":1'),
         'the next backup keeps those copies rather than copying them again');
     const noStore = await finish(startEntry(app, { STATS_DB: join(scratch, 'nowhere', 'stats.db') }, 'backup.ts'));
     check(noStore.code === 1 && noStore.out.includes('backup_failed'), 'backup.ts on a store that is not there exits 1');

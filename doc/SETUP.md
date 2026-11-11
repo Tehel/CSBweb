@@ -117,7 +117,8 @@ and `~/csbweb` as the stack's folder. Replace them with your own.
     `DEPLOY_INSTANCE` (`https://csbweb.example.org`). Git ignores this file.
 
 15. **Deploy:** `npm run deploy -- --no-replay`. It builds the image, copies it and the
-    compose file into `DEPLOY_DIR`, and starts the stack. A deploy first replays the
+    compose file into `DEPLOY_DIR`, and starts the stack: the server, `csbweb`, and the
+    verifier of the achievements' proofs, `csbweb-verifier`, from the same image. A deploy first replays the
     recordings the site shares, which needs the site and a moderator (step 22), so the
     first one goes without.
 
@@ -125,10 +126,11 @@ and `~/csbweb` as the stack's folder. Replace them with your own.
 
     ```bash
     curl -s https://csbweb.example.org/api/health      # {"ok":true}
-    ssh you@csbweb.example.org 'cd ~/csbweb && docker compose logs --tail 5'
+    ssh you@csbweb.example.org 'cd ~/csbweb && docker compose logs --tail 5 csbweb verifier'
     ```
 
-    The log's last line is `Listening on port 8085: …`, with `no set` for now.
+    The server's last line is `Listening on port 8085: …`, with `no set` for now; the
+    verifier's, `Verifying the proofs in /data/stats/proofs …`.
 
 ## In your browser: become the moderator
 

@@ -4,7 +4,9 @@
  * (`recordings.ts`) and the players' identities (`identity.ts`), on one connection, so that `backup.ts`'s snapshot holds them all.
  *
  * The file runs in WAL mode. Closing the connection checkpoints the WAL into it, so the file
- * alone is the whole store once the server has stopped. A missing file is made; each
+ * alone is the whole store once the server has stopped. Two processes write it, the server
+ * and the verifier (`verifier.ts`), so a write waits up to `BUSY_TIMEOUT_MS` for the other's
+ * to end rather than failing at once with `SQLITE_BUSY`. A missing file is made; each
  * table's owner gives it the schema it lacks.
  *
  * SQLite's temporary files are kept in memory: the container's file system is read-only
@@ -14,8 +16,12 @@
  */
 import { DatabaseSync } from 'node:sqlite';
 
+/** How long a write waits for the other process's: a transaction of either takes milliseconds. */
+const BUSY_TIMEOUT_MS = 5000;
+
 export function openStore(path: string): DatabaseSync {
     const db = new DatabaseSync(path);
+    db.exec(`PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS}`);
     db.exec('PRAGMA journal_mode = WAL');
     db.exec('PRAGMA temp_store = MEMORY');
     return db;
