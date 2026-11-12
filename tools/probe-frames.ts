@@ -1971,6 +1971,7 @@ const PROFILE_RUN = Date.now().toString(36).slice(-6);
 const profileShown = () => evaluate(`(d=>d&&{ open: d.open, hash: location.hash, name: d.querySelector('#profile-name').value,
   nameStatus: d.querySelector('.profile-name-status').textContent, linkStatus: d.querySelector('.profile-link-status').textContent,
   publicId: d.querySelector('.profile-public-id').hidden ? null : d.querySelector('.profile-public-id').textContent,
+  fame: d.querySelector('.profile-public-id .profile-fame')?.getAttribute('href') ?? null,
   key: d.querySelector('.profile-key').hidden ? null : d.querySelector('.profile-key-text').textContent,
   dump: Object.fromEntries([...d.querySelectorAll('.profile-part')].map(p=>[p.querySelector('h4').textContent.replace(/,.*$/, ''),
     [...p.querySelectorAll('li, .profile-none')].map(l=>l.textContent)])) })(document.querySelector('dialog.profile'))`);
@@ -2021,9 +2022,10 @@ check(profileFirst?.open === true && profileFirst.hash === '#profile' && profile
   'it opens PROFILE at #profile: no name, and what the server knows, the set this browser published, listed');
 check(takenElsewhere === 201 && /^Refused: A name is 3 to 16/.test(profileShort?.nameStatus ?? '') && profileTaken?.nameStatus === 'Taken: This name is taken.',
   'a name too short is refused, and another\'s, in another case, taken, each said beside SAVE');
-check(profileSaved?.nameStatus === 'Saved.' && /^Your public id: [0-9a-z]{10}$/.test(profileSaved.publicId ?? '') && /^([0-9A-Z]{5}-){4}[0-9A-Z]{5}$/.test(profileSaved.key ?? '')
+const savedPublicId = /^Your public id: ([0-9a-z]{10}), and your page in the Hall of Fame\.$/.exec(profileSaved?.publicId ?? '')?.[1];
+check(profileSaved?.nameStatus === 'Saved.' && savedPublicId !== undefined && profileSaved.fame === `fame#${savedPublicId}` && /^([0-9A-Z]{5}-){4}[0-9A-Z]{5}$/.test(profileSaved.key ?? '')
   && profileSaved.dump['Your name']?.[0]?.startsWith(`Probe ${PROFILE_RUN}, public id `) && ['Copied.', 'Selected: copy it with your keyboard.'].includes(profileCopied) && profileClosed,
-  'the run\'s name is saved: its public id, its key shown once, COPY said, and the dump\'s name; CLOSE takes #profile off');
+  'the run\'s name is saved: its public id, linking to its page in the Hall of Fame, its key shown once, COPY said, and the dump\'s name; CLOSE takes #profile off');
 check(sharerAlone?.dump['Recordings you shared']?.includes(sharedRow) && profileWrongKey?.linkStatus === 'Refused: This key is no name\'s.'
   && profileLinked?.linkStatus === `Linked: this browser is Probe ${PROFILE_RUN} too.` && profileLinked.name === `Probe ${PROFILE_RUN}`
   && profileLinked.dump['Your name']?.[1] === 'Known in 2 browsers.' && profileLinked.dump['Dungeons you published']?.join() === published
@@ -2564,6 +2566,53 @@ const proofWords = await evaluate(`[...document.querySelectorAll('dialog.documen
   .map((i) => i.dataset.achievement + ':' + [...i.querySelectorAll('.achievements-proof')].map((p) => p.textContent).join('/')).join()`);
 check(proofWords === 'first-blood:verified,pest-control:not verified', `each unlock says what the server's replay said of it (${proofWords})`);
 await clickOn('#documents-close');
+// The Hall of Fame (`src/fame/famePage.ts`), which the welcome page's footer links to (and
+// PROFILE, above), at `/fame`, none of the game's code loaded: the dev server's verifier
+// verified the prover's First Blood above, so their set is the column's first, selected,
+// and its achievements, their tiers, counts, shares and firsts are `api/fame`'s; a click
+// on First Blood's first opens their page, their badge and its day; back returns to the
+// set; an id nobody has says so.
+const fameLink = await evaluate(`[...document.querySelectorAll('.welcome-footer nav a')].find(a=>a.textContent==='Hall of Fame')?.getAttribute('href')`);
+await navigate(`${APP}fame?keepsaves&keepsettings`, STATS);
+const famePage = () => evaluate(`(async()=>{const q=(s,r=document)=>[...r.querySelectorAll(s)];const text=(e)=>e?.textContent;
+  const panel=document.querySelector('.stats-set');
+  for(let i=0;i<50&&!panel.querySelector('h2');i++) await new Promise(r=>setTimeout(r,100));
+  const summary=await (await fetch('api/fame')).json();
+  const id=q('.stats-pick[aria-current="true"]').map(p=>p.dataset.set).join();
+  const set=id?await (await fetch('api/fame/sets/'+encodeURIComponent(id))).json():null;
+  const player=location.hash?await fetch('api/fame/players/'+location.hash.slice(1)).then(r=>r.ok?r.json():null):null;
+  return { hash: location.hash, selected: id, name: text(panel.querySelector('h2')),
+    band: q('.stats-band dd').map(text).join('|'), expectedBand: [summary.players, summary.sets.filter(s=>s.players>0).length].join('|'),
+    picks: q('.stats-pick').map(p=>p.dataset.set).join(), expectedPicks: summary.sets.map(s=>s.id).join(),
+    items: q('.fame-achievement',panel).map(i=>[i.dataset.achievement, text(i.querySelector('.fame-tier')), text(i.querySelector('.stats-row-value')),
+      text(i.querySelector('.fame-first')), text(i.querySelector('.fame-day'))].join('|')).join(),
+    expectedItems: set?.achievements.map(a=>[a.id, a.tier, a.players+' · '+Math.round(a.share*100)+'%', a.first?'First: '+a.first.name:'Nobody yet.', ''].join('|')).join(),
+    expectedBadges: player?.sets.flatMap(s=>s.achievements.map(a=>[a.id, a.tier, '', '', 'Verified '+a.day].join('|'))).join(),
+    first: set?.achievements.find(a=>a.id==='first-blood')?.first ?? null, playerName: player?.name,
+    colour: (e=>e&&getComputedStyle(e).color)(panel.querySelector('.fame-achievement:not(.fame-nobody) .fame-tier')),
+    gameCode: performance.getEntriesByType('resource').map(e=>e.name).filter(n=>/\\/main(-[\\w-]+)?\\.(ts|js)(\\?|$)|\\.dat$/i.test(n)) };})()`);
+const fameFirst = await famePage();
+console.log('state: Hall of Fame');
+console.log('  ', JSON.stringify(fameFirst));
+check(fameLink === 'fame' && fameFirst.gameCode.length === 0 && fameFirst.band === fameFirst.expectedBand && fameFirst.picks === fameFirst.expectedPicks
+  && fameFirst.selected === fameFirst.expectedPicks.split(',')[0],
+  'the welcome page\'s footer links to the Hall of Fame, which loads none of the game\'s code; its band and its column are api/fame\'s, the first selected');
+check(fameFirst.items === fameFirst.expectedItems && fameFirst.first !== null && fameFirst.colour === 'rgb(252, 180, 0)',
+  'the selected set\'s achievements are api/fame\'s, in order, each its tier, its players and share, and its first: First Blood\'s the prover, its tier easy\'s orange');
+await clickOn('.fame-achievement[data-achievement="first-blood"] .fame-first a');
+await until(`document.querySelector('.stats-set h2')?.textContent === ${JSON.stringify(fameFirst.first?.name ?? '')}`, 'the prover\'s page');
+const famePlayer = await famePage();
+console.log('  ', JSON.stringify(famePlayer));
+check(famePlayer.hash === `#${fameFirst.first?.id}` && famePlayer.name === famePlayer.playerName && famePlayer.selected === ''
+  && famePlayer.items === famePlayer.expectedBadges && famePlayer.items.startsWith('first-blood|easy|'),
+  'a click on the first\'s name opens their page at #<public id>: their name and their badges, each with its day, api/fame\'s');
+await evaluate(`history.back(),1`);
+await until(`document.querySelector('.stats-pick[aria-current="true"]') !== null && !!document.querySelector('.stats-set .fame-first')`, 'the set again');
+const fameBack = await famePage();
+check(fameBack.hash === '' && fameBack.selected === fameFirst.selected && fameBack.items === fameFirst.items, 'back returns to the set');
+await navigate(`${APP}fame?keepsaves&keepsettings#0000000000`, STATS);
+const fameUnknown = await famePage();
+check(fameUnknown.name === 'No such player' && fameUnknown.selected === '' && fameUnknown.playerName === undefined, 'an id nobody has: No such player');
 
 
 // Fullscreen (`src/lib/fullscreen.ts`), DISPLAY's FULLSCREEN. A finger's press is no

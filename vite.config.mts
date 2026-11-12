@@ -481,8 +481,8 @@ function webAppManifest(): Plugin {
   };
   return {
     name: 'csbweb-web-app-manifest',
-    // The game's page alone: the statistics page is no app.
-    transformIndexHtml: (_html, { filename }) => filename.endsWith('stats.html') ? []
+    // The game's page alone: the statistics page and the Hall of Fame are no app.
+    transformIndexHtml: (_html, { filename }) => filename.endsWith('stats.html') || filename.endsWith('fame.html') ? []
       : [{ tag: 'link', attrs: { rel: 'manifest', href: `./${FILE_NAME}` }, injectTo: 'head' }],
     configureServer(server) {
       server.middlewares.use(`/${FILE_NAME}`, (req, res, next) => {
@@ -541,6 +541,8 @@ export default defineConfig(({ command, isSsrBuild, mode }) => ({
         main: resolve(import.meta.dirname, 'index.html'),
         // The statistics page, `/stats` (`server/app.ts`): none of the game's code.
         stats: resolve(import.meta.dirname, 'stats.html'),
+        // The Hall of Fame, `/fame` (`server/app.ts`): none of the game's code either.
+        fame: resolve(import.meta.dirname, 'fame.html'),
       }
     }
   },

@@ -223,6 +223,7 @@ const PAGE = `
     <nav class="px px2" aria-label="Footer">
       <a href="#about">About</a>
       <a href="stats">Stats</a>
+      <a href="fame">Hall of Fame</a>
       <a href="https://github.com/Tehel/CSBweb" target="_blank">Source</a>
     </nav>
   </footer>

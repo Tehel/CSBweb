@@ -6,7 +6,8 @@
  *
  * Its top section says "I shall be known on the server as:", with the name's field and SAVE,
  * the answer beside it: refused (`publicNameProblem`, checked here before it is sent),
- * taken, or saved. Once there is a name, its public id; once a name is first chosen, or a
+ * taken, or saved. Once there is a name, its public id and a link to its page in the Hall
+ * of Fame (`fame.html`); once a name is first chosen, or a
  * new key drawn (NEW KEY), the identity key, shown this once, with COPY. Under it a field
  * that takes a key from another browser and LINK, which links this one to that name.
  *
@@ -84,11 +85,24 @@ export function openProfile(): void {
     const dump = $('.profile-dump');
     let identity: PlayerProfile['identity'] = null;
 
-    /** The identity as the server answered it: its name in the field, its id, and NEW KEY offered. */
+    /**
+     * The identity as the server answered it: its name in the field, its id, and while it has
+     * a name, a link to its page in the Hall of Fame (`fame.html`), and NEW KEY offered.
+     */
     const showIdentity = (shown: { name: string | null; id: string } | null) => {
         if (shown !== null) name.value = shown.name ?? '';
         publicId.hidden = shown === null;
-        publicId.textContent = shown === null ? '' : `Your public id: ${shown.id}`;
+        publicId.replaceChildren();
+        if (shown !== null) {
+            publicId.append(`Your public id: ${shown.id}`);
+            if (shown.name !== null) {
+                const page = document.createElement('a');
+                page.className = 'profile-fame';
+                page.href = `fame#${shown.id}`;
+                page.textContent = 'your page in the Hall of Fame';
+                publicId.append(', and ', page, '.');
+            }
+        }
         newKey.hidden = shown === null || !keyBox.hidden;
     };
     const showKey = (key: string) => {

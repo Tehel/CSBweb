@@ -8,6 +8,7 @@
 !vite.config.mts
 !index.html
 !stats.html
+!fame.html
 !src/
 !server/
 !tools/**/*.ts

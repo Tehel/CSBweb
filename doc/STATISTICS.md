@@ -182,7 +182,9 @@ The events sent before `hero` count a reincarnated champion by their typed name.
 Public and aggregates only: never an event, a player or a playthrough, and nothing of a set
 that is pending or hidden. Every answer is kept 30 s and says so (`Cache-Control: public,
 max-age=30`, `AnswerCache`), so that a loop of requests costs a lookup; making one again is
-a few indexed queries, about 0.1 s at 200,000 events.
+a few indexed queries, about 0.1 s at 200,000 events. The Hall of Fame's answers,
+`api/fame`, are kept in the same cache, but count the achievements' proofs, not these
+events, and go by the players' public names (`doc/ACHIEVEMENTS.md` → "The Hall of Fame").
 
 - **`api/stats`**, the public sets: players ever, time played (`playTime`, ms), sessions,
   games started and won, sessions and games started per week (from Monday, UTC), and each

@@ -19,7 +19,8 @@ history in each save's row, the store of the unlocks, the banner, the dialog and
 welcome page's tab ("The page"); and the players' identities, the public name and its key,
 on the server and in the welcome page's PROFILE ("Identity"); and the proofs: a game's
 recording sent with the unlocks it claims, replayed by the verifier service, and its
-verdicts shown ("Proofs"). The rest of this document is the design that `PLAN.md` phase 18
+verdicts shown ("Proofs"); and the Hall of Fame, its answers and its page ("The Hall of
+Fame"). The rest of this document is the design that `PLAN.md` phase 18
 builds, step by step, and each step rewrites its section here to say what was built.
 
 ## The file
@@ -556,3 +557,27 @@ pending and hidden sets left out, dropped, unverified and drifted claims and an 
 file does not hold not counted, each achievement in its file's order, a player's badges and
 their days, the 404s, the cache, and no `playerId`, playthrough or proof id in any answer.
 `tools/checks/build.ts` proves the built readers hold the source's achievements.
+
+**The page** is `/fame` (`fame.html`, Vite's third entry, `src/fame/famePage.ts`), in the
+statistics page's look (`doc/STATISTICS.md`), which loads none of the game's code: the
+routes' names are its own copies, as the statistics page's are. The welcome page's footer
+links to it beside the statistics, ABOUT tells of it, and PROFILE's public id links to the
+player's own page, `fame#<public id>`, once they have a name.
+
+- **The band** says how many players the Hall has and how many dungeons have one; **the
+  column**, the sets in `api/fame`'s order, each its players and how many of its
+  achievements were earned. A click selects one, `?set=<id>` in the URL, the other
+  parameters kept; with none, the column's first is selected.
+- **The selected set**: its players, achievements and those earned, and each achievement in
+  its file's order, its name, its tier in its colour (the banner's, as the book's), its
+  text, a bar of the share of the set's players who earned it with their count and the
+  share, and its first, a link to their page; one nobody earned is dim, "Nobody yet."
+- **A player's page**, `fame#<public id>` or `?player=<public id>`, in the set's place:
+  their name, how many badges and dungeons, and their badges by set, each set's name a link
+  to it, each badge with its tier, its text and the day it was verified. An id no player of
+  the Hall has says so.
+
+`tools/probe-frames.ts` proves it against the dev server, after its proof is verified: the
+footer's link, none of the game's code loaded, the band, the column and the set's
+achievements as `api/fame` answers them, the prover First Blood's first, their page at a
+click on their name, back to the set, and an unknown id; and PROFILE's link to the page.

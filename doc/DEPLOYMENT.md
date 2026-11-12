@@ -440,9 +440,9 @@ player uploads it, and the installed game's icons, named by its web app manifest
 `manifest.webmanifest`; the build hashes them, and inlines `swoosh.img`, 3 KB, in the
 bundle. The manifest itself is built beside `index.html` under a name that does not change,
 as a browser keeps an installed app's manifest URL (`webAppManifest`, `vite.config.mts`).
-The statistics page, `stats.html`, is the page's second entry, which shares none of the
-game's modules and links no manifest. A build is `index.html`, `stats.html`,
-`manifest.webmanifest` and `assets/`, about 1.4 MB, and the server's module.
+The statistics page, `stats.html`, is the page's second entry, and the Hall of Fame,
+`fame.html`, its third, which share none of the game's modules and link no manifest. A
+build is `index.html`, `stats.html`, `fame.html`, `manifest.webmanifest` and `assets/`, about 1.4 MB, and the server's module.
 
 **The server's module** is the second build, `--ssr`: the page's readers the server uses
 (`src/engine/PageReaders.ts`), the check of a player's own set, `checkLocalDataSet`

@@ -145,7 +145,8 @@ There is still **no test framework** (`PLAN.md` → "The evidence") — `npm tes
   CONTINUE lead, CONTINUE's save read straight into play, and the form that adds a set,
   and edits, publishes and deletes one, the tiles that moderate a published one, and the book that
   downloads a set's archive and lists its documents, where a moderator adds and removes them, and its achievements, and lists the site's recordings of the set, moderated and withdrawn, and the browser's, played, uploaded and deleted;
-  and the statistics page its footer links to, as `api/stats` answers, a click selecting a set.
+  and the statistics page its footer links to, as `api/stats` answers, a click selecting a set;
+  and the Hall of Fame, as `api/fame` answers, the prover first, their page and back.
 - `tools/checks/*.ts` stand the real engine up against the real game files, print what
   happened, and assert invariants. Each is named for what it checks; a `watch-` tool runs
   the clock and reports what emerged over time. **They are the regression suite for
@@ -283,6 +284,8 @@ ui/         The page's DOM side: events (the canvas's and the keyboard's listene
             (its ABOUT: the questions a player asks of the site, the statistics among them)
 stats/      statsPage: the statistics page, `/stats` (`stats.html`, Vite's second entry): what
             `api/stats` answers, in the welcome page's look, and none of the game's code
+fame/       famePage: the Hall of Fame, `/fame` (`fame.html`, Vite's third entry): what
+            `api/fame` answers, in the statistics page's look, and none of the game's code
 settings/   Settings: the player's settings, one model the page, the game and the dialogs
             read and change, kept in `localStorage`
 lib/        crt (the CRT effect: a WebGL tube over the canvas, and the pointer read through it),

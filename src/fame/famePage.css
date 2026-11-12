@@ -1,0 +1,26 @@
+/* The Hall of Fame (`src/fame/famePage.ts`), over the statistics page's look
+   (`src/stats/statsPage.css`), itself over the welcome page's. An achievement's tier is in
+   its colour, the banner's (`TIER_COLORS`), as the welcome page's book shows an unlocked
+   one; one nobody has verified is dim. */
+
+.fame-page .stats-band { grid-template-columns: minmax(0, 1fr); }
+
+.fame-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 21px; }
+.fame-achievement { display: flex; flex-direction: column; gap: 6px; }
+.fame-head { display: flex; align-items: baseline; gap: 12px; }
+.fame-name { color: var(--p15); overflow-wrap: anywhere; }
+.fame-tier { margin-left: auto; text-transform: uppercase; white-space: nowrap; }
+.fame-tier.tier-easy { color: var(--p9); }
+.fame-tier.tier-silly { color: var(--p4); }
+.fame-tier.tier-weird { color: var(--p7); }
+.fame-tier.tier-hard { color: var(--p11); }
+.fame-text { margin: 0; color: var(--p13); font-size: 15px; }
+.fame-first, .fame-day { color: var(--p2); font-size: 15px; }
+.fame-first a, .fame-set-link { color: var(--p11); text-decoration: none; }
+.fame-first a:hover, .fame-set-link:hover { color: var(--p15); }
+.fame-achievement .stats-row { grid-template-columns: 120px minmax(0, 1fr) 96px; }
+.fame-nobody .fame-name, .fame-nobody .fame-tier { color: var(--p2); }
+
+@media (max-width: 640px) {
+    .fame-achievement .stats-row { grid-template-columns: 96px minmax(0, 1fr) 72px; }
+}
