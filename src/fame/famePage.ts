@@ -18,6 +18,13 @@
  * - **A player's page**, `fame#<public id>` or `fame?player=<public id>`, in the set's
  *   place (`api/fame/players/<id>`): their name, and their badges by set, each its name,
  *   tier, text and the day it was verified. PROFILE links to the player's own.
+ * - **To a moderator**, whose switch is on (the welcome page's), a player's page ends with
+ *   MODERATION (`GET api/identities/<id>`): how many browsers share the name, RESET NAME,
+ *   which asks a second click, then withdraws the name (`POST api/identities/<id>`), and
+ *   the identity's proofs, the latest first, each its set, when it was sent, how far it got
+ *   and its claims' verdicts, and, while its package is kept, PLAY, which plays it in the
+ *   game's page (`?recording=proof:<id>`), and DOWNLOAD (`GET api/proofs/<id>`). A name
+ *   reset leaves the Hall at once, and the section stays, so that its proofs can be read.
  *
  * An answer that does not come is said where it would have been.
  */
@@ -26,6 +33,7 @@ import '../stats/statsPage.css';
 import './famePage.css';
 import logoUrl from '../assets/csbweb-logo.jpg';
 import type { FameAchievement, FamePlayerPage, FameSet, FameSummary } from '../../server/answers';
+import type { ClaimState, ModeratedIdentity, ModeratedProof } from '../data/DataSets';
 
 /**
  * The Hall's routes (`FAME_ROUTE`, `FAME_SETS`, `FAME_PLAYERS`, `src/data/DataSets.ts`):
@@ -35,6 +43,22 @@ import type { FameAchievement, FamePlayerPage, FameSet, FameSummary } from '../.
 const FAME_ROUTE = 'api/fame';
 const FAME_SETS = 'sets';
 const FAME_PLAYERS = 'players';
+/**
+ * And the moderators' (`IDENTITIES_ROUTE`, `PROOFS_ROUTE`, `PROOF_RECORDING_PREFIX`,
+ * `PLAYER_ID_HEADER`), the page's player as the game's page keeps it (`PLAYER_ID_KEY`,
+ * `src/ui/gameEvents.ts`), and the moderator's switch (`MODERATION_KEY`,
+ * `src/ui/welcomePage.ts`), `'off'` once turned off.
+ */
+const IDENTITIES_ROUTE = 'api/identities';
+const PROOFS_ROUTE = 'api/proofs';
+const PROOF_RECORDING_PREFIX = 'proof:';
+const PLAYER_ID_HEADER = 'X-Player-Id';
+const PLAYER_ID_KEY = 'csbweb_player_v1';
+const MODERATION_KEY = 'csbweb_moderation_v1';
+
+/** What a proof's state and a claim's verdict are said as. */
+const PROOF_STATES = { queued: 'awaiting the verifier', checked: 'replayed', drifted: 'drifted' } as const;
+const CLAIM_STATES: Record<ClaimState, string> = { verified: 'verified', dropped: 'dropped', unverified: 'not verified' };
 
 const PAGE = `
 <main class="welcome-page stats-page fame-page">
@@ -88,8 +112,12 @@ async function showFamePage(body: HTMLElement): Promise<void> {
 
     /** What the panel shows: a set's id, or a player's `#id`. */
     let selected: string | null = null;
-    /** The player the URL names, shown in the panel; else the set it names, or the column's first. */
-    function select(): void {
+    /**
+     * The player the URL names, shown in the panel; else the set it names, or the column's
+     * first. `fresh` asks the server past the browser's cache, which keeps an answer its 30 s:
+     * a name a moderator has just reset is 404 at once.
+     */
+    function select(fresh = false): void {
         const player = shownPlayer();
         const asked = new URLSearchParams(window.location.search).get('set');
         const set = player === null ? summary!.sets.find((known) => known.id === asked) ?? summary!.sets[0] : undefined;
@@ -98,9 +126,14 @@ async function showFamePage(body: HTMLElement): Promise<void> {
         for (const pick of picks) pick.setAttribute('aria-current', String(pick.dataset.set === shown));
         panel.replaceChildren();
         if (player !== null) {
-            void fetchJson<FamePlayerPage>(`${FAME_ROUTE}/${FAME_PLAYERS}/${encodeURIComponent(player)}`).then((page) => {
+            const asker = moderatorId();
+            void Promise.all([
+                fetchJson<FamePlayerPage>(`${FAME_ROUTE}/${FAME_PLAYERS}/${encodeURIComponent(player)}`, {}, fresh ? 'reload' : 'default'),
+                asker === null ? null : fetchJson<ModeratedIdentity>(`${IDENTITIES_ROUTE}/${encodeURIComponent(player)}`, { [PLAYER_ID_HEADER]: asker }),
+            ]).then(([page, moderated]) => {
                 if (selected !== shown) return;
                 panel.replaceChildren(...(page === null ? [heading('No such player'), line('stats-none', 'No player of the Hall has this id, or their name was withdrawn.')] : playerView(page)));
+                if (moderated !== null && asker !== null) panel.append(moderation(moderated, asker, () => select(true)));
             });
         } else if (set !== undefined) {
             void fetchJson<FameSet>(`${FAME_ROUTE}/${FAME_SETS}/${encodeURIComponent(set.id)}`).then((fame) => {
@@ -109,8 +142,8 @@ async function showFamePage(body: HTMLElement): Promise<void> {
             });
         }
     }
-    window.addEventListener('popstate', select);
-    window.addEventListener('hashchange', select);
+    window.addEventListener('popstate', () => select());
+    window.addEventListener('hashchange', () => select());
     select();
 }
 
@@ -162,6 +195,118 @@ function playerView(page: FamePlayerPage): HTMLElement[] {
         view.push(part);
     }
     return view;
+}
+
+/**
+ * A moderator's section of a player's page: the identity's browsers, RESET NAME, and its
+ * proofs, `asker` the moderator's `playerId`; `again` shows the page again once the name
+ * is reset.
+ */
+function moderation(identity: ModeratedIdentity, asker: string, again: () => void): HTMLElement {
+    const part = section('Moderation', []);
+    part.classList.add('fame-moderation');
+    part.append(line('fame-text', `${plural(identity.browsers, 'browser')} share${identity.browsers === 1 ? 's' : ''} this identity.`));
+    if (identity.name !== null) {
+        const row = document.createElement('div');
+        row.className = 'fame-reset';
+        const reset = document.createElement('button');
+        reset.type = 'button';
+        reset.className = 'btn px fame-reset-button';
+        reset.textContent = 'Reset name';
+        const status = line('fame-reset-status px px2', '');
+        let asked = false;
+        reset.addEventListener('click', () => {
+            if (!asked) {
+                asked = true;
+                reset.textContent = 'Confirm reset';
+                status.textContent = `${identity.name} leaves the Hall, and nobody may choose this name again.`;
+                return;
+            }
+            reset.disabled = true;
+            void fetch(`${IDENTITIES_ROUTE}/${encodeURIComponent(identity.id)}`, {
+                method: 'POST', headers: { [PLAYER_ID_HEADER]: asker, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'reset' }),
+            }).then(async (answer) => {
+                if (answer.ok) return again();
+                status.textContent = `Not reset: ${((await answer.json().catch(() => null)) as { error?: string } | null)?.error ?? `HTTP ${answer.status}`}`;
+                reset.disabled = false;
+            }, () => {
+                status.textContent = 'Not reset: the server does not answer.';
+                reset.disabled = false;
+            });
+        });
+        row.append(reset, status);
+        part.append(row);
+    } else part.append(line('stats-none', 'Its name is reset: it is in no answer of the Hall until its player chooses another.'));
+    const list = document.createElement('ol');
+    list.className = 'fame-list fame-proofs';
+    for (const proof of identity.proofs) list.append(proofItem(proof, asker));
+    part.append(identity.proofs.length === 0 ? line('stats-none', 'No proof sent.') : list);
+    return part;
+}
+
+/** A proof as a moderator reads it: its set, when, how far it got, its claims, and PLAY and DOWNLOAD while its package is kept. */
+function proofItem(proof: ModeratedProof, asker: string): HTMLElement {
+    const item = document.createElement('li');
+    item.className = 'fame-proof';
+    item.dataset.proof = proof.id;
+    const head = document.createElement('div');
+    head.className = 'fame-head';
+    head.append(line('fame-name px px2', proof.name), line('fame-day px px2', `${dayTime(proof.sentAt)}, ${PROOF_STATES[proof.state]}`));
+    item.append(head);
+    if (proof.reason !== undefined) item.append(line('fame-text', `It drifted: ${proof.reason}`));
+    const claims = Object.entries(proof.claims);
+    item.append(line('fame-text fame-claims', claims.length === 0 ? 'No claim.' : claims.map(([id, state]) => `${id} ${CLAIM_STATES[state]}`).join(', ')));
+    if (!proof.kept) {
+        item.append(line('fame-day', 'Its package is deleted: it verified nothing new.'));
+        return item;
+    }
+    const actions = document.createElement('div');
+    actions.className = 'fame-reset';
+    const play = document.createElement('a');
+    play.className = 'btn px fame-play';
+    const params = new URLSearchParams(window.location.search);
+    params.delete('set');
+    params.delete('player');
+    params.set('recording', `${PROOF_RECORDING_PREFIX}${proof.id}`);
+    play.href = `./?${params}`;
+    play.textContent = 'Play';
+    const download = document.createElement('button');
+    download.type = 'button';
+    download.className = 'btn px fame-download';
+    download.textContent = 'Download';
+    const status = line('fame-reset-status px px2', '');
+    download.addEventListener('click', () => {
+        void fetch(`${PROOFS_ROUTE}/${proof.id}`, { headers: { [PLAYER_ID_HEADER]: asker } }).then(async (answer) => {
+            if (!answer.ok) throw new Error(`HTTP ${answer.status}`);
+            const url = URL.createObjectURL(await answer.blob());
+            const link = Object.assign(document.createElement('a'), { href: url, download: `proof-${proof.id}.gz` });
+            link.click();
+            setTimeout(() => URL.revokeObjectURL(url), 60_000);
+            status.textContent = '';
+        }).catch((error: unknown) => {
+            status.textContent = `Not downloaded: ${error instanceof Error ? error.message : String(error)}`;
+        });
+    });
+    actions.append(play, download, status);
+    item.append(actions);
+    return item;
+}
+
+/** The moderator this browser's player is, as far as the page knows: its `playerId`, or `null` without one or with the switch off. */
+function moderatorId(): string | null {
+    try {
+        if (localStorage.getItem(MODERATION_KEY) === 'off') return null;
+        return localStorage.getItem(PLAYER_ID_KEY) || null;
+    } catch {
+        return null;
+    }
+}
+
+/** A time in ms as `YYYY-MM-DD HH:MM`, the browser's local time. */
+function dayTime(time: number): string {
+    const date = new Date(time);
+    const two = (value: number) => String(value).padStart(2, '0');
+    return `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())} ${two(date.getHours())}:${two(date.getMinutes())}`;
 }
 
 /** An achievement's block: its name, its tier in its colour, and its text; dim where nobody has it. */
@@ -244,10 +389,10 @@ function line(className: string, text: string): HTMLElement {
     return element;
 }
 
-/** The answer of `route`, or `null` where it does not come. */
-async function fetchJson<T>(route: string): Promise<T | null> {
+/** The answer of `route`, asked with `headers` through the browser's cache as `cache` says, or `null` where it does not come. */
+async function fetchJson<T>(route: string, headers: Record<string, string> = {}, cache: RequestCache = 'default'): Promise<T | null> {
     try {
-        const answer = await fetch(route);
+        const answer = await fetch(route, { headers, cache });
         return answer.ok ? await answer.json() as T : null;
     } catch {
         return null;

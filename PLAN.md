@@ -63,11 +63,8 @@ At the author's request, beside the debt. The design is `doc/ACHIEVEMENTS.md`.
   `achievements.txt` is read by neither the page nor the book until 18.7.
 - ✅ 18.4 Identity (`doc/ACHIEVEMENTS.md` → "Identity"): the public name, its public id
   and the identity key on the server (`server/identity.ts`), what it knows of a player
-  (`GET api/profile`), and the welcome page's PROFILE (`src/ui/profile.ts`). Deferred: a
-  moderator resets a name by `POST api/identities/<id>` alone, with no page's control,
-  until the Hall of Fame shows the names (18.6); and a name chosen is not notified to the
-  moderators (`server/notify.ts` tells only of the sets and their recordings). No unlock
-  is sent yet: each stays `unverified` until 18.5.
+  (`GET api/profile`), and the welcome page's PROFILE (`src/ui/profile.ts`). Settled in
+  18.6: the reset from the Hall's page, and the names notified to the moderators.
 - ✅ 18.5 The proofs (`doc/ACHIEVEMENTS.md` → "Proofs"): the server's upload and queue
   (`server/proofs.ts`, `api/proofs`), the verifier service (`server/verifier.ts`,
   `replayProof`, `dist/server/VerifierReaders.js`, the compose file's `verifier`), and the
@@ -75,14 +72,20 @@ At the author's request, beside the debt. The design is `doc/ACHIEVEMENTS.md`.
   `tools/checks/server-proofs.ts`, `achievement-proofs.ts`, `build.ts`,
   `tools/check-image.sh` and `tools/probe-frames.ts`. Settled: CSB's adventure keeps a
   history of its own, as the verifier gives it; a verified run is shared through the book's
-  UPLOAD. Deferred: re-verifying the kept proofs when a set gains an achievement (18.7), a
-  moderator watching a proof (18.6), and an unlock the replay grants unclaimed, which the
-  server keeps but the page adds no row for.
-- ⏳ 18.6 The Hall of Fame (`doc/ACHIEVEMENTS.md` → "The Hall of Fame"). Done: its answers,
+  UPLOAD. Deferred: re-verifying the kept proofs when a set gains an achievement (18.7),
+  and an unlock the replay grants unclaimed, which the server keeps but the page adds no
+  row for. A moderator watching a proof is settled in 18.6.
+- ✅ 18.6 The Hall of Fame (`doc/ACHIEVEMENTS.md` → "The Hall of Fame"): its answers,
   `api/fame` (`server/fame.ts`), proved by `tools/checks/server-fame.ts` and `build.ts`;
-  the page, `fame.html` (`src/fame/famePage.ts`), linked from the footer and PROFILE,
-  proved by `build.ts` and `tools/probe-frames.ts`. Left: the moderators' half (a name
-  reset from the Hall, a suspicious proof watched, a name chosen notified).
+  the page, `fame.html` (`src/fame/famePage.ts`), linked from the footer, ABOUT and
+  PROFILE, proved by `build.ts` and `tools/probe-frames.ts`; and its moderation: an
+  identity's proofs to a moderator (`GET api/identities/<id>`), a kept package played
+  (`?recording=proof:<id>`) or downloaded (`GET api/proofs/<id>`), RESET NAME on the
+  player's page, and each name chosen, changed or reset notified (`server/notify.ts`),
+  proved by `server-identity.ts`, `server-proofs.ts` and `tools/probe-frames.ts`.
+  Deferred: a moderator undoing a proof's verdict (a claim verified turned dropped), the
+  name's reset being the remedy meanwhile; and the sets' answers showing a name reset for
+  up to their 30 s.
 - ⏳ 18.7 A player's own set's `achievements.txt`: its row in the form, and its check at
   publish. The FTL sets' own files.
 

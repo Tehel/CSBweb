@@ -21,6 +21,10 @@
  *   - a moderator's reset: a body not `{"action": "reset"}` 400, an unknown id 404, an asker
  *     who is not a moderator 403, then the name gone, the identity kept, a second reset
  *     409; the name refused to everyone from then, in any case; its player names it again;
+ *   - an identity read (`GET api/identities/<id>`): 403 to anyone but a moderator, 404 an
+ *     unknown id, and its name, browsers and proofs to a moderator, not cached;
+ *   - the moderators told of each name chosen, changed, in case too, and reset, by whom,
+ *     with its public id, and of nothing refused, linked or keyed (`notify.ts`);
  *   - a POST from another site 403, a body over `MAX_PROFILE_BYTES` 413, the rate per
  *     address 429; and no answer of any route holding a `playerId`;
  *   - the store's life: a store opened again keeps its identities, and one whose log has
@@ -39,6 +43,7 @@ import { createAppServer } from '../../server/app.ts';
 import { DataSetStore, parseModerators } from '../../server/dataSets.ts';
 import { RateLimit } from '../../server/events.ts';
 import { IdentityStore, MAX_PROFILE_BYTES } from '../../server/identity.ts';
+import { notificationText, type DataSetEvent, type IdentityEvent } from '../../server/notify.ts';
 import { ProofStore } from '../../server/proofs.ts';
 import { RecordingStore } from '../../server/recordings.ts';
 import { StatsStore } from '../../server/stats.ts';
@@ -60,6 +65,9 @@ const PLAYER_IDS = [PLAYER, OTHER, THIRD, MODERATOR];
 
 /** Changes per address and window: more than the checks ask from one address but the rate's own. */
 const CHANGES_PER_WINDOW = 5;
+
+/** What the server told the moderators. */
+const notified: (DataSetEvent | IdentityEvent)[] = [];
 
 interface Answer {
     status: number;
@@ -103,7 +111,7 @@ async function main(): Promise<void> {
     const recordings = new RecordingStore(db, 1 << 30);
     const identities = new IdentityStore(db);
     const server = createAppServer({ distDir, gamefilesDir }, {
-        checkDataSet: checkLocalDataSet, dataSets, moderators: parseModerators(`${MODERATOR}=Alice`), store: stats, notify: () => {},
+        checkDataSet: checkLocalDataSet, dataSets, moderators: parseModerators(`${MODERATOR}=Alice`), store: stats, notify: (event) => notified.push(event),
         rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(100, 60_000), eventBudget: new RateLimit(1000, 60_000),
         publishRateLimit: new RateLimit(100, 60_000), now: Date.now,
         recordings: { store: recordings, dir: recordingsDir, readPackage: readRecordingPackage, shareRateLimit: new RateLimit(100, 60_000) },
@@ -254,6 +262,14 @@ async function main(): Promise<void> {
             'the name reset is refused to everyone from then, in any case');
         const renamedAfter = await named(PLAYER, 'Tehel Four');
         check(renamedAfter.status === 200 && renamedAfter.json.id === id && renamedAfter.json.key === undefined, 'its player names the identity again: 200, the id kept');
+        const told = notified.flatMap((event) => 'publicId' in event && event.publicId === id ? [`${event.activity} ${event.name}${event.was ? ` from ${event.was}` : ''} by ${event.by}`] : []);
+        console.log(`  told: ${JSON.stringify(told)}`);
+        check(JSON.stringify(told) === JSON.stringify(['chosen Tehel by a player', 'changed tehel from Tehel by a player', 'changed Tehel Two from tehel by a player',
+            'changed Tehel Three from Tehel Two by a player', 'reset Tehel Three by Alice', 'chosen Tehel Four by a player']),
+            'the moderators are told of each name chosen, changed, in case too, and reset, by whom; of nothing refused, linked or keyed');
+        const last = notified.at(-1);
+        check(last !== undefined && new RegExp(`^Name Tehel Four: chosen \\(public id ${id}\\)\nBy a player at \\d{8} \\d\\d:\\d\\d$`).test(notificationText(last)),
+            `a name's notification: "${last && notificationText(last).replace('\n', ' / ')}"`);
 
         // The route's own refusals.
         console.log('\nThe routes:');
@@ -263,7 +279,12 @@ async function main(): Promise<void> {
             [PLAYER_ID_HEADER]: PLAYER, 'Content-Length': String(MAX_PROFILE_BYTES + 1), 'X-Real-IP': '10.9.2.1', Connection: 'close' });
         const largeReset = await ask(port, `/${IDENTITIES_ROUTE}/${id}`, 'POST', { [PLAYER_ID_HEADER]: MODERATOR, 'Content-Length': String(MAX_PROFILE_BYTES + 1), Connection: 'close' });
         const notJson = await change(PLAYER, '{"action": "name"}');
-        const methods = [await ask(port, `/${PROFILE_ROUTE}`, 'PUT'), await ask(port, `/${IDENTITIES_ROUTE}/${id}`)];
+        const methods = [await ask(port, `/${PROFILE_ROUTE}`, 'PUT'), await ask(port, `/${IDENTITIES_ROUTE}/${id}`, 'PUT')];
+        const viewed = [await ask(port, `/${IDENTITIES_ROUTE}/${id}`), await ask(port, `/${IDENTITIES_ROUTE}/${id}`, 'GET', { [PLAYER_ID_HEADER]: PLAYER }),
+            await ask(port, `/${IDENTITIES_ROUTE}/zzzzzzzzzz`, 'GET', { [PLAYER_ID_HEADER]: MODERATOR }), await ask(port, `/${IDENTITIES_ROUTE}/${id}`, 'GET', { [PLAYER_ID_HEADER]: MODERATOR })];
+        check(viewed.map((answer) => answer.status).join() === '403,403,404,200' && viewed[3]?.headers['cache-control'] === 'no-store'
+            && viewed[3].body === JSON.stringify({ id, name: 'Tehel Four', browsers: 3, proofs: [] }),
+            `an identity read: 403 to anyone but a moderator, its own player too, 404 an unknown id, and to a moderator, uncached, its name, browsers and proofs: ${viewed[3]?.body}`);
         check(noPlayer.every((answer) => answer.status === 400) && crossSite.status === 403 && large.status === 413 && largeReset.status === 413 && notJson.status === 400
             && methods.every((answer) => answer.status === 405), 'no player 400, another site\'s POST 403, a body too large 413, a body not an action 400, another method 405');
         const rated: number[] = [];

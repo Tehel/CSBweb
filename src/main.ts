@@ -9,7 +9,7 @@ import { VBL_FREQUENCY } from './core/constants';
 import { CsbRandom } from './core/random';
 import { extractPresetHeroes } from './data/HeroExtractor';
 import {
-    DATA_SET_FILES_ROUTE, DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, dataSetNamed, parseManifest, PLAYER_ID_HEADER, SHARED_RECORDING_ID, THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH,
+    DATA_SET_FILES_ROUTE, DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, dataSetNamed, parseManifest, PLAYER_ID_HEADER, PROOF_ID, PROOF_RECORDING_PREFIX, PROOFS_ROUTE, SHARED_RECORDING_ID, THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH,
     thumbnailPath, type DataSet, type DataSetManifest,
 } from './data/DataSets';
 import { digestedFiles, fileDigest, folderFiles, loadGameFiles, type DataSetFiles, type DigestedFiles, type GameFiles } from './data/DataSetFiles';
@@ -732,7 +732,9 @@ function applySettings({ game }: Built, sound: SoundManager, values: SettingsVal
  * `doc/RECORDING.md` → "The port's player"), from its root through each branch down to
  * it. A site's id (`SHARED_RECORDING_ID`) is its package's path, read from the server and
  * never put in the store (`fetchSharedRecording`), played to the point it was shared at,
- * a save's file checked there. A store's save, `save:<its row's id>` (`SAVE_POINT_PREFIX`),
+ * a save's file checked there. A proof's, `proof:<its id>` (`PROOF_RECORDING_PREFIX`), is
+ * its package as the server answers it to a moderator alone, played as a site's is
+ * (`fetchProofRecording`). A store's save, `save:<its row's id>` (`SAVE_POINT_PREFIX`),
  * is the path the store holds to its point, played to it and its file checked there, as a
  * site's (`readSavePoint`). Any other is the store's recording, its path as far up as the
  * store holds it (`readRecordingPath`). Every
@@ -1019,6 +1021,7 @@ interface PlayedPath {
  */
 async function readPlayedRecording(id: string): Promise<PlayedPath> {
     if (SHARED_RECORDING_ID.test(id)) return fetchSharedRecording(id);
+    if (id.startsWith(PROOF_RECORDING_PREFIX)) return fetchProofRecording(id.slice(PROOF_RECORDING_PREFIX.length));
     const storeRandom = new CsbRandom();
     const draw: DrawPlaythrough = (rows) => drawPlaythrough(storeRandom, rows);
     const recordingStore = new BrowserRecordingStore(draw);
@@ -1093,8 +1096,24 @@ function cutProgressShown(canvas: HTMLCanvasElement, what: string): (fraction: n
  * not serve, or whose form is wrong, ends the page as an error does.
  */
 async function fetchSharedRecording(id: string): Promise<PlayedPath> {
-    const url = recordingPackageUrl(id);
-    const response = await fetch(url).catch(() => null);
+    return fetchPackage(recordingPackageUrl(id), {});
+}
+
+/**
+ * The proof `id`'s package (`?recording=proof:<id>`), which the server answers only to a
+ * moderator (`GET PROOFS_ROUTE/<id>`, `server/app.ts`), asked as this browser's player, and
+ * played as a site's recording is, so that a moderator watches a proof that looks
+ * suspicious from the Hall of Fame (`src/fame/famePage.ts`). Anyone else's page ends as an
+ * error does.
+ */
+async function fetchProofRecording(id: string): Promise<PlayedPath> {
+    if (!PROOF_ID.test(id)) throw new Error(`'${id}' is not a proof's id.`);
+    return fetchPackage(`${PROOFS_ROUTE}/${id}`, { [PLAYER_ID_HEADER]: keptPlayerId() ?? '' });
+}
+
+/** The package at `url`, asked with `headers`, as `?recording=` plays it. */
+async function fetchPackage(url: string, headers: Record<string, string>): Promise<PlayedPath> {
+    const response = await fetch(url, { headers }).catch(() => null);
     if (!response?.ok) throw new Error(`Cannot read the recording '${url}'${response ? ` (HTTP ${response.status})` : ''}.`);
     const pkg = await readRecordingPackage(new Uint8Array(await response.arrayBuffer()));
     return { path: pkg.path, savedAtEnd: pkg.shared.kind === 'save' ? pkg.shared : null };

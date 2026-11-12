@@ -109,6 +109,7 @@ export class ProofStore {
     private readonly insert: StatementSync;
     private readonly insertClaim: StatementSync;
     private readonly row: StatementSync;
+    private readonly rowsOf: StatementSync;
     private readonly claimRows: StatementSync;
     private readonly oldestQueued: StatementSync;
     private readonly queuedOf: StatementSync;
@@ -135,6 +136,7 @@ export class ProofStore {
         this.insert = db.prepare(`INSERT INTO proofs (${columns}) VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', '', NULL, NULL, 1)`);
         this.insertClaim = db.prepare("INSERT INTO claims (proof, achievement, state) VALUES (?, ?, 'unverified')");
         this.row = db.prepare(`SELECT ${columns} FROM proofs WHERE id = ?`);
+        this.rowsOf = db.prepare(`SELECT ${columns} FROM proofs WHERE player IN (SELECT value FROM json_each(?)) ORDER BY sent_at DESC, id`);
         this.claimRows = db.prepare('SELECT achievement, state, claimed FROM claims WHERE proof = ? ORDER BY achievement');
         this.oldestQueued = db.prepare(`SELECT ${columns} FROM proofs WHERE state = 'queued' ORDER BY sent_at, id LIMIT 1`);
         this.queuedOf = db.prepare("SELECT COUNT(*) AS n FROM proofs WHERE state = 'queued' AND player IN (SELECT value FROM json_each(?))");
@@ -161,6 +163,11 @@ export class ProofStore {
     get(id: string): StoredProof | null {
         const row = this.row.get(id) as Record<string, string | number | null> | undefined;
         return row ? proofOf(row) : null;
+    }
+
+    /** The proofs `players` sent, the latest first: what a moderator reads of an identity (`identityText`, `identity.ts`). */
+    sentBy(players: readonly string[]): StoredProof[] {
+        return (this.rowsOf.all(JSON.stringify(players)) as Record<string, string | number | null>[]).map(proofOf);
     }
 
     /** `id`'s claims, by achievement, and those its replay granted unclaimed among them. */

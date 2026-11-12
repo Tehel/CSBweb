@@ -367,8 +367,11 @@ The server's half is `server/identity.ts`, in the store's SQLite file beside the
 - **A moderator resets a name** (`POST api/identities/<public id>`, `{"action": "reset"}`):
   the identity keeps its id, its key and its browsers, and has no name until its player
   chooses another. The name is retired (`retired_names`), refused to everyone from then on.
-  No page offers the reset yet; the Hall of Fame (phase 18.6) is where a moderator will see
-  the names.
+  The moderator does it from the name's page in the Hall of Fame ("Moderation", below).
+- **A name chosen, changed or reset is told to the moderators** (`server/notify.ts`,
+  `doc/DEPLOYMENT.md` → "Notifications"): the name, the one it replaces, its public id and
+  who did it, so that a moderator sees each name the Hall shows. A link, a key drawn and a
+  name refused tell nothing.
 - **What the server knows about you**, `GET api/profile`, answers the `playerId` that asks
   and its identity's other browsers (`PlayerProfile`): the identity, its name, its id and
   how many browsers share it; the sets they published and the state of each; the recordings
@@ -477,9 +480,8 @@ the prison's path, which the store does not link to the adventure. A player who 
 verified run seen shares the same point through the book's UPLOAD, the shared recordings'
 moderation ("Shared recordings", `doc/RECORDING.md`): nothing links the two.
 **Deferred:** replaying the kept proofs again when a set gains an achievement, which phase
-18.7's sets' own files make possible without a deploy; and a moderator watching a proof
-that looks suspicious, which needs the Hall of Fame's moderation (18.6), where the names
-are shown; a kept package stays on the server for it.
+18.7's sets' own files make possible without a deploy. A moderator watching a proof that
+looks suspicious plays or downloads its kept package from the Hall ("Moderation", below).
 
 **The page's half** is `PageProofs` (`src/engine/achievements/PageProofs.ts`), built beside
 `PageAchievements` for a game the player plays, never for a recording's viewer, over the
@@ -581,3 +583,33 @@ player's own page, `fame#<public id>`, once they have a name.
 footer's link, none of the game's code loaded, the band, the column and the set's
 achievements as `api/fame` answers them, the prover First Blood's first, their page at a
 click on their name, back to the set, and an unknown id; and PROFILE's link to the page.
+
+**Moderation.** To a moderator whose switch is on (the welcome page's, kept in
+`localStorage`), a player's page ends with MODERATION, from `GET api/identities/<public id>`
+(`identityText`, `server/identity.ts`), which answers a moderator alone, uncached, and never
+a `playerId` nor a playthrough: how many browsers share the identity, and its browsers'
+proofs, the latest sent first, each its set, when it was sent, how far it got, why it
+drifted, its claims' verdicts, the replay's grants among them, and whether its package is
+kept.
+
+- **RESET NAME** asks a second click, CONFIRM RESET, then withdraws the name (`POST
+  api/identities/<id>`, "Identity"): the Hall's answers leave it out, its page at once, the
+  sets' once their 30 s are up, and the page, asking again past the browser's cache, says
+  no player has this id, MODERATION staying so that its proofs can still be read.
+- **A proof that looks suspicious** is watched by its package, which the server keeps and
+  never serves, but to a moderator: `GET api/proofs/<id>` (`answerProofPackage`,
+  `server/app.ts`) answers its bytes as sent, uncached, and 403 to anyone else, its sender
+  included, 404 where the verifier deleted it as proving nothing new. PLAY opens it in the
+  game's page, `?recording=proof:<id>` (`fetchProofRecording`, `src/main.ts`), the
+  recording's viewer playing it as a site's recording; DOWNLOAD saves it,
+  `proof-<id>.gz`, a shared recording's package that the tools read.
+- **Deferred:** a moderator undoing a proof's verdict, a claim verified turned dropped,
+  when a replay shows a game won by a bug the verifier cannot tell apart: the remedy is the
+  name's reset, which takes the identity out of the Hall whole.
+
+`tools/checks/server-identity.ts` proves the identity's answer (403 to anyone but a
+moderator, its own player too, 404 an unknown id) and the notifications;
+`tools/checks/server-proofs.ts` the proofs listed to a moderator and the package's route
+over the verifier's own proofs; `tools/probe-frames.ts` MODERATION to the dev server's
+moderator, the proof's verdicts, PLAY playing it, DOWNLOAD's fetch, and RESET NAME's two
+clicks and the name withdrawn.

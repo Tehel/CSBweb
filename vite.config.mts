@@ -8,7 +8,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { DatabaseSync } from 'node:sqlite';
 
 import {
-  answerFame, answerProfile, answerProofs, answerRecordings, answerStats, contentType, dataSetViewer, pathSegments, receiveDocument, receiveEdit, receiveModeration,
+  answerFame, answerIdentity, answerProfile, answerProofPackage, answerProofs, answerRecordings, answerStats, contentType, dataSetViewer, pathSegments, receiveDocument, receiveEdit, receiveModeration,
   receiveNameReset, receiveProfileChange, receiveProof, receivePublish, receiveRecordingModeration, receiveShare,
 } from './server/app.ts';
 import { DataSetStore, manifestText, parseModerators, wallsText } from './server/dataSets.ts';
@@ -348,7 +348,7 @@ function dataSetsRoute(): Plugin {
         }
         const db = new sqlite.DatabaseSync(':memory:');
         try {
-          if (req.method === 'POST') await receiveProfileChange({ now: Date.now, identities }, req, res);
+          if (req.method === 'POST') await receiveProfileChange({ now: Date.now, identities, notify: NOBODY }, req, res);
           else answerProfile({ dataSets: openStore(db), store: stats, recordings: { store: recordingStore }, identities, proofs }, req, res);
         } catch (error) {
           next(error);
@@ -359,15 +359,20 @@ function dataSetsRoute(): Plugin {
       server.middlewares.use(`/${IDENTITIES_ROUTE}`, async (req, res, next) => {
         const id = pathSegments(req.url ?? '');
         if (id?.length !== 1) return next();
-        if (req.method !== 'POST' || !identities) {
-          res.statusCode = req.method !== 'POST' ? 405 : 501;
-          if (req.method !== 'POST') res.setHeader('Allow', 'POST');
+        const allowed = ['GET', 'HEAD', 'POST'].includes(req.method ?? '');
+        if (!allowed || !sqlite || !identities || !proofs) {
+          res.statusCode = !allowed ? 405 : 501;
+          if (!allowed) res.setHeader('Allow', 'GET, HEAD, POST');
           return res.end();
         }
+        const db = new sqlite.DatabaseSync(':memory:');
         try {
-          await receiveNameReset(id[0]!, { moderators, identities }, req, res);
+          if (req.method === 'POST') await receiveNameReset(id[0]!, { moderators, identities, notify: NOBODY, now: Date.now }, req, res);
+          else answerIdentity(id[0]!, { moderators, dataSets: openStore(db), identities, proofs }, req, res);
         } catch (error) {
           next(error);
+        } finally {
+          db.close();
         }
       });
 
@@ -403,6 +408,16 @@ function dataSetsRoute(): Plugin {
         })();
       };
       server.middlewares.use(`/${PROOFS_ROUTE}`, async (req, res, next) => {
+        const proofId = pathSegments(req.url ?? '');
+        if (proofId?.length === 1 && proofs) {
+          // A proof's package, to a moderator alone.
+          if (req.method !== 'GET' && req.method !== 'HEAD') {
+            res.statusCode = 405;
+            res.setHeader('Allow', 'GET, HEAD');
+            return res.end();
+          }
+          return answerProofPackage(proofId[0]!, { moderators, proofs }, req, res);
+        }
         if (req.url !== '/' && !req.url?.startsWith('/?')) return next();
         if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'POST') {
           res.statusCode = 405;

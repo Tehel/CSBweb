@@ -28,7 +28,11 @@
  *     whose save shared differs, drifted, its claims unverified and the reason answered,
  *     its file kept; a package made by hand that the game does not play as it says,
  *     drifted; the verdicts answered as the page asks them, and the
- *     profile listing First Blood once.
+ *     profile listing First Blood once;
+ *   - a moderator watching them (`identityText`, `answerProofPackage`): the identity's
+ *     proofs, the latest first, each its set, state, reason, package kept or not and
+ *     claims, uncached; a kept package's bytes, to a moderator alone, not to its sender nor
+ *     to nobody, 403; a package deleted, an unknown id and a malformed one 404.
  *
  * Usage: npm test -- --only=server-proofs.ts
  */
@@ -47,7 +51,7 @@ import { RecordingStore } from '../../server/recordings.ts';
 import { StatsStore } from '../../server/stats.ts';
 import { openStore } from '../../server/store.ts';
 import {
-    MAX_CLAIMS, parseManifest, PLAYER_ID_HEADER, PROFILE_ROUTE, PROOF_FIELDS, PROOF_ID, PROOFS_ROUTE, type ProofVerdict,
+    IDENTITIES_ROUTE, MAX_CLAIMS, parseManifest, PLAYER_ID_HEADER, PROFILE_ROUTE, PROOF_FIELDS, PROOF_ID, PROOFS_ROUTE, type ModeratedIdentity, type ProofVerdict,
 } from '../../src/data/DataSets.ts';
 import { checkLocalDataSet } from '../../src/engine/LocalDataSetCheck.ts';
 import { replayProof } from '../../src/engine/achievements/ProofReplay.ts';
@@ -276,7 +280,7 @@ async function verifier(): Promise<void> {
     const identities = new IdentityStore(db);
     const proofs = new ProofStore(db, 1 << 30);
     const api = {
-        checkDataSet: checkLocalDataSet, dataSets, moderators: [], store: new StatsStore(db), notify: () => {},
+        checkDataSet: checkLocalDataSet, dataSets, moderators: parseModerators(`${MODERATOR}=Alice`), store: new StatsStore(db), notify: () => {},
         rules: { hasSet: (id: string) => dataSets.hasSet(id) }, rateLimit: new RateLimit(100, 60_000), eventBudget: new RateLimit(1000, 60_000),
         publishRateLimit: new RateLimit(100, 60_000), now: Date.now,
         recordings: { store: new RecordingStore(db, 1 << 30), dir: join(scratch, 'recordings'), readPackage: readRecordingPackage, shareRateLimit: new RateLimit(100, 60_000) },
@@ -360,6 +364,33 @@ async function verifier(): Promise<void> {
         console.log(`  the profile's achievements: ${JSON.stringify(achievements)}`);
         check(JSON.stringify(achievements) === JSON.stringify([{ dataSet: 'dm-atari-1.2', name: dataSets.read().dataSets.find((set) => set.id === 'dm-atari-1.2')?.name, unlocked: ['first-blood'] }]),
             'the profile lists First Blood once, by its set');
+
+        // A moderator watching the proofs: the identity's, the latest first, then a package
+        // kept, to them alone.
+        const identityId = identities.of(PLAYER)?.id ?? '';
+        const moderated = await fetch(`${base}/${IDENTITIES_ROUTE}/${identityId}`, { headers: { [PLAYER_ID_HEADER]: MODERATOR } });
+        const moderatedBody = await moderated.text();
+        bodies.push(moderatedBody);
+        const listed = (JSON.parse(moderatedBody) as ModeratedIdentity).proofs;
+        console.log(`  to a moderator: ${JSON.stringify(listed.map(({ id, state, kept, claims }) => ({ id, state, kept, claims })))}`);
+        const byId = new Map(listed.map((proof) => [proof.id, proof]));
+        check(moderated.status === 200 && moderated.headers.get('cache-control') === 'no-store' && listed.length === 5
+            && listed.every((proof, i) => i === 0 || proof.sentAt <= listed[i - 1]!.sentAt)
+            && [forged, again, lost, drifting, elsewhere].every((id) => byId.has(id))
+            && JSON.stringify(byId.get(forged)?.claims) === JSON.stringify({ 'first-blood': 'verified', 'roll-the-credits': 'dropped' })
+            && byId.get(forged)?.kept === true && byId.get(again)?.kept === false && byId.get(drifting)?.reason === fourth?.reason
+            && byId.get(forged)?.name === dataSets.read().dataSets.find((one) => one.id === 'dm-atari-1.2')?.name,
+            'a moderator reads the identity\'s proofs, uncached, the latest first: each its set, its state, its drift\'s reason, whether its package is kept, and its claims');
+        const packageAs = (player: string | null, id: string, method = 'GET') => fetch(`${base}/${PROOFS_ROUTE}/${id}`, { method, headers: player === null ? {} : { [PLAYER_ID_HEADER]: player } });
+        const served = await packageAs(MODERATOR, forged);
+        const servedBytes = new Uint8Array(await served.arrayBuffer());
+        check(served.status === 200 && served.headers.get('content-type') === 'application/gzip' && served.headers.get('cache-control') === 'no-store'
+            && Buffer.from(servedBytes).equals(Buffer.from(genuine)), 'a kept package, to a moderator: its bytes, as sent, not cached');
+        const refusedPackages = [await packageAs(PLAYER, forged), await packageAs(null, forged), await packageAs(MODERATOR, again), await packageAs(MODERATOR, '0'.repeat(16)),
+            await packageAs(MODERATOR, 'not-a-proof'), await packageAs(MODERATOR, forged, 'DELETE')];
+        for (const answer of refusedPackages) bodies.push(await answer.text());
+        check(refusedPackages.map((answer) => answer.status).join() === '403,403,404,404,404,405',
+            `to its own sender and to nobody 403, a package deleted, an unknown id and a malformed one 404, another method 405: ${refusedPackages.map((answer) => answer.status).join()}`);
     } finally {
         server.close();
         db.close();

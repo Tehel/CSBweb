@@ -1,5 +1,6 @@
 /**
- * What the server tells the moderators' phones: each change to the sets, through an ntfy
+ * What the server tells the moderators' phones: each change to the sets and to the public
+ * names, through an ntfy
  * (`doc/DEPLOYMENT.md` → "Notifications"). A set published (`publish.ts`), approved,
  * rejected, withdrawn, hidden or shown (`moderate.ts`), edited (`edit.ts`), or given or
  * relieved of a document (`documents.ts`), and a recording of a set's shared, approved,
@@ -11,9 +12,15 @@
  * or, for a document, `Dataset <name>: document <added | removed> (<file>)` first, and for a
  * recording, `Dataset <name>: recording <added | approved | …> (<title>)`.
  *
+ * A public name chosen or changed by its player (`identity.ts`), so that a moderator sees
+ * each name the Hall of Fame shows, or reset by a moderator, is one too:
+ *
+ *   Name <name>: <chosen | changed from <old> | reset> (public id <id>)
+ *   By <who> at YYYYMMDD HH:mm
+ *
  * <who> is a moderator's name (`Moderator`, `dataSets.ts`), `its owner` for a set or a
- * recording withdrawn, and `a player` for a set published or a recording shared by one who
- * does not moderate: never a `playerId`. The
+ * recording withdrawn, and `a player` for a set published, a recording shared or a name
+ * chosen by one who does not moderate: never a `playerId`. The
  * time is the server's local time, its `TZ`.
  *
  * A message is sent and forgotten: no request waits on ntfy, and one it refuses or does not
@@ -39,8 +46,23 @@ export interface DataSetEvent {
     at: number;
 }
 
+/** A public name's change, as a notification says it. */
+export interface IdentityEvent {
+    /** The name: the new one, or the one reset. */
+    name: string;
+    activity: 'chosen' | 'changed' | 'reset';
+    /** The name before, for a name changed. */
+    was?: string;
+    /** The identity's public id, which its page in the Hall of Fame is at. */
+    publicId: string;
+    /** Who did it: a moderator's name, or `a player`. */
+    by: string;
+    /** When, as `Date.now()` gives it. */
+    at: number;
+}
+
 /** Tells someone of `event`, without waiting. */
-export type Notify = (event: DataSetEvent) => void;
+export type Notify = (event: DataSetEvent | IdentityEvent) => void;
 
 /** Tells no one: the server without `NTFY_URL`, and the dev server. */
 export const NOBODY: Notify = () => {};
@@ -49,12 +71,16 @@ export const NOBODY: Notify = () => {};
 const TIMEOUT_MS = 10_000;
 
 /** The message `event` is. */
-export function notificationText({ name, activity, document, recording, by, at }: DataSetEvent): string {
-    const date = new Date(at);
+export function notificationText(event: DataSetEvent | IdentityEvent): string {
+    const date = new Date(event.at);
     const two = (value: number) => String(value).padStart(2, '0');
     const stamp = `${date.getFullYear()}${two(date.getMonth() + 1)}${two(date.getDate())} ${two(date.getHours())}:${two(date.getMinutes())}`;
-    const what = document ?? recording;
-    return `Dataset ${name}: ${activity}${what === undefined ? '' : ` (${what})`}\nBy ${by} at ${stamp}`;
+    if ('publicId' in event) {
+        const activity = event.activity === 'changed' ? `changed from ${event.was}` : event.activity;
+        return `Name ${event.name}: ${activity} (public id ${event.publicId})\nBy ${event.by} at ${stamp}`;
+    }
+    const what = event.document ?? event.recording;
+    return `Dataset ${event.name}: ${event.activity}${what === undefined ? '' : ` (${what})`}\nBy ${event.by} at ${stamp}`;
 }
 
 /**

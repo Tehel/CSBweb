@@ -295,7 +295,10 @@ through `node:sqlite` (as below, to add the site's sets), and in `gamefiles/`:
 Each change to the sets is a message to the VPS's ntfy (`server/notify.ts`): a set
 published, approved, rejected, withdrawn by its owner, hidden, shown or edited, a
 document added or removed, or a recording of the set shared, approved, hidden, shown,
-broken, deleted or withdrawn by its uploader ("Shared recordings", below). It is two lines:
+broken, deleted or withdrawn by its uploader ("Shared recordings", below); and so is each
+public name chosen or changed by its player, which the Hall of Fame shows, or reset by a
+moderator (`Name <name>: <chosen | changed from <old> | reset> (public id <id>)`, the
+player's page at `fame#<id>`). It is two lines:
 
 ```
 Dataset <name>: <added | approved | rejected | withdrawn | shown | hidden | edited>
@@ -306,8 +309,8 @@ or, for a document, `Dataset <name>: document <added | removed> (<file>)` first,
 recording, `Dataset <name>: recording <added | approved | …> (<title>)`.
 `<name>` is the set's name, not its id. `<who>` is the moderator's alias from
 `MODERATOR_PLAYER_IDS`, or `moderator <n>`, their place in that list, for one without;
-`its owner` for a set or a recording withdrawn; `a player` for a set published or a
-recording shared by someone who does not moderate. A `playerId` is never sent. The time is the server's local time: the container's
+`its owner` for a set or a recording withdrawn; `a player` for a set published, a
+recording shared or a name chosen by someone who does not moderate. A `playerId` is never sent. The time is the server's local time: the container's
 is UTC unless `.env` sets `TZ` (`TZ=Europe/Paris`).
 
 The server posts to `NTFY_URL`, the topic's whole URL (`https://<host>/<topic>`), with
@@ -501,6 +504,7 @@ comma-separated `<playerId>[=<alias>]`, spaces around a comma or the `=` ignored
 | --- | --- | --- |
 | `/` | `dist/index.html` | `no-cache` |
 | `/stats` | `dist/stats.html`, the statistics page (`doc/STATISTICS.md`) | `no-cache` |
+| `/fame` | `dist/fame.html`, the Hall of Fame (`doc/ACHIEVEMENTS.md` → "The Hall of Fame") | `no-cache` |
 | `/manifest.webmanifest` | `dist/manifest.webmanifest`, the installed game's | `no-cache` |
 | `/assets/…` | `dist/assets/…`, hashed names | `immutable` |
 | `/server/…` | 404: `dist/server/` is the server's module | |
@@ -515,18 +519,22 @@ comma-separated `<playerId>[=<alias>]`, spaces around a comma or the `=` ignored
 | `/api/recordings?dataSet=<id>` | the set's shared recordings the `X-Player-Id` may see; POST: a package shared ("Shared recordings", below) | `no-store`, `Vary: X-Player-Id` |
 | `/api/recordings/<id>` | POST: the recording approved, hidden, shown, broken or deleted by a moderator, or withdrawn by its uploader | `no-store` |
 | `/api/profile` | what the server holds of the `X-Player-Id` and the other browsers its identity links, PROFILE's dump (`doc/ACHIEVEMENTS.md` → "Identity"); POST: a public name chosen, a browser linked by its identity key, a new key drawn | `no-store`, `Vary: X-Player-Id` |
-| `/api/identities/<id>` | POST: a public name reset by a moderator | `no-store` |
+| `/api/identities/<id>` | to a moderator alone, the identity and its proofs; POST: a public name reset by a moderator | `no-store`, `Vary: X-Player-Id` |
 | `/api/proofs?ids=<id>,…` | the verdicts of those proofs the `X-Player-Id`'s identity sent (`doc/ACHIEVEMENTS.md` → "Proofs"); POST: a proof sent, queued | `no-store`, `Vary: X-Player-Id` |
+| `/api/proofs/<id>` | a proof's package kept, to a moderator alone | `no-store`, `Vary: X-Player-Id` |
 | `/api/health` | `{"ok":true}`, for the healthcheck | `no-store` |
 | `/api/event` | POST: one of the page's events (`doc/STATISTICS.md`) | |
 | `/api/stats` | the public sets' statistics (`doc/STATISTICS.md`) | `public, max-age=30`, kept as long |
 | `/api/stats/<id>` | a public set's | `public, max-age=30`, kept as long |
 | `/api/stats/<id>/<level>` | the deaths on its level's squares | `public, max-age=30`, kept as long |
+| `/api/fame` | the Hall of Fame: the public sets' players of the Hall | `public, max-age=30`, kept as long |
+| `/api/fame/sets/<id>` | a public set's achievements, their players, share and first | `public, max-age=30`, kept as long |
+| `/api/fame/players/<id>` | a named player's badges, by public id | `public, max-age=30`, kept as long |
 
 Every file answers a conditional GET with 304, and only GET and HEAD are allowed, except on
-`api/event`, `api/data-sets`'s POST, `api/data-sets/<id>`, `api/data-sets/<id>/documents`,
-`api/recordings`'s POST, `api/recordings/<id>`, `api/profile`'s POST, `api/proofs`'s POST
-and `api/identities/<id>`, POST only. A POST a
+`api/event`, `api/data-sets/<id>`, `api/data-sets/<id>/documents` and `api/recordings/<id>`,
+POST only, and `api/data-sets`, `api/recordings`, `api/profile`, `api/proofs` and
+`api/identities/<id>`, which take a POST too. A POST a
 browser says another site's page sent, by its `Sec-Fetch-Site` or its `Origin`, is refused
 with 403 (`isCrossSite`, `doc/STATISTICS.md`). A path with a segment that starts with `.`, or holds a `/`, a `\` or a NUL once
 decoded, is refused with 400 before it reaches the disk. A folder is 404, never a listing.

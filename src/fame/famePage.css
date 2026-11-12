@@ -21,6 +21,12 @@
 .fame-achievement .stats-row { grid-template-columns: 120px minmax(0, 1fr) 96px; }
 .fame-nobody .fame-name, .fame-nobody .fame-tier { color: var(--p2); }
 
+/* A moderator's section: RESET NAME and each proof's PLAY and DOWNLOAD, a line each. */
+.fame-moderation { padding-top: 18px; border-top: 3px solid #1d1d30; }
+.fame-reset { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.fame-reset-status { color: var(--p9); }
+.fame-claims { color: var(--p2); }
+
 @media (max-width: 640px) {
     .fame-achievement .stats-row { grid-template-columns: 96px minmax(0, 1fr) 72px; }
 }

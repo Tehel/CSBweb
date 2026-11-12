@@ -2613,6 +2613,44 @@ check(fameBack.hash === '' && fameBack.selected === fameFirst.selected && fameBa
 await navigate(`${APP}fame?keepsaves&keepsettings#0000000000`, STATS);
 const fameUnknown = await famePage();
 check(fameUnknown.name === 'No such player' && fameUnknown.selected === '' && fameUnknown.playerName === undefined, 'an id nobody has: No such player');
+// To a moderator (the dev server's, `DEV_MODERATOR_PLAYER_ID`), the prover's page ends with
+// MODERATION: their proof, First Blood verified and Pest Control dropped, its package kept,
+// with PLAY, which plays it in the game's page (`?recording=proof:<id>`), and DOWNLOAD, the
+// package fetched as the moderator; RESET NAME asks a second click, then withdraws the name:
+// the page says the player is no more, and the section stays, the name reset.
+await evaluate(`localStorage.setItem('csbweb_player_v1', ${JSON.stringify(MODERATOR)}),1`);
+await navigate(`${APP}fame?keepsaves&keepsettings#${fameFirst.first?.id}`, STATS);
+await until(`!!document.querySelector('.fame-moderation .fame-proof')`, 'MODERATION');
+const fameModeration = () => evaluate(`(m=>m&&{ name: document.querySelector('.stats-set h2')?.textContent,
+  proofs: [...m.querySelectorAll('.fame-proof')].map(p=>[p.dataset.proof, p.querySelector('.fame-claims').textContent,
+    p.querySelector('.fame-play')?.getAttribute('href') ?? '', !!p.querySelector('.fame-download')].join('|')),
+  reset: m.querySelector('.fame-reset-button')?.textContent ?? null, status: m.querySelector('.fame-reset-status')?.textContent ?? null,
+  none: m.querySelector(':scope > .stats-none')?.textContent ?? null })(document.querySelector('.fame-moderation'))`);
+const moderationFirst = await fameModeration();
+const proofPlay = `./?keepsaves=&keepsettings=&recording=proof%3A${proofSent.id}`;
+const proofFetched = await evaluate(`fetch('api/proofs/${proofSent.id}', { headers: { 'X-Player-Id': ${JSON.stringify(MODERATOR)} } }).then(async (r) => r.status + ':' + (await r.arrayBuffer()).byteLength)`);
+console.log('  moderation:', JSON.stringify({ moderationFirst, proofFetched }));
+check(moderationFirst?.name === fameFirst.first?.name && moderationFirst.proofs.join() === `${proofSent.id}|first-blood verified, pest-control dropped|${proofPlay}|true`
+  && moderationFirst.reset === 'Reset name' && proofFetched === `200:${Buffer.from(corpusProof, 'base64').length}`,
+  'to a moderator, the prover\'s page ends with MODERATION: their proof, its claims\' verdicts, PLAY and DOWNLOAD, its package theirs to fetch');
+await navigate(`${APP}${proofPlay.slice(2)}`, 'window.__probe?.player() != null');
+const proofPlayed = await evaluate(`({ drift: window.__probe.player().drift, recording: new URLSearchParams(location.search).get('recording') })`);
+check(proofPlayed.drift === null && proofPlayed.recording === `proof:${proofSent.id}`, 'PLAY plays the proof\'s package in the game\'s page, ?recording=proof:<id>');
+await navigate(`${APP}fame?keepsaves&keepsettings#${fameFirst.first?.id}`, STATS);
+await until(`!!document.querySelector('.fame-moderation .fame-reset-button')`, 'MODERATION again');
+await clickOn('.fame-reset-button');
+const moderationAsked = await fameModeration();
+await clickOn('.fame-reset-button');
+let moderationReset = await fameModeration();
+for (let i = 0; i < 60 && moderationReset?.name !== 'No such player'; i++) {
+  await wait(250);
+  moderationReset = await fameModeration();
+}
+const resetAnswered: number = await evaluate(`fetch('api/fame/players/${fameFirst.first?.id}', { cache: 'no-store' }).then((r) => r.status)`);
+console.log('  reset:', JSON.stringify({ moderationAsked, moderationReset, resetAnswered }));
+check(moderationAsked?.reset === 'Confirm reset' && /leaves the Hall/.test(moderationAsked.status ?? '') && moderationReset?.reset === null
+  && /^Its name is reset/.test(moderationReset.none ?? '') && moderationReset.proofs.length === 1 && resetAnswered === 404,
+  'RESET NAME asks a second click, then withdraws the name: No such player, the Hall answering 404, the section and its proof still there');
 
 
 // Fullscreen (`src/lib/fullscreen.ts`), DISPLAY's FULLSCREEN. A finger's press is no

@@ -331,8 +331,43 @@ export interface ProofVerdict {
     claims: Record<string, ClaimState>;
 }
 
-/** Where a moderator resets a public name: `POST IDENTITIES_ROUTE/<public id>`, `{"action": "reset"}`. */
+/**
+ * Where a moderator resets a public name, `POST IDENTITIES_ROUTE/<public id>`,
+ * `{"action": "reset"}`, and reads what the server holds of its proofs, `GET`
+ * (`ModeratedIdentity`), naming themselves as `DATA_SETS_ROUTE` does.
+ */
 export const IDENTITIES_ROUTE = 'api/identities';
+
+/** A proof as `GET IDENTITIES_ROUTE/<public id>` answers it to a moderator: never its sender's `playerId` nor its playthrough. */
+export interface ModeratedProof {
+    id: string;
+    dataSet: string;
+    /** Its set's name, or its id where the table no longer holds it. */
+    name: string;
+    state: ProofState;
+    /** Why it drifted, where it did. */
+    reason?: string;
+    sentAt: number;
+    checkedAt: number | null;
+    /** Whether its package is still on the server, which `GET PROOFS_ROUTE/<id>` answers to a moderator. */
+    kept: boolean;
+    /** Each claim's verdict, and each unlock its replay granted unclaimed, `verified`. */
+    claims: Record<string, ClaimState>;
+}
+
+/** `GET IDENTITIES_ROUTE/<public id>`: an identity as a moderator sees it, and its browsers' proofs, the latest sent first. */
+export interface ModeratedIdentity {
+    id: string;
+    name: string | null;
+    browsers: number;
+    proofs: ModeratedProof[];
+}
+
+/**
+ * `?recording=` of a proof, `PROOF_RECORDING_PREFIX<id>`: its package, which the server keeps
+ * and answers a moderator alone (`GET PROOFS_ROUTE/<id>`), played as a site's recording is.
+ */
+export const PROOF_RECORDING_PREFIX = 'proof:';
 
 /**
  * The Hall of Fame's answers (`server/fame.ts`), public and cached as `api/stats`'s are:

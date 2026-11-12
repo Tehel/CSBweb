@@ -7,6 +7,7 @@
  *   GET  PROFILE_ROUTE            what the server holds of the asker (`profileText`)
  *   POST PROFILE_ROUTE            a name chosen, a browser linked, a key drawn (`changeProfile`)
  *   POST IDENTITIES_ROUTE/<id>    a name reset by a moderator (`resetName`)
+ *   GET  IDENTITIES_ROUTE/<id>    an identity and its proofs, to a moderator (`identityText`)
  *
  * A **public name** is what the Hall of Fame shows (`fame.ts`): 3 to 16 ASCII letters,
  * digits, `-`, `_` and `.`, words a single space apart (`publicNameProblem`), unique
@@ -22,7 +23,9 @@
  *
  * A moderator resets a name: the identity keeps its id, its key and its browsers, and has
  * no name until its player chooses another; the name reset is retired, refused to everyone
- * from then on.
+ * from then on. Each name chosen, changed or reset is told to the moderators (`notify.ts`),
+ * who see on its page in the Hall of Fame the identity's proofs, and may play or download
+ * the packages kept (`proofs.ts`).
  *
  * Every answer is JSON, and none holds a `playerId`, which is the player's secret
  * (`dataSets.ts`): an identity answers with its name, its id and how many browsers share it.
@@ -34,7 +37,9 @@ import {
     IDENTITY_ALPHABET, IDENTITY_KEY_LENGTH, identityKeyOf, PROFILE_ACTIONS, PUBLIC_ID, publicNameProblem,
     type PlayerProfile, type ProfileAction, type ProfileIdentity, type ProfileState,
 } from '../src/data/DataSets.ts';
+import type { ClaimState, ModeratedIdentity } from '../src/data/DataSets.ts';
 import { samePlayerId, type DataSetStore, type DataSetViewer } from './dataSets.ts';
+import { NOBODY, type Notify } from './notify.ts';
 import type { ProofStore } from './proofs.ts';
 import type { RecordingStore } from './recordings.ts';
 import type { StatsStore } from './stats.ts';
@@ -263,8 +268,9 @@ function profileRequest(body: string): { action: ProfileAction; fields: Record<s
 }
 
 /**
- * `POST PROFILE_ROUTE`: `body`, sent by `player`, checked and, where it passes, done. The
- * body is JSON, and nothing else:
+ * `POST PROFILE_ROUTE`: `body`, sent by `player`, checked and, where it passes, done, a name
+ * chosen or changed told to the moderators (`notify`, dated by `now`). The body is JSON, and
+ * nothing else:
  *
  *   {"action": "name", "name": …}  the name chosen: a new identity, `player` its first
  *                                  browser, 201 with its key; or the identity's renamed, 200
@@ -283,7 +289,7 @@ function profileRequest(body: string): { action: ProfileAction; fields: Record<s
  * 200 or 201 answers the identity (`ProfileIdentity`), with its key where one was drawn; a
  * refusal `{"error": "<why>"}`.
  */
-export function changeProfile(body: string, player: string, identities: IdentityStore): ProfileAnswer {
+export function changeProfile(body: string, player: string, identities: IdentityStore, notify: Notify = NOBODY, now: () => number = Date.now): ProfileAnswer {
     const refuse = (status: number, error: string): ProfileAnswer => ({ status, body: { error } });
     const request = profileRequest(body);
     if (request === null) return refuse(400, `The body is not {"action": "name", "name": …}, {"action": "link", "key": …} or {"action": "key"}.`);
@@ -297,9 +303,13 @@ export function changeProfile(body: string, player: string, identities: Identity
         if (taken === 'taken') return refuse(409, 'This name is taken.');
         if (own !== null) {
             identities.rename(own.id, name);
+            if (own.name !== name) {
+                notify({ name, activity: own.name === null ? 'chosen' : 'changed', ...(own.name === null ? {} : { was: own.name }), publicId: own.id, by: 'a player', at: now() });
+            }
             return { status: 200, body: { id: own.id, name } };
         }
         const { identity, key } = identities.create(player, name);
+        notify({ name, activity: 'chosen', publicId: identity.id, by: 'a player', at: now() });
         return { status: 201, body: { ...identity, key } };
     }
     if (request.action === 'link') {
@@ -317,9 +327,10 @@ export function changeProfile(body: string, player: string, identities: Identity
  * and, where it passes, done. The body is `{"action": "reset"}` and nothing else. The
  * rules, in order, each answered with nothing changed: 413 a body over `MAX_PROFILE_BYTES`
  * (`app.ts`); 400 another body; 404 an id the table does not hold; 403 an asker who is not
- * a moderator; 409 an identity with no name. 200 answers `{"id": "<id>"}`.
+ * a moderator; 409 an identity with no name. 200 answers `{"id": "<id>"}`, and the reset is
+ * told to the moderators (`notify`, dated by `now`).
  */
-export function resetName(id: string, body: string, viewer: DataSetViewer, identities: IdentityStore): ProfileAnswer {
+export function resetName(id: string, body: string, viewer: DataSetViewer, identities: IdentityStore, notify: Notify = NOBODY, now: () => number = Date.now): ProfileAnswer {
     const refuse = (status: number, error: string): ProfileAnswer => ({ status, body: { error } });
     let action: unknown = null;
     try {
@@ -335,5 +346,30 @@ export function resetName(id: string, body: string, viewer: DataSetViewer, ident
     if (identity.name === null) return refuse(409, 'This name is reset already.');
     identities.reset(id);
     console.log(`identity ${id} reset`);
+    notify({ name: identity.name, activity: 'reset', publicId: id, by: viewer.moderator.name, at: now() });
     return { status: 200, body: { id } };
+}
+
+/**
+ * `GET IDENTITIES_ROUTE/<id>` for `viewer`: the identity `id` and the proofs its browsers
+ * sent, the latest first (`ModeratedIdentity`), so that a moderator watching a proof that
+ * looks suspicious finds it, plays it (`?recording=proof:<id>`) or downloads it
+ * (`GET PROOFS_ROUTE/<id>`). 404 an id the table does not hold, a name reset included;
+ * 403 an asker who is not a moderator. Never a `playerId` nor a playthrough.
+ */
+export function identityText(id: string, viewer: DataSetViewer, { identities, dataSets, proofs }: Pick<ProfileSources, 'identities' | 'dataSets' | 'proofs'>): { status: number; body: string } {
+    const identity = PUBLIC_ID.test(id) ? identities.get(id) : null;
+    if (identity === null) return { status: 404, body: JSON.stringify({ error: 'The site has no name of this id.' }) };
+    if (viewer.moderator === null) return { status: 403, body: JSON.stringify({ error: 'Only a moderator reads an identity\'s proofs.' }) };
+    const players = identities.players(id);
+    const sets = dataSets.read().dataSets;
+    const answer: ModeratedIdentity = {
+        id: identity.id, name: identity.name, browsers: players.length,
+        proofs: proofs.sentBy(players).map((proof) => ({
+            id: proof.id, dataSet: proof.dataSet, name: sets.find((set) => set.id === proof.dataSet)?.name ?? proof.dataSet,
+            state: proof.state, ...(proof.state === 'drifted' ? { reason: proof.reason } : {}), sentAt: proof.sentAt, checkedAt: proof.checkedAt, kept: proof.kept,
+            claims: Object.fromEntries(proofs.claims(proof.id).map((claim): [string, ClaimState] => [claim.achievement, claim.state])),
+        })),
+    };
+    return { status: 200, body: JSON.stringify(answer) };
 }

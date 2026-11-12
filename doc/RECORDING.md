@@ -577,7 +577,10 @@ a root and the branches down to the one played, or a branch alone, from its own 
 page's own loop, over the set its files are found in ("The set a recording plays over",
 above): the path is read before the page is built (`readPlayedRecording`), so the link
 needs no `?dungeon=`, and one that names another set ends the page as an error. A store's id is the path the store holds to it, from its root
-(`readRecordingPath`, `src/data/saves/RecordingStore.ts`). A store's save,
+(`readRecordingPath`, `src/data/saves/RecordingStore.ts`). A proof's,
+`proof:<its id>` (`PROOF_RECORDING_PREFIX`), is its package as the server answers it to a
+moderator alone (`fetchProofRecording`, `doc/ACHIEVEMENTS.md` → "The Hall of Fame"), played
+as a site's is. A store's save,
 `save:<its row's id>` (`SAVE_POINT_PREFIX`, `src/engine/RecordingPoints.ts`), is the path the
 store holds to its point, played to it and the save's file checked there, as a site's
 (`readSavePoint`). Either, with `&from=` and `&to=` naming saves on its way (`WayPoint.id`,

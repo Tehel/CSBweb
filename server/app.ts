@@ -37,11 +37,13 @@
  *                     other browsers their identity links (`profileText`); POST: their public
  *                     name chosen, their browser linked, their key drawn again (`changeProfile`,
  *                     `identity.ts`)
- *   /api/identities/<id>  POST: a public name reset by a moderator (`resetName`)
+ *   /api/identities/<id>  POST: a public name reset by a moderator (`resetName`); GET: the
+ *                     identity and its proofs, to a moderator (`identityText`)
  *   /api/proofs       POST: the package of a player with a public name sent with the
  *                     unlocks it claims, queued for the verifier (`sendProof`, `proofs.ts`);
  *                     GET `?ids=<id>,<id>…`: the verdicts of those of the player's
  *                     (`proofsText`)
+ *   /api/proofs/<id>  a proof's package kept, to a moderator alone (`answerProofPackage`)  no-store
  *   /api/health       200, for the compose healthcheck
  *   /api/event        POST: a game's event, checked (`events.ts`) and stored (`stats.ts`)
  *   /api/stats        the public sets' statistics, as JSON (`StatsStore.summary`)  max-age 30 s
@@ -67,7 +69,7 @@ import { pathToFileURL } from 'node:url';
 
 import {
     DATA_SET_FILES_ROUTE, DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, FAME_PLAYERS, FAME_ROUTE, FAME_SETS, IDENTITIES_ROUTE, PLAYER_ID_HEADER, PROFILE_ROUTE, PROOFS_ROUTE, RECORDING_FILES,
-    PUBLIC_ID, RECORDINGS_ROUTE,
+    PROOF_ID, PUBLIC_ID, RECORDINGS_ROUTE,
 } from '../src/data/DataSets.ts';
 import type { FamePlayerPage, FameSet, FameSummary, StatsSet } from './answers.ts';
 import { manifestText, samePlayerId, wallsText, type DataSetStore, type DataSetViewer, type Moderator } from './dataSets.ts';
@@ -75,7 +77,7 @@ import { addDocument, removeDocument } from './documents.ts';
 import { editDataSet } from './edit.ts';
 import { fameSet, famePlayer, fameSummary, type AchievementDefsOf } from './fame.ts';
 import { addressBucket, checkEvent, isPlayerId, MAX_EVENT_BYTES, type EventRules, type RateLimit } from './events.ts';
-import { changeProfile, MAX_PROFILE_BYTES, profileText, resetName, type IdentityStore, type ProfileAnswer } from './identity.ts';
+import { changeProfile, identityText, MAX_PROFILE_BYTES, profileText, resetName, type IdentityStore, type ProfileAnswer } from './identity.ts';
 import { MAX_PROOF_BYTES, proofsText, sendProof, type BuiltReplayProof, type ProofAnswer, type ProofStore, type VerifierReaders } from './proofs.ts';
 import { MAX_MODERATION_BYTES, moderateDataSet, type ModerationAnswer } from './moderate.ts';
 import type { Notify } from './notify.ts';
@@ -191,7 +193,7 @@ export interface ApiOptions {
     publishRateLimit: RateLimit;
     /** The clock events are stored and notifications dated with. */
     now: () => number;
-    /** Who is told of each change to the sets and their recordings (`notify.ts`). */
+    /** Who is told of each change to the sets, their recordings and the public names (`notify.ts`). */
     notify: Notify;
     /** The shared recordings (`recordings.ts`). */
     recordings: RecordingsApi;
@@ -404,8 +406,13 @@ function route({ distDir, gamefilesDir, filesDir }: ServerOptions, api: ApiOptio
             return answerProfile(api, req, res);
         }
         if (segments.length === 3 && segments.slice(0, 2).join('/') === IDENTITIES_ROUTE) {
-            if (req.method !== 'POST') return refuseMethod(res, 'POST');
-            return receiveNameReset(segments[2]!, api, req, res);
+            if (req.method === 'POST') return receiveNameReset(segments[2]!, api, req, res);
+            if (req.method !== 'GET' && req.method !== 'HEAD') return refuseMethod(res, 'GET, HEAD, POST');
+            return answerIdentity(segments[2]!, api, req, res);
+        }
+        if (segments.length === 3 && segments.slice(0, 2).join('/') === PROOFS_ROUTE) {
+            if (req.method !== 'GET' && req.method !== 'HEAD') return refuseMethod(res);
+            return answerProofPackage(segments[2]!, api, req, res);
         }
         if (segments.join('/') === PROOFS_ROUTE) {
             if (req.method === 'POST') return receiveProof(api, req, res);
@@ -837,7 +844,7 @@ export function answerProfile(api: ProfileApi, req: IncomingMessage, res: Server
  * `POST PROFILE_ROUTE`: the rate limit first, then the player and a body of at most
  * `MAX_PROFILE_BYTES`, before `changeProfile` decides. Every answer is JSON (`ProfileAnswer`).
  */
-export async function receiveProfileChange(api: Pick<ApiOptions, 'now' | 'identities'>, req: IncomingMessage, res: ServerResponse): Promise<void> {
+export async function receiveProfileChange(api: Pick<ApiOptions, 'now' | 'identities' | 'notify'>, req: IncomingMessage, res: ServerResponse): Promise<void> {
     const answer = (status: number, error: string): ProfileAnswer => ({ status, body: { error } });
     const header = req.headers[PLAYER_ID_HEADER.toLowerCase()];
     let reply: ProfileAnswer;
@@ -849,7 +856,7 @@ export async function receiveProfileChange(api: Pick<ApiOptions, 'now' | 'identi
         reply = answer(400, `No player: ${PLAYER_ID_HEADER} is not a playerId.`);
     } else {
         const body = await readBody(req, MAX_PROFILE_BYTES);
-        reply = body === null ? answer(413, `The body is larger than ${MAX_PROFILE_BYTES} bytes.`) : changeProfile(body.toString('utf8'), header, api.identities.store);
+        reply = body === null ? answer(413, `The body is larger than ${MAX_PROFILE_BYTES} bytes.`) : changeProfile(body.toString('utf8'), header, api.identities.store, api.notify, api.now);
     }
     res.setHeader('Cache-Control', 'no-store');
     send(res, reply.status, JSON.stringify(reply.body), 'application/json; charset=utf-8');
@@ -859,12 +866,44 @@ export async function receiveProfileChange(api: Pick<ApiOptions, 'now' | 'identi
  * `POST IDENTITIES_ROUTE/<id>`: its asker and a body of at most `MAX_PROFILE_BYTES`, before
  * `resetName` decides. Every answer is JSON (`ProfileAnswer`).
  */
-export async function receiveNameReset(id: string, api: Pick<ApiOptions, 'moderators' | 'identities'>, req: IncomingMessage, res: ServerResponse): Promise<void> {
+export async function receiveNameReset(id: string, api: Pick<ApiOptions, 'moderators' | 'identities' | 'notify' | 'now'>, req: IncomingMessage, res: ServerResponse): Promise<void> {
     const body = await readBody(req, MAX_PROFILE_BYTES);
     const reply: ProfileAnswer = body === null ? { status: 413, body: { error: `The body is larger than ${MAX_PROFILE_BYTES} bytes.` } }
-        : resetName(id, body.toString('utf8'), dataSetViewer(api, req), api.identities.store);
+        : resetName(id, body.toString('utf8'), dataSetViewer(api, req), api.identities.store, api.notify, api.now);
     res.setHeader('Cache-Control', 'no-store');
     send(res, reply.status, JSON.stringify(reply.body), 'application/json; charset=utf-8');
+}
+
+/** What `answerIdentity` needs of the API. */
+export type IdentityApi = Pick<ApiOptions, 'moderators' | 'dataSets'> & { identities: Pick<IdentitiesApi, 'store'>; proofs: Pick<ProofsApi, 'store'> };
+
+/**
+ * `GET IDENTITIES_ROUTE/<id>`: the identity and its proofs, as `identityText` gives them to
+ * the moderator the request names, not cached. The dev server answers the route with it too
+ * (`vite.config.mts`), as it does `answerProofPackage`.
+ */
+export function answerIdentity(id: string, api: IdentityApi, req: IncomingMessage, res: ServerResponse): void {
+    const { status, body } = identityText(id, dataSetViewer(api, req), { identities: api.identities.store, dataSets: api.dataSets, proofs: api.proofs.store });
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Vary', PLAYER_ID_HEADER);
+    send(res, status, body, 'application/json; charset=utf-8');
+}
+
+/**
+ * `GET PROOFS_ROUTE/<id>`: the package of the proof `id`, which the server keeps and never
+ * serves to anyone else, to the moderator the request names, so that they play it (the
+ * page's `?recording=proof:<id>`, `src/main.ts`) or download it; not cached. 403 to anyone
+ * else, before anything is looked up; 404 an id that is no proof's, or whose file the
+ * verifier deleted.
+ */
+export function answerProofPackage(id: string, api: Pick<ApiOptions, 'moderators'> & { proofs: Pick<ProofsApi, 'store' | 'dir'> }, req: IncomingMessage, res: ServerResponse): void {
+    res.setHeader('Vary', PLAYER_ID_HEADER);
+    if (dataSetViewer(api, req).moderator === null) {
+        res.setHeader('Cache-Control', 'no-store');
+        return send(res, 403, 'Only a moderator reads a proof\'s package.');
+    }
+    if (!PROOF_ID.test(id) || api.proofs.store.get(id)?.kept !== true) return send(res, 404, 'Not found');
+    serveFile(req, res, join(api.proofs.dir, `${id}.gz`), 'no-store');
 }
 
 /** What `receiveProof` and `answerProofs` need of the API. */
