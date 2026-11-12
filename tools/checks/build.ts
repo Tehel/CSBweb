@@ -19,9 +19,10 @@
  *     `checkLocalDataSet` says, its problems, record, census and walls, and of a
  *     `dungeon.dat` what `readDungeonWalls` says: DM's `dungeon.dat` on its
  *     base set's `graphics.dat`, read from the set's folder, the same with Chaos Strikes Back's
- *     own `graphics.dat`, and a `dungeon.dat` that does not read; and of a package what the
+ *     own `graphics.dat`, and a `dungeon.dat` that does not read; of a package what the
  *     page's `readRecordingPackage` says: one read, one past the limit it unzips to, and
- *     bytes that are no package;
+ *     bytes that are no package; and holds the source's achievements, which the Hall of
+ *     Fame lists (`achievementDefs`);
  *   - the verifier's module (`VERIFIER_MODULE`, `--ssr --mode verifier`) imports nothing,
  *     loads through the verifier's loader (`loadVerifierReaders`), and replays a proof as
  *     the page's `replayProof` does, with the build's achievements: a genuine corpus
@@ -164,7 +165,7 @@ async function main(): Promise<void> {
         const module = readFileSync(join(outDir, READERS_MODULE), 'utf8');
         const imports = module.match(/^\s*(?:import|export\s.*\sfrom)\s.*$|\bimport\(|\brequire\(/gm) ?? [];
         check(imports.length === 0, `${READERS_MODULE} imports nothing${imports.length ? `: not ${imports.join(', ')}` : ''}`);
-        const { checkDataSet: built, readDungeonWalls: builtWalls, readRecordingPackage: builtPackage } = await loadPageReaders(outDir);
+        const { checkDataSet: built, readDungeonWalls: builtWalls, readRecordingPackage: builtPackage, achievementDefs: builtDefs } = await loadPageReaders(outDir);
         const base = (set: string): DataSetFolder | null => set === 'dm-atari' || set === 'csb' ? folder(set) : null;
         const drafts: [string, DataSetDraft, boolean][] = [
             ['DM, on its base set\'s graphics.dat', draftOf('dm-atari', ['dungeon.dat']), true],
@@ -193,6 +194,10 @@ async function main(): Promise<void> {
             console.log(`  ${what}: ${fromBuild.startsWith('throws') ? fromBuild : `${fromBuild.length} characters of JSON`}`);
             check(fromBuild === await read(readRecordingPackage), `${what}: the built reader of a package says what the source's does`);
         }
+        const sourceDefs = setAchievementDefs(readFileSync(resolve(ROOT, 'src/engine/achievements/defs/common.txt'), 'utf8'), null);
+        const hallDefs = builtDefs('dm-atari');
+        console.log(`  the achievements of dm-atari: ${hallDefs?.length ?? 'none'}`);
+        check(hallDefs !== null && JSON.stringify(hallDefs) === JSON.stringify(sourceDefs), 'the built achievements, which the Hall of Fame lists, are the source\'s');
 
         console.log('\nThe verifier\'s module:');
         const verifier = readFileSync(join(outDir, VERIFIER_MODULE), 'utf8');
@@ -203,7 +208,7 @@ async function main(): Promise<void> {
         const dataSets = new DataSetStore(db);
         dataSets.fill(parseManifest(readFileSync(MANIFEST_FILE, 'utf8'), ''));
         const sets = await verifierSets(dataSets, resolve(ROOT, GAMEFILES_DIR), new FileDigestCache());
-        const common = setAchievementDefs(readFileSync(resolve(ROOT, 'src/engine/achievements/defs/common.txt'), 'utf8'), null);
+        const common = sourceDefs;
         const proofs: [string, Uint8Array][] = [
             ['a genuine recording', new Uint8Array(readFileSync(join(CORPUS_DIR, 'replay-saves-written-over.L5.gz')))],
             ['bytes that are no package', new Uint8Array([1, 2, 3])],

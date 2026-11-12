@@ -8,10 +8,10 @@
  *   POST PROFILE_ROUTE            a name chosen, a browser linked, a key drawn (`changeProfile`)
  *   POST IDENTITIES_ROUTE/<id>    a name reset by a moderator (`resetName`)
  *
- * A **public name** is what the Hall of Fame will show (phase 18.6): 3 to 16 ASCII letters,
+ * A **public name** is what the Hall of Fame shows (`fame.ts`): 3 to 16 ASCII letters,
  * digits, `-`, `_` and `.`, words a single space apart (`publicNameProblem`), unique
  * regardless of case (the column's `NOCASE`). Its **public id**, ten characters of
- * Crockford's base 32 drawn by the server (`PUBLIC_ID`), is what the Hall's pages will link
+ * Crockford's base 32 drawn by the server (`PUBLIC_ID`), is what the Hall's pages link
  * by, and never changes. A `playerId` belongs to one identity at most, and an identity to
  * as many as are linked to it: the first chose its name, and the others gave its
  * **identity key**, 25 characters of the same alphabet, some 125 bits, drawn at the name's

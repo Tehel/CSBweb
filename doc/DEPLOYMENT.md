@@ -447,7 +447,8 @@ game's modules and links no manifest. A build is `index.html`, `stats.html`,
 **The server's module** is the second build, `--ssr`: the page's readers the server uses
 (`src/engine/PageReaders.ts`), the check of a player's own set, `checkLocalDataSet`
 (`src/engine/LocalDataSetCheck.ts`), and every reader under it, and the reader of a shared
-recording's package, `readRecordingPackage` (`src/engine/RecordingPackage.ts`), bundled
+recording's package, `readRecordingPackage` (`src/engine/RecordingPackage.ts`), and the
+build's achievements, which the Hall of Fame lists (`achievementDefs`), bundled
 into one module that imports nothing, `dist/server/PageReaders.js` (`vite.config.mts`).
 The server cannot import the page's sources as it imports `DataSets.ts`, since they are not
 erasable syntax and the image has no `node_modules`, so it loads this module instead and

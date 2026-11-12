@@ -283,7 +283,8 @@ function scratchFiles(scratch: string): ServerOptions {
     mkdirSync(join(distDir, 'server'));
     writeFileSync(join(distDir, READERS_MODULE), 'export function checkLocalDataSet() {}\n'
         + 'export async function readDungeonWalls() { throw new Error("a stand-in"); }\n'
-        + 'export async function readRecordingPackage() { throw new Error("a stand-in"); }\n');
+        + 'export async function readRecordingPackage() { throw new Error("a stand-in"); }\n'
+        + 'export function achievementDefs() { return null; }\n');
     writeFileSync(join(gamefilesDir, 'set-a', 'dungeon.dat'), Buffer.from([1, 2, 3, 4]));
     writeFileSync(join(gamefilesDir, 'set-a', 'large.dat'), Buffer.alloc(LARGE_FILE_BYTES));
     writeFileSync(join(gamefilesDir, 'set-a', '.hidden'), 'hidden');
@@ -627,7 +628,7 @@ async function checkEventBudget(scratch: string): Promise<void> {
         checkDataSet: checkLocalDataSet, dataSets, moderators: [], store, notify: NOBODY,
         rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000), eventBudget: new RateLimit(4, 86_400_000),
         publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now, recordings: recordingsApi(db, join(scratch, 'budget', 'recordings')),
-        identities: identitiesApi(db), proofs: proofsApi(db),
+        identities: identitiesApi(db), proofs: proofsApi(db), achievementDefs: () => null,
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
     const port = (server.address() as AddressInfo).port;
@@ -697,7 +698,7 @@ async function checkPublish(scratch: string): Promise<void> {
         notify: (event) => told.push(`${event.name}: ${event.activity} by ${event.by}`),
         rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000), eventBudget: new RateLimit(EVENTS_A_DAY, 86_400_000),
         publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now, recordings: recordingsApi(db, join(root, 'recordings')),
-        identities: identitiesApi(db), proofs: proofsApi(db),
+        identities: identitiesApi(db), proofs: proofsApi(db), achievementDefs: () => null,
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
     const port = (server.address() as AddressInfo).port;
@@ -1027,7 +1028,7 @@ async function checkModeration(scratch: string): Promise<void> {
         checkDataSet: checkLocalDataSet, dataSets, moderators: parseModerators(MODERATORS.join()), notify: NOBODY, store: new StatsStore(db),
         rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000), eventBudget: new RateLimit(EVENTS_A_DAY, 86_400_000),
         publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now, recordings: recordingsApi(db, join(root, 'recordings')),
-        identities: identitiesApi(db), proofs: proofsApi(db),
+        identities: identitiesApi(db), proofs: proofsApi(db), achievementDefs: () => null,
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
     const port = (server.address() as AddressInfo).port;
@@ -1145,7 +1146,7 @@ async function checkDocuments(scratch: string): Promise<void> {
         notify: (event) => told.push(notificationText({ ...event, at: 0 }).split('\n')[0]!),
         rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000), eventBudget: new RateLimit(EVENTS_A_DAY, 86_400_000),
         publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now, recordings: recordingsApi(db, join(root, 'recordings')),
-        identities: identitiesApi(db), proofs: proofsApi(db),
+        identities: identitiesApi(db), proofs: proofsApi(db), achievementDefs: () => null,
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
     const port = (server.address() as AddressInfo).port;
@@ -1275,7 +1276,7 @@ async function checkRecordings(scratch: string): Promise<void> {
         notify: (event) => told.push(notificationText(event).split('\n')[0]!), rules: { hasSet: (id) => dataSets.hasSet(id) },
         rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000), eventBudget: new RateLimit(EVENTS_A_DAY, 86_400_000),
         publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now, recordings,
-        identities: identitiesApi(db), proofs: proofsApi(db),
+        identities: identitiesApi(db), proofs: proofsApi(db), achievementDefs: () => null,
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
     const port = (server.address() as AddressInfo).port;
@@ -1698,7 +1699,7 @@ async function main(): Promise<void> {
             publishRateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000),
             now: Date.now,
             recordings: recordingsApi(db, join(scratch, 'recordings')),
-            identities: identitiesApi(db), proofs: proofsApi(db),
+            identities: identitiesApi(db), proofs: proofsApi(db), achievementDefs: () => null,
         };
         server = createAppServer(options, api);
         await new Promise<void>((done) => server!.listen(0, '127.0.0.1', done));

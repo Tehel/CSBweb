@@ -92,6 +92,16 @@ export interface StoredProof {
     kept: boolean;
 }
 
+/** An achievement of a set verified by an identity with a public name, at the time its first proof was checked (`ProofStore.hall`). */
+export interface HallRow {
+    dataSet: string;
+    achievement: string;
+    /** The identity's public id. */
+    identity: string;
+    name: string;
+    at: number;
+}
+
 export class ProofStore {
     /** The most the packages kept may take on the disk together, in bytes. */
     readonly diskBytes: number;
@@ -110,6 +120,8 @@ export class ProofStore {
     private readonly updateClaim: StatementSync;
     private readonly grantClaim: StatementSync;
     private readonly updateKept: StatementSync;
+    /** `hall`'s, prepared at its first call: it reads `identity.ts`'s tables, made beside these. */
+    private hallRows: StatementSync | null = null;
 
     constructor(db: DatabaseSync, diskBytes: number) {
         this.db = db;
@@ -177,6 +189,22 @@ export class ProofStore {
     verifiedBy(players: readonly string[]): { dataSet: string; achievement: string }[] {
         return (this.verifiedOf.all(JSON.stringify(players)) as { data_set: string; achievement: string }[])
             .map((row) => ({ dataSet: row.data_set, achievement: row.achievement }));
+    }
+
+    /**
+     * The Hall of Fame's rows (`fame.ts`): each achievement a replay verified, by set, of each
+     * identity with a public name, once, at the first proof of its browsers that verified it,
+     * through `identity_players` (a browser linked to another identity since speaks for that
+     * one); of the identity `identity` alone where it is given. The first verified first, then
+     * by identity. An identity a moderator reset, which has no name, is left out.
+     */
+    hall(identity: string | null = null): HallRow[] {
+        this.hallRows ??= this.db.prepare(`SELECT p.data_set, c.achievement, i.id AS identity, i.name, MIN(p.checked_at) AS at
+            FROM claims c JOIN proofs p ON p.id = c.proof JOIN identity_players ip ON ip.player = p.player JOIN identities i ON i.id = ip.identity
+            WHERE c.state = 'verified' AND p.state = 'checked' AND i.name IS NOT NULL AND (?1 IS NULL OR i.id = ?1)
+            GROUP BY p.data_set, c.achievement, i.id ORDER BY at, i.id`);
+        return (this.hallRows.all(identity) as { data_set: string; achievement: string; identity: string; name: string; at: number }[])
+            .map((row) => ({ dataSet: row.data_set, achievement: row.achievement, identity: row.identity, name: row.name, at: row.at }));
     }
 
     /**

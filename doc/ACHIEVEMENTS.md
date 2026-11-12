@@ -354,7 +354,7 @@ The server's half is `server/identity.ts`, in the store's SQLite file beside the
   is unique regardless of case: the `identities` table's `name` is `COLLATE NOCASE`. A
   name is chosen and changed as often as its player likes.
 - **Its public id** is ten characters of Crockford's base 32 (`PUBLIC_ID`), drawn by the
-  server when the name is first chosen, and never changed: the Hall's pages will link by it.
+  server when the name is first chosen, and never changed: the Hall's pages link by it.
 - **Several `playerId`s share one identity** (`identity_players`): the browser that chose the
   name, and every one linked to it since. Each answer speaks for them all.
 - **The identity key** is 25 characters of the same alphabet, some 125 bits, drawn with the
@@ -520,7 +520,39 @@ so it stays in the browser.
 
 ## The Hall of Fame
 
-*Designed (phase 18.6).* **The Hall of Fame** (`fame.html`) shows each set's achievements
-with how many players of the Hall have unlocked each, the share that is, and who unlocked it
-first; and each player's page of badges. Its answers, like `api/stats`, never hold a
-`playerId` or a playthrough.
+**The answers** are `server/fame.ts`, public and cached as `api/stats`'s are, for 30 s
+(`STATS_CACHE_MS`, one `AnswerCache` with the statistics'), over the proofs the replays
+checked (`ProofStore.hall`). GET only, 404 for an unknown set or id, and none holds a
+`playerId`, a playthrough or a proof's id: a player is their public name and public id.
+
+- **A player of the Hall** is an identity with a public name, counted once whatever browsers
+  it links (through `identity_players`: a browser linked to another identity since speaks
+  for that one), who verified an achievement of the set. An identity a moderator reset has
+  no name, and is in no answer until its player chooses another.
+- **An achievement verified** is a claim `verified` by a checked proof, the replay's grants
+  among them; an unverified claim, a dropped one and a drifted proof's count for nothing.
+  Its time is the time its first proof of the identity's was checked (`checked_at`), not
+  sent.
+- **The sets** are the public ones, approved and not hidden, as `api/stats`'; **their
+  achievements** the build's (`achievementDefs`, `src/ui/achievementFiles.ts`), which the
+  server reads through the page's readers, `dist/server/PageReaders.js` exporting them as
+  the verifier's module does (`loadPageReaders`); the server has no file of its own. An
+  unlock whose id the set's file no longer holds is not counted.
+- **`api/fame`** (`fameSummary`): how many players the Hall has, and each set, the most
+  players first, then in the table's order: its players, its achievements and how many of
+  them someone verified.
+- **`api/fame/sets/<id>`** (`fameSet`): the set's players, and each achievement in its
+  file's order, its name, text and tier, how many players verified it, their share of the
+  set's players, and who verified it first, by `checked_at`, then by public id.
+- **`api/fame/players/<public id>`** (`famePlayer`): the player's name, and their badges by
+  public set, each set's in its file's order, with the day, UTC, its first proof was
+  checked. A named player who verified nothing has a page with no set; an identity without
+  a name is 404 at once, though the sets' answers may still show it until they expire.
+
+The dev server answers the routes over its own proofs, uncached (`vite.config.mts`).
+`tools/checks/server-fame.ts` proves the answers: two browsers of one identity counted once,
+the first by `checked_at` and not by the time sent, a reset name left out and its page 404,
+pending and hidden sets left out, dropped, unverified and drifted claims and an unlock the
+file does not hold not counted, each achievement in its file's order, a player's badges and
+their days, the 404s, the cache, and no `playerId`, playthrough or proof id in any answer.
+`tools/checks/build.ts` proves the built readers hold the source's achievements.

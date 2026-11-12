@@ -78,7 +78,10 @@ At the author's request, beside the debt. The design is `doc/ACHIEVEMENTS.md`.
   UPLOAD. Deferred: re-verifying the kept proofs when a set gains an achievement (18.7), a
   moderator watching a proof (18.6), and an unlock the replay grants unclaimed, which the
   server keeps but the page adds no row for.
-- ⏳ 18.6 The Hall of Fame page.
+- ⏳ 18.6 The Hall of Fame (`doc/ACHIEVEMENTS.md` → "The Hall of Fame"). Done: its answers,
+  `api/fame` (`server/fame.ts`), proved by `tools/checks/server-fame.ts` and `build.ts`.
+  Left: the page, `fame.html`; the moderators' half (a name reset from the Hall, a
+  suspicious proof watched, a name chosen notified).
 - ⏳ 18.7 A player's own set's `achievements.txt`: its row in the form, and its check at
   publish. The FTL sets' own files.
 

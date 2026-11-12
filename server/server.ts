@@ -152,6 +152,7 @@ const server = createAppServer(options, {
     recordings: { store: recordings, dir: recordingsDir, readPackage: readers.readRecordingPackage, shareRateLimit: new RateLimit(SHARES_PER_HOUR, 3_600_000) },
     identities: { store: identities, rateLimit: new RateLimit(PROFILE_CHANGES_PER_HOUR, 3_600_000) },
     proofs: { store: proofs, dir: proofsDir, rateLimit: new RateLimit(PROOFS_PER_HOUR, 3_600_000) },
+    achievementDefs: readers.achievementDefs,
 });
 server.listen(port, () => {
     const address = server.address();

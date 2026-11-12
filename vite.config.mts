@@ -8,7 +8,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { DatabaseSync } from 'node:sqlite';
 
 import {
-  answerProfile, answerProofs, answerRecordings, answerStats, contentType, dataSetViewer, pathSegments, receiveDocument, receiveEdit, receiveModeration,
+  answerFame, answerProfile, answerProofs, answerRecordings, answerStats, contentType, dataSetViewer, pathSegments, receiveDocument, receiveEdit, receiveModeration,
   receiveNameReset, receiveProfileChange, receiveProof, receivePublish, receiveRecordingModeration, receiveShare,
 } from './server/app.ts';
 import { DataSetStore, manifestText, parseModerators, wallsText } from './server/dataSets.ts';
@@ -18,10 +18,11 @@ import { IdentityStore } from './server/identity.ts';
 import { NOBODY } from './server/notify.ts';
 import { ProofStore, verifyNext, type BuiltReplayProof, type VerifierReaders } from './server/proofs.ts';
 import type { CheckDataSet } from './server/publish.ts';
+import type { AchievementDefsOf } from './server/fame.ts';
 import { RecordingStore, type ReadRecordingPackage } from './server/recordings.ts';
 import { AnswerCache, StatsStore } from './server/stats.ts';
 import {
-  DATA_SET_FILES_ROUTE, DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, IDENTITIES_ROUTE, PLAYER_ID_HEADER, PROFILE_ROUTE, PROOFS_ROUTE, RECORDING_FILES,
+  DATA_SET_FILES_ROUTE, DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, FAME_ROUTE, IDENTITIES_ROUTE, PLAYER_ID_HEADER, PROFILE_ROUTE, PROOFS_ROUTE, RECORDING_FILES,
   RECORDINGS_ROUTE,
   SHARED_RECORDING_ID, parseManifest,
 } from './src/data/DataSets.ts';
@@ -94,6 +95,10 @@ const DEV_MODERATOR_PLAYER_ID = '00000000-0000-4000-8000-000000000001';
  * `dm-atari` and `csb`: the dev page sends no event, and the statistics page then has
  * something to show. Nothing is cached, so that a set published shows at once. Without
  * `node:sqlite`, it is 501.
+ *
+ * `api/fame` is `answerFame` over the proofs' store and the identities', with the build's
+ * achievements (`ssrLoadModule`), uncached as `api/stats` is, so that a proof verified
+ * shows at once. Without `node:sqlite`, it is 501.
  */
 function dataSetsRoute(): Plugin {
   const file = resolve(import.meta.dirname, 'tools', 'data-sets.json');
@@ -414,6 +419,25 @@ function dataSetsRoute(): Plugin {
             await receiveProof({ dataSets: openStore(db), now: Date.now, proofs, recordings: { readPackage }, identities }, req, res);
             if (res.statusCode === 201) verifyQueue();
           } else answerProofs({ proofs, identities }, req, res);
+        } catch (error) {
+          next(error);
+        } finally {
+          db.close();
+        }
+      });
+
+      const fameCache = new AnswerCache(0, Date.now);
+      server.middlewares.use(`/${FAME_ROUTE}`, async (req, res, next) => {
+        const path = pathSegments(req.url ?? '');
+        if (path === null) return next();
+        if (!sqlite || !identities || !proofs) {
+          res.statusCode = 501;
+          return res.end();
+        }
+        const db = new sqlite.DatabaseSync(':memory:');
+        try {
+          const { achievementDefs } = (await server.ssrLoadModule('/src/ui/achievementFiles.ts')) as { achievementDefs: AchievementDefsOf };
+          answerFame(path, { dataSets: openStore(db), proofs, identities, achievementDefs }, fameCache, req, res);
         } catch (error) {
           next(error);
         } finally {

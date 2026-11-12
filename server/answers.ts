@@ -76,3 +76,54 @@ export interface SetStats extends StatsSet {
     /** Sessions, games started and games won per week, the weeks with one. */
     weeks: { week: string; sessions: number; started: number; won: number }[];
 }
+
+/** An achievement's tier, as the achievements' file names it (`TIERS`, `src/engine/achievements/AchievementFile.ts`). */
+export type FameTier = 'easy' | 'silly' | 'weird' | 'hard';
+
+/** What the Hall of Fame shows of an achievement of the build (`achievementDefs`). */
+export interface FameDef {
+    id: string;
+    name: string;
+    text: string;
+    tier: FameTier;
+}
+
+/** A player of the Hall: their public name and its public id, never a `playerId`. */
+export interface FamePlayer {
+    id: string;
+    name: string;
+}
+
+/**
+ * `api/fame`: every public set, the most players of the Hall first, then in the table's
+ * order. Aggregates only, and no proof, playthrough or `playerId`.
+ */
+export interface FameSummary {
+    /** The players of the Hall: the identities with a public name who verified an achievement of a public set. */
+    players: number;
+    /** Each set's players of the Hall, its achievements, and how many of them someone verified. */
+    sets: (StatsSet & { players: number; achievements: number; verified: number })[];
+}
+
+/** An achievement as `api/fame/sets/<id>` answers it. */
+export interface FameAchievement extends FameDef {
+    /** The players of the Hall who verified it. */
+    players: number;
+    /** Their share of the set's players of the Hall, 0 to 1. */
+    share: number;
+    /** Who verified it first, by the time its proof was checked; `null` where nobody has. */
+    first: FamePlayer | null;
+}
+
+/** `api/fame/sets/<id>`: a public set's achievements, in its file's order. */
+export interface FameSet extends StatsSet {
+    /** Its players of the Hall: who verified one of its achievements. */
+    players: number;
+    achievements: FameAchievement[];
+}
+
+/** `api/fame/players/<public id>`: a player's badges, by public set, in the table's order, each set's in its file's order. */
+export interface FamePlayerPage extends FamePlayer {
+    /** Each badge's `day` is the day, `YYYY-MM-DD`, UTC, its first proof was checked. */
+    sets: (StatsSet & { achievements: (FameDef & { day: string })[] })[];
+}

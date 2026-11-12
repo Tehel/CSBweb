@@ -8,6 +8,7 @@
  *
  *   /                 dist/index.html               no-cache
  *   /stats            dist/stats.html, the statistics page, whatever the query  no-cache
+ *   /fame             dist/fame.html, the Hall of Fame, whatever the query    no-cache
  *   /manifest.webmanifest  the installed game's     no-cache
  *   /assets/…         dist/assets/…, hashed names   immutable
  *   /server/…         404: the server's own module (`READERS_MODULE`), never served
@@ -46,6 +47,9 @@
  *   /api/stats        the public sets' statistics, as JSON (`StatsStore.summary`)  max-age 30 s
  *   /api/stats/<id>   a public set's (`StatsStore.setStats`), 404 for any other    max-age 30 s
  *   /api/stats/<id>/<level>  the deaths on its level's squares (`levelStats`)     max-age 30 s
+ *   /api/fame         the Hall of Fame: every public set's players of the Hall (`fameSummary`)  max-age 30 s
+ *   /api/fame/sets/<id>  a public set's achievements, their players and the first (`fameSet`), 404 for any other  max-age 30 s
+ *   /api/fame/players/<id>  a named player's badges, by public id (`famePlayer`), 404 for any other  max-age 30 s
  *
  * Every answer, the API's and every error's as a file's, carries `SECURITY_HEADERS`, a shared
  * file's with `FILES_POLICY` for its policy. A POST a
@@ -62,13 +66,14 @@ import { pipeline } from 'node:stream';
 import { pathToFileURL } from 'node:url';
 
 import {
-    DATA_SET_FILES_ROUTE, DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, IDENTITIES_ROUTE, PLAYER_ID_HEADER, PROFILE_ROUTE, PROOFS_ROUTE, RECORDING_FILES,
-    RECORDINGS_ROUTE,
+    DATA_SET_FILES_ROUTE, DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, FAME_PLAYERS, FAME_ROUTE, FAME_SETS, IDENTITIES_ROUTE, PLAYER_ID_HEADER, PROFILE_ROUTE, PROOFS_ROUTE, RECORDING_FILES,
+    PUBLIC_ID, RECORDINGS_ROUTE,
 } from '../src/data/DataSets.ts';
-import type { StatsSet } from './answers.ts';
+import type { FamePlayerPage, FameSet, FameSummary, StatsSet } from './answers.ts';
 import { manifestText, samePlayerId, wallsText, type DataSetStore, type DataSetViewer, type Moderator } from './dataSets.ts';
 import { addDocument, removeDocument } from './documents.ts';
 import { editDataSet } from './edit.ts';
+import { fameSet, famePlayer, fameSummary, type AchievementDefsOf } from './fame.ts';
 import { addressBucket, checkEvent, isPlayerId, MAX_EVENT_BYTES, type EventRules, type RateLimit } from './events.ts';
 import { changeProfile, MAX_PROFILE_BYTES, profileText, resetName, type IdentityStore, type ProfileAnswer } from './identity.ts';
 import { MAX_PROOF_BYTES, proofsText, sendProof, type BuiltReplayProof, type ProofAnswer, type ProofStore, type VerifierReaders } from './proofs.ts';
@@ -98,12 +103,14 @@ export const READERS_MODULE = `${SERVER_DIR}/PageReaders.js`;
 
 /**
  * What the server uses of `READERS_MODULE`: the page's check of a set, its reader of a
- * dungeon's walls, and its reader of a shared recording's package.
+ * dungeon's walls, its reader of a shared recording's package, and the build's
+ * achievements, which the Hall of Fame lists (`fame.ts`).
  */
 export interface PageReaders {
     checkDataSet: CheckDataSet;
     readDungeonWalls: ReadDungeonWalls;
     readRecordingPackage: ReadRecordingPackage;
+    achievementDefs: AchievementDefsOf;
 }
 
 /**
@@ -131,7 +138,7 @@ export async function loadVerifierReaders(distDir: string): Promise<VerifierRead
 /** What `READERS_MODULE` exports, loaded from `distDir`; throws, saying why, where it is not built. */
 export async function loadPageReaders(distDir: string): Promise<PageReaders> {
     const file = join(distDir, READERS_MODULE);
-    let module: { checkLocalDataSet?: unknown; readDungeonWalls?: unknown; readRecordingPackage?: unknown };
+    let module: { checkLocalDataSet?: unknown; readDungeonWalls?: unknown; readRecordingPackage?: unknown; achievementDefs?: unknown };
     try {
         module = await import(pathToFileURL(file).href);
     } catch (error) {
@@ -140,9 +147,10 @@ export async function loadPageReaders(distDir: string): Promise<PageReaders> {
     if (typeof module.checkLocalDataSet !== 'function') throw new Error(`${file} exports no checkLocalDataSet`);
     if (typeof module.readDungeonWalls !== 'function') throw new Error(`${file} exports no readDungeonWalls`);
     if (typeof module.readRecordingPackage !== 'function') throw new Error(`${file} exports no readRecordingPackage`);
+    if (typeof module.achievementDefs !== 'function') throw new Error(`${file} exports no achievementDefs`);
     return {
         checkDataSet: module.checkLocalDataSet as CheckDataSet, readDungeonWalls: module.readDungeonWalls as ReadDungeonWalls,
-        readRecordingPackage: module.readRecordingPackage as ReadRecordingPackage,
+        readRecordingPackage: module.readRecordingPackage as ReadRecordingPackage, achievementDefs: module.achievementDefs as AchievementDefsOf,
     };
 }
 
@@ -191,6 +199,8 @@ export interface ApiOptions {
     identities: IdentitiesApi;
     /** The proofs of the achievements (`proofs.ts`). */
     proofs: ProofsApi;
+    /** The build's achievements of a set, which the Hall of Fame lists (`READERS_MODULE`'s, `fame.ts`). */
+    achievementDefs: AchievementDefsOf;
 }
 
 /** What the API needs of the proofs. */
@@ -231,6 +241,9 @@ const STATS = 'stats';
 
 /** The statistics page, `/stats`: `distDir`'s `stats.html` (`src/stats/statsPage.ts`). */
 const STATS_PAGE = 'stats';
+
+/** The Hall of Fame, `/fame`: `distDir`'s `fame.html` (`src/fame/famePage.ts`). */
+const FAME_PAGE = 'fame';
 
 /** The sets the statistics answer for: the approved ones that are not hidden, in the table's order. */
 function publicSets(dataSets: DataSetStore): StatsSet[] {
@@ -410,6 +423,7 @@ function route({ distDir, gamefilesDir, filesDir }: ServerOptions, api: ApiOptio
             return send(res, 200, '{"ok":true}', 'application/json; charset=utf-8');
         }
         if (segments[1] === STATS) return answerStats(segments.slice(2), api, statsCache, req, res);
+        if (segments.slice(0, 2).join('/') === FAME_ROUTE) return answerFame(segments.slice(2), api, statsCache, req, res);
         return send(res, 404, 'Not found');
     }
 
@@ -428,6 +442,7 @@ function route({ distDir, gamefilesDir, filesDir }: ServerOptions, api: ApiOptio
     }
     if (segments.length === 0) return serveFile(req, res, join(distDir, 'index.html'), NO_CACHE);
     if (segments.length === 1 && segments[0] === STATS_PAGE) return serveFile(req, res, join(distDir, `${STATS_PAGE}.html`), NO_CACHE);
+    if (segments.length === 1 && segments[0] === FAME_PAGE) return serveFile(req, res, join(distDir, `${FAME_PAGE}.html`), NO_CACHE);
     if (segments[0] === SERVER_DIR) return send(res, 404, 'Not found');
     return serveFile(req, res, join(distDir, ...segments), segments[0] === 'assets' ? IMMUTABLE : NO_CACHE);
 }
@@ -461,6 +476,37 @@ export function answerStats(path: string[], api: StatsApi, statsCache: AnswerCac
     const body = statsCache.get(path.join('/'), () => JSON.stringify(
         set === undefined ? api.store.summary(sets) : level === undefined ? api.store.setStats(set) : api.store.levelStats(set, level)));
     send(res, 200, body, 'application/json; charset=utf-8');
+}
+
+/** What `answerFame` needs of the API. */
+export type FameApi = Pick<ApiOptions, 'dataSets' | 'achievementDefs'> & { proofs: Pick<ProofsApi, 'store'>; identities: Pick<IdentitiesApi, 'store'> };
+
+/**
+ * `FAME_ROUTE/<path>`: the Hall of Fame (`fame.ts`): every public set's figures for an empty
+ * `path`, a public set's achievements for `FAME_SETS/<id>`, and a named player's badges for
+ * `FAME_PLAYERS/<public id>`, from `cache`, which keeps each for `STATS_CACHE_MS` beside the
+ * statistics' and says so; 404 for any other, an identity without a name, a moderator's
+ * reset, at once. The dev server answers the route with it too (`vite.config.mts`).
+ */
+export function answerFame(path: string[], api: FameApi, cache: AnswerCache, req: IncomingMessage, res: ServerResponse): void {
+    if (req.method !== 'GET' && req.method !== 'HEAD') return refuseMethod(res);
+    const sets = publicSets(api.dataSets);
+    const [kind, id] = path;
+    let make: () => FameSummary | FameSet | FamePlayerPage;
+    if (path.length === 0) make = () => fameSummary(sets, api.proofs.store.hall(), api.achievementDefs);
+    else if (path.length !== 2) return send(res, 404, 'Not found');
+    else if (kind === FAME_SETS) {
+        const set = sets.find((known) => known.id === id);
+        if (set === undefined) return send(res, 404, 'Not found');
+        make = () => fameSet(set, api.proofs.store.hall(), api.achievementDefs);
+    } else if (kind === FAME_PLAYERS) {
+        const identity = PUBLIC_ID.test(id!) ? api.identities.store.get(id!) : null;
+        if (!identity?.name) return send(res, 404, 'Not found');
+        const player = { id: identity.id, name: identity.name };
+        make = () => famePlayer(player, sets, api.proofs.store.hall(player.id), api.achievementDefs);
+    } else return send(res, 404, 'Not found');
+    res.setHeader('Cache-Control', `public, max-age=${STATS_CACHE_MS / 1000}`);
+    send(res, 200, cache.get(`${FAME_ROUTE}/${path.join('/')}`, () => JSON.stringify(make())), 'application/json; charset=utf-8');
 }
 
 /**

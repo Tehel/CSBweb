@@ -334,6 +334,15 @@ export interface ProofVerdict {
 /** Where a moderator resets a public name: `POST IDENTITIES_ROUTE/<public id>`, `{"action": "reset"}`. */
 export const IDENTITIES_ROUTE = 'api/identities';
 
+/**
+ * The Hall of Fame's answers (`server/fame.ts`), public and cached as `api/stats`'s are:
+ * `GET FAME_ROUTE` every public set's figures, `FAME_ROUTE/FAME_SETS/<id>` a set's
+ * achievements, and `FAME_ROUTE/FAME_PLAYERS/<public id>` a player's badges.
+ */
+export const FAME_ROUTE = 'api/fame';
+export const FAME_SETS = 'sets';
+export const FAME_PLAYERS = 'players';
+
 /** The shortest and the longest public name, in characters. */
 export const PUBLIC_NAME_LIMITS = { min: 3, max: 16 } as const;
 

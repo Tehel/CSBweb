@@ -314,6 +314,9 @@ const CHECKS: Tool[] = [
   // the dump of what the server holds of a player, a moderator's reset.
   { tool: 'server-identity.ts' },
   { tool: 'server-proofs.ts' },
+  // The Hall of Fame's answers: players per identity, the first by the time checked, a
+  // reset name, hidden and pending sets and unverified claims left out, the cache.
+  { tool: 'server-fame.ts' },
   // The statistics: what api/event accepts and rebuilds, the SQLite store, its aggregates.
   { tool: 'stats.ts' },
   // utils/install-official-sets.ts's test of what an instance holds: a set by its files,
