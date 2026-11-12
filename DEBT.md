@@ -143,7 +143,7 @@ In payoff order: the first row is the next item.
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
 | X9 | Thrown weapons' tags kept across a save | M | ⏸️ |
 | X10 | The cells the party has seen, kept across a save for an automap | M | ⏸️ |
-| X20 | More achievements, from the author's choice among the proposals | L | ⏸️ waits on the author |
+| X20 | More achievements: the author's list | L | ⏸️ |
 | E22 | Fullscreen filled by a fraction | M | ⏸️ waits on the author |
 | H | Deliberate divergences | — | 🚫 |
 
@@ -1212,17 +1212,14 @@ drawing a map from them is a separate item, entered when the author names it.
   pit seen as floor, saves, loads, and compares every code. The same file with the
   records deleted loads with every cell unknown.
 
-### X20 ⏸️ More achievements, from the author's choice among the proposals
+### X20 ⏸️ More achievements: the author's list
 
 The achievements are `src/engine/achievements/defs/common.txt`'s 19, and no FTL set has a
-file of its own (`doc/ACHIEVEMENTS.md`). A list of proposals waits on the author's
-comments: [CSBweb: more achievements](https://claude.ai/artifact/DPvNkHtYJEnGef1W4iegF4),
-about 70, generic, tuned per set, Dungeon Master's, Chaos Strikes Back's and across
-games, each marked as expressible today or with the event or sample it needs. The item
-is not a setting, unlike the other extras: an achievement only watches the game.
+file of its own (`doc/ACHIEVEMENTS.md`). The author chose the list below. ✓ marks what the
+condition language expresses today; [needs …] names the event or sample the tracker must
+observe first ("The triggers", below). The item is not a setting, unlike the other
+extras: an achievement only watches the game.
 
-- **Waits on the author**, who comments on each proposal and hands the list back. The
-  doc's last section, "Decided in chat", overrides the items above it.
 - **Three kinds of achievement**, each a line of the file's format
   (`doc/ACHIEVEMENTS.md` → "The file"):
   1. **Fixed**: the same condition in every set, as every achievement is now.
@@ -1233,24 +1230,192 @@ is not a setting, unlike the other extras: an achievement only watches the game.
      in the dialog or the book, no unlock. A set without a file of its own, a player's,
      simply has fewer. A set's check reports a value its file defines that no
      achievement names, as it reports `unknownItems`. The format gains the `value` line,
-     `{name}` in a text, and a named value in a duration's unit. Speed Runner, Blitz,
-     Conscientious Objector and Clean Sweep (its list of levels) are valued.
+     `{name}` in a text, and a named value in a duration's unit.
   3. **Counted from the data**: quantities the reader works out from the set's own files,
      such as the kinds of food among its objects, the spells in its table, and the monster
-     types its `dungeon.dat` places, the last needing a census of the dungeon. Gourmet
-     (`distinct(eat.item) >= foods`), Rune Scholar and Bestiary are counted.
-- **The set's own achievements** go in `dm-atari.txt` and `csb.txt`: what only fits one
-  dungeon, such as Scrooge and Midas, Deep Diver, Express Elevator and Knight Rider. A set reads
+     types its `dungeon.dat` places, the last needing a census of the dungeon.
+- **The set's own achievements** go in `dm-atari.txt` and `csb.txt`. A set reads
   `defs/<set id>.txt` (`src/ui/achievementFiles.ts`), so Dungeon Master's need one file
   read by every DM set: the Atari versions, the Amiga's and the hidden ones.
-- **The ones kept that need a new event or sample** each add it to the tracker
-  (`doc/ACHIEVEMENTS.md` → "Watching the engine"), with its proof in
-  `tools/checks/achievements-tracker.ts`, and change no tick.
-- **Across games** (Hall of Fame Tour, Every Ending, Grand Slam, Encore, the kill ladder's
-  total over several games) keeps its progress in the saves' database beside the unlocks
+- **Each new trigger** is observed by the tracker (`doc/ACHIEVEMENTS.md` → "Watching the
+  engine"), with its proof in `tools/checks/achievements-tracker.ts`, and changes no tick.
+- **Across games** keeps its progress in the saves' database beside the unlocks
   (`BrowserAchievementStore`). Each unlock row already holds the party's names, so Hall of
   Fame Tour reads the Roll the Credits rows; a total over games needs rows of its own. No
   single recording proves one, so it is verified once the games it counts are.
+
+**The existing ones that move.** Speed Runner leaves `common.txt` for a valued
+`speedRunnerMinutes`. Dungeon Janitor (500 kills) and Lord Chaos's HR Problem (1000) become
+totals across games: DM holds 303 monsters and CSB 266, generators aside, and a ladder over
+games spares the player a First Blood in every run. Scrooge (more than 10 coins) becomes
+Dungeon Master's: DM holds 37 coins, some spent on its puzzles. The lower rungs of the
+kill ladder stay common.
+
+**Common, fixed.**
+
+- Runs with a rule:
+  - **Ironman** (hard): win without ever loading a save. [save loads]
+  - **Hardcore** (hard): win without loading a save and without a champion ever dying.
+    [save loads]
+  - **Untouchable** (hard): win without a champion ever dying. ✓ `won and never(death)`
+  - **Full House** (hard): win with all four champions alive. ✓ `won and alive = 4`
+  - **Sole Survivor** (weird): win with only one of a party of four still alive. ✓
+    `won and max(party) = 4 and alive = 1`
+  - **Ace Driver** (hard): win without ever walking into a wall. ✓
+    `won and never(hurt where by = wall)`
+  - **Emperor's New Clothes** (hard): win without ever putting on armour. ✓
+    `won and never(wear where slot != neck)`
+  - **Teetotaller** (weird): win without drinking a potion. ✓
+    `won and never(drink where item ~ "*POTION")`
+  - **Low Profile** (hard): win with no champion above Expert in any skill. [skill levels]
+  - **Insomniac** (hard): win without ever sleeping. [sleep]
+  - **Dark Ages** (hard): win without a light spell (FUL, OH IR RA) or a torch. An
+    ILLUMULET is allowed: DM's two, on levels 4 and 6, are a relief after four black
+    levels. ✓ for the spells, [the item held] for the torch.
+  - **Featherweight** (weird): win without a champion ever carrying more than half their
+    load. [load]
+- The party:
+  - **New Souls** (weird): win with four reincarnated champions. ✓
+  - **True to Themselves** (weird): win with four champions, none of them reincarnated. ✓
+  - **Girl Power** (weird): win with no male champion in the party. [the champion's sex]
+  - **Speedy Gonzales** (hard): all four champions wear BOOTS OF SPEED at the same time.
+    DM holds exactly four pairs, on levels 6, 9, 10 and 11. [what each champion wears]
+  - **Lazarus** (weird): bring the same champion back from the dead three times. [a
+    revival at an altar]
+  - **Archmaster** (hard): raise a champion to ARCHMASTER in any skill. [skill levels]
+  - **Jack of All Trades** (hard): make one champion a Master in all four classes. [skill
+    levels]
+- Combat:
+  - **Doorman** (weird): kill 10 monsters by closing a door on them. ✓
+  - **Telefrag** (weird): kill a monster by teleporting or falling onto it. CSBWin deletes
+    a group the party lands on, which counts as nobody's kill today. [a kill `by: landing`]
+  - **Another One Bites the Crust** (weird): kill a monster with BREAD. ✓
+  - **Grenadier** (weird): kill a monster with a thrown FUL BOMB. ✓
+  - **Rest in Pieces** (weird): kill a monster with a fallen comrade's BONES. ✓
+  - **Pocket Change** (weird): kill a monster with a thrown coin. ✓ `item ~ "*COIN"`
+  - **Bare Knuckles** (hard): kill 100 monsters with an empty hand. [the item held: an
+    empty hand]
+  - **Overkill** (hard): deal 100 damage or more in one blow. [the damage dealt]
+  - **Strike!** (weird): wipe out a whole group of four with one blow or one fireball.
+    [which blow killed what]
+- Silly deaths:
+  - **Squashed** (silly): a door kills a champion. ✓
+  - **Splat** (silly): a fall kills a champion. ✓
+  - **Stubbed Toe** (silly): a champion dies walking into a wall. ✓
+  - **Bad Medicine** (silly): a potion kills a champion. ✓
+  - **Friendly Fire Fatality** (silly): the party's own spell kills a champion. [`party`
+    on `death`]
+- Magic and food:
+  - **I Know What I'm Doing** (hard): win without ever casting runes that make no spell.
+    `ok` is no for a meaningless spell and a skill failure alike. [why a cast failed]
+  - **Blazing Glory Day** (weird): cast a fireball at full power, MON. [the power rune]
+  - **Thick Atmosphere** (weird): cast a poison cloud at full power, MON. [the power rune]
+  - **Butterfingers** (silly): fail 50 spells. ✓
+  - **Vegetarian** (weird): win having eaten no meat. ✓
+  - **Carnivore** (weird): win having eaten nothing but meat. ✓
+- Exploration:
+  - **Tourist** (easy): set foot on every level. [the current level]
+  - **Cartographer** (hard): walk on 90% of the floor squares. [the squares visited]
+
+**Common, valued.**
+
+- **Speed Runner** (hard): win in less than `speedRunnerMinutes` minutes of play. ✓
+- **Blitz** (hard): win in less than `blitzMinutes` minutes, a tier above Speed Runner. ✓
+- **Conscientious Objector** (hard): win having killed at most `objectorKills` monsters,
+  the fewest the dungeon forces. ✓
+- **Clean Sweep** (hard): leave a level with no monster alive on it, among the levels
+  the set lists (DM's would leave out the Hall of Champions and the Dragon's level).
+  [census]
+
+**Common, counted from the data.**
+
+- **Bestiary** (hard): kill a monster of every type the dungeon places. [census]
+- **Rune Scholar** (hard): cast every spell of the set's table successfully. ✓ once the
+  count is the data's: `distinct(cast.spell where ok = yes) >= spells`
+- **Gourmet** (weird): eat every kind of food the set's objects hold. ✓ once the count is
+  the data's: `distinct(eat.item) >= foods`
+
+**Dungeon Master** (`dm-atari.txt`).
+
+- **Scrooge** (weird): carry more than 10 coins at once. ✓ (moved from `common.txt`)
+- **Midas** (weird): carry 30 coins at once. ✓
+- **Deep Diver** (easy): reach the deepest level. [the current level]
+- **Express Elevator** (hard): reach the deepest level within N minutes of play. [the
+  current level]
+- **Dragonslayer** (hard): kill the Dragon, DM's only one. ✓
+- **Farm to Table** (weird): kill the Dragon and eat a DRAGON STEAK. ✓
+- **Let Sleeping Dragons Lie** (weird): win without killing the Dragon. ✓
+- **Ghostbuster** (weird): destroy 10 immaterial monsters. DM holds 10 groups of Rives
+  and 4 of Zytaz. ✓ `count(kill where monster in (Rive, Zytaz)) >= 10`
+- **Knight Rider** (hard): kill all 7 Deth Knights; DM has no generator of them. ✓
+- **To Serve Man** (weird): win with only non-human champions: Hissssa, Wuuf, Daroou and
+  Gothmog. ✓ through `join.champion`
+- **Brute Force** (hard): win having cast no spell but ZO KATH RA, which the fluxcages
+  need. Level 2's door that needs ZO is in a part that can be bypassed, and level 3's
+  Rive, which only magic kills, can be avoided. A potion brewed counts as a cast. ✓
+- **Gullible** (silly): hand the Firestaff to Lord Librasulus and see the bad ending.
+  [which ending]
+- **Some Assembly Required** (easy): join the Power Gem to the Firestaff. [objects
+  combined]
+- **Shining Armour** (hard): one champion wears the whole armour of Lyte. [what each
+  champion wears]
+- **Darc Knight** (hard): one champion wears the whole armour of Darc. [what each
+  champion wears]
+- **Pickpocket's Revenge** (silly): be robbed by a Giggler, then kill it. [theft]
+- **Riddle Me This** (easy): fully solve the riddle room, its 4 alcoves satisfied. [a
+  lock or switch triggered]
+
+**Chaos Strikes Back** (`csb.txt`). A base the author may ask the forum's players to
+improve.
+
+- **Self-Reliant** (hard): win without consulting the Hint Oracle. [the Oracle opened]
+- **Veterans** (weird): win with a party brought over from a won DM game by MAKE NEW
+  ADVENTURE. [where the party came from]
+- **Fresh Faces** (hard): win with a party recruited in the prison, none of them
+  imported. [where the party came from]
+- **Here Be Dragons** (hard): kill 8 dragons. ✓
+- **Corbum Courier** (hard): deliver every CORBUM within N hours of play. [a lock or
+  switch triggered]
+- **Coin-Operated** (weird): open every GOR COIN lock. [a lock or switch triggered]
+- **Solitary Confinement** (hard): CSB's own Lone Wolf, with a text of its own. ✓
+
+**Across games.**
+
+- **Hall of Fame Tour** (hard): win with each of the 24 champions, over any number of
+  games.
+- **Every Ending** (hard): see each of the dungeon's endings: won, lost, and DM's bad
+  ending. [which ending]
+- **Grand Slam** (hard): win every FTL dungeon.
+- **Encore** (easy): win the same dungeon three times.
+- **Dungeon Janitor** and **Lord Chaos's HR Problem** (hard): 500 and 1000 kills over all
+  games.
+
+**The triggers**, by how many achievements each serves:
+
+| Trigger or sample | Achievements |
+| --- | --- |
+| Progress across games | Hall of Fame Tour, Every Ending, Grand Slam, Encore, Dungeon Janitor, HR Problem |
+| The current level, the squares visited | Tourist, Cartographer, Deep Diver, Express Elevator |
+| Skill levels | Low Profile, Archmaster, Jack of All Trades |
+| What each champion wears | Speedy Gonzales, Shining Armour, Darc Knight |
+| A lock or switch triggered | Riddle Me This, Corbum Courier, Coin-Operated |
+| Save loads | Ironman, Hardcore |
+| The power rune on `cast` | Blazing Glory Day, Thick Atmosphere |
+| The damage dealt, which blow killed what | Overkill, Strike! |
+| Which ending | Gullible, Every Ending |
+| A census of the dungeon's monsters | Bestiary, Clean Sweep |
+| Where the party came from | Veterans, Fresh Faces |
+| The item held, an empty hand | Dark Ages (the torch), Bare Knuckles |
+| The champion's sex | Girl Power |
+| Why a cast failed | I Know What I'm Doing |
+| A kill `by: landing` | Telefrag |
+| Sleep | Insomniac |
+| The load carried | Featherweight |
+| A revival at an altar | Lazarus |
+| `party` on `death` | Friendly Fire Fatality |
+| A theft | Pickpocket's Revenge |
+| Objects combined | Some Assembly Required |
+| The Oracle opened | Self-Reliant |
 
 ## H — Deliberate divergences (not debt)
 
