@@ -143,7 +143,7 @@ In payoff order: the first row is the next item.
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
 | X9 | Thrown weapons' tags kept across a save | M | ⏸️ |
 | X10 | The cells the party has seen, kept across a save for an automap | M | ⏸️ |
-| X20 | More achievements, from the author's choice among the proposals | M | ⏸️ waits on the author |
+| X20 | More achievements, from the author's choice among the proposals | L | ⏸️ waits on the author |
 | E22 | Fullscreen filled by a fraction | M | ⏸️ waits on the author |
 | H | Deliberate divergences | — | 🚫 |
 
@@ -1221,16 +1221,36 @@ about 70, generic, tuned per set, Dungeon Master's, Chaos Strikes Back's and acr
 games, each marked as expressible today or with the event or sample it needs. The item
 is not a setting, unlike the other extras: an achievement only watches the game.
 
-- **Waits on the author**, who comments on each proposal and hands the list back.
-- **The ones kept that the language expresses** become blocks of `common.txt`,
-  `dm-atari.txt` and `csb.txt`. A duration or a count that only fits one dungeon (Speed
-  Runner's three hours, the 500 and 1000 kills, Scrooge's coins) moves out of `common.txt`
-  into each set's file. A set reads `defs/<set id>.txt` (`src/ui/achievementFiles.ts`),
-  so Dungeon Master's achievements need one file read by every DM set: the Atari versions,
-  the Amiga's and the hidden ones.
+- **Waits on the author**, who comments on each proposal and hands the list back. The
+  doc's last section, "Decided in chat", overrides the items above it.
+- **Three kinds of achievement**, each a line of the file's format
+  (`doc/ACHIEVEMENTS.md` → "The file"):
+  1. **Fixed**: the same condition in every set, as every achievement is now.
+  2. **Valued**: `common.txt` names a value where a number would be, in `when:` and in
+     `text:` as `{name}` (`text: Win in less than {blitzMinutes} minutes of play.`). A
+     set's own file defines it on a line of its own (`value blitzMinutes = 45`). An
+     achievement whose value the set does not define does not exist in that set: no row
+     in the dialog or the book, no unlock. A set without a file of its own, a player's,
+     simply has fewer. A set's check reports a value its file defines that no
+     achievement names, as it reports `unknownItems`. The format gains the `value` line,
+     `{name}` in a text, and a named value in a duration's unit. Speed Runner, Blitz,
+     Conscientious Objector and Clean Sweep (its list of levels) are valued.
+  3. **Counted from the data**: quantities the reader works out from the set's own files,
+     such as the kinds of food among its objects, the spells in its table, and the monster
+     types its `dungeon.dat` places, the last needing a census of the dungeon. Gourmet
+     (`distinct(eat.item) >= foods`), Rune Scholar and Bestiary are counted.
+- **The set's own achievements** go in `dm-atari.txt` and `csb.txt`: what only fits one
+  dungeon, such as Scrooge and Midas, Deep Diver, Express Elevator and Knight Rider. A set reads
+  `defs/<set id>.txt` (`src/ui/achievementFiles.ts`), so Dungeon Master's need one file
+  read by every DM set: the Atari versions, the Amiga's and the hidden ones.
 - **The ones kept that need a new event or sample** each add it to the tracker
   (`doc/ACHIEVEMENTS.md` → "Watching the engine"), with its proof in
   `tools/checks/achievements-tracker.ts`, and change no tick.
+- **Across games** (Hall of Fame Tour, Every Ending, Grand Slam, Encore, the kill ladder's
+  total over several games) keeps its progress in the saves' database beside the unlocks
+  (`BrowserAchievementStore`). Each unlock row already holds the party's names, so Hall of
+  Fame Tour reads the Roll the Credits rows; a total over games needs rows of its own. No
+  single recording proves one, so it is verified once the games it counts are.
 
 ## H — Deliberate divergences (not debt)
 
