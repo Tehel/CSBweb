@@ -18,10 +18,14 @@ import {
   type AchievementDef, type AchievementFile,
 } from '../../src/engine/achievements/AchievementFile';
 import { AchievementState, type AchievementEvent } from '../../src/engine/achievements/AchievementState';
+import { achievementFileOf } from '../../src/engine/achievements/PageAchievements';
+import { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import { check, fail, finish } from '../lib/check';
-import { graphicsTablesOf, stockGraphics } from '../lib/game';
+import { DATA_SETS } from '../lib/dataSets';
+import { graphicsTablesOf, STOCK_DIR, stockGraphics } from '../lib/game';
 
-const COMMON = resolve(import.meta.dirname, '../../src/engine/achievements/defs/common.txt');
+const DEFS = resolve(import.meta.dirname, '../../src/engine/achievements/defs');
+const COMMON = resolve(DEFS, 'common.txt');
 
 function read(text: string): AchievementFile {
   const r = readAchievementFile(text);
@@ -45,7 +49,10 @@ function commonFile(): AchievementFile {
     console.log(`  ${d.id.padEnd(20)} ${d.tier.padEnd(5)} ${d.whole ? 'whole' : '     '}  ${d.name}`);
     for (const a of d.aggregates) console.log(`      ${a.key}`);
   }
-  const whole = new Set(['five-a-day', 'leather-is-enough', 'minimalist-mage', 'lone-wolf', 'buddy-cop', 'speed-runner']);
+  const whole = new Set([
+    'five-a-day', 'leather-is-enough', 'minimalist-mage', 'lone-wolf', 'buddy-cop', 'speed-runner', 'teetotaller',
+    'vegetarian', 'carnivore', 'untouchable', 'ace-driver', 'emperors-new-clothes',
+  ]);
   for (const d of r.file.defs) {
     check(d.whole === whole.has(d.id), `${d.id} ${whole.has(d.id) ? 'needs' : 'does not need'} the whole game`);
   }
@@ -60,6 +67,36 @@ function commonFile(): AchievementFile {
   const leather = r.file.defs.find(d => d.id === 'leather-is-enough');
   check(leather !== undefined && unknownItems(leather, new Set(['HELMET'])).includes('PLATE OF DARC'),
     'unknownItems lists a name the set lacks');
+  return r.file;
+}
+
+/**
+ * A set's own file, `defs/<name>.txt`: read, printed, its names against the set's
+ * `graphics.dat`, laid over the common file, and the sets that read it.
+ */
+function setFile(common: AchievementFile, name: string, graphicsDir: string, whole: readonly string[]): AchievementFile {
+  console.log(`--- ${name}.txt`);
+  const r = readAchievementFile(readFileSync(resolve(DEFS, `${name}.txt`), 'utf8'));
+  check(r.ok, `${name}.txt reads`);
+  if (!r.ok) {
+    for (const e of r.errors) console.log(`  line ${e.line}: ${e.message}`);
+    throw new Error(`${name}.txt did not read`);
+  }
+  for (const d of r.file.defs) console.log(`  ${d.id.padEnd(24)} ${d.tier.padEnd(5)} ${d.whole ? 'whole' : '     '}  ${d.name}`);
+  for (const d of r.file.defs) check(d.whole === whole.includes(d.id), `${d.id} ${whole.includes(d.id) ? 'needs' : 'does not need'} the whole game`);
+  const graphics = new GraphicsLoader();
+  graphics.loadFromArray(new Uint8Array(readFileSync(resolve(graphicsDir, 'graphics.dat'))));
+  const names = new Set(graphicsTablesOf(graphics).objects.objectNames);
+  for (const d of r.file.defs) {
+    const unknown = unknownItems(d, names);
+    check(unknown.length === 0, `${d.id} names only ${graphicsDir}'s objects (not ${unknown.join(', ')})`);
+  }
+  const merged = mergeAchievements(common, r.file);
+  const replaced = r.file.defs.filter((d) => common.defs.some((c) => c.id === d.id)).length;
+  check(merged.length === common.defs.length + r.file.defs.length - replaced, `${name}.txt adds ${r.file.defs.length - replaced} to the common file and replaces ${replaced}`);
+  const readers = DATA_SETS.filter((set) => achievementFileOf(set.id) === name).map((set) => set.id);
+  console.log(`  read by ${readers.join(', ')}`);
+  check(readers.length > 0, `${name}.txt is read by a set`);
   return r.file;
 }
 
@@ -150,9 +187,9 @@ const kill = (item = 'SWORD', party = 'yes'): AchievementEvent => ({ kind: 'kill
 const eat = (item: string): AchievementEvent => ({ kind: 'eat', attrs: { champion: 'HALK', item } });
 
 /** A game played out of events: what unlocks, when. */
-function evaluator(common: AchievementFile): void {
-  console.log('--- the evaluator');
-  const defs = common.defs;
+function evaluator(common: AchievementFile, dm: AchievementFile): void {
+  console.log('--- the evaluator, Dungeon Master\'s achievements');
+  const defs = mergeAchievements(common, dm);
   const state = new AchievementState(defs, true);
   state.sample('party', 1);
   state.sample('alive', 1);
@@ -187,8 +224,9 @@ function evaluator(common: AchievementFile): void {
   state.ended(true);
   const won = state.evaluate();
   console.log(`  won, all apples and corn, two hours, one champion: ${won.join(', ')}`);
-  check(sameIds(won, ['five-a-day', 'leather-is-enough', 'minimalist-mage', 'roll-the-credits', 'lone-wolf', 'speed-runner']),
-    'the win unlocks the diet, the leather, the spells, the credits, the lone wolf and the speed');
+  const clean = ['teetotaller', 'vegetarian', 'untouchable', 'ace-driver', 'emperors-new-clothes', 'let-sleeping-dragons-lie', 'brute-force'];
+  check(sameIds(won, ['five-a-day', 'leather-is-enough', 'minimalist-mage', 'roll-the-credits', 'lone-wolf', 'speed-runner', ...clean]),
+    'the win unlocks the diet, the leather, the spells, the credits, the lone wolf, the speed and every win without something');
 
   restored.record(eat('BREAD'));
   restored.sample('party', 3);
@@ -196,8 +234,40 @@ function evaluator(common: AchievementFile): void {
   restored.ended(true);
   const branch = restored.evaluate();
   console.log(`  the branch, bread, three champions, four hours: ${branch.join(', ')}`);
-  check(sameIds(branch, ['leather-is-enough', 'minimalist-mage', 'roll-the-credits']),
-    'the branch that ate bread with three champions in four hours wins none of those');
+  check(sameIds(branch, ['leather-is-enough', 'minimalist-mage', 'roll-the-credits', ...clean]),
+    'the branch that ate bread with three champions in four hours wins none of the diet, the lone wolf and the speed');
+
+  // A party of four, reincarnated, carnivorous, that kills the Dragon and every knight.
+  const four = new AchievementState(defs, true);
+  four.sample('party', 4);
+  four.sample('alive', 4);
+  four.sample('coins', 30);
+  for (const champion of ['A', 'B', 'C', 'D']) four.record({ kind: 'join', attrs: { champion, how: 'reincarnate' } });
+  const killOf = (monster: string, by = 'melee', item = 'SWORD'): AchievementEvent => ({ kind: 'kill', attrs: { monster, by, item, champion: 'A', party: 'yes' } });
+  for (let i = 0; i < 7; i++) four.record(killOf('DethKnight'));
+  for (let i = 0; i < 9; i++) four.record(killOf('Rive'));
+  four.record(killOf('Zytaz', 'throw', 'GOLD COIN'));
+  four.record(killOf('Dragon', 'explosion', 'FUL BOMB'));
+  four.record(eat('DRAGON STEAK'));
+  for (let i = 0; i < 50; i++) four.record({ kind: 'cast', attrs: { champion: 'A', spell: 'FUL', ok: 'no' } });
+  const fours = four.evaluate();
+  console.log(`  a party of four, before the end: ${fours.join(', ')}`);
+  check(sameIds(fours, ['first-blood', 'pest-control', 'pocket-change', 'grenadier', 'butterfingers', 'scrooge', 'midas', 'farm-to-table',
+    'ghostbuster', 'dragonslayer', 'knight-rider']), 'the kills by item, monster and count, the coins and the failed casts unlock as they happen');
+  four.record({ kind: 'death', attrs: { champion: 'B', cause: 'door' } });
+  check(sameIds(four.evaluate(), ['squashed']), 'a death by a door is Squashed');
+  four.ended(true);
+  const fourWon = four.evaluate();
+  console.log(`  …won: ${fourWon.join(', ')}`);
+  check(sameIds(fourWon, ['roll-the-credits', 'full-house', 'new-souls', 'carnivore', 'teetotaller', 'ace-driver', 'emperors-new-clothes', 'speed-runner', 'minimalist-mage', 'leather-is-enough', 'brute-force']),
+    'won with four alive, reincarnated, eating only meat, every cast failed: Full House, New Souls, Carnivore, Brute Force, not Untouchable, Vegetarian nor To Serve Man');
+  const survivor = new AchievementState(defs, false);
+  survivor.sample('party', 4);
+  survivor.sample('alive', 1);
+  for (const champion of ['HISSSSA', 'WUUF', 'DAROOU', 'GOTHMOG']) survivor.record({ kind: 'join', attrs: { champion, how: 'resurrect' } });
+  survivor.ended(true);
+  check(sameIds(survivor.evaluate(), ['roll-the-credits', 'sole-survivor', 'true-to-themselves', 'to-serve-man']),
+    'won from a save, one of four alive, the four non-humans resurrected: Sole Survivor, True to Themselves, To Serve Man');
 
   // A game whose history starts at a save that held none.
   const partial = new AchievementState(defs, false);
@@ -248,9 +318,14 @@ function sameIds(a: readonly string[], b: readonly string[]): boolean {
 
 function main(): void {
   const common = commonFile();
+  const dm = setFile(common, 'dm-atari', STOCK_DIR, ['let-sleeping-dragons-lie', 'brute-force']);
+  setFile(common, 'csb', 'tools/fixtures/gamefiles/csb', []);
+  for (const set of DATA_SETS) {
+    if (set.id.startsWith('dm-')) check(achievementFileOf(set.id) === 'dm-atari', `${set.id}, a Dungeon Master set, reads dm-atari.txt`);
+  }
   errors();
   wholeGame();
-  evaluator(common);
+  evaluator(common, dm);
   merging(common);
   finish();
 }

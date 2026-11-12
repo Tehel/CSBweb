@@ -17,20 +17,24 @@
  *    (starvation, a wall, a monster), what was eaten, drunk and worn, and the unlocks
  *    (First Blood, Forgot to Pack Lunch, Roll the Credits, the play time counted);
  *    the lost game's four deaths to monsters and its end; and the whole CSB game, where
- *    the party hurts itself (Own Goal) and carries more than ten coins (Scrooge).
+ *    the party hurts itself (Own Goal) and carries more than ten coins, though Scrooge is
+ *    Dungeon Master's alone. Each game is tracked with its set's achievements as the page
+ *    merges them (`achievementFileOf`): DMMovie2615 kills with a Ful bomb (Grenadier),
+ *    loses Gothmog to a wall (Stubbed Toe) and wins with one of four alive (Sole Survivor).
  * 4. The worn places (`WORN_SLOTS`) are the slots whose `CarryLocation` in `graphics.dat`
  *    is the head's, neck's, torso's, legs' or feet's mask (`doc/CSBwin-src/CSB.h:1682-1687`).
  *
  * Usage: npm test -- --only=achievements-tracker.ts [<package name>…] [--not=<name>] [--events]
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { fileDigest } from '../../src/data/DataSetFiles';
 import { findRecordingSet } from '../../src/data/RecordingSet';
-import { mergeAchievements, readAchievementFile } from '../../src/engine/achievements/AchievementFile';
+import { mergeAchievements, readAchievementFile, type AchievementDef, type AchievementFile } from '../../src/engine/achievements/AchievementFile';
 import type { AchievementEvent } from '../../src/engine/achievements/AchievementState';
 import { AchievementTracker, WORN_SLOTS } from '../../src/engine/achievements/AchievementTracker';
+import { achievementFileOf } from '../../src/engine/achievements/PageAchievements';
 import type { Happening } from '../../src/engine/Happening';
 import { readRecordingPackage } from '../../src/engine/RecordingPackage';
 import { check, finish } from '../lib/check';
@@ -38,9 +42,10 @@ import { DATA_SETS, diskFiles, diskSetDigests } from '../lib/dataSets';
 import { playPath } from '../lib/playback';
 import { CORPUS_DIR, CORPUS_FILE, corpusFiles } from '../lib/recordingCorpus';
 
-const COMMON = resolve(import.meta.dirname, '../../src/engine/achievements/defs/common.txt');
-const common = readAchievementFile(readFileSync(COMMON, 'utf8'));
+const DEFS = resolve(import.meta.dirname, '../../src/engine/achievements/defs');
+const common = readAchievementFile(readFileSync(resolve(DEFS, 'common.txt'), 'utf8'));
 if (!common.ok) throw new Error('common.txt does not read');
+const commonFile = common.file;
 /** This tool's own, beside the common file's: facts no common achievement reads alone. */
 const own = readAchievementFile(`# CSBweb achievements 1
 [t-lost]
@@ -52,9 +57,26 @@ when: lost
 name: Fused
 text: Lord Chaos fused.
 when: ever(kill where monster = LordChaos and by = fusion and party = yes)
+
+[t-coins]
+name: Coins
+text: More than ten coins carried.
+when: max(coins) > 10
 `);
 if (!own.ok) throw new Error(`the tool's own achievements do not read: ${JSON.stringify(own.errors)}`);
-const defs = mergeAchievements(common.file, own.file);
+const ownFile = own.file;
+
+/** The set's achievements, as the page merges them (`achievementFileOf`), and this tool's own. */
+function defsOf(setId: string): AchievementDef[] {
+  const path = resolve(DEFS, `${achievementFileOf(setId)}.txt`);
+  let file: AchievementFile | null = null;
+  if (existsSync(path)) {
+    const read = readAchievementFile(readFileSync(path, 'utf8'));
+    if (!read.ok) throw new Error(`${path} does not read`);
+    file = read.file;
+  }
+  return [...mergeAchievements(commonFile, file), ...ownFile.defs];
+}
 
 const args = process.argv.slice(2);
 const showEvents = args.includes('--events');
@@ -85,7 +107,7 @@ for (const file of corpusFiles()) {
   let carryLocation: readonly number[] = [];
   const startedAt = Date.now();
   const played = await playPath(set, diskFiles(set), pkg.path, pkg.shared.kind === 'save' ? pkg.shared : null, null, null, (page) => {
-    tracker = new AchievementTracker(page.game, defs, page.screen.ui.objectTables.objectNames);
+    tracker = new AchievementTracker(page.game, defsOf(set.id), page.screen.ui.objectTables.objectNames);
     tracker.onEvent((event) => events.push(event));
     tracker.attach();
     carryLocation = Array.from(page.game.ctx.tables.carryLocation);
@@ -141,10 +163,16 @@ for (const file of corpusFiles()) {
     check(count(events, 'drink', { champion: 'STAMM', item: 'VI POTION' }) > 0, 'DMMovie2615: Stamm drinks a Vi potion');
     check(count(events, 'wear', { champion: 'STAMM', slot: 'feet', item: 'BOOTS OF SPEED' }) === 1, 'DMMovie2615: Stamm puts on the boots of speed');
     check(count(events, 'cast', { ok: 'yes', spell: 'FUL IR' }) > 0, 'DMMovie2615: a fireball, FUL IR, is cast');
-    for (const id of ['first-blood', 'pest-control', 'forgot-lunch', 'roll-the-credits', 't-fused']) {
+    check(count(events, 'kill', { party: 'yes', by: 'explosion', champion: 'STAMM', item: 'FUL BOMB' }) > 0, 'DMMovie2615: Stamm\'s thrown Ful bombs kill, the bomb named on the explosion\'s kill');
+    for (const id of [
+      'first-blood', 'pest-control', 'forgot-lunch', 'roll-the-credits', 't-fused', 'stubbed-toe', 'grenadier', 'sole-survivor',
+      'true-to-themselves', 'let-sleeping-dragons-lie',
+    ]) {
       check(unlocked.has(id), `DMMovie2615 unlocks ${id}`);
     }
-    for (const id of ['lone-wolf', 'buddy-cop', 'exterminator', 't-lost']) check(!unlocked.has(id), `DMMovie2615 does not unlock ${id}`);
+    for (const id of ['lone-wolf', 'buddy-cop', 'exterminator', 't-lost', 'untouchable', 'full-house', 'new-souls', 'dragonslayer', 'brute-force']) {
+      check(!unlocked.has(id), `DMMovie2615 does not unlock ${id}`);
+    }
     const playVbls = Math.round(played.game.playTime() * 60 / 1000);
     check(Math.abs(tracker.playedVbls - playVbls) <= 1, `DMMovie2615: the play time counted is the game's, ${tracker.playedVbls} VBLs (${playVbls})`);
   }
@@ -153,7 +181,8 @@ for (const file of corpusFiles()) {
     check(unlocked.has('t-lost') && !unlocked.has('roll-the-credits'), 'replay-lost-game: the game is lost, not won');
   }
   if (name === 'CSBFullRecordingV4') {
-    for (const id of ['first-blood', 'exterminator', 'own-goal', 'scrooge', 'roll-the-credits']) check(unlocked.has(id), `CSBFullRecordingV4 unlocks ${id}`);
+    for (const id of ['first-blood', 'exterminator', 'own-goal', 't-coins', 'roll-the-credits']) check(unlocked.has(id), `CSBFullRecordingV4 unlocks ${id}`);
+    check(!unlocked.has('scrooge'), 'CSBFullRecordingV4: Scrooge is Dungeon Master\'s, not CSB\'s');
     check(!unlocked.has('speed-runner'), 'CSBFullRecordingV4: Speed Runner, which needs the whole game, stays locked in a game from a CSBWin save');
     check(count(events, 'hurt', { party: 'yes' }) > 0, 'CSBFullRecordingV4: the party hurts itself');
   }

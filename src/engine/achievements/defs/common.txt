@@ -62,7 +62,67 @@ text: Let a champion die of exhaustion.
 tier: silly
 when: ever(death where cause = fatigue)
 
+[squashed]
+name: Squashed
+text: Let a door crush a champion to death.
+tier: silly
+when: ever(death where cause = door)
+
+[splat]
+name: Splat
+text: Let a champion die of a fall.
+tier: silly
+when: ever(death where cause = pit)
+
+[stubbed-toe]
+name: Stubbed Toe
+text: Let a champion die walking into a wall.
+tier: silly
+when: ever(death where cause = wall)
+
+[bad-medicine]
+name: Bad Medicine
+text: Let a potion kill a champion.
+tier: silly
+when: ever(death where cause = potion)
+
+[butterfingers]
+name: Butterfingers
+text: Fail 50 spells.
+tier: silly
+when: count(cast where ok = no) >= 50
+
 # Weird.
+
+[doorman]
+name: Doorman
+text: Kill 10 monsters by closing a door on them.
+tier: weird
+when: count(kill where by = door) >= 10
+
+[another-one-bites-the-crust]
+name: Another One Bites the Crust
+text: Kill a monster with bread.
+tier: weird
+when: ever(kill where party = yes and item = BREAD)
+
+[grenadier]
+name: Grenadier
+text: Kill a monster with a thrown Ful bomb.
+tier: weird
+when: ever(kill where party = yes and item = "FUL BOMB")
+
+[rest-in-pieces]
+name: Rest in Pieces
+text: Kill a monster with a fallen comrade's bones.
+tier: weird
+when: ever(kill where party = yes and item = BONES)
+
+[pocket-change]
+name: Pocket Change
+text: Kill a monster with a thrown coin.
+tier: weird
+when: ever(kill where party = yes and by = throw and item ~ "*COIN")
 
 [death-by-drumstick]
 name: Death by Drumstick
@@ -70,12 +130,6 @@ text: Kill a monster with food.
 tier: weird
 when: ever(kill where party = yes and item in (APPLE, CORN, BREAD, CHEESE,
         "SCREAMER SLICE", "WORM ROUND", DRUMSTICK, "DRAGON STEAK"))
-
-[scrooge]
-name: Scrooge
-text: Carry more than 10 coins at once.
-tier: weird
-when: max(coins) > 10
 
 [five-a-day]
 name: Five a Day
@@ -98,6 +152,44 @@ name: Minimalist Mage
 text: Win having cast no more than three different spells.
 tier: weird
 when: won and distinct(cast.spell where ok = yes) <= 3
+
+[sole-survivor]
+name: Sole Survivor
+text: Win with only one of a party of four still alive.
+tier: weird
+when: won and party = 4 and alive = 1
+
+[teetotaller]
+name: Teetotaller
+text: Win without drinking a potion.
+tier: weird
+when: won and never(drink where item ~ "*POTION")
+
+[new-souls]
+name: New Souls
+text: Win with four reincarnated champions.
+tier: weird
+when: won and count(join where how = reincarnate) >= 4
+
+[true-to-themselves]
+name: True to Themselves
+text: Win with four champions, none of them reincarnated.
+tier: weird
+when: won and count(join where how = resurrect) >= 4
+
+# The meat is the drumstick, the worm round and the dragon steak.
+
+[vegetarian]
+name: Vegetarian
+text: Win having eaten no meat.
+tier: weird
+when: won and never(eat where item in (DRUMSTICK, "WORM ROUND", "DRAGON STEAK"))
+
+[carnivore]
+name: Carnivore
+text: Win having eaten nothing but meat.
+tier: weird
+when: won and ever(eat) and never(eat where not item in (DRUMSTICK, "WORM ROUND", "DRAGON STEAK"))
 
 # Hard.
 
@@ -124,3 +216,27 @@ name: Speed Runner
 text: Win in less than three hours of play.
 tier: hard
 when: won and playTime < 3h
+
+[untouchable]
+name: Untouchable
+text: Win without a champion ever dying.
+tier: hard
+when: won and never(death)
+
+[full-house]
+name: Full House
+text: Win with all four champions alive.
+tier: hard
+when: won and alive = 4
+
+[ace-driver]
+name: Ace Driver
+text: Win without ever walking into a wall.
+tier: hard
+when: won and never(hurt where by = wall)
+
+[emperors-new-clothes]
+name: Emperor's New Clothes
+text: Win without putting on anything but a necklace.
+tier: hard
+when: won and never(wear where slot != neck)

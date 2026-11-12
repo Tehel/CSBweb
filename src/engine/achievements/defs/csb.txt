@@ -1,0 +1,18 @@
+# CSBweb achievements 1
+#
+# Chaos Strikes Back's own achievements (doc/ACHIEVEMENTS.md), beside the common file's.
+# Its adventure, mini.dat, recruits nobody: the party is the prison's, whole from the start.
+
+[here-be-dragons]
+name: Here Be Dragons
+text: Kill 8 dragons.
+tier: hard
+when: count(kill where party = yes and monster = Dragon) >= 8
+
+# CSB's Lone Wolf: the party at the end is the party all along, so the sample is enough.
+
+[lone-wolf]
+name: Solitary Confinement
+text: Win Chaos Strikes Back with a single champion.
+tier: hard
+when: won and party = 1

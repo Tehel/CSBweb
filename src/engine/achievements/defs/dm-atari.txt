@@ -1,0 +1,65 @@
+# CSBweb achievements 1
+#
+# Dungeon Master's own achievements (doc/ACHIEVEMENTS.md), beside the common file's. Every
+# Dungeon Master set reads this file: the Atari's, the Amiga's and the hidden ones
+# (achievementFileOf, PageAchievements.ts).
+
+[scrooge]
+name: Scrooge
+text: Carry more than 10 coins at once.
+tier: weird
+when: max(coins) > 10
+
+[midas]
+name: Midas
+text: Carry 30 coins at once.
+tier: weird
+when: max(coins) >= 30
+
+[farm-to-table]
+name: Farm to Table
+text: Kill the Dragon and eat a dragon steak.
+tier: weird
+when: ever(kill where party = yes and monster = Dragon) and ever(eat where item = "DRAGON STEAK")
+
+[let-sleeping-dragons-lie]
+name: Let Sleeping Dragons Lie
+text: Win without killing the Dragon.
+tier: weird
+when: won and never(kill where monster = Dragon)
+
+# The immaterial: Dungeon Master holds 10 groups of Rives and 4 of Zytaz.
+
+[ghostbuster]
+name: Ghostbuster
+text: Destroy 10 immaterial monsters.
+tier: weird
+when: count(kill where party = yes and monster in (Rive, Zytaz)) >= 10
+
+[to-serve-man]
+name: To Serve Man
+text: Win with only non-human champions: Hissssa, Wuuf, Daroou and Gothmog.
+tier: weird
+when: won and count(join where how = resurrect and champion in (HISSSSA, WUUF, DAROOU, GOTHMOG)) >= 4
+
+[dragonslayer]
+name: Dragonslayer
+text: Kill the Dragon.
+tier: hard
+when: ever(kill where party = yes and monster = Dragon)
+
+# Dungeon Master holds seven Deth Knights, and no generator of them.
+
+[knight-rider]
+name: Knight Rider
+text: Kill all seven Deth Knights.
+tier: hard
+when: count(kill where party = yes and monster = DethKnight) >= 7
+
+# ZO KATH RA is the one spell the fluxcages need; a potion brewed is a spell cast.
+
+[brute-force]
+name: Brute Force
+text: Win having cast no spell but ZO KATH RA.
+tier: hard
+when: won and never(cast where ok = yes and spell != "ZO KATH RA")

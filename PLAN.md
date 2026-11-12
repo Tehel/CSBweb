@@ -87,7 +87,7 @@ At the author's request, beside the debt. The design is `doc/ACHIEVEMENTS.md`.
   name's reset being the remedy meanwhile; and the sets' answers showing a name reset for
   up to their 30 s.
 - ⏳ 18.7 A player's own set's `achievements.txt`: its row in the form, and its check at
-  publish. The FTL sets' own files.
+  publish. The FTL sets' own files grow with `DEBT.md` X20.
 
 ## Ground rules
 

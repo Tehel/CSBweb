@@ -303,6 +303,13 @@ export class AchievementTracker {
       } else {
         attrs.by = KILL_BY[b.by];
         if (b.by === 'melee' && b.item !== undefined) attrs.item = this.itemName(b.item);
+        if (b.by === 'explosion') {
+          // A bomb's blast is a blow inside its explosion's, which names the bomb.
+          for (let i = top; i >= 0 && this.blows[i]!.by === 'explosion'; i--) {
+            const item = this.blows[i]!.item;
+            if (item !== undefined) { attrs.item = this.itemName(item); break; }
+          }
+        }
       }
     } else {
       attrs.party = 'no';

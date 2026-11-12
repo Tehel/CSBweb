@@ -28,7 +28,9 @@ builds, step by step, and each step rewrites its section here to say what was bu
 A set's achievements are `achievements.txt`, an optional file in the set's folder, like
 `hcsb.hct`. The common achievements, which every set has, are
 `src/engine/achievements/defs/common.txt`. The FTL sets' own achievements are written by the
-project, as `src/engine/achievements/defs/<set id>.txt`, and a set with no
+project, as `src/engine/achievements/defs/<name>.txt` (`achievementFileOf`,
+`src/engine/achievements/PageAchievements.ts`): `dm-atari.txt`, which every Dungeon Master
+set reads, the Atari's, the Amiga's and the hidden ones, and `csb.txt`. A set with no
 `achievements.txt` of its own reads that file instead. The file is never a game file
 (`GAME_FILES`, `src/data/DataSets.ts`), so a recording's digests never name it, and an
 author can change the file without breaking a recording.
@@ -121,7 +123,7 @@ compare without regard to case.
 
 | Event | When | Attributes |
 | --- | --- | --- |
-| `kill` | a monster dies | `monster`, `by`: `melee` `spell` `throw` `explosion` `cloud` `door` `pit` `fusion`; `item`, the object thrown or swung; `champion`, who struck; `party`: `yes` when the party's own blow, spell or throw killed it |
+| `kill` | a monster dies | `monster`, `by`: `melee` `spell` `throw` `explosion` `cloud` `door` `pit` `fusion`; `item`, the object thrown or swung, or the bomb whose explosion killed; `champion`, who struck; `party`: `yes` when the party's own blow, spell or throw killed it |
 | `hurt` | a champion takes damage | `champion`; `by`: `monster` `missile` `explosion` `cloud` `door` `pit` `wall` `poison` `starvation` `thirst` `fatigue` `potion`; `party`: `yes` when it came from the party's own missile or spell |
 | `death` | a champion dies | `champion`; `cause`, as `hurt`'s `by`: the last damage the champion took |
 | `eat` | a champion eats | `champion`, `item` |
@@ -272,7 +274,11 @@ It reads the game only to name things: a champion, an object, the samples.
 parent's state, a path from a new game keeps its whole history and one from a CSBWin save
 does not (Speed Runner stays locked in the whole CSB game), and the kills, the deaths and
 their causes, the joins, the meals, the worn objects and the unlocks of Dungeon Master won
-(DMMovie2615), a lost game and the whole CSB game.
+(DMMovie2615), a lost game and the whole CSB game, each tracked with its set's
+achievements: DMMovie2615's Ful bombs (Grenadier), its champion lost to a wall (Stubbed
+Toe) and its win with one of four alive (Sole Survivor). `tools/checks/achievements-format.ts`
+reads each file, checks its names against its set's `graphics.dat`, and plays the
+conditions out of made-up events.
 
 ## The page
 

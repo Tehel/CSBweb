@@ -1214,8 +1214,9 @@ drawing a map from them is a separate item, entered when the author names it.
 
 ### X20 ⏸️ More achievements: the author's list
 
-The achievements are `src/engine/achievements/defs/common.txt`'s 19, and no FTL set has a
-file of its own (`doc/ACHIEVEMENTS.md`). The author chose the list below. ✓ marks what the
+The achievements are `src/engine/achievements/defs/common.txt`'s 37, `dm-atari.txt`'s 9,
+which every Dungeon Master set reads, and `csb.txt`'s 2 (`doc/ACHIEVEMENTS.md`). The author
+chose the list below, which holds what is left to write. ✓ marks what the
 condition language expresses today; [needs …] names the event or sample the tracker must
 observe first ("The triggers", below). The item is not a setting, unlike the other
 extras: an achievement only watches the game.
@@ -1234,9 +1235,6 @@ extras: an achievement only watches the game.
   3. **Counted from the data**: quantities the reader works out from the set's own files,
      such as the kinds of food among its objects, the spells in its table, and the monster
      types its `dungeon.dat` places, the last needing a census of the dungeon.
-- **The set's own achievements** go in `dm-atari.txt` and `csb.txt`. A set reads
-  `defs/<set id>.txt` (`src/ui/achievementFiles.ts`), so Dungeon Master's need one file
-  read by every DM set: the Atari versions, the Amiga's and the hidden ones.
 - **Each new trigger** is observed by the tracker (`doc/ACHIEVEMENTS.md` → "Watching the
   engine"), with its proof in `tools/checks/achievements-tracker.ts`, and changes no tick.
 - **Across games** keeps its progress in the saves' database beside the unlocks
@@ -1245,12 +1243,9 @@ extras: an achievement only watches the game.
   single recording proves one, so it is verified once the games it counts are.
 
 **The steps**, one commit each, each with its proof and `doc/ACHIEVEMENTS.md` rewritten to
-say what it built. None is done.
+say what it built. Step 1 is done: the sets' own files, and every fixed achievement the
+language expresses, Scrooge moved to Dungeon Master's. What is left:
 
-1. **The sets' own files, and what the language expresses today.** `dm-atari.txt`, read
-   by every Dungeon Master set, and `csb.txt`; every ✓ achievement below that is fixed,
-   Scrooge moved. The unlocks of DMMovie2615 (DM won) and of the whole CSB game in
-   `tools/checks/achievements-tracker.ts` are their proof.
 2. **Valued.** The `value` line, `{name}` in a text, a named value in a number's or a
    duration's place, an achievement without its value absent from the set, and the check's
    report of a value no achievement names. Speed Runner moves; Blitz and Conscientious
@@ -1280,9 +1275,21 @@ say what it built. None is done.
 **The existing ones that move.** Speed Runner leaves `common.txt` for a valued
 `speedRunnerMinutes`. Dungeon Janitor (500 kills) and Lord Chaos's HR Problem (1000) become
 totals across games: DM holds 303 monsters and CSB 266, generators aside, and a ladder over
-games spares the player a First Blood in every run. Scrooge (more than 10 coins) becomes
-Dungeon Master's: DM holds 37 coins, some spent on its puzzles. The lower rungs of the
-kill ladder stay common.
+games spares the player a First Blood in every run. The lower rungs of the kill ladder
+stay common.
+
+**Waiting on the author: a CSB adventure's history.** CSB's adventure starts at the save
+RISE makes from the prison's (`Chaos.ts`), which holds no history, so no condition that
+needs the whole game ever unlocks in it ("Settled", `doc/ACHIEVEMENTS.md` → "Proofs"):
+none of the common wins without something (Untouchable, Teetotaller, Vegetarian, Ace
+Driver, Emperor's New Clothes and the rest) can be earned in Chaos Strikes Back. Lone
+Wolf is replaced there by Solitary Confinement, `won and party = 1`, which is exact
+because the adventure recruits nobody (`mini.dat` has no champion's mirror). The options:
+(a) leave it, and give CSB exact variants where one exists, as for Lone Wolf; (b) count a
+history begun at RISE's save as the whole game's, on the page and in the verifier alike,
+since the adventure is a game of its own from there and the prison's kills and meals are
+few. (b) is the recommendation: it is one rule, and it makes every common achievement
+CSB's too.
 
 **Common, fixed.**
 
@@ -1290,16 +1297,6 @@ kill ladder stay common.
   - **Ironman** (hard): win without ever loading a save. [save loads]
   - **Hardcore** (hard): win without loading a save and without a champion ever dying.
     [save loads]
-  - **Untouchable** (hard): win without a champion ever dying. ✓ `won and never(death)`
-  - **Full House** (hard): win with all four champions alive. ✓ `won and alive = 4`
-  - **Sole Survivor** (weird): win with only one of a party of four still alive. ✓
-    `won and max(party) = 4 and alive = 1`
-  - **Ace Driver** (hard): win without ever walking into a wall. ✓
-    `won and never(hurt where by = wall)`
-  - **Emperor's New Clothes** (hard): win without ever putting on armour. ✓
-    `won and never(wear where slot != neck)`
-  - **Teetotaller** (weird): win without drinking a potion. ✓
-    `won and never(drink where item ~ "*POTION")`
   - **Low Profile** (hard): win with no champion above Expert in any skill. [skill levels]
   - **Insomniac** (hard): win without ever sleeping. [sleep]
   - **Dark Ages** (hard): win without a light spell (FUL, OH IR RA) or a torch. An
@@ -1308,8 +1305,6 @@ kill ladder stay common.
   - **Featherweight** (weird): win without a champion ever carrying more than half their
     load. [load]
 - The party:
-  - **New Souls** (weird): win with four reincarnated champions. ✓
-  - **True to Themselves** (weird): win with four champions, none of them reincarnated. ✓
   - **Girl Power** (weird): win with no male champion in the party. [the champion's sex]
   - **Speedy Gonzales** (hard): all four champions wear BOOTS OF SPEED at the same time.
     DM holds exactly four pairs, on levels 6, 9, 10 and 11. [what each champion wears]
@@ -1319,23 +1314,14 @@ kill ladder stay common.
   - **Jack of All Trades** (hard): make one champion a Master in all four classes. [skill
     levels]
 - Combat:
-  - **Doorman** (weird): kill 10 monsters by closing a door on them. ✓
   - **Telefrag** (weird): kill a monster by teleporting or falling onto it. CSBWin deletes
     a group the party lands on, which counts as nobody's kill today. [a kill `by: landing`]
-  - **Another One Bites the Crust** (weird): kill a monster with BREAD. ✓
-  - **Grenadier** (weird): kill a monster with a thrown FUL BOMB. ✓
-  - **Rest in Pieces** (weird): kill a monster with a fallen comrade's BONES. ✓
-  - **Pocket Change** (weird): kill a monster with a thrown coin. ✓ `item ~ "*COIN"`
   - **Bare Knuckles** (hard): kill 100 monsters with an empty hand. [the item held: an
     empty hand]
   - **Overkill** (hard): deal 100 damage or more in one blow. [the damage dealt]
   - **Strike!** (weird): wipe out a whole group of four with one blow or one fireball.
     [which blow killed what]
 - Silly deaths:
-  - **Squashed** (silly): a door kills a champion. ✓
-  - **Splat** (silly): a fall kills a champion. ✓
-  - **Stubbed Toe** (silly): a champion dies walking into a wall. ✓
-  - **Bad Medicine** (silly): a potion kills a champion. ✓
   - **Friendly Fire Fatality** (silly): the party's own spell kills a champion. [`party`
     on `death`]
 - Magic and food:
@@ -1343,9 +1329,6 @@ kill ladder stay common.
     `ok` is no for a meaningless spell and a skill failure alike. [why a cast failed]
   - **Blazing Glory Day** (weird): cast a fireball at full power, MON. [the power rune]
   - **Thick Atmosphere** (weird): cast a poison cloud at full power, MON. [the power rune]
-  - **Butterfingers** (silly): fail 50 spells. ✓
-  - **Vegetarian** (weird): win having eaten no meat. ✓
-  - **Carnivore** (weird): win having eaten nothing but meat. ✓
 - Exploration:
   - **Tourist** (easy): set foot on every level. [the current level]
   - **Cartographer** (hard): walk on 90% of the floor squares. [the squares visited]
@@ -1370,22 +1353,9 @@ kill ladder stay common.
 
 **Dungeon Master** (`dm-atari.txt`).
 
-- **Scrooge** (weird): carry more than 10 coins at once. ✓ (moved from `common.txt`)
-- **Midas** (weird): carry 30 coins at once. ✓
 - **Deep Diver** (easy): reach the deepest level. [the current level]
 - **Express Elevator** (hard): reach the deepest level within N minutes of play. [the
   current level]
-- **Dragonslayer** (hard): kill the Dragon, DM's only one. ✓
-- **Farm to Table** (weird): kill the Dragon and eat a DRAGON STEAK. ✓
-- **Let Sleeping Dragons Lie** (weird): win without killing the Dragon. ✓
-- **Ghostbuster** (weird): destroy 10 immaterial monsters. DM holds 10 groups of Rives
-  and 4 of Zytaz. ✓ `count(kill where monster in (Rive, Zytaz)) >= 10`
-- **Knight Rider** (hard): kill all 7 Deth Knights; DM has no generator of them. ✓
-- **To Serve Man** (weird): win with only non-human champions: Hissssa, Wuuf, Daroou and
-  Gothmog. ✓ through `join.champion`
-- **Brute Force** (hard): win having cast no spell but ZO KATH RA, which the fluxcages
-  need. Level 2's door that needs ZO is in a part that can be bypassed, and level 3's
-  Rive, which only magic kills, can be avoided. A potion brewed counts as a cast. ✓
 - **Gullible** (silly): hand the Firestaff to Lord Librasulus and see the bad ending.
   [which ending]
 - **Some Assembly Required** (easy): join the Power Gem to the Firestaff. [objects
@@ -1406,11 +1376,9 @@ improve.
   ADVENTURE. [where the party came from]
 - **Fresh Faces** (hard): win with a party recruited in the prison, none of them
   imported. [where the party came from]
-- **Here Be Dragons** (hard): kill 8 dragons. ✓
 - **Corbum Courier** (hard): deliver every CORBUM within N hours of play. [a lock or
   switch triggered]
 - **Coin-Operated** (weird): open every GOR COIN lock. [a lock or switch triggered]
-- **Solitary Confinement** (hard): CSB's own Lone Wolf, with a text of its own. ✓
 
 **Across games.**
 

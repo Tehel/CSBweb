@@ -22,7 +22,7 @@ export interface Blow {
   readonly by: BlowCause;
   /** The champion who struck, a party slot. */
   readonly champion?: number;
-  /** The object swung or thrown. */
+  /** The object swung or thrown, or the bomb exploding. */
   readonly item?: ObjectID;
   /** Whether the party struck; left out, the missile's, the cloud's or the blow around it says. */
   readonly party?: boolean;

@@ -578,7 +578,8 @@ export class MissileEncounter {
         }
       }
       const cloudPos = projectile === RN_POISON_CLOUD ? 255 : objectPos & 0xff;
-      if (this.ctx.host.observing) this.ctx.host.observe({ k: 'blow', by: 'explosion', missile: missileRn });
+      // A bomb's explosion carries the potion that exploded, still the missile's object here.
+      if (this.ctx.host.observing) this.ctx.host.observe({ k: 'blow', by: 'explosion', missile: missileRn, ...(convertedPotion ? { item: missile.projectileObject } : {}) });
       this.createCloud(projectile, size, objX, objY, position, cloudPos, mmr);
       if (this.ctx.host.observing) this.ctx.host.observe(BLOW_END);
     } else {
