@@ -1244,6 +1244,39 @@ extras: an achievement only watches the game.
   Fame Tour reads the Roll the Credits rows; a total over games needs rows of its own. No
   single recording proves one, so it is verified once the games it counts are.
 
+**The steps**, one commit each, each with its proof and `doc/ACHIEVEMENTS.md` rewritten to
+say what it built. None is done.
+
+1. **The sets' own files, and what the language expresses today.** `dm-atari.txt`, read
+   by every Dungeon Master set, and `csb.txt`; every ✓ achievement below that is fixed,
+   Scrooge moved. The unlocks of DMMovie2615 (DM won) and of the whole CSB game in
+   `tools/checks/achievements-tracker.ts` are their proof.
+2. **Valued.** The `value` line, `{name}` in a text, a named value in a number's or a
+   duration's place, an achievement without its value absent from the set, and the check's
+   report of a value no achievement names. Speed Runner moves; Blitz and Conscientious
+   Objector join. Their numbers are the author's to give: Speed Runner keeps 3 hours in
+   DM and CSB unless told otherwise.
+3. **Counted from the data.** The reader's quantities from the set's own files: its
+   spells, its foods, the monster types its dungeon places (`DungeonCensus`). Rune
+   Scholar, Gourmet, Bestiary.
+4. **Where the party is.** The current level and the squares walked on, and a level left
+   with no monster alive: Tourist, Cartographer, Deep Diver, Express Elevator, Clean Sweep.
+5. **The champions' state.** Skill levels, what each wears, the sex, the load, sleep:
+   Low Profile, Archmaster, Jack of All Trades, Speedy Gonzales, Shining Armour, Darc
+   Knight, Girl Power, Featherweight, Insomniac.
+6. **The casts and the blows.** The power rune and why a cast failed on `cast`; the
+   damage dealt, which blow killed what, the item held or an empty hand, a kill by
+   landing, `party` on `death`: Blazing Glory Day, Thick Atmosphere, I Know What I'm
+   Doing, Overkill, Strike!, Bare Knuckles, Dark Ages, Telefrag, Friendly Fire Fatality.
+7. **The rest of a game's own triggers.** Save loads, a revival at an altar, which
+   ending, objects combined, a theft, a lock or switch triggered, the Oracle opened, where
+   the party came from: Ironman, Hardcore, Lazarus, Gullible, Some Assembly Required,
+   Pickpocket's Revenge, Riddle Me This, Self-Reliant, Veterans, Fresh Faces, Corbum
+   Courier, Coin-Operated. Size M; split it again if it overruns.
+8. **Across games.** The totals' rows in the saves' database, and how the Hall verifies
+   them: Hall of Fame Tour, Every Ending, Grand Slam, Encore, and Dungeon Janitor and Lord
+   Chaos's HR Problem moved. Size M.
+
 **The existing ones that move.** Speed Runner leaves `common.txt` for a valued
 `speedRunnerMinutes`. Dungeon Janitor (500 kills) and Lord Chaos's HR Problem (1000) become
 totals across games: DM holds 303 monsters and CSB 266, generators aside, and a ladder over
