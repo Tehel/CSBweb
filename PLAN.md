@@ -86,8 +86,34 @@ At the author's request, beside the debt. The design is `doc/ACHIEVEMENTS.md`.
   Deferred: a moderator undoing a proof's verdict (a claim verified turned dropped), the
   name's reset being the remedy meanwhile; and the sets' answers showing a name reset for
   up to their 30 s.
-- ⏳ 18.7 A player's own set's `achievements.txt`: its row in the form, and its check at
-  publish.
+- ⏳ 18.7 A set's own achievements are a file of the set, `achievements.txt` in its folder,
+  beside `hcsb.hct`; the build keeps only `common.txt`. The site's first deployment of the
+  achievements waits for it, at the author's choice. The steps:
+  1. **The FTL sets' files move out of the build**: `defs/dm-atari.txt` and `defs/csb.txt`
+     become each official set's `achievements.txt`. Their source stays in git, as the
+     folders do not, and reaches the folders where the game files do (`fetch-gamefiles`,
+     then `install-official-sets`). `achievementFileOf` and its list of Dungeon Master sets
+     go. `achievements.txt` is not a recording's file: editing it changes no recording's
+     set (`findRecordingSet`).
+  2. **Read where the set's files are read**: the game's page and the book through the
+     set's files (`DataSetFiles`), a local set's from its record; the verifier, the Hall
+     and PROFILE from the set's folder, each set's file read and kept by its digest, the
+     build's `achievementDefs` then `common.txt` alone.
+  3. **Another dungeon's games without a shared file**: Grand Slam's `in "dm-atari"`
+     names a file eight sets read today; it needs a name the files declare (to decide).
+  4. **A player's set**: the file's row in the form, local and published, and a moderator's
+     edit; the check at publish and in the form: a file that does not read, an unknown
+     item, a value no achievement names (`unusedValues`).
+  5. **The kept proofs replayed again** when a set's file changes, as an edit now can
+     without a deploy (the 18.5 deferral).
+  6. **The designers' guide**: one HTML page that teaches a dungeon's designer to write
+     `achievements.txt`, with many examples, linked from the form and the book; a check
+     reads each of its examples with the file's reader, so that the guide cannot drift
+     from the format.
+  To decide with the author before step 1: where the FTL files' source lives in git; how
+  a file names the dungeons whose games it counts (step 3); and where the guide is served
+  (a page of the site's own, as `stats.html` and `fame.html` are, or a document of the
+  sets').
 
 ## Ground rules
 
