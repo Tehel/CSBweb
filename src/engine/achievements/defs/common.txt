@@ -25,17 +25,20 @@ text: Kill 100 monsters.
 tier: easy
 when: count(kill where party = yes) >= 100
 
+# Its top rungs are across games: the sum of each game's kills, the dungeon holding a
+# few hundred monsters.
+
 [dungeon-janitor]
 name: Dungeon Janitor
-text: Kill 500 monsters.
+text: Kill 500 monsters, over all your games of the dungeon.
 tier: hard
-when: count(kill where party = yes) >= 500
+when: total(count(kill where party = yes)) >= 500
 
 [hr-problem]
 name: Lord Chaos's HR Problem
-text: Kill 1000 monsters.
+text: Kill 1000 monsters, over all your games of the dungeon.
 tier: hard
-when: count(kill where party = yes) >= 1000
+when: total(count(kill where party = yes)) >= 1000
 
 # Silly.
 
@@ -207,6 +210,12 @@ name: Roll the Credits
 text: Win the game.
 tier: hard
 when: won
+
+[encore]
+name: Encore
+text: Win the dungeon three times, in three games.
+tier: easy
+when: games(won) >= 3
 
 [lone-wolf]
 name: Lone Wolf

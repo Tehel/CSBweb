@@ -24,6 +24,10 @@
  *    unlocked in their tier's colour; a click selects a row and the detail says it, and
  *    one needing the whole game says so in a game from a save; the wheel and the arrows
  *    scroll; Esc closes it. `tools/probe-frames.ts` takes its frame.
+ * 7. **Across games**: each playthrough's figures merged into its row of the store, each
+ *    key at the larger; an achievement across games unlocked as the live game's figures
+ *    and another playthrough's stored ones make it yes, a row of the playthrough playing
+ *    and shown, but never the tracker's; a teleported playthrough's figures not written.
  *
  * The viewer's page builds no tracker: `tools/probe-frames.ts` asserts it on
  * `?recording=`.
@@ -261,5 +265,57 @@ achievementsDialogKey(ui, 'ArrowUp');
 check(state?.selected === 2 && state.scrollTop === 2, 'the up arrow selects the row above, the list scrolled to it');
 achievementsDialogKey(ui, 'Escape');
 check(dialogName() === undefined && ui.achievementsDialog === null && !a.game.ctx.state.paused, 'Esc closes it, and lets the clock run');
+
+// 7. Across games.
+console.log('=== across games ===');
+const acrossDefs = setAchievementDefs(common, `# CSBweb achievements 1
+[speedy-gonzales]
+disabled
+
+[t-two-games]
+name: Two Games
+text: Play two games for two seconds each.
+when: games(playTime >= 2s) >= 2
+`);
+const acrossStore = memoryAchievementStore();
+const twoSeconds = acrossDefs.find((def) => def.id === 't-two-games')!.games[0]!.key;
+await acrossStore.raiseFigures({ dataSet: set.id, playthrough: 1, figures: { [twoSeconds]: 1, x: 3 } });
+await acrossStore.raiseFigures({ dataSet: set.id, playthrough: 1, figures: { x: 2, y: 5 } });
+const merged = (await acrossStore.figures(set.id))[0]?.figures;
+check(JSON.stringify(merged) === JSON.stringify({ [twoSeconds]: 1, x: 3, y: 5 }), 'a playthrough\'s figures merge into one row, each key at the larger');
+const settle = (): Promise<void> => new Promise((done) => setTimeout(done, 0));
+// A new game of the stand-in page draws the same id in a store of its own: each is given its own.
+const across = async (playthrough: number, teleported: boolean) => {
+  const built = await standInPage(set, files, memoryStore());
+  const achievements = built.track(acrossDefs, acrossStore, touched);
+  const shown: ShownUnlock[] = [];
+  achievements.onShown((one) => shown.push(one));
+  await settle();
+  await built.saves.newGameRead();
+  built.game.ctx.state.block1.randomGameID = playthrough;
+  if (teleported) touched.add(playthrough);
+  return { ...built, achievements, shown };
+};
+const played = await across(501, false);
+run(played, 1000);
+await played.achievements.settled();
+const eRows = async () => (await acrossStore.list(set.id)).filter((r) => r.id === 't-two-games');
+const eFigures = async () => (await acrossStore.figures(set.id)).find((r) => r.playthrough === played.achievements.playthrough)?.figures;
+console.log(`  a second played: ${JSON.stringify(await eFigures())}`);
+check((await eRows()).length === 0 && (await eFigures())?.[twoSeconds] === undefined, 'a game a second long meets nothing, and Two Games stays locked');
+run(played, 1500);
+await played.achievements.settled();
+const unlockedRows = await eRows();
+console.log(`  two and a half: ${JSON.stringify(await eFigures())}, rows ${unlockedRows.map((r) => r.playthrough).join()}`);
+check((await eFigures())?.[twoSeconds] === 1, 'two seconds played meet the game\'s condition, in its figures');
+check(unlockedRows.length === 1 && unlockedRows[0]!.playthrough === played.achievements.playthrough,
+  'with the stored playthrough\'s, Two Games unlocks, a row of the playthrough playing');
+check(played.shown.some((one) => one.def.id === 't-two-games') && played.achievements.view().unlocked.has('t-two-games'), 'it is shown, and the dialog has it unlocked');
+check(!played.achievements.tracker.unlocked.has('t-two-games') && !played.achievements.tracker.unlocked.has(twoSeconds),
+  'the game\'s history unlocks neither it nor the condition of one game');
+const jumped = await across(502, true);
+run(jumped, 2500);
+await jumped.achievements.settled();
+check(!(await acrossStore.figures(set.id)).some((r) => r.playthrough === jumped.achievements.playthrough), 'a teleported playthrough writes no figures');
 
 finish();

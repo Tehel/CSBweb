@@ -10,6 +10,7 @@ import type { DrawPlaythrough, StoredSaveRecord } from './SaveStore';
 
 const DB_NAME = 'csbweb-saves';
 /**
+ * 9: a store more, `ACHIEVEMENT_FIGURES_STORE`, the playthroughs' figures across games.
  * 8: a store more, `ACHIEVEMENTS_STORE`, the achievements unlocked.
  * 7: two stores more, `RECORDINGS_STORE` and `RECORDING_PARTS_STORE`, the recordings.
  * 6: the saves' files in a store of their own, `SAVE_FILES_STORE`, apart from their rows.
@@ -20,7 +21,7 @@ const DB_NAME = 'csbweb-saves';
  * a CSBWin file, which may name no playthrough. 1 had neither the three fields nor that
  * rule, and a second store for a directory handle.
  */
-const DB_VERSION = 8;
+const DB_VERSION = 9;
 
 /** The saves' rows, one `SaveEntry` each, keyed by `id`: what a list reads. */
 export const SAVES_STORE = 'saves';
@@ -43,6 +44,14 @@ const RECORDINGS_VERSION = 7;
 export const ACHIEVEMENTS_STORE = 'achievements';
 /** The version that added `ACHIEVEMENTS_STORE`. */
 const ACHIEVEMENTS_VERSION = 8;
+/**
+ * The figures each playthrough's history reached, which the achievements across games
+ * read, one `AchievementFiguresRow` each, keyed by its data set and its playthrough
+ * (`BrowserAchievementStore`).
+ */
+export const ACHIEVEMENT_FIGURES_STORE = 'achievementFigures';
+/** The version that added `ACHIEVEMENT_FIGURES_STORE`. */
+const ACHIEVEMENT_FIGURES_VERSION = 9;
 /** Version 1's other store. */
 const HANDLES_STORE = 'handles';
 
@@ -132,6 +141,9 @@ export function openSaveDatabase(draw: DrawPlaythrough): Promise<IDBDatabase> {
             }
             if (event.oldVersion < ACHIEVEMENTS_VERSION) {
                 db.createObjectStore(ACHIEVEMENTS_STORE, { keyPath: ['dataSet', 'id', 'playthrough'] });
+            }
+            if (event.oldVersion < ACHIEVEMENT_FIGURES_VERSION) {
+                db.createObjectStore(ACHIEVEMENT_FIGURES_STORE, { keyPath: ['dataSet', 'playthrough'] });
             }
         };
         request.onblocked = () => {

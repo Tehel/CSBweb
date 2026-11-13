@@ -27,6 +27,7 @@ export interface AchievementSnapshot {
   readonly v: 1;
   /** Whether the history goes back to the game's start. */
   readonly whole: boolean;
+  /** The achievements unlocked, and the conditions of one game met, by their keys, `games(…)`. */
   readonly unlocked: readonly string[];
   readonly vbls: number;
   /** Each sample by its key: `party`, or `party(where …)`. */
@@ -39,9 +40,34 @@ export interface AchievementSnapshot {
 
 type Kept = { agg: Aggregate; value: number; values: Set<string> | null; sampled: boolean; known: boolean };
 
+/** A condition this game tests: an achievement of one game's, or a `games(…)`'s, by its key. */
+interface Tested {
+  readonly id: string;
+  readonly when: Expr;
+  readonly whole: boolean;
+  readonly aggregates: readonly Aggregate[];
+}
+
+/**
+ * A playthrough's figures, which the achievements across games read
+ * (`doc/ACHIEVEMENTS.md` → "Across games"): 1 for each `games(…)` key whose condition its
+ * history met, and each `total(…)` key's count.
+ */
+export type GameFigures = Readonly<Record<string, number>>;
+
+/** Whether `id` is a condition of one game's key, `games(…)`, rather than an achievement's id. */
+function isGameKey(id: string): boolean {
+  return id.startsWith('games(');
+}
+
 export class AchievementState {
   private readonly kept = new Map<string, Kept>();
   private readonly unlockedIds = new Set<string>();
+  /** The `games(…)` conditions this history has met, by key. */
+  private readonly met = new Set<string>();
+  private readonly tested: Tested[] = [];
+  /** The `total(…)`s, each its key and the count it adds up. */
+  private readonly totals = new Map<string, string>();
   private readonly samples: Record<string, number> = {};
   /** The `party(where …)` samples the conditions read, each its filter by its key. */
   private readonly partyFilters = new Map<string, Filter>();
@@ -55,21 +81,33 @@ export class AchievementState {
    * A game's state from its start (`whole` true), or from a save that held none, its
    * history starting there.
    */
-  constructor(private readonly defs: readonly AchievementDef[], private readonly whole: boolean) {
-    for (const def of defs) {
-      for (const agg of def.aggregates) {
+  constructor(defs: readonly AchievementDef[], private readonly whole: boolean) {
+    const keep = (aggregates: readonly Aggregate[]): void => {
+      for (const agg of aggregates) {
         if (!this.kept.has(agg.key)) {
           this.kept.set(agg.key, { agg, value: 0, values: agg.k === 'distinct' ? new Set() : null, sampled: false, known: whole });
         }
       }
-      for (const s of samplesOf(def.when)) if (s.where !== null) this.partyFilters.set(s.key, s.where);
+    };
+    const games = new Set<string>();
+    for (const def of defs) {
+      keep(def.aggregates);
+      if (!def.across) this.tested.push(def);
+      for (const agg of def.across ? def.aggregates : []) this.totals.set(`total(${agg.key})`, agg.key);
+      for (const game of def.games) {
+        if (games.has(game.key)) continue;
+        games.add(game.key);
+        keep(game.aggregates);
+        this.tested.push({ id: game.key, when: game.when, whole: game.whole, aggregates: game.aggregates });
+      }
     }
+    for (const t of this.tested) for (const s of samplesOf(t.when)) if (s.where !== null) this.partyFilters.set(s.key, s.where);
   }
 
   /** The state a save kept, read for the achievements `defs` names now. */
   static restore(defs: readonly AchievementDef[], snapshot: AchievementSnapshot): AchievementState {
     const state = new AchievementState(defs, snapshot.whole);
-    for (const id of snapshot.unlocked) state.unlockedIds.add(id);
+    for (const id of snapshot.unlocked) (isGameKey(id) ? state.met : state.unlockedIds).add(id);
     state.vbls = snapshot.vbls;
     for (const [key, v] of Object.entries(snapshot.samples)) state.samples[key] = v;
     const unknown = new Set(snapshot.unknown);
@@ -94,7 +132,7 @@ export class AchievementState {
     return {
       v: 1,
       whole: this.whole,
-      unlocked: [...this.unlockedIds].sort(),
+      unlocked: [...this.unlockedIds, ...this.met].sort(),
       vbls: this.vbls,
       samples: { ...this.samples },
       aggregates,
@@ -102,8 +140,17 @@ export class AchievementState {
     };
   }
 
+  /** The achievements of one game unlocked. */
   get unlocked(): ReadonlySet<string> {
     return this.unlockedIds;
+  }
+
+  /** The figures the achievements across games read of this history (`GameFigures`). */
+  figures(): GameFigures {
+    const out: Record<string, number> = {};
+    for (const key of this.met) out[key] = 1;
+    for (const [key, agg] of this.totals) out[key] = this.kept.get(agg)?.value ?? 0;
+    return out;
   }
 
   /** An event happened. */
@@ -179,18 +226,23 @@ export class AchievementState {
   /**
    * Test the conditions that are not unlocked yet, if anything they read has changed:
    * the ids unlocked by this test, in the file's order. `playTime` alone changes without
-   * saying so; the tracker sets the clock each tick, which does.
+   * saying so; the tracker sets the clock each tick, which does. A `games(…)` condition
+   * met is kept (`figures`), and not among them.
    */
   evaluate(): string[] {
     if (!this.changed) return [];
     this.changed = false;
     const out: string[] = [];
-    for (const def of this.defs) {
-      if (this.unlockedIds.has(def.id)) continue;
-      if (def.whole && (!this.whole || !def.aggregates.every(a => this.kept.get(a.key)?.known === true))) continue;
-      if (this.truth(def.when)) {
-        this.unlockedIds.add(def.id);
-        out.push(def.id);
+    for (const t of this.tested) {
+      const game = isGameKey(t.id);
+      if ((game ? this.met : this.unlockedIds).has(t.id)) continue;
+      if (t.whole && (!this.whole || !t.aggregates.every(a => this.kept.get(a.key)?.known === true))) continue;
+      if (this.truth(t.when)) {
+        if (game) this.met.add(t.id);
+        else {
+          this.unlockedIds.add(t.id);
+          out.push(t.id);
+        }
       }
     }
     return out;
@@ -231,6 +283,8 @@ export class AchievementState {
       case 'fact': return this.fact(e.name);
       case 'sample': return this.samples[e.sample.key] ?? 0;
       case 'agg': return this.aggregate(e.agg);
+      // An achievement across games is never tested here (`acrossUnlocked`).
+      case 'games': case 'total': return 0;
       default: return this.truth(e) ? 1 : 0;
     }
   }
@@ -287,3 +341,44 @@ function globMatches(pattern: string, value: string): boolean {
   const re = new RegExp(`^${pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`);
   return re.test(value);
 }
+
+/**
+ * The achievements across games of `defs` whose conditions the playthroughs' figures
+ * `games` make yes (`doc/ACHIEVEMENTS.md` → "Across games"): `games(…)` the number of
+ * playthroughs that met it, `total(…)` the sum of their counts. In the file's order.
+ */
+export function acrossUnlocked(defs: readonly AchievementDef[], games: Iterable<GameFigures>): string[] {
+  const all = [...games];
+  const sum = (key: string): number => all.reduce((n, figures) => n + (figures[key] ?? 0), 0);
+  const number = (e: Expr): number => {
+    switch (e.k) {
+      case 'num': return e.value;
+      case 'games': return all.filter((figures) => (figures[e.game.key] ?? 0) > 0).length;
+      case 'total': return sum(e.key);
+      default: return truth(e) ? 1 : 0;
+    }
+  };
+  const truth = (e: Expr): boolean => {
+    switch (e.k) {
+      case 'and': return truth(e.a) && truth(e.b);
+      case 'or': return truth(e.a) || truth(e.b);
+      case 'not': return !truth(e.a);
+      case 'cmp': {
+        const a = number(e.a);
+        const b = number(e.b);
+        switch (e.op) {
+          case '=': return a === b;
+          case '!=': return a !== b;
+          case '<': return a < b;
+          case '<=': return a <= b;
+          case '>': return a > b;
+          case '>=': return a >= b;
+        }
+      }
+      // The reader refuses anything else across games (`gameFactOutside`).
+      default: return false;
+    }
+  };
+  return defs.filter((def) => def.across && truth(def.when)).map((def) => def.id);
+}
+

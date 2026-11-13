@@ -1716,10 +1716,10 @@ const stagedV5 = await evaluate(`(async()=>{
 await navigate(`${APP}?dungeon=nowhere&keepsaves`, WELCOME);
 const upgradedV5 = await evaluate(rawSaves);
 console.log('  version 5 upgraded:', JSON.stringify(upgradedV5));
-check(upgradedV5.version === 8 && upgradedV5.rows === 'probe-v5.dat' && upgradedV5.files === stagedV5,
+check(upgradedV5.version === 9 && upgradedV5.rows === 'probe-v5.dat' && upgradedV5.files === stagedV5,
   "the upgrade to version 6 keeps a row without its file, and its file byte for byte in saveFiles under the row's id");
-check(upgradedV5.stores === 'achievements,dataSets,recordingParts,recordings,saveFiles,saves',
-  `and to version 7 adds the recordings' two stores, and to version 8 the achievements' (${upgradedV5.stores})`);
+check(upgradedV5.stores === 'achievementFigures,achievements,dataSets,recordingParts,recordings,saveFiles,saves',
+  `and to version 7 adds the recordings' two stores, to version 8 the achievements', and to version 9 their figures' (${upgradedV5.stores})`);
 await navigate(`${APP}?intro=0&dungeon=csb&keepsaves`, GAME);
 const filesApart = await evaluate(`(async()=>{ const { saves } = window.__probe;
   const listed = await saves.list(), entry = listed.find((e) => e.id === 'probe-v5.dat');

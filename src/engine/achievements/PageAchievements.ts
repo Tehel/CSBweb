@@ -8,10 +8,11 @@
  *
  * **Nothing in this file touches the DOM.**
  */
-import type { AchievementProof, AchievementRow, AchievementStore } from '../../data/saves/AchievementStore';
+import { mergeFigures, type AchievementProof, type AchievementRow, type AchievementStore } from '../../data/saves/AchievementStore';
 import type { Game } from '../Game';
 import type { GameSaves } from '../GameSaves';
 import { mergeAchievements, readAchievementFile, type AchievementDef } from './AchievementFile';
+import { acrossUnlocked } from './AchievementState';
 import { AchievementTracker, type PortraitSheet, type Unlock } from './AchievementTracker';
 import type { AchievementSetFiles } from './DataCounts';
 
@@ -67,6 +68,14 @@ export class PageAchievements {
   private writes: Promise<unknown> = Promise.resolve();
   /** The proof of each row of the set, by playthrough and id, as the store last said (`readProofs`). */
   private proofs = new Map<string, AchievementProof>();
+  /** The set's achievements across games (`doc/ACHIEVEMENTS.md` → "Across games"). */
+  private readonly across: readonly AchievementDef[];
+  /** Each playthrough's figures of the set, as the store held them and this page has raised them since. */
+  private readonly figures = new Map<number, Record<string, number>>();
+  /** The achievements across games unlocked, in whichever playthrough. */
+  private readonly acrossDone = new Set<string>();
+  /** Whether the store's figures and rows have been read, before which nothing across games is tested. */
+  private figuresRead = false;
 
   constructor(
     private readonly game: Game,
@@ -88,9 +97,54 @@ export class PageAchievements {
     this.byId = new Map(defs.map((def) => [def.id, def]));
     this.tracker = new AchievementTracker(game, defs, objectNames, files, portraits);
     this.tracker.onUnlock((unlocks) => this.unlocked(unlocks));
+    this.across = defs.filter((def) => def.across);
+    if (this.across.length > 0) {
+      this.tracker.onTested(() => this.tested());
+      void this.readFigures();
+    }
     this.tracker.attach();
     saves.trackAchievements(this.tracker);
     void this.readProofs();
+  }
+
+  /** The set's figures and its achievements across games already unlocked, read from the store. */
+  private async readFigures(): Promise<void> {
+    try {
+      const [figures, rows] = await Promise.all([this.store.figures(this.dataSet), this.store.list(this.dataSet)]);
+      for (const row of figures) this.figures.set(row.playthrough, mergeFigures(row.figures, this.figures.get(row.playthrough) ?? {}));
+      const ids = new Set(this.across.map((def) => def.id));
+      for (const row of rows) if (ids.has(row.id)) this.acrossDone.add(row.id);
+      this.figuresRead = true;
+      this.tested();
+    } catch (error) {
+      this.log('The achievements across games could not be read', error);
+    }
+  }
+
+  /**
+   * The conditions tested (`AchievementTracker.onTested`): the playthrough's figures raised
+   * where its history passed them, written to the store, and each achievement across games
+   * their sum now makes yes unlocked, as the playthrough's. Not in a playthrough a teleport
+   * has touched, whose figures count for nothing.
+   */
+  private tested(): void {
+    if (!this.figuresRead || this.teleported) return;
+    const playthrough = this.playthrough;
+    const live = this.tracker.figures();
+    const old = this.figures.get(playthrough) ?? {};
+    const raised = mergeFigures(old, live);
+    if (Object.entries(raised).some(([key, v]) => old[key] !== v)) {
+      this.figures.set(playthrough, raised);
+      const row = { dataSet: this.dataSet, playthrough, figures: { ...live } };
+      this.writes = this.writes.then(() => this.store.raiseFigures(row))
+        .catch((error) => this.log('The figures across games could not be stored', error));
+    }
+    const ids = acrossUnlocked(this.across, this.figures.values()).filter((id) => !this.acrossDone.has(id));
+    if (ids.length === 0) return;
+    for (const id of ids) this.acrossDone.add(id);
+    const gameTime = this.game.ctx.state.tickCount;
+    const vbls = this.tracker.playedVbls;
+    this.unlocked(ids.map((id) => ({ id, gameTime, vbls })));
   }
 
   /**
@@ -131,7 +185,8 @@ export class PageAchievements {
   } {
     const playthrough = this.playthrough;
     return {
-      defs: this.defs, unlocked: this.tracker.unlocked, whole: this.tracker.whole,
+      defs: this.defs, unlocked: this.acrossDone.size === 0 ? this.tracker.unlocked : new Set([...this.tracker.unlocked, ...this.acrossDone]),
+      whole: this.tracker.whole,
       proof: (id) => this.proofs.get(`${playthrough}|${id}`) ?? null,
     };
   }

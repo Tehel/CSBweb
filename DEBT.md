@@ -1214,9 +1214,9 @@ drawing a map from them is a separate item, entered when the author names it.
 
 ### X20 ⏸️ More achievements: the author's list
 
-The achievements are `src/engine/achievements/defs/common.txt`'s 64, four of them valued
-and four counted from the data,
-`dm-atari.txt`'s 17, which every Dungeon Master set reads, and `csb.txt`'s 6, which
+The achievements are `src/engine/achievements/defs/common.txt`'s 65, four of them valued,
+four counted from the data and three across games,
+`dm-atari.txt`'s 18, which every Dungeon Master set reads, and `csb.txt`'s 6, which
 disables Girl Power (`doc/ACHIEVEMENTS.md`). The author
 chose the list below, which holds what is left to write. ✓ marks what the
 condition language expresses today; [needs …] names the event or sample the tracker must
@@ -1291,77 +1291,51 @@ Veterans, won with DM's champions alone, which no game can tell came from a won 
 at the author's choice (`doc/ACHIEVEMENTS.md` → "Where the party came from"). Step 8e is
 done: the `load` event at every save read, the page's CONTINUE among them, but a CSB
 adventure's start, with Ironman and Hardcore (`doc/ACHIEVEMENTS.md` → "Saves loaded").
-What is left is step 9, across games, which waits on the author's four answers below.
+Step 9a is done: `games(…)` and `total(count(…))`, each game's figures, the page's
+`achievementFigures` store (IndexedDB version 9) and its achievements across games over
+them, with Encore, Dungeon Master's Every Ending, and Dungeon Janitor and Lord Chaos's HR
+Problem moved (`doc/ACHIEVEMENTS.md` → "Across games"). What is left is 9b and 9c, below.
 
-**Across games.**
+**Across games, left to make.**
 
 - **Hall of Fame Tour** (hard): win with each of the dungeon's 24 champions, over any
   number of games.
-- **Every Ending** (hard): see each of the dungeon's endings.
 - **Grand Slam** (hard): win every FTL dungeon.
-- **Encore** (easy): win the same dungeon three times.
-- **Dungeon Janitor** and **Lord Chaos's HR Problem** (hard): 500 and 1000 kills over all
-  games, where they are now 500 and 1000 in one game. DM holds 303 monsters and CSB 266,
-  generators aside, and a ladder over games spares the player a First Blood in every run.
-  The lower rungs of the kill ladder stay in one game. A row either unlocked in one game
-  stays: a total is at least any one game's.
 
-**The design**, what the code and the rules settle:
+**The design left**, what the code and the rules settle:
 
-- **A game's part of a total is its playthrough's** (`d.RandomGameID`), and the largest
-  value its branches reached, never their sum: two branches of a playthrough share their
-  history up to the save they part at, so a sum would count that part twice.
-- **The conditions across games** read each playthrough's per-game history through two
-  new forms in `when:`, which a block uses alone, never beside a game's own facts:
-  `games(condition)`, the number of the set's playthroughs in which `condition`, a
-  condition of one game, has been yes (Encore, `games(won) >= 3`); and
-  `total(aggregate)`, the sum over the set's playthroughs of each one's largest value of
-  that aggregate (Dungeon Janitor, `total(count(kill where party = yes)) >= 500`). Hall of
-  Fame Tour reads the party at each game's win, a third form, `distinct(games(won).champion
-  [where filter])`. The reader turns each `games(…)` into a hidden achievement of one game,
-  so the tracker needs no event of its own.
-- **The page** keeps, beside the unlocks, one row per set, playthrough and total
-  (`AchievementTotal`): the largest value, written as the tracker's history passes it, and
-  the party at each hidden `games(…)` unlock. The store gains an IndexedDB object store, so
-  a version (`DB_VERSION`, bumped last in a scratch worktree, `.claude/memory/live-tree-is-served.md`).
-  An achievement across games unlocks in the page as its condition over the rows is yes,
-  its row naming the playthrough whose game made it so. The dialog and the book list it
-  with the set's others.
-- **The proof**: the verifier's replay records, beside the unlocks, each total's value and
-  each hidden unlock's party at its point (a table of the proof's figures,
-  `server/proofs.ts`), and the Hall works an identity's achievements across games out of
-  its checked proofs, each playthrough at the largest figure any of its proofs reached.
-  The page sends a proof at a game's end whenever a total grew since the playthrough's last
-  proof, and at a save on the same ten-minute cadence (`PROOF_INTERVAL_MS`), so a game
-  that unlocks nothing new still counts.
+- **Hall of Fame Tour** reads the champions at each game's win, a third form beside
+  `games(…)` and `total(…)`, such as `distinct(games(won).portrait) >= 24`: each game's
+  figures then keep the portraits of the party at the condition's unlock.
+- **The proof**: the verifier's replay records, beside the unlocks, the history's figures at
+  its point (a table of the proof's figures, `server/proofs.ts`), and the Hall works an
+  identity's achievements across games out of its checked proofs, each playthrough at the
+  largest figure any of its proofs reached. The page sends a proof at a game's end whenever
+  its figures grew since the playthrough's last proof, and at a save on the same
+  ten-minute cadence (`PROOF_INTERVAL_MS`), so a game that unlocks nothing new still counts.
 
-**Decisions for the author:**
+**The author's choices:**
 
-1. **Which games make a total**: (a) the set's alone, as every row, the dialog, the book
-   and the Hall are per set, so a Dungeon Master won on the Atari 1.1 and on the Amiga
-   are two sets' and no Encore; or (b) every set of one achievement file together
-   (`achievementFileOf`), every Dungeon Master set as one dungeon, which the Hall then
-   counts under each of them. Recommended: (a).
-2. **Grand Slam**: the FTL dungeons the site plays are Dungeon Master and Chaos Strikes
-   Back; no Theron's Quest set is FTL's. (a) A block in both `dm-atari.txt` and `csb.txt`,
-   unlocked in both sets' lists once each is won, which needs a condition to name another
-   set's games; (b) an achievement of the site, in no set's list, shown in PROFILE and the
-   Hall's player page alone; (c) not made, two dungeons being a thin slam. Recommended: (a).
-3. **Hall of Fame Tour**: a champion known (a) by name, as each unlock row holds the party
-   (a reincarnated champion is a new name, and a name typed at REINCARNATE as another's
-   counts as that one), or (b) by portrait, as Veterans knows a champion, which the
-   rows and the proofs' figures then keep instead; and whether a champion dead at the win
-   counts. Recommended: by name, the 24 named by a list value of `dm-atari.txt`, dead or
-   alive, in Dungeon Master alone (CSB's prisoners are another 24, which `csb.txt` could
-   name the same way).
-4. **Every Ending**, which endings: (a) Dungeon Master's three, won, its bad ending
-   (Gullible's cell) and a loss anywhere else, in `dm-atari.txt` alone; (b) the same, and
-   CSB's two, won and lost, in `csb.txt`. Recommended: (a); CSB's two are Encore's kind.
+1. **A total is one set's games alone**, as every row, the dialog, the book and the Hall
+   are per set: a Dungeon Master won on the Atari 1.1 and one on the Amiga are two sets'
+   wins, and no Encore.
+2. **Grand Slam is a block in both `dm-atari.txt` and `csb.txt`**, the FTL dungeons the
+   site plays (no Theron's Quest set is FTL's), unlocked in both sets' lists once each is
+   won, so its condition names another set's games.
+3. **Hall of Fame Tour knows a champion by portrait**, as Veterans does, a cell of the
+   set's graphic 26, so that REINCARNATE's new name is the same champion and a name typed
+   as another's is not; a champion dead at the win counts; Dungeon Master's alone,
+   `dm-atari.txt`. The page's rows and the proofs' figures keep each win's portraits.
 
-**The steps**, once decided, one commit each: 9a the format's three forms and the page's
-rows, with Encore, Every Ending and Dungeon Janitor and HR Problem moved; 9b the proofs'
-figures, the Hall's achievements across games and the page's proofs of a total grown;
-9c Hall of Fame Tour and Grand Slam, as decided.
+Still to ask the author at 9c: which games Chaos Strikes Back's Grand Slam reads as
+Dungeon Master's, (a) those of any set that reads `dm-atari.txt`, or (b) `dm-atari`'s alone.
+
+**The steps left**, one commit each: 9b the proofs' figures, the Hall's achievements
+across games and the page's proofs of a total grown: no proof claims an achievement across
+games now (`claimableRows` keeps the history's own unlocks), so the Hall counts none, and
+the Dungeon Janitor and HR Problem a replay verified in one game before they moved stay
+verified; 9c Hall of Fame Tour and Grand Slam, as chosen, which need a third form, the
+portraits of each game's party at its win, and a condition naming another set's games.
 
 ## H — Deliberate divergences (not debt)
 

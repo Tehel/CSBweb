@@ -35,7 +35,8 @@ common file's values: Speed Runner in less than 180 minutes, Blitz in less than 
 Conscientious Objector with at most 40 kills. Dungeon Master's also lists the levels Clean
 Sweep counts, 1 to 12, all but the Hall of Champions and the Dragon's, and gives its own
 Express Elevator 60 minutes, and has Shining Armour and Darc Knight, the armours of Lyte and
-Darc worn whole, Gullible, its bad ending ("Where a game ends"), Some Assembly Required,
+Darc worn whole, Gullible, its bad ending ("Where a game ends"), Every Ending, its three
+endings each seen ("Across games"), Some Assembly Required,
 the Power Gem joined to the Firestaff, Pickpocket's Revenge, a Giggler that robbed the
 party killed, and Riddle Me This, the riddle room's four riddles answered at once
 ("Locks and switches"); Chaos Strikes Back
@@ -157,6 +158,8 @@ A condition is a yes or a no, made from these parts:
   - `never(event [where filter])` means the count is 0.
   - `distinct(event.attribute [where filter])` is how many different values the attribute
     has had among the events counted.
+- **Across games**: `games(condition)` and `total(count(…))`, read over the player's games
+  of the set ("Across games", below).
 
 A **filter** is made of `and`, `or`, `not`, parentheses, and these tests on the event's
 attributes:
@@ -363,6 +366,42 @@ The tracker works the counts out as it is made (`dataCounts`,
 files, and puts them in the conditions (`withCounts`). The welcome page and the Hall of
 Fame list a set's achievements without its files, so a text cannot name a count as it
 names a value: Gourmet says "every kind of food", not "the 8 kinds".
+
+### Across games
+
+An achievement across games reads the player's games of the set, each playthrough
+(`d.RandomGameID`, `doc/SAVES.md` → "A playthrough") one game, through two numbers:
+
+- **`games(condition)`**: how many playthroughs met `condition`, a condition of one game,
+  at any point of their history, as an achievement unlocks. `games(won) >= 3` is Encore.
+- **`total(count(event [where filter]))`**: the sum of each playthrough's count.
+  `total(count(kill where party = yes)) >= 500` is Dungeon Janitor, and 1000 Lord Chaos's
+  HR Problem, the kill ladder's top rungs: the dungeon holds a few hundred monsters, DM
+  303 and CSB 266, generators aside.
+
+Such a condition reads nothing else of a game: no fact, sample or count outside them, and
+neither inside `games(…)` nor `total(…)` inside another. It only asks for "at least": a
+game left out, its figures lost or touched by a teleport, can only make a number too small,
+so `games(won) = 0` or `total(…) < 10` is refused. It needs no game's whole history; the
+condition inside `games(…)` does where its form says so ("Some conditions need the whole
+game"), as an achievement's.
+
+Each `games(…)` condition is tested in every game as an achievement is, kept by its key,
+its canonical text (`games(won)`), and never unlocked as one. Each history's **figures**
+(`GameFigures`, `AchievementState.figures`) are 1 for each `games(…)` it met and each
+`total(…)`'s count. A playthrough's figures are each the largest any of its branches
+reached, never their sum: two branches share their history up to the save they part at.
+`acrossUnlocked` (`src/engine/achievements/AchievementState.ts`) tests a set's achievements
+across games over the playthroughs' figures.
+
+- **Encore** (common): win the dungeon three times, in three games.
+- **Every Ending**, Dungeon Master's: `games(won) >= 1`, its bad ending, `games(lost and
+  level = 0 and x = 9 and y = 1) >= 1`, as Gullible's ("Where a game ends"), and a loss
+  anywhere else, `games(lost and not (…)) >= 1`.
+
+A total is of one set's games: a Dungeon Master won on the Atari 1.1 and one on the Amiga
+are two sets' wins. No proof claims an achievement across games yet, so the Hall of Fame
+counts none (`DEBT.md` X20).
 
 ### When an achievement unlocks
 
@@ -620,7 +659,9 @@ champion lost, and the whole CSB game Ironman and Hardcore.
 `tools/checks/achievements-format.ts` reads each file, checks its names against its set's
 `graphics.dat` and its values against its achievements, counts the FTL sets' data, and
 plays the conditions out of made-up events and champions, the named values, the lists and
-the counts put in their places.
+the counts put in their places, and the achievements across games: what the reader refuses
+of them, each game's figures, and Encore, Every Ending, Dungeon Janitor and HR Problem over
+made-up games' figures.
 
 ## The page
 
@@ -647,13 +688,21 @@ The page tracks the achievements of a game the player plays (`PageAchievements`,
   one) starts a history of its own, which is not the whole game's, unless its file is a
   CSB adventure's start, as a new adventure made by RISE is ("A CSB adventure"). The history is the store's alone: an export carries the CSBWin file and nothing
   else, and CSBWin reads every export (`doc/SAVES.md`).
-- **The `achievements` store** in the saves' IndexedDB database (version 8,
+- **The `achievements` store** in the saves' IndexedDB database (version 9,
   `BrowserAchievementStore`) keeps one row per set, achievement id and playthrough
   (`AchievementRow`): when it was unlocked, the player's time then (the tracker's VBLs),
   the game's clock, the party's names, and how far its proof has got, `unverified`,
   `verified` or `dropped`, with the proofs that claim it ("Proofs"). A row is written as the tracker unlocks, unless
   one of the same key is there: the first unlock stays when a branch loaded since unlocks
   it again.
+- **The `achievementFigures` store**, beside it, keeps one row per set and playthrough
+  (`AchievementFiguresRow`): its figures, each key at the largest its branches reached
+  (`raiseFigures`, one transaction). After each test of the conditions
+  (`AchievementTracker.onTested`), the page raises the playing playthrough's row where its
+  history passed it, and tests the set's achievements across games over every row of the
+  set ("Across games"). One their sum makes yes is unlocked once, in whichever playthrough:
+  a row of the playthrough playing, shown as any other, which the dialog counts unlocked
+  in every game of the set. A playthrough a teleport has touched writes no figures.
 
 - **The banner** (`src/renderer/ui/AchievementBanner.ts`): an unlock shows ACHIEVEMENT
   UNLOCKED, its tier and its name on a panel across the top of the viewport, drawn after
@@ -688,7 +737,8 @@ The page tracks the achievements of a game the player plays (`PageAchievements`,
 `tools/checks/achievements-page.ts` proves the history through F5, F9 and a fresh page's
 read, a new game's whole and an import's not, RISE's adventure whole and a later CSB
 save not, the store's rows, the teleport earning
-nothing, the banner's turns and the dialog's, on the stand-in page
+nothing, the figures merged and an achievement across games unlocked over a stored
+playthrough's and the live game's, the banner's turns and the dialog's, on the stand-in page
 (`StandInPage.track`); `tools/probe-frames.ts` that the viewer tracks nothing, and an
 unlock's IndexedDB row, its banner (frame 34), ACHIEVEMENT NOTICES, the dialog
 (frame 35) and the book's tab.

@@ -118,6 +118,15 @@ text: Bring the Firestaff back to Lord Librasulus, and see the bad ending.
 tier: silly
 when: lost and level = 0 and x = 9 and y = 1
 
+# Its three endings, each in a game of its own: won, the bad ending, and lost anywhere else.
+
+[every-ending]
+name: Every Ending
+text: See each of the dungeon's three endings: win, see the bad ending, and lose anywhere else.
+tier: hard
+when: games(won) >= 1 and games(lost and level = 0 and x = 9 and y = 1) >= 1
+      and games(lost and not (level = 0 and x = 9 and y = 1)) >= 1
+
 # The Power Gem: the wall of map 13 (24,3) takes the Firestaff in hand and gives back the
 # one it holds, the gem joined, a type 16 actuator's swap. Both are THE FIRESTAFF, and no
 # other wall of the dungeon swaps one.

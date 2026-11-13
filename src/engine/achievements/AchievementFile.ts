@@ -200,9 +200,29 @@ export type Expr =
   | { k: 'agg'; agg: Aggregate }
   /** `ever` and `never`: the count compared with 0, kept apart for the bounds. */
   | { k: 'ever' | 'never'; agg: Aggregate }
+  /**
+   * Across games (`doc/ACHIEVEMENTS.md` → "Across games"): `games(condition)`, the set's
+   * playthroughs in which a condition of one game has been yes, and `total(count(…))`,
+   * the sum over them of each one's count. The evaluator of one game never meets either:
+   * an achievement that reads one is evaluated over the playthroughs' figures (`acrossUnlocked`).
+   */
+  | { k: 'games'; game: GameCondition }
+  | { k: 'total'; agg: Aggregate; key: string }
   | { k: 'cmp'; op: Comparison; a: Expr; b: Expr }
   | { k: 'and' | 'or'; a: Expr; b: Expr }
   | { k: 'not'; a: Expr };
+
+/**
+ * A condition of one game that `games(…)` counts the playthroughs of: kept in each game's
+ * history as an achievement is, by `key`, its canonical text, `games(…)`.
+ */
+export interface GameCondition {
+  readonly key: string;
+  readonly when: Expr;
+  /** Whether it needs the game's whole history (`needsWholeGame`). */
+  readonly whole: boolean;
+  readonly aggregates: readonly Aggregate[];
+}
 
 /** One achievement of a file. */
 export interface AchievementDef {
@@ -213,8 +233,15 @@ export interface AchievementDef {
   readonly when: Expr;
   /** Whether the condition needs the game's whole history (`needsWholeGame`). */
   readonly whole: boolean;
-  /** The values the condition keeps over the game, each once. */
+  /**
+   * The values the condition keeps over the game, each once: for an achievement across
+   * games, the counts its `total(…)`s add up.
+   */
   readonly aggregates: readonly Aggregate[];
+  /** Whether the condition is across games, reading `games(…)` and `total(…)` alone. */
+  readonly across: boolean;
+  /** The conditions of one game its `games(…)` count, each once. */
+  readonly games: readonly GameCondition[];
   /**
    * The named values its condition and its text name, each once. Out of
    * `mergeAchievements` they are in their places already, and this says which were.
@@ -347,14 +374,22 @@ export function readAchievementFile(text: string): AchievementRead {
     if (!name || !desc) continue;
     const named = new Set([...desc.value.matchAll(NAMED_IN_TEXT)].map((m) => m[1] ?? ''));
     for (const v of valuesOf(expr)) named.add(v);
+    const across = isAcross(expr);
+    if (across) {
+      const local = gameFactOutside(expr);
+      if (local !== null) { error(when.line, `a condition across games reads games(…) and total(…), not ${local}`); continue; }
+      if (needsWholeGame(expr)) { error(when.line, 'a condition across games asks for at least: a game not counted can only make a figure too small'); continue; }
+    }
     defs.push({
       id: b.id,
       name: name.value,
       text: desc.value,
       tier: (tier?.value ?? 'easy') as Tier,
       when: expr,
-      whole: needsWholeGame(expr),
+      whole: !across && needsWholeGame(expr),
       aggregates: aggregatesOf(expr),
+      across,
+      games: gamesOf(expr),
       values: [...named],
       line: b.line,
     });
@@ -416,6 +451,8 @@ function withValues(def: AchievementDef, values: ReadonlyMap<string, readonly nu
       }
       case 'sample': return { k: 'sample', sample: sampleRef(e.sample.name, filter(e.sample.where)) };
       case 'agg': case 'ever': case 'never': return { ...e, agg: agg(e.agg) };
+      case 'games': return { k: 'games', game: gameCondition(put(e.game.when)) };
+      case 'total': return totalOf(agg(e.agg));
       case 'cmp': return { ...e, a: put(e.a), b: put(e.b) };
       case 'and': case 'or': return { ...e, a: put(e.a), b: put(e.b) };
       case 'not': return { ...e, a: put(e.a) };
@@ -428,7 +465,7 @@ function withValues(def: AchievementDef, values: ReadonlyMap<string, readonly nu
     if (n === null) fits = false;
     return String(n);
   });
-  return fits ? { ...def, text, when, aggregates: aggregatesOf(when) } : null;
+  return fits ? { ...def, text, when, aggregates: aggregatesOf(when), games: gamesOf(when) } : null;
 }
 
 /** `def` with the counts `counts` in the places that read them. */
@@ -436,13 +473,15 @@ export function withCounts(def: AchievementDef, counts: DataCounts): Achievement
   const put = (e: Expr): Expr => {
     switch (e.k) {
       case 'data': return { k: 'num', value: counts[e.name], type: 'num' };
+      case 'games': return { k: 'games', game: { ...e.game, when: put(e.game.when) } };
       case 'cmp': return { ...e, a: put(e.a), b: put(e.b) };
       case 'and': case 'or': return { ...e, a: put(e.a), b: put(e.b) };
       case 'not': return { ...e, a: put(e.a) };
       default: return e;
     }
   };
-  return { ...def, when: put(def.when) };
+  const when = put(def.when);
+  return { ...def, when, games: gamesOf(when) };
 }
 
 /**
@@ -472,8 +511,8 @@ export function unknownItems(def: AchievementDef, items: ReadonlySet<string>): s
       case 'not': filter(f.a); return;
     }
   };
-  for (const a of def.aggregates) if (a.k === 'count' || a.k === 'distinct') filter(a.where);
-  for (const s of samplesOf(def.when)) filter(s.where);
+  for (const a of [...def.aggregates, ...def.games.flatMap((g) => g.aggregates)]) if (a.k === 'count' || a.k === 'distinct') filter(a.where);
+  for (const s of [def.when, ...def.games.map((g) => g.when)].flatMap(samplesOf)) filter(s.where);
   return [...out];
 }
 
@@ -562,6 +601,8 @@ export function parseCondition(text: string): Expr {
     return t.t === 'end' ? 'at the end' : `before "${t.t === 'string' ? `"${t.v}"` : t.t === 'value' ? `{${t.name}}` : String(t.v)}"`;
   };
 
+  /** Inside `games(…)`, where a condition is one game's and another `games` or `total` is refused. */
+  let inGame = false;
   const orExpr = (): Expr => {
     let a = andExpr();
     while (isWord('or')) { pos++; a = { k: 'or', a, b: andExpr() }; }
@@ -600,6 +641,28 @@ export function parseCondition(text: string): Expr {
     if ((DATA_COUNTS as readonly string[]).includes(t.v)) return { k: 'data', name: t.v as DataCountName };
     if ((SAMPLES as readonly string[]).includes(t.v)) { pos--; return { k: 'sample', sample: sample() }; }
     switch (t.v) {
+      case 'games': {
+        if (inGame) throw new ConditionError('games(…) takes a condition of one game, with no games(…) or total(…) in it');
+        expectOp('(');
+        inGame = true;
+        const when = orExpr();
+        inGame = false;
+        expectOp(')');
+        if (typeOf(when) !== 'bool') throw new ConditionError('games(…) takes a yes-or-no condition, not a number');
+        return { k: 'games', game: gameCondition(when) };
+      }
+      case 'total': {
+        if (inGame) throw new ConditionError('games(…) takes a condition of one game, with no games(…) or total(…) in it');
+        expectOp('(');
+        if (!isWord('count')) throw new ConditionError('total(…) takes a count, total(count(event [where …]))');
+        pos++;
+        expectOp('(');
+        const event = eventName();
+        const filter = whereClause(EVENTS[event], event);
+        expectOp(')');
+        expectOp(')');
+        return totalOf(keyed({ k: 'count', event, where: filter, key: '' }));
+      }
       case 'count': case 'ever': case 'never': {
         expectOp('(');
         const event = eventName();
@@ -730,7 +793,7 @@ function typeOf(e: Expr): ValueType {
   switch (e.k) {
     case 'num': case 'value': return e.type;
     case 'fact': return FACTS[e.name];
-    case 'data': case 'sample': case 'agg': return 'num';
+    case 'data': case 'sample': case 'agg': case 'games': case 'total': return 'num';
     case 'ever': case 'never': return 'bool';
     case 'cmp': {
       const a = typeOf(e.a);
@@ -785,6 +848,8 @@ function boundOf(e: Expr): Bound | null {
     case 'num': case 'value': case 'data': case 'sample': return 'exact';
     case 'fact': return e.name === 'playTime' || e.name === 'explored' ? 'low' : e.name === 'gameTime' ? 'exact' : null;
     case 'agg': return e.agg.k === 'min' ? 'high' : 'low';
+    // A playthrough not counted, its rows lost or a teleport's, can only make either too small.
+    case 'games': case 'total': return 'low';
     default: return null;
   }
 }
@@ -848,7 +913,8 @@ function valuesOf(e: Expr): string[] {
   switch (e.k) {
     case 'value': return [e.name];
     case 'sample': return named(e.sample.where);
-    case 'agg': case 'ever': case 'never': return named(e.agg.k === 'count' || e.agg.k === 'distinct' ? e.agg.where : e.agg.sample.where);
+    case 'agg': case 'ever': case 'never': case 'total': return named(e.agg.k === 'count' || e.agg.k === 'distinct' ? e.agg.where : e.agg.sample.where);
+    case 'games': return valuesOf(e.game.when);
     case 'cmp': case 'and': case 'or': return [...valuesOf(e.a), ...valuesOf(e.b)];
     case 'not': return valuesOf(e.a);
     default: return [];
@@ -860,7 +926,7 @@ function aggregatesOf(e: Expr): Aggregate[] {
   const out = new Map<string, Aggregate>();
   const walk = (x: Expr): void => {
     switch (x.k) {
-      case 'agg': case 'ever': case 'never': out.set(x.agg.key, x.agg); return;
+      case 'agg': case 'ever': case 'never': case 'total': out.set(x.agg.key, x.agg); return;
       case 'cmp': case 'and': case 'or': walk(x.a); walk(x.b); return;
       case 'not': walk(x.a); return;
       default: return;
@@ -868,6 +934,71 @@ function aggregatesOf(e: Expr): Aggregate[] {
   };
   walk(e);
   return [...out.values()];
+}
+
+/** A condition of one game, `games(…)`'s, with its key and what it reads. */
+function gameCondition(when: Expr): GameCondition {
+  return { key: `games(${exprText(when)})`, when, whole: needsWholeGame(when), aggregates: aggregatesOf(when) };
+}
+
+/** `total(…)` of a count, keyed by it. */
+function totalOf(agg: Aggregate): Expr {
+  return { k: 'total', agg, key: `total(${agg.key})` };
+}
+
+/** Whether a condition reads `games(…)` or `total(…)`. */
+function isAcross(e: Expr): boolean {
+  switch (e.k) {
+    case 'games': case 'total': return true;
+    case 'cmp': case 'and': case 'or': return isAcross(e.a) || isAcross(e.b);
+    case 'not': return isAcross(e.a);
+    default: return false;
+  }
+}
+
+/** What a condition across games reads of one game outside its `games(…)` and `total(…)`, if anything. */
+function gameFactOutside(e: Expr): string | null {
+  switch (e.k) {
+    case 'num': case 'value': case 'games': case 'total': return null;
+    case 'fact': return e.name;
+    case 'data': return e.name;
+    case 'sample': return e.sample.key;
+    case 'agg': case 'ever': case 'never': return e.agg.key;
+    case 'cmp': case 'and': case 'or': return gameFactOutside(e.a) ?? gameFactOutside(e.b);
+    case 'not': return gameFactOutside(e.a);
+  }
+}
+
+/** The conditions of one game a condition's `games(…)` count, each once by its key. */
+function gamesOf(e: Expr): GameCondition[] {
+  const out = new Map<string, GameCondition>();
+  const walk = (x: Expr): void => {
+    switch (x.k) {
+      case 'games': out.set(x.game.key, x.game); return;
+      case 'cmp': case 'and': case 'or': walk(x.a); walk(x.b); return;
+      case 'not': walk(x.a); return;
+      default: return;
+    }
+  };
+  walk(e);
+  return [...out.values()];
+}
+
+/** A condition as canonical text, for a `games(…)`'s key. */
+function exprText(e: Expr): string {
+  switch (e.k) {
+    case 'num': return e.type === 'seconds' ? `${e.value}s` : `${e.value}`;
+    case 'value': return `{${e.name}}${e.type === 'seconds' ? `*${e.scale}s` : ''}`;
+    case 'fact': case 'data': return e.name;
+    case 'sample': return e.sample.key;
+    case 'agg': return e.agg.key;
+    case 'ever': case 'never': return `${e.k}(${e.agg.key})`;
+    case 'games': return e.game.key;
+    case 'total': return e.key;
+    case 'cmp': return `(${exprText(e.a)} ${e.op} ${exprText(e.b)})`;
+    case 'and': case 'or': return `(${exprText(e.a)} ${e.k} ${exprText(e.b)})`;
+    case 'not': return `not ${exprText(e.a)}`;
+  }
 }
 
 /** The samples a condition reads, bare or in a `max` or `min`, each once by its key. */

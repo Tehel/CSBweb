@@ -41,6 +41,27 @@ export interface AchievementRow {
     drift?: string;
 }
 
+/**
+ * One playthrough's figures, which the achievements across games read (`GameFigures`,
+ * `doc/ACHIEVEMENTS.md` → "Across games"): each key at the largest any of its branches
+ * reached.
+ */
+export interface AchievementFiguresRow {
+    /** The data set, its `DataSet.id`. */
+    dataSet: string;
+    /** The playthrough, `d.RandomGameID`. */
+    playthrough: number;
+    /** Each `games(…)` key its history met, 1, and each `total(…)` key's count. */
+    figures: Record<string, number>;
+}
+
+/** Two figures of one playthrough's branches as one: each key at the larger, as a branch's history only grows. */
+export function mergeFigures(a: Readonly<Record<string, number>>, b: Readonly<Record<string, number>>): Record<string, number> {
+    const out: Record<string, number> = { ...a };
+    for (const [key, v] of Object.entries(b)) out[key] = Math.max(out[key] ?? 0, v);
+    return out;
+}
+
 export interface AchievementStore {
     /** One data set's rows, or every set's for `null`, the earliest unlocked first. */
     list(dataSet: string | null): Promise<AchievementRow[]>;
@@ -52,6 +73,10 @@ export interface AchievementStore {
     unlock(row: AchievementRow): Promise<boolean>;
     /** `rows` written over the rows of their set, id and playthrough: their proofs, and their verdicts. */
     update(rows: readonly AchievementRow[]): Promise<void>;
+    /** One data set's figures, a row per playthrough. */
+    figures(dataSet: string): Promise<AchievementFiguresRow[]>;
+    /** `row` merged into the playthrough's figures, each key at the larger (`mergeFigures`): one transaction. */
+    raiseFigures(row: AchievementFiguresRow): Promise<void>;
 }
 
 /**
@@ -98,10 +123,18 @@ export function sortAchievementRows(rows: AchievementRow[]): AchievementRow[] {
 }
 
 /** A store in memory, which keeps a clone of what it is given, as IndexedDB does. */
-export function memoryAchievementStore(): AchievementStore & { rows: AchievementRow[] } {
+export function memoryAchievementStore(): AchievementStore & { rows: AchievementRow[]; figureRows: AchievementFiguresRow[] } {
     const rows: AchievementRow[] = [];
+    const figureRows: AchievementFiguresRow[] = [];
     return {
         rows,
+        figureRows,
+        figures: async (dataSet) => figureRows.filter((row) => row.dataSet === dataSet).map((row) => structuredClone(row)),
+        raiseFigures: async (row) => {
+            const held = figureRows.find((one) => one.dataSet === row.dataSet && one.playthrough === row.playthrough);
+            if (held) held.figures = mergeFigures(held.figures, row.figures);
+            else figureRows.push(structuredClone(row));
+        },
         list: async (dataSet) => sortAchievementRows(rows.filter((row) => dataSet === null || row.dataSet === dataSet))
             .map((row) => structuredClone(row)),
         unlock: async (row) => {

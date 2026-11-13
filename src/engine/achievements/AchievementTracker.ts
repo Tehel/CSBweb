@@ -41,7 +41,7 @@ import { determineMastery } from '../skills';
 import type { Blow, BlowCause, Happening } from '../Happening';
 import { NameIndex } from '../objectIndex';
 import { isAlive } from '../rules';
-import { AchievementState, type AchievementEvent, type AchievementSnapshot } from './AchievementState';
+import { AchievementState, type AchievementEvent, type AchievementSnapshot, type GameFigures } from './AchievementState';
 import { EMPTY_HAND, FOUNTAIN, withCounts, type AchievementDef, type DataCounts, type EventKind } from './AchievementFile';
 import { dataCounts, floorSquares, setDungeons, type AchievementSetFiles } from './DataCounts';
 import { TimerFunction } from '../TimerQueue';
@@ -170,6 +170,7 @@ export class AchievementTracker {
   private vbls = 0;
   private readonly unlockListeners: ((unlocks: readonly Unlock[]) => void)[] = [];
   private readonly eventListeners: ((event: AchievementEvent) => void)[] = [];
+  private readonly testListeners: (() => void)[] = [];
   private readonly found: Unlock[] = [];
 
   /** The counts of the set's own files its conditions read (`dataCounts`). */
@@ -232,6 +233,19 @@ export class AchievementTracker {
   /** Told the achievements each test unlocks, in the file's order. */
   onUnlock(listener: (unlocks: readonly Unlock[]) => void): void {
     this.unlockListeners.push(listener);
+  }
+
+  /**
+   * Told each time the conditions are tested, at a tick's end and at the game's end, after
+   * the unlocks: when the figures (`figures`) may have changed.
+   */
+  onTested(listener: () => void): void {
+    this.testListeners.push(listener);
+  }
+
+  /** The figures the achievements across games read of the history (`GameFigures`). */
+  figures(): GameFigures {
+    return this.state.figures();
   }
 
   /** Told each event as it is recorded. */
@@ -491,12 +505,14 @@ export class AchievementTracker {
 
   private evaluate(): void {
     const ids = this.state.evaluate();
-    if (ids.length === 0) return;
-    const gameTime = this.game.ctx.state.tickCount;
-    const vbls = this.state.snapshot().vbls;
-    const unlocks = ids.map((id) => ({ id, gameTime, vbls }));
-    this.found.push(...unlocks);
-    for (const listener of this.unlockListeners) listener(unlocks);
+    if (ids.length > 0) {
+      const gameTime = this.game.ctx.state.tickCount;
+      const vbls = this.state.snapshot().vbls;
+      const unlocks = ids.map((id) => ({ id, gameTime, vbls }));
+      this.found.push(...unlocks);
+      for (const listener of this.unlockListeners) listener(unlocks);
+    }
+    for (const listener of this.testListeners) listener();
   }
 
   /**

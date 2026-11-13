@@ -23,7 +23,7 @@ import {
 } from '../../src/engine/achievements/AchievementFile';
 import { dataCounts, readAchievementSetFiles, setDungeons } from '../../src/engine/achievements/DataCounts';
 import { dungeonCensus } from '../../src/engine/DungeonCensus';
-import { AchievementState, type AchievementEvent } from '../../src/engine/achievements/AchievementState';
+import { acrossUnlocked, AchievementState, type AchievementEvent, type GameFigures } from '../../src/engine/achievements/AchievementState';
 import { achievementFileOf } from '../../src/engine/achievements/PageAchievements';
 import { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import { check, fail, finish } from '../lib/check';
@@ -726,6 +726,85 @@ async function counted(common: AchievementFile): Promise<DataCounts> {
   return found['dm-atari']!;
 }
 
+/**
+ * Across games (`doc/ACHIEVEMENTS.md` → "Across games"): `games(…)` and `total(…)` read,
+ * the reader's refusals, each game's figures, and the achievements across games over the
+ * figures of several playthroughs.
+ */
+function acrossGames(common: AchievementFile, dm: AchievementFile, counts: DataCounts): void {
+  console.log('--- across games');
+  const H = '# CSBweb achievements 1\n';
+  const refused: [string, string, RegExp][] = [
+    ['a game\'s fact beside games(…)', 'games(won) >= 1 and won', /not won/],
+    ['games(…) inside games(…)', 'games(games(won) >= 1) >= 1', /no games\(…\) or total\(…\)/],
+    ['total(…) inside games(…)', 'games(total(count(kill)) >= 1) >= 1', /no games\(…\) or total\(…\)/],
+    ['a total of what is no count', 'total(max(party)) >= 1', /takes a count/],
+    ['games(…) of a number', 'games(count(kill)) >= 1', /yes-or-no/],
+    ['a total asked to be small', 'total(count(kill)) < 10', /asks for at least/],
+    ['no game asked', 'games(won) = 0', /asks for at least/],
+  ];
+  for (const [what, when, message] of refused) {
+    const r = readAchievementFile(`${H}[a]\nname: A\ntext: T\nwhen: ${when}\n`);
+    const said = r.ok ? '(read)' : r.errors.map((e) => e.message).join('; ');
+    console.log(`  ${what}: ${said}`);
+    check(!r.ok && message.test(said), `${what} is refused`);
+  }
+  const defs = mergeAchievements(common, dm).map((d) => withCounts(d, counts));
+  const across = defs.filter((d) => d.across);
+  for (const d of across) console.log(`  ${d.id}: ${[...d.aggregates.map((a) => `total(${a.key})`), ...d.games.map((g) => g.key)].join(', ')}`);
+  check(sameIds(across.map((d) => d.id), ['dungeon-janitor', 'hr-problem', 'encore', 'every-ending']),
+    'Dungeon Janitor, HR Problem, Encore and Dungeon Master\'s Every Ending are across games');
+  check(across.every((d) => !d.whole), 'no achievement across games needs a game\'s whole history');
+  const keyOf = (id: string, i: number): string => defs.find((d) => d.id === id)!.games[i]!.key;
+  const won = keyOf('encore', 0);
+  const [, badEnding, elsewhere] = [0, 1, 2].map((i) => keyOf('every-ending', i));
+  const kills = `total(${defs.find((d) => d.id === 'dungeon-janitor')!.aggregates[0]!.key})`;
+  check(keyOf('every-ending', 0) === won, 'Encore and Every Ending share games(won)');
+
+  // A game: its figures as it goes, and nothing across games among its unlocks.
+  const game = (end: 'won' | 'lost' | null, at: readonly [number, number, number], killed: number): { figures: GameFigures; unlocks: string[] } => {
+    const state = new AchievementState(defs, true);
+    const unlocks: string[] = [];
+    for (let i = 0; i < killed; i++) state.record(kill());
+    state.sample('level', at[0]);
+    state.sample('x', at[1]);
+    state.sample('y', at[2]);
+    unlocks.push(...state.evaluate());
+    if (end !== null) state.ended(end === 'won');
+    unlocks.push(...state.evaluate());
+    const restored = AchievementState.restore(defs, state.snapshot());
+    check(JSON.stringify(restored.figures()) === JSON.stringify(state.figures()), 'a game\'s figures are kept by its snapshot');
+    return { figures: state.figures(), unlocks };
+  };
+  const a = game('won', [13, 5, 5], 300);
+  const b = game('lost', [0, 9, 1], 120);
+  const c = game('lost', [2, 3, 4], 90);
+  const d = game(null, [1, 1, 1], 600);
+  for (const [name, g] of [['won', a], ['the bad ending', b], ['lost elsewhere', c], ['under way', d]] as const) {
+    console.log(`  ${name}: ${JSON.stringify(g.figures)}`);
+  }
+  check(![a, b, c, d].some((g) => g.unlocks.some((id) => across.some((x) => x.id === id) || id.startsWith('games('))),
+    'a game unlocks no achievement across games, nor a games(…) condition, as its own');
+  check(a.figures[won] === 1 && a.figures[badEnding] === undefined && a.figures[elsewhere] === undefined, 'a win meets games(won) alone');
+  check(b.figures[badEnding] === 1 && b.figures[elsewhere] === undefined && b.figures[won] === undefined, 'a loss in map 0 (9,1) is the bad ending');
+  check(c.figures[elsewhere] === 1 && c.figures[badEnding] === undefined, 'a loss anywhere else is the other loss');
+  check(d.figures[kills] === 600 && Object.keys(d.figures).length === 1, 'a game under way has its kills and no ending');
+  check(sameIds(d.unlocks, ['first-blood', 'pest-control', 'exterminator']), 'its 600 kills are no Dungeon Janitor in one game');
+
+  const cases: [string, GameFigures[], string[]][] = [
+    ['one win', [a.figures], []],
+    ['a win, the bad ending and another loss', [a.figures, b.figures, c.figures], ['dungeon-janitor', 'every-ending']],
+    ['three wins', [a.figures, a.figures, a.figures], ['dungeon-janitor', 'encore']],
+    ['a game of 600 kills and one of 300, won twice', [d.figures, a.figures, a.figures], ['dungeon-janitor', 'hr-problem']],
+    ['the bad ending twice and a win, 540 kills', [b.figures, b.figures, a.figures], ['dungeon-janitor']],
+  ];
+  for (const [what, figures, unlocked] of cases) {
+    const got = acrossUnlocked(defs, figures);
+    console.log(`  ${what}: ${got.join(', ') || '(none)'}`);
+    check(sameIds(got, unlocked), `${what}: ${unlocked.join(', ') || 'nothing'}`);
+  }
+}
+
 function sameIds(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && [...a].sort().join() === [...b].sort().join();
 }
@@ -745,6 +824,7 @@ async function main(): Promise<void> {
   evaluator(common, dm, counts);
   endings(common, dm, csb, counts);
   merging(common, counts);
+  acrossGames(common, dm, counts);
   finish();
 }
 
