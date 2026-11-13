@@ -121,7 +121,15 @@ At the author's request, beside the debt. The design is `doc/ACHIEVEMENTS.md`.
      own sets (`"reservedFamilies"`, the author's choice). Not in the set's archive. Proved
      by `tools/checks/local-data-set.ts`, `server.ts`, `build.ts` and `tools/probe-frames.ts`.
   5. **The kept proofs replayed again** when a set's file changes, as an edit now can
-     without a deploy (the 18.5 deferral).
+     without a deploy (the 18.5 deferral). What is kept changes first (the author's
+     choice): a package is the whole path from the game's start, so a playthrough's latest
+     proof holds those before it on the same branch; the server keeps the latest package of
+     each playthrough's branch, whatever it verified, and deletes the earlier ones it holds,
+     in place of deleting a proof that verified nothing new (`ProofStore.dropFile`). A
+     replay then grants everything a sent game reached, an achievement across games whose
+     figures no proof kept among it. Measured on the corpus, a package takes some 15 to
+     45 KB an hour of play (a save's start some 40 KB more): about 1 MB a whole game, the
+     1 GiB of `PROOFS_DISK_BYTES` some 20,000 hours.
   6. **The designers' guide**: one standalone HTML document that teaches a dungeon's
      designer to write `achievements.txt`, with many examples, which the author uploads
      to the instance's shared files and serves under `files/`, as `training.html`,
