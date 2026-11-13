@@ -91,8 +91,8 @@ At the author's request, beside the debt. The design is `doc/ACHIEVEMENTS.md`.
   1. ✅ **The FTL sets' files move out of `src/`**: `tools/achievements/dungeon-master.txt`
      and `csb.txt`, one file per family, which `fetch-gamefiles` copies into each official
      set's folder as `achievements.txt` (the Kids dungeon has none), and
-     `install-official-sets` to an instance with the set, or alone to a set installed
-     already. The tools read the folders' copies. The build still bundles both through
+     `install-official-sets` to an instance with a set it installs, never into a set's
+     folder already written (`server/backup.ts`). The tools read the folders' copies. The build still bundles both through
      `achievementFileOf` until step 2, whose readers make its list of sets redundant.
   2. ✅ **Read where the set's files are read**: the game's page and the book through the
      set's files (`readAchievementsText`), a local set's from its record, past the digests
@@ -111,7 +111,8 @@ At the author's request, beside the debt. The design is `doc/ACHIEVEMENTS.md`.
      any family, a player's set `dungeon-master`'s: whether step 4's check refuses that is
      to decide.
   4. **A player's set**: the file's row in the form, local and published, and a moderator's
-     edit; the check at publish and in the form: a file that does not read, an unknown
+     edit, which is also how the production instance's FTL sets get theirs, from
+     `tools/achievements/`, their ids there not the manifest's (the author's choice); the check at publish and in the form: a file that does not read, an unknown
      item, a value no achievement names (`unusedValues`).
   5. **The kept proofs replayed again** when a set's file changes, as an edit now can
      without a deploy (the 18.5 deferral).

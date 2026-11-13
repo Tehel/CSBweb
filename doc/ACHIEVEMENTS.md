@@ -41,7 +41,8 @@ project, one file per family, beside the repository's manifest: `tools/achieveme
 which every Dungeon Master set's folder holds, the Atari's, the Amiga's and the hidden
 ones, and `csb.txt`, Chaos Strikes Back's. `npm run fetch-gamefiles` copies each into its
 sets' folders as `achievements.txt`, and `utils/install-official-sets.ts` copies it to an
-instance with the set. Both give the
+instance with a set it installs; a set the instance holds already gets it through a
+moderator's edit, as any set's file changes (`PLAN.md` 18.7, step 4). Both give the
 common file's values: Speed Runner in less than 180 minutes, Blitz in less than 60, and
 Conscientious Objector with at most 40 kills. Dungeon Master's also lists the levels Clean
 Sweep counts, 1 to 12, all but the Hall of Champions and the Dragon's, and gives its own

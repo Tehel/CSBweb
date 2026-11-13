@@ -329,9 +329,10 @@ one at a time, on a yes, it copies a set's files from `tools/fixtures/gamefiles/
 `gamefiles/<dir>/` (those its archive names, CSB's `utility-portraits.dat` and the set's
 `achievements.txt`) and writes its row, the site's (no owner), approved, with the
 manifest's flags, then the manifest's default set where the table has none. It skips a set
-whose id or folder the table holds already, but offers it its fetched `achievements.txt`
-where the instance's is missing or differs: the repository's files
-(`tools/achievements/`) are edited after a set is installed. It
+whose id or folder the table holds already, its `achievements.txt` too, since a set's
+folder never changes once its row names it (`server/backup.ts`): an installed set gets a
+new or changed `achievements.txt` through a moderator's edit (`server/edit.ts`), which
+writes it a new folder under the same id. It
 does not publish them through `api/data-sets`: a published set has an owner, and so is no
 base set, and a publish carries no `mini.dat`.
 
