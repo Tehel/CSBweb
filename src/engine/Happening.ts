@@ -32,6 +32,12 @@ export interface Blow {
   readonly cloud?: ObjectID;
 }
 
+/**
+ * Why a cast failed, as `SpellErrorMsg` says it (`doc/CSBwin-src/Magic.cpp:1007`): the
+ * runes make no spell, the champion's skill fell short, no empty flask was in hand.
+ */
+export type CastFailure = 'meaningless' | 'practice' | 'flask';
+
 export type Happening =
   | Blow
   | { readonly k: 'blow-end' }
@@ -47,8 +53,11 @@ export type Happening =
   | { readonly k: 'cloud'; readonly cloud: ObjectID }
   /** A champion ate or drank `nameIndex` (`RN::NameIndex`), or drank at a fountain (-1). */
   | { readonly k: 'meal'; readonly chIdx: number; readonly nameIndex: number; readonly eat: boolean }
-  /** A champion cast the runes `runes` (the game's codes, 96 and up) from the panel. */
-  | { readonly k: 'cast'; readonly chIdx: number; readonly runes: readonly number[]; readonly ok: boolean }
+  /**
+   * A champion cast the runes `runes` (the game's codes, 96 and up) from the panel, and
+   * why it failed where `SpellErrorMsg` said so.
+   */
+  | { readonly k: 'cast'; readonly chIdx: number; readonly runes: readonly number[]; readonly ok: boolean; readonly failure?: CastFailure }
   /** An object was put in a worn place: possession slot `slot`, 2 to 5 or 10, the neck. */
   | { readonly k: 'wear'; readonly chIdx: number; readonly slot: number; readonly object: ObjectID }
   /** A champion joined for good, RESURRECT or REINCARNATE (`GameHost.championJoined`). */

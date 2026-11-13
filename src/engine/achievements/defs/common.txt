@@ -323,6 +323,36 @@ text: Win with no male champion ever in the party.
 tier: weird
 when: won and max(party(where sex = male)) = 0
 
+# The casts: the power rune, LO to MON, and why a cast failed, as the message says it:
+# meaningless runes, a skill too low (practice), no empty flask in hand.
+
+[blazing-glory-day]
+name: Blazing Glory Day
+text: Cast a fireball at full power, MON.
+tier: weird
+when: ever(cast where spell = "FUL IR" and power = MON and ok = yes)
+
+[thick-atmosphere]
+name: Thick Atmosphere
+text: Cast a poison cloud at full power, MON.
+tier: weird
+when: ever(cast where spell = "OH VEN" and power = MON and ok = yes)
+
+[i-know-what-im-doing]
+name: I Know What I'm Doing
+text: Win without ever casting runes that make no spell.
+tier: hard
+when: won and never(cast where why = meaningless)
+
+# An Illumulet is allowed: Dungeon Master's two are a relief after four black levels.
+
+[dark-ages]
+name: Dark Ages
+text: Win without casting a light spell or holding a torch.
+tier: hard
+when: won and never(cast where ok = yes and spell in (FUL, "OH IR RA"))
+      and max(party(where ready = TORCH or action = TORCH)) = 0
+
 # The valued: a set without the value in its own file has no such achievement.
 
 [speed-runner]

@@ -64,6 +64,9 @@ export const WORN_SLOTS: Readonly<Record<number, string>> = { 2: 'head', 3: 'tor
  */
 const CHAMPION_PLACES: Readonly<Record<number, string>> = { ...WORN_SLOTS, 0: 'ready', 1: 'action' };
 
+/** The power runes, `LO` to `MON`: the first row of `RUNE_NAMES`. */
+const POWER_RUNES = 6;
+
 /** The four classes, skills 0 to 3, as `party(where …)` names them. */
 const CLASSES = ['fighter', 'ninja', 'priest', 'wizard'] as const;
 
@@ -246,9 +249,11 @@ export class AchievementTracker {
       }
       case 'cast': {
         const runes = h.runes.filter((rune) => rune !== 0);
-        // The power rune, first, is not the spell's (`"FUL IR"`).
+        // The power rune, first, is not the spell's (`"FUL IR"`), but the cast's `power`.
+        const first = (runes[0] ?? 0) - FIRST_RUNE;
+        const power = first >= 0 && first < POWER_RUNES ? RUNE_NAMES[first] : undefined;
         const spell = runes.slice(1).map((rune) => RUNE_NAMES[rune - FIRST_RUNE] ?? `${rune}`).join(' ');
-        this.record('cast', { champion: this.championName(h.chIdx), spell, ok: yesNo(h.ok) });
+        this.record('cast', { champion: this.championName(h.chIdx), spell, power, ok: yesNo(h.ok), why: h.failure });
         return;
       }
       case 'wear':

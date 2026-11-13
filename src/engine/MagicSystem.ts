@@ -21,6 +21,7 @@ import type { Champion, PartyState } from './gameTypes';
 import { markAllPortraitsChanged } from './Party';
 import { selectPaletteForLightLevel } from './LightLevel';
 import { setClockTick, waitForButtonFlash } from './LoopState';
+import type { CastFailure } from './Happening';
 import type { SpellParameters } from './magicTypes';
 import { spellParametersFromWords } from './filterParameters';
 import { encodeMissileTimerWord8, spellObjectId } from './missileHelpers';
@@ -29,9 +30,18 @@ import { AdjustSkillsWhy } from './skills';
 import { adjustSkillsOnPartyLevel, isAlive, masteryOf } from './rules';
 import { TimerFunction, type TimerQueue } from './TimerQueue';
 
+/** Why a cast failed, by the code `SpellErrorMsg` printed its message for (`doc/CSBwin-src/Magic.cpp:1007`). */
+const CAST_FAILURES: Readonly<Record<number, CastFailure>> = { 0: 'practice', 1: 'meaningless', 10: 'flask' };
+
 export class MagicSystem {
   private readonly dungeon: DungeonState;
   private readonly timers: TimerQueue;
+  /**
+   * The code of the `SpellErrorMsg` an observed cast from the panel printed, -1 for none:
+   * the `cast` happening's `failure`. `null` outside such a cast, so that it holds nothing
+   * between ticks. Not CSBWin's, and nothing of the game reads it.
+   */
+  private spellError: number | null = null;
 
   constructor(private readonly ctx: GameContext) {
     this.dungeon = ctx.dungeon;
@@ -150,10 +160,13 @@ export class MagicSystem {
     const runes = host.observing
       ? (filtered.incantation !== -1 ? this.decodeIncantationOverride(filtered.incantation) : [...champion.incantation])
       : null;
+    if (runes !== null) this.spellError = -1;
     const result = this.castSpell(casterIdx, filtered);
     if (runes !== null) {
       const chIdx = filtered.chIdx !== -1 ? filtered.chIdx & 0xffff : casterIdx;
-      host.observe({ k: 'cast', chIdx, runes, ok: result === 1 });
+      const failure = CAST_FAILURES[this.spellError ?? -1];
+      this.spellError = null;
+      host.observe({ k: 'cast', chIdx, runes, ok: result === 1, failure });
     }
     return result;
   }
@@ -659,6 +672,7 @@ export class MagicSystem {
    * puts a hard newline between the champion name and the message body.
    */
   private spellErrorMsg(champion: Champion, code: number, skillNumber: number): void {
+    if (this.spellError !== null) this.spellError = code;
     const messages = this.ctx.host.messages;
 
     let base = skillNumber | 0;

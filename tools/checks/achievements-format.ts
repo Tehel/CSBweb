@@ -59,7 +59,7 @@ function commonFile(): AchievementFile {
   const whole = new Set([
     'five-a-day', 'leather-is-enough', 'minimalist-mage', 'lone-wolf', 'buddy-cop', 'speed-runner', 'blitz', 'teetotaller',
     'vegetarian', 'carnivore', 'untouchable', 'ace-driver', 'emperors-new-clothes', 'conscientious-objector',
-    'low-profile', 'featherweight', 'insomniac', 'girl-power',
+    'low-profile', 'featherweight', 'insomniac', 'girl-power', 'i-know-what-im-doing', 'dark-ages',
   ]);
   for (const d of r.file.defs) {
     check(d.whole === whole.has(d.id), `${d.id} ${whole.has(d.id) ? 'needs' : 'does not need'} the whole game`);
@@ -292,9 +292,10 @@ function evaluator(common: AchievementFile, dm: AchievementFile, counts: DataCou
   state.ended(true);
   const won = state.evaluate();
   console.log(`  won, all apples and corn, two hours, one champion: ${won.join(', ')}`);
-  // The made-up games tell no champion: no rank, sex or load ever counted, no sleep.
+  // The made-up games tell no champion: no rank, sex, load or hand ever counted, no sleep, no
+  // meaningless cast nor light spell.
   const clean = ['teetotaller', 'vegetarian', 'untouchable', 'ace-driver', 'emperors-new-clothes', 'let-sleeping-dragons-lie', 'brute-force',
-    'low-profile', 'featherweight', 'insomniac', 'girl-power'];
+    'low-profile', 'featherweight', 'insomniac', 'girl-power', 'i-know-what-im-doing', 'dark-ages'];
   check(sameIds(won, ['five-a-day', 'leather-is-enough', 'minimalist-mage', 'roll-the-credits', 'lone-wolf', 'speed-runner', 'conscientious-objector', ...clean]),
     'the win unlocks the diet, the leather, the spells, the credits, the lone wolf, the speed in two hours of 180 minutes but not the blitz of 60, eleven kills of 40, and every win without something');
 
@@ -330,7 +331,7 @@ function evaluator(common: AchievementFile, dm: AchievementFile, counts: DataCou
   const fourWon = four.evaluate();
   console.log(`  …won: ${fourWon.join(', ')}`);
   check(sameIds(fourWon, ['roll-the-credits', 'full-house', 'new-souls', 'carnivore', 'teetotaller', 'ace-driver', 'emperors-new-clothes', 'speed-runner', 'blitz', 'conscientious-objector', 'minimalist-mage', 'leather-is-enough', 'brute-force',
-    'low-profile', 'featherweight', 'insomniac', 'girl-power']),
+    'low-profile', 'featherweight', 'insomniac', 'girl-power', 'i-know-what-im-doing', 'dark-ages']),
     'won with four alive, reincarnated, eating only meat, every cast failed, at once and with 18 kills: Full House, New Souls, Carnivore, Brute Force, Blitz, Conscientious Objector, not Untouchable, Vegetarian nor To Serve Man');
   const butcher = new AchievementState(defs, true);
   for (let i = 0; i < 41; i++) butcher.record(kill());
@@ -400,6 +401,7 @@ function evaluator(common: AchievementFile, dm: AchievementFile, counts: DataCou
   check(sameIds(worn.evaluate(), ['l']), 'a pattern matches regardless of case');
 
   champions(defs);
+  casts(defs);
 }
 
 /** A champion's attributes as the tracker gives them (`CHAMPION_ATTRIBUTES`), a male Expert by default. */
@@ -447,6 +449,41 @@ function champions(defs: readonly AchievementDef[]): void {
   late.champions([champ({ sex: 'female' })]);
   late.ended(true);
   check(!late.evaluate().includes('girl-power'), 'a man who was in the party once, and is no longer, is no Girl Power');
+}
+
+/** The casts' power rune and why one failed, and the hands' torch: the casts' achievements. */
+function casts(defs: readonly AchievementDef[]): void {
+  console.log('--- the casts');
+  const cast = (spell: string, power: string, ok: string, why?: string): AchievementEvent =>
+    ({ kind: 'cast', attrs: { champion: 'A', spell, power, ok, ...(why ? { why } : {}) } });
+  const mage = new AchievementState(defs, true);
+  mage.record(cast('FUL IR', 'PAL', 'yes'));
+  mage.record(cast('FUL IR', 'MON', 'no', 'practice'));
+  mage.record(cast('OH VEN', 'MON', 'no', 'flask'));
+  check(mage.evaluate().length === 0, 'a fireball at PAL, and failed ones at MON, are neither Blazing Glory Day nor Thick Atmosphere');
+  mage.record(cast('FUL IR', 'MON', 'yes'));
+  check(sameIds(mage.evaluate(), ['blazing-glory-day']), 'a fireball at MON is Blazing Glory Day');
+  mage.record(cast('OH VEN', 'MON', 'yes'));
+  check(sameIds(mage.evaluate(), ['thick-atmosphere']), 'a poison cloud at MON is Thick Atmosphere');
+  mage.record(cast('FUL', 'LO', 'no', 'practice'));
+  mage.champions([champ({ neck: 'ILLUMULET' })]);
+  mage.ended(true);
+  const sure = mage.evaluate();
+  console.log(`  won by the sure: ${sure.join(', ')}`);
+  check(sure.includes('i-know-what-im-doing') && sure.includes('dark-ages'),
+    'won after failing for want of practice and of a flask, a light spell failed and an Illumulet worn: I Know What I\'m Doing and Dark Ages');
+
+  const mumbler = new AchievementState(defs, true);
+  mumbler.record(cast('LO', 'MON', 'no', 'meaningless'));
+  mumbler.record(cast('OH IR RA', 'LO', 'yes'));
+  mumbler.ended(true);
+  const lost = mumbler.evaluate();
+  check(!lost.includes('i-know-what-im-doing') && !lost.includes('dark-ages'), 'a meaningless cast is no I Know What I\'m Doing, a magic torch cast no Dark Ages');
+  const torch = new AchievementState(defs, true);
+  torch.champions([champ({ action: 'TORCH' })]);
+  torch.champions([champ()]);
+  torch.ended(true);
+  check(!torch.evaluate().includes('dark-ages'), 'a torch held once is no Dark Ages');
 }
 
 /** A set's file over the common one. */

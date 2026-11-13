@@ -170,7 +170,7 @@ number for a `level`. Names compare without regard to case.
 | `death` | a champion dies | `champion`; `cause`, as `hurt`'s `by`: the last damage the champion took |
 | `eat` | a champion eats | `champion`, `item` |
 | `drink` | a champion drinks, a potion or water, or from a fountain | `champion`, `item` (`FOUNTAIN` for a fountain) |
-| `cast` | a champion casts a spell | `champion`; `spell`, its runes, such as `"FUL IR"`; `ok`: `yes` when the spell worked |
+| `cast` | a champion casts a spell | `champion`; `spell`, its runes after the power rune, such as `"FUL IR"`; `power`, the power rune: `LO` `UM` `ON` `EE` `PAL` `MON`; `ok`: `yes` when the spell worked; `why`, for a cast the game said failed: `meaningless`, runes that make no spell, `practice`, a skill too low, `flask`, a potion with no empty flask in hand |
 | `wear` | an object is put on a worn place | `champion`; `slot`: `head` `neck` `torso` `legs` `feet`; `item` |
 | `join` | a champion joins the party | `champion`; `how`: `resurrect` `reincarnate` |
 | `enter` | the party stands on a level it did not stand on at the last tick's end, and at a history's first tick | `level`, the map, from 0 |
@@ -344,8 +344,11 @@ whole replay corpus with the tracker attached, and every package plays to its po
   potion drunk. Drinking at a fountain (an extra) is `FOUNTAIN`. The stand-in page runs
   that code in a replay too.
 - **The spells** are at `CastMagic`, around `castSpell`: the runes it reads, the
-  champion's or a spell filter's, and whether it returned 1. A DSA's `&CAST` and a
-  weapon's spell are not the player's cast.
+  champion's or a spell filter's, whether it returned 1, and the code of the message
+  `SpellErrorMsg` printed in it, if any (`doc/CSBwin-src/Magic.cpp:1007`): 1 a meaningless
+  spell, 0 more practice needed, 10 no empty flask. A failure it prints nothing for, a
+  spell filter's abort or a dead caster's, has no `why`. A DSA's `&CAST` and a weapon's
+  spell are not the player's cast.
 - **A worn object** is at `AddCharacterPossession` into the head, the torso, the legs or
   the feet (slots 2 to 5) or the neck (10), the slots whose `CarryLocation` is those
   places' masks (`doc/CSBwin-src/CSB.h:1682-1687`, which the check reads in

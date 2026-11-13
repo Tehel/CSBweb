@@ -1214,7 +1214,7 @@ drawing a map from them is a separate item, entered when the author names it.
 
 ### X20 ⏸️ More achievements: the author's list
 
-The achievements are `src/engine/achievements/defs/common.txt`'s 52, four of them valued
+The achievements are `src/engine/achievements/defs/common.txt`'s 56, four of them valued
 and four counted from the data,
 `dm-atari.txt`'s 13, which every Dungeon Master set reads, and `csb.txt`'s 2, which
 disables Girl Power (`doc/ACHIEVEMENTS.md`). The author
@@ -1263,12 +1263,23 @@ Archmaster, Jack of All Trades, Speedy Gonzales, Featherweight, Insomniac and Gi
 and Dungeon Master's Shining Armour and Darc Knight, each armour's shield in a hand
 (`doc/ACHIEVEMENTS.md` → "The champions"). Girl Power reads `CHARFLAG_male`, which a CSB
 adventure CSBWin's utility made has lost (H, "A champion carried into a new adventure
-keeps their sex"), so at the author's choice `csb.txt` disables it. What is left:
+keeps their sex"), so at the author's choice `csb.txt` disables it. Step 7's casts are
+done: `cast`'s `power` and `why`, the code of the message `SpellErrorMsg` printed, with
+Blazing Glory Day, Thick Atmosphere, I Know What I'm Doing and Dark Ages, whose torch is
+read in the hands at each tick's end (`doc/ACHIEVEMENTS.md` → "The events"). What is left:
 
-7. **The casts and the blows.** The power rune and why a cast failed on `cast`; the
-   damage dealt, which blow killed what, the item held or an empty hand, a kill by
-   landing, `party` on `death`: Blazing Glory Day, Thick Atmosphere, I Know What I'm
-   Doing, Overkill, Strike!, Bare Knuckles, Dark Ages, Telefrag, Friendly Fire Fatality.
+7. **The blows.** Overkill, Strike!, Bare Knuckles, Telefrag and Friendly Fire Fatality:
+   - the damage a blow deals a monster, `DamageMonster`'s, on each hit, a kill or not
+     (Overkill: 100 or more in one);
+   - which blow killed what: on a kill, how many of its group the outermost blow has
+     killed so far, so that four is a whole group of four wiped out by one blow or one
+     fireball (Strike!);
+   - an empty hand on a melee kill, a value a filter can test, as `FOUNTAIN` names a
+     fountain (Bare Knuckles);
+   - a kill by landing: the group CSBWin deletes where the party arrives by a teleporter
+     or a pit, each member a kill, the party's (Telefrag);
+   - `party` on `death`, the side of the blow that killed, kept with the pending cause
+     (Friendly Fire Fatality).
 8. **The rest of a game's own triggers.** Save loads, a revival at an altar, which
    ending, objects combined, a theft, a lock or switch triggered, the Oracle opened, where
    the party came from: Ironman, Hardcore, Lazarus, Gullible, Some Assembly Required,
@@ -1289,9 +1300,6 @@ stay common.
   - **Ironman** (hard): win without ever loading a save. [save loads]
   - **Hardcore** (hard): win without loading a save and without a champion ever dying.
     [save loads]
-  - **Dark Ages** (hard): win without a light spell (FUL, OH IR RA) or a torch. An
-    ILLUMULET is allowed: DM's two, on levels 4 and 6, are a relief after four black
-    levels. ✓ for the spells, [the item held] for the torch.
 - The party:
   - **Lazarus** (weird): bring the same champion back from the dead three times. [a
     revival at an altar]
@@ -1306,11 +1314,6 @@ stay common.
 - Silly deaths:
   - **Friendly Fire Fatality** (silly): the party's own spell kills a champion. [`party`
     on `death`]
-- Magic and food:
-  - **I Know What I'm Doing** (hard): win without ever casting runes that make no spell.
-    `ok` is no for a meaningless spell and a skill failure alike. [why a cast failed]
-  - **Blazing Glory Day** (weird): cast a fireball at full power, MON. [the power rune]
-  - **Thick Atmosphere** (weird): cast a poison cloud at full power, MON. [the power rune]
 
 **Dungeon Master** (`dm-atari.txt`).
 
@@ -1352,12 +1355,10 @@ improve.
 | Progress across games | Hall of Fame Tour, Every Ending, Grand Slam, Encore, Dungeon Janitor, HR Problem |
 | A lock or switch triggered | Riddle Me This, Corbum Courier, Coin-Operated |
 | Save loads | Ironman, Hardcore |
-| The power rune on `cast` | Blazing Glory Day, Thick Atmosphere |
 | The damage dealt, which blow killed what | Overkill, Strike! |
 | Which ending | Gullible, Every Ending |
 | Where the party came from | Veterans, Fresh Faces |
-| The item held, an empty hand | Dark Ages (the torch), Bare Knuckles |
-| Why a cast failed | I Know What I'm Doing |
+| An empty hand | Bare Knuckles |
 | A kill `by: landing` | Telefrag |
 | A revival at an altar | Lazarus |
 | `party` on `death` | Friendly Fire Fatality |

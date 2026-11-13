@@ -44,6 +44,10 @@
  *    do. The whole CSB game's party reads as no man, Buzzzzz and Lor among it: CSBWin's
  *    utility clears `CHARFLAG_male` (`DEBT.md` H, "A champion carried into a new adventure
  *    keeps their sex"), so `csb.txt` disables Girl Power.
+ * 8. The casts: each names its power rune, and a failed one why, exactly as often as the
+ *    game prints `SpellErrorMsg`'s message for it (`doc/CSBwin-src/Magic.cpp:1007`); a torch
+ *    in a hand counted at the tick the tool sees it there itself; and Blazing Glory Day,
+ *    Thick Atmosphere, I Know What I'm Doing and Dark Ages as the casts and hands say.
  *
  * Usage: npm test -- --only=achievements-tracker.ts [<package name>…] [--not=<name>] [--events]
  */
@@ -59,7 +63,9 @@ import { isNewAdventure } from '../../src/engine/Chaos';
 import { achievementFileOf } from '../../src/engine/achievements/PageAchievements';
 import type { Happening } from '../../src/engine/Happening';
 import { readRecordingPackage } from '../../src/engine/RecordingPackage';
-import { CHARFLAG_MALE } from '../../src/core/charDesc';
+import { CHARFLAG_MALE, getChampionPossession } from '../../src/core/charDesc';
+import { NameIndex } from '../../src/engine/objectIndex';
+import { isAlive } from '../../src/engine/rules';
 import { determineMastery } from '../../src/engine/skills';
 import { check, finish } from '../lib/check';
 import { DATA_SETS, diskFiles, diskSetDigests } from '../lib/dataSets';
@@ -106,6 +112,11 @@ when: party(where feet = "BOOTS OF SPEED") >= 1
 name: Master
 text: A Master in a class.
 when: party(where fighter >= 9 or ninja >= 9 or priest >= 9 or wizard >= 9) >= 1
+
+[t-torch]
+name: Torch
+text: A torch in a champion's hand.
+when: party(where ready = TORCH or action = TORCH) >= 1
 
 [t-heavy]
 name: Heavy
@@ -173,6 +184,10 @@ for (const file of corpusFiles()) {
   let wasAsleep = false;
   let asleep = 0;
   let males = 0;
+  /** The d.Time of the first tick's end a champion holds a torch at, read by the tool itself. */
+  let firstTorch = -1;
+  /** The failures `SpellErrorMsg` printed, by its message: meaningless, practice, flask. */
+  const failures = { meaningless: 0, practice: 0, flask: 0 };
   const ranks = new Map<string, number[]>();
   const miniDat = set.miniDat ? await diskFiles(set).read('mini.dat') : null;
   const start = pkg.path[0]!.start;
@@ -189,6 +204,14 @@ for (const file of corpusFiles()) {
     tracker.attach();
     carryLocation = Array.from(page.game.ctx.tables.carryLocation);
     const host = page.game.ctx.host;
+    const names = page.screen.ui.objectTables.objectNames;
+    const print = host.messages.quePrintLines.bind(host.messages);
+    host.messages.quePrintLines = (color, text) => {
+      if (text === ' MUMBLES A MEANINGLESS SPELL.') failures.meaningless++;
+      else if (text === ' NEEDS MORE PRACTICE WITH THIS ') failures.practice++;
+      else if (text === ' NEEDS AN EMPTY FLASK IN HAND FOR POTION.') failures.flask++;
+      print(color, text);
+    };
     const observe = host.observe;
     host.observe = (h: Happening) => {
       if (h.k === 'tick') {
@@ -200,6 +223,10 @@ for (const file of corpusFiles()) {
         party.champions.forEach((champ, i) => {
           if (!champ || i === party.potentialChampionIndex) return;
           if ((champ.charFlags & CHARFLAG_MALE) !== 0) maleNow++;
+          if (firstTorch < 0 && [0, 1].some((slot) => {
+            const rn = getChampionPossession(champ, slot);
+            return rn !== 0xffff && names[NameIndex(ctx.dungeon, ctx.tables, party.facing, rn)] === 'TORCH';
+          })) firstTorch = time;
           const rank = [0, 1, 2, 3].map((skill) => Math.min(16, determineMastery(champ, skill | 0xc000)) - 1);
           ranks.set(champ.name, rank);
           if (firstMaster < 0 && rank.some((r) => r >= 9)) firstMaster = time;
@@ -293,6 +320,25 @@ for (const file of corpusFiles()) {
   ];
   for (const [id, want] of expect) check(unlocked.has(id) === want, `${file}: ${id} ${want ? 'unlocks' : 'stays locked'}, as its ranks, loads, sleeps and sexes say`);
 
+  // 8. The casts: each one's power rune, and its failure as the message the game printed says it.
+  const casts = events.filter((e) => e.kind === 'cast');
+  const powers = new Map<string, number>();
+  for (const e of casts) powers.set(e.attrs.power ?? '-', (powers.get(e.attrs.power ?? '-') ?? 0) + 1);
+  const whys = { meaningless: count(events, 'cast', { why: 'meaningless' }), practice: count(events, 'cast', { why: 'practice' }), flask: count(events, 'cast', { why: 'flask' }) };
+  console.log(`  casts ${casts.length}: powers ${[...powers].map(([p, n]) => `${p} ${n}`).join(', ')}; failed ${JSON.stringify(whys)}, printed ${JSON.stringify(failures)}; first torch in hand at ${firstTorch}`);
+  check(casts.every((e) => e.attrs.power !== undefined), `${file}: every cast names its power rune`);
+  check(casts.every((e) => e.attrs.why === undefined || e.attrs.ok === 'no'), `${file}: only a failed cast says why`);
+  check(JSON.stringify(whys) === JSON.stringify(failures), `${file}: each cast's failure is the message the game printed for it`);
+  const mon = (spell: string): boolean => count(events, 'cast', { spell, power: 'MON', ok: 'yes' }) > 0;
+  const light = casts.some((e) => e.attrs.ok === 'yes' && (e.attrs.spell === 'FUL' || e.attrs.spell === 'OH IR RA'));
+  for (const [id, want] of [
+    ['blazing-glory-day', mon('FUL IR')],
+    ['thick-atmosphere', mon('OH VEN')],
+    ['i-know-what-im-doing', won && tracker.whole && whys.meaningless === 0],
+    ['dark-ages', won && tracker.whole && !light && firstTorch < 0],
+  ] as const) check(unlocked.has(id) === want, `${file}: ${id} ${want ? 'unlocks' : 'stays locked'}, as its casts and hands say`);
+  if (firstTorch >= 0) check(at('t-torch') === firstTorch, `${file}: a torch in hand is counted at d.Time ${firstTorch} (${at('t-torch')})`);
+
   // 3. What the games hold.
   if (name === 'DMMovie2615') {
     for (const hero of ['HALK', 'STAMM', 'LEYLA', 'GOTHMOG']) {
@@ -343,6 +389,17 @@ for (const file of corpusFiles()) {
     tracker.observe({ k: 'tick' });
     check(explored > 0 && tracker.explored === explored && events.length === before,
       `DMMovie2615: a state kept and read back keeps the ${explored}% of the floor walked on, and the level, entered again by nothing`);
+    // Runes that make no spell, a power and an element (`0x60 + 6 * row + n`), cast by a
+    // living champion after the end: no recording mumbles one.
+    const { ctx } = played.game;
+    const caster = ctx.party.state.champions.findIndex((champ) => isAlive(champ));
+    const mumbled = failures.meaningless;
+    ctx.party.state.champions[caster]!.incantation = [101, 106];
+    ctx.systems.magic.castSpellFromUi(caster);
+    const last = events[events.length - 1];
+    check(last?.kind === 'cast' && last.attrs.spell === 'DES' && last.attrs.power === 'MON' && last.attrs.ok === 'no'
+      && last.attrs.why === 'meaningless' && failures.meaningless === mumbled + 1,
+      `DMMovie2615: MON DES, which makes no spell, is a cast of power MON that failed as meaningless, the message printed (${JSON.stringify(last?.attrs)})`);
     const playVbls = Math.round(played.game.playTime() * 60 / 1000);
     check(Math.abs(tracker.playedVbls - playVbls) <= 1, `DMMovie2615: the play time counted is the game's, ${tracker.playedVbls} VBLs (${playVbls})`);
   }
