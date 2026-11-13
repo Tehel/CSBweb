@@ -153,6 +153,7 @@ const server = createAppServer(options, {
     identities: { store: identities, rateLimit: new RateLimit(PROFILE_CHANGES_PER_HOUR, 3_600_000) },
     proofs: { store: proofs, dir: proofsDir, rateLimit: new RateLimit(PROOFS_PER_HOUR, 3_600_000) },
     achievementDefs: readers.achievementDefs,
+    achievementsAcross: readers.achievementsAcross,
 });
 server.listen(port, () => {
     const address = server.address();

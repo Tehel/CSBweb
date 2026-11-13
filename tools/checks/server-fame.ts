@@ -20,7 +20,14 @@
  *   - an unknown set or id, a malformed id, a path too long, another kind 404; a POST 405;
  *   - no answer holds a `playerId`, a playthrough or a proof's id;
  *   - the cache: `max-age=30`, the same answer within it though a proof is checked
- *     meanwhile, and the new count once it expires.
+ *     meanwhile, and the new count once it expires;
+ *   - the achievements across games (`ProofStore.hall`), worked out of the checked proofs'
+ *     figures: each playthrough at the largest its proofs reached, never their sum, so a
+ *     playthrough's second proof raises a total and does not add to it; Dungeon Janitor at
+ *     the proof that took the kills past 500, Encore at the third game won, not a drifted
+ *     proof's nor a queued one's; a Janitor a replay verified in one game, before it moved
+ *     across games, still counted, at its own time; and the profile's achievements
+ *     (`verifiedBy`) the same.
  *
  * Usage: npm test -- --only=server-fame.ts
  */
@@ -39,7 +46,8 @@ import { ProofStore } from '../../server/proofs.ts';
 import { RecordingStore } from '../../server/recordings.ts';
 import { STATS_CACHE_MS, StatsStore } from '../../server/stats.ts';
 import { openStore } from '../../server/store.ts';
-import { FAME_PLAYERS, FAME_ROUTE, FAME_SETS, IDENTITIES_ROUTE, parseManifest, PLAYER_ID_HEADER } from '../../src/data/DataSets.ts';
+import { FAME_PLAYERS, FAME_ROUTE, FAME_SETS, IDENTITIES_ROUTE, parseManifest, PLAYER_ID_HEADER, PROFILE_ROUTE, type PlayerProfile } from '../../src/data/DataSets.ts';
+import { acrossUnlocked } from '../../src/engine/achievements/AchievementState.ts';
 import { setAchievementDefs } from '../../src/engine/achievements/PageAchievements.ts';
 import { checkLocalDataSet } from '../../src/engine/LocalDataSetCheck.ts';
 import { readRecordingPackage } from '../../src/engine/RecordingPackage.ts';
@@ -54,8 +62,9 @@ const BOB = '22222222-2222-4222-8222-222222222222';
 const CAROL = '33333333-3333-4333-8333-333333333333';
 const DAN = '44444444-4444-4444-8444-444444444444';
 const EVE = '55555555-5555-4555-8555-555555555555';
+const FAY = '66666666-6666-4666-8666-666666666666';
 const MODERATOR = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-const PLAYER_IDS = [ANN, ANN_LINKED, BOB, CAROL, DAN, EVE, MODERATOR];
+const PLAYER_IDS = [ANN, ANN_LINKED, BOB, CAROL, DAN, EVE, FAY, MODERATOR];
 /** Each proof's playthrough: a number no answer should hold. */
 const PLAYTHROUGH = 987654321;
 
@@ -111,6 +120,7 @@ async function main(): Promise<void> {
         identities: { store: identities, rateLimit: new RateLimit(100, 60_000) },
         proofs: { store: proofs, dir: join(scratch, 'proofs'), rateLimit: new RateLimit(100, 60_000) },
         achievementDefs: (id) => (id === 'b' ? COMMON.slice(0, 3) : COMMON),
+        achievementsAcross: (id, games) => (id === 'b' ? [] : acrossUnlocked(COMMON.filter((def) => def.across), games)),
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
     const port = (server.address() as AddressInfo).port;
@@ -122,16 +132,23 @@ async function main(): Promise<void> {
         const carol = identities.create(CAROL, 'Carol').identity;
         const dan = identities.create(DAN, 'Dan').identity;
         const eve = identities.create(EVE, 'Eve').identity;
+        const fay = identities.create(FAY, 'Fay').identity;
 
         const [first, second, third] = COMMON;
         if (!first || !second || !third) throw new Error('the common file holds fewer than three achievements');
         const proofIds: string[] = [];
-        /** A proof of `player` on `dataSet`, sent at `sentAt`, claiming `claims`, and checked at `checkedAt` unlocking `unlocked` where it is given. */
-        const proof = (player: string, dataSet: string, sentAt: number, claims: string[], checkedAt?: number, unlocked: string[] = claims) => {
+        /**
+         * A proof of `player` on `dataSet`, sent at `sentAt`, claiming `claims`, and checked at
+         * `checkedAt` unlocking `unlocked`, in `playthrough` with `figures`, where it is given.
+         */
+        const proof = (
+            player: string, dataSet: string, sentAt: number, claims: string[], checkedAt?: number, unlocked: string[] = claims,
+            figures: Record<string, number> = {}, playthrough = PLAYTHROUGH,
+        ) => {
             const id = (proofIds.length + 0xA0).toString(16).toUpperCase().padStart(16, 'F');
             proofIds.push(id);
             proofs.queue({ id, dataSet, player, build: 'test', level: 1, size: 1, sentAt }, claims);
-            if (checkedAt !== undefined) proofs.checked(id, checkedAt, PLAYTHROUGH, new Set(unlocked));
+            if (checkedAt !== undefined) proofs.checked(id, checkedAt, playthrough, new Set(unlocked), figures);
             return id;
         };
         // Carol first of all, then reset; Bob sent before Ann but checked after her.
@@ -196,7 +213,7 @@ async function main(): Promise<void> {
 
         // The cache: Dan's proof checked meanwhile changes nothing until the answer expires.
         const before = (await ask(port, `/${FAME_ROUTE}/${FAME_SETS}/a`)).body;
-        proofs.checked(proofIds[7]!, 8_000, PLAYTHROUGH, new Set([third.id]));
+        proofs.checked(proofIds[7]!, 8_000, PLAYTHROUGH, new Set([third.id]), {});
         check((await ask(port, `/${FAME_ROUTE}/${FAME_SETS}/a`)).body === before, 'within 30 seconds, the same answer, though a proof was checked');
         // A moderator's reset: the page 404 at once, the set's answer cached until it expires.
         const reset = await ask(port, `/${IDENTITIES_ROUTE}/${bob.id}`, 'POST', { [PLAYER_ID_HEADER]: MODERATOR, 'Content-Type': 'application/json' }, '{"action":"reset"}');
@@ -206,6 +223,42 @@ async function main(): Promise<void> {
         const after = await json<FameSet>(`/${FAME_SETS}/a`);
         check(after.json?.players === 2 && after.json.achievements[0]?.players === 1 && after.json.achievements[2]?.players === 1 && after.json.achievements[2]?.first?.name === 'Dan',
             `once it expires: Bob left out, Dan's ${third.id} counted (${after.json?.players} players)`);
+
+        // Across games: Fay's games, each playthrough at its largest figure, never the sum of its proofs'.
+        const across = (id: string) => COMMON.find((def) => def.id === id)!;
+        const WON = across('encore').games[0]!.key;
+        const KILLS = `total(${across('dungeon-janitor').aggregates[0]!.key})`;
+        proof(FAY, 'a', 10, [], 9_000, [], { [WON]: 1, [KILLS]: 300 }, 1);
+        proof(FAY, 'a', 11, [], 9_500, [], { [WON]: 1, [KILLS]: 400 }, 1);
+        proof(FAY, 'a', 12, [], 10_000, [], { [WON]: 1, [KILLS]: 150 }, 2);
+        proof(FAY, 'a', 13, [], 10_500, [], { [KILLS]: 10 }, 3);
+        const lost = proof(FAY, 'a', 14, []);
+        proofs.drifted(lost, 10_600, 'it does not play');
+        proof(FAY, 'a', 15, []);
+        proof(FAY, 'b', 16, [], 10_700, [], { [WON]: 1 }, 4);
+        // Dan's Dungeon Janitor, verified in one game before it moved across games.
+        proof(DAN, 'a', 17, ['dungeon-janitor'], 10_800);
+        const fayPage = async () => (await json<FamePlayerPage>(`/${FAME_PLAYERS}/${fay.id}`)).json;
+        clock += STATS_CACHE_MS + 1;
+        const fays = await fayPage();
+        console.log(`  Fay's page, two games won: ${JSON.stringify(fays)}`);
+        const fayA = fays?.sets.find((set) => set.id === 'a')?.achievements.map((one) => one.id).join() ?? '';
+        check(fayA === 'dungeon-janitor', `Fay: Dungeon Janitor, 400 + 150 kills and not 850, no Encore at two games won: ${fayA}`);
+        check(fays?.sets.every((set) => set.id === 'a') === true, 'and nothing of set B, whose file has no achievement across games');
+        proof(FAY, 'a', 18, [], 11_000, [], { [WON]: 1, [KILLS]: 5 }, 3);
+        clock += STATS_CACHE_MS + 1;
+        const fayAfter = (await fayPage())?.sets.find((set) => set.id === 'a')?.achievements.map((one) => one.id).join() ?? '';
+        check(fayAfter === 'dungeon-janitor,encore', `a third game won, its playthrough's second proof: Encore (${fayAfter})`);
+        const fame = (await json<FameSet>(`/${FAME_SETS}/a`)).json;
+        const janitor = fame?.achievements.find((one) => one.id === 'dungeon-janitor');
+        const hrProblem = fame?.achievements.find((one) => one.id === 'hr-problem');
+        check(janitor?.players === 2 && janitor.first?.name === 'Fay' && hrProblem?.players === 0,
+            `Dungeon Janitor: Fay first, at the proof that took the kills past 500, before Dan's verified in one game, both counted; HR Problem nobody (${janitor?.players}, ${janitor?.first?.name})`);
+        const profile = await fetch(`http://127.0.0.1:${port}/${PROFILE_ROUTE}`, { headers: { [PLAYER_ID_HEADER]: FAY } });
+        const theirs = ((await profile.json()) as PlayerProfile).achievements;
+        console.log(`  Fay's profile: ${JSON.stringify(theirs)}`);
+        check(JSON.stringify(theirs.map((set) => [set.dataSet, set.unlocked])) === '[["a",["dungeon-janitor","encore"]]]',
+            'her profile lists the same, the first first');
 
         const leaks = [...PLAYER_IDS, String(PLAYTHROUGH), ...proofIds].filter((secret) => bodies.some((body) => body.toLowerCase().includes(secret.toLowerCase())));
         check(leaks.length === 0, `no answer holds a playerId, a playthrough or a proof's id${leaks.length ? `: ${leaks.join(', ')}` : ''}`);

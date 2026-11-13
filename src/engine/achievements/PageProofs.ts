@@ -6,11 +6,13 @@
  *
  * A proof is sent only by a player with a public name (`ProofsDeps.named`), and claims the
  * rows of the playthrough that its history holds and no replay has verified
- * (`claimableRows`):
+ * (`claimableRows`). Its replay also keeps its history's figures, which the Hall works the
+ * achievements across games out of (`GameFigures`), so a proof is sent where they grew past
+ * the last this page sent of the playthrough, though it claims nothing:
  *
- * - **at the game's end**, when it claims anything;
- * - **at a save**, when it claims an unlock no proof has claimed yet, and the last proof of
- *   the playthrough this page sent is `PROOF_INTERVAL_MS` old or more.
+ * - **at the game's end**, when it claims anything or its figures grew;
+ * - **at a save**, when it claims an unlock no proof has claimed yet or its figures grew,
+ *   and the last proof of the playthrough this page sent is `PROOF_INTERVAL_MS` old or more.
  *
  * Each row claimed keeps the proof's id (`AchievementRow.proofs`); `refresh` asks for the
  * verdicts of every row that awaits one and writes them (`judgedRows`).
@@ -18,12 +20,13 @@
  * **Nothing in this file touches the DOM**: the page hands it the server's routes
  * (`src/main.ts`), and the tools a stand-in (`tools/checks/achievement-proofs.ts`).
  */
-import { claimableRows, judgedRows, pendingProofs, type AchievementRow, type AchievementStore } from '../../data/saves/AchievementStore';
+import { claimableRows, judgedRows, mergeFigures, pendingProofs, type AchievementRow, type AchievementStore } from '../../data/saves/AchievementStore';
 import type { RecordingEntry, RecordingStore } from '../../data/saves/RecordingStore';
 import type { SaveEntry, SaveStore } from '../../data/saves/SaveStore';
 import { MAX_CLAIMS, type ProofVerdict } from '../../data/DataSets';
 import { packageOfEnd, packageOfSave, writeRecordingPackage, type RecordingPackageText } from '../RecordingPackage';
 import { pointInfo, pointMadeAt, pointPath, storedPoints, type StoredPoint } from '../RecordingPoints';
+import type { GameFigures } from './AchievementState';
 import type { PageAchievements } from './PageAchievements';
 
 /** The least time between two proofs a page sends of one playthrough at its saves: ten minutes. */
@@ -49,7 +52,7 @@ export interface ProofsDeps {
 }
 
 /** What the proofs read of the page's achievements (`PageAchievements`). */
-export type ProofsAchievements = Pick<PageAchievements, 'playthrough' | 'settled' | 'readProofs'> & { readonly tracker: { readonly unlocked: ReadonlySet<string> } };
+export type ProofsAchievements = Pick<PageAchievements, 'playthrough' | 'settled' | 'readProofs' | 'figuresOf'> & { readonly tracker: { readonly unlocked: ReadonlySet<string> } };
 
 /** The stores a package is read from: the page's own (`src/main.ts`). */
 export interface ProofSources {
@@ -102,6 +105,8 @@ export async function refreshVerdicts(
 export class PageProofs {
     /** When this page last sent a proof of each playthrough. */
     private readonly sentAt = new Map<number, number>();
+    /** The figures of the proofs this page sent of each playthrough, each key at the largest. */
+    private readonly sentFigures = new Map<number, GameFigures>();
     /** The proofs under way, one at a time, which `settled` awaits. */
     private sending: Promise<unknown> = Promise.resolve();
 
@@ -115,26 +120,28 @@ export class PageProofs {
 
     /**
      * A save written (`GameSaves.onSaved`): its proof sent, where the history its row kept as
-     * its file was made (`SaveEntry.achievements`) claims an unlock no proof has, and none
-     * was sent of the playthrough for `PROOF_INTERVAL_MS`.
+     * its file was made (`SaveEntry.achievements`) claims an unlock no proof has or has
+     * figures grown, and none was sent of the playthrough for `PROOF_INTERVAL_MS`.
      */
     saved(entry: SaveEntry): Promise<void> {
         const unlocked = new Set(entry.achievements?.state.unlocked ?? []);
+        const figures = entry.achievements ? this.achievements.figuresOf(entry.playthrough, entry.achievements.state) : {};
         return this.queue(async () => {
             const claims = await this.claims(entry.playthrough, unlocked);
-            if (!claims.some((row) => !row.proofs?.length)) return;
+            if (!claims.some((row) => !row.proofs?.length) && !this.grew(entry.playthrough, figures)) return;
             if (this.deps.now() - (this.sentAt.get(entry.playthrough) ?? -Infinity) < PROOF_INTERVAL_MS) return;
-            await this.sendClaims(entry.playthrough, claims, () => this.deps.packageOf(entry));
+            await this.sendClaims(entry.playthrough, claims, figures, () => this.deps.packageOf(entry));
         });
     }
 
-    /** The game's end (`showCredits`): its proof sent, where its history claims anything. */
+    /** The game's end (`showCredits`): its proof sent, where its history claims anything or has figures grown. */
     ended(): Promise<void> {
         const playthrough = this.achievements.playthrough;
         const unlocked = new Set(this.achievements.tracker.unlocked);
+        const figures = this.achievements.figuresOf(playthrough, null);
         return this.queue(async () => {
             const claims = await this.claims(playthrough, unlocked);
-            if (claims.length > 0) await this.sendClaims(playthrough, claims, () => this.deps.packageOf('end'));
+            await this.sendClaims(playthrough, claims, figures, () => this.deps.packageOf('end'));
         });
     }
 
@@ -147,7 +154,7 @@ export class PageProofs {
         const playthrough = this.achievements.playthrough;
         const rows = (await this.store.list(this.dataSet)).filter((row) => row.playthrough === playthrough && row.proof !== 'verified' && ids.includes(row.id));
         let id: string | null = null;
-        await this.queue(async () => { id = await this.sendClaims(playthrough, rows, async () => bytes); });
+        await this.queue(async () => { id = await this.sendClaims(playthrough, rows, {}, async () => bytes); });
         return id;
     }
 
@@ -180,15 +187,28 @@ export class PageProofs {
         return claimableRows(await this.store.list(this.dataSet), this.dataSet, playthrough, unlocked);
     }
 
-    /** `claims` of `playthrough` sent with the package `packed` makes, by a player with a name, and the proof's id kept in each: the id, or `null`. */
-    private async sendClaims(playthrough: number, claims: readonly AchievementRow[], packed: () => Promise<Uint8Array | null>): Promise<string | null> {
-        if (claims.length === 0 || !await this.deps.named()) return null;
+    /** Whether `figures` of `playthrough` hold a key past the proofs this page sent of it. */
+    private grew(playthrough: number, figures: GameFigures): boolean {
+        const sent = this.sentFigures.get(playthrough) ?? {};
+        return Object.entries(figures).some(([key, v]) => v > (sent[key] ?? 0));
+    }
+
+    /**
+     * `claims` of `playthrough`, its history's figures `figures`, sent with the package
+     * `packed` makes, by a player with a name, where it claims anything or the figures grew,
+     * and the proof's id kept in each: the id, or `null`.
+     */
+    private async sendClaims(
+        playthrough: number, claims: readonly AchievementRow[], figures: GameFigures, packed: () => Promise<Uint8Array | null>,
+    ): Promise<string | null> {
+        if ((claims.length === 0 && !this.grew(playthrough, figures)) || !await this.deps.named()) return null;
         const bytes = await packed();
         if (bytes === null) return null;
         const sent = claims.slice(0, MAX_CLAIMS);
         const id = await this.deps.send(bytes, sent.map((row) => row.id));
         this.sentAt.set(playthrough, this.deps.now());
-        await this.store.update(sent.map((row) => ({ ...row, proofs: [...(row.proofs ?? []), id] })));
+        this.sentFigures.set(playthrough, mergeFigures(this.sentFigures.get(playthrough) ?? {}, figures));
+        if (sent.length > 0) await this.store.update(sent.map((row) => ({ ...row, proofs: [...(row.proofs ?? []), id] })));
         return id;
     }
 }

@@ -117,7 +117,7 @@ async function main(): Promise<void> {
         recordings: { store: recordings, dir: recordingsDir, readPackage: readRecordingPackage, shareRateLimit: new RateLimit(100, 60_000) },
         identities: { store: identities, rateLimit: new RateLimit(CHANGES_PER_WINDOW, 60_000) },
         proofs: { store: new ProofStore(db, 1 << 30), dir: join(scratch, 'proofs'), rateLimit: new RateLimit(100, 60_000) },
-        achievementDefs: () => null,
+        achievementDefs: () => null, achievementsAcross: () => [],
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
     const port = (server.address() as AddressInfo).port;

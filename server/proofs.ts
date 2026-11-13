@@ -15,7 +15,9 @@
  * the page's own reader (`readRecordingPackage`), which checks its form alone: the verifier,
  * a service of its own (`verifier.ts`), replays it later. Only a player with a public name
  * sends one (`identity.ts`): the Hall of Fame shows the verified unlocks by that name. Its
- * claims are listed at once, `unverified`, until the replay says.
+ * claims are listed at once, `unverified`, until the replay says. The replay keeps its
+ * history's figures beside them (`proof_figures`), which the Hall works the achievements
+ * across games out of (`acrossRows`), so a proof may claim nothing.
  *
  * A proof is its sender's alone: the server keeps their `playerId` with it, and answers its
  * verdicts to the browsers their identity links. No answer holds a `playerId` or a
@@ -59,6 +61,12 @@ CREATE TABLE IF NOT EXISTS claims (
     claimed      INTEGER NOT NULL DEFAULT 1,  -- 0 for an unlock the replay granted unclaimed
     PRIMARY KEY (proof, achievement)
 );
+CREATE TABLE IF NOT EXISTS proof_figures (
+    proof        TEXT    NOT NULL REFERENCES proofs (id),
+    key          TEXT    NOT NULL,     -- a figure's key, games(…) or total(…) (GameFigures)
+    value        INTEGER NOT NULL,     -- its value at the proof's point, above 0
+    PRIMARY KEY (proof, key)
+);
 `;
 
 /**
@@ -92,6 +100,66 @@ export interface StoredProof {
     kept: boolean;
 }
 
+/**
+ * The build's achievements across games of the set `setId` that `games`, each playthrough's
+ * figures, make yes (`achievementsAcross`, `READERS_MODULE`'s, `app.ts`).
+ */
+export type AchievementsAcrossOf = (setId: string, games: readonly Readonly<Record<string, number>>[]) => readonly string[];
+
+/** A figure a checked proof keeps, with its proof's set, playthrough and time, and who it is counted for. */
+interface FigureRow {
+    data_set: string;
+    /** The identity, or the browsers, the figure is counted for. */
+    owner: string;
+    proof: string;
+    playthrough: number;
+    at: number;
+    key: string;
+    value: number;
+}
+
+/** An achievement across games `acrossRows` works out: of `owner`, in `dataSet`, at the time of the proof that made it yes. */
+interface AcrossRow {
+    dataSet: string;
+    achievement: string;
+    owner: string;
+    at: number;
+}
+
+/**
+ * The achievements across games `rows`, the checked proofs' figures in the order they were
+ * checked, make yes (`doc/ACHIEVEMENTS.md` → "Across games"): for each owner and set, its
+ * proofs taken in turn, each playthrough at the largest figure any of its proofs reached so
+ * far, and each achievement at the first proof after which `across` says yes.
+ */
+function acrossRows(rows: readonly FigureRow[], across: AchievementsAcrossOf): AcrossRow[] {
+    const groups = new Map<string, FigureRow[][]>();
+    for (const row of rows) {
+        const group = `${row.owner}\u0000${row.data_set}`;
+        const proofs = groups.get(group) ?? [];
+        if (proofs.at(-1)?.[0]?.proof !== row.proof) proofs.push([]);
+        proofs.at(-1)!.push(row);
+        groups.set(group, proofs);
+    }
+    const out: AcrossRow[] = [];
+    for (const proofs of groups.values()) {
+        const playthroughs = new Map<number, Record<string, number>>();
+        const done = new Set<string>();
+        for (const figures of proofs) {
+            const { data_set: dataSet, owner, playthrough, at } = figures[0]!;
+            const held = playthroughs.get(playthrough) ?? {};
+            for (const { key, value } of figures) held[key] = Math.max(held[key] ?? 0, value);
+            playthroughs.set(playthrough, held);
+            for (const achievement of across(dataSet, [...playthroughs.values()])) {
+                if (done.has(achievement)) continue;
+                done.add(achievement);
+                out.push({ dataSet, achievement, owner, at });
+            }
+        }
+    }
+    return out;
+}
+
 /** An achievement of a set verified by an identity with a public name, at the time its first proof was checked (`ProofStore.hall`). */
 export interface HallRow {
     dataSet: string;
@@ -121,8 +189,12 @@ export class ProofStore {
     private readonly updateClaim: StatementSync;
     private readonly grantClaim: StatementSync;
     private readonly updateKept: StatementSync;
+    private readonly insertFigure: StatementSync;
+    private readonly figuresOf: StatementSync;
     /** `hall`'s, prepared at its first call: it reads `identity.ts`'s tables, made beside these. */
     private hallRows: StatementSync | null = null;
+    /** `hall`'s figures, prepared at its first call, as `hallRows`. */
+    private hallFigures: StatementSync | null = null;
 
     constructor(db: DatabaseSync, diskBytes: number) {
         this.db = db;
@@ -150,6 +222,10 @@ export class ProofStore {
         this.updateClaim = db.prepare('UPDATE claims SET state = ? WHERE proof = ? AND achievement = ?');
         this.grantClaim = db.prepare("INSERT INTO claims (proof, achievement, state, claimed) VALUES (?, ?, 'verified', 0)");
         this.updateKept = db.prepare('UPDATE proofs SET kept = 0 WHERE id = ?');
+        this.insertFigure = db.prepare('INSERT INTO proof_figures (proof, key, value) VALUES (?, ?, ?)');
+        this.figuresOf = db.prepare(`SELECT p.data_set, '' AS owner, p.id AS proof, p.playthrough, p.checked_at AS at, f.key, f.value
+            FROM proof_figures f JOIN proofs p ON p.id = f.proof
+            WHERE p.state = 'checked' AND p.player IN (SELECT value FROM json_each(?)) ORDER BY p.checked_at, p.id, f.key`);
     }
 
     /** `proof` queued, with its `claims`, `unverified`. */
@@ -192,26 +268,53 @@ export class ProofStore {
         return (this.total.get() as { bytes: number }).bytes;
     }
 
-    /** The achievements a replay verified of the proofs `players` sent, by set, each once, the first verified first. */
-    verifiedBy(players: readonly string[]): { dataSet: string; achievement: string }[] {
-        return (this.verifiedOf.all(JSON.stringify(players)) as { data_set: string; achievement: string }[])
-            .map((row) => ({ dataSet: row.data_set, achievement: row.achievement }));
+    /**
+     * The achievements a replay verified of the proofs `players` sent, and those across games
+     * their figures make yes (`across`), by set, each once, the first verified first.
+     */
+    verifiedBy(players: readonly string[], across: AchievementsAcrossOf): { dataSet: string; achievement: string }[] {
+        const json = JSON.stringify(players);
+        const rows = (this.verifiedOf.all(json) as { data_set: string; achievement: string; at: number }[])
+            .map((row) => ({ dataSet: row.data_set, achievement: row.achievement, at: row.at }));
+        const first = new Map(rows.map((row) => [`${row.dataSet}\u0000${row.achievement}`, row]));
+        for (const row of acrossRows(this.figuresOf.all(json) as unknown as FigureRow[], across)) {
+            const held = first.get(`${row.dataSet}\u0000${row.achievement}`);
+            if (held === undefined) first.set(`${row.dataSet}\u0000${row.achievement}`, row);
+            else held.at = Math.min(held.at, row.at);
+        }
+        return [...first.values()].sort((a, b) => a.dataSet.localeCompare(b.dataSet) || a.at - b.at || a.achievement.localeCompare(b.achievement))
+            .map(({ dataSet, achievement }) => ({ dataSet, achievement }));
     }
 
     /**
      * The Hall of Fame's rows (`fame.ts`): each achievement a replay verified, by set, of each
      * identity with a public name, once, at the first proof of its browsers that verified it,
      * through `identity_players` (a browser linked to another identity since speaks for that
-     * one); of the identity `identity` alone where it is given. The first verified first, then
-     * by identity. An identity a moderator reset, which has no name, is left out.
+     * one); of the identity `identity` alone where it is given. Its achievements across games
+     * are those its checked proofs' figures make yes (`across`, `acrossRows`), at the proof
+     * that made each yes. The first verified first, then by identity. An identity a
+     * moderator reset, which has no name, is left out.
      */
-    hall(identity: string | null = null): HallRow[] {
+    hall(identity: string | null, across: AchievementsAcrossOf): HallRow[] {
         this.hallRows ??= this.db.prepare(`SELECT p.data_set, c.achievement, i.id AS identity, i.name, MIN(p.checked_at) AS at
             FROM claims c JOIN proofs p ON p.id = c.proof JOIN identity_players ip ON ip.player = p.player JOIN identities i ON i.id = ip.identity
             WHERE c.state = 'verified' AND p.state = 'checked' AND i.name IS NOT NULL AND (?1 IS NULL OR i.id = ?1)
             GROUP BY p.data_set, c.achievement, i.id ORDER BY at, i.id`);
-        return (this.hallRows.all(identity) as { data_set: string; achievement: string; identity: string; name: string; at: number }[])
+        this.hallFigures ??= this.db.prepare(`SELECT p.data_set, i.id AS owner, i.name, p.id AS proof, p.playthrough, p.checked_at AS at, f.key, f.value
+            FROM proof_figures f JOIN proofs p ON p.id = f.proof JOIN identity_players ip ON ip.player = p.player JOIN identities i ON i.id = ip.identity
+            WHERE p.state = 'checked' AND i.name IS NOT NULL AND (?1 IS NULL OR i.id = ?1) ORDER BY p.checked_at, p.id, f.key`);
+        const rows = (this.hallRows.all(identity) as { data_set: string; achievement: string; identity: string; name: string; at: number }[])
             .map((row) => ({ dataSet: row.data_set, achievement: row.achievement, identity: row.identity, name: row.name, at: row.at }));
+        const figures = this.hallFigures.all(identity) as unknown as (FigureRow & { name: string })[];
+        const names = new Map(figures.map((row) => [row.owner, row.name]));
+        const first = new Map(rows.map((row) => [`${row.dataSet}\u0000${row.achievement}\u0000${row.identity}`, row]));
+        for (const row of acrossRows(figures, across)) {
+            const key = `${row.dataSet}\u0000${row.achievement}\u0000${row.owner}`;
+            const held = first.get(key);
+            if (held === undefined) first.set(key, { dataSet: row.dataSet, achievement: row.achievement, identity: row.owner, name: names.get(row.owner)!, at: row.at });
+            else held.at = Math.min(held.at, row.at);
+        }
+        return [...first.values()].sort((a, b) => a.at - b.at || (a.identity < b.identity ? -1 : a.identity > b.identity ? 1 : 0));
     }
 
     /**
@@ -224,12 +327,13 @@ export class ProofStore {
 
     /**
      * `id` replayed to its point, in the playthrough `playthrough`, the replay having
-     * unlocked `unlocked`: each claim verified or dropped, and each unlock it did not claim
-     * granted, verified.
+     * unlocked `unlocked` and its history's figures being `figures`: each claim verified or
+     * dropped, each unlock it did not claim granted, verified, and each figure above 0 kept.
      */
-    checked(id: string, at: number, playthrough: number, unlocked: ReadonlySet<string>): void {
+    checked(id: string, at: number, playthrough: number, unlocked: ReadonlySet<string>, figures: Readonly<Record<string, number>>): void {
         this.transaction(() => {
             this.updateChecked.run(at, playthrough, id);
+            for (const [key, value] of Object.entries(figures)) if (value > 0) this.insertFigure.run(id, key, value);
             const claimed = new Set<string>();
             for (const { achievement } of this.claims(id)) {
                 claimed.add(achievement);
@@ -294,7 +398,7 @@ export interface ProofOptions {
     now: () => number;
 }
 
-/** The claims `text` lists: 1 to `MAX_CLAIMS` distinct ids of `CLAIM_ID`'s form, or `null`. */
+/** The claims `text` lists: 0 to `MAX_CLAIMS` distinct ids of `CLAIM_ID`'s form, or `null`. */
 function claimsOf(text: string): string[] | null {
     let json: unknown;
     try {
@@ -302,7 +406,7 @@ function claimsOf(text: string): string[] | null {
     } catch {
         return null;
     }
-    if (!Array.isArray(json) || json.length === 0 || json.length > MAX_CLAIMS) return null;
+    if (!Array.isArray(json) || json.length > MAX_CLAIMS) return null;
     if (!json.every((id) => typeof id === 'string' && CLAIM_ID.test(id)) || new Set(json).size !== json.length) return null;
     return json as string[];
 }
@@ -320,7 +424,8 @@ function playedWithDevMoves(pkg: SharedPackage): boolean {
  *
  *   403  a player whose identity has no public name, or who has none
  *   400  a form that is not `PROOF_FIELDS` alone, the package a file and the claims a JSON
- *        list of 1 to `MAX_CLAIMS` distinct ids of `CLAIM_ID`'s form
+ *        list of 0 to `MAX_CLAIMS` distinct ids of `CLAIM_ID`'s form: a proof whose figures
+ *        grew claims nothing
  *   413  a package over `MAX_RECORDING_BYTES`
  *   422  a package `readPackage` refuses, saying why; one of a set the site does not
  *        publish, pending or not in the table; one that holds a move of the page's `?dev`
@@ -338,7 +443,7 @@ export async function sendProof(form: FormData, playerId: string, options: Proof
     const text = form.get(PROOF_FIELDS.claims);
     const claims = typeof text === 'string' ? claimsOf(text) : null;
     if (fields.length !== 2 || !(file instanceof File) || claims === null) {
-        return refuse(400, `The form is not a file, ${PROOF_FIELDS.package}, and ${PROOF_FIELDS.claims}, a list of 1 to ${MAX_CLAIMS} achievements' ids.`);
+        return refuse(400, `The form is not a file, ${PROOF_FIELDS.package}, and ${PROOF_FIELDS.claims}, a list of 0 to ${MAX_CLAIMS} achievements' ids.`);
     }
     if (file.size > MAX_RECORDING_BYTES) return refuse(413, `The package is larger than ${MAX_RECORDING_BYTES / (1024 * 1024)} MiB.`);
 
@@ -405,7 +510,10 @@ export interface VerifierSet {
 
 /** What the page's replay says of a proof (`ProofReplayed`). */
 export type ProofReplayed =
-    | { readonly kind: 'checked'; readonly dataSet: string; readonly over: string; readonly playthrough: number; readonly unlocked: readonly string[] }
+    | {
+        readonly kind: 'checked'; readonly dataSet: string; readonly over: string; readonly playthrough: number;
+        readonly unlocked: readonly string[]; readonly figures: Readonly<Record<string, number>>;
+    }
     | { readonly kind: 'drifted'; readonly reason: string };
 
 /** The page's replay of a proof, `replayProof`, as `VERIFIER_MODULE` exports it, its achievements given by `defsOf` (`app.ts`). */
@@ -472,8 +580,9 @@ export interface Verified {
  * The verifier's step: the oldest queued proof replayed (`replay`) and its verdict kept, or
  * `null` where none is queued. Played to its point, it is `checked`: each claim the replay
  * unlocked verified and each other dropped, an unlock it did not claim granted, verified,
- * and its file deleted where it verified nothing of its own, nothing that an earlier proof of
- * its identity's browsers had not in the same playthrough. Where it drifts, or its file is
+ * its history's figures kept, and its file deleted where it verified nothing of its own,
+ * nothing that an earlier proof of its identity's browsers had not in the same playthrough:
+ * figures that grew alone keep no file. Where it drifts, or its file is
  * gone, it is `drifted`, the reason kept, its claims unverified and its file kept.
  */
 export async function verifyNext(options: VerifyOptions): Promise<Verified | null> {
@@ -499,7 +608,7 @@ export async function verifyNext(options: VerifyOptions): Promise<Verified | nul
     const unlocked = new Set(replayed.unlocked);
     const players = playersOf(options.identities, proof.player);
     const own = replayed.unlocked.filter((achievement) => !proofs.verifiedBefore(achievement, proof.dataSet, playthrough, proof.id, players));
-    proofs.checked(proof.id, options.now(), playthrough, unlocked);
+    proofs.checked(proof.id, options.now(), playthrough, unlocked, replayed.figures);
     const dropped = proofs.claims(proof.id).filter((claim) => claim.state === 'dropped').map((claim) => claim.achievement);
     if (own.length === 0) {
         await rm(path, { force: true });

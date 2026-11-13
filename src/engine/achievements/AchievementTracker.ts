@@ -248,6 +248,11 @@ export class AchievementTracker {
     return this.state.figures();
   }
 
+  /** The figures of the history `snapshot`, a save's as its file was made (`GameFigures`). */
+  figuresOf(snapshot: AchievementSnapshot): GameFigures {
+    return AchievementState.restore(this.defs, snapshot).figures();
+  }
+
   /** Told each event as it is recorded. */
   onEvent(listener: (event: AchievementEvent) => void): void {
     this.eventListeners.push(listener);

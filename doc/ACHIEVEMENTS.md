@@ -400,8 +400,12 @@ across games over the playthroughs' figures.
   anywhere else, `games(lost and not (…)) >= 1`.
 
 A total is of one set's games: a Dungeon Master won on the Atari 1.1 and one on the Amiga
-are two sets' wins. No proof claims an achievement across games yet, so the Hall of Fame
-counts none (`DEBT.md` X20).
+are two sets' wins.
+
+**On the server** an achievement across games is claimed by no proof: each replay keeps its
+history's figures (`proof_figures`, "Proofs"), and the Hall works the achievements out of
+an identity's checked proofs ("The Hall of Fame"). A Dungeon Janitor or an HR Problem a
+replay verified in one game, before they moved across games, stays verified.
 
 ### When an achievement unlocks
 
@@ -815,7 +819,8 @@ package is kept in `PROOFS_DIR` (`proofs/` beside the store), never served.
 
 - **`POST api/proofs`** takes a form of two fields (`PROOF_FIELDS`): the package, read with
   the page's own reader as a shared recording is (`readRecordingPackage`), which checks its
-  form alone, and the claims, a JSON list of 1 to 64 distinct ids (`CLAIM_ID`, `MAX_CLAIMS`).
+  form alone, and the claims, a JSON list of 0 to 64 distinct ids (`CLAIM_ID`, `MAX_CLAIMS`):
+  a proof sent because its figures grew claims nothing.
   Only a browser whose identity has a public name sends one; a set the site does not
   publish, a package that does not read and one holding a move of `?dev`, which earns
   nothing, are refused; an identity's browsers have at most 8 proofs queued at once
@@ -852,13 +857,16 @@ achievements, beside the main server's readers (`PageReaders.js`), which never l
 - **Played to its point**, the proof is `checked`, and its playthrough is the one the replay
   read there (`d.RandomGameID`). Each claim the replay's history holds is `verified`, each
   other `dropped`, and an unlock it holds that the page did not claim is granted,
-  `verified`, all the same: the replay is the authority, not the claim.
+  `verified`, all the same: the replay is the authority, not the claim. Its history's
+  figures there (`GameFigures`, "Across games") are kept, each above 0, in
+  `proof_figures`, a row per proof and key.
 - **Where it does not**, it drifts, a later level's, a package that does not read and one
   whose files no set has among them, the proof is `drifted`, the reason kept and answered,
   its claims `unverified`, and its file kept.
 - **A proof that verified nothing of its own**, nothing an earlier proof of its identity's
   browsers had not verified in the same playthrough, has its file deleted once checked
-  (`ProofStore.dropFile`); its row and its claims stay. A proof that did is kept, and the
+  (`ProofStore.dropFile`); its row, its claims and its figures stay. Figures that grew
+  alone keep no file. A proof that did is kept, and the
   nightly backup copies its package once (`server/backup.ts`, `doc/DEPLOYMENT.md` →
   "Backups").
 
@@ -866,8 +874,9 @@ achievements, beside the main server's readers (`PageReaders.js`), which never l
 page's source: a genuine corpus recording (`replay-saves-written-over`) whose forged claim is
 dropped and whose First Blood is granted, the same game again verified but not its own and
 its file deleted, a game unlocking nothing whose claim is dropped, a package whose save
-differs and one made by hand left unverified with their reasons, the verdicts as the page
-asks them and the profile. `tools/checks/build.ts` proves the built module replays as the
+differs and one made by hand left unverified with their reasons, the same game claiming
+nothing, its two kills kept as its figures, a drifted proof keeping none, the verdicts as
+the page asks them and the profile. `tools/checks/build.ts` proves the built module replays as the
 source does, and `tools/check-image.sh` runs the verifier in its own container beside the
 server's, a proof sent to the server checked by it.
 
@@ -892,8 +901,12 @@ server's routes (`src/ui/proofRoutes.ts`). Only a browser whose player has a pub
   playthrough a teleport touched has no rows, so it claims nothing.
 - **When it is sent**: at a save (`GameSaves.onSaved`), the history its row kept as its
   file was made (`SaveEntry.achievements`), when it claims an unlock no proof has claimed
-  yet and this page sent none of the playthrough for ten minutes (`PROOF_INTERVAL_MS`); and
-  at the game's end, when it claims anything. The package is the store's point, packed as
+  yet or its figures grew, and this page sent none of the playthrough for ten minutes
+  (`PROOF_INTERVAL_MS`); and at the game's end, when it claims anything or its figures
+  grew. Its **figures grew** where one of its history's figures (`figuresOf`) is past the
+  largest the proofs this page sent of the playthrough held, so that a game that unlocks
+  nothing new still counts across games; a page loaded afresh knows of no proof sent, and
+  sends one more. A playthrough a teleport touched has no figures. The package is the store's point, packed as
   the book's UPLOAD packs it, titled `Proof` (`storedPackage`): the save's, its recording
   written to the store first, or the set's latest game's end.
 - **Each row claimed keeps the proof's id** (`AchievementRow.proofs`). The page asks for the
@@ -906,13 +919,16 @@ server's routes (`src/ui/proofRoutes.ts`). Only a browser whose player has a pub
 - **Shown**: the dialog's detail says UNLOCKED, VERIFIED or UNLOCKED, NOT VERIFIED; the
   book's tab says of each playthrough's unlock "verified", "not verified", "awaiting the
   server" or "its replay drifted", and nothing where no proof claimed it; PROFILE's "Your
-  achievements, verified" lists the server's by name. ABOUT tells the player the
-  recordings are sent, kept and replayed.
+  achievements, verified" lists the server's by name. An achievement across games, which
+  no proof claims, is UNLOCKED, NOT VERIFIED in the dialog and has nothing in the book:
+  PROFILE says whether the server counts it. ABOUT tells the player the recordings are
+  sent, kept and replayed.
 
 The dev server is its own verifier: it replays each proof as it is queued, in its own
 process (`vite.config.mts`). `tools/checks/achievement-proofs.ts` proves the verdicts, the
-claims, when the page sends, the package of a save the store keeps, replayed to First
-Blood by the verifier's replay, and the whole CSB game, from the adventure's start, to
+claims, when the page sends, a proof claiming nothing where the figures grew among them,
+the package of a save the store keeps, replayed to First Blood and its kills by the
+verifier's replay, and the whole CSB game, from the adventure's start, to
 Speed Runner; `tools/probe-frames.ts` a proof the live page sends with a
 name, replayed by the dev server, First Blood verified and Pest Control dropped, and the
 book saying so.
@@ -935,6 +951,13 @@ checked (`ProofStore.hall`). GET only, 404 for an unknown set or id, and none ho
   among them; an unverified claim, a dropped one and a drifted proof's count for nothing.
   Its time is the time its first proof of the identity's was checked (`checked_at`), not
   sent.
+- **An achievement across games verified** is one the figures of the identity's checked
+  proofs of the set make yes (`acrossRows`, `server/proofs.ts`): its proofs are taken in
+  the order they were checked, each playthrough at the largest figure any of its proofs
+  reached so far, never their sum, and the build's conditions tested over them after each
+  (`achievementsAcross`, which the page's readers export beside `achievementDefs`). Its
+  time is that of the proof after which the condition was first yes. PROFILE's
+  achievements (`ProofStore.verifiedBy`) count them the same way.
 - **The sets** are the public ones, approved and not hidden, as `api/stats`'; **their
   achievements** the build's (`achievementDefs`, `src/ui/achievementFiles.ts`), which the
   server reads through the page's readers, `dist/server/PageReaders.js` exporting them as
@@ -956,8 +979,12 @@ The dev server answers the routes over its own proofs, uncached (`vite.config.mt
 the first by `checked_at` and not by the time sent, a reset name left out and its page 404,
 pending and hidden sets left out, dropped, unverified and drifted claims and an unlock the
 file does not hold not counted, each achievement in its file's order, a player's badges and
-their days, the 404s, the cache, and no `playerId`, playthrough or proof id in any answer.
-`tools/checks/build.ts` proves the built readers hold the source's achievements.
+their days, the 404s, the cache, and no `playerId`, playthrough or proof id in any answer;
+and the achievements across games out of the proofs' figures, a playthrough at its
+largest and not its proofs' sum, Dungeon Janitor at the proof past 500 kills and Encore at
+the third game won, a drifted and a queued proof's figures not counted, a Janitor verified
+in one game still counted, and the profile the same. `tools/checks/build.ts` proves the
+built readers hold the source's achievements and work those across games out of figures.
 
 **The page** is `/fame` (`fame.html`, Vite's third entry, `src/fame/famePage.ts`), in the
 statistics page's look (`doc/STATISTICS.md`), which loads none of the game's code: the

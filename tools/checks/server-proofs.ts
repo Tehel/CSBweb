@@ -6,8 +6,8 @@
  * Asserts:
  *   - only a player with a public name sends one: none, 403; a name a moderator reset,
  *     403; nothing written;
- *   - the form: not multipart 400; a package without claims, claims not a JSON list, an
- *     empty one, one of more than `MAX_CLAIMS`, an id twice, an id not of `CLAIM_ID`'s
+ *   - the form: not multipart 400; a package without claims, claims not a JSON list, one
+ *     of more than `MAX_CLAIMS`, an id twice, an id not of `CLAIM_ID`'s
  *     form, an extra field, each 400; a package that does not read 422, saying why; one of
  *     a set the site does not publish 422; one with a move of `?dev` 422; nothing written;
  *   - a proof sent: 201 and its id, its file kept in `PROOFS_DIR` and never served, its row
@@ -27,8 +27,9 @@
  *     (`quietPackage`) claiming First Blood, dropped, its file deleted; the same package
  *     whose save shared differs, drifted, its claims unverified and the reason answered,
  *     its file kept; a package made by hand that the game does not play as it says,
- *     drifted; the verdicts answered as the page asks them, and the
- *     profile listing First Blood once;
+ *     drifted; the genuine recording again claiming nothing, for its figures alone,
+ *     checked, its kills kept as its figures (`proof_figures`), a drifted proof's none; the
+ *     verdicts answered as the page asks them, and the profile listing First Blood once;
  *   - a moderator watching them (`identityText`, `answerProofPackage`): the identity's
  *     proofs, the latest first, each its set, state, reason, package kept or not and
  *     claims, uncached; a kept package's bytes, to a moderator alone, not to its sender nor
@@ -55,6 +56,7 @@ import {
 } from '../../src/data/DataSets.ts';
 import { checkLocalDataSet } from '../../src/engine/LocalDataSetCheck.ts';
 import { replayProof } from '../../src/engine/achievements/ProofReplay.ts';
+import { acrossUnlocked } from '../../src/engine/achievements/AchievementState.ts';
 import { setAchievementDefs } from '../../src/engine/achievements/PageAchievements.ts';
 import { readRecordingPackage, writeRecordingPackage } from '../../src/engine/RecordingPackage.ts';
 import { check, finish } from '../lib/check.ts';
@@ -110,6 +112,7 @@ async function main(): Promise<void> {
         identities: { store: identities, rateLimit: new RateLimit(100, 60_000) },
         proofs: { store: proofs, dir: proofsDir, rateLimit: new RateLimit(PROOFS_PER_WINDOW, 60_000) },
         achievementDefs: () => COMMON,
+        achievementsAcross: (_id: string, games: readonly Readonly<Record<string, number>>[]) => acrossUnlocked(COMMON.filter((def) => def.across), games),
     };
     const server = createAppServer({ distDir, gamefilesDir }, api);
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
@@ -169,7 +172,7 @@ async function main(): Promise<void> {
         const badForms: [FormData, string][] = [
             [formOf(won, null), 'a package without claims'], [formOf(null, claims), 'claims without a package'],
             [formOf(won, 'first-blood'), 'claims that are not JSON'], [formOf(won, '{"id": "first-blood"}'), 'claims that are no list'],
-            [formOf(won, '[]'), 'no claim'], [formOf(won, tooMany), `${MAX_CLAIMS + 1} claims`],
+            [formOf(won, tooMany), `${MAX_CLAIMS + 1} claims`],
             [formOf(won, '["first-blood", "first-blood"]'), 'an id twice'], [formOf(won, '["First-Blood"]'), 'an id in capitals'],
             [formOf(won, '["-blood"]'), 'an id with a - first'], [formOf(won, `["${'a'.repeat(65)}"]`), 'an id of 65 characters'],
             [formOf(won, '[7]'), 'an id that is a number'], [formOf(won, claims, { note: 'hi' }), 'a field more'],
@@ -287,6 +290,7 @@ async function verifier(): Promise<void> {
         identities: { store: identities, rateLimit: new RateLimit(100, 60_000) },
         proofs: { store: proofs, dir: proofsDir, rateLimit: new RateLimit(100, 60_000) },
         achievementDefs: () => COMMON,
+        achievementsAcross: (_id: string, games: readonly Readonly<Record<string, number>>[]) => acrossUnlocked(COMMON.filter((def) => def.across), games),
     };
     const server = createAppServer({ distDir, gamefilesDir }, api);
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
@@ -326,14 +330,15 @@ async function verifier(): Promise<void> {
         if (quiet.shared.kind !== 'save') throw new Error('quietPackage is no longer shared at a save');
         const drifting = await send(new Uint8Array(await writeRecordingPackage({ ...quiet, shared: { ...quiet.shared, md5: '0'.repeat(32) } })), ['first-blood']);
         const elsewhere = await send(await packageOf('dm-atari', 'Elsewhere'), ['first-blood']);
+        const figured = await send(genuine, []);
 
         const done = [];
         for (let step = await verifyNext(options); step !== null; step = await verifyNext(options)) {
             console.log(`  ${JSON.stringify(step)}`);
             done.push(step);
         }
-        check(JSON.stringify(done.map((step) => step.id)) === JSON.stringify([forged, again, lost, drifting, elsewhere]), 'each queued proof replayed once, the oldest first');
-        const [first, second, third, fourth, fifth] = done;
+        check(JSON.stringify(done.map((step) => step.id)) === JSON.stringify([forged, again, lost, drifting, elsewhere, figured]), 'each queued proof replayed once, the oldest first');
+        const [first, second, third, fourth, fifth, sixth] = done;
         check(first?.state === 'checked' && JSON.stringify(first.verified) === '["first-blood"]' && JSON.stringify(first.dropped) === '["roll-the-credits"]'
             && JSON.stringify(first.own) === '["first-blood"]' && first.kept && existsSync(join(proofsDir, `${forged}.gz`)),
             'a genuine recording claiming what it does not unlock: the claim dropped, First Blood granted unclaimed, its file kept');
@@ -349,6 +354,12 @@ async function verifier(): Promise<void> {
             && proofs.claims(drifting).every((claim) => claim.state === 'unverified'),
             `a package whose save differs: drifted, "${fourth?.reason}", its claims unverified, its file kept`);
         check(fifth?.state === 'drifted' && fifth.reason.length > 0, `a package made by hand: drifted, "${fifth?.reason}"`);
+        const figuresOf = (id: string) => JSON.stringify(db.prepare('SELECT key, value FROM proof_figures WHERE proof = ? ORDER BY key').all(id).map((row) => [row.key, row.value]));
+        console.log(`  the figures kept: ${figuresOf(figured)}`);
+        check(sixth?.state === 'checked' && sixth.own.length === 0 && !sixth.kept && proofs.claims(figured).every((claim) => !claim.claimed)
+            && figuresOf(figured) === JSON.stringify([[`total(${COMMON.find((def) => def.id === 'dungeon-janitor')!.aggregates[0]!.key})`, 2]]) && figuresOf(forged) === figuresOf(figured),
+            'the same game claiming nothing, for its figures: checked, its two kills kept as its figures, its file deleted');
+        check(figuresOf(drifting) === '[]' && figuresOf(lost) === '[]', 'a drifted proof keeps no figure, nor a game with nothing above 0');
 
         const verdicts = await verdictsOf([forged, again, lost, drifting]);
         console.log(`  the verdicts: ${JSON.stringify(verdicts)}`);
@@ -374,9 +385,9 @@ async function verifier(): Promise<void> {
         const listed = (JSON.parse(moderatedBody) as ModeratedIdentity).proofs;
         console.log(`  to a moderator: ${JSON.stringify(listed.map(({ id, state, kept, claims }) => ({ id, state, kept, claims })))}`);
         const byId = new Map(listed.map((proof) => [proof.id, proof]));
-        check(moderated.status === 200 && moderated.headers.get('cache-control') === 'no-store' && listed.length === 5
+        check(moderated.status === 200 && moderated.headers.get('cache-control') === 'no-store' && listed.length === 6
             && listed.every((proof, i) => i === 0 || proof.sentAt <= listed[i - 1]!.sentAt)
-            && [forged, again, lost, drifting, elsewhere].every((id) => byId.has(id))
+            && [forged, again, lost, drifting, elsewhere, figured].every((id) => byId.has(id))
             && JSON.stringify(byId.get(forged)?.claims) === JSON.stringify({ 'first-blood': 'verified', 'roll-the-credits': 'dropped' })
             && byId.get(forged)?.kept === true && byId.get(again)?.kept === false && byId.get(drifting)?.reason === fourth?.reason
             && byId.get(forged)?.name === dataSets.read().dataSets.find((one) => one.id === 'dm-atari-1.2')?.name,

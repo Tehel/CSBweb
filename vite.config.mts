@@ -16,7 +16,7 @@ import { FileDigestCache, filesText } from './server/setFiles.ts';
 import { RateLimit } from './server/events.ts';
 import { IdentityStore } from './server/identity.ts';
 import { NOBODY } from './server/notify.ts';
-import { ProofStore, verifyNext, type BuiltReplayProof, type VerifierReaders } from './server/proofs.ts';
+import { ProofStore, verifyNext, type AchievementsAcrossOf, type BuiltReplayProof, type VerifierReaders } from './server/proofs.ts';
 import type { CheckDataSet } from './server/publish.ts';
 import type { AchievementDefsOf } from './server/fame.ts';
 import { RecordingStore, type ReadRecordingPackage } from './server/recordings.ts';
@@ -349,7 +349,10 @@ function dataSetsRoute(): Plugin {
         const db = new sqlite.DatabaseSync(':memory:');
         try {
           if (req.method === 'POST') await receiveProfileChange({ now: Date.now, identities, notify: NOBODY }, req, res);
-          else answerProfile({ dataSets: openStore(db), store: stats, recordings: { store: recordingStore }, identities, proofs }, req, res);
+          else {
+            const { achievementsAcross } = (await server.ssrLoadModule('/src/ui/achievementFiles.ts')) as { achievementsAcross: AchievementsAcrossOf };
+            answerProfile({ dataSets: openStore(db), store: stats, recordings: { store: recordingStore }, identities, proofs, achievementsAcross }, req, res);
+          }
         } catch (error) {
           next(error);
         } finally {
@@ -451,8 +454,8 @@ function dataSetsRoute(): Plugin {
         }
         const db = new sqlite.DatabaseSync(':memory:');
         try {
-          const { achievementDefs } = (await server.ssrLoadModule('/src/ui/achievementFiles.ts')) as { achievementDefs: AchievementDefsOf };
-          answerFame(path, { dataSets: openStore(db), proofs, identities, achievementDefs }, fameCache, req, res);
+          const { achievementDefs, achievementsAcross } = (await server.ssrLoadModule('/src/ui/achievementFiles.ts')) as { achievementDefs: AchievementDefsOf; achievementsAcross: AchievementsAcrossOf };
+          answerFame(path, { dataSets: openStore(db), proofs, identities, achievementDefs, achievementsAcross }, fameCache, req, res);
         } catch (error) {
           next(error);
         } finally {

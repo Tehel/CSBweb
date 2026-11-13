@@ -25,6 +25,7 @@ import { cutPageOf, standInPage } from '../../renderer/StandInPage';
 import { cutDriftReason, playCut } from '../RecordingCut';
 import { readRecordingPackage, type RecordingPackage } from '../RecordingPackage';
 import type { AchievementDef } from './AchievementFile';
+import type { GameFigures } from './AchievementState';
 import { AchievementTracker } from './AchievementTracker';
 
 /** A set a proof may be played over: the page's set, its files, and their digests. */
@@ -38,9 +39,13 @@ export interface ProofSet {
 export type ProofReplayed =
     /**
      * It played to its point over the set `over`, in the playthrough `playthrough`
-     * (`d.RandomGameID` there), and its history then holds `unlocked`, in the file's order.
+     * (`d.RandomGameID` there), and its history then holds `unlocked`, in the file's order,
+     * and `figures`, those the achievements across games read (`GameFigures`).
      */
-    | { readonly kind: 'checked'; readonly dataSet: string; readonly over: string; readonly playthrough: number; readonly unlocked: readonly string[] }
+    | {
+        readonly kind: 'checked'; readonly dataSet: string; readonly over: string; readonly playthrough: number;
+        readonly unlocked: readonly string[]; readonly figures: GameFigures;
+    }
     /** It did not: why, as a line says it. */
     | { readonly kind: 'drifted'; readonly reason: string };
 
@@ -77,7 +82,7 @@ export async function replayProof(
         if (drift) return drifted(cutDriftReason(drift));
         return {
             kind: 'checked', dataSet: pkg.dataSet, over: over.set.id, playthrough: page.game.ctx.state.block1.randomGameID,
-            unlocked: defs.filter((def) => tracker.unlocked.has(def.id)).map((def) => def.id),
+            unlocked: defs.filter((def) => tracker.unlocked.has(def.id)).map((def) => def.id), figures: tracker.figures(),
         };
     } catch (error) {
         return drifted(`it does not play: ${error instanceof Error ? error.message : String(error)}`);

@@ -40,7 +40,7 @@ import {
 import type { ClaimState, ModeratedIdentity } from '../src/data/DataSets.ts';
 import { samePlayerId, type DataSetStore, type DataSetViewer } from './dataSets.ts';
 import { NOBODY, type Notify } from './notify.ts';
-import type { ProofStore } from './proofs.ts';
+import type { AchievementsAcrossOf, ProofStore } from './proofs.ts';
 import type { RecordingStore } from './recordings.ts';
 import type { StatsStore } from './stats.ts';
 
@@ -192,6 +192,8 @@ export interface ProfileSources {
     recordings: RecordingStore;
     stats: StatsStore;
     proofs: ProofStore;
+    /** The build's achievements across games the proofs' figures make yes (`ProofStore.verifiedBy`). */
+    across: AchievementsAcrossOf;
 }
 
 /** The `playerId`s `player` speaks for: their identity's, or theirs alone. */
@@ -206,10 +208,11 @@ function playersOf(identities: IdentityStore, player: string): { identity: Ident
  * the sets they published, whatever their state; the recordings they shared, and how many
  * of them are listed; their `started`, `won` and `lost` events by set, which the statistics
  * log keeps with their `playerId` (`StatsStore.playerCounts`); and their achievements, those
- * a replay of their proofs verified (`ProofStore.verifiedBy`), by set, each once, the first
- * verified first. A set the table no longer holds goes by its id.
+ * a replay of their proofs verified and those across games their figures make yes
+ * (`ProofStore.verifiedBy`), by set, each once, the first verified first. A set the table
+ * no longer holds goes by its id.
  */
-export function profileText(player: string, { identities, dataSets, recordings, stats, proofs }: ProfileSources): string {
+export function profileText(player: string, { identities, dataSets, recordings, stats, proofs, across }: ProfileSources): string {
     const { identity, players } = playersOf(identities, player);
     const theirs = (owner: string | null) => owner !== null && players.some((one) => samePlayerId(one, owner));
     const sets = dataSets.read().dataSets;
@@ -225,7 +228,7 @@ export function profileText(player: string, { identities, dataSets, recordings, 
         })),
         replays: shared.filter((recording) => !recording.pending && !recording.hidden && !recording.broken).length,
         statistics: stats.playerCounts(players).map((row) => ({ ...row, name: nameOf(row.dataSet) })),
-        achievements: achievementsBySet(proofs.verifiedBy(players), nameOf),
+        achievements: achievementsBySet(proofs.verifiedBy(players, across), nameOf),
     };
     return JSON.stringify(profile);
 }

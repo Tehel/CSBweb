@@ -78,7 +78,7 @@ import { editDataSet } from './edit.ts';
 import { fameSet, famePlayer, fameSummary, type AchievementDefsOf } from './fame.ts';
 import { addressBucket, checkEvent, isPlayerId, MAX_EVENT_BYTES, type EventRules, type RateLimit } from './events.ts';
 import { changeProfile, identityText, MAX_PROFILE_BYTES, profileText, resetName, type IdentityStore, type ProfileAnswer } from './identity.ts';
-import { MAX_PROOF_BYTES, proofsText, sendProof, type BuiltReplayProof, type ProofAnswer, type ProofStore, type VerifierReaders } from './proofs.ts';
+import { MAX_PROOF_BYTES, proofsText, sendProof, type AchievementsAcrossOf, type BuiltReplayProof, type ProofAnswer, type ProofStore, type VerifierReaders } from './proofs.ts';
 import { MAX_MODERATION_BYTES, moderateDataSet, type ModerationAnswer } from './moderate.ts';
 import type { Notify } from './notify.ts';
 import { FileDigestCache, filesText } from './setFiles.ts';
@@ -106,13 +106,15 @@ export const READERS_MODULE = `${SERVER_DIR}/PageReaders.js`;
 /**
  * What the server uses of `READERS_MODULE`: the page's check of a set, its reader of a
  * dungeon's walls, its reader of a shared recording's package, and the build's
- * achievements, which the Hall of Fame lists (`fame.ts`).
+ * achievements, which the Hall of Fame lists (`fame.ts`), and those across games the
+ * proofs' figures make yes (`ProofStore.hall`).
  */
 export interface PageReaders {
     checkDataSet: CheckDataSet;
     readDungeonWalls: ReadDungeonWalls;
     readRecordingPackage: ReadRecordingPackage;
     achievementDefs: AchievementDefsOf;
+    achievementsAcross: AchievementsAcrossOf;
 }
 
 /**
@@ -140,7 +142,7 @@ export async function loadVerifierReaders(distDir: string): Promise<VerifierRead
 /** What `READERS_MODULE` exports, loaded from `distDir`; throws, saying why, where it is not built. */
 export async function loadPageReaders(distDir: string): Promise<PageReaders> {
     const file = join(distDir, READERS_MODULE);
-    let module: { checkLocalDataSet?: unknown; readDungeonWalls?: unknown; readRecordingPackage?: unknown; achievementDefs?: unknown };
+    let module: { checkLocalDataSet?: unknown; readDungeonWalls?: unknown; readRecordingPackage?: unknown; achievementDefs?: unknown; achievementsAcross?: unknown };
     try {
         module = await import(pathToFileURL(file).href);
     } catch (error) {
@@ -150,9 +152,11 @@ export async function loadPageReaders(distDir: string): Promise<PageReaders> {
     if (typeof module.readDungeonWalls !== 'function') throw new Error(`${file} exports no readDungeonWalls`);
     if (typeof module.readRecordingPackage !== 'function') throw new Error(`${file} exports no readRecordingPackage`);
     if (typeof module.achievementDefs !== 'function') throw new Error(`${file} exports no achievementDefs`);
+    if (typeof module.achievementsAcross !== 'function') throw new Error(`${file} exports no achievementsAcross`);
     return {
         checkDataSet: module.checkLocalDataSet as CheckDataSet, readDungeonWalls: module.readDungeonWalls as ReadDungeonWalls,
         readRecordingPackage: module.readRecordingPackage as ReadRecordingPackage, achievementDefs: module.achievementDefs as AchievementDefsOf,
+        achievementsAcross: module.achievementsAcross as AchievementsAcrossOf,
     };
 }
 
@@ -203,6 +207,8 @@ export interface ApiOptions {
     proofs: ProofsApi;
     /** The build's achievements of a set, which the Hall of Fame lists (`READERS_MODULE`'s, `fame.ts`). */
     achievementDefs: AchievementDefsOf;
+    /** The build's achievements across games the proofs' figures make yes (`READERS_MODULE`'s, `ProofStore.hall`). */
+    achievementsAcross: AchievementsAcrossOf;
 }
 
 /** What the API needs of the proofs. */
@@ -486,7 +492,7 @@ export function answerStats(path: string[], api: StatsApi, statsCache: AnswerCac
 }
 
 /** What `answerFame` needs of the API. */
-export type FameApi = Pick<ApiOptions, 'dataSets' | 'achievementDefs'> & { proofs: Pick<ProofsApi, 'store'>; identities: Pick<IdentitiesApi, 'store'> };
+export type FameApi = Pick<ApiOptions, 'dataSets' | 'achievementDefs' | 'achievementsAcross'> & { proofs: Pick<ProofsApi, 'store'>; identities: Pick<IdentitiesApi, 'store'> };
 
 /**
  * `FAME_ROUTE/<path>`: the Hall of Fame (`fame.ts`): every public set's figures for an empty
@@ -500,17 +506,17 @@ export function answerFame(path: string[], api: FameApi, cache: AnswerCache, req
     const sets = publicSets(api.dataSets);
     const [kind, id] = path;
     let make: () => FameSummary | FameSet | FamePlayerPage;
-    if (path.length === 0) make = () => fameSummary(sets, api.proofs.store.hall(), api.achievementDefs);
+    if (path.length === 0) make = () => fameSummary(sets, api.proofs.store.hall(null, api.achievementsAcross), api.achievementDefs);
     else if (path.length !== 2) return send(res, 404, 'Not found');
     else if (kind === FAME_SETS) {
         const set = sets.find((known) => known.id === id);
         if (set === undefined) return send(res, 404, 'Not found');
-        make = () => fameSet(set, api.proofs.store.hall(), api.achievementDefs);
+        make = () => fameSet(set, api.proofs.store.hall(null, api.achievementsAcross), api.achievementDefs);
     } else if (kind === FAME_PLAYERS) {
         const identity = PUBLIC_ID.test(id!) ? api.identities.store.get(id!) : null;
         if (!identity?.name) return send(res, 404, 'Not found');
         const player = { id: identity.id, name: identity.name };
-        make = () => famePlayer(player, sets, api.proofs.store.hall(player.id), api.achievementDefs);
+        make = () => famePlayer(player, sets, api.proofs.store.hall(player.id, api.achievementsAcross), api.achievementDefs);
     } else return send(res, 404, 'Not found');
     res.setHeader('Cache-Control', `public, max-age=${STATS_CACHE_MS / 1000}`);
     send(res, 200, cache.get(`${FAME_ROUTE}/${path.join('/')}`, () => JSON.stringify(make())), 'application/json; charset=utf-8');
@@ -821,7 +827,7 @@ export async function receiveRecordingModeration(id: string, api: RecordingShare
 }
 
 /** What `answerProfile` needs of the API. */
-export type ProfileApi = Pick<ApiOptions, 'dataSets' | 'store'> & {
+export type ProfileApi = Pick<ApiOptions, 'dataSets' | 'store' | 'achievementsAcross'> & {
     recordings: Pick<RecordingsApi, 'store'>; identities: Pick<IdentitiesApi, 'store'>; proofs: Pick<ProofsApi, 'store'>;
 };
 
@@ -837,6 +843,7 @@ export function answerProfile(api: ProfileApi, req: IncomingMessage, res: Server
     res.setHeader('Vary', PLAYER_ID_HEADER);
     send(res, 200, profileText(header, {
         identities: api.identities.store, dataSets: api.dataSets, recordings: api.recordings.store, stats: api.store, proofs: api.proofs.store,
+        across: api.achievementsAcross,
     }), 'application/json; charset=utf-8');
 }
 

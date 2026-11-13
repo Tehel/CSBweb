@@ -12,7 +12,7 @@ import { mergeFigures, type AchievementProof, type AchievementRow, type Achievem
 import type { Game } from '../Game';
 import type { GameSaves } from '../GameSaves';
 import { mergeAchievements, readAchievementFile, type AchievementDef } from './AchievementFile';
-import { acrossUnlocked } from './AchievementState';
+import { acrossUnlocked, type AchievementSnapshot, type GameFigures } from './AchievementState';
 import { AchievementTracker, type PortraitSheet, type Unlock } from './AchievementTracker';
 import type { AchievementSetFiles } from './DataCounts';
 
@@ -168,6 +168,17 @@ export class PageAchievements {
   /** The playthrough being played, `d.RandomGameID`. */
   get playthrough(): number {
     return this.game.ctx.state.block1.randomGameID;
+  }
+
+  /**
+   * The figures the achievements across games read (`GameFigures`) of the history
+   * `snapshot` of the playthrough `playthrough`, a save's as its file was made, or the
+   * game's now for `null`: what a proof sends them for (`PageProofs`). None in a
+   * playthrough a teleport has touched, whose figures count for nothing.
+   */
+  figuresOf(playthrough: number, snapshot: AchievementSnapshot | null): GameFigures {
+    if (this.touched.has(playthrough)) return {};
+    return snapshot === null ? this.tracker.figures() : this.tracker.figuresOf(snapshot);
   }
 
   /** Whether a teleport has touched the playthrough being played: it earns nothing. */

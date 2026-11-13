@@ -16,12 +16,15 @@
  *      or one with nothing new, sends nothing; past ten minutes, a new unlock sends again,
  *      claiming every row not judged; the game's end sends whatever it claims; a player
  *      with no public name sends nothing; `refresh` writes the verdicts and reads the
- *      dialog's again, and asks nothing once none awaits one;
+ *      dialog's again, and asks nothing once none awaits one; the figures across games: a
+ *      save whose figures grew past the last proof's sends a proof claiming nothing, past
+ *      ten minutes and not within them, one whose figures did not grow nothing, and the
+ *      game's end whose figures grew sends though it claims nothing;
  *   4. the package of a save the page's stores keep (`storedPackage`): the corpus recording
  *      `replay-saves-written-over` as the store holds it, its save's file made again
  *      (`fileAtEnd`), packed as the book's UPLOAD packs a point, and replayed by the
- *      verifier's `replayProof`: First Blood; and the latest game's end of the set, packed
- *      at its end;
+ *      verifier's `replayProof`: First Blood, and its kill among its figures; and the latest
+ *      game's end of the set, packed at its end;
  *   5. a CSB adventure's start, replayed by `replayProof`: the corpus's whole CSB game,
  *      which begins at the adventure CSBWin's utility made, unlocks Speed Runner, which
  *      needs the whole game, with the achievements of `csb.txt`.
@@ -39,6 +42,7 @@ import { setAchievementDefs } from '../../src/engine/achievements/PageAchievemen
 import { PageProofs, PROOF_INTERVAL_MS, storedPackage, type ProofsDeps } from '../../src/engine/achievements/PageProofs';
 import { replayProof } from '../../src/engine/achievements/ProofReplay';
 import type { TrackerSnapshot } from '../../src/engine/achievements/AchievementTracker';
+import { AchievementState, type GameFigures } from '../../src/engine/achievements/AchievementState';
 import type { Recording } from '../../src/engine/Recorder';
 import { fileAtEnd } from '../../src/engine/RecordingCut';
 import { readRecordingPackage } from '../../src/engine/RecordingPackage';
@@ -111,10 +115,18 @@ const deps: ProofsDeps = {
     log: (message, error) => console.log(`  log: ${message} ${error}`),
 };
 const unlocked = new Set<string>();
-const proofs = new PageProofs({ playthrough: 7, settled: async () => {}, readProofs: async () => { reads++; }, tracker: { unlocked } }, 'dm', store, deps);
-/** A save of playthrough 7 whose history holds `ids`. */
-function saveOf(name: string, ids: readonly string[]): SaveEntry {
-    const snapshot = { v: 1, state: { v: 1, whole: true, unlocked: ids, vbls: 0, samples: {}, aggregates: {}, unknown: [] }, missiles: [], clouds: [], causes: [] } satisfies TrackerSnapshot;
+/** The common file's kills across games, a `total(…)`'s count, by its key. */
+const KILLS = COMMON.find((def) => def.id === 'dungeon-janitor')!.aggregates[0]!.key;
+/** The live game's figures, the game's end's. */
+let liveFigures: GameFigures = {};
+const proofs = new PageProofs({
+    playthrough: 7, settled: async () => {}, readProofs: async () => { reads++; }, tracker: { unlocked },
+    figuresOf: (_playthrough, snapshot) => (snapshot === null ? liveFigures : AchievementState.restore(COMMON, snapshot).figures()),
+}, 'dm', store, deps);
+/** A save of playthrough 7 whose history holds `ids`, and `kills` kills. */
+function saveOf(name: string, ids: readonly string[], kills = 0): SaveEntry {
+    const state = { v: 1, whole: true, unlocked: ids, vbls: 0, samples: {}, aggregates: { [KILLS]: kills }, unknown: [] } as const;
+    const snapshot = { v: 1, state, missiles: [], clouds: [], causes: [] } satisfies TrackerSnapshot;
     return {
         id: name, name, dataSet: 'dm', playthrough: 7, quick: false, sleep: false, savedAt: clock, usedAt: clock, playTime: 0, level: 0,
         champions: [], unofficial: false, recording: null, achievements: snapshot,
@@ -163,6 +175,25 @@ check(await proofs.refresh() === 0 && asked.length === 0, 'and asks nothing once
 await proofs.ended();
 check(sent.length === 3, 'a game\'s end whose unlocks are all verified or dropped sends nothing');
 
+const unlockedNow = ['first-blood', 'own-goal', 'scrooge'];
+clock += PROOF_INTERVAL_MS;
+await proofs.saved(saveOf('k1', unlockedNow, 120));
+check(sent.length === 4 && JSON.stringify(sent[3]) === '{"claims":[],"point":"k1"}', 'a save whose figures grew, 120 kills: sent, claiming nothing');
+clock += PROOF_INTERVAL_MS - 1;
+await proofs.saved(saveOf('k2', unlockedNow, 130));
+check(sent.length === 4, 'within ten minutes, its figures grown: nothing sent');
+clock += 1;
+await proofs.saved(saveOf('k3', unlockedNow, 120));
+check(sent.length === 4, 'past them, its figures no larger than the last proof\'s: nothing sent');
+await proofs.saved(saveOf('k4', unlockedNow, 130));
+check(sent.length === 5 && JSON.stringify(sent[4]) === '{"claims":[],"point":"k4"}', 'past them, its figures grown: sent');
+liveFigures = { [`total(${KILLS})`]: 130 };
+await proofs.ended();
+check(sent.length === 5, 'the game\'s end, its figures the last proof\'s: nothing sent');
+liveFigures = { [`total(${KILLS})`]: 131 };
+await proofs.ended();
+check(sent.length === 6 && JSON.stringify(sent[5]) === '{"claims":[],"point":"end"}', 'the game\'s end, a kill more: sent at once, claiming nothing');
+
 // 4. The package of a save the store keeps.
 console.log('\nA save the store keeps, packed:');
 const corpus = await readRecordingPackage(new Uint8Array(readFileSync(join(CORPUS_DIR, 'replay-saves-written-over.L5.gz'))));
@@ -198,7 +229,8 @@ const sets = (await diskSetDigests()).map((digests) => {
 });
 const replayed = packed && await replayProof(packed, Infinity, sets, () => COMMON);
 console.log(`  replayed: ${JSON.stringify(replayed)}`);
-check(replayed?.kind === 'checked' && replayed.unlocked.includes('first-blood'), 'and the verifier\'s replay of it unlocks First Blood');
+check(replayed?.kind === 'checked' && replayed.unlocked.includes('first-blood') && replayed.figures[`total(${KILLS})`] === 2,
+    'and the verifier\'s replay of it unlocks First Blood, its two kills among its figures');
 check(await storedPackage({ ...save, recording: { ...save.recording!, changes: root.changes.length + 1 } }, corpus.dataSet, sources) === null,
     'a save whose recording the store holds not that far: no package');
 

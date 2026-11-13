@@ -87,7 +87,7 @@ const server = createAppServer(options, {
     recordings: { store, dir: recordingsDir, readPackage: readRecordingPackage, shareRateLimit: new RateLimit(100, 60_000) },
     identities: { store: new IdentityStore(db), rateLimit: new RateLimit(100, 60_000) },
     proofs: { store: new ProofStore(db, 1 << 30), dir: join(scratch, 'proofs'), rateLimit: new RateLimit(100, 60_000) },
-    achievementDefs: () => null,
+    achievementDefs: () => null, achievementsAcross: () => [],
 });
 await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
 const instance = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;

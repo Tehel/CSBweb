@@ -1294,7 +1294,11 @@ adventure's start, with Ironman and Hardcore (`doc/ACHIEVEMENTS.md` → "Saves l
 Step 9a is done: `games(…)` and `total(count(…))`, each game's figures, the page's
 `achievementFigures` store (IndexedDB version 9) and its achievements across games over
 them, with Encore, Dungeon Master's Every Ending, and Dungeon Janitor and Lord Chaos's HR
-Problem moved (`doc/ACHIEVEMENTS.md` → "Across games"). What is left is 9b and 9c, below.
+Problem moved (`doc/ACHIEVEMENTS.md` → "Across games"). Step 9b is done: each replay keeps
+its history's figures (`proof_figures`), the Hall and PROFILE work an identity's
+achievements across games out of its checked proofs (`acrossRows`, `achievementsAcross`),
+and the page sends a proof, claiming nothing if need be, where the figures grew
+(`doc/ACHIEVEMENTS.md` → "Proofs", → "The Hall of Fame"). What is left is 9c, below.
 
 **Across games, left to make.**
 
@@ -1306,13 +1310,11 @@ Problem moved (`doc/ACHIEVEMENTS.md` → "Across games"). What is left is 9b and
 
 - **Hall of Fame Tour** reads the champions at each game's win, a third form beside
   `games(…)` and `total(…)`, such as `distinct(games(won).portrait) >= 24`: each game's
-  figures then keep the portraits of the party at the condition's unlock.
-- **The proof**: the verifier's replay records, beside the unlocks, the history's figures at
-  its point (a table of the proof's figures, `server/proofs.ts`), and the Hall works an
-  identity's achievements across games out of its checked proofs, each playthrough at the
-  largest figure any of its proofs reached. The page sends a proof at a game's end whenever
-  its figures grew since the playthrough's last proof, and at a save on the same
-  ten-minute cadence (`PROOF_INTERVAL_MS`), so a game that unlocks nothing new still counts.
+  figures then keep the portraits of the party at the condition's unlock, the page's
+  `achievementFigures` rows and the proofs' figures alike (a figure is a number now, a key
+  and a value: the portraits need a set of values beside it).
+- **Grand Slam** names another set's games: the page reads another set's
+  `achievementFigures` rows, and the Hall the identity's proofs of the other set.
 
 **The author's choices:**
 
@@ -1330,12 +1332,13 @@ Problem moved (`doc/ACHIEVEMENTS.md` → "Across games"). What is left is 9b and
 Still to ask the author at 9c: which games Chaos Strikes Back's Grand Slam reads as
 Dungeon Master's, (a) those of any set that reads `dm-atari.txt`, or (b) `dm-atari`'s alone.
 
-**The steps left**, one commit each: 9b the proofs' figures, the Hall's achievements
-across games and the page's proofs of a total grown: no proof claims an achievement across
-games now (`claimableRows` keeps the history's own unlocks), so the Hall counts none, and
-the Dungeon Janitor and HR Problem a replay verified in one game before they moved stay
-verified; 9c Hall of Fame Tour and Grand Slam, as chosen, which need a third form, the
-portraits of each game's party at its win, and a condition naming another set's games.
+**The step left**: 9c, Hall of Fame Tour and Grand Slam, as chosen, which need a third
+form, the portraits of each game's party at its win, and a condition naming another set's
+games.
+
+The page's row of an achievement across games stays "UNLOCKED, NOT VERIFIED" in the
+dialog, and has no proof in the book: no proof claims it, and the server's verdict of it is
+PROFILE's and the Hall's alone, as a replay's grant unclaimed is.
 
 ## H — Deliberate divergences (not debt)
 
