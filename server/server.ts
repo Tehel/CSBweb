@@ -51,6 +51,7 @@ import { NOBODY, ntfyNotifier, type Notify } from './notify.ts';
 import { ProofStore } from './proofs.ts';
 import { fillEndings, RecordingStore } from './recordings.ts';
 import { StatsStore } from './stats.ts';
+import { folderAchievements } from './setAchievements.ts';
 import { openStore } from './store.ts';
 
 /** Events per address and minute: a game sends a few, a party's joins included. */
@@ -152,8 +153,7 @@ const server = createAppServer(options, {
     recordings: { store: recordings, dir: recordingsDir, readPackage: readers.readRecordingPackage, shareRateLimit: new RateLimit(SHARES_PER_HOUR, 3_600_000) },
     identities: { store: identities, rateLimit: new RateLimit(PROFILE_CHANGES_PER_HOUR, 3_600_000) },
     proofs: { store: proofs, dir: proofsDir, rateLimit: new RateLimit(PROOFS_PER_HOUR, 3_600_000) },
-    achievementDefs: readers.achievementDefs,
-    achievementsAcross: readers.achievementsAcross,
+    ...folderAchievements(options.gamefilesDir, dataSets, readers),
 });
 server.listen(port, () => {
     const address = server.address();

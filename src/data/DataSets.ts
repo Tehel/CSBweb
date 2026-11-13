@@ -224,6 +224,14 @@ export const DATA_SET_FILES_ROUTE = 'api/data-set-files';
 export const GAME_FILES = ['graphics.dat', 'CSBgraphics.dat', 'hcsb.hct', 'hcsb.dat', 'dungeon.dat', 'mini.dat', 'utility-portraits.dat'] as const;
 
 /**
+ * A set's own achievements, an optional file of its folder or its record
+ * (`doc/ACHIEVEMENTS.md` → "The file"), read as text (`readAchievementsText`,
+ * `DataSetFiles.ts`). It is no game file (`GAME_FILES`): a recording names none of it, so
+ * an edit of it changes no recording's set (`findRecordingSet`).
+ */
+export const ACHIEVEMENTS_FILE = 'achievements.txt';
+
+/**
  * The header in which the page names its player to `DATA_SETS_ROUTE`: their `playerId`
  * (`src/ui/gameEvents.ts`), a secret, which a URL's query would leak into logs.
  */
@@ -442,8 +450,12 @@ export interface PlayerProfile {
     replays: number;
     /** Their games the statistics hold, by set. */
     statistics: { dataSet: string; name: string; started: number; won: number; lost: number }[];
-    /** Their achievements by set, those a replay of their proofs verified, each once, the first verified first. */
-    achievements: { dataSet: string; name: string; unlocked: string[] }[];
+    /**
+     * Their achievements by set, those a replay of their proofs verified, each once, the first
+     * verified first; and their `names`, in the set's file's order, an id the file no longer
+     * holds by itself, last.
+     */
+    achievements: { dataSet: string; name: string; unlocked: string[]; names: string[] }[];
 }
 
 /** `POST PROFILE_ROUTE`'s answer once done: the identity, and its key where one was drawn, shown this once. */

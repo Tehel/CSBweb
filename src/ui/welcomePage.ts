@@ -117,13 +117,13 @@
 import './welcomePage.css';
 import logoUrl from '../assets/csbweb-logo.jpg';
 import { archiveName, dataSetArchive, type ReadArchiveFile } from '../data/DataSetArchive';
-import { fileDigest, folderFiles } from '../data/DataSetFiles';
+import { fileDigest, folderFiles, readAchievementsText } from '../data/DataSetFiles';
 import {
     chooserSets, DATA_SETS_ROUTE, DOCUMENT_EXTENSIONS, DOCUMENTS_SEGMENT, documentPath, isDocumentName, PLAYER_ID_HEADER, PNG_HEAD_BYTES, pngSize,
     RECORDING_ENDINGS, RECORDING_PACKAGE_FIELD, RECORDINGS_ROUTE, SHARED_RECORDING_ID, thumbnailPath, type RecordingEnding,
     type DataSet, type DataSetManifest, type ModerationAction, type RecordingAction,
 } from '../data/DataSets';
-import { localDataSet, type LocalDataSetFile, type LocalDataSetRecord } from '../data/LocalDataSets';
+import { localDataSet, recordFiles, type LocalDataSetFile, type LocalDataSetRecord } from '../data/LocalDataSets';
 import { openAddDataSetForm, openPublishedSetForm, type EditedPublishedSet } from './addDataSetForm';
 import { ABOUT_HASH, openAbout } from './about';
 import { closeOnBackdrop } from './backdropClose';
@@ -135,7 +135,8 @@ import {
     type AchievementRow, type AchievementStore, type BrowserDataSetStore, type RecordingEntry, type RecordingStore, type SaveEntry, type SaveStore,
 } from '../data/saves';
 import { achievementDefs, achievementsAcross } from './achievementFiles';
-import { figuresBySet } from '../engine/achievements/PageAchievements';
+import { figuresBySet, ownFilesRead } from '../engine/achievements/PageAchievements';
+import type { AchievementDef } from '../engine/achievements/AchievementFile';
 import { askVerdicts } from './proofRoutes';
 import { refreshVerdicts } from '../engine/achievements/PageProofs';
 import {
@@ -327,6 +328,13 @@ export async function showWelcomePage(
     const back = takeReturn();
     const records = await localSets.list().catch(() => [] as LocalDataSetRecord[]);
     const local = records.map((record) => ({ set: localDataSet(record), record, thumbnail: record.files.thumbnail ?? null }));
+    /** A set's own achievements, a local set's from its record, any other's from its folder; `null` for an unknown one. */
+    const ownAchievements = async (id: string): Promise<string | null> => {
+        const record = local.find((l) => l.set.id === id)?.record;
+        const set = manifest.dataSets.find((one) => one.id === id);
+        const files = record ? recordFiles(record, null) : set ? folderFiles(set.dir) : null;
+        return files && readAchievementsText(files).catch(() => null);
+    };
     const moderating = manifest.moderator && moderationOn();
     // The manifest the page shows: a player's, but where a moderator moderates.
     const viewed = manifest.moderator && !moderating ? playerView(manifest) : manifest;
@@ -424,7 +432,7 @@ export async function showWelcomePage(
     function openDocuments(set: DataSet, recording: string | null = null, span: RecordingSpan = WHOLE): void {
         const keep = selected?.id ?? null;
         const isLocal = local.some((l) => l.set === set);
-        showDocuments(set, isLocal, viewed.moderator, loadManifest, { saves: store, recordings, achievements }, (asked) => {
+        showDocuments(set, isLocal, viewed.moderator, loadManifest, { saves: store, recordings, achievements, ownAchievements }, (asked) => {
             if (asked) again(keep, asked);
         }, { recording, span, played: (played, chosen) => noteReturn({ set: set.id, recording: played, span: chosen, selected: keep }) });
     }
@@ -653,6 +661,8 @@ interface RecordingsSource {
     readonly saves: Pick<SaveStore, 'list' | 'read'>;
     readonly recordings: RecordingStore;
     readonly achievements: Pick<AchievementStore, 'list' | 'update' | 'figures'>;
+    /** The text of a set's own achievements file (`ACHIEVEMENTS_FILE`), by its id, `null` for none. */
+    readonly ownAchievements: (setId: string) => Promise<string | null>;
 }
 
 /**
@@ -801,7 +811,7 @@ function showDocuments(
     };
     tabs.forEach((tab, n) => tab.addEventListener('click', () => showTab(n)));
     showRecordings(dialog, set, !isLocal, moderator, source, status, recordingsAt);
-    showAchievements(dialog, set, source.achievements);
+    showAchievements(dialog, set, source.achievements, source.ownAchievements);
     if (isLocal) {
         showTab(0);
     } else {
@@ -813,8 +823,8 @@ function showDocuments(
 }
 
 /**
- * The ACHIEVEMENTS tab of `dialog`, on `set`: its achievements (`achievementDefs`), in the
- * file's order, and over them how many this browser has unlocked. Each with its name, its
+ * The ACHIEVEMENTS tab of `dialog`, on `set`: its achievements (`achievementDefs`, its own
+ * file `ownOf`'s merged with the common one), in the file's order, once read, and over them how many this browser has unlocked. Each with its name, its
  * tier in its colour, its text, and under them the playthroughs that unlocked it, from
  * `store`, the first first: the party then, the day and the time played, and what the
  * server's replay said of it (`PROOF_WORDS`). An achievement across games that this
@@ -823,18 +833,22 @@ function showDocuments(
  * no longer has is not listed, and the store keeps it. The verdicts its rows await are asked
  * of the server first (`refreshVerdicts`), and listed again once written.
  */
-function showAchievements(dialog: HTMLElement, set: DataSet, store: Pick<AchievementStore, 'list' | 'update' | 'figures'>): void {
+function showAchievements(
+    dialog: HTMLElement, set: DataSet, store: Pick<AchievementStore, 'list' | 'update' | 'figures'>, ownOf: (setId: string) => Promise<string | null>,
+): void {
     const summary = dialog.querySelector<HTMLElement>('.achievements-summary')!;
     const list = dialog.querySelector<HTMLElement>('.achievements-list')!;
-    const defs = achievementDefs(set.id) ?? [];
+    let defs: readonly AchievementDef[] | null = null;
     let across: ReadonlySet<string> = new Set();
     const show = (rows: readonly AchievementRow[]): void => {
+        if (defs === null) return;
+        const shown = defs;
         const unlocks = new Map<string, AchievementRow[]>();
         for (const row of rows) unlocks.set(row.id, [...(unlocks.get(row.id) ?? []), row]);
-        const unlocked = defs.filter((def) => unlocks.has(def.id) || across.has(def.id)).length;
-        summary.textContent = defs.length === 0 ? 'This dungeon has no achievements.'
-            : `${unlocked} of ${defs.length} unlocked in this browser.`;
-        list.replaceChildren(...defs.map((def) => {
+        const unlocked = shown.filter((def) => unlocks.has(def.id) || across.has(def.id)).length;
+        summary.textContent = shown.length === 0 ? 'This dungeon has no achievements.'
+            : `${unlocked} of ${shown.length} unlocked in this browser.`;
+        list.replaceChildren(...shown.map((def) => {
             const item = document.createElement('li');
             const own = unlocks.get(def.id) ?? [];
             item.className = `achievements-item${own.length > 0 || across.has(def.id) ? ' unlocked' : ''}`;
@@ -872,9 +886,13 @@ function showAchievements(dialog: HTMLElement, set: DataSet, store: Pick<Achieve
     const failed = (error: unknown) => {
         summary.textContent = `This browser's achievements could not be read: ${error instanceof Error ? error.message : String(error)}`;
     };
-    show([]);
-    void Promise.all([store.list(set.id), store.figures(null).catch(() => [])]).then(([rows, figures]) => {
-        across = new Set(achievementsAcross(set.id, figuresBySet(figures)));
+    void Promise.all([ownOf(set.id), store.list(set.id), store.figures(null).catch(() => [])]).then(async ([own, rows, figures]) => {
+        const read = achievementDefs(own) ?? [];
+        const bySet = figuresBySet(figures);
+        const ids = [...ownFilesRead(read.filter((def) => def.across), set.id, bySet.keys())];
+        const texts = new Map(await Promise.all(ids.map(async (id) => [id, id === set.id ? own : await ownOf(id)] as const)));
+        across = new Set(achievementsAcross(set.id, (id) => texts.get(id) ?? null, bySet));
+        defs = read;
         show(rows);
     }, failed);
     void refreshVerdicts(store, askVerdicts, set.id).then((changed) => changed.length > 0 ? store.list(set.id).then(show, failed) : undefined,

@@ -41,6 +41,7 @@ import type { ClaimState, ModeratedIdentity } from '../src/data/DataSets.ts';
 import { samePlayerId, type DataSetStore, type DataSetViewer } from './dataSets.ts';
 import { NOBODY, type Notify } from './notify.ts';
 import type { AchievementsAcrossOf, ProofStore } from './proofs.ts';
+import type { AchievementDefsOf } from './fame.ts';
 import type { RecordingStore } from './recordings.ts';
 import type { StatsStore } from './stats.ts';
 
@@ -192,8 +193,10 @@ export interface ProfileSources {
     recordings: RecordingStore;
     stats: StatsStore;
     proofs: ProofStore;
-    /** The build's achievements across games the proofs' figures make yes (`ProofStore.verifiedBy`). */
+    /** The achievements across games the proofs' figures make yes (`ProofStore.verifiedBy`). */
     across: AchievementsAcrossOf;
+    /** Each set's achievements, which name the ids (`setAchievements.ts`). */
+    defsOf: AchievementDefsOf;
 }
 
 /** The `playerId`s `player` speaks for: their identity's, or theirs alone. */
@@ -209,10 +212,11 @@ function playersOf(identities: IdentityStore, player: string): { identity: Ident
  * of them are listed; their `started`, `won` and `lost` events by set, which the statistics
  * log keeps with their `playerId` (`StatsStore.playerCounts`); and their achievements, those
  * a replay of their proofs verified and those across games their figures make yes
- * (`ProofStore.verifiedBy`), by set, each once, the first verified first. A set the table
- * no longer holds goes by its id.
+ * (`ProofStore.verifiedBy`), by set, each once, the first verified first, with their names
+ * in the set's file's order (`defsOf`). A set the table no longer holds goes by its id, and
+ * so does an achievement its file no longer holds.
  */
-export function profileText(player: string, { identities, dataSets, recordings, stats, proofs, across }: ProfileSources): string {
+export function profileText(player: string, { identities, dataSets, recordings, stats, proofs, across, defsOf }: ProfileSources): string {
     const { identity, players } = playersOf(identities, player);
     const theirs = (owner: string | null) => owner !== null && players.some((one) => samePlayerId(one, owner));
     const sets = dataSets.read().dataSets;
@@ -228,20 +232,26 @@ export function profileText(player: string, { identities, dataSets, recordings, 
         })),
         replays: shared.filter((recording) => !recording.pending && !recording.hidden && !recording.broken).length,
         statistics: stats.playerCounts(players).map((row) => ({ ...row, name: nameOf(row.dataSet) })),
-        achievements: achievementsBySet(proofs.verifiedBy(players, across), nameOf),
+        achievements: achievementsBySet(proofs.verifiedBy(players, across), nameOf, defsOf),
     };
     return JSON.stringify(profile);
 }
 
-/** `verified`, the achievements of a player's proofs verified, grouped by set, each set at its first. */
-function achievementsBySet(verified: readonly { dataSet: string; achievement: string }[], nameOf: (id: string) => string): PlayerProfile['achievements'] {
+/** `verified`, the achievements of a player's proofs verified, grouped by set, each set at its first, each named by its file (`defsOf`). */
+function achievementsBySet(
+    verified: readonly { dataSet: string; achievement: string }[], nameOf: (id: string) => string, defsOf: AchievementDefsOf,
+): PlayerProfile['achievements'] {
     const bySet = new Map<string, string[]>();
     for (const { dataSet, achievement } of verified) {
         const unlocked = bySet.get(dataSet) ?? [];
         unlocked.push(achievement);
         bySet.set(dataSet, unlocked);
     }
-    return [...bySet].map(([dataSet, unlocked]) => ({ dataSet, name: nameOf(dataSet), unlocked }));
+    return [...bySet].map(([dataSet, unlocked]) => {
+        const defs = defsOf(dataSet) ?? [];
+        const names = [...defs.filter((def) => unlocked.includes(def.id)).map((def) => def.name), ...unlocked.filter((id) => !defs.some((def) => def.id === id))];
+        return { dataSet, name: nameOf(dataSet), unlocked, names };
+    });
 }
 
 /** The status and the JSON body `POST PROFILE_ROUTE` and `POST IDENTITIES_ROUTE/<id>` answer with. */

@@ -16,9 +16,9 @@ import { FileDigestCache, filesText } from './server/setFiles.ts';
 import { RateLimit } from './server/events.ts';
 import { IdentityStore } from './server/identity.ts';
 import { NOBODY } from './server/notify.ts';
-import { ProofStore, verifyNext, type AchievementsAcrossOf, type BuiltReplayProof, type VerifierReaders } from './server/proofs.ts';
+import { ProofStore, verifyNext, type BuiltReplayProof, type VerifierReaders } from './server/proofs.ts';
 import type { CheckDataSet } from './server/publish.ts';
-import type { AchievementDefsOf } from './server/fame.ts';
+import { folderAchievements, type BuiltAchievementDefs, type BuiltAchievementsAcross } from './server/setAchievements.ts';
 import { RecordingStore, type ReadRecordingPackage } from './server/recordings.ts';
 import { AnswerCache, StatsStore } from './server/stats.ts';
 import {
@@ -350,8 +350,8 @@ function dataSetsRoute(): Plugin {
         try {
           if (req.method === 'POST') await receiveProfileChange({ now: Date.now, identities, notify: NOBODY }, req, res);
           else {
-            const { achievementsAcross } = (await server.ssrLoadModule('/src/ui/achievementFiles.ts')) as { achievementsAcross: AchievementsAcrossOf };
-            answerProfile({ dataSets: openStore(db), store: stats, recordings: { store: recordingStore }, identities, proofs, achievementsAcross }, req, res);
+            const dataSets = openStore(db);
+            answerProfile({ dataSets, store: stats, recordings: { store: recordingStore }, identities, proofs, ...await setAchievements(dataSets) }, req, res);
           }
         } catch (error) {
           next(error);
@@ -379,9 +379,12 @@ function dataSetsRoute(): Plugin {
         }
       });
 
+      // Each set's achievements, its own file read from its folder, as the deployed server's (`folderAchievements`).
+      const setAchievements = async (dataSets: DataSetStore) => folderAchievements(scratch, dataSets,
+        (await server.ssrLoadModule('/src/ui/achievementFiles.ts')) as { achievementDefs: BuiltAchievementDefs; achievementsAcross: BuiltAchievementsAcross });
       const replay: VerifierReaders['replay'] = async (bytes, limit, sets) => {
         const { replayProof } = (await server.ssrLoadModule('/src/engine/achievements/ProofReplay.ts')) as { replayProof: BuiltReplayProof };
-        const { achievementDefs } = (await server.ssrLoadModule('/src/ui/achievementFiles.ts')) as { achievementDefs: (setId: string) => unknown };
+        const { achievementDefs } = (await server.ssrLoadModule('/src/ui/achievementFiles.ts')) as { achievementDefs: (own: string | null) => unknown };
         return replayProof(bytes, limit, sets, achievementDefs);
       };
       // The queue replayed, one proof at a time, until it is empty; a proof queued meanwhile is replayed by the same run.
@@ -454,8 +457,8 @@ function dataSetsRoute(): Plugin {
         }
         const db = new sqlite.DatabaseSync(':memory:');
         try {
-          const { achievementDefs, achievementsAcross } = (await server.ssrLoadModule('/src/ui/achievementFiles.ts')) as { achievementDefs: AchievementDefsOf; achievementsAcross: AchievementsAcrossOf };
-          answerFame(path, { dataSets: openStore(db), proofs, identities, achievementDefs, achievementsAcross }, fameCache, req, res);
+          const dataSets = openStore(db);
+          answerFame(path, { dataSets, proofs, identities, ...await setAchievements(dataSets) }, fameCache, req, res);
         } catch (error) {
           next(error);
         } finally {
@@ -463,12 +466,17 @@ function dataSetsRoute(): Plugin {
         }
       });
 
-      // A set's files: a published one's from the scratch folder, a site's from the fixtures.
+      // A set's files: a published one's from the scratch folder, a site's from the fixtures;
+      // a file a folder does not hold is a 404, as the deployed server's, not the page's
+      // fallback, which an optional file's reader would take for the file (`achievements.txt`).
       server.middlewares.use('/gamefiles', (req, res, next) => {
         const segments = pathSegments(req.url ?? '');
         if (!segments || segments.length === 0 || (req.method !== 'GET' && req.method !== 'HEAD')) return next();
         const path = join(published.has(segments[0]!) ? scratch : gamefiles, ...segments);
-        if (!statSync(path, { throwIfNoEntry: false })?.isFile()) return next();
+        if (!statSync(path, { throwIfNoEntry: false })?.isFile()) {
+          res.statusCode = 404;
+          return res.end('Not found');
+        }
         res.setHeader('Content-Type', contentType(path));
         res.setHeader('X-Content-Type-Options', 'nosniff');
         res.setHeader('Cache-Control', 'no-cache');

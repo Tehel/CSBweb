@@ -455,15 +455,16 @@ build is `index.html`, `stats.html`, `fame.html`, `manifest.webmanifest` and `as
 (`src/engine/PageReaders.ts`), the check of a player's own set, `checkLocalDataSet`
 (`src/engine/LocalDataSetCheck.ts`), and every reader under it, and the reader of a shared
 recording's package, `readRecordingPackage` (`src/engine/RecordingPackage.ts`), and the
-build's achievements, which the Hall of Fame lists (`achievementDefs`), bundled
-into one module that imports nothing, `dist/server/PageReaders.js` (`vite.config.mts`).
+merge of a set's `achievements.txt` with the build's common file, which the server gives
+each set's file from its folder for the Hall of Fame and PROFILE (`achievementDefs`,
+`server/setAchievements.ts`), bundled into one module that imports nothing, `dist/server/PageReaders.js` (`vite.config.mts`).
 The server cannot import the page's sources as it imports `DataSets.ts`, since they are not
 erasable syntax and the image has no `node_modules`, so it loads this module instead and
 reads a set and a package with the page's own readers. It is never served.
 
 **The verifier's module** is the third, `--ssr --mode verifier`: the replay of a proof
 (`src/engine/VerifierReaders.ts`, `replayProof`), the whole engine and a page without the
-DOM, with the build's achievements, bundled into another module that imports nothing,
+DOM, with the same merge of a set's achievements, bundled into another module that imports nothing,
 `dist/server/VerifierReaders.js`, about 2 MB, which only the verifier service loads
 (`server/verifier.ts`, `doc/ACHIEVEMENTS.md` → "Proofs"). A build of its own, so that neither
 module imports a chunk of the other's. `build.ts` asserts it imports nothing and replays a

@@ -123,7 +123,7 @@ async function main(): Promise<void> {
         identities: { store: identities, rateLimit: new RateLimit(100, 60_000) },
         proofs: { store: proofs, dir: join(scratch, 'proofs'), rateLimit: new RateLimit(100, 60_000) },
         achievementDefs: (id) => (id === 'b' ? COMMON.slice(0, 3) : id === 'a' ? A_DEFS : COMMON),
-        achievementsAcross: (id, bySet) => (id === 'b' ? [] : acrossInSets((id === 'a' ? A_DEFS : COMMON).filter((def) => def.across), id, bySet)),
+        achievementsAcross: (id, bySet) => (id === 'b' ? [] : acrossInSets((id === 'a' ? A_DEFS : COMMON).filter((def) => def.across), id, bySet, () => null)),
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
     const port = (server.address() as AddressInfo).port;
@@ -262,6 +262,9 @@ async function main(): Promise<void> {
         console.log(`  Fay's profile: ${JSON.stringify(theirs)}`);
         check(JSON.stringify(theirs.map((set) => [set.dataSet, set.unlocked])) === '[["a",["dungeon-janitor","grand-slam","encore"]]]',
             'her profile lists the same, the first first: Grand Slam at the proof of B\'s win, between the 500th kill and the third win');
+        const named = A_DEFS.filter((def) => theirs[0]?.unlocked.includes(def.id)).map((def) => def.name);
+        check(JSON.stringify(theirs[0]?.names) === JSON.stringify(named) && named.length === 3,
+            `and names them by A's file, in its order (${theirs[0]?.names.join(', ')})`);
         const slam = fame?.achievements.find((one) => one.id === 'grand-slam');
         check(slam?.players === 1 && slam.first?.name === 'Fay', `Grand Slam, A's, made yes by a proof of B: Fay (${slam?.players}, ${slam?.first?.name})`);
 

@@ -22,7 +22,6 @@ import {
     identityKeyOf, identityKeyText, PLAYER_ID_HEADER, PROFILE_ROUTE, PUBLIC_NAME_LIMITS, publicNameProblem,
     type PlayerProfile, type ProfileIdentity, type ProfileState,
 } from '../data/DataSets';
-import { achievementDefs } from './achievementFiles';
 import { closeOnBackdrop } from './backdropClose';
 import { keptPlayerId, playerId } from './gameEvents';
 
@@ -252,16 +251,10 @@ function dumpOf(profile: PlayerProfile | null): HTMLElement[] {
             recordings.map((recording) => `${recording.title}, of ${recording.name}: ${STATES[recording.state]}${recording.broken ? ', broken on this build' : ''}`), 'None.'),
         part('Your games', statistics.map((row) => `${row.name}: ${plural(row.started, 'game')} started, ${row.won} won, ${plural(row.lost, 'death')}`),
             'None counted.'),
-        part('Your achievements, verified', achievements.map((row) => `${row.name}: ${namesOf(row.dataSet, row.unlocked).join(', ')}`),
+        part('Your achievements, verified', achievements.map((row) => `${row.name}: ${row.names.join(', ')}`),
             'None yet. Once you have a name, your browser sends the server the recording of each game that unlocks one, at a save and at its end, and the server replays it to verify them.'),
         paragraph('profile-note', 'Your games are counted under the random id this browser drew, which no public page shows, nor any answer but this one: your name tells the server which ids are yours, and shows this to you alone. Your sessions and your time played are counted with no id at all.'),
     ];
-}
-
-/** The names of `ids`, achievements of the set `dataSet` (`achievementDefs`), in the file's order; an id the file does not hold goes by itself, last. */
-function namesOf(dataSet: string, ids: readonly string[]): string[] {
-    const defs = achievementDefs(dataSet) ?? [];
-    return [...defs.filter((def) => ids.includes(def.id)).map((def) => def.name), ...ids.filter((id) => !defs.some((def) => def.id === id))];
 }
 
 function paragraph(className: string, text: string): HTMLElement {

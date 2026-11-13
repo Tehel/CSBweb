@@ -12,7 +12,7 @@ import {
     DATA_SET_FILES_ROUTE, DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, dataSetNamed, parseManifest, PLAYER_ID_HEADER, PROOF_ID, PROOF_RECORDING_PREFIX, PROOFS_ROUTE, SHARED_RECORDING_ID, THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH,
     thumbnailPath, type DataSet, type DataSetManifest,
 } from './data/DataSets';
-import { digestedFiles, fileDigest, folderFiles, loadGameFiles, type DataSetFiles, type DigestedFiles, type GameFiles } from './data/DataSetFiles';
+import { digestedFiles, fileDigest, folderFiles, loadGameFiles, readAchievementsText, type DataSetFiles, type DigestedFiles, type GameFiles } from './data/DataSetFiles';
 import { parsePublishedDungeons, type KnownDungeon } from './data/DungeonSignature';
 import { isLocalDataSetId, localDataSet, recordFiles } from './data/LocalDataSets';
 import { findRecordingSet, parseSetDigests, type SetDigests } from './data/RecordingSet';
@@ -312,12 +312,11 @@ async function loadTitlePicture(): Promise<TitleFrame | null> {
 /**
  * The engine and the screen, each handed what it asks of the other: the engine its
  * `GameHost`, the screen its `ScreenHooks`. Both are handed the one message area,
- * which the engine writes and the screen draws. `achievementFiles` are the set's dungeon
- * files where the page tracks achievements, which their counts are read from and a CSB
- * adventure's start against (`AchievementTracker`).
+ * which the engine writes and the screen draws. `tracked` is what the page tracks
+ * achievements with, where it does (`TrackedSet`).
  */
 function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: GameTables, sound: SoundManager,
-    achievementFiles: AchievementSetFiles | null): Built {
+    tracked: TrackedSet | null): Built {
     const messages = new ScrollingText(tables.byte1830);
     const playSound = (soundId: number, rateIdx?: number, highVolume?: number) => sound.playSound(soundId, rateIdx, highVolume);
     // The screen is built second, over the engine's dungeon, so the engine→UI notices
@@ -530,10 +529,11 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
 
     // The achievements of a game the player plays: none for a recording played back, whose
     // game is not the player's (`doc/ACHIEVEMENTS.md` → "The page").
-    const defs = achievementFiles && achievementDefs(dataSet.id);
+    const defs = tracked && achievementDefs(tracked.own);
     const achievementStore = new BrowserAchievementStore((rows) => drawPlaythrough(storeRandom, rows));
-    const achievements = achievementFiles && defs && new PageAchievements(game, dataSet.id, defs, screen.ui.objectTables.objectNames,
-        screen.ui.graphics.basicGraphic(26), achievementStore, saves, teleported, achievementFiles, (message, error) => console.warn(message, error));
+    const achievements = tracked && defs && new PageAchievements(game, dataSet.id, defs, screen.ui.objectTables.objectNames,
+        screen.ui.graphics.basicGraphic(26), achievementStore, saves, teleported, tracked.files, (message, error) => console.warn(message, error),
+        tracked.ownOf);
     // Each unlock a banner over the view, with ACHIEVEMENT NOTICES on.
     achievements?.onShown(({ def }) => showAchievementNotice(screen.ui, { name: def.name, tier: def.tier }));
     // The proofs of the unlocks, sent by a player with a public name at a save and at the
@@ -550,6 +550,18 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         setInterval(() => { void proofs.refresh(); }, VERDICTS_MS);
     }
     return { game, screen, saves, recorder, recordings, recordingStore, messages, events, input, playInput, achievements, proofs };
+}
+
+/**
+ * What the page tracks a game's achievements with (`doc/ACHIEVEMENTS.md` → "The page"): the
+ * set's dungeon files, which their counts are read from and a CSB adventure's start against
+ * (`AchievementTracker`); the text of its own achievements file (`ACHIEVEMENTS_FILE`); and
+ * that of any set's, by its id, which the achievements across games compare.
+ */
+interface TrackedSet {
+    files: AchievementSetFiles;
+    own: string | null;
+    ownOf(setId: string): Promise<string | null>;
 }
 
 /** What `construct` builds, which the boot, the play and the end of the game share. */
@@ -1237,24 +1249,25 @@ function publishedDungeons(): Promise<KnownDungeon[]> {
  * one: the welcome page's. `id` is `?dungeon=`'s, or a recording's set where the page plays
  * one without it. A `local:` id is a record of the store's (`src/data/LocalDataSets.ts`),
  * which plays its base set's `graphics.dat` where it has none; any other is the
- * manifest's, read from its folder.
+ * manifest's, read from its folder. The console names an unknown one, but where `warn` is
+ * false.
  */
-async function chooseDataSet(manifest: DataSetManifest, id: string | null): Promise<{ set: DataSet; files: DataSetFiles; thumbnail: () => Promise<Blob | null> } | null> {
+async function chooseDataSet(manifest: DataSetManifest, id: string | null, warn = true): Promise<{ set: DataSet; files: DataSetFiles; thumbnail: () => Promise<Blob | null> } | null> {
     if (isLocalDataSetId(id)) {
         const storeRandom = new CsbRandom();
         const record = await new BrowserDataSetStore((rows) => drawPlaythrough(storeRandom, rows)).get(id!).catch((error: unknown) => {
-            console.warn(`The local data sets cannot be read: ${error instanceof Error ? error.message : String(error)}`);
+            if (warn) console.warn(`The local data sets cannot be read: ${error instanceof Error ? error.message : String(error)}`);
             return undefined;
         });
         if (!record) {
-            console.warn(`Unknown data set '${id}'`);
+            if (warn) console.warn(`Unknown data set '${id}'`);
             return null;
         }
         const base = record.baseSet === null ? null : dataSetNamed(manifest, record.baseSet);
         return { set: localDataSet(record), files: recordFiles(record, base && folderFiles(base.dir)), thumbnail: () => Promise.resolve(record.files.thumbnail ?? null) };
     }
     const set = dataSetNamed(manifest, id);
-    if (id !== null && !set) console.warn(`Unknown data set '${id}'`);
+    if (id !== null && !set && warn) console.warn(`Unknown data set '${id}'`);
     return set && { set, files: folderFiles(set.dir), thumbnail: () => fetchThumbnail(set) };
 }
 
@@ -1299,8 +1312,14 @@ async function init() {
         const tables = buildGameTables(graphicsTables);
         const sound = createSoundManager(files.graphicsLoader, tables);
         // Read past the digests: a recording names the files the game reads, and these are the achievements'.
-        const achievementFiles = playedRecording === null ? await readAchievementSetFiles(dataSet, chosen.files) : null;
-        const built = construct(files, graphicsTables, tables, sound, achievementFiles);
+        let tracked: TrackedSet | null = null;
+        if (playedRecording === null) {
+            const own = await readAchievementsText(chosen.files).catch(() => null);
+            const ownOf = (id: string) => id === dataSet.id ? Promise.resolve(own)
+                : chooseDataSet(manifest, id, false).then((other) => other && readAchievementsText(other.files));
+            tracked = { files: await readAchievementSetFiles(dataSet, chosen.files), own, ownOf };
+        }
+        const built = construct(files, graphicsTables, tables, sound, tracked);
         game = built.game;
         screen = built.screen;
         // The data set's rules, before any file is read: one with an Extended Features

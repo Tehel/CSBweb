@@ -1,50 +1,57 @@
 /**
- * The achievements' files the project writes, in the page's build: the common file, and
- * the FTL sets' own, `tools/achievements/<family>.txt` (`achievementFileOf`), which
- * `fetch-gamefiles` also copies into each official set's folder (`doc/ACHIEVEMENTS.md` →
- * "The file"). The game's page tracks them (`src/main.ts`) and the welcome page's book
- * lists them (`welcomePage.ts`).
+ * The achievements' file in the page's build, the common one, and a set's achievements: the
+ * common file's merged with the set's own, `achievements.txt` in its folder or its record
+ * (`ACHIEVEMENTS_FILE`, `doc/ACHIEVEMENTS.md` → "The file"), whose text the caller reads.
+ * The game's page tracks them (`src/main.ts`), the welcome page's book lists them
+ * (`welcomePage.ts`), and the server's Hall of Fame, PROFILE and verifier read them through
+ * the page's readers built for Node (`server/setAchievements.ts`).
  */
 import type { AchievementDef } from '../engine/achievements/AchievementFile';
 import type { GameFigures } from '../engine/achievements/AchievementState';
-import { achievementFileOf, acrossInSets, setAchievementDefs } from '../engine/achievements/PageAchievements';
+import { acrossInSets, setAchievementDefs, type OwnAchievementsOf } from '../engine/achievements/PageAchievements';
 
-const FILES = import.meta.glob<string>('../engine/achievements/defs/*.txt', { query: '?raw', import: 'default', eager: true });
-const OWN = import.meta.glob<string>('../../tools/achievements/*.txt', { query: '?raw', import: 'default', eager: true });
+const FILES = import.meta.glob<string>('../engine/achievements/defs/common.txt', { query: '?raw', import: 'default', eager: true });
 
-/** The repository's file of the sets that read `defs/<name>.txt` (`achievementFileOf`). */
-const ownFile = (name: string): string | undefined => OWN[`../../tools/achievements/${name === 'dm-atari' ? 'dungeon-master' : name}.txt`];
+/** Each own file's achievements, read once, by its text; `NONE`'s, a set's without one. */
+const KEPT = new Map<string, AchievementDef[] | null>();
+/** The same files' achievements across games, by text. */
+const ACROSS = new Map<string, readonly AchievementDef[]>();
+const NONE = '';
 
 /**
- * The achievements of the set `setId`: the common file's merged with the set's own file
- * where the project has one. `null`, and the console says why, where a file does not
- * read: the game plays on with none.
+ * The achievements of a set whose own file is `own`, its text, `null` for none: the common
+ * file's merged with it, kept by its text. `null`, and the console says why, where a file
+ * does not read: the game plays on with none.
  */
-export function achievementDefs(setId: string): AchievementDef[] | null {
+export function achievementDefs(own: string | null): AchievementDef[] | null {
+    const key = own ?? NONE;
+    if (KEPT.has(key)) return KEPT.get(key)!;
+    let defs: AchievementDef[] | null;
     try {
         const common = FILES['../engine/achievements/defs/common.txt'];
         if (common === undefined) throw new Error('the common achievements are not in the build');
-        return setAchievementDefs(common, ownFile(achievementFileOf(setId)) ?? null);
+        defs = setAchievementDefs(common, own);
     } catch (error) {
         console.error('No achievements:', error);
-        return null;
+        defs = null;
     }
+    KEPT.set(key, defs);
+    return defs;
 }
-
-/** Each set's achievements across games, read once (`achievementsAcross`). */
-const ACROSS = new Map<string, readonly AchievementDef[]>();
 
 /**
  * The achievements across games of the set `setId` that `bySet`, each set's playthroughs'
  * figures (`GameFigures`), make yes, in the file's order (`acrossInSets`,
- * `doc/ACHIEVEMENTS.md` → "Across games"): what the book shows and the Hall of Fame works
- * out of the proofs' figures (`server/proofs.ts`). None where the set's files do not read.
+ * `doc/ACHIEVEMENTS.md` → "Across games"), each set's own file `ownOf`'s: what the book
+ * shows and the Hall of Fame works out of the proofs' figures (`server/proofs.ts`). None
+ * where the set's files do not read.
  */
-export function achievementsAcross(setId: string, bySet: ReadonlyMap<string, readonly GameFigures[]>): string[] {
-    let defs = ACROSS.get(setId);
+export function achievementsAcross(setId: string, ownOf: OwnAchievementsOf, bySet: ReadonlyMap<string, readonly GameFigures[]>): string[] {
+    const own = ownOf(setId);
+    let defs = ACROSS.get(own ?? NONE);
     if (defs === undefined) {
-        defs = (achievementDefs(setId) ?? []).filter((def) => def.across);
-        ACROSS.set(setId, defs);
+        defs = (achievementDefs(own) ?? []).filter((def) => def.across);
+        ACROSS.set(own ?? NONE, defs);
     }
-    return defs.length === 0 ? [] : acrossInSets(defs, setId, bySet);
+    return defs.length === 0 ? [] : acrossInSets(defs, setId, bySet, ownOf);
 }

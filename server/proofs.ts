@@ -101,9 +101,9 @@ export interface StoredProof {
 }
 
 /**
- * The build's achievements across games of the set `setId` that `bySet`, each set's
- * playthroughs' figures, make yes (`achievementsAcross`, `READERS_MODULE`'s, `app.ts`): a
- * `games(…, in "file")` reads other sets' games.
+ * The achievements across games of the set `setId` that `bySet`, each set's playthroughs'
+ * figures, make yes (`folderAchievements`, `setAchievements.ts`): a `games(…, in "x")`
+ * reads other sets' games.
  */
 export type AchievementsAcrossOf = (setId: string, bySet: ReadonlyMap<string, readonly Readonly<Record<string, number>>[]>) => readonly string[];
 
@@ -523,10 +523,13 @@ export type ProofReplayed =
     }
     | { readonly kind: 'drifted'; readonly reason: string };
 
-/** The page's replay of a proof, `replayProof`, as `VERIFIER_MODULE` exports it, its achievements given by `defsOf` (`app.ts`). */
-export type BuiltReplayProof = (bytes: Uint8Array, limit: number, sets: readonly VerifierSet[], defsOf: (setId: string) => unknown) => Promise<ProofReplayed>;
+/**
+ * The page's replay of a proof, `replayProof`, as `VERIFIER_MODULE` exports it, the set's
+ * achievements `defsOf` its own file's text merged with the common one (`app.ts`).
+ */
+export type BuiltReplayProof = (bytes: Uint8Array, limit: number, sets: readonly VerifierSet[], defsOf: (own: string | null) => unknown) => Promise<ProofReplayed>;
 
-/** What the verifier replays a proof with: the page's replay, over the build's achievements (`loadVerifierReaders`, `app.ts`). */
+/** What the verifier replays a proof with: the page's replay, over the set's achievements (`loadVerifierReaders`, `app.ts`). */
 export interface VerifierReaders {
     replay(bytes: Uint8Array, limit: number, sets: readonly VerifierSet[]): Promise<ProofReplayed>;
 }

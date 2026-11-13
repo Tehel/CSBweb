@@ -36,6 +36,13 @@ const COMMON = resolve(DEFS, 'common.txt');
 /** The FTL sets' own files, one per family, which `fetch-gamefiles` copies into their folders as `achievements.txt`. */
 const FAMILIES = resolve(import.meta.dirname, '../achievements');
 
+/** The text of the set `id`'s `achievements.txt`, in its folder, `null` for none or a set the manifest does not hold. */
+function ownFileOf(id: string): string | null {
+  const set = DATA_SETS.find((one) => one.id === id);
+  const path = set && resolve(set.dir, 'achievements.txt');
+  return path !== undefined && existsSync(path) ? readFileSync(path, 'utf8') : null;
+}
+
 /** The sets whose folder holds `text` as its `achievements.txt`. */
 function setsHolding(text: string): string[] {
   return DATA_SETS.filter((set) => {
@@ -880,7 +887,7 @@ function acrossGames(common: AchievementFile, dm: AchievementFile, csb: Achievem
     ['CSB won, DM\'s win a player\'s set\'s', 'csb', [['csb', [a.figures]], ['my-dungeon', [a.figures]]], false],
   ];
   for (const [what, setId, sets, unlocked] of slams) {
-    const got = acrossInSets(setId === 'csb' ? csbDefs : across, setId, new Map(sets)).includes('grand-slam');
+    const got = acrossInSets(setId === 'csb' ? csbDefs : across, setId, new Map(sets), ownFileOf).includes('grand-slam');
     console.log(`  ${what}: ${got ? 'Grand Slam' : '(none)'}`);
     check(got === unlocked, `${what}: ${unlocked ? 'Grand Slam' : 'no Grand Slam'}`);
   }

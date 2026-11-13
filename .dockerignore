@@ -12,4 +12,3 @@
 !src/
 !server/
 !tools/**/*.ts
-!tools/achievements/

@@ -10,7 +10,7 @@
  */
 import { md5 } from '../core/md5';
 import { CSBGraphicsLoader } from './CSBGraphicsLoader';
-import type { DataSet } from './DataSets';
+import { ACHIEVEMENTS_FILE, type DataSet } from './DataSets';
 import { GraphicsLoader } from './GraphicsLoader';
 import { parseHcsbDat } from './HintOracleLoader';
 import type { HintOracleFiles } from '../renderer/ui/HintOracleButton';
@@ -62,6 +62,15 @@ export function digestedFiles(files: DataSetFiles): DigestedFiles {
 /** `bytes`' MD5, in lower-case hex (`FileDigests`). */
 export function fileDigest(bytes: Uint8Array): string {
     return [...md5(bytes)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * The text of `files`' `ACHIEVEMENTS_FILE`, `null` where the set has none. The page reads it
+ * through the set's files, never through `digestedFiles`, so that no recording names it.
+ */
+export async function readAchievementsText(files: DataSetFiles): Promise<string | null> {
+    const bytes = await files.read(ACHIEVEMENTS_FILE);
+    return bytes && new TextDecoder().decode(bytes);
 }
 
 /** What the boot reads of a set before anything is built. */

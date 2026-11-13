@@ -11,9 +11,9 @@
  * **A player of the Hall** is an identity with a public name (`identity.ts`), counted once
  * whatever browsers it links, who has verified an achievement of the set; an identity a
  * moderator reset is no player of the Hall until it chooses another name. A set's
- * achievements are the build's (`achievementDefs`, `src/ui/achievementFiles.ts`), which
- * the server reads through the page's readers (`PageReaders.js`, `app.ts`): an unlock
- * whose id the set's file no longer holds is not counted.
+ * achievements are its folder's `achievements.txt` merged with the common file
+ * (`folderAchievements`, `setAchievements.ts`): an unlock whose id the set's file no
+ * longer holds is not counted.
  *
  * No answer holds a `playerId`, a playthrough or a proof's id: a player is their name and
  * their public id.
@@ -21,7 +21,7 @@
 import type { FameDef, FamePlayer, FamePlayerPage, FameSet, FameSummary, StatsSet } from './answers.ts';
 import type { HallRow } from './proofs.ts';
 
-/** The build's achievements of a set, the common file's merged with its own (`achievementDefs`); `null` where they do not read. */
+/** A set's achievements, the common file's merged with its own (`folderAchievements`); `null` where they do not read. */
 export type AchievementDefsOf = (setId: string) => readonly FameDef[] | null;
 
 /** A set's rows among `rows`, those of an achievement its file holds, by achievement, each its players' in `rows`' order (the first first). */

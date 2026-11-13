@@ -30,32 +30,30 @@ export interface ShownUnlock {
   readonly unlock: Unlock;
 }
 
-/** The Dungeon Master sets, which all read `tools/achievements/dungeon-master.txt`: the Atari's, the Amiga's and the hidden ones. */
-const DUNGEON_MASTER_SETS: ReadonlySet<string> = new Set([
-  'dm-atari', 'dm-atari-1.0a', 'dm-atari-1.0b', 'dm-atari-1.1', 'dm-atari-1.2', 'dm-atari-1.2-de',
-  'dm-atari-1.3-fr', 'dm-amiga', 'dm-windows', 'dm-minimum-item-picking',
-]);
-
-/**
- * The name of the project's own file of the set `setId`'s achievements
- * (`doc/ACHIEVEMENTS.md` → "The file"): `dm-atari` for every Dungeon Master set,
- * `tools/achievements/dungeon-master.txt`, else the set's id, which has a file only where
- * the project wrote one.
- */
-export function achievementFileOf(setId: string): string {
-  return DUNGEON_MASTER_SETS.has(setId) ? 'dm-atari' : setId;
-}
+/** The text of each set's own achievements file, by its id (`ACHIEVEMENTS_FILE`), `null` for a set with none. */
+export type OwnAchievementsOf = (setId: string) => string | null;
 
 /**
  * The achievements across games of `defs`, the set `setId`'s, that `bySet`, each set's
  * playthroughs' figures, make yes (`acrossUnlocked`, `doc/ACHIEVEMENTS.md` → "Across
- * games"): its own games those of `setId`, and a `games(…, in "file")`'s those of every set
- * of `bySet` that reads the file `achievementFileOf` names, `setId` among them where it
- * does. What the page, the book and the Hall all work them out with.
+ * games"): its own games those of `setId`, and a `games(…, in "x")`'s those of the set `x`
+ * and of every set of `bySet` whose own file, `ownOf`, is the same text as `x`'s, `setId`
+ * among them where it is. What the page, the book and the Hall all work them out with.
  */
-export function acrossInSets(defs: readonly AchievementDef[], setId: string, bySet: ReadonlyMap<string, readonly GameFigures[]>): string[] {
-  return acrossUnlocked(defs, bySet.get(setId) ?? [],
-    (file) => [...bySet].filter(([id]) => achievementFileOf(id) === file).flatMap(([, games]) => games));
+export function acrossInSets(defs: readonly AchievementDef[], setId: string, bySet: ReadonlyMap<string, readonly GameFigures[]>, ownOf: OwnAchievementsOf): string[] {
+  return acrossUnlocked(defs, bySet.get(setId) ?? [], (named) => {
+    const text = ownOf(named);
+    return [...bySet].filter(([id]) => id === named || (text !== null && ownOf(id) === text)).flatMap(([, games]) => games);
+  });
+}
+
+/**
+ * The sets whose own files `acrossInSets` reads of `defs`, the set `setId`'s, over `sets`,
+ * those `bySet` holds figures of: the set's, each of `sets`', and each a `games(…, in "x")`
+ * names.
+ */
+export function ownFilesRead(defs: readonly AchievementDef[], setId: string, sets: Iterable<string>): Set<string> {
+  return new Set([setId, ...sets, ...defs.flatMap((def) => def.games.flatMap((game) => (game.of === null ? [] : [game.of])))]);
 }
 
 /** Each set's playthroughs' figures, `rows` grouped by their set. */
@@ -68,8 +66,7 @@ export function figuresBySet(rows: readonly AchievementFiguresRow[]): Map<string
 /**
  * A set's achievements: `common`, the common file's text, merged with `own`, the set's own
  * file's (`mergeAchievements`), where it has one. A file that does not read throws, each
- * error with its line: the files are the project's, and a set's own is checked as it is
- * added (phase 18.7).
+ * error with its line.
  */
 export function setAchievementDefs(common: string, own: string | null): AchievementDef[] {
   const read = (text: string, what: string) => {
@@ -98,6 +95,8 @@ export class PageAchievements {
   private readonly acrossDone = new Set<string>();
   /** Whether the store's figures and rows have been read, before which nothing across games is tested. */
   private figuresRead = false;
+  /** The own achievements files `acrossInSets` reads, by set, read with the figures. */
+  private ownFiles = new Map<string, string | null>();
 
   constructor(
     private readonly game: Game,
@@ -115,6 +114,8 @@ export class PageAchievements {
     files: AchievementSetFiles,
     /** A line for the console, with the error, where a row could not be written. */
     private readonly log: (message: string, error?: unknown) => void = () => {},
+    /** The text of a set's own achievements file (`ACHIEVEMENTS_FILE`), by its id, which `acrossInSets` compares. */
+    private readonly ownFileOf: (setId: string) => Promise<string | null> = () => Promise.resolve(null),
   ) {
     this.byId = new Map(defs.map((def) => [def.id, def]));
     this.tracker = new AchievementTracker(game, defs, objectNames, files, portraits);
@@ -140,6 +141,8 @@ export class PageAchievements {
         if (row.dataSet === this.dataSet) this.figures.set(row.playthrough, mergeFigures(row.figures, this.figures.get(row.playthrough) ?? {}));
       }
       this.elsewhere = figuresBySet(figures.filter((row) => row.dataSet !== this.dataSet));
+      const read = [...ownFilesRead(this.across, this.dataSet, this.elsewhere.keys())];
+      this.ownFiles = new Map(await Promise.all(read.map(async (id) => [id, await this.ownFileOf(id).catch(() => null)] as const)));
       const ids = new Set(this.across.map((def) => def.id));
       for (const row of rows) if (ids.has(row.id)) this.acrossDone.add(row.id);
       this.figuresRead = true;
@@ -168,7 +171,7 @@ export class PageAchievements {
         .catch((error) => this.log('The figures across games could not be stored', error));
     }
     const bySet = new Map(this.elsewhere).set(this.dataSet, [...this.figures.values()]);
-    const ids = acrossInSets(this.across, this.dataSet, bySet).filter((id) => !this.acrossDone.has(id));
+    const ids = acrossInSets(this.across, this.dataSet, bySet, (id) => this.ownFiles.get(id) ?? null).filter((id) => !this.acrossDone.has(id));
     if (ids.length === 0) return;
     for (const id of ids) this.acrossDone.add(id);
     const gameTime = this.game.ctx.state.tickCount;

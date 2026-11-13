@@ -373,8 +373,8 @@ async function verifier(): Promise<void> {
         bodies.push(profile);
         const achievements = (JSON.parse(profile) as { achievements: unknown }).achievements;
         console.log(`  the profile's achievements: ${JSON.stringify(achievements)}`);
-        check(JSON.stringify(achievements) === JSON.stringify([{ dataSet: 'dm-atari-1.2', name: dataSets.read().dataSets.find((set) => set.id === 'dm-atari-1.2')?.name, unlocked: ['first-blood'] }]),
-            'the profile lists First Blood once, by its set');
+        check(JSON.stringify(achievements) === JSON.stringify([{ dataSet: 'dm-atari-1.2', name: dataSets.read().dataSets.find((set) => set.id === 'dm-atari-1.2')?.name, unlocked: ['first-blood'], names: ['First Blood'] }]),
+            'the profile lists First Blood once, by its set, named by its file');
 
         // A moderator watching the proofs: the identity's, the latest first, then a package
         // kept, to them alone.

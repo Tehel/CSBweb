@@ -59,8 +59,7 @@ At the author's request, beside the debt. The design is `doc/ACHIEVEMENTS.md`.
   `tools/probe-frames.ts`. Deferred: CSB's adventure, made by RISE from the prison's
   save, starts a history that is not the whole game's, as its recording begins at a save
   the replay holds no state for, so no needs-the-whole-game achievement unlocks in CSB;
-  giving it the prison's history needs the verifier to agree (18.5). A set's own
-  `achievements.txt` is read by neither the page nor the book until 18.7.
+  giving it the prison's history needs the verifier to agree (18.5).
 - ✅ 18.4 Identity (`doc/ACHIEVEMENTS.md` → "Identity"): the public name, its public id
   and the identity key on the server (`server/identity.ts`), what it knows of a player
   (`GET api/profile`), and the welcome page's PROFILE (`src/ui/profile.ts`). Settled in
@@ -95,12 +94,15 @@ At the author's request, beside the debt. The design is `doc/ACHIEVEMENTS.md`.
      `install-official-sets` to an instance with the set, or alone to a set installed
      already. The tools read the folders' copies. The build still bundles both through
      `achievementFileOf` until step 2, whose readers make its list of sets redundant.
-  2. **Read where the set's files are read**: the game's page and the book through the
-     set's files (`DataSetFiles`), a local set's from its record; the verifier, the Hall
-     and PROFILE from the set's folder, each set's file read and kept by its digest, the
-     build's `achievementDefs` then `common.txt` alone, `achievementFileOf` and its list
-     of Dungeon Master sets gone. `achievements.txt` is not a recording's file: editing it
-     changes no recording's set (`findRecordingSet`).
+  2. ✅ **Read where the set's files are read**: the game's page and the book through the
+     set's files (`readAchievementsText`), a local set's from its record, past the digests
+     a recording keeps; the verifier through the files it replays over; the Hall and
+     PROFILE, whose names the server now gives, from the set's folder
+     (`folderAchievements`), read anew at each answer; each text's achievements kept by
+     it, the build's `achievementDefs` the merge with `common.txt`, the one file it holds.
+     `achievementFileOf` is gone: until step 3, `in "x"` counts the set `x` and every set
+     whose own file is the same text. The dev server answers a file a folder lacks with a
+     404, as the deployed server does, not the page's fallback.
   3. **Another dungeon's games without a shared file**: a file declares its family on a
      line of its own, `family: dungeon-master`, the set's id where it has none, and
      `games(won, in "dungeon-master")` counts the games of every set of that family

@@ -26,15 +26,22 @@ builds, step by step, and each step rewrites its section here to say what was bu
 ## The file
 
 A set's achievements are `achievements.txt`, an optional file in the set's folder, like
-`hcsb.hct`. The common achievements, which every set has, are
-`src/engine/achievements/defs/common.txt`. The FTL sets' own achievements are written by the
+`hcsb.hct` (`ACHIEVEMENTS_FILE`, `src/data/DataSets.ts`), merged with the common
+achievements, which every set has, `src/engine/achievements/defs/common.txt`, the one file
+the build holds (`achievementDefs`, `src/ui/achievementFiles.ts`). Each reader reads the
+set's file where it reads the set's other files: the game's page and the welcome page's
+book through the set's files (`readAchievementsText`, `src/data/DataSetFiles.ts`), a
+site's set's from its folder and a local set's from its record; the verifier through the
+files it replays a proof over (`replayProof`); and the Hall of Fame and PROFILE from the
+set's folder on the server (`folderAchievements`, `server/setAchievements.ts`). Each
+file's achievements are read once and kept by its text, and the server reads the file
+anew at each answer, so an edit of it needs no restart. A set without one has the common
+achievements alone. The FTL sets' own achievements are written by the
 project, one file per family, beside the repository's manifest: `tools/achievements/dungeon-master.txt`,
 which every Dungeon Master set's folder holds, the Atari's, the Amiga's and the hidden
 ones, and `csb.txt`, Chaos Strikes Back's. `npm run fetch-gamefiles` copies each into its
 sets' folders as `achievements.txt`, and `utils/install-official-sets.ts` copies it to an
-instance with the set. Until the readers read a set's folder (`PLAN.md` 18.7, step 2), the
-build bundles both and gives each set its family's (`achievementFileOf`,
-`src/engine/achievements/PageAchievements.ts`). Both give the
+instance with the set. Both give the
 common file's values: Speed Runner in less than 180 minutes, Blitz in less than 60, and
 Conscientious Objector with at most 40 kills. Dungeon Master's also lists the levels Clean
 Sweep counts, 1 to 12, all but the Hall of Champions and the Dragon's, and gives its own
@@ -430,12 +437,11 @@ across games over the playthroughs' figures.
 A total is of one set's games: a Dungeon Master won on the Atari 1.1 and one on the Amiga
 are two sets' wins.
 
-**Another dungeon's games**: `games(condition, in "file")` counts the playthroughs that met
-`condition` in every set that reads the project's file `defs/<file>.txt`
-(`achievementFileOf`), this set among them where it reads that file (`"dm-atari"` names
-`tools/achievements/dungeon-master.txt`). `"dm-atari"` is every
-Dungeon Master set, the Atari's, the Amiga's and the hidden ones, and `"csb"` Chaos Strikes
-Back. The figure it reads is the one each of those sets keeps by the same key, `games(won)`,
+**Another dungeon's games**: `games(condition, in "x")` counts the playthroughs that met
+`condition` in the set `x` and in every set whose own file is the same text as `x`'s, this
+set among them where it is (`PLAN.md` 18.7, step 3, names the files' families instead).
+`"dm-atari"` is every Dungeon Master set, the Atari's, the Amiga's and the hidden ones,
+each holding `dungeon-master.txt`, and `"csb"` Chaos Strikes Back. The figure it reads is the one each of those sets keeps by the same key, `games(won)`,
 so a set counts there only by a condition its own achievements test; an achievement that
 names another file's games is best in both files. `acrossInSets`
 (`src/engine/achievements/PageAchievements.ts`) tests a set's achievements across games
@@ -715,9 +721,10 @@ made-up games' figures, and Grand Slam over made-up sets' games.
 The page tracks the achievements of a game the player plays (`PageAchievements`,
 `src/engine/achievements/PageAchievements.ts`), and of no other.
 
-- **Its achievements** are the common file's merged with the set's own file, where the
-  project has one (`setAchievementDefs`, read from the build by `src/main.ts`). A file
-  that does not read leaves the game without achievements, and the console says why.
+- **Its achievements** are the common file's merged with the set's own file, where it
+  has one (`achievementDefs`, its text read through the set's files by `src/main.ts`, past
+  the digests a recording keeps). A file that does not read leaves the game without
+  achievements, and the console says why.
   The objects are named by the screen's `objectTables`.
 - **The recording's viewer** (`?recording=`) builds no tracker, and nothing observes its
   engine: a recording played back is no game of the player's.
@@ -893,8 +900,9 @@ replays one queued proof at a time, the oldest first (`verifyNext`, `server/proo
 with the page's replay built for Node (`replayProof`,
 `src/engine/achievements/ProofReplay.ts`): the server bundles it as a second module,
 `dist/server/VerifierReaders.js` (`src/engine/VerifierReaders.ts`, `vite build --ssr
---mode verifier`), with the whole engine, a page without the DOM and the build's
-achievements, beside the main server's readers (`PageReaders.js`), which never load it.
+--mode verifier`), with the whole engine, a page without the DOM and the build's common
+file, merged with the `achievements.txt` of the set the package names, read from its
+folder, beside the main server's readers (`PageReaders.js`), which never load it.
 
 - The package is read with the page's reader, its set found by its files' digests among
   every set the store holds (`findRecordingSet`, the digests of each set's folder, as
@@ -1002,17 +1010,17 @@ checked (`ProofStore.hall`). GET only, 404 for an unknown set or id, and none ho
 - **An achievement across games verified** is one the figures of the identity's checked
   proofs make yes (`acrossRows`, `server/proofs.ts`): its proofs of every set are taken in
   the order they were checked, each playthrough at the largest figure any of its proofs
-  reached so far, never their sum, and the build's conditions of each set it has proofs of
+  reached so far, never their sum, and the conditions of each set it has proofs of
   tested over them after each (`achievementsAcross`, which the page's readers export
-  beside `achievementDefs`). Its time is that of the proof after which the condition was
+  beside `achievementDefs`, each set's file read from its folder). Its time is that of the proof after which the condition was
   first yes, a proof of another set's where it reads that set's games, as Grand Slam
   does. PROFILE's
   achievements (`ProofStore.verifiedBy`) count them the same way.
 - **The sets** are the public ones, approved and not hidden, as `api/stats`'; **their
-  achievements** the build's (`achievementDefs`, `src/ui/achievementFiles.ts`), which the
-  server reads through the page's readers, `dist/server/PageReaders.js` exporting them as
-  the verifier's module does (`loadPageReaders`); the server has no file of its own. An
-  unlock whose id the set's file no longer holds is not counted.
+  achievements** each set's `achievements.txt`, read from its folder, merged with the
+  common file by the page's readers, `dist/server/PageReaders.js` exporting the merge as
+  the verifier's module does (`folderAchievements`, `loadPageReaders`). An unlock whose id
+  the set's file no longer holds is not counted.
 - **`api/fame`** (`fameSummary`): how many players the Hall has, and each set, the most
   players first, then in the table's order: its players, its achievements and how many of
   them someone verified.

@@ -12,12 +12,12 @@
  * from a new game or a CSB adventure's start has its whole history, one from another save
  * that no replay holds a state for has a history of its own from there, as the page's had.
  *
- * `src/engine/VerifierReaders.ts` bundles it for the server, with the achievements of the
- * build (`achievementDefs`).
+ * `src/engine/VerifierReaders.ts` bundles it for the server, with the build's merge of a
+ * set's own file with the common one (`achievementDefs`).
  *
  * **Nothing in this file touches the DOM.**
  */
-import type { DataSetFiles } from '../../data/DataSetFiles';
+import { readAchievementsText, type DataSetFiles } from '../../data/DataSetFiles';
 import type { DataSet } from '../../data/DataSets';
 import { findRecordingSet, type SetDigests } from '../../data/RecordingSet';
 import { UTILITY_PORTRAITS_FILE } from '../../data/UtilityPortraits';
@@ -51,13 +51,14 @@ export type ProofReplayed =
 
 /**
  * The package `bytes` hold, read to at most `limit` bytes unzipped, replayed over the set
- * of `sets` whose files have its digests, with the achievements `defsOf` gives its set. A
- * package that does not read, whose files no set has, whose set has no achievements, or
- * that drifts, a later level's among them, or whose game an error ends (`die`), is
- * `drifted`, saying why.
+ * of `sets` whose files have its digests, with the achievements `defsOf` gives its set's
+ * own file (`ACHIEVEMENTS_FILE`), read through the files of the set the package names, or
+ * of the set it is played over where `sets` hold none of that id. A package that does not
+ * read, whose files no set has, whose set has no achievements, or that drifts, a later
+ * level's among them, or whose game an error ends (`die`), is `drifted`, saying why.
  */
 export async function replayProof(
-    bytes: Uint8Array, limit: number, sets: readonly ProofSet[], defsOf: (setId: string) => readonly AchievementDef[] | null,
+    bytes: Uint8Array, limit: number, sets: readonly ProofSet[], defsOf: (own: string | null) => readonly AchievementDef[] | null,
 ): Promise<ProofReplayed> {
     const drifted = (reason: string): ProofReplayed => ({ kind: 'drifted', reason });
     let pkg: RecordingPackage;
@@ -69,7 +70,8 @@ export async function replayProof(
     const found = findRecordingSet(pkg.path, sets.map((one) => one.digests));
     if (found.kind === 'refused') return drifted(found.why);
     const over = sets.find((one) => one.set.id === found.id)!;
-    const defs = defsOf(pkg.dataSet);
+    const named = sets.find((one) => one.set.id === pkg.dataSet) ?? over;
+    const defs = defsOf(await readAchievementsText(named.files).catch(() => null));
     if (defs === null || defs.length === 0) return drifted(`${pkg.dataSet} has no achievements`);
     try {
         const page = await standInPage(over.set, over.files);

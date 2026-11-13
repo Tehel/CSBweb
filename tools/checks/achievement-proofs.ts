@@ -253,7 +253,7 @@ console.log('\nA CSB adventure\'s start, replayed:');
 const csbDefs = setAchievementDefs(readFileSync(join(import.meta.dirname, '../../src/engine/achievements/defs/common.txt'), 'utf8'),
     readFileSync(join(dataSetNamed('csb').dir, 'achievements.txt'), 'utf8'));
 const csbGame = new Uint8Array(readFileSync(join(CORPUS_DIR, 'CSBFullRecordingV4.L5.gz')));
-const csbReplayed = await replayProof(csbGame, Infinity, sets, (setId) => (setId === 'csb' ? csbDefs : null));
+const csbReplayed = await replayProof(csbGame, Infinity, sets, (own) => (own === readFileSync(join(dataSetNamed('csb').dir, 'achievements.txt'), 'utf8') ? csbDefs : null));
 console.log(`  replayed: ${JSON.stringify(csbReplayed)}`);
 check(csbReplayed.kind === 'checked' && csbReplayed.unlocked.includes('speed-runner'),
     'the whole CSB game, from the adventure\'s start, unlocks Speed Runner, which needs the whole game');

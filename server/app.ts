@@ -76,6 +76,7 @@ import { manifestText, samePlayerId, wallsText, type DataSetStore, type DataSetV
 import { addDocument, removeDocument } from './documents.ts';
 import { editDataSet } from './edit.ts';
 import { fameSet, famePlayer, fameSummary, type AchievementDefsOf } from './fame.ts';
+import type { BuiltAchievementDefs, BuiltAchievementsAcross } from './setAchievements.ts';
 import { addressBucket, checkEvent, isPlayerId, MAX_EVENT_BYTES, type EventRules, type RateLimit } from './events.ts';
 import { changeProfile, identityText, MAX_PROFILE_BYTES, profileText, resetName, type IdentityStore, type ProfileAnswer } from './identity.ts';
 import { MAX_PROOF_BYTES, proofsText, sendProof, type AchievementsAcrossOf, type BuiltReplayProof, type ProofAnswer, type ProofStore, type VerifierReaders } from './proofs.ts';
@@ -105,16 +106,16 @@ export const READERS_MODULE = `${SERVER_DIR}/PageReaders.js`;
 
 /**
  * What the server uses of `READERS_MODULE`: the page's check of a set, its reader of a
- * dungeon's walls, its reader of a shared recording's package, and the build's
- * achievements, which the Hall of Fame lists (`fame.ts`), and those across games the
- * proofs' figures make yes (`ProofStore.hall`).
+ * dungeon's walls, its reader of a shared recording's package, and its merge of a set's
+ * own achievements file with the common one, and of those across games the proofs' figures
+ * make yes, which the server gives each set's file from its folder (`folderAchievements`).
  */
 export interface PageReaders {
     checkDataSet: CheckDataSet;
     readDungeonWalls: ReadDungeonWalls;
     readRecordingPackage: ReadRecordingPackage;
-    achievementDefs: AchievementDefsOf;
-    achievementsAcross: AchievementsAcrossOf;
+    achievementDefs: BuiltAchievementDefs;
+    achievementsAcross: BuiltAchievementsAcross;
 }
 
 /**
@@ -135,7 +136,7 @@ export async function loadVerifierReaders(distDir: string): Promise<VerifierRead
     if (typeof module.replayProof !== 'function') throw new Error(`${file} exports no replayProof`);
     if (typeof module.achievementDefs !== 'function') throw new Error(`${file} exports no achievementDefs`);
     const replayProof = module.replayProof as BuiltReplayProof;
-    const achievementDefs = module.achievementDefs as (setId: string) => unknown;
+    const achievementDefs = module.achievementDefs as (own: string | null) => unknown;
     return { replay: (bytes, limit, sets) => replayProof(bytes, limit, sets, achievementDefs) };
 }
 
@@ -155,8 +156,8 @@ export async function loadPageReaders(distDir: string): Promise<PageReaders> {
     if (typeof module.achievementsAcross !== 'function') throw new Error(`${file} exports no achievementsAcross`);
     return {
         checkDataSet: module.checkLocalDataSet as CheckDataSet, readDungeonWalls: module.readDungeonWalls as ReadDungeonWalls,
-        readRecordingPackage: module.readRecordingPackage as ReadRecordingPackage, achievementDefs: module.achievementDefs as AchievementDefsOf,
-        achievementsAcross: module.achievementsAcross as AchievementsAcrossOf,
+        readRecordingPackage: module.readRecordingPackage as ReadRecordingPackage, achievementDefs: module.achievementDefs as BuiltAchievementDefs,
+        achievementsAcross: module.achievementsAcross as BuiltAchievementsAcross,
     };
 }
 
@@ -205,9 +206,9 @@ export interface ApiOptions {
     identities: IdentitiesApi;
     /** The proofs of the achievements (`proofs.ts`). */
     proofs: ProofsApi;
-    /** The build's achievements of a set, which the Hall of Fame lists (`READERS_MODULE`'s, `fame.ts`). */
+    /** A set's achievements, which the Hall of Fame lists and PROFILE names (`folderAchievements`, `fame.ts`). */
     achievementDefs: AchievementDefsOf;
-    /** The build's achievements across games the proofs' figures make yes (`READERS_MODULE`'s, `ProofStore.hall`). */
+    /** A set's achievements across games the proofs' figures make yes (`folderAchievements`, `ProofStore.hall`). */
     achievementsAcross: AchievementsAcrossOf;
 }
 
@@ -827,7 +828,7 @@ export async function receiveRecordingModeration(id: string, api: RecordingShare
 }
 
 /** What `answerProfile` needs of the API. */
-export type ProfileApi = Pick<ApiOptions, 'dataSets' | 'store' | 'achievementsAcross'> & {
+export type ProfileApi = Pick<ApiOptions, 'dataSets' | 'store' | 'achievementDefs' | 'achievementsAcross'> & {
     recordings: Pick<RecordingsApi, 'store'>; identities: Pick<IdentitiesApi, 'store'>; proofs: Pick<ProofsApi, 'store'>;
 };
 
@@ -843,7 +844,7 @@ export function answerProfile(api: ProfileApi, req: IncomingMessage, res: Server
     res.setHeader('Vary', PLAYER_ID_HEADER);
     send(res, 200, profileText(header, {
         identities: api.identities.store, dataSets: api.dataSets, recordings: api.recordings.store, stats: api.store, proofs: api.proofs.store,
-        across: api.achievementsAcross,
+        across: api.achievementsAcross, defsOf: api.achievementDefs,
     }), 'application/json; charset=utf-8');
 }
 
