@@ -55,6 +55,14 @@ export class UtilityPortraits {
     const charID = this.dmCells.indexOf(portrait.join());
     return charID < 0 ? undefined : this.newFaces[charID]!.slice();
   }
+
+  /**
+   * Every face a DM champion has, each cell's pixels joined: the 24 of DM's graphic 26 and
+   * the 24 the utility disk redrew, which RISE's NEW FACE puts on them.
+   */
+  dungeonMasterFaces(): string[] {
+    return [...this.dmCells, ...this.newFaces.map((face) => face.join())];
+  }
 }
 
 /**

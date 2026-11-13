@@ -40,8 +40,9 @@ the Power Gem joined to the Firestaff, Pickpocket's Revenge, a Giggler that robb
 party killed, and Riddle Me This, the riddle room's four riddles answered at once
 ("Locks and switches"); Chaos Strikes Back
 lists no level to sweep, disables Girl Power ("The champions"), and has Self-Reliant, won
-without the Hint Oracle asked, Coin-Operated, every GOR COIN lock opened, and Fresh Faces,
-won with a party raised from the prison alone ("Where the party came from"). A set with no `achievements.txt` of its own reads that file instead. The file is never a game file
+without the Hint Oracle asked, Coin-Operated, every GOR COIN lock opened, Fresh Faces,
+won with a party raised from the prison alone, and Veterans, from Dungeon Master alone
+("Where the party came from"). A set with no `achievements.txt` of its own reads that file instead. The file is never a game file
 (`GAME_FILES`, `src/data/DataSets.ts`), so a recording's digests never name it, and an
 author can change the file without breaking a recording.
 
@@ -183,7 +184,7 @@ number for a `level`. Names compare without regard to case.
 | `wear` | an object is put on a worn place | `champion`; `slot`: `head` `neck` `torso` `legs` `feet`; `item` |
 | `join` | a champion joins the party | `champion`; `how`: `resurrect` `reincarnate` |
 | `revive` | the Vi altar brings a champion of the party back to life | `champion`; `times`, how many times the altar has revived that champion in the game, this one included |
-| `raise` | a CSB adventure begins, once for each champion of its party | `champion`; `from`: `prison` `imported` ("Where the party came from") |
+| `raise` | a CSB adventure begins, once for each champion of its party | `champion`; `from`: `prison` `dm` `imported` ("Where the party came from") |
 | `enter` | the party stands on a level it did not stand on at the last tick's end, and at a history's first tick | `level`, the map, from 0 |
 | `leave` | the party stands on another level than at the last tick's end | `level`, the map left; `cleared`: `yes` when no monster is alive on it then |
 | `theft` | a monster's blow takes an object from a champion, a Giggler's | `champion`, `item`, `monster` |
@@ -244,15 +245,22 @@ makes a save of its own"): the prison's, whose champions are Chaos Strikes Back'
 another dungeon's, Dungeon Master's most often. As the tracker begins the adventure's
 history ("A CSB adventure") it raises each champion of the party, `from: prison` where
 their portrait is a cell of the set's own champions' portraits, graphic 26 of its
-`graphics.dat`, the faces its mirrors give, and `imported` otherwise. A champion is known
-by their portrait, as RISE's NEW FACE knows them, and never by their name, which
+`graphics.dat`, the faces its mirrors give; `from: dm` where it is a cell of either sheet
+of the set's `utility-portraits.dat` (`dungeonMasterFaces`,
+`src/data/UtilityPortraits.ts`), Dungeon Master's graphic 26 and the utility disk's
+redrawn faces of the same 24, so a DM party raised with OLD FACE or NEW FACE is from DM;
+and `imported` otherwise, which is every champion of a set without that file. A champion
+is known by their portrait, as RISE's NEW FACE knows them, and never by their name, which
 REINCARNATE changes and the portrait keeps. Chaos Strikes Back's 24 portraits are none of
-Dungeon Master's, nor of the utility disk's redrawn faces of them, so a DM party raised
-with either is imported.
+Dungeon Master's, nor of the utility disk's. No game holds whether the DM game the party
+came from was won: a DM save is always made before the win, which writes none, and the
+adventure keeps only the party of its source (`TAG002724`, `src/engine/Chaos.ts`).
 
-- **Fresh Faces**, Chaos Strikes Back's: `won and ever(raise) and never(raise where from =
-  imported)`. A game that begins at another save raises nobody, so only a whole history
+- **Fresh Faces**, Chaos Strikes Back's: `won and ever(raise) and never(raise where from !=
+  prison)`. A game that begins at another save raises nobody, so only a whole history
   can earn it.
+- **Veterans**, Chaos Strikes Back's: `won and ever(raise) and never(raise where from !=
+  dm)`, a party of Dungeon Master's champions, however many, and only theirs.
 
 ### The champions
 
@@ -513,7 +521,8 @@ what it observes, and of nothing else, so a live game and its replay give the sa
 It reads the game only to name things: a champion, an object, the samples. It is made
 with the set's dungeon files (`AchievementSetFiles`): it reads the counts of the data from
 them and the game's tables ("Counted from the data"), and a CSB adventure's start against
-the `mini.dat`, its party against the set's graphic 26 ("Where the party came from").
+the `mini.dat`, its party against the set's graphic 26 and its `utility-portraits.dat`
+("Where the party came from").
 
 - At each tick's end it takes the samples: `party` and `alive` leave out a mirror's
   champion; `coins` counts every object whose name ends in `COIN` in the party's
@@ -587,7 +596,8 @@ back, DMMovie2823's one; no recording revives one champion three times, so a new
 two champions die and their bones are given to the altar's timer, the first's three
 times, Lazarus unlocking at the third, after a save kept and read back; and the whole CSB
 game's four prisoners raised from the prison (Fresh Faces), where `csbgame7.dat`'s four DM
-champions, raised by RISE with their own faces or the utility disk's, are imported.
+champions, raised by RISE with their own faces or the utility disk's, are from DM, and
+imported where the set has no utility portraits.
 `tools/checks/achievements-format.ts` reads each file, checks its names against its set's
 `graphics.dat` and its values against its achievements, counts the FTL sets' data, and
 plays the conditions out of made-up events and champions, the named values, the lists and

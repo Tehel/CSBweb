@@ -56,11 +56,17 @@ when: ever(trigger where item = "GOR COIN" and level = 0 and x = 9 and y = 14)
       and ever(trigger where item = "GOR COIN" and level = 4 and x = 19 and y = 19)
 
 # The party a utility raised into the adventure: a champion is the prison's where their
-# portrait is one of this set's champions', which REINCARNATE keeps under a new name, and
-# imported otherwise.
+# portrait is one of this set's champions', which REINCARNATE keeps under a new name, dm
+# where it is one of Dungeon Master's, as the utility disk has them, and imported otherwise.
 
 [fresh-faces]
 name: Fresh Faces
 text: Win with a party recruited in the prison, none of them imported.
 tier: hard
-when: won and ever(raise) and never(raise where from = imported)
+when: won and ever(raise) and never(raise where from != prison)
+
+[veterans]
+name: Veterans
+text: Win with a party of Dungeon Master's champions.
+tier: weird
+when: won and ever(raise) and never(raise where from != dm)

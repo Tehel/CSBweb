@@ -20,6 +20,7 @@
 import type { DataSetFiles } from '../../data/DataSetFiles';
 import type { DataSet } from '../../data/DataSets';
 import { findRecordingSet, type SetDigests } from '../../data/RecordingSet';
+import { UTILITY_PORTRAITS_FILE } from '../../data/UtilityPortraits';
 import { cutPageOf, standInPage } from '../../renderer/StandInPage';
 import { cutDriftReason, playCut } from '../RecordingCut';
 import { readRecordingPackage, type RecordingPackage } from '../RecordingPackage';
@@ -68,7 +69,8 @@ export async function replayProof(
     try {
         const page = await standInPage(over.set, over.files);
         const miniDat = over.set.miniDat ? await over.files.read('mini.dat') : null;
-        const tracker = new AchievementTracker(page.game, defs, page.screen.ui.objectTables.objectNames, { dungeonDat: page.dungeonDat, miniDat },
+        const utilityPortraits = over.set.miniDat ? await over.files.read(UTILITY_PORTRAITS_FILE) : null;
+        const tracker = new AchievementTracker(page.game, defs, page.screen.ui.objectTables.objectNames, { dungeonDat: page.dungeonDat, miniDat, utilityPortraits },
             page.screen.ui.graphics.basicGraphic(26));
         tracker.attach();
         const drift = await playCut(pkg.path, pkg.shared.kind === 'save' ? pkg.shared : null, async () => cutPageOf(page));

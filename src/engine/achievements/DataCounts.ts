@@ -20,6 +20,7 @@ import { loadCsbwinWorld } from '../../data/CsbwinDungeonImage';
 import type { DataSetFiles } from '../../data/DataSetFiles';
 import type { DataSet } from '../../data/DataSets';
 import { DungeonLoader } from '../../data/DungeonLoader';
+import { UTILITY_PORTRAITS_FILE } from '../../data/UtilityPortraits';
 import type { CreatureRecord, DungeonData } from '../../data/dungeonTypes';
 import { monsterInvincible, monsterLeavesDroppings } from '../../data/tables/MonsterDesc';
 import { OBJNI_APPLE, OBJNI_DRAGON_STEAK } from '../../core/objectNameIndex';
@@ -31,18 +32,27 @@ import type { MonsterType } from '../monsterTypes';
 import { GetBasicObjectType, OBJDI_COMPASS } from '../objectIndex';
 import type { DataCounts } from './AchievementFile';
 
-/** The set's files the counts are read from, besides the game's tables. */
+/** The set's files the counts are read from, besides the game's tables, and those a CSB adventure's start is read against. */
 export interface AchievementSetFiles {
   readonly dungeonDat: Uint8Array;
   /** Chaos Strikes Back's adventure, a CSBWin save (`DataSet.miniDat`); `null` where the set has none. */
   readonly miniDat: Uint8Array | null;
+  /**
+   * The utility disk's portraits (`UTILITY_PORTRAITS_FILE`), which tell a champion raised
+   * from Dungeon Master (`AchievementTracker`); absent or `null` where the set has none.
+   */
+  readonly utilityPortraits?: Uint8Array | null;
 }
 
-/** `set`'s dungeon files, read from `files`; a `dungeon.dat` missing throws, as the boot's does. */
+/**
+ * `set`'s dungeon files, read from `files`, and beside a `mini.dat` the utility's portraits;
+ * a `dungeon.dat` missing throws, as the boot's does.
+ */
 export async function readAchievementSetFiles(set: DataSet, files: DataSetFiles): Promise<AchievementSetFiles> {
   const dungeonDat = await files.read('dungeon.dat');
   if (!dungeonDat) throw new Error(`Cannot open dungeon file '${files.where('dungeon.dat')}'`);
-  return { dungeonDat, miniDat: set.miniDat ? await files.read('mini.dat') : null };
+  if (!set.miniDat) return { dungeonDat, miniDat: null };
+  return { dungeonDat, miniDat: await files.read('mini.dat'), utilityPortraits: await files.read(UTILITY_PORTRAITS_FILE) };
 }
 
 /** The tables the counts read. */

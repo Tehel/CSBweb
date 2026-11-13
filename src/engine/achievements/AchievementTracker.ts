@@ -16,7 +16,8 @@
  *
  * A CSB adventure's start raises its party, each champion `prison` where their portrait is
  * a cell of the set's own champions' sheet, graphic 26, the portraits its mirrors give:
- * the prison's, which REINCARNATE keeps under a new name.
+ * the prison's, which REINCARNATE keeps under a new name; `dm` where it is a DM champion's,
+ * as the utility disk's portraits hold them (`UtilityPortraits`); `imported` otherwise.
  *
  * The counts a condition reads of the set's own files (`dataCounts`) are worked out once,
  * as the tracker is made, from the game's tables and the set's dungeon files, and put in
@@ -29,6 +30,8 @@ import { OBJECT_ID_EOF, OBJECT_ID_NULL, DBType, Position, type ObjectID } from '
 import { OBJNI_NOT_AN_OBJECT } from '../../core/objectNameIndex';
 import { CHARFLAG_MALE, getChampionPossession } from '../../core/charDesc';
 import { PORTRAIT_HEIGHT, PORTRAIT_WIDTH } from '../../data/CsbwinCharacters';
+import { GraphicsLoader } from '../../data/GraphicsLoader';
+import { UtilityPortraits } from '../../data/UtilityPortraits';
 import { FIRST_RUNE, RUNE_NAMES } from '../../core/runes';
 import { isMagicSpellRn } from '../../core/spellRn';
 import type { Game } from '../Game';
@@ -174,6 +177,8 @@ export class AchievementTracker {
   private readonly miniDat: Uint8Array | null;
   /** The cells of the set's champions' portraits, each its pixels joined: a champion raised from the prison wears one. */
   private readonly prisonFaces = new Set<string>();
+  /** A DM champion's faces, DM's own and the utility disk's, each its pixels joined: a champion raised from DM wears one. */
+  private readonly dmFaces = new Set<string>();
   /** Each floor square's bit in `visited`, by `squareKey`. */
   private readonly floors = new Map<number, number>();
   private visited: Uint8Array;
@@ -185,7 +190,8 @@ export class AchievementTracker {
    * A tracker of `game`, for the achievements `defs` names, the objects named by
    * `objectNames` (`d.ObjectNames`, the set's `graphics.dat`), and `files`, the set's
    * dungeon files: the counts are read from them, and a CSB adventure's start is read
-   * against its `mini.dat`, its party raised against `portraits`, the set's graphic 26.
+   * against its `mini.dat`, its party raised against `portraits`, the set's graphic 26,
+   * and the utility's portraits of DM's champions.
    * Until a game is read it keeps a history that does not go back to the start.
    */
   constructor(
@@ -200,6 +206,11 @@ export class AchievementTracker {
     this.visited = new Uint8Array((this.floors.size + 7) >> 3);
     this.miniDat = files.miniDat;
     if (portraits) for (const cell of portraitCells(portraits)) this.prisonFaces.add(cell);
+    if (files.utilityPortraits) {
+      const sheet = new GraphicsLoader();
+      sheet.loadFromArray(files.utilityPortraits);
+      for (const cell of new UtilityPortraits(sheet).dungeonMasterFaces()) this.dmFaces.add(cell);
+    }
     this.state = new AchievementState(this.defs, false);
   }
 
@@ -377,15 +388,17 @@ export class AchievementTracker {
 
   /**
    * A CSB adventure's party, each champion `prison` where their portrait is one of the
-   * set's own champions', else `imported`: a party a utility put in from another game.
+   * set's own champions', `dm` where it is a DM champion's, else `imported`: a party a
+   * utility put in from another game.
    */
   private raised(): void {
     const party = this.game.ctx.party.state;
     for (let i = 0; i < party.champions.length; i++) {
       const champ = party.champions[i];
       if (!champ || i === party.potentialChampionIndex) continue;
-      const prison = champ.portrait !== undefined && this.prisonFaces.has(champ.portrait.join());
-      this.record('raise', { champion: champ.name, from: prison ? 'prison' : 'imported' });
+      const face = champ.portrait?.join();
+      const from = face === undefined ? 'imported' : this.prisonFaces.has(face) ? 'prison' : this.dmFaces.has(face) ? 'dm' : 'imported';
+      this.record('raise', { champion: champ.name, from });
     }
   }
 

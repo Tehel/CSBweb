@@ -444,7 +444,7 @@ function endings(common: AchievementFile, dm: AchievementFile, csb: AchievementF
   partial.ended(true);
   check(!partial.evaluate().includes('self-reliant'), 'nor is a win whose history starts at a save');
   // Lazarus: the same champion revived a third time, in any history; Fresh Faces: a CSB
-  // adventure won with a party raised from the prison alone.
+  // adventure won with a party raised from the prison alone; Veterans: from DM alone.
   const revived = new AchievementState(dmDefs, false);
   for (const [champion, times] of [['HALK', 1], ['HALK', 2], ['STAMM', 1], ['ELIJA', 1]] as const) {
     revived.record({ kind: 'revive', attrs: { champion, times: `${times}` } });
@@ -453,15 +453,20 @@ function endings(common: AchievementFile, dm: AchievementFile, csb: AchievementF
   revived.record({ kind: 'revive', attrs: { champion: 'HALK', times: '3' } });
   check(!before && revived.evaluate().includes('lazarus'),
     'four revivals of three champions are no Lazarus; a third of the same champion is, in a history that starts at a save too');
-  const raised = (froms: readonly string[], whole = true): boolean => {
+  const raised = (froms: readonly string[], id: string, whole = true): boolean => {
     const game = new AchievementState(csbDefs, whole);
     froms.forEach((from, i) => game.record({ kind: 'raise', attrs: { champion: `C${i}`, from } }));
     game.ended(true);
-    return game.evaluate().includes('fresh-faces');
+    return game.evaluate().includes(id);
   };
   const prison = ['prison', 'prison', 'prison', 'prison'];
-  check(raised(prison) && !raised([...prison.slice(1), 'imported']) && !raised([]) && !raised(prison, false),
-    'a CSB adventure won with four prisoners raised is Fresh Faces; one imported, none raised, or a history from a save is not');
+  const fresh = (froms: readonly string[], whole = true): boolean => raised(froms, 'fresh-faces', whole);
+  check(fresh(prison) && !fresh([...prison.slice(1), 'imported']) && !fresh([...prison.slice(1), 'dm']) && !fresh([]) && !fresh(prison, false),
+    'a CSB adventure won with four prisoners raised is Fresh Faces; one imported or from DM, none raised, or a history from a save is not');
+  const fromDm = ['dm', 'dm', 'dm'];
+  const veterans = (froms: readonly string[], whole = true): boolean => raised(froms, 'veterans', whole);
+  check(veterans(fromDm) && !veterans([...fromDm, 'prison']) && !veterans([...fromDm, 'imported']) && !veterans([]) && !veterans(fromDm, false),
+    'a CSB adventure won with three DM champions raised is Veterans; one more from the prison or imported, none raised, or a history from a save is not');
 }
 
 /** A champion's attributes as the tracker gives them (`CHAMPION_ATTRIBUTES`), a male Expert by default. */
@@ -719,7 +724,7 @@ async function main(): Promise<void> {
   const values = 'speedRunnerMinutes = 180; blitzMinutes = 60; objectorKills = 40';
   const dm = setFile(common, 'dm-atari', STOCK_DIR, ['let-sleeping-dragons-lie', 'brute-force', 'express-elevator'],
     `${values}; cleanSweepLevels = 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12; expressElevatorMinutes = 60`);
-  const csb = setFile(common, 'csb', 'tools/fixtures/gamefiles/csb', ['self-reliant', 'fresh-faces'], values, ['clean-sweep'], ['girl-power']);
+  const csb = setFile(common, 'csb', 'tools/fixtures/gamefiles/csb', ['self-reliant', 'fresh-faces', 'veterans'], values, ['clean-sweep'], ['girl-power']);
   for (const set of DATA_SETS) {
     if (set.id.startsWith('dm-')) check(achievementFileOf(set.id) === 'dm-atari', `${set.id}, a Dungeon Master set, reads dm-atari.txt`);
   }

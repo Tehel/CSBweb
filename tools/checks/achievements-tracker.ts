@@ -78,7 +78,8 @@
  *    brings back, DMMovie2823's one; a new game's champion revived at the altar three times,
  *    across a save kept and read back, Lazarus at the third; the whole CSB game's four
  *    champions raised from the prison (Fresh Faces), and `csbgame7.dat`'s four DM champions
- *    raised by RISE, with their own faces or the utility disk's, imported.
+ *    raised by RISE, with their own faces or the utility disk's, from DM (Veterans'), and
+ *    imported where the set has no utility portraits.
  *
  * Usage: npm test -- --only=achievements-tracker.ts [<package name>…] [--not=<name>] [--events]
  */
@@ -283,12 +284,13 @@ for (const file of corpusFiles()) {
   let emptyHandKills = 0;
   const ranks = new Map<string, number[]>();
   const miniDat = set.miniDat ? await diskFiles(set).read('mini.dat') : null;
+  const utilityPortraits = set.miniDat ? await diskFiles(set).read(UTILITY_PORTRAITS_FILE) : null;
   const start = pkg.path[0]!.start;
   const fromAdventure = start.kind === 'save' && miniDat !== null && isNewAdventure(start.bytes, miniDat);
   const defs = defsOf(set.id);
   const startedAt = Date.now();
   const played = await playPath(set, diskFiles(set), pkg.path, pkg.shared.kind === 'save' ? pkg.shared : null, null, null, (page) => {
-    tracker = new AchievementTracker(page.game, defs, page.screen.ui.objectTables.objectNames, { dungeonDat: page.dungeonDat, miniDat },
+    tracker = new AchievementTracker(page.game, defs, page.screen.ui.objectTables.objectNames, { dungeonDat: page.dungeonDat, miniDat, utilityPortraits },
       page.screen.ui.graphics.basicGraphic(26));
     tracker.onEvent((event) => {
       events.push(event);
@@ -847,7 +849,8 @@ for (const file of corpusFiles()) {
 }
 
 // 13. A party raised from Dungeon Master: RISE on csbgame7.dat, a DM save, with the DM
-// champions' own faces and with the utility disk's, imported either way.
+// champions' own faces and with the utility disk's, from DM either way, and imported where
+// the set has no utility portraits to tell them by.
 {
   console.log('--- a party raised from Dungeon Master');
   const csb = DATA_SETS.find((one) => one.id === 'csb')!;
@@ -856,18 +859,20 @@ for (const file of corpusFiles()) {
   const portraits = await files.read(UTILITY_PORTRAITS_FILE);
   if (!mini || !portraits) throw new Error('the csb set has no mini.dat or utility-portraits.dat');
   const newFaces = await readUtilityPortraits(async () => portraits, (error) => { throw error; });
-  for (const faces of [null, newFaces]) {
+  for (const [faces, told] of [[null, true], [newFaces, true], [null, false]] as const) {
     const page = await standInPage(csb, files);
     const events: AchievementEvent[] = [];
-    const tracker = new AchievementTracker(page.game, defsOf('csb'), page.screen.ui.objectTables.objectNames, { dungeonDat: page.dungeonDat, miniDat: mini },
-      page.screen.ui.graphics.basicGraphic(26));
+    const tracker = new AchievementTracker(page.game, defsOf('csb'), page.screen.ui.objectTables.objectNames,
+      { dungeonDat: page.dungeonDat, miniDat: mini, utilityPortraits: told ? portraits : null }, page.screen.ui.graphics.basicGraphic(26));
     tracker.onEvent((event) => events.push(event));
     tracker.attach();
     applySaveBytes(page.game, makeNewAdventure(new Uint8Array(readFileSync(savePath('csbgame7.dat'))), mini, new CsbRandom(1), faces));
     const raises = events.filter((e) => e.kind === 'raise');
-    console.log(`  ${faces ? 'NEW FACE' : 'OLD FACE'}: raised ${raises.map((e) => `${e.attrs.champion} from ${e.attrs.from}`).join(', ')}`);
-    check(tracker.whole && raises.length === 4 && raises.every((e) => e.attrs.from === 'imported'),
-      `csbgame7.dat's four DM champions raised with ${faces ? 'the utility disk\'s faces' : 'their own faces'} are imported`);
+    const from = told ? 'dm' : 'imported';
+    const how = `${faces ? 'NEW FACE' : 'OLD FACE'}${told ? '' : ', no utility portraits'}`;
+    console.log(`  ${how}: raised ${raises.map((e) => `${e.attrs.champion} from ${e.attrs.from}`).join(', ')}`);
+    check(tracker.whole && raises.length === 4 && raises.every((e) => e.attrs.from === from),
+      `csbgame7.dat's four DM champions raised with ${faces ? 'the utility disk\'s faces' : 'their own faces'} are from ${from}${told ? '' : ', the set having no utility portraits'}`);
   }
 }
 
