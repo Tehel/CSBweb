@@ -25,7 +25,7 @@ import { dataCounts, readAchievementSetFiles, setDungeons } from '../../src/engi
 import { dungeonCensus } from '../../src/engine/DungeonCensus';
 import { acrossUnlocked, AchievementState, partyFigureKey, type AchievementEvent, type GameFigures } from '../../src/engine/achievements/AchievementState';
 import { mergeFigures } from '../../src/data/saves/AchievementStore';
-import { acrossInSets } from '../../src/engine/achievements/PageAchievements';
+import { acrossInSets, familyOf } from '../../src/engine/achievements/PageAchievements';
 import { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import { check, fail, finish } from '../lib/check';
 import { DATA_SETS, dataSetNamed, diskFiles } from '../lib/dataSets';
@@ -83,6 +83,7 @@ function commonFile(): AchievementFile {
     check(d.whole === whole.has(d.id), `${d.id} ${whole.has(d.id) ? 'needs' : 'does not need'} the whole game`);
   }
   check(r.file.disabled.length === 0, 'common.txt disables nothing');
+  check(r.file.family === null, 'common.txt declares no family');
   check(r.file.values.size === 0, 'common.txt defines no value: a set without its own file has no valued achievement');
   const valued = r.file.defs.filter((d) => d.values.length > 0).map((d) => `${d.id} {${d.values.join(', ')}}`);
   console.log(`  valued: ${valued.join('; ')}`);
@@ -184,6 +185,10 @@ function errors(): void {
     ['an unknown word', block('victory'), 5, /no fact/],
     ['a value after a block', `${H}[a]\nname: A\ntext: T\nwhen: won\nvalue n = 3\n`, 6, /before the first/],
     ['a value defined twice', `${H}value n = 3\nvalue n = 4\n`, 3, /twice/],
+    ['a family declared twice', `${H}family: a\nfamily: b\n`, 3, /family is declared twice/],
+    ['a family in capitals', `${H}family: Dungeon-Master\n`, 2, /no family's name/],
+    ['a family of no name', `${H}family:\n`, 2, /no family's name/],
+    ['a family after a block', `${H}[a]\nname: A\ntext: T\nwhen: won\nfamily: b\n`, 6, /"family" is no field/],
     ['a value\'s bad name', `${H}value 2n = 3\n`, 2, /no value's name/],
     ['a value not a whole number', `${H}value n = 1.5\n`, 2, /whole number/],
     ['a value line without its number', `${H}value n\n`, 2, /value name = number/],
@@ -638,7 +643,7 @@ function merging(common: AchievementFile, counts: DataCounts): void {
     + '[in-one]\nname: B\ntext: T\nwhen: ever(enter where level not in {one})\n'
     + '[few-as-number]\nname: C\ntext: T\nwhen: count(kill) >= {few}\n'
     + '[few-in-text]\nname: D\ntext: Levels {few}.\nwhen: won\n');
-  const lists = mergeAchievements({ defs: [], disabled: [], values: new Map() }, listed);
+  const lists = mergeAchievements({ defs: [], disabled: [], values: new Map(), family: null }, listed);
   console.log(`  ${lists.map((d) => `${d.id}: ${d.aggregates.map((a) => a.key).join()}`).join('; ')}`);
   check(lists.map((d) => d.id).join() === 'in-few,in-one', 'a list stands for an in\'s list; where one number is wanted, in a condition or a text, the achievement is absent');
   check(lists[0]?.aggregates[0]?.key === 'count(enter where level in ("1","2"))', 'the aggregate is keyed by the list it was given, so another list is another aggregate');
@@ -761,9 +766,9 @@ function acrossGames(common: AchievementFile, dm: AchievementFile, csb: Achievem
     ['games(…) of a number', 'games(count(kill)) >= 1', /yes-or-no/],
     ['a total asked to be small', 'total(count(kill)) < 10', /asks for at least/],
     ['no game asked', 'games(won) = 0', /asks for at least/],
-    ['another file\'s games without in', 'games(won, "csb") >= 1', /expected in "file"/],
-    ['another file named bare', 'games(won, in csb) >= 1', /names a file of achievements/],
-    ['another file named in capitals', 'games(won, in "CSB") >= 1', /names a file of achievements/],
+    ['another family\'s games without in', 'games(won, "csb") >= 1', /expected in "family"/],
+    ['another family named bare', 'games(won, in csb) >= 1', /names a family of sets/],
+    ['another family named in capitals', 'games(won, in "CSB") >= 1', /names a family of sets/],
     ['a champions\' distinct of no attribute of theirs', 'distinct(games(won).monster) >= 1', /party has no attribute "monster"/],
     ['a champions\' distinct asked to be small', 'distinct(games(won).portrait) < 24', /asks for at least/],
     ['a champions\' distinct inside games(…)', 'games(distinct(games(won).portrait) >= 1) >= 1', /no games\(…\) or total\(…\)/],
@@ -796,7 +801,7 @@ function acrossGames(common: AchievementFile, dm: AchievementFile, csb: Achievem
     else if (e.k === 'cmp' || e.k === 'and' || e.k === 'or') { walk(e.a); walk(e.b); } else if (e.k === 'not') walk(e.a);
   };
   walk(slam.when);
-  check(ofs.join() === 'dm-atari,csb', `its games are dungeon-master.txt's sets' and csb.txt's (${ofs.join()})`);
+  check(ofs.join() === 'dungeon-master,csb', `its games are the dungeon-master family's and csb's (${ofs.join()})`);
   const tour = defs.find((d) => d.id === 'hall-of-fame-tour')!;
   const tourKey = tour.when.k === 'cmp' && tour.when.a.k === 'gamesParty' ? tour.when.a.key : '';
   check(tourKey === 'distinct(games(won).portrait)' && tour.games.length === 1 && tour.games[0]!.key === won,
@@ -891,6 +896,23 @@ function acrossGames(common: AchievementFile, dm: AchievementFile, csb: Achievem
     console.log(`  ${what}: ${got ? 'Grand Slam' : '(none)'}`);
     check(got === unlocked, `${what}: ${unlocked ? 'Grand Slam' : 'no Grand Slam'}`);
   }
+  // A family is what a file declares, whatever its sets' ids, and a set's id where it declares none.
+  const declaring = (family: string) => `# CSBweb achievements 1\nfamily: ${family}\n[x]\nname: X\ntext: T\nwhen: won\n`;
+  const ownOf = (files: Record<string, string>) => (id: string) => files[id] ?? ownFileOf(id);
+  const families: [string, Record<string, string>, boolean][] = [
+    ['CSB won, DM\'s win a player\'s set\'s that declares the family', { 'my-dungeon': declaring('dungeon-master') }, true],
+    ['CSB won, DM\'s win a player\'s set\'s of another family', { 'my-dungeon': declaring('dungeon-master-2') }, false],
+    ['CSB won as a set that declares a family of its own, DM won', { csb: declaring('chaos') }, false],
+  ];
+  for (const [what, files, unlocked] of families) {
+    const setId = 'csb';
+    const got = acrossInSets(csbDefs, setId, new Map([['csb', [a.figures]], ['my-dungeon', [a.figures]]]), ownOf(files)).includes('grand-slam');
+    console.log(`  ${what}: ${got ? 'Grand Slam' : '(none)'}`);
+    check(got === unlocked, `${what}: ${unlocked ? 'Grand Slam' : 'no Grand Slam'}`);
+  }
+  check(familyOf('dm-amiga', ownFileOf('dm-amiga')) === 'dungeon-master' && familyOf('csb', ownFileOf('csb')) === 'csb'
+    && familyOf('kids-dungeon', ownFileOf('kids-dungeon')) === 'kids-dungeon' && familyOf('x', '# not a file') === 'x',
+    'each Dungeon Master set is of the dungeon-master family, CSB of csb, its id, and a set without a file or whose file does not read of its id');
 }
 
 function sameIds(a: readonly string[], b: readonly string[]): boolean {
@@ -908,6 +930,7 @@ async function main(): Promise<void> {
     if (set.id.startsWith('dm-')) check(dungeonMaster.includes(set.id), `${set.id}, a Dungeon Master set, holds dungeon-master.txt`);
   }
   check(sameIds(setsHolding(readFileSync(resolve(FAMILIES, 'csb.txt'), 'utf8')), ['csb']), 'Chaos Strikes Back alone holds csb.txt');
+  check(dm.family === 'dungeon-master' && csb.family === null, `dungeon-master.txt declares its family, and csb.txt none, CSB's id its family (${dm.family}, ${csb.family})`);
   errors();
   wholeGame();
   const counts = await counted(common);

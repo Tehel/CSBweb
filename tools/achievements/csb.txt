@@ -71,11 +71,12 @@ text: Win with a party of Dungeon Master's champions.
 tier: weird
 when: won and ever(raise) and never(raise where from != dm)
 
-# Both FTL dungeons won, the same block in dm-atari.txt: Dungeon Master's games are those of
-# every set that reads dm-atari.txt, the Atari's, the Amiga's and the hidden ones.
+# Both FTL dungeons won, the same block in dungeon-master.txt: Dungeon Master's games are
+# those of every set of its family, the Atari's, the Amiga's and the hidden ones, and Chaos
+# Strikes Back's those of this set, whose file declares no family: its id, csb, is its family.
 
 [grand-slam]
 name: Grand Slam
 text: Win both Dungeon Master and Chaos Strikes Back.
 tier: hard
-when: games(won, in "dm-atari") >= 1 and games(won, in "csb") >= 1
+when: games(won, in "dungeon-master") >= 1 and games(won, in "csb") >= 1

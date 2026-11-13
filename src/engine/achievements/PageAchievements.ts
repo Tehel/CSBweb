@@ -33,27 +33,40 @@ export interface ShownUnlock {
 /** The text of each set's own achievements file, by its id (`ACHIEVEMENTS_FILE`), `null` for a set with none. */
 export type OwnAchievementsOf = (setId: string) => string | null;
 
+/** The family each own file declares (`family:`), by its text, `null` where it declares none or does not read. */
+const FAMILIES = new Map<string, string | null>();
+
 /**
- * The achievements across games of `defs`, the set `setId`'s, that `bySet`, each set's
- * playthroughs' figures, make yes (`acrossUnlocked`, `doc/ACHIEVEMENTS.md` → "Across
- * games"): its own games those of `setId`, and a `games(…, in "x")`'s those of the set `x`
- * and of every set of `bySet` whose own file, `ownOf`, is the same text as `x`'s, `setId`
- * among them where it is. What the page, the book and the Hall all work them out with.
+ * The family of the set `setId`, whose own file is `own` (`doc/ACHIEVEMENTS.md` → "Across
+ * games"): the one the file declares (`family: name`), else the set's id, a file that does
+ * not read declaring none.
  */
-export function acrossInSets(defs: readonly AchievementDef[], setId: string, bySet: ReadonlyMap<string, readonly GameFigures[]>, ownOf: OwnAchievementsOf): string[] {
-  return acrossUnlocked(defs, bySet.get(setId) ?? [], (named) => {
-    const text = ownOf(named);
-    return [...bySet].filter(([id]) => id === named || (text !== null && ownOf(id) === text)).flatMap(([, games]) => games);
-  });
+export function familyOf(setId: string, own: string | null): string {
+  if (own === null) return setId;
+  let family = FAMILIES.get(own);
+  if (family === undefined) {
+    const read = readAchievementFile(own);
+    family = read.ok ? read.file.family : null;
+    FAMILIES.set(own, family);
+  }
+  return family ?? setId;
 }
 
 /**
- * The sets whose own files `acrossInSets` reads of `defs`, the set `setId`'s, over `sets`,
- * those `bySet` holds figures of: the set's, each of `sets`', and each a `games(…, in "x")`
- * names.
+ * The achievements across games of `defs`, the set `setId`'s, that `bySet`, each set's
+ * playthroughs' figures, make yes (`acrossUnlocked`, `doc/ACHIEVEMENTS.md` → "Across
+ * games"): its own games those of `setId`, and a `games(…, in "family")`'s those of every
+ * set of `bySet` of that family, its own file `ownOf`'s (`familyOf`), `setId` among them
+ * where it is. What the page, the book and the Hall all work them out with.
  */
-export function ownFilesRead(defs: readonly AchievementDef[], setId: string, sets: Iterable<string>): Set<string> {
-  return new Set([setId, ...sets, ...defs.flatMap((def) => def.games.flatMap((game) => (game.of === null ? [] : [game.of])))]);
+export function acrossInSets(defs: readonly AchievementDef[], setId: string, bySet: ReadonlyMap<string, readonly GameFigures[]>, ownOf: OwnAchievementsOf): string[] {
+  return acrossUnlocked(defs, bySet.get(setId) ?? [],
+    (family) => [...bySet].filter(([id]) => familyOf(id, ownOf(id)) === family).flatMap(([, games]) => games));
+}
+
+/** The sets whose own files `acrossInSets` reads for the set `setId` over `sets`, those `bySet` holds figures of: its own, and each of `sets`'. */
+export function ownFilesRead(setId: string, sets: Iterable<string>): Set<string> {
+  return new Set([setId, ...sets]);
 }
 
 /** Each set's playthroughs' figures, `rows` grouped by their set. */
@@ -141,7 +154,7 @@ export class PageAchievements {
         if (row.dataSet === this.dataSet) this.figures.set(row.playthrough, mergeFigures(row.figures, this.figures.get(row.playthrough) ?? {}));
       }
       this.elsewhere = figuresBySet(figures.filter((row) => row.dataSet !== this.dataSet));
-      const read = [...ownFilesRead(this.across, this.dataSet, this.elsewhere.keys())];
+      const read = [...ownFilesRead(this.dataSet, this.elsewhere.keys())];
       this.ownFiles = new Map(await Promise.all(read.map(async (id) => [id, await this.ownFileOf(id).catch(() => null)] as const)));
       const ids = new Set(this.across.map((def) => def.id));
       for (const row of rows) if (ids.has(row.id)) this.acrossDone.add(row.id);

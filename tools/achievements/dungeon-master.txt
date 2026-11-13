@@ -2,7 +2,10 @@
 #
 # Dungeon Master's own achievements (doc/ACHIEVEMENTS.md), beside the common file's. Every
 # Dungeon Master set's folder holds this file as its achievements.txt: the Atari's, the
-# Amiga's and the hidden ones (tools/fetch-gamefiles.ts copies it).
+# Amiga's and the hidden ones (tools/fetch-gamefiles.ts copies it). They are one family,
+# whose games another dungeon's achievements count as games(..., in "dungeon-master").
+
+family: dungeon-master
 
 # The common file's values.
 
@@ -128,13 +131,13 @@ when: games(won) >= 1 and games(lost and level = 0 and x = 9 and y = 1) >= 1
       and games(lost and not (level = 0 and x = 9 and y = 1)) >= 1
 
 # Both FTL dungeons won, the same block in csb.txt: Dungeon Master's games are those of
-# every set that reads this file, the Atari's, the Amiga's and the hidden ones.
+# every set of this file's family, the Atari's, the Amiga's and the hidden ones.
 
 [grand-slam]
 name: Grand Slam
 text: Win both Dungeon Master and Chaos Strikes Back.
 tier: hard
-when: games(won, in "dm-atari") >= 1 and games(won, in "csb") >= 1
+when: games(won, in "dungeon-master") >= 1 and games(won, in "csb") >= 1
 
 # The Power Gem: the wall of map 13 (24,3) takes the Firestaff in hand and gives back the
 # one it holds, the gem joined, a type 16 actuator's swap. Both are THE FIRESTAFF, and no

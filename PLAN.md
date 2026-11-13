@@ -103,10 +103,13 @@ At the author's request, beside the debt. The design is `doc/ACHIEVEMENTS.md`.
      `achievementFileOf` is gone: until step 3, `in "x"` counts the set `x` and every set
      whose own file is the same text. The dev server answers a file a folder lacks with a
      404, as the deployed server does, not the page's fallback.
-  3. **Another dungeon's games without a shared file**: a file declares its family on a
+  3. ✅ **Another dungeon's games without a shared file**: a file declares its family on a
      line of its own, `family: dungeon-master`, the set's id where it has none, and
      `games(won, in "dungeon-master")` counts the games of every set of that family
-     (the author's choice), Grand Slam's `in "dm-atari"` and `in "csb"` rewritten so.
+     (the author's choice), Grand Slam's `in "dm-atari"` and `in "csb"` rewritten so. A
+     family's name has a set id's form, dots and underscores allowed. Any set may declare
+     any family, a player's set `dungeon-master`'s: whether step 4's check refuses that is
+     to decide.
   4. **A player's set**: the file's row in the form, local and published, and a moderator's
      edit; the check at publish and in the form: a file that does not read, an unknown
      item, a value no achievement names (`unusedValues`).

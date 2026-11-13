@@ -101,6 +101,13 @@ when: won and ever(eat)
   a common id replaces the common achievement for that set. Disabling an id that the common
   file does not have does nothing, so a published set does not break when the common file
   loses one.
+- **`family: name`**, on a line of its own before the first block, at most once, declares
+  the family of sets the file's set belongs to, which another dungeon's achievements count
+  the games of (`games(…, in "name")`, "Across games"): 1 to 40 lowercase letters, digits,
+  dots, hyphens and underscores, a letter or a digit first, the form of a set's id. A set
+  whose file declares none, or that has no file, is a family of its own, its id.
+  `dungeon-master.txt` declares `family: dungeon-master`; `csb.txt` none, so Chaos Strikes
+  Back's family is `csb`. The common file declares none.
 - **`value name = number`**, on a line of its own before the first block, defines a named
   value: a whole number from 0 to 1,000,000,000, its name 1 to 40 letters and digits, a
   letter first. A text names it as `{name}`, and a condition where a number would be, as
@@ -175,7 +182,7 @@ A condition is a yes or a no, made from these parts:
     has had among the events counted.
 - **Across games**: `games(condition)`, `total(count(…))` and
   `distinct(games(condition).attribute)`, read over the player's games of the set, and
-  `games(condition, in "file")`, over another dungeon's ("Across games", below).
+  `games(condition, in "family")`, over another dungeon's ("Across games", below).
 
 A **filter** is made of `and`, `or`, `not`, parentheses, and these tests on the event's
 attributes:
@@ -437,18 +444,21 @@ across games over the playthroughs' figures.
 A total is of one set's games: a Dungeon Master won on the Atari 1.1 and one on the Amiga
 are two sets' wins.
 
-**Another dungeon's games**: `games(condition, in "x")` counts the playthroughs that met
-`condition` in the set `x` and in every set whose own file is the same text as `x`'s, this
-set among them where it is (`PLAN.md` 18.7, step 3, names the files' families instead).
-`"dm-atari"` is every Dungeon Master set, the Atari's, the Amiga's and the hidden ones,
-each holding `dungeon-master.txt`, and `"csb"` Chaos Strikes Back. The figure it reads is the one each of those sets keeps by the same key, `games(won)`,
-so a set counts there only by a condition its own achievements test; an achievement that
-names another file's games is best in both files. `acrossInSets`
+**Another dungeon's games**: `games(condition, in "family")` counts the playthroughs that
+met `condition` in every set of that family, this set among them where it is one of them:
+each set whose own file declares it (`family:`, "The file"), and the set whose id it is
+where its file declares none (`familyOf`, `src/engine/achievements/PageAchievements.ts`).
+`"dungeon-master"` is every Dungeon Master set, the Atari's, the Amiga's and the hidden
+ones, and `"csb"` Chaos Strikes Back. Any set may declare a family, a player's among them,
+and its games then count as that family's. The figure it reads is the one each of those
+sets keeps by the same key, `games(won)`, so a set counts there only by a condition its own
+achievements test; an achievement that names another family's games is best in both
+dungeons' files. `acrossInSets`
 (`src/engine/achievements/PageAchievements.ts`) tests a set's achievements across games
 over each set's playthroughs' figures, for the page, the book and the Hall alike.
 
 - **Grand Slam**, Dungeon Master's and Chaos Strikes Back's, the same block in both:
-  `games(won, in "dm-atari") >= 1 and games(won, in "csb") >= 1`. It unlocks in both
+  `games(won, in "dungeon-master") >= 1 and games(won, in "csb") >= 1`. It unlocks in both
   dungeons' lists once each is won, a Dungeon Master won on any of its sets.
 
 **On the server** an achievement across games is claimed by no proof: each replay keeps its

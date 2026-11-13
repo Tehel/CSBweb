@@ -889,7 +889,7 @@ function showAchievements(
     void Promise.all([ownOf(set.id), store.list(set.id), store.figures(null).catch(() => [])]).then(async ([own, rows, figures]) => {
         const read = achievementDefs(own) ?? [];
         const bySet = figuresBySet(figures);
-        const ids = [...ownFilesRead(read.filter((def) => def.across), set.id, bySet.keys())];
+        const ids = [...ownFilesRead(set.id, bySet.keys())];
         const texts = new Map(await Promise.all(ids.map(async (id) => [id, id === set.id ? own : await ownOf(id)] as const)));
         across = new Set(achievementsAcross(set.id, (id) => texts.get(id) ?? null, bySet));
         defs = read;

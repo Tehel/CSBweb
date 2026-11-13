@@ -228,8 +228,9 @@ export type Expr =
 export interface GameCondition {
   readonly key: string;
   /**
-   * The project's file of achievements whose sets' games it counts, `games(won, in "csb")`,
-   * each set that reads `defs/<of>.txt` (`achievementFileOf`); `null`, this set's games alone.
+   * The family of sets whose games it counts, `games(won, in "dungeon-master")`: each set
+   * whose own file declares it (`family:`), or whose id it is where its file declares none
+   * (`familyOf`); `null`, this set's games alone.
    */
   readonly of: string | null;
   readonly when: Expr;
@@ -273,6 +274,8 @@ export interface AchievementFile {
   readonly defs: readonly AchievementDef[];
   readonly disabled: readonly string[];
   readonly values: ReadonlyMap<string, readonly number[]>;
+  /** The family of sets the file declares (`family: name`), `null` for none: its set's id is its family then. */
+  readonly family: string | null;
 }
 
 export interface AchievementError {
@@ -285,8 +288,9 @@ export type AchievementRead =
   | { readonly ok: false; readonly errors: readonly AchievementError[] };
 
 const ID = /^[a-z0-9][a-z0-9-]*$/;
-/** The name of a file of the project's achievements, `defs/<name>.txt`, that `games(…, in "name")` names. */
-const ACHIEVEMENT_FILE_NAME = /^[a-z0-9][a-z0-9-]{0,39}$/;
+/** A family of sets' name, which a file declares (`family: name`) and `games(…, in "name")` names, as a set's id may be. */
+const FAMILY_NAME = /^[a-z0-9][a-z0-9._-]{0,39}$/;
+const FAMILY_LINE = /^family\s*:\s*(.*?)\s*$/;
 /** A named value's name, and the same in braces, where a text or a condition names it. */
 const VALUE_NAME = '[A-Za-z][A-Za-z0-9]*';
 const NAMED_IN_TEXT = new RegExp(`\\{(${VALUE_NAME})\\}`, 'g');
@@ -309,6 +313,7 @@ export function readAchievementFile(text: string): AchievementRead {
   interface Block { id: string; line: number; fields: Map<string, { value: string; line: number }>; disabled: boolean }
   const blocks: Block[] = [];
   const values = new Map<string, number[]>();
+  let family: string | null = null;
   let block: Block | null = null;
   let last: { value: string; line: number } | null = null;
   for (let i = 1; i < lines.length; i++) {
@@ -335,6 +340,14 @@ export function readAchievementFile(text: string): AchievementRead {
         error(n, `a value is a whole number from 0 to ${MAX_NUMBER}, or a list of them, a comma between two`);
       } else if (values.has(name)) error(n, `the value "${name}" is defined twice`);
       else values.set(name, numbers.map(Number));
+      continue;
+    }
+    const familyLine = block === null ? FAMILY_LINE.exec(content) : null;
+    if (familyLine) {
+      const name = familyLine[1] ?? '';
+      if (!FAMILY_NAME.test(name)) error(n, `"${name}" is no family's name: 1 to 40 lowercase letters, digits, dots, hyphens and underscores, a letter or a digit first`);
+      else if (family !== null) error(n, 'the family is declared twice');
+      else family = name;
       continue;
     }
     const header = /^\[([^\]]*)\]\s*$/.exec(content);
@@ -413,7 +426,7 @@ export function readAchievementFile(text: string): AchievementRead {
   if (defs.length + disabled.length > ACHIEVEMENT_LIMITS.achievements) {
     error(1, `the file holds over ${ACHIEVEMENT_LIMITS.achievements} achievements`);
   }
-  return errors.length > 0 ? { ok: false, errors } : { ok: true, file: { defs, disabled, values } };
+  return errors.length > 0 ? { ok: false, errors } : { ok: true, file: { defs, disabled, values, family } };
 }
 
 /**
@@ -709,7 +722,7 @@ export function parseCondition(text: string): Expr {
     }
     throw new ConditionError(`"${t.v}" is no fact, sample, count or count of the data`);
   };
-  /** `games(condition [, in "file"])`, its word read. */
+  /** `games(condition [, in "family"])`, its word read. */
   const games = (): GameCondition => {
     if (inGame) throw new ConditionError('games(…) takes a condition of one game, with no games(…) or total(…) in it');
     expectOp('(');
@@ -719,13 +732,13 @@ export function parseCondition(text: string): Expr {
     let of: string | null = null;
     if (isOp(',')) {
       pos++;
-      if (!isWord('in')) throw new ConditionError(`expected in "file" ${where()}, the games of the sets that read defs/<file>.txt`);
+      if (!isWord('in')) throw new ConditionError(`expected in "family" ${where()}, the games of the sets of that family`);
       pos++;
-      const file = next();
-      if (file.t !== 'string' || !ACHIEVEMENT_FILE_NAME.test(file.v)) {
-        throw new ConditionError('games(…, in "file") names a file of achievements, such as "csb": lowercase letters, digits and hyphens');
+      const family = next();
+      if (family.t !== 'string' || !FAMILY_NAME.test(family.v)) {
+        throw new ConditionError('games(…, in "family") names a family of sets, such as "dungeon-master", in quotes: lowercase letters, digits, dots, hyphens and underscores');
       }
-      of = file.v;
+      of = family.v;
     }
     expectOp(')');
     if (typeOf(when) !== 'bool') throw new ConditionError('games(…) takes a yes-or-no condition, not a number');
