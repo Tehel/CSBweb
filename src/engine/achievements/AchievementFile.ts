@@ -29,11 +29,12 @@ export const ACHIEVEMENT_LIMITS = {
 export const TIERS = ['easy', 'silly', 'weird', 'hard'] as const;
 export type Tier = (typeof TIERS)[number];
 
-/** What an attribute's values are: one of a few words, yes or no, or a name. */
-type AttributeKind = { kind: 'enum'; values: readonly string[] } | { kind: 'yesno' } | { kind: 'name' };
+/** What an attribute's values are: one of a few words, yes or no, a name, or a whole number. */
+type AttributeKind = { kind: 'enum'; values: readonly string[] } | { kind: 'yesno' } | { kind: 'name' } | { kind: 'number' };
 
 const NAME: AttributeKind = { kind: 'name' };
 const YESNO: AttributeKind = { kind: 'yesno' };
+const NUMBER: AttributeKind = { kind: 'number' };
 const enumOf = (...values: string[]): AttributeKind => ({ kind: 'enum', values });
 
 /** A champion's damage, and their death, by what caused it. */
@@ -58,6 +59,8 @@ export const EVENTS = {
   cast: { champion: NAME, spell: NAME, ok: YESNO },
   wear: { champion: NAME, slot: enumOf('head', 'neck', 'torso', 'legs', 'feet'), item: NAME },
   join: { champion: NAME, how: enumOf('resurrect', 'reincarnate') },
+  enter: { level: NUMBER },
+  leave: { level: NUMBER, cleared: YESNO },
 } as const satisfies Record<string, Record<string, AttributeKind>>;
 export type EventKind = keyof typeof EVENTS;
 
@@ -69,7 +72,7 @@ export type SampleName = (typeof SAMPLES)[number];
  * The counts of the set's own files (`DataCounts`, `dataCounts`), which a condition reads by
  * name, as it reads a fact.
  */
-export const DATA_COUNTS = ['spells', 'foods', 'monsterTypes'] as const;
+export const DATA_COUNTS = ['spells', 'foods', 'monsterTypes', 'levels'] as const;
 export type DataCountName = (typeof DATA_COUNTS)[number];
 export type DataCounts = Readonly<Record<DataCountName, number>>;
 
@@ -80,6 +83,7 @@ const FACTS = {
   ended: 'bool',
   gameTime: 'num',
   playTime: 'seconds',
+  explored: 'num',
 } as const;
 export type FactName = keyof typeof FACTS;
 
@@ -95,10 +99,14 @@ type Bound = 'exact' | 'low' | 'high';
 
 export type Comparison = '=' | '!=' | '<' | '<=' | '>' | '>=';
 
-/** A filter on an event's attributes, its names upper-cased. */
+/**
+ * A filter on an event's attributes, its names upper-cased, its numbers in decimal. An
+ * `in` may name a value, `{name}`, for its list: `mergeAchievements` puts the list in its
+ * place.
+ */
 export type Filter =
   | { k: 'cmp'; attr: string; op: '=' | '!='; value: string }
-  | { k: 'in'; attr: string; values: readonly string[]; negated: boolean }
+  | { k: 'in'; attr: string; values: readonly string[]; negated: boolean; named?: string }
   | { k: 'like'; attr: string; pattern: string }
   | { k: 'and' | 'or'; a: Filter; b: Filter }
   | { k: 'not'; a: Filter };
@@ -156,11 +164,14 @@ export interface AchievementDef {
   readonly line: number;
 }
 
-/** A file read: its achievements, the common ones it switches off, and its named values. */
+/**
+ * A file read: its achievements, the common ones it switches off, and its named values,
+ * each a list of one number or more.
+ */
 export interface AchievementFile {
   readonly defs: readonly AchievementDef[];
   readonly disabled: readonly string[];
-  readonly values: ReadonlyMap<string, number>;
+  readonly values: ReadonlyMap<string, readonly number[]>;
 }
 
 export interface AchievementError {
@@ -176,7 +187,7 @@ const ID = /^[a-z0-9][a-z0-9-]*$/;
 /** A named value's name, and the same in braces, where a text or a condition names it. */
 const VALUE_NAME = '[A-Za-z][A-Za-z0-9]*';
 const NAMED_IN_TEXT = new RegExp(`\\{(${VALUE_NAME})\\}`, 'g');
-const VALUE_LINE = /^value\s+(\S+)\s*=\s*(\S+)\s*$/;
+const VALUE_LINE = /^value\s+(\S+)\s*=\s*(\S.*?)\s*$/;
 /** The largest number a file may write. */
 const MAX_NUMBER = 1e9;
 
@@ -194,7 +205,7 @@ export function readAchievementFile(text: string): AchievementRead {
 
   interface Block { id: string; line: number; fields: Map<string, { value: string; line: number }>; disabled: boolean }
   const blocks: Block[] = [];
-  const values = new Map<string, number>();
+  const values = new Map<string, number[]>();
   let block: Block | null = null;
   let last: { value: string; line: number } | null = null;
   for (let i = 1; i < lines.length; i++) {
@@ -212,13 +223,15 @@ export function readAchievementFile(text: string): AchievementRead {
     if (/^value\b/.test(content)) {
       const v = VALUE_LINE.exec(content);
       const name = v?.[1] ?? '';
-      if (v === null) error(n, 'a value is defined as "value name = number"');
+      const numbers = (v?.[2] ?? '').split(',').map((x) => x.trim());
+      if (v === null) error(n, 'a value is defined as "value name = number", or "value name = number, number, …"');
       else if (block !== null) error(n, 'a value is defined before the first [id]');
       else if (!new RegExp(`^${VALUE_NAME}$`).test(name) || name.length > ACHIEVEMENT_LIMITS.value) {
         error(n, `"${name}" is no value's name: 1 to ${ACHIEVEMENT_LIMITS.value} letters and digits, a letter first`);
-      } else if (!/^\d+$/.test(v[2] ?? '') || Number(v[2]) > MAX_NUMBER) error(n, `a value is a whole number from 0 to ${MAX_NUMBER}`);
-      else if (values.has(name)) error(n, `the value "${name}" is defined twice`);
-      else values.set(name, Number(v[2]));
+      } else if (!numbers.every((x) => /^\d+$/.test(x) && Number(x) <= MAX_NUMBER)) {
+        error(n, `a value is a whole number from 0 to ${MAX_NUMBER}, or a list of them, a comma between two`);
+      } else if (values.has(name)) error(n, `the value "${name}" is defined twice`);
+      else values.set(name, numbers.map(Number));
       continue;
     }
     const header = /^\[([^\]]*)\]\s*$/.exec(content);
@@ -310,20 +323,50 @@ export function mergeAchievements(common: AchievementFile, own: AchievementFile 
   return valued([...merged, ...own.defs.filter(d => !commonIds.has(d.id))]);
 }
 
-/** An achievement with its named values in their places, or `null` where one is not defined. */
-function withValues(def: AchievementDef, values: ReadonlyMap<string, number>): AchievementDef | null {
+/**
+ * An achievement with its named values in their places, or `null` where one is not
+ * defined, or a list stands where one number is wanted: in a condition's number or in a
+ * text. An `in` takes the whole list, each aggregate keyed by the list it was given.
+ */
+function withValues(def: AchievementDef, values: ReadonlyMap<string, readonly number[]>): AchievementDef | null {
   if (def.values.length === 0) return def;
   if (!def.values.every((v) => values.has(v))) return null;
+  const one = (name: string): number | null => {
+    const list = values.get(name);
+    return list?.length === 1 ? list[0] ?? null : null;
+  };
+  let fits = true;
+  const filter = (f: Filter | null): Filter | null => {
+    if (f === null) return null;
+    switch (f.k) {
+      case 'in': return f.named === undefined ? f : { k: 'in', attr: f.attr, values: (values.get(f.named) ?? []).map(String), negated: f.negated };
+      case 'and': case 'or': return { ...f, a: filter(f.a)!, b: filter(f.b)! };
+      case 'not': return { ...f, a: filter(f.a)! };
+      default: return f;
+    }
+  };
+  const agg = (a: Aggregate): Aggregate => (a.k === 'count' || a.k === 'distinct' ? keyed({ ...a, where: filter(a.where) }) : a);
   const put = (e: Expr): Expr => {
     switch (e.k) {
-      case 'value': return { k: 'num', value: (values.get(e.name) ?? 0) * e.scale, type: e.type };
+      case 'value': {
+        const n = one(e.name);
+        if (n === null) fits = false;
+        return { k: 'num', value: (n ?? 0) * e.scale, type: e.type };
+      }
+      case 'agg': case 'ever': case 'never': return { ...e, agg: agg(e.agg) };
       case 'cmp': return { ...e, a: put(e.a), b: put(e.b) };
       case 'and': case 'or': return { ...e, a: put(e.a), b: put(e.b) };
       case 'not': return { ...e, a: put(e.a) };
       default: return e;
     }
   };
-  return { ...def, text: def.text.replace(NAMED_IN_TEXT, (_, v: string) => String(values.get(v))), when: put(def.when) };
+  const when = put(def.when);
+  const text = def.text.replace(NAMED_IN_TEXT, (_, v: string) => {
+    const n = one(v);
+    if (n === null) fits = false;
+    return String(n);
+  });
+  return fits ? { ...def, text, when, aggregates: aggregatesOf(when) } : null;
 }
 
 /** `def` with the counts `counts` in the places that read them. */
@@ -497,7 +540,7 @@ export function parseCondition(text: string): Expr {
         const event = eventName();
         const filter = whereClause(event);
         expectOp(')');
-        const agg: Aggregate = { k: 'count', event, where: filter, key: `count(${event}${filterKey(filter)})` };
+        const agg = keyed({ k: 'count', event, where: filter, key: '' });
         return t.v === 'count' ? { k: 'agg', agg } : { k: t.v, agg };
       }
       case 'distinct': {
@@ -507,7 +550,7 @@ export function parseCondition(text: string): Expr {
         const attr = attributeOf(event);
         const filter = whereClause(event);
         expectOp(')');
-        return { k: 'agg', agg: { k: 'distinct', event, attr, where: filter, key: `distinct(${event}.${attr}${filterKey(filter)})` } };
+        return { k: 'agg', agg: keyed({ k: 'distinct', event, attr, where: filter, key: '' }) };
       }
       case 'max': case 'min': {
         expectOp('(');
@@ -567,6 +610,12 @@ export function parseCondition(text: string): Expr {
     let negated = false;
     if (t.t === 'word' && t.v === 'not' && isWord('in')) { negated = true; pos++; }
     else if (!(t.t === 'word' && t.v === 'in')) { pos--; throw new ConditionError(`expected =, !=, in, not in or ~ ${where()}`); }
+    const named = peek();
+    if (named.t === 'value') {
+      if (kind.kind !== 'number' || named.unit !== undefined) throw new ConditionError(`in {name} takes a list of numbers; ${event}.${attr} is not a number`);
+      pos++;
+      return { k: 'in', attr, values: [], negated, named: named.name };
+    }
     expectOp('(');
     const values = [value(event, attr, kind)];
     while (isOp(',')) { pos++; values.push(value(event, attr, kind)); }
@@ -575,6 +624,10 @@ export function parseCondition(text: string): Expr {
   };
   const value = (event: EventKind, attr: string, kind: AttributeKind): string => {
     const t = next();
+    if (kind.kind === 'number') {
+      if (t.t !== 'num') { pos--; throw new ConditionError(`${event}.${attr} is a whole number ${where()}`); }
+      return String(t.v);
+    }
     if (t.t !== 'word' && t.t !== 'string') { pos--; throw new ConditionError(`expected a value for ${event}.${attr} ${where()}`); }
     if (kind.kind === 'enum' && !kind.values.includes(t.v)) {
       throw new ConditionError(`${event}.${attr} is one of ${kind.values.join(', ')}`);
@@ -612,6 +665,12 @@ function typeOf(e: Expr): ValueType {
   }
 }
 
+/** `agg` with its key, its canonical text, which the tracker's saved state keeps it by. */
+function keyed(agg: Exclude<Aggregate, { k: 'max' | 'min' }>): Aggregate {
+  const key = agg.k === 'count' ? `count(${agg.event}${filterKey(agg.where)})` : `distinct(${agg.event}.${agg.attr}${filterKey(agg.where)})`;
+  return { ...agg, key };
+}
+
 /** A filter as canonical text, for an aggregate's key. */
 function filterKey(f: Filter | null): string {
   return f === null ? '' : ` where ${filterText(f)}`;
@@ -620,7 +679,7 @@ function filterText(f: Filter): string {
   const q = (v: string): string => JSON.stringify(v);
   switch (f.k) {
     case 'cmp': return `${f.attr}${f.op}${q(f.value)}`;
-    case 'in': return `${f.attr} ${f.negated ? 'not in' : 'in'} (${f.values.map(q).join(',')})`;
+    case 'in': return `${f.attr} ${f.negated ? 'not in' : 'in'} ${f.named !== undefined ? `{${f.named}}` : `(${f.values.map(q).join(',')})`}`;
     case 'like': return `${f.attr}~${q(f.pattern)}`;
     case 'and': case 'or': return `(${filterText(f.a)} ${f.k} ${filterText(f.b)})`;
     case 'not': return `not ${filterText(f.a)}`;
@@ -631,7 +690,7 @@ function filterText(f: Filter): string {
 function boundOf(e: Expr): Bound | null {
   switch (e.k) {
     case 'num': case 'value': case 'data': case 'sample': return 'exact';
-    case 'fact': return e.name === 'playTime' ? 'low' : e.name === 'gameTime' ? 'exact' : null;
+    case 'fact': return e.name === 'playTime' || e.name === 'explored' ? 'low' : e.name === 'gameTime' ? 'exact' : null;
     case 'agg': return e.agg.k === 'min' ? 'high' : 'low';
     default: return null;
   }
@@ -682,10 +741,20 @@ function flip(op: Comparison): Comparison {
   }
 }
 
-/** The named values a condition reads. */
+/** The named values a condition reads, its filters' lists among them. */
 function valuesOf(e: Expr): string[] {
+  const named = (f: Filter | null): string[] => {
+    if (f === null) return [];
+    switch (f.k) {
+      case 'in': return f.named !== undefined ? [f.named] : [];
+      case 'and': case 'or': return [...named(f.a), ...named(f.b)];
+      case 'not': return named(f.a);
+      default: return [];
+    }
+  };
   switch (e.k) {
     case 'value': return [e.name];
+    case 'agg': case 'ever': case 'never': return e.agg.k === 'count' || e.agg.k === 'distinct' ? named(e.agg.where) : [];
     case 'cmp': case 'and': case 'or': return [...valuesOf(e.a), ...valuesOf(e.b)];
     case 'not': return valuesOf(e.a);
     default: return [];

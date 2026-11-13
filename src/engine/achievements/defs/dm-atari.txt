@@ -9,6 +9,13 @@
 value speedRunnerMinutes = 180
 value blitzMinutes = 60
 value objectorKills = 40
+# Every level but the Hall of Champions, which holds no monster, and the Dragon's, which
+# holds the Dragon alone. Lord Chaos's, 12, can never be swept.
+value cleanSweepLevels = 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
+
+# Dungeon Master's own.
+
+value expressElevatorMinutes = 60
 
 [scrooge]
 name: Scrooge
@@ -69,3 +76,17 @@ name: Brute Force
 text: Win having cast no spell but ZO KATH RA.
 tier: hard
 when: won and never(cast where ok = yes and spell != "ZO KATH RA")
+
+# The deepest level is 13, the Dragon's, where the Power Gem lies.
+
+[deep-diver]
+name: Deep Diver
+text: Reach the deepest level.
+tier: easy
+when: ever(enter where level = 13)
+
+[express-elevator]
+name: Express Elevator
+text: Reach the deepest level in less than {expressElevatorMinutes} minutes of play.
+tier: hard
+when: ever(enter where level = 13) and playTime < {expressElevatorMinutes}m

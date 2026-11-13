@@ -32,7 +32,9 @@ project, as `src/engine/achievements/defs/<name>.txt` (`achievementFileOf`,
 `src/engine/achievements/PageAchievements.ts`): `dm-atari.txt`, which every Dungeon Master
 set reads, the Atari's, the Amiga's and the hidden ones, and `csb.txt`. Both give the
 common file's values: Speed Runner in less than 180 minutes, Blitz in less than 60, and
-Conscientious Objector with at most 40 kills. A set with no
+Conscientious Objector with at most 40 kills. Dungeon Master's also lists the levels Clean
+Sweep counts, 1 to 12, all but the Hall of Champions and the Dragon's, and gives its own
+Express Elevator 60 minutes; Chaos Strikes Back lists no level to sweep. A set with no
 `achievements.txt` of its own reads that file instead. The file is never a game file
 (`GAME_FILES`, `src/data/DataSets.ts`), so a recording's digests never name it, and an
 author can change the file without breaking a recording.
@@ -80,8 +82,9 @@ when: won and ever(eat)
   value: a whole number from 0 to 1,000,000,000, its name 1 to 40 letters and digits, a
   letter first. A text names it as `{name}`, and a condition where a number would be, as
   `{name}`, or `{name}m` for that many minutes (`h` and `s` too), a duration
-  ("Conditions"). The common file names values and defines none; a set's own file defines
-  them:
+  ("Conditions"). **`value name = number, number, …`** defines a list, which a filter
+  names for the list of an `in`, `level in {cleanSweepLevels}`. The common file names
+  values and defines none; a set's own file defines them:
 
   ```
   value blitzMinutes = 60
@@ -95,7 +98,9 @@ when: won and ever(eat)
   A set's achievements are its files merged (`mergeAchievements`): the set's values over
   the common file's, each put in every place that names it. An achievement that names a
   value the set does not define does not exist in that set: no row in the dialog or the
-  book, no unlock. A set without a file of its own, a player's, has none of the valued
+  book, no unlock; nor does one where a list stands in a number's place or in a text. An
+  aggregate whose filter names a list is kept by the list it was given, so a set that
+  changes its list starts that count afresh in the games saved before. A set without a file of its own, a player's, has none of the valued
   ones. A value the set's file defines that none of its achievements names is reported by
   `unusedValues`, as a misspelt object is by `unknownItems`.
 
@@ -117,8 +122,13 @@ A condition is a yes or a no, made from these parts:
   - `playTime` is the time the player has played the game, in seconds. It counts the
     VBLs the game has run, sixty a second, so the page and a replay of its recording
     count the same.
-- **Counts of the set's data**: `spells`, `foods` and `monsterTypes`, numbers worked out
-  from the set's own files, the same in every game of the set ("Counted from the data").
+- **Counts of the set's data**: `spells`, `foods`, `monsterTypes` and `levels`, numbers
+  worked out from the set's own files, the same in every game of the set ("Counted from
+  the data").
+- **`explored`**: the share of the dungeon's floor squares, its corridors as it begins
+  (`floorSquares`, `src/engine/achievements/DataCounts.ts`), that the party has stood on
+  at a tick's end, in percent, rounded down. Like a count, it can only be too small in a
+  history that starts at a save.
 - **Samples**, read at the end of each tick. A sample's bare name is its value at that moment:
   - `party`: the number of champions in the party.
   - `alive`: the number of those champions who are alive.
@@ -139,12 +149,13 @@ A **filter** is made of `and`, `or`, `not`, parentheses, and these tests on the 
 attributes:
 
 - `attribute = value` and `attribute != value`.
-- `attribute in (value, …)` and `attribute not in (value, …)`.
+- `attribute in (value, …)` and `attribute not in (value, …)`, or `in {name}` and `not in
+  {name}` for a list the set's file defines.
 - `attribute ~ "pattern"`, where `*` in the pattern stands for any run of characters and
   `?` for one character.
 
-A value is a word, such as `APPLE`, or a quoted name, such as `"DRAGON STEAK"`. Names
-compare without regard to case.
+A value is a word, such as `APPLE`, or a quoted name, such as `"DRAGON STEAK"`, or a whole
+number for a `level`. Names compare without regard to case.
 
 ### The events
 
@@ -158,6 +169,8 @@ compare without regard to case.
 | `cast` | a champion casts a spell | `champion`; `spell`, its runes, such as `"FUL IR"`; `ok`: `yes` when the spell worked |
 | `wear` | an object is put on a worn place | `champion`; `slot`: `head` `neck` `torso` `legs` `feet`; `item` |
 | `join` | a champion joins the party | `champion`; `how`: `resurrect` `reincarnate` |
+| `enter` | the party stands on a level it did not stand on at the last tick's end, and at a history's first tick | `level`, the map, from 0 |
+| `leave` | the party stands on another level than at the last tick's end | `level`, the map left; `cleared`: `yes` when no monster is alive on it then |
 
 An `item` is the object's name as the game shows it (`RN::NameIndex`), from the set's own
 `graphics.dat`.
@@ -176,7 +189,7 @@ manual's names (`src/core/runes.ts`), which no game file holds either.
 
 ### Counted from the data
 
-Three numbers a condition reads are the set's own, so that one condition says "every one
+Four numbers a condition reads are the set's own, so that one condition says "every one
 of them" in every set:
 
 ```
@@ -198,15 +211,19 @@ when: foods > 0 and distinct(eat.item) >= foods
   STEAK`), among the objects the set's dungeons hold, on a square, carried by a group or in
   a chest, and among the droppings of those monster types (`CreateAndDropObject`,
   `doc/CSBwin-src/Code11f52.cpp:735-788`), such as a worm's worm rounds.
+- **`levels`**: the maps of the dungeon the game is played in that hold a floor square, a
+  corridor, which `enter.level` names. Chaos Strikes Back's adventure has eleven maps, and
+  the last is a single square of stone.
 
 A set's dungeons are its `dungeon.dat`, and its `mini.dat` where it has one, Chaos Strikes
-Back's adventure. Dungeon Master counts 25 spells, 8 foods and 24 types; Chaos Strikes
-Back 25 spells, 8 foods and 23 types, three of them only its generators make
-(`tools/checks/achievements-format.ts`).
+Back's adventure, which is the dungeon its game is played in. Dungeon Master counts 25
+spells, 8 foods, 24 types and 14 levels; Chaos Strikes Back 25 spells, 8 foods, 23 types,
+three of them only its generators make, and 10 levels (`tools/checks/achievements-format.ts`).
+Every Dungeon Master set has the same 14 levels, so `dm-atari.txt` names the deepest, 13.
 
 Each count is that of the values its event can take in a game of the set, so `distinct(…)
 >= count` is exact: a spell that works is one of the table's, a meal one of the foods, a
-monster a blow kills one of the types. A dungeon whose DSAs create a monster or a food of
+monster a blow kills one of the types, a level the party stands on one with a floor. A dungeon whose DSAs create a monster or a food of
 a kind the counts leave out, or make something else edible, can reach the count with it
 instead. A set whose count is 0 has nothing to earn, so the common file's conditions ask
 for more than 0 first.
@@ -291,6 +308,7 @@ whole replay corpus with the tracker attached, and every package plays to its po
   `graphics.dat`). A mirror's champion's own possessions are not put on by the player.
 - **A join** is at the end of `_ResurrectReincarnateCancel`, beside
   `GameHost.championJoined`.
+- **Where the party is** needs no happening: the tracker reads it at each tick's end.
 - **The game's boundaries**: each VBL of the player's time (`Game.playTime`'s), each main
   loop tick's end, `MainLoop`'s return (won or lost), a new game read, a save's file made
   (`saveFileOf`) and a save's file read (`applySaveBytes`).
@@ -343,11 +361,20 @@ the `mini.dat`.
 - At each tick's end it takes the samples: `party` and `alive` leave out a mirror's
   champion; `coins` counts every object whose name ends in `COIN` in the party's
   possessions, inside the chests they carry (an open chest's slots for the open one) and
-  under the pointer. It sets the clock, adds the VBLs counted, and tests the conditions.
-  At `MainLoop`'s return it does the same and says the game ended.
+  under the pointer. It reads where the party stands: a level other than the last tick's
+  is `leave` of that one, then `enter` of this one, and a floor square not stood on yet
+  adds to `explored`. A party moved to another level in the tick's input stands there from
+  the next tick, which loads the level (`Game.loadNewPartyLevel`, `d.newPartyLevel`):
+  until then its square is the new level's and its level the old one, so the tracker
+  reads nothing of its place. A level left is `cleared` when no group is on one of its
+  squares, nor waits to be put on one on a `TT_60` or `TT_61` timer
+  (`CreateMovementTimer`, `doc/CSBwin-src/Code11f52.cpp:2481`). It sets the clock, adds the
+  VBLs counted, and tests the conditions. At `MainLoop`'s return it does the same and says
+  the game ended.
 - It keeps its state by the MD5 of each save's file it sees made, and when a file is read
-  it takes up the state kept for it: a replay's joins read the files their parents made, so
-  each branch goes on with its parent's history. A file read with no state kept starts a
+  it takes up the state kept for it, the level the party stood on and the floor squares
+  walked on among it: a replay's joins read the files their parents made, so each branch
+  goes on with its parent's history. A file read with no state kept starts a
   history of its own ("Some conditions need the whole game"), unless it is a CSB
   adventure's start, read against the set's `mini.dat` ("A CSB adventure"), which starts
   one from its start, as a new game does.
@@ -363,11 +390,17 @@ their causes, the joins, the meals, the worn objects and the unlocks of Dungeon 
 achievements: DMMovie2615's Ful bombs (Grenadier), its champion lost to a wall (Stubbed
 Toe) and its win with one of four alive (Sole Survivor); and that the tracker counts its
 set's data, Rune Scholar, Gourmet and Bestiary unlocking exactly where a game's distinct
-spells, foods and types reach the counts: the whole CSB game eats all eight foods.
+spells, foods and types reach the counts: the whole CSB game eats all eight foods; and
+where the party is: each history enters a level and leaves it before the next, a join's
+read and a state kept and read back take up the level and the floor walked, Tourist
+unlocks where the levels entered reach the set's, DMMovie2615 leaves the Hall of Champions
+cleared and the Dragon's level not, and reaches level 13 within the hour, Deep Diver and
+Express Elevator at the tick it enters. The games played to their end explore well under
+90% of the floor: 37 to 39% for Dungeon Master's wins, 65% for the whole CSB game.
 `tools/checks/achievements-format.ts` reads each file, checks its names against its set's
 `graphics.dat` and its values against its achievements, counts the FTL sets' data, and
-plays the conditions out of made-up events, the named values and the counts put in their
-places.
+plays the conditions out of made-up events, the named values, the lists and the counts put
+in their places.
 
 ## The page
 

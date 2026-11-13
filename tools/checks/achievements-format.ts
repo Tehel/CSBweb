@@ -9,7 +9,9 @@
  * one of FTL's objects, which is the canary: a name misspelt there would match nothing,
  * silently, in every set. The counts of the data (`dataCounts`) are Dungeon Master's and
  * Chaos Strikes Back's, each half of them proven by what it adds: DM's worm round only a
- * worm drops, CSB's types only its generators make, DM's Lord Chaos whom no blow kills.
+ * worm drops, CSB's types only its generators make, DM's Lord Chaos whom no blow kills,
+ * CSB's stone map that is no level. Every Dungeon Master set has fourteen levels, so the
+ * deepest is 13 in each, as `dm-atari.txt` says.
  *
  * Run: `npm test -- --only=achievements-format.ts`
  */
@@ -65,8 +67,8 @@ function commonFile(): AchievementFile {
   check(r.file.values.size === 0, 'common.txt defines no value: a set without its own file has no valued achievement');
   const valued = r.file.defs.filter((d) => d.values.length > 0).map((d) => `${d.id} {${d.values.join(', ')}}`);
   console.log(`  valued: ${valued.join('; ')}`);
-  check(valued.join('; ') === 'speed-runner {speedRunnerMinutes}; blitz {blitzMinutes}; conscientious-objector {objectorKills}',
-    'Speed Runner, Blitz and Conscientious Objector are the valued ones, each naming its value in its text and its condition');
+  check(valued.join('; ') === 'speed-runner {speedRunnerMinutes}; blitz {blitzMinutes}; conscientious-objector {objectorKills}; clean-sweep {cleanSweepLevels}',
+    'Speed Runner, Blitz, Conscientious Objector and Clean Sweep are the valued ones, each naming its value in its text or its condition');
 
   const names = new Set(graphicsTablesOf(stockGraphics()).objects.objectNames);
   console.log(`--- common.txt's item names against graphics.dat's ${names.size} names`);
@@ -84,7 +86,9 @@ function commonFile(): AchievementFile {
  * A set's own file, `defs/<name>.txt`: read, printed, its names against the set's
  * `graphics.dat`, laid over the common file, and the sets that read it.
  */
-function setFile(common: AchievementFile, name: string, graphicsDir: string, whole: readonly string[], values: string): AchievementFile {
+function setFile(
+  common: AchievementFile, name: string, graphicsDir: string, whole: readonly string[], values: string, absent: readonly string[] = [],
+): AchievementFile {
   console.log(`--- ${name}.txt`);
   const r = readAchievementFile(readFileSync(resolve(DEFS, `${name}.txt`), 'utf8'));
   check(r.ok, `${name}.txt reads`);
@@ -101,12 +105,14 @@ function setFile(common: AchievementFile, name: string, graphicsDir: string, who
     const unknown = unknownItems(d, names);
     check(unknown.length === 0, `${d.id} names only ${graphicsDir}'s objects (not ${unknown.join(', ')})`);
   }
-  const given = [...r.file.values].map(([v, n]) => `${v} = ${n}`).join(', ');
+  const given = [...r.file.values].map(([v, n]) => `${v} = ${n.join(', ')}`).join('; ');
   console.log(`  values: ${given}`);
   check(given === values, `${name}.txt gives ${values}`);
   const merged = mergeAchievements(common, r.file);
   const replaced = r.file.defs.filter((d) => common.defs.some((c) => c.id === d.id)).length;
-  check(merged.length === common.defs.length + r.file.defs.length - replaced, `${name}.txt adds ${r.file.defs.length - replaced} to the common file and replaces ${replaced}, every valued one there`);
+  const missing = common.defs.filter((c) => !merged.some((d) => d.id === c.id)).map((c) => c.id);
+  check(merged.length === common.defs.length + r.file.defs.length - replaced - absent.length && missing.join() === absent.join(),
+    `${name}.txt adds ${r.file.defs.length - replaced} to the common file and replaces ${replaced}, every valued one there${absent.length > 0 ? ` but ${absent.join(', ')}, whose value it does not give` : ''}`);
   const unused = unusedValues(r.file, merged);
   check(unused.length === 0, `every value ${name}.txt gives is named (not ${unused.join(', ')})`);
   for (const d of merged.filter((m) => m.values.length > 0)) console.log(`  ${d.id.padEnd(24)} ${d.text}`);
@@ -155,6 +161,12 @@ function errors(): void {
     ['a value\'s bad name', `${H}value 2n = 3\n`, 2, /no value's name/],
     ['a value not a whole number', `${H}value n = 1.5\n`, 2, /whole number/],
     ['a value line without its number', `${H}value n\n`, 2, /value name = number/],
+    ['a list with a word in it', `${H}value n = 1, two\n`, 2, /list of them/],
+    ['a list with an empty place', `${H}value n = 1,, 2\n`, 2, /list of them/],
+    ['a level not a number', block('ever(enter where level = top)'), 5, /whole number/],
+    ['a pattern on a level', block('ever(enter where level ~ "1*")'), 5, /compares names/],
+    ['a list of names', block('ever(eat where item in {n})'), 5, /list of numbers/],
+    ['a list in minutes', block('ever(enter where level in {n}m)'), 5, /list of numbers/],
     ['a brace not a value\'s', `${H}[a]\nname: A\ntext: Kill {n monsters.\nwhen: won\n`, 4, /braces/],
     ['a value\'s braces not closed', block('count(kill) >= {n'), 5, /braces/],
     ['a value in minutes against a count', block('count(kill) >= {n}m'), 5, /duration/],
@@ -205,6 +217,11 @@ function wholeGame(): void {
     ['count(kill) >= {n}', false],
     ['won and count(kill) <= {n}', true],
     ['won and playTime < {n}m', true],
+    ['explored >= 90', false],
+    ['explored < 10', true],
+    ['levels > 0 and distinct(enter.level) >= levels', false],
+    ['ever(leave where cleared = yes and level in {n})', false],
+    ['ever(enter where level = 13) and playTime < {n}m', true],
   ];
   for (const [text, expected] of cases) {
     const got = needsWholeGame(parseCondition(text));
@@ -303,6 +320,33 @@ function evaluator(common: AchievementFile, dm: AchievementFile, counts: DataCou
   check(sameIds(survivor.evaluate(), ['roll-the-credits', 'sole-survivor', 'true-to-themselves', 'to-serve-man']),
     'won from a save, one of four alive, the four non-humans resurrected: Sole Survivor, True to Themselves, To Serve Man');
 
+  // Where the party is: the levels entered and left, the floor walked on.
+  const walker = new AchievementState(defs, true);
+  const enter = (level: number): AchievementEvent => ({ kind: 'enter', attrs: { level: `${level}` } });
+  const leave = (level: number, cleared: string): AchievementEvent => ({ kind: 'leave', attrs: { level: `${level}`, cleared } });
+  walker.addVbls(60 * 60 * 59);
+  const walks: [AchievementEvent[], number, string[], string][] = [
+    [[enter(0), leave(0, 'yes'), enter(1)], 89, [], 'the Hall of Champions left empty is no Clean Sweep: it is not listed; 89% of the floor is no Cartographer'],
+    [[leave(1, 'no'), enter(2)], 90, ['cartographer'], 'a level left with a monster on it is no sweep; 90% of the floor is Cartographer'],
+    [[leave(2, 'yes'), enter(3)], 90, ['clean-sweep'], 'level 2 left with no monster on it is a Clean Sweep'],
+    [[...[4, 5, 6, 7, 8, 9, 10, 11, 12].map(enter)], 90, [], 'thirteen levels of fourteen are no Tourist'],
+    [[enter(13)], 90, ['tourist', 'deep-diver', 'express-elevator'], 'the fourteenth, the deepest, in 59 minutes, is Tourist, Deep Diver and Express Elevator'],
+  ];
+  for (const [events, explored, unlocks, what] of walks) {
+    for (const event of events) walker.record(event);
+    walker.setExplored(explored);
+    check(sameIds(walker.evaluate(), unlocks), what);
+  }
+  const slow = new AchievementState(defs, true);
+  slow.addVbls(60 * 60 * 60);
+  slow.record(enter(13));
+  slow.record(leave(13, 'yes'));
+  check(sameIds(slow.evaluate(), ['deep-diver']), 'the deepest reached in 60 minutes is Deep Diver, not Express Elevator; the Dragon\'s level swept is no Clean Sweep');
+  const resumed = new AchievementState(defs, false);
+  resumed.addVbls(60 * 60);
+  resumed.record(enter(13));
+  check(sameIds(resumed.evaluate(), ['deep-diver']), 'from a save with no history, the deepest reached in a minute is Deep Diver alone: the play time is too small');
+
   // A game whose history starts at a save that held none.
   const partial = new AchievementState(defs, false);
   partial.sample('party', 1);
@@ -347,6 +391,22 @@ function merging(common: AchievementFile, counts: DataCounts): void {
   check(mergeAchievements(common, null).length === fixed, 'a set with no file has the common ones, less the valued');
   check(!mergeAchievements(common, null).some((d) => d.id === 'speed-runner'), 'a set with no file has no Speed Runner');
 
+  console.log('--- lists');
+  const listed = read('# CSBweb achievements 1\nvalue few = 1, 2\nvalue one = 7\n'
+    + '[in-few]\nname: A\ntext: T\nwhen: ever(enter where level in {few})\n'
+    + '[in-one]\nname: B\ntext: T\nwhen: ever(enter where level not in {one})\n'
+    + '[few-as-number]\nname: C\ntext: T\nwhen: count(kill) >= {few}\n'
+    + '[few-in-text]\nname: D\ntext: Levels {few}.\nwhen: won\n');
+  const lists = mergeAchievements({ defs: [], disabled: [], values: new Map() }, listed);
+  console.log(`  ${lists.map((d) => `${d.id}: ${d.aggregates.map((a) => a.key).join()}`).join('; ')}`);
+  check(lists.map((d) => d.id).join() === 'in-few,in-one', 'a list stands for an in\'s list; where one number is wanted, in a condition or a text, the achievement is absent');
+  check(lists[0]?.aggregates[0]?.key === 'count(enter where level in ("1","2"))', 'the aggregate is keyed by the list it was given, so another list is another aggregate');
+  const visits = new AchievementState(lists, true);
+  visits.record({ kind: 'enter', attrs: { level: '7' } });
+  check(visits.evaluate().length === 0, 'level 7 is neither in {few} nor not in {one}');
+  visits.record({ kind: 'enter', attrs: { level: '2' } });
+  check(sameIds(visits.evaluate(), ['in-few', 'in-one']), 'level 2 is in {few}, and not in {one}');
+
   console.log('--- named values');
   const valued = read('# CSBweb achievements 1\nvalue speedRunnerMinutes = 90\nvalue kills = 7\nvalue spare = 1\n'
     + '[seven]\nname: Seven\ntext: Kill {kills}, then {kills} more.\nwhen: count(kill) >= {kills}\n'
@@ -379,8 +439,8 @@ function merging(common: AchievementFile, counts: DataCounts): void {
 async function counted(common: AchievementFile): Promise<DataCounts> {
   console.log('--- counted from the data');
   const expected: Record<string, DataCounts> = {
-    'dm-atari': { spells: 25, foods: 8, monsterTypes: 24 },
-    csb: { spells: 25, foods: 8, monsterTypes: 23 },
+    'dm-atari': { spells: 25, foods: 8, monsterTypes: 24, levels: 14 },
+    csb: { spells: 25, foods: 8, monsterTypes: 23, levels: 10 },
   };
   const found: Record<string, DataCounts> = {};
   for (const [id, want] of Object.entries(expected)) {
@@ -391,7 +451,7 @@ async function counted(common: AchievementFile): Promise<DataCounts> {
     const tables = gameTablesOf(graphics);
     const dungeons = setDungeons(files);
     const counts = found[id] = dataCounts(tables, dungeons);
-    console.log(`  ${id.padEnd(9)} spells ${counts.spells}, foods ${counts.foods}, monsterTypes ${counts.monsterTypes}`);
+    console.log(`  ${id.padEnd(9)} spells ${counts.spells}, foods ${counts.foods}, monsterTypes ${counts.monsterTypes}, levels ${counts.levels}`);
     check(JSON.stringify(counts) === JSON.stringify(want), `${id} counts ${JSON.stringify(want)}`);
     if (id === 'dm-atari') {
       const placed = dataCounts({ ...tables, monsterDroppings: [] }, dungeons).foods;
@@ -404,13 +464,18 @@ async function counted(common: AchievementFile): Promise<DataCounts> {
       const groups = dungeonCensus(dungeons[1]!).monsterTypes;
       console.log(`  ${''.padEnd(9)} the adventure's groups are of ${groups} types`);
       check(groups === 21, 'the adventure\'s groups are of 21 types, the Grey Lord, whom no blow kills, among them: its generators make the other three');
+      check(dungeons[1]!.maps.length === 11, 'the adventure has eleven maps, the last a square of stone, which is no level');
     }
+  }
+  for (const set of DATA_SETS.filter((s) => s.id.startsWith('dm-'))) {
+    const levels = dataCounts(gameTablesOf(stockGraphics()), setDungeons(await readAchievementSetFiles(set, diskFiles(set)))).levels;
+    check(levels === 14, `${set.id} has fourteen levels, the deepest 13 (${levels})`);
   }
 
   check(!needsWholeGame(parseCondition('distinct(cast.spell where ok = yes) >= spells')), 'every spell cast can be earned in any game');
   check(needsWholeGame(parseCondition('distinct(eat.item) < foods')), 'fewer foods than there are needs the whole game');
   const defs = mergeAchievements(common, null);
-  const small = defs.map((d) => withCounts(d, { spells: 2, foods: 2, monsterTypes: 2 }));
+  const small = defs.map((d) => withCounts(d, { spells: 2, foods: 2, monsterTypes: 2, levels: 2 }));
   const ids = ['rune-scholar', 'gourmet', 'bestiary'];
   check(ids.every((id) => small.some((d) => d.id === id)), 'Rune Scholar, Gourmet and Bestiary are common: a set without a file of its own has them');
   let threw = false;
@@ -433,7 +498,7 @@ async function counted(common: AchievementFile): Promise<DataCounts> {
     for (const event of events) state.record(event);
     check(sameIds(state.evaluate(), unlocks), what);
   }
-  const none = new AchievementState(defs.map((d) => withCounts(d, { spells: 0, foods: 0, monsterTypes: 0 })), true);
+  const none = new AchievementState(defs.map((d) => withCounts(d, { spells: 0, foods: 0, monsterTypes: 0, levels: 0 })), true);
   for (const [events] of steps) for (const event of events) none.record(event);
   check(!none.evaluate().some((id) => ids.includes(id)), 'a set with no spell, food or monster has no Rune Scholar, Gourmet or Bestiary to earn');
   return found['dm-atari']!;
@@ -445,9 +510,10 @@ function sameIds(a: readonly string[], b: readonly string[]): boolean {
 
 async function main(): Promise<void> {
   const common = commonFile();
-  const values = 'speedRunnerMinutes = 180, blitzMinutes = 60, objectorKills = 40';
-  const dm = setFile(common, 'dm-atari', STOCK_DIR, ['let-sleeping-dragons-lie', 'brute-force'], values);
-  setFile(common, 'csb', 'tools/fixtures/gamefiles/csb', [], values);
+  const values = 'speedRunnerMinutes = 180; blitzMinutes = 60; objectorKills = 40';
+  const dm = setFile(common, 'dm-atari', STOCK_DIR, ['let-sleeping-dragons-lie', 'brute-force', 'express-elevator'],
+    `${values}; cleanSweepLevels = 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12; expressElevatorMinutes = 60`);
+  setFile(common, 'csb', 'tools/fixtures/gamefiles/csb', [], values, ['clean-sweep']);
   for (const set of DATA_SETS) {
     if (set.id.startsWith('dm-')) check(achievementFileOf(set.id) === 'dm-atari', `${set.id}, a Dungeon Master set, reads dm-atari.txt`);
   }

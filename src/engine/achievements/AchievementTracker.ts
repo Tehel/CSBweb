@@ -16,11 +16,12 @@
  *
  * The counts a condition reads of the set's own files (`dataCounts`) are worked out once,
  * as the tracker is made, from the game's tables and the set's dungeon files, and put in
- * the conditions (`withCounts`).
+ * the conditions (`withCounts`), and so are the floor squares the party walks on
+ * (`floorSquares`), which `explored` counts.
  */
 import { fileDigest } from '../../data/DataSetFiles';
 import { isNewAdventure } from '../Chaos';
-import { OBJECT_ID_EOF, OBJECT_ID_NULL, DBType, type ObjectID } from '../../core/types';
+import { OBJECT_ID_EOF, OBJECT_ID_NULL, DBType, Position, type ObjectID } from '../../core/types';
 import { OBJNI_NOT_AN_OBJECT } from '../../core/objectNameIndex';
 import { FIRST_RUNE, RUNE_NAMES } from '../../core/runes';
 import { isMagicSpellRn } from '../../core/spellRn';
@@ -30,7 +31,8 @@ import { NameIndex } from '../objectIndex';
 import { isAlive } from '../rules';
 import { AchievementState, type AchievementEvent, type AchievementSnapshot } from './AchievementState';
 import { withCounts, type AchievementDef, type DataCounts, type EventKind } from './AchievementFile';
-import { dataCounts, setDungeons, type AchievementSetFiles } from './DataCounts';
+import { dataCounts, floorSquares, setDungeons, type AchievementSetFiles } from './DataCounts';
+import { TimerFunction } from '../TimerQueue';
 
 /**
  * A monster type's name: CSBWin's `monsterNames` (`doc/CSBwin-src/Statistics.cpp:16-44`),
@@ -77,6 +79,13 @@ export interface TrackerSnapshot {
   readonly clouds: readonly (readonly [number, number])[];
   /** Each champion's last damage, by party slot, which a death pending names. */
   readonly causes: readonly (string | null)[];
+  /** The level the party was on at the last tick's end; left out by a state kept before it was kept, as none. */
+  readonly level?: number;
+  /**
+   * The floor squares the party has stood on at a tick's end, a bit each in
+   * `floorSquares`' order, in base 64; left out by a state kept before they were kept, as none.
+   */
+  readonly visited?: string;
 }
 
 /** An achievement unlocked, with the game's clock and the player's time then. */
@@ -102,6 +111,12 @@ export class AchievementTracker {
   readonly counts: DataCounts;
   private readonly defs: readonly AchievementDef[];
   private readonly miniDat: Uint8Array | null;
+  /** Each floor square's bit in `visited`, by `squareKey`. */
+  private readonly floors = new Map<number, number>();
+  private visited: Uint8Array;
+  private visitedCount = 0;
+  /** The level the party was on at the last tick's end, -1 before the first. */
+  private level = -1;
 
   /**
    * A tracker of `game`, for the achievements `defs` names, the objects named by
@@ -114,8 +129,12 @@ export class AchievementTracker {
     private readonly game: Game, defs: readonly AchievementDef[], private readonly objectNames: readonly string[],
     files: AchievementSetFiles,
   ) {
-    this.counts = dataCounts(game.ctx.tables, setDungeons(files));
+    const dungeons = setDungeons(files);
+    this.counts = dataCounts(game.ctx.tables, dungeons);
     this.defs = defs.map((def) => withCounts(def, this.counts));
+    const played = dungeons[dungeons.length - 1];
+    if (played) for (const square of floorSquares(played)) this.floors.set(squareKey(square.z, square.x, square.y), this.floors.size);
+    this.visited = new Uint8Array((this.floors.size + 7) >> 3);
     this.miniDat = files.miniDat;
     this.state = new AchievementState(this.defs, false);
   }
@@ -159,6 +178,11 @@ export class AchievementTracker {
     return this.state.snapshot().whole;
   }
 
+  /** The share of the dungeon's floor squares the history has stood on, in percent: `explored`. */
+  get explored(): number {
+    return this.floors.size === 0 ? 0 : Math.floor((this.visitedCount * 100) / this.floors.size);
+  }
+
   /** The player's time the history counts, in VBLs. */
   get playedVbls(): number {
     return this.state.snapshot().vbls + this.vbls;
@@ -170,7 +194,10 @@ export class AchievementTracker {
     this.vbls = 0;
     const party = (tags: Map<number, Side>): [number, number][] =>
       [...tags].filter(([, side]) => side.party).map(([rn, side]) => [rn, side.champion]);
-    return { v: 1, state: this.state.snapshot(), missiles: party(this.missiles), clouds: party(this.clouds), causes: [...this.causes] };
+    return {
+      v: 1, state: this.state.snapshot(), missiles: party(this.missiles), clouds: party(this.clouds), causes: [...this.causes],
+      level: this.level, visited: toBase64(this.visited),
+    };
   }
 
   /** The state kept for the save whose file has `md5`, if any. */
@@ -237,6 +264,11 @@ export class AchievementTracker {
     this.clouds.clear();
     this.causes = [null, null, null, null];
     this.vbls = 0;
+    this.level = kept?.level ?? -1;
+    const visited = kept?.visited !== undefined ? fromBase64(kept.visited) : null;
+    this.visited = visited?.length === this.visited.length ? visited : new Uint8Array(this.visited.length);
+    this.visitedCount = 0;
+    for (const byte of this.visited) for (let b = byte; b !== 0; b &= b - 1) this.visitedCount++;
     if (!kept) {
       this.state = new AchievementState(this.defs, whole);
       return;
@@ -270,9 +302,54 @@ export class AchievementTracker {
     this.state.sample('party', members);
     this.state.sample('alive', alive);
     this.state.sample('coins', coins);
+    this.where();
     this.state.setGameTime(ctx.state.tickCount);
     this.state.addVbls(this.vbls);
     this.vbls = 0;
+  }
+
+  /**
+   * Where the party stands at a tick's end: a level entered, and the one left with whether
+   * a monster is alive on it, and the floor square walked on. A party moved to another
+   * level in the tick's input stands there from the next tick, which loads the level
+   * (`Game.loadNewPartyLevel`): until then its square is the new level's, and its level
+   * the old one.
+   */
+  private where(): void {
+    const { ctx } = this.game;
+    if (ctx.loop.newPartyLevel !== -1) return;
+    const { x, y, z } = ctx.party.state.position;
+    if (z !== this.level) {
+      if (this.level >= 0) this.record('leave', { level: `${this.level}`, cleared: yesNo(!this.monsterOn(this.level)) });
+      this.record('enter', { level: `${z}` });
+      this.level = z;
+    }
+    const bit = this.floors.get(squareKey(z, x, y));
+    if (bit !== undefined && (this.visited[bit >> 3]! & (1 << (bit & 7))) === 0) {
+      this.visited[bit >> 3]! |= 1 << (bit & 7);
+      this.visitedCount++;
+    }
+    this.state.setExplored(this.explored);
+  }
+
+  /**
+   * Whether a monster is alive on `level`: a group on one of its squares, or one waiting
+   * to be put on one, which `CreateMovementTimer` parks on a `TT_60` or `TT_61` timer
+   * (`doc/CSBwin-src/Code11f52.cpp:2481`) until its square is free.
+   */
+  private monsterOn(level: number): boolean {
+    const { dungeon, timers } = this.game.ctx;
+    const map = dungeon.getMap(level);
+    if (map) {
+      for (let x = 0; x < map.descriptor.width; x++) {
+        for (let y = 0; y < map.descriptor.height; y++) {
+          if (dungeon.findFirstMonster(new Position(x, y, level)) !== OBJECT_ID_EOF) return true;
+        }
+      }
+    }
+    return timers.getTimers().some((timer) =>
+      (timer.function === TimerFunction.TT_60 || timer.function === TimerFunction.TT_61) && (timer.level & 0xff) === level
+      && timer.object !== undefined && dungeon.rnMaps.dbType(timer.object) === DBType.CREATURE);
   }
 
   private evaluate(): void {
@@ -382,4 +459,24 @@ export class AchievementTracker {
 
 function yesNo(b: boolean): string {
   return b ? 'yes' : 'no';
+}
+
+/** A square's key in `floors`. */
+function squareKey(z: number, x: number, y: number): number {
+  return (z << 16) | (x << 8) | y;
+}
+
+function toBase64(bytes: Uint8Array): string {
+  let text = '';
+  for (const byte of bytes) text += String.fromCharCode(byte);
+  return btoa(text);
+}
+
+/** `text`'s bytes, or `null` where it is no base 64. */
+function fromBase64(text: string): Uint8Array | null {
+  try {
+    return Uint8Array.from(atob(text), (c) => c.charCodeAt(0));
+  } catch {
+    return null;
+  }
 }

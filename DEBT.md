@@ -1214,9 +1214,9 @@ drawing a map from them is a separate item, entered when the author names it.
 
 ### X20 ⏸️ More achievements: the author's list
 
-The achievements are `src/engine/achievements/defs/common.txt`'s 42, three of them valued
-and three counted from the data,
-`dm-atari.txt`'s 9, which every Dungeon Master set reads, and `csb.txt`'s 2
+The achievements are `src/engine/achievements/defs/common.txt`'s 45, four of them valued
+and four counted from the data,
+`dm-atari.txt`'s 11, which every Dungeon Master set reads, and `csb.txt`'s 2
 (`doc/ACHIEVEMENTS.md`). The author
 chose the list below, which holds what is left to write. ✓ marks what the
 condition language expresses today; [needs …] names the event or sample the tracker must
@@ -1234,7 +1234,7 @@ extras: an achievement only watches the game.
      simply has fewer. A set's check reports a value its file defines that no
      achievement names, as it reports `unknownItems`. The format gains the `value` line,
      `{name}` in a text, and a named value in a duration's unit.
-  3. **Counted from the data**: `spells`, `foods` and `monsterTypes`, which the tracker
+  3. **Counted from the data**: `spells`, `foods`, `monsterTypes` and `levels`, which the tracker
      works out from the set's own files (`dataCounts`, `doc/ACHIEVEMENTS.md` → "Counted
      from the data").
 - **Each new trigger** is observed by the tracker (`doc/ACHIEVEMENTS.md` → "Watching the
@@ -1245,18 +1245,19 @@ extras: an achievement only watches the game.
   single recording proves one, so it is verified once the games it counts are.
 
 **The steps**, one commit each, each with its proof and `doc/ACHIEVEMENTS.md` rewritten to
-say what it built. Steps 1 to 4 are done: the sets' own files, every fixed achievement the
+say what it built. Steps 1 to 5 are done: the sets' own files, every fixed achievement the
 language expresses, Scrooge moved to Dungeon Master's; the valued (`value` lines,
 `{name}`, `unusedValues`), with Speed Runner, Blitz and Conscientious Objector at the
 author's numbers, 180 minutes, 60 minutes and 40 kills, in both `dm-atari.txt` and
 `csb.txt`; and a CSB adventure's history, the whole game's from the save a utility makes
 (`isNewAdventure`, `doc/ACHIEVEMENTS.md` → "A CSB adventure"), so every common
 achievement is CSB's too; and the counts of the data, with Rune Scholar, Gourmet and
-Bestiary. Solitary Confinement, CSB's Lone Wolf (`won and party = 1`,
+Bestiary; and where the party is, the `enter` and `leave` events, `levels`, `explored` and
+lists for values, with Tourist, Cartographer, Clean Sweep and Dungeon Master's Deep Diver
+and Express Elevator, at the author's choices: Clean Sweep counts DM's levels 1 to 12 and
+none of CSB's, Express Elevator 60 minutes. Solitary Confinement, CSB's Lone Wolf (`won and party = 1`,
 exact because the adventure recruits nobody), stays. What is left:
 
-5. **Where the party is.** The current level and the squares walked on, and a level left
-   with no monster alive: Tourist, Cartographer, Deep Diver, Express Elevator, Clean Sweep.
 6. **The champions' state.** Skill levels, what each wears, the sex, the load, sleep:
    Low Profile, Archmaster, Jack of All Trades, Speedy Gonzales, Shining Armour, Darc
    Knight, Girl Power, Featherweight, Insomniac.
@@ -1316,21 +1317,9 @@ stay common.
     `ok` is no for a meaningless spell and a skill failure alike. [why a cast failed]
   - **Blazing Glory Day** (weird): cast a fireball at full power, MON. [the power rune]
   - **Thick Atmosphere** (weird): cast a poison cloud at full power, MON. [the power rune]
-- Exploration:
-  - **Tourist** (easy): set foot on every level. [the current level]
-  - **Cartographer** (hard): walk on 90% of the floor squares. [the squares visited]
-
-**Common, valued.**
-
-- **Clean Sweep** (hard): leave a level with no monster alive on it, among the levels
-  the set lists (DM's would leave out the Hall of Champions and the Dragon's level).
-  [census]
 
 **Dungeon Master** (`dm-atari.txt`).
 
-- **Deep Diver** (easy): reach the deepest level. [the current level]
-- **Express Elevator** (hard): reach the deepest level within N minutes of play. [the
-  current level]
 - **Gullible** (silly): hand the Firestaff to Lord Librasulus and see the bad ending.
   [which ending]
 - **Some Assembly Required** (easy): join the Power Gem to the Firestaff. [objects
@@ -1371,7 +1360,6 @@ improve.
 | Trigger or sample | Achievements |
 | --- | --- |
 | Progress across games | Hall of Fame Tour, Every Ending, Grand Slam, Encore, Dungeon Janitor, HR Problem |
-| The current level, the squares visited | Tourist, Cartographer, Deep Diver, Express Elevator |
 | Skill levels | Low Profile, Archmaster, Jack of All Trades |
 | What each champion wears | Speedy Gonzales, Shining Armour, Darc Knight |
 | A lock or switch triggered | Riddle Me This, Corbum Courier, Coin-Operated |
@@ -1379,7 +1367,6 @@ improve.
 | The power rune on `cast` | Blazing Glory Day, Thick Atmosphere |
 | The damage dealt, which blow killed what | Overkill, Strike! |
 | Which ending | Gullible, Every Ending |
-| A census of the dungeon's monsters | Clean Sweep |
 | Where the party came from | Veterans, Fresh Faces |
 | The item held, an empty hand | Dark Ages (the torch), Bare Knuckles |
 | The champion's sex | Girl Power |

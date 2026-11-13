@@ -23,7 +23,7 @@ import { DungeonLoader } from '../../data/DungeonLoader';
 import type { CreatureRecord, DungeonData } from '../../data/dungeonTypes';
 import { monsterInvincible, monsterLeavesDroppings } from '../../data/tables/MonsterDesc';
 import { OBJNI_APPLE, OBJNI_DRAGON_STEAK } from '../../core/objectNameIndex';
-import { DBType, RoomType } from '../../core/types';
+import { DBType, getRoomType, RoomType } from '../../core/types';
 import { forEachObject } from '../DungeonCensus';
 import type { GameTables } from '../GameTables';
 import { DROPPING_MISC_BASE, MONSTER_DROPPINGS_INDEX } from '../MonsterDamage';
@@ -70,6 +70,9 @@ export function setDungeons(files: AchievementSetFiles): DungeonData[] {
  *   `_FeedCharacter` chews) among the objects the dungeons hold, and among the droppings
  *   of those monster types (`CreateAndDropObject`, `doc/CSBwin-src/Code11f52.cpp:735-788`):
  *   a worm's worm rounds, a dragon's steaks.
+ * - `levels`: the maps of the dungeon the game is played in, the last of `dungeons`, that
+ *   hold a floor square (`floorSquares`): Chaos Strikes Back's adventure has eleven maps,
+ *   and the last is a single square of stone.
  */
 export function dataCounts(tables: CountTables, dungeons: readonly DungeonData[]): DataCounts {
   const spells = new Set(tables.spells.filter((spell) => spell.spellId !== 0).map((spell) => spell.spellId & 0xffffff));
@@ -108,5 +111,31 @@ export function dataCounts(tables: CountTables, dungeons: readonly DungeonData[]
       if (isFood(nameIndex)) foods.add(nameIndex);
     }
   }
-  return { spells: spells.size, foods: foods.size, monsterTypes: types.size };
+  const played = dungeons[dungeons.length - 1];
+  const levels = played ? new Set(floorSquares(played).map((square) => square.z)).size : 0;
+  return { spells: spells.size, foods: foods.size, monsterTypes: types.size, levels };
+}
+
+/** A square of a map: its map, its column and its row. */
+export interface Square {
+  readonly z: number;
+  readonly x: number;
+  readonly y: number;
+}
+
+/**
+ * The floor squares of `data`, map by map, column by column: those of type `OPEN`, a
+ * corridor, as the dungeon begins. The other squares the party may stand on are left out:
+ * a door's, a closed pit, a teleporter switched off and a false wall open.
+ */
+export function floorSquares(data: DungeonData): Square[] {
+  const out: Square[] = [];
+  data.maps.forEach((map, z) => {
+    for (let x = 0; x < map.descriptor.width; x++) {
+      for (let y = 0; y < map.descriptor.height; y++) {
+        if (getRoomType(map.cellFlags[x]?.[y] ?? 0) === RoomType.OPEN) out.push({ z, x, y });
+      }
+    }
+  });
+  return out;
 }

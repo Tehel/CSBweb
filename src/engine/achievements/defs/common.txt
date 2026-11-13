@@ -257,6 +257,22 @@ text: Kill a monster of every kind the dungeon holds.
 tier: hard
 when: monsterTypes > 0 and distinct(kill.monster where party = yes and not by = fusion) >= monsterTypes
 
+# Where the party is: the level it stands on at each tick's end. levels counts the maps of
+# the dungeon that hold a floor, a corridor square; explored is the share of those squares
+# the party has stood on, in percent (doc/ACHIEVEMENTS.md -> "The events").
+
+[tourist]
+name: Tourist
+text: Set foot on every level of the dungeon.
+tier: easy
+when: levels > 0 and distinct(enter.level) >= levels
+
+[cartographer]
+name: Cartographer
+text: Walk on 90% of the dungeon's floor.
+tier: hard
+when: explored >= 90
+
 # The valued: a set without the value in its own file has no such achievement.
 
 [speed-runner]
@@ -278,3 +294,12 @@ name: Conscientious Objector
 text: Win having killed no more than {objectorKills} monsters.
 tier: hard
 when: won and count(kill where party = yes) <= {objectorKills}
+
+# cleanSweepLevels: the levels worth sweeping, a list; a monster that no blow kills, such
+# as Lord Chaos, keeps his level from ever being swept.
+
+[clean-sweep]
+name: Clean Sweep
+text: Leave a level with no monster alive on it.
+tier: hard
+when: ever(leave where cleared = yes and level in {cleanSweepLevels})

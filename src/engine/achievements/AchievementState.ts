@@ -44,6 +44,7 @@ export class AchievementState {
   private readonly samples: Partial<Record<SampleName, number>> = {};
   private vbls = 0;
   private gameTime = 0;
+  private explored = 0;
   private end: 'won' | 'lost' | null = null;
   private changed = true;
 
@@ -144,6 +145,13 @@ export class AchievementState {
     this.changed = true;
   }
 
+  /** The share of the dungeon's floor squares the party has stood on, in percent. */
+  setExplored(percent: number): void {
+    if (percent === this.explored) return;
+    this.explored = percent;
+    this.changed = true;
+  }
+
   /** The game has ended. */
   ended(won: boolean): void {
     this.end = won ? 'won' : 'lost';
@@ -216,6 +224,7 @@ export class AchievementState {
       case 'ended': return this.end !== null ? 1 : 0;
       case 'gameTime': return this.gameTime;
       case 'playTime': return Math.floor(this.vbls / VBLS_PER_SECOND);
+      case 'explored': return this.explored;
     }
   }
 

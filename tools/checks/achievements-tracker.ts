@@ -28,6 +28,13 @@
  * 5. The tracker reads its set's counts of the data (`dataCounts`), and Rune Scholar,
  *    Gourmet and Bestiary unlock exactly where the game's distinct spells cast, foods eaten
  *    and types killed reach them.
+ * 6. Where the party is: each history enters its first level once, and a level after it
+ *    only by leaving the one before, a join's read taking up the level and the floor its
+ *    parent had at the save, so it enters nothing again and walks on from the share
+ *    explored. Tourist unlocks exactly where the levels entered reach the set's. DMMovie2615
+ *    leaves the Hall of Champions, which holds no monster, cleared, and the Dragon's level,
+ *    the Dragon alive, not; it reaches level 13 in less than an hour: Deep Diver and
+ *    Express Elevator, at the tick it enters.
  *
  * Usage: npm test -- --only=achievements-tracker.ts [<package name>…] [--not=<name>] [--events]
  */
@@ -86,8 +93,8 @@ function defsOf(setId: string): AchievementDef[] {
 
 /** The counts of the data (`dataCounts`) the FTL sets' games read, as `achievements-format.ts` proves them. */
 const COUNTS: Readonly<Record<string, DataCounts>> = {
-  'dm-atari': { spells: 25, foods: 8, monsterTypes: 24 },
-  csb: { spells: 25, foods: 8, monsterTypes: 23 },
+  'dm-atari': { spells: 25, foods: 8, monsterTypes: 24, levels: 14 },
+  csb: { spells: 25, foods: 8, monsterTypes: 23, levels: 10 },
 };
 
 const args = process.argv.slice(2);
@@ -114,6 +121,10 @@ for (const file of corpusFiles()) {
   }
   const set = DATA_SETS.find((candidate) => candidate.id === found.id)!;
   const events: AchievementEvent[] = [];
+  /** `d.Time` at each event. */
+  const times: number[] = [];
+  /** The share explored before each join's read, and after it. */
+  const joinsExplored: [number, number][] = [];
   let tracker!: AchievementTracker;
   let restored = 0;
   let carryLocation: readonly number[] = [];
@@ -123,14 +134,16 @@ for (const file of corpusFiles()) {
   const startedAt = Date.now();
   const played = await playPath(set, diskFiles(set), pkg.path, pkg.shared.kind === 'save' ? pkg.shared : null, null, null, (page) => {
     tracker = new AchievementTracker(page.game, defsOf(set.id), page.screen.ui.objectTables.objectNames, { dungeonDat: page.dungeonDat, miniDat });
-    tracker.onEvent((event) => events.push(event));
+    tracker.onEvent((event) => { events.push(event); times.push(page.game.ctx.state.tickCount); });
     tracker.attach();
     carryLocation = Array.from(page.game.ctx.tables.carryLocation);
     const host = page.game.ctx.host;
     const observe = host.observe;
     host.observe = (h: Happening) => {
+      const before = tracker.explored;
       if (h.k === 'read' && tracker.snapshotOf(fileDigest(h.file))) restored++;
       observe(h);
+      if (h.k === 'read' && tracker.snapshotOf(fileDigest(h.file))) joinsExplored.push([before, tracker.explored]);
     };
   });
   const seconds = ((Date.now() - startedAt) / 1000).toFixed(1);
@@ -166,6 +179,21 @@ for (const file of corpusFiles()) {
   for (const [id, name] of [['rune-scholar', 'spells'], ['gourmet', 'foods'], ['bestiary', 'monsterTypes']] as const) {
     check(unlocked.has(id) === (reached[name] >= counts[name]), `${file}: ${id} ${unlocked.has(id) ? 'unlocks' : 'stays locked'}, ${reached[name]} of ${counts[name]}`);
   }
+
+  // 6. Where the party is.
+  const levels = events.filter((e) => e.kind === 'enter' || e.kind === 'leave');
+  const entered = new Set(events.filter((e) => e.kind === 'enter').map((e) => e.attrs.level));
+  console.log(`  levels entered ${[...entered].join(' ')} of ${counts.levels}, explored ${tracker.explored}%`);
+  let alternates = levels.length > 0 && levels[0]!.kind === 'enter';
+  for (let i = 1; i < levels.length; i++) {
+    const [prev, e] = [levels[i - 1]!, levels[i]!];
+    if (e.kind === prev.kind || (e.kind === 'leave' && e.attrs.level !== prev.attrs.level)) alternates = false;
+  }
+  check(alternates, `${file}: its history enters a level, then leaves that one before it enters the next`);
+  check(joinsExplored.length === played.joins && joinsExplored.every(([before, after]) => after <= before),
+    `${file}: each join's read takes up the share its parent explored (${joinsExplored.map(([b, a]) => `${b}% then ${a}%`).join(', ')})`);
+  check(unlocked.has('tourist') === (entered.size >= counts.levels), `${file}: tourist ${unlocked.has('tourist') ? 'unlocks' : 'stays locked'}, ${entered.size} of ${counts.levels} levels`);
+  if (played.joins > 0) check(count(events, 'enter') === 1, `${file}: its joins enter no level again: their reads take up the level the party was on`);
 
   // 4. The worn places, once.
   if (!wornChecked) {
@@ -206,6 +234,23 @@ for (const file of corpusFiles()) {
     for (const id of ['lone-wolf', 'buddy-cop', 'exterminator', 't-lost', 'untouchable', 'full-house', 'new-souls', 'dragonslayer', 'brute-force']) {
       check(!unlocked.has(id), `DMMovie2615 does not unlock ${id}`);
     }
+    check(entered.size === 14, 'DMMovie2615 enters every level, 0 to 13');
+    check(count(events, 'leave', { level: '0', cleared: 'yes' }) === 1, 'DMMovie2615 leaves the Hall of Champions, which holds no monster, cleared');
+    check(count(events, 'leave', { level: '13', cleared: 'no' }) === 1, 'DMMovie2615 leaves the Dragon\'s level with the Dragon alive');
+    const deepest = events.findIndex((e) => e.kind === 'enter' && e.attrs.level === '13');
+    const at = (id: string): number | undefined => tracker.unlocks.find((u) => u.id === id)?.gameTime;
+    check(['tourist', 'deep-diver', 'express-elevator'].every((id) => at(id) === times[deepest]),
+      `DMMovie2615: Tourist, Deep Diver and Express Elevator unlock at d.Time ${times[deepest]}, as the party enters level 13`);
+    check(!unlocked.has('clean-sweep') && !unlocked.has('cartographer'), 'DMMovie2615 sweeps no listed level and walks on less than 90% of the floor');
+    // Its state kept at a save and read back: the floor walked and the level come back with it.
+    const file = new Uint8Array([2, 6, 1, 5]);
+    const explored = tracker.explored;
+    const before = events.length;
+    tracker.keep(fileDigest(file), JSON.parse(JSON.stringify(tracker.snapshot())) as ReturnType<AchievementTracker['snapshot']>);
+    tracker.observe({ k: 'read', file });
+    tracker.observe({ k: 'tick' });
+    check(explored > 0 && tracker.explored === explored && events.length === before,
+      `DMMovie2615: a state kept and read back keeps the ${explored}% of the floor walked on, and the level, entered again by nothing`);
     const playVbls = Math.round(played.game.playTime() * 60 / 1000);
     check(Math.abs(tracker.playedVbls - playVbls) <= 1, `DMMovie2615: the play time counted is the game's, ${tracker.playedVbls} VBLs (${playVbls})`);
   }
@@ -221,6 +266,8 @@ for (const file of corpusFiles()) {
       `CSBFullRecordingV4: Speed Runner, which needs the whole game, unlocks in a game from the adventure's start, and Blitz does not (${Math.round(tracker.playedVbls / 3600)} minutes)`);
     check(count(events, 'hurt', { party: 'yes' }) > 0, 'CSBFullRecordingV4: the party hurts itself');
     check(unlocked.has('gourmet') && !unlocked.has('bestiary'), 'CSBFullRecordingV4: the party eats all eight kinds of food (Gourmet), and kills 22 of the 23 types');
+    check(unlocked.has('tourist') && count(events, 'leave', { cleared: 'yes' }) > 0 && !unlocked.has('clean-sweep'),
+      'CSBFullRecordingV4 sets foot on every level, and leaves some with no monster alive, though CSB lists no level to sweep');
   }
 }
 if (!wornChecked) check(false, 'a package was played');
