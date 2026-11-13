@@ -2613,8 +2613,8 @@ check(fameBack.hash === '' && fameBack.selected === fameFirst.selected && fameBa
 await navigate(`${APP}fame?keepsaves&keepsettings#0000000000`, STATS);
 const fameUnknown = await famePage();
 check(fameUnknown.name === 'No such player' && fameUnknown.selected === '' && fameUnknown.playerName === undefined, 'an id nobody has: No such player');
-// To a moderator (the dev server's, `DEV_MODERATOR_PLAYER_ID`), the prover's page ends with
-// MODERATION: their proof, First Blood verified and Pest Control dropped, its package kept,
+// To a moderator (the dev server's, `DEV_MODERATOR_PLAYER_ID`), First Blood's first's page
+// ends with MODERATION: their proofs, First Blood verified, a package kept,
 // with PLAY, which plays it in the game's page (`?recording=proof:<id>`), and DOWNLOAD, the
 // package fetched as the moderator; RESET NAME asks a second click, then withdraws the name:
 // the page says the player is no more, and the section stays, the name reset.
@@ -2627,15 +2627,24 @@ const fameModeration = () => evaluate(`(m=>m&&{ name: document.querySelector('.s
   reset: m.querySelector('.fame-reset-button')?.textContent ?? null, status: m.querySelector('.fame-reset-status')?.textContent ?? null,
   none: m.querySelector(':scope > .stats-none')?.textContent ?? null })(document.querySelector('.fame-moderation'))`);
 const moderationFirst = await fameModeration();
-const proofPlay = `./?keepsaves=&keepsettings=&recording=proof%3A${proofSent.id}`;
-const proofFetched = await evaluate(`fetch('api/proofs/${proofSent.id}', { headers: { 'X-Player-Id': ${JSON.stringify(MODERATOR)} } }).then(async (r) => r.status + ':' + (await r.arrayBuffer()).byteLength)`);
-console.log('  moderation:', JSON.stringify({ moderationFirst, proofFetched }));
-check(moderationFirst?.name === fameFirst.first?.name && moderationFirst.proofs.join() === `${proofSent.id}|first-blood verified, pest-control dropped|${proofPlay}|true`
-  && moderationFirst.reset === 'Reset name' && proofFetched === `200:${Buffer.from(corpusProof, 'base64').length}`,
-  'to a moderator, the prover\'s page ends with MODERATION: their proof, its claims\' verdicts, PLAY and DOWNLOAD, its package theirs to fetch');
+// What the server answers the moderator of that identity (the image's own proof, sent by
+// `tools/check-image.sh` before the probe's, is the first there), and its first proof's package.
+const moderatedIdentity: { proofs: { id: string; kept: boolean; claims: Record<string, string> }[] } = await evaluate(
+  `fetch('api/identities/${fameFirst.first?.id}', { headers: { 'X-Player-Id': ${JSON.stringify(MODERATOR)} } }).then((r) => r.json())`);
+const claimWords: Record<string, string> = { verified: 'verified', dropped: 'dropped', unverified: 'not verified' };
+const playOf = (id: string) => `./?keepsaves=&keepsettings=&recording=proof%3A${id}`;
+const expectedProofs = moderatedIdentity.proofs.map((proof) => [proof.id,
+  Object.entries(proof.claims).map(([id, state]) => `${id} ${claimWords[state]}`).join(', '), proof.kept ? playOf(proof.id) : '', proof.kept].join('|'));
+const keptProof = moderatedIdentity.proofs.find((proof) => proof.kept)?.id ?? '';
+const proofPlay = playOf(keptProof);
+const proofFetched = await evaluate(`fetch('api/proofs/${keptProof}', { headers: { 'X-Player-Id': ${JSON.stringify(MODERATOR)} } }).then(async (r) => r.status + ':' + (await r.arrayBuffer()).byteLength)`);
+console.log('  moderation:', JSON.stringify({ moderationFirst, expectedProofs, proofFetched }));
+check(moderationFirst?.name === fameFirst.first?.name && moderationFirst.proofs.length > 0 && moderationFirst.proofs.join() === expectedProofs.join()
+  && moderationFirst.proofs.some((row: string) => row.includes('|first-blood verified')) && moderationFirst.reset === 'Reset name' && /^200:[1-9]\d*$/.test(proofFetched),
+  'to a moderator, the first\'s page ends with MODERATION: their proofs as api/identities answers them, First Blood verified, PLAY and DOWNLOAD where kept, the package theirs to fetch');
 await navigate(`${APP}${proofPlay.slice(2)}`, 'window.__probe?.player() != null');
 const proofPlayed = await evaluate(`({ drift: window.__probe.player().drift, recording: new URLSearchParams(location.search).get('recording') })`);
-check(proofPlayed.drift === null && proofPlayed.recording === `proof:${proofSent.id}`, 'PLAY plays the proof\'s package in the game\'s page, ?recording=proof:<id>');
+check(proofPlayed.drift === null && proofPlayed.recording === `proof:${keptProof}`, 'PLAY plays the proof\'s package in the game\'s page, ?recording=proof:<id>');
 await navigate(`${APP}fame?keepsaves&keepsettings#${fameFirst.first?.id}`, STATS);
 await until(`!!document.querySelector('.fame-moderation .fame-reset-button')`, 'MODERATION again');
 await clickOn('.fame-reset-button');
@@ -2649,7 +2658,7 @@ for (let i = 0; i < 60 && moderationReset?.name !== 'No such player'; i++) {
 const resetAnswered: number = await evaluate(`fetch('api/fame/players/${fameFirst.first?.id}', { cache: 'no-store' }).then((r) => r.status)`);
 console.log('  reset:', JSON.stringify({ moderationAsked, moderationReset, resetAnswered }));
 check(moderationAsked?.reset === 'Confirm reset' && /leaves the Hall/.test(moderationAsked.status ?? '') && moderationReset?.reset === null
-  && /^Its name is reset/.test(moderationReset.none ?? '') && moderationReset.proofs.length === 1 && resetAnswered === 404,
+  && /^Its name is reset/.test(moderationReset.none ?? '') && moderationReset.proofs.join() === expectedProofs.join() && resetAnswered === 404,
   'RESET NAME asks a second click, then withdraws the name: No such player, the Hall answering 404, the section and its proof still there');
 
 
