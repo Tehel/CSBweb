@@ -113,7 +113,11 @@ At the author's request, beside the debt. The design is `doc/ACHIEVEMENTS.md`.
      designer to write `achievements.txt`, with many examples, which the author uploads
      to the instance's shared files and serves under `files/`, as `training.html`,
      `monster-behaviour.html` and `luck.html` are (the author's choice): inline styles
-     and `data:` images, no script (`FILES_POLICY`, `server/app.ts`). A check reads each
+     and `data:` images, no script (`FILES_POLICY`, `server/app.ts`). Its look is theirs,
+     not the welcome page's: their sources are `doc/training.html`, `doc/luck.html`,
+     `doc/monster-behaviour.html` and `doc/dm-versions.html` (the `:root` tokens, the serif
+     and the measure, light and dark), and their voice
+     (`.claude/memory/public-pages-voice.md`). A check reads each
      of its examples with the file's reader, so that the guide cannot drift from the
      format; the form and the book link to it.
   The format is frozen once 18.7 ships, the guide published: later work may add to the
