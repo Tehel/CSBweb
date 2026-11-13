@@ -43,17 +43,20 @@ const DAMAGE_CAUSES = enumOf(
   'poison', 'starvation', 'thirst', 'fatigue', 'potion',
 );
 
+/** What hit or killed a monster. */
+const BLOWS = enumOf('melee', 'spell', 'throw', 'explosion', 'cloud', 'door', 'pit', 'fusion', 'landing');
+
+/** The `item` of a melee blow struck with an empty hand. */
+export const EMPTY_HAND = 'HAND';
+/** The `item` drunk at a fountain. */
+export const FOUNTAIN = 'FOUNTAIN';
+
 /** The events and their attributes (`doc/ACHIEVEMENTS.md` → "The events"). */
 export const EVENTS = {
-  kill: {
-    monster: NAME,
-    by: enumOf('melee', 'spell', 'throw', 'explosion', 'cloud', 'door', 'pit', 'fusion'),
-    item: NAME,
-    champion: NAME,
-    party: YESNO,
-  },
+  kill: { monster: NAME, by: BLOWS, item: NAME, champion: NAME, party: YESNO, group: NUMBER },
+  hit: { monster: NAME, by: BLOWS, item: NAME, champion: NAME, party: YESNO, damage: NUMBER },
   hurt: { champion: NAME, by: DAMAGE_CAUSES, party: YESNO },
-  death: { champion: NAME, cause: DAMAGE_CAUSES },
+  death: { champion: NAME, cause: DAMAGE_CAUSES, party: YESNO },
   eat: { champion: NAME, item: NAME },
   drink: { champion: NAME, item: NAME },
   cast: {
@@ -101,6 +104,9 @@ export const CHAMPION_ATTRIBUTES = {
 
 /** The attributes that name an object, which `unknownItems` checks: an event's and a champion's. */
 const ITEM_ATTRIBUTES: ReadonlySet<string> = new Set(['item', 'head', 'neck', 'torso', 'legs', 'feet', 'ready', 'action']);
+
+/** The `item`s that are no object, and no set's objects need to have. */
+const NOT_OBJECTS: ReadonlySet<string> = new Set([EMPTY_HAND, FOUNTAIN]);
 
 /**
  * The counts of the set's own files (`DataCounts`, `dataCounts`), which a condition reads by
@@ -445,11 +451,12 @@ export function unusedValues(own: AchievementFile, merged: readonly AchievementD
  */
 export function unknownItems(def: AchievementDef, items: ReadonlySet<string>): string[] {
   const out = new Set<string>();
+  const known = (name: string): boolean => items.has(name) || NOT_OBJECTS.has(name.toUpperCase());
   const filter = (f: Filter | null): void => {
     if (f === null) return;
     switch (f.k) {
-      case 'cmp': if (ITEM_ATTRIBUTES.has(f.attr) && !items.has(f.value)) out.add(f.value); return;
-      case 'in': if (ITEM_ATTRIBUTES.has(f.attr)) for (const v of f.values) if (!items.has(v)) out.add(v); return;
+      case 'cmp': if (ITEM_ATTRIBUTES.has(f.attr) && !known(f.value)) out.add(f.value); return;
+      case 'in': if (ITEM_ATTRIBUTES.has(f.attr)) for (const v of f.values) if (!known(v)) out.add(v); return;
       case 'like': return;
       case 'and': case 'or': filter(f.a); filter(f.b); return;
       case 'not': filter(f.a); return;

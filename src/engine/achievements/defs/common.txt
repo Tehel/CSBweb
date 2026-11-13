@@ -353,6 +353,40 @@ tier: hard
 when: won and never(cast where ok = yes and spell in (FUL, "OH IR RA"))
       and max(party(where ready = TORCH or action = TORCH)) = 0
 
+# The blows: the damage each hit deals a monster, how many of its group a blow or a
+# fireball has killed (group), an empty hand (HAND), a group the party lands on (landing),
+# and whose blow killed a champion.
+
+[overkill]
+name: Overkill
+text: Deal 100 damage or more to a monster in one blow.
+tier: hard
+when: ever(hit where party = yes and damage >= 100)
+
+[strike]
+name: Strike!
+text: Wipe out a whole group of four with one blow or one fireball.
+tier: weird
+when: ever(kill where party = yes and group = 4 and by != landing)
+
+[bare-knuckles]
+name: Bare Knuckles
+text: Kill 100 monsters with an empty hand.
+tier: hard
+when: count(kill where party = yes and by = melee and item = HAND) >= 100
+
+[telefrag]
+name: Telefrag
+text: Kill a monster by teleporting or falling onto it.
+tier: weird
+when: ever(kill where by = landing)
+
+[friendly-fire-fatality]
+name: Friendly Fire Fatality
+text: Let the party's own spell or missile kill a champion.
+tier: silly
+when: ever(death where party = yes)
+
 # The valued: a set without the value in its own file has no such achievement.
 
 [speed-runner]

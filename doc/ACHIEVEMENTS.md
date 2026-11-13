@@ -165,9 +165,10 @@ number for a `level`. Names compare without regard to case.
 
 | Event | When | Attributes |
 | --- | --- | --- |
-| `kill` | a monster dies | `monster`, `by`: `melee` `spell` `throw` `explosion` `cloud` `door` `pit` `fusion`; `item`, the object thrown or swung, or the bomb whose explosion killed; `champion`, who struck; `party`: `yes` when the party's own blow, spell or throw killed it |
+| `kill` | a monster dies | `monster`, `by`: `melee` `spell` `throw` `explosion` `cloud` `door` `pit` `fusion` `landing`, the party arriving on its group; `item`, the object thrown or swung, `HAND` for a melee blow with an empty hand, or the bomb whose explosion killed; `champion`, who struck; `party`: `yes` when the party's own blow, spell, throw or arrival killed it; `group`, how many of its group the strike has killed, this one included, so 4 is a whole group of four |
+| `hit` | a blow deals a monster damage, a kill or not | as `kill`'s, but `group`; `damage`, what `DamageMonster` takes off |
 | `hurt` | a champion takes damage | `champion`; `by`: `monster` `missile` `explosion` `cloud` `door` `pit` `wall` `poison` `starvation` `thirst` `fatigue` `potion`; `party`: `yes` when it came from the party's own missile or spell |
-| `death` | a champion dies | `champion`; `cause`, as `hurt`'s `by`: the last damage the champion took |
+| `death` | a champion dies | `champion`; `cause`, as `hurt`'s `by`: the last damage the champion took; `party`, as that damage's |
 | `eat` | a champion eats | `champion`, `item` |
 | `drink` | a champion drinks, a potion or water, or from a fountain | `champion`, `item` (`FOUNTAIN` for a fountain) |
 | `cast` | a champion casts a spell | `champion`; `spell`, its runes after the power rune, such as `"FUL IR"`; `power`, the power rune: `LO` `UM` `ON` `EE` `PAL` `MON`; `ok`: `yes` when the spell worked; `why`, for a cast the game said failed: `meaningless`, runes that make no spell, `practice`, a skill too low, `flask`, a potion with no empty flask in hand |
@@ -178,7 +179,7 @@ number for a `level`. Names compare without regard to case.
 | `sleep` | the party lies down to sleep | none |
 
 An `item` is the object's name as the game shows it (`RN::NameIndex`), from the set's own
-`graphics.dat`.
+`graphics.dat`, or one of the two words no object is, `HAND` and `FOUNTAIN`.
 A name that a set's objects do not have matches nothing. The common file names FTL's
 objects, so in a set that renamed one of them, that name simply matches nothing. In a set's
 own file, such a name is an error, which the set's check reports (`unknownItems`).
@@ -325,21 +326,32 @@ whole replay corpus with the tracker attached, and every package plays to its po
   or a lightning bolt as its cloud appears (`createCloud`), a poison or dispel cloud's
   tick (`TimerSystem`'s `TT_25`), a door closing (`TT_DOOR`), a pit (`WorldMove`), a wall
   run into (`MovementSystem`), a monster's blow (`MonsterAttack`), poison
-  (`poisonCharacter`), a potion that takes health off (`applyFeedParameters`), and Lord
-  Chaos fused (`_FusionSequence`, his type as the sequence finds him: it flips it to the
+  (`poisonCharacter`), a potion that takes health off (`applyFeedParameters`), the party
+  landing on a group (`WorldMove`), and Lord Chaos fused (`_FusionSequence`, his type as the sequence finds him: it flips it to the
   mon_25 graphic and back before the Grey Lord).
 - **The stamina's damage** (`adjustStamina`) is starvation while the champion's food is
   below −512, else thirst while the water is, else fatigue: the thresholds below which
   `TenSecondUpdate` takes stamina for them (`doc/CSBwin-src/Code17818.cpp:289`, `:313`).
+- **A monster is hit** where `DamageMonster` takes a positive damage off a member a blow
+  can hurt, not an invincible type's nor an invulnerable member's: the damage it was given,
+  whether the member survives it or not.
 - **A monster dies** where `DamageMonster` finds a member's death, whether the group is
   removed then or by the move it was hurt in (`apply` false): once a member. A member at
   0 HP that `ProcessTimers29to41` removes (`MonsterAI`) dies inside no blow, and is
-  nobody's kill. `DeleteMonster` and `DeleteMonsterInGroup` alone kill nobody: a group
-  the party lands on, the monsters Fusion clears from the level, a DSA's, a full
-  database's.
+  nobody's kill. The group the party lands on, which `MoveObject` deletes where the party
+  arrives (`doc/CSBwin-src/Code11f52.cpp:3333-3343`, `WorldMove.moveParty`), dies whole in a
+  blow of the party's, `landing`: a death each member. `DeleteMonster` and
+  `DeleteMonsterInGroup` alone kill nobody else: the monsters Fusion clears from the
+  level, a DSA's, a full database's.
+- **A strike** is an outermost blow, with the blows after it in the same tick of the
+  same missile: a missile's meeting with a group and its explosion, whose blast is a blow
+  inside it, are one strike, a fireball's. A kill's `group` counts the members of its
+  group, by the square it stands on, that the strike has killed; a kill outside any blow
+  is 1.
 - **A champion is hurt** where `DamageCharacter` adds to the pending damage, and **dies**
   at `KillCharacter`. The damage is pending till the tick's `DisplayCharacterDamage`, so
-  the tracker keeps each champion's last cause, and a death outside any blow takes it.
+  the tracker keeps each champion's last cause and whether it was the party's, and a
+  death outside any blow takes both.
 - **The meals** are at `handleMouthPress`: a meal chewed is eaten, a waterskin's or a
   potion drunk. Drinking at a fountain (an extra) is `FOUNTAIN`. The stand-in page runs
   that code in a replay too.
@@ -453,7 +465,15 @@ first tick's end after he puts them on, the first Master and the first load over
 the tick the tool reads them itself, and Low Profile, Archmaster, Jack of All Trades,
 Featherweight and Insomniac as the games' ranks, loads and sleeps say: DMMovie2615 wins
 with no champion above Journeyman, so Low Profile, and sleeps nine times; the whole CSB
-game's party reads as no man, CSBWin's utility having cleared the flag.
+game's party reads as no man, CSBWin's utility having cleared the flag. And the blows: a
+hit for each `DamageMonster` call that hurt or killed, its damage the call's, a kill's
+`group` one more than the kill before it in its strike, a melee kill naming `HAND` exactly
+where the action hand was empty, and a death the party's exactly where the champion's last
+hurt was. Dungeon Master's wins deal blows of 140 and 173 (Overkill), and DMMovie2615's
+fireballs wipe out two groups of four (Strike!). No recording lands on a group nor loses a
+champion to the party, so the tool puts a new game's party on a group of four mummies,
+four kills by landing (Telefrag), and lets a champion its explosion hurt die after a save
+kept and read back (Friendly Fire Fatality).
 `tools/checks/achievements-format.ts` reads each file, checks its names against its set's
 `graphics.dat` and its values against its achievements, counts the FTL sets' data, and
 plays the conditions out of made-up events and champions, the named values, the lists and

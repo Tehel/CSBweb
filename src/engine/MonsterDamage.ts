@@ -505,6 +505,9 @@ export class MonsterDamage {
 
     const hp = monster.hp[indexInGroup] ?? 0;
     if (hp === HP_INVULNERABLE) return MonsterDamageResult.NO_MONSTER_DIED;
+    if (damage > 0 && this.ctx.host.observing) {
+      this.ctx.host.observe({ k: 'monster-hit', type: monster.creatureType, damage });
+    }
 
     if (hp > damage) {
       // Survived. CSBWin only writes back for positive damage, so a zero-damage
@@ -515,7 +518,9 @@ export class MonsterDamage {
 
     // This member has died.
     if (this.ctx.host.observing) {
-      this.ctx.host.observe({ k: 'monster-died', type: monster.creatureType, alternateGraphics: monster.alternateGraphics });
+      this.ctx.host.observe({
+        k: 'monster-died', type: monster.creatureType, alternateGraphics: monster.alternateGraphics, level, x: attackX, y: attackY,
+      });
     }
     const positions = this.monsterPositionByte(monster, level, noItem16);
     const deadPosition = positions === 255 ? 255 : (positions >> (2 * indexInGroup)) & 0x3;

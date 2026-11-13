@@ -33,7 +33,7 @@ import type { Blow, BlowCause, Happening } from '../Happening';
 import { NameIndex } from '../objectIndex';
 import { isAlive } from '../rules';
 import { AchievementState, type AchievementEvent, type AchievementSnapshot } from './AchievementState';
-import { withCounts, type AchievementDef, type DataCounts, type EventKind } from './AchievementFile';
+import { EMPTY_HAND, FOUNTAIN, withCounts, type AchievementDef, type DataCounts, type EventKind } from './AchievementFile';
 import { dataCounts, floorSquares, setDungeons, type AchievementSetFiles } from './DataCounts';
 import { TimerFunction } from '../TimerQueue';
 
@@ -76,9 +76,12 @@ const CLASSES = ['fighter', 'ninja', 'priest', 'wizard'] as const;
  */
 const ARCHMASTER_MASTERY = 16;
 
-/** What `kill`'s `by` and `hurt`'s are, for each blow's cause; a missile's is the kill's `throw` or `spell`. */
+/**
+ * What `kill`'s and `hit`'s `by` and `hurt`'s are, for each blow's cause; a missile's is the
+ * kill's `throw` or `spell`.
+ */
 const KILL_BY: Partial<Record<BlowCause, string>> = {
-  melee: 'melee', explosion: 'explosion', cloud: 'cloud', door: 'door', pit: 'pit', fusion: 'fusion',
+  melee: 'melee', explosion: 'explosion', cloud: 'cloud', door: 'door', pit: 'pit', fusion: 'fusion', landing: 'landing',
 };
 const HURT_BY: Partial<Record<BlowCause, string>> = {
   monster: 'monster', missile: 'missile', explosion: 'explosion', cloud: 'cloud', door: 'door', pit: 'pit',
@@ -101,6 +104,11 @@ export interface TrackerSnapshot {
   readonly clouds: readonly (readonly [number, number])[];
   /** Each champion's last damage, by party slot, which a death pending names. */
   readonly causes: readonly (string | null)[];
+  /**
+   * Whether each champion's last damage was the party's, by party slot, which a death
+   * pending says; left out by a state kept before it was kept, as none.
+   */
+  readonly sides?: readonly boolean[];
   /** The level the party was on at the last tick's end; left out by a state kept before it was kept, as none. */
   readonly level?: number;
   /**
@@ -123,7 +131,15 @@ export class AchievementTracker {
   private readonly missiles = new Map<number, Side>();
   private readonly clouds = new Map<number, Side>();
   private causes: (string | null)[] = [null, null, null, null];
+  private sides: boolean[] = [false, false, false, false];
   private readonly blows: Blow[] = [];
+  /**
+   * The kills of the strike under way, by the square of the group (`squareKey`): an
+   * outermost blow's, and the blows after it, in the same tick, of the same missile, its
+   * meeting and its explosion. `strikeMissile` is that missile, `null` for a strike of none.
+   */
+  private readonly strikeKills = new Map<number, number>();
+  private strikeMissile: ObjectID | null = null;
   private vbls = 0;
   private readonly unlockListeners: ((unlocks: readonly Unlock[]) => void)[] = [];
   private readonly eventListeners: ((event: AchievementEvent) => void)[] = [];
@@ -218,7 +234,7 @@ export class AchievementTracker {
       [...tags].filter(([, side]) => side.party).map(([rn, side]) => [rn, side.champion]);
     return {
       v: 1, state: this.state.snapshot(), missiles: party(this.missiles), clouds: party(this.clouds), causes: [...this.causes],
-      level: this.level, visited: toBase64(this.visited),
+      sides: [...this.sides], level: this.level, visited: toBase64(this.visited),
     };
   }
 
@@ -234,16 +250,17 @@ export class AchievementTracker {
 
   observe(h: Happening): void {
     switch (h.k) {
-      case 'blow': this.blows.push(h); return;
+      case 'blow': this.strike(h); this.blows.push(h); return;
       case 'blow-end': this.blows.pop(); return;
       case 'vbl': this.vbls++; return;
-      case 'monster-died': this.killed(h.type); return;
+      case 'monster-hit': this.hit(h.type, h.damage); return;
+      case 'monster-died': this.killed(h.type, squareKey(h.level, h.x, h.y)); return;
       case 'champion-hurt': this.hurt(h.chIdx); return;
       case 'champion-died': this.died(h.chIdx); return;
       case 'missile': this.missiles.set(h.missile, h.launcher >= 0 ? { party: true, champion: h.launcher } : NOBODY); return;
       case 'cloud': this.clouds.set(h.cloud, this.side(this.blows.length - 1)); return;
       case 'meal': {
-        const item = h.nameIndex < 0 ? 'FOUNTAIN' : this.objectNames[h.nameIndex];
+        const item = h.nameIndex < 0 ? FOUNTAIN : this.objectNames[h.nameIndex];
         this.record(h.eat ? 'eat' : 'drink', { champion: this.championName(h.chIdx), item });
         return;
       }
@@ -263,7 +280,7 @@ export class AchievementTracker {
         this.record('join', { champion: this.championName(h.chIdx), how: h.reincarnated ? 'reincarnate' : 'resurrect' });
         return;
       case 'sleep': this.record('sleep', {}); return;
-      case 'tick': this.tick(); return;
+      case 'tick': this.strikeMissile = null; this.strikeKills.clear(); this.tick(); return;
       case 'ended':
         this.sample();
         this.state.ended(h.won);
@@ -285,9 +302,12 @@ export class AchievementTracker {
    */
   private begin(kept: TrackerSnapshot | null, whole: boolean): void {
     this.blows.length = 0;
+    this.strikeKills.clear();
+    this.strikeMissile = null;
     this.missiles.clear();
     this.clouds.clear();
     this.causes = [null, null, null, null];
+    this.sides = [false, false, false, false];
     this.vbls = 0;
     this.level = kept?.level ?? -1;
     const visited = kept?.visited !== undefined ? fromBase64(kept.visited) : null;
@@ -302,6 +322,7 @@ export class AchievementTracker {
     for (const [rn, champion] of kept.missiles) this.missiles.set(rn, { party: true, champion });
     for (const [rn, champion] of kept.clouds) this.clouds.set(rn, { party: true, champion });
     this.causes = [...kept.causes];
+    if (kept.sides) this.sides = [...kept.sides];
   }
 
   private tick(): void {
@@ -457,48 +478,86 @@ export class AchievementTracker {
     return NOBODY;
   }
 
-  private killed(type: number): void {
+  /**
+   * A blow begun: an outermost one begins a strike, unless it is of the missile the strike
+   * under way is, whose meeting and explosion are one strike.
+   */
+  private strike(b: Blow): void {
+    if (this.blows.length !== 0) return;
+    if (b.missile === undefined || b.missile !== this.strikeMissile) this.strikeKills.clear();
+    this.strikeMissile = b.missile ?? null;
+  }
+
+  /**
+   * What the blow on top of the stack is, for a monster it hits or kills: who struck, how,
+   * and with what. A melee blow's empty hand is `EMPTY_HAND`.
+   */
+  private blowAttrs(type: number): Record<string, string | undefined> {
     const top = this.blows.length - 1;
     const b = this.blows[top];
     const attrs: Record<string, string | undefined> = { monster: MONSTER_NAMES[type] ?? `${type}` };
-    if (b) {
-      const side = this.side(top);
-      attrs.party = yesNo(side.party);
-      if (side.champion >= 0) attrs.champion = this.championName(side.champion);
-      if (b.by === 'missile') {
-        const spell = b.item !== undefined && isMagicSpellRn(b.item);
-        attrs.by = spell ? 'spell' : 'throw';
-        if (!spell && b.item !== undefined) attrs.item = this.itemName(b.item);
-      } else {
-        attrs.by = KILL_BY[b.by];
-        if (b.by === 'melee' && b.item !== undefined) attrs.item = this.itemName(b.item);
-        if (b.by === 'explosion') {
-          // A bomb's blast is a blow inside its explosion's, which names the bomb.
-          for (let i = top; i >= 0 && this.blows[i]!.by === 'explosion'; i--) {
-            const item = this.blows[i]!.item;
-            if (item !== undefined) { attrs.item = this.itemName(item); break; }
-          }
+    if (!b) {
+      attrs.party = 'no';
+      return attrs;
+    }
+    const side = this.side(top);
+    attrs.party = yesNo(side.party);
+    if (side.champion >= 0) attrs.champion = this.championName(side.champion);
+    if (b.by === 'missile') {
+      const spell = b.item !== undefined && isMagicSpellRn(b.item);
+      attrs.by = spell ? 'spell' : 'throw';
+      if (!spell && b.item !== undefined) attrs.item = this.itemName(b.item);
+    } else {
+      attrs.by = KILL_BY[b.by];
+      if (b.by === 'melee' && b.item !== undefined) attrs.item = b.item === OBJECT_ID_NULL ? EMPTY_HAND : this.itemName(b.item);
+      if (b.by === 'explosion') {
+        // A bomb's blast is a blow inside its explosion's, which names the bomb.
+        for (let i = top; i >= 0 && this.blows[i]!.by === 'explosion'; i--) {
+          const item = this.blows[i]!.item;
+          if (item !== undefined) { attrs.item = this.itemName(item); break; }
         }
       }
-    } else {
-      attrs.party = 'no';
     }
-    this.record('kill', attrs);
+    return attrs;
+  }
+
+  private hit(type: number, damage: number): void {
+    this.record('hit', { ...this.blowAttrs(type), damage: `${damage}` });
+  }
+
+  /** A kill, and how many of its group, on square `square`, the strike has killed so far. */
+  private killed(type: number, square: number): void {
+    let group = 1;
+    if (this.blows.length > 0) {
+      group = (this.strikeKills.get(square) ?? 0) + 1;
+      this.strikeKills.set(square, group);
+    }
+    this.record('kill', { ...this.blowAttrs(type), group: `${group}` });
   }
 
   private hurt(chIdx: number): void {
     const top = this.blows.length - 1;
     const b = this.blows[top];
     const by = b ? HURT_BY[b.by] : undefined;
-    if (chIdx >= 0 && chIdx < this.causes.length) this.causes[chIdx] = by ?? null;
-    this.record('hurt', { champion: this.championName(chIdx), by, party: yesNo(b ? this.side(top).party : false) });
+    const party = b ? this.side(top).party : false;
+    if (chIdx >= 0 && chIdx < this.causes.length) {
+      this.causes[chIdx] = by ?? null;
+      this.sides[chIdx] = party;
+    }
+    this.record('hurt', { champion: this.championName(chIdx), by, party: yesNo(party) });
   }
 
-  /** A death: inside a blow, the blow's cause; else the last damage the champion took, pending till the tick. */
+  /**
+   * A death: inside a blow, the blow's cause and side; else the last damage the champion
+   * took, pending till the tick, and whose it was.
+   */
   private died(chIdx: number): void {
-    const b = this.blows[this.blows.length - 1];
-    const cause = (b ? HURT_BY[b.by] : undefined) ?? this.causes[chIdx] ?? undefined;
-    this.record('death', { champion: this.championName(chIdx), cause });
+    const top = this.blows.length - 1;
+    const b = this.blows[top];
+    const by = b ? HURT_BY[b.by] : undefined;
+    const cause = by ?? this.causes[chIdx] ?? undefined;
+    const party = by !== undefined ? this.side(top).party : this.sides[chIdx] ?? false;
+    this.record('death', { champion: this.championName(chIdx), cause, party: yesNo(party) });
   }
 
   private record(kind: EventKind, attrs: Record<string, string | undefined>): void {

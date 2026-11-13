@@ -1214,7 +1214,7 @@ drawing a map from them is a separate item, entered when the author names it.
 
 ### X20 ⏸️ More achievements: the author's list
 
-The achievements are `src/engine/achievements/defs/common.txt`'s 56, four of them valued
+The achievements are `src/engine/achievements/defs/common.txt`'s 61, four of them valued
 and four counted from the data,
 `dm-atari.txt`'s 13, which every Dungeon Master set reads, and `csb.txt`'s 2, which
 disables Girl Power (`doc/ACHIEVEMENTS.md`). The author
@@ -1266,20 +1266,12 @@ adventure CSBWin's utility made has lost (H, "A champion carried into a new adve
 keeps their sex"), so at the author's choice `csb.txt` disables it. Step 7's casts are
 done: `cast`'s `power` and `why`, the code of the message `SpellErrorMsg` printed, with
 Blazing Glory Day, Thick Atmosphere, I Know What I'm Doing and Dark Ages, whose torch is
-read in the hands at each tick's end (`doc/ACHIEVEMENTS.md` → "The events"). What is left:
+read in the hands at each tick's end (`doc/ACHIEVEMENTS.md` → "The events"). Step 7 is
+done: the blows, a `hit` event with `DamageMonster`'s damage, a kill's `group` struck down
+by one strike, `HAND` for an empty hand, a kill `by: landing`, `party` on `death`, with
+Overkill, Strike!, Bare Knuckles, Telefrag and Friendly Fire Fatality
+(`doc/ACHIEVEMENTS.md` → "The happenings"). What is left:
 
-7. **The blows.** Overkill, Strike!, Bare Knuckles, Telefrag and Friendly Fire Fatality:
-   - the damage a blow deals a monster, `DamageMonster`'s, on each hit, a kill or not
-     (Overkill: 100 or more in one);
-   - which blow killed what: on a kill, how many of its group the outermost blow has
-     killed so far, so that four is a whole group of four wiped out by one blow or one
-     fireball (Strike!);
-   - an empty hand on a melee kill, a value a filter can test, as `FOUNTAIN` names a
-     fountain (Bare Knuckles);
-   - a kill by landing: the group CSBWin deletes where the party arrives by a teleporter
-     or a pit, each member a kill, the party's (Telefrag);
-   - `party` on `death`, the side of the blow that killed, kept with the pending cause
-     (Friendly Fire Fatality).
 8. **The rest of a game's own triggers.** Save loads, a revival at an altar, which
    ending, objects combined, a theft, a lock or switch triggered, the Oracle opened, where
    the party came from: Ironman, Hardcore, Lazarus, Gullible, Some Assembly Required,
@@ -1303,17 +1295,6 @@ stay common.
 - The party:
   - **Lazarus** (weird): bring the same champion back from the dead three times. [a
     revival at an altar]
-- Combat:
-  - **Telefrag** (weird): kill a monster by teleporting or falling onto it. CSBWin deletes
-    a group the party lands on, which counts as nobody's kill today. [a kill `by: landing`]
-  - **Bare Knuckles** (hard): kill 100 monsters with an empty hand. [the item held: an
-    empty hand]
-  - **Overkill** (hard): deal 100 damage or more in one blow. [the damage dealt]
-  - **Strike!** (weird): wipe out a whole group of four with one blow or one fireball.
-    [which blow killed what]
-- Silly deaths:
-  - **Friendly Fire Fatality** (silly): the party's own spell kills a champion. [`party`
-    on `death`]
 
 **Dungeon Master** (`dm-atari.txt`).
 
@@ -1355,13 +1336,9 @@ improve.
 | Progress across games | Hall of Fame Tour, Every Ending, Grand Slam, Encore, Dungeon Janitor, HR Problem |
 | A lock or switch triggered | Riddle Me This, Corbum Courier, Coin-Operated |
 | Save loads | Ironman, Hardcore |
-| The damage dealt, which blow killed what | Overkill, Strike! |
 | Which ending | Gullible, Every Ending |
 | Where the party came from | Veterans, Fresh Faces |
-| An empty hand | Bare Knuckles |
-| A kill `by: landing` | Telefrag |
 | A revival at an altar | Lazarus |
-| `party` on `death` | Friendly Fire Fatality |
 | A theft | Pickpocket's Revenge |
 | Objects combined | Some Assembly Required |
 | The Oracle opened | Self-Reliant |

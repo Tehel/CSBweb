@@ -48,6 +48,15 @@
  *    game prints `SpellErrorMsg`'s message for it (`doc/CSBwin-src/Magic.cpp:1007`); a torch
  *    in a hand counted at the tick the tool sees it there itself; and Blazing Glory Day,
  *    Thick Atmosphere, I Know What I'm Doing and Dark Ages as the casts and hands say.
+ * 9. The blows: a hit for each `DamageMonster` call that hurt or killed, its damage the
+ *    call's; a kill's group counting up by one from the kill before it in its strike; a
+ *    melee kill naming the empty hand exactly where the action hand was empty; each death
+ *    the party's exactly where the champion's last hurt was; and Overkill, Strike!, Bare
+ *    Knuckles and Friendly Fire Fatality as the hits, kills and deaths say. No recording
+ *    lands on a group, so a new game's party is put on one of level 1's (`moveParty`):
+ *    each member is a kill by landing, the party's, and Telefrag unlocks; and no champion
+ *    dies to the party, so one hurt by its explosion dies after a save kept and read back,
+ *    the party's death, and Friendly Fire Fatality unlocks.
  *
  * Usage: npm test -- --only=achievements-tracker.ts [<package name>…] [--not=<name>] [--events]
  */
@@ -67,7 +76,10 @@ import { CHARFLAG_MALE, getChampionPossession } from '../../src/core/charDesc';
 import { NameIndex } from '../../src/engine/objectIndex';
 import { isAlive } from '../../src/engine/rules';
 import { determineMastery } from '../../src/engine/skills';
+import { MonsterDamageResult } from '../../src/engine/MonsterDamage';
+import { OBJECT_ID_EOF, OBJECT_ID_NULL, Position } from '../../src/core/types';
 import { check, finish } from '../lib/check';
+import { graphicsTablesOf, STOCK_DIR, stockGame, stockGraphics } from '../lib/game';
 import { DATA_SETS, diskFiles, diskSetDigests } from '../lib/dataSets';
 import { playPath } from '../lib/playback';
 import { CORPUS_DIR, CORPUS_FILE, corpusFiles } from '../lib/recordingCorpus';
@@ -188,6 +200,12 @@ for (const file of corpusFiles()) {
   let firstTorch = -1;
   /** The failures `SpellErrorMsg` printed, by its message: meaningless, practice, flask. */
   const failures = { meaningless: 0, practice: 0, flask: 0 };
+  /** The `DamageMonster` calls that hurt or killed, and their damage, read by the tool itself. */
+  let hurtCalls = 0;
+  let hurtDamage = 0;
+  /** Whether each blow open is a melee blow with an empty action hand, and the kills inside one. */
+  const emptyHanded: boolean[] = [];
+  let emptyHandKills = 0;
   const ranks = new Map<string, number[]>();
   const miniDat = set.miniDat ? await diskFiles(set).read('mini.dat') : null;
   const start = pkg.path[0]!.start;
@@ -212,8 +230,22 @@ for (const file of corpusFiles()) {
       else if (text === ' NEEDS AN EMPTY FLASK IN HAND FOR POTION.') failures.flask++;
       print(color, text);
     };
+    const monsterDamage = page.game.ctx.systems.monsterDamage;
+    const damageMonster = monsterDamage.damageMonster.bind(monsterDamage);
+    monsterDamage.damageMonster = (monster, index, level, x, y, damage, ...rest) => {
+      const hp = monster.hp[index];
+      const result = damageMonster(monster, index, level, x, y, damage, ...rest);
+      if (damage > 0 && (result !== MonsterDamageResult.NO_MONSTER_DIED || monster.hp[index] !== hp)) {
+        hurtCalls++;
+        hurtDamage += damage;
+      }
+      return result;
+    };
     const observe = host.observe;
     host.observe = (h: Happening) => {
+      if (h.k === 'blow') emptyHanded.push(h.by === 'melee' && h.item === OBJECT_ID_NULL);
+      else if (h.k === 'blow-end') emptyHanded.pop();
+      else if (h.k === 'monster-died' && emptyHanded[emptyHanded.length - 1]) emptyHandKills++;
       if (h.k === 'tick') {
         const { ctx } = page.game;
         const party = ctx.party.state;
@@ -339,6 +371,42 @@ for (const file of corpusFiles()) {
   ] as const) check(unlocked.has(id) === want, `${file}: ${id} ${want ? 'unlocks' : 'stays locked'}, as its casts and hands say`);
   if (firstTorch >= 0) check(at('t-torch') === firstTorch, `${file}: a torch in hand is counted at d.Time ${firstTorch} (${at('t-torch')})`);
 
+  // 9. The blows.
+  const hits = events.filter((e) => e.kind === 'hit');
+  const kills = events.filter((e) => e.kind === 'kill');
+  const deaths = events.filter((e) => e.kind === 'death');
+  const partyHits = hits.filter((e) => e.attrs.party === 'yes').map((e) => Number(e.attrs.damage));
+  const hardest = Math.max(0, ...partyHits);
+  const groups = new Map<string, number>();
+  for (const e of kills) groups.set(e.attrs.group ?? '-', (groups.get(e.attrs.group ?? '-') ?? 0) + 1);
+  const hand = count(events, 'kill', { by: 'melee', item: 'HAND' });
+  console.log(`  hits ${hits.length} (${hurtCalls} DamageMonster calls hurt or killed), the party's hardest ${hardest}; kills by group ${[...groups].map(([g, n]) => `${g}: ${n}`).join(', ')}; empty-handed ${hand}; deaths the party's ${count(events, 'death', { party: 'yes' })} of ${deaths.length}`);
+  check(hits.length === hurtCalls && hits.reduce((sum, e) => sum + Number(e.attrs.damage), 0) === hurtDamage,
+    `${file}: a hit for each DamageMonster call that hurt or killed, ${hurtCalls}, its damage the call's (${hurtDamage})`);
+  check(kills.every((e, i) => {
+    const group = Number(e.attrs.group);
+    if (group === 1) return true;
+    const prev = kills[i - 1];
+    return group <= 4 && prev !== undefined && Number(prev.attrs.group) === group - 1 && prev.attrs.monster === e.attrs.monster;
+  }), `${file}: a kill's group is 1, or one more than the kill before it in the same strike, of the same type, and at most 4`);
+  check(count(events, 'kill', { by: 'melee' }) === kills.filter((e) => e.attrs.by === 'melee' && e.attrs.item !== undefined).length,
+    `${file}: every melee kill names what struck, an object or the empty hand`);
+  check(hand === emptyHandKills, `${file}: a melee kill names the empty hand exactly where the action hand was empty (${emptyHandKills})`);
+  const lastHurt = new Map<string, string>();
+  let sidesKept = true;
+  for (const e of events) {
+    if (e.kind === 'hurt') lastHurt.set(e.attrs.champion ?? '', e.attrs.party ?? '');
+    if (e.kind === 'death' && e.attrs.party !== (lastHurt.get(e.attrs.champion ?? '') ?? 'no')) sidesKept = false;
+  }
+  check(sidesKept, `${file}: each death is the party's exactly where the champion's last hurt was`);
+  for (const [id, want] of [
+    ['overkill', hardest >= 100],
+    ['strike', kills.some((e) => e.attrs.party === 'yes' && e.attrs.group === '4' && e.attrs.by !== 'landing')],
+    ['bare-knuckles', count(events, 'kill', { party: 'yes', by: 'melee', item: 'HAND' }) >= 100],
+    ['telefrag', count(events, 'kill', { by: 'landing' }) > 0],
+    ['friendly-fire-fatality', count(events, 'death', { party: 'yes' }) > 0],
+  ] as const) check(unlocked.has(id) === want, `${file}: ${id} ${want ? 'unlocks' : 'stays locked'}, as its hits, kills and deaths say`);
+
   // 3. What the games hold.
   if (name === 'DMMovie2615') {
     for (const hero of ['HALK', 'STAMM', 'LEYLA', 'GOTHMOG']) {
@@ -423,5 +491,53 @@ for (const file of corpusFiles()) {
       'CSBFullRecordingV4 sets foot on every level, and leaves some with no monster alive, though CSB lists no level to sweep');
   }
 }
+// 9. A group landed on: no recording lands on one, so a new Dungeon Master game's party is
+// put on level 1's largest group from nowhere (`moveParty(-1, …)`), as an arrival is.
+{
+  console.log('--- a group landed on');
+  const game = stockGame();
+  const events: AchievementEvent[] = [];
+  const tracker = new AchievementTracker(game, defsOf('dm-atari'), graphicsTablesOf(stockGraphics()).objects.objectNames, {
+    dungeonDat: new Uint8Array(readFileSync(resolve(`${STOCK_DIR}/dungeon.dat`))), miniDat: null,
+  });
+  tracker.onEvent((event) => events.push(event));
+  tracker.attach();
+  const { ctx } = game;
+  const map = ctx.dungeon.getMap(1)!;
+  let at: Position | null = null;
+  let members = 0;
+  for (let x = 0; x < map.descriptor.width; x++) {
+    for (let y = 0; y < map.descriptor.height; y++) {
+      const rn = ctx.dungeon.findFirstMonster(new Position(x, y, 1));
+      const n = rn === OBJECT_ID_EOF ? 0 : (ctx.dungeon.getCreatureRecord(rn)!.numMonM1 & 0x3) + 1;
+      if (n > members) [at, members] = [new Position(x, y, 1), n];
+    }
+  }
+  if (!at) throw new Error('level 1 holds no group');
+  ctx.party.state.position = new Position(at.x, at.y, 1);
+  game.systems.monsters.loadPartyLevelIfChanged();
+  game.ctx.systems.worldMove.moveParty(-1, 0, at.x, at.y);
+  tracker.observe({ k: 'tick' });
+  const landed = events.filter((e) => e.kind === 'kill');
+  console.log(`  the party lands on (${at.x},${at.y}) of level 1, a group of ${members}: ${landed.map((e) => JSON.stringify(e.attrs)).join(', ')}`);
+  check(ctx.dungeon.findFirstMonster(at) === OBJECT_ID_EOF, 'the group the party lands on is deleted');
+  check(landed.length === members && landed.every((e, i) => e.attrs.by === 'landing' && e.attrs.party === 'yes' && e.attrs.group === `${i + 1}`),
+    `each of its ${members} members is a kill by landing, the party's, the strike's ${members} of its group`);
+  check(tracker.unlocked.has('telefrag') && !tracker.unlocked.has('strike'), 'Telefrag unlocks, and a group landed on is no Strike!');
+  // A champion hurt by the party's own explosion, the damage pending across a save kept and
+  // read back, dies at the tick outside any blow: the death is the party's.
+  tracker.observe({ k: 'blow', by: 'explosion', party: true });
+  tracker.observe({ k: 'champion-hurt', chIdx: 2, damage: 50 });
+  tracker.observe({ k: 'blow-end' });
+  const file = new Uint8Array([7, 3]);
+  tracker.keep(fileDigest(file), JSON.parse(JSON.stringify(tracker.snapshot())) as ReturnType<AchievementTracker['snapshot']>);
+  tracker.observe({ k: 'read', file });
+  tracker.observe({ k: 'champion-died', chIdx: 2 });
+  tracker.observe({ k: 'tick' });
+  const death = events[events.length - 1];
+  check(death?.kind === 'death' && death.attrs.cause === 'explosion' && death.attrs.party === 'yes' && tracker.unlocked.has('friendly-fire-fatality'),
+    `a death pending from the party's own explosion, across a save read, is the party's: Friendly Fire Fatality (${JSON.stringify(death?.attrs)})`);
+}
+
 if (!wornChecked) check(false, 'a package was played');
 finish();

@@ -402,6 +402,7 @@ function evaluator(common: AchievementFile, dm: AchievementFile, counts: DataCou
 
   champions(defs);
   casts(defs);
+  blows(defs);
 }
 
 /** A champion's attributes as the tracker gives them (`CHAMPION_ATTRIBUTES`), a male Expert by default. */
@@ -484,6 +485,42 @@ function casts(defs: readonly AchievementDef[]): void {
   torch.champions([champ()]);
   torch.ended(true);
   check(!torch.evaluate().includes('dark-ages'), 'a torch held once is no Dark Ages');
+}
+
+/**
+ * The blows: a hit's damage, a kill's group struck down by one strike, an empty hand, a group
+ * landed on, and a death's side: Overkill, Strike!, Bare Knuckles, Telefrag and Friendly
+ * Fire Fatality.
+ */
+function blows(defs: readonly AchievementDef[]): void {
+  console.log('--- the blows');
+  const hit = (damage: number, party = 'yes'): AchievementEvent =>
+    ({ kind: 'hit', attrs: { monster: 'Mummy', by: 'melee', item: 'SWORD', champion: 'A', party, damage: `${damage}` } });
+  const kill = (attrs: Record<string, string>): AchievementEvent =>
+    ({ kind: 'kill', attrs: { monster: 'Mummy', by: 'melee', item: 'SWORD', champion: 'A', party: 'yes', group: '1', ...attrs } });
+  const fight = new AchievementState(defs, false);
+  fight.record(hit(99));
+  fight.record(hit(150, 'no'));
+  fight.record(kill({ by: 'explosion', item: '', group: '3' }));
+  fight.record(kill({ by: 'explosion', party: 'no', group: '4' }));
+  fight.record({ kind: 'death', attrs: { champion: 'A', cause: 'missile', party: 'no' } });
+  for (let i = 0; i < 99; i++) fight.record(kill({ item: 'HAND' }));
+  fight.record(kill({ by: 'throw', item: 'HAND' }));
+  const blows = ['overkill', 'strike', 'bare-knuckles', 'telefrag', 'friendly-fire-fatality'];
+  check(fight.evaluate().every((id) => !blows.includes(id)),
+    `a hit of 99, one of 150 not the party's, three of a group struck down, four by nobody's fireball, a death to a missile not the party's and 99 kills with an empty hand unlock none of the blows' achievements`);
+  fight.record(hit(100));
+  check(sameIds(fight.evaluate(), ['overkill']), 'a hit of 100 is Overkill');
+  fight.record(kill({ by: 'explosion', group: '4' }));
+  check(sameIds(fight.evaluate(), ['strike']), `the fourth of a group struck down by the party's one strike is Strike!`);
+  fight.record(kill({ item: 'HAND' }));
+  check(sameIds(fight.evaluate(), ['bare-knuckles']), 'the hundredth melee kill with an empty hand is Bare Knuckles');
+  fight.record(kill({ by: 'landing', item: '', champion: '' }));
+  check(sameIds(fight.evaluate(), ['telefrag']), 'a group landed on is Telefrag');
+  fight.record({ kind: 'death', attrs: { champion: 'A', cause: 'explosion', party: 'yes' } });
+  check(sameIds(fight.evaluate(), ['friendly-fire-fatality']), 'a death to the party\'s own blow is Friendly Fire Fatality');
+  check(defs.filter((d) => blows.includes(d.id)).every((d) => !d.whole),
+    'none of the blows\' achievements needs the whole game');
 }
 
 /** A set's file over the common one. */

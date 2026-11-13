@@ -142,7 +142,11 @@ export class WorldMove {
       const dmp = deleteMonsterParameters(DeleteMonsterWhy.DMW_Movement2, -1);
       monsterDamage.processMonsterDeleteFilter(at.z, at.x, at.y, dmp);
       monsterDamage.dropMonsterRemains(at.z, at.x, at.y, monster, 1, at.z, dmp.dropResidue < 2);
+      // Observed, each member of the group the party lands on is the party's kill
+      // (`doc/ACHIEVEMENTS.md` → "Watching the engine").
+      if (this.ctx.host.observing) this.observeLanding(at);
       monsterDamage.deleteMonster(at.z, at.x, at.y);
+      if (this.ctx.host.observing) this.ctx.host.observe(BLOW_END);
     }
     if (at.z === level) {
       actuators.triggerObjectMove(at, OBJECT_ID_NULL, true, unchangedRoom, party.facing);
@@ -151,6 +155,22 @@ export class WorldMove {
       // `LoadLevel(AttachedLevel_4); d.newPartyLevel = sw(curLevel);` (`:3356-3358`).
       party.position = new Position(at.x, at.y, level);
       this.ctx.loop.newPartyLevel = at.z;
+    }
+  }
+
+  /**
+   * The group on `at`, which the party lands on and `DeleteMonster` deletes, told as a
+   * blow of the party's, `landing`, that kills each of its members. The blow is ended by
+   * the caller, after the deletion.
+   */
+  private observeLanding(at: Position): void {
+    const host = this.ctx.host;
+    host.observe({ k: 'blow', by: 'landing', party: true });
+    const rn = this.dungeon.findFirstMonster(at);
+    const group = rn === OBJECT_ID_EOF ? undefined : this.dungeon.getCreatureRecord(rn);
+    if (!group) return;
+    for (let i = 0; i <= (group.numMonM1 & 0x3); i++) {
+      host.observe({ k: 'monster-died', type: group.creatureType, alternateGraphics: group.alternateGraphics, level: at.z, x: at.x, y: at.y });
     }
   }
 

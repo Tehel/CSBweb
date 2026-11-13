@@ -14,7 +14,7 @@ import type { ObjectID } from '../core/types';
 /** What dealt a blow. */
 export type BlowCause =
   | 'melee' | 'missile' | 'explosion' | 'cloud' | 'door' | 'pit' | 'wall' | 'monster'
-  | 'poison' | 'starvation' | 'thirst' | 'fatigue' | 'potion' | 'fusion';
+  | 'poison' | 'starvation' | 'thirst' | 'fatigue' | 'potion' | 'fusion' | 'landing';
 
 /** A blow begins: the damage dealt until its `BLOW_END` is its. */
 export interface Blow {
@@ -41,8 +41,13 @@ export type CastFailure = 'meaningless' | 'practice' | 'flask';
 export type Happening =
   | Blow
   | { readonly k: 'blow-end' }
-  /** A member of a group died, in `DamageMonster`, or Lord Chaos was fused. */
-  | { readonly k: 'monster-died'; readonly type: number; readonly alternateGraphics: number }
+  /** `DamageMonster` dealt `damage` to a member of a group, one a blow can hurt. */
+  | { readonly k: 'monster-hit'; readonly type: number; readonly damage: number }
+  /**
+   * A member of the group on square `x`, `y` of `level` died: in `DamageMonster`, in the
+   * group the party landed on, or Lord Chaos fused.
+   */
+  | { readonly k: 'monster-died'; readonly type: number; readonly alternateGraphics: number; readonly level: number; readonly x: number; readonly y: number }
   /** `DamageCharacter` dealt `damage` to the champion in slot `chIdx`, pending till the tick. */
   | { readonly k: 'champion-hurt'; readonly chIdx: number; readonly damage: number }
   /** `KillCharacter`. */
