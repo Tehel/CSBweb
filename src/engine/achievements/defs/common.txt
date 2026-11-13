@@ -178,6 +178,14 @@ text: Win with four champions, none of them reincarnated.
 tier: weird
 when: won and count(join where how = resurrect) >= 4
 
+# A revival is a champion the Vi altar brings back; times counts that champion's.
+
+[lazarus]
+name: Lazarus
+text: Bring the same champion back to life at an altar three times.
+tier: weird
+when: ever(revive where times >= 3)
+
 # The meat is the drumstick, the worm round and the dragon steak.
 
 [vegetarian]

@@ -68,6 +68,8 @@ export const EVENTS = {
   },
   wear: { champion: NAME, slot: enumOf('head', 'neck', 'torso', 'legs', 'feet'), item: NAME },
   join: { champion: NAME, how: enumOf('resurrect', 'reincarnate') },
+  revive: { champion: NAME, times: NUMBER },
+  raise: { champion: NAME, from: enumOf('prison', 'imported') },
   enter: { level: NUMBER },
   leave: { level: NUMBER, cleared: YESNO },
   theft: { champion: NAME, item: NAME, monster: NAME },

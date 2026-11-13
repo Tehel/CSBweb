@@ -1066,6 +1066,7 @@ export class TimerSystem {
     if (state === 0) {
       const chIdx = pos & 0x3;
       this.ctx.systems.character.bringCharacterToLife(chIdx);
+      if (this.ctx.host.observing) this.ctx.host.observe({ k: 'revived', chIdx });
     }
   }
 

@@ -72,6 +72,11 @@ export type Happening =
   /** A champion joined for good, RESURRECT or REINCARNATE (`GameHost.championJoined`). */
   | { readonly k: 'joined'; readonly chIdx: number; readonly reincarnated: boolean }
   /**
+   * The Vi altar brought the champion in slot `chIdx` back to life: `ProcessTT_ViAltar`'s
+   * last state, `BringCharacterToLife` (`doc/CSBwin-src/Timer.cpp:2806-2808`).
+   */
+  | { readonly k: 'revived'; readonly chIdx: number }
+  /**
    * `StealFromCharacter` took `object` from the champion in slot `chIdx` into the
    * possessions of a group of type `type` (`doc/CSBwin-src/Monster.cpp:258-269`).
    */

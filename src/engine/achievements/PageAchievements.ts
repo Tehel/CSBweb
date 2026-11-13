@@ -12,7 +12,7 @@ import type { AchievementProof, AchievementRow, AchievementStore } from '../../d
 import type { Game } from '../Game';
 import type { GameSaves } from '../GameSaves';
 import { mergeAchievements, readAchievementFile, type AchievementDef } from './AchievementFile';
-import { AchievementTracker, type Unlock } from './AchievementTracker';
+import { AchievementTracker, type PortraitSheet, type Unlock } from './AchievementTracker';
 import type { AchievementSetFiles } from './DataCounts';
 
 /** The VBLs a second, which the tracker counts the player's time in. */
@@ -75,6 +75,8 @@ export class PageAchievements {
     readonly defs: readonly AchievementDef[],
     /** The set's object names (`d.ObjectNames`), which an event's `item` is. */
     objectNames: readonly string[],
+    /** The set's champions' portraits, graphic 26, which tell a CSB adventure's prisoners (`AchievementTracker`). */
+    portraits: PortraitSheet | null,
     private readonly store: AchievementStore,
     saves: GameSaves,
     private readonly touched: TouchedPlaythroughs,
@@ -84,7 +86,7 @@ export class PageAchievements {
     private readonly log: (message: string, error?: unknown) => void = () => {},
   ) {
     this.byId = new Map(defs.map((def) => [def.id, def]));
-    this.tracker = new AchievementTracker(game, defs, objectNames, files);
+    this.tracker = new AchievementTracker(game, defs, objectNames, files, portraits);
     this.tracker.onUnlock((unlocks) => this.unlocked(unlocks));
     this.tracker.attach();
     saves.trackAchievements(this.tracker);

@@ -14,6 +14,10 @@
  * read (`AchievementState`), unless it is a CSB adventure's start (`isNewAdventure`): the
  * adventure is a game of its own from there, and its history is the whole game's.
  *
+ * A CSB adventure's start raises its party, each champion `prison` where their portrait is
+ * a cell of the set's own champions' sheet, graphic 26, the portraits its mirrors give:
+ * the prison's, which REINCARNATE keeps under a new name.
+ *
  * The counts a condition reads of the set's own files (`dataCounts`) are worked out once,
  * as the tracker is made, from the game's tables and the set's dungeon files, and put in
  * the conditions (`withCounts`), and so are the floor squares the party walks on
@@ -24,6 +28,7 @@ import { isNewAdventure } from '../Chaos';
 import { OBJECT_ID_EOF, OBJECT_ID_NULL, DBType, Position, type ObjectID } from '../../core/types';
 import { OBJNI_NOT_AN_OBJECT } from '../../core/objectNameIndex';
 import { CHARFLAG_MALE, getChampionPossession } from '../../core/charDesc';
+import { PORTRAIT_HEIGHT, PORTRAIT_WIDTH } from '../../data/CsbwinCharacters';
 import { FIRST_RUNE, RUNE_NAMES } from '../../core/runes';
 import { isMagicSpellRn } from '../../core/spellRn';
 import type { Game } from '../Game';
@@ -88,6 +93,13 @@ const HURT_BY: Partial<Record<BlowCause, string>> = {
   wall: 'wall', poison: 'poison', starvation: 'starvation', thirst: 'thirst', fatigue: 'fatigue', potion: 'potion',
 };
 
+/** The set's champions' portraits, graphic 26: 32x29 cells, eight a row (`AddCharacter`, `doc/CSBwin-src/Character.cpp:487-509`). */
+export interface PortraitSheet {
+  readonly width: number;
+  readonly height: number;
+  readonly pixels: ArrayLike<number>;
+}
+
 /** Who struck: the party, by a champion's slot (-1 for none named), or not. */
 interface Side {
   readonly party: boolean;
@@ -113,6 +125,8 @@ export interface TrackerSnapshot {
   readonly level?: number;
   /** The objects groups took from the party (`theft`); left out by a state kept before they were kept, as none. */
   readonly stolen?: readonly number[];
+  /** How many times the Vi altar has revived each champion, by name; left out by a state kept before they were kept, as none. */
+  readonly revivals?: readonly (readonly [string, number])[];
   /**
    * The floor squares the party has stood on at a tick's end, a bit each in
    * `floorSquares`' order, in base 64; left out by a state kept before they were kept, as none.
@@ -139,6 +153,8 @@ export class AchievementTracker {
    * member dies: a kill's `thief`.
    */
   private readonly stolen = new Set<number>();
+  /** How many times the Vi altar has revived each champion, by name: a revival's `times`. */
+  private readonly revivals = new Map<string, number>();
   private readonly blows: Blow[] = [];
   /**
    * The kills of the strike under way, by the square of the group (`squareKey`): an
@@ -156,6 +172,8 @@ export class AchievementTracker {
   readonly counts: DataCounts;
   private readonly defs: readonly AchievementDef[];
   private readonly miniDat: Uint8Array | null;
+  /** The cells of the set's champions' portraits, each its pixels joined: a champion raised from the prison wears one. */
+  private readonly prisonFaces = new Set<string>();
   /** Each floor square's bit in `visited`, by `squareKey`. */
   private readonly floors = new Map<number, number>();
   private visited: Uint8Array;
@@ -167,12 +185,12 @@ export class AchievementTracker {
    * A tracker of `game`, for the achievements `defs` names, the objects named by
    * `objectNames` (`d.ObjectNames`, the set's `graphics.dat`), and `files`, the set's
    * dungeon files: the counts are read from them, and a CSB adventure's start is read
-   * against its `mini.dat`. Until a game is read it keeps a history that does not go back
-   * to the start.
+   * against its `mini.dat`, its party raised against `portraits`, the set's graphic 26.
+   * Until a game is read it keeps a history that does not go back to the start.
    */
   constructor(
     private readonly game: Game, defs: readonly AchievementDef[], private readonly objectNames: readonly string[],
-    files: AchievementSetFiles,
+    files: AchievementSetFiles, portraits: PortraitSheet | null,
   ) {
     const dungeons = setDungeons(files);
     this.counts = dataCounts(game.ctx.tables, dungeons);
@@ -181,6 +199,7 @@ export class AchievementTracker {
     if (played) for (const square of floorSquares(played)) this.floors.set(squareKey(square.z, square.x, square.y), this.floors.size);
     this.visited = new Uint8Array((this.floors.size + 7) >> 3);
     this.miniDat = files.miniDat;
+    if (portraits) for (const cell of portraitCells(portraits)) this.prisonFaces.add(cell);
     this.state = new AchievementState(this.defs, false);
   }
 
@@ -241,7 +260,7 @@ export class AchievementTracker {
       [...tags].filter(([, side]) => side.party).map(([rn, side]) => [rn, side.champion]);
     return {
       v: 1, state: this.state.snapshot(), missiles: party(this.missiles), clouds: party(this.clouds), causes: [...this.causes],
-      sides: [...this.sides], stolen: [...this.stolen], level: this.level, visited: toBase64(this.visited),
+      sides: [...this.sides], stolen: [...this.stolen], revivals: [...this.revivals], level: this.level, visited: toBase64(this.visited),
     };
   }
 
@@ -286,6 +305,13 @@ export class AchievementTracker {
       case 'joined':
         this.record('join', { champion: this.championName(h.chIdx), how: h.reincarnated ? 'reincarnate' : 'resurrect' });
         return;
+      case 'revived': {
+        const champion = this.championName(h.chIdx) ?? `#${h.chIdx}`;
+        const times = (this.revivals.get(champion) ?? 0) + 1;
+        this.revivals.set(champion, times);
+        this.record('revive', { champion, times: `${times}` });
+        return;
+      }
       case 'theft':
         this.stolen.add(h.object);
         this.record('theft', { champion: this.championName(h.chIdx), item: this.itemName(h.object), monster: MONSTER_NAMES[h.type] ?? `${h.type}` });
@@ -308,7 +334,9 @@ export class AchievementTracker {
       case 'saved': this.snapshots.set(fileDigest(h.file), this.snapshot()); return;
       case 'read': {
         const kept = this.snapshots.get(fileDigest(h.file)) ?? null;
-        this.begin(kept, kept === null && this.miniDat !== null && isNewAdventure(h.file, this.miniDat));
+        const adventure = kept === null && this.miniDat !== null && isNewAdventure(h.file, this.miniDat);
+        this.begin(kept, adventure);
+        if (adventure) this.raised();
         return;
       }
     }
@@ -325,6 +353,7 @@ export class AchievementTracker {
     this.missiles.clear();
     this.clouds.clear();
     this.stolen.clear();
+    this.revivals.clear();
     this.causes = [null, null, null, null];
     this.sides = [false, false, false, false];
     this.vbls = 0;
@@ -343,6 +372,21 @@ export class AchievementTracker {
     this.causes = [...kept.causes];
     if (kept.sides) this.sides = [...kept.sides];
     for (const rn of kept.stolen ?? []) this.stolen.add(rn);
+    for (const [champion, times] of kept.revivals ?? []) this.revivals.set(champion, times);
+  }
+
+  /**
+   * A CSB adventure's party, each champion `prison` where their portrait is one of the
+   * set's own champions', else `imported`: a party a utility put in from another game.
+   */
+  private raised(): void {
+    const party = this.game.ctx.party.state;
+    for (let i = 0; i < party.champions.length; i++) {
+      const champ = party.champions[i];
+      if (!champ || i === party.potentialChampionIndex) continue;
+      const prison = champ.portrait !== undefined && this.prisonFaces.has(champ.portrait.join());
+      this.record('raise', { champion: champ.name, from: prison ? 'prison' : 'imported' });
+    }
   }
 
   private tick(): void {
@@ -619,6 +663,23 @@ export class AchievementTracker {
     const index = NameIndex(ctx.dungeon, ctx.tables, ctx.party.state.facing, rn);
     return index === OBJNI_NOT_AN_OBJECT ? undefined : this.objectNames[index];
   }
+}
+
+/** Each cell of `sheet`, laid out as graphic 26, its pixels joined. */
+function portraitCells(sheet: PortraitSheet): string[] {
+  const cells: string[] = [];
+  const cols = Math.floor(sheet.width / PORTRAIT_WIDTH);
+  const rows = Math.floor(sheet.height / PORTRAIT_HEIGHT);
+  for (let charID = 0; charID < cols * rows; charID++) {
+    const ox = (charID % cols) * PORTRAIT_WIDTH;
+    const oy = Math.floor(charID / cols) * PORTRAIT_HEIGHT;
+    const cell: number[] = [];
+    for (let y = 0; y < PORTRAIT_HEIGHT; y++) {
+      for (let x = 0; x < PORTRAIT_WIDTH; x++) cell.push(sheet.pixels[(oy + y) * sheet.width + ox + x]!);
+    }
+    cells.push(cell.join());
+  }
+  return cells;
 }
 
 function yesNo(b: boolean): string {

@@ -40,7 +40,8 @@ the Power Gem joined to the Firestaff, Pickpocket's Revenge, a Giggler that robb
 party killed, and Riddle Me This, the riddle room's four riddles answered at once
 ("Locks and switches"); Chaos Strikes Back
 lists no level to sweep, disables Girl Power ("The champions"), and has Self-Reliant, won
-without the Hint Oracle asked, and Coin-Operated, every GOR COIN lock opened. A set with no `achievements.txt` of its own reads that file instead. The file is never a game file
+without the Hint Oracle asked, Coin-Operated, every GOR COIN lock opened, and Fresh Faces,
+won with a party raised from the prison alone ("Where the party came from"). A set with no `achievements.txt` of its own reads that file instead. The file is never a game file
 (`GAME_FILES`, `src/data/DataSets.ts`), so a recording's digests never name it, and an
 author can change the file without breaking a recording.
 
@@ -181,6 +182,8 @@ number for a `level`. Names compare without regard to case.
 | `cast` | a champion casts a spell | `champion`; `spell`, its runes after the power rune, such as `"FUL IR"`; `power`, the power rune: `LO` `UM` `ON` `EE` `PAL` `MON`; `ok`: `yes` when the spell worked; `why`, for a cast the game said failed: `meaningless`, runes that make no spell, `practice`, a skill too low, `flask`, a potion with no empty flask in hand |
 | `wear` | an object is put on a worn place | `champion`; `slot`: `head` `neck` `torso` `legs` `feet`; `item` |
 | `join` | a champion joins the party | `champion`; `how`: `resurrect` `reincarnate` |
+| `revive` | the Vi altar brings a champion of the party back to life | `champion`; `times`, how many times the altar has revived that champion in the game, this one included |
+| `raise` | a CSB adventure begins, once for each champion of its party | `champion`; `from`: `prison` `imported` ("Where the party came from") |
 | `enter` | the party stands on a level it did not stand on at the last tick's end, and at a history's first tick | `level`, the map, from 0 |
 | `leave` | the party stands on another level than at the last tick's end | `level`, the map left; `cleared`: `yes` when no monster is alive on it then |
 | `theft` | a monster's blow takes an object from a champion, a Giggler's | `champion`, `item`, `monster` |
@@ -233,6 +236,23 @@ puzzle the dungeon counts itself is solved where its last actuator fires.
   (19,19), which take a coin each time, so the condition asks for each square, and for
   two at (22,19). An `item` alone names no lock: a switch touched with a coin in hand is
   a trigger with that coin too.
+
+### Where the party came from
+
+A CSB adventure's party is put in by a utility from a saved game (`doc/SAVES.md` → "RISE
+makes a save of its own"): the prison's, whose champions are Chaos Strikes Back's own, or
+another dungeon's, Dungeon Master's most often. As the tracker begins the adventure's
+history ("A CSB adventure") it raises each champion of the party, `from: prison` where
+their portrait is a cell of the set's own champions' portraits, graphic 26 of its
+`graphics.dat`, the faces its mirrors give, and `imported` otherwise. A champion is known
+by their portrait, as RISE's NEW FACE knows them, and never by their name, which
+REINCARNATE changes and the portrait keeps. Chaos Strikes Back's 24 portraits are none of
+Dungeon Master's, nor of the utility disk's redrawn faces of them, so a DM party raised
+with either is imported.
+
+- **Fresh Faces**, Chaos Strikes Back's: `won and ever(raise) and never(raise where from =
+  imported)`. A game that begins at another save raises nobody, so only a whole history
+  can earn it.
 
 ### The champions
 
@@ -439,7 +459,13 @@ whole replay corpus with the tracker attached, and every package plays to its po
 - **A sleep** is at the sleep icon's engine half, button 145 (`MouseSystem.sleep`,
   `doc/CSBwin-src/Mouse.cpp:1822-1847`), as `d.PartySleeping` is set: a party woken in the
   same tick has slept all the same.
-- **Where the party is** needs no happening: the tracker reads it at each tick's end.
+- **A revival** is at `ProcessTT_ViAltar`'s last state, as `BringCharacterToLife` brings
+  the champion back (`doc/CSBwin-src/Timer.cpp:2806-2808`), its only caller: the bones
+  given to the altar's alcove, five ticks of its cloud, then the bones taken. A champion
+  who has left the party is revived in the wings instead (`:2771-2782`), outside the party,
+  and is no revival.
+- **Where the party is** needs no happening: the tracker reads it at each tick's end, and
+  where the party came from at a CSB adventure's start.
 - **The game's boundaries**: each VBL of the player's time (`Game.playTime`'s), each main
   loop tick's end, `MainLoop`'s return (won or lost), a new game read, a save's file made
   (`saveFileOf`) and a save's file read (`applySaveBytes`).
@@ -487,7 +513,7 @@ what it observes, and of nothing else, so a live game and its replay give the sa
 It reads the game only to name things: a champion, an object, the samples. It is made
 with the set's dungeon files (`AchievementSetFiles`): it reads the counts of the data from
 them and the game's tables ("Counted from the data"), and a CSB adventure's start against
-the `mini.dat`.
+the `mini.dat`, its party against the set's graphic 26 ("Where the party came from").
 
 - At each tick's end it takes the samples: `party` and `alive` leave out a mirror's
   champion; `coins` counts every object whose name ends in `COIN` in the party's
@@ -506,7 +532,7 @@ the `mini.dat`.
   the game ended.
 - It keeps its state by the MD5 of each save's file it sees made, and when a file is read
   it takes up the state kept for it, the level the party stood on, the floor squares
-  walked on and the objects taken from the party among it: a replay's joins read the files their parents made, so each branch
+  walked on, the objects taken from the party and each champion's revivals among it: a replay's joins read the files their parents made, so each branch
   goes on with its parent's history. A file read with no state kept starts a
   history of its own ("Some conditions need the whole game"), unless it is a CSB
   adventure's start, read against the set's `mini.dat` ("A CSB adventure"), which starts
@@ -555,7 +581,13 @@ that robbed nobody no thief, those whose group took a torch thieves, across a sa
 and read back. And the locks and switches: a trigger with a GOR COIN at a wall for each
 coin the wall took from the hand, Riddle Me This the tick after the riddle room's counter
 at 4 reaches 0, which the Dungeon Master wins do and DMMovie42, three riddles answered,
-does not, and the whole CSB game feeding all nine GOR COIN locks (Coin-Operated).
+does not, and the whole CSB game feeding all nine GOR COIN locks (Coin-Operated). And the
+revivals and the party raised: a revival for each champion `BringCharacterToLife` brings
+back, DMMovie2823's one; no recording revives one champion three times, so a new game's
+two champions die and their bones are given to the altar's timer, the first's three
+times, Lazarus unlocking at the third, after a save kept and read back; and the whole CSB
+game's four prisoners raised from the prison (Fresh Faces), where `csbgame7.dat`'s four DM
+champions, raised by RISE with their own faces or the utility disk's, are imported.
 `tools/checks/achievements-format.ts` reads each file, checks its names against its set's
 `graphics.dat` and its values against its achievements, counts the FTL sets' data, and
 plays the conditions out of made-up events and champions, the named values, the lists and

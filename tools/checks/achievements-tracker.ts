@@ -74,6 +74,11 @@
  *    counter at 4 reaches 0, which the Dungeon Master wins do and DMMovie42, three riddles
  *    answered, does not; Chaos Strikes Back's adventure has nine GOR COIN locks, and the
  *    whole game feeds them all (Coin-Operated).
+ * 13. The revivals and the party raised: a revival for each champion `BringCharacterToLife`
+ *    brings back, DMMovie2823's one; a new game's champion revived at the altar three times,
+ *    across a save kept and read back, Lazarus at the third; the whole CSB game's four
+ *    champions raised from the prison (Fresh Faces), and `csbgame7.dat`'s four DM champions
+ *    raised by RISE, with their own faces or the utility disk's, imported.
  *
  * Usage: npm test -- --only=achievements-tracker.ts [<package name>…] [--not=<name>] [--events]
  */
@@ -85,7 +90,12 @@ import { findRecordingSet } from '../../src/data/RecordingSet';
 import { mergeAchievements, readAchievementFile, type AchievementDef, type AchievementFile, type DataCounts } from '../../src/engine/achievements/AchievementFile';
 import type { AchievementEvent } from '../../src/engine/achievements/AchievementState';
 import { AchievementTracker, WORN_SLOTS } from '../../src/engine/achievements/AchievementTracker';
-import { isNewAdventure } from '../../src/engine/Chaos';
+import { isNewAdventure, makeNewAdventure } from '../../src/engine/Chaos';
+import { CsbRandom } from '../../src/core/random';
+import { readUtilityPortraits, UTILITY_PORTRAITS_FILE } from '../../src/data/UtilityPortraits';
+import { applySaveBytes } from '../../src/engine/SaveGameFile';
+import { standInPage } from '../../src/renderer/StandInPage';
+import { savePath } from '../lib/saves';
 import { achievementFileOf } from '../../src/engine/achievements/PageAchievements';
 import { BLOW_END, type Happening } from '../../src/engine/Happening';
 import { MonsterType } from '../../src/engine/monsterTypes';
@@ -263,6 +273,8 @@ for (const file of corpusFiles()) {
   /** The walls' sides that hold a lock taking a GOR COIN, by square, as the history's first tick finds them, and how many the hand fed. */
   let coinLocks: Map<string, number> | null = null;
   const coinsTaken = new Map<string, number>();
+  /** The champions `BringCharacterToLife` revived, read by the tool itself. */
+  let revived = 0;
   /** The `DamageMonster` calls that hurt or killed, and their damage, read by the tool itself. */
   let hurtCalls = 0;
   let hurtDamage = 0;
@@ -276,7 +288,8 @@ for (const file of corpusFiles()) {
   const defs = defsOf(set.id);
   const startedAt = Date.now();
   const played = await playPath(set, diskFiles(set), pkg.path, pkg.shared.kind === 'save' ? pkg.shared : null, null, null, (page) => {
-    tracker = new AchievementTracker(page.game, defs, page.screen.ui.objectTables.objectNames, { dungeonDat: page.dungeonDat, miniDat });
+    tracker = new AchievementTracker(page.game, defs, page.screen.ui.objectTables.objectNames, { dungeonDat: page.dungeonDat, miniDat },
+      page.screen.ui.graphics.basicGraphic(26));
     tracker.onEvent((event) => {
       events.push(event);
       times.push(page.game.ctx.state.tickCount);
@@ -303,6 +316,12 @@ for (const file of corpusFiles()) {
         hurtDamage += damage;
       }
       return result;
+    };
+    const character = page.game.ctx.systems.character;
+    const bringCharacterToLife = character.bringCharacterToLife.bind(character);
+    character.bringCharacterToLife = (chIdx) => {
+      bringCharacterToLife(chIdx);
+      revived++;
     };
     const attack = page.game.ctx.systems.monsterAttack as unknown as StealFromCharacter;
     const stealFromCharacter = attack.stealFromCharacter.bind(attack);
@@ -527,6 +546,17 @@ for (const file of corpusFiles()) {
     check(unlocked.has('coin-operated') === allLocks, `${file}: Coin-Operated ${allLocks ? 'unlocks' : 'stays locked'}, as the locks fed say`);
   }
 
+  // 13. The revivals at an altar, and a CSB adventure's party raised.
+  const raises = events.filter((e) => e.kind === 'raise');
+  console.log(`  revivals ${count(events, 'revive')} (${revived} BringCharacterToLife calls); raised ${raises.map((e) => `${e.attrs.champion} from ${e.attrs.from}`).join(', ') || 'none'}`);
+  check(count(events, 'revive') === revived, `${file}: a revival for each champion BringCharacterToLife brought back (${revived})`);
+  check(fromAdventure ? raises.length > 0 && raises.every((_, i) => events[i]?.kind === 'raise') : raises.length === 0,
+    `${file}: ${fromAdventure ? 'its party is raised as its history begins, at the adventure\'s start' : 'no champion is raised: it begins at no CSB adventure\'s start'}`);
+  if (defs.some((d) => d.id === 'fresh-faces')) {
+    const fresh = won && raises.length > 0 && raises.every((e) => e.attrs.from === 'prison');
+    check(unlocked.has('fresh-faces') === fresh, `${file}: Fresh Faces ${fresh ? 'unlocks' : 'stays locked'}, as its party raised says`);
+  }
+
   // 3. What the games hold.
   if (name === 'DMMovie2615') {
     check(riddleSolved >= 0, 'DMMovie2615 answers the riddle room\'s four riddles at once');
@@ -615,6 +645,8 @@ for (const file of corpusFiles()) {
     check(!defs.some((d) => d.id === 'girl-power') && !unlocked.has('girl-power'),
       'CSBFullRecordingV4: Girl Power, which its party of no man would earn, is disabled in csb.txt');
     check(unlocked.has('self-reliant'), 'CSBFullRecordingV4, won without the Oracle asked, is Self-Reliant');
+    check(raises.length === 4 && raises.every((e) => e.attrs.from === 'prison') && raises.some((e) => e.attrs.champion === 'BUZZZZZ') && unlocked.has('fresh-faces'),
+      'CSBFullRecordingV4: its four champions, Buzzzzz among them, are raised from the prison, their portraits the set\'s: Fresh Faces');
     check(unlocked.has('gourmet') && !unlocked.has('bestiary'), 'CSBFullRecordingV4: the party eats all eight kinds of food (Gourmet), and kills 22 of the 23 types');
     check(unlocked.has('tourist') && count(events, 'leave', { cleared: 'yes' }) > 0 && !unlocked.has('clean-sweep'),
       'CSBFullRecordingV4 sets foot on every level, and leaves some with no monster alive, though CSB lists no level to sweep');
@@ -628,7 +660,7 @@ for (const file of corpusFiles()) {
   const events: AchievementEvent[] = [];
   const tracker = new AchievementTracker(game, defsOf('dm-atari'), graphicsTablesOf(stockGraphics()).objects.objectNames, {
     dungeonDat: new Uint8Array(readFileSync(resolve(`${STOCK_DIR}/dungeon.dat`))), miniDat: null,
-  });
+  }, stockGraphics().getImage(26));
   tracker.onEvent((event) => events.push(event));
   tracker.attach();
   const { ctx } = game;
@@ -676,7 +708,7 @@ for (const file of corpusFiles()) {
   game.setRandomSeed(0x12345678);
   const tracker = new AchievementTracker(game, defsOf('dm-atari'), graphicsTablesOf(stockGraphics()).objects.objectNames, {
     dungeonDat: new Uint8Array(readFileSync(resolve(`${STOCK_DIR}/dungeon.dat`))), miniDat: null,
-  });
+  }, stockGraphics().getImage(26));
   tracker.attach();
   tracker.observe({ k: 'new-game' });
   const { ctx } = game;
@@ -715,7 +747,7 @@ for (const file of corpusFiles()) {
   const names = graphicsTablesOf(stockGraphics()).objects.objectNames;
   const tracker = new AchievementTracker(game, defsOf('dm-atari'), names, {
     dungeonDat: new Uint8Array(readFileSync(resolve(`${STOCK_DIR}/dungeon.dat`))), miniDat: null,
-  });
+  }, stockGraphics().getImage(26));
   tracker.onEvent((event) => events.push(event));
   tracker.attach();
   tracker.observe({ k: 'new-game' });
@@ -767,6 +799,76 @@ for (const file of corpusFiles()) {
     'the Giggler that robbed nobody is no thief; each of the two that robbed the party, across a save kept and read back, is');
   check(tracker.unlocked.has('pickpockets-revenge'), 'Pickpocket\'s Revenge unlocks');
   check(ctx.dungeon.findFirstObject(new Position(0, 24, 9)) !== OBJECT_ID_EOF, 'the thieves\' group, its last member dead, drops what it took');
+}
+
+// 13. The Vi altar: no recording revives a champion three times, so a new game's two
+// champions die where the party stands, and their bones are given to the altar's timer as
+// the alcove gives them (`scheduleViAltar`), three times the first's and once the second's.
+{
+  console.log('--- the Vi altar');
+  const game = stockGame();
+  game.setRandomSeed(0x12345678);
+  const events: AchievementEvent[] = [];
+  const names = graphicsTablesOf(stockGraphics()).objects.objectNames;
+  const tracker = new AchievementTracker(game, defsOf('dm-atari'), names, {
+    dungeonDat: new Uint8Array(readFileSync(resolve(`${STOCK_DIR}/dungeon.dat`))), miniDat: null,
+  }, stockGraphics().getImage(26));
+  tracker.onEvent((event) => events.push(event));
+  tracker.attach();
+  tracker.observe({ k: 'new-game' });
+  const { ctx } = game;
+  game.systems.hallOfChampions.addChampion(testChampion(0, { fingerprint: 0x101 }));
+  game.systems.hallOfChampions.addChampion(testChampion(1, { fingerprint: 0x202 }));
+  const revive = (chIdx: number): boolean => {
+    ctx.systems.championDamage.killCharacter(chIdx);
+    const { x, y, z } = ctx.party.state.position;
+    const at = new Position(x, y, z);
+    let bones = OBJECT_ID_EOF;
+    for (let rn = ctx.dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = ctx.dungeon.getDBRecordLink(rn)) {
+      if (names[NameIndex(ctx.dungeon, ctx.tables, 0, rn)] === 'BONES') bones = rn;
+    }
+    if (bones === OBJECT_ID_EOF) throw new Error(`no bones where HERO${chIdx} died`);
+    ctx.systems.timer.scheduleViAltar(bones, at, ctx.dungeon.rnMaps.pos(bones), ctx.state.tickCount);
+    for (let t = 0; t < 20 && !isAlive(ctx.party.state.champions[chIdx]!); t++) game.gameTick();
+    return isAlive(ctx.party.state.champions[chIdx]!);
+  };
+  const back = [revive(0), revive(0), revive(1)];
+  const twice = tracker.unlocked.has('lazarus');
+  // Its state kept at a save and read back: the revivals come back with it.
+  const file = new Uint8Array([13, 0, 2]);
+  tracker.keep(fileDigest(file), JSON.parse(JSON.stringify(tracker.snapshot())) as ReturnType<AchievementTracker['snapshot']>);
+  tracker.observe({ k: 'read', file });
+  back.push(revive(0));
+  const revivals = events.filter((e) => e.kind === 'revive').map((e) => `${e.attrs.champion} ${e.attrs.times}`);
+  console.log(`  revivals: ${revivals.join(', ')}`);
+  check(back.every(Boolean) && revivals.join() === 'HERO0 1,HERO0 2,HERO1 1,HERO0 3',
+    'each champion the altar brings back is a revival, counting that champion\'s, across a save kept and read back');
+  check(!twice && tracker.unlocked.has('lazarus'), 'Lazarus unlocks at the third revival of the same champion, not before');
+}
+
+// 13. A party raised from Dungeon Master: RISE on csbgame7.dat, a DM save, with the DM
+// champions' own faces and with the utility disk's, imported either way.
+{
+  console.log('--- a party raised from Dungeon Master');
+  const csb = DATA_SETS.find((one) => one.id === 'csb')!;
+  const files = diskFiles(csb);
+  const mini = await files.read('mini.dat');
+  const portraits = await files.read(UTILITY_PORTRAITS_FILE);
+  if (!mini || !portraits) throw new Error('the csb set has no mini.dat or utility-portraits.dat');
+  const newFaces = await readUtilityPortraits(async () => portraits, (error) => { throw error; });
+  for (const faces of [null, newFaces]) {
+    const page = await standInPage(csb, files);
+    const events: AchievementEvent[] = [];
+    const tracker = new AchievementTracker(page.game, defsOf('csb'), page.screen.ui.objectTables.objectNames, { dungeonDat: page.dungeonDat, miniDat: mini },
+      page.screen.ui.graphics.basicGraphic(26));
+    tracker.onEvent((event) => events.push(event));
+    tracker.attach();
+    applySaveBytes(page.game, makeNewAdventure(new Uint8Array(readFileSync(savePath('csbgame7.dat'))), mini, new CsbRandom(1), faces));
+    const raises = events.filter((e) => e.kind === 'raise');
+    console.log(`  ${faces ? 'NEW FACE' : 'OLD FACE'}: raised ${raises.map((e) => `${e.attrs.champion} from ${e.attrs.from}`).join(', ')}`);
+    check(tracker.whole && raises.length === 4 && raises.every((e) => e.attrs.from === 'imported'),
+      `csbgame7.dat's four DM champions raised with ${faces ? 'the utility disk\'s faces' : 'their own faces'} are imported`);
+  }
 }
 
 if (!wornChecked) check(false, 'a package was played');

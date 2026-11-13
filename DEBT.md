@@ -1214,9 +1214,9 @@ drawing a map from them is a separate item, entered when the author names it.
 
 ### X20 ⏸️ More achievements: the author's list
 
-The achievements are `src/engine/achievements/defs/common.txt`'s 61, four of them valued
+The achievements are `src/engine/achievements/defs/common.txt`'s 62, four of them valued
 and four counted from the data,
-`dm-atari.txt`'s 17, which every Dungeon Master set reads, and `csb.txt`'s 4, which
+`dm-atari.txt`'s 17, which every Dungeon Master set reads, and `csb.txt`'s 5, which
 disables Girl Power (`doc/ACHIEVEMENTS.md`). The author
 chose the list below, which holds what is left to write. ✓ marks what the
 condition language expresses today; [needs …] names the event or sample the tracker must
@@ -1283,10 +1283,13 @@ Me This, the riddle room's counter at 4 firing the combination of map 5 (13,19),
 Coin-Operated, its nine GOR COIN locks (`doc/ACHIEVEMENTS.md` → "Locks and switches").
 Corbum Courier is not made, at the author's choice: delivering the fourth CORBUM to the
 FULYA PIT is what wins Chaos Strikes Back (`doc/CSBwin-src/Attack.cpp:2204`), so its time
-limit would be Speed Runner's and Blitz's again. What is left:
+limit would be Speed Runner's and Blitz's again. Step 8d is done: the `revive` event at the
+Vi altar, its `times` that champion's count, and the `raise` event at a CSB adventure's
+start, `from: prison` where a champion's portrait is a cell of the set's graphic 26, with
+Lazarus and CSB's Fresh Faces (`doc/ACHIEVEMENTS.md` → "Where the party came from").
+Veterans waits on the author, below. What is left:
 
-8. **The rest of a game's own triggers**, in two parts left, one commit each:
-   - **8d. A revival and where the party came from** (M): Lazarus, Veterans, Fresh Faces.
+8. **The rest of a game's own triggers**, one part left:
    - **8e. Save loads** (S): Ironman, Hardcore. A load is a `read` the tracker sees,
      and the boot's CONTINUE after the page was closed is one too: the recording's path
      prunes what was played past a save before its read (`doc/RECORDING.md` → "Pruning"),
@@ -1311,17 +1314,24 @@ stay common.
   - **Ironman** (hard): win without ever loading a save. [save loads]
   - **Hardcore** (hard): win without loading a save and without a champion ever dying.
     [save loads]
-- The party:
-  - **Lazarus** (weird): bring the same champion back from the dead three times. [a
-    revival at an altar]
-
 **Chaos Strikes Back** (`csb.txt`). A base the author may ask the forum's players to
 improve.
 
 - **Veterans** (weird): win with a party brought over from a won DM game by MAKE NEW
-  ADVENTURE. [where the party came from]
-- **Fresh Faces** (hard): win with a party recruited in the prison, none of them
-  imported. [where the party came from]
+  ADVENTURE. **Waits on the author.** No game holds that its source was won: a DM save is
+  always made before the win, which writes none (`_FusionSequence`,
+  `doc/CSBwin-src/Attack.cpp:2270`, the game ending at its credits), and the adventure
+  keeps of its source only the party, the source's `RandomGameID` with its first byte one
+  higher, and `Word22594` (`TAG002724`, `src/engine/Chaos.ts`). The options:
+  1. **Without "won"**, in one game: win with a party of Dungeon Master's champions.
+     `raise`'s `from` gains `dm`, a portrait that is a cell of DM's graphic 26 or of the
+     utility disk's redrawn faces, both in `utility-portraits.dat` (items 1 and 0), which
+     the tracker would read beside `mini.dat`. The verifier checks it exactly. Size S.
+  2. **With "won"**, across games, in step 9: the adventure's playthrough names the DM
+     one it was raised from, and the store knows whether that one was won (its Roll the
+     Credits row). The Hall verifies it only with the DM game's proof as well. Size M,
+     with step 9.
+  3. **Not made.**
 
 **Across games.**
 
@@ -1341,8 +1351,7 @@ improve.
 | Progress across games | Hall of Fame Tour, Every Ending, Grand Slam, Encore, Dungeon Janitor, HR Problem |
 | Save loads | Ironman, Hardcore |
 | Which ending, across games (Gullible's unlock for DM's bad one) | Every Ending |
-| Where the party came from | Veterans, Fresh Faces |
-| A revival at an altar | Lazarus |
+| Where the party came from, from DM | Veterans, if the author chooses option 1 |
 
 ## H — Deliberate divergences (not debt)
 

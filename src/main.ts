@@ -533,7 +533,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     const defs = achievementFiles && achievementDefs(dataSet.id);
     const achievementStore = new BrowserAchievementStore((rows) => drawPlaythrough(storeRandom, rows));
     const achievements = achievementFiles && defs && new PageAchievements(game, dataSet.id, defs, screen.ui.objectTables.objectNames,
-        achievementStore, saves, teleported, achievementFiles, (message, error) => console.warn(message, error));
+        screen.ui.graphics.basicGraphic(26), achievementStore, saves, teleported, achievementFiles, (message, error) => console.warn(message, error));
     // Each unlock a banner over the view, with ACHIEVEMENT NOTICES on.
     achievements?.onShown(({ def }) => showAchievementNotice(screen.ui, { name: def.name, tier: def.tier }));
     // The proofs of the unlocks, sent by a player with a public name at a save and at the
