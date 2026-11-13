@@ -469,7 +469,7 @@ body.welcome {
     grid-template-columns: 18px 174px minmax(0, 1fr) auto;
     align-items: center;
     column-gap: 9px;
-    min-height: 27px;
+    min-height: 24px;
 }
 .add-set-checklist li > .px { color: var(--p15); }
 .add-set-checklist li.absent > .px { color: var(--p1); }

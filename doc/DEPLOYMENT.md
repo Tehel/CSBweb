@@ -331,8 +331,9 @@ one at a time, on a yes, it copies a set's files from `tools/fixtures/gamefiles/
 manifest's flags, then the manifest's default set where the table has none. It skips a set
 whose id or folder the table holds already, its `achievements.txt` too, since a set's
 folder never changes once its row names it (`server/backup.ts`): an installed set gets a
-new or changed `achievements.txt` through a moderator's edit (`server/edit.ts`), which
-writes it a new folder under the same id. It
+new or changed `achievements.txt` through a moderator's edit, the pen on its tile and the
+form's `achievements.txt` row, given `tools/achievements/dungeon-master.txt` or `csb.txt`
+(`server/edit.ts`), which writes it a new folder under the same id. It
 does not publish them through `api/data-sets`: a published set has an owner, and so is no
 base set, and a publish carries no `mini.dat`.
 

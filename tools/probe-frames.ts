@@ -665,12 +665,13 @@ await clickBeside();
 check(await evaluate(`!document.querySelector('dialog.about') && location.hash === ''`), 'a click beside it closes it, and takes #about off the address');
 await clickOn('.pick[data-set="dm-atari-1.2"]');
 // The form that adds a set (`src/ui/addDataSetForm.ts`), which "+ Add my own" opens: its
-// checklist, a row each for the name, the id and the six files, crossed where needed and
+// checklist, a row each for the name, the id and the seven files, crossed where needed and
 // missing or wrong, checked where right. CANCEL closes it. Then the player's own set
 // (`src/data/LocalDataSets.ts`) is made through it: DM's dungeon.dat dropped with CSB's
 // thumbnail, hcsb.hct, and a file none of a dungeon's, the game files under names that
 // are not theirs; the id made from the name, then
-// written; hcsb.hct alone crossing hcsb.dat and holding CONFIRM, until it is removed; a
+// written; hcsb.hct alone crossing hcsb.dat and holding CONFIRM, until it is removed;
+// Dungeon Master's achievements, under another name, crossed, their family the site's; a
 // graphics.dat given turning off the choice of graphics; an image of 640x400 refused as
 // the thumbnail, its row saying so, the one before kept; the thumbnail removed, and drawn
 // again by "Generate from data" from DM's graphics; the checkbox beside a thumbnail, off
@@ -705,7 +706,7 @@ await clickOn('.pick.add');
 const opened = await form();
 console.log('  form:', JSON.stringify(opened));
 check(opened?.open === true && !opened.confirm && opened.title === 'Add my own dungeon' && !opened.fixedId && !opened.deletable && opened.dmRules && opened.base === 'dm-atari*,csb' && opened.problems.length === 0 && opened.holds === ''
-  && opened.rows === 'namex,idx,dungeon.datx,graphics.dat+,CSBgraphics.dat,hcsb.hct,hcsb.dat,thumbnail'
+  && opened.rows === 'namex,idx,dungeon.datx,graphics.dat+,CSBgraphics.dat,hcsb.hct,hcsb.dat,achievements.txt,thumbnail'
   && opened.generate === 'on' && opened.thumbnail === 'Generate from data' && opened.asTitle === '' && opened.official === 'hidden',
   '"+ Add my own" opens the form, DM rules checked, no official game\'s checkbox to a player: the name, the id and dungeon.dat crossed, DM\'s graphics.dat checked, the thumbnail offered from it, CONFIRM held');
 check(opened.height <= 600, 'the form is on one screen');
@@ -718,7 +719,7 @@ await typeIn('name', 'My Own Dungeon');
 await settled();
 const filled = await form();
 console.log('  form:', JSON.stringify(filled));
-check(filled.id === 'my-own-dungeon' && filled.rows === 'name+,id+,dungeon.dat+,graphics.dat+,CSBgraphics.dat,hcsb.hct+,hcsb.datx,thumbnail+'
+check(filled.id === 'my-own-dungeon' && filled.rows === 'name+,id+,dungeon.dat+,graphics.dat+,CSBgraphics.dat,hcsb.hct+,hcsb.datx,achievements.txt,thumbnail+'
   && filled.dropped === "Not one of a dungeon's files: notes.txt." && !filled.confirm && filled.asTitle === 'off'
   && filled.problems.join() === 'The Hint Oracle needs hcsb.dat beside hcsb.hct.',
   'dropped files go where what they hold says, whatever their names, an image to the thumbnail; the id is the name\'s; hcsb.hct alone crosses hcsb.dat and holds CONFIRM');
@@ -732,9 +733,19 @@ await settled();
 const ready = await form();
 check(ownGraphics.base === 'dm-atari*-,csb-' && ownGraphics.dropped === '' && ready.base === 'dm-atari*,csb',
   'a graphics.dat given turns the choice of graphics off, and its removal on');
-check(ready.rows === 'name+,id+,dungeon.dat+,graphics.dat+,CSBgraphics.dat,hcsb.hct,hcsb.dat,thumbnail+' && ready.id === MINE
+check(ready.rows === 'name+,id+,dungeon.dat+,graphics.dat+,CSBgraphics.dat,hcsb.hct,hcsb.dat,achievements.txt,thumbnail+' && ready.id === MINE
   && ready.confirm && ready.problems.length === 0,
   'a row\'s × takes its file back, and with nothing wrong CONFIRM is given');
+await dropIn([['/gamefiles/dm-atari/achievements.txt', 'dungeon-master.txt']]);
+await settled();
+const achieved = await form();
+console.log('  achievements:', JSON.stringify(achieved));
+await removeIn('achievements.txt');
+await settled();
+check(achieved.rows === ready.rows.replace('achievements.txt', 'achievements.txtx') && !achieved.confirm && achieved.height <= 600
+  && achieved.problems.join() === 'Family "dungeon-master": moderators only.'
+  && (await form()).rows === ready.rows,
+  'Dungeon Master\'s achievements, told by what they hold, are crossed to a player: their family is the site\'s; the form on one screen');
 await inForm(`const c=new OffscreenCanvas(640,400);c.getContext('2d').fillRect(0,0,640,400);
   const dt=new DataTransfer();dt.items.add(new File([await c.convertToBlob({type:'image/png'})],'large.png',{type:'image/png'}));
   d.querySelector('.add-set-drop').dispatchEvent(new DragEvent('drop',{dataTransfer:dt,bubbles:true,cancelable:true}))`);
@@ -1060,7 +1071,7 @@ const siteForm = { ...(await form()), publish: await publishState(), note: await
 console.log('  the pen, to a moderator:', JSON.stringify(siteForm));
 check(siteForm.open === true && siteForm.title === 'Edit the published dungeon' && siteForm.name === 'My Edited Dungeon' && siteForm.id === MINE
   && siteForm.fixedId && siteForm.prefix === true && !siteForm.deletable && siteForm.publish === 'hidden' && siteForm.removable === 'graphics.dat,thumbnail'
-  && !siteForm.rows.includes('x') && siteForm.rows.includes('dungeon.dat+') && siteForm.thumbnail === 'thumbnail.png' && !siteForm.confirm && siteForm.note === ''
+  && !/x(,|$)/.test(siteForm.rows) && siteForm.rows.includes('dungeon.dat+') && siteForm.thumbnail === 'thumbnail.png' && !siteForm.confirm && siteForm.note === ''
   && siteForm.official === 'off',
   'the pen opens the form on the published set, its files the folder\'s, its id fixed, no PUBLISH nor DELETE, CONFIRM held until a change, the official game\'s checkbox offered, off');
 await typeIn('description', 'Edited by a moderator.');

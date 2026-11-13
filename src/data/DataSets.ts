@@ -42,6 +42,10 @@
  * `"moderator": true` says that the player asking is one of the site's moderators, which
  * only the server's answer to a moderator says; it may be left out, for `false`.
  *
+ * `"reservedFamilies"` lists the families of sets a player's own set may not declare in its
+ * achievements, the site's own sets' (`DataSetManifest.reservedFamilies`); it may be left
+ * out, for none.
+ *
  * A set's folder may also hold its thumbnail, `<id>-thumbnail.png` (`thumbnailPath`): the
  * last frame of its title, which the welcome page's tile shows. `tools/gen-thumbnails.ts`
  * writes it from the folder's `graphics.dat`, so the page fetches no game file to draw the
@@ -158,6 +162,15 @@ export interface DataSetManifest {
      * welcome page then lists the hidden sets too (`chooserSets`).
      */
     moderator: boolean;
+    /**
+     * The families of sets a player who does not moderate may not declare in a set's own
+     * achievements (`family:`, `doc/ACHIEVEMENTS.md` → "The file"): the manifest's
+     * `"reservedFamilies"`, each site's set's id and the family its file declares
+     * (`reservedFamilies`, `server/setAchievements.ts`), none where it says none. The form
+     * that adds a set checks a file against them (`checkLocalDataSet`), as the server does
+     * at a publish.
+     */
+    reservedFamilies: readonly string[];
 }
 
 /**
@@ -175,10 +188,11 @@ export const LOCAL_DATA_SET_PREFIX = 'local:';
 export const LOCAL_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,39}$/;
 
 /**
- * The files a player's own set may hold, by the name the game reads them under, and
- * `thumbnail`, an image (`LocalDataSetRecord`, `src/data/LocalDataSets.ts`).
+ * The files a player's own set may hold, by the name the game reads them under, its own
+ * achievements (`ACHIEVEMENTS_FILE`), and `thumbnail`, an image (`LocalDataSetRecord`,
+ * `src/data/LocalDataSets.ts`).
  */
-export const LOCAL_DATA_SET_FILES = ['dungeon.dat', 'graphics.dat', 'CSBgraphics.dat', 'hcsb.hct', 'hcsb.dat', 'thumbnail'] as const;
+export const LOCAL_DATA_SET_FILES = ['dungeon.dat', 'graphics.dat', 'CSBgraphics.dat', 'hcsb.hct', 'hcsb.dat', 'achievements.txt', 'thumbnail'] as const;
 
 /**
  * The field of a moderator's edit of a published set that names a file of
@@ -230,6 +244,13 @@ export const GAME_FILES = ['graphics.dat', 'CSBgraphics.dat', 'hcsb.hct', 'hcsb.
  * an edit of it changes no recording's set (`findRecordingSet`).
  */
 export const ACHIEVEMENTS_FILE = 'achievements.txt';
+
+/**
+ * The largest `ACHIEVEMENTS_FILE`, in bytes (`ACHIEVEMENT_LIMITS`,
+ * `src/engine/achievements/AchievementFile.ts`): here, where the server reads it, which
+ * refuses a larger one in a set's form (`server/publish.ts`).
+ */
+export const ACHIEVEMENTS_FILE_BYTES = 64 * 1024;
 
 /**
  * The header in which the page names its player to `DATA_SETS_ROUTE`: their `playerId`
@@ -515,7 +536,7 @@ export function parseManifest(text: string, base: string): DataSetManifest {
         throw manifestError(`it is not JSON (${error instanceof Error ? error.message : String(error)})`);
     }
     if (!isRecord(json)) throw manifestError('it is not an object');
-    const { dataSets: list, default: defaultId, moderator = false } = json;
+    const { dataSets: list, default: defaultId, moderator = false, reservedFamilies = [] } = json;
     if (!Array.isArray(list)) throw manifestError('"dataSets" is not a list of data sets');
 
     const dataSets = list.map((entry: unknown, i): DataSet => {
@@ -560,7 +581,8 @@ export function parseManifest(text: string, base: string): DataSetManifest {
     const defaultSet = defaultId === undefined || defaultId === null ? null : dataSets.find((set) => set.id === defaultId);
     if (defaultSet === undefined) throw manifestError(`"default" names none of its data sets`);
     if (typeof moderator !== 'boolean') throw manifestError('"moderator" is neither true nor false');
-    return { dataSets, defaultSet, moderator };
+    if (!Array.isArray(reservedFamilies) || !reservedFamilies.every(isText)) throw manifestError('"reservedFamilies" is not a list of texts');
+    return { dataSets, defaultSet, moderator, reservedFamilies: reservedFamilies as string[] };
 }
 
 /**

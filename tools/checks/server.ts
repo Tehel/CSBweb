@@ -43,21 +43,27 @@
  *     published, its `local:` dropped, its folder written whole with its base set's
  *     `graphics.dat` and its thumbnail, no `.partial` left, its row pending, last, owned by
  *     its sender, its text and flags those of the page's record, and offered to its owner
- *     and the moderators only; one with its own `graphics.dat` and the Hint Oracle; and
+ *     and the moderators only; one with its own `graphics.dat` and the Hint Oracle; one
+ *     with its own achievements, of a family of its own, kept as `achievements.txt` and
+ *     digested by no `api/data-set-files`; the families `api/data-sets` reserves, the site's
+ *     sets' ids and Dungeon Master's, which a moderator may give a set; and
  *     every refusal answered with nothing written: the rate limit, no player, not a form,
  *     a field unknown, missing, twice or too long, a bad id, a file or a request too
  *     large, an id the table or the folder holds, and a set the page's check refuses, a
- *     thumbnail that is not a PNG or not 320x200, and a base set that is not the site's; a table made
+ *     thumbnail that is not a PNG or not 320x200, a base set that is not the site's, and
+ *     achievements of a family the site reserves, that do not read or over 64 KB; a table made
  *     before the publish's columns gains them;
  *   - `POST /api/data-sets/<id>` with a form (`server/edit.ts`): a moderator edits a set's
  *     text, its row changed and its folder not, and its files, each change a new folder,
  *     `<id>@2` then `<id>@3`, a file the form does not know carried over, the old folder
  *     deleted, its flags following from its files and its walls the new `dungeon.dat`'s; a
  *     site's set too, whose folder is a link, the folder it leads to left as it was; each
- *     edit notified; and every refusal answered with nothing changed: an asker who is not a
+ *     edit notified; a site's set given Dungeon Master's achievements, its family the
+ *     site's, and its achievements taken away, each a new folder; and every refusal
+ *     answered with nothing changed: an asker who is not a
  *     moderator (403, a body too large too, unread), a body too large or not a form, an id
  *     in the form, a field missing, a `remove` of no file, twice or of a file given (400), an
- *     unknown id (404), and a set the page's check refuses (422);
+ *     unknown id (404), and a set the page's check refuses (422), its achievements too;
  *   - `POST /api/data-sets/<id>/documents` (`server/documents.ts`): a moderator adds a document
  *     to a set, a site's whose folder is a link and a pending player's, and removes one,
  *     each change a new folder, `<id>@2` and on, every other file carried over, the old
@@ -133,25 +139,34 @@ import { NOBODY, notificationText } from '../../server/notify.ts';
 import { DOCUMENT_FIELD } from '../../server/documents.ts';
 import { MAX_MODERATION_BYTES } from '../../server/moderate.ts';
 import { MAX_PUBLISH_BYTES, MAX_PUBLISHED_FILE_BYTES } from '../../server/publish.ts';
+import { folderAchievements, type BuiltAchievements } from '../../server/setAchievements.ts';
 import { ProofStore } from '../../server/proofs.ts';
 import { fillEndings, MAX_RECORDING_BYTES, MAX_RECORDING_MODERATION_BYTES, MAX_SHARE_BYTES, RecordingStore } from '../../server/recordings.ts';
 import { StatsStore } from '../../server/stats.ts';
 import { openStore } from '../../server/store.ts';
 import {
-    DATA_SET_FILES_ROUTE, DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, documentPath, GAME_FILES, LOCAL_DATA_SET_TEXT_LIMITS, parseManifest, PLAYER_ID_HEADER, RECORDING_FILES, RECORDING_PACKAGE_FIELD, RECORDINGS_ROUTE, SHARED_RECORDING_ID,
+    ACHIEVEMENTS_FILE, ACHIEVEMENTS_FILE_BYTES, DATA_SET_FILES_ROUTE, DATA_SET_WALLS_ROUTE, DATA_SETS_ROUTE, DOCUMENTS_SEGMENT, documentPath, GAME_FILES, LOCAL_DATA_SET_TEXT_LIMITS, parseManifest, PLAYER_ID_HEADER, RECORDING_FILES, RECORDING_PACKAGE_FIELD, RECORDINGS_ROUTE, SHARED_RECORDING_ID,
 } from '../../src/data/DataSets.ts';
 import { fileDigest } from '../../src/data/DataSetFiles.ts';
 import { localDataSet } from '../../src/data/LocalDataSets.ts';
 import { parseSetDigests } from '../../src/data/RecordingSet.ts';
+import { familyOf } from '../../src/engine/achievements/PageAchievements.ts';
 import { checkLocalDataSet, readDungeonWalls } from '../../src/engine/LocalDataSetCheck.ts';
 import { readRecordingPackage } from '../../src/engine/RecordingPackage.ts';
 import { parsePublishedDungeons } from '../../src/data/DungeonSignature.ts';
 import { indexedPng, indexedPngRows } from '../../src/core/png.ts';
 import { check, finish as verdict } from '../lib/check.ts';
+import { anyFamily, COMMON_ACHIEVEMENTS_TEXT } from '../lib/commonAchievements.ts';
 import { dataSetNamed, GAMEFILES_DIR, MANIFEST_FILE } from '../lib/dataSets.ts';
 import { PACKAGE_PARTY, packageOf } from '../lib/recordingPackages.ts';
 
 const ROOT = resolve(import.meta.dirname, '../..');
+
+/** The FTL sets' achievements, a file per family (`doc/ACHIEVEMENTS.md` → "The file"). */
+const FAMILIES_DIR = resolve(ROOT, 'tools/achievements');
+
+/** The source's readers of the sets' achievements, as the server's module gives them (`PageReaders`): the family and the common file, what a publish checks against. */
+const SOURCE_ACHIEVEMENTS: BuiltAchievements = { achievementDefs: () => null, achievementsAcross: () => [], familyOf, commonAchievementsText: () => COMMON_ACHIEVEMENTS_TEXT };
 
 interface Answer {
     status: number;
@@ -285,7 +300,9 @@ function scratchFiles(scratch: string): ServerOptions {
         + 'export async function readDungeonWalls() { throw new Error("a stand-in"); }\n'
         + 'export async function readRecordingPackage() { throw new Error("a stand-in"); }\n'
         + 'export function achievementDefs() { return null; }\n'
-        + 'export function achievementsAcross() { return []; }\n');
+        + 'export function achievementsAcross() { return []; }\n'
+        + 'export function familyOf(id) { return id; }\n'
+        + 'export function commonAchievementsText() { return ""; }\n');
     writeFileSync(join(gamefilesDir, 'set-a', 'dungeon.dat'), Buffer.from([1, 2, 3, 4]));
     writeFileSync(join(gamefilesDir, 'set-a', 'large.dat'), Buffer.alloc(LARGE_FILE_BYTES));
     writeFileSync(join(gamefilesDir, 'set-a', '.hidden'), 'hidden');
@@ -629,7 +646,7 @@ async function checkEventBudget(scratch: string): Promise<void> {
         checkDataSet: checkLocalDataSet, dataSets, moderators: [], store, notify: NOBODY,
         rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000), eventBudget: new RateLimit(4, 86_400_000),
         publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now, recordings: recordingsApi(db, join(scratch, 'budget', 'recordings')),
-        identities: identitiesApi(db), proofs: proofsApi(db), achievementDefs: () => null, achievementsAcross: () => [],
+        identities: identitiesApi(db), proofs: proofsApi(db), achievementDefs: () => null, achievementsAcross: () => [], achievementsCheck: anyFamily,
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
     const port = (server.address() as AddressInfo).port;
@@ -683,6 +700,8 @@ async function checkPublish(scratch: string): Promise<void> {
         mkdirSync(join(gamefilesDir, folder), { recursive: true });
         symlinkSync(resolve(from, 'graphics.dat'), join(gamefilesDir, folder, 'graphics.dat'));
     }
+    // Dungeon Master's achievements, which declare its family, `dungeon-master`.
+    symlinkSync(resolve(FAMILIES_DIR, 'dungeon-master.txt'), join(gamefilesDir, 'dm-atari', ACHIEVEMENTS_FILE));
     mkdirSync(join(gamefilesDir, 'conflux-dir'));
     mkdirSync(join(gamefilesDir, 'stray'));
     const options: ServerOptions = { distDir, gamefilesDir };
@@ -700,6 +719,7 @@ async function checkPublish(scratch: string): Promise<void> {
         rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000), eventBudget: new RateLimit(EVENTS_A_DAY, 86_400_000),
         publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now, recordings: recordingsApi(db, join(root, 'recordings')),
         identities: identitiesApi(db), proofs: proofsApi(db), achievementDefs: () => null, achievementsAcross: () => [],
+        achievementsCheck: folderAchievements(gamefilesDir, dataSets, SOURCE_ACHIEVEMENTS).achievementsCheck,
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
     const port = (server.address() as AddressInfo).port;
@@ -741,7 +761,7 @@ async function checkPublish(scratch: string): Promise<void> {
         console.log(`  its row: ${JSON.stringify({ ...row, owner: row.owner === PLAYER ? '<the player>' : row.owner, walls: row.walls === null ? null : '<its walls>' })}`);
         const dmFolder = { read: async (name: string) => new Uint8Array(readFileSync(`${dm.dir}/${name}`)), where: (name: string) => name };
         const record = (await checkLocalDataSet({ id: 'my-dm', name: '  My DM ', description: 'Mine. ', authors: ['A Player', ' ', 'Another '], dmRules: true, thumbnailAsTitle: false, official: false, baseSet: 'dm-atari', files: dmFiles() },
-            new Set(), (set) => (set === 'dm-atari' ? dmFolder : null), 0)).record!;
+            new Set(), (set) => (set === 'dm-atari' ? dmFolder : null), 0, anyFamily())).record!;
         const flags = localDataSet(record);
         const stored = dataSets.read().dataSets.find((set) => set.id === 'my-dm')!;
         check(row.status === 'pending' && row.owner === PLAYER && row.dir === 'my-dm' && row.position === 3, 'its row is pending, owned by its sender, its folder its id, last in the list');
@@ -896,6 +916,27 @@ async function checkPublish(scratch: string): Promise<void> {
         check(officialPublished.status === 201 && offeredOfficial.find((set) => set.id === 'p3')?.official === true
             && offeredOfficial.filter((set) => set.id !== 'p3').every((set) => !set.official), 'a moderator publishes an official game, which api/data-sets says, and of no other set');
 
+        // A set's own achievements: a file of its folder, no game file, of no family the site reserves but to a moderator.
+        const dmAchievements = new Uint8Array(readFileSync(resolve(FAMILIES_DIR, 'dungeon-master.txt')));
+        const ownAchievements = new TextEncoder().encode('# CSBweb achievements 1\nfamily: fans\n\n[fan]\nname: Fan\ntext: Win.\nwhen: won\n');
+        const reserved = parseManifest((await ask(port, '/api/data-sets', 'GET', { [PLAYER_ID_HEADER]: PLAYER })).body, '').reservedFamilies;
+        console.log(`  the families api/data-sets reserves: ${reserved.join(', ')}`);
+        check(reserved.join() === 'conflux,csb,dm-atari,dungeon-master', 'api/data-sets reserves each site\'s set\'s id and the family its achievements declare, none of a player\'s');
+        const withAchievements = await publish(fields('p4'), { ...dmFiles(), [ACHIEVEMENTS_FILE]: fileOf(ownAchievements, 'mine.txt', 'text/plain') });
+        console.log(`  with its own achievements: ${withAchievements.status} ${withAchievements.body}, ${readdirSync(join(gamefilesDir, 'p4')).sort().join(', ')}`);
+        check(withAchievements.status === 201 && readFileSync(join(gamefilesDir, 'p4', ACHIEVEMENTS_FILE)).equals(ownAchievements),
+            'a set published with its own achievements, of a family of its own, has them in its folder as achievements.txt');
+        const digested = (await ask(port, `/${DATA_SET_FILES_ROUTE}`, 'GET', { [PLAYER_ID_HEADER]: PLAYER })).body;
+        check(parseSetDigests(digested, new Map()).every((set) => !(ACHIEVEMENTS_FILE in set.files)), 'and api/data-set-files digests none of them: they are no game file');
+        await refused('achievements of a family the site reserves', 422, () => publish(fields('p5'), { ...dmFiles(), [ACHIEVEMENTS_FILE]: fileOf(dmAchievements, ACHIEVEMENTS_FILE) }),
+            'Family \\"dungeon-master\\": moderators only.');
+        await refused('achievements that do not read', 422, () => publish(fields('p5'), { ...dmFiles(), [ACHIEVEMENTS_FILE]: fileOf(new TextEncoder().encode('[x]\n'), ACHIEVEMENTS_FILE) }),
+            '"about":"achievements.txt","text":"Line 1: ');
+        await refused('achievements over 64 KB', 413, () => publish(fields('p5'), { ...dmFiles(), [ACHIEVEMENTS_FILE]: fileOf(new Uint8Array(ACHIEVEMENTS_FILE_BYTES + 1), ACHIEVEMENTS_FILE) }),
+            'achievements.txt is larger than 64 KiB');
+        const moderated = await publish(fields('p5'), { ...dmFiles(), [ACHIEVEMENTS_FILE]: fileOf(dmAchievements, ACHIEVEMENTS_FILE) }, MODERATORS[0]);
+        check(moderated.status === 201 && readFileSync(join(gamefilesDir, 'p5', ACHIEVEMENTS_FILE)).equals(dmAchievements), 'a moderator may give a set the site\'s family');
+
         // A moderator's edit (`server/edit.ts`): the moderation's route, with a form.
         console.log('\nEditing a set:');
         const edit = async (id: string, text: Record<string, string | string[]>, files: Record<string, File> = {}, player: string | null = MODERATORS[0]) => {
@@ -964,6 +1005,12 @@ async function checkPublish(scratch: string): Promise<void> {
             && rowOf('linked').owner === null && !rowOf('linked').pending, 'a site\'s set is edited too, its state kept');
         check(!existsSync(join(gamefilesDir, 'linked')) && readdirSync(outside).sort().join() === 'dungeon.dat,graphics.dat'
             && readFileSync(join(outside, 'dungeon.dat')).equals(dmDungeon), 'its link is deleted, and the folder it led to left as it was');
+        const givenAchievements = await edit('linked', editFields({ name: 'Linked' }), { [ACHIEVEMENTS_FILE]: fileOf(dmAchievements, 'dungeon-master.txt') });
+        console.log(`  achievements given, the site's family: ${givenAchievements.status}, ${rowOf('linked').dir}: ${listing(rowOf('linked').dir)}`);
+        check(givenAchievements.status === 200 && rowOf('linked').dir === 'linked@3' && readFileSync(join(gamefilesDir, 'linked@3', ACHIEVEMENTS_FILE)).equals(dmAchievements),
+            'a moderator\'s edit gives a set its achievements, as achievements.txt in a new folder, of whatever family: how an instance\'s FTL sets get theirs');
+        const removedAchievements = await edit('linked', editFields({ name: 'Linked', remove: ACHIEVEMENTS_FILE }));
+        check(removedAchievements.status === 200 && listing(rowOf('linked').dir) === 'dungeon.dat,graphics.dat,linked-thumbnail.png', 'and takes them away again');
 
         console.log('  refusals:');
         const sent = told.length;
@@ -991,6 +1038,8 @@ async function checkPublish(scratch: string): Promise<void> {
         await editRefused('dungeon.dat removed', 422, () => edit('my-dm', editFields({ remove: 'dungeon.dat' })), '"about":"dungeon.dat"');
         await editRefused('a thumbnail that is not a PNG', 422, () => edit('my-dm', editFields(), { thumbnail: fileOf(new Uint8Array(64), 'thumbnail.png', 'image/png') }), 'It is not a PNG.');
         await editRefused('an empty name', 422, () => edit('my-dm', editFields({ name: ' ' })), '"about":"name"');
+        await editRefused('achievements that do not read', 422, () => edit('my-dm', editFields(), { [ACHIEVEMENTS_FILE]: fileOf(new TextEncoder().encode('[x]\n'), ACHIEVEMENTS_FILE) }),
+            '"about":"achievements.txt"');
         check(told.length === sent, 'and nothing is notified');
     } finally {
         server.close();
@@ -1029,7 +1078,7 @@ async function checkModeration(scratch: string): Promise<void> {
         checkDataSet: checkLocalDataSet, dataSets, moderators: parseModerators(MODERATORS.join()), notify: NOBODY, store: new StatsStore(db),
         rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000), eventBudget: new RateLimit(EVENTS_A_DAY, 86_400_000),
         publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now, recordings: recordingsApi(db, join(root, 'recordings')),
-        identities: identitiesApi(db), proofs: proofsApi(db), achievementDefs: () => null, achievementsAcross: () => [],
+        identities: identitiesApi(db), proofs: proofsApi(db), achievementDefs: () => null, achievementsAcross: () => [], achievementsCheck: anyFamily,
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
     const port = (server.address() as AddressInfo).port;
@@ -1147,7 +1196,7 @@ async function checkDocuments(scratch: string): Promise<void> {
         notify: (event) => told.push(notificationText({ ...event, at: 0 }).split('\n')[0]!),
         rules: { hasSet: (id) => dataSets.hasSet(id) }, rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000), eventBudget: new RateLimit(EVENTS_A_DAY, 86_400_000),
         publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now, recordings: recordingsApi(db, join(root, 'recordings')),
-        identities: identitiesApi(db), proofs: proofsApi(db), achievementDefs: () => null, achievementsAcross: () => [],
+        identities: identitiesApi(db), proofs: proofsApi(db), achievementDefs: () => null, achievementsAcross: () => [], achievementsCheck: anyFamily,
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
     const port = (server.address() as AddressInfo).port;
@@ -1277,7 +1326,7 @@ async function checkRecordings(scratch: string): Promise<void> {
         notify: (event) => told.push(notificationText(event).split('\n')[0]!), rules: { hasSet: (id) => dataSets.hasSet(id) },
         rateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000), eventBudget: new RateLimit(EVENTS_A_DAY, 86_400_000),
         publishRateLimit: new RateLimit(PUBLISHES_PER_WINDOW, 60_000), now: Date.now, recordings,
-        identities: identitiesApi(db), proofs: proofsApi(db), achievementDefs: () => null, achievementsAcross: () => [],
+        identities: identitiesApi(db), proofs: proofsApi(db), achievementDefs: () => null, achievementsAcross: () => [], achievementsCheck: anyFamily,
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
     const port = (server.address() as AddressInfo).port;
@@ -1700,7 +1749,7 @@ async function main(): Promise<void> {
             publishRateLimit: new RateLimit(EVENTS_PER_WINDOW, 60_000),
             now: Date.now,
             recordings: recordingsApi(db, join(scratch, 'recordings')),
-            identities: identitiesApi(db), proofs: proofsApi(db), achievementDefs: () => null, achievementsAcross: () => [],
+            identities: identitiesApi(db), proofs: proofsApi(db), achievementDefs: () => null, achievementsAcross: () => [], achievementsCheck: anyFamily,
         };
         server = createAppServer(options, api);
         await new Promise<void>((done) => server!.listen(0, '127.0.0.1', done));

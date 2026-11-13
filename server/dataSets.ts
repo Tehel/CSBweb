@@ -362,8 +362,13 @@ export class DataSetStore {
  * with no set answers an empty list, and one with no `data_set_defaults` row `null` for the
  * default, which the page takes (`parseManifest`). A set the site lists recordings of to
  * everyone says how many, `"recordings"` (`RecordingStore.listed`), from `recordings`.
+ * `reservedFamilies`, the families a player's set may not declare in its achievements
+ * (`SetAchievements.achievementsCheck`), are `"reservedFamilies"`, in order, left out where
+ * there are none.
  */
-export function manifestText(stored: StoredDataSets, viewer: DataSetViewer, recordings: ReadonlyMap<string, number> = new Map()): string {
+export function manifestText(
+    stored: StoredDataSets, viewer: DataSetViewer, recordings: ReadonlyMap<string, number> = new Map(), reservedFamilies: ReadonlySet<string> = new Set(),
+): string {
     const dataSets = visibleSets(stored, viewer).map((set) => {
         const entry: Record<string, string | readonly string[] | boolean | number | readonly DataSetDocument[]> = { id: set.id, name: set.name };
         if (set.description !== '') entry.description = set.description;
@@ -376,7 +381,10 @@ export function manifestText(stored: StoredDataSets, viewer: DataSetViewer, reco
         if (listed > 0) entry.recordings = listed;
         return entry;
     });
-    return JSON.stringify({ default: stored.defaultId, ...(viewer.moderator !== null ? { moderator: true } : {}), dataSets });
+    return JSON.stringify({
+        default: stored.defaultId, ...(viewer.moderator !== null ? { moderator: true } : {}),
+        ...(reservedFamilies.size > 0 ? { reservedFamilies: [...reservedFamilies].sort() } : {}), dataSets,
+    });
 }
 
 /**

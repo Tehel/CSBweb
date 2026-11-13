@@ -13,7 +13,8 @@
  *   screen's size (`THUMBNAIL_WIDTH`): one of another size, or that does not read, is not
  *   taken, its row saying why, and any thumbnail given before stays. Any other file goes where
  *   what it holds says, whatever its name (`identifyLocalDataSetFile`): `dungeon.dat`,
- *   `graphics.dat`, `CSBgraphics.dat`, the Hint Oracle's `hcsb.hct` and `hcsb.dat`; one
+ *   `graphics.dat`, `CSBgraphics.dat`, the Hint Oracle's `hcsb.hct` and `hcsb.dat`, and the
+ *   set's own achievements, `achievements.txt` (`doc/ACHIEVEMENTS.md` → "The file"); one
  *   that reads as none of them goes where its name says, whatever its case, so that a
  *   broken file shows why on its row. A file given again replaces the one before. A PC
  *   `dungeon.dat`, little-endian, is taken as the Atari file it is the twin of
@@ -26,7 +27,9 @@
  * - **The right column** is the checklist of everything the set has, `checkLocalDataSet`'s
  *   verdict on each, run at every change: a green check where it is given and right, a
  *   red cross where it is needed and missing, or wrong, and nothing where it is optional
- *   and absent. A wrong one says why under it; each row's tooltip says what it is. A given
+ *   and absent. A wrong one says why under it; each row's tooltip says what it is. The
+ *   achievements are read against the common file, and may not declare a family of the
+ *   site's own sets (`DataSetManifest.reservedFamilies`), but to a moderator. A given
  *   file can be removed from its row. Under it, what the dungeon holds, once its
  *   `dungeon.dat` reads (`dungeonCensus`, `src/engine/DungeonCensus.ts`): its levels, its
  *   items by kind, its monsters and their groups, and its DSAs with the operations they
@@ -73,8 +76,9 @@ import { lastTitleFrame, thumbnailPng } from '../renderer/intro/TitleThumbnail';
 import { recordFile, type LocalDataSetFile, type LocalDataSetRecord } from '../data/LocalDataSets';
 import {
     checkLocalDataSet, identifyLocalDataSetFile,
-    type LocalDataSetDraft, type LocalDataSetField, type LocalDataSetProblem,
+    type AchievementsCheck, type LocalDataSetDraft, type LocalDataSetField, type LocalDataSetProblem,
 } from '../engine/LocalDataSetCheck';
+import { commonAchievementsText } from './achievementFiles';
 import { playerId } from './gameEvents';
 
 /** The sets a record without a `graphics.dat` may play the graphics of. */
@@ -97,11 +101,12 @@ const CHECKLIST: readonly ChecklistRow[] = [
     { about: 'CSBgraphics.dat', label: 'CSBgraphics.dat', needed: false, hint: "CSBWin's extra graphics, for a dungeon made with them." },
     { about: 'hcsb.hct', label: 'hcsb.hct', needed: false, hint: "The Hint Oracle's hints, with hcsb.dat." },
     { about: 'hcsb.dat', label: 'hcsb.dat', needed: false, hint: "The Hint Oracle's program, with hcsb.hct." },
+    { about: 'achievements.txt', label: 'achievements.txt', needed: false, hint: "The dungeon's own achievements, beside those every dungeon has." },
     { about: 'thumbnail', label: 'Thumbnail', needed: false, hint: `The welcome page's picture of it: an image of ${THUMBNAIL_WIDTH}x${THUMBNAIL_HEIGHT}, the screen's size, or the last frame of its title, drawn from its graphics.` },
 ];
 
 /** The files the drop area takes by name, the name the game reads them under. */
-const NAMED_FILES: readonly LocalDataSetFile[] = ['dungeon.dat', 'graphics.dat', 'CSBgraphics.dat', 'hcsb.hct', 'hcsb.dat'];
+const NAMED_FILES: readonly LocalDataSetFile[] = ['dungeon.dat', 'graphics.dat', 'CSBgraphics.dat', 'hcsb.hct', 'hcsb.dat', 'achievements.txt'];
 
 /** The thumbnail's checkbox. */
 const AS_TITLE_HINT = "The game opens on this picture, faded in and out, in place of the title's animation.";
@@ -273,6 +278,10 @@ function openForm(
     const drop = form.querySelector<HTMLElement>('.add-set-drop')!;
     const picker = drop.querySelector('input')!;
     const holds = form.querySelector<HTMLElement>('.add-set-holds')!;
+    // A moderator may give a set any family (`server/publish.ts`).
+    const achievements: AchievementsCheck = {
+        common: commonAchievementsText(), reservedFamilies: new Set(manifest.moderator ? [] : manifest.reservedFamilies),
+    };
 
     const files: Partial<Record<LocalDataSetFile, File>> = {};
     const editing: FormRecord | null = edited?.record ?? null;
@@ -526,7 +535,7 @@ function openForm(
         refused = [];
         confirm.disabled = true;
         publish.disabled = true;
-        void checkLocalDataSet(draft, takenIds, base, editing?.createdAt ?? Date.now()).then(({ problems, record: made, census }) => {
+        void checkLocalDataSet(draft, takenIds, base, editing?.createdAt ?? Date.now(), achievements).then(({ problems, record: made, census }) => {
             if (mine !== generation) return;
             verdict = { draft, problems, census };
             record = made;

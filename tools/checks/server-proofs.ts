@@ -60,6 +60,7 @@ import { acrossUnlocked } from '../../src/engine/achievements/AchievementState.t
 import { setAchievementDefs } from '../../src/engine/achievements/PageAchievements.ts';
 import { readRecordingPackage, writeRecordingPackage } from '../../src/engine/RecordingPackage.ts';
 import { check, finish } from '../lib/check.ts';
+import { anyFamily } from '../lib/commonAchievements.ts';
 import { dataSetNamed, diskFiles, GAMEFILES_DIR, MANIFEST_FILE } from '../lib/dataSets.ts';
 import { CORPUS_DIR } from '../lib/recordingCorpus.ts';
 import { packageOf, quietPackage } from '../lib/recordingPackages.ts';
@@ -112,7 +113,7 @@ async function main(): Promise<void> {
         identities: { store: identities, rateLimit: new RateLimit(100, 60_000) },
         proofs: { store: proofs, dir: proofsDir, rateLimit: new RateLimit(PROOFS_PER_WINDOW, 60_000) },
         achievementDefs: () => COMMON,
-        achievementsAcross: (id: string, bySet: ReadonlyMap<string, readonly Readonly<Record<string, number>>[]>) => acrossUnlocked(COMMON.filter((def) => def.across), bySet.get(id) ?? []),
+        achievementsAcross: (id: string, bySet: ReadonlyMap<string, readonly Readonly<Record<string, number>>[]>) => acrossUnlocked(COMMON.filter((def) => def.across), bySet.get(id) ?? []), achievementsCheck: anyFamily,
     };
     const server = createAppServer({ distDir, gamefilesDir }, api);
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
@@ -290,7 +291,7 @@ async function verifier(): Promise<void> {
         identities: { store: identities, rateLimit: new RateLimit(100, 60_000) },
         proofs: { store: proofs, dir: proofsDir, rateLimit: new RateLimit(100, 60_000) },
         achievementDefs: () => COMMON,
-        achievementsAcross: (id: string, bySet: ReadonlyMap<string, readonly Readonly<Record<string, number>>[]>) => acrossUnlocked(COMMON.filter((def) => def.across), bySet.get(id) ?? []),
+        achievementsAcross: (id: string, bySet: ReadonlyMap<string, readonly Readonly<Record<string, number>>[]>) => acrossUnlocked(COMMON.filter((def) => def.across), bySet.get(id) ?? []), achievementsCheck: anyFamily,
     };
     const server = createAppServer({ distDir, gamefilesDir }, api);
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));

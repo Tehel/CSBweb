@@ -41,6 +41,7 @@ import { DATA_SET_FILES_ROUTE, parseManifest, PLAYER_ID_HEADER, RECORDING_PACKAG
 import { checkLocalDataSet } from '../../src/engine/LocalDataSetCheck.ts';
 import { readRecordingPackage } from '../../src/engine/RecordingPackage.ts';
 import { check, finish } from '../lib/check.ts';
+import { anyFamily } from '../lib/commonAchievements.ts';
 import { CSBWIN_RUNS_UNCHECKED } from '../lib/csbwinRun.ts';
 import { dataSetNamed, diskFiles } from '../lib/dataSets.ts';
 import { packageOf, quietPackage } from '../lib/recordingPackages.ts';
@@ -87,7 +88,7 @@ const server = createAppServer(options, {
     recordings: { store, dir: recordingsDir, readPackage: readRecordingPackage, shareRateLimit: new RateLimit(100, 60_000) },
     identities: { store: new IdentityStore(db), rateLimit: new RateLimit(100, 60_000) },
     proofs: { store: new ProofStore(db, 1 << 30), dir: join(scratch, 'proofs'), rateLimit: new RateLimit(100, 60_000) },
-    achievementDefs: () => null, achievementsAcross: () => [],
+    achievementDefs: () => null, achievementsAcross: () => [], achievementsCheck: anyFamily,
 });
 await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
 const instance = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;

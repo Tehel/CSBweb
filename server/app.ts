@@ -76,7 +76,7 @@ import { manifestText, samePlayerId, wallsText, type DataSetStore, type DataSetV
 import { addDocument, removeDocument } from './documents.ts';
 import { editDataSet } from './edit.ts';
 import { fameSet, famePlayer, fameSummary, type AchievementDefsOf } from './fame.ts';
-import type { BuiltAchievementDefs, BuiltAchievementsAcross } from './setAchievements.ts';
+import type { BuiltAchievementDefs, BuiltAchievementsAcross, BuiltFamilyOf, SetAchievements } from './setAchievements.ts';
 import { addressBucket, checkEvent, isPlayerId, MAX_EVENT_BYTES, type EventRules, type RateLimit } from './events.ts';
 import { changeProfile, identityText, MAX_PROFILE_BYTES, profileText, resetName, type IdentityStore, type ProfileAnswer } from './identity.ts';
 import { MAX_PROOF_BYTES, proofsText, sendProof, type AchievementsAcrossOf, type BuiltReplayProof, type ProofAnswer, type ProofStore, type VerifierReaders } from './proofs.ts';
@@ -108,7 +108,9 @@ export const READERS_MODULE = `${SERVER_DIR}/PageReaders.js`;
  * What the server uses of `READERS_MODULE`: the page's check of a set, its reader of a
  * dungeon's walls, its reader of a shared recording's package, and its merge of a set's
  * own achievements file with the common one, and of those across games the proofs' figures
- * make yes, which the server gives each set's file from its folder (`folderAchievements`).
+ * make yes, which the server gives each set's file from its folder (`folderAchievements`),
+ * the family a set's file declares and the common file's text, which a set's own file is
+ * checked against at a publish.
  */
 export interface PageReaders {
     checkDataSet: CheckDataSet;
@@ -116,6 +118,8 @@ export interface PageReaders {
     readRecordingPackage: ReadRecordingPackage;
     achievementDefs: BuiltAchievementDefs;
     achievementsAcross: BuiltAchievementsAcross;
+    familyOf: BuiltFamilyOf;
+    commonAchievementsText: () => string;
 }
 
 /**
@@ -143,7 +147,10 @@ export async function loadVerifierReaders(distDir: string): Promise<VerifierRead
 /** What `READERS_MODULE` exports, loaded from `distDir`; throws, saying why, where it is not built. */
 export async function loadPageReaders(distDir: string): Promise<PageReaders> {
     const file = join(distDir, READERS_MODULE);
-    let module: { checkLocalDataSet?: unknown; readDungeonWalls?: unknown; readRecordingPackage?: unknown; achievementDefs?: unknown; achievementsAcross?: unknown };
+    let module: {
+        checkLocalDataSet?: unknown; readDungeonWalls?: unknown; readRecordingPackage?: unknown; achievementDefs?: unknown; achievementsAcross?: unknown;
+        familyOf?: unknown; commonAchievementsText?: unknown;
+    };
     try {
         module = await import(pathToFileURL(file).href);
     } catch (error) {
@@ -154,10 +161,13 @@ export async function loadPageReaders(distDir: string): Promise<PageReaders> {
     if (typeof module.readRecordingPackage !== 'function') throw new Error(`${file} exports no readRecordingPackage`);
     if (typeof module.achievementDefs !== 'function') throw new Error(`${file} exports no achievementDefs`);
     if (typeof module.achievementsAcross !== 'function') throw new Error(`${file} exports no achievementsAcross`);
+    if (typeof module.familyOf !== 'function') throw new Error(`${file} exports no familyOf`);
+    if (typeof module.commonAchievementsText !== 'function') throw new Error(`${file} exports no commonAchievementsText`);
     return {
         checkDataSet: module.checkLocalDataSet as CheckDataSet, readDungeonWalls: module.readDungeonWalls as ReadDungeonWalls,
         readRecordingPackage: module.readRecordingPackage as ReadRecordingPackage, achievementDefs: module.achievementDefs as BuiltAchievementDefs,
-        achievementsAcross: module.achievementsAcross as BuiltAchievementsAcross,
+        achievementsAcross: module.achievementsAcross as BuiltAchievementsAcross, familyOf: module.familyOf as BuiltFamilyOf,
+        commonAchievementsText: module.commonAchievementsText as () => string,
     };
 }
 
@@ -210,6 +220,8 @@ export interface ApiOptions {
     achievementDefs: AchievementDefsOf;
     /** A set's achievements across games the proofs' figures make yes (`folderAchievements`, `ProofStore.hall`). */
     achievementsAcross: AchievementsAcrossOf;
+    /** What a set's own achievements are checked against at a publish or an edit, and the families the manifest reserves (`folderAchievements`). */
+    achievementsCheck: SetAchievements['achievementsCheck'];
 }
 
 /** What the API needs of the proofs. */
@@ -374,7 +386,8 @@ function route({ distDir, gamefilesDir, filesDir }: ServerOptions, api: ApiOptio
             if (req.method !== 'GET' && req.method !== 'HEAD') return refuseMethod(res, 'GET, HEAD, POST');
             res.setHeader('Cache-Control', 'no-store');
             res.setHeader('Vary', PLAYER_ID_HEADER);
-            return send(res, 200, manifestText(api.dataSets.read(), dataSetViewer(api, req), api.recordings.store.listed()), 'application/json; charset=utf-8');
+            return send(res, 200, manifestText(api.dataSets.read(), dataSetViewer(api, req), api.recordings.store.listed(), api.achievementsCheck().reservedFamilies),
+                'application/json; charset=utf-8');
         }
         if (segments.join('/') === DATA_SET_WALLS_ROUTE) {
             if (req.method !== 'GET' && req.method !== 'HEAD') return refuseMethod(res);
@@ -651,7 +664,7 @@ async function receiveEvent(api: ApiOptions, req: IncomingMessage, res: ServerRe
 }
 
 /** What `receivePublish` needs of the API. */
-export type PublishApi = Pick<ApiOptions, 'checkDataSet' | 'dataSets' | 'moderators' | 'publishRateLimit' | 'now' | 'notify'>;
+export type PublishApi = Pick<ApiOptions, 'checkDataSet' | 'achievementsCheck' | 'dataSets' | 'moderators' | 'publishRateLimit' | 'now' | 'notify'>;
 
 /**
  * `POST api/data-sets`: the rate limit first, then the player, a `multipart/form-data` body
@@ -675,7 +688,7 @@ export async function receivePublish(gamefilesDir: string, api: PublishApi, req:
         const form = await readForm(req);
         reply = typeof form === 'string' ? answer(form === 'large' ? 413 : 400, FORM_REFUSALS[form])
             : await publishDataSet(form, playerId, {
-                checkDataSet: api.checkDataSet, dataSets: api.dataSets, gamefilesDir, now: api.now,
+                checkDataSet: api.checkDataSet, achievementsCheck: api.achievementsCheck, dataSets: api.dataSets, gamefilesDir, now: api.now,
                 notify: api.notify, publisher: moderator?.name ?? 'a player', moderates: moderator !== null,
             });
     }
@@ -700,7 +713,7 @@ async function readForm(req: IncomingMessage, limit = MAX_PUBLISH_BYTES): Promis
 }
 
 /** What `receiveEdit` needs of the API. */
-export type EditApi = Pick<ApiOptions, 'checkDataSet' | 'dataSets' | 'moderators' | 'now' | 'notify'>;
+export type EditApi = Pick<ApiOptions, 'checkDataSet' | 'achievementsCheck' | 'dataSets' | 'moderators' | 'now' | 'notify'>;
 
 /**
  * `POST api/data-sets/<id>` with a form: its asker, refused unless they moderate before the
@@ -717,7 +730,9 @@ export async function receiveEdit(id: string, gamefilesDir: string, api: EditApi
     } else {
         const form = await readForm(req);
         reply = typeof form === 'string' ? { status: form === 'large' ? 413 : 400, body: { error: FORM_REFUSALS[form] } }
-            : await editDataSet(id, form, viewer, { checkDataSet: api.checkDataSet, dataSets: api.dataSets, gamefilesDir, notify: api.notify, now: api.now });
+            : await editDataSet(id, form, viewer, {
+                checkDataSet: api.checkDataSet, achievementsCheck: api.achievementsCheck, dataSets: api.dataSets, gamefilesDir, notify: api.notify, now: api.now,
+            });
     }
     res.setHeader('Cache-Control', 'no-store');
     send(res, reply.status, JSON.stringify(reply.body), 'application/json; charset=utf-8');

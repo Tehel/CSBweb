@@ -9,7 +9,7 @@
 import { CSBGraphicsLoader, CSBGRAPHICS_SENTINEL } from '../data/CSBGraphicsLoader';
 import { readRuntimeFileSignatures } from '../data/CsbwinExpool';
 import { csbGraphicsExpected, noExpectedSignatures, readExpectedSignatures } from '../data/CsbwinExtendedFeatures';
-import { LOCAL_DATA_SET_PREFIX, LOCAL_ID_PATTERN } from '../data/DataSets';
+import { ACHIEVEMENTS_FILE_BYTES, LOCAL_DATA_SET_PREFIX, LOCAL_ID_PATTERN } from '../data/DataSets';
 import type { DataSetFiles } from '../data/DataSetFiles';
 import { DungeonLoader } from '../data/DungeonLoader';
 import { dungeonWalls, type DungeonWalls } from '../data/DungeonSignature';
@@ -20,6 +20,7 @@ import { parseHcsbDat } from '../data/HintOracleLoader';
 import type { LocalDataSetFile, LocalDataSetRecord } from '../data/LocalDataSets';
 import { extractGraphicsTables } from '../data/tables/GraphicsTables';
 import { readU16BE } from '../core/bytes';
+import { ACHIEVEMENTS_HEADER, mergeAchievements, readAchievementFile, unknownItems, unusedValues } from './achievements/AchievementFile';
 import { dungeonCensus, type DungeonCensus } from './DungeonCensus';
 import { buildGameTables } from './GameTables';
 
@@ -38,6 +39,20 @@ export interface LocalDataSetDraft {
     /** The set whose `graphics.dat` it plays where `files` holds none: `dm-atari` or `csb`. */
     baseSet: string;
     files: Partial<Record<LocalDataSetFile, Blob>>;
+}
+
+/**
+ * What the check needs to read a set's own achievements (`achievements.txt`,
+ * `doc/ACHIEVEMENTS.md` → "The file"): the page's and the server's alike.
+ */
+export interface AchievementsCheck {
+    /** The common file's text (`common.txt`, `commonAchievementsText`), which the set's is laid over. */
+    common: string;
+    /**
+     * The families the set's file may not declare (`family:`): the site's own sets'
+     * (`DataSetManifest.reservedFamilies`), none to a moderator.
+     */
+    reservedFamilies: ReadonlySet<string>;
 }
 
 /** What a problem is about: a field of the form, or one of its files. */
@@ -64,6 +79,11 @@ export interface LocalDataSetProblem {
  *   does not expect one (`csbGraphicsExpected`). Either is the boot's death
  *   (`src/engine/FileSignatures.ts`).
  * - The Hint Oracle is both its files or neither, and `hcsb.dat` parses.
+ * - Its own achievements, where it has them (`achievementsProblems`): a file of at most
+ *   `ACHIEVEMENTS_FILE_BYTES` that reads, each error a problem with its line; of no family
+ *   of `achievements.reservedFamilies`; whose every value an achievement names
+ *   (`unusedValues`), once laid over `achievements.common`; and whose every object is one
+ *   its `graphics.dat` names (`unknownItems`), where that reads.
  * - The thumbnail is an image. The record shows it as the title only where it has one.
  *
  * With them, what the dungeon holds (`dungeonCensus`) and its walls (`dungeonWalls`),
@@ -78,6 +98,7 @@ export async function checkLocalDataSet(
     takenIds: ReadonlySet<string>,
     base: (set: string) => DataSetFiles | null,
     createdAt: number,
+    achievements: AchievementsCheck,
 ): Promise<{ problems: LocalDataSetProblem[]; record: LocalDataSetRecord | null; census: DungeonCensus | null; walls: DungeonWalls | null }> {
     const problems: LocalDataSetProblem[] = [];
     const problem = (about: LocalDataSetField, text: string): void => {
@@ -104,6 +125,7 @@ export async function checkLocalDataSet(
     const graphicsAbout: LocalDataSetField = ownGraphics ? 'graphics.dat' : 'baseSet';
     const baseFiles = ownGraphics ? null : base(draft.baseSet);
     const graphicsSource = ownGraphics ?? await baseFiles?.read('graphics.dat') ?? null;
+    let objectNames: ReadonlySet<string> | null = null;
     if (!graphicsSource) {
         problem('baseSet', baseFiles ? `The graphics.dat of '${draft.baseSet}' cannot be read.`
             : `The site has no '${draft.baseSet}' to lend its graphics.dat: give the set its own.`);
@@ -112,6 +134,7 @@ export async function checkLocalDataSet(
         const graphics = await readGraphics(graphicsSource);
         if (graphics.error !== null) problem(graphicsAbout, `It is not a graphics.dat: ${graphics.error}`);
         else {
+            objectNames = graphics.objectNames;
             const refused = runtime && graphicsSignatureRefused(runtime, graphics.signature!);
             if (refused !== null) problem(graphicsAbout, `The dungeon was made for another graphics.dat (signature ${runtime!.graphicsSignature}, this one's ${refused}).`);
         }
@@ -137,6 +160,10 @@ export async function checkLocalDataSet(
     if (dat) {
         const error = await readHcsbDat(dat);
         if (error !== null) problem('hcsb.dat', `It is not the Hint Oracle's hcsb.dat: ${error}`);
+    }
+    const ownAchievements = files['achievements.txt'];
+    if (ownAchievements) {
+        for (const text of achievementsProblems(await readText(ownAchievements), achievements, objectNames)) problem('achievements.txt', text);
     }
     const thumbnail = files.thumbnail;
     if (thumbnail && !thumbnail.type.startsWith('image/')) problem('thumbnail', 'It is not an image.');
@@ -165,6 +192,33 @@ export async function checkLocalDataSet(
 }
 
 /**
+ * What is wrong with `text`, a set's own achievements file (`checkLocalDataSet`), `null`
+ * where the file is over `ACHIEVEMENTS_FILE_BYTES`: none where nothing is. Its objects are
+ * checked against `objectNames` where its `graphics.dat` reads.
+ */
+function achievementsProblems(text: string | null, { common, reservedFamilies }: AchievementsCheck, objectNames: ReadonlySet<string> | null): string[] {
+    if (text === null) return [`It is over ${ACHIEVEMENTS_FILE_BYTES / 1024} KB.`];
+    const read = readAchievementFile(text);
+    if (!read.ok) return read.errors.map(({ line, message }) => `Line ${line}: ${message}.`);
+    const own = read.file;
+    const problems: string[] = [];
+    if (own.family !== null && reservedFamilies.has(own.family)) {
+        problems.push(`Family "${own.family}": moderators only.`);
+    }
+    const commonRead = readAchievementFile(common);
+    if (!commonRead.ok) throw new Error('The common achievements do not read.');
+    const unused = unusedValues(own, mergeAchievements(commonRead.file, own));
+    if (unused.length > 0) problems.push(`No achievement names ${unused.length === 1 ? 'the value' : 'the values'} ${unused.join(', ')}.`);
+    if (objectNames) {
+        for (const def of own.defs) {
+            const unknown = unknownItems(def, objectNames);
+            if (unknown.length > 0) problems.push(`[${def.id}] names what no object of its graphics.dat is called: ${unknown.join(', ')}.`);
+        }
+    }
+    return problems;
+}
+
+/**
  * Why the party cannot start in `dungeon`, or `null` where it can. A new game puts the
  * party on the header's square of level 0 (`ReadDatabases`,
  * `doc/CSBwin-src/SaveGame.cpp:2613-2622`), and nothing in CSBWin checks either: a
@@ -187,7 +241,9 @@ function unstartableDungeon(dungeon: DungeonData): string | null {
  * reads as none of them:
  *
  * - `CSBgraphics.dat` opens with `CSBg` (`CSBGraphicsLoader`), and a plain `hcsb.hct`
- *   with the words 2 and 13 (`parseHintOracle`).
+ *   with the words 2 and 13 (`parseHintOracle`). A set's achievements open with their
+ *   format's line (`ACHIEVEMENTS_HEADER`), whatever the file's name: a moderator gives the
+ *   FTL sets theirs from `tools/achievements/`.
  * - `graphics.dat` and `hcsb.dat` share `GraphicsLoader`'s format: a first word counting
  *   the items, then their sizes, packed and unpacked, and the packed items, which the
  *   file holds. In that shape it is `hcsb.dat` where `parseHcsbDat` reads it, and
@@ -203,6 +259,7 @@ export async function identifyLocalDataSetFile(file: Blob): Promise<Exclude<Loca
     const head = new Uint8Array(await file.slice(0, 2 + 2 * MAX_GRAPHICS_ITEMS).arrayBuffer());
     const word = (at: number): number => at + 2 <= head.length ? readU16BE(head, at) : -1;
     if (String.fromCharCode(...head.subarray(0, 4)) === CSBGRAPHICS_SENTINEL) return 'CSBgraphics.dat';
+    if (String.fromCharCode(...head.subarray(0, ACHIEVEMENTS_HEADER.length)) === ACHIEVEMENTS_HEADER) return 'achievements.txt';
     if (word(0) === 2 && word(2) === 13) return 'hcsb.hct';
     const items = word(0);
     if (items > 0 && items <= MAX_GRAPHICS_ITEMS && file.size >= 2 + 4 * items) {
@@ -263,19 +320,29 @@ export async function readDungeonWalls(bytes: Uint8Array): Promise<DungeonWalls>
     return dungeonWalls(new DungeonLoader().loadDungeonDat(bytes));
 }
 
-/** `file` read as a `graphics.dat`, its tables built as the boot builds them, and its signature; or why it does not read. */
-function readGraphics(file: Blob | Uint8Array): Promise<{ signature: FileSignature | null; error: string | null }> {
+/**
+ * `file` read as a `graphics.dat`, its tables built as the boot builds them, its signature
+ * and its objects' names (`d.ObjectNames`), which a set's achievements name; or why it does
+ * not read.
+ */
+function readGraphics(file: Blob | Uint8Array): Promise<{ signature: FileSignature | null; objectNames: ReadonlySet<string> | null; error: string | null }> {
     return once(file, 'graphics.dat', async () => {
         try {
             const bytes = await bytesOf(file);
             const loader = new GraphicsLoader();
             loader.loadFromArray(bytes);
-            buildGameTables(extractGraphicsTables(loader));
-            return { signature: Signature(bytes), error: null };
+            const tables = extractGraphicsTables(loader);
+            buildGameTables(tables);
+            return { signature: Signature(bytes), objectNames: new Set(tables.objects.objectNames), error: null };
         } catch (error) {
-            return { signature: null, error: why(error) };
+            return { signature: null, objectNames: null, error: why(error) };
         }
     });
+}
+
+/** `file`'s text, a set's achievements, or `null` where it is over `ACHIEVEMENTS_FILE_BYTES`. */
+function readText(file: Blob): Promise<string | null> {
+    return once(file, 'text', async () => file.size > ACHIEVEMENTS_FILE_BYTES ? null : new TextDecoder().decode(await file.arrayBuffer()));
 }
 
 /** `file` parsed as a `CSBgraphics.dat`, and its signature; or why it does not parse. */

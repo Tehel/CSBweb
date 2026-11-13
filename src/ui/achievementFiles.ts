@@ -10,6 +10,8 @@ import type { AchievementDef } from '../engine/achievements/AchievementFile';
 import type { GameFigures } from '../engine/achievements/AchievementState';
 import { acrossInSets, setAchievementDefs, type OwnAchievementsOf } from '../engine/achievements/PageAchievements';
 
+export { familyOf } from '../engine/achievements/PageAchievements';
+
 const FILES = import.meta.glob<string>('../engine/achievements/defs/common.txt', { query: '?raw', import: 'default', eager: true });
 
 /** Each own file's achievements, read once, by its text; `NONE`'s, a set's without one. */
@@ -17,6 +19,16 @@ const KEPT = new Map<string, AchievementDef[] | null>();
 /** The same files' achievements across games, by text. */
 const ACROSS = new Map<string, readonly AchievementDef[]>();
 const NONE = '';
+
+/**
+ * The common file's text, which a set's own is laid over: what the check of a player's set
+ * reads its file against (`AchievementsCheck`, `src/engine/LocalDataSetCheck.ts`).
+ */
+export function commonAchievementsText(): string {
+    const common = FILES['../engine/achievements/defs/common.txt'];
+    if (common === undefined) throw new Error('the common achievements are not in the build');
+    return common;
+}
 
 /**
  * The achievements of a set whose own file is `own`, its text, `null` for none: the common
@@ -28,9 +40,7 @@ export function achievementDefs(own: string | null): AchievementDef[] | null {
     if (KEPT.has(key)) return KEPT.get(key)!;
     let defs: AchievementDef[] | null;
     try {
-        const common = FILES['../engine/achievements/defs/common.txt'];
-        if (common === undefined) throw new Error('the common achievements are not in the build');
-        defs = setAchievementDefs(common, own);
+        defs = setAchievementDefs(commonAchievementsText(), own);
     } catch (error) {
         console.error('No achievements:', error);
         defs = null;

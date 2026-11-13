@@ -52,6 +52,7 @@ import { acrossInSets, setAchievementDefs } from '../../src/engine/achievements/
 import { checkLocalDataSet } from '../../src/engine/LocalDataSetCheck.ts';
 import { readRecordingPackage } from '../../src/engine/RecordingPackage.ts';
 import { check, finish } from '../lib/check.ts';
+import { anyFamily } from '../lib/commonAchievements.ts';
 
 /** The common achievements, as the build holds them (`achievementFiles.ts`), which `tsx` cannot glob. */
 const COMMON_TEXT = readFileSync(join(import.meta.dirname, '../../src/engine/achievements/defs/common.txt'), 'utf8');
@@ -123,7 +124,7 @@ async function main(): Promise<void> {
         identities: { store: identities, rateLimit: new RateLimit(100, 60_000) },
         proofs: { store: proofs, dir: join(scratch, 'proofs'), rateLimit: new RateLimit(100, 60_000) },
         achievementDefs: (id) => (id === 'b' ? COMMON.slice(0, 3) : id === 'a' ? A_DEFS : COMMON),
-        achievementsAcross: (id, bySet) => (id === 'b' ? [] : acrossInSets((id === 'a' ? A_DEFS : COMMON).filter((def) => def.across), id, bySet, () => null)),
+        achievementsAcross: (id, bySet) => (id === 'b' ? [] : acrossInSets((id === 'a' ? A_DEFS : COMMON).filter((def) => def.across), id, bySet, () => null)), achievementsCheck: anyFamily,
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
     const port = (server.address() as AddressInfo).port;

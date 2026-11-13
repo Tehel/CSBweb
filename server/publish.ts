@@ -6,7 +6,8 @@
  * The form's fields are the record's: `id`, `name`, `description`, `authors` once per
  * author, `dmRules`, `thumbnailAsTitle` and `official` (`true` or `false`) and `baseSet`, each once, and its files by the
  * name the game reads them under, `thumbnail` a PNG of 320x200 (`LOCAL_DATA_SET_FILES`,
- * `THUMBNAIL_WIDTH`). Nothing else.
+ * `THUMBNAIL_WIDTH`), and `achievements.txt`, the set's own achievements, a text of at most
+ * `ACHIEVEMENTS_FILE_BYTES`. Nothing else.
  * The rules, in order, each answered with nothing written:
  *
  *   400  a field missing, twice, of the wrong kind, unknown or longer than the form takes
@@ -14,11 +15,14 @@
  *        (`LOCAL_ID_PATTERN`) once its `local:` is dropped
  *   403  `official` true from a player who does not moderate: only a moderator says a set
  *        is one of FTL's own games
- *   413  a file over `MAX_PUBLISHED_FILE_BYTES`
+ *   413  a file over `MAX_PUBLISHED_FILE_BYTES`, an `achievements.txt` over `ACHIEVEMENTS_FILE_BYTES`
  *   409  an id the table holds, pending or not, or that `GAMEFILES_DIR` holds an entry of
  *        (a folder no row names)
  *   422  the page's own check (`CheckDataSet`) finds a problem, as the form would show it,
- *        or the thumbnail is not a PNG, or one of another size than 320x200
+ *        or the thumbnail is not a PNG, or one of another size than 320x200; its
+ *        achievements are read as the form reads them, against the site's own sets'
+ *        families, which a player who does not moderate may not declare
+ *        (`SetAchievements.achievementsCheck`)
  *
  * Then the folder: written whole as `GAMEFILES_DIR/.<id>.<uuid>.partial/`, which the server
  * never serves (`pathSegments`), and renamed `GAMEFILES_DIR/<id>/`, which fails where another
@@ -40,7 +44,7 @@ import { copyFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promis
 import { join } from 'node:path';
 
 import {
-    EDIT_REMOVE_FIELD, LOCAL_DATA_SET_FILES, LOCAL_DATA_SET_PREFIX, LOCAL_DATA_SET_TEXT_LIMITS, LOCAL_ID_PATTERN, PNG_HEAD_BYTES, pngSize, THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH,
+    ACHIEVEMENTS_FILE, ACHIEVEMENTS_FILE_BYTES, EDIT_REMOVE_FIELD, LOCAL_DATA_SET_FILES, LOCAL_DATA_SET_PREFIX, LOCAL_DATA_SET_TEXT_LIMITS, LOCAL_ID_PATTERN, PNG_HEAD_BYTES, pngSize, THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH,
 } from '../src/data/DataSets.ts';
 import type { DataSetStore, DataSetWalls, StoredDataSet } from './dataSets.ts';
 import type { Notify } from './notify.ts';
@@ -76,6 +80,16 @@ export interface DataSetDraft {
 }
 
 /**
+ * What the check reads a set's own achievements against (`AchievementsCheck`,
+ * `src/engine/LocalDataSetCheck.ts`): the common file's text, and the families its file may
+ * not declare.
+ */
+export interface AchievementsCheck {
+    common: string;
+    reservedFamilies: ReadonlySet<string>;
+}
+
+/**
  * The page's check of a player's own set, `checkLocalDataSet` (`src/engine/LocalDataSetCheck.ts`),
  * which `npm run build` makes a Node module (`vite.config.mts`) and the server loads at
  * start-up (`loadCheckDataSet`, `app.ts`), so that the server reads a set with the page's
@@ -88,6 +102,7 @@ export type CheckDataSet = (
     takenIds: ReadonlySet<string>,
     base: (set: string) => DataSetFolder | null,
     createdAt: number,
+    achievements: AchievementsCheck,
 ) => Promise<{
     problems: Problem[];
     /** Its text trimmed, its empty authors dropped; `null` where there is a problem. */
@@ -112,6 +127,8 @@ interface Problem {
 /** What `publishDataSet` needs of the server. */
 export interface PublishOptions {
     checkDataSet: CheckDataSet;
+    /** What the set's own achievements are checked against (`SetAchievements.achievementsCheck`). */
+    achievementsCheck: () => AchievementsCheck;
     dataSets: DataSetStore;
     gamefilesDir: string;
     now: () => number;
@@ -175,6 +192,7 @@ export function readSetForm(form: FormData, edit: boolean): SetForm | PublishAns
         const [value] = values;
         if (values.length !== 1 || value === undefined || typeof value === 'string') return refuse(400, `The form's '${file}' is not one file.`);
         if (value.size > MAX_PUBLISHED_FILE_BYTES) return refuse(413, `${file} is larger than ${MAX_PUBLISHED_FILE_BYTES / (1024 * 1024)} MiB.`);
+        if (file === ACHIEVEMENTS_FILE && value.size > ACHIEVEMENTS_FILE_BYTES) return refuse(413, `${file} is larger than ${ACHIEVEMENTS_FILE_BYTES / 1024} KiB.`);
         files[file] = value;
     }
     const remove = form.getAll(EDIT_REMOVE_FIELD);
@@ -190,11 +208,14 @@ export function readSetForm(form: FormData, edit: boolean): SetForm | PublishAns
 type Checked = { record: NonNullable<Awaited<ReturnType<CheckDataSet>>['record']>; walls: DataSetWalls };
 
 /**
- * `draft` read by the page's check, with `gamefilesDir`'s site's sets its base sets, and its
- * thumbnail, if any, a PNG of 320x200; or the refusal, a 422 with the problems.
+ * `draft` read by the page's check, with `gamefilesDir`'s site's sets its base sets, its
+ * achievements against `achievements`, and its thumbnail, if any, a PNG of 320x200; or the
+ * refusal, a 422 with the problems.
  */
-export async function checkSet(draft: DataSetDraft, checkDataSet: CheckDataSet, dataSets: DataSetStore, gamefilesDir: string, now: number): Promise<Checked | PublishAnswer> {
-    const { problems, record, walls } = await checkDataSet(draft, new Set(), (set) => baseFolder(dataSets, gamefilesDir, set), now);
+export async function checkSet(
+    draft: DataSetDraft, checkDataSet: CheckDataSet, achievements: AchievementsCheck, dataSets: DataSetStore, gamefilesDir: string, now: number,
+): Promise<Checked | PublishAnswer> {
+    const { problems, record, walls } = await checkDataSet(draft, new Set(), (set) => baseFolder(dataSets, gamefilesDir, set), now, achievements);
     const thumbnail = draft.files.thumbnail;
     const size = thumbnail && pngSize(new Uint8Array(await thumbnail.slice(0, PNG_HEAD_BYTES).arrayBuffer()));
     if (thumbnail && !size) problems.push({ about: 'thumbnail', text: 'It is not a PNG.' });
@@ -235,7 +256,9 @@ export function thumbnailFile(id: string): string {
 }
 
 /** `form`, sent by `owner`, a `playerId`, checked and, where it passes, published. */
-export async function publishDataSet(form: FormData, owner: string, { checkDataSet, dataSets, gamefilesDir, now, notify, publisher, moderates }: PublishOptions): Promise<PublishAnswer> {
+export async function publishDataSet(
+    form: FormData, owner: string, { checkDataSet, achievementsCheck, dataSets, gamefilesDir, now, notify, publisher, moderates }: PublishOptions,
+): Promise<PublishAnswer> {
     const refuse = (status: number, error: string): PublishAnswer => ({ status, body: { error } });
 
     const draft = readSetForm(form, false);
@@ -247,7 +270,9 @@ export async function publishDataSet(form: FormData, owner: string, { checkDataS
     const folder = join(gamefilesDir, id);
     if (existsSync(folder)) return refuse(409, 'The site already has a folder of this name.');
 
-    const checked = await checkSet(draft, checkDataSet, dataSets, gamefilesDir, now());
+    // A moderator may give a set any family: the FTL sets' are given so.
+    const achievements = achievementsCheck();
+    const checked = await checkSet(draft, checkDataSet, moderates ? { ...achievements, reservedFamilies: new Set() } : achievements, dataSets, gamefilesDir, now());
     if ('status' in checked) return checked;
     const { record, walls } = checked;
 

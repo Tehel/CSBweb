@@ -6,8 +6,10 @@
  * route's JSON body is a moderation's (`moderate.ts`).
  *
  * The form is a publish's (`publish.ts`) but for the id, the URL's: every text field, the
- * files that change, by the name the game reads them under, and `remove` (`EDIT_REMOVE_FIELD`)
- * once per file the set no longer has, and `official`, which only a moderator sets. Every other file of its folder stays as it is, those
+ * files that change, by the name the game reads them under, its own achievements among
+ * them, and `remove` (`EDIT_REMOVE_FIELD`) once per file the set no longer has, and
+ * `official`, which only a moderator sets. Its achievements may declare any family, since a
+ * moderator edits: that is how an instance's FTL sets get theirs, from `tools/achievements/`. Every other file of its folder stays as it is, those
  * the form does not know too (CSB's `mini.dat`, a readme). Any set is edited, pending,
  * approved or hidden, with an owner or none.
  *
@@ -19,7 +21,7 @@
  *        too long, or a `remove` that names no file of a set, names one twice, or one given
  *   404  an id the table does not hold
  *   422  the set as it would be, its folder's files and the form's, fails the page's check,
- *        as a publish does
+ *        as a moderator's publish does
  *   409  another edit of the set wrote its new folder first
  *
  * A form that changes no file changes the row alone: its text and flags. One that does
@@ -50,11 +52,13 @@ import { join } from 'node:path';
 import { LOCAL_DATA_SET_FILES } from '../src/data/DataSets.ts';
 import type { DataSetStore, DataSetViewer } from './dataSets.ts';
 import type { Notify } from './notify.ts';
-import { checkSet, readSetForm, thumbnailFile, writeSetFiles, type CheckDataSet, type PublishAnswer } from './publish.ts';
+import { checkSet, readSetForm, thumbnailFile, writeSetFiles, type AchievementsCheck, type CheckDataSet, type PublishAnswer } from './publish.ts';
 
 /** What `editDataSet` needs of the server. */
 export interface EditOptions {
     checkDataSet: CheckDataSet;
+    /** What the set's own achievements are checked against (`SetAchievements.achievementsCheck`), its reserved families aside. */
+    achievementsCheck: () => AchievementsCheck;
     dataSets: DataSetStore;
     gamefilesDir: string;
     notify: Notify;
@@ -62,7 +66,9 @@ export interface EditOptions {
 }
 
 /** `form`, sent by `viewer` about the set `id`, checked and, where it passes, done. */
-export async function editDataSet(id: string, form: FormData, viewer: DataSetViewer, { checkDataSet, dataSets, gamefilesDir, notify, now }: EditOptions): Promise<PublishAnswer> {
+export async function editDataSet(
+    id: string, form: FormData, viewer: DataSetViewer, { checkDataSet, achievementsCheck, dataSets, gamefilesDir, notify, now }: EditOptions,
+): Promise<PublishAnswer> {
     const refuse = (status: number, error: string): PublishAnswer => ({ status, body: { error } });
 
     if (!viewer.moderator) return refuse(403, 'Only a moderator may edit a set.');
@@ -82,7 +88,7 @@ export async function editDataSet(id: string, form: FormData, viewer: DataSetVie
     for (const file of edit.remove) delete files[file];
     const changesFiles = Object.keys(edit.files).length > 0 || edit.remove.some((file) => had[file]);
 
-    const checked = await checkSet({ ...edit, id, files }, checkDataSet, dataSets, gamefilesDir, now());
+    const checked = await checkSet({ ...edit, id, files }, checkDataSet, { ...achievementsCheck(), reservedFamilies: new Set() }, dataSets, gamefilesDir, now());
     if ('status' in checked) return checked;
     const { record, walls } = checked;
 

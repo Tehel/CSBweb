@@ -12,13 +12,14 @@
  * `withCounts` puts the counts a set's files give (`DataCounts`) in the places that read
  * them, which the tracker does, since only it has the files.
  */
+import { ACHIEVEMENTS_FILE_BYTES } from '../../data/DataSets';
 
 /** The first line of every file: the format and its version. */
 export const ACHIEVEMENTS_HEADER = '# CSBweb achievements 1';
 
 /** The limits of a file and of its texts. */
 export const ACHIEVEMENT_LIMITS = {
-  bytes: 64 * 1024,
+  bytes: ACHIEVEMENTS_FILE_BYTES,
   achievements: 200,
   id: 40,
   value: 40,

@@ -108,12 +108,18 @@ At the author's request, beside the debt. The design is `doc/ACHIEVEMENTS.md`.
      `games(won, in "dungeon-master")` counts the games of every set of that family
      (the author's choice), Grand Slam's `in "dm-atari"` and `in "csb"` rewritten so. A
      family's name has a set id's form, dots and underscores allowed. Any set may declare
-     any family, a player's set `dungeon-master`'s: whether step 4's check refuses that is
-     to decide.
-  4. **A player's set**: the file's row in the form, local and published, and a moderator's
+     any family but a player's set, which step 4's check holds to the families no site's
+     set has.
+  4. ✅ **A player's set** (`doc/ACHIEVEMENTS.md` → "A player's set"): the file's row in the
+     form, local and published, kept by the record (`LOCAL_DATA_SET_FILES`), told by its
+     first line; the server writing it into the set's folder, at most 64 KB; a moderator's
      edit, which is also how the production instance's FTL sets get theirs, from
-     `tools/achievements/`, their ids there not the manifest's (the author's choice); the check at publish and in the form: a file that does not read, an unknown
-     item, a value no achievement names (`unusedValues`).
+     `tools/achievements/`, their ids there not the manifest's (the author's choice); and the
+     check, in the form and at a publish and an edit (`checkLocalDataSet`): a file that does
+     not read, each error with its line, an object its `graphics.dat` does not name, a value
+     no achievement names, and, to a player who does not moderate, a family of the site's
+     own sets (`"reservedFamilies"`, the author's choice). Not in the set's archive. Proved
+     by `tools/checks/local-data-set.ts`, `server.ts`, `build.ts` and `tools/probe-frames.ts`.
   5. **The kept proofs replayed again** when a set's file changes, as an edit now can
      without a deploy (the 18.5 deferral).
   6. **The designers' guide**: one standalone HTML document that teaches a dungeon's

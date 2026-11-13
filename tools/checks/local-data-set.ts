@@ -13,6 +13,10 @@
  * a record missing a file; and the form's check (`checkLocalDataSet`): the record it
  * writes is the one played here, and it refuses what the boot would die of, file by file,
  * and a dungeon it cannot start in;
+ * and a set's own achievements, `achievements.txt`: kept by the record and read through it,
+ * each error of a file that does not read a problem with its line, a family the site
+ * reserves refused but to a moderator, a value no achievement names, an object its
+ * `graphics.dat` does not name, and a file over 64 KB;
  * which file a dropped one is, told by what it holds (`identifyLocalDataSetFile`);
  * a PC `dungeon.dat`, little-endian, taken as the Atari file it is the twin of (`recordFile`);
  * and what it shows the dungeon holds (`dungeonCensus`), every record in use counted
@@ -24,8 +28,8 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 
-import { LOCAL_DATA_SET_PREFIX, parseManifest, type DataSet } from '../../src/data/DataSets';
-import { loadGameFiles, type DataSetFiles, type GameFiles } from '../../src/data/DataSetFiles';
+import { ACHIEVEMENTS_FILE_BYTES, LOCAL_DATA_SET_PREFIX, parseManifest, type DataSet } from '../../src/data/DataSets';
+import { loadGameFiles, readAchievementsText, type DataSetFiles, type GameFiles } from '../../src/data/DataSetFiles';
 import { Expool } from '../../src/data/CsbwinExpool';
 import { buildDungeonImage, buildImageChecksum } from '../../src/data/CsbwinDungeonImageWriter';
 import { buildExtendedFeaturesPrefix, EF_FLAGS, readExtendedFeatures, type ExtendedFeaturesBlock } from '../../src/data/CsbwinExtendedFeatures';
@@ -42,6 +46,7 @@ import { dungeonCensus, ITEM_KINDS, operationsUsed, type DungeonCensus } from '.
 import type { Game } from '../../src/engine/Game';
 import { csbGraphicsOpener } from '../../src/engine/FileSignatures';
 import { check, finish } from '../lib/check';
+import { ANY_FAMILY } from '../lib/commonAchievements';
 import { DATA_SETS, dataSetNamed, diskFiles } from '../lib/dataSets';
 import { genuineSaves } from '../lib/saves';
 import { newGame, runVbl, TICK_DUE } from '../lib/game';
@@ -147,8 +152,8 @@ const base = (set: string): DataSetFiles | null => set === 'dm-atari' || set ===
 const CREATED = 1_760_000_000_000;
 
 /** What `checkLocalDataSet` says of `draft`, its problems as `about: text`, printed under `label`. */
-async function problemsOf(label: string, draft: LocalDataSetDraft, taken: string[] = []): Promise<string[]> {
-  const { problems, record } = await checkLocalDataSet(draft, new Set(taken), base, CREATED);
+async function problemsOf(label: string, draft: LocalDataSetDraft, taken: string[] = [], achievements = ANY_FAMILY): Promise<string[]> {
+  const { problems, record } = await checkLocalDataSet(draft, new Set(taken), base, CREATED, achievements);
   const lines = problems.map(({ about, text }) => `${about}: ${text}`);
   console.log(`  ${label}: ${lines.length === 0 ? 'none' : lines.join(' | ')}${record ? ', a record' : ''}`);
   return lines;
@@ -171,9 +176,9 @@ async function checkForm(): Promise<void> {
       };
       draft.files[name] = counted;
     }
-    const first = await checkLocalDataSet(draft, new Set(), base, CREATED);
-    const second = await checkLocalDataSet({ ...draft, name: 'Another name', id: '' }, new Set(), base, CREATED);
-    const third = await checkLocalDataSet({ ...draft, name: 'A third name' }, new Set(), base, CREATED);
+    const first = await checkLocalDataSet(draft, new Set(), base, CREATED, ANY_FAMILY);
+    const second = await checkLocalDataSet({ ...draft, name: 'Another name', id: '' }, new Set(), base, CREATED, ANY_FAMILY);
+    const third = await checkLocalDataSet({ ...draft, name: 'A third name' }, new Set(), base, CREATED, ANY_FAMILY);
     console.log(`  three checks of conflux's files: ${[...reads].map(([name, n]) => `${name} read ${n}`).join(', ')}`);
     check(reads.size === 3 && [...reads.values()].every((n) => n === 1),
       'three checks of the same files, the fields changed between them, read each file once');
@@ -188,7 +193,7 @@ async function checkForm(): Promise<void> {
     [csb, ['dungeon.dat', 'graphics.dat', 'hcsb.hct', 'hcsb.dat'], null],
   ] as const) {
     const draft = await draftOf(from, `my-${from.id}`, [...names], baseSet ?? 'dm-atari');
-    const { problems, record } = await checkLocalDataSet(draft, new Set(['local:other']), base, CREATED);
+    const { problems, record } = await checkLocalDataSet(draft, new Set(['local:other']), base, CREATED, ANY_FAMILY);
     const expected = await recordOf(from, `my-${from.id}`, [...names], baseSet);
     console.log(`  ${from.id}: ${problems.length} problems, record ${record ? digest({ ...record, files: Object.keys(record.files) }) : 'none'}`);
     check(problems.length === 0 && record !== null && digest({ ...record, name: expected.name, description: expected.description, authors: expected.authors, files: Object.keys(record.files) })
@@ -238,7 +243,7 @@ async function checkForm(): Promise<void> {
   check((await problemsOf('an unknown base set', { ...good, baseSet: 'nowhere' })).join()
     === "baseSet: The site has no 'nowhere' to lend its graphics.dat: give the set its own.",
     'without a graphics.dat, a base set the site lacks is refused, saying the set needs its own');
-  const unread = await checkLocalDataSet({ ...good, baseSet: 'dm-atari' }, new Set(), () => ({ read: async () => null, where: (name) => name }), CREATED);
+  const unread = await checkLocalDataSet({ ...good, baseSet: 'dm-atari' }, new Set(), () => ({ read: async () => null, where: (name) => name }), CREATED, ANY_FAMILY);
   check(unread.problems.map(({ about, text }) => `${about}: ${text}`).join() === "baseSet: The graphics.dat of 'dm-atari' cannot be read.",
     'and one whose graphics.dat does not read, saying so');
   check((await problemsOf('Conflux on DM\'s graphics.dat', await draftOf(conflux, 'cx', ['dungeon.dat', 'CSBgraphics.dat']))).length === 0,
@@ -300,13 +305,57 @@ async function checkForm(): Promise<void> {
 
   const png = new Blob([readFileSync('tools/fixtures/gamefiles/csb/csb-thumbnail.png')], { type: 'image/png' });
   check((await problemsOf('a PNG thumbnail', { ...good, files: { ...good.files, thumbnail: png } })).length === 0, 'an image is a thumbnail');
-  const asTitle = async (draft: LocalDataSetDraft) => (await checkLocalDataSet(draft, new Set(), base, 0)).record?.thumbnailAsTitle;
+  const asTitle = async (draft: LocalDataSetDraft) => (await checkLocalDataSet(draft, new Set(), base, 0, ANY_FAMILY)).record?.thumbnailAsTitle;
   const titled = { ...good, thumbnailAsTitle: true };
   check(await asTitle({ ...titled, files: { ...good.files, thumbnail: png } }) === true && await asTitle({ ...good, files: { ...good.files, thumbnail: png } }) === false
     && await asTitle({ ...titled, files: { ...good.files, thumbnail: undefined } }) === false,
     'the record shows its thumbnail as the title where the form says so, and never without a thumbnail');
   check((await problemsOf('a .dat thumbnail', { ...good, files: { ...good.files, thumbnail: good.files['dungeon.dat']! } })).join() === 'thumbnail: It is not an image.',
     'a file that is not an image is no thumbnail');
+}
+
+/**
+ * A set's own achievements, `achievements.txt` (`doc/ACHIEVEMENTS.md` → "The file"): the
+ * FTL files on their sets, a family the site reserves, and each thing the check refuses.
+ */
+async function checkAchievements(): Promise<void> {
+  console.log('=== a set\'s own achievements ===');
+  const dm = dataSetNamed('dm-atari'), csb = dataSetNamed('csb');
+  const text = (body: string): Blob => new Blob([body], { type: 'text/plain' });
+  const family = (name: string): Blob => text(readFileSync(`tools/achievements/${name}.txt`, 'utf8'));
+  const good = await draftOf(dm, 'mine', ['dungeon.dat']);
+  const withFile = (file: Blob, draft = good): LocalDataSetDraft => ({ ...draft, files: { ...draft.files, 'achievements.txt': file } });
+
+  const dmFile = family('dungeon-master');
+  const made = await checkLocalDataSet(withFile(dmFile), new Set(), base, CREATED, ANY_FAMILY);
+  check(made.problems.length === 0 && made.record?.files['achievements.txt'] === dmFile,
+    'Dungeon Master\'s file on DM\'s dungeon reads, every object one of its graphics.dat, and the record keeps it');
+  const kept = made.record && await readAchievementsText(recordFiles(made.record, diskFiles(dm)));
+  check(kept === readFileSync('tools/achievements/dungeon-master.txt', 'utf8'), 'the record\'s files give it to the page and the book (`readAchievementsText`)');
+  const site = { ...ANY_FAMILY, reservedFamilies: new Set(['csb', 'dm-atari', 'dungeon-master']) };
+  check((await problemsOf('DM\'s file, its family the site\'s', withFile(dmFile), [], site)).join()
+    === 'achievements.txt: Family "dungeon-master": moderators only.',
+    'a family the site reserves is refused, as to a player who does not moderate: their wins would count toward Grand Slam');
+  const csbDraft = await draftOf(csb, 'c', ['dungeon.dat', 'graphics.dat', 'hcsb.hct', 'hcsb.dat']);
+  check((await problemsOf('CSB\'s file on CSB, the site\'s families reserved', withFile(family('csb'), csbDraft), [], site)).length === 0,
+    'CSB\'s file declares no family, and reads on CSB whatever the site reserves');
+  check((await problemsOf('a family of its own', withFile(text('# CSBweb achievements 1\nfamily: my-dungeons\n')), [], site)).length === 0,
+    'a family the site does not reserve is the player\'s to declare');
+
+  check((await problemsOf('no header', withFile(text('[x]\nname: X\n')))).join()
+    === 'achievements.txt: Line 1: the first line must be "# CSBweb achievements 1".', 'a file without its first line does not read');
+  const errors = await problemsOf('two errors', withFile(text('# CSBweb achievements 1\n[a]\nname: A\ntext: A.\nwhen: won\n[a]\ntext: B.\nwhen: won\n')));
+  check(errors.length >= 2 && errors.every((line) => /^achievements\.txt: Line \d+: /.test(line)), 'each error of a file that does not read is a problem, with its line');
+  check((await problemsOf('a value unused', withFile(text('# CSBweb achievements 1\nvalue spare = 3\nvalue blitzMinutes = 60\n')))).join()
+    === 'achievements.txt: No achievement names the value spare.', 'a value no achievement names is refused, one a common achievement names is not');
+  check((await problemsOf('an object the set lacks', withFile(text('# CSBweb achievements 1\n[banana]\nname: Banana\ntext: Eat one.\nwhen: ever(eat where item = BANANA)\n')))).join()
+    === 'achievements.txt: [banana] names what no object of its graphics.dat is called: BANANA.', 'an object its graphics.dat does not name is refused');
+  check((await problemsOf('an object, graphics unread', { ...withFile(text('# CSBweb achievements 1\n[banana]\nname: Banana\ntext: Eat one.\nwhen: ever(eat where item = BANANA)\n')), baseSet: 'nowhere' }))
+    .every((line) => line.startsWith('baseSet: ')), 'and not checked where its graphics.dat does not read');
+  check((await problemsOf('over 64 KB', withFile(text(`# CSBweb achievements 1\n${'#'.repeat(ACHIEVEMENTS_FILE_BYTES)}`)))).join()
+    === 'achievements.txt: It is over 64 KB.', 'a file over 64 KB is refused');
+  check(await identifyLocalDataSetFile(new File([dmFile], 'dungeon-master.txt')) === 'achievements.txt',
+    'a file of achievements is told by its first line, whatever its name');
 }
 
 /** `census` on one line: levels, items by kind, monsters, DSAs. */
@@ -335,7 +384,7 @@ function inUse(data: DungeonData): string {
  */
 async function checkIdentify(): Promise<void> {
   console.log('=== a file told by what it holds ===');
-  const names: LocalDataSetFile[] = ['dungeon.dat', 'graphics.dat', 'CSBgraphics.dat', 'hcsb.hct', 'hcsb.dat'];
+  const names: LocalDataSetFile[] = ['dungeon.dat', 'graphics.dat', 'CSBgraphics.dat', 'hcsb.hct', 'hcsb.dat', 'achievements.txt'];
   let told = 0, wrong: string[] = [];
   for (const set of DATA_SETS) {
     for (const name of names) {
@@ -420,12 +469,12 @@ async function checkCensus(): Promise<void> {
   }
   const dm = dataSetNamed('dm-atari');
   const good = await draftOf(dm, 'mine', ['dungeon.dat']);
-  const taken = await checkLocalDataSet(good, new Set(['local:mine']), base, CREATED);
+  const taken = await checkLocalDataSet(good, new Set(['local:mine']), base, CREATED, ANY_FAMILY);
   check(taken.record === null && taken.census !== null && censusLine(taken.census) === expected['dm-atari'],
     'the form shows what a dungeon.dat holds wherever it reads, whatever else is wrong');
   const unread = await checkLocalDataSet({ ...good, files: { 'dungeon.dat': (await draftOf(dm, 'x', ['graphics.dat'])).files['graphics.dat']! } },
-    new Set(), base, CREATED);
-  check(unread.census === null && (await checkLocalDataSet({ ...good, files: {} }, new Set(), base, CREATED)).census === null,
+    new Set(), base, CREATED, ANY_FAMILY);
+  check(unread.census === null && (await checkLocalDataSet({ ...good, files: {} }, new Set(), base, CREATED, ANY_FAMILY)).census === null,
     'and nothing where it does not read, or is not given');
 }
 
@@ -464,6 +513,7 @@ async function main(): Promise<void> {
   const withThumbnail = { ...bare, files: { ...bare.files, thumbnail: blobOf(new Uint8Array([0x89, 0x50, 0x4e, 0x47])) } };
   check(await recordFiles(withThumbnail, diskFiles(dm)).read('thumbnail') === null, 'the thumbnail is not one of the game\'s files');
   await checkForm();
+  await checkAchievements();
   await checkIdentify();
   await checkPcDungeon();
   await checkCensus();

@@ -119,7 +119,7 @@ import logoUrl from '../assets/csbweb-logo.jpg';
 import { archiveName, dataSetArchive, type ReadArchiveFile } from '../data/DataSetArchive';
 import { fileDigest, folderFiles, readAchievementsText } from '../data/DataSetFiles';
 import {
-    chooserSets, DATA_SETS_ROUTE, DOCUMENT_EXTENSIONS, DOCUMENTS_SEGMENT, documentPath, isDocumentName, PLAYER_ID_HEADER, PNG_HEAD_BYTES, pngSize,
+    ACHIEVEMENTS_FILE, chooserSets, DATA_SETS_ROUTE, DOCUMENT_EXTENSIONS, DOCUMENTS_SEGMENT, documentPath, isDocumentName, PLAYER_ID_HEADER, PNG_HEAD_BYTES, pngSize,
     RECORDING_ENDINGS, RECORDING_PACKAGE_FIELD, RECORDINGS_ROUTE, SHARED_RECORDING_ID, thumbnailPath, type RecordingEnding,
     type DataSet, type DataSetManifest, type ModerationAction, type RecordingAction,
 } from '../data/DataSets';
@@ -599,8 +599,8 @@ async function answerAsPlayer(route: string, headers: Record<string, string>, bo
 /**
  * The published `set` as the form edits it: its text, and the files of its folder the form
  * knows, `dungeon.dat` and `graphics.dat`, the `CSBgraphics.dat` and the Hint Oracle its
- * flags say it has, and its thumbnail where it is served as a PNG. Throws where one of its
- * files cannot be read, but the thumbnail.
+ * flags say it has, its own achievements where it has them, and its thumbnail where it is
+ * served as a PNG. Throws where one of its files cannot be read, but those two.
  */
 async function publishedRecord(set: DataSet): Promise<EditedPublishedSet['record']> {
     const folder = folderFiles(set.dir);
@@ -612,6 +612,9 @@ async function publishedRecord(set: DataSet): Promise<EditedPublishedSet['record
         if (!bytes) throw new Error(`${folder.where(name)} cannot be read.`);
         files[name] = new File([bytes as Uint8Array<ArrayBuffer>], name);
     }));
+    // A set's own achievements are optional: a folder without them answers a 404.
+    const achievements = await folder.read(ACHIEVEMENTS_FILE);
+    if (achievements) files[ACHIEVEMENTS_FILE] = new File([achievements as Uint8Array<ArrayBuffer>], ACHIEVEMENTS_FILE, { type: 'text/plain' });
     const thumbnail = await fetch(thumbnailPath(set)).then((response) => (response.ok ? response.blob() : null), () => null);
     if (thumbnail && pngSize(new Uint8Array(await thumbnail.slice(0, PNG_HEAD_BYTES).arrayBuffer()))) {
         files.thumbnail = new File([thumbnail], 'thumbnail.png', { type: 'image/png' });

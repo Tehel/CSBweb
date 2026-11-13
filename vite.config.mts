@@ -18,7 +18,7 @@ import { IdentityStore } from './server/identity.ts';
 import { NOBODY } from './server/notify.ts';
 import { ProofStore, verifyNext, type BuiltReplayProof, type VerifierReaders } from './server/proofs.ts';
 import type { CheckDataSet } from './server/publish.ts';
-import { folderAchievements, type BuiltAchievementDefs, type BuiltAchievementsAcross } from './server/setAchievements.ts';
+import { folderAchievements, type BuiltAchievements } from './server/setAchievements.ts';
 import { RecordingStore, type ReadRecordingPackage } from './server/recordings.ts';
 import { AnswerCache, StatsStore } from './server/stats.ts';
 import {
@@ -116,6 +116,9 @@ function dataSetsRoute(): Plugin {
       const publishRateLimit = new RateLimit(1000, 60_000);
       const checkDataSet: CheckDataSet = async (...args) =>
         ((await server.ssrLoadModule('/src/engine/LocalDataSetCheck.ts')) as { checkLocalDataSet: CheckDataSet }).checkLocalDataSet(...args);
+      /** What a set's own achievements are checked against, and the families the manifest reserves, as the deployed server's (`folderAchievements`). */
+      const achievementsCheckOf = async (dataSets: DataSetStore) =>
+        folderAchievements(scratch, dataSets, (await server.ssrLoadModule('/src/ui/achievementFiles.ts')) as BuiltAchievements).achievementsCheck;
 
       /** The store as it stands: the manifest's sets, then every change made since, a new one kept. */
       const openStore = (db: DatabaseSync): DataSetStore => {
@@ -173,10 +176,11 @@ function dataSetsRoute(): Plugin {
         try {
           const dataSets = openStore(db);
           if (req.method === 'POST') {
-            await receivePublish(scratch, { checkDataSet, dataSets, moderators, publishRateLimit, now: Date.now, notify: NOBODY }, req, res);
+            const achievementsCheck = await achievementsCheckOf(dataSets);
+            await receivePublish(scratch, { checkDataSet, achievementsCheck, dataSets, moderators, publishRateLimit, now: Date.now, notify: NOBODY }, req, res);
           } else {
             res.setHeader('Vary', PLAYER_ID_HEADER);
-            json(200, manifestText(dataSets.read(), dataSetViewer({ moderators }, req), recordingStore?.listed()));
+            json(200, manifestText(dataSets.read(), dataSetViewer({ moderators }, req), recordingStore?.listed(), (await achievementsCheckOf(dataSets))().reservedFamilies));
           }
         } catch (error) {
           next(error);
@@ -195,7 +199,8 @@ function dataSetsRoute(): Plugin {
         }
         const db = new sqlite.DatabaseSync(':memory:');
         try {
-          const api = { checkDataSet, dataSets: openStore(db), moderators, now: Date.now, notify: NOBODY };
+          const dataSets = openStore(db);
+          const api = { checkDataSet, achievementsCheck: await achievementsCheckOf(dataSets), dataSets, moderators, now: Date.now, notify: NOBODY };
           if (documents) await receiveDocument(id, scratch, api, req, res);
           else if (req.headers['content-type']?.startsWith('multipart/form-data')) await receiveEdit(id, scratch, api, req, res);
           else await receiveModeration(id, scratch, api, req, res);
@@ -381,7 +386,7 @@ function dataSetsRoute(): Plugin {
 
       // Each set's achievements, its own file read from its folder, as the deployed server's (`folderAchievements`).
       const setAchievements = async (dataSets: DataSetStore) => folderAchievements(scratch, dataSets,
-        (await server.ssrLoadModule('/src/ui/achievementFiles.ts')) as { achievementDefs: BuiltAchievementDefs; achievementsAcross: BuiltAchievementsAcross });
+        (await server.ssrLoadModule('/src/ui/achievementFiles.ts')) as BuiltAchievements);
       const replay: VerifierReaders['replay'] = async (bytes, limit, sets) => {
         const { replayProof } = (await server.ssrLoadModule('/src/engine/achievements/ProofReplay.ts')) as { replayProof: BuiltReplayProof };
         const { achievementDefs } = (await server.ssrLoadModule('/src/ui/achievementFiles.ts')) as { achievementDefs: (own: string | null) => unknown };

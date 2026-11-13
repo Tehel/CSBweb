@@ -20,7 +20,9 @@
  *     `checkLocalDataSet` says, its problems, record, census and walls, and of a
  *     `dungeon.dat` what `readDungeonWalls` says: DM's `dungeon.dat` on its
  *     base set's `graphics.dat`, read from the set's folder, the same with Chaos Strikes Back's
- *     own `graphics.dat`, and a `dungeon.dat` that does not read; of a package what the
+ *     own `graphics.dat`, and a `dungeon.dat` that does not read, and DM's with its
+ *     achievements, refused their family, which the built readers reserve to the site's
+ *     sets (`achievementsCheck`) over the source's common file; of a package what the
  *     page's `readRecordingPackage` says: one read, one past the limit it unzips to, and
  *     bytes that are no package; and merges a set's own file with the source's common
  *     one, as the Hall of Fame lists them, each set's file read from its folder
@@ -174,16 +176,27 @@ async function main(): Promise<void> {
         const module = readFileSync(join(outDir, READERS_MODULE), 'utf8');
         const imports = module.match(/^\s*(?:import|export\s.*\sfrom)\s.*$|\bimport\(|\brequire\(/gm) ?? [];
         check(imports.length === 0, `${READERS_MODULE} imports nothing${imports.length ? `: not ${imports.join(', ')}` : ''}`);
-        const { checkDataSet: built, readDungeonWalls: builtWalls, readRecordingPackage: builtPackage, achievementDefs: builtDefs, achievementsAcross: builtAcross } = await loadPageReaders(outDir);
+        const readers = await loadPageReaders(outDir);
+        const { checkDataSet: built, readDungeonWalls: builtWalls, readRecordingPackage: builtPackage, achievementDefs: builtDefs } = readers;
+        const commonText = readFileSync(resolve(ROOT, 'src/engine/achievements/defs/common.txt'), 'utf8');
+        const dmText = readFileSync(resolve(ROOT, 'tools/achievements/dungeon-master.txt'), 'utf8');
+        const hallStore = new DataSetStore(openStore(':memory:'));
+        hallStore.fill(parseManifest(readFileSync(MANIFEST_FILE, 'utf8'), ''));
+        const { achievementDefs: hallOf, achievementsAcross: acrossOf, achievementsCheck } = folderAchievements(resolve(ROOT, GAMEFILES_DIR), hallStore, readers);
+        const reserved = achievementsCheck();
+        console.log(`  the families a player's set may not declare: ${[...reserved.reservedFamilies].sort().join(', ')}`);
+        check(reserved.common === commonText && ['dm-atari', 'dm-amiga', 'csb', 'dungeon-master'].every((family) => reserved.reservedFamilies.has(family)),
+            'the built readers give the source\'s common file, and reserve each site\'s set\'s id and the family its file declares');
         const base = (set: string): DataSetFolder | null => set === 'dm-atari' || set === 'csb' ? folder(set) : null;
         const drafts: [string, DataSetDraft, boolean][] = [
             ['DM, on its base set\'s graphics.dat', draftOf('dm-atari', ['dungeon.dat']), true],
             ['CSB, with its own graphics.dat', draftOf('csb', ['dungeon.dat', 'graphics.dat']), true],
             ['a dungeon.dat that does not read', draftOf('dm-atari', [], { 'dungeon.dat': new Blob([new Uint8Array(3)]) }), false],
+            ['DM with its achievements, their family the site\'s', draftOf('dm-atari', ['dungeon.dat'], { 'achievements.txt': new Blob([dmText]) }), false],
         ];
         for (const [what, draft, makesRecord] of drafts) {
             const said = async (check: typeof built) => {
-                const { problems, record, census, walls } = await check(draft, new Set(), base, 0);
+                const { problems, record, census, walls } = await check(draft, new Set(), base, 0, reserved);
                 return JSON.stringify({ problems, record: record && { ...record, files: undefined }, census, walls });
             };
             const fromBuild = await said(built), fromSource = await said(checkLocalDataSet);
@@ -203,12 +216,7 @@ async function main(): Promise<void> {
             console.log(`  ${what}: ${fromBuild.startsWith('throws') ? fromBuild : `${fromBuild.length} characters of JSON`}`);
             check(fromBuild === await read(readRecordingPackage), `${what}: the built reader of a package says what the source's does`);
         }
-        const commonText = readFileSync(resolve(ROOT, 'src/engine/achievements/defs/common.txt'), 'utf8');
-        const sourceDefs = setAchievementDefs(commonText, readFileSync(resolve(ROOT, 'tools/achievements/dungeon-master.txt'), 'utf8'));
-        const hallStore = new DataSetStore(openStore(':memory:'));
-        hallStore.fill(parseManifest(readFileSync(MANIFEST_FILE, 'utf8'), ''));
-        const { achievementDefs: hallOf, achievementsAcross: acrossOf } = folderAchievements(resolve(ROOT, GAMEFILES_DIR), hallStore,
-            { achievementDefs: builtDefs, achievementsAcross: builtAcross });
+        const sourceDefs = setAchievementDefs(commonText, dmText);
         const hallDefs = hallOf('dm-atari');
         console.log(`  the achievements of dm-atari, its folder's file merged with the common one: ${hallDefs?.length ?? 'none'}`);
         check(hallDefs !== null && JSON.stringify(hallDefs) === JSON.stringify(sourceDefs), 'the built achievements, which the Hall of Fame lists, are the source\'s, of the set\'s folder');

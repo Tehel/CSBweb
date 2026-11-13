@@ -42,7 +42,7 @@ which every Dungeon Master set's folder holds, the Atari's, the Amiga's and the 
 ones, and `csb.txt`, Chaos Strikes Back's. `npm run fetch-gamefiles` copies each into its
 sets' folders as `achievements.txt`, and `utils/install-official-sets.ts` copies it to an
 instance with a set it installs; a set the instance holds already gets it through a
-moderator's edit, as any set's file changes (`PLAN.md` 18.7, step 4). Both give the
+moderator's edit, as any set's file changes ("A player's set", below). Both give the
 common file's values: Speed Runner in less than 180 minutes, Blitz in less than 60, and
 Conscientious Objector with at most 40 kills. Dungeon Master's also lists the levels Clean
 Sweep counts, 1 to 12, all but the Hall of Champions and the Dragon's, and gives its own
@@ -61,7 +61,36 @@ achievement for delivering the CORBUMs in time: the fourth delivered to the FULY
 what wins the game (`doc/CSBwin-src/Attack.cpp:2204`), so its limit would be Speed Runner's
 and Blitz's again. A set with no `achievements.txt` of its own reads that file instead. The file is never a game file
 (`GAME_FILES`, `src/data/DataSets.ts`), so a recording's digests never name it, and an
-author can change the file without breaking a recording.
+author can change the file without breaking a recording. Nor is it in a set's archive
+(`archiveFiles`, `src/data/DataSetArchive.ts`), which holds CSBWin's files.
+
+**A player's set** has its file too. The form that adds a set (`src/ui/addDataSetForm.ts`)
+has a row for it, optional, which takes a dropped file whatever its name, told by its first
+line (`identifyLocalDataSetFile`); the record keeps it (`LOCAL_DATA_SET_FILES`), and the page
+and the book read it through the record's files (`recordFiles`). PUBLISH sends it, and the
+server writes it into the set's folder as `achievements.txt` (`server/publish.ts`), refusing
+one over 64 KB (413). A moderator's pen on a published set's tile opens the form on the
+folder's file, where it has one (`publishedRecord`, `src/ui/welcomePage.ts`); an edit that
+gives, replaces or removes it writes the set a new folder, `<dir>@<n>`, as any file's does,
+since a folder never changes once its row names it (`server/edit.ts`). That edit is how an
+instance's FTL sets get their files, from `tools/achievements/`, under the instance's ids.
+
+The form checks the file at every change, and the server again at a publish and an edit,
+with the same check (`checkLocalDataSet`, `src/engine/LocalDataSetCheck.ts`, bundled for
+the server): a file that does not read, each error a problem with its line; a value no
+achievement names once it is laid over the common file (`unusedValues`); an object its
+`graphics.dat`, its own or its base set's, does not name (`unknownItems`), where that
+reads; and a family of the site's own sets (`family:`, below). Each refuses the set as a
+whole, as any problem of the check does.
+
+**A family the site reserves**: the site's own sets, those with no owner, the FTL ones
+among them, each reserve their id and the family their file declares
+(`SetAchievements.achievementsCheck`, `server/setAchievements.ts`), which `api/data-sets`
+lists (`"reservedFamilies"`, `DataSetManifest.reservedFamilies`). A player who does not
+moderate may not declare one, in the form or at a publish: `family: dungeon-master` would
+count their dungeon's wins toward Grand Slam (the author's choice). A moderator may declare
+any family, at a publish or an edit. A player's sets may share a family of their own, or
+another player's.
 
 The file is ASCII text, at most 64 KB. Its first line is exactly
 
@@ -450,8 +479,9 @@ met `condition` in every set of that family, this set among them where it is one
 each set whose own file declares it (`family:`, "The file"), and the set whose id it is
 where its file declares none (`familyOf`, `src/engine/achievements/PageAchievements.ts`).
 `"dungeon-master"` is every Dungeon Master set, the Atari's, the Amiga's and the hidden
-ones, and `"csb"` Chaos Strikes Back. Any set may declare a family, a player's among them,
-and its games then count as that family's. The figure it reads is the one each of those
+ones, and `"csb"` Chaos Strikes Back. Any set may declare a family, and its games then
+count as that family's, but a player's set none of the site's own sets' ("A family the site
+reserves", above). The figure it reads is the one each of those
 sets keeps by the same key, `games(won)`, so a set counts there only by a condition its own
 achievements test; an achievement that names another family's games is best in both
 dungeons' files. `acrossInSets`

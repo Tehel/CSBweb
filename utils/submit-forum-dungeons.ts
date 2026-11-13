@@ -61,6 +61,7 @@ import { bigEndianDungeonDat } from '../src/data/LittleEndianDungeon';
 import type { LocalDataSetFile } from '../src/data/LocalDataSets';
 import { checkLocalDataSet, identifyLocalDataSetFile, type LocalDataSetDraft } from '../src/engine/LocalDataSetCheck';
 import { lastTitleFrame, thumbnailPng } from '../src/renderer/intro/TitleThumbnail';
+import { ANY_FAMILY } from '../tools/lib/commonAchievements';
 import { fetchOk, oneDriveCustomDungeons, oneDriveFiles, type OneDriveItem } from '../tools/lib/oneDrive';
 
 /** The forum's list of custom dungeons, kept up to date by its moderators. */
@@ -443,10 +444,10 @@ async function submit(found: Found, root: string, text: Submission, sets: DataSe
         return listedSet ? { read: (name) => instanceFile(listedSet, name), where: (name) => `${listedSet.dir}/${name}` } : null;
     };
     let baseSet = BASE_SETS[0];
-    let checked = await checkLocalDataSet({ id, ...text, dmRules: true, thumbnailAsTitle: false, official: false, baseSet, files }, new Set(), base, Date.now());
+    let checked = await checkLocalDataSet({ id, ...text, dmRules: true, thumbnailAsTitle: false, official: false, baseSet, files }, new Set(), base, Date.now(), ANY_FAMILY);
     if (!files['graphics.dat'] && checked.problems.some((problem) => problem.about === 'baseSet')) {
         baseSet = BASE_SETS[1];
-        checked = await checkLocalDataSet({ id, ...text, dmRules: true, thumbnailAsTitle: false, official: false, baseSet, files }, new Set(), base, Date.now());
+        checked = await checkLocalDataSet({ id, ...text, dmRules: true, thumbnailAsTitle: false, official: false, baseSet, files }, new Set(), base, Date.now(), ANY_FAMILY);
     }
     if (!checked.record) {
         console.log('  It does not pass the check:');
