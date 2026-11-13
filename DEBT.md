@@ -1214,10 +1214,10 @@ drawing a map from them is a separate item, entered when the author names it.
 
 ### X20 ⏸️ More achievements: the author's list
 
-The achievements are `src/engine/achievements/defs/common.txt`'s 51, four of them valued
+The achievements are `src/engine/achievements/defs/common.txt`'s 52, four of them valued
 and four counted from the data,
-`dm-atari.txt`'s 13, which every Dungeon Master set reads, and `csb.txt`'s 2
-(`doc/ACHIEVEMENTS.md`). The author
+`dm-atari.txt`'s 13, which every Dungeon Master set reads, and `csb.txt`'s 2, which
+disables Girl Power (`doc/ACHIEVEMENTS.md`). The author
 chose the list below, which holds what is left to write. ✓ marks what the
 condition language expresses today; [needs …] names the event or sample the tracker must
 observe first ("The triggers", below). The item is not a setting, unlike the other
@@ -1256,26 +1256,15 @@ Bestiary; and where the party is, the `enter` and `leave` events, `levels`, `exp
 lists for values, with Tourist, Cartographer, Clean Sweep and Dungeon Master's Deep Diver
 and Express Elevator, at the author's choices: Clean Sweep counts DM's levels 1 to 12 and
 none of CSB's, Express Elevator 60 minutes. Solitary Confinement, CSB's Lone Wolf (`won and party = 1`,
-exact because the adventure recruits nobody), stays. Step 6 is done but for Girl Power:
-the champions at each tick's end, `party(where …)` by what each wears and holds, their
-sex, ranks and load, ordered comparisons on a filter's numbers, and the `sleep` event, with
-Low Profile, Archmaster, Jack of All Trades, Speedy Gonzales, Featherweight and Insomniac,
+exact because the adventure recruits nobody), stays. Step 6 is done: the champions at
+each tick's end, `party(where …)` by what each wears and holds, their sex, ranks and load,
+ordered comparisons on a filter's numbers, and the `sleep` event, with Low Profile,
+Archmaster, Jack of All Trades, Speedy Gonzales, Featherweight, Insomniac and Girl Power,
 and Dungeon Master's Shining Armour and Darc Knight, each armour's shield in a hand
-(`doc/ACHIEVEMENTS.md` → "The champions"). What is left:
+(`doc/ACHIEVEMENTS.md` → "The champions"). Girl Power reads `CHARFLAG_male`, which a CSB
+adventure CSBWin's utility made has lost (H, "A champion carried into a new adventure
+keeps their sex"), so at the author's choice `csb.txt` disables it. What is left:
 
-6. **Girl Power, waiting on the author.** `won and max(party(where sex = male)) = 0`
-   reads `CHARFLAG_male`, which is right in Dungeon Master, where every champion joins at
-   a mirror, and in RISE's adventures, and lost in a CSB adventure CSBWin's utility made:
-   it clears the flag (H, "A champion carried into a new adventure keeps their sex"), so
-   the whole CSB game's party, Buzzzzz and Lor among it, reads as no man and would unlock
-   it (`tools/checks/achievements-tracker.ts`). The options:
-   1. **The flag as it is**, in every set: an imported CSBWin adventure won by any party
-      earns it.
-   2. **The flag, and Girl Power off in `csb.txt`**: right wherever it exists, and no CSB
-      game earns it, RISE's adventures included.
-   3. **The sex read from the champion's text** in the set's dungeons, by name and title,
-      where a CSB adventure's start holds no flag: a reincarnated champion's new name is
-      in no text, so some parties still read wrong.
 7. **The casts and the blows.** The power rune and why a cast failed on `cast`; the
    damage dealt, which blow killed what, the item held or an empty hand, a kill by
    landing, `party` on `death`: Blazing Glory Day, Thick Atmosphere, I Know What I'm
@@ -1304,8 +1293,6 @@ stay common.
     ILLUMULET is allowed: DM's two, on levels 4 and 6, are a relief after four black
     levels. ✓ for the spells, [the item held] for the torch.
 - The party:
-  - **Girl Power** (weird): win with no male champion in the party. [the sex, step 6's
-    decision]
   - **Lazarus** (weird): bring the same champion back from the dead three times. [a
     revival at an altar]
 - Combat:
@@ -1370,7 +1357,6 @@ improve.
 | Which ending | Gullible, Every Ending |
 | Where the party came from | Veterans, Fresh Faces |
 | The item held, an empty hand | Dark Ages (the torch), Bare Knuckles |
-| The champion's sex, as step 6 decides | Girl Power |
 | Why a cast failed | I Know What I'm Doing |
 | A kill `by: landing` | Telefrag |
 | A revival at an altar | Lazarus |

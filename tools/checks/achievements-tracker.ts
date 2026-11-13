@@ -40,9 +40,10 @@
  *    tick he puts them on; the first Master and the first load over half the most a champion
  *    carries at the tick the tool reads them itself, `DetermineMastery(chIdx, skill |
  *    0xc000)` and `MaxLoad`; and Low Profile, Archmaster, Jack of All Trades, Featherweight
- *    and Insomniac as the game's ranks, loads and sleeps say. The whole CSB game's party
- *    reads as no man, Buzzzzz and Lor among it: CSBWin's utility clears `CHARFLAG_male`
- *    (`DEBT.md` H, "A champion carried into a new adventure keeps their sex").
+ *    and Insomniac as the game's ranks, loads and sleeps say, and Girl Power as the sexes
+ *    do. The whole CSB game's party reads as no man, Buzzzzz and Lor among it: CSBWin's
+ *    utility clears `CHARFLAG_male` (`DEBT.md` H, "A champion carried into a new adventure
+ *    keeps their sex"), so `csb.txt` disables Girl Power.
  *
  * Usage: npm test -- --only=achievements-tracker.ts [<package name>…] [--not=<name>] [--events]
  */
@@ -176,9 +177,10 @@ for (const file of corpusFiles()) {
   const miniDat = set.miniDat ? await diskFiles(set).read('mini.dat') : null;
   const start = pkg.path[0]!.start;
   const fromAdventure = start.kind === 'save' && miniDat !== null && isNewAdventure(start.bytes, miniDat);
+  const defs = defsOf(set.id);
   const startedAt = Date.now();
   const played = await playPath(set, diskFiles(set), pkg.path, pkg.shared.kind === 'save' ? pkg.shared : null, null, null, (page) => {
-    tracker = new AchievementTracker(page.game, defsOf(set.id), page.screen.ui.objectTables.objectNames, { dungeonDat: page.dungeonDat, miniDat });
+    tracker = new AchievementTracker(page.game, defs, page.screen.ui.objectTables.objectNames, { dungeonDat: page.dungeonDat, miniDat });
     tracker.onEvent((event) => {
       events.push(event);
       times.push(page.game.ctx.state.tickCount);
@@ -287,8 +289,9 @@ for (const file of corpusFiles()) {
     ['jack-of-all-trades', all.some((r) => r.every((x) => x >= 9))],
     ['featherweight', won && tracker.whole && firstHeavy < 0],
     ['insomniac', won && tracker.whole && count(events, 'sleep') === 0],
+    ['girl-power', defs.some((d) => d.id === 'girl-power') && won && tracker.whole && males === 0],
   ];
-  for (const [id, want] of expect) check(unlocked.has(id) === want, `${file}: ${id} ${want ? 'unlocks' : 'stays locked'}, as its ranks, loads and sleeps say`);
+  for (const [id, want] of expect) check(unlocked.has(id) === want, `${file}: ${id} ${want ? 'unlocks' : 'stays locked'}, as its ranks, loads, sleeps and sexes say`);
 
   // 3. What the games hold.
   if (name === 'DMMovie2615') {
@@ -356,6 +359,8 @@ for (const file of corpusFiles()) {
     check(count(events, 'hurt', { party: 'yes' }) > 0, 'CSBFullRecordingV4: the party hurts itself');
     check(males === 0 && ['BUZZZZZ', 'LOR'].every((hero) => ranks.has(hero)),
       'CSBFullRecordingV4: no champion carries CHARFLAG_male, which CSBWin\'s utility cleared, Buzzzzz and Lor among them');
+    check(!defs.some((d) => d.id === 'girl-power') && !unlocked.has('girl-power'),
+      'CSBFullRecordingV4: Girl Power, which its party of no man would earn, is disabled in csb.txt');
     check(unlocked.has('gourmet') && !unlocked.has('bestiary'), 'CSBFullRecordingV4: the party eats all eight kinds of food (Gourmet), and kills 22 of the 23 types');
     check(unlocked.has('tourist') && count(events, 'leave', { cleared: 'yes' }) > 0 && !unlocked.has('clean-sweep'),
       'CSBFullRecordingV4 sets foot on every level, and leaves some with no monster alive, though CSB lists no level to sweep');

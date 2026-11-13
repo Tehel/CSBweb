@@ -314,6 +314,15 @@ text: Win without ever sleeping.
 tier: hard
 when: won and never(sleep)
 
+# The sex is CHARFLAG_male, which a CSB adventure CSBWin's utility made has lost: csb.txt
+# disables Girl Power (doc/ACHIEVEMENTS.md -> "The champions").
+
+[girl-power]
+name: Girl Power
+text: Win with no male champion ever in the party.
+tier: weird
+when: won and max(party(where sex = male)) = 0
+
 # The valued: a set without the value in its own file has no such achievement.
 
 [speed-runner]

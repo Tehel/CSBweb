@@ -59,7 +59,7 @@ function commonFile(): AchievementFile {
   const whole = new Set([
     'five-a-day', 'leather-is-enough', 'minimalist-mage', 'lone-wolf', 'buddy-cop', 'speed-runner', 'blitz', 'teetotaller',
     'vegetarian', 'carnivore', 'untouchable', 'ace-driver', 'emperors-new-clothes', 'conscientious-objector',
-    'low-profile', 'featherweight', 'insomniac',
+    'low-profile', 'featherweight', 'insomniac', 'girl-power',
   ]);
   for (const d of r.file.defs) {
     check(d.whole === whole.has(d.id), `${d.id} ${whole.has(d.id) ? 'needs' : 'does not need'} the whole game`);
@@ -92,6 +92,7 @@ function commonFile(): AchievementFile {
  */
 function setFile(
   common: AchievementFile, name: string, graphicsDir: string, whole: readonly string[], values: string, absent: readonly string[] = [],
+  disabled: readonly string[] = [],
 ): AchievementFile {
   console.log(`--- ${name}.txt`);
   const r = readAchievementFile(readFileSync(resolve(DEFS, `${name}.txt`), 'utf8'));
@@ -112,11 +113,13 @@ function setFile(
   const given = [...r.file.values].map(([v, n]) => `${v} = ${n.join(', ')}`).join('; ');
   console.log(`  values: ${given}`);
   check(given === values, `${name}.txt gives ${values}`);
+  check(r.file.disabled.join() === disabled.join(), `${name}.txt disables ${disabled.join(', ') || 'nothing'} (${r.file.disabled.join(', ')})`);
   const merged = mergeAchievements(common, r.file);
   const replaced = r.file.defs.filter((d) => common.defs.some((c) => c.id === d.id)).length;
   const missing = common.defs.filter((c) => !merged.some((d) => d.id === c.id)).map((c) => c.id);
-  check(merged.length === common.defs.length + r.file.defs.length - replaced - absent.length && missing.join() === absent.join(),
-    `${name}.txt adds ${r.file.defs.length - replaced} to the common file and replaces ${replaced}, every valued one there${absent.length > 0 ? ` but ${absent.join(', ')}, whose value it does not give` : ''}`);
+  const gone = [...disabled, ...absent];
+  check(merged.length === common.defs.length + r.file.defs.length - replaced - gone.length && sameIds(missing, gone),
+    `${name}.txt adds ${r.file.defs.length - replaced} to the common file and replaces ${replaced}, every valued one there${absent.length > 0 ? ` but ${absent.join(', ')}, whose value it does not give` : ''}${disabled.length > 0 ? `, and leaves out ${disabled.join(', ')}` : ''}`);
   const unused = unusedValues(r.file, merged);
   check(unused.length === 0, `every value ${name}.txt gives is named (not ${unused.join(', ')})`);
   for (const d of merged.filter((m) => m.values.length > 0)) console.log(`  ${d.id.padEnd(24)} ${d.text}`);
@@ -291,7 +294,7 @@ function evaluator(common: AchievementFile, dm: AchievementFile, counts: DataCou
   console.log(`  won, all apples and corn, two hours, one champion: ${won.join(', ')}`);
   // The made-up games tell no champion: no rank, sex or load ever counted, no sleep.
   const clean = ['teetotaller', 'vegetarian', 'untouchable', 'ace-driver', 'emperors-new-clothes', 'let-sleeping-dragons-lie', 'brute-force',
-    'low-profile', 'featherweight', 'insomniac'];
+    'low-profile', 'featherweight', 'insomniac', 'girl-power'];
   check(sameIds(won, ['five-a-day', 'leather-is-enough', 'minimalist-mage', 'roll-the-credits', 'lone-wolf', 'speed-runner', 'conscientious-objector', ...clean]),
     'the win unlocks the diet, the leather, the spells, the credits, the lone wolf, the speed in two hours of 180 minutes but not the blitz of 60, eleven kills of 40, and every win without something');
 
@@ -327,7 +330,7 @@ function evaluator(common: AchievementFile, dm: AchievementFile, counts: DataCou
   const fourWon = four.evaluate();
   console.log(`  …won: ${fourWon.join(', ')}`);
   check(sameIds(fourWon, ['roll-the-credits', 'full-house', 'new-souls', 'carnivore', 'teetotaller', 'ace-driver', 'emperors-new-clothes', 'speed-runner', 'blitz', 'conscientious-objector', 'minimalist-mage', 'leather-is-enough', 'brute-force',
-    'low-profile', 'featherweight', 'insomniac']),
+    'low-profile', 'featherweight', 'insomniac', 'girl-power']),
     'won with four alive, reincarnated, eating only meat, every cast failed, at once and with 18 kills: Full House, New Souls, Carnivore, Brute Force, Blitz, Conscientious Objector, not Untouchable, Vegetarian nor To Serve Man');
   const butcher = new AchievementState(defs, true);
   for (let i = 0; i < 41; i++) butcher.record(kill());
@@ -425,11 +428,11 @@ function champions(defs: readonly AchievementDef[]): void {
   strong.champions([champ()]);
   strong.record({ kind: 'sleep', attrs: {} });
   strong.ended(true);
-  const four = ['low-profile', 'featherweight', 'insomniac'];
+  const four = ['low-profile', 'featherweight', 'insomniac', 'girl-power'];
   const strongWon = strong.evaluate();
   console.log(`  won by the strong: ${strongWon.join(', ')}`);
   check(strongWon.includes('roll-the-credits') && !four.some((id) => strongWon.includes(id)),
-    'won after a Master, more than half a load carried once and a sleep: no Low Profile, Featherweight nor Insomniac');
+    'won after a Master, more than half a load carried once, a sleep and men in the party: no Low Profile, Featherweight, Insomniac nor Girl Power');
 
   const meek = new AchievementState(defs, true);
   meek.champions([champ({ sex: 'female', load: '50' }), champ({ sex: 'female', alive: 'no', load: '0' })]);
@@ -437,7 +440,13 @@ function champions(defs: readonly AchievementDef[]): void {
   const meekWon = meek.evaluate();
   console.log(`  won by the meek: ${meekWon.join(', ')}`);
   check(four.every((id) => meekWon.includes(id)),
-    'won with none above Expert, half a load at most, never asleep: Low Profile, Featherweight and Insomniac');
+    'won with none above Expert, half a load at most, never asleep, and two women, one of them dead: Low Profile, Featherweight, Insomniac and Girl Power');
+  const late = new AchievementState(defs, true);
+  late.champions([champ({ sex: 'female' })]);
+  late.champions([champ({ sex: 'female' }), champ()]);
+  late.champions([champ({ sex: 'female' })]);
+  late.ended(true);
+  check(!late.evaluate().includes('girl-power'), 'a man who was in the party once, and is no longer, is no Girl Power');
 }
 
 /** A set's file over the common one. */
@@ -577,7 +586,7 @@ async function main(): Promise<void> {
   const values = 'speedRunnerMinutes = 180; blitzMinutes = 60; objectorKills = 40';
   const dm = setFile(common, 'dm-atari', STOCK_DIR, ['let-sleeping-dragons-lie', 'brute-force', 'express-elevator'],
     `${values}; cleanSweepLevels = 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12; expressElevatorMinutes = 60`);
-  setFile(common, 'csb', 'tools/fixtures/gamefiles/csb', [], values, ['clean-sweep']);
+  setFile(common, 'csb', 'tools/fixtures/gamefiles/csb', [], values, ['clean-sweep'], ['girl-power']);
   for (const set of DATA_SETS) {
     if (set.id.startsWith('dm-')) check(achievementFileOf(set.id) === 'dm-atari', `${set.id}, a Dungeon Master set, reads dm-atari.txt`);
   }

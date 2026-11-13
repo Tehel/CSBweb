@@ -22,3 +22,9 @@ name: Solitary Confinement
 text: Win Chaos Strikes Back with a single champion.
 tier: hard
 when: won and party = 1
+
+# CSBWin's utility clears CHARFLAG_male from every champion it carries into an adventure, so
+# a CSB party reads as no man (doc/ACHIEVEMENTS.md -> "The champions").
+
+[girl-power]
+disabled

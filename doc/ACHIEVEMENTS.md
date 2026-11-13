@@ -35,8 +35,8 @@ common file's values: Speed Runner in less than 180 minutes, Blitz in less than 
 Conscientious Objector with at most 40 kills. Dungeon Master's also lists the levels Clean
 Sweep counts, 1 to 12, all but the Hall of Champions and the Dragon's, and gives its own
 Express Elevator 60 minutes, and has Shining Armour and Darc Knight, the armours of Lyte and
-Darc worn whole; Chaos Strikes Back lists no level to sweep. A set with no
-`achievements.txt` of its own reads that file instead. The file is never a game file
+Darc worn whole; Chaos Strikes Back lists no level to sweep, and disables Girl Power
+("The champions"). A set with no `achievements.txt` of its own reads that file instead. The file is never a game file
 (`GAME_FILES`, `src/data/DataSets.ts`), so a recording's digests never name it, and an
 author can change the file without breaking a recording.
 
@@ -226,7 +226,10 @@ which falls with the stamina and a wound. Rounded up, `load > 50` is exactly mor
 **The sex is not to be trusted in a CSB adventure CSBWin's utility made.** That utility
 clears `CHARFLAG_male` from every champion it carries over (`DEBT.md` H, "A champion
 carried into a new adventure keeps their sex"), so such a party reads as no man; RISE's
-adventure keeps the flag. No achievement reads the sex yet (`DEBT.md` X20).
+adventure keeps the flag. Girl Power, `won and max(party(where sex = male)) = 0`, reads the
+flag, which is right in Dungeon Master, where every champion joins at a mirror, and
+`csb.txt` disables it, so that no CSB game, RISE's adventures included, earns it by a flag
+lost.
 
 ### Counted from the data
 
