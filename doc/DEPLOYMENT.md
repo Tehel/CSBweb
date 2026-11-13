@@ -254,7 +254,8 @@ one by one: the server builds nothing, and lists no folder (`src/data/DataSetArc
 thumbnail and its documents, stored uncompressed in one folder of the set's name, each
 dated by its `Last-Modified`: a folder CSBWin plays as its `directory=`, so that a set
 published here can be played elsewhere. A file of the folder the set does not name is left
-out: a readme that is no document, and the port's own files (CSB's `utility-portraits.dat`).
+out: a readme that is no document, and the port's own files (CSB's `utility-portraits.dat`,
+a set's `achievements.txt`).
 A file the set is not whole without that does not load leaves no archive, which the dialog
 says. `tools/checks/data-set-archive.ts` checks the zip with a reader of its own and with
 `unzip`, over every set of the repository's manifest. Each is a `POST` to
@@ -325,9 +326,12 @@ server sends none.
 FTL's games, the manifest's `official` sets, are installed by
 `npx tsx utils/install-official-sets.ts [--dry-run]`, over SSH to the local `.env`'s target:
 one at a time, on a yes, it copies a set's files from `tools/fixtures/gamefiles/` into
-`gamefiles/<dir>/` (those its archive names, and CSB's `utility-portraits.dat`) and writes its
-row, the site's (no owner), approved, with the manifest's flags, then the manifest's default
-set where the table has none. It skips a set whose id or folder the table holds already. It
+`gamefiles/<dir>/` (those its archive names, CSB's `utility-portraits.dat` and the set's
+`achievements.txt`) and writes its row, the site's (no owner), approved, with the
+manifest's flags, then the manifest's default set where the table has none. It skips a set
+whose id or folder the table holds already, but offers it its fetched `achievements.txt`
+where the instance's is missing or differs: the repository's files
+(`tools/achievements/`) are edited after a set is installed. It
 does not publish them through `api/data-sets`: a published set has an owner, and so is no
 base set, and a publish carries no `mini.dat`.
 

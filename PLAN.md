@@ -89,17 +89,18 @@ At the author's request, beside the debt. The design is `doc/ACHIEVEMENTS.md`.
 - ⏳ 18.7 A set's own achievements are a file of the set, `achievements.txt` in its folder,
   beside `hcsb.hct`; the build keeps only `common.txt`. The site's first deployment of the
   achievements waits for it, at the author's choice. The steps:
-  1. **The FTL sets' files move out of the build**: `defs/dm-atari.txt` and `defs/csb.txt`
-     become each official set's `achievements.txt`. Their source is in git beside
-     `tools/data-sets.json`, one file per family, as the folders are not, and
-     `fetch-gamefiles` copies it into each official set's folder, which
-     `install-official-sets` copies to an instance (the author's choice). `achievementFileOf` and its list of Dungeon Master sets
-     go. `achievements.txt` is not a recording's file: editing it changes no recording's
-     set (`findRecordingSet`).
+  1. ✅ **The FTL sets' files move out of `src/`**: `tools/achievements/dungeon-master.txt`
+     and `csb.txt`, one file per family, which `fetch-gamefiles` copies into each official
+     set's folder as `achievements.txt` (the Kids dungeon has none), and
+     `install-official-sets` to an instance with the set, or alone to a set installed
+     already. The tools read the folders' copies. The build still bundles both through
+     `achievementFileOf` until step 2, whose readers make its list of sets redundant.
   2. **Read where the set's files are read**: the game's page and the book through the
      set's files (`DataSetFiles`), a local set's from its record; the verifier, the Hall
      and PROFILE from the set's folder, each set's file read and kept by its digest, the
-     build's `achievementDefs` then `common.txt` alone.
+     build's `achievementDefs` then `common.txt` alone, `achievementFileOf` and its list
+     of Dungeon Master sets gone. `achievements.txt` is not a recording's file: editing it
+     changes no recording's set (`findRecordingSet`).
   3. **Another dungeon's games without a shared file**: a file declares its family on a
      line of its own, `family: dungeon-master`, the set's id where it has none, and
      `games(won, in "dungeon-master")` counts the games of every set of that family

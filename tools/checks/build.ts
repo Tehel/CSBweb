@@ -45,7 +45,7 @@ import { FileDigestCache } from '../../server/setFiles.ts';
 import { openStore } from '../../server/store.ts';
 import { parseManifest } from '../../src/data/DataSets.ts';
 import { replayProof } from '../../src/engine/achievements/ProofReplay.ts';
-import { achievementFileOf, setAchievementDefs } from '../../src/engine/achievements/PageAchievements.ts';
+import { setAchievementDefs } from '../../src/engine/achievements/PageAchievements.ts';
 import type { DataSetDraft, DataSetFolder } from '../../server/publish.ts';
 import { checkLocalDataSet, readDungeonWalls } from '../../src/engine/LocalDataSetCheck.ts';
 import { readRecordingPackage } from '../../src/engine/RecordingPackage.ts';
@@ -200,8 +200,8 @@ async function main(): Promise<void> {
             console.log(`  ${what}: ${fromBuild.startsWith('throws') ? fromBuild : `${fromBuild.length} characters of JSON`}`);
             check(fromBuild === await read(readRecordingPackage), `${what}: the built reader of a package says what the source's does`);
         }
-        const defsText = (name: string) => readFileSync(resolve(ROOT, `src/engine/achievements/defs/${name}.txt`), 'utf8');
-        const sourceDefs = setAchievementDefs(defsText('common'), defsText(achievementFileOf('dm-atari')));
+        const sourceDefs = setAchievementDefs(readFileSync(resolve(ROOT, 'src/engine/achievements/defs/common.txt'), 'utf8'),
+            readFileSync(resolve(ROOT, 'tools/achievements/dungeon-master.txt'), 'utf8'));
         const hallDefs = builtDefs('dm-atari');
         console.log(`  the achievements of dm-atari: ${hallDefs?.length ?? 'none'}`);
         check(hallDefs !== null && JSON.stringify(hallDefs) === JSON.stringify(sourceDefs), 'the built achievements, which the Hall of Fame lists, are the source\'s');

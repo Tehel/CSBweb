@@ -11,11 +11,11 @@
  * Chaos Strikes Back's, each half of them proven by what it adds: DM's worm round only a
  * worm drops, CSB's types only its generators make, DM's Lord Chaos whom no blow kills,
  * CSB's stone map that is no level. Every Dungeon Master set has fourteen levels, so the
- * deepest is 13 in each, as `dm-atari.txt` says.
+ * deepest is 13 in each, as `dungeon-master.txt` says.
  *
  * Run: `npm test -- --only=achievements-format.ts`
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   mergeAchievements, needsWholeGame, parseCondition, readAchievementFile, unknownItems, unusedValues, withCounts,
@@ -25,7 +25,7 @@ import { dataCounts, readAchievementSetFiles, setDungeons } from '../../src/engi
 import { dungeonCensus } from '../../src/engine/DungeonCensus';
 import { acrossUnlocked, AchievementState, partyFigureKey, type AchievementEvent, type GameFigures } from '../../src/engine/achievements/AchievementState';
 import { mergeFigures } from '../../src/data/saves/AchievementStore';
-import { achievementFileOf, acrossInSets } from '../../src/engine/achievements/PageAchievements';
+import { acrossInSets } from '../../src/engine/achievements/PageAchievements';
 import { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import { check, fail, finish } from '../lib/check';
 import { DATA_SETS, dataSetNamed, diskFiles } from '../lib/dataSets';
@@ -33,6 +33,16 @@ import { gameTablesOf, graphicsTablesOf, STOCK_DIR, stockGraphics } from '../lib
 
 const DEFS = resolve(import.meta.dirname, '../../src/engine/achievements/defs');
 const COMMON = resolve(DEFS, 'common.txt');
+/** The FTL sets' own files, one per family, which `fetch-gamefiles` copies into their folders as `achievements.txt`. */
+const FAMILIES = resolve(import.meta.dirname, '../achievements');
+
+/** The sets whose folder holds `text` as its `achievements.txt`. */
+function setsHolding(text: string): string[] {
+  return DATA_SETS.filter((set) => {
+    const path = resolve(set.dir, 'achievements.txt');
+    return existsSync(path) && readFileSync(path, 'utf8') === text;
+  }).map((set) => set.id);
+}
 
 function read(text: string): AchievementFile {
   const r = readAchievementFile(text);
@@ -88,15 +98,16 @@ function commonFile(): AchievementFile {
 }
 
 /**
- * A set's own file, `defs/<name>.txt`: read, printed, its names against the set's
- * `graphics.dat`, laid over the common file, and the sets that read it.
+ * A family's own file, `tools/achievements/<name>.txt`: read, printed, its names against the
+ * set's `graphics.dat`, laid over the common file, and the sets whose folder holds it.
  */
 function setFile(
   common: AchievementFile, name: string, graphicsDir: string, whole: readonly string[], values: string, absent: readonly string[] = [],
   disabled: readonly string[] = [],
 ): AchievementFile {
   console.log(`--- ${name}.txt`);
-  const r = readAchievementFile(readFileSync(resolve(DEFS, `${name}.txt`), 'utf8'));
+  const text = readFileSync(resolve(FAMILIES, `${name}.txt`), 'utf8');
+  const r = readAchievementFile(text);
   check(r.ok, `${name}.txt reads`);
   if (!r.ok) {
     for (const e of r.errors) console.log(`  line ${e.line}: ${e.message}`);
@@ -124,9 +135,9 @@ function setFile(
   const unused = unusedValues(r.file, merged);
   check(unused.length === 0, `every value ${name}.txt gives is named (not ${unused.join(', ')})`);
   for (const d of merged.filter((m) => m.values.length > 0)) console.log(`  ${d.id.padEnd(24)} ${d.text}`);
-  const readers = DATA_SETS.filter((set) => achievementFileOf(set.id) === name).map((set) => set.id);
-  console.log(`  read by ${readers.join(', ')}`);
-  check(readers.length > 0, `${name}.txt is read by a set`);
+  const readers = setsHolding(text);
+  console.log(`  in the folders of ${readers.join(', ')}`);
+  check(readers.length > 0, `${name}.txt is a set's achievements.txt (npm run fetch-gamefiles copies it)`);
   return r.file;
 }
 
@@ -778,7 +789,7 @@ function acrossGames(common: AchievementFile, dm: AchievementFile, csb: Achievem
     else if (e.k === 'cmp' || e.k === 'and' || e.k === 'or') { walk(e.a); walk(e.b); } else if (e.k === 'not') walk(e.a);
   };
   walk(slam.when);
-  check(ofs.join() === 'dm-atari,csb', `its games are dm-atari.txt's sets' and csb.txt's (${ofs.join()})`);
+  check(ofs.join() === 'dm-atari,csb', `its games are dungeon-master.txt's sets' and csb.txt's (${ofs.join()})`);
   const tour = defs.find((d) => d.id === 'hall-of-fame-tour')!;
   const tourKey = tour.when.k === 'cmp' && tour.when.a.k === 'gamesParty' ? tour.when.a.key : '';
   check(tourKey === 'distinct(games(won).portrait)' && tour.games.length === 1 && tour.games[0]!.key === won,
@@ -858,7 +869,7 @@ function acrossGames(common: AchievementFile, dm: AchievementFile, csb: Achievem
     check(sameIds(got, unlocked), `${what}: ${unlocked.join(', ') || 'nothing'}`);
   }
 
-  // Grand Slam: Dungeon Master's games those of every set that reads dm-atari.txt, CSB's csb.txt's.
+  // Grand Slam: Dungeon Master's games those of every set that holds dungeon-master.txt, CSB's csb.txt's.
   const csbDefs = mergeAchievements(common, csb).map((d) => withCounts(d, counts)).filter((d) => d.across);
   const slams: [string, string, [string, GameFigures[]][], boolean][] = [
     ['DM won, and CSB not', 'dm-atari', [['dm-atari', [a.figures]], ['csb', [b.figures]]], false],
@@ -882,12 +893,14 @@ function sameIds(a: readonly string[], b: readonly string[]): boolean {
 async function main(): Promise<void> {
   const common = commonFile();
   const values = 'speedRunnerMinutes = 180; blitzMinutes = 60; objectorKills = 40';
-  const dm = setFile(common, 'dm-atari', STOCK_DIR, ['let-sleeping-dragons-lie', 'brute-force', 'express-elevator'],
+  const dm = setFile(common, 'dungeon-master', STOCK_DIR, ['let-sleeping-dragons-lie', 'brute-force', 'express-elevator'],
     `${values}; cleanSweepLevels = 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12; expressElevatorMinutes = 60`);
   const csb = setFile(common, 'csb', 'tools/fixtures/gamefiles/csb', ['self-reliant', 'fresh-faces', 'veterans'], values, ['clean-sweep'], ['girl-power']);
+  const dungeonMaster = setsHolding(readFileSync(resolve(FAMILIES, 'dungeon-master.txt'), 'utf8'));
   for (const set of DATA_SETS) {
-    if (set.id.startsWith('dm-')) check(achievementFileOf(set.id) === 'dm-atari', `${set.id}, a Dungeon Master set, reads dm-atari.txt`);
+    if (set.id.startsWith('dm-')) check(dungeonMaster.includes(set.id), `${set.id}, a Dungeon Master set, holds dungeon-master.txt`);
   }
+  check(sameIds(setsHolding(readFileSync(resolve(FAMILIES, 'csb.txt'), 'utf8')), ['csb']), 'Chaos Strikes Back alone holds csb.txt');
   errors();
   wholeGame();
   const counts = await counted(common);

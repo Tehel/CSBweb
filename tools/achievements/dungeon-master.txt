@@ -1,8 +1,8 @@
 # CSBweb achievements 1
 #
 # Dungeon Master's own achievements (doc/ACHIEVEMENTS.md), beside the common file's. Every
-# Dungeon Master set reads this file: the Atari's, the Amiga's and the hidden ones
-# (achievementFileOf, PageAchievements.ts).
+# Dungeon Master set's folder holds this file as its achievements.txt: the Atari's, the
+# Amiga's and the hidden ones (tools/fetch-gamefiles.ts copies it).
 
 # The common file's values.
 

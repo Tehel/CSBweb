@@ -251,7 +251,7 @@ check(await storedPackage('end', 'csb', ends) === null, 'and none of a set with 
 // 5. A CSB adventure's start, replayed.
 console.log('\nA CSB adventure\'s start, replayed:');
 const csbDefs = setAchievementDefs(readFileSync(join(import.meta.dirname, '../../src/engine/achievements/defs/common.txt'), 'utf8'),
-    readFileSync(join(import.meta.dirname, '../../src/engine/achievements/defs/csb.txt'), 'utf8'));
+    readFileSync(join(dataSetNamed('csb').dir, 'achievements.txt'), 'utf8'));
 const csbGame = new Uint8Array(readFileSync(join(CORPUS_DIR, 'CSBFullRecordingV4.L5.gz')));
 const csbReplayed = await replayProof(csbGame, Infinity, sets, (setId) => (setId === 'csb' ? csbDefs : null));
 console.log(`  replayed: ${JSON.stringify(csbReplayed)}`);

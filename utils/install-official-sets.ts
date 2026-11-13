@@ -35,8 +35,11 @@
  *   q  quit
  *
  * The folder holds the files the set's archive names (`archiveFiles`), its thumbnail and,
- * where the fetched folder has one, `utility-portraits.dat`; nothing else of the fetched
- * folder, since everything under `gamefiles/` can be downloaded. The rows are written by
+ * where the fetched folder has them, `utility-portraits.dat` and `achievements.txt`, the
+ * set's achievements (`doc/ACHIEVEMENTS.md` → "The file"); nothing else of the fetched
+ * folder, since everything under `gamefiles/` can be downloaded. A set the instance holds
+ * already whose `achievements.txt` is not the fetched folder's is offered that file alone:
+ * the repository's are edited after a set is installed. The rows are written by
  * the container's Node through `node:sqlite`, the server's own store, which takes them at
  * once: no restart. At its end it names the instance's duplicates, the sets that hold the
  * same files under several ids, which it never removes: that is the author's, on the
@@ -54,6 +57,9 @@ import { archiveFiles } from '../src/data/DataSetArchive';
 import { LOCAL_DATA_SET_TEXT_LIMITS, parseManifest, type DataSet } from '../src/data/DataSets';
 import { UTILITY_PORTRAITS_FILE } from '../src/data/UtilityPortraits';
 import { GAMEFILES_DIR, MANIFEST_FILE } from '../tools/lib/dataSets';
+
+/** A set's own achievements, in its folder (`doc/ACHIEVEMENTS.md` → "The file"), which `fetch-gamefiles` copies into each official set's. */
+const ACHIEVEMENTS_FILE = 'achievements.txt';
 import { duplicates, GAME_FILES, gameFilesOf, holding, type GameDigests, type InstanceSet } from '../tools/lib/officialSets';
 
 /** The authors an official set is offered with: FTL's own games, by the manifest's `official`. */
@@ -69,6 +75,8 @@ interface Text {
 interface Instance {
     rows: InstanceSet[];
     defaultSet: string | null;
+    /** The SHA-256 of each row's `achievements.txt`, by its id, `null` where its folder has none. */
+    achievements: Record<string, string | null>;
 }
 
 function fail(message: string): never {
@@ -123,7 +131,8 @@ const names = ${JSON.stringify(GAME_FILES)};
 const rows = db.prepare('SELECT id, dir, csb_graphics, mini_dat FROM data_sets ORDER BY position').all().map((row) => ({ id: row.id, dir: row.dir,
     files: Object.fromEntries(names.map((name) => [name, (name === 'CSBgraphics.dat' && !row.csb_graphics) || (name === 'mini.dat' && !row.mini_dat) ? null : digest(row.dir, name)])) }));
 const defaults = db.prepare('SELECT default_set FROM data_set_defaults').get();
-console.log(JSON.stringify({ rows, defaultSet: defaults ? defaults.default_set : null }));`)) as Instance;
+const achievements = Object.fromEntries(rows.map((row) => [row.id, digest(row.dir, ${JSON.stringify(ACHIEVEMENTS_FILE)})]));
+console.log(JSON.stringify({ rows, defaultSet: defaults ? defaults.default_set : null, achievements }));`)) as Instance;
 }
 
 /** `set`'s game files in its fetched folder, by name. */
@@ -137,17 +146,17 @@ function localDigests(set: DataSet): GameDigests {
 function setFiles(set: DataSet): string[] {
     const local = join(GAMEFILES_DIR, set.dir);
     const files = archiveFiles(set).map(({ file }) => file);
-    if (existsSync(join(local, UTILITY_PORTRAITS_FILE))) files.push(UTILITY_PORTRAITS_FILE);
+    for (const extra of [UTILITY_PORTRAITS_FILE, ACHIEVEMENTS_FILE]) if (existsSync(join(local, extra))) files.push(extra);
     const missing = files.filter((file) => !existsSync(join(local, file)));
     if (missing.length > 0) fail(`${local} lacks ${missing.join(', ')}: run npm run fetch-gamefiles first.`);
     return files;
 }
 
-/** `set`'s folder copied to the instance's `gamefiles/`, its files over any of the same name. */
-function copyFolder(set: DataSet, files: string[]): void {
+/** `files` of `set`'s fetched folder copied to the instance's `gamefiles/<dir>/`, over any of the same name. */
+function copyFolder(set: DataSet, files: string[], dir = set.dir): void {
     const tar = spawnSync('tar', ['-C', join(GAMEFILES_DIR, set.dir), '-cf', '-', ...files], { maxBuffer: 1 << 28 });
     if (tar.status !== 0) fail(`tar: ${tar.stderr.toString().trim()}`);
-    const target = quoted(`gamefiles/${set.dir}`);
+    const target = quoted(`gamefiles/${dir}`);
     remote(`mkdir -p ${target} && tar -C ${target} -xf -`, tar.stdout);
 }
 
@@ -209,6 +218,32 @@ function fits(text: Text): boolean {
     return over.length === 0 && text.name !== '';
 }
 
+/**
+ * The fetched folder's `achievements.txt` offered to `as`, the instance's row that holds
+ * `set`'s files, where its own is not the same; whether the run goes on.
+ */
+async function offerAchievements(set: DataSet, as: string, instance: Instance): Promise<'next' | 'quit'> {
+    const local = join(GAMEFILES_DIR, set.dir, ACHIEVEMENTS_FILE);
+    if (!existsSync(local)) return 'next';
+    const digest = createHash('sha256').update(readFileSync(local)).digest('hex');
+    const theirs = instance.achievements[as] ?? null;
+    if (theirs === digest) return 'next';
+    const dir = instance.rows.find((row) => row.id === as)!.dir;
+    for (;;) {
+        const answer = (await ask(`  Its ${ACHIEVEMENTS_FILE} ${theirs === null ? 'is missing' : 'differs'} on the instance: copy it to gamefiles/${dir}/? [y]es, [n]o, [q]uit: `)).toLowerCase();
+        if (answer === 'q') return 'quit';
+        if (answer === 'n') return 'next';
+        if (answer !== 'y') continue;
+        if (dryRun) console.log(`  Dry run: would copy ${ACHIEVEMENTS_FILE} to gamefiles/${dir}/.`);
+        else {
+            copyFolder(set, [ACHIEVEMENTS_FILE], dir);
+            console.log(`  Copied ${ACHIEVEMENTS_FILE} to gamefiles/${dir}/.`);
+        }
+        instance.achievements[as] = digest;
+        return 'next';
+    }
+}
+
 // ---------------------------------------------------------------- the run
 
 async function main(): Promise<void> {
@@ -223,6 +258,7 @@ async function main(): Promise<void> {
         const held = holding({ id: set.id, dir: set.dir, files: digests }, instance.rows);
         if (held.kind === 'installed') {
             console.log(`- ${set.name}: the instance has its files${held.as === set.id ? '' : ' as'} '${held.as}'.`);
+            if (await offerAchievements(set, held.as, instance) === 'quit') return;
             continue;
         }
         if (held.kind === 'id-taken') {
@@ -253,6 +289,8 @@ async function main(): Promise<void> {
                 console.log(`  Installed '${set.id}', approved${set.hidden ? ' and hidden' : ''}.`);
             }
             instance.rows.push({ id: set.id, dir: set.dir, files: digests });
+            instance.achievements[set.id] = existsSync(join(GAMEFILES_DIR, set.dir, ACHIEVEMENTS_FILE))
+                ? createHash('sha256').update(readFileSync(join(GAMEFILES_DIR, set.dir, ACHIEVEMENTS_FILE))).digest('hex') : null;
             break;
         }
     }

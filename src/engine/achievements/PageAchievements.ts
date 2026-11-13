@@ -30,16 +30,17 @@ export interface ShownUnlock {
   readonly unlock: Unlock;
 }
 
-/** The Dungeon Master sets, which all read `dm-atari.txt`: the Atari's, the Amiga's and the hidden ones. */
+/** The Dungeon Master sets, which all read `tools/achievements/dungeon-master.txt`: the Atari's, the Amiga's and the hidden ones. */
 const DUNGEON_MASTER_SETS: ReadonlySet<string> = new Set([
   'dm-atari', 'dm-atari-1.0a', 'dm-atari-1.0b', 'dm-atari-1.1', 'dm-atari-1.2', 'dm-atari-1.2-de',
   'dm-atari-1.3-fr', 'dm-amiga', 'dm-windows', 'dm-minimum-item-picking',
 ]);
 
 /**
- * The name of the project's own file of the set `setId`'s achievements,
- * `defs/<name>.txt` (`doc/ACHIEVEMENTS.md` → "The file"): `dm-atari` for every Dungeon
- * Master set, else the set's id, which has a file only where the project wrote one.
+ * The name of the project's own file of the set `setId`'s achievements
+ * (`doc/ACHIEVEMENTS.md` → "The file"): `dm-atari` for every Dungeon Master set,
+ * `tools/achievements/dungeon-master.txt`, else the set's id, which has a file only where
+ * the project wrote one.
  */
 export function achievementFileOf(setId: string): string {
   return DUNGEON_MASTER_SETS.has(setId) ? 'dm-atari' : setId;
@@ -49,7 +50,7 @@ export function achievementFileOf(setId: string): string {
  * The achievements across games of `defs`, the set `setId`'s, that `bySet`, each set's
  * playthroughs' figures, make yes (`acrossUnlocked`, `doc/ACHIEVEMENTS.md` → "Across
  * games"): its own games those of `setId`, and a `games(…, in "file")`'s those of every set
- * of `bySet` that reads `defs/<file>.txt` (`achievementFileOf`), `setId` among them where it
+ * of `bySet` that reads the file `achievementFileOf` names, `setId` among them where it
  * does. What the page, the book and the Hall all work them out with.
  */
 export function acrossInSets(defs: readonly AchievementDef[], setId: string, bySet: ReadonlyMap<string, readonly GameFigures[]>): string[] {

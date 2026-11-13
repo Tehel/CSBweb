@@ -1,14 +1,19 @@
 /**
  * The achievements' files the project writes, in the page's build: the common file, and
- * the FTL sets' own, `defs/<name>.txt` (`achievementFileOf`) (`doc/ACHIEVEMENTS.md` → "The file"). The game's
- * page tracks them (`src/main.ts`) and the welcome page's book lists them
- * (`welcomePage.ts`).
+ * the FTL sets' own, `tools/achievements/<family>.txt` (`achievementFileOf`), which
+ * `fetch-gamefiles` also copies into each official set's folder (`doc/ACHIEVEMENTS.md` →
+ * "The file"). The game's page tracks them (`src/main.ts`) and the welcome page's book
+ * lists them (`welcomePage.ts`).
  */
 import type { AchievementDef } from '../engine/achievements/AchievementFile';
 import type { GameFigures } from '../engine/achievements/AchievementState';
 import { achievementFileOf, acrossInSets, setAchievementDefs } from '../engine/achievements/PageAchievements';
 
 const FILES = import.meta.glob<string>('../engine/achievements/defs/*.txt', { query: '?raw', import: 'default', eager: true });
+const OWN = import.meta.glob<string>('../../tools/achievements/*.txt', { query: '?raw', import: 'default', eager: true });
+
+/** The repository's file of the sets that read `defs/<name>.txt` (`achievementFileOf`). */
+const ownFile = (name: string): string | undefined => OWN[`../../tools/achievements/${name === 'dm-atari' ? 'dungeon-master' : name}.txt`];
 
 /**
  * The achievements of the set `setId`: the common file's merged with the set's own file
@@ -19,7 +24,7 @@ export function achievementDefs(setId: string): AchievementDef[] | null {
     try {
         const common = FILES['../engine/achievements/defs/common.txt'];
         if (common === undefined) throw new Error('the common achievements are not in the build');
-        return setAchievementDefs(common, FILES[`../engine/achievements/defs/${achievementFileOf(setId)}.txt`] ?? null);
+        return setAchievementDefs(common, ownFile(achievementFileOf(setId)) ?? null);
     } catch (error) {
         console.error('No achievements:', error);
         return null;

@@ -21,7 +21,7 @@
  *    the lost game's four deaths to monsters and its end; and the whole CSB game, where
  *    the party hurts itself (Own Goal), carries more than ten coins, though Scrooge is
  *    Dungeon Master's alone, and eats every kind of food the set holds (Gourmet). Each game is tracked with its set's achievements as the page
- *    merges them (`achievementFileOf`): DMMovie2615 kills with a Ful bomb (Grenadier),
+ *    merges them, the common file's and its folder's `achievements.txt`: DMMovie2615 kills with a Ful bomb (Grenadier),
  *    loses Gothmog to a wall (Stubbed Toe) and wins with one of four alive (Sole Survivor).
  * 4. The worn places (`WORN_SLOTS`) are the slots whose `CarryLocation` in `graphics.dat`
  *    is the head's, neck's, torso's, legs' or feet's mask (`doc/CSBwin-src/CSB.h:1682-1687`).
@@ -103,7 +103,6 @@ import { readUtilityPortraits, UTILITY_PORTRAITS_FILE } from '../../src/data/Uti
 import { applySaveBytes } from '../../src/engine/SaveGameFile';
 import { standInPage } from '../../src/renderer/StandInPage';
 import { savePath } from '../lib/saves';
-import { achievementFileOf } from '../../src/engine/achievements/PageAchievements';
 import { BLOW_END, type Happening } from '../../src/engine/Happening';
 import { MonsterType } from '../../src/engine/monsterTypes';
 import type { ActuatorRecord, CreatureRecord } from '../../src/data/dungeonTypes';
@@ -121,7 +120,7 @@ import { OBJNI_THE_FIRESTAFF_A, OBJNI_THE_FIRESTAFF_B } from '../../src/core/obj
 import { testChampion } from '../lib/champion';
 import { check, finish } from '../lib/check';
 import { graphicsTablesOf, STOCK_DIR, stockGame, stockGraphics } from '../lib/game';
-import { DATA_SETS, diskFiles, diskSetDigests } from '../lib/dataSets';
+import { DATA_SETS, dataSetNamed, diskFiles, diskSetDigests } from '../lib/dataSets';
 import { playPath } from '../lib/playback';
 import { CORPUS_DIR, CORPUS_FILE, corpusFiles } from '../lib/recordingCorpus';
 
@@ -208,9 +207,9 @@ function coinLocksOf(dungeon: DungeonState, names: readonly string[]): Map<strin
   return locks;
 }
 
-/** The set's achievements, as the page merges them (`achievementFileOf`), and this tool's own. */
+/** The set's achievements, the common file's merged with its folder's `achievements.txt`, and this tool's own. */
 function defsOf(setId: string): AchievementDef[] {
-  const path = resolve(DEFS, `${achievementFileOf(setId)}.txt`);
+  const path = resolve(dataSetNamed(setId).dir, 'achievements.txt');
   let file: AchievementFile | null = null;
   if (existsSync(path)) {
     const read = readAchievementFile(readFileSync(path, 'utf8'));

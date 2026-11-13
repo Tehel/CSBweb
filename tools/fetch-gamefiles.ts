@@ -26,6 +26,11 @@
  * - Conflux 3.5 beta 8 (his site, or the OneDrive), The Towers of Chaos 3.3 and the Kids
  *   dungeon 24 (the OneDrive).
  *
+ * The project's own files are copied from the repository: each official set's achievements,
+ * `tools/achievements/dungeon-master.txt` into every Dungeon Master set's folder and
+ * `csb.txt` into Chaos Strikes Back's, as `achievements.txt` (`doc/ACHIEVEMENTS.md` →
+ * "The file"). The Kids dungeon has none.
+ *
  * Four steps make the rest, each by its own tool, in this order: `dm-atari`'s
  * `graphics.dat`, CSBWin's with three items of 1.2's (`tools/checks/dm-atari-graphics.ts
  * --write`); `dm-amiga`'s, `dm-atari`'s with the Amiga's credits, font, names, sounds and colours
@@ -40,9 +45,10 @@
  *   npm run fetch-gamefiles              # write the missing files, then check every one
  *   npm run fetch-gamefiles -- --check   # only check the files against FILES
  *
- * A file that is there is never written over: one that differs is named (changed, missing
- * or extra), and the tool exits with 1. Move it aside to fetch a clean one. Only the
- * archives a missing file needs are downloaded.
+ * A fetched file that is there is never written over: one that differs is named (changed,
+ * missing or extra), and the tool exits with 1. Move it aside to fetch a clean one. Only the
+ * archives a missing file needs are downloaded. A copy of the repository's that differs is
+ * written over, but by `--check`, which names it.
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -145,18 +151,32 @@ type ArchiveName = keyof typeof ARCHIVES;
 
 /**
  * Where a file comes from: a file of an archive, a file of a disk image in it (a Pasti image
- * or an ADF, by its extension), a step (`STEPS`), or another file of the folder, copied
- * once the steps before the thumbnails have written it.
+ * or an ADF, by its extension), a step (`STEPS`), another file of the folder, copied
+ * once the steps before the thumbnails have written it, or a file of the repository's
+ * (`fromRepository`).
  */
 type Origin =
   | { archive: ArchiveName; path: string; disk?: string }
   | { step: StepName }
-  | { copy: string };
+  | { copy: string }
+  | { repository: string };
 
 const DM_STX = 'Floppy Disks STX/Dungeon Master for Atati ST';
 const DM_AMIGA_ADF = 'Floppy Disks ADF/Dungeon Master for Amiga v2.2 (English) Original (Not working).adf';
 const CSB_UTILITY_STX = 'Floppy Disks STX/Chaos Strikes Back for Atari ST Utility Disk v2.1 (English).stx';
 const MINIMUM_ITEM_PICKING = 'Dungeon Master minimum item picking/DMMovie42 - Paul Hayes - 42';
+
+/** The repository's achievements files, one per family of sets (`doc/ACHIEVEMENTS.md` → "The file"). */
+const ACHIEVEMENTS = 'tools/achievements';
+
+/**
+ * A file of the folder copied from the repository's `path`: the project's own, which the
+ * folder's are not, so its SHA-256 is the repository file's, never pinned, and a copy that
+ * differs is written over, the repository's being the newer.
+ */
+function fromRepository(path: string): [sha256: string, origin: Origin] {
+  return [createHash('sha256').update(readFileSync(path)).digest('hex'), { repository: path }];
+}
 
 /** Every file of the folder, by its path under it: its SHA-256 and where it comes from. */
 const FILES: Record<string, [sha256: string, origin: Origin]> = {
@@ -171,6 +191,7 @@ const FILES: Record<string, [sha256: string, origin: Origin]> = {
   'conflux-3.5-b8/graphics.dat': ['94064802c1bd7e2b867e59b2a6dd605b204f6c5567e7097546548eed27677817', { archive: 'conflux', path: 'Conflux_3.5_B8/Files/graphics.dat' }],
   'conflux-3.5-b8/conflux-3.5-thumbnail.png': ['e2670aa65fa2b7c37272c55533001335534e7088155c263a74627367ebf6c56b', { step: 'thumbnails' }],
   'csbgraphics/CSBgraphics.dat': ['d9d181c622732ef7e82fc788c6fe03f8c1c1de0e8d93e28f00fe1d6741367adb', { archive: 'csbGraphics', path: 'CSBgraphics.dat' }],
+  'csb/achievements.txt': fromRepository(`${ACHIEVEMENTS}/csb.txt`),
   'csb/csbgame2.dat': ['105104b30dde164e7000d388f251f3d6d3f83a56959f28f56220711d1e9f3a9e', { archive: 'csbWindows', path: 'csbgame2.dat' }],
   'csb/dungeon.dat': ['3cafd2fb9f255df93e99ae27d4bf60ff22cc8e43cfa90de7d29c04172b2542ba', { archive: 'csbWindows', path: 'dungeon.dat' }],
   'csb/graphics.dat': ['7cceef26a20acec6c5f9de659a6a0c57cdb24908687a2ca3a58e3c62cc6b0593', { archive: 'csbWindows', path: 'graphics.dat' }],
@@ -179,33 +200,43 @@ const FILES: Record<string, [sha256: string, origin: Origin]> = {
   'csb/mini.dat': ['61d981061bbb7a81b9b7f4795e99c24a592ee329169eb0c195459ba4eb62e3a9', { archive: 'csbWindows', path: 'mini.dat' }],
   'csb/utility-portraits.dat': ['50ec780dccedd255bd6f323852db1a992a5cc0bc52e50432ebe01f3e2c1b5482', { step: 'utilityPortraits' }],
   'csb/csb-thumbnail.png': ['bd45d907acabbd887626d67a70c0e094af1d5dd7e4d5f4fb9fcd7cb45b495b68', { step: 'thumbnails' }],
+  'dm-atari/achievements.txt': fromRepository(`${ACHIEVEMENTS}/dungeon-master.txt`),
   'dm-atari/dungeon.dat': ['a26f0edc4fb13e3d38551d91ad7c24f517257cfc689affe72d657f4e423853b2', { archive: 'dmAtari', path: `${DM_STX} v1.1 (English).stx`, disk: 'DUNGEON.DAT' }],
   'dm-atari/graphics.dat': ['b5f238d299207b11107881ffa113c362685362c00c9c109116fe872ce6531ac5', { step: 'dmAtariGraphics' }],
   'dm-atari/dm-atari-thumbnail.png': ['0449c5fd626d79618ac0f21a0a30ee992a56b6e890aee184c86579aa095b8ae1', { step: 'thumbnails' }],
+  'dm-amiga/achievements.txt': fromRepository(`${ACHIEVEMENTS}/dungeon-master.txt`),
   'dm-amiga/dungeon.dat': ['f89f51bdecf95a5f9b9b4f70afb6381bdd2b7f6b571379ab33118d4a8b3d5c8b', { archive: 'dmAmiga', path: DM_AMIGA_ADF, disk: 'Dungeon.dat' }],
   'dm-amiga/graphics.dat': ['94e16696e93f85e35e64745333cca8bbaa32f882ace7e08b4706285554341ba9', { step: 'dmAmigaGraphics' }],
   'dm-amiga/dm-amiga-thumbnail.png': ['0449c5fd626d79618ac0f21a0a30ee992a56b6e890aee184c86579aa095b8ae1', { step: 'thumbnails' }],
+  'dm-atari-1.0a/achievements.txt': fromRepository(`${ACHIEVEMENTS}/dungeon-master.txt`),
   'dm-atari-1.0a/dungeon.dat': ['f388d156d2533abb90efb1235194d9d4f90e041193d8190e6a1efab809acf681', { archive: 'dmAtari', path: `${DM_STX} v1.0 (English) 1987-12-08.stx`, disk: 'DUNGEON.DAT' }],
   'dm-atari-1.0a/graphics.dat': ['e0daae7b956c10ae94c097e5294c6eb5fce5b3280bd1e29d96f2c2a51d5a863f', { archive: 'dmAtari', path: `${DM_STX} v1.0 (English) 1987-12-08.stx`, disk: 'GRAPHICS.DAT' }],
   'dm-atari-1.0a/dm-atari-1.0a-thumbnail.png': ['0449c5fd626d79618ac0f21a0a30ee992a56b6e890aee184c86579aa095b8ae1', { step: 'thumbnails' }],
+  'dm-atari-1.0b/achievements.txt': fromRepository(`${ACHIEVEMENTS}/dungeon-master.txt`),
   'dm-atari-1.0b/dungeon.dat': ['a43a07834444d868a6b67bbc414b1f2618973635caf505696ba86c1d30894ee8', { archive: 'dmAtari', path: `${DM_STX} v1.0 (English) 1987-12-11.stx`, disk: 'DUNGEON.DAT' }],
   'dm-atari-1.0b/graphics.dat': ['16180d645f9d9292cafd95a1a763ce0a7f893afba3c34619b618dfc368a1a20a', { archive: 'dmAtari', path: `${DM_STX} v1.0 (English) 1987-12-11.stx`, disk: 'GRAPHICS.DAT' }],
   'dm-atari-1.0b/dm-atari-1.0b-thumbnail.png': ['0449c5fd626d79618ac0f21a0a30ee992a56b6e890aee184c86579aa095b8ae1', { step: 'thumbnails' }],
+  'dm-atari-1.1/achievements.txt': fromRepository(`${ACHIEVEMENTS}/dungeon-master.txt`),
   'dm-atari-1.1/dungeon.dat': ['a26f0edc4fb13e3d38551d91ad7c24f517257cfc689affe72d657f4e423853b2', { archive: 'dmAtari', path: `${DM_STX} v1.1 (English).stx`, disk: 'DUNGEON.DAT' }],
   'dm-atari-1.1/graphics.dat': ['310eb7737e1756e67c7f16c048485c5c8b5bb8307fdcee695d199a065fda2003', { archive: 'dmAtari', path: `${DM_STX} v1.1 (English).stx`, disk: 'GRAPHICS.DAT' }],
   'dm-atari-1.1/dm-atari-1.1-thumbnail.png': ['0449c5fd626d79618ac0f21a0a30ee992a56b6e890aee184c86579aa095b8ae1', { step: 'thumbnails' }],
+  'dm-atari-1.2/achievements.txt': fromRepository(`${ACHIEVEMENTS}/dungeon-master.txt`),
   'dm-atari-1.2/dungeon.dat': ['0db918d30a2cca24da067f72f8a050366a739cbbaf4bca50300e2556314f667e', { archive: 'dmAtari', path: `${DM_STX} v1.2 (English).stx`, disk: 'DUNGEON.DAT' }],
   'dm-atari-1.2/graphics.dat': ['b4ab5f43d06193d76976eaead3be4aa941a74367bc84a0f2a3b00ad44756aa30', { archive: 'dmAtari', path: `${DM_STX} v1.2 (English).stx`, disk: 'GRAPHICS.DAT' }],
   'dm-atari-1.2/dm-atari-1.2-thumbnail.png': ['0449c5fd626d79618ac0f21a0a30ee992a56b6e890aee184c86579aa095b8ae1', { step: 'thumbnails' }],
+  'dm-atari-1.2-de/achievements.txt': fromRepository(`${ACHIEVEMENTS}/dungeon-master.txt`),
   'dm-atari-1.2-de/dungeon.dat': ['85e2017ec6bec3d27389cca6d2b3fcd201025f6f9775363fa483ba2ef6355141', { archive: 'dmAtari', path: `${DM_STX} v1.2 (German).stx`, disk: 'DUNGEON.DAT' }],
   'dm-atari-1.2-de/graphics.dat': ['650ff7f430ac1113cce08a14b0f56bd010400232e97adcd2659b4be9671c18a2', { archive: 'dmAtari', path: `${DM_STX} v1.2 (German).stx`, disk: 'GRAPHICS.DAT' }],
   'dm-atari-1.2-de/dm-atari-1.2-de-thumbnail.png': ['0449c5fd626d79618ac0f21a0a30ee992a56b6e890aee184c86579aa095b8ae1', { step: 'thumbnails' }],
+  'dm-atari-1.3-fr/achievements.txt': fromRepository(`${ACHIEVEMENTS}/dungeon-master.txt`),
   'dm-atari-1.3-fr/dungeon.dat': ['e0f5696a5eb792b7ece238f5d5b49c3967ce64c268e0978b658d2bf67b54be3c', { archive: 'dmAtari', path: `${DM_STX} v1.3 (French).stx`, disk: 'DUNGEON.DAT' }],
   'dm-atari-1.3-fr/graphics.dat': ['b14e87bb2fb4a6ecc051e8e160b20d5244d6293e71e01bd754d6aaa6d8bdee1a', { archive: 'dmAtari', path: `${DM_STX} v1.3 (French).stx`, disk: 'GRAPHICS.DAT' }],
   'dm-atari-1.3-fr/dm-atari-1.3-fr-thumbnail.png': ['0449c5fd626d79618ac0f21a0a30ee992a56b6e890aee184c86579aa095b8ae1', { step: 'thumbnails' }],
+  'dm-minimum-item-picking/achievements.txt': fromRepository(`${ACHIEVEMENTS}/dungeon-master.txt`),
   'dm-minimum-item-picking/dungeon.dat': ['5bee1c9126495523f82e773c95cddf44bc68c2e4da9115ebc986177a774001b9', { archive: 'csbwinMovies', path: `${MINIMUM_ITEM_PICKING}/dungeon.dat` }],
   'dm-minimum-item-picking/graphics.dat': ['b5f238d299207b11107881ffa113c362685362c00c9c109116fe872ce6531ac5', { copy: 'dm-atari/graphics.dat' }],
   'dm-minimum-item-picking/dm-minimum-item-picking-thumbnail.png': ['0449c5fd626d79618ac0f21a0a30ee992a56b6e890aee184c86579aa095b8ae1', { step: 'thumbnails' }],
+  'dm-windows/achievements.txt': fromRepository(`${ACHIEVEMENTS}/dungeon-master.txt`),
   'dm-windows/dungeon.dat': ['ac3f9a233a988c9ff7d8074a6736909ce13fc482555cd329b3a130f661f90da5', { archive: 'dmWindows', path: 'dungeon.dat' }],
   'dm-windows/graphics.dat': ['196cb349827e8926e2763fa61ecbe8e10810003045ef72a435b7da4dded56d8e', { archive: 'dmWindows', path: 'graphics.dat' }],
   'dm-windows/dm-windows-thumbnail.png': ['0449c5fd626d79618ac0f21a0a30ee992a56b6e890aee184c86579aa095b8ae1', { step: 'thumbnails' }],
@@ -308,6 +339,14 @@ function differences(): string[] {
   return lines;
 }
 
+if (!checkOnly) {
+  for (const [path, [sha, origin]] of Object.entries(FILES)) {
+    if (!('repository' in origin) || !existsSync(join(TREE, path)) || sha256(readFileSync(join(TREE, path))) === sha) continue;
+    writeFileSync(join(TREE, path), readFileSync(origin.repository));
+    console.log(`${path}: written over from ${origin.repository}`);
+  }
+}
+
 const missing = Object.entries(FILES).filter(([path]) => !existsSync(join(TREE, path)));
 if (!checkOnly && missing.length > 0) {
   const archives = new Set<ArchiveName>();
@@ -319,6 +358,11 @@ if (!checkOnly && missing.length > 0) {
   if (steps.has('utilityPortraits')) archives.add('csbAtari');
   for (const name of archives) await unpack(name);
 
+  for (const [path, [, origin]] of missing) {
+    if (!('repository' in origin)) continue;
+    mkdirSync(dirname(join(TREE, path)), { recursive: true });
+    writeFileSync(join(TREE, path), readFileSync(origin.repository));
+  }
   for (const [path, [, origin]] of missing) {
     if (!('archive' in origin)) continue;
     const source = unpacked(origin.archive, origin.path);

@@ -28,9 +28,13 @@ builds, step by step, and each step rewrites its section here to say what was bu
 A set's achievements are `achievements.txt`, an optional file in the set's folder, like
 `hcsb.hct`. The common achievements, which every set has, are
 `src/engine/achievements/defs/common.txt`. The FTL sets' own achievements are written by the
-project, as `src/engine/achievements/defs/<name>.txt` (`achievementFileOf`,
-`src/engine/achievements/PageAchievements.ts`): `dm-atari.txt`, which every Dungeon Master
-set reads, the Atari's, the Amiga's and the hidden ones, and `csb.txt`. Both give the
+project, one file per family, beside the repository's manifest: `tools/achievements/dungeon-master.txt`,
+which every Dungeon Master set's folder holds, the Atari's, the Amiga's and the hidden
+ones, and `csb.txt`, Chaos Strikes Back's. `npm run fetch-gamefiles` copies each into its
+sets' folders as `achievements.txt`, and `utils/install-official-sets.ts` copies it to an
+instance with the set. Until the readers read a set's folder (`PLAN.md` 18.7, step 2), the
+build bundles both and gives each set its family's (`achievementFileOf`,
+`src/engine/achievements/PageAchievements.ts`). Both give the
 common file's values: Speed Runner in less than 180 minutes, Blitz in less than 60, and
 Conscientious Objector with at most 40 kills. Dungeon Master's also lists the levels Clean
 Sweep counts, 1 to 12, all but the Hall of Champions and the Dragon's, and gives its own
@@ -364,7 +368,7 @@ A set's dungeons are its `dungeon.dat`, and its `mini.dat` where it has one, Cha
 Back's adventure, which is the dungeon its game is played in. Dungeon Master counts 25
 spells, 8 foods, 24 types and 14 levels; Chaos Strikes Back 25 spells, 8 foods, 23 types,
 three of them only its generators make, and 10 levels (`tools/checks/achievements-format.ts`).
-Every Dungeon Master set has the same 14 levels, so `dm-atari.txt` names the deepest, 13.
+Every Dungeon Master set has the same 14 levels, so `dungeon-master.txt` names the deepest, 13.
 
 Each count is that of the values its event can take in a game of the set, so `distinct(…)
 >= count` is exact: a spell that works is one of the table's, a meal one of the foods, a
@@ -428,7 +432,8 @@ are two sets' wins.
 
 **Another dungeon's games**: `games(condition, in "file")` counts the playthroughs that met
 `condition` in every set that reads the project's file `defs/<file>.txt`
-(`achievementFileOf`), this set among them where it reads that file. `"dm-atari"` is every
+(`achievementFileOf`), this set among them where it reads that file (`"dm-atari"` names
+`tools/achievements/dungeon-master.txt`). `"dm-atari"` is every
 Dungeon Master set, the Atari's, the Amiga's and the hidden ones, and `"csb"` Chaos Strikes
 Back. The figure it reads is the one each of those sets keeps by the same key, `games(won)`,
 so a set counts there only by a condition its own achievements test; an achievement that
