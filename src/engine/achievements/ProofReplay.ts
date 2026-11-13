@@ -9,8 +9,8 @@
  * recording at its own engine level (`RecordingPlayer`). The tracker is a function of what
  * it observes alone, so the replay unlocks what the player's game unlocked, its joins
  * reading the histories their parents kept at their saves (`AchievementTracker`): a path
- * from a new game has its whole history, one from a save that no replay holds a state for
- * has a history of its own from there, as the page's had.
+ * from a new game or a CSB adventure's start has its whole history, one from another save
+ * that no replay holds a state for has a history of its own from there, as the page's had.
  *
  * `src/engine/VerifierReaders.ts` bundles it for the server, with the achievements of the
  * build (`achievementDefs`).
@@ -67,7 +67,8 @@ export async function replayProof(
     if (defs === null || defs.length === 0) return drifted(`${pkg.dataSet} has no achievements`);
     try {
         const page = await standInPage(over.set, over.files);
-        const tracker = new AchievementTracker(page.game, defs, page.screen.ui.objectTables.objectNames);
+        const miniDat = over.set.miniDat ? await over.files.read('mini.dat') : null;
+        const tracker = new AchievementTracker(page.game, defs, page.screen.ui.objectTables.objectNames, miniDat);
         tracker.attach();
         const drift = await playCut(pkg.path, pkg.shared.kind === 'save' ? pkg.shared : null, async () => cutPageOf(page));
         if (drift) return drifted(cutDriftReason(drift));

@@ -47,10 +47,11 @@ export interface StandInPage {
   readonly saves: GameSaves;
   /**
    * The achievements of `defs` tracked as the page tracks a game the player plays
-   * (`PageAchievements`), over `store` and the playthroughs `touched`; the page's own
-   * builds none, as a recording's viewer has none.
+   * (`PageAchievements`), over `store` and the playthroughs `touched`, a CSB adventure's
+   * start read against `miniDat`; the page's own builds none, as a recording's viewer has
+   * none.
    */
-  track(defs: readonly AchievementDef[], store?: AchievementStore, touched?: TouchedPlaythroughs): PageAchievements;
+  track(defs: readonly AchievementDef[], store?: AchievementStore, touched?: TouchedPlaythroughs, miniDat?: Uint8Array | null): PageAchievements;
 }
 
 /**
@@ -149,8 +150,9 @@ export async function standInPage(set: DataSet, files: DataSetFiles, store: Save
   });
   game.ctx.rules.dmRulesDesignOption = set.dmRules;
 
-  const track = (defs: readonly AchievementDef[], achievementStore = memoryAchievementStore(), touched: TouchedPlaythroughs = { has: () => false }) =>
-    (tracked = new PageAchievements(game, set.id, defs, screen!.ui.objectTables.objectNames, achievementStore, saves, touched));
+  const track = (defs: readonly AchievementDef[], achievementStore = memoryAchievementStore(), touched: TouchedPlaythroughs = { has: () => false },
+    miniDat: Uint8Array | null = null) =>
+    (tracked = new PageAchievements(game, set.id, defs, screen!.ui.objectTables.objectNames, achievementStore, saves, touched, miniDat));
   return { game, screen, messages, clock, dungeonDat, saves, track };
 }
 

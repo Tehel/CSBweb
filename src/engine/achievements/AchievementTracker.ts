@@ -11,9 +11,11 @@
  * back when that file is read (`read`): a replay, whose joins read the files their parents
  * made, so takes up the history its parent had at each save. A file read with no state
  * kept for it starts a history of its own, which needs-the-whole-game conditions never
- * read (`AchievementState`).
+ * read (`AchievementState`), unless it is a CSB adventure's start (`isNewAdventure`): the
+ * adventure is a game of its own from there, and its history is the whole game's.
  */
 import { fileDigest } from '../../data/DataSetFiles';
+import { isNewAdventure } from '../Chaos';
 import { OBJECT_ID_EOF, OBJECT_ID_NULL, DBType, type ObjectID } from '../../core/types';
 import { OBJNI_NOT_AN_OBJECT } from '../../core/objectNameIndex';
 import { FIRST_RUNE, RUNE_NAMES } from '../../core/runes';
@@ -93,10 +95,14 @@ export class AchievementTracker {
 
   /**
    * A tracker of `game`, for the achievements `defs` names, the objects named by
-   * `objectNames` (`d.ObjectNames`, the set's `graphics.dat`). Until a game is read it
-   * keeps a history that does not go back to the start.
+   * `objectNames` (`d.ObjectNames`, the set's `graphics.dat`), and `miniDat`, the set's
+   * `mini.dat` where it has one, which a CSB adventure's start is read against. Until a
+   * game is read it keeps a history that does not go back to the start.
    */
-  constructor(private readonly game: Game, private readonly defs: readonly AchievementDef[], private readonly objectNames: readonly string[]) {
+  constructor(
+    private readonly game: Game, private readonly defs: readonly AchievementDef[], private readonly objectNames: readonly string[],
+    private readonly miniDat: Uint8Array | null = null,
+  ) {
     this.state = new AchievementState(defs, false);
   }
 
@@ -199,11 +205,18 @@ export class AchievementTracker {
         return;
       case 'new-game': this.begin(null, true); return;
       case 'saved': this.snapshots.set(fileDigest(h.file), this.snapshot()); return;
-      case 'read': this.begin(this.snapshots.get(fileDigest(h.file)) ?? null, false); return;
+      case 'read': {
+        const kept = this.snapshots.get(fileDigest(h.file)) ?? null;
+        this.begin(kept, kept === null && this.miniDat !== null && isNewAdventure(h.file, this.miniDat));
+        return;
+      }
     }
   }
 
-  /** A history begun: a new game's from its start, or a save's from what was kept for it. */
+  /**
+   * A history begun: a new game's or a CSB adventure's from its start, or a save's from
+   * what was kept for it.
+   */
   private begin(kept: TrackerSnapshot | null, whole: boolean): void {
     this.blows.length = 0;
     this.missiles.clear();

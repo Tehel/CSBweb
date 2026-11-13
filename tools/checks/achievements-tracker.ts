@@ -8,9 +8,11 @@
  * 1. Every package plays to its point with the tracker attached, as it plays without one
  *    in `recording-corpus.ts`: the happenings change nothing in a tick.
  * 2. Each join's read finds the state its parent kept at the save (`saved`, `read`), and a
- *    path that begins with a new game keeps a history from its start through its joins;
- *    one that begins with a CSBWin save has none, and the needs-the-whole-game conditions
- *    stay locked there (Speed Runner in the whole CSB game).
+ *    path that begins with a new game or a CSB adventure's start, the set's `mini.dat` with
+ *    a party put in (`isNewAdventure`), keeps a history from its start through its joins;
+ *    one that begins with another CSBWin save has none. The whole CSB game begins at the
+ *    adventure CSBWin's utility made, so its needs-the-whole-game conditions unlock: Speed
+ *    Runner, won in less than 180 minutes, and not Blitz, in 60.
  * 3. What the tracker sees in the games: DMMovie2615, Dungeon Master won with four
  *    champions resurrected, their kills (melee, throw, explosion, Lord Chaos's fusion,
  *    each the party's with its champion and item), three deaths and their causes
@@ -34,6 +36,7 @@ import { findRecordingSet } from '../../src/data/RecordingSet';
 import { mergeAchievements, readAchievementFile, type AchievementDef, type AchievementFile } from '../../src/engine/achievements/AchievementFile';
 import type { AchievementEvent } from '../../src/engine/achievements/AchievementState';
 import { AchievementTracker, WORN_SLOTS } from '../../src/engine/achievements/AchievementTracker';
+import { isNewAdventure } from '../../src/engine/Chaos';
 import { achievementFileOf } from '../../src/engine/achievements/PageAchievements';
 import type { Happening } from '../../src/engine/Happening';
 import { readRecordingPackage } from '../../src/engine/RecordingPackage';
@@ -105,9 +108,12 @@ for (const file of corpusFiles()) {
   let tracker!: AchievementTracker;
   let restored = 0;
   let carryLocation: readonly number[] = [];
+  const miniDat = set.miniDat ? await diskFiles(set).read('mini.dat') : null;
+  const start = pkg.path[0]!.start;
+  const fromAdventure = start.kind === 'save' && miniDat !== null && isNewAdventure(start.bytes, miniDat);
   const startedAt = Date.now();
   const played = await playPath(set, diskFiles(set), pkg.path, pkg.shared.kind === 'save' ? pkg.shared : null, null, null, (page) => {
-    tracker = new AchievementTracker(page.game, defsOf(set.id), page.screen.ui.objectTables.objectNames);
+    tracker = new AchievementTracker(page.game, defsOf(set.id), page.screen.ui.objectTables.objectNames, miniDat);
     tracker.onEvent((event) => events.push(event));
     tracker.attach();
     carryLocation = Array.from(page.game.ctx.tables.carryLocation);
@@ -131,8 +137,9 @@ for (const file of corpusFiles()) {
 
   // 2. The joins, restored.
   check(restored === played.joins, `${file}: each of its ${played.joins} join(s) reads the state its parent kept at the save (${restored})`);
-  const fromNewGame = pkg.path[0]!.start.kind === 'new';
-  check(tracker.whole === fromNewGame, `${file}: its history goes back to the game's start exactly where its path begins with a new game (${fromNewGame})`);
+  const fromStart = start.kind === 'new' || fromAdventure;
+  check(tracker.whole === fromStart,
+    `${file}: its history goes back to the game's start exactly where its path begins with a new game or a CSB adventure's start (${start.kind}${fromAdventure ? ', an adventure' : ''})`);
 
   // 4. The worn places, once.
   if (!wornChecked) {
@@ -183,7 +190,9 @@ for (const file of corpusFiles()) {
   if (name === 'CSBFullRecordingV4') {
     for (const id of ['first-blood', 'exterminator', 'own-goal', 't-coins', 'roll-the-credits']) check(unlocked.has(id), `CSBFullRecordingV4 unlocks ${id}`);
     check(!unlocked.has('scrooge'), 'CSBFullRecordingV4: Scrooge is Dungeon Master\'s, not CSB\'s');
-    check(!unlocked.has('speed-runner'), 'CSBFullRecordingV4: Speed Runner, which needs the whole game, stays locked in a game from a CSBWin save');
+    check(fromAdventure, 'CSBFullRecordingV4 begins at a new adventure CSBWin\'s utility made, mini.dat with its party put in');
+    check(unlocked.has('speed-runner') && !unlocked.has('blitz'),
+      `CSBFullRecordingV4: Speed Runner, which needs the whole game, unlocks in a game from the adventure's start, and Blitz does not (${Math.round(tracker.playedVbls / 3600)} minutes)`);
     check(count(events, 'hurt', { party: 'yes' }) > 0, 'CSBFullRecordingV4: the party hurts itself');
   }
 }

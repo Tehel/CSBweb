@@ -281,6 +281,36 @@ export function TAG000fc4(source: SaveFileBlocks, mini: SaveFileBlocks): Uint8Ar
 }
 
 /**
+ * The port's own: whether `file` is a new adventure as `makeNewAdventure` writes it from
+ * `mini`, `mini.dat` with a party put in and nothing else, whichever utility put it there,
+ * RISE's or CSBWin's. The fields `TAG002724` writes are taken from `file` into `mini.dat`'s
+ * record, which `TAG000fc4` writes: the file is a new adventure exactly when that is the
+ * file, byte for byte. The achievements' tracker reads it, so a CSB adventure's history
+ * begins at its start (`doc/ACHIEVEMENTS.md` → "A CSB adventure").
+ */
+export function isNewAdventure(file: Uint8Array, mini: Uint8Array): boolean {
+    let made: SaveFileBlocks;
+    let adventure: SaveFileBlocks;
+    let written: Uint8Array;
+    try {
+        made = ReadSavedGame(file, 0);
+        adventure = ReadSavedGame(mini, 1);
+        const block1 = adventure.block1.slice();
+        block1.set(made.block1.subarray(256, 296), 256);
+        block1.set(made.block1.subarray(308, 312), 308);
+        block1.set(made.block1.subarray(376, 378), 376);
+        const block2 = adventure.block2.slice();
+        block2.set(made.block2.subarray(10, 12), 10);
+        const characters = adventure.characters.slice();
+        characters.set(made.characters.subarray(0, 3200), 0);
+        written = TAG000fc4(made, { ...adventure, block1, block2, characters });
+    } catch {
+        return false;
+    }
+    return written.length === file.length && written.every((byte, i) => byte === file[i]);
+}
+
+/**
  * "MAKE NEW ADVENTURE" (`_TAG004518`'s button 13, `doc/CSBwin-src/Chaos.cpp:4806-4833`):
  * the saved game `source` checked, `mini.dat` read and checked, the party copied in, and
  * the new adventure's save file. A refusal throws a `UtilityError` with the message

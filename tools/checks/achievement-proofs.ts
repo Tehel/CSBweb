@@ -21,7 +21,10 @@
  *      `replay-saves-written-over` as the store holds it, its save's file made again
  *      (`fileAtEnd`), packed as the book's UPLOAD packs a point, and replayed by the
  *      verifier's `replayProof`: First Blood; and the latest game's end of the set, packed
- *      at its end.
+ *      at its end;
+ *   5. a CSB adventure's start, replayed by `replayProof`: the corpus's whole CSB game,
+ *      which begins at the adventure CSBWin's utility made, unlocks Speed Runner, which
+ *      needs the whole game, with the achievements of `csb.txt`.
  *
  * Usage: npm test -- --only=achievement-proofs.ts
  */
@@ -212,5 +215,15 @@ const endRead = ended && await readRecordingPackage(ended);
 check(endRead?.shared.kind === 'end' && endRead.path.length === 1 && endRead.path[0]!.id === won.id && endRead.info.endedAt === 6000,
     'the game\'s end: the latest the store keeps of the set, packed at its end');
 check(await storedPackage('end', 'csb', ends) === null, 'and none of a set with no game\'s end: no package');
+
+// 5. A CSB adventure's start, replayed.
+console.log('\nA CSB adventure\'s start, replayed:');
+const csbDefs = setAchievementDefs(readFileSync(join(import.meta.dirname, '../../src/engine/achievements/defs/common.txt'), 'utf8'),
+    readFileSync(join(import.meta.dirname, '../../src/engine/achievements/defs/csb.txt'), 'utf8'));
+const csbGame = new Uint8Array(readFileSync(join(CORPUS_DIR, 'CSBFullRecordingV4.L5.gz')));
+const csbReplayed = await replayProof(csbGame, Infinity, sets, (setId) => (setId === 'csb' ? csbDefs : null));
+console.log(`  replayed: ${JSON.stringify(csbReplayed)}`);
+check(csbReplayed.kind === 'checked' && csbReplayed.unlocked.includes('speed-runner'),
+    'the whole CSB game, from the adventure\'s start, unlocks Speed Runner, which needs the whole game');
 
 finish();

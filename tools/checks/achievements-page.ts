@@ -10,7 +10,9 @@
  * 2. **The snapshot through a save and a read**: F5's row holds the tracker's history as
  *    the file was made; F9 reads it back, its unlocks after the save forgotten, its time
  *    the row's; a fresh page reading the row takes it up; a new game's save keeps a whole
- *    history, and the same file in a row without one does not.
+ *    history, and the same file in a row without one does not. In Chaos Strikes Back, the
+ *    adventure RISE makes from `csbgame7.dat`'s party is a game from its start, and its
+ *    history the whole game's, though its row holds none; a CSB save made later is not.
  * 3. **The store's rows**: an unlock is a row of the set, the playthrough and the party,
  *    `unverified`, shown once; unlocked again after F9, the first row stays.
  * 4. **The teleport**: a playthrough a teleport has touched writes and shows nothing.
@@ -43,7 +45,7 @@ import {
 import { listRowRect } from '../../src/renderer/ui/Widgets';
 import { openSettingsDialog, settingButtonFrame, settingsDialogClick } from '../../src/renderer/ui/SettingsDialog';
 import { check, finish } from '../lib/check';
-import { STOCK_DATA_SET, diskFiles } from '../lib/dataSets';
+import { STOCK_DATA_SET, dataSetNamed, diskFiles } from '../lib/dataSets';
 import { memoryStore, savePath } from '../lib/saves';
 
 const VBL_MS = Math.ceil(1000 / VBL_FREQUENCY);
@@ -165,6 +167,31 @@ const e = await page();
 const bare = await storedRow('exported.dat', await saves.read(saved.id));
 e.saves.read(await e.saves.open(bare));
 check(!e.achievements.tracker.whole, 'the same file in a row without a history, as an export imported, starts one of its own');
+
+// A CSB adventure's history, whole from RISE's save.
+console.log('=== a CSB adventure ===');
+const csb = dataSetNamed('csb');
+const csbFiles = diskFiles(csb);
+const mini = await csbFiles.read('mini.dat');
+if (!mini) throw new Error('the csb set has no mini.dat');
+const csbPage = async () => {
+  const built = await standInPage(csb, csbFiles, saves);
+  return { ...built, achievements: built.track(defs, achievementStore, touched, mini) };
+};
+const f = await csbPage();
+const adventure = await f.saves.makeNewAdventure(imported, mini);
+check(adventure.entry.achievements === null, `RISE's row ${adventure.entry.name} holds no history`);
+f.saves.read(adventure);
+check(f.achievements.tracker.whole, 'read, the adventure\'s history is the whole game\'s: the adventure begins there');
+run(f, 500);
+const adventureSaved = await f.saves.save('running', 'new');
+check(adventureSaved.achievements?.state.whole === true, 'its save\'s row holds a whole history');
+const g = await csbPage();
+g.saves.read(await g.saves.open(await storedRow('csbgame-early-1hero.dat', new Uint8Array(readFileSync(savePath('csbgame-early-1hero.dat'))))));
+check(!g.achievements.tracker.whole, 'a CSB save made later in a row with no history starts a history of its own');
+const h = await page();
+h.saves.read(await h.saves.open(await storedRow('adventure-in-dm.dat', adventure.bytes)));
+check(!h.achievements.tracker.whole, 'the adventure\'s file read where the set has no mini.dat starts one of its own');
 
 // 4. The teleport.
 console.log('=== the teleport ===');

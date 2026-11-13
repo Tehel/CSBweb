@@ -188,6 +188,16 @@ history goes back to its start. The reader decides this from the condition's for
 (`needsWholeGame`), so an author never has to mark it. A condition that only asks for
 "at least", such as `count(kill) >= 100`, can be earned in any game.
 
+**A CSB adventure** is a game from its start. Chaos Strikes Back's adventure begins at a
+save that a utility makes, RISE's or CSBWin's UTILITY's, `mini.dat` with a party put in
+(`makeNewAdventure`, `src/engine/Chaos.ts`): the prison before it is only where the party
+is chosen, and its kills and meals are few. Such a save holds no history, but its history
+is the whole game's all the same, so every common achievement is CSB's too. The tracker
+tells it by its bytes alone (`isNewAdventure`): the fields the utility writes taken from
+the file into the set's `mini.dat`, which the utility's writer writes, give the file back
+byte for byte. So the page and the verifier agree, and a CSBWin adventure imported counts
+as RISE's does.
+
 ## Watching the engine
 
 The engine tells its host what happened through one `GameHost` member,
@@ -290,14 +300,16 @@ It reads the game only to name things: a champion, an object, the samples.
 - It keeps its state by the MD5 of each save's file it sees made, and when a file is read
   it takes up the state kept for it: a replay's joins read the files their parents made, so
   each branch goes on with its parent's history. A file read with no state kept starts a
-  history of its own ("Some conditions need the whole game"); a new game starts one from
-  its start.
+  history of its own ("Some conditions need the whole game"), unless it is a CSB
+  adventure's start, read against the set's `mini.dat` ("A CSB adventure"), which starts
+  one from its start, as a new game does.
 - `snapshot` and `keep` give the page the state to store beside a save and to give back
   at a read ("The page").
 
 `tools/checks/achievements-tracker.ts` proves it on the corpus: each join reads its
-parent's state, a path from a new game keeps its whole history and one from a CSBWin save
-does not (Speed Runner stays locked in the whole CSB game), and the kills, the deaths and
+parent's state, a path from a new game or a CSB adventure's start keeps its whole history
+and one from another CSBWin save does not (the whole CSB game, which begins at the
+adventure CSBWin's utility made, unlocks Speed Runner), and the kills, the deaths and
 their causes, the joins, the meals, the worn objects and the unlocks of Dungeon Master won
 (DMMovie2615), a lost game and the whole CSB game, each tracked with its set's
 achievements: DMMovie2615's Ful bombs (Grenadier), its champion lost to a wall (Stubbed
@@ -328,8 +340,8 @@ The page tracks the achievements of a game the player plays (`PageAchievements`,
   file's MD5 before the file is read (`AchievementTracker.keep`), so the game goes on
   with the save's history: what was unlocked after the save is forgotten, and unlocks
   again if it is earned again. A row with none (an import, a row made before rows held
-  one, a new adventure made by RISE) starts a history of its own, which is not the whole
-  game's. The history is the store's alone: an export carries the CSBWin file and nothing
+  one) starts a history of its own, which is not the whole game's, unless its file is a
+  CSB adventure's start, as a new adventure made by RISE is ("A CSB adventure"). The history is the store's alone: an export carries the CSBWin file and nothing
   else, and CSBWin reads every export (`doc/SAVES.md`).
 - **The `achievements` store** in the saves' IndexedDB database (version 8,
   `BrowserAchievementStore`) keeps one row per set, achievement id and playthrough
@@ -370,7 +382,8 @@ The page tracks the achievements of a game the player plays (`PageAchievements`,
   achievement the file no longer has is not listed; the store keeps it.
 
 `tools/checks/achievements-page.ts` proves the history through F5, F9 and a fresh page's
-read, a new game's whole and an import's not, the store's rows, the teleport earning
+read, a new game's whole and an import's not, RISE's adventure whole and a later CSB
+save not, the store's rows, the teleport earning
 nothing, the banner's turns and the dialog's, on the stand-in page
 (`StandInPage.track`); `tools/probe-frames.ts` that the viewer tracks nothing, and an
 unlock's IndexedDB row, its banner (frame 34), ACHIEVEMENT NOTICES, the dialog
@@ -504,13 +517,12 @@ asks them and the profile. `tools/checks/build.ts` proves the built module repla
 source does, and `tools/check-image.sh` runs the verifier in its own container beside the
 server's, a proof sent to the server checked by it.
 
-**Settled:** CSB's adventure, made by RISE from the prison's save (`Chaos.ts`), begins its
-recording at a save no replay holds a state for, so the verifier gives it a history of its
-own from there, as the page does: the two agree, and no needs-the-whole-game achievement
-unlocks in CSB's adventure. Giving it the prison's history would need the package to carry
-the prison's path, which the store does not link to the adventure. A player who wants a
-verified run seen shares the same point through the book's UPLOAD, the shared recordings'
-moderation ("Shared recordings", `doc/RECORDING.md`): nothing links the two.
+**CSB's adventure**, made by RISE from the prison's save (`Chaos.ts`), begins its recording
+at a save no replay holds a state for, which the verifier's tracker, given the set's
+`mini.dat`, tells as the page's does: its history is the whole game's on both ("A CSB
+adventure"). A player who wants a verified run seen shares the same point through the
+book's UPLOAD, the shared recordings' moderation ("Shared recordings", `doc/RECORDING.md`):
+nothing links the two.
 **Deferred:** replaying the kept proofs again when a set gains an achievement, which phase
 18.7's sets' own files make possible without a deploy. A moderator watching a proof that
 looks suspicious plays or downloads its kept package from the Hall ("Moderation", below).
@@ -545,8 +557,9 @@ server's routes (`src/ui/proofRoutes.ts`). Only a browser whose player has a pub
 
 The dev server is its own verifier: it replays each proof as it is queued, in its own
 process (`vite.config.mts`). `tools/checks/achievement-proofs.ts` proves the verdicts, the
-claims, when the page sends, and the package of a save the store keeps, replayed to First
-Blood by the verifier's replay; `tools/probe-frames.ts` a proof the live page sends with a
+claims, when the page sends, the package of a save the store keeps, replayed to First
+Blood by the verifier's replay, and the whole CSB game, from the adventure's start, to
+Speed Runner; `tools/probe-frames.ts` a proof the live page sends with a
 name, replayed by the dev server, First Blood verified and Pest Control dropped, and the
 book saying so.
 

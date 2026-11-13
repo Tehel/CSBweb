@@ -311,9 +311,11 @@ async function loadTitlePicture(): Promise<TitleFrame | null> {
 /**
  * The engine and the screen, each handed what it asks of the other: the engine its
  * `GameHost`, the screen its `ScreenHooks`. Both are handed the one message area,
- * which the engine writes and the screen draws.
+ * which the engine writes and the screen draws. `miniDat` is the set's `mini.dat` where
+ * the page tracks achievements in a set that has one, against which a CSB adventure's
+ * start is read (`AchievementTracker`).
  */
-function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: GameTables, sound: SoundManager): Built {
+function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: GameTables, sound: SoundManager, miniDat: Uint8Array | null): Built {
     const messages = new ScrollingText(tables.byte1830);
     const playSound = (soundId: number, rateIdx?: number, highVolume?: number) => sound.playSound(soundId, rateIdx, highVolume);
     // The screen is built second, over the engine's dungeon, so the engine→UI notices
@@ -529,7 +531,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     const defs = playedRecording === null ? achievementDefs(dataSet.id) : null;
     const achievementStore = new BrowserAchievementStore((rows) => drawPlaythrough(storeRandom, rows));
     const achievements = defs && new PageAchievements(game, dataSet.id, defs, screen.ui.objectTables.objectNames, achievementStore, saves, teleported,
-        (message, error) => console.warn(message, error));
+        miniDat, (message, error) => console.warn(message, error));
     // Each unlock a banner over the view, with ACHIEVEMENT NOTICES on.
     achievements?.onShown(({ def }) => showAchievementNotice(screen.ui, { name: def.name, tier: def.tier }));
     // The proofs of the unlocks, sent by a player with a public name at a save and at the
@@ -1294,7 +1296,9 @@ async function init() {
         const graphicsTables = extractGraphicsTables(files.graphicsLoader);
         const tables = buildGameTables(graphicsTables);
         const sound = createSoundManager(files.graphicsLoader, tables);
-        const built = construct(files, graphicsTables, tables, sound);
+        // Read past the digests: a recording names the files the game reads, and this is the achievements'.
+        const miniDat = dataSet.miniDat && playedRecording === null ? await chosen.files.read('mini.dat') : null;
+        const built = construct(files, graphicsTables, tables, sound, miniDat);
         game = built.game;
         screen = built.screen;
         // The data set's rules, before any file is read: one with an Extended Features

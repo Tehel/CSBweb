@@ -77,11 +77,13 @@ export class PageAchievements {
     private readonly store: AchievementStore,
     saves: GameSaves,
     private readonly touched: TouchedPlaythroughs,
+    /** The set's `mini.dat`, where it has one: a CSB adventure's start is the whole game's (`AchievementTracker`). */
+    miniDat: Uint8Array | null,
     /** A line for the console, with the error, where a row could not be written. */
     private readonly log: (message: string, error?: unknown) => void = () => {},
   ) {
     this.byId = new Map(defs.map((def) => [def.id, def]));
-    this.tracker = new AchievementTracker(game, defs, objectNames);
+    this.tracker = new AchievementTracker(game, defs, objectNames, miniDat);
     this.tracker.onUnlock((unlocks) => this.unlocked(unlocks));
     this.tracker.attach();
     saves.trackAchievements(this.tracker);

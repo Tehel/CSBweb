@@ -70,7 +70,8 @@ export interface SaveEntry {
      * The achievements' history as the save's file was made (`AchievementTracker.snapshot`),
      * which a read of the save takes up (`doc/ACHIEVEMENTS.md` → "The page"). The store's
      * alone: no file holds it, so an export leaves it behind, and an import, like a row
-     * made before rows held it, has `null`, and its game starts a history of its own.
+     * made before rows held it, or RISE's new adventure, has `null`, and its game starts a
+     * history of its own: the whole game's for a CSB adventure's start (`isNewAdventure`).
      */
     achievements: TrackerSnapshot | null;
 }

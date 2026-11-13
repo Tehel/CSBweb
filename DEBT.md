@@ -1244,15 +1244,15 @@ extras: an achievement only watches the game.
   single recording proves one, so it is verified once the games it counts are.
 
 **The steps**, one commit each, each with its proof and `doc/ACHIEVEMENTS.md` rewritten to
-say what it built. Steps 1 and 2 are done: the sets' own files, every fixed achievement the
-language expresses, Scrooge moved to Dungeon Master's; and the valued (`value` lines,
+say what it built. Steps 1 to 3 are done: the sets' own files, every fixed achievement the
+language expresses, Scrooge moved to Dungeon Master's; the valued (`value` lines,
 `{name}`, `unusedValues`), with Speed Runner, Blitz and Conscientious Objector at the
 author's numbers, 180 minutes, 60 minutes and 40 kills, in both `dm-atari.txt` and
-`csb.txt`. What is left:
+`csb.txt`; and a CSB adventure's history, the whole game's from the save a utility makes
+(`isNewAdventure`, `doc/ACHIEVEMENTS.md` → "A CSB adventure"), so every common
+achievement is CSB's too. Solitary Confinement, CSB's Lone Wolf (`won and party = 1`,
+exact because the adventure recruits nobody), stays. What is left:
 
-3. **A CSB adventure's history**, the author's (b) ("A CSB adventure's history", below): a
-   game begun at RISE's save counts as begun at its start, on the page and in the
-   verifier alike.
 4. **Counted from the data.** The reader's quantities from the set's own files: its
    spells, its foods, the monster types its dungeon places (`DungeonCensus`). Rune
    Scholar, Gourmet, Bestiary.
@@ -1278,17 +1278,6 @@ author's numbers, 180 minutes, 60 minutes and 40 kills, in both `dm-atari.txt` a
 totals across games: DM holds 303 monsters and CSB 266, generators aside, and a ladder over
 games spares the player a First Blood in every run. The lower rungs of the kill ladder
 stay common.
-
-**A CSB adventure's history.** CSB's adventure starts at the save RISE makes from the
-prison's (`Chaos.ts`), which holds no history, so no condition that needs the whole game
-unlocks in it yet ("Settled", `doc/ACHIEVEMENTS.md` → "Proofs"): none of the common wins
-without something (Untouchable, Teetotaller, Vegetarian, Ace Driver, Emperor's New
-Clothes, Speed Runner and the rest) can be earned in Chaos Strikes Back. The author chose
-(b): a history begun at RISE's save counts as the whole game's, on the page and in the
-verifier alike, since the adventure is a game of its own from there and the prison's
-kills and meals are few. It is one rule, and it makes every common achievement CSB's too.
-Solitary Confinement, CSB's Lone Wolf (`won and party = 1`, exact because the adventure
-recruits nobody), stays.
 
 **Common, fixed.**
 
