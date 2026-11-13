@@ -36,14 +36,14 @@ Conscientious Objector with at most 40 kills. Dungeon Master's also lists the le
 Sweep counts, 1 to 12, all but the Hall of Champions and the Dragon's, and gives its own
 Express Elevator 60 minutes, and has Shining Armour and Darc Knight, the armours of Lyte and
 Darc worn whole, Gullible, its bad ending ("Where a game ends"), Every Ending, its three
-endings each seen ("Across games"), Some Assembly Required,
+endings each seen, and Grand Slam, both FTL dungeons won ("Across games"), Some Assembly Required,
 the Power Gem joined to the Firestaff, Pickpocket's Revenge, a Giggler that robbed the
 party killed, and Riddle Me This, the riddle room's four riddles answered at once
 ("Locks and switches"); Chaos Strikes Back
 lists no level to sweep, disables Girl Power ("The champions"), and has Self-Reliant, won
 without the Hint Oracle asked, Coin-Operated, every GOR COIN lock opened, Fresh Faces,
 won with a party raised from the prison alone, and Veterans, from Dungeon Master alone
-("Where the party came from"). A set with no `achievements.txt` of its own reads that file instead. The file is never a game file
+("Where the party came from"), and Grand Slam, as Dungeon Master's. A set with no `achievements.txt` of its own reads that file instead. The file is never a game file
 (`GAME_FILES`, `src/data/DataSets.ts`), so a recording's digests never name it, and an
 author can change the file without breaking a recording.
 
@@ -159,7 +159,8 @@ A condition is a yes or a no, made from these parts:
   - `distinct(event.attribute [where filter])` is how many different values the attribute
     has had among the events counted.
 - **Across games**: `games(condition)` and `total(count(…))`, read over the player's games
-  of the set ("Across games", below).
+  of the set, and `games(condition, in "file")`, over another dungeon's ("Across games",
+  below).
 
 A **filter** is made of `and`, `or`, `not`, parentheses, and these tests on the event's
 attributes:
@@ -401,6 +402,20 @@ across games over the playthroughs' figures.
 
 A total is of one set's games: a Dungeon Master won on the Atari 1.1 and one on the Amiga
 are two sets' wins.
+
+**Another dungeon's games**: `games(condition, in "file")` counts the playthroughs that met
+`condition` in every set that reads the project's file `defs/<file>.txt`
+(`achievementFileOf`), this set among them where it reads that file. `"dm-atari"` is every
+Dungeon Master set, the Atari's, the Amiga's and the hidden ones, and `"csb"` Chaos Strikes
+Back. The figure it reads is the one each of those sets keeps by the same key, `games(won)`,
+so a set counts there only by a condition its own achievements test; an achievement that
+names another file's games is best in both files. `acrossInSets`
+(`src/engine/achievements/PageAchievements.ts`) tests a set's achievements across games
+over each set's playthroughs' figures, for the page, the book and the Hall alike.
+
+- **Grand Slam**, Dungeon Master's and Chaos Strikes Back's, the same block in both:
+  `games(won, in "dm-atari") >= 1 and games(won, in "csb") >= 1`. It unlocks in both
+  dungeons' lists once each is won, a Dungeon Master won on any of its sets.
 
 **On the server** an achievement across games is claimed by no proof: each replay keeps its
 history's figures (`proof_figures`, "Proofs"), and the Hall works the achievements out of
@@ -665,7 +680,7 @@ champion lost, and the whole CSB game Ironman and Hardcore.
 plays the conditions out of made-up events and champions, the named values, the lists and
 the counts put in their places, and the achievements across games: what the reader refuses
 of them, each game's figures, and Encore, Every Ending, Dungeon Janitor and HR Problem over
-made-up games' figures.
+made-up games' figures, and Grand Slam over made-up sets' games.
 
 ## The page
 
@@ -704,7 +719,8 @@ The page tracks the achievements of a game the player plays (`PageAchievements`,
   (`raiseFigures`, one transaction). After each test of the conditions
   (`AchievementTracker.onTested`), the page raises the playing playthrough's row where its
   history passed it, and tests the set's achievements across games over every row of the
-  set ("Across games"). One their sum makes yes is unlocked once, in whichever playthrough:
+  set, and of the other sets as they were when the game began ("Across games"). One their
+  figures make yes is unlocked once, in whichever playthrough:
   a row of the playthrough playing, shown as any other, which the dialog counts unlocked
   in every game of the set. A playthrough a teleport has touched writes no figures.
 
@@ -735,14 +751,18 @@ The page tracks the achievements of a game the player plays (`PageAchievements`,
   (`showAchievements`, `src/ui/welcomePage.ts`), a local set's too: the set's
   achievements in the file's order, how many this browser has unlocked, and each with
   its name, its tier in its colour, its text, and the playthroughs that unlocked it, the
-  first first, each by the party then, the day and the time played. A row whose
-  achievement the file no longer has is not listed; the store keeps it.
+  first first, each by the party then, the day and the time played. An achievement across
+  games that the browser's figures of every set make yes is unlocked though no row of the
+  set holds it yet, "Unlocked across your games": Grand Slam, once the other dungeon is
+  won, before a game of this one has written its row. A row whose achievement the file no
+  longer has is not listed; the store keeps it.
 
 `tools/checks/achievements-page.ts` proves the history through F5, F9 and a fresh page's
 read, a new game's whole and an import's not, RISE's adventure whole and a later CSB
 save not, the store's rows, the teleport earning
 nothing, the figures merged and an achievement across games unlocked over a stored
-playthrough's and the live game's, the banner's turns and the dialog's, on the stand-in page
+playthrough's and the live game's, and over another set's where it names that set's games,
+the banner's turns and the dialog's, on the stand-in page
 (`StandInPage.track`); `tools/probe-frames.ts` that the viewer tracks nothing, and an
 unlock's IndexedDB row, its banner (frame 34), ACHIEVEMENT NOTICES, the dialog
 (frame 35) and the book's tab.
@@ -952,11 +972,13 @@ checked (`ProofStore.hall`). GET only, 404 for an unknown set or id, and none ho
   Its time is the time its first proof of the identity's was checked (`checked_at`), not
   sent.
 - **An achievement across games verified** is one the figures of the identity's checked
-  proofs of the set make yes (`acrossRows`, `server/proofs.ts`): its proofs are taken in
+  proofs make yes (`acrossRows`, `server/proofs.ts`): its proofs of every set are taken in
   the order they were checked, each playthrough at the largest figure any of its proofs
-  reached so far, never their sum, and the build's conditions tested over them after each
-  (`achievementsAcross`, which the page's readers export beside `achievementDefs`). Its
-  time is that of the proof after which the condition was first yes. PROFILE's
+  reached so far, never their sum, and the build's conditions of each set it has proofs of
+  tested over them after each (`achievementsAcross`, which the page's readers export
+  beside `achievementDefs`). Its time is that of the proof after which the condition was
+  first yes, a proof of another set's where it reads that set's games, as Grand Slam
+  does. PROFILE's
   achievements (`ProofStore.verifiedBy`) count them the same way.
 - **The sets** are the public ones, approved and not hidden, as `api/stats`'; **their
   achievements** the build's (`achievementDefs`, `src/ui/achievementFiles.ts`), which the
@@ -983,8 +1005,10 @@ their days, the 404s, the cache, and no `playerId`, playthrough or proof id in a
 and the achievements across games out of the proofs' figures, a playthrough at its
 largest and not its proofs' sum, Dungeon Janitor at the proof past 500 kills and Encore at
 the third game won, a drifted and a queued proof's figures not counted, a Janitor verified
-in one game still counted, and the profile the same. `tools/checks/build.ts` proves the
-built readers hold the source's achievements and work those across games out of figures.
+in one game still counted, a Grand Slam of two sets at the proof of the second, and the
+profile the same. `tools/checks/build.ts` proves the built readers hold the source's
+achievements and work those across games out of figures, Grand Slam out of the Amiga's
+Dungeon Master and Chaos Strikes Back.
 
 **The page** is `/fame` (`fame.html`, Vite's third entry, `src/fame/famePage.ts`), in the
 statistics page's look (`doc/STATISTICS.md`), which loads none of the game's code: the

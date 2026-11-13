@@ -5,8 +5,8 @@
  * (`welcomePage.ts`).
  */
 import type { AchievementDef } from '../engine/achievements/AchievementFile';
-import { acrossUnlocked, type GameFigures } from '../engine/achievements/AchievementState';
-import { achievementFileOf, setAchievementDefs } from '../engine/achievements/PageAchievements';
+import type { GameFigures } from '../engine/achievements/AchievementState';
+import { achievementFileOf, acrossInSets, setAchievementDefs } from '../engine/achievements/PageAchievements';
 
 const FILES = import.meta.glob<string>('../engine/achievements/defs/*.txt', { query: '?raw', import: 'default', eager: true });
 
@@ -30,16 +30,16 @@ export function achievementDefs(setId: string): AchievementDef[] | null {
 const ACROSS = new Map<string, readonly AchievementDef[]>();
 
 /**
- * The achievements across games of the set `setId` that `games`, each playthrough's figures
- * (`GameFigures`), make yes, in the file's order (`acrossUnlocked`, `doc/ACHIEVEMENTS.md` →
- * "Across games"): what the Hall of Fame works out of the proofs' figures
- * (`server/proofs.ts`). None where the set's files do not read.
+ * The achievements across games of the set `setId` that `bySet`, each set's playthroughs'
+ * figures (`GameFigures`), make yes, in the file's order (`acrossInSets`,
+ * `doc/ACHIEVEMENTS.md` → "Across games"): what the book shows and the Hall of Fame works
+ * out of the proofs' figures (`server/proofs.ts`). None where the set's files do not read.
  */
-export function achievementsAcross(setId: string, games: readonly GameFigures[]): string[] {
+export function achievementsAcross(setId: string, bySet: ReadonlyMap<string, readonly GameFigures[]>): string[] {
     let defs = ACROSS.get(setId);
     if (defs === undefined) {
         defs = (achievementDefs(setId) ?? []).filter((def) => def.across);
         ACROSS.set(setId, defs);
     }
-    return defs.length === 0 ? [] : acrossUnlocked(defs, games);
+    return defs.length === 0 ? [] : acrossInSets(defs, setId, bySet);
 }

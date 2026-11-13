@@ -214,10 +214,16 @@ export type Expr =
 
 /**
  * A condition of one game that `games(…)` counts the playthroughs of: kept in each game's
- * history as an achievement is, by `key`, its canonical text, `games(…)`.
+ * history as an achievement is, by `key`, its canonical text, `games(…)`, the same whichever
+ * set's games it counts.
  */
 export interface GameCondition {
   readonly key: string;
+  /**
+   * The project's file of achievements whose sets' games it counts, `games(won, in "csb")`,
+   * each set that reads `defs/<of>.txt` (`achievementFileOf`); `null`, this set's games alone.
+   */
+  readonly of: string | null;
   readonly when: Expr;
   /** Whether it needs the game's whole history (`needsWholeGame`). */
   readonly whole: boolean;
@@ -271,6 +277,8 @@ export type AchievementRead =
   | { readonly ok: false; readonly errors: readonly AchievementError[] };
 
 const ID = /^[a-z0-9][a-z0-9-]*$/;
+/** The name of a file of the project's achievements, `defs/<name>.txt`, that `games(…, in "name")` names. */
+const ACHIEVEMENT_FILE_NAME = /^[a-z0-9][a-z0-9-]{0,39}$/;
 /** A named value's name, and the same in braces, where a text or a condition names it. */
 const VALUE_NAME = '[A-Za-z][A-Za-z0-9]*';
 const NAMED_IN_TEXT = new RegExp(`\\{(${VALUE_NAME})\\}`, 'g');
@@ -451,7 +459,7 @@ function withValues(def: AchievementDef, values: ReadonlyMap<string, readonly nu
       }
       case 'sample': return { k: 'sample', sample: sampleRef(e.sample.name, filter(e.sample.where)) };
       case 'agg': case 'ever': case 'never': return { ...e, agg: agg(e.agg) };
-      case 'games': return { k: 'games', game: gameCondition(put(e.game.when)) };
+      case 'games': return { k: 'games', game: gameCondition(put(e.game.when), e.game.of) };
       case 'total': return totalOf(agg(e.agg));
       case 'cmp': return { ...e, a: put(e.a), b: put(e.b) };
       case 'and': case 'or': return { ...e, a: put(e.a), b: put(e.b) };
@@ -647,9 +655,20 @@ export function parseCondition(text: string): Expr {
         inGame = true;
         const when = orExpr();
         inGame = false;
+        let of: string | null = null;
+        if (isOp(',')) {
+          pos++;
+          if (!isWord('in')) throw new ConditionError(`expected in "file" ${where()}, the games of the sets that read defs/<file>.txt`);
+          pos++;
+          const file = next();
+          if (file.t !== 'string' || !ACHIEVEMENT_FILE_NAME.test(file.v)) {
+            throw new ConditionError('games(…, in "file") names a file of achievements, such as "csb": lowercase letters, digits and hyphens');
+          }
+          of = file.v;
+        }
         expectOp(')');
         if (typeOf(when) !== 'bool') throw new ConditionError('games(…) takes a yes-or-no condition, not a number');
-        return { k: 'games', game: gameCondition(when) };
+        return { k: 'games', game: gameCondition(when, of) };
       }
       case 'total': {
         if (inGame) throw new ConditionError('games(…) takes a condition of one game, with no games(…) or total(…) in it');
@@ -936,9 +955,9 @@ function aggregatesOf(e: Expr): Aggregate[] {
   return [...out.values()];
 }
 
-/** A condition of one game, `games(…)`'s, with its key and what it reads. */
-function gameCondition(when: Expr): GameCondition {
-  return { key: `games(${exprText(when)})`, when, whole: needsWholeGame(when), aggregates: aggregatesOf(when) };
+/** A condition of one game, `games(…)`'s, of the sets that read `of`'s file, with its key and what it reads. */
+function gameCondition(when: Expr, of: string | null): GameCondition {
+  return { key: `games(${exprText(when)})`, of, when, whole: needsWholeGame(when), aggregates: aggregatesOf(when) };
 }
 
 /** `total(…)` of a count, keyed by it. */

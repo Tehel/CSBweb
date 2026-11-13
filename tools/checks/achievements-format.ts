@@ -19,12 +19,12 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   mergeAchievements, needsWholeGame, parseCondition, readAchievementFile, unknownItems, unusedValues, withCounts,
-  type AchievementDef, type AchievementFile, type DataCounts,
+  type AchievementDef, type AchievementFile, type DataCounts, type Expr,
 } from '../../src/engine/achievements/AchievementFile';
 import { dataCounts, readAchievementSetFiles, setDungeons } from '../../src/engine/achievements/DataCounts';
 import { dungeonCensus } from '../../src/engine/DungeonCensus';
 import { acrossUnlocked, AchievementState, type AchievementEvent, type GameFigures } from '../../src/engine/achievements/AchievementState';
-import { achievementFileOf } from '../../src/engine/achievements/PageAchievements';
+import { achievementFileOf, acrossInSets } from '../../src/engine/achievements/PageAchievements';
 import { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import { check, fail, finish } from '../lib/check';
 import { DATA_SETS, dataSetNamed, diskFiles } from '../lib/dataSets';
@@ -731,7 +731,7 @@ async function counted(common: AchievementFile): Promise<DataCounts> {
  * the reader's refusals, each game's figures, and the achievements across games over the
  * figures of several playthroughs.
  */
-function acrossGames(common: AchievementFile, dm: AchievementFile, counts: DataCounts): void {
+function acrossGames(common: AchievementFile, dm: AchievementFile, csb: AchievementFile, counts: DataCounts): void {
   console.log('--- across games');
   const H = '# CSBweb achievements 1\n';
   const refused: [string, string, RegExp][] = [
@@ -742,6 +742,9 @@ function acrossGames(common: AchievementFile, dm: AchievementFile, counts: DataC
     ['games(…) of a number', 'games(count(kill)) >= 1', /yes-or-no/],
     ['a total asked to be small', 'total(count(kill)) < 10', /asks for at least/],
     ['no game asked', 'games(won) = 0', /asks for at least/],
+    ['another file\'s games without in', 'games(won, "csb") >= 1', /expected in "file"/],
+    ['another file named bare', 'games(won, in csb) >= 1', /names a file of achievements/],
+    ['another file named in capitals', 'games(won, in "CSB") >= 1', /names a file of achievements/],
   ];
   for (const [what, when, message] of refused) {
     const r = readAchievementFile(`${H}[a]\nname: A\ntext: T\nwhen: ${when}\n`);
@@ -752,14 +755,25 @@ function acrossGames(common: AchievementFile, dm: AchievementFile, counts: DataC
   const defs = mergeAchievements(common, dm).map((d) => withCounts(d, counts));
   const across = defs.filter((d) => d.across);
   for (const d of across) console.log(`  ${d.id}: ${[...d.aggregates.map((a) => `total(${a.key})`), ...d.games.map((g) => g.key)].join(', ')}`);
-  check(sameIds(across.map((d) => d.id), ['dungeon-janitor', 'hr-problem', 'encore', 'every-ending']),
-    'Dungeon Janitor, HR Problem, Encore and Dungeon Master\'s Every Ending are across games');
+  check(sameIds(across.map((d) => d.id), ['dungeon-janitor', 'hr-problem', 'encore', 'every-ending', 'grand-slam']),
+    'Dungeon Janitor, HR Problem, Encore and Dungeon Master\'s Every Ending and Grand Slam are across games');
   check(across.every((d) => !d.whole), 'no achievement across games needs a game\'s whole history');
   const keyOf = (id: string, i: number): string => defs.find((d) => d.id === id)!.games[i]!.key;
   const won = keyOf('encore', 0);
   const [, badEnding, elsewhere] = [0, 1, 2].map((i) => keyOf('every-ending', i));
   const kills = `total(${defs.find((d) => d.id === 'dungeon-janitor')!.aggregates[0]!.key})`;
   check(keyOf('every-ending', 0) === won, 'Encore and Every Ending share games(won)');
+  const slam = defs.find((d) => d.id === 'grand-slam')!;
+  const slamCsb = mergeAchievements(common, csb).find((d) => d.id === 'grand-slam')!;
+  check(slam.games.length === 1 && slam.games[0]!.key === won && JSON.stringify(slamCsb.when) === JSON.stringify(slam.when),
+    'Grand Slam, the same in both files, counts games(won), each set testing it in its own games');
+  const ofs: string[] = [];
+  const walk = (e: Expr): void => {
+    if (e.k === 'games') ofs.push(String(e.game.of));
+    else if (e.k === 'cmp' || e.k === 'and' || e.k === 'or') { walk(e.a); walk(e.b); } else if (e.k === 'not') walk(e.a);
+  };
+  walk(slam.when);
+  check(ofs.join() === 'dm-atari,csb', `its games are dm-atari.txt's sets' and csb.txt's (${ofs.join()})`);
 
   // A game: its figures as it goes, and nothing across games among its unlocks.
   const game = (end: 'won' | 'lost' | null, at: readonly [number, number, number], killed: number): { figures: GameFigures; unlocks: string[] } => {
@@ -803,6 +817,22 @@ function acrossGames(common: AchievementFile, dm: AchievementFile, counts: DataC
     console.log(`  ${what}: ${got.join(', ') || '(none)'}`);
     check(sameIds(got, unlocked), `${what}: ${unlocked.join(', ') || 'nothing'}`);
   }
+
+  // Grand Slam: Dungeon Master's games those of every set that reads dm-atari.txt, CSB's csb.txt's.
+  const csbDefs = mergeAchievements(common, csb).map((d) => withCounts(d, counts)).filter((d) => d.across);
+  const slams: [string, string, [string, GameFigures[]][], boolean][] = [
+    ['DM won, and CSB not', 'dm-atari', [['dm-atari', [a.figures]], ['csb', [b.figures]]], false],
+    ['DM and CSB won', 'dm-atari', [['dm-atari', [a.figures]], ['csb', [a.figures]]], true],
+    ['DM won on the Amiga, read on the Atari\'s set', 'dm-atari', [['dm-atari', [b.figures]], ['dm-amiga', [a.figures]], ['csb', [a.figures]]], true],
+    ['DM won on the Amiga, read on CSB', 'csb', [['dm-amiga', [a.figures]], ['csb', [a.figures]]], true],
+    ['CSB won twice', 'csb', [['csb', [a.figures, a.figures]]], false],
+    ['CSB won, DM\'s win a player\'s set\'s', 'csb', [['csb', [a.figures]], ['my-dungeon', [a.figures]]], false],
+  ];
+  for (const [what, setId, sets, unlocked] of slams) {
+    const got = acrossInSets(setId === 'csb' ? csbDefs : across, setId, new Map(sets)).includes('grand-slam');
+    console.log(`  ${what}: ${got ? 'Grand Slam' : '(none)'}`);
+    check(got === unlocked, `${what}: ${unlocked ? 'Grand Slam' : 'no Grand Slam'}`);
+  }
 }
 
 function sameIds(a: readonly string[], b: readonly string[]): boolean {
@@ -824,7 +854,7 @@ async function main(): Promise<void> {
   evaluator(common, dm, counts);
   endings(common, dm, csb, counts);
   merging(common, counts);
-  acrossGames(common, dm, counts);
+  acrossGames(common, dm, csb, counts);
   finish();
 }
 

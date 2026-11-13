@@ -70,3 +70,12 @@ name: Veterans
 text: Win with a party of Dungeon Master's champions.
 tier: weird
 when: won and ever(raise) and never(raise where from != dm)
+
+# Both FTL dungeons won, the same block in dm-atari.txt: Dungeon Master's games are those of
+# every set that reads dm-atari.txt, the Atari's, the Amiga's and the hidden ones.
+
+[grand-slam]
+name: Grand Slam
+text: Win both Dungeon Master and Chaos Strikes Back.
+tier: hard
+when: games(won, in "dm-atari") >= 1 and games(won, in "csb") >= 1

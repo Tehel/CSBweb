@@ -134,7 +134,8 @@ import {
     formatPlayTime, formatSaveDate, formatSaveTime, lastUsedSave,
     type AchievementRow, type AchievementStore, type BrowserDataSetStore, type RecordingEntry, type RecordingStore, type SaveEntry, type SaveStore,
 } from '../data/saves';
-import { achievementDefs } from './achievementFiles';
+import { achievementDefs, achievementsAcross } from './achievementFiles';
+import { figuresBySet } from '../engine/achievements/PageAchievements';
 import { askVerdicts } from './proofRoutes';
 import { refreshVerdicts } from '../engine/achievements/PageProofs';
 import {
@@ -318,7 +319,7 @@ export async function showWelcomePage(
     store: Pick<SaveStore, 'list' | 'read'>,
     localSets: Pick<BrowserDataSetStore, 'list' | 'put' | 'remove'>,
     recordings: RecordingStore,
-    achievements: Pick<AchievementStore, 'list' | 'update'>,
+    achievements: Pick<AchievementStore, 'list' | 'update' | 'figures'>,
     loadManifest: () => Promise<DataSetManifest>,
     help: HowToPlayHost,
     select: string | null = null,
@@ -651,7 +652,7 @@ function confirmation(prefix: string, title: string, text: string, verb: string,
 interface RecordingsSource {
     readonly saves: Pick<SaveStore, 'list' | 'read'>;
     readonly recordings: RecordingStore;
-    readonly achievements: Pick<AchievementStore, 'list' | 'update'>;
+    readonly achievements: Pick<AchievementStore, 'list' | 'update' | 'figures'>;
 }
 
 /**
@@ -816,24 +817,27 @@ function showDocuments(
  * file's order, and over them how many this browser has unlocked. Each with its name, its
  * tier in its colour, its text, and under them the playthroughs that unlocked it, from
  * `store`, the first first: the party then, the day and the time played, and what the
- * server's replay said of it (`PROOF_WORDS`). A row whose achievement the file no longer
- * has is not listed, and the store keeps it. The verdicts its rows await are asked of the
- * server first (`refreshVerdicts`), and listed again once written.
+ * server's replay said of it (`PROOF_WORDS`). An achievement across games that this
+ * browser's figures make yes, every set's (`achievementsAcross`), is unlocked though no row
+ * holds it yet: Grand Slam once the other dungeon is won. A row whose achievement the file
+ * no longer has is not listed, and the store keeps it. The verdicts its rows await are asked
+ * of the server first (`refreshVerdicts`), and listed again once written.
  */
-function showAchievements(dialog: HTMLElement, set: DataSet, store: Pick<AchievementStore, 'list' | 'update'>): void {
+function showAchievements(dialog: HTMLElement, set: DataSet, store: Pick<AchievementStore, 'list' | 'update' | 'figures'>): void {
     const summary = dialog.querySelector<HTMLElement>('.achievements-summary')!;
     const list = dialog.querySelector<HTMLElement>('.achievements-list')!;
     const defs = achievementDefs(set.id) ?? [];
+    let across: ReadonlySet<string> = new Set();
     const show = (rows: readonly AchievementRow[]): void => {
         const unlocks = new Map<string, AchievementRow[]>();
         for (const row of rows) unlocks.set(row.id, [...(unlocks.get(row.id) ?? []), row]);
-        const unlocked = defs.filter((def) => unlocks.has(def.id)).length;
+        const unlocked = defs.filter((def) => unlocks.has(def.id) || across.has(def.id)).length;
         summary.textContent = defs.length === 0 ? 'This dungeon has no achievements.'
             : `${unlocked} of ${defs.length} unlocked in this browser.`;
         list.replaceChildren(...defs.map((def) => {
             const item = document.createElement('li');
             const own = unlocks.get(def.id) ?? [];
-            item.className = `achievements-item${own.length > 0 ? ' unlocked' : ''}`;
+            item.className = `achievements-item${own.length > 0 || across.has(def.id) ? ' unlocked' : ''}`;
             item.dataset.achievement = def.id;
             const head = document.createElement('div');
             head.className = 'achievements-head';
@@ -854,6 +858,13 @@ function showAchievements(dialog: HTMLElement, set: DataSet, store: Pick<Achieve
                     return unlock;
                 }));
                 item.append(by);
+            } else if (across.has(def.id)) {
+                const by = document.createElement('ul');
+                by.className = 'achievements-unlocks';
+                const unlock = document.createElement('li');
+                unlock.append(line('achievements-party', 'Unlocked across your games'));
+                by.append(unlock);
+                item.append(by);
             }
             return item;
         }));
@@ -862,7 +873,10 @@ function showAchievements(dialog: HTMLElement, set: DataSet, store: Pick<Achieve
         summary.textContent = `This browser's achievements could not be read: ${error instanceof Error ? error.message : String(error)}`;
     };
     show([]);
-    void store.list(set.id).then(show, failed);
+    void Promise.all([store.list(set.id), store.figures(null).catch(() => [])]).then(([rows, figures]) => {
+        across = new Set(achievementsAcross(set.id, figuresBySet(figures)));
+        show(rows);
+    }, failed);
     void refreshVerdicts(store, askVerdicts, set.id).then((changed) => changed.length > 0 ? store.list(set.id).then(show, failed) : undefined,
         (error: unknown) => console.warn('The proofs\' verdicts could not be asked', error));
 }

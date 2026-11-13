@@ -50,9 +50,9 @@ export class BrowserAchievementStore implements AchievementStore {
         await done;
     }
 
-    async figures(dataSet: string): Promise<AchievementFiguresRow[]> {
+    async figures(dataSet: string | null): Promise<AchievementFiguresRow[]> {
         const rows = await idbGetAll<AchievementFiguresRow>(await this.db(), ACHIEVEMENT_FIGURES_STORE);
-        return rows.filter((row) => row.dataSet === dataSet);
+        return rows.filter((row) => dataSet === null || row.dataSet === dataSet);
     }
 
     /** One transaction, so another tab's figures of the same playthrough are merged, not written over. */

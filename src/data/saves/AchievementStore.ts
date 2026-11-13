@@ -73,8 +73,8 @@ export interface AchievementStore {
     unlock(row: AchievementRow): Promise<boolean>;
     /** `rows` written over the rows of their set, id and playthrough: their proofs, and their verdicts. */
     update(rows: readonly AchievementRow[]): Promise<void>;
-    /** One data set's figures, a row per playthrough. */
-    figures(dataSet: string): Promise<AchievementFiguresRow[]>;
+    /** One data set's figures, a row per playthrough, or every set's for `null`. */
+    figures(dataSet: string | null): Promise<AchievementFiguresRow[]>;
     /** `row` merged into the playthrough's figures, each key at the larger (`mergeFigures`): one transaction. */
     raiseFigures(row: AchievementFiguresRow): Promise<void>;
 }
@@ -129,7 +129,7 @@ export function memoryAchievementStore(): AchievementStore & { rows: Achievement
     return {
         rows,
         figureRows,
-        figures: async (dataSet) => figureRows.filter((row) => row.dataSet === dataSet).map((row) => structuredClone(row)),
+        figures: async (dataSet) => figureRows.filter((row) => dataSet === null || row.dataSet === dataSet).map((row) => structuredClone(row)),
         raiseFigures: async (row) => {
             const held = figureRows.find((one) => one.dataSet === row.dataSet && one.playthrough === row.playthrough);
             if (held) held.figures = mergeFigures(held.figures, row.figures);

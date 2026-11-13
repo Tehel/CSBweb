@@ -345,15 +345,19 @@ function globMatches(pattern: string, value: string): boolean {
 /**
  * The achievements across games of `defs` whose conditions the playthroughs' figures
  * `games` make yes (`doc/ACHIEVEMENTS.md` → "Across games"): `games(…)` the number of
- * playthroughs that met it, `total(…)` the sum of their counts. In the file's order.
+ * playthroughs that met it, `total(…)` the sum of their counts. `games(…, in "file")`
+ * counts `elsewhere(file)`'s instead, the playthroughs of every set that reads that file,
+ * this one's among them where it does. In the file's order.
  */
-export function acrossUnlocked(defs: readonly AchievementDef[], games: Iterable<GameFigures>): string[] {
+export function acrossUnlocked(
+  defs: readonly AchievementDef[], games: Iterable<GameFigures>, elsewhere: (file: string) => readonly GameFigures[] = () => [],
+): string[] {
   const all = [...games];
   const sum = (key: string): number => all.reduce((n, figures) => n + (figures[key] ?? 0), 0);
   const number = (e: Expr): number => {
     switch (e.k) {
       case 'num': return e.value;
-      case 'games': return all.filter((figures) => (figures[e.game.key] ?? 0) > 0).length;
+      case 'games': return (e.game.of === null ? all : elsewhere(e.game.of)).filter((figures) => (figures[e.game.key] ?? 0) > 0).length;
       case 'total': return sum(e.key);
       default: return truth(e) ? 1 : 0;
     }

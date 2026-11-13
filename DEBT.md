@@ -1216,7 +1216,7 @@ drawing a map from them is a separate item, entered when the author names it.
 
 The achievements are `src/engine/achievements/defs/common.txt`'s 65, four of them valued,
 four counted from the data and three across games,
-`dm-atari.txt`'s 18, which every Dungeon Master set reads, and `csb.txt`'s 6, which
+`dm-atari.txt`'s 19, which every Dungeon Master set reads, and `csb.txt`'s 7, which
 disables Girl Power (`doc/ACHIEVEMENTS.md`). The author
 chose the list below, which holds what is left to write. ✓ marks what the
 condition language expresses today; [needs …] names the event or sample the tracker must
@@ -1298,43 +1298,38 @@ Problem moved (`doc/ACHIEVEMENTS.md` → "Across games"). Step 9b is done: each 
 its history's figures (`proof_figures`), the Hall and PROFILE work an identity's
 achievements across games out of its checked proofs (`acrossRows`, `achievementsAcross`),
 and the page sends a proof, claiming nothing if need be, where the figures grew
-(`doc/ACHIEVEMENTS.md` → "Proofs", → "The Hall of Fame"). What is left is 9c, below.
+(`doc/ACHIEVEMENTS.md` → "Proofs", → "The Hall of Fame"). Step 9c is done: `games(…, in
+"file")`, the games of every set that reads another project file, over each set's figures
+(`acrossInSets`) on the page, in the book, which shows one unlocked before a row of the set
+holds it, and in the Hall, which takes an identity's proofs of every set in turn, with
+Grand Slam, the same block in both files, Dungeon Master's games those of every set that
+reads `dm-atari.txt`, at the author's choice (`doc/ACHIEVEMENTS.md` → "Across games").
+What is left is 9d, below.
 
 **Across games, left to make.**
 
 - **Hall of Fame Tour** (hard): win with each of the dungeon's 24 champions, over any
   number of games.
-- **Grand Slam** (hard): win every FTL dungeon.
 
-**The design left**, what the code and the rules settle:
-
-- **Hall of Fame Tour** reads the champions at each game's win, a third form beside
-  `games(…)` and `total(…)`, such as `distinct(games(won).portrait) >= 24`: each game's
-  figures then keep the portraits of the party at the condition's unlock, the page's
-  `achievementFigures` rows and the proofs' figures alike (a figure is a number now, a key
-  and a value: the portraits need a set of values beside it).
-- **Grand Slam** names another set's games: the page reads another set's
-  `achievementFigures` rows, and the Hall the identity's proofs of the other set.
+**The design left**, what the code and the rules settle: Hall of Fame Tour reads the
+champions at each game's win, a third form beside `games(…)` and `total(…)`, such as
+`distinct(games(won).portrait) >= 24`: each game's figures then keep the portraits of the
+party at the condition's unlock, the page's `achievementFigures` rows and the proofs'
+figures alike (a figure is a number now, a key and a value: the portraits need a set of
+values beside it).
 
 **The author's choices:**
 
 1. **A total is one set's games alone**, as every row, the dialog, the book and the Hall
    are per set: a Dungeon Master won on the Atari 1.1 and one on the Amiga are two sets'
    wins, and no Encore.
-2. **Grand Slam is a block in both `dm-atari.txt` and `csb.txt`**, the FTL dungeons the
-   site plays (no Theron's Quest set is FTL's), unlocked in both sets' lists once each is
-   won, so its condition names another set's games.
-3. **Hall of Fame Tour knows a champion by portrait**, as Veterans does, a cell of the
+2. **Hall of Fame Tour knows a champion by portrait**, as Veterans does, a cell of the
    set's graphic 26, so that REINCARNATE's new name is the same champion and a name typed
    as another's is not; a champion dead at the win counts; Dungeon Master's alone,
    `dm-atari.txt`. The page's rows and the proofs' figures keep each win's portraits.
 
-Still to ask the author at 9c: which games Chaos Strikes Back's Grand Slam reads as
-Dungeon Master's, (a) those of any set that reads `dm-atari.txt`, or (b) `dm-atari`'s alone.
-
-**The step left**: 9c, Hall of Fame Tour and Grand Slam, as chosen, which need a third
-form, the portraits of each game's party at its win, and a condition naming another set's
-games.
+**The step left**: 9d, Hall of Fame Tour, as chosen, which needs that third form, the
+portraits of each game's party at its win.
 
 The page's row of an achievement across games stays "UNLOCKED, NOT VERIFIED" in the
 dialog, and has no proof in the book: no proof claims it, and the server's verdict of it is

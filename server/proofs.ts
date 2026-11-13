@@ -101,10 +101,11 @@ export interface StoredProof {
 }
 
 /**
- * The build's achievements across games of the set `setId` that `games`, each playthrough's
- * figures, make yes (`achievementsAcross`, `READERS_MODULE`'s, `app.ts`).
+ * The build's achievements across games of the set `setId` that `bySet`, each set's
+ * playthroughs' figures, make yes (`achievementsAcross`, `READERS_MODULE`'s, `app.ts`): a
+ * `games(…, in "file")` reads other sets' games.
  */
-export type AchievementsAcrossOf = (setId: string, games: readonly Readonly<Record<string, number>>[]) => readonly string[];
+export type AchievementsAcrossOf = (setId: string, bySet: ReadonlyMap<string, readonly Readonly<Record<string, number>>[]>) => readonly string[];
 
 /** A figure a checked proof keeps, with its proof's set, playthrough and time, and who it is counted for. */
 interface FigureRow {
@@ -128,32 +129,38 @@ interface AcrossRow {
 
 /**
  * The achievements across games `rows`, the checked proofs' figures in the order they were
- * checked, make yes (`doc/ACHIEVEMENTS.md` → "Across games"): for each owner and set, its
- * proofs taken in turn, each playthrough at the largest figure any of its proofs reached so
- * far, and each achievement at the first proof after which `across` says yes.
+ * checked, make yes (`doc/ACHIEVEMENTS.md` → "Across games"): for each owner, its proofs
+ * taken in turn, each playthrough of each set at the largest figure any of its proofs
+ * reached so far, and each achievement of each set the owner has proofs of at the first
+ * proof after which `across` says yes, a proof of another set's among them where the
+ * achievement reads that set's games.
  */
 function acrossRows(rows: readonly FigureRow[], across: AchievementsAcrossOf): AcrossRow[] {
-    const groups = new Map<string, FigureRow[][]>();
+    const owners = new Map<string, FigureRow[][]>();
     for (const row of rows) {
-        const group = `${row.owner}\u0000${row.data_set}`;
-        const proofs = groups.get(group) ?? [];
+        const proofs = owners.get(row.owner) ?? [];
         if (proofs.at(-1)?.[0]?.proof !== row.proof) proofs.push([]);
         proofs.at(-1)!.push(row);
-        groups.set(group, proofs);
+        owners.set(row.owner, proofs);
     }
     const out: AcrossRow[] = [];
-    for (const proofs of groups.values()) {
-        const playthroughs = new Map<number, Record<string, number>>();
+    for (const proofs of owners.values()) {
+        const sets = new Map<string, Map<number, Record<string, number>>>();
         const done = new Set<string>();
         for (const figures of proofs) {
-            const { data_set: dataSet, owner, playthrough, at } = figures[0]!;
+            const { data_set: proved, owner, playthrough, at } = figures[0]!;
+            const playthroughs = sets.get(proved) ?? new Map<number, Record<string, number>>();
             const held = playthroughs.get(playthrough) ?? {};
             for (const { key, value } of figures) held[key] = Math.max(held[key] ?? 0, value);
             playthroughs.set(playthrough, held);
-            for (const achievement of across(dataSet, [...playthroughs.values()])) {
-                if (done.has(achievement)) continue;
-                done.add(achievement);
-                out.push({ dataSet, achievement, owner, at });
+            sets.set(proved, playthroughs);
+            const bySet = new Map([...sets].map(([set, games]) => [set, [...games.values()]]));
+            for (const dataSet of sets.keys()) {
+                for (const achievement of across(dataSet, bySet)) {
+                    if (done.has(`${dataSet}\u0000${achievement}`)) continue;
+                    done.add(`${dataSet}\u0000${achievement}`);
+                    out.push({ dataSet, achievement, owner, at });
+                }
             }
         }
     }

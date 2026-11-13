@@ -8,7 +8,7 @@
  *
  * **Nothing in this file touches the DOM.**
  */
-import { mergeFigures, type AchievementProof, type AchievementRow, type AchievementStore } from '../../data/saves/AchievementStore';
+import { mergeFigures, type AchievementFiguresRow, type AchievementProof, type AchievementRow, type AchievementStore } from '../../data/saves/AchievementStore';
 import type { Game } from '../Game';
 import type { GameSaves } from '../GameSaves';
 import { mergeAchievements, readAchievementFile, type AchievementDef } from './AchievementFile';
@@ -46,6 +46,25 @@ export function achievementFileOf(setId: string): string {
 }
 
 /**
+ * The achievements across games of `defs`, the set `setId`'s, that `bySet`, each set's
+ * playthroughs' figures, make yes (`acrossUnlocked`, `doc/ACHIEVEMENTS.md` → "Across
+ * games"): its own games those of `setId`, and a `games(…, in "file")`'s those of every set
+ * of `bySet` that reads `defs/<file>.txt` (`achievementFileOf`), `setId` among them where it
+ * does. What the page, the book and the Hall all work them out with.
+ */
+export function acrossInSets(defs: readonly AchievementDef[], setId: string, bySet: ReadonlyMap<string, readonly GameFigures[]>): string[] {
+  return acrossUnlocked(defs, bySet.get(setId) ?? [],
+    (file) => [...bySet].filter(([id]) => achievementFileOf(id) === file).flatMap(([, games]) => games));
+}
+
+/** Each set's playthroughs' figures, `rows` grouped by their set. */
+export function figuresBySet(rows: readonly AchievementFiguresRow[]): Map<string, GameFigures[]> {
+  const bySet = new Map<string, GameFigures[]>();
+  for (const row of rows) bySet.set(row.dataSet, [...(bySet.get(row.dataSet) ?? []), row.figures]);
+  return bySet;
+}
+
+/**
  * A set's achievements: `common`, the common file's text, merged with `own`, the set's own
  * file's (`mergeAchievements`), where it has one. A file that does not read throws, each
  * error with its line: the files are the project's, and a set's own is checked as it is
@@ -72,6 +91,8 @@ export class PageAchievements {
   private readonly across: readonly AchievementDef[];
   /** Each playthrough's figures of the set, as the store held them and this page has raised them since. */
   private readonly figures = new Map<number, Record<string, number>>();
+  /** The other sets' playthroughs' figures, by set, as the store held them when the game began. */
+  private elsewhere = new Map<string, GameFigures[]>();
   /** The achievements across games unlocked, in whichever playthrough. */
   private readonly acrossDone = new Set<string>();
   /** Whether the store's figures and rows have been read, before which nothing across games is tested. */
@@ -107,11 +128,17 @@ export class PageAchievements {
     void this.readProofs();
   }
 
-  /** The set's figures and its achievements across games already unlocked, read from the store. */
+  /**
+   * Every set's figures, which a `games(…, in "file")` may read, and the set's achievements
+   * across games already unlocked, read from the store.
+   */
   private async readFigures(): Promise<void> {
     try {
-      const [figures, rows] = await Promise.all([this.store.figures(this.dataSet), this.store.list(this.dataSet)]);
-      for (const row of figures) this.figures.set(row.playthrough, mergeFigures(row.figures, this.figures.get(row.playthrough) ?? {}));
+      const [figures, rows] = await Promise.all([this.store.figures(null), this.store.list(this.dataSet)]);
+      for (const row of figures) {
+        if (row.dataSet === this.dataSet) this.figures.set(row.playthrough, mergeFigures(row.figures, this.figures.get(row.playthrough) ?? {}));
+      }
+      this.elsewhere = figuresBySet(figures.filter((row) => row.dataSet !== this.dataSet));
       const ids = new Set(this.across.map((def) => def.id));
       for (const row of rows) if (ids.has(row.id)) this.acrossDone.add(row.id);
       this.figuresRead = true;
@@ -124,7 +151,7 @@ export class PageAchievements {
   /**
    * The conditions tested (`AchievementTracker.onTested`): the playthrough's figures raised
    * where its history passed them, written to the store, and each achievement across games
-   * their sum now makes yes unlocked, as the playthrough's. Not in a playthrough a teleport
+   * they and the other sets' now make yes unlocked, as the playthrough's. Not in a playthrough a teleport
    * has touched, whose figures count for nothing.
    */
   private tested(): void {
@@ -139,7 +166,8 @@ export class PageAchievements {
       this.writes = this.writes.then(() => this.store.raiseFigures(row))
         .catch((error) => this.log('The figures across games could not be stored', error));
     }
-    const ids = acrossUnlocked(this.across, this.figures.values()).filter((id) => !this.acrossDone.has(id));
+    const bySet = new Map(this.elsewhere).set(this.dataSet, [...this.figures.values()]);
+    const ids = acrossInSets(this.across, this.dataSet, bySet).filter((id) => !this.acrossDone.has(id));
     if (ids.length === 0) return;
     for (const id of ids) this.acrossDone.add(id);
     const gameTime = this.game.ctx.state.tickCount;

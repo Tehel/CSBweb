@@ -112,7 +112,7 @@ async function main(): Promise<void> {
         identities: { store: identities, rateLimit: new RateLimit(100, 60_000) },
         proofs: { store: proofs, dir: proofsDir, rateLimit: new RateLimit(PROOFS_PER_WINDOW, 60_000) },
         achievementDefs: () => COMMON,
-        achievementsAcross: (_id: string, games: readonly Readonly<Record<string, number>>[]) => acrossUnlocked(COMMON.filter((def) => def.across), games),
+        achievementsAcross: (id: string, bySet: ReadonlyMap<string, readonly Readonly<Record<string, number>>[]>) => acrossUnlocked(COMMON.filter((def) => def.across), bySet.get(id) ?? []),
     };
     const server = createAppServer({ distDir, gamefilesDir }, api);
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
@@ -290,7 +290,7 @@ async function verifier(): Promise<void> {
         identities: { store: identities, rateLimit: new RateLimit(100, 60_000) },
         proofs: { store: proofs, dir: proofsDir, rateLimit: new RateLimit(100, 60_000) },
         achievementDefs: () => COMMON,
-        achievementsAcross: (_id: string, games: readonly Readonly<Record<string, number>>[]) => acrossUnlocked(COMMON.filter((def) => def.across), games),
+        achievementsAcross: (id: string, bySet: ReadonlyMap<string, readonly Readonly<Record<string, number>>[]>) => acrossUnlocked(COMMON.filter((def) => def.across), bySet.get(id) ?? []),
     };
     const server = createAppServer({ distDir, gamefilesDir }, api);
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));

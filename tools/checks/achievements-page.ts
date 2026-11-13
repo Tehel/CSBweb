@@ -27,7 +27,8 @@
  * 7. **Across games**: each playthrough's figures merged into its row of the store, each
  *    key at the larger; an achievement across games unlocked as the live game's figures
  *    and another playthrough's stored ones make it yes, a row of the playthrough playing
- *    and shown, but never the tracker's; a teleported playthrough's figures not written.
+ *    and shown, but never the tracker's; another set's games counted only by a
+ *    `games(…, in "csb")`; a teleported playthrough's figures not written.
  *
  * The viewer's page builds no tracker: `tools/probe-frames.ts` asserts it on
  * `?recording=`.
@@ -276,6 +277,11 @@ disabled
 name: Two Games
 text: Play two games for two seconds each.
 when: games(playTime >= 2s) >= 2
+
+[t-both]
+name: Both
+text: Play two seconds of this dungeon and of Chaos Strikes Back.
+when: games(playTime >= 2s) >= 1 and games(playTime >= 2s, in "csb") >= 1
 `);
 const acrossStore = memoryAchievementStore();
 const twoSeconds = acrossDefs.find((def) => def.id === 't-two-games')!.games[0]!.key;
@@ -296,7 +302,12 @@ const across = async (playthrough: number, teleported: boolean) => {
   if (teleported) touched.add(playthrough);
   return { ...built, achievements, shown };
 };
+// Chaos Strikes Back's game of two seconds: another set's, which Two Games never counts and Both does.
+await acrossStore.raiseFigures({ dataSet: 'csb', playthrough: 9, figures: { [twoSeconds]: 1 } });
 const played = await across(501, false);
+const bothRows = (await acrossStore.list(set.id)).filter((r) => r.id === 't-both');
+check(bothRows.length === 1 && played.achievements.view().unlocked.has('t-both'),
+  'Both unlocks as the page reads the figures, over the stored playthrough\'s and CSB\'s');
 run(played, 1000);
 await played.achievements.settled();
 const eRows = async () => (await acrossStore.list(set.id)).filter((r) => r.id === 't-two-games');

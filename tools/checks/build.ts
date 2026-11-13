@@ -24,7 +24,8 @@
  *     page's `readRecordingPackage` says: one read, one past the limit it unzips to, and
  *     bytes that are no package; and holds the source's achievements, which the Hall of
  *     Fame lists (`achievementDefs`), and works those across games out of figures
- *     (`achievementsAcross`);
+ *     (`achievementsAcross`), Grand Slam out of a Dungeon Master set's and Chaos Strikes
+ *     Back's;
  *   - the verifier's module (`VERIFIER_MODULE`, `--ssr --mode verifier`) imports nothing,
  *     loads through the verifier's loader (`loadVerifierReaders`), and replays a proof as
  *     the page's `replayProof` does, with the build's achievements: a genuine corpus
@@ -207,10 +208,17 @@ async function main(): Promise<void> {
         const keyOf = (id: string) => sourceDefs.find((def) => def.id === id)!;
         const figures = { [keyOf('encore').games[0]!.key]: 1, [`total(${keyOf('dungeon-janitor').aggregates[0]!.key})`]: 300 };
         const games = (n: number) => Array.from({ length: n }, () => figures);
-        const across = [builtAcross('dm-atari', games(2)), builtAcross('dm-atari', games(3)), builtAcross('nowhere-at-all', games(3))].map((ids) => ids.join('+'));
+        const only = (id: string, n: number) => new Map([[id, games(n)]]);
+        const across = [builtAcross('dm-atari', only('dm-atari', 2)), builtAcross('dm-atari', only('dm-atari', 3)), builtAcross('nowhere-at-all', only('nowhere-at-all', 3))]
+            .map((ids) => ids.join('+'));
         console.log(`  across games, two games won, three, and of a set without a file of its own: ${JSON.stringify(across)}`);
         check(JSON.stringify(across) === JSON.stringify(['dungeon-janitor', 'dungeon-janitor+encore', 'dungeon-janitor+encore']),
             'the built achievements across games, which the Hall works out of the proofs\' figures');
+        const wins = { [keyOf('encore').games[0]!.key]: 1 };
+        const slams = [builtAcross('dm-atari', new Map([['dm-amiga', [wins]], ['csb', [wins]]])), builtAcross('csb', new Map([['dm-amiga', [wins]], ['csb', [wins]]])),
+            builtAcross('csb', new Map([['csb', [wins, wins]]]))].map((ids) => ids.join('+'));
+        console.log(`  Dungeon Master won on the Amiga and Chaos Strikes Back, as the Atari's set and CSB's, and CSB alone: ${JSON.stringify(slams)}`);
+        check(JSON.stringify(slams) === JSON.stringify(['grand-slam', 'grand-slam', '']), 'the built Grand Slam reads every Dungeon Master set\'s games and CSB\'s');
 
         console.log('\nThe verifier\'s module:');
         const verifier = readFileSync(join(outDir, VERIFIER_MODULE), 'utf8');

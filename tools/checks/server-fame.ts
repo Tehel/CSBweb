@@ -26,7 +26,8 @@
  *     playthrough's second proof raises a total and does not add to it; Dungeon Janitor at
  *     the proof that took the kills past 500, Encore at the third game won, not a drifted
  *     proof's nor a queued one's; a Janitor a replay verified in one game, before it moved
- *     across games, still counted, at its own time; and the profile's achievements
+ *     across games, still counted, at its own time; a Grand Slam of set A's games and set
+ *     B's, at the proof of B that made it yes; and the profile's achievements
  *     (`verifiedBy`) the same.
  *
  * Usage: npm test -- --only=server-fame.ts
@@ -47,14 +48,16 @@ import { RecordingStore } from '../../server/recordings.ts';
 import { STATS_CACHE_MS, StatsStore } from '../../server/stats.ts';
 import { openStore } from '../../server/store.ts';
 import { FAME_PLAYERS, FAME_ROUTE, FAME_SETS, IDENTITIES_ROUTE, parseManifest, PLAYER_ID_HEADER, PROFILE_ROUTE, type PlayerProfile } from '../../src/data/DataSets.ts';
-import { acrossUnlocked } from '../../src/engine/achievements/AchievementState.ts';
-import { setAchievementDefs } from '../../src/engine/achievements/PageAchievements.ts';
+import { acrossInSets, setAchievementDefs } from '../../src/engine/achievements/PageAchievements.ts';
 import { checkLocalDataSet } from '../../src/engine/LocalDataSetCheck.ts';
 import { readRecordingPackage } from '../../src/engine/RecordingPackage.ts';
 import { check, finish } from '../lib/check.ts';
 
 /** The common achievements, as the build holds them (`achievementFiles.ts`), which `tsx` cannot glob. */
-const COMMON = setAchievementDefs(readFileSync(join(import.meta.dirname, '../../src/engine/achievements/defs/common.txt'), 'utf8'), null);
+const COMMON_TEXT = readFileSync(join(import.meta.dirname, '../../src/engine/achievements/defs/common.txt'), 'utf8');
+const COMMON = setAchievementDefs(COMMON_TEXT, null);
+/** Set A's: the common file's, and a Grand Slam of its games and set B's. */
+const A_DEFS = setAchievementDefs(COMMON_TEXT, '# CSBweb achievements 1\n[grand-slam]\nname: Grand Slam\ntext: Win A and B.\ntier: hard\nwhen: games(won) >= 1 and games(won, in "b") >= 1\n');
 
 const ANN = '00000000-0000-4000-8000-000000000000';
 const ANN_LINKED = '11111111-1111-4111-8111-111111111111';
@@ -119,8 +122,8 @@ async function main(): Promise<void> {
         recordings: { store: new RecordingStore(db, 1 << 30), dir: join(scratch, 'recordings'), readPackage: readRecordingPackage, shareRateLimit: new RateLimit(100, 60_000) },
         identities: { store: identities, rateLimit: new RateLimit(100, 60_000) },
         proofs: { store: proofs, dir: join(scratch, 'proofs'), rateLimit: new RateLimit(100, 60_000) },
-        achievementDefs: (id) => (id === 'b' ? COMMON.slice(0, 3) : COMMON),
-        achievementsAcross: (id, games) => (id === 'b' ? [] : acrossUnlocked(COMMON.filter((def) => def.across), games)),
+        achievementDefs: (id) => (id === 'b' ? COMMON.slice(0, 3) : id === 'a' ? A_DEFS : COMMON),
+        achievementsAcross: (id, bySet) => (id === 'b' ? [] : acrossInSets((id === 'a' ? A_DEFS : COMMON).filter((def) => def.across), id, bySet)),
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
     const port = (server.address() as AddressInfo).port;
@@ -175,14 +178,14 @@ async function main(): Promise<void> {
         const sets = summary.json?.sets ?? [];
         check(summary.json?.players === 2, `the Hall's players are Ann and Bob, once each: ${summary.json?.players}`);
         check(sets.map((set) => set.id).join() === 'a,b', `the public sets alone, the most players first: ${sets.map((set) => set.id).join()}`);
-        check(sets[0]?.players === 2 && sets[0]?.achievements === COMMON.length && sets[0]?.verified === 2, 'set A: 2 players, the common file\'s achievements, 2 verified');
+        check(sets[0]?.players === 2 && sets[0]?.achievements === A_DEFS.length && sets[0]?.verified === 2, 'set A: 2 players, its file\'s achievements, 2 verified');
         check(sets[1]?.players === 1 && sets[1]?.achievements === 3 && sets[1]?.verified === 1, 'set B: 1 player, its own file\'s 3 achievements, 1 verified');
 
         const a = await json<FameSet>(`/${FAME_SETS}/a`);
         const listed = a.json?.achievements ?? [];
         console.log(`  api/fame/sets/a: ${JSON.stringify(listed.filter((one) => one.players > 0))}`);
-        check(listed.map((one) => one.id).join() === COMMON.map((def) => def.id).join(), 'every achievement of the file, in its order');
-        check(listed.every((one, i) => one.name === COMMON[i]!.name && one.text === COMMON[i]!.text && one.tier === COMMON[i]!.tier), 'each with its name, text and tier');
+        check(listed.map((one) => one.id).join() === A_DEFS.map((def) => def.id).join(), 'every achievement of the file, in its order');
+        check(listed.every((one, i) => one.name === A_DEFS[i]!.name && one.text === A_DEFS[i]!.text && one.tier === A_DEFS[i]!.tier), 'each with its name, text and tier');
         const firstBlood = listed[0];
         check(a.json?.players === 2 && firstBlood?.players === 2 && firstBlood.share === 1,
             `${first.id}: Ann's two browsers once, Bob, and not Carol, reset: ${firstBlood?.players} of ${a.json?.players}`);
@@ -243,12 +246,12 @@ async function main(): Promise<void> {
         const fays = await fayPage();
         console.log(`  Fay's page, two games won: ${JSON.stringify(fays)}`);
         const fayA = fays?.sets.find((set) => set.id === 'a')?.achievements.map((one) => one.id).join() ?? '';
-        check(fayA === 'dungeon-janitor', `Fay: Dungeon Janitor, 400 + 150 kills and not 850, no Encore at two games won: ${fayA}`);
+        check(fayA === 'dungeon-janitor,grand-slam', `Fay: Dungeon Janitor, 400 + 150 kills and not 850, no Encore at two games won, and Grand Slam, A and B won: ${fayA}`);
         check(fays?.sets.every((set) => set.id === 'a') === true, 'and nothing of set B, whose file has no achievement across games');
         proof(FAY, 'a', 18, [], 11_000, [], { [WON]: 1, [KILLS]: 5 }, 3);
         clock += STATS_CACHE_MS + 1;
         const fayAfter = (await fayPage())?.sets.find((set) => set.id === 'a')?.achievements.map((one) => one.id).join() ?? '';
-        check(fayAfter === 'dungeon-janitor,encore', `a third game won, its playthrough's second proof: Encore (${fayAfter})`);
+        check(fayAfter === 'dungeon-janitor,encore,grand-slam', `a third game won, its playthrough's second proof: Encore (${fayAfter})`);
         const fame = (await json<FameSet>(`/${FAME_SETS}/a`)).json;
         const janitor = fame?.achievements.find((one) => one.id === 'dungeon-janitor');
         const hrProblem = fame?.achievements.find((one) => one.id === 'hr-problem');
@@ -257,8 +260,10 @@ async function main(): Promise<void> {
         const profile = await fetch(`http://127.0.0.1:${port}/${PROFILE_ROUTE}`, { headers: { [PLAYER_ID_HEADER]: FAY } });
         const theirs = ((await profile.json()) as PlayerProfile).achievements;
         console.log(`  Fay's profile: ${JSON.stringify(theirs)}`);
-        check(JSON.stringify(theirs.map((set) => [set.dataSet, set.unlocked])) === '[["a",["dungeon-janitor","encore"]]]',
-            'her profile lists the same, the first first');
+        check(JSON.stringify(theirs.map((set) => [set.dataSet, set.unlocked])) === '[["a",["dungeon-janitor","grand-slam","encore"]]]',
+            'her profile lists the same, the first first: Grand Slam at the proof of B\'s win, between the 500th kill and the third win');
+        const slam = fame?.achievements.find((one) => one.id === 'grand-slam');
+        check(slam?.players === 1 && slam.first?.name === 'Fay', `Grand Slam, A's, made yes by a proof of B: Fay (${slam?.players}, ${slam?.first?.name})`);
 
         const leaks = [...PLAYER_IDS, String(PLAYTHROUGH), ...proofIds].filter((secret) => bodies.some((body) => body.toLowerCase().includes(secret.toLowerCase())));
         check(leaks.length === 0, `no answer holds a playerId, a playthrough or a proof's id${leaks.length ? `: ${leaks.join(', ')}` : ''}`);
