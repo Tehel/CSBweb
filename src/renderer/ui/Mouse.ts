@@ -30,6 +30,7 @@ import { describeObject as describeObjectInterface, repackChest, tag019036 as ta
 import { CursorFilterType } from '../../engine/dsa/DsaTypes';
 import { freeze, thaw } from '../../engine/LoopState';
 import { wakeUp } from '../../engine/MouseSystem';
+import { ORACLE } from '../../engine/Happening';
 import { showHideInventory, tag02076e, tag0207cc } from '../../engine/ShowHideInventory';
 import {
   hasCursorObject,
@@ -196,8 +197,12 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
   if (id === HINT_ORACLE_BUTTON) {
     // The close box, where the data set has the Hint Oracle (`inventoryButtonList`):
     // guarded as the disk icon is, and like it raising a flag for whoever drained the
-    // queue (`src/renderer/ui/HintOracleButton.ts`).
-    if (numChampions > 0 && !potential) ui.hintOracleNeeded = true;
+    // queue (`src/renderer/ui/HintOracleButton.ts`). The Oracle is asked whether the page
+    // runs it or a recording played back stops for it, so the achievements hear it here.
+    if (numChampions > 0 && !potential) {
+      ui.hintOracleNeeded = true;
+      if (ui.ctx.host.observing) ui.ctx.host.observe(ORACLE);
+    }
     return;
   }
   if (id === 147) {

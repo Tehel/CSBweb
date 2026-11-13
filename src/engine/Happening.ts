@@ -69,6 +69,8 @@ export type Happening =
   | { readonly k: 'joined'; readonly chIdx: number; readonly reincarnated: boolean }
   /** The party lay down to sleep: the sleep icon, button 145 (`MouseSystem.sleep`). */
   | { readonly k: 'sleep' }
+  /** The Hint Oracle's button, which opens the Oracle (`ui.hintOracleNeeded`, `src/renderer/ui/Mouse.ts`). */
+  | { readonly k: 'oracle' }
   /** A VBL of the player's time has run (`Game.playTime`): not a frozen game's, nor the save menu's. */
   | { readonly k: 'vbl' }
   /** The main loop's tick has ended. */
@@ -87,3 +89,6 @@ export const BLOW_END: Happening = { k: 'blow-end' };
 
 /** The party lying down to sleep, one object as `BLOW_END` is. */
 export const SLEEP: Happening = { k: 'sleep' };
+
+/** The Hint Oracle asked, one object as `BLOW_END` is. */
+export const ORACLE: Happening = { k: 'oracle' };

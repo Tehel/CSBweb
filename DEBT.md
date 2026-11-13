@@ -1216,7 +1216,7 @@ drawing a map from them is a separate item, entered when the author names it.
 
 The achievements are `src/engine/achievements/defs/common.txt`'s 61, four of them valued
 and four counted from the data,
-`dm-atari.txt`'s 13, which every Dungeon Master set reads, and `csb.txt`'s 2, which
+`dm-atari.txt`'s 14, which every Dungeon Master set reads, and `csb.txt`'s 3, which
 disables Girl Power (`doc/ACHIEVEMENTS.md`). The author
 chose the list below, which holds what is left to write. ✓ marks what the
 condition language expresses today; [needs …] names the event or sample the tracker must
@@ -1270,16 +1270,12 @@ read in the hands at each tick's end (`doc/ACHIEVEMENTS.md` → "The events"). S
 done: the blows, a `hit` event with `DamageMonster`'s damage, a kill's `group` struck down
 by one strike, `HAND` for an empty hand, a kill `by: landing`, `party` on `death`, with
 Overkill, Strike!, Bare Knuckles, Telefrag and Friendly Fire Fatality
-(`doc/ACHIEVEMENTS.md` → "The happenings"). What is left:
+(`doc/ACHIEVEMENTS.md` → "The happenings"). Step 8a is done: the `oracle` event at the
+Oracle's button, and the samples `level`, `x` and `y`, where the party stands, with CSB's
+Self-Reliant and Dungeon Master's Gullible, a game lost in the cell its bad ending sends
+the Firestaff's bearer to (`doc/ACHIEVEMENTS.md` → "Where a game ends"). What is left:
 
-8. **The rest of a game's own triggers**, split in five, one commit each:
-   - **8a. The Oracle and the ending** (S): an `oracle` event at the Oracle's button
-     (`ui.hintOracleNeeded`, `src/renderer/ui/Mouse.ts`), which the live page and a
-     replay both run; and where the party stands when the game ends. Dungeon Master's bad
-     ending is no ending of the engine's: the entrance's pad (map 0 (1,4), type 8, the
-     party carrying the Firestaff) sends its bearer through (1,3)'s teleporter to the
-     closed cell of map 0 (9,1), "IT IS TOO BAD YOU DID NOT DISCOVER THE TRUE SECRET OF
-     THE FIRESTAFF", and the game is lost there. Self-Reliant, Gullible.
+8. **The rest of a game's own triggers**, in four parts left, one commit each:
    - **8b. Objects combined and a theft** (S): the Power Gem joined (map 13 (24,3)'s
      type 16, the Firestaff in hand swapped), and a Giggler's theft, then that Giggler's
      kill. Some Assembly Required, Pickpocket's Revenge.
@@ -1321,8 +1317,6 @@ stay common.
 
 **Dungeon Master** (`dm-atari.txt`).
 
-- **Gullible** (silly): hand the Firestaff to Lord Librasulus and see the bad ending.
-  [which ending]
 - **Some Assembly Required** (easy): join the Power Gem to the Firestaff. [objects
   combined]
 - **Pickpocket's Revenge** (silly): be robbed by a Giggler, then kill it. [theft]
@@ -1332,7 +1326,6 @@ stay common.
 **Chaos Strikes Back** (`csb.txt`). A base the author may ask the forum's players to
 improve.
 
-- **Self-Reliant** (hard): win without consulting the Hint Oracle. [the Oracle opened]
 - **Veterans** (weird): win with a party brought over from a won DM game by MAKE NEW
   ADVENTURE. [where the party came from]
 - **Fresh Faces** (hard): win with a party recruited in the prison, none of them
@@ -1359,12 +1352,11 @@ improve.
 | Progress across games | Hall of Fame Tour, Every Ending, Grand Slam, Encore, Dungeon Janitor, HR Problem |
 | A lock or switch triggered | Riddle Me This, Corbum Courier, Coin-Operated |
 | Save loads | Ironman, Hardcore |
-| Which ending | Gullible, Every Ending |
+| Which ending, across games (Gullible's unlock for DM's bad one) | Every Ending |
 | Where the party came from | Veterans, Fresh Faces |
 | A revival at an altar | Lazarus |
 | A theft | Pickpocket's Revenge |
 | Objects combined | Some Assembly Required |
-| The Oracle opened | Self-Reliant |
 
 ## H — Deliberate divergences (not debt)
 

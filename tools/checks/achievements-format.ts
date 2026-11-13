@@ -243,6 +243,9 @@ function wholeGame(): void {
     ['max(party(where wizard >= 15)) >= 1', false],
     ['min(party(where alive = yes)) >= 1', true],
     ['won and never(sleep)', true],
+    ['won and never(oracle)', true],
+    ['lost and level = 0 and x = 9 and y = 1', false],
+    ['max(level) >= 13', false],
   ];
   for (const [text, expected] of cases) {
     const got = needsWholeGame(parseCondition(text));
@@ -403,6 +406,43 @@ function evaluator(common: AchievementFile, dm: AchievementFile, counts: DataCou
   champions(defs);
   casts(defs);
   blows(defs);
+}
+
+/**
+ * Where a game ends, and the Oracle asked: Gullible, a game of Dungeon Master's lost on map 0
+ * (9,1) and nowhere else; Self-Reliant, a game of Chaos Strikes Back's won without the
+ * Oracle asked.
+ */
+function endings(common: AchievementFile, dm: AchievementFile, csb: AchievementFile, counts: DataCounts): void {
+  console.log('--- where a game ends, and the Oracle');
+  const at = (defs: readonly AchievementDef[], level: number, x: number, y: number): AchievementState => {
+    const state = new AchievementState(defs, true);
+    state.sample('level', level);
+    state.sample('x', x);
+    state.sample('y', y);
+    return state;
+  };
+  const dmDefs = mergeAchievements(common, dm).map((d) => withCounts(d, counts));
+  const cell = at(dmDefs, 0, 9, 1);
+  check(!cell.evaluate().includes('gullible'), 'standing on map 0 (9,1) is no Gullible before the game is lost');
+  cell.ended(false);
+  check(cell.evaluate().includes('gullible'), 'a game lost on map 0 (9,1) is Gullible');
+  for (const [level, x, y] of [[0, 1, 4], [1, 9, 1], [0, 9, 2]] as const) {
+    const elsewhere = at(dmDefs, level, x, y);
+    elsewhere.ended(false);
+    check(!elsewhere.evaluate().includes('gullible'), `a game lost on map ${level} (${x},${y}) is not`);
+  }
+  const csbDefs = mergeAchievements(common, csb).map((d) => withCounts(d, counts));
+  const asked = new AchievementState(csbDefs, true);
+  asked.record({ kind: 'oracle', attrs: {} });
+  asked.ended(true);
+  const self = new AchievementState(csbDefs, true);
+  self.ended(true);
+  check(!asked.evaluate().includes('self-reliant') && self.evaluate().includes('self-reliant'),
+    'Chaos Strikes Back won with the Oracle asked once is no Self-Reliant, won without it is');
+  const partial = new AchievementState(csbDefs, false);
+  partial.ended(true);
+  check(!partial.evaluate().includes('self-reliant'), 'nor is a win whose history starts at a save');
 }
 
 /** A champion's attributes as the tracker gives them (`CHAMPION_ATTRIBUTES`), a male Expert by default. */
@@ -660,7 +700,7 @@ async function main(): Promise<void> {
   const values = 'speedRunnerMinutes = 180; blitzMinutes = 60; objectorKills = 40';
   const dm = setFile(common, 'dm-atari', STOCK_DIR, ['let-sleeping-dragons-lie', 'brute-force', 'express-elevator'],
     `${values}; cleanSweepLevels = 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12; expressElevatorMinutes = 60`);
-  setFile(common, 'csb', 'tools/fixtures/gamefiles/csb', [], values, ['clean-sweep'], ['girl-power']);
+  const csb = setFile(common, 'csb', 'tools/fixtures/gamefiles/csb', ['self-reliant'], values, ['clean-sweep'], ['girl-power']);
   for (const set of DATA_SETS) {
     if (set.id.startsWith('dm-')) check(achievementFileOf(set.id) === 'dm-atari', `${set.id}, a Dungeon Master set, reads dm-atari.txt`);
   }
@@ -668,6 +708,7 @@ async function main(): Promise<void> {
   wholeGame();
   const counts = await counted(common);
   evaluator(common, dm, counts);
+  endings(common, dm, csb, counts);
   merging(common, counts);
   finish();
 }

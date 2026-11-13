@@ -71,11 +71,15 @@ export const EVENTS = {
   enter: { level: NUMBER },
   leave: { level: NUMBER, cleared: YESNO },
   sleep: {},
+  oracle: {},
 } as const satisfies Record<string, Record<string, AttributeKind>>;
 export type EventKind = keyof typeof EVENTS;
 
-/** The samples, read at the end of each tick. */
-export const SAMPLES = ['party', 'alive', 'coins'] as const;
+/**
+ * The samples, read at the end of each tick: the party's champions, those alive, the coins
+ * carried, and where the party stands, its level, from 0, and its square's column and row.
+ */
+export const SAMPLES = ['party', 'alive', 'coins', 'level', 'x', 'y'] as const;
 export type SampleName = (typeof SAMPLES)[number];
 
 /**

@@ -280,6 +280,7 @@ export class AchievementTracker {
         this.record('join', { champion: this.championName(h.chIdx), how: h.reincarnated ? 'reincarnate' : 'resurrect' });
         return;
       case 'sleep': this.record('sleep', {}); return;
+      case 'oracle': this.record('oracle', {}); return;
       case 'tick': this.strikeMissile = null; this.strikeKills.clear(); this.tick(); return;
       case 'ended':
         this.sample();
@@ -364,7 +365,8 @@ export class AchievementTracker {
 
   /**
    * Where the party stands at a tick's end: a level entered, and the one left with whether
-   * a monster is alive on it, and the floor square walked on. A party moved to another
+   * a monster is alive on it, the samples of its level and square, and the floor square
+   * walked on. A party moved to another
    * level in the tick's input stands there from the next tick, which loads the level
    * (`Game.loadNewPartyLevel`): until then its square is the new level's, and its level
    * the old one.
@@ -378,6 +380,9 @@ export class AchievementTracker {
       this.record('enter', { level: `${z}` });
       this.level = z;
     }
+    this.state.sample('level', z);
+    this.state.sample('x', x);
+    this.state.sample('y', y);
     const bit = this.floors.get(squareKey(z, x, y));
     if (bit !== undefined && (this.visited[bit >> 3]! & (1 << (bit & 7))) === 0) {
       this.visited[bit >> 3]! |= 1 << (bit & 7);

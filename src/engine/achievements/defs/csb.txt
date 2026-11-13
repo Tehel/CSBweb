@@ -28,3 +28,12 @@ when: won and party = 1
 
 [girl-power]
 disabled
+
+# The Hint Oracle's button, the inventory's close box, which CSBWin has not: asking it is
+# the oracle event, whatever it answers.
+
+[self-reliant]
+name: Self-Reliant
+text: Win without consulting the Hint Oracle.
+tier: hard
+when: won and never(oracle)

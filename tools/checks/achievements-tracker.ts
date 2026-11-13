@@ -57,6 +57,11 @@
  *    each member is a kill by landing, the party's, and Telefrag unlocks; and no champion
  *    dies to the party, so one hurt by its explosion dies after a save kept and read back,
  *    the party's death, and Friendly Fire Fatality unlocks.
+ * 10. Where a game ends, and the Oracle: the whole CSB game, which never asks the Oracle,
+ *    is Self-Reliant. No recording sees Dungeon Master's bad ending, so a new game's champion
+ *    carries the Firestaff from the entrance's pad, map 0 (1,4), north onto (1,3): the party
+ *    is sent to the closed cell of map 0 (9,1), dies there, the game is lost, and Gullible
+ *    unlocks.
  *
  * Usage: npm test -- --only=achievements-tracker.ts [<package name>…] [--not=<name>] [--events]
  */
@@ -78,6 +83,9 @@ import { isAlive } from '../../src/engine/rules';
 import { determineMastery } from '../../src/engine/skills';
 import { MonsterDamageResult } from '../../src/engine/MonsterDamage';
 import { OBJECT_ID_EOF, OBJECT_ID_NULL, Position } from '../../src/core/types';
+import { MovementAction } from '../../src/engine/gameTypes';
+import { OBJNI_THE_FIRESTAFF_A } from '../../src/core/objectNameIndex';
+import { testChampion } from '../lib/champion';
 import { check, finish } from '../lib/check';
 import { graphicsTablesOf, STOCK_DIR, stockGame, stockGraphics } from '../lib/game';
 import { DATA_SETS, diskFiles, diskSetDigests } from '../lib/dataSets';
@@ -486,6 +494,7 @@ for (const file of corpusFiles()) {
       'CSBFullRecordingV4: no champion carries CHARFLAG_male, which CSBWin\'s utility cleared, Buzzzzz and Lor among them');
     check(!defs.some((d) => d.id === 'girl-power') && !unlocked.has('girl-power'),
       'CSBFullRecordingV4: Girl Power, which its party of no man would earn, is disabled in csb.txt');
+    check(unlocked.has('self-reliant'), 'CSBFullRecordingV4, won without the Oracle asked, is Self-Reliant');
     check(unlocked.has('gourmet') && !unlocked.has('bestiary'), 'CSBFullRecordingV4: the party eats all eight kinds of food (Gourmet), and kills 22 of the 23 types');
     check(unlocked.has('tourist') && count(events, 'leave', { cleared: 'yes' }) > 0 && !unlocked.has('clean-sweep'),
       'CSBFullRecordingV4 sets foot on every level, and leaves some with no monster alive, though CSB lists no level to sweep');
@@ -537,6 +546,43 @@ for (const file of corpusFiles()) {
   const death = events[events.length - 1];
   check(death?.kind === 'death' && death.attrs.cause === 'explosion' && death.attrs.party === 'yes' && tracker.unlocked.has('friendly-fire-fatality'),
     `a death pending from the party's own explosion, across a save read, is the party's: Friendly Fire Fatality (${JSON.stringify(death?.attrs)})`);
+}
+
+// 10. Dungeon Master's bad ending: no recording sees it, so a new game's champion carries
+// the Firestaff, taken from its altar on map 6 (14,16), from the entrance's pad north.
+{
+  console.log('--- the bad ending');
+  const game = stockGame();
+  game.setRandomSeed(0x12345678);
+  const tracker = new AchievementTracker(game, defsOf('dm-atari'), graphicsTablesOf(stockGraphics()).objects.objectNames, {
+    dungeonDat: new Uint8Array(readFileSync(resolve(`${STOCK_DIR}/dungeon.dat`))), miniDat: null,
+  });
+  tracker.attach();
+  tracker.observe({ k: 'new-game' });
+  const { ctx } = game;
+  game.systems.hallOfChampions.addChampion(testChampion(0));
+  const altar = new Position(14, 16, 6);
+  let staff = OBJECT_ID_NULL;
+  for (let rn = ctx.dungeon.findFirstObject(altar); rn !== OBJECT_ID_EOF; rn = ctx.dungeon.getDBRecordLink(rn)) {
+    if (NameIndex(ctx.dungeon, ctx.tables, 0, rn) === OBJNI_THE_FIRESTAFF_A) staff = rn;
+  }
+  if (staff === OBJECT_ID_NULL || !ctx.dungeon.removeObjectFromCell(altar, staff)) throw new Error('no Firestaff on map 6 (14,16)');
+  ctx.systems.character.addCharacterPossession(0, staff, 1);
+  ctx.party.state.position = new Position(1, 5, 0);
+  ctx.party.state.facing = 0;
+  game.systems.monsters.loadPartyLevel(0);
+  const step = (): void => {
+    ctx.systems.movement.moveParty(MovementAction.MOVE_FORWARD);
+    for (let t = 0; t < 3; t++) game.gameTick();
+  };
+  step();
+  step();
+  for (let t = 0; t < 1000 && !game.mainLoopHasReturned(); t++) game.gameTick();
+  const { x, y, z } = ctx.party.state.position;
+  console.log(`  the party ends on map ${z} (${x},${y}), d.Time ${ctx.state.tickCount}, the game ${ctx.party.state.gameIsLost ? 'lost' : 'not lost'}`);
+  check(game.mainLoopHasReturned() && ctx.party.state.gameIsLost && !ctx.state.gameWon && z === 0 && x === 9 && y === 1,
+    'the Firestaff carried from the entrance\'s pad north sends the party to map 0 (9,1), where the game is lost');
+  check(tracker.unlocked.has('gullible') && tracker.unlocked.has('t-lost'), 'Gullible unlocks, the game lost');
 }
 
 if (!wornChecked) check(false, 'a package was played');

@@ -35,8 +35,9 @@ common file's values: Speed Runner in less than 180 minutes, Blitz in less than 
 Conscientious Objector with at most 40 kills. Dungeon Master's also lists the levels Clean
 Sweep counts, 1 to 12, all but the Hall of Champions and the Dragon's, and gives its own
 Express Elevator 60 minutes, and has Shining Armour and Darc Knight, the armours of Lyte and
-Darc worn whole; Chaos Strikes Back lists no level to sweep, and disables Girl Power
-("The champions"). A set with no `achievements.txt` of its own reads that file instead. The file is never a game file
+Darc worn whole, and Gullible, its bad ending ("Where a game ends"); Chaos Strikes Back
+lists no level to sweep, disables Girl Power ("The champions"), and has Self-Reliant, won
+without the Hint Oracle asked. A set with no `achievements.txt` of its own reads that file instead. The file is never a game file
 (`GAME_FILES`, `src/data/DataSets.ts`), so a recording's digests never name it, and an
 author can change the file without breaking a recording.
 
@@ -139,6 +140,9 @@ A condition is a yes or a no, made from these parts:
   - `party(where filter)`: the number of the party's champions that the filter accepts,
     by what each is at that moment ("The champions", below), such as `party(where feet =
     "BOOTS OF SPEED") >= 4`.
+  - `level`, `x` and `y`: where the party stands, its level, from 0, and its square's
+    column and row, as the game counts them, north up and `y` growing south. While the
+    party changes level in a tick, they are the last tick's ("The tracker").
 - **`max(sample)`** and **`min(sample)`** are the largest and the smallest value the sample
   has had in the game.
 - **Counts of events**:
@@ -177,6 +181,7 @@ number for a `level`. Names compare without regard to case.
 | `enter` | the party stands on a level it did not stand on at the last tick's end, and at a history's first tick | `level`, the map, from 0 |
 | `leave` | the party stands on another level than at the last tick's end | `level`, the map left; `cleared`: `yes` when no monster is alive on it then |
 | `sleep` | the party lies down to sleep | none |
+| `oracle` | the player asks the Hint Oracle, by its button | none |
 
 An `item` is the object's name as the game shows it (`RN::NameIndex`), from the set's own
 `graphics.dat`, or one of the two words no object is, `HAND` and `FOUNTAIN`.
@@ -192,6 +197,15 @@ names a monster; CSBWin's statistics name the dead by these, unless the dungeon'
 names them (`GetMonsterName`, `:48-89`), which the tracker does not read yet. A `champion`
 is the name the champion carries. A `spell` is the runes after the power rune, by the
 manual's names (`src/core/runes.ts`), which no game file holds either.
+
+### Where a game ends
+
+The samples of where the party stands, read at the game's end, tell an ending the engine
+does not tell from a loss. Dungeon Master's bad ending is one: the entrance's pad, map 0
+(1,4), sends a party carrying the Firestaff north through (1,3)'s teleporter into the
+closed cell of map 0 (9,1), "IT IS TOO BAD YOU DID NOT DISCOVER THE TRUE SECRET OF THE
+FIRESTAFF", where a spell launcher kills it. So Gullible is `lost and level = 0 and x = 9
+and y = 1`: a game lost in that cell, which nothing else reaches.
 
 ### The champions
 
@@ -367,6 +381,11 @@ whole replay corpus with the tracker attached, and every package plays to its po
   `graphics.dat`). A mirror's champion's own possessions are not put on by the player.
 - **A join** is at the end of `_ResurrectReincarnateCancel`, beside
   `GameHost.championJoined`.
+- **The Oracle asked** is at its button, as `ui.hintOracleNeeded` is raised
+  (`src/renderer/ui/Mouse.ts`, `doc/CSBWIN_HINT_ORACLE_REFERENCE.md`), which the live page
+  and a recording played back both run: the page then opens the Oracle, the playback
+  stops the clock for it. A click refused, with an empty party or a champion only
+  provisionally joined, asks nothing.
 - **A sleep** is at the sleep icon's engine half, button 145 (`MouseSystem.sleep`,
   `doc/CSBwin-src/Mouse.cpp:1822-1847`), as `d.PartySleeping` is set: a party woken in the
   same tick has slept all the same.
@@ -424,7 +443,8 @@ the `mini.dat`.
   champion; `coins` counts every object whose name ends in `COIN` in the party's
   possessions, inside the chests they carry (an open chest's slots for the open one) and
   under the pointer. Where a condition reads `party(where …)`, it reads each champion's
-  attributes ("The champions"). It reads where the party stands: a level other than the last tick's
+  attributes ("The champions"). It reads where the party stands, the samples `level`, `x`
+  and `y`: a level other than the last tick's
   is `leave` of that one, then `enter` of this one, and a floor square not stood on yet
   adds to `explored`. A party moved to another level in the tick's input stands there from
   the next tick, which loads the level (`Game.loadNewPartyLevel`, `d.newPartyLevel`):
@@ -473,7 +493,11 @@ hurt was. Dungeon Master's wins deal blows of 140 and 173 (Overkill), and DMMovi
 fireballs wipe out two groups of four (Strike!). No recording lands on a group nor loses a
 champion to the party, so the tool puts a new game's party on a group of four mummies,
 four kills by landing (Telefrag), and lets a champion its explosion hurt die after a save
-kept and read back (Friendly Fire Fatality).
+kept and read back (Friendly Fire Fatality). And where a game ends: the whole CSB game,
+which never asks the Oracle, is Self-Reliant, and a new game's champion carrying the
+Firestaff north from the entrance's pad dies in map 0 (9,1), the game lost (Gullible);
+`tools/checks/hint-oracle-button.ts` proves each click on the Oracle's button tells one
+`oracle`, and a refused one none.
 `tools/checks/achievements-format.ts` reads each file, checks its names against its set's
 `graphics.dat` and its values against its achievements, counts the FTL sets' data, and
 plays the conditions out of made-up events and champions, the named values, the lists and

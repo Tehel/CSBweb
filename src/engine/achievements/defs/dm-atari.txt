@@ -107,3 +107,13 @@ text: Have one champion wear the whole armour of Darc, its shield in hand.
 tier: hard
 when: party(where head = "HELM OF DARC" and torso = "PLATE OF DARC" and legs = "POLEYN OF DARC"
         and feet = "GREAVE OF DARC" and (ready = "SHIELD OF DARC" or action = "SHIELD OF DARC")) >= 1
+
+# The bad ending: the party carrying the Firestaff back to the entrance, onto map 0 (1,4),
+# is sent to the closed cell of map 0 (9,1), "IT IS TOO BAD YOU DID NOT DISCOVER THE TRUE
+# SECRET OF THE FIRESTAFF", where a spell launcher kills it: a game lost there.
+
+[gullible]
+name: Gullible
+text: Bring the Firestaff back to Lord Librasulus, and see the bad ending.
+tier: silly
+when: lost and level = 0 and x = 9 and y = 1

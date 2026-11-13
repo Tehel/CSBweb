@@ -14,7 +14,10 @@
  * 3. **The square is the party's**, after a step, a teleporter to level 0 (3,23), which
  *    lists CREATURES, THE MAZE and FULYA PIT, and a pit down to level 1, each list
  *    different from the one before.
- * 4. **Refused** while a champion is only provisionally joined, as the disk icon is.
+ *    Each click tells the engine's host the Oracle asked, once (`oracle`, which the
+ *    achievements count).
+ * 4. **Refused** while a champion is only provisionally joined, as the disk icon is, and
+ *    the Oracle not asked.
  * 5. **Closing**: a right click is still button 11 and closes the inventory, and without
  *    the files, as in DM, the close box is button 11 and closes it too.
  *
@@ -55,6 +58,8 @@ interface Setup {
   game: Game;
   ui: UIState;
   opened: HintSquare[];
+  /** The `oracle` happenings the engine told its host (`doc/ACHIEVEMENTS.md` → "The happenings"). */
+  asked: number;
 }
 
 /**
@@ -66,6 +71,9 @@ function setup(withOracle: boolean): Setup {
   const game = newGame(new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync(`${CSB}/dungeon.dat`))), graphics);
   applyCsbwinSave(game, new Uint8Array(readFileSync(`${CSB}/csbgame2.dat`)));
   const opened: HintSquare[] = [];
+  const s = { game, opened, asked: 0 } as Setup;
+  game.ctx.host.observing = true;
+  game.ctx.host.observe = (h) => { if (h.k === 'oracle') s.asked++; };
   const store = graphicsStoreOf(graphics);
   const ui = newUIState(graphics, game.ctx, {
     getGraphicBitmap: (n) => store.basicGraphic(n),
@@ -84,7 +92,8 @@ function setup(withOracle: boolean): Setup {
     },
     unclick: () => handleMouseUnclick(ui),
   });
-  return { game, ui, opened };
+  s.ui = ui;
+  return s;
 }
 
 /** A left click at (x, y), searched in the interface's lists and queued, then a VBL to take it. */
@@ -145,8 +154,10 @@ function openInventory(s: Setup): void {
 async function askOracle(s: Setup, when: string): Promise<string[]> {
   const box = closeBoxRect(s.ui)!;
   const before = s.opened.length;
+  const asked = s.asked;
   const id = click(s, box.x1 + 4, box.y1 + 4);
   check(id === HINT_ORACLE_BUTTON && s.opened.length === before + 1, `${when}: a click on the close box is the Oracle's button, and opens the Oracle`);
+  check(s.asked === asked + 1, `${when}: the engine tells its host the Oracle asked, once`);
   const square = s.opened[s.opened.length - 1]!;
   const { x, y, z } = s.ui.partyState.position;
   check(square.level === z && square.x === x && square.y === y && s.game.ctx.loop.newPartyLevel === -1,
@@ -230,7 +241,9 @@ async function main(): Promise<void> {
 
   s.ui.partyState.potentialChampionIndex = 1;
   const opened = s.opened.length;
+  const asked = s.asked;
   click(s, box.x1 + 4, box.y1 + 4);
+  check(s.asked === asked, 'with a champion only provisionally joined, the Oracle is not asked');
   check(s.opened.length === opened && !s.ui.hintOracleNeeded && s.ui.partyState.selectedCharacterIndex === 0,
     'with a champion only provisionally joined, the button does nothing');
   s.ui.partyState.potentialChampionIndex = -1;
