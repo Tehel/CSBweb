@@ -117,6 +117,8 @@ A condition is a yes or a no, made from these parts:
   - `playTime` is the time the player has played the game, in seconds. It counts the
     VBLs the game has run, sixty a second, so the page and a replay of its recording
     count the same.
+- **Counts of the set's data**: `spells`, `foods` and `monsterTypes`, numbers worked out
+  from the set's own files, the same in every game of the set ("Counted from the data").
 - **Samples**, read at the end of each tick. A sample's bare name is its value at that moment:
   - `party`: the number of champions in the party.
   - `alive`: the number of those champions who are alive.
@@ -171,6 +173,49 @@ names a monster; CSBWin's statistics name the dead by these, unless the dungeon'
 names them (`GetMonsterName`, `:48-89`), which the tracker does not read yet. A `champion`
 is the name the champion carries. A `spell` is the runes after the power rune, by the
 manual's names (`src/core/runes.ts`), which no game file holds either.
+
+### Counted from the data
+
+Three numbers a condition reads are the set's own, so that one condition says "every one
+of them" in every set:
+
+```
+[gourmet]
+name: Gourmet
+text: Eat every kind of food the dungeon holds.
+when: foods > 0 and distinct(eat.item) >= foods
+```
+
+- **`spells`**: the spells of the set's table (`d.Spells`, graphic `0x230` of its
+  `graphics.dat`), each once by the runes after the power rune, which `cast.spell` names.
+- **`monsterTypes`**: the types of the groups the set's dungeons place, those a group
+  carries among them, and of the monsters their generators make (an actuator of type 6 on
+  an open square, `doc/CSBwin-src/Timer.cpp:1771-1820`, the type its value's low five
+  bits, `doc/CSBwin-src/Monster.cpp:130`), less the types a blow cannot kill (their
+  `MonsterDesc`'s invincible bit): Lord Chaos, whom only the Firestaff fuses, type 25
+  and the Grey Lord. Bestiary leaves out the fusion's kill for the same reason.
+- **`foods`**: the kinds of food, the objects `_FeedCharacter` chews (`APPLE` to `DRAGON
+  STEAK`), among the objects the set's dungeons hold, on a square, carried by a group or in
+  a chest, and among the droppings of those monster types (`CreateAndDropObject`,
+  `doc/CSBwin-src/Code11f52.cpp:735-788`), such as a worm's worm rounds.
+
+A set's dungeons are its `dungeon.dat`, and its `mini.dat` where it has one, Chaos Strikes
+Back's adventure. Dungeon Master counts 25 spells, 8 foods and 24 types; Chaos Strikes
+Back 25 spells, 8 foods and 23 types, three of them only its generators make
+(`tools/checks/achievements-format.ts`).
+
+Each count is that of the values its event can take in a game of the set, so `distinct(…)
+>= count` is exact: a spell that works is one of the table's, a meal one of the foods, a
+monster a blow kills one of the types. A dungeon whose DSAs create a monster or a food of
+a kind the counts leave out, or make something else edible, can reach the count with it
+instead. A set whose count is 0 has nothing to earn, so the common file's conditions ask
+for more than 0 first.
+
+The tracker works the counts out as it is made (`dataCounts`,
+`src/engine/achievements/DataCounts.ts`), from the game's tables and the set's dungeon
+files, and puts them in the conditions (`withCounts`). The welcome page and the Hall of
+Fame list a set's achievements without its files, so a text cannot name a count as it
+names a value: Gourmet says "every kind of food", not "the 8 kinds".
 
 ### When an achievement unlocks
 
@@ -290,7 +335,10 @@ keeps its side in the tracker's state kept with it.
 `AchievementTracker` (`src/engine/achievements/AchievementTracker.ts`) turns the
 happenings into the evaluator's events and samples (`AchievementState`). It is a function of
 what it observes, and of nothing else, so a live game and its replay give the same unlocks.
-It reads the game only to name things: a champion, an object, the samples.
+It reads the game only to name things: a champion, an object, the samples. It is made
+with the set's dungeon files (`AchievementSetFiles`): it reads the counts of the data from
+them and the game's tables ("Counted from the data"), and a CSB adventure's start against
+the `mini.dat`.
 
 - At each tick's end it takes the samples: `party` and `alive` leave out a mirror's
   champion; `coins` counts every object whose name ends in `COIN` in the party's
@@ -313,10 +361,13 @@ adventure CSBWin's utility made, unlocks Speed Runner), and the kills, the death
 their causes, the joins, the meals, the worn objects and the unlocks of Dungeon Master won
 (DMMovie2615), a lost game and the whole CSB game, each tracked with its set's
 achievements: DMMovie2615's Ful bombs (Grenadier), its champion lost to a wall (Stubbed
-Toe) and its win with one of four alive (Sole Survivor). `tools/checks/achievements-format.ts`
-reads each file, checks its names against its set's `graphics.dat` and its values against
-its achievements, and plays the conditions out of made-up events, the named values put in
-their places.
+Toe) and its win with one of four alive (Sole Survivor); and that the tracker counts its
+set's data, Rune Scholar, Gourmet and Bestiary unlocking exactly where a game's distinct
+spells, foods and types reach the counts: the whole CSB game eats all eight foods.
+`tools/checks/achievements-format.ts` reads each file, checks its names against its set's
+`graphics.dat` and its values against its achievements, counts the FTL sets' data, and
+plays the conditions out of made-up events, the named values and the counts put in their
+places.
 
 ## The page
 

@@ -236,6 +236,27 @@ text: Win without putting on anything but a necklace.
 tier: hard
 when: won and never(wear where slot != neck)
 
+# Counted from the data: spells, foods and monsterTypes are the set's own (doc/ACHIEVEMENTS.md
+# -> "Counted from the data"). A fused Lord Chaos is not a monster type a blow can kill.
+
+[rune-scholar]
+name: Rune Scholar
+text: Cast every spell of the game.
+tier: hard
+when: spells > 0 and distinct(cast.spell where ok = yes) >= spells
+
+[gourmet]
+name: Gourmet
+text: Eat every kind of food the dungeon holds.
+tier: weird
+when: foods > 0 and distinct(eat.item) >= foods
+
+[bestiary]
+name: Bestiary
+text: Kill a monster of every kind the dungeon holds.
+tier: hard
+when: monsterTypes > 0 and distinct(kill.monster where party = yes and not by = fusion) >= monsterTypes
+
 # The valued: a set without the value in its own file has no such achievement.
 
 [speed-runner]

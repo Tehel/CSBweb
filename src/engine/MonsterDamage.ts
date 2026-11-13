@@ -66,7 +66,7 @@ const SOUND_ORDINAL_DROPPED_ITEM = 0;
  * returns immediately on its `default:` branch. Each entry is a start offset into
  * `MonsterDroppings[40]`, and the list at that offset runs until a zero word.
  */
-const MONSTER_DROPPINGS_INDEX: Partial<Record<MonsterType, number>> = {
+export const MONSTER_DROPPINGS_INDEX: Partial<Record<MonsterType, number>> = {
   [MonsterType.mon_Skeleton]: 37,
   [MonsterType.mon_StoneGolem]: 35,
   [MonsterType.mon_AntMan]: 33,
@@ -85,7 +85,7 @@ const CURSED_DROPPINGS: ReadonlySet<number> = new Set([MonsterType.mon_DethKnigh
  * `CreateAndDropObject`'s type/index split of a `MonsterDroppings` word
  * (`doc/CSBwin-src/Code11f52.cpp:770-788`). A value below 23 is skipped entirely.
  */
-const DROPPING_MISC_BASE = 127;
+export const DROPPING_MISC_BASE = 127;
 const DROPPING_CLOTHING_BASE = 69;
 const DROPPING_WEAPON_BASE = 23;
 

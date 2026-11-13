@@ -26,6 +26,7 @@ import { extractGraphicsTables, type GraphicsTables } from './data/tables/Graphi
 import { UtilityDiskMessages, UtilityError } from './engine/Chaos';
 import { GameSaves, drawPlaythrough } from './engine/GameSaves';
 import { PageAchievements } from './engine/achievements/PageAchievements';
+import { readAchievementSetFiles, type AchievementSetFiles } from './engine/achievements/DataCounts';
 import { PageProofs, storedPackage } from './engine/achievements/PageProofs';
 import { achievementDefs } from './ui/achievementFiles';
 import { loadSwoosh, type Swoosh } from './data/SwooshLoader';
@@ -311,11 +312,12 @@ async function loadTitlePicture(): Promise<TitleFrame | null> {
 /**
  * The engine and the screen, each handed what it asks of the other: the engine its
  * `GameHost`, the screen its `ScreenHooks`. Both are handed the one message area,
- * which the engine writes and the screen draws. `miniDat` is the set's `mini.dat` where
- * the page tracks achievements in a set that has one, against which a CSB adventure's
- * start is read (`AchievementTracker`).
+ * which the engine writes and the screen draws. `achievementFiles` are the set's dungeon
+ * files where the page tracks achievements, which their counts are read from and a CSB
+ * adventure's start against (`AchievementTracker`).
  */
-function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: GameTables, sound: SoundManager, miniDat: Uint8Array | null): Built {
+function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: GameTables, sound: SoundManager,
+    achievementFiles: AchievementSetFiles | null): Built {
     const messages = new ScrollingText(tables.byte1830);
     const playSound = (soundId: number, rateIdx?: number, highVolume?: number) => sound.playSound(soundId, rateIdx, highVolume);
     // The screen is built second, over the engine's dungeon, so the engine→UI notices
@@ -528,10 +530,10 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
 
     // The achievements of a game the player plays: none for a recording played back, whose
     // game is not the player's (`doc/ACHIEVEMENTS.md` → "The page").
-    const defs = playedRecording === null ? achievementDefs(dataSet.id) : null;
+    const defs = achievementFiles && achievementDefs(dataSet.id);
     const achievementStore = new BrowserAchievementStore((rows) => drawPlaythrough(storeRandom, rows));
-    const achievements = defs && new PageAchievements(game, dataSet.id, defs, screen.ui.objectTables.objectNames, achievementStore, saves, teleported,
-        miniDat, (message, error) => console.warn(message, error));
+    const achievements = achievementFiles && defs && new PageAchievements(game, dataSet.id, defs, screen.ui.objectTables.objectNames,
+        achievementStore, saves, teleported, achievementFiles, (message, error) => console.warn(message, error));
     // Each unlock a banner over the view, with ACHIEVEMENT NOTICES on.
     achievements?.onShown(({ def }) => showAchievementNotice(screen.ui, { name: def.name, tier: def.tier }));
     // The proofs of the unlocks, sent by a player with a public name at a save and at the
@@ -1296,9 +1298,9 @@ async function init() {
         const graphicsTables = extractGraphicsTables(files.graphicsLoader);
         const tables = buildGameTables(graphicsTables);
         const sound = createSoundManager(files.graphicsLoader, tables);
-        // Read past the digests: a recording names the files the game reads, and this is the achievements'.
-        const miniDat = dataSet.miniDat && playedRecording === null ? await chosen.files.read('mini.dat') : null;
-        const built = construct(files, graphicsTables, tables, sound, miniDat);
+        // Read past the digests: a recording names the files the game reads, and these are the achievements'.
+        const achievementFiles = playedRecording === null ? await readAchievementSetFiles(dataSet, chosen.files) : null;
+        const built = construct(files, graphicsTables, tables, sound, achievementFiles);
         game = built.game;
         screen = built.screen;
         // The data set's rules, before any file is read: one with an Extended Features

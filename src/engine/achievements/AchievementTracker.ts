@@ -13,6 +13,10 @@
  * kept for it starts a history of its own, which needs-the-whole-game conditions never
  * read (`AchievementState`), unless it is a CSB adventure's start (`isNewAdventure`): the
  * adventure is a game of its own from there, and its history is the whole game's.
+ *
+ * The counts a condition reads of the set's own files (`dataCounts`) are worked out once,
+ * as the tracker is made, from the game's tables and the set's dungeon files, and put in
+ * the conditions (`withCounts`).
  */
 import { fileDigest } from '../../data/DataSetFiles';
 import { isNewAdventure } from '../Chaos';
@@ -25,7 +29,8 @@ import type { Blow, BlowCause, Happening } from '../Happening';
 import { NameIndex } from '../objectIndex';
 import { isAlive } from '../rules';
 import { AchievementState, type AchievementEvent, type AchievementSnapshot } from './AchievementState';
-import type { AchievementDef, EventKind } from './AchievementFile';
+import { withCounts, type AchievementDef, type DataCounts, type EventKind } from './AchievementFile';
+import { dataCounts, setDungeons, type AchievementSetFiles } from './DataCounts';
 
 /**
  * A monster type's name: CSBWin's `monsterNames` (`doc/CSBwin-src/Statistics.cpp:16-44`),
@@ -93,17 +98,26 @@ export class AchievementTracker {
   private readonly eventListeners: ((event: AchievementEvent) => void)[] = [];
   private readonly found: Unlock[] = [];
 
+  /** The counts of the set's own files its conditions read (`dataCounts`). */
+  readonly counts: DataCounts;
+  private readonly defs: readonly AchievementDef[];
+  private readonly miniDat: Uint8Array | null;
+
   /**
    * A tracker of `game`, for the achievements `defs` names, the objects named by
-   * `objectNames` (`d.ObjectNames`, the set's `graphics.dat`), and `miniDat`, the set's
-   * `mini.dat` where it has one, which a CSB adventure's start is read against. Until a
-   * game is read it keeps a history that does not go back to the start.
+   * `objectNames` (`d.ObjectNames`, the set's `graphics.dat`), and `files`, the set's
+   * dungeon files: the counts are read from them, and a CSB adventure's start is read
+   * against its `mini.dat`. Until a game is read it keeps a history that does not go back
+   * to the start.
    */
   constructor(
-    private readonly game: Game, private readonly defs: readonly AchievementDef[], private readonly objectNames: readonly string[],
-    private readonly miniDat: Uint8Array | null = null,
+    private readonly game: Game, defs: readonly AchievementDef[], private readonly objectNames: readonly string[],
+    files: AchievementSetFiles,
   ) {
-    this.state = new AchievementState(defs, false);
+    this.counts = dataCounts(game.ctx.tables, setDungeons(files));
+    this.defs = defs.map((def) => withCounts(def, this.counts));
+    this.miniDat = files.miniDat;
+    this.state = new AchievementState(this.defs, false);
   }
 
   /** The engine's happenings sent here. */

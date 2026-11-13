@@ -7,22 +7,26 @@
  * each common achievement with its tier, whether it needs the whole game (`whole`), and
  * the aggregates it keeps by their keys, and the values it names. Every name the common file gives an item must be
  * one of FTL's objects, which is the canary: a name misspelt there would match nothing,
- * silently, in every set.
+ * silently, in every set. The counts of the data (`dataCounts`) are Dungeon Master's and
+ * Chaos Strikes Back's, each half of them proven by what it adds: DM's worm round only a
+ * worm drops, CSB's types only its generators make, DM's Lord Chaos whom no blow kills.
  *
  * Run: `npm test -- --only=achievements-format.ts`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
-  mergeAchievements, needsWholeGame, parseCondition, readAchievementFile, unknownItems, unusedValues,
-  type AchievementDef, type AchievementFile,
+  mergeAchievements, needsWholeGame, parseCondition, readAchievementFile, unknownItems, unusedValues, withCounts,
+  type AchievementDef, type AchievementFile, type DataCounts,
 } from '../../src/engine/achievements/AchievementFile';
+import { dataCounts, readAchievementSetFiles, setDungeons } from '../../src/engine/achievements/DataCounts';
+import { dungeonCensus } from '../../src/engine/DungeonCensus';
 import { AchievementState, type AchievementEvent } from '../../src/engine/achievements/AchievementState';
 import { achievementFileOf } from '../../src/engine/achievements/PageAchievements';
 import { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import { check, fail, finish } from '../lib/check';
-import { DATA_SETS } from '../lib/dataSets';
-import { graphicsTablesOf, STOCK_DIR, stockGraphics } from '../lib/game';
+import { DATA_SETS, dataSetNamed, diskFiles } from '../lib/dataSets';
+import { gameTablesOf, graphicsTablesOf, STOCK_DIR, stockGraphics } from '../lib/game';
 
 const DEFS = resolve(import.meta.dirname, '../../src/engine/achievements/defs');
 const COMMON = resolve(DEFS, 'common.txt');
@@ -127,6 +131,8 @@ function errors(): void {
     ['a field before any id', `${H}name: A\n`, 2, /must follow an \[id\]/],
     ['a continuation with nothing before', `${H}[a]\n  won\n`, 3, /continued line/],
     ['a bad tier', `${H}[a]\nname: A\ntext: T\ntier: epic\nwhen: won\n`, 5, /tier/],
+    ['a count of the data alone', block('spells'), 5, /yes or a no/],
+    ['a count of the data against a duration', block('playTime > spells'), 5, /duration/],
     ['a name too long', `${H}[a]\nname: ${'X'.repeat(33)}\ntext: T\nwhen: won\n`, 3, /over 32/],
     ['non-ASCII', `${H}[a]\nname: Café\ntext: T\nwhen: won\n`, 3, /ASCII/],
     ['disabled with fields', `${H}[a]\ndisabled\nname: A\n`, 2, /nothing else/],
@@ -211,9 +217,9 @@ const kill = (item = 'SWORD', party = 'yes'): AchievementEvent => ({ kind: 'kill
 const eat = (item: string): AchievementEvent => ({ kind: 'eat', attrs: { champion: 'HALK', item } });
 
 /** A game played out of events: what unlocks, when. */
-function evaluator(common: AchievementFile, dm: AchievementFile): void {
+function evaluator(common: AchievementFile, dm: AchievementFile, counts: DataCounts): void {
   console.log('--- the evaluator, Dungeon Master\'s achievements');
-  const defs = mergeAchievements(common, dm);
+  const defs = mergeAchievements(common, dm).map((d) => withCounts(d, counts));
   const state = new AchievementState(defs, true);
   state.sample('party', 1);
   state.sample('alive', 1);
@@ -327,7 +333,7 @@ function evaluator(common: AchievementFile, dm: AchievementFile): void {
 }
 
 /** A set's file over the common one. */
-function merging(common: AchievementFile): void {
+function merging(common: AchievementFile, counts: DataCounts): void {
   console.log('--- merging');
   const own = read('# CSBweb achievements 1\n[lone-wolf]\ndisabled\n[no-such]\ndisabled\n[first-blood]\nname: Blooded\ntext: Kill.\nwhen: count(kill) >= 1\n[mine]\nname: Mine\ntext: T\nwhen: won\n');
   const merged = mergeAchievements(common, own);
@@ -345,7 +351,7 @@ function merging(common: AchievementFile): void {
   const valued = read('# CSBweb achievements 1\nvalue speedRunnerMinutes = 90\nvalue kills = 7\nvalue spare = 1\n'
     + '[seven]\nname: Seven\ntext: Kill {kills}, then {kills} more.\nwhen: count(kill) >= {kills}\n'
     + '[nowhere]\nname: Nowhere\ntext: T\nwhen: count(kill) >= {absent}\n');
-  const set = mergeAchievements(common, valued);
+  const set = mergeAchievements(common, valued).map((d) => withCounts(d, counts));
   const seven = set.find((d) => d.id === 'seven');
   const speed = set.find((d) => d.id === 'speed-runner');
   console.log(`  ${seven?.text} / ${speed?.text}`);
@@ -369,11 +375,75 @@ function merging(common: AchievementFile): void {
   check(!late.evaluate().includes('speed-runner'), 'one in 90 is not');
 }
 
+/** The counts of the data: the FTL sets', and what a condition does with them. */
+async function counted(common: AchievementFile): Promise<DataCounts> {
+  console.log('--- counted from the data');
+  const expected: Record<string, DataCounts> = {
+    'dm-atari': { spells: 25, foods: 8, monsterTypes: 24 },
+    csb: { spells: 25, foods: 8, monsterTypes: 23 },
+  };
+  const found: Record<string, DataCounts> = {};
+  for (const [id, want] of Object.entries(expected)) {
+    const set = dataSetNamed(id);
+    const files = await readAchievementSetFiles(set, diskFiles(set));
+    const graphics = new GraphicsLoader();
+    graphics.loadFromArray(new Uint8Array(readFileSync(resolve(set.dir, 'graphics.dat'))));
+    const tables = gameTablesOf(graphics);
+    const dungeons = setDungeons(files);
+    const counts = found[id] = dataCounts(tables, dungeons);
+    console.log(`  ${id.padEnd(9)} spells ${counts.spells}, foods ${counts.foods}, monsterTypes ${counts.monsterTypes}`);
+    check(JSON.stringify(counts) === JSON.stringify(want), `${id} counts ${JSON.stringify(want)}`);
+    if (id === 'dm-atari') {
+      const placed = dataCounts({ ...tables, monsterDroppings: [] }, dungeons).foods;
+      console.log(`  ${''.padEnd(9)} foods without the droppings ${placed}`);
+      check(placed === 7, 'Dungeon Master places no worm round: only a worm drops one');
+      const killable = dataCounts({ ...tables, monsterDesc: Array.from(tables.monsterDesc, (d) => ({ ...d, word2: d.word2 & ~0x2000 })) }, dungeons);
+      check(killable.monsterTypes === 25, 'Dungeon Master places 25 types, Lord Chaos the one no blow kills');
+    } else {
+      check(dungeons.length === 2, 'Chaos Strikes Back\'s counts read its prison and its adventure, mini.dat');
+      const groups = dungeonCensus(dungeons[1]!).monsterTypes;
+      console.log(`  ${''.padEnd(9)} the adventure's groups are of ${groups} types`);
+      check(groups === 21, 'the adventure\'s groups are of 21 types, the Grey Lord, whom no blow kills, among them: its generators make the other three');
+    }
+  }
+
+  check(!needsWholeGame(parseCondition('distinct(cast.spell where ok = yes) >= spells')), 'every spell cast can be earned in any game');
+  check(needsWholeGame(parseCondition('distinct(eat.item) < foods')), 'fewer foods than there are needs the whole game');
+  const defs = mergeAchievements(common, null);
+  const small = defs.map((d) => withCounts(d, { spells: 2, foods: 2, monsterTypes: 2 }));
+  const ids = ['rune-scholar', 'gourmet', 'bestiary'];
+  check(ids.every((id) => small.some((d) => d.id === id)), 'Rune Scholar, Gourmet and Bestiary are common: a set without a file of its own has them');
+  let threw = false;
+  try { new AchievementState(defs, true).evaluate(); } catch { threw = true; }
+  check(threw, 'a count of the data the tracker never gave is an error, not a zero');
+
+  const state = new AchievementState(small, true);
+  const cast = (spell: string, ok: string): AchievementEvent => ({ kind: 'cast', attrs: { champion: 'A', spell, ok } });
+  const slay = (monster: string, by: string, party: string): AchievementEvent => ({ kind: 'kill', attrs: { monster, by, champion: 'A', party } });
+  const steps: [AchievementEvent[], string[], string][] = [
+    [[cast('FUL', 'yes'), cast('FUL', 'yes'), cast('FUL IR', 'no')], [], 'one spell twice and one failed are one of two'],
+    [[cast('FUL IR', 'yes')], ['rune-scholar'], 'the second spell is Rune Scholar'],
+    [[eat('APPLE'), eat('APPLE')], [], 'an apple twice is one food of two'],
+    [[eat('CORN')], ['gourmet'], 'corn after it is Gourmet'],
+    [[slay('Mummy', 'melee', 'yes'), slay('LordChaos', 'fusion', 'yes'), slay('Worm', 'door', 'no')], ['first-blood'],
+      'a mummy, Lord Chaos fused and a worm the party did not kill are one type of two'],
+    [[slay('Worm', 'spell', 'yes')], ['bestiary'], 'a worm the party kills is Bestiary'],
+  ];
+  for (const [events, unlocks, what] of steps) {
+    for (const event of events) state.record(event);
+    check(sameIds(state.evaluate(), unlocks), what);
+  }
+  const none = new AchievementState(defs.map((d) => withCounts(d, { spells: 0, foods: 0, monsterTypes: 0 })), true);
+  for (const [events] of steps) for (const event of events) none.record(event);
+  check(!none.evaluate().some((id) => ids.includes(id)), 'a set with no spell, food or monster has no Rune Scholar, Gourmet or Bestiary to earn');
+  return found['dm-atari']!;
+}
+
 function sameIds(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && [...a].sort().join() === [...b].sort().join();
 }
 
-function main(): void {
+async function main(): Promise<void> {
   const common = commonFile();
   const values = 'speedRunnerMinutes = 180, blitzMinutes = 60, objectorKills = 40';
   const dm = setFile(common, 'dm-atari', STOCK_DIR, ['let-sleeping-dragons-lie', 'brute-force'], values);
@@ -383,9 +453,10 @@ function main(): void {
   }
   errors();
   wholeGame();
-  evaluator(common, dm);
-  merging(common);
+  const counts = await counted(common);
+  evaluator(common, dm, counts);
+  merging(common, counts);
   finish();
 }
 
-main();
+await main();

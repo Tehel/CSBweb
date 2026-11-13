@@ -9,6 +9,8 @@
  * whole, each error naming its line. `mergeAchievements` lays a set's file over the common
  * one and puts the set's values in the places that name them, `unknownItems` lists the
  * names a set's objects do not have, and `unusedValues` the values no achievement names.
+ * `withCounts` puts the counts a set's files give (`DataCounts`) in the places that read
+ * them, which the tracker does, since only it has the files.
  */
 
 /** The first line of every file: the format and its version. */
@@ -63,6 +65,14 @@ export type EventKind = keyof typeof EVENTS;
 export const SAMPLES = ['party', 'alive', 'coins'] as const;
 export type SampleName = (typeof SAMPLES)[number];
 
+/**
+ * The counts of the set's own files (`DataCounts`, `dataCounts`), which a condition reads by
+ * name, as it reads a fact.
+ */
+export const DATA_COUNTS = ['spells', 'foods', 'monsterTypes'] as const;
+export type DataCountName = (typeof DATA_COUNTS)[number];
+export type DataCounts = Readonly<Record<DataCountName, number>>;
+
 /** The facts about the game, and what each is. */
 const FACTS = {
   won: 'bool',
@@ -113,6 +123,11 @@ export type Expr =
    */
   | { k: 'value'; name: string; type: 'num' | 'seconds'; scale: number }
   | { k: 'fact'; name: FactName }
+  /**
+   * A count of the set's own files (`DataCounts`), the same in every game of the set:
+   * `withCounts` puts the number in its place, so the evaluator never meets one.
+   */
+  | { k: 'data'; name: DataCountName }
   | { k: 'sample'; name: SampleName }
   | { k: 'agg'; agg: Aggregate }
   /** `ever` and `never`: the count compared with 0, kept apart for the bounds. */
@@ -311,6 +326,20 @@ function withValues(def: AchievementDef, values: ReadonlyMap<string, number>): A
   return { ...def, text: def.text.replace(NAMED_IN_TEXT, (_, v: string) => String(values.get(v))), when: put(def.when) };
 }
 
+/** `def` with the counts `counts` in the places that read them. */
+export function withCounts(def: AchievementDef, counts: DataCounts): AchievementDef {
+  const put = (e: Expr): Expr => {
+    switch (e.k) {
+      case 'data': return { k: 'num', value: counts[e.name], type: 'num' };
+      case 'cmp': return { ...e, a: put(e.a), b: put(e.b) };
+      case 'and': case 'or': return { ...e, a: put(e.a), b: put(e.b) };
+      case 'not': return { ...e, a: put(e.a) };
+      default: return e;
+    }
+  };
+  return { ...def, when: put(def.when) };
+}
+
 /**
  * The values `own`, a set's file, defines that none of `merged`, the set's achievements
  * (`mergeAchievements`), names: a misspelt name, or one an achievement no longer uses.
@@ -460,6 +489,7 @@ export function parseCondition(text: string): Expr {
     if (t.t === 'op' && t.v === '(') { const e = orExpr(); expectOp(')'); return e; }
     if (t.t !== 'word') { pos--; throw new ConditionError(`expected a value ${where()}`); }
     if (t.v in FACTS) return { k: 'fact', name: t.v as FactName };
+    if ((DATA_COUNTS as readonly string[]).includes(t.v)) return { k: 'data', name: t.v as DataCountName };
     if ((SAMPLES as readonly string[]).includes(t.v) && !isOp('(')) return { k: 'sample', name: t.v as SampleName };
     switch (t.v) {
       case 'count': case 'ever': case 'never': {
@@ -489,7 +519,7 @@ export function parseCondition(text: string): Expr {
         return { k: 'agg', agg: { k: t.v, sample: s.v as SampleName, key: `${t.v}(${s.v})` } };
       }
     }
-    throw new ConditionError(`"${t.v}" is no fact, sample or count`);
+    throw new ConditionError(`"${t.v}" is no fact, sample, count or count of the data`);
   };
   const eventName = (): EventKind => {
     const t = next();
@@ -564,7 +594,7 @@ function typeOf(e: Expr): ValueType {
   switch (e.k) {
     case 'num': case 'value': return e.type;
     case 'fact': return FACTS[e.name];
-    case 'sample': case 'agg': return 'num';
+    case 'data': case 'sample': case 'agg': return 'num';
     case 'ever': case 'never': return 'bool';
     case 'cmp': {
       const a = typeOf(e.a);
@@ -600,7 +630,7 @@ function filterText(f: Filter): string {
 /** How far a numeric part read over a history that starts at a save can be trusted. */
 function boundOf(e: Expr): Bound | null {
   switch (e.k) {
-    case 'num': case 'value': case 'sample': return 'exact';
+    case 'num': case 'value': case 'data': case 'sample': return 'exact';
     case 'fact': return e.name === 'playTime' ? 'low' : e.name === 'gameTime' ? 'exact' : null;
     case 'agg': return e.agg.k === 'min' ? 'high' : 'low';
     default: return null;

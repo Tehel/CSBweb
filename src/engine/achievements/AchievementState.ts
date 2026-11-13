@@ -200,6 +200,8 @@ export class AchievementState {
       case 'num': return e.value;
       // `mergeAchievements` puts every named value in its place.
       case 'value': throw new Error(`the value {${e.name}} was never given`);
+      // `withCounts` puts every count of the data in its place.
+      case 'data': throw new Error(`the count ${e.name} was never given`);
       case 'fact': return this.fact(e.name);
       case 'sample': return this.samples[e.name] ?? 0;
       case 'agg': return this.aggregate(e.agg);

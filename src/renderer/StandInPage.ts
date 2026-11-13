@@ -152,7 +152,8 @@ export async function standInPage(set: DataSet, files: DataSetFiles, store: Save
 
   const track = (defs: readonly AchievementDef[], achievementStore = memoryAchievementStore(), touched: TouchedPlaythroughs = { has: () => false },
     miniDat: Uint8Array | null = null) =>
-    (tracked = new PageAchievements(game, set.id, defs, screen!.ui.objectTables.objectNames, achievementStore, saves, touched, miniDat));
+    (tracked = new PageAchievements(game, set.id, defs, screen!.ui.objectTables.objectNames, achievementStore, saves, touched,
+      { dungeonDat, miniDat }));
   return { game, screen, messages, clock, dungeonDat, saves, track };
 }
 

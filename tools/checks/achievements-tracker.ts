@@ -19,12 +19,15 @@
  *    (starvation, a wall, a monster), what was eaten, drunk and worn, and the unlocks
  *    (First Blood, Forgot to Pack Lunch, Roll the Credits, the play time counted);
  *    the lost game's four deaths to monsters and its end; and the whole CSB game, where
- *    the party hurts itself (Own Goal) and carries more than ten coins, though Scrooge is
- *    Dungeon Master's alone. Each game is tracked with its set's achievements as the page
+ *    the party hurts itself (Own Goal), carries more than ten coins, though Scrooge is
+ *    Dungeon Master's alone, and eats every kind of food the set holds (Gourmet). Each game is tracked with its set's achievements as the page
  *    merges them (`achievementFileOf`): DMMovie2615 kills with a Ful bomb (Grenadier),
  *    loses Gothmog to a wall (Stubbed Toe) and wins with one of four alive (Sole Survivor).
  * 4. The worn places (`WORN_SLOTS`) are the slots whose `CarryLocation` in `graphics.dat`
  *    is the head's, neck's, torso's, legs' or feet's mask (`doc/CSBwin-src/CSB.h:1682-1687`).
+ * 5. The tracker reads its set's counts of the data (`dataCounts`), and Rune Scholar,
+ *    Gourmet and Bestiary unlock exactly where the game's distinct spells cast, foods eaten
+ *    and types killed reach them.
  *
  * Usage: npm test -- --only=achievements-tracker.ts [<package name>…] [--not=<name>] [--events]
  */
@@ -33,7 +36,7 @@ import { resolve } from 'node:path';
 
 import { fileDigest } from '../../src/data/DataSetFiles';
 import { findRecordingSet } from '../../src/data/RecordingSet';
-import { mergeAchievements, readAchievementFile, type AchievementDef, type AchievementFile } from '../../src/engine/achievements/AchievementFile';
+import { mergeAchievements, readAchievementFile, type AchievementDef, type AchievementFile, type DataCounts } from '../../src/engine/achievements/AchievementFile';
 import type { AchievementEvent } from '../../src/engine/achievements/AchievementState';
 import { AchievementTracker, WORN_SLOTS } from '../../src/engine/achievements/AchievementTracker';
 import { isNewAdventure } from '../../src/engine/Chaos';
@@ -81,6 +84,12 @@ function defsOf(setId: string): AchievementDef[] {
   return [...mergeAchievements(commonFile, file), ...ownFile.defs];
 }
 
+/** The counts of the data (`dataCounts`) the FTL sets' games read, as `achievements-format.ts` proves them. */
+const COUNTS: Readonly<Record<string, DataCounts>> = {
+  'dm-atari': { spells: 25, foods: 8, monsterTypes: 24 },
+  csb: { spells: 25, foods: 8, monsterTypes: 23 },
+};
+
 const args = process.argv.slice(2);
 const showEvents = args.includes('--events');
 const only = args.filter((arg) => !arg.startsWith('--'));
@@ -113,7 +122,7 @@ for (const file of corpusFiles()) {
   const fromAdventure = start.kind === 'save' && miniDat !== null && isNewAdventure(start.bytes, miniDat);
   const startedAt = Date.now();
   const played = await playPath(set, diskFiles(set), pkg.path, pkg.shared.kind === 'save' ? pkg.shared : null, null, null, (page) => {
-    tracker = new AchievementTracker(page.game, defsOf(set.id), page.screen.ui.objectTables.objectNames, miniDat);
+    tracker = new AchievementTracker(page.game, defsOf(set.id), page.screen.ui.objectTables.objectNames, { dungeonDat: page.dungeonDat, miniDat });
     tracker.onEvent((event) => events.push(event));
     tracker.attach();
     carryLocation = Array.from(page.game.ctx.tables.carryLocation);
@@ -140,6 +149,23 @@ for (const file of corpusFiles()) {
   const fromStart = start.kind === 'new' || fromAdventure;
   check(tracker.whole === fromStart,
     `${file}: its history goes back to the game's start exactly where its path begins with a new game or a CSB adventure's start (${start.kind}${fromAdventure ? ', an adventure' : ''})`);
+
+  // 5. The counts of the data: the set's, and the three achievements that read them unlocked
+  // exactly where the game's distinct spells, foods and types reach them.
+  const distinct = (kind: string, attr: string, keep: (e: AchievementEvent) => boolean = () => true): number =>
+    new Set(events.filter((e) => e.kind === kind && keep(e)).map((e) => e.attrs[attr])).size;
+  const reached = {
+    spells: distinct('cast', 'spell', (e) => e.attrs.ok === 'yes'),
+    foods: distinct('eat', 'item'),
+    monsterTypes: distinct('kill', 'monster', (e) => e.attrs.party === 'yes' && e.attrs.by !== 'fusion'),
+  };
+  const { counts } = tracker;
+  console.log(`  of the data: spells ${reached.spells}/${counts.spells}, foods ${reached.foods}/${counts.foods}, monsterTypes ${reached.monsterTypes}/${counts.monsterTypes}`);
+  const want = COUNTS[found.id];
+  if (want) check(JSON.stringify(counts) === JSON.stringify(want), `${file}: the tracker counts ${found.id}'s ${JSON.stringify(want)}`);
+  for (const [id, name] of [['rune-scholar', 'spells'], ['gourmet', 'foods'], ['bestiary', 'monsterTypes']] as const) {
+    check(unlocked.has(id) === (reached[name] >= counts[name]), `${file}: ${id} ${unlocked.has(id) ? 'unlocks' : 'stays locked'}, ${reached[name]} of ${counts[name]}`);
+  }
 
   // 4. The worn places, once.
   if (!wornChecked) {
@@ -194,6 +220,7 @@ for (const file of corpusFiles()) {
     check(unlocked.has('speed-runner') && !unlocked.has('blitz'),
       `CSBFullRecordingV4: Speed Runner, which needs the whole game, unlocks in a game from the adventure's start, and Blitz does not (${Math.round(tracker.playedVbls / 3600)} minutes)`);
     check(count(events, 'hurt', { party: 'yes' }) > 0, 'CSBFullRecordingV4: the party hurts itself');
+    check(unlocked.has('gourmet') && !unlocked.has('bestiary'), 'CSBFullRecordingV4: the party eats all eight kinds of food (Gourmet), and kills 22 of the 23 types');
   }
 }
 if (!wornChecked) check(false, 'a package was played');

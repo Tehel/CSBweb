@@ -13,6 +13,7 @@ import type { Game } from '../Game';
 import type { GameSaves } from '../GameSaves';
 import { mergeAchievements, readAchievementFile, type AchievementDef } from './AchievementFile';
 import { AchievementTracker, type Unlock } from './AchievementTracker';
+import type { AchievementSetFiles } from './DataCounts';
 
 /** The VBLs a second, which the tracker counts the player's time in. */
 const VBLS_PER_SECOND = 60;
@@ -77,13 +78,13 @@ export class PageAchievements {
     private readonly store: AchievementStore,
     saves: GameSaves,
     private readonly touched: TouchedPlaythroughs,
-    /** The set's `mini.dat`, where it has one: a CSB adventure's start is the whole game's (`AchievementTracker`). */
-    miniDat: Uint8Array | null,
+    /** The set's dungeon files, which the counts are read from and a CSB adventure's start against (`AchievementTracker`). */
+    files: AchievementSetFiles,
     /** A line for the console, with the error, where a row could not be written. */
     private readonly log: (message: string, error?: unknown) => void = () => {},
   ) {
     this.byId = new Map(defs.map((def) => [def.id, def]));
-    this.tracker = new AchievementTracker(game, defs, objectNames, miniDat);
+    this.tracker = new AchievementTracker(game, defs, objectNames, files);
     this.tracker.onUnlock((unlocks) => this.unlocked(unlocks));
     this.tracker.attach();
     saves.trackAchievements(this.tracker);

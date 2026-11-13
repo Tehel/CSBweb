@@ -68,7 +68,7 @@ export async function replayProof(
     try {
         const page = await standInPage(over.set, over.files);
         const miniDat = over.set.miniDat ? await over.files.read('mini.dat') : null;
-        const tracker = new AchievementTracker(page.game, defs, page.screen.ui.objectTables.objectNames, miniDat);
+        const tracker = new AchievementTracker(page.game, defs, page.screen.ui.objectTables.objectNames, { dungeonDat: page.dungeonDat, miniDat });
         tracker.attach();
         const drift = await playCut(pkg.path, pkg.shared.kind === 'save' ? pkg.shared : null, async () => cutPageOf(page));
         if (drift) return drifted(cutDriftReason(drift));

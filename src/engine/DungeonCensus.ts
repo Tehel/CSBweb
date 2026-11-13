@@ -18,7 +18,7 @@
  * (`:4980-4982`): a program calling one, or a value `STKOP` lacks, calls an illegal
  * subcode.
  */
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';
+import { DBType, getRoomType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID, type RoomType } from '../core/types';
 import type { ContainerRecord, CreatureRecord, DungeonData } from '../data/dungeonTypes';
 import { StkOp } from './dsa/DsaTypes';
 import { DungeonState, NO_GAME } from './DungeonState';
@@ -61,36 +61,20 @@ export interface DungeonCensus {
 
 /** `data` counted; it is read and never changed. */
 export function dungeonCensus(data: DungeonData): DungeonCensus {
-  const dungeon = new DungeonState(data, NO_GAME);
   const items = Object.fromEntries(ITEM_KINDS.map((kind) => [kind, 0])) as Record<ItemKind, number>;
   const types = new Set<number>();
   let groups = 0;
   let monsters = 0;
-  /** Every object once, so a damaged file's loop ends. */
-  const seen = new Set<number>();
-  const walk = (first: ObjectID): void => {
-    for (let rn = first; rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL && !seen.has(rn); rn = dungeon.getDBRecordLink(rn)) {
-      seen.add(rn);
-      const category = data.rnMaps.decode(rn).category;
-      const kind = KIND_OF[category];
-      if (kind) items[kind]++;
-      if (category === DBType.CREATURE) {
-        const creature = dungeon.getRecord(rn) as CreatureRecord | null;
-        if (!creature) continue;
-        groups++;
-        monsters += creature.numMonM1 + 1;
-        types.add(creature.creatureType);
-        walk(creature.possession);
-      } else if (category === DBType.CHEST) {
-        const container = dungeon.getRecord(rn) as ContainerRecord | null;
-        if (container) walk(container.containedObject);
-      }
-    }
-  };
-  data.maps.forEach((map, z) => {
-    for (let x = 0; x < map.descriptor.width; x++) {
-      for (let y = 0; y < map.descriptor.height; y++) walk(dungeon.findFirstObject(new Position(x, y, z)));
-    }
+  forEachObject(data, (rn, dungeon) => {
+    const category = data.rnMaps.decode(rn).category;
+    const kind = KIND_OF[category];
+    if (kind) items[kind]++;
+    if (category !== DBType.CREATURE) return;
+    const creature = dungeon.getRecord(rn) as CreatureRecord | null;
+    if (!creature) return;
+    groups++;
+    monsters += creature.numMonM1 + 1;
+    types.add(creature.creatureType);
   });
   return {
     maps: data.maps.length,
@@ -101,6 +85,39 @@ export function dungeonCensus(data: DungeonData): DungeonCensus {
     monsterTypes: types.size,
     dsa: dsaCensus(data),
   };
+}
+
+/**
+ * Each object of `data` once, as the census counts them: those a square's chain reaches,
+ * with what a monster carries and what a container holds, each with `room`, the type of
+ * the square it lies on. `dungeon` is a world over `data`, which `visit` reads and never
+ * changes.
+ */
+export function forEachObject(data: DungeonData, visit: (rn: ObjectID, dungeon: DungeonState, room: RoomType) => void): void {
+  const dungeon = new DungeonState(data, NO_GAME);
+  /** Every object once, so a damaged file's loop ends. */
+  const seen = new Set<number>();
+  const walk = (first: ObjectID, room: RoomType): void => {
+    for (let rn = first; rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL && !seen.has(rn); rn = dungeon.getDBRecordLink(rn)) {
+      seen.add(rn);
+      visit(rn, dungeon, room);
+      const category = data.rnMaps.decode(rn).category;
+      if (category === DBType.CREATURE) {
+        const creature = dungeon.getRecord(rn) as CreatureRecord | null;
+        if (creature) walk(creature.possession, room);
+      } else if (category === DBType.CHEST) {
+        const container = dungeon.getRecord(rn) as ContainerRecord | null;
+        if (container) walk(container.containedObject, room);
+      }
+    }
+  };
+  data.maps.forEach((map, z) => {
+    for (let x = 0; x < map.descriptor.width; x++) {
+      for (let y = 0; y < map.descriptor.height; y++) {
+        walk(dungeon.findFirstObject(new Position(x, y, z)), getRoomType(map.cellFlags[x]?.[y] ?? 0));
+      }
+    }
+  });
 }
 
 /** `data`'s DSAs, each program decoded. */
