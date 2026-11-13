@@ -77,6 +77,7 @@ export const EVENTS = {
   trigger: { level: NUMBER, x: NUMBER, y: NUMBER, item: NAME },
   sleep: {},
   oracle: {},
+  load: {},
 } as const satisfies Record<string, Record<string, AttributeKind>>;
 export type EventKind = keyof typeof EVENTS;
 

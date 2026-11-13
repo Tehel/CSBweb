@@ -58,7 +58,7 @@ function commonFile(): AchievementFile {
   }
   const whole = new Set([
     'five-a-day', 'leather-is-enough', 'minimalist-mage', 'lone-wolf', 'buddy-cop', 'speed-runner', 'blitz', 'teetotaller',
-    'vegetarian', 'carnivore', 'untouchable', 'ace-driver', 'emperors-new-clothes', 'conscientious-objector',
+    'vegetarian', 'carnivore', 'untouchable', 'ironman', 'hardcore', 'ace-driver', 'emperors-new-clothes', 'conscientious-objector',
     'low-profile', 'featherweight', 'insomniac', 'girl-power', 'i-know-what-im-doing', 'dark-ages',
   ]);
   for (const d of r.file.defs) {
@@ -296,8 +296,8 @@ function evaluator(common: AchievementFile, dm: AchievementFile, counts: DataCou
   const won = state.evaluate();
   console.log(`  won, all apples and corn, two hours, one champion: ${won.join(', ')}`);
   // The made-up games tell no champion: no rank, sex, load or hand ever counted, no sleep, no
-  // meaningless cast nor light spell.
-  const clean = ['teetotaller', 'vegetarian', 'untouchable', 'ace-driver', 'emperors-new-clothes', 'let-sleeping-dragons-lie', 'brute-force',
+  // meaningless cast nor light spell, and load no save.
+  const clean = ['teetotaller', 'vegetarian', 'untouchable', 'ironman', 'hardcore', 'ace-driver', 'emperors-new-clothes', 'let-sleeping-dragons-lie', 'brute-force',
     'low-profile', 'featherweight', 'insomniac', 'girl-power', 'i-know-what-im-doing', 'dark-ages'];
   check(sameIds(won, ['five-a-day', 'leather-is-enough', 'minimalist-mage', 'roll-the-credits', 'lone-wolf', 'speed-runner', 'conscientious-objector', ...clean]),
     'the win unlocks the diet, the leather, the spells, the credits, the lone wolf, the speed in two hours of 180 minutes but not the blitz of 60, eleven kills of 40, and every win without something');
@@ -334,8 +334,8 @@ function evaluator(common: AchievementFile, dm: AchievementFile, counts: DataCou
   const fourWon = four.evaluate();
   console.log(`  …won: ${fourWon.join(', ')}`);
   check(sameIds(fourWon, ['roll-the-credits', 'full-house', 'new-souls', 'carnivore', 'teetotaller', 'ace-driver', 'emperors-new-clothes', 'speed-runner', 'blitz', 'conscientious-objector', 'minimalist-mage', 'leather-is-enough', 'brute-force',
-    'low-profile', 'featherweight', 'insomniac', 'girl-power', 'i-know-what-im-doing', 'dark-ages']),
-    'won with four alive, reincarnated, eating only meat, every cast failed, at once and with 18 kills: Full House, New Souls, Carnivore, Brute Force, Blitz, Conscientious Objector, not Untouchable, Vegetarian nor To Serve Man');
+    'low-profile', 'featherweight', 'insomniac', 'girl-power', 'i-know-what-im-doing', 'dark-ages', 'ironman']),
+    'won with four alive, reincarnated, eating only meat, every cast failed, at once and with 18 kills: Full House, New Souls, Carnivore, Brute Force, Blitz, Conscientious Objector, Ironman, not Untouchable, Hardcore, Vegetarian nor To Serve Man');
   const butcher = new AchievementState(defs, true);
   for (let i = 0; i < 41; i++) butcher.record(kill());
   butcher.ended(true);
@@ -443,6 +443,17 @@ function endings(common: AchievementFile, dm: AchievementFile, csb: AchievementF
   const partial = new AchievementState(csbDefs, false);
   partial.ended(true);
   check(!partial.evaluate().includes('self-reliant'), 'nor is a win whose history starts at a save');
+  // Ironman: won without a load; Hardcore: without a load nor a death.
+  const ruled = (load: boolean, death: boolean): string[] => {
+    const game = new AchievementState(dmDefs, true);
+    if (death) game.record({ kind: 'death', attrs: { champion: 'HALK', cause: 'monster', party: 'no' } });
+    if (load) game.record({ kind: 'load', attrs: {} });
+    game.ended(true);
+    return game.evaluate().filter((id) => id === 'ironman' || id === 'hardcore');
+  };
+  check(sameIds(ruled(false, false), ['ironman', 'hardcore']) && sameIds(ruled(false, true), ['ironman'])
+    && ruled(true, false).length === 0 && ruled(true, true).length === 0,
+    'a win with no load is Ironman, and Hardcore with no death too; a win with a load is neither');
   // Lazarus: the same champion revived a third time, in any history; Fresh Faces: a CSB
   // adventure won with a party raised from the prison alone; Veterans: from DM alone.
   const revived = new AchievementState(dmDefs, false);

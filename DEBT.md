@@ -1214,7 +1214,7 @@ drawing a map from them is a separate item, entered when the author names it.
 
 ### X20 ⏸️ More achievements: the author's list
 
-The achievements are `src/engine/achievements/defs/common.txt`'s 62, four of them valued
+The achievements are `src/engine/achievements/defs/common.txt`'s 64, four of them valued
 and four counted from the data,
 `dm-atari.txt`'s 17, which every Dungeon Master set reads, and `csb.txt`'s 6, which
 disables Girl Power (`doc/ACHIEVEMENTS.md`). The author
@@ -1288,18 +1288,11 @@ Vi altar, its `times` that champion's count, and the `raise` event at a CSB adve
 start, `from: prison` where a champion's portrait is a cell of the set's graphic 26 and
 `dm` where it is a cell of `utility-portraits.dat`, with Lazarus and CSB's Fresh Faces and
 Veterans, won with DM's champions alone, which no game can tell came from a won DM game,
-at the author's choice (`doc/ACHIEVEMENTS.md` → "Where the party came from"). What is left:
+at the author's choice (`doc/ACHIEVEMENTS.md` → "Where the party came from"). Step 8e is
+done: the `load` event at every save read, the page's CONTINUE among them, but a CSB
+adventure's start, with Ironman and Hardcore (`doc/ACHIEVEMENTS.md` → "Saves loaded").
+What is left:
 
-8. **The rest of a game's own triggers**, one part left:
-   - **8e. Save loads** (S): Ironman, Hardcore. A load is a `read` the tracker sees,
-     and the boot's CONTINUE after the page was closed is one too: the recording's path
-     prunes what was played past a save before its read (`doc/RECORDING.md` → "Pruning"),
-     so neither the history nor the verifier's replay can tell a game resumed from a save
-     reloaded after a death. At the author's choice, every read counts, CONTINUE's
-     included, a CSB adventure's start aside: Ironman is won in one sitting from a new
-     game, a path with no join, and the verifier checks it exactly. A save menu's SAVE
-     AND QUIT, whose read alone would not count, is not made (`doc/SAVES.md` → "What the
-     dialog leaves out").
 9. **Across games.** The totals' rows in the saves' database, and how the Hall verifies
    them: Hall of Fame Tour, Every Ending, Grand Slam, Encore, and Dungeon Janitor and Lord
    Chaos's HR Problem moved. Size M.
@@ -1309,12 +1302,6 @@ totals across games: DM holds 303 monsters and CSB 266, generators aside, and a 
 games spares the player a First Blood in every run. The lower rungs of the kill ladder
 stay common.
 
-**Common, fixed.**
-
-- Runs with a rule:
-  - **Ironman** (hard): win without ever loading a save. [save loads]
-  - **Hardcore** (hard): win without loading a save and without a champion ever dying.
-    [save loads]
 **Across games.**
 
 - **Hall of Fame Tour** (hard): win with each of the 24 champions, over any number of
@@ -1331,7 +1318,6 @@ stay common.
 | Trigger or sample | Achievements |
 | --- | --- |
 | Progress across games | Hall of Fame Tour, Every Ending, Grand Slam, Encore, Dungeon Janitor, HR Problem |
-| Save loads | Ironman, Hardcore |
 | Which ending, across games (Gullible's unlock for DM's bad one) | Every Ending |
 
 ## H — Deliberate divergences (not debt)

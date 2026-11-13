@@ -192,6 +192,7 @@ number for a `level`. Names compare without regard to case.
 | `trigger` | an actuator fires: a switch or a lock touched, a pad or an alcove pressed or released, a counter or a combination reaching what it waits for | `level`, `x` and `y`, its square, as the samples count them; `item`, the object that fired it: at a wall the object in hand, `HAND` for none, on a pad or in an alcove the object put or taken, and none for the party, a counter or a combination |
 | `sleep` | the party lies down to sleep | none |
 | `oracle` | the player asks the Hint Oracle, by its button | none |
+| `load` | a save is read, but a CSB adventure's start ("Saves loaded") | none |
 
 An `item` is the object's name as the game shows it (`RN::NameIndex`), from the set's own
 `graphics.dat`, or one of the two words no object is, `HAND` and `FOUNTAIN`.
@@ -261,6 +262,21 @@ adventure keeps only the party of its source (`TAG002724`, `src/engine/Chaos.ts`
   can earn it.
 - **Veterans**, Chaos Strikes Back's: `won and ever(raise) and never(raise where from !=
   dm)`, a party of Dungeon Master's champions, however many, and only theirs.
+
+### Saves loaded
+
+Every save read is a `load`, in the history the read takes up: the save menu's and the
+entrance's, F9's, the save chooser after the party died, and the page's CONTINUE after it
+was closed. CONTINUE is no different: the recording's path prunes what was played past a
+save before its read (`doc/RECORDING.md` → "Pruning"), so neither the history nor the
+verifier's replay can tell a game resumed from a save reloaded after a death. A CSB
+adventure's start is no load: it raises the party and begins the game ("A CSB
+adventure"). So a game won with no `load` was played in one sitting from its start, a path
+with no join, which the verifier replays exactly. There is no SAVE AND QUIT to leave a
+game and come back without one (`doc/SAVES.md` → "What the dialog leaves out").
+
+- **Ironman**: `won and never(load)`.
+- **Hardcore**: `won and never(load) and never(death)`.
 
 ### The champions
 
@@ -545,7 +561,8 @@ the `mini.dat`, its party against the set's graphic 26 and its `utility-portrait
   goes on with its parent's history. A file read with no state kept starts a
   history of its own ("Some conditions need the whole game"), unless it is a CSB
   adventure's start, read against the set's `mini.dat` ("A CSB adventure"), which starts
-  one from its start, as a new game does.
+  one from its start, as a new game does. Every read but that start records a `load`
+  ("Saves loaded").
 - `snapshot` and `keep` give the page the state to store beside a save and to give back
   at a read ("The page").
 
@@ -597,7 +614,9 @@ two champions die and their bones are given to the altar's timer, the first's th
 times, Lazarus unlocking at the third, after a save kept and read back; and the whole CSB
 game's four prisoners raised from the prison (Fresh Faces), where `csbgame7.dat`'s four DM
 champions, raised by RISE with their own faces or the utility disk's, are from DM, and
-imported where the set has no utility portraits.
+imported where the set has no utility portraits. And the saves loaded: a load for each
+read but a CSB adventure's start, each join's among them, DMMovie2615 Ironman with a
+champion lost, and the whole CSB game Ironman and Hardcore.
 `tools/checks/achievements-format.ts` reads each file, checks its names against its set's
 `graphics.dat` and its values against its achievements, counts the FTL sets' data, and
 plays the conditions out of made-up events and champions, the named values, the lists and

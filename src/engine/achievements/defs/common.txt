@@ -226,6 +226,20 @@ text: Win without a champion ever dying.
 tier: hard
 when: won and never(death)
 
+# A load is every save read, the page's CONTINUE among them, but a CSB adventure's start.
+
+[ironman]
+name: Ironman
+text: Win without ever loading a save.
+tier: hard
+when: won and never(load)
+
+[hardcore]
+name: Hardcore
+text: Win without loading a save and without a champion ever dying.
+tier: hard
+when: won and never(load) and never(death)
+
 [full-house]
 name: Full House
 text: Win with all four champions alive.

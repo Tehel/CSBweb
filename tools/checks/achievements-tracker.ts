@@ -80,6 +80,9 @@
  *    champions raised from the prison (Fresh Faces), and `csbgame7.dat`'s four DM champions
  *    raised by RISE, with their own faces or the utility disk's, from DM (Veterans'), and
  *    imported where the set has no utility portraits.
+ * 14. The saves loaded: a load for each read but a CSB adventure's start, each join's
+ *    among them, so a game won with no read is Ironman, and Hardcore with no champion dead:
+ *    DMMovie2615 is Ironman, a champion lost, and the whole CSB game both.
  *
  * Usage: npm test -- --only=achievements-tracker.ts [<package name>…] [--not=<name>] [--events]
  */
@@ -250,6 +253,7 @@ for (const file of corpusFiles()) {
   const joinsExplored: [number, number][] = [];
   let tracker!: AchievementTracker;
   let restored = 0;
+  let reads = 0;
   let carryLocation: readonly number[] = [];
   /** What the tool reads itself at each tick's end: the first Master's and the first load over half's `d.Time`, the ranks, the sleeps begun. */
   let firstMaster = -1;
@@ -382,6 +386,7 @@ for (const file of corpusFiles()) {
         wasAsleep = party.sleeping;
       }
       const before = tracker.explored;
+      if (h.k === 'read') reads++;
       if (h.k === 'read' && tracker.snapshotOf(fileDigest(h.file))) restored++;
       observe(h);
       if (h.k === 'read' && tracker.snapshotOf(fileDigest(h.file))) joinsExplored.push([before, tracker.explored]);
@@ -559,6 +564,16 @@ for (const file of corpusFiles()) {
     check(unlocked.has('fresh-faces') === fresh, `${file}: Fresh Faces ${fresh ? 'unlocks' : 'stays locked'}, as its party raised says`);
   }
 
+  // 14. The saves loaded: every read but a CSB adventure's start.
+  const loads = count(events, 'load');
+  const ironman = won && tracker.whole && loads === 0;
+  const hardcore = ironman && deaths.length === 0;
+  console.log(`  reads ${reads}, loads ${loads}; Ironman ${unlocked.has('ironman') ? 'unlocked' : 'locked'}, Hardcore ${unlocked.has('hardcore') ? 'unlocked' : 'locked'}`);
+  check(loads === reads - (fromAdventure ? 1 : 0) && loads >= played.joins,
+    `${file}: a load for each read, its ${played.joins} join(s) among them, but a CSB adventure's start (${reads} read(s))`);
+  check(unlocked.has('ironman') === ironman && unlocked.has('hardcore') === hardcore,
+    `${file}: Ironman ${ironman ? 'unlocks' : 'stays locked'} and Hardcore ${hardcore ? 'unlocks' : 'stays locked'}, as its loads, its history and its deaths say`);
+
   // 3. What the games hold.
   if (name === 'DMMovie2615') {
     check(riddleSolved >= 0, 'DMMovie2615 answers the riddle room\'s four riddles at once');
@@ -588,11 +603,11 @@ for (const file of corpusFiles()) {
     check(count(events, 'kill', { party: 'yes', by: 'explosion', champion: 'STAMM', item: 'FUL BOMB' }) > 0, 'DMMovie2615: Stamm\'s thrown Ful bombs kill, the bomb named on the explosion\'s kill');
     for (const id of [
       'first-blood', 'pest-control', 'forgot-lunch', 'roll-the-credits', 't-fused', 'stubbed-toe', 'grenadier', 'sole-survivor',
-      'true-to-themselves', 'let-sleeping-dragons-lie',
+      'true-to-themselves', 'let-sleeping-dragons-lie', 'ironman',
     ]) {
       check(unlocked.has(id), `DMMovie2615 unlocks ${id}`);
     }
-    for (const id of ['lone-wolf', 'buddy-cop', 'exterminator', 't-lost', 'untouchable', 'full-house', 'new-souls', 'dragonslayer', 'brute-force']) {
+    for (const id of ['lone-wolf', 'buddy-cop', 'exterminator', 't-lost', 'untouchable', 'hardcore', 'full-house', 'new-souls', 'dragonslayer', 'brute-force']) {
       check(!unlocked.has(id), `DMMovie2615 does not unlock ${id}`);
     }
     check(entered.size === 14, 'DMMovie2615 enters every level, 0 to 13');
@@ -609,8 +624,8 @@ for (const file of corpusFiles()) {
     tracker.keep(fileDigest(file), JSON.parse(JSON.stringify(tracker.snapshot())) as ReturnType<AchievementTracker['snapshot']>);
     tracker.observe({ k: 'read', file });
     tracker.observe({ k: 'tick' });
-    check(explored > 0 && tracker.explored === explored && events.length === before,
-      `DMMovie2615: a state kept and read back keeps the ${explored}% of the floor walked on, and the level, entered again by nothing`);
+    check(explored > 0 && tracker.explored === explored && events.length === before + 1 && events[before]?.kind === 'load',
+      `DMMovie2615: a state kept and read back keeps the ${explored}% of the floor walked on, and the level, entered again by nothing; the read is a load`);
     // Runes that make no spell, a power and an element (`0x60 + 6 * row + n`), cast by a
     // living champion after the end: no recording mumbles one.
     const { ctx } = played.game;
@@ -647,6 +662,8 @@ for (const file of corpusFiles()) {
     check(!defs.some((d) => d.id === 'girl-power') && !unlocked.has('girl-power'),
       'CSBFullRecordingV4: Girl Power, which its party of no man would earn, is disabled in csb.txt');
     check(unlocked.has('self-reliant'), 'CSBFullRecordingV4, won without the Oracle asked, is Self-Reliant');
+    check(unlocked.has('ironman') && unlocked.has('hardcore'),
+      'CSBFullRecordingV4, won in one sitting from the adventure\'s start, which is no load, with no champion dead, is Ironman and Hardcore');
     check(raises.length === 4 && raises.every((e) => e.attrs.from === 'prison') && raises.some((e) => e.attrs.champion === 'BUZZZZZ') && unlocked.has('fresh-faces'),
       'CSBFullRecordingV4: its four champions, Buzzzzz among them, are raised from the prison, their portraits the set\'s: Fresh Faces');
     check(unlocked.has('gourmet') && !unlocked.has('bestiary'), 'CSBFullRecordingV4: the party eats all eight kinds of food (Gourmet), and kills 22 of the 23 types');

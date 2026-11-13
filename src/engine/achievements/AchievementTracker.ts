@@ -12,7 +12,8 @@
  * made, so takes up the history its parent had at each save. A file read with no state
  * kept for it starts a history of its own, which needs-the-whole-game conditions never
  * read (`AchievementState`), unless it is a CSB adventure's start (`isNewAdventure`): the
- * adventure is a game of its own from there, and its history is the whole game's.
+ * adventure is a game of its own from there, and its history is the whole game's. Every
+ * other read is a `load`, in the history it takes up.
  *
  * A CSB adventure's start raises its party, each champion `prison` where their portrait is
  * a cell of the set's own champions' sheet, graphic 26, the portraits its mirrors give:
@@ -348,6 +349,7 @@ export class AchievementTracker {
         const adventure = kept === null && this.miniDat !== null && isNewAdventure(h.file, this.miniDat);
         this.begin(kept, adventure);
         if (adventure) this.raised();
+        else this.record('load', {});
         return;
       }
     }
