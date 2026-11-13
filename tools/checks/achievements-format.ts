@@ -59,6 +59,7 @@ function commonFile(): AchievementFile {
   const whole = new Set([
     'five-a-day', 'leather-is-enough', 'minimalist-mage', 'lone-wolf', 'buddy-cop', 'speed-runner', 'blitz', 'teetotaller',
     'vegetarian', 'carnivore', 'untouchable', 'ace-driver', 'emperors-new-clothes', 'conscientious-objector',
+    'low-profile', 'featherweight', 'insomniac',
   ]);
   for (const d of r.file.defs) {
     check(d.whole === whole.has(d.id), `${d.id} ${whole.has(d.id) ? 'needs' : 'does not need'} the whole game`);
@@ -79,6 +80,9 @@ function commonFile(): AchievementFile {
   const leather = r.file.defs.find(d => d.id === 'leather-is-enough');
   check(leather !== undefined && unknownItems(leather, new Set(['HELMET'])).includes('PLATE OF DARC'),
     'unknownItems lists a name the set lacks');
+  const speedy = r.file.defs.find(d => d.id === 'speedy-gonzales');
+  check(speedy !== undefined && unknownItems(speedy, new Set(['HELMET'])).join() === 'BOOTS OF SPEED',
+    'unknownItems lists a name a champion\'s place is compared with, in a party(where …)');
   return r.file;
 }
 
@@ -168,6 +172,15 @@ function errors(): void {
     ['a list of names', block('ever(eat where item in {n})'), 5, /list of numbers/],
     ['a list in minutes', block('ever(enter where level in {n}m)'), 5, /list of numbers/],
     ['a brace not a value\'s', `${H}[a]\nname: A\ntext: Kill {n monsters.\nwhen: won\n`, 4, /braces/],
+    ['a champion\'s unknown attribute', block('party(where colour = red) > 1'), 5, /party has no attribute "colour"/],
+    ['a filter on another sample', block('coins(where item = APPLE) > 1'), 5, /only party takes a filter/],
+    ['a party filter without where', block('party(sex = male) > 1'), 5, /expected "where"/],
+    ['a sex outside its list', block('party(where sex = boy) > 0'), 5, /party\.sex is one of male, female/],
+    ['a name ordered', block('party(where champion > HALK) > 0'), 5, /orders numbers; party\.champion/],
+    ['an item ordered', block('count(kill where item < SWORD) > 0'), 5, /orders numbers; kill\.item/],
+    ['a rank not a number', block('party(where wizard = high) > 0'), 5, /party\.wizard is a whole number/],
+    ['a party filtered alone', block('party(where wizard >= 15)'), 5, /yes or a no/],
+    ['an attribute of sleep', block('distinct(sleep.champion) > 0'), 5, /sleep has no attributes/],
     ['a value\'s braces not closed', block('count(kill) >= {n'), 5, /braces/],
     ['a value in minutes against a count', block('count(kill) >= {n}m'), 5, /duration/],
     ['play time against a bare value', block('playTime < {n}'), 5, /duration/],
@@ -222,6 +235,11 @@ function wholeGame(): void {
     ['levels > 0 and distinct(enter.level) >= levels', false],
     ['ever(leave where cleared = yes and level in {n})', false],
     ['ever(enter where level = 13) and playTime < {n}m', true],
+    ['party(where feet = "BOOTS OF SPEED") >= 4', false],
+    ['won and max(party(where sex = male)) = 0', true],
+    ['max(party(where wizard >= 15)) >= 1', false],
+    ['min(party(where alive = yes)) >= 1', true],
+    ['won and never(sleep)', true],
   ];
   for (const [text, expected] of cases) {
     const got = needsWholeGame(parseCondition(text));
@@ -271,7 +289,9 @@ function evaluator(common: AchievementFile, dm: AchievementFile, counts: DataCou
   state.ended(true);
   const won = state.evaluate();
   console.log(`  won, all apples and corn, two hours, one champion: ${won.join(', ')}`);
-  const clean = ['teetotaller', 'vegetarian', 'untouchable', 'ace-driver', 'emperors-new-clothes', 'let-sleeping-dragons-lie', 'brute-force'];
+  // The made-up games tell no champion: no rank, sex or load ever counted, no sleep.
+  const clean = ['teetotaller', 'vegetarian', 'untouchable', 'ace-driver', 'emperors-new-clothes', 'let-sleeping-dragons-lie', 'brute-force',
+    'low-profile', 'featherweight', 'insomniac'];
   check(sameIds(won, ['five-a-day', 'leather-is-enough', 'minimalist-mage', 'roll-the-credits', 'lone-wolf', 'speed-runner', 'conscientious-objector', ...clean]),
     'the win unlocks the diet, the leather, the spells, the credits, the lone wolf, the speed in two hours of 180 minutes but not the blitz of 60, eleven kills of 40, and every win without something');
 
@@ -306,7 +326,8 @@ function evaluator(common: AchievementFile, dm: AchievementFile, counts: DataCou
   four.ended(true);
   const fourWon = four.evaluate();
   console.log(`  …won: ${fourWon.join(', ')}`);
-  check(sameIds(fourWon, ['roll-the-credits', 'full-house', 'new-souls', 'carnivore', 'teetotaller', 'ace-driver', 'emperors-new-clothes', 'speed-runner', 'blitz', 'conscientious-objector', 'minimalist-mage', 'leather-is-enough', 'brute-force']),
+  check(sameIds(fourWon, ['roll-the-credits', 'full-house', 'new-souls', 'carnivore', 'teetotaller', 'ace-driver', 'emperors-new-clothes', 'speed-runner', 'blitz', 'conscientious-objector', 'minimalist-mage', 'leather-is-enough', 'brute-force',
+    'low-profile', 'featherweight', 'insomniac']),
     'won with four alive, reincarnated, eating only meat, every cast failed, at once and with 18 kills: Full House, New Souls, Carnivore, Brute Force, Blitz, Conscientious Objector, not Untouchable, Vegetarian nor To Serve Man');
   const butcher = new AchievementState(defs, true);
   for (let i = 0; i < 41; i++) butcher.record(kill());
@@ -374,6 +395,49 @@ function evaluator(common: AchievementFile, dm: AchievementFile, counts: DataCou
   check(worn.evaluate().length === 0, 'a pattern with another slot does not match');
   worn.record({ kind: 'wear', attrs: { champion: 'HALK', slot: 'torso', item: 'LEATHER JERKIN' } });
   check(sameIds(worn.evaluate(), ['l']), 'a pattern matches regardless of case');
+
+  champions(defs);
+}
+
+/** A champion's attributes as the tracker gives them (`CHAMPION_ATTRIBUTES`), a male Expert by default. */
+const champ = (attrs: Record<string, string> = {}): Record<string, string> =>
+  ({ champion: 'HALK', sex: 'male', alive: 'yes', fighter: '8', ninja: '3', priest: '2', wizard: '1', load: '20', ...attrs });
+
+/** The champions at each tick's end, `party(where …)`: what each wears and holds, their sex, ranks and load. */
+function champions(defs: readonly AchievementDef[]): void {
+  console.log('--- the champions');
+  const fast = (n: number): Record<string, string>[] => [0, 1, 2, 3].map((i) => champ(i < n ? { feet: 'BOOTS OF SPEED' } : {}));
+  const strong = new AchievementState(defs, true);
+  strong.champions(fast(3));
+  check(strong.evaluate().length === 0, 'three champions of four in boots of speed are no Speedy Gonzales; an Expert is no Master');
+  strong.champions(fast(4));
+  check(sameIds(strong.evaluate(), ['speedy-gonzales']), 'all four at once are');
+  const lyte = { head: 'HELM OF LYTE', torso: 'PLATE OF LYTE', legs: 'POLEYN OF LYTE', feet: 'GREAVE OF LYTE' };
+  strong.champions([champ(lyte), champ({ ready: 'SHIELD OF LYTE' })]);
+  check(strong.evaluate().length === 0, 'the armour of Lyte worn, its shield in another champion\'s hand, is no Shining Armour');
+  strong.champions([champ({ ...lyte, action: 'SHIELD OF LYTE' }), champ({ fighter: '9', ninja: '9', priest: '9', wizard: '8' })]);
+  check(sameIds(strong.evaluate(), ['shining-armour']), 'with the shield in its own action hand it is; a Master in three classes is no Jack of All Trades');
+  strong.champions([champ({ fighter: '9', ninja: '9', priest: '9', wizard: '9', load: '51' }), champ({ wizard: '15' })]);
+  check(sameIds(strong.evaluate(), ['jack-of-all-trades', 'archmaster']), 'a Master in all four is Jack of All Trades, an Archmaster wizard Archmaster');
+  const saved = JSON.parse(JSON.stringify(strong.snapshot())) as ReturnType<AchievementState['snapshot']>;
+  check(saved.samples['party(where feet="BOOTS OF SPEED")'] === 0 && JSON.stringify(AchievementState.restore(defs, saved).snapshot()) === JSON.stringify(strong.snapshot()),
+    'a party(where …) sample is kept by its key, and comes back with the state');
+  strong.champions([champ()]);
+  strong.record({ kind: 'sleep', attrs: {} });
+  strong.ended(true);
+  const four = ['low-profile', 'featherweight', 'insomniac'];
+  const strongWon = strong.evaluate();
+  console.log(`  won by the strong: ${strongWon.join(', ')}`);
+  check(strongWon.includes('roll-the-credits') && !four.some((id) => strongWon.includes(id)),
+    'won after a Master, more than half a load carried once and a sleep: no Low Profile, Featherweight nor Insomniac');
+
+  const meek = new AchievementState(defs, true);
+  meek.champions([champ({ sex: 'female', load: '50' }), champ({ sex: 'female', alive: 'no', load: '0' })]);
+  meek.ended(true);
+  const meekWon = meek.evaluate();
+  console.log(`  won by the meek: ${meekWon.join(', ')}`);
+  check(four.every((id) => meekWon.includes(id)),
+    'won with none above Expert, half a load at most, never asleep: Low Profile, Featherweight and Insomniac');
 }
 
 /** A set's file over the common one. */

@@ -1214,9 +1214,9 @@ drawing a map from them is a separate item, entered when the author names it.
 
 ### X20 ⏸️ More achievements: the author's list
 
-The achievements are `src/engine/achievements/defs/common.txt`'s 45, four of them valued
+The achievements are `src/engine/achievements/defs/common.txt`'s 51, four of them valued
 and four counted from the data,
-`dm-atari.txt`'s 11, which every Dungeon Master set reads, and `csb.txt`'s 2
+`dm-atari.txt`'s 13, which every Dungeon Master set reads, and `csb.txt`'s 2
 (`doc/ACHIEVEMENTS.md`). The author
 chose the list below, which holds what is left to write. ✓ marks what the
 condition language expresses today; [needs …] names the event or sample the tracker must
@@ -1256,11 +1256,26 @@ Bestiary; and where the party is, the `enter` and `leave` events, `levels`, `exp
 lists for values, with Tourist, Cartographer, Clean Sweep and Dungeon Master's Deep Diver
 and Express Elevator, at the author's choices: Clean Sweep counts DM's levels 1 to 12 and
 none of CSB's, Express Elevator 60 minutes. Solitary Confinement, CSB's Lone Wolf (`won and party = 1`,
-exact because the adventure recruits nobody), stays. What is left:
+exact because the adventure recruits nobody), stays. Step 6 is done but for Girl Power:
+the champions at each tick's end, `party(where …)` by what each wears and holds, their
+sex, ranks and load, ordered comparisons on a filter's numbers, and the `sleep` event, with
+Low Profile, Archmaster, Jack of All Trades, Speedy Gonzales, Featherweight and Insomniac,
+and Dungeon Master's Shining Armour and Darc Knight, each armour's shield in a hand
+(`doc/ACHIEVEMENTS.md` → "The champions"). What is left:
 
-6. **The champions' state.** Skill levels, what each wears, the sex, the load, sleep:
-   Low Profile, Archmaster, Jack of All Trades, Speedy Gonzales, Shining Armour, Darc
-   Knight, Girl Power, Featherweight, Insomniac.
+6. **Girl Power, waiting on the author.** `won and max(party(where sex = male)) = 0`
+   reads `CHARFLAG_male`, which is right in Dungeon Master, where every champion joins at
+   a mirror, and in RISE's adventures, and lost in a CSB adventure CSBWin's utility made:
+   it clears the flag (H, "A champion carried into a new adventure keeps their sex"), so
+   the whole CSB game's party, Buzzzzz and Lor among it, reads as no man and would unlock
+   it (`tools/checks/achievements-tracker.ts`). The options:
+   1. **The flag as it is**, in every set: an imported CSBWin adventure won by any party
+      earns it.
+   2. **The flag, and Girl Power off in `csb.txt`**: right wherever it exists, and no CSB
+      game earns it, RISE's adventures included.
+   3. **The sex read from the champion's text** in the set's dungeons, by name and title,
+      where a CSB adventure's start holds no flag: a reincarnated champion's new name is
+      in no text, so some parties still read wrong.
 7. **The casts and the blows.** The power rune and why a cast failed on `cast`; the
    damage dealt, which blow killed what, the item held or an empty hand, a kill by
    landing, `party` on `death`: Blazing Glory Day, Thick Atmosphere, I Know What I'm
@@ -1285,22 +1300,14 @@ stay common.
   - **Ironman** (hard): win without ever loading a save. [save loads]
   - **Hardcore** (hard): win without loading a save and without a champion ever dying.
     [save loads]
-  - **Low Profile** (hard): win with no champion above Expert in any skill. [skill levels]
-  - **Insomniac** (hard): win without ever sleeping. [sleep]
   - **Dark Ages** (hard): win without a light spell (FUL, OH IR RA) or a torch. An
     ILLUMULET is allowed: DM's two, on levels 4 and 6, are a relief after four black
     levels. ✓ for the spells, [the item held] for the torch.
-  - **Featherweight** (weird): win without a champion ever carrying more than half their
-    load. [load]
 - The party:
-  - **Girl Power** (weird): win with no male champion in the party. [the champion's sex]
-  - **Speedy Gonzales** (hard): all four champions wear BOOTS OF SPEED at the same time.
-    DM holds exactly four pairs, on levels 6, 9, 10 and 11. [what each champion wears]
+  - **Girl Power** (weird): win with no male champion in the party. [the sex, step 6's
+    decision]
   - **Lazarus** (weird): bring the same champion back from the dead three times. [a
     revival at an altar]
-  - **Archmaster** (hard): raise a champion to ARCHMASTER in any skill. [skill levels]
-  - **Jack of All Trades** (hard): make one champion a Master in all four classes. [skill
-    levels]
 - Combat:
   - **Telefrag** (weird): kill a monster by teleporting or falling onto it. CSBWin deletes
     a group the party lands on, which counts as nobody's kill today. [a kill `by: landing`]
@@ -1324,10 +1331,6 @@ stay common.
   [which ending]
 - **Some Assembly Required** (easy): join the Power Gem to the Firestaff. [objects
   combined]
-- **Shining Armour** (hard): one champion wears the whole armour of Lyte. [what each
-  champion wears]
-- **Darc Knight** (hard): one champion wears the whole armour of Darc. [what each
-  champion wears]
 - **Pickpocket's Revenge** (silly): be robbed by a Giggler, then kill it. [theft]
 - **Riddle Me This** (easy): fully solve the riddle room, its 4 alcoves satisfied. [a
   lock or switch triggered]
@@ -1360,8 +1363,6 @@ improve.
 | Trigger or sample | Achievements |
 | --- | --- |
 | Progress across games | Hall of Fame Tour, Every Ending, Grand Slam, Encore, Dungeon Janitor, HR Problem |
-| Skill levels | Low Profile, Archmaster, Jack of All Trades |
-| What each champion wears | Speedy Gonzales, Shining Armour, Darc Knight |
 | A lock or switch triggered | Riddle Me This, Corbum Courier, Coin-Operated |
 | Save loads | Ironman, Hardcore |
 | The power rune on `cast` | Blazing Glory Day, Thick Atmosphere |
@@ -1369,11 +1370,9 @@ improve.
 | Which ending | Gullible, Every Ending |
 | Where the party came from | Veterans, Fresh Faces |
 | The item held, an empty hand | Dark Ages (the torch), Bare Knuckles |
-| The champion's sex | Girl Power |
+| The champion's sex, as step 6 decides | Girl Power |
 | Why a cast failed | I Know What I'm Doing |
 | A kill `by: landing` | Telefrag |
-| Sleep | Insomniac |
-| The load carried | Featherweight |
 | A revival at an altar | Lazarus |
 | `party` on `death` | Friendly Fire Fatality |
 | A theft | Pickpocket's Revenge |

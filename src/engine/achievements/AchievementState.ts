@@ -11,7 +11,7 @@
  * game and reads one never unlocks there.
  */
 import type { AchievementDef, Aggregate, EventKind, Expr, FactName, Filter, SampleName } from './AchievementFile';
-import { SAMPLES } from './AchievementFile';
+import { samplesOf } from './AchievementFile';
 
 /** The VBLs a second, which `playTime` counts by. */
 const VBLS_PER_SECOND = 60;
@@ -29,7 +29,8 @@ export interface AchievementSnapshot {
   readonly whole: boolean;
   readonly unlocked: readonly string[];
   readonly vbls: number;
-  readonly samples: Readonly<Partial<Record<SampleName, number>>>;
+  /** Each sample by its key: `party`, or `party(where …)`. */
+  readonly samples: Readonly<Record<string, number>>;
   /** Each known aggregate by its key: a count, a `max` or `min`, or a `distinct`'s values. */
   readonly aggregates: Readonly<Record<string, number | readonly string[]>>;
   /** The aggregates kept that are not known from the game's start. */
@@ -41,7 +42,9 @@ type Kept = { agg: Aggregate; value: number; values: Set<string> | null; sampled
 export class AchievementState {
   private readonly kept = new Map<string, Kept>();
   private readonly unlockedIds = new Set<string>();
-  private readonly samples: Partial<Record<SampleName, number>> = {};
+  private readonly samples: Record<string, number> = {};
+  /** The `party(where …)` samples the conditions read, each its filter by its key. */
+  private readonly partyFilters = new Map<string, Filter>();
   private vbls = 0;
   private gameTime = 0;
   private explored = 0;
@@ -59,6 +62,7 @@ export class AchievementState {
           this.kept.set(agg.key, { agg, value: 0, values: agg.k === 'distinct' ? new Set() : null, sampled: false, known: whole });
         }
       }
+      for (const s of samplesOf(def.when)) if (s.where !== null) this.partyFilters.set(s.key, s.where);
     }
   }
 
@@ -67,10 +71,7 @@ export class AchievementState {
     const state = new AchievementState(defs, snapshot.whole);
     for (const id of snapshot.unlocked) state.unlockedIds.add(id);
     state.vbls = snapshot.vbls;
-    for (const s of SAMPLES) {
-      const v = snapshot.samples[s];
-      if (v !== undefined) state.samples[s] = v;
-    }
+    for (const [key, v] of Object.entries(snapshot.samples)) state.samples[key] = v;
     const unknown = new Set(snapshot.unknown);
     for (const [key, kept] of state.kept) {
       const saved = snapshot.aggregates[key];
@@ -122,11 +123,28 @@ export class AchievementState {
 
   /** A sample read at a tick's end. */
   sample(name: SampleName, value: number): void {
-    if (this.samples[name] === value) return;
-    this.samples[name] = value;
+    this.setSample(name, value);
+  }
+
+  /** Whether a condition reads the champions, `party(where …)`, which `champions` is told. */
+  get readsChampions(): boolean {
+    return this.partyFilters.size > 0;
+  }
+
+  /**
+   * The party's champions at a tick's end, each by its attributes
+   * (`CHAMPION_ATTRIBUTES`): each `party(where …)` is the number its filter accepts.
+   */
+  champions(members: readonly Readonly<Record<string, string>>[]): void {
+    for (const [key, where] of this.partyFilters) this.setSample(key, members.filter((attrs) => accepts(where, attrs)).length);
+  }
+
+  private setSample(key: string, value: number): void {
+    if (this.samples[key] === value) return;
+    this.samples[key] = value;
     for (const kept of this.kept.values()) {
       const agg = kept.agg;
-      if ((agg.k !== 'max' && agg.k !== 'min') || agg.sample !== name) continue;
+      if ((agg.k !== 'max' && agg.k !== 'min') || agg.sample.key !== key) continue;
       if (!kept.sampled) { kept.value = value; kept.sampled = true; }
       else kept.value = agg.k === 'max' ? Math.max(kept.value, value) : Math.min(kept.value, value);
     }
@@ -211,7 +229,7 @@ export class AchievementState {
       // `withCounts` puts every count of the data in its place.
       case 'data': throw new Error(`the count ${e.name} was never given`);
       case 'fact': return this.fact(e.name);
-      case 'sample': return this.samples[e.name] ?? 0;
+      case 'sample': return this.samples[e.sample.key] ?? 0;
       case 'agg': return this.aggregate(e.agg);
       default: return this.truth(e) ? 1 : 0;
     }
@@ -248,7 +266,17 @@ function accepts(f: Filter | null, attrs: Readonly<Record<string, string>>): boo
   if (raw === undefined) return false;
   const v = raw.toUpperCase();
   switch (f.k) {
-    case 'cmp': return (v === f.value.toUpperCase()) === (f.op === '=');
+    case 'cmp':
+      switch (f.op) {
+        case '=': return v === f.value.toUpperCase();
+        case '!=': return v !== f.value.toUpperCase();
+        // Only a number is ordered (`parseCondition`).
+        case '<': return Number(v) < Number(f.value);
+        case '<=': return Number(v) <= Number(f.value);
+        case '>': return Number(v) > Number(f.value);
+        case '>=': return Number(v) >= Number(f.value);
+      }
+      return false;
     case 'in': return f.values.some(x => x.toUpperCase() === v) !== f.negated;
     case 'like': return globMatches(f.pattern, v);
   }

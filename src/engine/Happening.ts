@@ -53,6 +53,8 @@ export type Happening =
   | { readonly k: 'wear'; readonly chIdx: number; readonly slot: number; readonly object: ObjectID }
   /** A champion joined for good, RESURRECT or REINCARNATE (`GameHost.championJoined`). */
   | { readonly k: 'joined'; readonly chIdx: number; readonly reincarnated: boolean }
+  /** The party lay down to sleep: the sleep icon, button 145 (`MouseSystem.sleep`). */
+  | { readonly k: 'sleep' }
   /** A VBL of the player's time has run (`Game.playTime`): not a frozen game's, nor the save menu's. */
   | { readonly k: 'vbl' }
   /** The main loop's tick has ended. */
@@ -68,3 +70,6 @@ export type Happening =
 
 /** A blow's end: one object, so that telling it builds nothing. */
 export const BLOW_END: Happening = { k: 'blow-end' };
+
+/** The party lying down to sleep, one object as `BLOW_END` is. */
+export const SLEEP: Happening = { k: 'sleep' };

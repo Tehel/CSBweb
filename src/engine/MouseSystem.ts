@@ -23,6 +23,7 @@ import {
 import { ActuatorAction } from '../data/actuatorHelpers';
 import { CursorFilterType } from './dsa/DsaTypes';
 import type { GameContext } from './GameContext';
+import { SLEEP } from './Happening';
 import { setClockTick, speed, VBL_PER_TICK } from './LoopState';
 import { tag0207cc } from './ShowHideInventory';
 import type { Champion } from './gameTypes';
@@ -374,6 +375,7 @@ export class MouseSystem {
     if (party.potentialChampionIndex >= 0) return false;
     const oldSpeed = speed(this.ctx);
     party.sleeping = true;
+    if (this.ctx.host.observing) this.ctx.host.observe(SLEEP);
     this.ctx.host.sleepChanged(true);
     this.ctx.host.messages.setNewSpeed(oldSpeed, 0, this.ctx.state.tickCount);
     this.ctx.mouseQueue.discardAllInput();

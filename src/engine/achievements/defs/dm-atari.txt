@@ -90,3 +90,20 @@ name: Express Elevator
 text: Reach the deepest level in less than {expressElevatorMinutes} minutes of play.
 tier: hard
 when: ever(enter where level = 13) and playTime < {expressElevatorMinutes}m
+
+# The armours of Lyte and of Darc: a helm, a plate, a poleyn, a greave and a shield each,
+# all in the dungeon, Lyte's on levels 9 to 11, Darc's on level 11.
+
+[shining-armour]
+name: Shining Armour
+text: Have one champion wear the whole armour of Lyte, its shield in hand.
+tier: hard
+when: party(where head = "HELM OF LYTE" and torso = "PLATE OF LYTE" and legs = "POLEYN OF LYTE"
+        and feet = "GREAVE OF LYTE" and (ready = "SHIELD OF LYTE" or action = "SHIELD OF LYTE")) >= 1
+
+[darc-knight]
+name: Darc Knight
+text: Have one champion wear the whole armour of Darc, its shield in hand.
+tier: hard
+when: party(where head = "HELM OF DARC" and torso = "PLATE OF DARC" and legs = "POLEYN OF DARC"
+        and feet = "GREAVE OF DARC" and (ready = "SHIELD OF DARC" or action = "SHIELD OF DARC")) >= 1

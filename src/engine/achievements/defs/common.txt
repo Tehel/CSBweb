@@ -273,6 +273,47 @@ text: Walk on 90% of the dungeon's floor.
 tier: hard
 when: explored >= 90
 
+# The champions at each tick's end: party(where ...) counts those its filter accepts, by
+# what each wears and holds, their sex, their rank in each class, 0 to 15 (8 EXPERT, 9 to
+# 14 the six masters, 15 ARCHMASTER), and their load, in percent of the most they can
+# carry (doc/ACHIEVEMENTS.md -> "The champions").
+
+[low-profile]
+name: Low Profile
+text: Win without a champion ever rising above Expert in any class.
+tier: hard
+when: won and max(party(where fighter > 8 or ninja > 8 or priest > 8 or wizard > 8)) = 0
+
+[archmaster]
+name: Archmaster
+text: Raise a champion to Archmaster in any class.
+tier: hard
+when: party(where fighter >= 15 or ninja >= 15 or priest >= 15 or wizard >= 15) >= 1
+
+[jack-of-all-trades]
+name: Jack of All Trades
+text: Make one champion a Master in all four classes.
+tier: hard
+when: party(where fighter >= 9 and ninja >= 9 and priest >= 9 and wizard >= 9) >= 1
+
+[speedy-gonzales]
+name: Speedy Gonzales
+text: Have all four champions wear boots of speed at once.
+tier: hard
+when: party(where feet = "BOOTS OF SPEED") >= 4
+
+[featherweight]
+name: Featherweight
+text: Win without a champion ever carrying more than half the most they can.
+tier: weird
+when: won and max(party(where load > 50)) = 0
+
+[insomniac]
+name: Insomniac
+text: Win without ever sleeping.
+tier: hard
+when: won and never(sleep)
+
 # The valued: a set without the value in its own file has no such achievement.
 
 [speed-runner]

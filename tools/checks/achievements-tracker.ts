@@ -35,6 +35,14 @@
  *    leaves the Hall of Champions, which holds no monster, cleared, and the Dragon's level,
  *    the Dragon alive, not; it reaches level 13 in less than an hour: Deep Diver and
  *    Express Elevator, at the tick it enters.
+ * 7. The champions at each tick's end (`party(where …)`): the sex read where the tool knows
+ *    it, Leyla a woman and Halk not; the feet sample counting Stamm's boots of speed from the
+ *    tick he puts them on; the first Master and the first load over half the most a champion
+ *    carries at the tick the tool reads them itself, `DetermineMastery(chIdx, skill |
+ *    0xc000)` and `MaxLoad`; and Low Profile, Archmaster, Jack of All Trades, Featherweight
+ *    and Insomniac as the game's ranks, loads and sleeps say. The whole CSB game's party
+ *    reads as no man, Buzzzzz and Lor among it: CSBWin's utility clears `CHARFLAG_male`
+ *    (`DEBT.md` H, "A champion carried into a new adventure keeps their sex").
  *
  * Usage: npm test -- --only=achievements-tracker.ts [<package name>…] [--not=<name>] [--events]
  */
@@ -50,6 +58,8 @@ import { isNewAdventure } from '../../src/engine/Chaos';
 import { achievementFileOf } from '../../src/engine/achievements/PageAchievements';
 import type { Happening } from '../../src/engine/Happening';
 import { readRecordingPackage } from '../../src/engine/RecordingPackage';
+import { CHARFLAG_MALE } from '../../src/core/charDesc';
+import { determineMastery } from '../../src/engine/skills';
 import { check, finish } from '../lib/check';
 import { DATA_SETS, diskFiles, diskSetDigests } from '../lib/dataSets';
 import { playPath } from '../lib/playback';
@@ -75,6 +85,31 @@ when: ever(kill where monster = LordChaos and by = fusion and party = yes)
 name: Coins
 text: More than ten coins carried.
 when: max(coins) > 10
+
+[t-leyla]
+name: Leyla
+text: Leyla, a woman, in the party.
+when: party(where champion = LEYLA and sex = female) >= 1
+
+[t-halk]
+name: Halk
+text: Halk, a woman, in the party.
+when: party(where champion = HALK and sex = female) >= 1
+
+[t-speed]
+name: Speed
+text: A champion in boots of speed.
+when: party(where feet = "BOOTS OF SPEED") >= 1
+
+[t-master]
+name: Master
+text: A Master in a class.
+when: party(where fighter >= 9 or ninja >= 9 or priest >= 9 or wizard >= 9) >= 1
+
+[t-heavy]
+name: Heavy
+text: More than half the most a champion carries.
+when: party(where load > 50) >= 1
 `);
 if (!own.ok) throw new Error(`the tool's own achievements do not read: ${JSON.stringify(own.errors)}`);
 const ownFile = own.file;
@@ -128,18 +163,51 @@ for (const file of corpusFiles()) {
   let tracker!: AchievementTracker;
   let restored = 0;
   let carryLocation: readonly number[] = [];
+  /** What the tool reads itself at each tick's end: the first Master's and the first load over half's `d.Time`, the ranks, the sleeps begun. */
+  let firstMaster = -1;
+  let firstHeavy = -1;
+  /** The `d.Time` of the first tick's end after boots of speed are first put on. */
+  let bootsWorn = false;
+  let bootsTick = -1;
+  let wasAsleep = false;
+  let asleep = 0;
+  let males = 0;
+  const ranks = new Map<string, number[]>();
   const miniDat = set.miniDat ? await diskFiles(set).read('mini.dat') : null;
   const start = pkg.path[0]!.start;
   const fromAdventure = start.kind === 'save' && miniDat !== null && isNewAdventure(start.bytes, miniDat);
   const startedAt = Date.now();
   const played = await playPath(set, diskFiles(set), pkg.path, pkg.shared.kind === 'save' ? pkg.shared : null, null, null, (page) => {
     tracker = new AchievementTracker(page.game, defsOf(set.id), page.screen.ui.objectTables.objectNames, { dungeonDat: page.dungeonDat, miniDat });
-    tracker.onEvent((event) => { events.push(event); times.push(page.game.ctx.state.tickCount); });
+    tracker.onEvent((event) => {
+      events.push(event);
+      times.push(page.game.ctx.state.tickCount);
+      if (event.kind === 'wear' && event.attrs.item === 'BOOTS OF SPEED') bootsWorn = true;
+    });
     tracker.attach();
     carryLocation = Array.from(page.game.ctx.tables.carryLocation);
     const host = page.game.ctx.host;
     const observe = host.observe;
     host.observe = (h: Happening) => {
+      if (h.k === 'tick') {
+        const { ctx } = page.game;
+        const party = ctx.party.state;
+        const time = ctx.state.tickCount;
+        if (bootsWorn && bootsTick < 0) bootsTick = time;
+        let maleNow = 0;
+        party.champions.forEach((champ, i) => {
+          if (!champ || i === party.potentialChampionIndex) return;
+          if ((champ.charFlags & CHARFLAG_MALE) !== 0) maleNow++;
+          const rank = [0, 1, 2, 3].map((skill) => Math.min(16, determineMastery(champ, skill | 0xc000)) - 1);
+          ranks.set(champ.name, rank);
+          if (firstMaster < 0 && rank.some((r) => r >= 9)) firstMaster = time;
+          const stats = ctx.systems.characterStats;
+          if (firstHeavy < 0 && stats.characterLoad(champ) * 2 > stats.maxLoad(champ)) firstHeavy = time;
+        });
+        males = Math.max(males, maleNow);
+        if (party.sleeping && !wasAsleep) asleep++;
+        wasAsleep = party.sleeping;
+      }
       const before = tracker.explored;
       if (h.k === 'read' && tracker.snapshotOf(fileDigest(h.file))) restored++;
       observe(h);
@@ -205,6 +273,23 @@ for (const file of corpusFiles()) {
     }
   }
 
+  // 7. The champions.
+  const at = (id: string): number => tracker.unlocks.find((u) => u.id === id)?.gameTime ?? -1;
+  console.log(`  ranks at the end: ${[...ranks].map(([hero, r]) => `${hero} ${r.join('/')}`).join(', ')}; first Master at ${firstMaster}, first load over half at ${firstHeavy}; sleeps ${count(events, 'sleep')} (${asleep} seen asleep at a tick's end)`);
+  check(at('t-master') === firstMaster, `${file}: a champion's first Master is counted at d.Time ${firstMaster} (${at('t-master')})`);
+  check(at('t-heavy') === firstHeavy, `${file}: the first load over half the most is counted at d.Time ${firstHeavy} (${at('t-heavy')})`);
+  check(count(events, 'sleep') >= asleep, `${file}: each sleep the party was seen in at a tick's end is a sleep event`);
+  const won = unlocked.has('roll-the-credits');
+  const all = [...ranks.values()];
+  const expect: [string, boolean][] = [
+    ['low-profile', won && tracker.whole && all.every((r) => r.every((x) => x <= 8))],
+    ['archmaster', all.some((r) => r.some((x) => x >= 15))],
+    ['jack-of-all-trades', all.some((r) => r.every((x) => x >= 9))],
+    ['featherweight', won && tracker.whole && firstHeavy < 0],
+    ['insomniac', won && tracker.whole && count(events, 'sleep') === 0],
+  ];
+  for (const [id, want] of expect) check(unlocked.has(id) === want, `${file}: ${id} ${want ? 'unlocks' : 'stays locked'}, as its ranks, loads and sleeps say`);
+
   // 3. What the games hold.
   if (name === 'DMMovie2615') {
     for (const hero of ['HALK', 'STAMM', 'LEYLA', 'GOTHMOG']) {
@@ -223,6 +308,11 @@ for (const file of corpusFiles()) {
     check(count(events, 'eat', { champion: 'HALK', item: 'WORM ROUND' }) > 0, 'DMMovie2615: Halk eats a worm round');
     check(count(events, 'drink', { champion: 'STAMM', item: 'VI POTION' }) > 0, 'DMMovie2615: Stamm drinks a Vi potion');
     check(count(events, 'wear', { champion: 'STAMM', slot: 'feet', item: 'BOOTS OF SPEED' }) === 1, 'DMMovie2615: Stamm puts on the boots of speed');
+    const boots = events.findIndex((e) => e.kind === 'wear' && e.attrs.item === 'BOOTS OF SPEED');
+    check(at('t-speed') === bootsTick && bootsTick >= times[boots]!,
+      `DMMovie2615: a champion in boots of speed is counted at the end of the first tick after Stamm puts them on at d.Time ${times[boots]}, d.Time ${bootsTick} (${at('t-speed')})`);
+    check(unlocked.has('t-leyla') && !unlocked.has('t-halk'), 'DMMovie2615: Leyla is a woman, Halk is not');
+    check(!unlocked.has('speedy-gonzales'), 'DMMovie2615: one pair of boots of speed is no Speedy Gonzales');
     check(count(events, 'cast', { ok: 'yes', spell: 'FUL IR' }) > 0, 'DMMovie2615: a fireball, FUL IR, is cast');
     check(count(events, 'kill', { party: 'yes', by: 'explosion', champion: 'STAMM', item: 'FUL BOMB' }) > 0, 'DMMovie2615: Stamm\'s thrown Ful bombs kill, the bomb named on the explosion\'s kill');
     for (const id of [
@@ -238,7 +328,6 @@ for (const file of corpusFiles()) {
     check(count(events, 'leave', { level: '0', cleared: 'yes' }) === 1, 'DMMovie2615 leaves the Hall of Champions, which holds no monster, cleared');
     check(count(events, 'leave', { level: '13', cleared: 'no' }) === 1, 'DMMovie2615 leaves the Dragon\'s level with the Dragon alive');
     const deepest = events.findIndex((e) => e.kind === 'enter' && e.attrs.level === '13');
-    const at = (id: string): number | undefined => tracker.unlocks.find((u) => u.id === id)?.gameTime;
     check(['tourist', 'deep-diver', 'express-elevator'].every((id) => at(id) === times[deepest]),
       `DMMovie2615: Tourist, Deep Diver and Express Elevator unlock at d.Time ${times[deepest]}, as the party enters level 13`);
     check(!unlocked.has('clean-sweep') && !unlocked.has('cartographer'), 'DMMovie2615 sweeps no listed level and walks on less than 90% of the floor');
@@ -265,6 +354,8 @@ for (const file of corpusFiles()) {
     check(unlocked.has('speed-runner') && !unlocked.has('blitz'),
       `CSBFullRecordingV4: Speed Runner, which needs the whole game, unlocks in a game from the adventure's start, and Blitz does not (${Math.round(tracker.playedVbls / 3600)} minutes)`);
     check(count(events, 'hurt', { party: 'yes' }) > 0, 'CSBFullRecordingV4: the party hurts itself');
+    check(males === 0 && ['BUZZZZZ', 'LOR'].every((hero) => ranks.has(hero)),
+      'CSBFullRecordingV4: no champion carries CHARFLAG_male, which CSBWin\'s utility cleared, Buzzzzz and Lor among them');
     check(unlocked.has('gourmet') && !unlocked.has('bestiary'), 'CSBFullRecordingV4: the party eats all eight kinds of food (Gourmet), and kills 22 of the 23 types');
     check(unlocked.has('tourist') && count(events, 'leave', { cleared: 'yes' }) > 0 && !unlocked.has('clean-sweep'),
       'CSBFullRecordingV4 sets foot on every level, and leaves some with no monster alive, though CSB lists no level to sweep');

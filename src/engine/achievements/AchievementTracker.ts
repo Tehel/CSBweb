@@ -23,9 +23,12 @@ import { fileDigest } from '../../data/DataSetFiles';
 import { isNewAdventure } from '../Chaos';
 import { OBJECT_ID_EOF, OBJECT_ID_NULL, DBType, Position, type ObjectID } from '../../core/types';
 import { OBJNI_NOT_AN_OBJECT } from '../../core/objectNameIndex';
+import { CHARFLAG_MALE, getChampionPossession } from '../../core/charDesc';
 import { FIRST_RUNE, RUNE_NAMES } from '../../core/runes';
 import { isMagicSpellRn } from '../../core/spellRn';
 import type { Game } from '../Game';
+import type { Champion } from '../gameTypes';
+import { determineMastery } from '../skills';
 import type { Blow, BlowCause, Happening } from '../Happening';
 import { NameIndex } from '../objectIndex';
 import { isAlive } from '../rules';
@@ -53,6 +56,22 @@ export const MONSTER_NAMES: readonly string[] = [
  * `tools/checks/achievements-tracker.ts` reads.
  */
 export const WORN_SLOTS: Readonly<Record<number, string>> = { 2: 'head', 3: 'torso', 4: 'legs', 5: 'feet', 10: 'neck' };
+
+/**
+ * A champion's places by possession slot, which `party(where …)` names: the worn places,
+ * and the hands, the ready hand slot 0 and the action hand 1 (`Possession(1)`, the hand
+ * `DetermineMastery` reads the Firestaff in, `doc/CSBwin-src/Code17818.cpp:76`).
+ */
+const CHAMPION_PLACES: Readonly<Record<number, string>> = { ...WORN_SLOTS, 0: 'ready', 1: 'action' };
+
+/** The four classes, skills 0 to 3, as `party(where …)` names them. */
+const CLASSES = ['fighter', 'ninja', 'priest', 'wizard'] as const;
+
+/**
+ * The highest rank, ARCHMASTER: `d.Pointer16770`'s last, which the inventory shows for
+ * every mastery from 16 up (`doc/CSBwin-src/CSBCode.cpp:380-394`).
+ */
+const ARCHMASTER_MASTERY = 16;
 
 /** What `kill`'s `by` and `hurt`'s are, for each blow's cause; a missile's is the kill's `throw` or `spell`. */
 const KILL_BY: Partial<Record<BlowCause, string>> = {
@@ -238,6 +257,7 @@ export class AchievementTracker {
       case 'joined':
         this.record('join', { champion: this.championName(h.chIdx), how: h.reincarnated ? 'reincarnate' : 'resurrect' });
         return;
+      case 'sleep': this.record('sleep', {}); return;
       case 'tick': this.tick(); return;
       case 'ended':
         this.sample();
@@ -302,6 +322,14 @@ export class AchievementTracker {
     this.state.sample('party', members);
     this.state.sample('alive', alive);
     this.state.sample('coins', coins);
+    if (this.state.readsChampions) {
+      const champions: Record<string, string>[] = [];
+      for (let i = 0; i < party.champions.length; i++) {
+        const champ = party.champions[i];
+        if (champ && i !== party.potentialChampionIndex) champions.push(this.championAttrs(champ));
+      }
+      this.state.champions(champions);
+    }
     this.where();
     this.state.setGameTime(ctx.state.tickCount);
     this.state.addVbls(this.vbls);
@@ -360,6 +388,38 @@ export class AchievementTracker {
     const unlocks = ids.map((id) => ({ id, gameTime, vbls }));
     this.found.push(...unlocks);
     for (const listener of this.unlockListeners) listener(unlocks);
+  }
+
+  /**
+   * A champion's attributes (`CHAMPION_ATTRIBUTES`): the name, the sex (`CHARFLAG_male`),
+   * alive or not, what each worn place and hand holds, the rank in each class, and the load.
+   *
+   * A rank is the class's mastery as the credits show it, `DetermineMastery(chIdx, skill |
+   * 0xc000)` (`doc/CSBwin-src/Code17818.cpp:13`): the experience alone, no object's bonus
+   * (the Firestaff's, a pendant's) and no temporary adjustment, and the champion's own while
+   * the party sleeps, when `DetermineMastery` reports 1. It is that mastery less one, up to
+   * ARCHMASTER: 0 for none shown, 1 NEOPHYTE, 8 EXPERT, 9 to 14 the six masters, 15
+   * ARCHMASTER. The load is `CHARDESC.load` with the object in hand on its owner, in percent
+   * of `MaxLoad` (`doc/CSBwin-src/Code11f52.cpp:4318`), rounded up: 50 is half the most at
+   * most.
+   */
+  private championAttrs(champ: Champion): Record<string, string> {
+    const attrs: Record<string, string> = {
+      sex: (champ.charFlags & CHARFLAG_MALE) !== 0 ? 'male' : 'female',
+      alive: yesNo(isAlive(champ)),
+    };
+    if (champ.name) attrs.champion = champ.name;
+    for (const [slot, place] of Object.entries(CHAMPION_PLACES)) {
+      const item = this.itemName(getChampionPossession(champ, Number(slot)));
+      if (item) attrs[place] = item;
+    }
+    CLASSES.forEach((role, skill) => {
+      attrs[role] = `${Math.min(ARCHMASTER_MASTERY, determineMastery(champ, skill | 0xc000)) - 1}`;
+    });
+    const stats = this.game.ctx.systems.characterStats;
+    const max = stats.maxLoad(champ);
+    attrs.load = `${max > 0 ? Math.floor((stats.characterLoad(champ) * 100 + max - 1) / max) : 0}`;
+    return attrs;
   }
 
   /** The coins `rn` is, or holds: a chest's contents, the open chest's in its slots. */

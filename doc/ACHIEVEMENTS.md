@@ -34,7 +34,8 @@ set reads, the Atari's, the Amiga's and the hidden ones, and `csb.txt`. Both giv
 common file's values: Speed Runner in less than 180 minutes, Blitz in less than 60, and
 Conscientious Objector with at most 40 kills. Dungeon Master's also lists the levels Clean
 Sweep counts, 1 to 12, all but the Hall of Champions and the Dragon's, and gives its own
-Express Elevator 60 minutes; Chaos Strikes Back lists no level to sweep. A set with no
+Express Elevator 60 minutes, and has Shining Armour and Darc Knight, the armours of Lyte and
+Darc worn whole; Chaos Strikes Back lists no level to sweep. A set with no
 `achievements.txt` of its own reads that file instead. The file is never a game file
 (`GAME_FILES`, `src/data/DataSets.ts`), so a recording's digests never name it, and an
 author can change the file without breaking a recording.
@@ -135,6 +136,9 @@ A condition is a yes or a no, made from these parts:
   - `coins`: the number of coins the party carries, counting the champions' hands, packs,
     pouches and quivers, the chests carried, and the object held under the pointer. A coin
     is any object whose name ends in `COIN`.
+  - `party(where filter)`: the number of the party's champions that the filter accepts,
+    by what each is at that moment ("The champions", below), such as `party(where feet =
+    "BOOTS OF SPEED") >= 4`.
 - **`max(sample)`** and **`min(sample)`** are the largest and the smallest value the sample
   has had in the game.
 - **Counts of events**:
@@ -148,7 +152,7 @@ A condition is a yes or a no, made from these parts:
 A **filter** is made of `and`, `or`, `not`, parentheses, and these tests on the event's
 attributes:
 
-- `attribute = value` and `attribute != value`.
+- `attribute = value` and `attribute != value`, and for a number, `<`, `<=`, `>` and `>=`.
 - `attribute in (value, …)` and `attribute not in (value, …)`, or `in {name}` and `not in
   {name}` for a list the set's file defines.
 - `attribute ~ "pattern"`, where `*` in the pattern stands for any run of characters and
@@ -171,6 +175,7 @@ number for a `level`. Names compare without regard to case.
 | `join` | a champion joins the party | `champion`; `how`: `resurrect` `reincarnate` |
 | `enter` | the party stands on a level it did not stand on at the last tick's end, and at a history's first tick | `level`, the map, from 0 |
 | `leave` | the party stands on another level than at the last tick's end | `level`, the map left; `cleared`: `yes` when no monster is alive on it then |
+| `sleep` | the party lies down to sleep | none |
 
 An `item` is the object's name as the game shows it (`RN::NameIndex`), from the set's own
 `graphics.dat`.
@@ -186,6 +191,42 @@ names a monster; CSBWin's statistics name the dead by these, unless the dungeon'
 names them (`GetMonsterName`, `:48-89`), which the tracker does not read yet. A `champion`
 is the name the champion carries. A `spell` is the runes after the power rune, by the
 manual's names (`src/core/runes.ts`), which no game file holds either.
+
+### The champions
+
+`party(where …)` filters the party's champions at a tick's end, each by these attributes
+(`CHAMPION_ATTRIBUTES`, `src/engine/achievements/AchievementFile.ts`). A champion who is
+only a candidate at a mirror is not in the party.
+
+| Attribute | What it is |
+| --- | --- |
+| `champion` | the name the champion carries |
+| `sex` | `male` where the champion carries `CHARFLAG_male`, which `AddCharacter` sets from the champion's text (`doc/CSBwin-src/Character.cpp:595`), else `female` |
+| `alive` | `yes` or `no` |
+| `head`, `neck`, `torso`, `legs`, `feet` | the object worn there, its name as an event's `item` is |
+| `ready`, `action` | the object in the ready hand, possession slot 0, and in the action hand, 1 |
+| `fighter`, `ninja`, `priest`, `wizard` | the rank in the class, a number |
+| `load` | what the champion carries, in percent of the most they can, rounded up |
+
+A **rank** is the class's mastery as the credits show it, `DetermineMastery(chIdx, skill |
+0xc000)` (`doc/CSBwin-src/Code17818.cpp:13`): the experience alone, with no object's bonus,
+such as the Firestaff's, and no temporary adjustment, and the champion's own while the party
+sleeps, when `DetermineMastery` reports 1 for every skill. It is that mastery less one, and
+no more than 15, ARCHMASTER, which the inventory shows for every mastery from 16 up
+(`d.Pointer16770`, `doc/CSBwin-src/CSBCode.cpp:380-394`):
+
+| Rank | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 to 14 | 15 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Shown | nothing | NEOPHYTE | NOVICE | APPRENTICE | JOURNEYMAN | CRAFTSMAN | ARTISAN | ADEPT | EXPERT | LO to MON MASTER | ARCHMASTER |
+
+The **load** is `CHARDESC.load`, the object in hand weighing on its owner, against `MaxLoad`
+(`doc/CSBwin-src/Code11f52.cpp:4318`), the most the inventory shows the champion can carry,
+which falls with the stamina and a wound. Rounded up, `load > 50` is exactly more than half.
+
+**The sex is not to be trusted in a CSB adventure CSBWin's utility made.** That utility
+clears `CHARFLAG_male` from every champion it carries over (`DEBT.md` H, "A champion
+carried into a new adventure keeps their sex"), so such a party reads as no man; RISE's
+adventure keeps the flag. No achievement reads the sex yet (`DEBT.md` X20).
 
 ### Counted from the data
 
@@ -308,6 +349,9 @@ whole replay corpus with the tracker attached, and every package plays to its po
   `graphics.dat`). A mirror's champion's own possessions are not put on by the player.
 - **A join** is at the end of `_ResurrectReincarnateCancel`, beside
   `GameHost.championJoined`.
+- **A sleep** is at the sleep icon's engine half, button 145 (`MouseSystem.sleep`,
+  `doc/CSBwin-src/Mouse.cpp:1822-1847`), as `d.PartySleeping` is set: a party woken in the
+  same tick has slept all the same.
 - **Where the party is** needs no happening: the tracker reads it at each tick's end.
 - **The game's boundaries**: each VBL of the player's time (`Game.playTime`'s), each main
   loop tick's end, `MainLoop`'s return (won or lost), a new game read, a save's file made
@@ -361,7 +405,8 @@ the `mini.dat`.
 - At each tick's end it takes the samples: `party` and `alive` leave out a mirror's
   champion; `coins` counts every object whose name ends in `COIN` in the party's
   possessions, inside the chests they carry (an open chest's slots for the open one) and
-  under the pointer. It reads where the party stands: a level other than the last tick's
+  under the pointer. Where a condition reads `party(where …)`, it reads each champion's
+  attributes ("The champions"). It reads where the party stands: a level other than the last tick's
   is `leave` of that one, then `enter` of this one, and a floor square not stood on yet
   adds to `explored`. A party moved to another level in the tick's input stands there from
   the next tick, which loads the level (`Game.loadNewPartyLevel`, `d.newPartyLevel`):
@@ -396,11 +441,17 @@ read and a state kept and read back take up the level and the floor walked, Tour
 unlocks where the levels entered reach the set's, DMMovie2615 leaves the Hall of Champions
 cleared and the Dragon's level not, and reaches level 13 within the hour, Deep Diver and
 Express Elevator at the tick it enters. The games played to their end explore well under
-90% of the floor: 37 to 39% for Dungeon Master's wins, 65% for the whole CSB game.
+90% of the floor: 37 to 39% for Dungeon Master's wins, 65% for the whole CSB game. And the
+champions: Leyla a woman and Halk not, the feet counting Stamm's boots of speed from the
+first tick's end after he puts them on, the first Master and the first load over half at
+the tick the tool reads them itself, and Low Profile, Archmaster, Jack of All Trades,
+Featherweight and Insomniac as the games' ranks, loads and sleeps say: DMMovie2615 wins
+with no champion above Journeyman, so Low Profile, and sleeps nine times; the whole CSB
+game's party reads as no man, CSBWin's utility having cleared the flag.
 `tools/checks/achievements-format.ts` reads each file, checks its names against its set's
 `graphics.dat` and its values against its achievements, counts the FTL sets' data, and
-plays the conditions out of made-up events, the named values, the lists and the counts put
-in their places.
+plays the conditions out of made-up events and champions, the named values, the lists and
+the counts put in their places.
 
 ## The page
 

@@ -61,12 +61,40 @@ export const EVENTS = {
   join: { champion: NAME, how: enumOf('resurrect', 'reincarnate') },
   enter: { level: NUMBER },
   leave: { level: NUMBER, cleared: YESNO },
+  sleep: {},
 } as const satisfies Record<string, Record<string, AttributeKind>>;
 export type EventKind = keyof typeof EVENTS;
 
 /** The samples, read at the end of each tick. */
 export const SAMPLES = ['party', 'alive', 'coins'] as const;
 export type SampleName = (typeof SAMPLES)[number];
+
+/**
+ * A champion's attributes at a tick's end, which `party(where …)` filters the party's
+ * champions by (`doc/ACHIEVEMENTS.md` → "The champions"): what each worn place and each
+ * hand holds, the rank in each class, 0 to 15, and the load, in percent of the most the
+ * champion can carry.
+ */
+export const CHAMPION_ATTRIBUTES = {
+  champion: NAME,
+  sex: enumOf('male', 'female'),
+  alive: YESNO,
+  head: NAME,
+  neck: NAME,
+  torso: NAME,
+  legs: NAME,
+  feet: NAME,
+  ready: NAME,
+  action: NAME,
+  fighter: NUMBER,
+  ninja: NUMBER,
+  priest: NUMBER,
+  wizard: NUMBER,
+  load: NUMBER,
+} as const satisfies Record<string, AttributeKind>;
+
+/** The attributes that name an object, which `unknownItems` checks: an event's and a champion's. */
+const ITEM_ATTRIBUTES: ReadonlySet<string> = new Set(['item', 'head', 'neck', 'torso', 'legs', 'feet', 'ready', 'action']);
 
 /**
  * The counts of the set's own files (`DataCounts`, `dataCounts`), which a condition reads by
@@ -100,16 +128,26 @@ type Bound = 'exact' | 'low' | 'high';
 export type Comparison = '=' | '!=' | '<' | '<=' | '>' | '>=';
 
 /**
- * A filter on an event's attributes, its names upper-cased, its numbers in decimal. An
- * `in` may name a value, `{name}`, for its list: `mergeAchievements` puts the list in its
- * place.
+ * A filter on an event's attributes, or a champion's, its names upper-cased, its numbers
+ * in decimal. Only a number is ordered (`<`, `<=`, `>`, `>=`). An `in` may name a value,
+ * `{name}`, for its list: `mergeAchievements` puts the list in its place.
  */
 export type Filter =
-  | { k: 'cmp'; attr: string; op: '=' | '!='; value: string }
+  | { k: 'cmp'; attr: string; op: Comparison; value: string }
   | { k: 'in'; attr: string; values: readonly string[]; negated: boolean; named?: string }
   | { k: 'like'; attr: string; pattern: string }
   | { k: 'and' | 'or'; a: Filter; b: Filter }
   | { k: 'not'; a: Filter };
+
+/**
+ * A sample a condition reads: its name, and for `party`, the filter on the champions it
+ * counts, `party(where …)`. `key` is its canonical text, which the state keeps it by.
+ */
+export interface SampleRef {
+  readonly name: SampleName;
+  readonly where: Filter | null;
+  readonly key: string;
+}
 
 /**
  * A value the evaluator keeps over the game: a count of events, the distinct values of an
@@ -119,7 +157,7 @@ export type Filter =
 export type Aggregate =
   | { k: 'count'; event: EventKind; where: Filter | null; key: string }
   | { k: 'distinct'; event: EventKind; attr: string; where: Filter | null; key: string }
-  | { k: 'max' | 'min'; sample: SampleName; key: string };
+  | { k: 'max' | 'min'; sample: SampleRef; key: string };
 
 /** A condition, or a part of one. */
 export type Expr =
@@ -136,7 +174,7 @@ export type Expr =
    * `withCounts` puts the number in its place, so the evaluator never meets one.
    */
   | { k: 'data'; name: DataCountName }
-  | { k: 'sample'; name: SampleName }
+  | { k: 'sample'; sample: SampleRef }
   | { k: 'agg'; agg: Aggregate }
   /** `ever` and `never`: the count compared with 0, kept apart for the bounds. */
   | { k: 'ever' | 'never'; agg: Aggregate }
@@ -345,7 +383,8 @@ function withValues(def: AchievementDef, values: ReadonlyMap<string, readonly nu
       default: return f;
     }
   };
-  const agg = (a: Aggregate): Aggregate => (a.k === 'count' || a.k === 'distinct' ? keyed({ ...a, where: filter(a.where) }) : a);
+  const agg = (a: Aggregate): Aggregate =>
+    (a.k === 'count' || a.k === 'distinct' ? keyed({ ...a, where: filter(a.where) }) : maxMin(a.k, sampleRef(a.sample.name, filter(a.sample.where))));
   const put = (e: Expr): Expr => {
     switch (e.k) {
       case 'value': {
@@ -353,6 +392,7 @@ function withValues(def: AchievementDef, values: ReadonlyMap<string, readonly nu
         if (n === null) fits = false;
         return { k: 'num', value: (n ?? 0) * e.scale, type: e.type };
       }
+      case 'sample': return { k: 'sample', sample: sampleRef(e.sample.name, filter(e.sample.where)) };
       case 'agg': case 'ever': case 'never': return { ...e, agg: agg(e.agg) };
       case 'cmp': return { ...e, a: put(e.a), b: put(e.b) };
       case 'and': case 'or': return { ...e, a: put(e.a), b: put(e.b) };
@@ -393,22 +433,24 @@ export function unusedValues(own: AchievementFile, merged: readonly AchievementD
 }
 
 /**
- * The `item` names a condition compares with exactly (`=`, `!=`, `in`) that `items`, the
- * set's object names, does not hold. A pattern (`~`) is never one.
+ * The object names a condition compares with exactly (`=`, `!=`, `in`), an event's `item`
+ * or what a champion wears or holds, that `items`, the set's object names, does not hold.
+ * A pattern (`~`) is never one.
  */
 export function unknownItems(def: AchievementDef, items: ReadonlySet<string>): string[] {
   const out = new Set<string>();
   const filter = (f: Filter | null): void => {
     if (f === null) return;
     switch (f.k) {
-      case 'cmp': if (f.attr === 'item' && !items.has(f.value)) out.add(f.value); return;
-      case 'in': if (f.attr === 'item') for (const v of f.values) if (!items.has(v)) out.add(v); return;
+      case 'cmp': if (ITEM_ATTRIBUTES.has(f.attr) && !items.has(f.value)) out.add(f.value); return;
+      case 'in': if (ITEM_ATTRIBUTES.has(f.attr)) for (const v of f.values) if (!items.has(v)) out.add(v); return;
       case 'like': return;
       case 'and': case 'or': filter(f.a); filter(f.b); return;
       case 'not': filter(f.a); return;
     }
   };
   for (const a of def.aggregates) if (a.k === 'count' || a.k === 'distinct') filter(a.where);
+  for (const s of samplesOf(def.when)) filter(s.where);
   return [...out];
 }
 
@@ -533,12 +575,12 @@ export function parseCondition(text: string): Expr {
     if (t.t !== 'word') { pos--; throw new ConditionError(`expected a value ${where()}`); }
     if (t.v in FACTS) return { k: 'fact', name: t.v as FactName };
     if ((DATA_COUNTS as readonly string[]).includes(t.v)) return { k: 'data', name: t.v as DataCountName };
-    if ((SAMPLES as readonly string[]).includes(t.v) && !isOp('(')) return { k: 'sample', name: t.v as SampleName };
+    if ((SAMPLES as readonly string[]).includes(t.v)) { pos--; return { k: 'sample', sample: sample() }; }
     switch (t.v) {
       case 'count': case 'ever': case 'never': {
         expectOp('(');
         const event = eventName();
-        const filter = whereClause(event);
+        const filter = whereClause(EVENTS[event], event);
         expectOp(')');
         const agg = keyed({ k: 'count', event, where: filter, key: '' });
         return t.v === 'count' ? { k: 'agg', agg } : { k: t.v, agg };
@@ -547,22 +589,34 @@ export function parseCondition(text: string): Expr {
         expectOp('(');
         const event = eventName();
         expectOp('.');
-        const attr = attributeOf(event);
-        const filter = whereClause(event);
+        const attr = attributeOf(EVENTS[event], event);
+        const filter = whereClause(EVENTS[event], event);
         expectOp(')');
         return { k: 'agg', agg: keyed({ k: 'distinct', event, attr, where: filter, key: '' }) };
       }
       case 'max': case 'min': {
         expectOp('(');
-        const s = next();
+        const s = peek();
         if (s.t !== 'word' || !(SAMPLES as readonly string[]).includes(s.v)) {
           throw new ConditionError(`${t.v}() takes a sample: ${SAMPLES.join(', ')}`);
         }
+        const ref = sample();
         expectOp(')');
-        return { k: 'agg', agg: { k: t.v, sample: s.v as SampleName, key: `${t.v}(${s.v})` } };
+        return { k: 'agg', agg: maxMin(t.v, ref) };
       }
     }
     throw new ConditionError(`"${t.v}" is no fact, sample, count or count of the data`);
+  };
+  /** A sample's name, and for `party` the filter on its champions, `party(where …)`. */
+  const sample = (): SampleRef => {
+    const name = (next() as { v: string }).v as SampleName;
+    if (!isOp('(')) return sampleRef(name, null);
+    if (name !== 'party') throw new ConditionError(`only party takes a filter, party(where …); ${name} does not`);
+    pos++;
+    if (!isWord('where')) throw new ConditionError(`expected "where" ${where()}`);
+    const filter = whereClause(CHAMPION_ATTRIBUTES, 'party');
+    expectOp(')');
+    return sampleRef(name, filter);
   };
   const eventName = (): EventKind => {
     const t = next();
@@ -571,68 +625,74 @@ export function parseCondition(text: string): Expr {
     }
     return t.v as EventKind;
   };
-  const attributeOf = (event: EventKind): string => {
+  /** An attribute of `attrs`, an event's or a champion's, `of` naming them. */
+  type Attributes = Readonly<Record<string, AttributeKind>>;
+  const attributeOf = (attrs: Attributes, of: string): string => {
     const t = next();
-    const attrs: Record<string, AttributeKind> = EVENTS[event];
+    if (Object.keys(attrs).length === 0) throw new ConditionError(`${of} has no attributes`);
     if (t.t !== 'word' || !(t.v in attrs)) {
-      throw new ConditionError(`${event} has no attribute "${t.t === 'word' ? t.v : ''}": ${Object.keys(attrs).join(', ')}`);
+      throw new ConditionError(`${of} has no attribute "${t.t === 'word' ? t.v : ''}": ${Object.keys(attrs).join(', ')}`);
     }
     return t.v;
   };
-  const whereClause = (event: EventKind): Filter | null => {
+  const whereClause = (attrs: Attributes, of: string): Filter | null => {
     if (!isWord('where')) return null;
     pos++;
-    return filterOr(event);
+    return filterOr(attrs, of);
   };
-  const filterOr = (event: EventKind): Filter => {
-    let a = filterAnd(event);
-    while (isWord('or')) { pos++; a = { k: 'or', a, b: filterAnd(event) }; }
+  const filterOr = (attrs: Attributes, of: string): Filter => {
+    let a = filterAnd(attrs, of);
+    while (isWord('or')) { pos++; a = { k: 'or', a, b: filterAnd(attrs, of) }; }
     return a;
   };
-  const filterAnd = (event: EventKind): Filter => {
-    let a = filterNot(event);
-    while (isWord('and')) { pos++; a = { k: 'and', a, b: filterNot(event) }; }
+  const filterAnd = (attrs: Attributes, of: string): Filter => {
+    let a = filterNot(attrs, of);
+    while (isWord('and')) { pos++; a = { k: 'and', a, b: filterNot(attrs, of) }; }
     return a;
   };
-  const filterNot = (event: EventKind): Filter => {
-    if (isWord('not')) { pos++; return { k: 'not', a: filterNot(event) }; }
-    if (isOp('(')) { pos++; const f = filterOr(event); expectOp(')'); return f; }
-    const attr = attributeOf(event);
-    const kind = (EVENTS[event] as Record<string, AttributeKind>)[attr] as AttributeKind;
+  const filterNot = (attrs: Attributes, of: string): Filter => {
+    if (isWord('not')) { pos++; return { k: 'not', a: filterNot(attrs, of) }; }
+    if (isOp('(')) { pos++; const f = filterOr(attrs, of); expectOp(')'); return f; }
+    const attr = attributeOf(attrs, of);
+    const kind = attrs[attr] as AttributeKind;
     const t = next();
-    if (t.t === 'op' && (t.v === '=' || t.v === '!=')) return { k: 'cmp', attr, op: t.v, value: value(event, attr, kind) };
+    if (t.t === 'op' && (t.v === '=' || t.v === '!=')) return { k: 'cmp', attr, op: t.v, value: value(of, attr, kind) };
+    if (t.t === 'op' && COMPARISONS.includes(t.v)) {
+      if (kind.kind !== 'number') throw new ConditionError(`${t.v} orders numbers; ${of}.${attr} is not one`);
+      return { k: 'cmp', attr, op: t.v as Comparison, value: value(of, attr, kind) };
+    }
     if (t.t === 'op' && t.v === '~') {
-      if (kind.kind !== 'name') throw new ConditionError(`~ compares names; ${event}.${attr} is not one`);
+      if (kind.kind !== 'name') throw new ConditionError(`~ compares names; ${of}.${attr} is not one`);
       const p = next();
       if (p.t !== 'string') throw new ConditionError('~ takes a quoted pattern');
       return { k: 'like', attr, pattern: p.v.toUpperCase() };
     }
     let negated = false;
     if (t.t === 'word' && t.v === 'not' && isWord('in')) { negated = true; pos++; }
-    else if (!(t.t === 'word' && t.v === 'in')) { pos--; throw new ConditionError(`expected =, !=, in, not in or ~ ${where()}`); }
+    else if (!(t.t === 'word' && t.v === 'in')) { pos--; throw new ConditionError(`expected =, !=, <, <=, >, >=, in, not in or ~ ${where()}`); }
     const named = peek();
     if (named.t === 'value') {
-      if (kind.kind !== 'number' || named.unit !== undefined) throw new ConditionError(`in {name} takes a list of numbers; ${event}.${attr} is not a number`);
+      if (kind.kind !== 'number' || named.unit !== undefined) throw new ConditionError(`in {name} takes a list of numbers; ${of}.${attr} is not a number`);
       pos++;
       return { k: 'in', attr, values: [], negated, named: named.name };
     }
     expectOp('(');
-    const values = [value(event, attr, kind)];
-    while (isOp(',')) { pos++; values.push(value(event, attr, kind)); }
+    const values = [value(of, attr, kind)];
+    while (isOp(',')) { pos++; values.push(value(of, attr, kind)); }
     expectOp(')');
     return { k: 'in', attr, values, negated };
   };
-  const value = (event: EventKind, attr: string, kind: AttributeKind): string => {
+  const value = (of: string, attr: string, kind: AttributeKind): string => {
     const t = next();
     if (kind.kind === 'number') {
-      if (t.t !== 'num') { pos--; throw new ConditionError(`${event}.${attr} is a whole number ${where()}`); }
+      if (t.t !== 'num') { pos--; throw new ConditionError(`${of}.${attr} is a whole number ${where()}`); }
       return String(t.v);
     }
-    if (t.t !== 'word' && t.t !== 'string') { pos--; throw new ConditionError(`expected a value for ${event}.${attr} ${where()}`); }
+    if (t.t !== 'word' && t.t !== 'string') { pos--; throw new ConditionError(`expected a value for ${of}.${attr} ${where()}`); }
     if (kind.kind === 'enum' && !kind.values.includes(t.v)) {
-      throw new ConditionError(`${event}.${attr} is one of ${kind.values.join(', ')}`);
+      throw new ConditionError(`${of}.${attr} is one of ${kind.values.join(', ')}`);
     }
-    if (kind.kind === 'yesno' && t.v !== 'yes' && t.v !== 'no') throw new ConditionError(`${event}.${attr} is yes or no`);
+    if (kind.kind === 'yesno' && t.v !== 'yes' && t.v !== 'no') throw new ConditionError(`${of}.${attr} is yes or no`);
     return kind.kind === 'name' ? t.v.toUpperCase() : t.v;
   };
 
@@ -663,6 +723,16 @@ function typeOf(e: Expr): ValueType {
       if (typeOf(e.a) !== 'bool') throw new ConditionError('not takes a yes-or-no condition, not a number');
       return 'bool';
   }
+}
+
+/** A sample with its key, its canonical text: `party`, or `party(where …)`. */
+function sampleRef(name: SampleName, where: Filter | null): SampleRef {
+  return { name, where, key: where === null ? name : `${name}(where ${filterText(where)})` };
+}
+
+/** A sample's largest or smallest, keyed by the sample's key: `max(party)`. */
+function maxMin(k: 'max' | 'min', sample: SampleRef): Aggregate {
+  return { k, sample, key: `${k}(${sample.key})` };
 }
 
 /** `agg` with its key, its canonical text, which the tracker's saved state keeps it by. */
@@ -754,7 +824,8 @@ function valuesOf(e: Expr): string[] {
   };
   switch (e.k) {
     case 'value': return [e.name];
-    case 'agg': case 'ever': case 'never': return e.agg.k === 'count' || e.agg.k === 'distinct' ? named(e.agg.where) : [];
+    case 'sample': return named(e.sample.where);
+    case 'agg': case 'ever': case 'never': return named(e.agg.k === 'count' || e.agg.k === 'distinct' ? e.agg.where : e.agg.sample.where);
     case 'cmp': case 'and': case 'or': return [...valuesOf(e.a), ...valuesOf(e.b)];
     case 'not': return valuesOf(e.a);
     default: return [];
@@ -767,6 +838,22 @@ function aggregatesOf(e: Expr): Aggregate[] {
   const walk = (x: Expr): void => {
     switch (x.k) {
       case 'agg': case 'ever': case 'never': out.set(x.agg.key, x.agg); return;
+      case 'cmp': case 'and': case 'or': walk(x.a); walk(x.b); return;
+      case 'not': walk(x.a); return;
+      default: return;
+    }
+  };
+  walk(e);
+  return [...out.values()];
+}
+
+/** The samples a condition reads, bare or in a `max` or `min`, each once by its key. */
+export function samplesOf(e: Expr): SampleRef[] {
+  const out = new Map<string, SampleRef>();
+  const walk = (x: Expr): void => {
+    switch (x.k) {
+      case 'sample': out.set(x.sample.key, x.sample); return;
+      case 'agg': case 'ever': case 'never': if (x.agg.k === 'max' || x.agg.k === 'min') out.set(x.agg.sample.key, x.agg.sample); return;
       case 'cmp': case 'and': case 'or': walk(x.a); walk(x.b); return;
       case 'not': walk(x.a); return;
       default: return;

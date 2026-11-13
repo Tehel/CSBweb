@@ -52,7 +52,12 @@ const VBL_MS = Math.ceil(1000 / VBL_FREQUENCY);
 const set = STOCK_DATA_SET;
 const files = diskFiles(set);
 const common = readFileSync(resolve(import.meta.dirname, '../../src/engine/achievements/defs/common.txt'), 'utf8');
+// csbgame7's four champions wear Dungeon Master's four pairs of boots of speed, which
+// would unlock Speedy Gonzales at its first tick: the tool's own are the ones it watches.
 const defs = setAchievementDefs(common, `# CSBweb achievements 1
+[speedy-gonzales]
+disabled
+
 [t-two]
 name: Two Seconds
 text: Play for two seconds.
