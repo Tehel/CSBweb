@@ -7,7 +7,8 @@
  * against the vocabulary (the events, their attributes, the facts and the samples), and
  * says whether it needs the whole game (`needsWholeGame`). A file with any error is refused
  * whole, each error naming its line. `mergeAchievements` lays a set's file over the common
- * one, and `unknownItems` lists the names a set's objects do not have.
+ * one and puts the set's values in the places that name them, `unknownItems` lists the
+ * names a set's objects do not have, and `unusedValues` the values no achievement names.
  */
 
 /** The first line of every file: the format and its version. */
@@ -18,6 +19,7 @@ export const ACHIEVEMENT_LIMITS = {
   bytes: 64 * 1024,
   achievements: 200,
   id: 40,
+  value: 40,
   name: 32,
   text: 160,
 } as const;
@@ -104,6 +106,12 @@ export type Aggregate =
 /** A condition, or a part of one. */
 export type Expr =
   | { k: 'num'; value: number; type: 'num' | 'seconds' }
+  /**
+   * A named value, `{name}`, which the set's file defines (`value name = n`): `n` times
+   * `scale`, a duration's unit in seconds where one follows it. `mergeAchievements` puts
+   * the number in its place, so the evaluator never meets one.
+   */
+  | { k: 'value'; name: string; type: 'num' | 'seconds'; scale: number }
   | { k: 'fact'; name: FactName }
   | { k: 'sample'; name: SampleName }
   | { k: 'agg'; agg: Aggregate }
@@ -124,14 +132,20 @@ export interface AchievementDef {
   readonly whole: boolean;
   /** The values the condition keeps over the game, each once. */
   readonly aggregates: readonly Aggregate[];
+  /**
+   * The named values its condition and its text name, each once. Out of
+   * `mergeAchievements` they are in their places already, and this says which were.
+   */
+  readonly values: readonly string[];
   /** The line its block starts on. */
   readonly line: number;
 }
 
-/** A file read: its achievements, and the common ones it switches off. */
+/** A file read: its achievements, the common ones it switches off, and its named values. */
 export interface AchievementFile {
   readonly defs: readonly AchievementDef[];
   readonly disabled: readonly string[];
+  readonly values: ReadonlyMap<string, number>;
 }
 
 export interface AchievementError {
@@ -144,6 +158,12 @@ export type AchievementRead =
   | { readonly ok: false; readonly errors: readonly AchievementError[] };
 
 const ID = /^[a-z0-9][a-z0-9-]*$/;
+/** A named value's name, and the same in braces, where a text or a condition names it. */
+const VALUE_NAME = '[A-Za-z][A-Za-z0-9]*';
+const NAMED_IN_TEXT = new RegExp(`\\{(${VALUE_NAME})\\}`, 'g');
+const VALUE_LINE = /^value\s+(\S+)\s*=\s*(\S+)\s*$/;
+/** The largest number a file may write. */
+const MAX_NUMBER = 1e9;
 
 /** Read a file. Every error is listed; a file with any is refused. */
 export function readAchievementFile(text: string): AchievementRead {
@@ -159,6 +179,7 @@ export function readAchievementFile(text: string): AchievementRead {
 
   interface Block { id: string; line: number; fields: Map<string, { value: string; line: number }>; disabled: boolean }
   const blocks: Block[] = [];
+  const values = new Map<string, number>();
   let block: Block | null = null;
   let last: { value: string; line: number } | null = null;
   for (let i = 1; i < lines.length; i++) {
@@ -173,6 +194,18 @@ export function readAchievementFile(text: string): AchievementRead {
       continue;
     }
     last = null;
+    if (/^value\b/.test(content)) {
+      const v = VALUE_LINE.exec(content);
+      const name = v?.[1] ?? '';
+      if (v === null) error(n, 'a value is defined as "value name = number"');
+      else if (block !== null) error(n, 'a value is defined before the first [id]');
+      else if (!new RegExp(`^${VALUE_NAME}$`).test(name) || name.length > ACHIEVEMENT_LIMITS.value) {
+        error(n, `"${name}" is no value's name: 1 to ${ACHIEVEMENT_LIMITS.value} letters and digits, a letter first`);
+      } else if (!/^\d+$/.test(v[2] ?? '') || Number(v[2]) > MAX_NUMBER) error(n, `a value is a whole number from 0 to ${MAX_NUMBER}`);
+      else if (values.has(name)) error(n, `the value "${name}" is defined twice`);
+      else values.set(name, Number(v[2]));
+      continue;
+    }
     const header = /^\[([^\]]*)\]\s*$/.exec(content);
     if (header) {
       const id = header[1] ?? '';
@@ -212,6 +245,7 @@ export function readAchievementFile(text: string): AchievementRead {
     else if (name.value.length > ACHIEVEMENT_LIMITS.name) error(name.line, `the name is over ${ACHIEVEMENT_LIMITS.name} characters`);
     if (!desc || desc.value === '') error(b.line, `"${b.id}" needs a text`);
     else if (desc.value.length > ACHIEVEMENT_LIMITS.text) error(desc.line, `the text is over ${ACHIEVEMENT_LIMITS.text} characters`);
+    else if (/[{}]/.test(desc.value.replace(NAMED_IN_TEXT, ''))) error(desc.line, 'braces in a text hold a value\'s name, as {name}');
     if (tier && !(TIERS as readonly string[]).includes(tier.value)) error(tier.line, `the tier is one of ${TIERS.join(', ')}`);
     if (!when || when.value === '') { error(b.line, `"${b.id}" needs a condition, "when:"`); continue; }
     let expr: Expr;
@@ -223,6 +257,8 @@ export function readAchievementFile(text: string): AchievementRead {
       continue;
     }
     if (!name || !desc) continue;
+    const named = new Set([...desc.value.matchAll(NAMED_IN_TEXT)].map((m) => m[1] ?? ''));
+    for (const v of valuesOf(expr)) named.add(v);
     defs.push({
       id: b.id,
       name: name.value,
@@ -231,26 +267,57 @@ export function readAchievementFile(text: string): AchievementRead {
       when: expr,
       whole: needsWholeGame(expr),
       aggregates: aggregatesOf(expr),
+      values: [...named],
       line: b.line,
     });
   }
   if (defs.length + disabled.length > ACHIEVEMENT_LIMITS.achievements) {
     error(1, `the file holds over ${ACHIEVEMENT_LIMITS.achievements} achievements`);
   }
-  return errors.length > 0 ? { ok: false, errors } : { ok: true, file: { defs, disabled } };
+  return errors.length > 0 ? { ok: false, errors } : { ok: true, file: { defs, disabled, values } };
 }
 
 /**
  * A set's achievements: the common file's, less those the set's file disables, a set's
- * block with a common id in place of the common one, then the set's own.
+ * block with a common id in place of the common one, then the set's own. Each named value
+ * is put in its places, the set's file's over the common one's; an achievement that names
+ * a value neither file defines does not exist in the set.
  */
 export function mergeAchievements(common: AchievementFile, own: AchievementFile | null): AchievementDef[] {
-  if (own === null) return [...common.defs];
+  const values = new Map([...common.values, ...(own?.values ?? [])]);
+  const valued = (defs: readonly AchievementDef[]): AchievementDef[] =>
+    defs.flatMap((d) => { const r = withValues(d, values); return r === null ? [] : [r]; });
+  if (own === null) return valued(common.defs);
   const off = new Set(own.disabled);
   const mine = new Map(own.defs.map(d => [d.id, d]));
   const merged = common.defs.filter(d => !off.has(d.id)).map(d => mine.get(d.id) ?? d);
   const commonIds = new Set(common.defs.map(d => d.id));
-  return [...merged, ...own.defs.filter(d => !commonIds.has(d.id))];
+  return valued([...merged, ...own.defs.filter(d => !commonIds.has(d.id))]);
+}
+
+/** An achievement with its named values in their places, or `null` where one is not defined. */
+function withValues(def: AchievementDef, values: ReadonlyMap<string, number>): AchievementDef | null {
+  if (def.values.length === 0) return def;
+  if (!def.values.every((v) => values.has(v))) return null;
+  const put = (e: Expr): Expr => {
+    switch (e.k) {
+      case 'value': return { k: 'num', value: (values.get(e.name) ?? 0) * e.scale, type: e.type };
+      case 'cmp': return { ...e, a: put(e.a), b: put(e.b) };
+      case 'and': case 'or': return { ...e, a: put(e.a), b: put(e.b) };
+      case 'not': return { ...e, a: put(e.a) };
+      default: return e;
+    }
+  };
+  return { ...def, text: def.text.replace(NAMED_IN_TEXT, (_, v: string) => String(values.get(v))), when: put(def.when) };
+}
+
+/**
+ * The values `own`, a set's file, defines that none of `merged`, the set's achievements
+ * (`mergeAchievements`), names: a misspelt name, or one an achievement no longer uses.
+ */
+export function unusedValues(own: AchievementFile, merged: readonly AchievementDef[]): string[] {
+  const named = new Set(merged.flatMap((d) => d.values));
+  return [...own.values.keys()].filter((v) => !named.has(v));
 }
 
 /**
@@ -294,6 +361,7 @@ type Token =
   | { t: 'string'; v: string }
   | { t: 'num'; v: number }
   | { t: 'dur'; v: number }
+  | { t: 'value'; name: string; unit: string | undefined }
   | { t: 'op'; v: string }
   | { t: 'end' };
 
@@ -309,9 +377,16 @@ function tokenize(text: string): Token[] {
     const num = /^(\d+)([hms])?(?![A-Za-z0-9_])/.exec(rest);
     if (num) {
       const value = Number(num[1]);
-      if (!Number.isSafeInteger(value) || value > 1e9) throw new ConditionError(`${num[1]} is too large`);
+      if (!Number.isSafeInteger(value) || value > MAX_NUMBER) throw new ConditionError(`${num[1]} is too large`);
       tokens.push(num[2] ? { t: 'dur', v: value * (DURATION_SECONDS[num[2]] ?? 1) } : { t: 'num', v: value });
       i += num[0].length;
+      continue;
+    }
+    if (c === '{') {
+      const named = new RegExp(`^\\{(${VALUE_NAME})\\}([hms])?(?![A-Za-z0-9_])`).exec(rest);
+      if (!named || (named[1] ?? '').length > ACHIEVEMENT_LIMITS.value) throw new ConditionError('braces hold a value\'s name, as {name}, or {name}m for minutes');
+      tokens.push({ t: 'value', name: named[1] ?? '', unit: named[2] });
+      i += named[0].length;
       continue;
     }
     const word = /^[A-Za-z_][A-Za-z0-9_']*/.exec(rest);
@@ -347,7 +422,7 @@ export function parseCondition(text: string): Expr {
   };
   const where = (): string => {
     const t = peek();
-    return t.t === 'end' ? 'at the end' : `before "${t.t === 'string' ? `"${t.v}"` : String(t.v)}"`;
+    return t.t === 'end' ? 'at the end' : `before "${t.t === 'string' ? `"${t.v}"` : t.t === 'value' ? `{${t.name}}` : String(t.v)}"`;
   };
 
   const orExpr = (): Expr => {
@@ -377,6 +452,11 @@ export function parseCondition(text: string): Expr {
     const t = next();
     if (t.t === 'num') return { k: 'num', value: t.v, type: 'num' };
     if (t.t === 'dur') return { k: 'num', value: t.v, type: 'seconds' };
+    if (t.t === 'value') {
+      return t.unit === undefined
+        ? { k: 'value', name: t.name, type: 'num', scale: 1 }
+        : { k: 'value', name: t.name, type: 'seconds', scale: DURATION_SECONDS[t.unit] ?? 1 };
+    }
     if (t.t === 'op' && t.v === '(') { const e = orExpr(); expectOp(')'); return e; }
     if (t.t !== 'word') { pos--; throw new ConditionError(`expected a value ${where()}`); }
     if (t.v in FACTS) return { k: 'fact', name: t.v as FactName };
@@ -482,7 +562,7 @@ export function parseCondition(text: string): Expr {
 /** The type of a part, checked all the way down. */
 function typeOf(e: Expr): ValueType {
   switch (e.k) {
-    case 'num': return e.type;
+    case 'num': case 'value': return e.type;
     case 'fact': return FACTS[e.name];
     case 'sample': case 'agg': return 'num';
     case 'ever': case 'never': return 'bool';
@@ -520,7 +600,7 @@ function filterText(f: Filter): string {
 /** How far a numeric part read over a history that starts at a save can be trusted. */
 function boundOf(e: Expr): Bound | null {
   switch (e.k) {
-    case 'num': case 'sample': return 'exact';
+    case 'num': case 'value': case 'sample': return 'exact';
     case 'fact': return e.name === 'playTime' ? 'low' : e.name === 'gameTime' ? 'exact' : null;
     case 'agg': return e.agg.k === 'min' ? 'high' : 'low';
     default: return null;
@@ -569,6 +649,16 @@ function flip(op: Comparison): Comparison {
     case '>': return '<';
     case '>=': return '<=';
     default: return op;
+  }
+}
+
+/** The named values a condition reads. */
+function valuesOf(e: Expr): string[] {
+  switch (e.k) {
+    case 'value': return [e.name];
+    case 'cmp': case 'and': case 'or': return [...valuesOf(e.a), ...valuesOf(e.b)];
+    case 'not': return valuesOf(e.a);
+    default: return [];
   }
 }
 

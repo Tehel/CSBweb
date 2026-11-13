@@ -3,6 +3,12 @@
 # Chaos Strikes Back's own achievements (doc/ACHIEVEMENTS.md), beside the common file's.
 # Its adventure, mini.dat, recruits nobody: the party is the prison's, whole from the start.
 
+# The common file's values.
+
+value speedRunnerMinutes = 180
+value blitzMinutes = 60
+value objectorKills = 40
+
 [here-be-dragons]
 name: Here Be Dragons
 text: Kill 8 dragons.

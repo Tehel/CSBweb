@@ -4,6 +4,12 @@
 # Dungeon Master set reads this file: the Atari's, the Amiga's and the hidden ones
 # (achievementFileOf, PageAchievements.ts).
 
+# The common file's values.
+
+value speedRunnerMinutes = 180
+value blitzMinutes = 60
+value objectorKills = 40
+
 [scrooge]
 name: Scrooge
 text: Carry more than 10 coins at once.

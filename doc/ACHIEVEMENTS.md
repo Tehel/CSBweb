@@ -30,7 +30,9 @@ A set's achievements are `achievements.txt`, an optional file in the set's folde
 `src/engine/achievements/defs/common.txt`. The FTL sets' own achievements are written by the
 project, as `src/engine/achievements/defs/<name>.txt` (`achievementFileOf`,
 `src/engine/achievements/PageAchievements.ts`): `dm-atari.txt`, which every Dungeon Master
-set reads, the Atari's, the Amiga's and the hidden ones, and `csb.txt`. A set with no
+set reads, the Atari's, the Amiga's and the hidden ones, and `csb.txt`. Both give the
+common file's values: Speed Runner in less than 180 minutes, Blitz in less than 60, and
+Conscientious Objector with at most 40 kills. A set with no
 `achievements.txt` of its own reads that file instead. The file is never a game file
 (`GAME_FILES`, `src/data/DataSets.ts`), so a recording's digests never name it, and an
 author can change the file without breaking a recording.
@@ -74,6 +76,28 @@ when: won and ever(eat)
   a common id replaces the common achievement for that set. Disabling an id that the common
   file does not have does nothing, so a published set does not break when the common file
   loses one.
+- **`value name = number`**, on a line of its own before the first block, defines a named
+  value: a whole number from 0 to 1,000,000,000, its name 1 to 40 letters and digits, a
+  letter first. A text names it as `{name}`, and a condition where a number would be, as
+  `{name}`, or `{name}m` for that many minutes (`h` and `s` too), a duration
+  ("Conditions"). The common file names values and defines none; a set's own file defines
+  them:
+
+  ```
+  value blitzMinutes = 60
+
+  [blitz]                       # common.txt
+  name: Blitz
+  text: Win in less than {blitzMinutes} minutes of play.
+  when: won and playTime < {blitzMinutes}m
+  ```
+
+  A set's achievements are its files merged (`mergeAchievements`): the set's values over
+  the common file's, each put in every place that names it. An achievement that names a
+  value the set does not define does not exist in that set: no row in the dialog or the
+  book, no unlock. A set without a file of its own, a player's, has none of the valued
+  ones. A value the set's file defines that none of its achievements names is reported by
+  `unusedValues`, as a misspelt object is by `unknownItems`.
 
 A file with any error is refused as a whole. Each error names its line.
 
@@ -83,8 +107,9 @@ A condition is a yes or a no, made from these parts:
 
 - `and`, `or`, `not`, parentheses, and the comparisons `=`, `!=`, `<`, `<=`, `>`, `>=`
   between two numbers of the same kind.
-- **Numbers**: integers, such as `100`. **Durations**: `3h`, `90m` and `45s`, which are
-  seconds and compare only with `playTime`.
+- **Numbers**: integers, such as `100`, or a named value, `{objectorKills}`.
+  **Durations**: `3h`, `90m` and `45s`, or a named value with its unit,
+  `{speedRunnerMinutes}m`, which are seconds and compare only with `playTime`.
 - **Facts about the game**:
   - `won`, `lost` and `ended` are yes only once the game has ended, won or lost.
   - `gameTime` is the game's clock, `d.Time`, in ticks: about four a second when the party
@@ -277,8 +302,9 @@ their causes, the joins, the meals, the worn objects and the unlocks of Dungeon 
 (DMMovie2615), a lost game and the whole CSB game, each tracked with its set's
 achievements: DMMovie2615's Ful bombs (Grenadier), its champion lost to a wall (Stubbed
 Toe) and its win with one of four alive (Sole Survivor). `tools/checks/achievements-format.ts`
-reads each file, checks its names against its set's `graphics.dat`, and plays the
-conditions out of made-up events.
+reads each file, checks its names against its set's `graphics.dat` and its values against
+its achievements, and plays the conditions out of made-up events, the named values put in
+their places.
 
 ## The page
 

@@ -1214,8 +1214,9 @@ drawing a map from them is a separate item, entered when the author names it.
 
 ### X20 ⏸️ More achievements: the author's list
 
-The achievements are `src/engine/achievements/defs/common.txt`'s 37, `dm-atari.txt`'s 9,
-which every Dungeon Master set reads, and `csb.txt`'s 2 (`doc/ACHIEVEMENTS.md`). The author
+The achievements are `src/engine/achievements/defs/common.txt`'s 39, three of them valued,
+`dm-atari.txt`'s 9, which every Dungeon Master set reads, and `csb.txt`'s 2
+(`doc/ACHIEVEMENTS.md`). The author
 chose the list below, which holds what is left to write. ✓ marks what the
 condition language expresses today; [needs …] names the event or sample the tracker must
 observe first ("The triggers", below). The item is not a setting, unlike the other
@@ -1243,53 +1244,51 @@ extras: an achievement only watches the game.
   single recording proves one, so it is verified once the games it counts are.
 
 **The steps**, one commit each, each with its proof and `doc/ACHIEVEMENTS.md` rewritten to
-say what it built. Step 1 is done: the sets' own files, and every fixed achievement the
-language expresses, Scrooge moved to Dungeon Master's. What is left:
+say what it built. Steps 1 and 2 are done: the sets' own files, every fixed achievement the
+language expresses, Scrooge moved to Dungeon Master's; and the valued (`value` lines,
+`{name}`, `unusedValues`), with Speed Runner, Blitz and Conscientious Objector at the
+author's numbers, 180 minutes, 60 minutes and 40 kills, in both `dm-atari.txt` and
+`csb.txt`. What is left:
 
-2. **Valued.** The `value` line, `{name}` in a text, a named value in a number's or a
-   duration's place, an achievement without its value absent from the set, and the check's
-   report of a value no achievement names. Speed Runner moves; Blitz and Conscientious
-   Objector join. Their numbers are the author's to give: Speed Runner keeps 3 hours in
-   DM and CSB unless told otherwise.
-3. **Counted from the data.** The reader's quantities from the set's own files: its
+3. **A CSB adventure's history**, the author's (b) ("A CSB adventure's history", below): a
+   game begun at RISE's save counts as begun at its start, on the page and in the
+   verifier alike.
+4. **Counted from the data.** The reader's quantities from the set's own files: its
    spells, its foods, the monster types its dungeon places (`DungeonCensus`). Rune
    Scholar, Gourmet, Bestiary.
-4. **Where the party is.** The current level and the squares walked on, and a level left
+5. **Where the party is.** The current level and the squares walked on, and a level left
    with no monster alive: Tourist, Cartographer, Deep Diver, Express Elevator, Clean Sweep.
-5. **The champions' state.** Skill levels, what each wears, the sex, the load, sleep:
+6. **The champions' state.** Skill levels, what each wears, the sex, the load, sleep:
    Low Profile, Archmaster, Jack of All Trades, Speedy Gonzales, Shining Armour, Darc
    Knight, Girl Power, Featherweight, Insomniac.
-6. **The casts and the blows.** The power rune and why a cast failed on `cast`; the
+7. **The casts and the blows.** The power rune and why a cast failed on `cast`; the
    damage dealt, which blow killed what, the item held or an empty hand, a kill by
    landing, `party` on `death`: Blazing Glory Day, Thick Atmosphere, I Know What I'm
    Doing, Overkill, Strike!, Bare Knuckles, Dark Ages, Telefrag, Friendly Fire Fatality.
-7. **The rest of a game's own triggers.** Save loads, a revival at an altar, which
+8. **The rest of a game's own triggers.** Save loads, a revival at an altar, which
    ending, objects combined, a theft, a lock or switch triggered, the Oracle opened, where
    the party came from: Ironman, Hardcore, Lazarus, Gullible, Some Assembly Required,
    Pickpocket's Revenge, Riddle Me This, Self-Reliant, Veterans, Fresh Faces, Corbum
    Courier, Coin-Operated. Size M; split it again if it overruns.
-8. **Across games.** The totals' rows in the saves' database, and how the Hall verifies
+9. **Across games.** The totals' rows in the saves' database, and how the Hall verifies
    them: Hall of Fame Tour, Every Ending, Grand Slam, Encore, and Dungeon Janitor and Lord
    Chaos's HR Problem moved. Size M.
 
-**The existing ones that move.** Speed Runner leaves `common.txt` for a valued
-`speedRunnerMinutes`. Dungeon Janitor (500 kills) and Lord Chaos's HR Problem (1000) become
+**The existing ones that move.** Dungeon Janitor (500 kills) and Lord Chaos's HR Problem (1000) become
 totals across games: DM holds 303 monsters and CSB 266, generators aside, and a ladder over
 games spares the player a First Blood in every run. The lower rungs of the kill ladder
 stay common.
 
-**Waiting on the author: a CSB adventure's history.** CSB's adventure starts at the save
-RISE makes from the prison's (`Chaos.ts`), which holds no history, so no condition that
-needs the whole game ever unlocks in it ("Settled", `doc/ACHIEVEMENTS.md` → "Proofs"):
-none of the common wins without something (Untouchable, Teetotaller, Vegetarian, Ace
-Driver, Emperor's New Clothes and the rest) can be earned in Chaos Strikes Back. Lone
-Wolf is replaced there by Solitary Confinement, `won and party = 1`, which is exact
-because the adventure recruits nobody (`mini.dat` has no champion's mirror). The options:
-(a) leave it, and give CSB exact variants where one exists, as for Lone Wolf; (b) count a
-history begun at RISE's save as the whole game's, on the page and in the verifier alike,
-since the adventure is a game of its own from there and the prison's kills and meals are
-few. (b) is the recommendation: it is one rule, and it makes every common achievement
-CSB's too.
+**A CSB adventure's history.** CSB's adventure starts at the save RISE makes from the
+prison's (`Chaos.ts`), which holds no history, so no condition that needs the whole game
+unlocks in it yet ("Settled", `doc/ACHIEVEMENTS.md` → "Proofs"): none of the common wins
+without something (Untouchable, Teetotaller, Vegetarian, Ace Driver, Emperor's New
+Clothes, Speed Runner and the rest) can be earned in Chaos Strikes Back. The author chose
+(b): a history begun at RISE's save counts as the whole game's, on the page and in the
+verifier alike, since the adventure is a game of its own from there and the prison's
+kills and meals are few. It is one rule, and it makes every common achievement CSB's too.
+Solitary Confinement, CSB's Lone Wolf (`won and party = 1`, exact because the adventure
+recruits nobody), stays.
 
 **Common, fixed.**
 
@@ -1335,10 +1334,6 @@ CSB's too.
 
 **Common, valued.**
 
-- **Speed Runner** (hard): win in less than `speedRunnerMinutes` minutes of play. ✓
-- **Blitz** (hard): win in less than `blitzMinutes` minutes, a tier above Speed Runner. ✓
-- **Conscientious Objector** (hard): win having killed at most `objectorKills` monsters,
-  the fewest the dungeon forces. ✓
 - **Clean Sweep** (hard): leave a level with no monster alive on it, among the levels
   the set lists (DM's would leave out the Hall of Champions and the Dragon's level).
   [census]

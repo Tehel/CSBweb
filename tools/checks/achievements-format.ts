@@ -5,7 +5,7 @@
  *
  * None of it is CSBWin's, and none of it shows on a frame. What to look for in the output:
  * each common achievement with its tier, whether it needs the whole game (`whole`), and
- * the aggregates it keeps by their keys. Every name the common file gives an item must be
+ * the aggregates it keeps by their keys, and the values it names. Every name the common file gives an item must be
  * one of FTL's objects, which is the canary: a name misspelt there would match nothing,
  * silently, in every set.
  *
@@ -14,7 +14,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
-  mergeAchievements, needsWholeGame, parseCondition, readAchievementFile, unknownItems,
+  mergeAchievements, needsWholeGame, parseCondition, readAchievementFile, unknownItems, unusedValues,
   type AchievementDef, type AchievementFile,
 } from '../../src/engine/achievements/AchievementFile';
 import { AchievementState, type AchievementEvent } from '../../src/engine/achievements/AchievementState';
@@ -48,15 +48,21 @@ function commonFile(): AchievementFile {
   for (const d of r.file.defs) {
     console.log(`  ${d.id.padEnd(20)} ${d.tier.padEnd(5)} ${d.whole ? 'whole' : '     '}  ${d.name}`);
     for (const a of d.aggregates) console.log(`      ${a.key}`);
+    for (const v of d.values) console.log(`      {${v}}`);
   }
   const whole = new Set([
-    'five-a-day', 'leather-is-enough', 'minimalist-mage', 'lone-wolf', 'buddy-cop', 'speed-runner', 'teetotaller',
-    'vegetarian', 'carnivore', 'untouchable', 'ace-driver', 'emperors-new-clothes',
+    'five-a-day', 'leather-is-enough', 'minimalist-mage', 'lone-wolf', 'buddy-cop', 'speed-runner', 'blitz', 'teetotaller',
+    'vegetarian', 'carnivore', 'untouchable', 'ace-driver', 'emperors-new-clothes', 'conscientious-objector',
   ]);
   for (const d of r.file.defs) {
     check(d.whole === whole.has(d.id), `${d.id} ${whole.has(d.id) ? 'needs' : 'does not need'} the whole game`);
   }
   check(r.file.disabled.length === 0, 'common.txt disables nothing');
+  check(r.file.values.size === 0, 'common.txt defines no value: a set without its own file has no valued achievement');
+  const valued = r.file.defs.filter((d) => d.values.length > 0).map((d) => `${d.id} {${d.values.join(', ')}}`);
+  console.log(`  valued: ${valued.join('; ')}`);
+  check(valued.join('; ') === 'speed-runner {speedRunnerMinutes}; blitz {blitzMinutes}; conscientious-objector {objectorKills}',
+    'Speed Runner, Blitz and Conscientious Objector are the valued ones, each naming its value in its text and its condition');
 
   const names = new Set(graphicsTablesOf(stockGraphics()).objects.objectNames);
   console.log(`--- common.txt's item names against graphics.dat's ${names.size} names`);
@@ -74,7 +80,7 @@ function commonFile(): AchievementFile {
  * A set's own file, `defs/<name>.txt`: read, printed, its names against the set's
  * `graphics.dat`, laid over the common file, and the sets that read it.
  */
-function setFile(common: AchievementFile, name: string, graphicsDir: string, whole: readonly string[]): AchievementFile {
+function setFile(common: AchievementFile, name: string, graphicsDir: string, whole: readonly string[], values: string): AchievementFile {
   console.log(`--- ${name}.txt`);
   const r = readAchievementFile(readFileSync(resolve(DEFS, `${name}.txt`), 'utf8'));
   check(r.ok, `${name}.txt reads`);
@@ -91,9 +97,15 @@ function setFile(common: AchievementFile, name: string, graphicsDir: string, who
     const unknown = unknownItems(d, names);
     check(unknown.length === 0, `${d.id} names only ${graphicsDir}'s objects (not ${unknown.join(', ')})`);
   }
+  const given = [...r.file.values].map(([v, n]) => `${v} = ${n}`).join(', ');
+  console.log(`  values: ${given}`);
+  check(given === values, `${name}.txt gives ${values}`);
   const merged = mergeAchievements(common, r.file);
   const replaced = r.file.defs.filter((d) => common.defs.some((c) => c.id === d.id)).length;
-  check(merged.length === common.defs.length + r.file.defs.length - replaced, `${name}.txt adds ${r.file.defs.length - replaced} to the common file and replaces ${replaced}`);
+  check(merged.length === common.defs.length + r.file.defs.length - replaced, `${name}.txt adds ${r.file.defs.length - replaced} to the common file and replaces ${replaced}, every valued one there`);
+  const unused = unusedValues(r.file, merged);
+  check(unused.length === 0, `every value ${name}.txt gives is named (not ${unused.join(', ')})`);
+  for (const d of merged.filter((m) => m.values.length > 0)) console.log(`  ${d.id.padEnd(24)} ${d.text}`);
   const readers = DATA_SETS.filter((set) => achievementFileOf(set.id) === name).map((set) => set.id);
   console.log(`  read by ${readers.join(', ')}`);
   check(readers.length > 0, `${name}.txt is read by a set`);
@@ -132,6 +144,15 @@ function errors(): void {
     ['max of an event', block('max(kill) > 1'), 5, /takes a sample/],
     ['something left over', block('won won'), 5, /unexpected/],
     ['an unknown word', block('victory'), 5, /no fact/],
+    ['a value after a block', `${H}[a]\nname: A\ntext: T\nwhen: won\nvalue n = 3\n`, 6, /before the first/],
+    ['a value defined twice', `${H}value n = 3\nvalue n = 4\n`, 3, /twice/],
+    ['a value\'s bad name', `${H}value 2n = 3\n`, 2, /no value's name/],
+    ['a value not a whole number', `${H}value n = 1.5\n`, 2, /whole number/],
+    ['a value line without its number', `${H}value n\n`, 2, /value name = number/],
+    ['a brace not a value\'s', `${H}[a]\nname: A\ntext: Kill {n monsters.\nwhen: won\n`, 4, /braces/],
+    ['a value\'s braces not closed', block('count(kill) >= {n'), 5, /braces/],
+    ['a value in minutes against a count', block('count(kill) >= {n}m'), 5, /duration/],
+    ['play time against a bare value', block('playTime < {n}'), 5, /duration/],
   ];
   for (const [what, text, line, message] of cases) {
     const r = readAchievementFile(text);
@@ -175,6 +196,9 @@ function wholeGame(): void {
     ['distinct(cast.spell) >= 10', false],
     ['count(kill) > count(eat)', true],
     ['won or never(eat)', true],
+    ['count(kill) >= {n}', false],
+    ['won and count(kill) <= {n}', true],
+    ['won and playTime < {n}m', true],
   ];
   for (const [text, expected] of cases) {
     const got = needsWholeGame(parseCondition(text));
@@ -225,8 +249,8 @@ function evaluator(common: AchievementFile, dm: AchievementFile): void {
   const won = state.evaluate();
   console.log(`  won, all apples and corn, two hours, one champion: ${won.join(', ')}`);
   const clean = ['teetotaller', 'vegetarian', 'untouchable', 'ace-driver', 'emperors-new-clothes', 'let-sleeping-dragons-lie', 'brute-force'];
-  check(sameIds(won, ['five-a-day', 'leather-is-enough', 'minimalist-mage', 'roll-the-credits', 'lone-wolf', 'speed-runner', ...clean]),
-    'the win unlocks the diet, the leather, the spells, the credits, the lone wolf, the speed and every win without something');
+  check(sameIds(won, ['five-a-day', 'leather-is-enough', 'minimalist-mage', 'roll-the-credits', 'lone-wolf', 'speed-runner', 'conscientious-objector', ...clean]),
+    'the win unlocks the diet, the leather, the spells, the credits, the lone wolf, the speed in two hours of 180 minutes but not the blitz of 60, eleven kills of 40, and every win without something');
 
   restored.record(eat('BREAD'));
   restored.sample('party', 3);
@@ -234,7 +258,7 @@ function evaluator(common: AchievementFile, dm: AchievementFile): void {
   restored.ended(true);
   const branch = restored.evaluate();
   console.log(`  the branch, bread, three champions, four hours: ${branch.join(', ')}`);
-  check(sameIds(branch, ['leather-is-enough', 'minimalist-mage', 'roll-the-credits', ...clean]),
+  check(sameIds(branch, ['leather-is-enough', 'minimalist-mage', 'roll-the-credits', 'conscientious-objector', ...clean]),
     'the branch that ate bread with three champions in four hours wins none of the diet, the lone wolf and the speed');
 
   // A party of four, reincarnated, carnivorous, that kills the Dragon and every knight.
@@ -259,8 +283,12 @@ function evaluator(common: AchievementFile, dm: AchievementFile): void {
   four.ended(true);
   const fourWon = four.evaluate();
   console.log(`  …won: ${fourWon.join(', ')}`);
-  check(sameIds(fourWon, ['roll-the-credits', 'full-house', 'new-souls', 'carnivore', 'teetotaller', 'ace-driver', 'emperors-new-clothes', 'speed-runner', 'minimalist-mage', 'leather-is-enough', 'brute-force']),
-    'won with four alive, reincarnated, eating only meat, every cast failed: Full House, New Souls, Carnivore, Brute Force, not Untouchable, Vegetarian nor To Serve Man');
+  check(sameIds(fourWon, ['roll-the-credits', 'full-house', 'new-souls', 'carnivore', 'teetotaller', 'ace-driver', 'emperors-new-clothes', 'speed-runner', 'blitz', 'conscientious-objector', 'minimalist-mage', 'leather-is-enough', 'brute-force']),
+    'won with four alive, reincarnated, eating only meat, every cast failed, at once and with 18 kills: Full House, New Souls, Carnivore, Brute Force, Blitz, Conscientious Objector, not Untouchable, Vegetarian nor To Serve Man');
+  const butcher = new AchievementState(defs, true);
+  for (let i = 0; i < 41; i++) butcher.record(kill());
+  butcher.ended(true);
+  check(!butcher.evaluate().includes('conscientious-objector'), 'a win with 41 kills is no Conscientious Objector');
   const survivor = new AchievementState(defs, false);
   survivor.sample('party', 4);
   survivor.sample('alive', 1);
@@ -308,8 +336,37 @@ function merging(common: AchievementFile): void {
   check(merged.find(d => d.id === 'first-blood')?.name === 'Blooded', 'a set\'s block replaces the common one of its id');
   check(ids.indexOf('first-blood') === 0, 'the replaced one keeps its place');
   check(ids[ids.length - 1] === 'mine', 'the set\'s own come after the common ones');
-  check(merged.length === common.defs.length, 'disabling an id the common file lacks does nothing');
-  check(mergeAchievements(common, null).length === common.defs.length, 'a set with no file has the common ones');
+  const fixed = common.defs.filter((d) => d.values.length === 0).length;
+  check(merged.length === fixed, 'disabling an id the common file lacks does nothing, and a valued one whose value the set lacks is absent');
+  check(mergeAchievements(common, null).length === fixed, 'a set with no file has the common ones, less the valued');
+  check(!mergeAchievements(common, null).some((d) => d.id === 'speed-runner'), 'a set with no file has no Speed Runner');
+
+  console.log('--- named values');
+  const valued = read('# CSBweb achievements 1\nvalue speedRunnerMinutes = 90\nvalue kills = 7\nvalue spare = 1\n'
+    + '[seven]\nname: Seven\ntext: Kill {kills}, then {kills} more.\nwhen: count(kill) >= {kills}\n'
+    + '[nowhere]\nname: Nowhere\ntext: T\nwhen: count(kill) >= {absent}\n');
+  const set = mergeAchievements(common, valued);
+  const seven = set.find((d) => d.id === 'seven');
+  const speed = set.find((d) => d.id === 'speed-runner');
+  console.log(`  ${seven?.text} / ${speed?.text}`);
+  check(seven?.text === 'Kill 7, then 7 more.', 'a value is put in every place its text names it');
+  check(speed?.text === 'Win in less than 90 minutes of play.' && !set.some((d) => d.id === 'blitz'),
+    'the set\'s value reaches a common achievement, and one whose value it does not give is absent');
+  check(!set.some((d) => d.id === 'nowhere'), 'the set\'s own achievement naming a value nobody gives is absent');
+  check(unusedValues(valued, set).join() === 'spare', 'unusedValues names the value no achievement names');
+  const counting = new AchievementState(set, true);
+  for (let i = 0; i < 6; i++) counting.record(kill());
+  check(!counting.evaluate().includes('seven'), 'six kills are not {kills}');
+  counting.record(kill());
+  check(counting.evaluate().includes('seven'), 'the seventh is');
+  const timed = new AchievementState(set, true);
+  timed.addVbls(60 * 60 * 89);
+  timed.ended(true);
+  check(timed.evaluate().includes('speed-runner'), 'a win in 89 minutes is less than {speedRunnerMinutes}m, 90');
+  const late = new AchievementState(set, true);
+  late.addVbls(60 * 60 * 90);
+  late.ended(true);
+  check(!late.evaluate().includes('speed-runner'), 'one in 90 is not');
 }
 
 function sameIds(a: readonly string[], b: readonly string[]): boolean {
@@ -318,8 +375,9 @@ function sameIds(a: readonly string[], b: readonly string[]): boolean {
 
 function main(): void {
   const common = commonFile();
-  const dm = setFile(common, 'dm-atari', STOCK_DIR, ['let-sleeping-dragons-lie', 'brute-force']);
-  setFile(common, 'csb', 'tools/fixtures/gamefiles/csb', []);
+  const values = 'speedRunnerMinutes = 180, blitzMinutes = 60, objectorKills = 40';
+  const dm = setFile(common, 'dm-atari', STOCK_DIR, ['let-sleeping-dragons-lie', 'brute-force'], values);
+  setFile(common, 'csb', 'tools/fixtures/gamefiles/csb', [], values);
   for (const set of DATA_SETS) {
     if (set.id.startsWith('dm-')) check(achievementFileOf(set.id) === 'dm-atari', `${set.id}, a Dungeon Master set, reads dm-atari.txt`);
   }

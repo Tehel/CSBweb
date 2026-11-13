@@ -1,7 +1,8 @@
 # CSBweb achievements 1
 #
 # The achievements every data set has (doc/ACHIEVEMENTS.md). A set's own achievements.txt
-# adds to them, replaces one by giving its id, or switches one off with "disabled".
+# adds to them, replaces one by giving its id, or switches one off with "disabled". An
+# achievement that names a value, {name}, exists only in a set whose file defines it.
 # The names are FTL's objects; one a set's objects do not have matches nothing there.
 
 # The kill ladder.
@@ -211,12 +212,6 @@ text: Win with a party of two.
 tier: hard
 when: won and max(party) = 2
 
-[speed-runner]
-name: Speed Runner
-text: Win in less than three hours of play.
-tier: hard
-when: won and playTime < 3h
-
 [untouchable]
 name: Untouchable
 text: Win without a champion ever dying.
@@ -240,3 +235,25 @@ name: Emperor's New Clothes
 text: Win without putting on anything but a necklace.
 tier: hard
 when: won and never(wear where slot != neck)
+
+# The valued: a set without the value in its own file has no such achievement.
+
+[speed-runner]
+name: Speed Runner
+text: Win in less than {speedRunnerMinutes} minutes of play.
+tier: hard
+when: won and playTime < {speedRunnerMinutes}m
+
+[blitz]
+name: Blitz
+text: Win in less than {blitzMinutes} minutes of play.
+tier: hard
+when: won and playTime < {blitzMinutes}m
+
+# objectorKills: about the fewest kills the set's dungeon forces on the way to its end.
+
+[conscientious-objector]
+name: Conscientious Objector
+text: Win having killed no more than {objectorKills} monsters.
+tier: hard
+when: won and count(kill where party = yes) <= {objectorKills}
