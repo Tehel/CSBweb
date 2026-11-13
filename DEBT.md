@@ -1277,23 +1277,15 @@ the Firestaff's bearer to (`doc/ACHIEVEMENTS.md` → "Where a game ends"). Step 
 the `swap` event at a type 16 actuator and the `theft` event at `StealFromCharacter`, a
 kill's `thief` where its group carries an object taken, with Dungeon Master's Some
 Assembly Required and Pickpocket's Revenge (`doc/ACHIEVEMENTS.md` → "The happenings").
-Step 8c is done but for Corbum Courier: the `trigger` event at each actuator that calls
+Step 8c is done: the `trigger` event at each actuator that calls
 `QueueSwitchAction`, its square and the object that fired it, with Dungeon Master's Riddle
 Me This, the riddle room's counter at 4 firing the combination of map 5 (13,19), and CSB's
 Coin-Operated, its nine GOR COIN locks (`doc/ACHIEVEMENTS.md` → "Locks and switches").
-What is left:
+Corbum Courier is not made, at the author's choice: delivering the fourth CORBUM to the
+FULYA PIT is what wins Chaos Strikes Back (`doc/CSBwin-src/Attack.cpp:2204`), so its time
+limit would be Speed Runner's and Blitz's again. What is left:
 
-8. **The rest of a game's own triggers**, in three parts left, one commit each:
-   - **8c. Corbum Courier** (S), waiting on the author. Delivering the fourth CORBUM is
-     what wins Chaos Strikes Back: each one dropped in the FULYA PIT, map 0 (1,24), lands
-     on (21,0)'s pads, which count the four down at (1,23), and the game ends with the
-     fourth ("We won the game with 4 corbums in FulYa pit", `doc/CSBwin-src/Attack.cpp:2204`).
-     So "deliver every CORBUM within N hours of play" is `won and playTime < {N}h`, which
-     `csb.txt`'s Speed Runner (180 minutes) and Blitz (60) already are. The options:
-     (a) drop it; (b) keep it as worded, a third time limit beside those two;
-     (c) time the deliveries themselves, every CORBUM within N minutes of the first, which
-     needs the language to read when an event happened (a new form, `gameTime` of an
-     event, M); (d) another rule the author names, such as the four carried at once.
+8. **The rest of a game's own triggers**, in two parts left, one commit each:
    - **8d. A revival and where the party came from** (M): Lazarus, Veterans, Fresh Faces.
    - **8e. Save loads** (S): Ironman, Hardcore. A load is a `read` the tracker sees,
      and the boot's CONTINUE after the page was closed is one too: the recording's path
@@ -1330,8 +1322,6 @@ improve.
   ADVENTURE. [where the party came from]
 - **Fresh Faces** (hard): win with a party recruited in the prison, none of them
   imported. [where the party came from]
-- **Corbum Courier** (hard): deliver every CORBUM within N hours of play. [waits on the
-  author, step 8c]
 
 **Across games.**
 
@@ -1349,7 +1339,6 @@ improve.
 | Trigger or sample | Achievements |
 | --- | --- |
 | Progress across games | Hall of Fame Tour, Every Ending, Grand Slam, Encore, Dungeon Janitor, HR Problem |
-| Corbum Courier's rule, the author's | Corbum Courier |
 | Save loads | Ironman, Hardcore |
 | Which ending, across games (Gullible's unlock for DM's bad one) | Every Ending |
 | Where the party came from | Veterans, Fresh Faces |
