@@ -355,6 +355,10 @@ export class ActuatorSystem {
 
           if (!switchOpen) {
             result = true;
+            // Before a lock takes the key: the object in hand as the switch fires.
+            if (this.ctx.host.observing) {
+              this.ctx.host.observe({ k: 'trigger', level: position.z, x: position.x, y: position.y, item: objectInHand, hand: true });
+            }
             if (isActuatorAudible(rec)) {
               this.ctx.sounds.queueSound(1, party.position.x, party.position.y, 1, party.position.z);
             }
@@ -494,6 +498,9 @@ export class ActuatorSystem {
       return false;
     }
 
+    if (this.ctx.host.observing) {
+      this.ctx.host.observe({ k: 'trigger', level: position.z, x: position.x, y: position.y, item: object, hand: false });
+    }
     if (isActuatorAudible(rec)) {
       this.ctx.sounds.queueSound(SOUND_PRESSURE_PAD, position.x, position.y, 1, position.z);
     }

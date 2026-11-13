@@ -291,6 +291,11 @@ export class AchievementTracker {
         this.record('theft', { champion: this.championName(h.chIdx), item: this.itemName(h.object), monster: MONSTER_NAMES[h.type] ?? `${h.type}` });
         return;
       case 'swap': this.record('swap', { item: this.itemName(h.given), took: this.itemName(h.taken) }); return;
+      case 'trigger':
+        this.record('trigger', {
+          level: `${h.level}`, x: `${h.x}`, y: `${h.y}`, item: h.hand && h.item === OBJECT_ID_NULL ? EMPTY_HAND : this.itemName(h.item),
+        });
+        return;
       case 'sleep': this.record('sleep', {}); return;
       case 'oracle': this.record('oracle', {}); return;
       case 'tick': this.strikeMissile = null; this.strikeKills.clear(); this.tick(); return;

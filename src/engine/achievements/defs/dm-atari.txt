@@ -136,3 +136,14 @@ name: Pickpocket's Revenge
 text: Be robbed by a Giggler, then kill it.
 tier: silly
 when: ever(kill where party = yes and monster = Giggler and thief = yes)
+
+# The riddle room, map 5: an alcove holding its answer, at (9,17), (12,17), (9,23) or
+# (12,23), counts the counters of (13,23) down, and taken back counts them up. The one at
+# 4 reaches 0 only with the four answers in at once, and stays there: it fires the
+# combination of (13,19), which nothing else reaches.
+
+[riddle-me-this]
+name: Riddle Me This
+text: Answer the four riddles of the riddle room at once.
+tier: easy
+when: ever(trigger where level = 5 and x = 13 and y = 19)

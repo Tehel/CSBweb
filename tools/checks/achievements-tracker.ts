@@ -69,6 +69,11 @@
  *    take seven, and the party kills three of the thieves (Pickpocket's Revenge). A new
  *    game's Giggler that robbed nobody is no thief, and the two whose group takes a torch
  *    from the ready hand are, across a save kept and read back.
+ * 12. The locks and switches triggered: a trigger with a GOR COIN at a wall for each coin
+ *    the wall took from the hand; Riddle Me This unlocks the tick after the riddle room's
+ *    counter at 4 reaches 0, which the Dungeon Master wins do and DMMovie42, three riddles
+ *    answered, does not; Chaos Strikes Back's adventure has nine GOR COIN locks, and the
+ *    whole game feeds them all (Coin-Operated).
  *
  * Usage: npm test -- --only=achievements-tracker.ts [<package name>…] [--not=<name>] [--events]
  */
@@ -84,14 +89,16 @@ import { isNewAdventure } from '../../src/engine/Chaos';
 import { achievementFileOf } from '../../src/engine/achievements/PageAchievements';
 import { BLOW_END, type Happening } from '../../src/engine/Happening';
 import { MonsterType } from '../../src/engine/monsterTypes';
-import type { CreatureRecord } from '../../src/data/dungeonTypes';
+import type { ActuatorRecord, CreatureRecord } from '../../src/data/dungeonTypes';
+import { getActuatorTargetY, getActuatorType, getActuatorValue } from '../../src/data/actuatorHelpers';
+import type { DungeonState } from '../../src/engine/DungeonState';
 import { readRecordingPackage } from '../../src/engine/RecordingPackage';
 import { CHARFLAG_MALE, getChampionPossession } from '../../src/core/charDesc';
 import { NameIndex } from '../../src/engine/objectIndex';
 import { isAlive } from '../../src/engine/rules';
 import { determineMastery } from '../../src/engine/skills';
 import { MonsterDamageResult } from '../../src/engine/MonsterDamage';
-import { OBJECT_ID_EOF, OBJECT_ID_NULL, Position } from '../../src/core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position } from '../../src/core/types';
 import { MovementAction } from '../../src/engine/gameTypes';
 import { OBJNI_THE_FIRESTAFF_A, OBJNI_THE_FIRESTAFF_B } from '../../src/core/objectNameIndex';
 import { testChampion } from '../lib/champion';
@@ -160,6 +167,30 @@ interface StealFromCharacter {
   stealFromCharacter(monster: CreatureRecord, chIdx: number): void;
 }
 
+/** The actuators on square `at`. */
+function actuatorsAt(dungeon: DungeonState, at: Position): ActuatorRecord[] {
+  const found: ActuatorRecord[] = [];
+  for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
+    const rec = dungeon.rnMaps.dbType(rn) === DBType.ACTUATOR ? dungeon.getActuatorRecord(rn) : undefined;
+    if (rec) found.push(rec);
+  }
+  return found;
+}
+
+/** The locks of type 4 that take a GOR COIN, by square, `level:x,y`, and how many sides of it hold one. */
+function coinLocksOf(dungeon: DungeonState, names: readonly string[]): Map<string, number> {
+  const locks = new Map<string, number>();
+  for (let z = 0, map = dungeon.getMap(z); map; map = dungeon.getMap(++z)) {
+    for (let x = 0; x < map.descriptor.width; x++) {
+      for (let y = 0; y < map.descriptor.height; y++) {
+        const n = actuatorsAt(dungeon, new Position(x, y, z)).filter((a) => getActuatorType(a) === 4 && names[getActuatorValue(a)] === 'GOR COIN').length;
+        if (n > 0) locks.set(`${z}:${x},${y}`, n);
+      }
+    }
+  }
+  return locks;
+}
+
 /** The set's achievements, as the page merges them (`achievementFileOf`), and this tool's own. */
 function defsOf(setId: string): AchievementDef[] {
   const path = resolve(DEFS, `${achievementFileOf(setId)}.txt`);
@@ -226,6 +257,12 @@ for (const file of corpusFiles()) {
   const failures = { meaningless: 0, practice: 0, flask: 0 };
   /** The objects `StealFromCharacter` took, read by the tool itself. */
   let taken = 0;
+  /** The d.Time of the first tick's end the riddle room's counter at 4, map 5 (13,23), has reached 0, read by the tool itself, and its last value. */
+  let riddleSolved = -1;
+  let riddleCount = -1;
+  /** The walls' sides that hold a lock taking a GOR COIN, by square, as the history's first tick finds them, and how many the hand fed. */
+  let coinLocks: Map<string, number> | null = null;
+  const coinsTaken = new Map<string, number>();
   /** The `DamageMonster` calls that hurt or killed, and their damage, read by the tool itself. */
   let hurtCalls = 0;
   let hurtDamage = 0;
@@ -275,6 +312,17 @@ for (const file of corpusFiles()) {
       stealFromCharacter(monster, chIdx);
       taken += before - held();
     };
+    const actuators = page.game.ctx.systems.actuators;
+    const touchWall = actuators.touchWall.bind(actuators);
+    actuators.touchWall = (position, side) => {
+      const { ctx } = page.game;
+      const hand = ctx.party.state.objectInHand;
+      const coin = hand !== OBJECT_ID_NULL && names[NameIndex(ctx.dungeon, ctx.tables, ctx.party.state.facing, hand)] === 'GOR COIN';
+      const fired = touchWall(position, side);
+      const key = `${position.z}:${position.x},${position.y}`;
+      if (coin && fired && ctx.party.state.objectInHand === OBJECT_ID_NULL) coinsTaken.set(key, (coinsTaken.get(key) ?? 0) + 1);
+      return fired;
+    };
     const observe = host.observe;
     host.observe = (h: Happening) => {
       if (h.k === 'blow') emptyHanded.push(h.by === 'melee' && h.item === OBJECT_ID_NULL);
@@ -287,6 +335,13 @@ for (const file of corpusFiles()) {
         if (bootsWorn && bootsTick < 0) bootsTick = time;
         if (firstGemmed < 0 && party.objectInHand !== OBJECT_ID_NULL
           && NameIndex(ctx.dungeon, ctx.tables, party.facing, party.objectInHand) === OBJNI_THE_FIRESTAFF_B) firstGemmed = time;
+        if (riddleSolved < 0 && found.id.startsWith('dm-')) {
+          const counter = actuatorsAt(ctx.dungeon, new Position(13, 23, 5)).find((a) => getActuatorType(a) === 6 && getActuatorTargetY(a) === 19);
+          const value = counter ? getActuatorValue(counter) : -1;
+          if (value === 0 && riddleCount > 0) riddleSolved = time;
+          riddleCount = value;
+        }
+        coinLocks ??= coinLocksOf(ctx.dungeon, names);
         let maleNow = 0;
         party.champions.forEach((champ, i) => {
           if (!champ || i === party.potentialChampionIndex) return;
@@ -455,8 +510,26 @@ for (const file of corpusFiles()) {
   check(count(events, 'theft') === taken, `${file}: a theft for each object a Giggler's blow took (${taken})`);
   check(count(events, 'kill', { thief: 'yes' }) === 0 || taken > 0, `${file}: no group is a thief where nothing was stolen`);
 
+  // 12. The locks and switches triggered.
+  const coinFed = (key: string): number => count(events, 'trigger', {
+    level: key.split(':')[0]!, x: key.split(/[:,]/)[1]!, y: key.split(',')[1]!, item: 'GOR COIN',
+  });
+  const lockSides = coinLocks ?? new Map<string, number>();
+  const allLocks = lockSides.size > 0 && [...lockSides].every(([key, sides]) => (coinsTaken.get(key) ?? 0) >= sides);
+  console.log(`  riddle room solved at ${riddleSolved}; GOR COIN locks ${[...lockSides].map(([key, sides]) => `${key}${sides > 1 ? ` x${sides}` : ''}`).join(' ') || 'none'}, fed ${[...coinsTaken].map(([key, n]) => `${key} x${n}`).join(' ') || 'none'}`);
+  for (const [key, n] of coinsTaken) check(coinFed(key) === n, `${file}: a trigger with a GOR COIN at ${key} for each coin a wall there took (${n})`);
+  if (defs.some((d) => d.id === 'riddle-me-this')) {
+    check(at('riddle-me-this') === (riddleSolved < 0 ? -1 : riddleSolved + 1),
+      `${file}: Riddle Me This unlocks the tick after the riddle room's counter at 4 reaches 0, d.Time ${riddleSolved}, as its message reaches map 5 (13,19) (${at('riddle-me-this')})`);
+  }
+  if (defs.some((d) => d.id === 'coin-operated')) {
+    check(lockSides.size === 8 && [...lockSides.values()].reduce((a, b) => a + b, 0) === 9, `${file}: Chaos Strikes Back's adventure has nine GOR COIN locks, on eight walls`);
+    check(unlocked.has('coin-operated') === allLocks, `${file}: Coin-Operated ${allLocks ? 'unlocks' : 'stays locked'}, as the locks fed say`);
+  }
+
   // 3. What the games hold.
   if (name === 'DMMovie2615') {
+    check(riddleSolved >= 0, 'DMMovie2615 answers the riddle room\'s four riddles at once');
     check(swaps.length === 1 && firstGemmed >= 0, 'DMMovie2615 joins the Power Gem to the Firestaff, its one swap');
     for (const hero of ['HALK', 'STAMM', 'LEYLA', 'GOTHMOG']) {
       check(count(events, 'join', { champion: hero, how: 'resurrect' }) === 1, `DMMovie2615: ${hero} joins, resurrected`);
@@ -520,6 +593,8 @@ for (const file of corpusFiles()) {
     const playVbls = Math.round(played.game.playTime() * 60 / 1000);
     check(Math.abs(tracker.playedVbls - playVbls) <= 1, `DMMovie2615: the play time counted is the game's, ${tracker.playedVbls} VBLs (${playVbls})`);
   }
+  if (name === 'DMMovie42') check(riddleSolved < 0 && !unlocked.has('riddle-me-this'), 'DMMovie42: three riddles answered, not the fourth: Riddle Me This stays locked');
+  if (name === 'CSBFullRecordingV4') check(allLocks && unlocked.has('coin-operated'), 'CSBFullRecordingV4: every GOR COIN lock opened, Coin-Operated');
   if (name === 'DMMovie2823') {
     check(count(events, 'theft', { monster: 'Giggler' }) === 7 && count(events, 'kill', { party: 'yes', monster: 'Giggler', thief: 'yes' }) === 3
       && unlocked.has('pickpockets-revenge'), 'DMMovie2823: Gigglers take seven objects, the party kills three of the thieves: Pickpocket\'s Revenge');

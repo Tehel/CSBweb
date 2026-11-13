@@ -835,7 +835,11 @@ export class TimerSystem {
     // The counter hands `QueueSwitchAction` its own target as the switch's square
     // (doc/CSBwin-src/Timer.cpp:1610-1612, :1657, :1672).
     const source = new Position(getActuatorTargetX(actuator), getActuatorTargetY(actuator), target.z);
-    if (getActuatorAction(actuator) === ActuatorAction.CONSTPRESSURE) {
+    const constPressure = getActuatorAction(actuator) === ActuatorAction.CONSTPRESSURE;
+    if ((constPressure || counter === 0) && this.ctx.host.observing) {
+      this.ctx.host.observe({ k: 'trigger', level: target.z, x: target.x, y: target.y, item: OBJECT_ID_NULL, hand: false });
+    }
+    if (constPressure) {
       const pressed = counter === 0;
       const closed = pressed !== isActuatorNormallyClosed(actuator);
       this.ctx.systems.actuators.queueSwitchAction(
@@ -911,7 +915,11 @@ export class TimerSystem {
 
     // The switch's square is the timer's, the actuator's own (doc/CSBwin-src/Timer.cpp:2331-2346), which
     // is what a local action rotates.
-    if (getActuatorAction(actuator) === ActuatorAction.CONSTPRESSURE) {
+    const constPressure = getActuatorAction(actuator) === ActuatorAction.CONSTPRESSURE;
+    if ((constPressure || closed) && this.ctx.host.observing) {
+      this.ctx.host.observe({ k: 'trigger', level: target.z, x: target.x, y: target.y, item: OBJECT_ID_NULL, hand: false });
+    }
+    if (constPressure) {
       this.ctx.systems.actuators.queueSwitchAction(
         actuator,
         closed ? ActuatorAction.SET : ActuatorAction.CLEAR,

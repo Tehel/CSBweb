@@ -37,3 +37,20 @@ name: Self-Reliant
 text: Win without consulting the Hint Oracle.
 tier: hard
 when: won and never(oracle)
+
+# The GOR COIN locks: map 0 (9,14), (21,16) and both of (22,19)'s, map 3 (2,12), which
+# takes a coin each time, and map 4 (21,11), (24,11), (26,18) and (19,19). Each lock but
+# (2,12) and map 4's (19,19) opens once.
+
+[coin-operated]
+name: Coin-Operated
+text: Open every GOR COIN lock.
+tier: weird
+when: ever(trigger where item = "GOR COIN" and level = 0 and x = 9 and y = 14)
+      and ever(trigger where item = "GOR COIN" and level = 0 and x = 21 and y = 16)
+      and count(trigger where item = "GOR COIN" and level = 0 and x = 22 and y = 19) >= 2
+      and ever(trigger where item = "GOR COIN" and level = 3 and x = 2 and y = 12)
+      and ever(trigger where item = "GOR COIN" and level = 4 and x = 21 and y = 11)
+      and ever(trigger where item = "GOR COIN" and level = 4 and x = 24 and y = 11)
+      and ever(trigger where item = "GOR COIN" and level = 4 and x = 26 and y = 18)
+      and ever(trigger where item = "GOR COIN" and level = 4 and x = 19 and y = 19)

@@ -1216,7 +1216,7 @@ drawing a map from them is a separate item, entered when the author names it.
 
 The achievements are `src/engine/achievements/defs/common.txt`'s 61, four of them valued
 and four counted from the data,
-`dm-atari.txt`'s 16, which every Dungeon Master set reads, and `csb.txt`'s 3, which
+`dm-atari.txt`'s 17, which every Dungeon Master set reads, and `csb.txt`'s 4, which
 disables Girl Power (`doc/ACHIEVEMENTS.md`). The author
 chose the list below, which holds what is left to write. ✓ marks what the
 condition language expresses today; [needs …] names the event or sample the tracker must
@@ -1277,11 +1277,23 @@ the Firestaff's bearer to (`doc/ACHIEVEMENTS.md` → "Where a game ends"). Step 
 the `swap` event at a type 16 actuator and the `theft` event at `StealFromCharacter`, a
 kill's `thief` where its group carries an object taken, with Dungeon Master's Some
 Assembly Required and Pickpocket's Revenge (`doc/ACHIEVEMENTS.md` → "The happenings").
+Step 8c is done but for Corbum Courier: the `trigger` event at each actuator that calls
+`QueueSwitchAction`, its square and the object that fired it, with Dungeon Master's Riddle
+Me This, the riddle room's counter at 4 firing the combination of map 5 (13,19), and CSB's
+Coin-Operated, its nine GOR COIN locks (`doc/ACHIEVEMENTS.md` → "Locks and switches").
 What is left:
 
 8. **The rest of a game's own triggers**, in three parts left, one commit each:
-   - **8c. A lock or switch triggered** (M): Riddle Me This, Corbum Courier,
-     Coin-Operated.
+   - **8c. Corbum Courier** (S), waiting on the author. Delivering the fourth CORBUM is
+     what wins Chaos Strikes Back: each one dropped in the FULYA PIT, map 0 (1,24), lands
+     on (21,0)'s pads, which count the four down at (1,23), and the game ends with the
+     fourth ("We won the game with 4 corbums in FulYa pit", `doc/CSBwin-src/Attack.cpp:2204`).
+     So "deliver every CORBUM within N hours of play" is `won and playTime < {N}h`, which
+     `csb.txt`'s Speed Runner (180 minutes) and Blitz (60) already are. The options:
+     (a) drop it; (b) keep it as worded, a third time limit beside those two;
+     (c) time the deliveries themselves, every CORBUM within N minutes of the first, which
+     needs the language to read when an event happened (a new form, `gameTime` of an
+     event, M); (d) another rule the author names, such as the four carried at once.
    - **8d. A revival and where the party came from** (M): Lazarus, Veterans, Fresh Faces.
    - **8e. Save loads** (S): Ironman, Hardcore. A load is a `read` the tracker sees,
      and the boot's CONTINUE after the page was closed is one too: the recording's path
@@ -1311,11 +1323,6 @@ stay common.
   - **Lazarus** (weird): bring the same champion back from the dead three times. [a
     revival at an altar]
 
-**Dungeon Master** (`dm-atari.txt`).
-
-- **Riddle Me This** (easy): fully solve the riddle room, its 4 alcoves satisfied. [a
-  lock or switch triggered]
-
 **Chaos Strikes Back** (`csb.txt`). A base the author may ask the forum's players to
 improve.
 
@@ -1323,9 +1330,8 @@ improve.
   ADVENTURE. [where the party came from]
 - **Fresh Faces** (hard): win with a party recruited in the prison, none of them
   imported. [where the party came from]
-- **Corbum Courier** (hard): deliver every CORBUM within N hours of play. [a lock or
-  switch triggered]
-- **Coin-Operated** (weird): open every GOR COIN lock. [a lock or switch triggered]
+- **Corbum Courier** (hard): deliver every CORBUM within N hours of play. [waits on the
+  author, step 8c]
 
 **Across games.**
 
@@ -1343,7 +1349,7 @@ improve.
 | Trigger or sample | Achievements |
 | --- | --- |
 | Progress across games | Hall of Fame Tour, Every Ending, Grand Slam, Encore, Dungeon Janitor, HR Problem |
-| A lock or switch triggered | Riddle Me This, Corbum Courier, Coin-Operated |
+| Corbum Courier's rule, the author's | Corbum Courier |
 | Save loads | Ironman, Hardcore |
 | Which ending, across games (Gullible's unlock for DM's bad one) | Every Ending |
 | Where the party came from | Veterans, Fresh Faces |

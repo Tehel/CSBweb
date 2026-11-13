@@ -72,6 +72,7 @@ export const EVENTS = {
   leave: { level: NUMBER, cleared: YESNO },
   theft: { champion: NAME, item: NAME, monster: NAME },
   swap: { item: NAME, took: NAME },
+  trigger: { level: NUMBER, x: NUMBER, y: NUMBER, item: NAME },
   sleep: {},
   oracle: {},
 } as const satisfies Record<string, Record<string, AttributeKind>>;

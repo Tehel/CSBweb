@@ -36,10 +36,11 @@ Conscientious Objector with at most 40 kills. Dungeon Master's also lists the le
 Sweep counts, 1 to 12, all but the Hall of Champions and the Dragon's, and gives its own
 Express Elevator 60 minutes, and has Shining Armour and Darc Knight, the armours of Lyte and
 Darc worn whole, Gullible, its bad ending ("Where a game ends"), Some Assembly Required,
-the Power Gem joined to the Firestaff, and Pickpocket's Revenge, a Giggler that robbed the
-party killed; Chaos Strikes Back
+the Power Gem joined to the Firestaff, Pickpocket's Revenge, a Giggler that robbed the
+party killed, and Riddle Me This, the riddle room's four riddles answered at once
+("Locks and switches"); Chaos Strikes Back
 lists no level to sweep, disables Girl Power ("The champions"), and has Self-Reliant, won
-without the Hint Oracle asked. A set with no `achievements.txt` of its own reads that file instead. The file is never a game file
+without the Hint Oracle asked, and Coin-Operated, every GOR COIN lock opened. A set with no `achievements.txt` of its own reads that file instead. The file is never a game file
 (`GAME_FILES`, `src/data/DataSets.ts`), so a recording's digests never name it, and an
 author can change the file without breaking a recording.
 
@@ -184,6 +185,7 @@ number for a `level`. Names compare without regard to case.
 | `leave` | the party stands on another level than at the last tick's end | `level`, the map left; `cleared`: `yes` when no monster is alive on it then |
 | `theft` | a monster's blow takes an object from a champion, a Giggler's | `champion`, `item`, `monster` |
 | `swap` | a wall takes the object in hand and gives the hand the one it holds | `item`, the object given; `took`, the object taken |
+| `trigger` | an actuator fires: a switch or a lock touched, a pad or an alcove pressed or released, a counter or a combination reaching what it waits for | `level`, `x` and `y`, its square, as the samples count them; `item`, the object that fired it: at a wall the object in hand, `HAND` for none, on a pad or in an alcove the object put or taken, and none for the party, a counter or a combination |
 | `sleep` | the party lies down to sleep | none |
 | `oracle` | the player asks the Hint Oracle, by its button | none |
 
@@ -210,6 +212,27 @@ does not tell from a loss. Dungeon Master's bad ending is one: the entrance's pa
 closed cell of map 0 (9,1), "IT IS TOO BAD YOU DID NOT DISCOVER THE TRUE SECRET OF THE
 FIRESTAFF", where a spell launcher kills it. So Gullible is `lost and level = 0 and x = 9
 and y = 1`: a game lost in that cell, which nothing else reaches.
+
+### Locks and switches
+
+A `trigger` names the square of the actuator that fired, so a condition names a puzzle by
+its squares, as Gullible names its cell. Every actuator that calls `QueueSwitchAction` is
+one ("The happenings"), the dungeon's own counters and combinations among them, so a
+puzzle the dungeon counts itself is solved where its last actuator fires.
+
+- **Riddle Me This**, Dungeon Master's riddle room on map 5: an alcove holding its answer,
+  at (9,17), (12,17), (9,23) or (12,23), counts the two counters of (13,23) down, and the
+  answer taken back counts them up. The one at 4 reaches 0 only with the four answers in
+  at once, and stays at 0 (`OperateCounterActuator`, `doc/CSBwin-src/Timer.cpp:1603`, a
+  counter at 0 no longer moving), and it fires the combination of (13,19), which nothing
+  else reaches: `ever(trigger where level = 5 and x = 13 and y = 19)`. Every Dungeon
+  Master set has the same room.
+- **Coin-Operated**, Chaos Strikes Back's GOR COIN locks: nine walls' sides of type 4
+  taking a GOR COIN, on map 0 (9,14), (21,16) and both sides of (22,19), map 3 (2,12),
+  and map 4 (21,11), (24,11), (26,18) and (19,19). Each fires once but (2,12) and map 4's
+  (19,19), which take a coin each time, so the condition asks for each square, and for
+  two at (22,19). An `item` alone names no lock: a switch touched with a coin in hand is
+  a trigger with that coin too.
 
 ### The champions
 
@@ -403,6 +426,16 @@ whole replay corpus with the tracker attached, and every package plays to its po
   object in hand is put on the wall's square and the one there is given to the hand. The
   only one in Dungeon Master is the wall of map 13 (24,3), which swaps THE FIRESTAFF for
   THE FIRESTAFF, the one with the Power Gem; Chaos Strikes Back has none.
+- **A trigger** is at each actuator that calls `QueueSwitchAction`
+  (`doc/CSBwin-src/Code11f52.cpp:3601`): `TouchWall` (`doc/CSBwin-src/Mouse.cpp:291`) as a
+  wall's switch fires, before a lock takes the key; `PressurePadOrAlcove`
+  (`doc/CSBwin-src/Code11f52.cpp:3720`) as a pad or an alcove fires, on the object put or
+  taken, or the party's move; and `ProcessTT_STONEROOM` (`doc/CSBwin-src/Timer.cpp:2165`),
+  as a counter or a combination a message reached sends its own. Each names the actuator's
+  square, where a counter hands `QueueSwitchAction` its target instead
+  (`doc/CSBwin-src/Timer.cpp:1610-1612`). A pad held down, a counter or a combination
+  that sends at every message (the action `hold`) is a trigger at each, so a game counts
+  many: the whole CSB game over a hundred thousand.
 - **A sleep** is at the sleep icon's engine half, button 145 (`MouseSystem.sleep`,
   `doc/CSBwin-src/Mouse.cpp:1822-1847`), as `d.PartySleeping` is set: a party woken in the
   same tick has slept all the same.
@@ -519,7 +552,10 @@ wins join the Power Gem, Some Assembly Required unlocking at the tick the Firest
 the gem is first in hand; a theft for each object a Giggler's blow takes, DMMovie2823's
 seven and three of its thieves killed (Pickpocket's Revenge), and a new game's Giggler
 that robbed nobody no thief, those whose group took a torch thieves, across a save kept
-and read back.
+and read back. And the locks and switches: a trigger with a GOR COIN at a wall for each
+coin the wall took from the hand, Riddle Me This the tick after the riddle room's counter
+at 4 reaches 0, which the Dungeon Master wins do and DMMovie42, three riddles answered,
+does not, and the whole CSB game feeding all nine GOR COIN locks (Coin-Operated).
 `tools/checks/achievements-format.ts` reads each file, checks its names against its set's
 `graphics.dat` and its values against its achievements, counts the FTL sets' data, and
 plays the conditions out of made-up events and champions, the named values, the lists and

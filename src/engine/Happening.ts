@@ -81,6 +81,16 @@ export type Happening =
    * object that was there, `taken` (`doc/CSBwin-src/Mouse.cpp:473-512`).
    */
   | { readonly k: 'swap'; readonly given: ObjectID; readonly taken: ObjectID }
+  /**
+   * An actuator on square `x`, `y` of `level` fired, as it calls `QueueSwitchAction`: a
+   * wall touched (`TouchWall`, `doc/CSBwin-src/Mouse.cpp:291`), a pad or an alcove
+   * pressed or released (`PressurePadOrAlcove`, `doc/CSBwin-src/Code11f52.cpp:3720`), a
+   * counter or a combination a message reached (`ProcessTT_STONEROOM`,
+   * `doc/CSBwin-src/Timer.cpp:2165`). `item` is the object that fired it: at a wall the
+   * object in hand, `hand` true, `RNnul` for an empty hand; on a pad or in an alcove the
+   * object put or taken, `RNnul` for the party; for a counter or a combination `RNnul`.
+   */
+  | { readonly k: 'trigger'; readonly level: number; readonly x: number; readonly y: number; readonly item: ObjectID; readonly hand: boolean }
   /** The party lay down to sleep: the sleep icon, button 145 (`MouseSystem.sleep`). */
   | { readonly k: 'sleep' }
   /** The Hint Oracle's button, which opens the Oracle (`ui.hintOracleNeeded`, `src/renderer/ui/Mouse.ts`). */
