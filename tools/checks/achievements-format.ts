@@ -23,7 +23,8 @@ import {
 } from '../../src/engine/achievements/AchievementFile';
 import { dataCounts, readAchievementSetFiles, setDungeons } from '../../src/engine/achievements/DataCounts';
 import { dungeonCensus } from '../../src/engine/DungeonCensus';
-import { acrossUnlocked, AchievementState, type AchievementEvent, type GameFigures } from '../../src/engine/achievements/AchievementState';
+import { acrossUnlocked, AchievementState, partyFigureKey, type AchievementEvent, type GameFigures } from '../../src/engine/achievements/AchievementState';
+import { mergeFigures } from '../../src/data/saves/AchievementStore';
 import { achievementFileOf, acrossInSets } from '../../src/engine/achievements/PageAchievements';
 import { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import { check, fail, finish } from '../lib/check';
@@ -745,6 +746,10 @@ function acrossGames(common: AchievementFile, dm: AchievementFile, csb: Achievem
     ['another file\'s games without in', 'games(won, "csb") >= 1', /expected in "file"/],
     ['another file named bare', 'games(won, in csb) >= 1', /names a file of achievements/],
     ['another file named in capitals', 'games(won, in "CSB") >= 1', /names a file of achievements/],
+    ['a champions\' distinct of no attribute of theirs', 'distinct(games(won).monster) >= 1', /party has no attribute "monster"/],
+    ['a champions\' distinct asked to be small', 'distinct(games(won).portrait) < 24', /asks for at least/],
+    ['a champions\' distinct inside games(…)', 'games(distinct(games(won).portrait) >= 1) >= 1', /no games\(…\) or total\(…\)/],
+    ['a game\'s fact beside a champions\' distinct', 'distinct(games(won).portrait) >= 1 and won', /not won/],
   ];
   for (const [what, when, message] of refused) {
     const r = readAchievementFile(`${H}[a]\nname: A\ntext: T\nwhen: ${when}\n`);
@@ -755,8 +760,8 @@ function acrossGames(common: AchievementFile, dm: AchievementFile, csb: Achievem
   const defs = mergeAchievements(common, dm).map((d) => withCounts(d, counts));
   const across = defs.filter((d) => d.across);
   for (const d of across) console.log(`  ${d.id}: ${[...d.aggregates.map((a) => `total(${a.key})`), ...d.games.map((g) => g.key)].join(', ')}`);
-  check(sameIds(across.map((d) => d.id), ['dungeon-janitor', 'hr-problem', 'encore', 'every-ending', 'grand-slam']),
-    'Dungeon Janitor, HR Problem, Encore and Dungeon Master\'s Every Ending and Grand Slam are across games');
+  check(sameIds(across.map((d) => d.id), ['dungeon-janitor', 'hr-problem', 'encore', 'every-ending', 'grand-slam', 'hall-of-fame-tour']),
+    'Dungeon Janitor, HR Problem, Encore and Dungeon Master\'s Every Ending, Grand Slam and Hall of Fame Tour are across games');
   check(across.every((d) => !d.whole), 'no achievement across games needs a game\'s whole history');
   const keyOf = (id: string, i: number): string => defs.find((d) => d.id === id)!.games[i]!.key;
   const won = keyOf('encore', 0);
@@ -774,11 +779,20 @@ function acrossGames(common: AchievementFile, dm: AchievementFile, csb: Achievem
   };
   walk(slam.when);
   check(ofs.join() === 'dm-atari,csb', `its games are dm-atari.txt's sets' and csb.txt's (${ofs.join()})`);
+  const tour = defs.find((d) => d.id === 'hall-of-fame-tour')!;
+  const tourKey = tour.when.k === 'cmp' && tour.when.a.k === 'gamesParty' ? tour.when.a.key : '';
+  check(tourKey === 'distinct(games(won).portrait)' && tour.games.length === 1 && tour.games[0]!.key === won,
+    `Hall of Fame Tour counts the portraits of the parties at games(won) (${tourKey})`);
+  check(!mergeAchievements(common, csb).some((d) => d.id === 'hall-of-fame-tour'), 'Hall of Fame Tour is Dungeon Master\'s alone');
 
   // A game: its figures as it goes, and nothing across games among its unlocks.
-  const game = (end: 'won' | 'lost' | null, at: readonly [number, number, number], killed: number): { figures: GameFigures; unlocks: string[] } => {
+  const game = (
+    end: 'won' | 'lost' | null, at: readonly [number, number, number], killed: number, party: readonly Record<string, string>[] = [],
+  ): { figures: GameFigures; unlocks: string[] } => {
     const state = new AchievementState(defs, true);
     const unlocks: string[] = [];
+    check(state.readsChampions, 'Dungeon Master\'s state reads the champions, which Hall of Fame Tour keeps at a win');
+    state.champions(party);
     for (let i = 0; i < killed; i++) state.record(kill());
     state.sample('level', at[0]);
     state.sample('x', at[1]);
@@ -804,6 +818,32 @@ function acrossGames(common: AchievementFile, dm: AchievementFile, csb: Achievem
   check(c.figures[elsewhere] === 1 && c.figures[badEnding] === undefined, 'a loss anywhere else is the other loss');
   check(d.figures[kills] === 600 && Object.keys(d.figures).length === 1, 'a game under way has its kills and no ending');
   check(sameIds(d.unlocks, ['first-blood', 'pest-control', 'exterminator']), 'its 600 kills are no Dungeon Janitor in one game');
+
+  // Hall of Fame Tour: each win keeps the portraits of its party, the dead among them; a
+  // champion whose portrait is no cell of graphic 26 has none; a loss keeps nothing.
+  const champion = (portrait: number | null, alive = true): Record<string, string> =>
+    ({ champion: 'X', alive: alive ? 'yes' : 'no', ...(portrait === null ? {} : { portrait: String(portrait) }) });
+  const winWith = (...cells: number[]): GameFigures => game('won', [13, 5, 5], 0, cells.map((c, i) => champion(c, i === 0))).figures;
+  const portraitKeys = (f: GameFigures): string[] => Object.keys(f).filter((k) => k.startsWith('distinct(')).sort();
+  const four = game('won', [13, 5, 5], 0, [champion(3), champion(7, false), champion(11, false), champion(null)]);
+  console.log(`  won by 3, 7 and 11 dead, and an imported champion: ${JSON.stringify(four.figures)}`);
+  check(portraitKeys(four.figures).join() === ['3', '7', '11'].map((v) => partyFigureKey(tourKey, v)).sort().join() && four.figures[won] === 1,
+    'a win keeps its party\'s portraits, the two dead among them, and no figure for the champion with none');
+  const lostWith = game('lost', [2, 3, 4], 0, [champion(20)]).figures;
+  check(portraitKeys(lostWith).length === 0, 'a loss keeps no portrait');
+  check(!four.unlocks.includes('hall-of-fame-tour'), 'a game unlocks no Hall of Fame Tour of its own');
+  const tours: [string, GameFigures[], boolean][] = [
+    ['six wins, four new champions each', [0, 4, 8, 12, 16, 20].map((c) => winWith(c, c + 1, c + 2, c + 3)), true],
+    ['six wins, one champion twice', [0, 4, 8, 12, 16, 20].map((c) => winWith(c, c + 1, c + 2, c === 20 ? 0 : c + 3)), false],
+    ['five wins and a loss with the last four', [...[0, 4, 8, 12, 16].map((c) => winWith(c, c + 1, c + 2, c + 3)), lostWith], false],
+    ['one playthrough\'s two branches won by two parties, and four more wins',
+      [mergeFigures(winWith(0, 1, 2, 3), winWith(4, 5, 6, 7)), ...[8, 12, 16, 20].map((c) => winWith(c, c + 1, c + 2, c + 3))], true],
+  ];
+  for (const [what, figures, unlocked] of tours) {
+    const got = acrossUnlocked(defs, figures).includes('hall-of-fame-tour');
+    console.log(`  ${what}: ${got ? 'Hall of Fame Tour' : '(none)'}`);
+    check(got === unlocked, `${what}: ${unlocked ? 'Hall of Fame Tour' : 'no Hall of Fame Tour'}`);
+  }
 
   const cases: [string, GameFigures[], string[]][] = [
     ['one win', [a.figures], []],

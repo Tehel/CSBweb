@@ -143,7 +143,6 @@ In payoff order: the first row is the next item.
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
 | X9 | Thrown weapons' tags kept across a save | M | ⏸️ |
 | X10 | The cells the party has seen, kept across a save for an automap | M | ⏸️ |
-| X20 | More achievements: the author's list | L | ⏸️ |
 | E22 | Fullscreen filled by a fraction | M | ⏸️ waits on the author |
 | H | Deliberate divergences | — | 🚫 |
 
@@ -1211,129 +1210,6 @@ drawing a map from them is a separate item, entered when the author names it.
   prints each level's codes as a map. It asserts a fake wall seen as stone and a hidden
   pit seen as floor, saves, loads, and compares every code. The same file with the
   records deleted loads with every cell unknown.
-
-### X20 ⏸️ More achievements: the author's list
-
-The achievements are `src/engine/achievements/defs/common.txt`'s 65, four of them valued,
-four counted from the data and three across games,
-`dm-atari.txt`'s 19, which every Dungeon Master set reads, and `csb.txt`'s 7, which
-disables Girl Power (`doc/ACHIEVEMENTS.md`). The author
-chose the list below, which holds what is left to write. ✓ marks what the
-condition language expresses today; [needs …] names the event or sample the tracker must
-observe first ("The triggers", below). The item is not a setting, unlike the other
-extras: an achievement only watches the game.
-
-- **Three kinds of achievement**, each a line of the file's format
-  (`doc/ACHIEVEMENTS.md` → "The file"):
-  1. **Fixed**: the same condition in every set, as every achievement is now.
-  2. **Valued**: `common.txt` names a value where a number would be, in `when:` and in
-     `text:` as `{name}` (`text: Win in less than {blitzMinutes} minutes of play.`). A
-     set's own file defines it on a line of its own (`value blitzMinutes = 45`). An
-     achievement whose value the set does not define does not exist in that set: no row
-     in the dialog or the book, no unlock. A set without a file of its own, a player's,
-     simply has fewer. A set's check reports a value its file defines that no
-     achievement names, as it reports `unknownItems`. The format gains the `value` line,
-     `{name}` in a text, and a named value in a duration's unit.
-  3. **Counted from the data**: `spells`, `foods`, `monsterTypes` and `levels`, which the tracker
-     works out from the set's own files (`dataCounts`, `doc/ACHIEVEMENTS.md` → "Counted
-     from the data").
-- **Each new trigger** is observed by the tracker (`doc/ACHIEVEMENTS.md` → "Watching the
-  engine"), with its proof in `tools/checks/achievements-tracker.ts`, and changes no tick.
-- **Across games** keeps its progress in the saves' database beside the unlocks
-  (`BrowserAchievementStore`). Each unlock row already holds the party's names, so Hall of
-  Fame Tour reads the Roll the Credits rows; a total over games needs rows of its own. No
-  single recording proves one, so it is verified once the games it counts are.
-
-**The steps**, one commit each, each with its proof and `doc/ACHIEVEMENTS.md` rewritten to
-say what it built. Steps 1 to 5 are done: the sets' own files, every fixed achievement the
-language expresses, Scrooge moved to Dungeon Master's; the valued (`value` lines,
-`{name}`, `unusedValues`), with Speed Runner, Blitz and Conscientious Objector at the
-author's numbers, 180 minutes, 60 minutes and 40 kills, in both `dm-atari.txt` and
-`csb.txt`; and a CSB adventure's history, the whole game's from the save a utility makes
-(`isNewAdventure`, `doc/ACHIEVEMENTS.md` → "A CSB adventure"), so every common
-achievement is CSB's too; and the counts of the data, with Rune Scholar, Gourmet and
-Bestiary; and where the party is, the `enter` and `leave` events, `levels`, `explored` and
-lists for values, with Tourist, Cartographer, Clean Sweep and Dungeon Master's Deep Diver
-and Express Elevator, at the author's choices: Clean Sweep counts DM's levels 1 to 12 and
-none of CSB's, Express Elevator 60 minutes. Solitary Confinement, CSB's Lone Wolf (`won and party = 1`,
-exact because the adventure recruits nobody), stays. Step 6 is done: the champions at
-each tick's end, `party(where …)` by what each wears and holds, their sex, ranks and load,
-ordered comparisons on a filter's numbers, and the `sleep` event, with Low Profile,
-Archmaster, Jack of All Trades, Speedy Gonzales, Featherweight, Insomniac and Girl Power,
-and Dungeon Master's Shining Armour and Darc Knight, each armour's shield in a hand
-(`doc/ACHIEVEMENTS.md` → "The champions"). Girl Power reads `CHARFLAG_male`, which a CSB
-adventure CSBWin's utility made has lost (H, "A champion carried into a new adventure
-keeps their sex"), so at the author's choice `csb.txt` disables it. Step 7's casts are
-done: `cast`'s `power` and `why`, the code of the message `SpellErrorMsg` printed, with
-Blazing Glory Day, Thick Atmosphere, I Know What I'm Doing and Dark Ages, whose torch is
-read in the hands at each tick's end (`doc/ACHIEVEMENTS.md` → "The events"). Step 7 is
-done: the blows, a `hit` event with `DamageMonster`'s damage, a kill's `group` struck down
-by one strike, `HAND` for an empty hand, a kill `by: landing`, `party` on `death`, with
-Overkill, Strike!, Bare Knuckles, Telefrag and Friendly Fire Fatality
-(`doc/ACHIEVEMENTS.md` → "The happenings"). Step 8a is done: the `oracle` event at the
-Oracle's button, and the samples `level`, `x` and `y`, where the party stands, with CSB's
-Self-Reliant and Dungeon Master's Gullible, a game lost in the cell its bad ending sends
-the Firestaff's bearer to (`doc/ACHIEVEMENTS.md` → "Where a game ends"). Step 8b is done:
-the `swap` event at a type 16 actuator and the `theft` event at `StealFromCharacter`, a
-kill's `thief` where its group carries an object taken, with Dungeon Master's Some
-Assembly Required and Pickpocket's Revenge (`doc/ACHIEVEMENTS.md` → "The happenings").
-Step 8c is done: the `trigger` event at each actuator that calls
-`QueueSwitchAction`, its square and the object that fired it, with Dungeon Master's Riddle
-Me This, the riddle room's counter at 4 firing the combination of map 5 (13,19), and CSB's
-Coin-Operated, its nine GOR COIN locks (`doc/ACHIEVEMENTS.md` → "Locks and switches").
-Corbum Courier is not made, at the author's choice: delivering the fourth CORBUM to the
-FULYA PIT is what wins Chaos Strikes Back (`doc/CSBwin-src/Attack.cpp:2204`), so its time
-limit would be Speed Runner's and Blitz's again. Step 8d is done: the `revive` event at the
-Vi altar, its `times` that champion's count, and the `raise` event at a CSB adventure's
-start, `from: prison` where a champion's portrait is a cell of the set's graphic 26 and
-`dm` where it is a cell of `utility-portraits.dat`, with Lazarus and CSB's Fresh Faces and
-Veterans, won with DM's champions alone, which no game can tell came from a won DM game,
-at the author's choice (`doc/ACHIEVEMENTS.md` → "Where the party came from"). Step 8e is
-done: the `load` event at every save read, the page's CONTINUE among them, but a CSB
-adventure's start, with Ironman and Hardcore (`doc/ACHIEVEMENTS.md` → "Saves loaded").
-Step 9a is done: `games(…)` and `total(count(…))`, each game's figures, the page's
-`achievementFigures` store (IndexedDB version 9) and its achievements across games over
-them, with Encore, Dungeon Master's Every Ending, and Dungeon Janitor and Lord Chaos's HR
-Problem moved (`doc/ACHIEVEMENTS.md` → "Across games"). Step 9b is done: each replay keeps
-its history's figures (`proof_figures`), the Hall and PROFILE work an identity's
-achievements across games out of its checked proofs (`acrossRows`, `achievementsAcross`),
-and the page sends a proof, claiming nothing if need be, where the figures grew
-(`doc/ACHIEVEMENTS.md` → "Proofs", → "The Hall of Fame"). Step 9c is done: `games(…, in
-"file")`, the games of every set that reads another project file, over each set's figures
-(`acrossInSets`) on the page, in the book, which shows one unlocked before a row of the set
-holds it, and in the Hall, which takes an identity's proofs of every set in turn, with
-Grand Slam, the same block in both files, Dungeon Master's games those of every set that
-reads `dm-atari.txt`, at the author's choice (`doc/ACHIEVEMENTS.md` → "Across games").
-What is left is 9d, below.
-
-**Across games, left to make.**
-
-- **Hall of Fame Tour** (hard): win with each of the dungeon's 24 champions, over any
-  number of games.
-
-**The design left**, what the code and the rules settle: Hall of Fame Tour reads the
-champions at each game's win, a third form beside `games(…)` and `total(…)`, such as
-`distinct(games(won).portrait) >= 24`: each game's figures then keep the portraits of the
-party at the condition's unlock, the page's `achievementFigures` rows and the proofs'
-figures alike (a figure is a number now, a key and a value: the portraits need a set of
-values beside it).
-
-**The author's choices:**
-
-1. **A total is one set's games alone**, as every row, the dialog, the book and the Hall
-   are per set: a Dungeon Master won on the Atari 1.1 and one on the Amiga are two sets'
-   wins, and no Encore.
-2. **Hall of Fame Tour knows a champion by portrait**, as Veterans does, a cell of the
-   set's graphic 26, so that REINCARNATE's new name is the same champion and a name typed
-   as another's is not; a champion dead at the win counts; Dungeon Master's alone,
-   `dm-atari.txt`. The page's rows and the proofs' figures keep each win's portraits.
-
-**The step left**: 9d, Hall of Fame Tour, as chosen, which needs that third form, the
-portraits of each game's party at its win.
-
-The page's row of an achievement across games stays "UNLOCKED, NOT VERIFIED" in the
-dialog, and has no proof in the book: no proof claims it, and the server's verdict of it is
-PROFILE's and the Hall's alone, as a replay's grant unclaimed is.
 
 ## H — Deliberate divergences (not debt)
 

@@ -91,8 +91,9 @@ export type SampleName = (typeof SAMPLES)[number];
 /**
  * A champion's attributes at a tick's end, which `party(where …)` filters the party's
  * champions by (`doc/ACHIEVEMENTS.md` → "The champions"): what each worn place and each
- * hand holds, the rank in each class, 0 to 15, and the load, in percent of the most the
- * champion can carry.
+ * hand holds, the rank in each class, 0 to 15, the load, in percent of the most the
+ * champion can carry, and the portrait, the cell of the set's champions' sheet, graphic 26,
+ * the champion wears, where it is one.
  */
 export const CHAMPION_ATTRIBUTES = {
   champion: NAME,
@@ -110,6 +111,7 @@ export const CHAMPION_ATTRIBUTES = {
   priest: NUMBER,
   wizard: NUMBER,
   load: NUMBER,
+  portrait: NUMBER,
 } as const satisfies Record<string, AttributeKind>;
 
 /** The attributes that name an object, which `unknownItems` checks: an event's and a champion's. */
@@ -208,6 +210,12 @@ export type Expr =
    */
   | { k: 'games'; game: GameCondition }
   | { k: 'total'; agg: Aggregate; key: string }
+  /**
+   * `distinct(games(condition).attribute)`: the values of a champion's attribute
+   * (`CHAMPION_ATTRIBUTES`) among the party's champions as each playthrough met
+   * `condition`, distinct over them. `key` is its canonical text.
+   */
+  | { k: 'gamesParty'; game: GameCondition; attr: string; key: string }
   | { k: 'cmp'; op: Comparison; a: Expr; b: Expr }
   | { k: 'and' | 'or'; a: Expr; b: Expr }
   | { k: 'not'; a: Expr };
@@ -460,6 +468,7 @@ function withValues(def: AchievementDef, values: ReadonlyMap<string, readonly nu
       case 'sample': return { k: 'sample', sample: sampleRef(e.sample.name, filter(e.sample.where)) };
       case 'agg': case 'ever': case 'never': return { ...e, agg: agg(e.agg) };
       case 'games': return { k: 'games', game: gameCondition(put(e.game.when), e.game.of) };
+      case 'gamesParty': return gamesParty(gameCondition(put(e.game.when), e.game.of), e.attr);
       case 'total': return totalOf(agg(e.agg));
       case 'cmp': return { ...e, a: put(e.a), b: put(e.b) };
       case 'and': case 'or': return { ...e, a: put(e.a), b: put(e.b) };
@@ -481,7 +490,7 @@ export function withCounts(def: AchievementDef, counts: DataCounts): Achievement
   const put = (e: Expr): Expr => {
     switch (e.k) {
       case 'data': return { k: 'num', value: counts[e.name], type: 'num' };
-      case 'games': return { k: 'games', game: { ...e.game, when: put(e.game.when) } };
+      case 'games': case 'gamesParty': return { ...e, game: { ...e.game, when: put(e.game.when) } };
       case 'cmp': return { ...e, a: put(e.a), b: put(e.b) };
       case 'and': case 'or': return { ...e, a: put(e.a), b: put(e.b) };
       case 'not': return { ...e, a: put(e.a) };
@@ -649,27 +658,7 @@ export function parseCondition(text: string): Expr {
     if ((DATA_COUNTS as readonly string[]).includes(t.v)) return { k: 'data', name: t.v as DataCountName };
     if ((SAMPLES as readonly string[]).includes(t.v)) { pos--; return { k: 'sample', sample: sample() }; }
     switch (t.v) {
-      case 'games': {
-        if (inGame) throw new ConditionError('games(…) takes a condition of one game, with no games(…) or total(…) in it');
-        expectOp('(');
-        inGame = true;
-        const when = orExpr();
-        inGame = false;
-        let of: string | null = null;
-        if (isOp(',')) {
-          pos++;
-          if (!isWord('in')) throw new ConditionError(`expected in "file" ${where()}, the games of the sets that read defs/<file>.txt`);
-          pos++;
-          const file = next();
-          if (file.t !== 'string' || !ACHIEVEMENT_FILE_NAME.test(file.v)) {
-            throw new ConditionError('games(…, in "file") names a file of achievements, such as "csb": lowercase letters, digits and hyphens');
-          }
-          of = file.v;
-        }
-        expectOp(')');
-        if (typeOf(when) !== 'bool') throw new ConditionError('games(…) takes a yes-or-no condition, not a number');
-        return { k: 'games', game: gameCondition(when, of) };
-      }
+      case 'games': return { k: 'games', game: games() };
       case 'total': {
         if (inGame) throw new ConditionError('games(…) takes a condition of one game, with no games(…) or total(…) in it');
         expectOp('(');
@@ -692,6 +681,14 @@ export function parseCondition(text: string): Expr {
       }
       case 'distinct': {
         expectOp('(');
+        if (isWord('games')) {
+          pos++;
+          const game = games();
+          expectOp('.');
+          const attr = attributeOf(CHAMPION_ATTRIBUTES, 'party');
+          expectOp(')');
+          return gamesParty(game, attr);
+        }
         const event = eventName();
         expectOp('.');
         const attr = attributeOf(EVENTS[event], event);
@@ -711,6 +708,28 @@ export function parseCondition(text: string): Expr {
       }
     }
     throw new ConditionError(`"${t.v}" is no fact, sample, count or count of the data`);
+  };
+  /** `games(condition [, in "file"])`, its word read. */
+  const games = (): GameCondition => {
+    if (inGame) throw new ConditionError('games(…) takes a condition of one game, with no games(…) or total(…) in it');
+    expectOp('(');
+    inGame = true;
+    const when = orExpr();
+    inGame = false;
+    let of: string | null = null;
+    if (isOp(',')) {
+      pos++;
+      if (!isWord('in')) throw new ConditionError(`expected in "file" ${where()}, the games of the sets that read defs/<file>.txt`);
+      pos++;
+      const file = next();
+      if (file.t !== 'string' || !ACHIEVEMENT_FILE_NAME.test(file.v)) {
+        throw new ConditionError('games(…, in "file") names a file of achievements, such as "csb": lowercase letters, digits and hyphens');
+      }
+      of = file.v;
+    }
+    expectOp(')');
+    if (typeOf(when) !== 'bool') throw new ConditionError('games(…) takes a yes-or-no condition, not a number');
+    return gameCondition(when, of);
   };
   /** A sample's name, and for `party` the filter on its champions, `party(where …)`. */
   const sample = (): SampleRef => {
@@ -812,7 +831,7 @@ function typeOf(e: Expr): ValueType {
   switch (e.k) {
     case 'num': case 'value': return e.type;
     case 'fact': return FACTS[e.name];
-    case 'data': case 'sample': case 'agg': case 'games': case 'total': return 'num';
+    case 'data': case 'sample': case 'agg': case 'games': case 'gamesParty': case 'total': return 'num';
     case 'ever': case 'never': return 'bool';
     case 'cmp': {
       const a = typeOf(e.a);
@@ -868,7 +887,7 @@ function boundOf(e: Expr): Bound | null {
     case 'fact': return e.name === 'playTime' || e.name === 'explored' ? 'low' : e.name === 'gameTime' ? 'exact' : null;
     case 'agg': return e.agg.k === 'min' ? 'high' : 'low';
     // A playthrough not counted, its rows lost or a teleport's, can only make either too small.
-    case 'games': case 'total': return 'low';
+    case 'games': case 'gamesParty': case 'total': return 'low';
     default: return null;
   }
 }
@@ -933,7 +952,7 @@ function valuesOf(e: Expr): string[] {
     case 'value': return [e.name];
     case 'sample': return named(e.sample.where);
     case 'agg': case 'ever': case 'never': case 'total': return named(e.agg.k === 'count' || e.agg.k === 'distinct' ? e.agg.where : e.agg.sample.where);
-    case 'games': return valuesOf(e.game.when);
+    case 'games': case 'gamesParty': return valuesOf(e.game.when);
     case 'cmp': case 'and': case 'or': return [...valuesOf(e.a), ...valuesOf(e.b)];
     case 'not': return valuesOf(e.a);
     default: return [];
@@ -968,7 +987,7 @@ function totalOf(agg: Aggregate): Expr {
 /** Whether a condition reads `games(…)` or `total(…)`. */
 function isAcross(e: Expr): boolean {
   switch (e.k) {
-    case 'games': case 'total': return true;
+    case 'games': case 'gamesParty': case 'total': return true;
     case 'cmp': case 'and': case 'or': return isAcross(e.a) || isAcross(e.b);
     case 'not': return isAcross(e.a);
     default: return false;
@@ -978,7 +997,7 @@ function isAcross(e: Expr): boolean {
 /** What a condition across games reads of one game outside its `games(…)` and `total(…)`, if anything. */
 function gameFactOutside(e: Expr): string | null {
   switch (e.k) {
-    case 'num': case 'value': case 'games': case 'total': return null;
+    case 'num': case 'value': case 'games': case 'gamesParty': case 'total': return null;
     case 'fact': return e.name;
     case 'data': return e.name;
     case 'sample': return e.sample.key;
@@ -993,7 +1012,7 @@ function gamesOf(e: Expr): GameCondition[] {
   const out = new Map<string, GameCondition>();
   const walk = (x: Expr): void => {
     switch (x.k) {
-      case 'games': out.set(x.game.key, x.game); return;
+      case 'games': case 'gamesParty': out.set(x.game.key, x.game); return;
       case 'cmp': case 'and': case 'or': walk(x.a); walk(x.b); return;
       case 'not': walk(x.a); return;
       default: return;
@@ -1001,6 +1020,35 @@ function gamesOf(e: Expr): GameCondition[] {
   };
   walk(e);
   return [...out.values()];
+}
+
+/** A champion's attribute kept at a playthrough's `games(…)`, which a `distinct(games(…).attribute)` reads. */
+export interface PartyAtGame {
+  /** The `games(…)` condition's key. */
+  readonly game: string;
+  readonly attr: string;
+  /** The `distinct(games(…).attribute)`'s key. */
+  readonly key: string;
+}
+
+/** The `distinct(games(…).attribute)`s a condition reads, each once by its key. */
+export function partiesAtGamesOf(e: Expr): PartyAtGame[] {
+  const out = new Map<string, PartyAtGame>();
+  const walk = (x: Expr): void => {
+    switch (x.k) {
+      case 'gamesParty': out.set(x.key, { game: x.game.key, attr: x.attr, key: x.key }); return;
+      case 'cmp': case 'and': case 'or': walk(x.a); walk(x.b); return;
+      case 'not': walk(x.a); return;
+      default: return;
+    }
+  };
+  walk(e);
+  return [...out.values()];
+}
+
+/** `distinct(games(…).attribute)`, keyed by its canonical text. */
+function gamesParty(game: GameCondition, attr: string): Expr {
+  return { k: 'gamesParty', game, attr, key: `distinct(${game.key}.${attr})` };
 }
 
 /** A condition as canonical text, for a `games(…)`'s key. */
@@ -1013,7 +1061,7 @@ function exprText(e: Expr): string {
     case 'agg': return e.agg.key;
     case 'ever': case 'never': return `${e.k}(${e.agg.key})`;
     case 'games': return e.game.key;
-    case 'total': return e.key;
+    case 'total': case 'gamesParty': return e.key;
     case 'cmp': return `(${exprText(e.a)} ${e.op} ${exprText(e.b)})`;
     case 'and': case 'or': return `(${exprText(e.a)} ${e.k} ${exprText(e.b)})`;
     case 'not': return `not ${exprText(e.a)}`;

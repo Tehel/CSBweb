@@ -11,7 +11,7 @@
  * game and reads one never unlocks there.
  */
 import type { AchievementDef, Aggregate, EventKind, Expr, FactName, Filter, SampleName } from './AchievementFile';
-import { samplesOf } from './AchievementFile';
+import { partiesAtGamesOf, samplesOf } from './AchievementFile';
 
 /** The VBLs a second, which `playTime` counts by. */
 const VBLS_PER_SECOND = 60;
@@ -32,7 +32,10 @@ export interface AchievementSnapshot {
   readonly vbls: number;
   /** Each sample by its key: `party`, or `party(where …)`. */
   readonly samples: Readonly<Record<string, number>>;
-  /** Each known aggregate by its key: a count, a `max` or `min`, or a `distinct`'s values. */
+  /**
+   * Each known aggregate by its key: a count, a `max` or `min`, or a `distinct`'s values,
+   * and each `distinct(games(…).attribute)`'s, the party's as the history met `games(…)`.
+   */
   readonly aggregates: Readonly<Record<string, number | readonly string[]>>;
   /** The aggregates kept that are not known from the game's start. */
   readonly unknown: readonly string[];
@@ -51,9 +54,16 @@ interface Tested {
 /**
  * A playthrough's figures, which the achievements across games read
  * (`doc/ACHIEVEMENTS.md` → "Across games"): 1 for each `games(…)` key whose condition its
- * history met, and each `total(…)` key's count.
+ * history met, each `total(…)` key's count, and 1 for each value of a
+ * `distinct(games(…).attribute)` its party had as it met `games(…)`, keyed by
+ * `partyFigureKey`.
  */
 export type GameFigures = Readonly<Record<string, number>>;
+
+/** The figure of a value a `distinct(games(…).attribute)` kept: `distinct(games(won).portrait)="7"`. */
+export function partyFigureKey(key: string, value: string): string {
+  return `${key}=${JSON.stringify(value)}`;
+}
 
 /** Whether `id` is a condition of one game's key, `games(…)`, rather than an achievement's id. */
 function isGameKey(id: string): boolean {
@@ -71,6 +81,12 @@ export class AchievementState {
   private readonly samples: Record<string, number> = {};
   /** The `party(where …)` samples the conditions read, each its filter by its key. */
   private readonly partyFilters = new Map<string, Filter>();
+  /** The `distinct(games(…).attribute)`s, each its `games(…)` key and attribute by its key. */
+  private readonly partiesAt = new Map<string, { game: string; attr: string }>();
+  /** The values each `distinct(games(…).attribute)` kept, by its key. */
+  private readonly partyValues = new Map<string, Set<string>>();
+  /** The party's champions at the last tick's end, each by its attributes, while a condition reads them. */
+  private members: readonly Readonly<Record<string, string>>[] = [];
   private vbls = 0;
   private gameTime = 0;
   private explored = 0;
@@ -94,6 +110,10 @@ export class AchievementState {
       keep(def.aggregates);
       if (!def.across) this.tested.push(def);
       for (const agg of def.across ? def.aggregates : []) this.totals.set(`total(${agg.key})`, agg.key);
+      for (const at of partiesAtGamesOf(def.when)) {
+        this.partiesAt.set(at.key, { game: at.game, attr: at.attr });
+        this.partyValues.set(at.key, new Set());
+      }
       for (const game of def.games) {
         if (games.has(game.key)) continue;
         games.add(game.key);
@@ -110,6 +130,10 @@ export class AchievementState {
     for (const id of snapshot.unlocked) (isGameKey(id) ? state.met : state.unlockedIds).add(id);
     state.vbls = snapshot.vbls;
     for (const [key, v] of Object.entries(snapshot.samples)) state.samples[key] = v;
+    for (const [key, values] of state.partyValues) {
+      const saved = snapshot.aggregates[key];
+      if (Array.isArray(saved)) for (const v of saved as readonly string[]) values.add(v);
+    }
     const unknown = new Set(snapshot.unknown);
     for (const [key, kept] of state.kept) {
       const saved = snapshot.aggregates[key];
@@ -129,6 +153,7 @@ export class AchievementState {
       aggregates[key] = kept.values !== null ? [...kept.values].sort() : kept.value;
       if (!kept.known) unknown.push(key);
     }
+    for (const [key, values] of this.partyValues) aggregates[key] = [...values].sort();
     return {
       v: 1,
       whole: this.whole,
@@ -150,6 +175,7 @@ export class AchievementState {
     const out: Record<string, number> = {};
     for (const key of this.met) out[key] = 1;
     for (const [key, agg] of this.totals) out[key] = this.kept.get(agg)?.value ?? 0;
+    for (const [key, values] of this.partyValues) for (const v of [...values].sort()) out[partyFigureKey(key, v)] = 1;
     return out;
   }
 
@@ -173,16 +199,21 @@ export class AchievementState {
     this.setSample(name, value);
   }
 
-  /** Whether a condition reads the champions, `party(where …)`, which `champions` is told. */
+  /**
+   * Whether a condition reads the champions, `party(where …)` or `distinct(games(…).attribute)`,
+   * which `champions` is told.
+   */
   get readsChampions(): boolean {
-    return this.partyFilters.size > 0;
+    return this.partyFilters.size > 0 || this.partiesAt.size > 0;
   }
 
   /**
    * The party's champions at a tick's end, each by its attributes
-   * (`CHAMPION_ATTRIBUTES`): each `party(where …)` is the number its filter accepts.
+   * (`CHAMPION_ATTRIBUTES`): each `party(where …)` is the number its filter accepts, and
+   * each `distinct(games(…).attribute)` keeps their values as `games(…)` is met.
    */
   champions(members: readonly Readonly<Record<string, string>>[]): void {
+    this.members = members;
     for (const [key, where] of this.partyFilters) this.setSample(key, members.filter((attrs) => accepts(where, attrs)).length);
   }
 
@@ -238,7 +269,7 @@ export class AchievementState {
       if ((game ? this.met : this.unlockedIds).has(t.id)) continue;
       if (t.whole && (!this.whole || !t.aggregates.every(a => this.kept.get(a.key)?.known === true))) continue;
       if (this.truth(t.when)) {
-        if (game) this.met.add(t.id);
+        if (game) this.meet(t.id);
         else {
           this.unlockedIds.add(t.id);
           out.push(t.id);
@@ -246,6 +277,22 @@ export class AchievementState {
       }
     }
     return out;
+  }
+
+  /**
+   * `games(…)`'s condition `key` met: each `distinct(games(…).attribute)` of it keeps the
+   * values of the party's champions as the last tick's end left them, the dead among them.
+   */
+  private meet(key: string): void {
+    this.met.add(key);
+    for (const [at, { game, attr }] of this.partiesAt) {
+      if (game !== key) continue;
+      const values = this.partyValues.get(at);
+      for (const member of this.members) {
+        const v = member[attr];
+        if (v !== undefined) values?.add(v.toUpperCase());
+      }
+    }
   }
 
   private truth(e: Expr): boolean {
@@ -284,7 +331,7 @@ export class AchievementState {
       case 'sample': return this.samples[e.sample.key] ?? 0;
       case 'agg': return this.aggregate(e.agg);
       // An achievement across games is never tested here (`acrossUnlocked`).
-      case 'games': case 'total': return 0;
+      case 'games': case 'gamesParty': case 'total': return 0;
       default: return this.truth(e) ? 1 : 0;
     }
   }
@@ -345,9 +392,10 @@ function globMatches(pattern: string, value: string): boolean {
 /**
  * The achievements across games of `defs` whose conditions the playthroughs' figures
  * `games` make yes (`doc/ACHIEVEMENTS.md` → "Across games"): `games(…)` the number of
- * playthroughs that met it, `total(…)` the sum of their counts. `games(…, in "file")`
- * counts `elsewhere(file)`'s instead, the playthroughs of every set that reads that file,
- * this one's among them where it does. In the file's order.
+ * playthroughs that met it, `total(…)` the sum of their counts, and
+ * `distinct(games(…).attribute)` the number of values their parties had as they met it.
+ * `games(…, in "file")` counts `elsewhere(file)`'s instead, the playthroughs of every set
+ * that reads that file, this one's among them where it does. In the file's order.
  */
 export function acrossUnlocked(
   defs: readonly AchievementDef[], games: Iterable<GameFigures>, elsewhere: (file: string) => readonly GameFigures[] = () => [],
@@ -358,6 +406,14 @@ export function acrossUnlocked(
     switch (e.k) {
       case 'num': return e.value;
       case 'games': return (e.game.of === null ? all : elsewhere(e.game.of)).filter((figures) => (figures[e.game.key] ?? 0) > 0).length;
+      case 'gamesParty': {
+        const prefix = partyFigureKey(e.key, '').slice(0, -2);
+        const values = new Set<string>();
+        for (const figures of e.game.of === null ? all : elsewhere(e.game.of)) {
+          for (const [key, n] of Object.entries(figures)) if (n > 0 && key.startsWith(prefix)) values.add(key.slice(prefix.length));
+        }
+        return values.size;
+      }
       case 'total': return sum(e.key);
       default: return truth(e) ? 1 : 0;
     }

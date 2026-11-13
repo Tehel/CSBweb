@@ -177,8 +177,16 @@ export class AchievementTracker {
   readonly counts: DataCounts;
   private readonly defs: readonly AchievementDef[];
   private readonly miniDat: Uint8Array | null;
-  /** The cells of the set's champions' portraits, each its pixels joined: a champion raised from the prison wears one. */
-  private readonly prisonFaces = new Set<string>();
+  /**
+   * The cells of the set's champions' portraits, each its pixels joined, to its number, the
+   * first where two are the same: a champion raised from the prison wears one, and a
+   * champion's `portrait` is its number.
+   */
+  private readonly prisonFaces = new Map<string, number>();
+  /** The same cells in the sheet's order, each its pixels joined: `AddCharacter`'s `charID` picks one. */
+  private readonly sheetCells: readonly string[];
+  /** Each champion's portrait's cell, `null` for none, by the champion's own pixels, which nothing changes in place. */
+  private readonly cells = new WeakMap<readonly number[], number | null>();
   /** A DM champion's faces, DM's own and the utility disk's, each its pixels joined: a champion raised from DM wears one. */
   private readonly dmFaces = new Set<string>();
   /** Each floor square's bit in `visited`, by `squareKey`. */
@@ -207,7 +215,8 @@ export class AchievementTracker {
     if (played) for (const square of floorSquares(played)) this.floors.set(squareKey(square.z, square.x, square.y), this.floors.size);
     this.visited = new Uint8Array((this.floors.size + 7) >> 3);
     this.miniDat = files.miniDat;
-    if (portraits) for (const cell of portraitCells(portraits)) this.prisonFaces.add(cell);
+    this.sheetCells = portraits ? portraitCells(portraits) : [];
+    this.sheetCells.forEach((cell, i) => { if (!this.prisonFaces.has(cell)) this.prisonFaces.set(cell, i); });
     if (files.utilityPortraits) {
       const sheet = new GraphicsLoader();
       sheet.loadFromArray(files.utilityPortraits);
@@ -522,7 +531,8 @@ export class AchievementTracker {
 
   /**
    * A champion's attributes (`CHAMPION_ATTRIBUTES`): the name, the sex (`CHARFLAG_male`),
-   * alive or not, what each worn place and hand holds, the rank in each class, and the load.
+   * alive or not, what each worn place and hand holds, the rank in each class, the load, and
+   * the portrait, the number of the cell of the set's graphic 26 it is, where it is one.
    *
    * A rank is the class's mastery as the credits show it, `DetermineMastery(chIdx, skill |
    * 0xc000)` (`doc/CSBwin-src/Code17818.cpp:13`): the experience alone, no object's bonus
@@ -549,7 +559,29 @@ export class AchievementTracker {
     const stats = this.game.ctx.systems.characterStats;
     const max = stats.maxLoad(champ);
     attrs.load = `${max > 0 ? Math.floor((stats.characterLoad(champ) * 100 + max - 1) / max) : 0}`;
+    const cell = this.cellOf(champ);
+    if (cell !== null) attrs.portrait = `${cell}`;
     return attrs;
+  }
+
+  /**
+   * The cell of the set's champions' sheet, graphic 26, `champ`'s portrait is, or `null`:
+   * by the pixels where the champion holds them, a save's champion, as the status box
+   * prefers them; else by `portraitGraphic`, the `charID` a champion this engine made was
+   * blitted from, past the sheet's cells a `CSBgraphics.dat` portrait.
+   */
+  private cellOf(champ: Champion): number | null {
+    const pixels = champ.portrait;
+    if (!pixels) {
+      const face = champ.portraitGraphic === undefined ? undefined : this.sheetCells[champ.portraitGraphic];
+      return face === undefined ? null : this.prisonFaces.get(face) ?? null;
+    }
+    let cell = this.cells.get(pixels);
+    if (cell === undefined) {
+      cell = this.prisonFaces.get(pixels.join()) ?? null;
+      this.cells.set(pixels, cell);
+    }
+    return cell;
   }
 
   /** The coins `rn` is, or holds: a chest's contents, the open chest's in its slots. */

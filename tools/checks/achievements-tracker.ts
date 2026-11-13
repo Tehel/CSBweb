@@ -43,7 +43,10 @@
  *    and Insomniac as the game's ranks, loads and sleeps say, and Girl Power as the sexes
  *    do. The whole CSB game's party reads as no man, Buzzzzz and Lor among it: CSBWin's
  *    utility clears `CHARFLAG_male` (`DEBT.md` H, "A champion carried into a new adventure
- *    keeps their sex"), so `csb.txt` disables Girl Power.
+ *    keeps their sex"), so `csb.txt` disables Girl Power. A game of a Dungeon Master set
+ *    won keeps the cell of graphic 26 each champion of its party wears, the dead among them,
+ *    as the tool reads it from the pixels or the `charID`, and one not won keeps none (Hall
+ *    of Fame Tour): DMMovie2615 wins with four, three dead.
  * 8. The casts: each names its power rune, and a failed one why, exactly as often as the
  *    game prints `SpellErrorMsg`'s message for it (`doc/CSBwin-src/Magic.cpp:1007`); a torch
  *    in a hand counted at the tick the tool sees it there itself; and Blazing Glory Day,
@@ -92,7 +95,7 @@ import { resolve } from 'node:path';
 import { fileDigest } from '../../src/data/DataSetFiles';
 import { findRecordingSet } from '../../src/data/RecordingSet';
 import { mergeAchievements, readAchievementFile, type AchievementDef, type AchievementFile, type DataCounts } from '../../src/engine/achievements/AchievementFile';
-import type { AchievementEvent } from '../../src/engine/achievements/AchievementState';
+import { partyFigureKey, type AchievementEvent } from '../../src/engine/achievements/AchievementState';
 import { AchievementTracker, WORN_SLOTS } from '../../src/engine/achievements/AchievementTracker';
 import { isNewAdventure, makeNewAdventure } from '../../src/engine/Chaos';
 import { CsbRandom } from '../../src/core/random';
@@ -252,6 +255,8 @@ for (const file of corpusFiles()) {
   /** The share explored before each join's read, and after it. */
   const joinsExplored: [number, number][] = [];
   let tracker!: AchievementTracker;
+  /** The party as the last page leaves it, each champion's portrait's cell of graphic 26 by the tool's own reading, and alive or not. */
+  let partyCells: () => { name: string; cell: number; alive: boolean }[] = () => [];
   let restored = 0;
   let reads = 0;
   let carryLocation: readonly number[] = [];
@@ -296,6 +301,23 @@ for (const file of corpusFiles()) {
   const played = await playPath(set, diskFiles(set), pkg.path, pkg.shared.kind === 'save' ? pkg.shared : null, null, null, (page) => {
     tracker = new AchievementTracker(page.game, defs, page.screen.ui.objectTables.objectNames, { dungeonDat: page.dungeonDat, miniDat, utilityPortraits },
       page.screen.ui.graphics.basicGraphic(26));
+    partyCells = () => {
+      const sheet = page.screen.ui.graphics.basicGraphic(26)!;
+      const party = page.game.ctx.party.state;
+      const cellOf = (pixels: readonly number[]): number => {
+        for (let cell = 0; cell < Math.floor(sheet.width / 32) * Math.floor(sheet.height / 29); cell++) {
+          const ox = (cell % Math.floor(sheet.width / 32)) * 32;
+          const oy = Math.floor(cell / Math.floor(sheet.width / 32)) * 29;
+          let same = true;
+          for (let i = 0; same && i < 32 * 29; i++) same = sheet.pixels[(oy + Math.floor(i / 32)) * sheet.width + ox + (i % 32)] === pixels[i];
+          if (same) return cell;
+        }
+        return -1;
+      };
+      // A champion the engine made carries the charID its mirror gave, and pixels only once a save is read.
+      return party.champions.flatMap((champ, i) => champ && i !== party.potentialChampionIndex
+        ? [{ name: champ.name, cell: champ.portrait ? cellOf(champ.portrait) : champ.portraitGraphic ?? -1, alive: isAlive(champ) }] : []);
+    };
     tracker.onEvent((event) => {
       events.push(event);
       times.push(page.game.ctx.state.tickCount);
@@ -574,8 +596,20 @@ for (const file of corpusFiles()) {
   check(unlocked.has('ironman') === ironman && unlocked.has('hardcore') === hardcore,
     `${file}: Ironman ${ironman ? 'unlocks' : 'stays locked'} and Hardcore ${hardcore ? 'unlocks' : 'stays locked'}, as its loads, its history and its deaths say`);
 
+  // Hall of Fame Tour: a win keeps the portraits of its party, the dead among them, and nothing else does.
+  if (defs.some((d) => d.id === 'hall-of-fame-tour')) {
+    const cells = partyCells();
+    const kept = Object.keys(tracker.figures()).filter((key) => key.startsWith('distinct(games(won).portrait)=')).sort();
+    console.log(`  the party at the end: ${cells.map((c) => `${c.name} cell ${c.cell}${c.alive ? '' : ' (dead)'}`).join(', ')}; kept ${kept.join(', ') || 'none'}`);
+    const want = won ? cells.filter((c) => c.cell >= 0).map((c) => partyFigureKey('distinct(games(won).portrait)', String(c.cell))).sort() : [];
+    check(kept.join() === want.join(), `${file}: ${won ? 'the win keeps each champion\'s portrait\'s cell, the dead among them' : 'a game not won keeps no portrait'} (Hall of Fame Tour)`);
+  }
+
   // 3. What the games hold.
   if (name === 'DMMovie2615') {
+    const cells = partyCells();
+    check(cells.length === 4 && cells.filter((c) => !c.alive).length === 3 && new Set(cells.map((c) => c.cell)).size === 4 && cells.every((c) => c.cell >= 0),
+      'DMMovie2615 wins with four champions, three dead, each wearing a cell of graphic 26 of their own, as the tool reads them');
     check(riddleSolved >= 0, 'DMMovie2615 answers the riddle room\'s four riddles at once');
     check(swaps.length === 1 && firstGemmed >= 0, 'DMMovie2615 joins the Power Gem to the Firestaff, its one swap');
     for (const hero of ['HALK', 'STAMM', 'LEYLA', 'GOTHMOG']) {

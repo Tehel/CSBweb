@@ -165,3 +165,13 @@ name: Riddle Me This
 text: Answer the four riddles of the riddle room at once.
 tier: easy
 when: ever(trigger where level = 5 and x = 13 and y = 19)
+
+# Each of the 24 champions of the Hall in a party that wins, over any number of games. A
+# champion is known by their portrait, a cell of graphic 26, so REINCARNATE's new name is
+# the same champion and a name typed as another's is not; one dead at the win counts.
+
+[hall-of-fame-tour]
+name: Hall of Fame Tour
+text: Win with each of the dungeon's 24 champions, over any number of games.
+tier: hard
+when: distinct(games(won).portrait) >= 24

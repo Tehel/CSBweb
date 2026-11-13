@@ -36,14 +36,18 @@ Conscientious Objector with at most 40 kills. Dungeon Master's also lists the le
 Sweep counts, 1 to 12, all but the Hall of Champions and the Dragon's, and gives its own
 Express Elevator 60 minutes, and has Shining Armour and Darc Knight, the armours of Lyte and
 Darc worn whole, Gullible, its bad ending ("Where a game ends"), Every Ending, its three
-endings each seen, and Grand Slam, both FTL dungeons won ("Across games"), Some Assembly Required,
+endings each seen, Grand Slam, both FTL dungeons won, and Hall of Fame Tour, each of its 24
+champions in a party that won ("Across games"), Some Assembly Required,
 the Power Gem joined to the Firestaff, Pickpocket's Revenge, a Giggler that robbed the
 party killed, and Riddle Me This, the riddle room's four riddles answered at once
 ("Locks and switches"); Chaos Strikes Back
 lists no level to sweep, disables Girl Power ("The champions"), and has Self-Reliant, won
 without the Hint Oracle asked, Coin-Operated, every GOR COIN lock opened, Fresh Faces,
 won with a party raised from the prison alone, and Veterans, from Dungeon Master alone
-("Where the party came from"), and Grand Slam, as Dungeon Master's. A set with no `achievements.txt` of its own reads that file instead. The file is never a game file
+("Where the party came from"), and Grand Slam, as Dungeon Master's. It has no
+achievement for delivering the CORBUMs in time: the fourth delivered to the FULYA PIT is
+what wins the game (`doc/CSBwin-src/Attack.cpp:2204`), so its limit would be Speed Runner's
+and Blitz's again. A set with no `achievements.txt` of its own reads that file instead. The file is never a game file
 (`GAME_FILES`, `src/data/DataSets.ts`), so a recording's digests never name it, and an
 author can change the file without breaking a recording.
 
@@ -158,9 +162,9 @@ A condition is a yes or a no, made from these parts:
   - `never(event [where filter])` means the count is 0.
   - `distinct(event.attribute [where filter])` is how many different values the attribute
     has had among the events counted.
-- **Across games**: `games(condition)` and `total(count(…))`, read over the player's games
-  of the set, and `games(condition, in "file")`, over another dungeon's ("Across games",
-  below).
+- **Across games**: `games(condition)`, `total(count(…))` and
+  `distinct(games(condition).attribute)`, read over the player's games of the set, and
+  `games(condition, in "file")`, over another dungeon's ("Across games", below).
 
 A **filter** is made of `and`, `or`, `not`, parentheses, and these tests on the event's
 attributes:
@@ -297,6 +301,7 @@ only a candidate at a mirror is not in the party.
 | `ready`, `action` | the object in the ready hand, possession slot 0, and in the action hand, 1 |
 | `fighter`, `ninja`, `priest`, `wizard` | the rank in the class, a number |
 | `load` | what the champion carries, in percent of the most they can, rounded up |
+| `portrait` | the number of the cell of the set's champions' sheet, graphic 26, the champion's portrait is, from 0, the first of two the same; none where it is no cell, a champion a utility put in from another dungeon |
 
 A **rank** is the class's mastery as the credits show it, `DetermineMastery(chIdx, skill |
 0xc000)` (`doc/CSBwin-src/Code17818.cpp:13`): the experience alone, with no object's bonus,
@@ -312,6 +317,12 @@ no more than 15, ARCHMASTER, which the inventory shows for every mastery from 16
 The **load** is `CHARDESC.load`, the object in hand weighing on its owner, against `MaxLoad`
 (`doc/CSBwin-src/Code11f52.cpp:4318`), the most the inventory shows the champion can carry,
 which falls with the stamina and a wound. Rounded up, `load > 50` is exactly more than half.
+
+The **portrait** is read from the champion's own pixels, `CHARDESC.portrait`, which a
+save's champion holds, and is the cell whose pixels they are; a champion who joined at a
+mirror since the last read holds the `charID` `AddCharacter` blitted the cell from instead
+(`doc/CSBwin-src/Character.cpp:487-509`), and is that cell. REINCARNATE keeps it under a
+new name, so a champion is known by it as RISE's NEW FACE knows them.
 
 **The sex is not to be trusted in a CSB adventure CSBWin's utility made.** That utility
 clears `CHARFLAG_male` from every champion it carries over (`DEBT.md` H, "A champion
@@ -371,7 +382,7 @@ names a value: Gourmet says "every kind of food", not "the 8 kinds".
 ### Across games
 
 An achievement across games reads the player's games of the set, each playthrough
-(`d.RandomGameID`, `doc/SAVES.md` → "A playthrough") one game, through two numbers:
+(`d.RandomGameID`, `doc/SAVES.md` → "A playthrough") one game, through three numbers:
 
 - **`games(condition)`**: how many playthroughs met `condition`, a condition of one game,
   at any point of their history, as an achievement unlocks. `games(won) >= 3` is Encore.
@@ -379,19 +390,28 @@ An achievement across games reads the player's games of the set, each playthroug
   `total(count(kill where party = yes)) >= 500` is Dungeon Janitor, and 1000 Lord Chaos's
   HR Problem, the kill ladder's top rungs: the dungeon holds a few hundred monsters, DM
   303 and CSB 266, generators aside.
+- **`distinct(games(condition).attribute)`**: how many values an attribute of the
+  champions ("The champions") had among the parties of the playthroughs as each met
+  `condition`, the dead champions among them, a champion with no value not counted.
+  `distinct(games(won).portrait) >= 24` is Hall of Fame Tour.
 
 Such a condition reads nothing else of a game: no fact, sample or count outside them, and
-neither inside `games(…)` nor `total(…)` inside another. It only asks for "at least": a
+no `games(…)`, `total(…)` or `distinct(games(…)…)` inside a `games(…)`. It only asks for "at least": a
 game left out, its figures lost or touched by a teleport, can only make a number too small,
 so `games(won) = 0` or `total(…) < 10` is refused. It needs no game's whole history; the
 condition inside `games(…)` does where its form says so ("Some conditions need the whole
 game"), as an achievement's.
 
 Each `games(…)` condition is tested in every game as an achievement is, kept by its key,
-its canonical text (`games(won)`), and never unlocked as one. Each history's **figures**
-(`GameFigures`, `AchievementState.figures`) are 1 for each `games(…)` it met and each
-`total(…)`'s count. A playthrough's figures are each the largest any of its branches
-reached, never their sum: two branches share their history up to the save they part at.
+its canonical text (`games(won)`), and never unlocked as one. As one is met, each
+`distinct(games(…).attribute)` of it keeps the values of the party's champions at the last
+tick's end, kept beside a save as a `distinct`'s values are. Each history's **figures**
+(`GameFigures`, `AchievementState.figures`) are 1 for each `games(…)` it met, each
+`total(…)`'s count, and 1 for each value a `distinct(games(…).attribute)` kept, a figure
+of its own (`partyFigureKey`, `distinct(games(won).portrait)="7"`), so the page's rows and
+the proofs' figures keep them as they keep a number. A playthrough's figures are each the
+largest any of its branches reached, never their sum: two branches share their history up
+to the save they part at, and two branches won by two parties keep both.
 `acrossUnlocked` (`src/engine/achievements/AchievementState.ts`) tests a set's achievements
 across games over the playthroughs' figures.
 
@@ -399,6 +419,9 @@ across games over the playthroughs' figures.
 - **Every Ending**, Dungeon Master's: `games(won) >= 1`, its bad ending, `games(lost and
   level = 0 and x = 9 and y = 1) >= 1`, as Gullible's ("Where a game ends"), and a loss
   anywhere else, `games(lost and not (…)) >= 1`.
+- **Hall of Fame Tour**, Dungeon Master's: `distinct(games(won).portrait) >= 24`, each of
+  the Hall's 24 champions in a party that won, over any number of games, by their portrait,
+  so a champion renamed by REINCARNATE is the same and one dead at the win counts.
 
 A total is of one set's games: a Dungeon Master won on the Atari 1.1 and one on the Amiga
 are two sets' wins.
