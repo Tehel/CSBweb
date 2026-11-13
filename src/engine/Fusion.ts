@@ -242,7 +242,9 @@ function* fusionSequence(ctx: GameContext): LoopScript {
   // Observed, Lord Chaos fused is the party's kill (`doc/ACHIEVEMENTS.md` → "Watching the engine").
   if (ctx.host.observing) {
     ctx.host.observe({ k: 'blow', by: 'fusion', party: true });
-    ctx.host.observe({ k: 'monster-died', type: fused, alternateGraphics: monster.alternateGraphics, level, x: w4, y: w6 });
+    ctx.host.observe({
+      k: 'monster-died', type: fused, alternateGraphics: monster.alternateGraphics, level, x: w4, y: w6, possession: monster.possession,
+    });
     ctx.host.observe(BLOW_END);
   }
   monster.creatureType = MonsterType.mon_GreyLord;

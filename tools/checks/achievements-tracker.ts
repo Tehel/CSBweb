@@ -62,6 +62,13 @@
  *    carries the Firestaff from the entrance's pad, map 0 (1,4), north onto (1,3): the party
  *    is sent to the closed cell of map 0 (9,1), dies there, the game is lost, and Gullible
  *    unlocks.
+ * 11. The objects swapped, and taken: Some Assembly Required unlocks at the tick the
+ *    Firestaff with the Power Gem is first in hand, which only the wall of map 13 (24,3)
+ *    gives for the Firestaff; a theft for each object `StealFromCharacter` takes, and a
+ *    Giggler killed a thief exactly where its group carries one: DMMovie2823's Gigglers
+ *    take seven, and the party kills three of the thieves (Pickpocket's Revenge). A new
+ *    game's Giggler that robbed nobody is no thief, and the two whose group takes a torch
+ *    from the ready hand are, across a save kept and read back.
  *
  * Usage: npm test -- --only=achievements-tracker.ts [<package name>…] [--not=<name>] [--events]
  */
@@ -75,7 +82,9 @@ import type { AchievementEvent } from '../../src/engine/achievements/Achievement
 import { AchievementTracker, WORN_SLOTS } from '../../src/engine/achievements/AchievementTracker';
 import { isNewAdventure } from '../../src/engine/Chaos';
 import { achievementFileOf } from '../../src/engine/achievements/PageAchievements';
-import type { Happening } from '../../src/engine/Happening';
+import { BLOW_END, type Happening } from '../../src/engine/Happening';
+import { MonsterType } from '../../src/engine/monsterTypes';
+import type { CreatureRecord } from '../../src/data/dungeonTypes';
 import { readRecordingPackage } from '../../src/engine/RecordingPackage';
 import { CHARFLAG_MALE, getChampionPossession } from '../../src/core/charDesc';
 import { NameIndex } from '../../src/engine/objectIndex';
@@ -84,7 +93,7 @@ import { determineMastery } from '../../src/engine/skills';
 import { MonsterDamageResult } from '../../src/engine/MonsterDamage';
 import { OBJECT_ID_EOF, OBJECT_ID_NULL, Position } from '../../src/core/types';
 import { MovementAction } from '../../src/engine/gameTypes';
-import { OBJNI_THE_FIRESTAFF_A } from '../../src/core/objectNameIndex';
+import { OBJNI_THE_FIRESTAFF_A, OBJNI_THE_FIRESTAFF_B } from '../../src/core/objectNameIndex';
 import { testChampion } from '../lib/champion';
 import { check, finish } from '../lib/check';
 import { graphicsTablesOf, STOCK_DIR, stockGame, stockGraphics } from '../lib/game';
@@ -146,6 +155,11 @@ when: party(where load > 50) >= 1
 if (!own.ok) throw new Error(`the tool's own achievements do not read: ${JSON.stringify(own.errors)}`);
 const ownFile = own.file;
 
+/** `MonsterAttack`'s Giggler's blow, private, which the tool wraps to count what it takes. */
+interface StealFromCharacter {
+  stealFromCharacter(monster: CreatureRecord, chIdx: number): void;
+}
+
 /** The set's achievements, as the page merges them (`achievementFileOf`), and this tool's own. */
 function defsOf(setId: string): AchievementDef[] {
   const path = resolve(DEFS, `${achievementFileOf(setId)}.txt`);
@@ -206,8 +220,12 @@ for (const file of corpusFiles()) {
   let males = 0;
   /** The d.Time of the first tick's end a champion holds a torch at, read by the tool itself. */
   let firstTorch = -1;
+  /** The d.Time of the first tick's end the hand holds the Firestaff with the Power Gem, read by the tool itself. */
+  let firstGemmed = -1;
   /** The failures `SpellErrorMsg` printed, by its message: meaningless, practice, flask. */
   const failures = { meaningless: 0, practice: 0, flask: 0 };
+  /** The objects `StealFromCharacter` took, read by the tool itself. */
+  let taken = 0;
   /** The `DamageMonster` calls that hurt or killed, and their damage, read by the tool itself. */
   let hurtCalls = 0;
   let hurtDamage = 0;
@@ -249,6 +267,14 @@ for (const file of corpusFiles()) {
       }
       return result;
     };
+    const attack = page.game.ctx.systems.monsterAttack as unknown as StealFromCharacter;
+    const stealFromCharacter = attack.stealFromCharacter.bind(attack);
+    attack.stealFromCharacter = (monster, chIdx) => {
+      const held = (): number => page.game.ctx.party.state.champions[chIdx]!.possessions.filter((rn) => rn !== OBJECT_ID_NULL).length;
+      const before = held();
+      stealFromCharacter(monster, chIdx);
+      taken += before - held();
+    };
     const observe = host.observe;
     host.observe = (h: Happening) => {
       if (h.k === 'blow') emptyHanded.push(h.by === 'melee' && h.item === OBJECT_ID_NULL);
@@ -259,6 +285,8 @@ for (const file of corpusFiles()) {
         const party = ctx.party.state;
         const time = ctx.state.tickCount;
         if (bootsWorn && bootsTick < 0) bootsTick = time;
+        if (firstGemmed < 0 && party.objectInHand !== OBJECT_ID_NULL
+          && NameIndex(ctx.dungeon, ctx.tables, party.facing, party.objectInHand) === OBJNI_THE_FIRESTAFF_B) firstGemmed = time;
         let maleNow = 0;
         party.champions.forEach((champ, i) => {
           if (!champ || i === party.potentialChampionIndex) return;
@@ -415,8 +443,21 @@ for (const file of corpusFiles()) {
     ['friendly-fire-fatality', count(events, 'death', { party: 'yes' }) > 0],
   ] as const) check(unlocked.has(id) === want, `${file}: ${id} ${want ? 'unlocks' : 'stays locked'}, as its hits, kills and deaths say`);
 
+  // 11. The objects swapped, and taken.
+  const swaps = events.filter((e) => e.kind === 'swap');
+  console.log(`  swaps ${swaps.map((e) => `${e.attrs.item} for ${e.attrs.took}`).join(', ') || 'none'}, the gem joined at ${firstGemmed}; thefts ${count(events, 'theft')}, thieves killed ${count(events, 'kill', { thief: 'yes' })}`);
+  if (defs.some((d) => d.id === 'some-assembly-required')) {
+    check(at('some-assembly-required') === firstGemmed,
+      `${file}: Some Assembly Required unlocks at the tick the Firestaff with the Power Gem is first in hand, d.Time ${firstGemmed} (${at('some-assembly-required')})`);
+    check(unlocked.has('pickpockets-revenge') === kills.some((e) => e.attrs.party === 'yes' && e.attrs.monster === 'Giggler' && e.attrs.thief === 'yes'),
+      `${file}: Pickpocket's Revenge ${unlocked.has('pickpockets-revenge') ? 'unlocks' : 'stays locked'}, as its kills say`);
+  }
+  check(count(events, 'theft') === taken, `${file}: a theft for each object a Giggler's blow took (${taken})`);
+  check(count(events, 'kill', { thief: 'yes' }) === 0 || taken > 0, `${file}: no group is a thief where nothing was stolen`);
+
   // 3. What the games hold.
   if (name === 'DMMovie2615') {
+    check(swaps.length === 1 && firstGemmed >= 0, 'DMMovie2615 joins the Power Gem to the Firestaff, its one swap');
     for (const hero of ['HALK', 'STAMM', 'LEYLA', 'GOTHMOG']) {
       check(count(events, 'join', { champion: hero, how: 'resurrect' }) === 1, `DMMovie2615: ${hero} joins, resurrected`);
     }
@@ -478,6 +519,10 @@ for (const file of corpusFiles()) {
       `DMMovie2615: MON DES, which makes no spell, is a cast of power MON that failed as meaningless, the message printed (${JSON.stringify(last?.attrs)})`);
     const playVbls = Math.round(played.game.playTime() * 60 / 1000);
     check(Math.abs(tracker.playedVbls - playVbls) <= 1, `DMMovie2615: the play time counted is the game's, ${tracker.playedVbls} VBLs (${playVbls})`);
+  }
+  if (name === 'DMMovie2823') {
+    check(count(events, 'theft', { monster: 'Giggler' }) === 7 && count(events, 'kill', { party: 'yes', monster: 'Giggler', thief: 'yes' }) === 3
+      && unlocked.has('pickpockets-revenge'), 'DMMovie2823: Gigglers take seven objects, the party kills three of the thieves: Pickpocket\'s Revenge');
   }
   if (name === 'replay-lost-game') {
     check(count(events, 'death', { cause: 'monster' }) === 4 && count(events, 'death') === 4, 'replay-lost-game: four champions die, each to a monster');
@@ -583,6 +628,70 @@ for (const file of corpusFiles()) {
   check(game.mainLoopHasReturned() && ctx.party.state.gameIsLost && !ctx.state.gameWon && z === 0 && x === 9 && y === 1,
     'the Firestaff carried from the entrance\'s pad north sends the party to map 0 (9,1), where the game is lost');
   check(tracker.unlocked.has('gullible') && tracker.unlocked.has('t-lost'), 'Gullible unlocks, the game lost');
+}
+
+// 11. A theft: no recording is robbed, so a new game's champion holding a torch stands by
+// map 9's Gigglers, whose blow `StealFromCharacter` is called until it takes the torch.
+{
+  console.log('--- a theft');
+  const game = stockGame();
+  game.setRandomSeed(0x12345678);
+  const events: AchievementEvent[] = [];
+  const names = graphicsTablesOf(stockGraphics()).objects.objectNames;
+  const tracker = new AchievementTracker(game, defsOf('dm-atari'), names, {
+    dungeonDat: new Uint8Array(readFileSync(resolve(`${STOCK_DIR}/dungeon.dat`))), miniDat: null,
+  });
+  tracker.onEvent((event) => events.push(event));
+  tracker.attach();
+  tracker.observe({ k: 'new-game' });
+  const { ctx } = game;
+  game.systems.hallOfChampions.addChampion(testChampion(0));
+  ctx.party.state.position = new Position(1, 24, 9);
+  game.systems.monsters.loadPartyLevelIfChanged();
+  const groupAt = (x: number, y: number): CreatureRecord => {
+    const rn = ctx.dungeon.findFirstMonster(new Position(x, y, 9));
+    const group = rn === OBJECT_ID_EOF ? undefined : ctx.dungeon.getCreatureRecord(rn);
+    if (!group || group.creatureType !== MonsterType.mon_Giggler) throw new Error(`no Giggler on map 9 (${x},${y})`);
+    return group;
+  };
+  const strike = (group: CreatureRecord, x: number, y: number): void => {
+    tracker.observe({ k: 'blow', by: 'melee', party: true, champion: 0, item: OBJECT_ID_NULL });
+    ctx.systems.monsterDamage.damageMonster(group, group.numMonM1 & 3, 9, x, y, 1000, true, false);
+    tracker.observe(BLOW_END);
+  };
+  // A Giggler that robbed nobody is no thief.
+  strike(groupAt(13, 24), 13, 24);
+  const thieves = groupAt(0, 24);
+  const torchAt = new Position(10, 6, 0);
+  let torch = OBJECT_ID_EOF;
+  for (let rn = ctx.dungeon.findFirstObject(torchAt); rn !== OBJECT_ID_EOF; rn = ctx.dungeon.getDBRecordLink(rn)) {
+    if (names[NameIndex(ctx.dungeon, ctx.tables, 0, rn)] === 'TORCH') torch = rn;
+  }
+  if (torch === OBJECT_ID_EOF || !ctx.dungeon.removeObjectFromCell(torchAt, torch)) throw new Error('no torch on map 0 (10,6)');
+  const steal = ctx.systems.monsterAttack as unknown as StealFromCharacter;
+  let tries = 0;
+  for (const champ = ctx.party.state.champions[0]!; tries < 100 && thieves.possession === OBJECT_ID_EOF; tries++) {
+    if (getChampionPossession(champ, 0) === OBJECT_ID_NULL) ctx.systems.character.addCharacterPossession(0, torch, 0);
+    steal.stealFromCharacter(thieves, 0);
+  }
+  const theft = events.find((e) => e.kind === 'theft');
+  console.log(`  taken after ${tries} blow(s): ${JSON.stringify(theft?.attrs)}`);
+  check(thieves.possession === torch && theft?.attrs.item === 'TORCH' && theft.attrs.monster === 'Giggler' && events.filter((e) => e.kind === 'theft').length === 1,
+    'a Giggler\'s blow takes the torch from the ready hand into its group\'s possessions, one theft');
+  // Its state kept at a save and read back: the stolen torch comes back with it.
+  const file = new Uint8Array([9, 0, 24]);
+  tracker.keep(fileDigest(file), JSON.parse(JSON.stringify(tracker.snapshot())) as ReturnType<AchievementTracker['snapshot']>);
+  tracker.observe({ k: 'read', file });
+  strike(thieves, 0, 24);
+  tracker.observe({ k: 'tick' });
+  strike(thieves, 0, 24);
+  tracker.observe({ k: 'tick' });
+  const kills = events.filter((e) => e.kind === 'kill');
+  console.log(`  kills: ${kills.map((e) => JSON.stringify(e.attrs)).join(', ')}`);
+  check(kills.length === 3 && kills[0]!.attrs.thief === 'no' && kills[1]!.attrs.thief === 'yes' && kills[2]!.attrs.thief === 'yes',
+    'the Giggler that robbed nobody is no thief; each of the two that robbed the party, across a save kept and read back, is');
+  check(tracker.unlocked.has('pickpockets-revenge'), 'Pickpocket\'s Revenge unlocks');
+  check(ctx.dungeon.findFirstObject(new Position(0, 24, 9)) !== OBJECT_ID_EOF, 'the thieves\' group, its last member dead, drops what it took');
 }
 
 if (!wornChecked) check(false, 'a package was played');

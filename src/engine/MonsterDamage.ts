@@ -520,6 +520,7 @@ export class MonsterDamage {
     if (this.ctx.host.observing) {
       this.ctx.host.observe({
         k: 'monster-died', type: monster.creatureType, alternateGraphics: monster.alternateGraphics, level, x: attackX, y: attackY,
+        possession: monster.possession,
       });
     }
     const positions = this.monsterPositionByte(monster, level, noItem16);

@@ -111,6 +111,8 @@ export interface TrackerSnapshot {
   readonly sides?: readonly boolean[];
   /** The level the party was on at the last tick's end; left out by a state kept before it was kept, as none. */
   readonly level?: number;
+  /** The objects groups took from the party (`theft`); left out by a state kept before they were kept, as none. */
+  readonly stolen?: readonly number[];
   /**
    * The floor squares the party has stood on at a tick's end, a bit each in
    * `floorSquares`' order, in base 64; left out by a state kept before they were kept, as none.
@@ -132,6 +134,11 @@ export class AchievementTracker {
   private readonly clouds = new Map<number, Side>();
   private causes: (string | null)[] = [null, null, null, null];
   private sides: boolean[] = [false, false, false, false];
+  /**
+   * The objects a group took from the party, by RN, which a group carries until its last
+   * member dies: a kill's `thief`.
+   */
+  private readonly stolen = new Set<number>();
   private readonly blows: Blow[] = [];
   /**
    * The kills of the strike under way, by the square of the group (`squareKey`): an
@@ -234,7 +241,7 @@ export class AchievementTracker {
       [...tags].filter(([, side]) => side.party).map(([rn, side]) => [rn, side.champion]);
     return {
       v: 1, state: this.state.snapshot(), missiles: party(this.missiles), clouds: party(this.clouds), causes: [...this.causes],
-      sides: [...this.sides], level: this.level, visited: toBase64(this.visited),
+      sides: [...this.sides], stolen: [...this.stolen], level: this.level, visited: toBase64(this.visited),
     };
   }
 
@@ -254,7 +261,7 @@ export class AchievementTracker {
       case 'blow-end': this.blows.pop(); return;
       case 'vbl': this.vbls++; return;
       case 'monster-hit': this.hit(h.type, h.damage); return;
-      case 'monster-died': this.killed(h.type, squareKey(h.level, h.x, h.y)); return;
+      case 'monster-died': this.killed(h.type, squareKey(h.level, h.x, h.y), h.possession); return;
       case 'champion-hurt': this.hurt(h.chIdx); return;
       case 'champion-died': this.died(h.chIdx); return;
       case 'missile': this.missiles.set(h.missile, h.launcher >= 0 ? { party: true, champion: h.launcher } : NOBODY); return;
@@ -279,6 +286,11 @@ export class AchievementTracker {
       case 'joined':
         this.record('join', { champion: this.championName(h.chIdx), how: h.reincarnated ? 'reincarnate' : 'resurrect' });
         return;
+      case 'theft':
+        this.stolen.add(h.object);
+        this.record('theft', { champion: this.championName(h.chIdx), item: this.itemName(h.object), monster: MONSTER_NAMES[h.type] ?? `${h.type}` });
+        return;
+      case 'swap': this.record('swap', { item: this.itemName(h.given), took: this.itemName(h.taken) }); return;
       case 'sleep': this.record('sleep', {}); return;
       case 'oracle': this.record('oracle', {}); return;
       case 'tick': this.strikeMissile = null; this.strikeKills.clear(); this.tick(); return;
@@ -307,6 +319,7 @@ export class AchievementTracker {
     this.strikeMissile = null;
     this.missiles.clear();
     this.clouds.clear();
+    this.stolen.clear();
     this.causes = [null, null, null, null];
     this.sides = [false, false, false, false];
     this.vbls = 0;
@@ -324,6 +337,7 @@ export class AchievementTracker {
     for (const [rn, champion] of kept.clouds) this.clouds.set(rn, { party: true, champion });
     this.causes = [...kept.causes];
     if (kept.sides) this.sides = [...kept.sides];
+    for (const rn of kept.stolen ?? []) this.stolen.add(rn);
   }
 
   private tick(): void {
@@ -530,14 +544,30 @@ export class AchievementTracker {
     this.record('hit', { ...this.blowAttrs(type), damage: `${damage}` });
   }
 
-  /** A kill, and how many of its group, on square `square`, the strike has killed so far. */
-  private killed(type: number, square: number): void {
+  /**
+   * A kill, how many of its group, on square `square`, the strike has killed so far, and
+   * whether the group carries, among the objects from `possession` on, one it took from the
+   * party: a member of the thieves' group, which drops what it carries only as its last
+   * member dies.
+   */
+  private killed(type: number, square: number, possession: ObjectID): void {
     let group = 1;
     if (this.blows.length > 0) {
       group = (this.strikeKills.get(square) ?? 0) + 1;
       this.strikeKills.set(square, group);
     }
-    this.record('kill', { ...this.blowAttrs(type), group: `${group}` });
+    this.record('kill', { ...this.blowAttrs(type), group: `${group}`, thief: yesNo(this.carriesStolen(possession)) });
+  }
+
+  /** Whether the objects from `rn` on, a group's possessions, hold one taken from the party. */
+  private carriesStolen(rn: ObjectID): boolean {
+    if (this.stolen.size === 0) return false;
+    const { dungeon } = this.game.ctx;
+    for (let guard = 0; rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL && guard < 1000; guard++) {
+      if (this.stolen.has(rn)) return true;
+      rn = dungeon.getDBRecordLink(rn);
+    }
+    return false;
   }
 
   private hurt(chIdx: number): void {

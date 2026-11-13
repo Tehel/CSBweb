@@ -35,7 +35,9 @@ common file's values: Speed Runner in less than 180 minutes, Blitz in less than 
 Conscientious Objector with at most 40 kills. Dungeon Master's also lists the levels Clean
 Sweep counts, 1 to 12, all but the Hall of Champions and the Dragon's, and gives its own
 Express Elevator 60 minutes, and has Shining Armour and Darc Knight, the armours of Lyte and
-Darc worn whole, and Gullible, its bad ending ("Where a game ends"); Chaos Strikes Back
+Darc worn whole, Gullible, its bad ending ("Where a game ends"), Some Assembly Required,
+the Power Gem joined to the Firestaff, and Pickpocket's Revenge, a Giggler that robbed the
+party killed; Chaos Strikes Back
 lists no level to sweep, disables Girl Power ("The champions"), and has Self-Reliant, won
 without the Hint Oracle asked. A set with no `achievements.txt` of its own reads that file instead. The file is never a game file
 (`GAME_FILES`, `src/data/DataSets.ts`), so a recording's digests never name it, and an
@@ -169,7 +171,7 @@ number for a `level`. Names compare without regard to case.
 
 | Event | When | Attributes |
 | --- | --- | --- |
-| `kill` | a monster dies | `monster`, `by`: `melee` `spell` `throw` `explosion` `cloud` `door` `pit` `fusion` `landing`, the party arriving on its group; `item`, the object thrown or swung, `HAND` for a melee blow with an empty hand, or the bomb whose explosion killed; `champion`, who struck; `party`: `yes` when the party's own blow, spell, throw or arrival killed it; `group`, how many of its group the strike has killed, this one included, so 4 is a whole group of four |
+| `kill` | a monster dies | `monster`, `by`: `melee` `spell` `throw` `explosion` `cloud` `door` `pit` `fusion` `landing`, the party arriving on its group; `item`, the object thrown or swung, `HAND` for a melee blow with an empty hand, or the bomb whose explosion killed; `champion`, who struck; `party`: `yes` when the party's own blow, spell, throw or arrival killed it; `group`, how many of its group the strike has killed, this one included, so 4 is a whole group of four; `thief`: `yes` when its group carries an object it took from the party (`theft`) |
 | `hit` | a blow deals a monster damage, a kill or not | as `kill`'s, but `group`; `damage`, what `DamageMonster` takes off |
 | `hurt` | a champion takes damage | `champion`; `by`: `monster` `missile` `explosion` `cloud` `door` `pit` `wall` `poison` `starvation` `thirst` `fatigue` `potion`; `party`: `yes` when it came from the party's own missile or spell |
 | `death` | a champion dies | `champion`; `cause`, as `hurt`'s `by`: the last damage the champion took; `party`, as that damage's |
@@ -180,6 +182,8 @@ number for a `level`. Names compare without regard to case.
 | `join` | a champion joins the party | `champion`; `how`: `resurrect` `reincarnate` |
 | `enter` | the party stands on a level it did not stand on at the last tick's end, and at a history's first tick | `level`, the map, from 0 |
 | `leave` | the party stands on another level than at the last tick's end | `level`, the map left; `cleared`: `yes` when no monster is alive on it then |
+| `theft` | a monster's blow takes an object from a champion, a Giggler's | `champion`, `item`, `monster` |
+| `swap` | a wall takes the object in hand and gives the hand the one it holds | `item`, the object given; `took`, the object taken |
 | `sleep` | the party lies down to sleep | none |
 | `oracle` | the player asks the Hint Oracle, by its button | none |
 
@@ -386,6 +390,19 @@ whole replay corpus with the tracker attached, and every package plays to its po
   and a recording played back both run: the page then opens the Oracle, the playback
   stops the clock for it. A click refused, with an empty party or a champion only
   provisionally joined, asks nothing.
+- **A theft** is at `StealFromCharacter` (`doc/CSBwin-src/Monster.cpp:239`), the blow of a
+  monster whose attack steals, a Giggler's (`monsterShouldSteal`, `:1083-1084`): one for each
+  object it takes from the champion into its group's possessions. A group carries what it
+  took until its last member dies and drops it (`DropMonsterRemains`,
+  `doc/CSBwin-src/Code11f52.cpp:865`), so a kill is the
+  thief's, `thief: yes`, where its group carries one of the objects taken: each member of
+  the thieves' group, and none of another's. The tracker keeps those objects by RN, which
+  an object keeps wherever it is moved; `monster-died` names the group's first possession,
+  the record linking the rest.
+- **A swap** is at an actuator of type 16 (`doc/CSBwin-src/Mouse.cpp:473-512`), as the
+  object in hand is put on the wall's square and the one there is given to the hand. The
+  only one in Dungeon Master is the wall of map 13 (24,3), which swaps THE FIRESTAFF for
+  THE FIRESTAFF, the one with the Power Gem; Chaos Strikes Back has none.
 - **A sleep** is at the sleep icon's engine half, button 145 (`MouseSystem.sleep`,
   `doc/CSBwin-src/Mouse.cpp:1822-1847`), as `d.PartySleeping` is set: a party woken in the
   same tick has slept all the same.
@@ -455,8 +472,8 @@ the `mini.dat`.
   VBLs counted, and tests the conditions. At `MainLoop`'s return it does the same and says
   the game ended.
 - It keeps its state by the MD5 of each save's file it sees made, and when a file is read
-  it takes up the state kept for it, the level the party stood on and the floor squares
-  walked on among it: a replay's joins read the files their parents made, so each branch
+  it takes up the state kept for it, the level the party stood on, the floor squares
+  walked on and the objects taken from the party among it: a replay's joins read the files their parents made, so each branch
   goes on with its parent's history. A file read with no state kept starts a
   history of its own ("Some conditions need the whole game"), unless it is a CSB
   adventure's start, read against the set's `mini.dat` ("A CSB adventure"), which starts
@@ -497,7 +514,12 @@ kept and read back (Friendly Fire Fatality). And where a game ends: the whole CS
 which never asks the Oracle, is Self-Reliant, and a new game's champion carrying the
 Firestaff north from the entrance's pad dies in map 0 (9,1), the game lost (Gullible);
 `tools/checks/hint-oracle-button.ts` proves each click on the Oracle's button tells one
-`oracle`, and a refused one none.
+`oracle`, and a refused one none. And the objects swapped and taken: the Dungeon Master
+wins join the Power Gem, Some Assembly Required unlocking at the tick the Firestaff with
+the gem is first in hand; a theft for each object a Giggler's blow takes, DMMovie2823's
+seven and three of its thieves killed (Pickpocket's Revenge), and a new game's Giggler
+that robbed nobody no thief, those whose group took a torch thieves, across a save kept
+and read back.
 `tools/checks/achievements-format.ts` reads each file, checks its names against its set's
 `graphics.dat` and its values against its achievements, counts the FTL sets' data, and
 plays the conditions out of made-up events and champions, the named values, the lists and

@@ -170,7 +170,10 @@ export class WorldMove {
     const group = rn === OBJECT_ID_EOF ? undefined : this.dungeon.getCreatureRecord(rn);
     if (!group) return;
     for (let i = 0; i <= (group.numMonM1 & 0x3); i++) {
-      host.observe({ k: 'monster-died', type: group.creatureType, alternateGraphics: group.alternateGraphics, level: at.z, x: at.x, y: at.y });
+      host.observe({
+        k: 'monster-died', type: group.creatureType, alternateGraphics: group.alternateGraphics, level: at.z, x: at.x, y: at.y,
+        possession: group.possession,
+      });
     }
   }
 

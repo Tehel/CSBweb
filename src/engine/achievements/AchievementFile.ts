@@ -53,7 +53,7 @@ export const FOUNTAIN = 'FOUNTAIN';
 
 /** The events and their attributes (`doc/ACHIEVEMENTS.md` → "The events"). */
 export const EVENTS = {
-  kill: { monster: NAME, by: BLOWS, item: NAME, champion: NAME, party: YESNO, group: NUMBER },
+  kill: { monster: NAME, by: BLOWS, item: NAME, champion: NAME, party: YESNO, group: NUMBER, thief: YESNO },
   hit: { monster: NAME, by: BLOWS, item: NAME, champion: NAME, party: YESNO, damage: NUMBER },
   hurt: { champion: NAME, by: DAMAGE_CAUSES, party: YESNO },
   death: { champion: NAME, cause: DAMAGE_CAUSES, party: YESNO },
@@ -70,6 +70,8 @@ export const EVENTS = {
   join: { champion: NAME, how: enumOf('resurrect', 'reincarnate') },
   enter: { level: NUMBER },
   leave: { level: NUMBER, cleared: YESNO },
+  theft: { champion: NAME, item: NAME, monster: NAME },
+  swap: { item: NAME, took: NAME },
   sleep: {},
   oracle: {},
 } as const satisfies Record<string, Record<string, AttributeKind>>;
@@ -107,7 +109,7 @@ export const CHAMPION_ATTRIBUTES = {
 } as const satisfies Record<string, AttributeKind>;
 
 /** The attributes that name an object, which `unknownItems` checks: an event's and a champion's. */
-const ITEM_ATTRIBUTES: ReadonlySet<string> = new Set(['item', 'head', 'neck', 'torso', 'legs', 'feet', 'ready', 'action']);
+const ITEM_ATTRIBUTES: ReadonlySet<string> = new Set(['item', 'took', 'head', 'neck', 'torso', 'legs', 'feet', 'ready', 'action']);
 
 /** The `item`s that are no object, and no set's objects need to have. */
 const NOT_OBJECTS: ReadonlySet<string> = new Set([EMPTY_HAND, FOUNTAIN]);

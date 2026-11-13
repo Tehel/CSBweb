@@ -117,3 +117,22 @@ name: Gullible
 text: Bring the Firestaff back to Lord Librasulus, and see the bad ending.
 tier: silly
 when: lost and level = 0 and x = 9 and y = 1
+
+# The Power Gem: the wall of map 13 (24,3) takes the Firestaff in hand and gives back the
+# one it holds, the gem joined, a type 16 actuator's swap. Both are THE FIRESTAFF, and no
+# other wall of the dungeon swaps one.
+
+[some-assembly-required]
+name: Some Assembly Required
+text: Join the Power Gem to the Firestaff.
+tier: easy
+when: ever(swap where item = "THE FIRESTAFF" and took = "THE FIRESTAFF")
+
+# A Giggler's blow steals instead of hurting, and its group carries what it took until its
+# last member dies.
+
+[pickpockets-revenge]
+name: Pickpocket's Revenge
+text: Be robbed by a Giggler, then kill it.
+tier: silly
+when: ever(kill where party = yes and monster = Giggler and thief = yes)

@@ -215,6 +215,7 @@ export class MonsterAttack {
         } else {
           this.dungeon.addObjectToChain(objD4, monster.possession);
         }
+        if (this.ctx.host.observing) this.ctx.host.observe({ k: 'theft', chIdx, object: objD4, type: monster.creatureType });
       }
       D5W = (D5W + 1) & 7;
       D7W = sw(D7W - 20);

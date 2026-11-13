@@ -321,6 +321,7 @@ export class ActuatorSystem {
             // `objectInHand`, which stays the object now on the wall. No later actuator
             // of this touch reads it: a type 16 is the last of its side.
             party.objectInHand = firstObject;
+            if (this.ctx.host.observing) this.ctx.host.observe({ k: 'swap', given: placed, taken: firstObject });
             emptyHanded = false;
             switchOpen = false;
             break;

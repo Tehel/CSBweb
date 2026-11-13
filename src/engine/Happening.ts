@@ -45,9 +45,13 @@ export type Happening =
   | { readonly k: 'monster-hit'; readonly type: number; readonly damage: number }
   /**
    * A member of the group on square `x`, `y` of `level` died: in `DamageMonster`, in the
-   * group the party landed on, or Lord Chaos fused.
+   * group the party landed on, or Lord Chaos fused. `possession` is the first of the
+   * objects the group carries, `RNeof` for none, which its record links to the rest.
    */
-  | { readonly k: 'monster-died'; readonly type: number; readonly alternateGraphics: number; readonly level: number; readonly x: number; readonly y: number }
+  | {
+    readonly k: 'monster-died'; readonly type: number; readonly alternateGraphics: number; readonly level: number;
+    readonly x: number; readonly y: number; readonly possession: ObjectID;
+  }
   /** `DamageCharacter` dealt `damage` to the champion in slot `chIdx`, pending till the tick. */
   | { readonly k: 'champion-hurt'; readonly chIdx: number; readonly damage: number }
   /** `KillCharacter`. */
@@ -67,6 +71,16 @@ export type Happening =
   | { readonly k: 'wear'; readonly chIdx: number; readonly slot: number; readonly object: ObjectID }
   /** A champion joined for good, RESURRECT or REINCARNATE (`GameHost.championJoined`). */
   | { readonly k: 'joined'; readonly chIdx: number; readonly reincarnated: boolean }
+  /**
+   * `StealFromCharacter` took `object` from the champion in slot `chIdx` into the
+   * possessions of a group of type `type` (`doc/CSBwin-src/Monster.cpp:258-269`).
+   */
+  | { readonly k: 'theft'; readonly chIdx: number; readonly object: ObjectID; readonly type: number }
+  /**
+   * A type 16 actuator put the object in hand, `given`, on its square, and gave the hand the
+   * object that was there, `taken` (`doc/CSBwin-src/Mouse.cpp:473-512`).
+   */
+  | { readonly k: 'swap'; readonly given: ObjectID; readonly taken: ObjectID }
   /** The party lay down to sleep: the sleep icon, button 145 (`MouseSystem.sleep`). */
   | { readonly k: 'sleep' }
   /** The Hint Oracle's button, which opens the Oracle (`ui.hintOracleNeeded`, `src/renderer/ui/Mouse.ts`). */

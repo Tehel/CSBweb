@@ -1216,7 +1216,7 @@ drawing a map from them is a separate item, entered when the author names it.
 
 The achievements are `src/engine/achievements/defs/common.txt`'s 61, four of them valued
 and four counted from the data,
-`dm-atari.txt`'s 14, which every Dungeon Master set reads, and `csb.txt`'s 3, which
+`dm-atari.txt`'s 16, which every Dungeon Master set reads, and `csb.txt`'s 3, which
 disables Girl Power (`doc/ACHIEVEMENTS.md`). The author
 chose the list below, which holds what is left to write. ✓ marks what the
 condition language expresses today; [needs …] names the event or sample the tracker must
@@ -1273,29 +1273,25 @@ Overkill, Strike!, Bare Knuckles, Telefrag and Friendly Fire Fatality
 (`doc/ACHIEVEMENTS.md` → "The happenings"). Step 8a is done: the `oracle` event at the
 Oracle's button, and the samples `level`, `x` and `y`, where the party stands, with CSB's
 Self-Reliant and Dungeon Master's Gullible, a game lost in the cell its bad ending sends
-the Firestaff's bearer to (`doc/ACHIEVEMENTS.md` → "Where a game ends"). What is left:
+the Firestaff's bearer to (`doc/ACHIEVEMENTS.md` → "Where a game ends"). Step 8b is done:
+the `swap` event at a type 16 actuator and the `theft` event at `StealFromCharacter`, a
+kill's `thief` where its group carries an object taken, with Dungeon Master's Some
+Assembly Required and Pickpocket's Revenge (`doc/ACHIEVEMENTS.md` → "The happenings").
+What is left:
 
-8. **The rest of a game's own triggers**, in four parts left, one commit each:
-   - **8b. Objects combined and a theft** (S): the Power Gem joined (map 13 (24,3)'s
-     type 16, the Firestaff in hand swapped), and a Giggler's theft, then that Giggler's
-     kill. Some Assembly Required, Pickpocket's Revenge.
+8. **The rest of a game's own triggers**, in three parts left, one commit each:
    - **8c. A lock or switch triggered** (M): Riddle Me This, Corbum Courier,
      Coin-Operated.
    - **8d. A revival and where the party came from** (M): Lazarus, Veterans, Fresh Faces.
-   - **8e. Save loads** (S), **waiting on the author**: Ironman, Hardcore. A load is
-     a `read` the tracker sees, and the boot's CONTINUE after the page was closed is one
-     too: the recording's path prunes what was played past a save before its read
-     (`doc/RECORDING.md` → "Pruning"), so neither the history nor the verifier's replay
-     can tell a game resumed from a save reloaded after a death. The options:
-     (a) every read counts, CONTINUE's included, a CSB adventure's start aside: Ironman
-     is won in one sitting from a new game, a path with no join, and the verifier checks
-     it exactly (recommended); (b) only the reads the page knows went back over play, the
-     parent's recording longer than the save's point before the prune: fairer to a game
-     of several sittings, but the verifier cannot see it and grants from its replay, so a
-     reload of the page earns it all the same; (c) a SAVE AND QUIT the save menu gains,
-     whose read alone does not count, logged in the recording so the verifier sees the
-     game left at the save: a feature of its own, which `doc/SAVES.md` → "What the dialog
-     leaves out" rules out today.
+   - **8e. Save loads** (S): Ironman, Hardcore. A load is a `read` the tracker sees,
+     and the boot's CONTINUE after the page was closed is one too: the recording's path
+     prunes what was played past a save before its read (`doc/RECORDING.md` → "Pruning"),
+     so neither the history nor the verifier's replay can tell a game resumed from a save
+     reloaded after a death. At the author's choice, every read counts, CONTINUE's
+     included, a CSB adventure's start aside: Ironman is won in one sitting from a new
+     game, a path with no join, and the verifier checks it exactly. A save menu's SAVE
+     AND QUIT, whose read alone would not count, is not made (`doc/SAVES.md` → "What the
+     dialog leaves out").
 9. **Across games.** The totals' rows in the saves' database, and how the Hall verifies
    them: Hall of Fame Tour, Every Ending, Grand Slam, Encore, and Dungeon Janitor and Lord
    Chaos's HR Problem moved. Size M.
@@ -1317,9 +1313,6 @@ stay common.
 
 **Dungeon Master** (`dm-atari.txt`).
 
-- **Some Assembly Required** (easy): join the Power Gem to the Firestaff. [objects
-  combined]
-- **Pickpocket's Revenge** (silly): be robbed by a Giggler, then kill it. [theft]
 - **Riddle Me This** (easy): fully solve the riddle room, its 4 alcoves satisfied. [a
   lock or switch triggered]
 
@@ -1355,8 +1348,6 @@ improve.
 | Which ending, across games (Gullible's unlock for DM's bad one) | Every Ending |
 | Where the party came from | Veterans, Fresh Faces |
 | A revival at an altar | Lazarus |
-| A theft | Pickpocket's Revenge |
-| Objects combined | Some Assembly Required |
 
 ## H — Deliberate divergences (not debt)
 
