@@ -91,8 +91,10 @@ export function drawAchievementBanner(ui: UIState): Rect | null {
   shown.until ??= nowMs() + BANNER_MS;
   const box = BANNER_RECT;
   drawPanel(ui, box);
+  // The text two columns clear of the panel's edge on each side: two of its left edge's
+  // and one of its right's are its border.
   const x = box.x1 + 4;
-  const right = box.x2 - 1;
+  const right = box.x2 - 3;
   const tier = shown.notice.tier.toUpperCase();
   drawText(ui, BANNER_TITLE, x, box.y1 + 9, TITLE_COLOR);
   drawText(ui, tier, right + 2 - tier.length * CHAR_WIDTH, box.y1 + 9, TIER_COLORS[shown.notice.tier]);

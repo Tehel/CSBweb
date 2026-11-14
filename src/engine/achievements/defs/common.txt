@@ -214,7 +214,7 @@ when: won
 [encore]
 name: Encore
 text: Win the dungeon three times, in three games.
-tier: easy
+tier: hard
 when: games(won) >= 3
 
 [lone-wolf]

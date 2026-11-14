@@ -510,15 +510,16 @@ achievement: no row in the lists, no unlock.</p>
 </div>
 
 <p>Dungeon Master's file gives all four. Its Clean Sweep counts every level but the Hall of
-Champions, which holds no monster, and the Dragon's, which holds the Dragon alone:</p>
+Champions, which holds no monster, the first, so linear that it is swept without trying,
+and the Dragon's, which holds the Dragon alone:</p>
 
 <pre class="example"># CSBweb achievements 1
 
 value speedRunnerMinutes = 180
 value blitzMinutes = 60
 value objectorKills = 40
-# Every level but the Hall of Champions and the Dragon's.
-value cleanSweepLevels = 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12</pre>
+# Every level but the Hall of Champions, the first and the Dragon's.
+value cleanSweepLevels = 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12</pre>
 
 <p>A value that no achievement names is an error, as a misspelt name would be: the file
 says <code>value blitzMinute = 45</code> and Blitz still waits for
@@ -1033,7 +1034,7 @@ of the dungeon through three numbers:</p>
 <pre class="example">[encore]
 name: Encore
 text: Win the dungeon three times, in three games.
-tier: easy
+tier: hard
 when: games(won) >= 3
 
 [dungeon-janitor]

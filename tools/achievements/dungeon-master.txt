@@ -12,9 +12,10 @@ family: dungeon-master
 value speedRunnerMinutes = 180
 value blitzMinutes = 60
 value objectorKills = 40
-# Every level but the Hall of Champions, which holds no monster, and the Dragon's, which
-# holds the Dragon alone. Lord Chaos's, 12, can never be swept.
-value cleanSweepLevels = 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
+# Every level but the Hall of Champions, which holds no monster, the first, so linear that
+# it is swept without trying, and the Dragon's, which holds the Dragon alone. Lord
+# Chaos's, 12, can never be swept.
+value cleanSweepLevels = 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
 
 # Dungeon Master's own.
 

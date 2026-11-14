@@ -923,7 +923,7 @@ async function main(): Promise<void> {
   const common = commonFile();
   const values = 'speedRunnerMinutes = 180; blitzMinutes = 60; objectorKills = 40';
   const dm = setFile(common, 'dungeon-master', STOCK_DIR, ['let-sleeping-dragons-lie', 'brute-force', 'express-elevator'],
-    `${values}; cleanSweepLevels = 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12; expressElevatorMinutes = 60`);
+    `${values}; cleanSweepLevels = 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12; expressElevatorMinutes = 60`);
   const csb = setFile(common, 'csb', 'tools/fixtures/gamefiles/csb', ['self-reliant', 'fresh-faces', 'veterans'], values, ['clean-sweep'], ['girl-power']);
   const dungeonMaster = setsHolding(readFileSync(resolve(FAMILIES, 'dungeon-master.txt'), 'utf8'));
   for (const set of DATA_SETS) {
