@@ -69,6 +69,7 @@ const PARTY_KEYS: ReadonlyArray<{ actions: KeyAction[]; label: string }> = [
     { actions: ['quickSave'], label: 'Quick save' },
     { actions: ['quickLoad'], label: 'Quick load' },
     { actions: ['freeze'], label: 'Freeze the game' },
+    { actions: ['achievements'], label: 'Achievements' },
 ];
 
 /** The manual's runes: its four rows, each with the six names, in the order the panel shows them. */
@@ -235,6 +236,7 @@ function helpSheet(bindings: KeyBindings, label: (code: string) => string): HTML
         'Every action is on the screen; a tap is a click. The arrows move, the hands above them fight, the runes above those cast.',
         'Click an object on the floor to take it: it becomes the pointer. Click the floor to drop it, the middle of the view to throw it.',
         'Click a wall\'s button or lever to use it, a keyhole with the key in hand.',
+        'Double-tap a champion\'s coloured bars to see the game\'s achievements.',
     ]));
 
     return [move, fight, magic, party, runes, start, mouse];

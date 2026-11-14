@@ -10,8 +10,10 @@
  *
  * - **The title line**: ACHIEVEMENTS and how many of them the game has unlocked, on a
  *   panel, and at its right CLOSE, where the settings have theirs.
- * - **The list**, a row an achievement in the file's order: its name and its tier, in
- *   the tier's colour once the game has unlocked it (`TIER_COLORS`), grey until then.
+ * - **The list**, a row an achievement, by tier, easy, silly, weird then hard (`TIERS`),
+ *   and in a tier in the order of the files, the common achievements and the set's merged
+ *   (`mergeAchievements`): its name and its tier, in the tier's colour once the game has
+ *   unlocked it (`TIER_COLORS`), grey until then.
  *   The selected row is inverted, the first when it opens. A click selects a row, the
  *   wheel and the scrollbar's arrows scroll the list, and the up and down arrows move
  *   the selection.
@@ -25,18 +27,20 @@
  *
  * ## Opening and closing
  *
- * GAME's ACHIEVEMENTS button in the settings opens it in the settings' place
- * (`SettingsDialog.ts`); it is inert where the page tracks no achievements, a recording
- * played back. Esc, CLOSE or a right click close it, back to the game. While it is up the
+ * The key bound to ACHIEVEMENTS, H in every preset, opens it, and so does a double tap on
+ * a champion's stat bars, for a touch screen (`GameInput`); neither does anything where the
+ * page tracks no achievements, a recording played back. Esc, the ACHIEVEMENTS key again,
+ * CLOSE or a right click close it, back to the game. While it is up the
  * clock is held, as under every dialog, and it is shown through the interface's palette
  * whole, as the settings are.
  */
 import type { Rect, UIButton } from '../../data/tables/UITables';
 import type { AchievementProof } from '../../data/saves/AchievementStore';
-import type { AchievementDef } from '../../engine/achievements/AchievementFile';
+import { TIERS, type AchievementDef } from '../../engine/achievements/AchievementFile';
 import { TIER_COLORS } from './AchievementBanner';
 import { closeDialog, openDialog, type Dialog, type DialogPoint } from './Dialog';
 import { searchButtonList } from './HitTest';
+import { keyAction } from './Keyboard';
 import { MENU_TITLE1_COLOR } from './Menu';
 import type { UIState } from './UIState';
 import {
@@ -66,7 +70,7 @@ import {
 
 /** What the dialog shows of the game's achievements: the tracker's (`PageAchievements.view`). */
 export interface AchievementsView {
-  /** The set's achievements, in the file's order. */
+  /** The set's achievements, in the files' order, as merged (`mergeAchievements`): the list sorts them (`listed`). */
   readonly defs: readonly AchievementDef[];
   /** Those the game's history has unlocked. */
   readonly unlocked: ReadonlySet<string>;
@@ -160,6 +164,19 @@ function hovered(state: AchievementsDialogState, count: number): number {
 
 /* ------------------------------------------------------------------- drawing ---- */
 
+/** The rows of each list of definitions, kept as long as the list (`listed`). */
+const rowsOf = new WeakMap<readonly AchievementDef[], readonly AchievementDef[]>();
+
+/** The list's rows: `view`'s achievements by tier (`TIERS`), and in a tier in their order. */
+export function listed(view: AchievementsView): readonly AchievementDef[] {
+  let rows = rowsOf.get(view.defs);
+  if (!rows) {
+    rows = [...view.defs].sort((a, b) => TIERS.indexOf(a.tier) - TIERS.indexOf(b.tier));
+    rowsOf.set(view.defs, rows);
+  }
+  return rows;
+}
+
 /** A row: the name, and the tier at the row's end. */
 export function rowText(def: AchievementDef): string {
   const tier = def.tier.toUpperCase();
@@ -196,7 +213,8 @@ export function drawAchievementsDialog(ui: UIState): void {
   const state = ui.achievementsDialog;
   const view = ui.achievements();
   if (!state || !view) return;
-  const { defs, unlocked } = view;
+  const { unlocked } = view;
+  const defs = listed(view);
   const over = hovered(state, defs.length);
   const look: ButtonLook = over === BTN_CLOSE ? 'hover' : 'raised';
 
@@ -238,12 +256,12 @@ export function achievementsDialogClick(ui: UIState, x: number, y: number, butto
   if (id >= BTN_ROW0) state.selected = state.scrollTop + id - BTN_ROW0;
 }
 
-/** Esc closes it; the up and down arrows move the selection, the list scrolled to it. */
+/** Esc and the ACHIEVEMENTS key close it; the up and down arrows move the selection, the list scrolled to it. */
 export function achievementsDialogKey(ui: UIState, code: string): void {
   const state = ui.achievementsDialog;
   const count = ui.achievements()?.defs.length ?? 0;
   if (!state) return;
-  if (code === 'Escape') {
+  if (code === 'Escape' || keyAction(code) === 'achievements') {
     closeAchievementsDialog(ui);
     return;
   }

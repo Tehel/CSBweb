@@ -82,6 +82,7 @@ export const KEY_ACTION_NAMES: ReadonlyArray<readonly [KeyAction, string]> = [
   ['quickLoad', 'QUICK LOAD'],
   ['map', 'MAP'],
   ['champions', 'CHAMPIONS'],
+  ['achievements', 'ACHIEVEMENTS'],
 ];
 
 /** The presets' frames, in their row's order, and CUSTOM last. */

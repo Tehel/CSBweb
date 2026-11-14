@@ -1407,10 +1407,14 @@ await evaluate(FACE(8, 3, 0, 2)); await vbls(TICK);
 console.log('state: wall text at F2');   await shot('19-wall-text-f2');
 // A left click on a portrait box's bars, where CSBWin has no left button, is the box's
 // right click (`searchMouseButtons`, `src/renderer/ui/Mouse.ts`): champion 1's inventory
-// opens, and a second click closes it. Nothing is drawn, so this is no frame.
+// opens, and a second click closes it. Nothing is drawn, so this is no frame. Two taps on
+// a champion's bars closer than `MESSAGE_DOUBLE_CLICK_MS` are a double tap, which opens
+// the achievements (`GameInput`): every second tap here waits it out.
 const selected = () => evaluate(`window.__probe.screen.ui.partyState.selectedCharacterIndex`);
+const pastDoubleTap = () => wait(600);
 await canvasClick(124, 10, 0); await vbls(TICK);
 check(await selected() === 1, 'a left click on a champion\'s bars opens the inventory');
+await pastDoubleTap();
 await canvasClick(124, 10, 0); await vbls(TICK);
 check(await selected() === -1, 'and a second one closes it');
 // A finger, through CDP's touch events, which Chrome delivers to the page as a touch
@@ -1429,6 +1433,7 @@ const pressingEye = () => evaluate(`window.__probe.screen.ui.ctx.interface.press
 const soundRunning = () => evaluate(`window.__probe.sound.isRunning()`);
 check(!(await soundRunning()), 'no user activation yet: the sound is locked');
 await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+await pastDoubleTap();
 await touch('touchStart', 124, 10); await touch('touchEnd', 124, 10); await vbls(TICK);
 check(await selected() === 1, 'a tap on a champion\'s bars opens the inventory, once');
 check(await soundRunning(), 'and unlocks the sound');
@@ -1438,6 +1443,15 @@ await touch('touchEnd', 19, 53); await vbls(TICK);
 check(!(await pressingEye()), 'and lifting it lets go');
 await touch('touchStart', 124, 10); await touch('touchEnd', 124, 10); await vbls(TICK);
 check(await selected() === -1, 'a second tap closes the inventory');
+// A double tap on the bars opens the achievements, its two taps the inventory's open and
+// close; Esc closes them.
+await pastDoubleTap();
+await touch('touchStart', 124, 10); await touch('touchEnd', 124, 10); await wait(100);
+await touch('touchStart', 124, 10); await touch('touchEnd', 124, 10); await vbls(TICK);
+check(await evaluate(`window.__probe.screen.ui.dialog?.name ?? null`) === 'achievements' && await selected() === -1,
+  'a double tap on a champion\'s bars opens the achievements, the inventory opened and closed by its taps');
+await key('Escape'); await vbls(TICK);
+check(await evaluate(`window.__probe.screen.ui.dialog`) === null, 'and Esc closes them');
 await send('Emulation.setTouchEmulationEnabled', { enabled: false });
 // A mouse pressed on the eye, moved off the canvas and released there: the canvas has the
 // pointer captured (`bindCanvasEvents`), so the release is its, and the eye is let go. A
@@ -2476,6 +2490,7 @@ await canvasClick(133, 27, 0); await leaveCanvas(); await vbls(SHOWN);
 console.log('state: champions, SKILLS');  await shot('27-champions-skills');
 await canvasClick(160, 100, 2); await vbls(SHOWN);
 check((await championsUp()) === null, 'a right click closes the champions');
+await pastDoubleTap();
 await cdpMouse('mousePressed', 55, 14); await wait(100);
 check((await selected()) === -1, 'a tap on the bars: nothing while it is down');
 await cdpMouse('mouseReleased', 55, 14); await vbls(TICK);
@@ -2492,6 +2507,7 @@ const unlock = (id: string) => evaluate(`window.__probe.achievements.unlocked([{
   gameTime: window.__probe.game.ctx.state.tickCount, vbls: 3600 }]), 1`);
 const achievementRows = () => evaluate(`(async()=>{ const a = window.__probe.achievements; await a.settled();
   return (await a.rows()).map((r) => [r.id, r.playthrough === a.playthrough, r.playTime, r.proof, r.champions.length > 0].join('|')); })()`);
+await pastDoubleTap();
 await cdpMouse('mousePressed', 55, 14); await wait(100); await cdpMouse('mouseReleased', 55, 14); await vbls(TICK);
 check((await selected()) === -1, 'a tap on the bars closes the inventory');
 await unlock('first-blood'); await leaveCanvas(); await vbls(SHOWN);
@@ -2512,14 +2528,10 @@ await unlock('pest-control'); await vbls(SHOWN);
 check(await banner() === null && (await achievementRows()).some((row: string) => row.startsWith('pest-control|true|')),
   'an unlock then is stored, and shows nothing');
 await evaluate(`window.__probe.screen.ui.settings.update({ achievementNotices: true }), 1`);
-// The achievements dialog (`src/renderer/ui/AchievementsDialog.ts`): GAME's ACHIEVEMENTS
-// (236,149) opens it in the settings' place; a click selects the sixth row, Own Goal, and
-// a frame of it with the pointer off the canvas; Esc closes it.
-await key('Escape'); await vbls(SHOWN);
-await canvasClick(45, 45, 0); await vbls(SHOWN);
-await canvasClick(236, 149, 0); await vbls(SHOWN);
-check(await evaluate(`window.__probe.screen.ui.dialog?.name === 'achievements' && window.__probe.screen.ui.settingsDialog === null`),
-  'GAME\'s ACHIEVEMENTS opens the achievements in the settings\' place');
+// The achievements dialog (`src/renderer/ui/AchievementsDialog.ts`): H opens it; a click
+// selects the sixth row, and a frame of it with the pointer off the canvas; Esc closes it.
+await key('KeyH'); await vbls(SHOWN);
+check(await evaluate(`window.__probe.screen.ui.dialog?.name === 'achievements'`), 'H opens the achievements');
 await canvasClick(100, 85, 0); await leaveCanvas(); await vbls(SHOWN);
 check(await evaluate(`window.__probe.screen.ui.achievementsDialog.selected`) === 5, 'a click on the sixth row selects it');
 console.log('state: achievements');      await shot('35-achievements');

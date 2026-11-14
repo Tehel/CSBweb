@@ -19,11 +19,14 @@
  * 5. **The banner** (`AchievementBanner.ts`): two unlocks at once show one after the
  *    other, each from its first drawing, none under a dialog, and none with ACHIEVEMENT
  *    NOTICES off. `tools/probe-frames.ts` takes its frame.
- * 6. **The dialog** (`AchievementsDialog.ts`): GAME's ACHIEVEMENTS opens it in the
- *    settings' place, the clock held; its rows are the set's, in the file's order, those
- *    unlocked in their tier's colour; a click selects a row and the detail says it, and
- *    one needing the whole game says so in a game from a save; the wheel and the arrows
- *    scroll; Esc closes it. `tools/probe-frames.ts` takes its frame.
+ * 6. **The dialog** (`AchievementsDialog.ts`): GAME has no button for it; H, the
+ *    ACHIEVEMENTS key of every preset, opens it through `GameInput`, the clock held, and
+ *    closes it; so does a double tap on a champion's stat bars, its two taps queued as
+ *    the two clicks they are, a tap on another's not; its rows are the set's, by tier and
+ *    in a tier in the merged files' order, those unlocked in their tier's colour; a click
+ *    selects a row and the detail says it, and one needing the whole game says so in a
+ *    game from a save; the wheel and the arrows scroll; Esc closes it.
+ *    `tools/probe-frames.ts` takes its frame.
  * 7. **Across games**: each playthrough's figures merged into its row of the store, each
  *    key at the larger; an achievement across games unlocked as the live game's figures
  *    and another playthrough's stored ones make it yes, a row of the playthrough playing
@@ -45,10 +48,16 @@ import { setAchievementDefs, type ShownUnlock } from '../../src/engine/achieveme
 import { standInPage, type StandInPage } from '../../src/renderer/StandInPage';
 import { BANNER_RECT, TIER_COLORS, drawAchievementBanner, showAchievementNotice, takeBannerChanged } from '../../src/renderer/ui/AchievementBanner';
 import {
-  DETAIL_CHARS, LIST, achievementsDialogClick, achievementsDialogKey, achievementsDialogWheel, detailLines, rowText, wrapText,
+  DETAIL_CHARS, LIST, achievementsDialogClick, achievementsDialogKey, achievementsDialogWheel, detailLines, listed, rowText, wrapText,
 } from '../../src/renderer/ui/AchievementsDialog';
 import { listRowRect } from '../../src/renderer/ui/Widgets';
-import { openSettingsDialog, settingButtonFrame, settingsDialogClick } from '../../src/renderer/ui/SettingsDialog';
+import { TABS } from '../../src/renderer/ui/SettingsDialog';
+import { statBarsAt } from '../../src/renderer/ui/ChampionDialog';
+import { KEY_PRESETS } from '../../src/renderer/ui/Keyboard';
+import { searchMouseButtons } from '../../src/renderer/ui/Mouse';
+import { GameInput, type KeyPress } from '../../src/renderer/GameInput';
+import { TIERS } from '../../src/engine/achievements/AchievementFile';
+import type { Game } from '../../src/engine/Game';
 import { check, finish } from '../lib/check';
 import { STOCK_DATA_SET, dataSetNamed, diskFiles } from '../lib/dataSets';
 import { memoryStore, savePath } from '../lib/saves';
@@ -237,15 +246,46 @@ check(ui.banner.shown === null && !takeBannerChanged(ui), 'with ACHIEVEMENT NOTI
 
 // 6. The dialog.
 console.log('=== the dialog ===');
-openSettingsDialog(ui);
-const achievementsButton = settingButtonFrame(9);
-settingsDialogClick(ui, (achievementsButton.x1 + achievementsButton.x2) >> 1, (achievementsButton.y1 + achievementsButton.y2) >> 1, 2);
-const state = ui.achievementsDialog;
+check(!TABS.some((tab) => tab.settings.some((setting) => setting.name === 'ACHIEVEMENTS')), 'no setting is ACHIEVEMENTS: GAME holds only its notices');
 const dialogName = (): string | undefined => (ui as { dialog: { name: string } | null }).dialog?.name;
-check(dialogName() === 'achievements' && ui.settingsDialog === null && state !== null && a.game.ctx.state.paused,
-  'GAME\'s ACHIEVEMENTS opens the achievements in the settings\' place, the clock held');
+const events: string[] = [];
+const input = new GameInput({
+  game: {
+    mainLoopHasReturned: () => false,
+    isDead: () => false,
+    onMouseClick: (x: number, y: number, b: number) => events.push(`click ${searchMouseButtons(ui, x, y, b)}`),
+    onMouseUnClick: () => events.push('unclick'),
+    enqueueKeyButton: () => {},
+    isPartySleeping: () => false,
+    isFrozen: () => false,
+  } as unknown as Game,
+  screen: { ui, screenPoint: (x, y) => ({ x, y }), setHoverPoint: () => {}, handleMouseButton: () => {}, handleDialogWheel: () => {} },
+  refreshScreen: () => {},
+  onQuickSave: () => {},
+  onQuickLoad: () => {},
+});
+const press = (code: string): KeyPress => ({ key: code, code, ctrlKey: false, metaKey: false, altKey: false });
+check(Object.values(KEY_PRESETS).every((table) => table.achievements.join() === 'KeyH,'), 'every preset binds ACHIEVEMENTS to H');
+check(input.keyDown(press('KeyH')) && dialogName() === 'achievements' && a.game.ctx.state.paused, 'H opens the achievements, the clock held');
+input.keyDown(press('KeyH'));
+check(dialogName() === undefined && !a.game.ctx.state.paused, 'and again, closes them');
+const tap = (x: number, y: number) => { input.mouseDown(x, y, 0); input.mouseUp(); };
+check(statBarsAt(ui, 124, 14) === 1, 'x 124, y 14 is on champion 2\'s stat bars');
+tap(124, 14); tap(55, 14);
+check(dialogName() === undefined && events.join() === 'click 8,unclick,click 7,unclick', 'a tap on champion 2\'s bars, then on champion 1\'s, are two clicks, and open nothing');
+events.length = 0;
+tap(124, 14); tap(124, 14);
+check(dialogName() === 'achievements' && events.join() === 'click 8,unclick,click 8,unclick',
+  'a double tap on one champion\'s bars opens the achievements, its two taps queued as two clicks of the inventory button');
+const state = ui.achievementsDialog;
 const view = ui.achievements()!;
-check(view.defs.map((def) => def.id).join() === defs.map((def) => def.id).join(), 'its rows are the set\'s achievements, in the file\'s order');
+const listedRows = listed(view);
+console.log(`  listedRows: ${listedRows.map((def) => `${def.id}:${def.tier}`).join(' ')}`);
+check(listedRows.length === defs.length && listedRows.every((def, i) => i === 0 || TIERS.indexOf(listedRows[i - 1]!.tier) <= TIERS.indexOf(def.tier)),
+  'its listedRows are the set\'s achievements, by tier');
+check(TIERS.every((tier) => listedRows.filter((def) => def.tier === tier).map((def) => def.id).join() === defs.filter((def) => def.tier === tier).map((def) => def.id).join())
+  && listedRows.findIndex((def) => def.id === 't-two') < listedRows.findIndex((def) => def.id === 't-four') && listedRows[0]!.tier === 'easy',
+  'and in a tier in the merged files\' order, the set\'s own after the common file\'s');
 check(view.unlocked.has('t-two') && view.unlocked.has('t-four') && !view.whole, 'what the game\'s history unlocked, not the whole game\'s');
 const firstRow = rowText(defs.find((def) => def.id === 'first-blood')!);
 console.log(`  "${firstRow}"`);
@@ -261,7 +301,7 @@ check(JSON.stringify(wrapText('Kill your first monster with a very long word', 1
 const rowRect = listRowRect(LIST, 3);
 achievementsDialogClick(ui, rowRect.x1 + 10, rowRect.y1 + 3, 2);
 check(state?.selected === 3, 'a click on a row selects it');
-check(achievementsDialogWheel(ui, 100) && state?.scrollTop === 3, 'a notch of the wheel scrolls three rows');
+check(achievementsDialogWheel(ui, 100) && state?.scrollTop === 3, 'a notch of the wheel scrolls three listedRows');
 achievementsDialogKey(ui, 'ArrowUp');
 check(state?.selected === 2 && state.scrollTop === 2, 'the up arrow selects the row above, the list scrolled to it');
 achievementsDialogKey(ui, 'Escape');

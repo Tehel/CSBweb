@@ -232,15 +232,23 @@ export function closeChampionDialog(ui: UIState): void {
 }
 
 /**
- * The champion whose stat bars a left press at `(x, y)` is on, where CHAMPION VIEW holds
- * it back for the long press that opens the dialog (`GameInput`): where the left click is
- * the box's inventory button, 7-10, as `searchMouseButtons` finds it, not the name and
- * hands' 12-15, and a champion is in the box. Else -1.
+ * The champion whose stat bars a left press at `(x, y)` is on: where the left click is the
+ * box's inventory button, 7-10, as `searchMouseButtons` finds it, not the name and hands'
+ * 12-15, and a champion is in the box. Else -1. A double tap there opens the achievements
+ * (`GameInput`).
  */
-export function championBarsAt(ui: UIState, x: number, y: number): number {
-  if (!ui.settings.values.championView) return -1;
+export function statBarsAt(ui: UIState, x: number, y: number): number {
   const id = searchMouseButtons(ui, x, y, 2);
   return id >= 7 && id <= 10 && id - 7 < ui.ctx.party.state.champions.length ? id - 7 : -1;
+}
+
+/**
+ * The champion whose stat bars a left press at `(x, y)` is on (`statBarsAt`), where
+ * CHAMPION VIEW holds it back for the long press that opens the dialog (`GameInput`).
+ * Else -1.
+ */
+export function championBarsAt(ui: UIState, x: number, y: number): number {
+  return ui.settings.values.championView ? statBarsAt(ui, x, y) : -1;
 }
 
 /* ---------------------------------------------------------------- the controls ---- */

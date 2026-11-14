@@ -217,14 +217,24 @@ function fromOldSettings(raw: unknown): Record<string, unknown> {
   };
 }
 
-/** A stored table: each action's two codes, the default preset's where they are not two strings. */
+/**
+ * A stored table: each action's two codes, the default preset's where they are not two
+ * strings, less a code the table's own slots already hold, so that an action added since
+ * the table was stored does not take a key the player gave another.
+ */
 function parseKeyBindings(raw: unknown): KeyBindings {
   const record = asRecord(raw);
+  const stored = (action: KeyAction): KeySlots | null => {
+    const slots = record[action];
+    return Array.isArray(slots) && slots.length === 2 && slots.every((code) => typeof code === 'string')
+      ? [slots[0] as string, slots[1] as string] : null;
+  };
+  const actions = Object.keys(KEY_PRESETS.csbwin) as KeyAction[];
+  const taken = new Set(actions.flatMap((action) => stored(action) ?? []));
   const table = {} as Record<KeyAction, KeySlots>;
-  for (const [action, slots] of Object.entries(KEY_PRESETS.csbwin) as Array<[KeyAction, KeySlots]>) {
-    const stored = record[action];
-    table[action] = Array.isArray(stored) && stored.length === 2 && stored.every((code) => typeof code === 'string')
-      ? [stored[0] as string, stored[1] as string] : slots;
+  for (const action of actions) {
+    const [first, second] = KEY_PRESETS.csbwin[action];
+    table[action] = stored(action) ?? [taken.has(first) ? '' : first, taken.has(second) ? '' : second];
   }
   return table;
 }

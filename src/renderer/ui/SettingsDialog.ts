@@ -15,8 +15,7 @@
  *   (`drawTabbedPage`): the selected one open into it, the others behind its edge.
  * - **The tab's settings**, on the page. On GAME and DISPLAY, each is a button holding its name,
  *   pressed when on and raised when off, two buttons a line (`settingButtonFrame`); a
- *   click turns it over. GAME's ACHIEVEMENTS is no setting: it is never pressed, and a click puts the
- *   achievements dialog up in this one's place (`AchievementsDialog.ts`). ASPECT RATIO's is a choice of two and names the one chosen:
+ *   click turns it over. ASPECT RATIO's is a choice of two and names the one chosen:
  *   16:10 raised, the default, and 4:3 pressed. On SOUND, each is a line: its name on a panel, and beside it a
  *   toggle, ON and OFF, the chosen one pressed, or a slider. The panel holds five lines.
  *   KEYS has its presets, its labels' layout and the list of the keys instead
@@ -87,7 +86,6 @@ import {
 } from './SettingsKeys';
 import { nowMs, type UIState } from './UIState';
 import { leftHandedFits } from '../LeftHanded';
-import { openAchievementsDialog } from './AchievementsDialog';
 import {
   BUTTON_GAP,
   LOW_BUTTON_HEIGHT,
@@ -248,17 +246,6 @@ export const TABS: ReadonlyArray<{
         kind: 'toggle',
         get: (values) => values.achievementNotices,
         set: (_values, on) => ({ achievementNotices: on }),
-      },
-      {
-        name: 'ACHIEVEMENTS',
-        help: 'THIS GAME\'S ACHIEVEMENTS, UNLOCKED OR NOT',
-        unavailable: { when: (ui) => ui.achievements() === null, help: 'A RECORDING PLAYED BACK EARNS NONE' },
-        kind: 'page',
-        get: () => false,
-        toggle: (ui) => {
-          closeSettingsDialog(ui);
-          openAchievementsDialog(ui);
-        },
       },
     ],
   },

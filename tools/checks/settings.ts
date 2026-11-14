@@ -4,7 +4,8 @@
  *
  * Over a stand-in storage, it checks the defaults, the page's earlier record read once
  * under the new key, a field of the wrong type replaced by its default, a table of keys
- * kept across a save and a load, and each extra's flag reaching the game alone, as
+ * kept across a save and a load, an action a stored table lacks given its default key
+ * where the table leaves it free, and each extra's flag reaching the game alone, as
  * `main.ts` applies it (`applyToGame`). The keys the game answers follow the table in
  * force (`keyAction`).
  *
@@ -150,6 +151,19 @@ console.log('\n=== a table of keys, saved and read back ===');
   settings.update({ keyPreset: 'csbwin' });
   check(settings.values.keyBindings === DEFAULT_KEY_BINDINGS, 'a preset named alone brings its table');
   check(new Settings(storage).values.keyBindings === DEFAULT_KEY_BINDINGS, 'and is read back as the preset');
+
+  // A custom table stored before an action was added: the action takes its default key,
+  // unless the table gives that key to another.
+  const older = (bindings: Record<string, readonly string[]>): KeyBindings => {
+    const kept = new MapStorage();
+    const { achievements: _added, ...rest } = { ...DEFAULT_KEY_BINDINGS, ...bindings };
+    kept.items.set(SETTINGS_KEY, JSON.stringify({ keyPreset: 'custom', keyBindings: rest }));
+    return new Settings(kept).values.keyBindings;
+  };
+  check(older({}).achievements.join() === 'KeyH,', 'an action a stored table lacks takes its default key');
+  const taken = older({ 'move.forward': ['KeyH', ''] });
+  check(taken.achievements.join() === ',' && taken['move.forward'].join() === 'KeyH,',
+    'but not one the table gives another action, which keeps it');
 
   // The keys the game answers are the table in force.
   const game = gameOf({ extras: NO_EXTRAS, mouseQueue: new MouseQueue() });

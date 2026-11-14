@@ -828,17 +828,20 @@ The page tracks the achievements of a game the player plays (`PageAchievements`,
 
 - **The dialog** (`src/renderer/ui/AchievementsDialog.ts`) lists the set's achievements
   in the canvas, for the playthrough being played: the tracker's history, so a save
-  loaded shows what that save had unlocked. It opens from the settings: GAME's
-  ACHIEVEMENTS button puts it up in the settings' place, and is inert where the page
-  tracks none. No key opens it: the settings are a click or Esc away on every screen,
-  touch screens included, and a key of its own would be one more for the KEYS tab. Its
-  title says how many are unlocked; a row an achievement, in the file's order, its name
-  and its tier, in the tier's colour once unlocked and grey until then; a panel at the
-  foot says whether the selected one is unlocked and its text, and, for one that needs
-  the whole game in a game from a save that kept no history, that it needs a game played
-  from its start. A click selects a row, the wheel, the scrollbar's arrows and the up
-  and down keys move through the list, and Esc, CLOSE or a right click close it. It
-  holds the clock as every dialog does, its stop named `achievements` in a recording.
+  loaded shows what that save had unlocked. The ACHIEVEMENTS key opens it, H in every
+  preset and rebound on the KEYS tab, and on a touch screen a double tap on a champion's
+  stat bars, whose two taps open and close the inventory as two clicks there do; neither
+  opens anything where the page tracks none. GAME's settings hold only ACHIEVEMENT
+  NOTICES, as every button there is a setting turned on and off. Its title says how many
+  are unlocked; a row an achievement, by tier (easy, silly, weird, hard) and in a tier in
+  the merged files' order (`mergeAchievements`: the common file's, a set's redefinition
+  in its place, then the set's new ones), its name and its tier, in the tier's colour
+  once unlocked and grey until then; a panel at the foot says whether the selected one is
+  unlocked and its text, and, for one that needs the whole game in a game from a save
+  that kept no history, that it needs a game played from its start. A click selects a
+  row, the wheel, the scrollbar's arrows and the up and down keys move through the list,
+  and Esc, the ACHIEVEMENTS key, CLOSE or a right click close it. It holds the clock as
+  every dialog does, its stop named `achievements` in a recording.
 
 - **The welcome page's book** has an ACHIEVEMENTS tab beside DOCUMENTS and RECORDINGS
   (`showAchievements`, `src/ui/welcomePage.ts`), a local set's too: the set's

@@ -15,7 +15,9 @@
  * (`portKeyAction`). Esc and a double click on the message area open the settings
  * (`src/renderer/ui/SettingsDialog.ts`); the MAP key and a long press there, the map
  * (`src/renderer/ui/MapDialog.ts`); the CHAMPIONS key and a long press on a champion's
- * stat bars, the champions (`src/renderer/ui/ChampionDialog.ts`). The queued buttons come back through `Game.handleMouseEvents` in
+ * stat bars, the champions (`src/renderer/ui/ChampionDialog.ts`); the ACHIEVEMENTS key
+ * and a double tap on the stat bars, the achievements
+ * (`src/renderer/ui/AchievementsDialog.ts`). The queued buttons come back through `Game.handleMouseEvents` in
  * their turn, and `install` hands them to the interface's dispatcher, `handleMouseButton`.
  *
  * What changes the game goes through its input boundary (`Game.input`, `InputBoundary`):
@@ -32,7 +34,8 @@ import { isReincarnateScreenOpen, reincarnateClick, reincarnateKey } from './ui/
 import { BARS_LONG_PRESS_MS, MESSAGE_DOUBLE_CLICK_MS, MESSAGE_LONG_PRESS_MS, isDialogOpen } from './ui/Dialog';
 import { openSettingsDialog } from './ui/SettingsDialog';
 import { openMapDialog } from './ui/MapDialog';
-import { championBarsAt, openChampionDialog } from './ui/ChampionDialog';
+import { championBarsAt, openChampionDialog, statBarsAt } from './ui/ChampionDialog';
+import { openAchievementsDialog } from './ui/AchievementsDialog';
 import { nowMs, type UIState } from './ui/UIState';
 
 /**
@@ -112,6 +115,8 @@ export class GameInput {
   private messageClickMs: number | null = null;
   /** The long press on the message area under way: its timer, or `null`. */
   private messagePress: ReturnType<typeof setTimeout> | null = null;
+  /** The last left press on a champion's stat bars: whose, and when, or `null` (`barsDoubleTap`). */
+  private barsTap: { chIdx: number; ms: number } | null = null;
   /** The press on a champion's stat bars held back (`holdBarsPress`), or `null`. */
   private barsPress: { x: number; y: number; chIdx: number; timer: ReturnType<typeof setTimeout> } | null = null;
   /** What holds the input whole (`take`), or `null`: the adventure has it. */
@@ -233,6 +238,13 @@ export class GameInput {
       return;
     }
     if (buttonMask === 2) {
+      if (this.barsDoubleTap(x, y)) {
+        this.messageClickMs = null;
+        game.onMouseClick(x, y, buttonMask);
+        game.onMouseUnClick();
+        this.host.refreshScreen();
+        return;
+      }
       const chIdx = championBarsAt(ui, x, y);
       if (chIdx >= 0) {
         this.messageClickMs = null;
@@ -276,6 +288,25 @@ export class GameInput {
     const second = this.messageClickMs !== null && now - this.messageClickMs <= MESSAGE_DOUBLE_CLICK_MS;
     this.messageClickMs = second ? null : now;
     return second;
+  }
+
+  /**
+   * Whether a left press at `(x, y)` is the second of a double tap on a champion's stat
+   * bars, the same champion's within `MESSAGE_DOUBLE_CLICK_MS` of the first, and the
+   * achievements opened by it: where the page tracks them. Neither tap is held back: the
+   * first opened the champion's inventory, and the second, queued with its release at
+   * once, as the dialog takes the real one, closes it again.
+   */
+  private barsDoubleTap(x: number, y: number): boolean {
+    const chIdx = statBarsAt(this.ui, x, y);
+    const first = this.barsTap;
+    const now = nowMs();
+    this.barsTap = chIdx >= 0 ? { chIdx, ms: now } : null;
+    if (chIdx < 0 || first === null || first.chIdx !== chIdx || now - first.ms > MESSAGE_DOUBLE_CLICK_MS) return false;
+    this.queueBarsPress();
+    if (!openAchievementsDialog(this.ui)) return false;
+    this.barsTap = null;
+    return true;
   }
 
   /**
@@ -446,7 +477,7 @@ export class GameInput {
       this.host.onQuickSave();
     } else if (action === 'quickLoad') {
       this.host.onQuickLoad();
-    } else if (action === 'map' ? openMapDialog(ui) : openChampionDialog(ui)) {
+    } else if (action === 'map' ? openMapDialog(ui) : action === 'champions' ? openChampionDialog(ui) : openAchievementsDialog(ui)) {
       this.host.refreshScreen();
     }
     return true;

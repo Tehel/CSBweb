@@ -102,6 +102,8 @@ type TableAction = keyof typeof TABLE_KEYSCAN;
  *   binds it.
  * - `champions`: the champion dialog, opened or closed (`ChampionDialog.ts`), with
  *   CHAMPION VIEW on. No preset binds it.
+ * - `achievements`: the achievements dialog, opened or closed (`AchievementsDialog.ts`),
+ *   where the page tracks achievements. Every preset binds it to H.
  */
 export type KeyAction =
   | `attack.${Champion}.${0 | 1 | 2}`
@@ -115,7 +117,8 @@ export type KeyAction =
   | 'quickSave'
   | 'quickLoad'
   | 'map'
-  | 'champions';
+  | 'champions'
+  | 'achievements';
 
 /** An action's two keys, each a `KeyboardEvent.code`, or `''` for none. */
 export type KeySlots = readonly [string, string];
@@ -134,7 +137,7 @@ export type KeyBindings = Readonly<Record<KeyAction, KeySlots>>;
  * which the file's one other `KEY` line gives Esc: Esc opens the settings
  * (`GameInput.keyDown`, `DEBT.md` H). Return wakes no one, since the file has no line for
  * it. The rune key is virtual key 0xc0, left of 1, which types `` ` `` and `~` on a US
- * keyboard.
+ * keyboard. H, which no line of the file binds, opens the achievements, the port's own.
  */
 export const DEFAULT_KEY_BINDINGS: KeyBindings = {
   'attack.0.0': ['KeyQ', ''],
@@ -180,6 +183,7 @@ export const DEFAULT_KEY_BINDINGS: KeyBindings = {
   quickLoad: ['F9', ''],
   map: ['', ''],
   champions: ['', ''],
+  achievements: ['KeyH', ''],
 };
 
 /** The default preset's moves on the keypad alone: K , J L M . free. */
@@ -282,12 +286,12 @@ function isTableAction(action: KeyAction): action is TableAction {
 
 /**
  * What one of the port's own keys asks of the page: F5's quick-save, F9's quick-load, the
- * map and the champions.
+ * map, the champions and the achievements.
  */
-type PortKeyAction = 'quickSave' | 'quickLoad' | 'map' | 'champions';
+type PortKeyAction = 'quickSave' | 'quickLoad' | 'map' | 'champions' | 'achievements';
 
 function isPortAction(action: KeyAction): action is PortKeyAction {
-  return action === 'quickSave' || action === 'quickLoad' || action === 'map' || action === 'champions';
+  return action === 'quickSave' || action === 'quickLoad' || action === 'map' || action === 'champions' || action === 'achievements';
 }
 
 /** Whether `action` is a panel's: an attack, an inventory, the magic or PASS. */
