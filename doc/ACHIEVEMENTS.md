@@ -20,8 +20,9 @@ welcome page's tab ("The page"); and the players' identities, the public name an
 on the server and in the welcome page's PROFILE ("Identity"); and the proofs: a game's
 recording sent with the unlocks it claims, replayed by the verifier service, and its
 verdicts shown ("Proofs"); and the Hall of Fame, its answers and its page ("The Hall of
-Fame"); and the designers' guide to the file ("The designers' guide"). The rest of this document is the design that `PLAN.md` phase 18
-builds, step by step, and each step rewrites its section here to say what was built.
+Fame"); and the designers' guide to the file ("The designers' guide"). What is left is in
+`DEBT.md`: U13, the dialog and the server's verdicts; W8, a moderator taking a verified
+achievement back; and P13, a dungeon's own monster names.
 
 ## The file
 
@@ -277,7 +278,7 @@ A `monster` is named by its type, with CSBWin's own names for the types, `monste
 `Skeleton`, `Couatl`, `Vexirk`, `Worm`, `AntMan`, `Muncher`, `DethKnight`, `Zytaz`,
 `WaterElemental`, `Oitu`, `Demon`, `LordChaos`, `Dragon`, `25`, `GreyLord`. No game file
 names a monster; CSBWin's statistics name the dead by these, unless the dungeon's `EXPOOL`
-names them (`GetMonsterName`, `:48-89`), which the tracker does not read yet. A `champion`
+names them (`GetMonsterName`, `:48-89`), which the tracker does not read (`DEBT.md` P13). A `champion`
 is the name the champion carries. A `spell` is the runes after the power rune, by the
 manual's names (`src/core/runes.ts`), which no game file holds either.
 
@@ -1208,9 +1209,9 @@ kept.
   game's page, `?recording=proof:<id>` (`fetchProofRecording`, `src/main.ts`), the
   recording's viewer playing it as a site's recording; DOWNLOAD saves it,
   `proof-<id>.gz`, a shared recording's package that the tools read.
-- **Deferred:** a moderator undoing a proof's verdict, a claim verified turned dropped,
-  when a replay shows a game won by a bug the verifier cannot tell apart: the remedy is the
-  name's reset, which takes the identity out of the Hall whole.
+- **Not yet** (`DEBT.md` W8): a moderator undoing a proof's verdict, a claim verified
+  turned dropped, when a replay shows a game won by a bug the verifier cannot tell apart:
+  the remedy is the name's reset, which takes the identity out of the Hall whole.
 
 `tools/checks/server-identity.ts` proves the identity's answer (403 to anyone but a
 moderator, its own player too, 404 an unknown id) and the notifications;

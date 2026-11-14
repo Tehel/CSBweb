@@ -133,11 +133,14 @@ In payoff order: the first row is the next item.
 | F24 | CSBWin's own recordings played to their end, and shared as the port's | L | ⏳ |
 | R20 | A path cut at a save carries less than a checkpoint: the screen's play state, the picking, the state no file holds | S | ⏳ |
 | C198 | A missile that cannot be made loses the object it was to carry | S | ⏳ |
+| U13 | The achievements dialog and the server's verdicts: a grant shown by no tool, the server's achievements across games | S | ⏳ |
 | P11 | A save keeps its own dungeon, so a set's new `dungeon.dat` does not reach it | ? | ⏳ to design with the author |
+| P13 | A dungeon's own monster names in its achievements | ? | ⏳ to decide with the author |
 | F21 | 3D2D1D's walkthrough is not replayed through `Game` | M | ⏸️ |
 | E40 | The statistics page's heat map | M | ⏸️ |
 | E45 | FROM and TO on a timeline of the recording | M | ⏸️ if the author asks |
 | E47 | The viewer paused hands the game to the player, from a save made there | M | ⏸️ if players ask |
+| W8 | A moderator takes a verified achievement back | M | ⏸️ if the moderators need it |
 | C150 | Conflux's "Jitter" DSA can pass an overlay jitter, where CSBWin's source stops | S | ⏸️ waits on the author |
 | G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
 | G22 | An unknown dungeon played from its save | — | ⏸️ |
@@ -152,7 +155,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: A11 · C202 · D22 · E48 · F26 · G32 · P13 · R21 · U13 · W8 · X21. An ID recorded and paid in one commit has no
+Next free IDs: A11 · C202 · D22 · E48 · F26 · G32 · P14 · R21 · U14 · W9 · X21. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -388,6 +391,22 @@ party into the new dungeon (as Chaos's "MAKE NEW ADVENTURE" carries a party into
 `mini.dat`). A moderator's new `dungeon.dat` for a published set does the same to its
 players' saves (`doc/DEPLOYMENT.md` → "Moderating the sets"), the form saying so.
 
+### P13 ⏳ A dungeon's own monster names in its achievements
+
+An event's `monster` is the type's name as CSBWin's statistics give it, `monsterNames`
+(`doc/CSBwin-src/Statistics.cpp:16-44`, `MONSTER_NAMES` in
+`src/engine/achievements/AchievementTracker.ts`), in every set. CSBWin's statistics name a
+dungeon's dead by the names its `EXPOOL` gives them, where it gives any (`GetMonsterName`,
+`Statistics.cpp:48-89`); the tracker does not read them, so the designer of a dungeon that
+renames its monsters writes the type's name (`doc/ACHIEVEMENTS.md` → "The events", and the
+designers' guide, `doc/achievements-guide.html` → "Objects, monsters and spells").
+
+The format is frozen (`doc/ACHIEVEMENTS.md` → "The designers' guide"): `monster = Dragon`
+matches in a published file what it matches today, so a dungeon's own names could only be
+added beside it, an attribute of their own, never read into `monster`. To decide with the
+author whether it is wanted, and then check it on a dungeon whose `EXPOOL` names its
+monsters.
+
 ---
 
 ## U — The interface in the canvas
@@ -457,6 +476,26 @@ None of it changes the game: with every new setting at its default, every tool's
 and every golden frame stay the same, the dialogs aside. Each item owes its check: a
 golden frame for what it draws, and a probe or a `tools/` assertion for what it does.
 
+### U13 ⏳ The achievements dialog and the server's verdicts
+
+The achievements dialog (`src/renderer/ui/AchievementsDialog.ts`) shows the rows of the
+playthrough being played (`AchievementsView`), each with what the server's replay said of it
+(`PROOF_STATUS`). Two of the server's answers reach it only in part (`doc/ACHIEVEMENTS.md` →
+"An edit of a set's achievements", "The page's half"):
+
+- **An unlock a replay granted unclaimed** (`AchievementRow.granted`, `grantedRows`,
+  `src/engine/achievements/PageProofs.ts`) joins the playthrough's rows, so the dialog says
+  UNLOCKED, VERIFIED of it, but no tool shows it: `tools/checks/achievement-proofs.ts`
+  proves the rows, and `tools/probe-frames.ts` the book's tab alone.
+- **An achievement across games** is worked out by the page from this browser's figures
+  alone (`acrossInSets`, `src/engine/achievements/PageAchievements.ts`), so one the server
+  counts from proofs this browser did not send shows on PROFILE and in the Hall of Fame,
+  not in the dialog nor in the book.
+
+The item: a check that the dialog shows a grant (a golden frame, or a probe of the
+dialog's rows), and, with the author, whether the dialog and the book show the server's
+achievements across games, from `api/profile`.
+
 ---
 
 ## R — Robustness
@@ -504,6 +543,20 @@ refused, a content security policy and `nosniff` on every answer, errors that le
 container held to a memory, process and privilege budget, read-only but for its data, and
 statistics aggregated as the events arrive, each answer capped and cached 30 s. Each item ships with its check in `tools/checks/server.ts`
 or `tools/checks/stats.ts`.
+
+### W8 ⏸️ A moderator takes a verified achievement back
+
+A claim the verifier verified stays verified until a replay again drops it
+(`doc/ACHIEVEMENTS.md` → "Proofs", "An edit of a set's achievements"). A moderator who
+watches a proof (`?recording=proof:<id>`) and sees a game won by a bug the verifier cannot
+tell apart has one remedy, RESET NAME, which takes the whole identity out of the Hall of
+Fame (`doc/ACHIEVEMENTS.md` → "The Hall of Fame", "Moderation"). And a reset leaves the
+player's page at once but the sets' answers of `api/fame` only once their 30 s cache is up
+(`server/fame.ts`).
+
+The item: a moderation action on one proof's claim, turning it dropped, which a replay again
+(`ProofStore.rechecked`) must not grant back; and the Hall's cache emptied at a reset. Taken
+if the moderators need it; the reset is the remedy meanwhile.
 
 ---
 
