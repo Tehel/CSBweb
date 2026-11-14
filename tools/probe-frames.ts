@@ -690,6 +690,7 @@ const form = () => evaluate(`(()=>{const d=document.querySelector('dialog.add-se
     holds: d.querySelector('.add-set-holds').hidden ? '' : [...d.querySelectorAll('.add-set-holds dd')].map(dd=>dd.textContent).join(' | '),
     generate: (b=>b?(b.disabled?'off':'on'):'')(d.querySelector('.add-set-generate')),
     thumbnail: (g=>g.title||g.textContent)(d.querySelector('.add-set-checklist li[data-about=thumbnail] .add-set-given')),
+    guide: (a=>a?a.textContent+' '+a.getAttribute('href'):'')(d.querySelector('.add-set-checklist li[data-about="achievements.txt"] .add-set-guide')),
     asTitle: (l=>!l?'':l.querySelector('input').checked?'on':'off')(d.querySelector('.add-set-checklist .add-set-as-title')),
     title: d.querySelector('#add-set-title').textContent, name: d.querySelector('[name=name]').value,
     fixedId: d.querySelector('[name=id]').readOnly, dmRules: d.querySelector('[name=dmRules]').checked, deletable: !d.querySelector('.add-set-delete').hidden,
@@ -710,6 +711,7 @@ check(opened?.open === true && !opened.confirm && opened.title === 'Add my own d
   && opened.generate === 'on' && opened.thumbnail === 'Generate from data' && opened.asTitle === '' && opened.official === 'hidden',
   '"+ Add my own" opens the form, DM rules checked, no official game\'s checkbox to a player: the name, the id and dungeon.dat crossed, DM\'s graphics.dat checked, the thumbnail offered from it, CONFIRM held');
 check(opened.height <= 600, 'the form is on one screen');
+check(opened.guide === 'How to write one files/achievements-guide.html', `the achievements row, empty, links to the designers' guide (${opened.guide})`);
 await inForm(`d.querySelector('#add-set-cancel').click()`);
 check(await form() === null, 'CANCEL closes it');
 await clickOn('.pick.add');
@@ -743,9 +745,9 @@ console.log('  achievements:', JSON.stringify(achieved));
 await removeIn('achievements.txt');
 await settled();
 check(achieved.rows === ready.rows.replace('achievements.txt', 'achievements.txtx') && !achieved.confirm && achieved.height <= 600
-  && achieved.problems.join() === 'Family "dungeon-master": moderators only.'
+  && achieved.problems.join() === 'Family "dungeon-master": moderators only.' && achieved.guide === 'Read the guide files/achievements-guide.html'
   && (await form()).rows === ready.rows,
-  'Dungeon Master\'s achievements, told by what they hold, are crossed to a player: their family is the site\'s; the form on one screen');
+  'Dungeon Master\'s achievements, told by what they hold, are crossed to a player: their family is the site\'s, the row linking to the guide; the form on one screen');
 await inForm(`const c=new OffscreenCanvas(640,400);c.getContext('2d').fillRect(0,0,640,400);
   const dt=new DataTransfer();dt.items.add(new File([await c.convertToBlob({type:'image/png'})],'large.png',{type:'image/png'}));
   d.querySelector('.add-set-drop').dispatchEvent(new DragEvent('drop',{dataTransfer:dt,bubbles:true,cancelable:true}))`);
@@ -2562,7 +2564,8 @@ const achievementsTab = await evaluate(`(d=>({
   summary: d.querySelector('.achievements-summary').textContent,
   items: [...d.querySelectorAll('.achievements-item')].map(i=>[i.dataset.achievement, i.classList.contains('unlocked'),
     i.querySelector('.achievements-tier').textContent, [...i.querySelectorAll('.achievements-party')].map(p=>p.textContent).join('/')].join('|')),
-  colour: getComputedStyle(d.querySelector('.achievements-item.unlocked .achievements-tier')).color }))(document.querySelector('dialog.documents'))`);
+  colour: getComputedStyle(d.querySelector('.achievements-item.unlocked .achievements-tier')).color,
+  guide: (a=>a.checkVisibility()&&a.getAttribute('href'))(d.querySelector('#achievements-pane .achievements-guide a')) }))(document.querySelector('dialog.documents'))`);
 console.log('  the book\'s achievements:', JSON.stringify(achievementsTab));
 check(achievementsTab.tabs === 'Documents:false,Recordings:false,Achievements:true'
   && achievementsTab.shown === 'documents-pane:false,recordings-pane:false,achievements-pane:true',
@@ -2572,6 +2575,7 @@ check(achievementsTab.summary === `2 of ${achievementsTab.items.length} unlocked
 check(achievementsTab.items[0] === `first-blood|true|easy|${playedParty}` && achievementsTab.items[1] === `pest-control|true|easy|${playedParty}`
   && achievementsTab.items.slice(2).every((item: string) => /\|false\|[a-z]+\|$/.test(item)),
   'it lists them in the file\'s order, the two unlocked by the party that played, the others not');
+check(achievementsTab.guide === 'files/achievements-guide.html', `the tab links to the designers' guide (${achievementsTab.guide})`);
 check(achievementsTab.colour === 'rgb(252, 180, 0)', 'an unlocked one\'s tier in its colour, easy\'s orange, palette entry 9');
 const proofWords = await evaluate(`[...document.querySelectorAll('dialog.documents .achievements-item.unlocked')]
   .map((i) => i.dataset.achievement + ':' + [...i.querySelectorAll('.achievements-proof')].map((p) => p.textContent).join('/')).join()`);

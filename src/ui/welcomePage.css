@@ -351,6 +351,9 @@ body.welcome {
    in the tier's colour (the banner's, `TIER_COLORS`), its text, and the playthroughs that
    unlocked it; one not unlocked is dim. */
 .achievements-summary { margin: 0; color: var(--p9); }
+.achievements-guide { margin: 0; font-size: 15px; color: var(--p9); }
+.achievements-guide a { color: var(--p13); }
+.achievements-guide a:hover { color: var(--p11); }
 .achievements-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px; max-height: 360px; overflow-y: auto; font-size: 17px; }
 .achievements-item { display: flex; flex-direction: column; gap: 3px; color: var(--p2); }
 .achievements-item.unlocked { color: var(--p13); }
@@ -500,6 +503,8 @@ body.welcome {
     cursor: pointer;
 }
 .add-set-generate:hover:not(:disabled) { color: var(--p11); }
+.add-set-guide { color: var(--p2); }
+.add-set-guide:hover { color: var(--p11); }
 .add-set-generate:disabled { color: var(--p1); text-decoration: none; cursor: default; }
 .add-set-checklist .add-set-problem { grid-column: 2 / -1; padding-bottom: 4px; }
 /* The thumbnail's row, with one: the checkbox that makes it the title. */

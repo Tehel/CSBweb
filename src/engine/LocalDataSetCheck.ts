@@ -194,9 +194,10 @@ export async function checkLocalDataSet(
 /**
  * What is wrong with `text`, a set's own achievements file (`checkLocalDataSet`), `null`
  * where the file is over `ACHIEVEMENTS_FILE_BYTES`: none where nothing is. Its objects are
- * checked against `objectNames` where its `graphics.dat` reads.
+ * checked against `objectNames` where its `graphics.dat` reads. The designers' guide's
+ * examples are checked by it too (`tools/checks/achievements-guide.ts`).
  */
-function achievementsProblems(text: string | null, { common, reservedFamilies }: AchievementsCheck, objectNames: ReadonlySet<string> | null): string[] {
+export function achievementsProblems(text: string | null, { common, reservedFamilies }: AchievementsCheck, objectNames: ReadonlySet<string> | null): string[] {
     if (text === null) return [`It is over ${ACHIEVEMENTS_FILE_BYTES / 1024} KB.`];
     const read = readAchievementFile(text);
     if (!read.ok) return read.errors.map(({ line, message }) => `Line ${line}: ${message}.`);

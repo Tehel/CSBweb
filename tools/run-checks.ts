@@ -50,6 +50,7 @@ interface Tool {
 const CHECKS: Tool[] = [
   { tool: 'object-name-index.ts' },
   { tool: 'achievements-format.ts' },
+  { tool: 'achievements-guide.ts' },
   { tool: 'object-index.ts' },
   { tool: 'monster-tables.ts' },
   { tool: 'monster-activation.ts', args: ['3'] },

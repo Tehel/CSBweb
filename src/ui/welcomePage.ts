@@ -80,7 +80,8 @@
  *   achievements (`achievementDefs`) in the file's order, how many this browser has
  *   unlocked over them, and each with its name, its tier in its colour, its text, and the
  *   playthroughs that unlocked it (`AchievementStore`), the first first: the party then,
- *   the day and the time played (`showAchievements`). CLOSE closes the dialog, and so does
+ *   the day and the time played (`showAchievements`), and under them a link to the
+ *   designers' guide to writing them (`ACHIEVEMENTS_GUIDE`). CLOSE closes the dialog, and so does
  *   a click beside it (`closeOnBackdrop`), as it closes HOW TO PLAY's and ABOUT's. The
  *   recording player's STOP leads back to the page with the dialog as its PLAY left it,
  *   the recording selected (`RECORDING_STOPPED_HASH`).
@@ -119,7 +120,7 @@ import logoUrl from '../assets/csbweb-logo.jpg';
 import { archiveName, dataSetArchive, type ReadArchiveFile } from '../data/DataSetArchive';
 import { fileDigest, folderFiles, readAchievementsText } from '../data/DataSetFiles';
 import {
-    ACHIEVEMENTS_FILE, chooserSets, DATA_SETS_ROUTE, DOCUMENT_EXTENSIONS, DOCUMENTS_SEGMENT, documentPath, isDocumentName, PLAYER_ID_HEADER, PNG_HEAD_BYTES, pngSize,
+    ACHIEVEMENTS_FILE, ACHIEVEMENTS_GUIDE, chooserSets, DATA_SETS_ROUTE, DOCUMENT_EXTENSIONS, DOCUMENTS_SEGMENT, documentPath, isDocumentName, PLAYER_ID_HEADER, PNG_HEAD_BYTES, pngSize,
     RECORDING_ENDINGS, RECORDING_PACKAGE_FIELD, RECORDINGS_ROUTE, SHARED_RECORDING_ID, thumbnailPath, type RecordingEnding,
     type DataSet, type DataSetManifest, type ModerationAction, type RecordingAction,
 } from '../data/DataSets';
@@ -272,6 +273,7 @@ const DOCUMENTS = `
   <div class="documents-pane" id="achievements-pane" role="tabpanel" aria-labelledby="documents-tab-achievements">
     <p class="achievements-summary"></p>
     <ul class="achievements-list"></ul>
+    <p class="achievements-guide">Making a dungeon? <a href="${ACHIEVEMENTS_GUIDE}" target="_blank" rel="noopener">How to write its achievements</a>.</p>
   </div>
   <p class="documents-status" aria-live="polite"></p>
   <div class="add-set-buttons">

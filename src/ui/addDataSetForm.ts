@@ -16,7 +16,8 @@
  *   `graphics.dat`, `CSBgraphics.dat`, the Hint Oracle's `hcsb.hct` and `hcsb.dat`, and the
  *   set's own achievements, `achievements.txt` (`doc/ACHIEVEMENTS.md` → "The file"); one
  *   that reads as none of them goes where its name says, whatever its case, so that a
- *   broken file shows why on its row. A file given again replaces the one before. A PC
+ *   broken file shows why on its row. The achievements' row, without its file or with one
+ *   that is wrong, links to the designers' guide (`ACHIEVEMENTS_GUIDE`). A file given again replaces the one before. A PC
  *   `dungeon.dat`, little-endian, is taken as the Atari file it is the twin of
  *   (`recordFile`), and that is the file the record keeps.
  *   Without a thumbnail, its row offers "Generate from data", which draws the one the site's
@@ -66,7 +67,7 @@
  */
 import { folderFiles, type DataSetFiles } from '../data/DataSetFiles';
 import {
-    DATA_SETS_ROUTE, dataSetNamed, EDIT_REMOVE_FIELD, LOCAL_DATA_SET_FILES, LOCAL_DATA_SET_PREFIX, LOCAL_DATA_SET_TEXT_LIMITS, PLAYER_ID_HEADER, PNG_HEAD_BYTES, pngSize,
+    ACHIEVEMENTS_GUIDE, DATA_SETS_ROUTE, dataSetNamed, EDIT_REMOVE_FIELD, LOCAL_DATA_SET_FILES, LOCAL_DATA_SET_PREFIX, LOCAL_DATA_SET_TEXT_LIMITS, PLAYER_ID_HEADER, PNG_HEAD_BYTES, pngSize,
     THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH, type DataSetManifest,
 } from '../data/DataSets';
 import { GraphicsLoader } from '../data/GraphicsLoader';
@@ -349,6 +350,12 @@ function openForm(
     };
 
     const checklist = form.querySelector('.add-set-checklist')!;
+    /** The achievements row's link to the designers' guide (`ACHIEVEMENTS_GUIDE`). */
+    const guide = document.createElement('a');
+    guide.className = 'add-set-guide';
+    guide.href = ACHIEVEMENTS_GUIDE;
+    guide.target = '_blank';
+    guide.rel = 'noopener';
     const rows = new Map(CHECKLIST.map((row) => {
         const item = document.createElement('li');
         item.dataset.about = row.about;
@@ -571,6 +578,14 @@ function openForm(
                 asTitleLabel.title = `${AS_TITLE_HINT}\nThe thumbnail: ${value}`;
             }
             if (row.about === 'thumbnail') given.title = value ?? '';
+            // Without the file, or with one that is wrong, the guide to writing it; the file's name goes to the tooltip.
+            if (row.about === 'achievements.txt') {
+                given.title = value ?? '';
+                if (value === null || state === 'wrong') {
+                    guide.textContent = value === null ? 'How to write one' : 'Read the guide';
+                    given.replaceChildren(guide);
+                }
+            }
             if (row.about === 'thumbnail') problem.textContent = [problem.textContent, thumbnailRefused].filter((t) => t !== '').join(' ');
             item.title = [row.hint, ...own.map((p: LocalDataSetProblem) => p.text)].join('\n');
         }

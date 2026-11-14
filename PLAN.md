@@ -85,9 +85,9 @@ At the author's request, beside the debt. The design is `doc/ACHIEVEMENTS.md`.
   Deferred: a moderator undoing a proof's verdict (a claim verified turned dropped), the
   name's reset being the remedy meanwhile; and the sets' answers showing a name reset for
   up to their 30 s.
-- ⏳ 18.7 A set's own achievements are a file of the set, `achievements.txt` in its folder,
-  beside `hcsb.hct`; the build keeps only `common.txt`. The site's first deployment of the
-  achievements waits for it, at the author's choice. The steps:
+- ✅ 18.7 A set's own achievements are a file of the set, `achievements.txt` in its folder,
+  beside `hcsb.hct`; the build keeps only `common.txt`. With it the achievements are ready
+  for the site's first deployment of them, the author's to make. The steps:
   1. ✅ **The FTL sets' files move out of `src/`**: `tools/achievements/dungeon-master.txt`
      and `csb.txt`, one file per family, which `fetch-gamefiles` copies into each official
      set's folder as `achievements.txt` (the Kids dungeon has none), and
@@ -137,19 +137,17 @@ At the author's request, beside the debt. The design is `doc/ACHIEVEMENTS.md`.
      `server.ts` and `achievement-proofs.ts`. Deferred: the dialog's grant, which no tool
      shows; a new achievement across games is worked out by the page from its own figures
      alone, so a grant of one shows on PROFILE and the Hall, not in the dialog.
-  6. **The designers' guide**: one standalone HTML document that teaches a dungeon's
-     designer to write `achievements.txt`, with many examples, which the author uploads
-     to the instance's shared files and serves under `files/`, as `training.html`,
-     `monster-behaviour.html` and `luck.html` are (the author's choice): inline styles
-     and `data:` images, no script (`FILES_POLICY`, `server/app.ts`). Its look is theirs,
-     not the welcome page's: their sources are `doc/training.html`, `doc/luck.html`,
-     `doc/monster-behaviour.html` and `doc/dm-versions.html` (the `:root` tokens, the serif
-     and the measure, light and dark), and their voice
-     (`.claude/memory/public-pages-voice.md`). A check reads each
-     of its examples with the file's reader, so that the guide cannot drift from the
-     format; the form and the book link to it.
-  The format is frozen once 18.7 ships, the guide published: later work may add to the
-  syntax, never change what a file already says.
+  6. ✅ **The designers' guide** (`doc/ACHIEVEMENTS.md` → "The designers' guide"):
+     `doc/achievements-guide.html`, one standalone page that teaches a dungeon's designer
+     to write `achievements.txt`, with many examples, which the author uploads to the
+     instance's shared files, served under `files/` as `training.html`,
+     `monster-behaviour.html` and `luck.html` are (the author's choice): an inline style,
+     no script, nothing fetched (`FILES_POLICY`, `server/app.ts`), in those pages' look and
+     voice. The form's achievements row and the book's ACHIEVEMENTS tab link to it
+     (`ACHIEVEMENTS_GUIDE`). Proved by `tools/checks/achievements-guide.ts`, which reads
+     each example with the form's check, and by `tools/probe-frames.ts`, the links.
+  The format is frozen: later work may add to the syntax, never change what a file
+  already says.
 
 ## Ground rules
 

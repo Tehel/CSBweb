@@ -1,0 +1,1312 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Writing a dungeon's achievements</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #faf8f5;
+    --bg-raised: #ffffff;
+    --bg-sunken: #f1ede7;
+    --ink: #23201c;
+    --ink-soft: #5c554c;
+    --ink-faint: #8a8177;
+    --rule: #e0d9cf;
+    --accent: #8c3a1e;
+    --accent-bg: #f6ece7;
+    --mystery: #6b4423;
+    --mystery-bg: #f7f0e6;
+    --mystery-rule: #d9c4a3;
+    --refused: #9b2c2c;
+    --measure: 42rem;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    --serif: Charter, "Bitstream Charter", "Iowan Old Style", Georgia, serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17161a;
+      --bg-raised: #1e1d22;
+      --bg-sunken: #131216;
+      --ink: #e6e2dc;
+      --ink-soft: #a9a49c;
+      --ink-faint: #7d786f;
+      --rule: #302e35;
+      --accent: #e8916a;
+      --accent-bg: #2a201c;
+      --mystery: #d8b78a;
+      --mystery-bg: #221d17;
+      --mystery-rule: #4a3d2c;
+      --refused: #e88a8a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #17161a;
+    --bg-raised: #1e1d22;
+    --bg-sunken: #131216;
+    --ink: #e6e2dc;
+    --ink-soft: #a9a49c;
+    --ink-faint: #7d786f;
+    --rule: #302e35;
+    --accent: #e8916a;
+    --accent-bg: #2a201c;
+    --mystery: #d8b78a;
+    --mystery-bg: #221d17;
+    --mystery-rule: #4a3d2c;
+    --refused: #e88a8a;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 18px;
+    line-height: 1.62;
+  }
+
+  .page { max-width: var(--measure); margin: 0 auto; padding: 4rem 1.5rem 6rem; }
+
+  header.masthead { margin-bottom: 3rem; }
+  header.masthead h1 {
+    font-size: clamp(2rem, 5.5vw, 2.9rem);
+    line-height: 1.12;
+    margin: 0 0 .9rem;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+  }
+  .standfirst { color: var(--ink-soft); font-size: 1.05rem; margin: 0 0 1.4rem; }
+  .provenance {
+    font-family: var(--mono);
+    font-size: .74rem;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    border-top: 1px solid var(--rule);
+    padding-top: .9rem;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+    line-height: 1.25;
+    margin: 3.4rem 0 1rem;
+    letter-spacing: -0.01em;
+    font-weight: 600;
+  }
+  h2::before {
+    content: "";
+    display: block;
+    width: 2.2rem;
+    height: 2px;
+    background: var(--accent);
+    margin-bottom: 1.1rem;
+    opacity: .8;
+  }
+  h3 {
+    font-size: 1.12rem;
+    margin: 2.2rem 0 .6rem;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  p { margin: 0 0 1.05rem; }
+  strong { font-weight: 600; }
+  em { font-style: italic; }
+  a { color: var(--accent); }
+
+  code {
+    font-family: var(--mono);
+    font-size: .84em;
+    background: var(--bg-sunken);
+    padding: .12em .38em;
+    border-radius: 3px;
+    border: 1px solid var(--rule);
+  }
+
+  ul, ol { margin: 0 0 1.05rem; padding-left: 1.3rem; }
+  li { margin-bottom: .5rem; }
+
+  /* --- Contents ---------------------------------------------------------- */
+  nav.contents {
+    background: var(--bg-raised);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 1rem 1.2rem .4rem;
+    margin: 0 0 2rem;
+    font-size: .92rem;
+  }
+  nav.contents .label {
+    display: block;
+    font-family: var(--mono);
+    font-size: .68rem;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: .5rem;
+  }
+  nav.contents ol { columns: 2; column-gap: 2rem; margin-bottom: .6rem; }
+  nav.contents li { margin-bottom: .25rem; break-inside: avoid; }
+  nav.contents a { text-decoration: none; }
+  nav.contents a:hover { text-decoration: underline; }
+
+  /* --- The examples: each one is read by CSBweb's reader ----------------- */
+  .example {
+    font-family: var(--mono);
+    font-size: .78rem;
+    line-height: 1.55;
+    background: var(--bg-sunken);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    padding: 1rem 1.2rem;
+    margin: 0 0 1.4rem;
+    overflow-x: auto;
+    white-space: pre;
+    color: var(--ink);
+  }
+  .example.refused { border-left-color: var(--refused); }
+  .verdict {
+    font-family: var(--mono);
+    font-size: .78rem;
+    color: var(--refused);
+    margin: -1rem 0 1.4rem;
+    padding: .5rem 1.2rem .55rem;
+    border: 1px solid var(--rule);
+    border-top: none;
+    border-left: 3px solid var(--refused);
+    border-radius: 0 0 4px 4px;
+    background: var(--bg-raised);
+  }
+  .verdict::before { content: "Refused: "; font-weight: 700; }
+
+  /* --- Tables ---------------------------------------------------------- */
+  .table-wrap { overflow-x: auto; margin: 0 0 1.5rem; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: .88rem;
+    font-family: var(--serif);
+  }
+  caption {
+    caption-side: bottom;
+    text-align: left;
+    font-size: .82rem;
+    color: var(--ink-faint);
+    padding-top: .7rem;
+    font-style: italic;
+  }
+  th, td {
+    text-align: left;
+    padding: .5rem .7rem;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  thead th {
+    font-size: .72rem;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 600;
+    border-bottom: 1.5px solid var(--rule);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.name { white-space: nowrap; font-weight: 600; }
+  td.why { color: var(--ink-soft); font-size: .92em; }
+  td code { font-size: .8em; }
+
+  /* --- Callouts -------------------------------------------------------- */
+  .note {
+    background: var(--bg-raised);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 1rem 1.2rem;
+    margin: 0 0 1.4rem;
+    font-size: .95rem;
+  }
+  .note p:last-child { margin-bottom: 0; }
+  .note .label, .recipe .label {
+    display: block;
+    font-family: var(--mono);
+    font-size: .68rem;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: .5rem;
+  }
+
+  .mystery {
+    background: var(--mystery-bg);
+    border: 1px solid var(--mystery-rule);
+    border-left: 3px solid var(--mystery);
+    border-radius: 4px;
+    padding: .95rem 1.15rem;
+    margin: 0 0 1.4rem;
+    font-size: .95rem;
+  }
+  .mystery h4 {
+    margin: 0 0 .45rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--mystery);
+    font-family: var(--serif);
+  }
+  .mystery p:last-child { margin-bottom: 0; }
+
+  .recipe {
+    background: var(--accent-bg);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    padding: .95rem 1.15rem;
+    margin: 0 0 1.4rem;
+    font-size: .97rem;
+  }
+  .recipe p:last-child, .recipe ul:last-child { margin-bottom: 0; }
+  .recipe .label { color: var(--accent); margin-bottom: .4rem; }
+
+  hr {
+    border: none;
+    border-top: 1px solid var(--rule);
+    margin: 3rem 0;
+  }
+
+  .lede {
+    font-size: 1.06rem;
+    color: var(--ink-soft);
+    border-left: 3px solid var(--rule);
+    padding-left: 1.1rem;
+    margin: 0 0 1.6rem;
+  }
+
+  footer.colophon {
+    margin-top: 4rem;
+    padding-top: 1.4rem;
+    border-top: 1px solid var(--rule);
+    font-size: .84rem;
+    color: var(--ink-faint);
+  }
+  footer.colophon p { margin-bottom: .5rem; }
+
+  @media (max-width: 34rem) {
+    .page { padding: 2.5rem 1rem 4rem; }
+    nav.contents ol { columns: 1; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="masthead">
+  <h1>Writing a dungeon's achievements</h1>
+  <p class="standfirst">A dungeon's own achievements are one short text file beside its
+  dungeon.dat. This guide teaches its format, from a first kill to a puzzle solved and a
+  feat spread over many games, with Dungeon Master's and Chaos Strikes Back's own files
+  as the examples.</p>
+  <p class="provenance">The achievements format of CSBweb, version 1 · Every example on
+  this page is read by CSBweb's own reader and checker</p>
+</header>
+
+<p class="lede">The short version: <strong>an achievement is a name, a sentence and a
+condition</strong>, such as <code>ever(kill where monster = Dragon)</code>. The game
+watches what the party does, tests each condition at the end of every tick, and unlocks
+an achievement the first time its condition holds. Every dungeon already has some sixty
+common achievements; a file adds the dungeon's own, tunes the common ones, or switches
+some off.</p>
+
+<nav class="contents">
+  <span class="label">Contents</span>
+  <ol>
+    <li><a href="#file">The file</a></li>
+    <li><a href="#block">An achievement's block</a></li>
+    <li><a href="#common">The common achievements</a></li>
+    <li><a href="#values">Values</a></li>
+    <li><a href="#conditions">Conditions</a></li>
+    <li><a href="#events">The events</a></li>
+    <li><a href="#names">Objects, monsters and spells</a></li>
+    <li><a href="#samples">Where the party stands</a></li>
+    <li><a href="#triggers">Locks and switches</a></li>
+    <li><a href="#champions">The champions</a></li>
+    <li><a href="#counts">Counted from the data</a></li>
+    <li><a href="#whole">When an achievement unlocks</a></li>
+    <li><a href="#across">Across games</a></li>
+    <li><a href="#family">Families of dungeons</a></li>
+    <li><a href="#checks">What the check refuses</a></li>
+    <li><a href="#published">Once the dungeon is published</a></li>
+    <li><a href="#complete">A complete file</a></li>
+  </ol>
+</nav>
+
+<hr>
+
+<h2 id="file">The file</h2>
+
+<p>The file is called <code>achievements.txt</code> and sits in the dungeon's folder,
+beside <code>dungeon.dat</code> and <code>graphics.dat</code>. On the welcome page, the
+form that adds your own dungeon has a row for it: drop the file in with the others,
+whatever its name, and the form recognises it by its first line. It is optional. A
+dungeon without one has the common achievements alone.</p>
+
+<p>The file is plain ASCII text, at most 64 KB, tabs allowed, and no other character.
+Its first line is always exactly this, the format and its version:</p>
+
+<pre class="example"># CSBweb achievements 1
+
+[first-steps]
+name: First Steps
+text: Leave the entrance hall.
+tier: easy
+when: ever(leave where level = 0)</pre>
+
+<p>After that line comes one block per achievement. <code>#</code> starts a comment that
+runs to the end of the line, except inside a quoted name such as <code>"DRAGON
+STEAK"</code>, and blank lines are ignored, so a file can explain itself:</p>
+
+<pre class="example"># CSBweb achievements 1
+#
+# The Sunken Keep's own achievements, beside the common ones.
+
+# The keep's well, on level 2, swallows whatever is thrown into it.
+
+[well-wisher]
+name: Well Wisher
+text: Throw a gold coin into the well.   # the text a player reads
+tier: silly
+when: ever(trigger where level = 2 and x = 14 and y = 7 and item = "GOLD COIN")</pre>
+
+<p>A file with any error is refused as a whole, and each error names its line. The form
+checks the file each time it changes, so a mistake shows at once, under the file's row
+(<a href="#checks">What the check refuses</a>).</p>
+
+<h2 id="block">An achievement's block</h2>
+
+<p>A block opens with its id in brackets, and holds four fields, each on a line of its
+own:</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Field</th><th>What it is</th><th>Limit</th></tr></thead>
+  <tbody>
+    <tr><td class="name"><code>[id]</code></td><td>The achievement's key: lowercase letters, digits and hyphens, a letter or a digit first. Unique in the file.</td><td>40 characters</td></tr>
+    <tr><td class="name"><code>name:</code></td><td>What the banner and the lists show. Required.</td><td>32 characters</td></tr>
+    <tr><td class="name"><code>text:</code></td><td>One sentence saying what to do. Required.</td><td>160 characters</td></tr>
+    <tr><td class="name"><code>tier:</code></td><td><code>easy</code>, <code>silly</code>, <code>weird</code> or <code>hard</code>; <code>easy</code> when left out.</td><td></td></tr>
+    <tr><td class="name"><code>when:</code></td><td>The condition. Required.</td><td></td></tr>
+  </tbody>
+</table>
+<p style="font-size:.82rem;color:var(--ink-faint);font-style:italic;margin:.5rem 0 0">A file holds at most 200 achievements.</p>
+</div>
+
+<p>The tier only sorts the achievements and gives each its colour; it is worth nothing
+more. A long condition continues on the lines that follow it, each of which begins with a
+space or a tab:</p>
+
+<pre class="example">[leather-is-enough]
+name: Leather Is Enough
+text: Win without ever wearing armour heavier than leather.
+tier: weird
+when: won and never(wear where item in (
+        "MAIL AKETON", "MITHRAL AKETON", "TORSO PLATE", "PLATE OF LYTE", "PLATE OF DARC",
+        "LEG MAIL", "MITHRAL MAIL", "LEG PLATE", "POLEYN OF LYTE", "POLEYN OF DARC",
+        HELMET, BASINET, "CASQUE 'N COIF", ARMET, "HELM OF LYTE", "HELM OF DARC",
+        "BEZERKER HELM", DEXHELM, "FOOT PLATE", "GREAVE OF LYTE", "GREAVE OF DARC"))</pre>
+
+<p>(On this page, an example that begins with a block rather than the first line is a
+piece of a file: the line <code># CSBweb achievements 1</code> goes above it.)</p>
+
+<div class="recipe">
+  <span class="label">Choose the id with care</span>
+  <p>Once the dungeon is published, an id is permanent: it is what every player's unlock
+  is stored by. The name and the text may change at any time, and a typo in them costs
+  nothing. A new id is a new achievement, which nobody has yet.</p>
+</div>
+
+<h2 id="common">The common achievements</h2>
+
+<p>Every dungeon has the common achievements, the same file in every set: the kill
+ladder (First Blood, Pest Control, Exterminator), the silly deaths (Forgot to Pack Lunch,
+Squashed, Splat), the odd wins (Five a Day, Vegetarian, Leather Is Enough), the hard wins
+(Lone Wolf, Untouchable, Ironman) and many more. Most of them suit any dungeon as they
+are. A file changes them in two ways.</p>
+
+<h3>Replacing one</h3>
+
+<p>A block with a common achievement's id replaces it in your dungeon. Chaos Strikes Back's
+party is whole from the start and never recruits, so its Lone Wolf reads the party's size
+at the end, and has a name of its own:</p>
+
+<pre class="example">[lone-wolf]
+name: Solitary Confinement
+text: Win Chaos Strikes Back with a single champion.
+tier: hard
+when: won and party = 1</pre>
+
+<h3>Switching one off</h3>
+
+<p>The word <code>disabled</code>, alone in a block, removes a common achievement from
+your dungeon. A dungeon whose party is always a single champion has no use for Lone Wolf
+or Buddy Cop:</p>
+
+<pre class="example"># CSBweb achievements 1
+
+# One champion, alone in the dark: a party of two is impossible here.
+
+[lone-wolf]
+disabled
+
+[buddy-cop]
+disabled
+
+[full-house]
+disabled</pre>
+
+<p>Disabling an id that the common file does not have does nothing, so a dungeon keeps
+working if a common achievement is ever retired.</p>
+
+<h2 id="values">Values</h2>
+
+<p>A value is a named number, defined on a line of its own before the first block:
+<code>value name = number</code>, a whole number from 0 to 1,000,000,000, its name
+letters and digits, a letter first, at most 40. A text names it in braces,
+<code>{name}</code>, and so does a condition, wherever a number would stand. In a
+condition, <code>{name}m</code> is that many minutes (<code>h</code> and <code>s</code>
+too), a duration to compare with the time played:</p>
+
+<pre class="example"># CSBweb achievements 1
+
+value expressElevatorMinutes = 60
+
+# The deepest level is 13, the Dragon's, where the Power Gem lies.
+
+[express-elevator]
+name: Express Elevator
+text: Reach the deepest level in less than {expressElevatorMinutes} minutes of play.
+tier: hard
+when: ever(enter where level = 13) and playTime &lt; {expressElevatorMinutes}m</pre>
+
+<p>A value may also be a list, <code>value name = number, number, …</code>, which a filter
+names in place of a parenthesised list: <code>level in {cleanSweepLevels}</code>.</p>
+
+<h3>The common file's values</h3>
+
+<p>Four common achievements name a value that the common file does not define. They exist
+only in a dungeon whose own file defines it, since only its designer knows what a fast
+win or a peaceful one is in that dungeon. A dungeon without the value has no such
+achievement: no row in the lists, no unlock.</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Value</th><th>Achievement</th><th>Its condition</th></tr></thead>
+  <tbody>
+    <tr><td class="name"><code>speedRunnerMinutes</code></td><td>Speed Runner</td><td><code>won and playTime &lt; {speedRunnerMinutes}m</code></td></tr>
+    <tr><td class="name"><code>blitzMinutes</code></td><td>Blitz</td><td><code>won and playTime &lt; {blitzMinutes}m</code></td></tr>
+    <tr><td class="name"><code>objectorKills</code></td><td>Conscientious Objector</td><td><code>won and count(kill where party = yes) &lt;= {objectorKills}</code></td></tr>
+    <tr><td class="name"><code>cleanSweepLevels</code></td><td>Clean Sweep, a list</td><td><code>ever(leave where cleared = yes and level in {cleanSweepLevels})</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Dungeon Master's file gives all four. Its Clean Sweep counts every level but the Hall of
+Champions, which holds no monster, and the Dragon's, which holds the Dragon alone:</p>
+
+<pre class="example"># CSBweb achievements 1
+
+value speedRunnerMinutes = 180
+value blitzMinutes = 60
+value objectorKills = 40
+# Every level but the Hall of Champions and the Dragon's.
+value cleanSweepLevels = 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12</pre>
+
+<p>A value that no achievement names is an error, as a misspelt name would be: the file
+says <code>value blitzMinute = 45</code> and Blitz still waits for
+<code>blitzMinutes</code> (<a href="#checks">What the check refuses</a>). A list where a
+single number is expected, in a comparison or in a text, makes its achievement vanish
+from the dungeon, as a missing value does.</p>
+
+<h2 id="conditions">Conditions</h2>
+
+<p>A condition is a yes or a no. It is built from these parts:</p>
+
+<ul>
+  <li><code>and</code>, <code>or</code>, <code>not</code> and parentheses, and the
+  comparisons <code>=</code>, <code>!=</code>, <code>&lt;</code>, <code>&lt;=</code>,
+  <code>&gt;</code>, <code>&gt;=</code> between two numbers of the same kind.</li>
+  <li><strong>Numbers</strong>: <code>100</code>, or a value, <code>{objectorKills}</code>.
+  <strong>Durations</strong>: <code>3h</code>, <code>90m</code>, <code>45s</code>, or a
+  value with its unit, <code>{blitzMinutes}m</code>; they compare only with
+  <code>playTime</code>.</li>
+  <li><strong>Facts about the game</strong>:
+    <ul>
+      <li><code>won</code>, <code>lost</code> and <code>ended</code>, yes only once the game
+      has ended.</li>
+      <li><code>playTime</code>, the time the player has played, in seconds, counted in the
+      frames the game has run, sixty a second.</li>
+      <li><code>gameTime</code>, the game's clock in ticks, about four a second while the
+      party is awake.</li>
+      <li><code>explored</code>, the share of the dungeon's floor the party has stood on, in
+      percent, rounded down.</li>
+    </ul>
+  </li>
+  <li><strong>Counts of events</strong>: <code>count(event)</code>, how many times it
+  happened; <code>count(event where filter)</code>, only those the filter accepts;
+  <code>ever(…)</code>, at least once; <code>never(…)</code>, not once; and
+  <code>distinct(event.attribute where filter)</code>, how many different values the
+  attribute took.</li>
+  <li><strong>Samples</strong>, read at the end of each tick: the party's size, where it
+  stands, the coins it carries (<a href="#samples">Where the party stands</a>), and
+  <code>max(…)</code> and <code>min(…)</code> of any of them over the game.</li>
+  <li><strong>Counts of the dungeon's data</strong>, <code>spells</code>,
+  <code>foods</code>, <code>monsterTypes</code> and <code>levels</code> (<a
+  href="#counts">Counted from the data</a>), and the counts <strong>across
+  games</strong> (<a href="#across">Across games</a>).</li>
+</ul>
+
+<p>A <strong>filter</strong> follows <code>where</code>, and tests an event's attributes
+with <code>and</code>, <code>or</code>, <code>not</code> and parentheses:</p>
+
+<ul>
+  <li><code>attribute = value</code> and <code>attribute != value</code>, and for a
+  number, <code>&lt;</code>, <code>&lt;=</code>, <code>&gt;</code> and
+  <code>&gt;=</code>.</li>
+  <li><code>attribute in (value, …)</code> and <code>attribute not in (value, …)</code>,
+  or <code>in {list}</code> for a list the file defines.</li>
+  <li><code>attribute ~ "pattern"</code>, where <code>*</code> stands for any run of
+  characters and <code>?</code> for one: <code>item ~ "*COIN"</code> is every coin.</li>
+</ul>
+
+<p>A value is a word, <code>APPLE</code>, or a quoted name, <code>"DRAGON STEAK"</code>,
+or a whole number. Names compare without regard to case. A few conditions from the
+common file:</p>
+
+<pre class="example">[first-blood]
+name: First Blood
+text: Kill your first monster.
+tier: easy
+when: count(kill where party = yes) >= 1
+
+[five-a-day]
+name: Five a Day
+text: Win having eaten nothing but apples and corn.
+tier: weird
+when: won and ever(eat) and never(eat where not item in (APPLE, CORN))
+
+[pocket-change]
+name: Pocket Change
+text: Kill a monster with a thrown coin.
+tier: weird
+when: ever(kill where party = yes and by = throw and item ~ "*COIN")
+
+[minimalist-mage]
+name: Minimalist Mage
+text: Win having cast no more than three different spells.
+tier: weird
+when: won and distinct(cast.spell where ok = yes) &lt;= 3
+
+[butterfingers]
+name: Butterfingers
+text: Fail 50 spells.
+tier: silly
+when: count(cast where ok = no) >= 50</pre>
+
+<p>Five a Day asks <code>ever(eat)</code> too, so that a party that never ate anything
+does not earn it by starving.</p>
+
+<h2 id="events">The events</h2>
+
+<p>An event is something the game does or the party does to it. Each has attributes, which
+a filter tests.</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Event</th><th>When</th><th>Attributes</th></tr></thead>
+  <tbody>
+    <tr><td class="name"><code>kill</code></td><td>a monster dies</td><td class="why"><code>monster</code>; <code>by</code>: <code>melee</code> <code>spell</code> <code>throw</code> <code>explosion</code> <code>cloud</code> <code>door</code> <code>pit</code> <code>fusion</code> <code>landing</code> (the party arriving on its square); <code>item</code>, the object swung or thrown, <code>HAND</code> for a bare fist, or the bomb that exploded; <code>champion</code>, who struck; <code>party</code>: <code>yes</code> when the party's own blow, spell, throw or arrival killed it; <code>group</code>, how many of its group the same strike has killed, this one included; <code>thief</code>: <code>yes</code> when its group carries an object it stole from the party</td></tr>
+    <tr><td class="name"><code>hit</code></td><td>a blow deals a monster damage</td><td class="why">as <code>kill</code>'s, but <code>group</code> and <code>thief</code>; <code>damage</code>, how much it took</td></tr>
+    <tr><td class="name"><code>hurt</code></td><td>a champion takes damage</td><td class="why"><code>champion</code>; <code>by</code>: <code>monster</code> <code>missile</code> <code>explosion</code> <code>cloud</code> <code>door</code> <code>pit</code> <code>wall</code> <code>poison</code> <code>starvation</code> <code>thirst</code> <code>fatigue</code> <code>potion</code>; <code>party</code>: <code>yes</code> when it came from the party's own missile or spell</td></tr>
+    <tr><td class="name"><code>death</code></td><td>a champion dies</td><td class="why"><code>champion</code>; <code>cause</code>, as <code>hurt</code>'s <code>by</code>, the last damage taken; <code>party</code>, as that damage's</td></tr>
+    <tr><td class="name"><code>eat</code></td><td>a champion eats</td><td class="why"><code>champion</code>, <code>item</code></td></tr>
+    <tr><td class="name"><code>drink</code></td><td>a champion drinks a potion or water, or at a fountain</td><td class="why"><code>champion</code>, <code>item</code> (<code>FOUNTAIN</code> for a fountain)</td></tr>
+    <tr><td class="name"><code>cast</code></td><td>a champion casts</td><td class="why"><code>champion</code>; <code>spell</code>, the runes after the power rune, <code>"FUL IR"</code>; <code>power</code>: <code>LO</code> <code>UM</code> <code>ON</code> <code>EE</code> <code>PAL</code> <code>MON</code>; <code>ok</code>: <code>yes</code> when the spell worked; <code>why</code>, for a failure: <code>meaningless</code> runes, <code>practice</code> (a skill too low), <code>flask</code> (no empty flask in hand)</td></tr>
+    <tr><td class="name"><code>wear</code></td><td>an object is put on a worn place</td><td class="why"><code>champion</code>; <code>slot</code>: <code>head</code> <code>neck</code> <code>torso</code> <code>legs</code> <code>feet</code>; <code>item</code></td></tr>
+    <tr><td class="name"><code>join</code></td><td>a champion joins at a mirror</td><td class="why"><code>champion</code>; <code>how</code>: <code>resurrect</code> <code>reincarnate</code></td></tr>
+    <tr><td class="name"><code>revive</code></td><td>a Vi altar brings a champion back to life</td><td class="why"><code>champion</code>; <code>times</code>, how often the altar has revived that champion, this time included</td></tr>
+    <tr><td class="name"><code>raise</code></td><td>a Chaos Strikes Back adventure begins, once per champion</td><td class="why"><code>champion</code>; <code>from</code>: <code>prison</code> <code>dm</code> <code>imported</code></td></tr>
+    <tr><td class="name"><code>enter</code></td><td>the party stands on a level it was not on at the last tick, and at the game's first tick</td><td class="why"><code>level</code>, from 0</td></tr>
+    <tr><td class="name"><code>leave</code></td><td>the party stands on another level than at the last tick</td><td class="why"><code>level</code>, the one left; <code>cleared</code>: <code>yes</code> when no monster is alive on it</td></tr>
+    <tr><td class="name"><code>theft</code></td><td>a monster's blow steals an object, a Giggler's</td><td class="why"><code>champion</code>, <code>item</code>, <code>monster</code></td></tr>
+    <tr><td class="name"><code>swap</code></td><td>a wall takes the object in hand and gives back the one it holds</td><td class="why"><code>item</code>, the object given; <code>took</code>, the object received</td></tr>
+    <tr><td class="name"><code>trigger</code></td><td>an actuator fires: a switch or lock, a pad or alcove pressed or released, a counter or combination reaching its goal</td><td class="why"><code>level</code>, <code>x</code>, <code>y</code>, its square; <code>item</code>, the object that fired it (<a href="#triggers">Locks and switches</a>)</td></tr>
+    <tr><td class="name"><code>sleep</code></td><td>the party lies down to sleep</td><td class="why">none</td></tr>
+    <tr><td class="name"><code>oracle</code></td><td>the player asks the Hint Oracle, in Chaos Strikes Back</td><td class="why">none</td></tr>
+    <tr><td class="name"><code>load</code></td><td>a saved game is loaded</td><td class="why">none</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Most achievements about the party's own deeds ask <code>party = yes</code>, so that a
+monster crushed by a door it walked under, or killed by another's fireball, does not
+count. Some examples of each kind:</p>
+
+<pre class="example">[grenadier]
+name: Grenadier
+text: Kill a monster with a thrown Ful bomb.
+tier: weird
+when: ever(kill where party = yes and item = "FUL BOMB")
+
+[doorman]
+name: Doorman
+text: Kill 10 monsters by closing a door on them.
+tier: weird
+when: count(kill where by = door) >= 10
+
+[strike]
+name: Strike!
+text: Wipe out a whole group of four with one blow or one fireball.
+tier: weird
+when: ever(kill where party = yes and group = 4 and by != landing)
+
+[overkill]
+name: Overkill
+text: Deal 100 damage or more to a monster in one blow.
+tier: hard
+when: ever(hit where party = yes and damage >= 100)
+
+[friendly-fire-fatality]
+name: Friendly Fire Fatality
+text: Let the party's own spell or missile kill a champion.
+tier: silly
+when: ever(death where party = yes)
+
+[blazing-glory-day]
+name: Blazing Glory Day
+text: Cast a fireball at full power, MON.
+tier: weird
+when: ever(cast where spell = "FUL IR" and power = MON and ok = yes)
+
+[lazarus]
+name: Lazarus
+text: Bring the same champion back to life at an altar three times.
+tier: weird
+when: ever(revive where times >= 3)
+
+[pickpockets-revenge]
+name: Pickpocket's Revenge
+text: Be robbed by a Giggler, then kill it.
+tier: silly
+when: ever(kill where party = yes and monster = Giggler and thief = yes)</pre>
+
+<p>A <code>swap</code> is the wall that trades objects, as Dungeon Master's Power Gem
+does: the wall takes the Firestaff and gives back the Firestaff joined to the gem. Both
+are named THE FIRESTAFF:</p>
+
+<pre class="example">[some-assembly-required]
+name: Some Assembly Required
+text: Join the Power Gem to the Firestaff.
+tier: easy
+when: ever(swap where item = "THE FIRESTAFF" and took = "THE FIRESTAFF")</pre>
+
+<p>A <code>load</code> is every saved game read: from the save menu, at the entrance,
+after the party died, or on the welcome page's CONTINUE. So a win with no
+<code>load</code> was played in one sitting from the start:</p>
+
+<pre class="example">[hardcore]
+name: Hardcore
+text: Win without loading a save and without a champion ever dying.
+tier: hard
+when: won and never(load) and never(death)</pre>
+
+<h2 id="names">Objects, monsters and spells</h2>
+
+<p><strong>An object</strong> (<code>item</code>, <code>took</code>, and the champions'
+worn places and hands) is named as the game shows it, from the dungeon's own
+<code>graphics.dat</code>: <code>"BOOTS OF SPEED"</code>, <code>"GOLD COIN"</code>,
+<code>TORCH</code>. A name with a space, or an apostrophe such as <code>"RABBIT'S
+FOOT"</code>, is quoted. Two words are no object: <code>HAND</code>, a bare fist, and
+<code>FOUNTAIN</code>. A dungeon with its own <code>graphics.dat</code> uses its own
+names, and the check refuses a name that its <code>graphics.dat</code> does not have,
+since such a name would silently match nothing. In a dungeon that renamed an FTL object,
+a common achievement naming the old name simply never unlocks by it.</p>
+
+<p><strong>A monster</strong> is named by its type, with these names, the same in every
+dungeon: <code>Scorpion</code>, <code>SlimeDevil</code>, <code>Giggler</code>,
+<code>FlyingEye</code>, <code>Hellhound</code>, <code>5</code>, <code>Screamer</code>,
+<code>RockPile</code>, <code>Rive</code>, <code>StoneGolem</code>, <code>Mummy</code>,
+<code>BlackFlame</code>, <code>Skeleton</code>, <code>Couatl</code>, <code>Vexirk</code>,
+<code>Worm</code>, <code>AntMan</code>, <code>Muncher</code>, <code>DethKnight</code>,
+<code>Zytaz</code>, <code>WaterElemental</code>, <code>Oitu</code>, <code>Demon</code>,
+<code>LordChaos</code>, <code>Dragon</code>, <code>25</code>, <code>GreyLord</code>: the
+names of CSBWin's statistics, which call two types by their number.</p>
+
+<p><strong>A spell</strong> is the runes after the power rune, as the manual names them:
+<code>"FUL IR"</code> the fireball, <code>"OH VEN"</code> the poison cloud,
+<code>"ZO KATH RA"</code> the spell that makes ZOKATHRA, <code>FUL</code> and <code>"OH IR
+RA"</code> the lights. A potion brewed is a spell cast, <code>VI</code> a health potion.
+<strong>A champion</strong> is the name the champion carries, which a reincarnated one
+chooses: <code>HISSSSA</code>, <code>WUUF</code>.</p>
+
+<pre class="example">[ghostbuster]
+name: Ghostbuster
+text: Destroy 10 immaterial monsters.
+tier: weird
+when: count(kill where party = yes and monster in (Rive, Zytaz)) >= 10
+
+[to-serve-man]
+name: To Serve Man
+text: Win with only non-human champions: Hissssa, Wuuf, Daroou and Gothmog.
+tier: weird
+when: won and count(join where how = resurrect and champion in (HISSSSA, WUUF, DAROOU, GOTHMOG)) >= 4
+
+[brute-force]
+name: Brute Force
+text: Win having cast no spell but ZO KATH RA.
+tier: hard
+when: won and never(cast where ok = yes and spell != "ZO KATH RA")</pre>
+
+<h2 id="samples">Where the party stands</h2>
+
+<p>A sample is read at the end of each tick. Its bare name is its value at that moment,
+and <code>max(sample)</code> and <code>min(sample)</code> the largest and smallest it has
+been in the game:</p>
+
+<ul>
+  <li><code>party</code>, the champions in the party, and <code>alive</code>, those of them
+  alive.</li>
+  <li><code>coins</code>, the coins the party carries: in hands, packs, pouches, quivers,
+  chests carried, and under the pointer. A coin is any object whose name ends in
+  COIN.</li>
+  <li><code>level</code>, <code>x</code> and <code>y</code>: the level, from 0, and the
+  square's column and row, as the game counts them, north up and <code>y</code> growing
+  southward. These are the coordinates a dungeon editor shows.</li>
+  <li><code>party(where filter)</code>, the champions that the filter accepts (<a
+  href="#champions">The champions</a>).</li>
+</ul>
+
+<pre class="example">[midas]
+name: Midas
+text: Carry 30 coins at once.
+tier: weird
+when: max(coins) >= 30
+
+[sole-survivor]
+name: Sole Survivor
+text: Win with only one of a party of four still alive.
+tier: weird
+when: won and party = 4 and alive = 1
+
+[lone-wolf]
+name: Lone Wolf
+text: Win with a single champion.
+tier: hard
+when: won and max(party) = 1</pre>
+
+<h3>Where a game ends</h3>
+
+<p>Read at the game's end, the samples tell one ending from another. Dungeon Master's bad
+ending is a party carrying the Firestaff back to the entrance: a teleporter sends it into
+a closed cell of the Hall of Champions, map 0 (9,1), and kills it there. So Gullible is a
+game lost in that cell, which nothing else reaches:</p>
+
+<pre class="example">[gullible]
+name: Gullible
+text: Bring the Firestaff back to Lord Librasulus, and see the bad ending.
+tier: silly
+when: lost and level = 0 and x = 9 and y = 1</pre>
+
+<h2 id="triggers">Locks and switches</h2>
+
+<p>A <code>trigger</code> names the square of the actuator that fired, so a condition
+names a puzzle by its squares. Every actuator that acts on the dungeon is one: a switch, a
+lock, a pressure pad, an alcove, and the dungeon's own counters and combinations. Its
+<code>item</code> is the object that fired it: at a wall, the object in hand
+(<code>HAND</code> for none); on a pad or in an alcove, the object put down or taken; and
+none for the party itself, a counter or a combination.</p>
+
+<p>A puzzle the dungeon counts itself is solved where its last actuator fires. Dungeon
+Master's riddle room on map 5 has four alcoves, each counting a counter down when its
+answer is put in and up when it is taken back; with the four answers in at once, the
+counter fires the combination of (13,19), which nothing else reaches:</p>
+
+<pre class="example">[riddle-me-this]
+name: Riddle Me This
+text: Answer the four riddles of the riddle room at once.
+tier: easy
+when: ever(trigger where level = 5 and x = 13 and y = 19)</pre>
+
+<p>A lock needs its square, not just its key: a switch touched with a coin in hand is a
+trigger with that coin too. Chaos Strikes Back's GOR COIN locks are nine walls' sides, and
+the wall of (22,19) has two, so the condition asks for each square, and for two triggers
+at (22,19). A lock that takes a coin every time it is used fires each time, which
+<code>count(…)</code> would count again:</p>
+
+<pre class="example" data-set="csb">[coin-operated]
+name: Coin-Operated
+text: Open every GOR COIN lock.
+tier: weird
+when: ever(trigger where item = "GOR COIN" and level = 0 and x = 9 and y = 14)
+      and ever(trigger where item = "GOR COIN" and level = 0 and x = 21 and y = 16)
+      and count(trigger where item = "GOR COIN" and level = 0 and x = 22 and y = 19) >= 2
+      and ever(trigger where item = "GOR COIN" and level = 3 and x = 2 and y = 12)
+      and ever(trigger where item = "GOR COIN" and level = 4 and x = 21 and y = 11)
+      and ever(trigger where item = "GOR COIN" and level = 4 and x = 24 and y = 11)
+      and ever(trigger where item = "GOR COIN" and level = 4 and x = 26 and y = 18)
+      and ever(trigger where item = "GOR COIN" and level = 4 and x = 19 and y = 19)</pre>
+
+<div class="recipe">
+  <span class="label">Finding the square</span>
+  <p>The square is the actuator's, on the wall or the floor, as the editor shows it,
+  levels counted from 0. A trigger that the party, a counter or a combination fired has
+  no object, so its filter leaves <code>item</code> out.</p>
+</div>
+
+<h2 id="champions">The champions</h2>
+
+<p><code>party(where filter)</code> counts the party's champions that the filter accepts,
+at a tick's end, by what each one is at that moment. A champion who is only a candidate at
+a mirror is not in the party yet.</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Attribute</th><th>What it is</th></tr></thead>
+  <tbody>
+    <tr><td class="name"><code>champion</code></td><td>the name the champion carries</td></tr>
+    <tr><td class="name"><code>sex</code></td><td><code>male</code> or <code>female</code>, as the champion's text in the dungeon says</td></tr>
+    <tr><td class="name"><code>alive</code></td><td><code>yes</code> or <code>no</code></td></tr>
+    <tr><td class="name"><code>head</code>, <code>neck</code>, <code>torso</code>, <code>legs</code>, <code>feet</code></td><td>the object worn there</td></tr>
+    <tr><td class="name"><code>ready</code>, <code>action</code></td><td>the object in the ready hand and in the action hand</td></tr>
+    <tr><td class="name"><code>fighter</code>, <code>ninja</code>, <code>priest</code>, <code>wizard</code></td><td>the rank in the class, 0 to 15</td></tr>
+    <tr><td class="name"><code>load</code></td><td>what the champion carries, in percent of the most they can, rounded up</td></tr>
+    <tr><td class="name"><code>portrait</code></td><td>the champion's portrait: its cell on the dungeon's sheet of champions' faces, from 0</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>A <strong>rank</strong> is the class's level as the inventory shows it, from the
+experience alone, with no object's bonus:</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Rank</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9–14</th><th>15</th></tr></thead>
+  <tbody>
+    <tr><td class="name">Shown</td><td>nothing</td><td>Neophyte</td><td>Novice</td><td>Apprentice</td><td>Journeyman</td><td>Craftsman</td><td>Artisan</td><td>Adept</td><td>Expert</td><td>Lo to Mon Master</td><td>Archmaster</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>The <strong>load</strong> is weighed against the most the inventory says the champion
+can carry, which falls with stamina and wounds; rounded up, <code>load > 50</code> is
+exactly "more than half". The <strong>portrait</strong> is how a champion is known whatever
+their name, since a reincarnated champion keeps their face under the new name they are
+given.</p>
+
+<pre class="example">[shining-armour]
+name: Shining Armour
+text: Have one champion wear the whole armour of Lyte, its shield in hand.
+tier: hard
+when: party(where head = "HELM OF LYTE" and torso = "PLATE OF LYTE" and legs = "POLEYN OF LYTE"
+        and feet = "GREAVE OF LYTE" and (ready = "SHIELD OF LYTE" or action = "SHIELD OF LYTE")) >= 1
+
+[speedy-gonzales]
+name: Speedy Gonzales
+text: Have all four champions wear boots of speed at once.
+tier: hard
+when: party(where feet = "BOOTS OF SPEED") >= 4
+
+[low-profile]
+name: Low Profile
+text: Win without a champion ever rising above Expert in any class.
+tier: hard
+when: won and max(party(where fighter > 8 or ninja > 8 or priest > 8 or wizard > 8)) = 0
+
+[dark-ages]
+name: Dark Ages
+text: Win without casting a light spell or holding a torch.
+tier: hard
+when: won and never(cast where ok = yes and spell in (FUL, "OH IR RA"))
+      and max(party(where ready = TORCH or action = TORCH)) = 0</pre>
+
+<p>Low Profile's <code>max(party(where …)) = 0</code> reads "at no tick was any champion
+above Expert": the largest count the filter ever gave is none.</p>
+
+<div class="note">
+  <span class="label">The sex of an imported party</span>
+  <p>CSBWin's utility, which carries a party into a new Chaos Strikes Back adventure, clears
+  the flag that marks a champion male, so such a party reads as all women. Chaos Strikes
+  Back's file disables Girl Power for that reason. A dungeon whose party always comes from
+  a mirror can trust <code>sex</code>.</p>
+</div>
+
+<h3>Where the party came from</h3>
+
+<p>A Chaos Strikes Back adventure begins with a party put in from a saved game, and raises
+each champion as it starts: <code>from = prison</code> for one of the prison's own
+champions, <code>dm</code> for one of Dungeon Master's, and <code>imported</code> for
+anybody else. A champion is known by their portrait here too:</p>
+
+<pre class="example">[fresh-faces]
+name: Fresh Faces
+text: Win with a party recruited in the prison, none of them imported.
+tier: hard
+when: won and ever(raise) and never(raise where from != prison)
+
+[veterans]
+name: Veterans
+text: Win with a party of Dungeon Master's champions.
+tier: weird
+when: won and ever(raise) and never(raise where from != dm)</pre>
+
+<h2 id="counts">Counted from the data</h2>
+
+<p>Four numbers are worked out from the dungeon's own files, the same in every game of it,
+so that one condition says "every one of them" in any dungeon:</p>
+
+<ul>
+  <li><code>spells</code>: the spells of the dungeon's spell table.</li>
+  <li><code>foods</code>: the kinds of food that the dungeon holds, on its floors, in its
+  chests and carried by its monsters, and that its monsters drop when they die.</li>
+  <li><code>monsterTypes</code>: the types of monster its groups and its generators bring,
+  but those no blow can kill, such as Lord Chaos.</li>
+  <li><code>levels</code>: the dungeon's levels that have a floor to stand on.</li>
+</ul>
+
+<p>The common file's Rune Scholar, Gourmet, Bestiary and Tourist read them, and so they
+work unchanged in your dungeon. Each asks for more than 0 first, since a dungeon with no
+food at all would otherwise hand out Gourmet for nothing:</p>
+
+<pre class="example">[gourmet]
+name: Gourmet
+text: Eat every kind of food the dungeon holds.
+tier: weird
+when: foods > 0 and distinct(eat.item) >= foods
+
+[tourist]
+name: Tourist
+text: Set foot on every level of the dungeon.
+tier: easy
+when: levels > 0 and distinct(enter.level) >= levels
+
+[cartographer]
+name: Cartographer
+text: Walk on 90% of the dungeon's floor.
+tier: hard
+when: explored >= 90</pre>
+
+<p>The lists of achievements are shown where the dungeon's files are not read, so a
+text cannot name a count: Gourmet says "every kind of food", not "the 8 kinds". A dungeon
+whose scripts create a monster or a food that the counts leave out can let a player reach
+the count with it instead.</p>
+
+<h2 id="whole">When an achievement unlocks</h2>
+
+<p>The conditions are tested at the end of each tick that changed anything they read, and
+at the game's end. An achievement unlocks the first time its condition is yes, and stays
+unlocked, whatever happens next.</p>
+
+<p><strong>Some conditions need the whole game.</strong> A game loaded from a save that
+holds no history of its own, such as a CSBWin save imported, is watched only from that
+save on. Its counts and its time played can then only be too small, and a condition that
+a too-small count could make true, such as <code>never(death)</code>, <code>max(party) =
+1</code>, <code>count(kill) &lt;= 40</code> or <code>playTime &lt; 3h</code>, is tested
+only in a game watched from its very start. The reader decides this from the condition's
+form, so a designer never marks it. A condition that only asks for "at least", such as
+<code>count(kill) >= 100</code>, can be earned in any game.</p>
+
+<p>A Chaos Strikes Back adventure begins at a save, the one its utility makes, but that
+save is the game's start, and its history is whole.</p>
+
+<h2 id="across">Across games</h2>
+
+<p>Some feats take more than one game. A condition across games reads the player's games
+of the dungeon through three numbers:</p>
+
+<ul>
+  <li><code>games(condition)</code>: how many games met <code>condition</code>, a condition
+  of one game, at any point.</li>
+  <li><code>total(count(event where filter))</code>: the sum of each game's count.</li>
+  <li><code>distinct(games(condition).attribute)</code>: how many values a champions'
+  attribute had among the parties of the games as each met the condition, the dead
+  champions among them.</li>
+</ul>
+
+<pre class="example">[encore]
+name: Encore
+text: Win the dungeon three times, in three games.
+tier: easy
+when: games(won) >= 3
+
+[dungeon-janitor]
+name: Dungeon Janitor
+text: Kill 500 monsters, over all your games of the dungeon.
+tier: hard
+when: total(count(kill where party = yes)) >= 500
+
+[every-ending]
+name: Every Ending
+text: See each of the dungeon's three endings: win, see the bad ending, and lose anywhere else.
+tier: hard
+when: games(won) >= 1 and games(lost and level = 0 and x = 9 and y = 1) >= 1
+      and games(lost and not (level = 0 and x = 9 and y = 1)) >= 1
+
+[hall-of-fame-tour]
+name: Hall of Fame Tour
+text: Win with each of the dungeon's 24 champions, over any number of games.
+tier: hard
+when: distinct(games(won).portrait) >= 24</pre>
+
+<p>Hall of Fame Tour counts champions by their portrait, so a champion renamed by
+reincarnation is the same one, and one who died before the win counts.</p>
+
+<p>Such a condition reads nothing else: no fact, sample or count outside
+<code>games(…)</code> and <code>total(…)</code>, and none of them nested in another. And
+it only asks for "at least": a game the player played in another browser, or deleted, can
+only make a number too small, so <code>games(won) = 0</code> is refused.</p>
+
+<h2 id="family">Families of dungeons</h2>
+
+<p><code>games(condition, in "family")</code> counts the games of every dungeon of a
+family. A file declares its dungeon's family on a line of its own before the first block,
+at most once: <code>family: name</code>, 1 to 40 lowercase letters, digits, dots, hyphens
+and underscores, a letter or a digit first. A dungeon that declares none is a family of
+its own, named by its id. Every Dungeon Master set, the Atari's and the Amiga's, declares
+<code>family: dungeon-master</code>; Chaos Strikes Back declares none, and is the family
+<code>csb</code>. So both of them hold this block, Grand Slam:</p>
+
+<pre class="example"># CSBweb achievements 1
+
+family: dungeon-master
+
+[grand-slam]
+name: Grand Slam
+text: Win both Dungeon Master and Chaos Strikes Back.
+tier: hard
+when: games(won, in "dungeon-master") >= 1 and games(won, in "csb") >= 1</pre>
+
+<p>A family is useful to a designer whose dungeon comes in several releases, or in a
+series. Each release is its own set on the site, and each declares the same family, so
+that an achievement counts the player's games of all of them. A game counts in another
+dungeon's condition only by a condition its own file tests too, so put the same block in
+every file of the family, as Grand Slam is in both of FTL's:</p>
+
+<pre class="example"># CSBweb achievements 1
+
+# The Sunken Keep, second release: the first release's games count too.
+family: sunken-keep
+
+[keep-veteran]
+name: Keep Veteran
+text: Win the Sunken Keep twice, in any of its releases.
+tier: hard
+when: games(won, in "sunken-keep") >= 2</pre>
+
+<p>The families of the site's own dungeons are reserved: a player's dungeon may not
+declare <code>dungeon-master</code>, <code>csb</code>, or the id of any dungeon the site
+itself offers, since its wins would then count toward Grand Slam. A player's dungeons may
+share a family of their own, or another player's.</p>
+
+<h2 id="checks">What the check refuses</h2>
+
+<p>The form that adds a dungeon checks the file at every change, and the server checks it
+again when the dungeon is published. Each problem shows under the file's row. A file is
+refused when it does not read:</p>
+
+<pre class="example refused">#CSBweb achievements
+
+[first-steps]
+name: First Steps
+text: Leave the entrance hall.
+when: ever(leave where level = 0)</pre>
+<p class="verdict">Line 1: the first line must be "# CSBweb achievements 1".</p>
+
+<pre class="example refused"># CSBweb achievements 1
+
+[dragon-tamer]
+name: Dragon Tamer
+text: Feed the dragon.
+tier: legendary
+when: ever(kill where monster = Dragon)</pre>
+<p class="verdict">Line 6: the tier is one of easy, silly, weird, hard.</p>
+
+<pre class="example refused"># CSBweb achievements 1
+
+[big-game]
+name: Big Game
+text: Kill a monster with a bow.
+tier: weird
+when: ever(kill where size = big and item = BOW)</pre>
+<p class="verdict">Line 7: kill has no attribute "size": monster, by, item, champion, party, group, thief.</p>
+
+<p>It is refused when it names an object that the dungeon's <code>graphics.dat</code>
+does not have, the dungeon's own or, without one, the Dungeon Master or Chaos Strikes
+Back graphics it plays with:</p>
+
+<pre class="example refused"># CSBweb achievements 1
+
+[snicker-snack]
+name: Snicker-Snack
+text: Kill a monster with the vorpal blade.
+tier: weird
+when: ever(kill where party = yes and item = "VORPAL SWORD")</pre>
+<p class="verdict">[snicker-snack] names what no object of its graphics.dat is called: VORPAL SWORD.</p>
+
+<p>When it defines a value that no achievement names:</p>
+
+<pre class="example refused">value blitzMinute = 45</pre>
+<p class="verdict">No achievement names the value blitzMinute.</p>
+
+<p>When a condition across games could be wrong by a game it does not see, or reads
+something of the current game:</p>
+
+<pre class="example refused"># CSBweb achievements 1
+
+[never-again]
+name: Never Again
+text: Never win the dungeon.
+tier: silly
+when: games(won) = 0</pre>
+<p class="verdict">Line 7: a condition across games asks for at least: a game not counted can only make a figure too small.</p>
+
+<pre class="example refused"># CSBweb achievements 1
+
+[third-time-lucky]
+name: Third Time Lucky
+text: Win, having lost twice before.
+tier: silly
+when: won and games(lost) >= 2</pre>
+<p class="verdict">Line 7: a condition across games reads games(…) and total(…), not won.</p>
+
+<p>And when a player's file declares a family that the site reserves:</p>
+
+<pre class="example refused" data-player>family: dungeon-master</pre>
+<p class="verdict">Family "dungeon-master": moderators only.</p>
+
+<div class="recipe">
+  <span class="label">Trying it out</span>
+  <p>A dungeon added in the form plays in your own browser before it is published, and
+  its achievements with it: the banner shows each one as it unlocks, and the dungeon's
+  book, its ACHIEVEMENTS tab, lists them all with what you unlocked. A game you play to
+  try them is a real game; its unlocks stay in your browser.</p>
+</div>
+
+<h2 id="published">Once the dungeon is published</h2>
+
+<p>A player who has chosen a public name sends the server the recordings of their games,
+at a save and at the game's end. The server replays each one, and keeps the achievements the replay
+unlocks as that player's: the Hall of Fame lists them, and who reached each one first.
+Only the latest recording of each game is kept, since it holds the earlier ones.</p>
+
+<p>After publication, the dungeon's files change through a moderator's edit: send the
+new file to the site's moderators. Then the kept recordings follow the file as it now
+is:</p>
+
+<ul>
+  <li><strong>An achievement added</strong> is granted to the games already played that
+  reach it, dated by the day each game was first proved, so the Hall's first is whoever
+  really did it first.</li>
+  <li><strong>An achievement made harder</strong> is taken back from the games that no
+  longer reach it, and one taken out of the file leaves the lists at once.</li>
+  <li><strong>A name or a text changed</strong> changes nothing else.</li>
+  <li><strong>A recording that no longer plays</strong>, because the dungeon itself
+  changed, keeps what it had.</li>
+</ul>
+
+<p>Each player's own browser keeps the unlocks it saw, so an achievement taken out and
+later put back under the same id returns with them, and the replays grant it again.</p>
+
+<div class="note">
+  <span class="label">Before publishing</span>
+  <p>Read the ids once more: they are the one thing that cannot change. Make the
+  achievement as hard as you mean it to be; a later edit can make it easier for everyone,
+  but making it harder takes it away from players who earned it.</p>
+</div>
+
+<h2 id="complete">A complete file</h2>
+
+<p>A fan dungeon's file, with Dungeon Master's objects: a family for its releases, a value
+for the common Speed Runner and one of its own, a common achievement switched off, one
+replaced, and the dungeon's own puzzles, monsters and treasures.</p>
+
+<pre class="example"># CSBweb achievements 1
+#
+# The Sunken Keep: six levels under a drowned castle, and a wizard at the bottom.
+
+family: sunken-keep
+
+# The common achievements' values: a careful game takes about four hours.
+value speedRunnerMinutes = 150
+value objectorKills = 25
+
+# The keep's own.
+value bellMinutes = 30
+
+# The party is always four: the keep starts with them.
+[lone-wolf]
+disabled
+
+[buddy-cop]
+disabled
+
+# The common Untouchable, under the keep's own name.
+[untouchable]
+name: Not a Scratch
+text: Win the Sunken Keep without a champion ever dying.
+tier: hard
+when: won and never(death)
+
+# The bell tower, level 1 (12,3): its rope rings when pulled, and opens the crypt.
+[bell-ringer]
+name: Bell Ringer
+text: Ring the bell of the drowned tower.
+tier: easy
+when: ever(trigger where level = 1 and x = 12 and y = 3 and item = HAND)
+
+[early-riser]
+name: Early Riser
+text: Ring the bell in less than {bellMinutes} minutes of play.
+tier: hard
+when: ever(trigger where level = 1 and x = 12 and y = 3 and item = HAND) and playTime &lt; {bellMinutes}m
+
+# The wizard Morbek is the keep's only Vexirk, at the bottom.
+[morbek]
+name: Morbek's Last Spell
+text: Defeat the wizard Morbek.
+tier: hard
+when: ever(kill where party = yes and monster = Vexirk)
+
+# The keep's four keys, each in a chest of its own.
+[key-master]
+name: Key Master
+text: Open the four sealed doors.
+tier: weird
+when: ever(trigger where item = "RUBY KEY") and ever(trigger where item = "EMERALD KEY")
+      and ever(trigger where item = "SAPPHIRE KEY") and ever(trigger where item = "TOPAZ KEY")
+
+[sure-footed]
+name: Sure-Footed
+text: Win without a champion ever dying of a fall.
+tier: weird
+when: won and never(death where cause = pit)
+
+[keep-veteran]
+name: Keep Veteran
+text: Win the Sunken Keep twice, in any of its releases.
+tier: hard
+when: games(won, in "sunken-keep") >= 2</pre>
+
+<footer class="colophon">
+  <p>Dungeon Master's and Chaos Strikes Back's own files, and the common file every
+  dungeon has, are in CSBweb's source: <code>tools/achievements/dungeon-master.txt</code>,
+  <code>tools/achievements/csb.txt</code> and
+  <code>src/engine/achievements/defs/common.txt</code>. The format and every rule on this
+  page are written up in full in <code>doc/ACHIEVEMENTS.md</code>.</p>
+  <p>Every example here is read by CSBweb's reader and checked against Dungeon Master's
+  objects, or Chaos Strikes Back's where it names them, by
+  <code>tools/checks/achievements-guide.ts</code>, so that the guide cannot drift from
+  the format. The format is frozen: later versions may add to it, never change what a
+  file already says.</p>
+</footer>
+
+</div>
+</body>
+</html>

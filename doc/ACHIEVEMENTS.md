@@ -20,7 +20,7 @@ welcome page's tab ("The page"); and the players' identities, the public name an
 on the server and in the welcome page's PROFILE ("Identity"); and the proofs: a game's
 recording sent with the unlocks it claims, replayed by the verifier service, and its
 verdicts shown ("Proofs"); and the Hall of Fame, its answers and its page ("The Hall of
-Fame"). The rest of this document is the design that `PLAN.md` phase 18
+Fame"); and the designers' guide to the file ("The designers' guide"). The rest of this document is the design that `PLAN.md` phase 18
 builds, step by step, and each step rewrites its section here to say what was built.
 
 ## The file
@@ -91,6 +91,22 @@ moderate may not declare one, in the form or at a publish: `family: dungeon-mast
 count their dungeon's wins toward Grand Slam (the author's choice). A moderator may declare
 any family, at a publish or an edit. A player's sets may share a family of their own, or
 another player's.
+
+**The designers' guide**, `doc/achievements-guide.html`, teaches a dungeon's designer to
+write the file, from its first line to the families and a moderator's edit, with many
+examples, the FTL files' blocks among them. It is a page of its own, in the look of the
+site's essays, `luck.html` and its like: its style inline, no script and nothing fetched,
+so that `FILES_POLICY` (`server/app.ts`) serves it whole, as the author shares it under the
+instance's `files/`. The form's achievements row, without its file or with one that is
+wrong, and the book's ACHIEVEMENTS tab link to it (`ACHIEVEMENTS_GUIDE`,
+`src/data/DataSets.ts`). `tools/checks/achievements-guide.ts` reads each of its examples,
+a `<pre class="example">`, with the form's check (`achievementsProblems`,
+`src/engine/LocalDataSetCheck.ts`) against Dungeon Master's objects or Chaos Strikes
+Back's: one that reads must have nothing wrong and keep every achievement once laid over
+the common file, a refused one must be refused with the verdict the page prints under it,
+word for word, and a block it gives with an FTL file's id and name must be that file's.
+The format is frozen: a later version may add to the syntax, never change what a file
+already says.
 
 The file is ASCII text, at most 64 KB. Its first line is exactly
 

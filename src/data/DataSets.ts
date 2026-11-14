@@ -246,6 +246,13 @@ export const GAME_FILES = ['graphics.dat', 'CSBgraphics.dat', 'hcsb.hct', 'hcsb.
 export const ACHIEVEMENTS_FILE = 'achievements.txt';
 
 /**
+ * The designers' guide to writing `ACHIEVEMENTS_FILE`, `doc/achievements-guide.html`, which
+ * the author shares under the server's `files/` (`server/app.ts`): the form's achievements
+ * row and the book's ACHIEVEMENTS tab link to it. A path from the page's own.
+ */
+export const ACHIEVEMENTS_GUIDE = 'files/achievements-guide.html';
+
+/**
  * The largest `ACHIEVEMENTS_FILE`, in bytes (`ACHIEVEMENT_LIMITS`,
  * `src/engine/achievements/AchievementFile.ts`): here, where the server reads it, which
  * refuses a larger one in a set's form (`server/publish.ts`).
