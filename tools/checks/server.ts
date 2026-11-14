@@ -59,7 +59,9 @@
  *     deleted, its flags following from its files and its walls the new `dungeon.dat`'s; a
  *     site's set too, whose folder is a link, the folder it leads to left as it was; each
  *     edit notified; a site's set given Dungeon Master's achievements, its family the
- *     site's, and its achievements taken away, each a new folder; and every refusal
+ *     site's, and its achievements taken away, each a new folder, each making the set's kept
+ *     proofs due for a replay against them and no other set's, where the edits of its text,
+ *     thumbnail and dungeon and the same achievements given again make none; and every refusal
  *     answered with nothing changed: an asker who is not a
  *     moderator (403, a body too large too, unread), a body too large or not a form, an id
  *     in the form, a field missing, a `remove` of no file, twice or of a file given (400), an
@@ -955,6 +957,15 @@ async function checkPublish(scratch: string): Promise<void> {
         const listing = (dir: string) => readdirSync(join(gamefilesDir, dir)).sort().join();
         const black = indexedPng(320, 200, [[0, 0, 0]], deflateSync(indexedPngRows(320, 200, new Uint8Array(320 * 200))));
         told.length = 0;
+        // Two sets' proofs, checked and kept: an edit of one's achievements makes its own due (`ProofStore.replayAgain`).
+        const proofStore = new ProofStore(db, 1 << 30);
+        const LINKED_PROOF = '00000000000000A1';
+        const MY_DM_PROOF = '00000000000000A2';
+        for (const [id, dataSet] of [[LINKED_PROOF, 'linked'], [MY_DM_PROOF, 'my-dm']] as const) {
+            proofStore.queue({ id, dataSet, player: PLAYER, build: 'test', level: 0, size: 1, sentAt: 1, path: [] }, []);
+            proofStore.checked(id, 2, 7, new Set(), {});
+        }
+        const due = () => [LINKED_PROOF, MY_DM_PROOF].filter((id) => proofStore.get(id)?.due !== null).join();
 
         const textOnly = await edit('my-dm', editFields({ name: 'My Edited DM', description: 'Edited.', authors: ['Someone'], official: 'true' }));
         const edited = rowOf('my-dm');
@@ -1005,12 +1016,18 @@ async function checkPublish(scratch: string): Promise<void> {
             && rowOf('linked').owner === null && !rowOf('linked').pending, 'a site\'s set is edited too, its state kept');
         check(!existsSync(join(gamefilesDir, 'linked')) && readdirSync(outside).sort().join() === 'dungeon.dat,graphics.dat'
             && readFileSync(join(outside, 'dungeon.dat')).equals(dmDungeon), 'its link is deleted, and the folder it led to left as it was');
+        check(due() === '', `edits of a set's text, thumbnail and dungeon make no proof due: ${due() || 'none'}`);
         const givenAchievements = await edit('linked', editFields({ name: 'Linked' }), { [ACHIEVEMENTS_FILE]: fileOf(dmAchievements, 'dungeon-master.txt') });
         console.log(`  achievements given, the site's family: ${givenAchievements.status}, ${rowOf('linked').dir}: ${listing(rowOf('linked').dir)}`);
         check(givenAchievements.status === 200 && rowOf('linked').dir === 'linked@3' && readFileSync(join(gamefilesDir, 'linked@3', ACHIEVEMENTS_FILE)).equals(dmAchievements),
             'a moderator\'s edit gives a set its achievements, as achievements.txt in a new folder, of whatever family: how an instance\'s FTL sets get theirs');
+        check(due() === LINKED_PROOF, `which makes the set's kept proofs due for a replay against them, and no other set's: ${due() || 'none'}`);
+        db.prepare('UPDATE proofs SET due = NULL').run();
+        const sameAchievements = await edit('linked', editFields({ name: 'Linked' }), { [ACHIEVEMENTS_FILE]: fileOf(dmAchievements, ACHIEVEMENTS_FILE) });
+        check(sameAchievements.status === 200 && due() === '', `the same achievements given again make none due: ${due() || 'none'}`);
         const removedAchievements = await edit('linked', editFields({ name: 'Linked', remove: ACHIEVEMENTS_FILE }));
         check(removedAchievements.status === 200 && listing(rowOf('linked').dir) === 'dungeon.dat,graphics.dat,linked-thumbnail.png', 'and takes them away again');
+        check(due() === LINKED_PROOF, `which makes its proofs due again: ${due() || 'none'}`);
 
         console.log('  refusals:');
         const sent = told.length;

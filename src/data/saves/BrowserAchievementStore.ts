@@ -3,7 +3,7 @@
  * row each, keyed by its data set, its id and its playthrough (`ACHIEVEMENTS_STORE`), and
  * the playthroughs' figures, a row each (`ACHIEVEMENT_FIGURES_STORE`).
  */
-import { mergeFigures, sortAchievementRows, type AchievementFiguresRow, type AchievementRow, type AchievementStore } from './AchievementStore';
+import { mergeFiguresRows, sortAchievementRows, type AchievementFiguresRow, type AchievementRow, type AchievementStore } from './AchievementStore';
 import { ACHIEVEMENT_FIGURES_STORE, ACHIEVEMENTS_STORE, askToPersist, idbDone, idbGetAll, openSaveDatabase } from './idb';
 import type { DrawPlaythrough } from './SaveStore';
 
@@ -55,15 +55,14 @@ export class BrowserAchievementStore implements AchievementStore {
         return rows.filter((row) => dataSet === null || row.dataSet === dataSet);
     }
 
-    /** One transaction, so another tab's figures of the same playthrough are merged, not written over. */
+    /** One transaction, so another tab's figures and proofs of the same playthrough are merged, not written over. */
     async raiseFigures(row: AchievementFiguresRow): Promise<void> {
         const tx = (await this.db()).transaction(ACHIEVEMENT_FIGURES_STORE, 'readwrite');
         const done = idbDone(tx);
         const store = tx.objectStore(ACHIEVEMENT_FIGURES_STORE);
         const held = store.get([row.dataSet, row.playthrough]);
         held.onsuccess = () => {
-            const old = held.result as AchievementFiguresRow | undefined;
-            store.put({ ...row, figures: old ? mergeFigures(old.figures, row.figures) : row.figures });
+            store.put(mergeFiguresRows(held.result as AchievementFiguresRow | undefined, row));
         };
         await done;
     }

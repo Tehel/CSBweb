@@ -23,13 +23,24 @@
  *     corpus recording (`replay-saves-written-over`, First Blood) claiming only an
  *     achievement it does not unlock, the forged claim dropped and First Blood granted
  *     unclaimed, verified, its file kept; the same proof again claiming First Blood,
- *     verified but not its own, its file deleted; a new game left alone and saved
- *     (`quietPackage`) claiming First Blood, dropped, its file deleted; the same package
- *     whose save shared differs, drifted, its claims unverified and the reason answered,
- *     its file kept; a package made by hand that the game does not play as it says,
- *     drifted; the genuine recording again claiming nothing, for its figures alone,
- *     checked, its kills kept as its figures (`proof_figures`), a drifted proof's none; the
- *     verdicts answered as the page asks them, and the profile listing First Blood once;
+ *     verified, the first's file deleted, superseded by it (`holdsPath`); a new game left
+ *     alone and saved (`quietPackage`) at its 300th VBL, then at its 600th claiming First
+ *     Blood, dropped, its file kept and the 300th's deleted; the same package whose save
+ *     shared differs, drifted, its claims unverified and the reason answered, its file kept;
+ *     a package made by hand that the game does not play as it says, drifted; the genuine
+ *     recording again claiming nothing, for its figures alone, checked, its kills kept as
+ *     its figures (`proof_figures`), a drifted proof's none, the second's file deleted and
+ *     the first now superseded by it; the verdicts answered as the page asks them, with
+ *     each checked proof's time, and the profile listing First Blood once;
+ *   - an edit of a set's achievements (`server/edit.ts`, `ProofStore.replayAgain`): an
+ *     edit of its name alone makes nothing due; one giving the set an achievement the
+ *     genuine recording unlocks (two kills) makes its kept proof due and no other set's,
+ *     a player's proof queued meanwhile replayed first; the replay again grants it,
+ *     verified, at the proof's first check, what the Hall lists (`fameSet`), and keeps
+ *     First Blood, no longer due; a proof due again during its replay stays due; a later
+ *     proof of the same game supersedes it; an edit making the achievement stricter drops
+ *     it on the latest proof and on the one it superseded, and the Hall no longer lists it;
+ *     a replay again that drifts keeps the verdict;
  *   - a moderator watching them (`identityText`, `answerProofPackage`): the identity's
  *     proofs, the latest first, each its set, state, reason, package kept or not and
  *     claims, uncached; a kept package's bytes, to a moderator alone, not to its sender nor
@@ -37,12 +48,13 @@
  *
  * Usage: npm test -- --only=server-proofs.ts
  */
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { createAppServer } from '../../server/app.ts';
+import { fameSet } from '../../server/fame.ts';
 import { DataSetStore, parseModerators } from '../../server/dataSets.ts';
 import { RateLimit } from '../../server/events.ts';
 import { IdentityStore } from '../../server/identity.ts';
@@ -52,7 +64,8 @@ import { RecordingStore } from '../../server/recordings.ts';
 import { StatsStore } from '../../server/stats.ts';
 import { openStore } from '../../server/store.ts';
 import {
-    IDENTITIES_ROUTE, MAX_CLAIMS, parseManifest, PLAYER_ID_HEADER, PROFILE_ROUTE, PROOF_FIELDS, PROOF_ID, PROOFS_ROUTE, type ModeratedIdentity, type ProofVerdict,
+    ACHIEVEMENTS_FILE, DATA_SETS_ROUTE, IDENTITIES_ROUTE, MAX_CLAIMS, parseManifest, PLAYER_ID_HEADER, PROFILE_ROUTE, PROOF_FIELDS, PROOF_ID, PROOFS_ROUTE,
+    type ModeratedIdentity, type ProofVerdict,
 } from '../../src/data/DataSets.ts';
 import { checkLocalDataSet } from '../../src/engine/LocalDataSetCheck.ts';
 import { replayProof } from '../../src/engine/achievements/ProofReplay.ts';
@@ -65,8 +78,15 @@ import { dataSetNamed, diskFiles, GAMEFILES_DIR, MANIFEST_FILE } from '../lib/da
 import { CORPUS_DIR } from '../lib/recordingCorpus.ts';
 import { packageOf, quietPackage } from '../lib/recordingPackages.ts';
 
-/** The common achievements, as the build holds them (`achievementFiles.ts`), which `tsx` cannot glob. */
-const COMMON = setAchievementDefs(readFileSync(join(import.meta.dirname, '../../src/engine/achievements/defs/common.txt'), 'utf8'), null);
+/** The common file's text, as the build holds it (`achievementFiles.ts`), which `tsx` cannot glob. */
+const COMMON_TEXT = readFileSync(join(import.meta.dirname, '../../src/engine/achievements/defs/common.txt'), 'utf8');
+/** The common achievements. */
+const COMMON = setAchievementDefs(COMMON_TEXT, null);
+
+/** A set's own achievements file holding one achievement, two kills or `kills` of them. */
+function killsFile(kills: number): string {
+    return `# CSBweb achievements 1\n\n[two-kills]\nname: Two Kills\ntext: Kill ${kills} monsters.\ntier: easy\nwhen: count(kill where party = yes) >= ${kills}\n`;
+}
 
 const PLAYER = '00000000-0000-4000-8000-000000000000';
 const LINKED = '11111111-1111-4111-8111-111111111111';
@@ -277,12 +297,24 @@ async function verifier(): Promise<void> {
     writeFileSync(join(distDir, 'index.html'), '<!doctype html><title>page</title>');
     const proofsDir = join(scratch, 'proofs');
     mkdirSync(proofsDir);
-    const gamefilesDir = join(process.cwd(), GAMEFILES_DIR);
+    // The repository's sets, each folder a link, so that an edit writes its new folder here.
+    const repository = join(process.cwd(), GAMEFILES_DIR);
+    const gamefilesDir = join(scratch, 'gamefiles');
+    mkdirSync(gamefilesDir);
+    for (const entry of readdirSync(repository)) symlinkSync(join(repository, entry), join(gamefilesDir, entry));
     const db = openStore(join(scratch, 'store.db'));
     const dataSets = new DataSetStore(db);
     dataSets.fill(parseManifest(readFileSync(MANIFEST_FILE, 'utf8'), ''));
     const identities = new IdentityStore(db);
     const proofs = new ProofStore(db, 1 << 30);
+    const edited = 'dm-atari-1.2';
+    /** The edited set's achievements as its folder holds them, the common file's alone before its edit; every other set's the common file's. */
+    let ownFiles = false;
+    const ownText = (): string | null => {
+        const dir = dataSets.read().dataSets.find((set) => set.id === edited)!.dir;
+        return readFileSync(join(gamefilesDir, dir, ACHIEVEMENTS_FILE), 'utf8');
+    };
+    const defsOf = (setId: string) => ownFiles && setId === edited ? setAchievementDefs(COMMON_TEXT, ownText()) : COMMON;
     const api = {
         checkDataSet: checkLocalDataSet, dataSets, moderators: parseModerators(`${MODERATOR}=Alice`), store: new StatsStore(db), notify: () => {},
         rules: { hasSet: (id: string) => dataSets.hasSet(id) }, rateLimit: new RateLimit(100, 60_000), eventBudget: new RateLimit(1000, 60_000),
@@ -290,15 +322,16 @@ async function verifier(): Promise<void> {
         recordings: { store: new RecordingStore(db, 1 << 30), dir: join(scratch, 'recordings'), readPackage: readRecordingPackage, shareRateLimit: new RateLimit(100, 60_000) },
         identities: { store: identities, rateLimit: new RateLimit(100, 60_000) },
         proofs: { store: proofs, dir: proofsDir, rateLimit: new RateLimit(100, 60_000) },
-        achievementDefs: () => COMMON,
+        achievementDefs: defsOf,
         achievementsAcross: (id: string, bySet: ReadonlyMap<string, readonly Readonly<Record<string, number>>[]>) => acrossUnlocked(COMMON.filter((def) => def.across), bySet.get(id) ?? []), achievementsCheck: anyFamily,
     };
     const server = createAppServer({ distDir, gamefilesDir }, api);
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
     const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    // The replay reads the set's own file through its files, as the verifier's module does, once the edit gives it one.
     const options: VerifyOptions = {
         proofs, identities, dataSets, dir: proofsDir, gamefilesDir, digests: new FileDigestCache(), now: Date.now,
-        replay: (bytes, limit, sets) => replayProof(bytes, limit, sets, () => COMMON),
+        replay: (bytes, limit, sets) => replayProof(bytes, limit, sets, (own) => ownFiles ? setAchievementDefs(COMMON_TEXT, own) : COMMON),
     };
     try {
         await fetch(`${base}/${PROFILE_ROUTE}`, { method: 'POST', headers: { [PLAYER_ID_HEADER]: PLAYER }, body: JSON.stringify({ action: 'name', name: 'Tehel' }) });
@@ -319,12 +352,21 @@ async function verifier(): Promise<void> {
             return (JSON.parse(body) as { proofs: ProofVerdict[] }).proofs;
         };
         const corpus = (name: string) => new Uint8Array(readFileSync(join(CORPUS_DIR, name)));
+        const replayAll = async () => {
+            const done = [];
+            for (let step = await verifyNext(options); step !== null; step = await verifyNext(options)) {
+                console.log(`  ${JSON.stringify(step)}`);
+                done.push(step);
+            }
+            return done;
+        };
 
         check(await verifyNext(options) === null, 'nothing queued: nothing done');
         const genuine = corpus('replay-saves-written-over.L5.gz');
         const forged = await send(genuine, ['roll-the-credits']);
         const again = await send(genuine, ['first-blood']);
         const set = dataSetNamed('dm-atari');
+        const short = await send(await quietPackage(set, diskFiles(set), 'Quiet', 300), []);
         const quietBytes = await quietPackage(set, diskFiles(set), 'Quiet', 600);
         const lost = await send(quietBytes, ['first-blood']);
         const quiet = await readRecordingPackage(quietBytes);
@@ -333,48 +375,48 @@ async function verifier(): Promise<void> {
         const elsewhere = await send(await packageOf('dm-atari', 'Elsewhere'), ['first-blood']);
         const figured = await send(genuine, []);
 
-        const done = [];
-        for (let step = await verifyNext(options); step !== null; step = await verifyNext(options)) {
-            console.log(`  ${JSON.stringify(step)}`);
-            done.push(step);
-        }
-        check(JSON.stringify(done.map((step) => step.id)) === JSON.stringify([forged, again, lost, drifting, elsewhere, figured]), 'each queued proof replayed once, the oldest first');
-        const [first, second, third, fourth, fifth, sixth] = done;
-        check(first?.state === 'checked' && JSON.stringify(first.verified) === '["first-blood"]' && JSON.stringify(first.dropped) === '["roll-the-credits"]'
-            && JSON.stringify(first.own) === '["first-blood"]' && first.kept && existsSync(join(proofsDir, `${forged}.gz`)),
+        const done = await replayAll();
+        check(JSON.stringify(done.map((step) => step.id)) === JSON.stringify([forged, again, short, lost, drifting, elsewhere, figured]), 'each queued proof replayed once, the oldest first');
+        const [first, second, , fourth, fifth, sixth, seventh] = done;
+        check(first?.state === 'checked' && !first.again && JSON.stringify(first.verified) === '["first-blood"]' && JSON.stringify(first.dropped) === '["roll-the-credits"]'
+            && first.kept && first.superseded.length === 0,
             'a genuine recording claiming what it does not unlock: the claim dropped, First Blood granted unclaimed, its file kept');
         check(proofs.get(forged)?.playthrough !== null && JSON.stringify(proofs.claims(forged))
             === '[{"achievement":"first-blood","state":"verified","claimed":false},{"achievement":"roll-the-credits","state":"dropped","claimed":true}]',
             'its playthrough read by the replay, its claims verdicts');
-        check(second?.state === 'checked' && JSON.stringify(second.verified) === '["first-blood"]' && second.own.length === 0 && !second.kept
-            && !existsSync(join(proofsDir, `${again}.gz`)) && proofs.get(again)?.kept === false,
-            'the same game claiming First Blood: verified, but not its own, its file deleted');
-        check(third?.state === 'checked' && third.verified.length === 0 && JSON.stringify(third.dropped) === '["first-blood"]' && !third.kept,
-            'a new game left alone claiming First Blood: dropped, its file deleted');
-        check(fourth?.state === 'drifted' && fourth.reason !== '' && fourth.kept && existsSync(join(proofsDir, `${drifting}.gz`))
-            && proofs.claims(drifting).every((claim) => claim.state === 'unverified'),
-            `a package whose save differs: drifted, "${fourth?.reason}", its claims unverified, its file kept`);
-        check(fifth?.state === 'drifted' && fifth.reason.length > 0, `a package made by hand: drifted, "${fifth?.reason}"`);
+        check(second?.state === 'checked' && JSON.stringify(second.verified) === '["first-blood"]' && second.kept && JSON.stringify(second.superseded) === JSON.stringify([forged])
+            && !existsSync(join(proofsDir, `${forged}.gz`)) && proofs.get(forged)?.kept === false,
+            'the same game claiming First Blood: verified, its file kept, the first\'s deleted, superseded by it');
+        check(fourth?.state === 'checked' && fourth.verified.length === 0 && JSON.stringify(fourth.dropped) === '["first-blood"]' && fourth.kept
+            && JSON.stringify(fourth.superseded) === JSON.stringify([short]) && !existsSync(join(proofsDir, `${short}.gz`)) && existsSync(join(proofsDir, `${lost}.gz`)),
+            'a new game left alone, saved at its 600th VBL, claiming First Blood: dropped, its file kept, the 300th\'s deleted, its path held');
+        check(fifth?.state === 'drifted' && fifth.reason !== '' && fifth.kept && existsSync(join(proofsDir, `${drifting}.gz`))
+            && proofs.claims(drifting).every((claim) => claim.state === 'unverified') && fifth.superseded.length === 0,
+            `a package whose save differs: drifted, "${fifth?.reason}", its claims unverified, its file kept`);
+        check(sixth?.state === 'drifted' && sixth.reason.length > 0, `a package made by hand: drifted, "${sixth?.reason}"`);
         const figuresOf = (id: string) => JSON.stringify(db.prepare('SELECT key, value FROM proof_figures WHERE proof = ? ORDER BY key').all(id).map((row) => [row.key, row.value]));
         console.log(`  the figures kept: ${figuresOf(figured)}`);
-        check(sixth?.state === 'checked' && sixth.own.length === 0 && !sixth.kept && proofs.claims(figured).every((claim) => !claim.claimed)
+        check(seventh?.state === 'checked' && seventh.kept && JSON.stringify(seventh.superseded) === JSON.stringify([again]) && proofs.claims(figured).every((claim) => !claim.claimed)
             && figuresOf(figured) === JSON.stringify([[`total(${COMMON.find((def) => def.id === 'dungeon-janitor')!.aggregates[0]!.key})`, 2]]) && figuresOf(forged) === figuresOf(figured),
-            'the same game claiming nothing, for its figures: checked, its two kills kept as its figures, its file deleted');
+            'the same game claiming nothing, for its figures: checked, its two kills kept as its figures, its file kept, the second\'s deleted');
+        check(proofs.get(forged)?.supersededBy === figured && proofs.get(again)?.supersededBy === figured && JSON.stringify(proofs.supersededBy(figured)) === JSON.stringify([forged, again]),
+            'what the second superseded is superseded by the third now');
         check(figuresOf(drifting) === '[]' && figuresOf(lost) === '[]', 'a drifted proof keeps no figure, nor a game with nothing above 0');
 
         const verdicts = await verdictsOf([forged, again, lost, drifting]);
         console.log(`  the verdicts: ${JSON.stringify(verdicts)}`);
+        const checkedAt = (id: string) => proofs.get(id)!.checkedAt!;
         check(JSON.stringify(verdicts) === JSON.stringify([
-            { id: forged, state: 'checked', claims: { 'first-blood': 'verified', 'roll-the-credits': 'dropped' } },
-            { id: again, state: 'checked', claims: { 'first-blood': 'verified' } },
-            { id: lost, state: 'checked', claims: { 'first-blood': 'dropped' } },
-            { id: drifting, state: 'drifted', reason: fourth?.reason, claims: { 'first-blood': 'unverified' } },
-        ]), 'the verdicts as the page asks them: verified, dropped, and the drift\'s reason');
+            { id: forged, state: 'checked', checkedAt: checkedAt(forged), claims: { 'first-blood': 'verified', 'roll-the-credits': 'dropped' } },
+            { id: again, state: 'checked', checkedAt: checkedAt(again), claims: { 'first-blood': 'verified' } },
+            { id: lost, state: 'checked', checkedAt: checkedAt(lost), claims: { 'first-blood': 'dropped' } },
+            { id: drifting, state: 'drifted', reason: fifth?.reason, claims: { 'first-blood': 'unverified' } },
+        ]), 'the verdicts as the page asks them: verified, dropped, each checked proof\'s time, and the drift\'s reason');
         const profile = await fetch(`${base}/${PROFILE_ROUTE}`, { headers: { [PLAYER_ID_HEADER]: PLAYER } }).then((answer) => answer.text());
         bodies.push(profile);
         const achievements = (JSON.parse(profile) as { achievements: unknown }).achievements;
         console.log(`  the profile's achievements: ${JSON.stringify(achievements)}`);
-        check(JSON.stringify(achievements) === JSON.stringify([{ dataSet: 'dm-atari-1.2', name: dataSets.read().dataSets.find((set) => set.id === 'dm-atari-1.2')?.name, unlocked: ['first-blood'], names: ['First Blood'] }]),
+        check(JSON.stringify(achievements) === JSON.stringify([{ dataSet: edited, name: dataSets.read().dataSets.find((set) => set.id === edited)?.name, unlocked: ['first-blood'], names: ['First Blood'] }]),
             'the profile lists First Blood once, by its set, named by its file');
 
         // A moderator watching the proofs: the identity's, the latest first, then a package
@@ -386,23 +428,86 @@ async function verifier(): Promise<void> {
         const listed = (JSON.parse(moderatedBody) as ModeratedIdentity).proofs;
         console.log(`  to a moderator: ${JSON.stringify(listed.map(({ id, state, kept, claims }) => ({ id, state, kept, claims })))}`);
         const byId = new Map(listed.map((proof) => [proof.id, proof]));
-        check(moderated.status === 200 && moderated.headers.get('cache-control') === 'no-store' && listed.length === 6
+        check(moderated.status === 200 && moderated.headers.get('cache-control') === 'no-store' && listed.length === 7
             && listed.every((proof, i) => i === 0 || proof.sentAt <= listed[i - 1]!.sentAt)
-            && [forged, again, lost, drifting, elsewhere, figured].every((id) => byId.has(id))
+            && [forged, again, short, lost, drifting, elsewhere, figured].every((id) => byId.has(id))
             && JSON.stringify(byId.get(forged)?.claims) === JSON.stringify({ 'first-blood': 'verified', 'roll-the-credits': 'dropped' })
-            && byId.get(forged)?.kept === true && byId.get(again)?.kept === false && byId.get(drifting)?.reason === fourth?.reason
-            && byId.get(forged)?.name === dataSets.read().dataSets.find((one) => one.id === 'dm-atari-1.2')?.name,
+            && byId.get(figured)?.kept === true && byId.get(forged)?.kept === false && byId.get(drifting)?.reason === fifth?.reason
+            && byId.get(forged)?.name === dataSets.read().dataSets.find((one) => one.id === edited)?.name,
             'a moderator reads the identity\'s proofs, uncached, the latest first: each its set, its state, its drift\'s reason, whether its package is kept, and its claims');
         const packageAs = (player: string | null, id: string, method = 'GET') => fetch(`${base}/${PROOFS_ROUTE}/${id}`, { method, headers: player === null ? {} : { [PLAYER_ID_HEADER]: player } });
-        const served = await packageAs(MODERATOR, forged);
+        const served = await packageAs(MODERATOR, figured);
         const servedBytes = new Uint8Array(await served.arrayBuffer());
         check(served.status === 200 && served.headers.get('content-type') === 'application/gzip' && served.headers.get('cache-control') === 'no-store'
             && Buffer.from(servedBytes).equals(Buffer.from(genuine)), 'a kept package, to a moderator: its bytes, as sent, not cached');
-        const refusedPackages = [await packageAs(PLAYER, forged), await packageAs(null, forged), await packageAs(MODERATOR, again), await packageAs(MODERATOR, '0'.repeat(16)),
-            await packageAs(MODERATOR, 'not-a-proof'), await packageAs(MODERATOR, forged, 'DELETE')];
+        const refusedPackages = [await packageAs(PLAYER, figured), await packageAs(null, figured), await packageAs(MODERATOR, forged), await packageAs(MODERATOR, '0'.repeat(16)),
+            await packageAs(MODERATOR, 'not-a-proof'), await packageAs(MODERATOR, figured, 'DELETE')];
         for (const answer of refusedPackages) bodies.push(await answer.text());
         check(refusedPackages.map((answer) => answer.status).join() === '403,403,404,404,404,405',
             `to its own sender and to nobody 403, a package deleted, an unknown id and a malformed one 404, another method 405: ${refusedPackages.map((answer) => answer.status).join()}`);
+
+        // An edit of a set's achievements: its kept proofs replayed against them.
+        console.log('\nAn edit of a set\'s achievements:');
+        const editSet = async (extra: Record<string, string>, files: Record<string, string> = {}) => {
+            const form = new FormData();
+            const text: Record<string, string> = {
+                name: dataSets.read().dataSets.find((one) => one.id === edited)!.name, description: '', dmRules: 'true', thumbnailAsTitle: 'false', official: 'true', baseSet: 'dm-atari', ...extra,
+            };
+            for (const [key, value] of Object.entries(text)) form.append(key, value);
+            for (const [name, content] of Object.entries(files)) form.append(name, new File([content], name));
+            const answer = await fetch(`${base}/${DATA_SETS_ROUTE}/${edited}`, { method: 'POST', body: form, headers: { [PLAYER_ID_HEADER]: MODERATOR } });
+            const body = await answer.text();
+            if (answer.status !== 200) throw new Error(`the edit refused: ${answer.status} ${body}`);
+        };
+        const fame = () => fameSet({ id: edited, name: 'A' } as Parameters<typeof fameSet>[0], proofs.hall(null, api.achievementsAcross), defsOf);
+        const twoKills = () => fame().achievements.find((one) => one.id === 'two-kills');
+        const due = () => [forged, again, short, lost, drifting, elsewhere, figured].filter((id) => proofs.get(id)?.due !== null);
+
+        await editSet({ description: 'Its name alone.' });
+        check(due().length === 0, 'an edit that leaves its achievements as they were makes nothing due');
+        ownFiles = true;
+        await editSet({}, { [ACHIEVEMENTS_FILE]: killsFile(2) });
+        check(JSON.stringify(due()) === JSON.stringify([figured]), `an edit giving the set an achievement makes its kept proof due, and no other set's: ${JSON.stringify(due())}`);
+        check(twoKills()?.players === 0, 'the Hall lists the new achievement, which nobody has yet');
+        const queuedMeanwhile = await send(await quietPackage(set, diskFiles(set), 'Quiet', 900), []);
+        const replays = await replayAll();
+        check(replays.length === 2 && replays[0]?.id === queuedMeanwhile && !replays[0].again && replays[1]?.id === figured && replays[1].again,
+            'a player\'s proof queued meanwhile is replayed first, then the proof due, again');
+        check(replays[1]?.state === 'checked' && JSON.stringify(replays[1].verified) === '["first-blood","two-kills"]' && replays[1].kept && replays[1].superseded.length === 0
+            && proofs.get(figured)?.due === null && proofs.get(figured)?.checkedAt === checkedAt(figured),
+            'the replay again grants the new achievement and keeps First Blood, its proof no longer due, its time kept');
+        check(JSON.stringify(proofs.claims(figured)) === '[{"achievement":"first-blood","state":"verified","claimed":false},{"achievement":"two-kills","state":"verified","claimed":false}]'
+            && figuresOf(figured) === figuresOf(forged), 'its claims, the grant verified, and its figures');
+        const hall = proofs.hall(null, api.achievementsAcross).find((row) => row.achievement === 'two-kills');
+        check(twoKills()?.players === 1 && twoKills()?.first?.name === 'Tehel' && hall?.at === checkedAt(figured),
+            'the Hall lists it, Tehel its first, at the proof\'s first check');
+
+        proofs.replayAgain(edited, Date.now());
+        const racing = await verifyNext({ ...options, replay: async (...args) => { proofs.replayAgain(edited, Date.now() + 1000); return options.replay(...args); } });
+        check(racing?.id === figured && proofs.get(figured)?.due !== null, 'a proof made due again while its replay runs stays due');
+        await replayAll();
+        const later = await send(genuine, []);
+        const latest = await replayAll();
+        check(latest.length === 1 && latest[0]?.id === later && JSON.stringify(latest[0].superseded) === JSON.stringify([figured])
+            && JSON.stringify(proofs.supersededBy(later)) === JSON.stringify([forged, again, figured]),
+            'a later proof of the same game supersedes it, and all it held');
+
+        await editSet({}, { [ACHIEVEMENTS_FILE]: killsFile(3) });
+        check(JSON.stringify(due()) === '[]' && proofs.get(later)?.due !== null, 'an edit making it stricter makes the latest proof due');
+        const stricter = await replayAll();
+        check(stricter.length === 1 && stricter[0]?.again && JSON.stringify(stricter[0].verified) === '["first-blood"]'
+            && proofs.claims(later).find((claim) => claim.achievement === 'two-kills')?.state === 'dropped'
+            && proofs.claims(figured).find((claim) => claim.achievement === 'two-kills')?.state === 'dropped'
+            && proofs.claims(figured).find((claim) => claim.achievement === 'first-blood')?.state === 'verified',
+            'the replay again drops it, on the latest proof and on the one it superseded, First Blood kept');
+        check(twoKills()?.players === 0, 'and the Hall no longer lists it');
+
+        proofs.replayAgain(edited, Date.now());
+        const before = JSON.stringify(proofs.claims(later));
+        const drift = await verifyNext({ ...options, replay: async () => ({ kind: 'drifted', reason: 'its files no longer match' }) });
+        check(drift?.state === 'drifted' && drift.again && proofs.get(later)?.state === 'checked' && proofs.get(later)?.due === null
+            && JSON.stringify(proofs.claims(later)) === before && proofs.get(later)?.reason === '',
+            'a replay again that drifts keeps the verdict, no longer due');
     } finally {
         server.close();
         db.close();

@@ -925,7 +925,8 @@ package is kept in `PROOFS_DIR` (`proofs/` beside the store), never served.
   20 proofs an hour per address, refused ones included (`PROOFS_PER_HOUR`,
   `server/server.ts`), a body of 8 MiB and 64 KB at most (`MAX_PROOF_BYTES`).
 - **`GET api/proofs?ids=<id>,…`** answers the verdicts of those of the asker's identity's
-  proofs (`ProofVerdict`): the state, why a drifted one drifted, and each claim's state.
+  proofs (`ProofVerdict`): the state, why a drifted one drifted, when a checked one was first
+  checked, and each claim's state, an unlock its replay granted unclaimed among them.
   Another's proof is left out. Neither route's answer holds a `playerId` or a playthrough.
 - **The profile** (`GET api/profile`) lists the achievements the replays verified, by set,
   each once, the first verified first (`ProofStore.verifiedBy`).
@@ -960,20 +961,28 @@ folder, beside the main server's readers (`PageReaders.js`), which never load it
 - **Where it does not**, it drifts, a later level's, a package that does not read and one
   whose files no set has among them, the proof is `drifted`, the reason kept and answered,
   its claims `unverified`, and its file kept.
-- **A proof that verified nothing of its own**, nothing an earlier proof of its identity's
-  browsers had not verified in the same playthrough, has its file deleted once checked
-  (`ProofStore.dropFile`); its row, its claims and its figures stay. Figures that grew
-  alone keep no file. A proof that did is kept, and the
-  nightly backup copies its package once (`server/backup.ts`, `doc/DEPLOYMENT.md` →
-  "Backups").
+- **The latest point of each branch is kept.** A package is the whole path from the game's
+  start, so a later proof of the same branch holds an earlier one's: its path's recordings
+  are the earlier one's, each its own id, cut at the same points, and its last run at least
+  as far (`holdsPath`, the path kept in the row as each recording's id and VBLs). Once a
+  proof is checked, each checked proof of its identity's browsers in the same playthrough
+  whose path it holds has its file deleted, the row naming the proof it is superseded by
+  (`superseded_by`, `ProofStore.supersede`), and its own is deleted where a kept one holds
+  its path; rows, claims and figures all stay. A proof is kept whatever it verified, figures
+  alone included: a branch's latest point is what a replay again needs (below). A package
+  takes some 15 to 45 KB an hour of play, measured on the corpus, and one from a save some
+  40 KB more, the save's file: about 1 MB a whole game, the 1 GiB the packages may take some
+  20,000 hours. The nightly backup copies a kept package once, and deletes the copy of one
+  superseded since (`server/backup.ts`, `doc/DEPLOYMENT.md` → "Backups").
 
 `tools/checks/server-proofs.ts` proves the verifier over the repository's sets, with the
 page's source: a genuine corpus recording (`replay-saves-written-over`) whose forged claim is
-dropped and whose First Blood is granted, the same game again verified but not its own and
-its file deleted, a game unlocking nothing whose claim is dropped, a package whose save
-differs and one made by hand left unverified with their reasons, the same game claiming
-nothing, its two kills kept as its figures, a drifted proof keeping none, the verdicts as
-the page asks them and the profile. `tools/checks/build.ts` proves the built module replays as the
+dropped and whose First Blood is granted, the same game again verified and the first's file
+deleted, superseded by it, a game left alone saved at its 300th VBL then at its 600th,
+whose claim is dropped and whose later package supersedes the earlier, a package whose
+save differs and one made by hand left unverified with their reasons, the same game
+claiming nothing, its two kills kept as its figures, superseding the second and what it
+held, a drifted proof keeping none, the verdicts as the page asks them and the profile. `tools/checks/build.ts` proves the built module replays as the
 source does, and `tools/check-image.sh` runs the verifier in its own container beside the
 server's, a proof sent to the server checked by it.
 
@@ -983,9 +992,51 @@ at a save no replay holds a state for, which the verifier's tracker, given the s
 adventure"). A player who wants a verified run seen shares the same point through the
 book's UPLOAD, the shared recordings' moderation ("Shared recordings", `doc/RECORDING.md`):
 nothing links the two.
-**Deferred:** replaying the kept proofs again when a set gains an achievement, which phase
-18.7's sets' own files make possible without a deploy. A moderator watching a proof that
-looks suspicious plays or downloads its kept package from the Hall ("Moderation", below).
+A moderator watching a proof that looks suspicious plays or downloads its kept package from
+the Hall ("Moderation", below).
+
+### An edit of a set's achievements
+
+A moderator's edit changes a set's `achievements.txt` on a running instance (`server/edit.ts`,
+"A player's set"), and its kept proofs then follow the file as it now is: an achievement
+added is granted to the games already played that reach it, and one made harder or removed
+is taken back. It is no game file, so a recording finds its set as before and replays.
+
+- **What makes them due**: an edit whose file is not the old folder's, given with other
+  bytes or removed, makes each proof of the set whose package is kept, queued or checked,
+  due (`ProofStore.replayAgain`, the row's `due`, the edit's time), once the set's row names
+  the new folder. An edit that leaves the file as it was, its text, its thumbnail or its
+  dungeon, makes none due. Only the edited set's: a `family:` line added or removed changes
+  what another set's `games(…, in "family")` counts, but the Hall reads every set's file at
+  each answer, and a set's figures depend on its own file alone.
+- **The verifier** replays a player's queued proof first, then the due proofs, the earliest
+  edit's first (`ProofStore.next`). A due proof is replayed against the set's file as it now
+  is (`ProofStore.rechecked`): its claims verified or dropped, an unlock it granted unclaimed
+  kept where it still unlocks and dropped where it no longer does, each new unlock granted,
+  and its figures replaced. Its time is kept, so an achievement it grants is dated by the
+  proof's first check, the day the game was proved, and the Hall's first is whoever reached
+  it first. Each proof it superseded has each verified claim it no longer unlocks dropped,
+  since what a later point of the same game does not unlock no earlier point did; an unlock
+  it gains is not given to them. A proof made due again while its replay runs, an edit
+  landing meanwhile, is replayed once more (`ProofStore.replayed`).
+- **A replay again that does not play**, its set's game files edited too among the causes,
+  leaves the proof as its last replay did: checked, its verdict kept.
+- **What a player sees meanwhile**: the verdicts as the last replay left them. The Hall and
+  PROFILE read the file anew at each answer (the Hall's 30 s cache aside), so an achievement
+  removed from it leaves them at once, and one added shows with nobody until the replays
+  grant it; one made harder stays listed by whoever had it until their proof is replayed.
+  The page learns of a change at its next start or the book's tab (below).
+
+A proof whose file is deleted, superseded, is not replayed itself; a drifted one, which its
+game files refuse, is not made due. `tools/checks/server-proofs.ts` proves it: an edit of
+the set's name alone makes nothing due; one giving it an achievement the genuine recording
+unlocks makes its kept proof due and no other set's, a player's proof queued meanwhile
+replayed first; the replay again grants it at the proof's first check, as the Hall lists
+it, and keeps First Blood; a proof made due during its replay stays due; a later proof of
+the same game supersedes it; an edit making the achievement harder drops it on the latest
+proof and on the one it superseded, and the Hall no longer lists it; and a replay again
+that drifts keeps the verdict. `tools/checks/server.ts` proves the edits that make a set's
+proofs due, giving it achievements and taking them away, and those that make none.
 
 **The page's half** is `PageProofs` (`src/engine/achievements/PageProofs.ts`), built beside
 `PageAchievements` for a game the player plays, never for a recording's viewer, over the
@@ -1006,24 +1057,35 @@ server's routes (`src/ui/proofRoutes.ts`). Only a browser whose player has a pub
   sends one more. A playthrough a teleport touched has no figures. The package is the store's point, packed as
   the book's UPLOAD packs it, titled `Proof` (`storedPackage`): the save's, its recording
   written to the store first, or the set's latest game's end.
-- **Each row claimed keeps the proof's id** (`AchievementRow.proofs`). The page asks for the
-  verdicts its rows await at its start and every two minutes (`refreshVerdicts`), the book's
-  ACHIEVEMENTS tab as it opens, and writes them (`judgedRows`): a row is `verified` once a
-  proof verified it, `dropped` once every proof that claimed it was replayed and none did,
-  and keeps the reason where one drifted. An unlock a replay granted unclaimed is the
-  server's alone: PROFILE lists it, and the browser adds no row for it. The store's shape
-  is the same, so IndexedDB's version stays 8.
-- **Shown**: the dialog's detail says UNLOCKED, VERIFIED or UNLOCKED, NOT VERIFIED; the
-  book's tab says of each playthrough's unlock "verified", "not verified", "awaiting the
-  server" or "its replay drifted", and nothing where no proof claimed it; PROFILE's "Your
-  achievements, verified" lists the server's by name. An achievement across games, which
+- **Each row claimed keeps the proof's id** (`AchievementRow.proofs`), and the playthrough's
+  figures row every proof sent of it, whatever it claimed (`AchievementFiguresRow.proofs`).
+  The page asks for the verdicts of every proof it sent of the set at its start and as the
+  book's ACHIEVEMENTS tab opens, since a replay again may have changed any, then every two
+  minutes those its rows still await (`refreshVerdicts`), and writes them (`judgedRows`): a
+  row is `verified` once a proof verified it, `dropped` once every proof that claimed it was
+  replayed and none did, and keeps the reason where one drifted; a row judged already is
+  judged again where every one of its proofs answered, a verified one turning dropped or a
+  dropped one verified. **An unlock a replay granted unclaimed** joins the playthrough's
+  row of it, or adds one, `granted`, verified, dated by its proof's first check
+  (`checkedAt`), its party the playthrough's other rows', its play time unknown
+  (`grantedRows`). The store's shape is the same but for optional fields, so IndexedDB's
+  version stays 8.
+- **Shown**: the dialog's detail says UNLOCKED, VERIFIED or UNLOCKED, NOT VERIFIED, and an
+  unlock the server granted the playthrough is UNLOCKED, VERIFIED while it stays verified,
+  though the game's history never unlocked it; the book's tab says of each playthrough's
+  unlock "verified", "not verified", "awaiting the server" or "its replay drifted", and
+  nothing where no proof claimed it, and lists a grant, while it stays verified, with its
+  day and "granted by the server's replay"; PROFILE's "Your achievements, verified" lists
+  the server's by name. An achievement across games, which
   no proof claims, is UNLOCKED, NOT VERIFIED in the dialog and has nothing in the book:
   PROFILE says whether the server counts it. ABOUT tells the player the recordings are
   sent, kept and replayed.
 
-The dev server is its own verifier: it replays each proof as it is queued, in its own
-process (`vite.config.mts`). `tools/checks/achievement-proofs.ts` proves the verdicts, the
-claims, when the page sends, a proof claiming nothing where the figures grew among them,
+The dev server is its own verifier: it replays each proof as it is queued, and a set's kept
+proofs once an edit of its achievements made them due, in its own process
+(`vite.config.mts`). `tools/checks/achievement-proofs.ts` proves the verdicts, the claims,
+when the page sends, a proof claiming nothing where the figures grew among them, every
+proof asked at a start and the rows a replay again changes or grants,
 the package of a save the store keeps, replayed to First Blood and its kills by the
 verifier's replay, and the whole CSB game, from the adventure's start, to
 Speed Runner; `tools/probe-frames.ts` a proof the live page sends with a
@@ -1047,7 +1109,7 @@ checked (`ProofStore.hall`). GET only, 404 for an unknown set or id, and none ho
 - **An achievement verified** is a claim `verified` by a checked proof, the replay's grants
   among them; an unverified claim, a dropped one and a drifted proof's count for nothing.
   Its time is the time its first proof of the identity's was checked (`checked_at`), not
-  sent.
+  sent, which a replay again keeps ("An edit of a set's achievements").
 - **An achievement across games verified** is one the figures of the identity's checked
   proofs make yes (`acrossRows`, `server/proofs.ts`): its proofs of every set are taken in
   the order they were checked, each playthrough at the largest figure any of its proofs

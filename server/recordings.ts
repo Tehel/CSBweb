@@ -109,6 +109,10 @@ export interface SharedPackage {
         readonly champions?: readonly string[];
     };
     readonly path: readonly {
+        /** Its key in the browser's store (`Recording.id`). */
+        readonly id: string;
+        /** The VBLs it runs in the package (`Recording.vbls`). */
+        readonly vbls: number;
         /** Its extras at its start, each a flag (`Extras`). */
         readonly extras: object;
         readonly changes: readonly { readonly change: { readonly kind: string; readonly extras?: object } }[];

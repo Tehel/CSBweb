@@ -10,7 +10,7 @@
  *   STATS_DB        the store's SQLite file, the server's: the verifier opens it beside the
  *                   server, and waits for its writes (`store.ts`)
  *   PROOFS_DIR      the proofs' packages (`proofs/` beside the store): it deletes those
- *                   that granted nothing of their own
+ *                   a later proof's package holds
  *
  * A replay takes the whole of a CPU while it runs, so the verifier lowers its own priority
  * to the lowest at start-up (`VERIFIER_NICENESS`), which needs no capability, and the
@@ -92,10 +92,12 @@ while (!stopping) {
         continue;
     }
     const seconds = ((Date.now() - startedAt) / 1000).toFixed(1);
+    const replay = done.again ? 'replayed again' : 'checked';
     console.log(done.state === 'drifted'
-        ? `proof ${done.id} drifted in ${seconds} s: ${done.reason}`
-        : `proof ${done.id} checked in ${seconds} s: verified ${done.verified.join(', ') || 'nothing'}`
-            + `${done.dropped.length > 0 ? `, dropped ${done.dropped.join(', ')}` : ''}${done.kept ? '' : ', its file deleted'}`);
+        ? `proof ${done.id} ${done.again ? 'replayed again, ' : ''}drifted in ${seconds} s: ${done.reason}${done.again ? ', its verdict kept' : ''}`
+        : `proof ${done.id} ${replay} in ${seconds} s: verified ${done.verified.join(', ') || 'nothing'}`
+            + `${done.dropped.length > 0 ? `, dropped ${done.dropped.join(', ')}` : ''}`
+            + `${done.superseded.length > 0 ? `, the files of ${done.superseded.join(', ')} deleted` : ''}${done.kept ? '' : ', its file deleted'}`);
 }
 db.close();
 console.log('Stopped');

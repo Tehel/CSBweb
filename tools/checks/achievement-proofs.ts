@@ -16,7 +16,11 @@
  *      or one with nothing new, sends nothing; past ten minutes, a new unlock sends again,
  *      claiming every row not judged; the game's end sends whatever it claims; a player
  *      with no public name sends nothing; `refresh` writes the verdicts and reads the
- *      dialog's again, and asks nothing once none awaits one; the figures across games: a
+ *      dialog's again, and asks nothing once none awaits one; each proof sent kept by its
+ *      playthrough's figures row, and every one asked at a start (`refresh(true)`), a
+ *      replay again turning a row verified dropped and one dropped verified (`judgedRows`),
+ *      and an unlock granted unclaimed a row of its own, granted and verified at its proof's
+ *      first check, then dropped (`grantedRows`); the figures across games: a
  *      save whose figures grew past the last proof's sends a proof claiming nothing, past
  *      ten minutes and not within them, one whose figures did not grow nothing, and the
  *      game's end whose figures grew sends though it claims nothing;
@@ -172,6 +176,31 @@ check(changed === 3 && JSON.stringify(after) === '{"first-blood":"verified","own
     'refresh writes the verdicts, and the dialog\'s are read again');
 asked = [];
 check(await proofs.refresh() === 0 && asked.length === 0, 'and asks nothing once no row awaits one');
+
+// A replay again against the set's achievements as they now are: every proof asked at a start.
+const sentIds = ['P000000000000001', 'P000000000000002', 'P000000000000003'];
+check(JSON.stringify(store.figureRows.find((row) => row.playthrough === 7)?.proofs) === JSON.stringify(sentIds),
+    'each proof sent is kept by its playthrough\'s figures row');
+answers = [
+    verdict('P000000000000001', 'checked', { 'first-blood': 'dropped' }),
+    verdict('P000000000000002', 'checked', { 'first-blood': 'dropped', 'own-goal': 'verified' }),
+    { ...verdict('P000000000000003', 'checked', { 'first-blood': 'dropped', 'own-goal': 'dropped', scrooge: 'dropped', 'roll-the-credits': 'verified' }), checkedAt: 5000 },
+];
+const again = await proofs.refresh(true);
+const rowsAgain = await store.list('dm');
+const granted = rowsAgain.find((row) => row.id === 'roll-the-credits');
+console.log(`  asked ${JSON.stringify(asked)}; the rows then ${JSON.stringify(rowsAgain.map((row) => [row.id, row.proof, row.granted ?? false]))}`);
+check(JSON.stringify(asked) === JSON.stringify([sentIds]) && again === 3 && reads === 2, 'refresh at a start asks every proof sent of the set, though none is awaited');
+check(rowsAgain.find((row) => row.id === 'first-blood')?.proof === 'dropped' && rowsAgain.find((row) => row.id === 'own-goal')?.proof === 'verified'
+    && rowsAgain.find((row) => row.id === 'scrooge')?.proof === 'dropped', 'a row verified turned dropped, one dropped turned verified, as the replays again say');
+check(granted?.granted === true && granted.proof === 'verified' && granted.playthrough === 7 && granted.unlockedAt === 5000 && JSON.stringify(granted.proofs) === '["P000000000000003"]',
+    'an unlock a replay granted unclaimed: a row of its playthrough, granted and verified, at its proof\'s first check');
+answers = [...answers.slice(0, 2), verdict('P000000000000003', 'checked', { 'first-blood': 'dropped', 'own-goal': 'dropped', scrooge: 'dropped', 'roll-the-credits': 'dropped' })];
+asked = [];
+await proofs.refresh(true);
+check((await store.list('dm')).find((row) => row.id === 'roll-the-credits')?.proof === 'dropped', 'and dropped once a later replay no longer grants it');
+asked = [];
+check(await proofs.refresh() === 0 && asked.length === 0, 'the refresh every few minutes still asks nothing');
 await proofs.ended();
 check(sent.length === 3, 'a game\'s end whose unlocks are all verified or dropped sends nothing');
 

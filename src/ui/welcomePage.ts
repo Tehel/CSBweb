@@ -320,7 +320,7 @@ export async function showWelcomePage(
     store: Pick<SaveStore, 'list' | 'read'>,
     localSets: Pick<BrowserDataSetStore, 'list' | 'put' | 'remove'>,
     recordings: RecordingStore,
-    achievements: Pick<AchievementStore, 'list' | 'update' | 'figures'>,
+    achievements: Pick<AchievementStore, 'list' | 'update' | 'unlock' | 'figures'>,
     loadManifest: () => Promise<DataSetManifest>,
     help: HowToPlayHost,
     select: string | null = null,
@@ -663,7 +663,7 @@ function confirmation(prefix: string, title: string, text: string, verb: string,
 interface RecordingsSource {
     readonly saves: Pick<SaveStore, 'list' | 'read'>;
     readonly recordings: RecordingStore;
-    readonly achievements: Pick<AchievementStore, 'list' | 'update' | 'figures'>;
+    readonly achievements: Pick<AchievementStore, 'list' | 'update' | 'unlock' | 'figures'>;
     /** The text of a set's own achievements file (`ACHIEVEMENTS_FILE`), by its id, `null` for none. */
     readonly ownAchievements: (setId: string) => Promise<string | null>;
 }
@@ -833,11 +833,14 @@ function showDocuments(
  * server's replay said of it (`PROOF_WORDS`). An achievement across games that this
  * browser's figures make yes, every set's (`achievementsAcross`), is unlocked though no row
  * holds it yet: Grand Slam once the other dungeon is won. A row whose achievement the file
- * no longer has is not listed, and the store keeps it. The verdicts its rows await are asked
- * of the server first (`refreshVerdicts`), and listed again once written.
+ * no longer has is not listed, and the store keeps it. An unlock a server's replay granted
+ * (`AchievementRow.granted`) is listed with the day of its proof's check, while the server
+ * verifies it. The verdicts of every proof the browser sent of the set are asked of the
+ * server first, a replay again having perhaps changed any (`refreshVerdicts`), and listed
+ * again once written.
  */
 function showAchievements(
-    dialog: HTMLElement, set: DataSet, store: Pick<AchievementStore, 'list' | 'update' | 'figures'>, ownOf: (setId: string) => Promise<string | null>,
+    dialog: HTMLElement, set: DataSet, store: Pick<AchievementStore, 'list' | 'update' | 'unlock' | 'figures'>, ownOf: (setId: string) => Promise<string | null>,
 ): void {
     const summary = dialog.querySelector<HTMLElement>('.achievements-summary')!;
     const list = dialog.querySelector<HTMLElement>('.achievements-list')!;
@@ -847,7 +850,8 @@ function showAchievements(
         if (defs === null) return;
         const shown = defs;
         const unlocks = new Map<string, AchievementRow[]>();
-        for (const row of rows) unlocks.set(row.id, [...(unlocks.get(row.id) ?? []), row]);
+        // A server's grant is listed while it verifies it: a replay again may drop it.
+        for (const row of rows) if (!row.granted || row.proof === 'verified') unlocks.set(row.id, [...(unlocks.get(row.id) ?? []), row]);
         const unlocked = shown.filter((def) => unlocks.has(def.id) || across.has(def.id)).length;
         summary.textContent = shown.length === 0 ? 'This dungeon has no achievements.'
             : `${unlocked} of ${shown.length} unlocked in this browser.`;
@@ -869,7 +873,8 @@ function showAchievements(
                 by.replaceChildren(...own.map((row) => {
                     const unlock = document.createElement('li');
                     unlock.append(line('achievements-party', row.champions.join(' ') || 'No party'),
-                        line('achievements-when', `${formatSaveDate(row.unlockedAt)}, played ${formatPlayTime(row.playTime)}`));
+                        line('achievements-when', row.granted ? `${formatSaveDate(row.unlockedAt)}, granted by the server's replay`
+                            : `${formatSaveDate(row.unlockedAt)}, played ${formatPlayTime(row.playTime)}`));
                     const proof = proofWords(row);
                     if (proof !== null) unlock.append(line(`achievements-proof proof-${row.proof}`, proof));
                     return unlock;
@@ -898,7 +903,7 @@ function showAchievements(
         defs = read;
         show(rows);
     }, failed);
-    void refreshVerdicts(store, askVerdicts, set.id).then((changed) => changed.length > 0 ? store.list(set.id).then(show, failed) : undefined,
+    void refreshVerdicts(store, askVerdicts, set.id, true).then((changed) => changed.length > 0 ? store.list(set.id).then(show, failed) : undefined,
         (error: unknown) => console.warn('The proofs\' verdicts could not be asked', error));
 }
 

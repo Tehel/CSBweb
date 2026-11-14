@@ -36,6 +36,11 @@
  * logged and left, a folder no row names. A player who loaded the set before plays its old
  * files until they load it again.
  *
+ * An edit whose `achievements.txt` is not the old folder's, given anew with other bytes or
+ * removed, makes each kept proof of the set due for a replay against it (`replayProofs`,
+ * `ProofStore.replayAgain`, `doc/ACHIEVEMENTS.md` → "An edit of a set's achievements"),
+ * once its row names the new folder; an edit that leaves it as it was makes none due.
+ *
  * A new `dungeon.dat` reaches no save already made, since a save holds its dungeon
  * (`DEBT.md` P11), and its walls replace the row's, so an import of a save of the old one
  * is no longer named after the set (`doc/SAVES.md`). The form says so before CONFIRM.
@@ -49,7 +54,7 @@ import { existsSync } from 'node:fs';
 import { cp, readFile, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { LOCAL_DATA_SET_FILES } from '../src/data/DataSets.ts';
+import { ACHIEVEMENTS_FILE, LOCAL_DATA_SET_FILES } from '../src/data/DataSets.ts';
 import type { DataSetStore, DataSetViewer } from './dataSets.ts';
 import type { Notify } from './notify.ts';
 import { checkSet, readSetForm, thumbnailFile, writeSetFiles, type AchievementsCheck, type CheckDataSet, type PublishAnswer } from './publish.ts';
@@ -63,11 +68,22 @@ export interface EditOptions {
     gamefilesDir: string;
     notify: Notify;
     now: () => number;
+    /**
+     * The set's kept proofs made due, at `at`, for a replay against its achievements as its
+     * folder now holds them (`ProofStore.replayAgain`): how many were.
+     */
+    replayProofs: (id: string, at: number) => number;
+}
+
+/** Whether the files `a` and `b` are both absent, or hold the same bytes. */
+async function sameFile(a: File | undefined, b: File | undefined): Promise<boolean> {
+    if (a === undefined || b === undefined) return a === b;
+    return a.size === b.size && Buffer.from(await a.arrayBuffer()).equals(Buffer.from(await b.arrayBuffer()));
 }
 
 /** `form`, sent by `viewer` about the set `id`, checked and, where it passes, done. */
 export async function editDataSet(
-    id: string, form: FormData, viewer: DataSetViewer, { checkDataSet, achievementsCheck, dataSets, gamefilesDir, notify, now }: EditOptions,
+    id: string, form: FormData, viewer: DataSetViewer, { checkDataSet, achievementsCheck, dataSets, gamefilesDir, notify, now, replayProofs }: EditOptions,
 ): Promise<PublishAnswer> {
     const refuse = (status: number, error: string): PublishAnswer => ({ status, body: { error } });
 
@@ -87,6 +103,7 @@ export async function editDataSet(
     const files = { ...had, ...edit.files };
     for (const file of edit.remove) delete files[file];
     const changesFiles = Object.keys(edit.files).length > 0 || edit.remove.some((file) => had[file]);
+    const changesAchievements = !await sameFile(had[ACHIEVEMENTS_FILE], files[ACHIEVEMENTS_FILE]);
 
     const checked = await checkSet({ ...edit, id, files }, checkDataSet, { ...achievementsCheck(), reservedFamilies: new Set() }, dataSets, gamefilesDir, now());
     if ('status' in checked) return checked;
@@ -116,8 +133,9 @@ export async function editDataSet(
         if (dir !== set.dir) await rm(join(gamefilesDir, dir), { recursive: true, force: true });
         throw error;
     }
+    const due = changesAchievements ? replayProofs(id, now()) : 0;
     if (dir !== set.dir) await deleteOldFolder(gamefilesDir, id, set.dir, dir, 'edited');
-    console.log(`'${id}' edited${dir !== set.dir ? `, its files now in ${dir}` : ''}`);
+    console.log(`'${id}' edited${dir !== set.dir ? `, its files now in ${dir}` : ''}${changesAchievements ? `, ${due} proof(s) to replay against its achievements` : ''}`);
     notify({ name: record.name, activity: 'edited', by: viewer.moderator.name, at: now() });
     return { status: 200, body: { id } };
 }

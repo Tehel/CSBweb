@@ -713,7 +713,7 @@ async function readForm(req: IncomingMessage, limit = MAX_PUBLISH_BYTES): Promis
 }
 
 /** What `receiveEdit` needs of the API. */
-export type EditApi = Pick<ApiOptions, 'checkDataSet' | 'achievementsCheck' | 'dataSets' | 'moderators' | 'now' | 'notify'>;
+export type EditApi = Pick<ApiOptions, 'checkDataSet' | 'achievementsCheck' | 'dataSets' | 'moderators' | 'now' | 'notify'> & { proofs: Pick<ProofsApi, 'store'> };
 
 /**
  * `POST api/data-sets/<id>` with a form: its asker, refused unless they moderate before the
@@ -732,6 +732,7 @@ export async function receiveEdit(id: string, gamefilesDir: string, api: EditApi
         reply = typeof form === 'string' ? { status: form === 'large' ? 413 : 400, body: { error: FORM_REFUSALS[form] } }
             : await editDataSet(id, form, viewer, {
                 checkDataSet: api.checkDataSet, achievementsCheck: api.achievementsCheck, dataSets: api.dataSets, gamefilesDir, notify: api.notify, now: api.now,
+                replayProofs: (setId, at) => api.proofs.store.replayAgain(setId, at),
             });
     }
     res.setHeader('Cache-Control', 'no-store');

@@ -73,7 +73,14 @@ CREATE TABLE IF NOT EXISTS proof_figures (
  * The columns `proofs` gained after its first deployment, which a table made before them
  * is altered to add, and a new one is too, as `recordings`' are (`recordings.ts`).
  */
-const ADDED_COLUMNS: readonly (readonly [string, string])[] = [];
+const ADDED_COLUMNS: readonly (readonly [string, string])[] = [
+    // Its package's path (`ProofPath`): each recording's id and VBLs, as JSON.
+    ['path', "TEXT NOT NULL DEFAULT '[]'"],
+    // The proof whose package holds its path, once its file was deleted for it (`holdsPath`).
+    ['superseded_by', 'TEXT'],
+    // When an edit of its set's achievements made it due for another replay (`ProofStore.replayAgain`), or NULL.
+    ['due', 'INTEGER'],
+];
 
 /** The largest request `POST PROOFS_ROUTE` reads: a package, its claims, and the form around them. */
 export const MAX_PROOF_BYTES = MAX_RECORDING_BYTES + 64 * 1024;
@@ -83,6 +90,28 @@ export const MAX_PROOF_BYTES = MAX_RECORDING_BYTES + 64 * 1024;
  * at most every ten minutes of a playthrough, and one at its end.
  */
 export const MAX_QUEUED_PER_IDENTITY = 8;
+
+/**
+ * A package's path as a proof keeps it (`RecordingPackage.path`): each recording's id and
+ * the VBLs it runs in the package, the root first, each branch's parent cut at its child's
+ * point and the last at the point shared.
+ */
+export type ProofPath = readonly (readonly [string, number])[];
+
+/**
+ * Whether the path `path` holds the whole of `other`: a later point of the same branch, or
+ * the same. Each recording of `other` but its last is one of `path`'s, at the same place,
+ * run as far, since a branch cut at the same child is cut at the same point; and its last is
+ * `path`'s recording there, run at least as far. A recording is never rewritten under its
+ * id, only run further, so the same id is the same game. A path of none holds nothing, nor
+ * is held: a row kept before paths were.
+ */
+export function holdsPath(path: ProofPath, other: ProofPath): boolean {
+    if (other.length === 0 || other.length > path.length) return false;
+    const last = other.length - 1;
+    for (let i = 0; i < last; i++) if (path[i]![0] !== other[i]![0] || path[i]![1] !== other[i]![1]) return false;
+    return path[last]![0] === other[last]![0] && path[last]![1] >= other[last]![1];
+}
 
 /** A proof's row. */
 export interface StoredProof {
@@ -98,6 +127,11 @@ export interface StoredProof {
     checkedAt: number | null;
     playthrough: number | null;
     kept: boolean;
+    path: ProofPath;
+    /** The proof whose package holds this one's path, once its file was deleted for it. */
+    supersededBy: string | null;
+    /** When an edit of its set's achievements made it due for another replay, or `null`. */
+    due: number | null;
 }
 
 /**
@@ -190,12 +224,19 @@ export class ProofStore {
     private readonly queuedOf: StatementSync;
     private readonly total: StatementSync;
     private readonly verifiedOf: StatementSync;
-    private readonly verifiedElsewhere: StatementSync;
     private readonly updateChecked: StatementSync;
     private readonly updateDrifted: StatementSync;
     private readonly updateClaim: StatementSync;
     private readonly grantClaim: StatementSync;
-    private readonly updateKept: StatementSync;
+    private readonly updateSuperseded: StatementSync;
+    private readonly moveSuperseded: StatementSync;
+    private readonly supersededOf: StatementSync;
+    private readonly keptOf: StatementSync;
+    private readonly oldestDue: StatementSync;
+    private readonly markDue: StatementSync;
+    private readonly clearDue: StatementSync;
+    private readonly deleteFigures: StatementSync;
+    private readonly regrantClaim: StatementSync;
     private readonly insertFigure: StatementSync;
     private readonly figuresOf: StatementSync;
     /** `hall`'s, prepared at its first call: it reads `identity.ts`'s tables, made beside these. */
@@ -211,8 +252,8 @@ export class ProofStore {
         for (const [column, type] of ADDED_COLUMNS) {
             if (!present.has(column)) db.exec(`ALTER TABLE proofs ADD COLUMN ${column} ${type}`);
         }
-        const columns = 'id, data_set, player, build, level, size, sent_at, state, reason, checked_at, playthrough, kept';
-        this.insert = db.prepare(`INSERT INTO proofs (${columns}) VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', '', NULL, NULL, 1)`);
+        const columns = 'id, data_set, player, build, level, size, sent_at, state, reason, checked_at, playthrough, kept, path, superseded_by, due';
+        this.insert = db.prepare(`INSERT INTO proofs (${columns}) VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', '', NULL, NULL, 1, ?, NULL, NULL)`);
         this.insertClaim = db.prepare("INSERT INTO claims (proof, achievement, state) VALUES (?, ?, 'unverified')");
         this.row = db.prepare(`SELECT ${columns} FROM proofs WHERE id = ?`);
         this.rowsOf = db.prepare(`SELECT ${columns} FROM proofs WHERE player IN (SELECT value FROM json_each(?)) ORDER BY sent_at DESC, id`);
@@ -222,13 +263,21 @@ export class ProofStore {
         this.total = db.prepare('SELECT COALESCE(SUM(size), 0) AS bytes FROM proofs WHERE kept = 1');
         this.verifiedOf = db.prepare(`SELECT p.data_set, c.achievement, MIN(p.checked_at) AS at FROM claims c JOIN proofs p ON p.id = c.proof
             WHERE c.state = 'verified' AND p.player IN (SELECT value FROM json_each(?)) GROUP BY p.data_set, c.achievement ORDER BY p.data_set, at, c.achievement`);
-        this.verifiedElsewhere = db.prepare(`SELECT 1 FROM claims c JOIN proofs p ON p.id = c.proof
-            WHERE c.state = 'verified' AND c.achievement = ? AND p.data_set = ? AND p.playthrough = ? AND p.id <> ? AND p.player IN (SELECT value FROM json_each(?)) LIMIT 1`);
         this.updateChecked = db.prepare("UPDATE proofs SET state = 'checked', checked_at = ?, playthrough = ? WHERE id = ?");
         this.updateDrifted = db.prepare("UPDATE proofs SET state = 'drifted', checked_at = ?, reason = ? WHERE id = ?");
         this.updateClaim = db.prepare('UPDATE claims SET state = ? WHERE proof = ? AND achievement = ?');
         this.grantClaim = db.prepare("INSERT INTO claims (proof, achievement, state, claimed) VALUES (?, ?, 'verified', 0)");
-        this.updateKept = db.prepare('UPDATE proofs SET kept = 0 WHERE id = ?');
+        this.updateSuperseded = db.prepare('UPDATE proofs SET kept = 0, superseded_by = ? WHERE id = ?');
+        this.moveSuperseded = db.prepare('UPDATE proofs SET superseded_by = ? WHERE superseded_by = ?');
+        this.supersededOf = db.prepare('SELECT id FROM proofs WHERE superseded_by = ? ORDER BY sent_at, id');
+        this.keptOf = db.prepare(`SELECT ${columns} FROM proofs WHERE state = 'checked' AND kept = 1 AND data_set = ? AND playthrough = ? AND id <> ?
+            AND player IN (SELECT value FROM json_each(?)) ORDER BY sent_at, id`);
+        this.oldestDue = db.prepare(`SELECT ${columns} FROM proofs WHERE state = 'checked' AND kept = 1 AND due IS NOT NULL ORDER BY due, sent_at, id LIMIT 1`);
+        this.markDue = db.prepare("UPDATE proofs SET due = ? WHERE data_set = ? AND kept = 1 AND state IN ('queued', 'checked')");
+        this.clearDue = db.prepare('UPDATE proofs SET due = NULL WHERE id = ? AND due <= ?');
+        this.deleteFigures = db.prepare('DELETE FROM proof_figures WHERE proof = ?');
+        this.regrantClaim = db.prepare(`INSERT INTO claims (proof, achievement, state, claimed) VALUES (?, ?, 'verified', 0)
+            ON CONFLICT (proof, achievement) DO UPDATE SET state = 'verified'`);
         this.insertFigure = db.prepare('INSERT INTO proof_figures (proof, key, value) VALUES (?, ?, ?)');
         this.figuresOf = db.prepare(`SELECT p.data_set, '' AS owner, p.id AS proof, p.playthrough, p.checked_at AS at, f.key, f.value
             FROM proof_figures f JOIN proofs p ON p.id = f.proof
@@ -236,9 +285,9 @@ export class ProofStore {
     }
 
     /** `proof` queued, with its `claims`, `unverified`. */
-    queue(proof: Pick<StoredProof, 'id' | 'dataSet' | 'player' | 'build' | 'level' | 'size' | 'sentAt'>, claims: readonly string[]): void {
+    queue(proof: Pick<StoredProof, 'id' | 'dataSet' | 'player' | 'build' | 'level' | 'size' | 'sentAt' | 'path'>, claims: readonly string[]): void {
         this.transaction(() => {
-            this.insert.run(proof.id, proof.dataSet, proof.player, proof.build, proof.level, proof.size, proof.sentAt);
+            this.insert.run(proof.id, proof.dataSet, proof.player, proof.build, proof.level, proof.size, proof.sentAt, JSON.stringify(proof.path));
             for (const claim of claims) this.insertClaim.run(proof.id, claim);
         });
     }
@@ -259,10 +308,35 @@ export class ProofStore {
             .map((row) => ({ achievement: row.achievement, state: row.state, claimed: row.claimed === 1 }));
     }
 
-    /** The proof the verifier replays next: the oldest queued. */
+    /**
+     * The proof the verifier replays next: the oldest queued, so that a player's proof never
+     * waits behind an edit's replays; then the checked one an edit of its set's achievements
+     * made due first (`replayAgain`).
+     */
     next(): StoredProof | null {
-        const row = this.oldestQueued.get() as Record<string, string | number | null> | undefined;
+        const row = (this.oldestQueued.get() ?? this.oldestDue.get()) as Record<string, string | number | null> | undefined;
         return row ? proofOf(row) : null;
+    }
+
+    /**
+     * Each proof of `dataSet` whose package is kept, queued or checked, made due at `at` for
+     * a replay against the set's achievements as its folder now holds them: an edit changed
+     * them (`edit.ts`). A queued one is replayed again too where its replay began before
+     * `at`. A drifted one, which its game files refuse, and one whose file is deleted, are
+     * not. How many were.
+     */
+    replayAgain(dataSet: string, at: number): number {
+        return Number(this.markDue.run(at, dataSet).changes);
+    }
+
+    /** `id` replayed from `startedAt` on: no longer due, unless an edit made it due after its replay began. */
+    replayed(id: string, startedAt: number): void {
+        this.clearDue.run(id, startedAt);
+    }
+
+    /** The checked proofs of `players` of `dataSet`'s playthrough `playthrough` whose files are kept, but `except`. */
+    keptIn(dataSet: string, playthrough: number, except: string, players: readonly string[]): StoredProof[] {
+        return (this.keptOf.all(dataSet, playthrough, except, JSON.stringify(players)) as Record<string, string | number | null>[]).map(proofOf);
     }
 
     /** How many proofs `players` sent are queued. */
@@ -325,14 +399,6 @@ export class ProofStore {
     }
 
     /**
-     * Whether another proof of `players`' verified `achievement` in the playthrough
-     * `playthrough` of `dataSet` already: what makes a proof's unlock not its own.
-     */
-    verifiedBefore(achievement: string, dataSet: string, playthrough: number, except: string, players: readonly string[]): boolean {
-        return this.verifiedElsewhere.get(achievement, dataSet, playthrough, except, JSON.stringify(players)) !== undefined;
-    }
-
-    /**
      * `id` replayed to its point, in the playthrough `playthrough`, the replay having
      * unlocked `unlocked` and its history's figures being `figures`: each claim verified or
      * dropped, each unlock it did not claim granted, verified, and each figure above 0 kept.
@@ -350,14 +416,53 @@ export class ProofStore {
         });
     }
 
+    /**
+     * `id`, checked before, replayed again against its set's achievements as they now are,
+     * its history then holding `unlocked` and `figures`: each claim verified or dropped, an
+     * unlock it granted unclaimed kept verified where it still unlocks and dropped where it
+     * no longer does, each new unlock granted, verified, and its figures those. Its time is
+     * kept: an unlock is dated by its proof's first check. Each proof whose path it holds
+     * (`supersede`) has each verified claim it no longer unlocks dropped, since what a later
+     * point of the same game does not unlock no earlier point did; one it unlocks is not
+     * granted to them, since the earlier point may not have reached it.
+     */
+    rechecked(id: string, unlocked: ReadonlySet<string>, figures: Readonly<Record<string, number>>): void {
+        this.transaction(() => {
+            this.deleteFigures.run(id);
+            for (const [key, value] of Object.entries(figures)) if (value > 0) this.insertFigure.run(id, key, value);
+            const held = new Set<string>();
+            for (const { achievement } of this.claims(id)) {
+                held.add(achievement);
+                this.updateClaim.run(unlocked.has(achievement) ? 'verified' : 'dropped', id, achievement);
+            }
+            for (const achievement of unlocked) if (!held.has(achievement)) this.regrantClaim.run(id, achievement);
+            for (const { id: earlier } of this.supersededOf.all(id) as { id: string }[]) {
+                for (const claim of this.claims(earlier)) {
+                    if (claim.state === 'verified' && !unlocked.has(claim.achievement)) this.updateClaim.run('dropped', earlier, claim.achievement);
+                }
+            }
+        });
+    }
+
     /** `id` drifted, for `reason`: its claims stay unverified. */
     drifted(id: string, at: number, reason: string): void {
         this.updateDrifted.run(at, reason, id);
     }
 
-    /** `id`'s file deleted. */
-    dropFile(id: string): void {
-        this.updateKept.run(id);
+    /**
+     * `id`'s file deleted, since `by`'s package holds its path (`holdsPath`): those it held
+     * are held by `by` now.
+     */
+    supersede(id: string, by: string): void {
+        this.transaction(() => {
+            this.updateSuperseded.run(by, id);
+            this.moveSuperseded.run(by, id);
+        });
+    }
+
+    /** The proofs whose files were deleted for `id`'s, which holds their paths. */
+    supersededBy(id: string): string[] {
+        return (this.supersededOf.all(id) as { id: string }[]).map((row) => row.id);
     }
 
     private transaction(change: () => void): void {
@@ -377,7 +482,8 @@ function proofOf(row: Record<string, string | number | null>): StoredProof {
         id: row.id as string, dataSet: row.data_set as string, player: row.player as string, build: row.build as string,
         level: row.level as number, size: row.size as number, sentAt: row.sent_at as number, state: row.state as ProofState,
         reason: row.reason as string, checkedAt: row.checked_at as number | null, playthrough: row.playthrough as number | null,
-        kept: row.kept === 1,
+        kept: row.kept === 1, path: JSON.parse(row.path as string) as ProofPath, supersededBy: row.superseded_by as string | null,
+        due: row.due as number | null,
     };
 }
 
@@ -478,7 +584,8 @@ export async function sendProof(form: FormData, playerId: string, options: Proof
         await rm(partial, { force: true });
         throw error;
     }
-    options.proofs.queue({ id, dataSet: pkg.dataSet, player: playerId, build: pkg.build, level: pkg.level, size: bytes.length, sentAt: options.now() }, claims);
+    const path: ProofPath = pkg.path.map((recording) => [recording.id, recording.vbls] as const);
+    options.proofs.queue({ id, dataSet: pkg.dataSet, player: playerId, build: pkg.build, level: pkg.level, size: bytes.length, sentAt: options.now(), path }, claims);
     console.log(`proof ${id} of '${pkg.dataSet}' queued, ${claims.length} claim(s)`);
     return { status: 201, body: { id } };
 }
@@ -500,7 +607,10 @@ export function proofsText(ids: string, player: string, proofs: ProofStore, iden
         const proof = proofs.get(id);
         if (!proof || !players.has(proof.player)) continue;
         const claims = Object.fromEntries(proofs.claims(id).map((claim) => [claim.achievement, claim.state]));
-        verdicts.push({ id, state: proof.state, ...(proof.state === 'drifted' ? { reason: proof.reason } : {}), claims });
+        verdicts.push({
+            id, state: proof.state, ...(proof.state === 'drifted' ? { reason: proof.reason } : {}),
+            ...(proof.state === 'checked' && proof.checkedAt !== null ? { checkedAt: proof.checkedAt } : {}), claims,
+        });
     }
     return JSON.stringify({ proofs: verdicts });
 }
@@ -574,31 +684,49 @@ export interface VerifyOptions {
     now: () => number;
 }
 
-/** What `verifyNext` did: the proof, its state, what its replay verified, and whether its file was kept. */
+/** What `verifyNext` did. */
 export interface Verified {
     id: string;
+    /**
+     * Its replay's outcome: `checked` or `drifted`. A replay again that drifts leaves the
+     * proof checked, its verdict as its last replay left it.
+     */
     state: Exclude<ProofState, 'queued'>;
+    /** Whether it was checked before, and replayed again against its set's achievements as they now are. */
+    again: boolean;
     reason: string;
     verified: string[];
     dropped: string[];
-    /** The verified that no earlier proof of its identity's verified in its playthrough. */
-    own: string[];
+    /** The proofs whose files it deleted, since its package holds their paths (`holdsPath`). */
+    superseded: string[];
+    /** Whether its file is kept: not where a kept proof's package holds its path. */
     kept: boolean;
 }
 
 /**
- * The verifier's step: the oldest queued proof replayed (`replay`) and its verdict kept, or
- * `null` where none is queued. Played to its point, it is `checked`: each claim the replay
- * unlocked verified and each other dropped, an unlock it did not claim granted, verified,
- * its history's figures kept, and its file deleted where it verified nothing of its own,
- * nothing that an earlier proof of its identity's browsers had not in the same playthrough:
- * figures that grew alone keep no file. Where it drifts, or its file is
- * gone, it is `drifted`, the reason kept, its claims unverified and its file kept.
+ * The verifier's step: the next proof (`ProofStore.next`) replayed (`replay`) and its verdict
+ * kept, or `null` where none is due.
+ *
+ * - **A queued proof**, played to its point, is `checked`: each claim the replay unlocked
+ *   verified and each other dropped, an unlock it did not claim granted, verified, and its
+ *   history's figures kept. Then the latest point of each branch is what is kept: each
+ *   checked proof of its identity's browsers in the same playthrough whose path its package
+ *   holds (`holdsPath`) has its file deleted, the proof it is superseded by noted; and its
+ *   own is deleted where a kept one holds its path. Where it drifts, or its file is gone, it
+ *   is `drifted`, the reason kept, its claims unverified and its file kept.
+ * - **A checked proof an edit made due** (`replayAgain`) is replayed against its set's
+ *   achievements as they now are (`rechecked`): its claims, its grants and its figures follow
+ *   them, and those of the proofs it superseded lose what it no longer unlocks. Where it no
+ *   longer plays, an edit of the set's game files among the causes, its last verdict stays.
+ *
+ * Either way it is no longer due, unless an edit made it due once its replay had begun.
  */
 export async function verifyNext(options: VerifyOptions): Promise<Verified | null> {
     const { proofs } = options;
     const proof = proofs.next();
     if (proof === null) return null;
+    const again = proof.state === 'checked';
+    const startedAt = options.now();
     const path = join(options.dir, `${proof.id}.gz`);
     let replayed: ProofReplayed;
     try {
@@ -610,19 +738,34 @@ export async function verifyNext(options: VerifyOptions): Promise<Verified | nul
     if (replayed.kind === 'checked' && replayed.dataSet !== proof.dataSet) {
         replayed = { kind: 'drifted', reason: `its package plays ${replayed.dataSet}, not ${proof.dataSet}` };
     }
+    if (replayed.kind === 'checked' && again && replayed.playthrough !== proof.playthrough) {
+        replayed = { kind: 'drifted', reason: `its replay reads the playthrough ${replayed.playthrough}, not its first replay's` };
+    }
+    const done = { id: proof.id, again, superseded: [] as string[] };
     if (replayed.kind === 'drifted') {
-        proofs.drifted(proof.id, options.now(), replayed.reason);
-        return { id: proof.id, state: 'drifted', reason: replayed.reason, verified: [], dropped: [], own: [], kept: true };
+        if (!again) proofs.drifted(proof.id, options.now(), replayed.reason);
+        proofs.replayed(proof.id, startedAt);
+        return { ...done, state: 'drifted', reason: replayed.reason, verified: [], dropped: [], kept: true };
     }
-    const { playthrough } = replayed;
     const unlocked = new Set(replayed.unlocked);
-    const players = playersOf(options.identities, proof.player);
-    const own = replayed.unlocked.filter((achievement) => !proofs.verifiedBefore(achievement, proof.dataSet, playthrough, proof.id, players));
-    proofs.checked(proof.id, options.now(), playthrough, unlocked, replayed.figures);
+    if (again) proofs.rechecked(proof.id, unlocked, replayed.figures);
+    else proofs.checked(proof.id, options.now(), replayed.playthrough, unlocked, replayed.figures);
+    proofs.replayed(proof.id, startedAt);
     const dropped = proofs.claims(proof.id).filter((claim) => claim.state === 'dropped').map((claim) => claim.achievement);
-    if (own.length === 0) {
-        await rm(path, { force: true });
-        proofs.dropFile(proof.id);
+    let kept = true;
+    if (!again) {
+        const others = proofs.keptIn(proof.dataSet, replayed.playthrough, proof.id, playersOf(options.identities, proof.player));
+        for (const other of others.filter((one) => holdsPath(proof.path, one.path))) {
+            await rm(join(options.dir, `${other.id}.gz`), { force: true });
+            proofs.supersede(other.id, proof.id);
+            done.superseded.push(other.id);
+        }
+        const holder = others.find((one) => !done.superseded.includes(one.id) && holdsPath(one.path, proof.path));
+        if (holder) {
+            await rm(path, { force: true });
+            proofs.supersede(proof.id, holder.id);
+            kept = false;
+        }
     }
-    return { id: proof.id, state: 'checked', reason: '', verified: [...replayed.unlocked], dropped, own, kept: own.length > 0 };
+    return { ...done, state: 'checked', reason: '', verified: [...replayed.unlocked], dropped, kept };
 }

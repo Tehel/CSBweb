@@ -703,14 +703,15 @@ It runs the same image a second time as the container `csbweb-verifier`, the ser
 `verifier`, whose command is `node server/verifier.ts`: the proofs' replays
 (`doc/ACHIEVEMENTS.md` → "Proofs"). It publishes no port, mounts `./gamefiles` read-only and
 `./stats` read-write, where it writes the store beside the server, waiting for the
-server's writes (`busy_timeout`, `server/store.ts`), and deletes the packages that proved
-nothing of their own. A replay takes a CPU while it runs, so it gets `cpus: 0.5` and
+server's writes (`busy_timeout`, `server/store.ts`), and deletes the packages a later
+proof of the same game holds. It replays a player's proof first, then those a moderator's
+edit of a set's achievements made due again. A replay takes a CPU while it runs, so it gets `cpus: 0.5` and
 `cpu_shares: 256`, a quarter of the server's weight, and lowers its own priority to nice 19
 at start-up, which needs no capability. Its limits are the server's: `mem_limit: 512m`,
 `pids_limit: 100`, `read_only`, `cap_drop: [ALL]`, `no-new-privileges`. It has no
 healthcheck, since it serves nothing; `docker compose logs verifier` shows a line per
-proof replayed. A deploy's `down` stops a replay under way, which leaves its proof queued,
-replayed at the next start. `tools/check-image.sh` runs it so beside the server's, and has
+proof replayed. A deploy's `down` stops a replay under way, which leaves its proof queued
+or due, replayed at the next start. `tools/check-image.sh` runs it so beside the server's, and has
 it check a proof the server took.
 
 **`.env` on the server** is the stack's, beside the compose file, and `deploy.sh` does not copy
@@ -843,8 +844,10 @@ an edited set's old one included, since a snapshot still names it. The shared re
 packages, which never change either but by a migration of their format, are copied the same way into
 `stats/backups/recordings/<id>.gz`; a migration moves the old copy to
 `stats/backups/recordings-old/` (`utils/migrate-recording-packages.ts`, "Shared recordings", above). So are
-the proofs' packages the verifier checked and kept, which it never deletes then, into
-`stats/backups/proofs/<id>.gz`; a queued one, which it may yet delete, is not. It prints one JSON line, `backup_ok` with the folders and
+the proofs' packages the verifier checked and kept, into `stats/backups/proofs/<id>.gz`; a
+queued one, which it may yet delete, is not, and the copy of one it deleted since,
+superseded by a later proof of the same game whose package holds its path, is deleted
+(`proofsDeleted`), so that the copies keep each branch's latest point as the server does. It prints one JSON line, `backup_ok` with the folders and
 the packages copied and the number of each kept, and exits with 1 when the store cannot be read or a folder cannot be copied
 (`backup_failed`). The crontab line, `doc/SETUP.md` step 28's (`docker-compose` under Compose v1), deletes the
 snapshots older than 14 days, and only them:

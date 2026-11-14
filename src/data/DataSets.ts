@@ -357,6 +357,12 @@ export interface ProofVerdict {
     state: ProofState;
     /** Why it drifted, where it did. */
     reason?: string;
+    /**
+     * Milliseconds since the epoch: when it was first checked, where it was, which dates an
+     * unlock its replay granted unclaimed; a replay again keeps it.
+     */
+    checkedAt?: number;
+    /** Each claim's verdict, an unlock its replay granted unclaimed among them. */
     claims: Record<string, ClaimState>;
 }
 

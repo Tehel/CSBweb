@@ -98,6 +98,8 @@ export class PageAchievements {
   private writes: Promise<unknown> = Promise.resolve();
   /** The proof of each row of the set, by playthrough and id, as the store last said (`readProofs`). */
   private proofs = new Map<string, AchievementProof>();
+  /** The unlocks a server's replay granted and verified, which no tracker of this browser's unlocked, by playthrough and id (`readProofs`). */
+  private granted = new Set<string>();
   /** The set's achievements across games (`doc/ACHIEVEMENTS.md` → "Across games"). */
   private readonly across: readonly AchievementDef[];
   /** Each playthrough's figures of the set, as the store held them and this page has raised them since. */
@@ -200,6 +202,7 @@ export class PageAchievements {
     try {
       const rows = await this.store.list(this.dataSet);
       this.proofs = new Map(rows.map((row) => [`${row.playthrough}|${row.id}`, row.proof]));
+      this.granted = new Set(rows.filter((row) => row.granted && row.proof === 'verified').map((row) => `${row.playthrough}|${row.id}`));
     } catch (error) {
       this.log('The achievements could not be read', error);
     }
@@ -233,15 +236,19 @@ export class PageAchievements {
 
   /**
    * What the achievements dialog shows (`AchievementsView`): the set's, what the game's
-   * history has unlocked, and how far the proof of each unlock of the playthrough has got.
+   * history has unlocked, those across games, and those a server's replay of the
+   * playthrough granted and verified (`AchievementRow.granted`), and how far the proof of
+   * each unlock of the playthrough has got.
    */
   view(): {
     readonly defs: readonly AchievementDef[]; readonly unlocked: ReadonlySet<string>; readonly whole: boolean;
     readonly proof: (id: string) => AchievementProof | null;
   } {
     const playthrough = this.playthrough;
+    const granted = this.defs.filter((def) => this.granted.has(`${playthrough}|${def.id}`)).map((def) => def.id);
     return {
-      defs: this.defs, unlocked: this.acrossDone.size === 0 ? this.tracker.unlocked : new Set([...this.tracker.unlocked, ...this.acrossDone]),
+      defs: this.defs,
+      unlocked: this.acrossDone.size === 0 && granted.length === 0 ? this.tracker.unlocked : new Set([...this.tracker.unlocked, ...this.acrossDone, ...granted]),
       whole: this.tracker.whole,
       proof: (id) => this.proofs.get(`${playthrough}|${id}`) ?? null,
     };

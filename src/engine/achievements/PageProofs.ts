@@ -14,13 +14,17 @@
  * - **at a save**, when it claims an unlock no proof has claimed yet or its figures grew,
  *   and the last proof of the playthrough this page sent is `PROOF_INTERVAL_MS` old or more.
  *
- * Each row claimed keeps the proof's id (`AchievementRow.proofs`); `refresh` asks for the
- * verdicts of every row that awaits one and writes them (`judgedRows`).
+ * Each row claimed keeps the proof's id (`AchievementRow.proofs`), and the playthrough's
+ * figures row every proof sent of it (`AchievementFiguresRow.proofs`); `refresh` asks for the
+ * verdicts of every row that awaits one, or of every proof sent, and writes them
+ * (`judgedRows`), an unlock the replay granted unclaimed a row of its own (`grantedRows`).
  *
  * **Nothing in this file touches the DOM**: the page hands it the server's routes
  * (`src/main.ts`), and the tools a stand-in (`tools/checks/achievement-proofs.ts`).
  */
-import { claimableRows, judgedRows, mergeFigures, pendingProofs, type AchievementRow, type AchievementStore } from '../../data/saves/AchievementStore';
+import {
+  claimableRows, grantedRows, judgedRows, knownProofs, mergeFigures, pendingProofs, type AchievementRow, type AchievementStore,
+} from '../../data/saves/AchievementStore';
 import type { RecordingEntry, RecordingStore } from '../../data/saves/RecordingStore';
 import type { SaveEntry, SaveStore } from '../../data/saves/SaveStore';
 import { MAX_CLAIMS, type ProofVerdict } from '../../data/DataSets';
@@ -86,20 +90,32 @@ export async function storedPackage(point: 'end' | SaveEntry, dataSet: string, s
 }
 
 /**
- * The verdicts of the proofs `store`'s rows of `dataSet` (every set's for `null`) await,
- * asked (`ask`) and written: the rows they change. Nothing is asked where none awaits one.
+ * The verdicts of the proofs `store`'s rows of `dataSet` await, asked (`ask`) and written:
+ * the rows they change or add. With `all`, those of every proof the browser sent of the set
+ * (`knownProofs`), since a replay again against the set's achievements as they now are
+ * (`doc/ACHIEVEMENTS.md` → "An edit of a set's achievements") may have changed any: at the
+ * page's start and as the book's ACHIEVEMENTS tab opens. A verdict's unlock granted
+ * unclaimed adds a row (`grantedRows`). Nothing is asked where none awaits one.
  */
 export async function refreshVerdicts(
-    store: Pick<AchievementStore, 'list' | 'update'>, ask: ProofsDeps['ask'], dataSet: string | null,
+    store: Pick<AchievementStore, 'list' | 'update' | 'unlock' | 'figures'>, ask: ProofsDeps['ask'], dataSet: string, all = false,
 ): Promise<AchievementRow[]> {
-    const rows = await store.list(dataSet);
-    const pending = pendingProofs(rows);
-    if (pending.length === 0) return [];
+    const [rows, figures] = await Promise.all([store.list(dataSet), store.figures(dataSet)]);
+    const asked = all ? knownProofs(rows, figures) : pendingProofs(rows);
+    if (asked.length === 0) return [];
     const verdicts: ProofVerdict[] = [];
-    for (let at = 0; at < pending.length; at += MAX_CLAIMS) verdicts.push(...await ask(pending.slice(at, at + MAX_CLAIMS)));
-    const changed = judgedRows(rows, verdicts);
-    await store.update(changed);
-    return changed;
+    for (let at = 0; at < asked.length; at += MAX_CLAIMS) verdicts.push(...await ask(asked.slice(at, at + MAX_CLAIMS)));
+    const keyOf = (row: AchievementRow) => `${row.playthrough}|${row.id}`;
+    const granted = new Map(grantedRows(rows, figures, verdicts, dataSet).map((row) => [keyOf(row), row]));
+    const held = new Set(rows.map(keyOf));
+    const merged = [...rows.map((row) => granted.get(keyOf(row)) ?? row), ...[...granted.values()].filter((row) => !held.has(keyOf(row)))];
+    const changed = new Map([...granted].filter(([key]) => held.has(key)));
+    for (const row of judgedRows(merged, verdicts)) changed.set(keyOf(row), row);
+    const added = [...granted.values()].filter((row) => !held.has(keyOf(row))).map((row) => changed.get(keyOf(row)) ?? row);
+    for (const row of added) changed.delete(keyOf(row));
+    await store.update([...changed.values()]);
+    for (const row of added) await store.unlock(row);
+    return [...changed.values(), ...added];
 }
 
 export class PageProofs {
@@ -158,10 +174,14 @@ export class PageProofs {
         return id;
     }
 
-    /** The verdicts the set's rows await, asked and written, and the dialog's read again: how many rows changed. */
-    async refresh(): Promise<number> {
+    /**
+     * The verdicts the set's rows await, or with `all` those of every proof sent of the set
+     * (`refreshVerdicts`), asked and written, and the dialog's read again: how many rows
+     * changed or were added.
+     */
+    async refresh(all = false): Promise<number> {
         try {
-            const changed = await refreshVerdicts(this.store, this.deps.ask, this.dataSet);
+            const changed = await refreshVerdicts(this.store, this.deps.ask, this.dataSet, all);
             if (changed.length > 0) await this.achievements.readProofs();
             return changed.length;
         } catch (error) {
@@ -208,6 +228,7 @@ export class PageProofs {
         const id = await this.deps.send(bytes, sent.map((row) => row.id));
         this.sentAt.set(playthrough, this.deps.now());
         this.sentFigures.set(playthrough, mergeFigures(this.sentFigures.get(playthrough) ?? {}, figures));
+        await this.store.raiseFigures({ dataSet: this.dataSet, playthrough, figures: {}, proofs: [id] });
         if (sent.length > 0) await this.store.update(sent.map((row) => ({ ...row, proofs: [...(row.proofs ?? []), id] })));
         return id;
     }

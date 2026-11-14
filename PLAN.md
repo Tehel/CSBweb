@@ -71,9 +71,9 @@ At the author's request, beside the debt. The design is `doc/ACHIEVEMENTS.md`.
   `tools/checks/server-proofs.ts`, `achievement-proofs.ts`, `build.ts`,
   `tools/check-image.sh` and `tools/probe-frames.ts`. Settled: CSB's adventure keeps a
   history of its own, as the verifier gives it; a verified run is shared through the book's
-  UPLOAD. Deferred: re-verifying the kept proofs when a set gains an achievement (18.7),
-  and an unlock the replay grants unclaimed, which the server keeps but the page adds no
-  row for. A moderator watching a proof is settled in 18.6.
+  UPLOAD. A moderator watching a proof is settled in 18.6; the kept proofs replayed when a
+  set's achievements change, and an unlock the replay grants unclaimed shown by the page,
+  in 18.7.
 - ✅ 18.6 The Hall of Fame (`doc/ACHIEVEMENTS.md` → "The Hall of Fame"): its answers,
   `api/fame` (`server/fame.ts`), proved by `tools/checks/server-fame.ts` and `build.ts`;
   the page, `fame.html` (`src/fame/famePage.ts`), linked from the footer, ABOUT and
@@ -120,16 +120,23 @@ At the author's request, beside the debt. The design is `doc/ACHIEVEMENTS.md`.
      no achievement names, and, to a player who does not moderate, a family of the site's
      own sets (`"reservedFamilies"`, the author's choice). Not in the set's archive. Proved
      by `tools/checks/local-data-set.ts`, `server.ts`, `build.ts` and `tools/probe-frames.ts`.
-  5. **The kept proofs replayed again** when a set's file changes, as an edit now can
-     without a deploy (the 18.5 deferral). What is kept changes first (the author's
-     choice): a package is the whole path from the game's start, so a playthrough's latest
-     proof holds those before it on the same branch; the server keeps the latest package of
-     each playthrough's branch, whatever it verified, and deletes the earlier ones it holds,
-     in place of deleting a proof that verified nothing new (`ProofStore.dropFile`). A
-     replay then grants everything a sent game reached, an achievement across games whose
-     figures no proof kept among it. Measured on the corpus, a package takes some 15 to
-     45 KB an hour of play (a save's start some 40 KB more): about 1 MB a whole game, the
-     1 GiB of `PROOFS_DISK_BYTES` some 20,000 hours.
+  5. ✅ **The kept proofs replayed again** when a set's file changes (`doc/ACHIEVEMENTS.md` →
+     "An edit of a set's achievements"). The latest package of each playthrough's branch is
+     kept, whatever it verified, and the earlier ones it holds deleted (`holdsPath`,
+     `superseded_by`, the author's choice), the backup's copies too: some 15 to 45 KB an
+     hour of play, measured on the corpus, the 1 GiB of `PROOFS_DISK_BYTES` some 20,000
+     hours. A moderator's edit that changes or removes a set's `achievements.txt` makes its
+     kept proofs due (`ProofStore.replayAgain`), replayed after the players' queued ones
+     against the file as it now is (`rechecked`): an unlock it no longer grants dropped, on
+     the proofs it superseded too; a new one granted, dated by the proof's first check; a
+     replay that no longer plays keeps the verdict; the edited set's alone, a family's
+     change needing none of the others' (the author's choices). The page asks every proof's
+     verdict at its start and the book's tab, re-judges its rows, and adds a row for an
+     unlock granted unclaimed, which the dialog and the book show while it stays verified
+     (the author's choice, the 18.5 deferral). Proved by `tools/checks/server-proofs.ts`,
+     `server.ts` and `achievement-proofs.ts`. Deferred: the dialog's grant, which no tool
+     shows; a new achievement across games is worked out by the page from its own figures
+     alone, so a grant of one shows on PROFILE and the Hall, not in the dialog.
   6. **The designers' guide**: one standalone HTML document that teaches a dungeon's
      designer to write `achievements.txt`, with many examples, which the author uploads
      to the instance's shared files and serves under `files/`, as `training.html`,

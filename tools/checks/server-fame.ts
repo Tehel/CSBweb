@@ -151,7 +151,7 @@ async function main(): Promise<void> {
         ) => {
             const id = (proofIds.length + 0xA0).toString(16).toUpperCase().padStart(16, 'F');
             proofIds.push(id);
-            proofs.queue({ id, dataSet, player, build: 'test', level: 1, size: 1, sentAt }, claims);
+            proofs.queue({ id, dataSet, player, build: 'test', level: 1, size: 1, sentAt, path: [] }, claims);
             if (checkedAt !== undefined) proofs.checked(id, checkedAt, playthrough, new Set(unlocked), figures);
             return id;
         };

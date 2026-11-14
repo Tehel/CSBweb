@@ -537,8 +537,8 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     // Each unlock a banner over the view, with ACHIEVEMENT NOTICES on.
     achievements?.onShown(({ def }) => showAchievementNotice(screen.ui, { name: def.name, tier: def.tier }));
     // The proofs of the unlocks, sent by a player with a public name at a save and at the
-    // game's end, and their verdicts asked at the start and every few minutes
-    // (`doc/ACHIEVEMENTS.md` → "Proofs").
+    // game's end, and their verdicts asked at the start, every proof's, which a replay again
+    // may have changed, then every few minutes those still awaited (`doc/ACHIEVEMENTS.md` → "Proofs").
     const sources = { flush: () => recordings.flush(), recordings: recordingStore, saves: saveStore };
     const proofs = achievements && new PageProofs(achievements, dataSet.id, achievementStore, {
         named: hasPublicName, send: sendProof, ask: askVerdicts, packageOf: (point) => storedPackage(point, dataSet.id, sources),
@@ -546,7 +546,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     });
     if (proofs) {
         saves.onSaved((entry) => { void proofs.saved(entry); });
-        void proofs.refresh();
+        void proofs.refresh(true);
         setInterval(() => { void proofs.refresh(); }, VERDICTS_MS);
     }
     return { game, screen, saves, recorder, recordings, recordingStore, messages, events, input, playInput, achievements, proofs };

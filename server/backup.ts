@@ -24,8 +24,11 @@
  * way, into `recordings/` under `BACKUP_DIR`. A migration of the package's format, the one
  * change it may have, moves the copy aside first (`utils/migrate-recording-packages.ts`),
  * so that the next run copies the new file. A proof's package (`proofs.ts`) is copied once
- * too, into `proofs/` under `BACKUP_DIR`, once the verifier has checked it and kept it, as
- * it never deletes it then; a queued one, which it may yet delete, is not.
+ * too, into `proofs/` under `BACKUP_DIR`, once the verifier has checked it and kept it; a
+ * queued one, which it may yet delete, is not. The copy of one the verifier has deleted
+ * since, superseded by a later proof whose package holds its path (`holdsPath`), is
+ * deleted: that proof is checked, and copied in the same run, so the backup keeps each
+ * branch's latest point as the server does, not every point it passed.
  *
  * It prints one JSON line, and exits with 1 when the store cannot be read or a folder or a
  * package cannot be copied.
@@ -64,6 +67,7 @@ try {
     let uploaded: string[];
     let packages: string[];
     let proofs: string[];
+    let superseded: string[];
     try {
         uploaded = (snapshot.prepare('SELECT dir FROM data_sets ORDER BY position').all() as { dir: string }[]).map((row) => row.dir);
         // A store the server has not opened since it kept recordings has no such table.
@@ -71,6 +75,10 @@ try {
         packages = recordings ? (snapshot.prepare('SELECT id FROM recordings ORDER BY uploaded_at').all() as { id: string }[]).map((row) => `${row.id}.gz`) : [];
         const proofTable = snapshot.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'proofs'").get() !== undefined;
         proofs = proofTable ? (snapshot.prepare("SELECT id FROM proofs WHERE state = 'checked' AND kept = 1 ORDER BY sent_at").all() as { id: string }[])
+            .map((row) => `${row.id}.gz`) : [];
+        // A store the server has not opened since its proofs were superseded has no such column.
+        const supersedes = proofTable && (snapshot.prepare('PRAGMA table_info(proofs)').all() as { name: string }[]).some((column) => column.name === 'superseded_by');
+        superseded = supersedes ? (snapshot.prepare('SELECT id FROM proofs WHERE superseded_by IS NOT NULL ORDER BY sent_at').all() as { id: string }[])
             .map((row) => `${row.id}.gz`) : [];
     } finally {
         snapshot.close();
@@ -107,10 +115,17 @@ try {
     const recordingsCopied = copyOnce(packages, recordingsDir, recordingsCopy);
     const proofsCopy = join(dir, 'proofs');
     const proofsCopied = copyOnce(proofs, proofsDir, proofsCopy);
+    let proofsDeleted = 0;
+    for (const file of superseded) {
+        const copy = inside(proofsCopy, file);
+        if (!existsSync(copy)) continue;
+        rmSync(copy);
+        proofsDeleted++;
+    }
     console.log(JSON.stringify({
         msg: 'backup_ok', target, bytes: statSync(target).size, folders, copied, kept: uploaded.length - copied.length,
         recordings: recordingsCopy, recordingsCopied, recordingsKept: packages.length - recordingsCopied,
-        proofs: proofsCopy, proofsCopied, proofsKept: proofs.length - proofsCopied,
+        proofs: proofsCopy, proofsCopied, proofsKept: proofs.length - proofsCopied, proofsDeleted,
     }));
 } catch (error) {
     console.error(JSON.stringify({ msg: 'backup_failed', error: error instanceof Error ? error.message : String(error) }));

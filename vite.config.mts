@@ -87,7 +87,8 @@ const DEV_MODERATOR_PLAYER_ID = '00000000-0000-4000-8000-000000000001';
  * identities, with the page's reader of a package, each package in a scratch folder of its
  * own, made at start and removed at the end. The dev server is its own verifier: once a
  * proof is queued, it replays the queue in its own process (`verifyNext`), with the page's
- * `replayProof` and the build's achievements (`ssrLoadModule`), over the sets it serves.
+ * `replayProof` and the build's achievements (`ssrLoadModule`), over the sets it serves, and
+ * once an edit of a set's achievements made its kept proofs due again (`receiveEdit`).
  * Without `node:sqlite`, it is 501.
  *
  * `api/stats` is `answerStats` over the same store's public sets, and over statistics made
@@ -202,8 +203,11 @@ function dataSetsRoute(): Plugin {
           const dataSets = openStore(db);
           const api = { checkDataSet, achievementsCheck: await achievementsCheckOf(dataSets), dataSets, moderators, now: Date.now, notify: NOBODY };
           if (documents) await receiveDocument(id, scratch, api, req, res);
-          else if (req.headers['content-type']?.startsWith('multipart/form-data')) await receiveEdit(id, scratch, api, req, res);
-          else await receiveModeration(id, scratch, api, req, res);
+          else if (req.headers['content-type']?.startsWith('multipart/form-data') && proofs) {
+            await receiveEdit(id, scratch, { ...api, proofs }, req, res);
+            // An edit of the set's achievements made its proofs due: replayed at once, as a proof queued is.
+            verifyQueue();
+          } else await receiveModeration(id, scratch, api, req, res);
         } catch (error) {
           next(error);
         } finally {
@@ -406,7 +410,7 @@ function dataSetsRoute(): Plugin {
                   proofs: proofs.store, identities: identities.store, dataSets: openStore(db), dir: proofsDir, gamefilesDir: scratch, digests, replay, now: Date.now,
                 });
                 if (done === null) break;
-                console.log(`proof ${done.id} ${done.state}: ${done.state === 'drifted' ? done.reason : `verified ${done.verified.join(', ') || 'nothing'}`}`);
+                console.log(`proof ${done.id}${done.again ? ' replayed again' : ''} ${done.state}: ${done.state === 'drifted' ? done.reason : `verified ${done.verified.join(', ') || 'nothing'}`}`);
               } finally {
                 db.close();
               }
