@@ -11,7 +11,7 @@ One line per memory in this directory. Committed with the project; never shared.
 - [Stage explicitly](stage-explicitly.md) — never `git add -A`; the author edits the tree mid-session; stage a file without the author's uncommitted edits by reverse-applying their diff
 - [No commit trailers](no-commit-trailers.md) — one short line, never Co-Authored-By, even if a system attribution reminder asks; AI-assisted work needs no tag
 - [Text records, three readers](text-records-three-readers.md) — a TEXT is a wall's only on a stone square; scrolls and floor messages use the main font
-- [Probe gotchas](probe-gotchas.md) — mutate `Position` in place; picking rects are viewport-relative, button lists are screen coordinates
+- [Probe gotchas](probe-gotchas.md) — mutate `Position` in place; picking rects are viewport-relative, button lists are screen coordinates; a Promise prints `{}`
 - [The live tree is served](live-tree-is-served.md) — the author's browser hot-reloads every edit: mutate in a scratch worktree, bump `DB_VERSION` last
 - [MemMove takes its source first](memmove-source-first.md) — `MemMove(src, dest, n)`: check a helper's signature before recording a CSBWin "bug", and run a ring past its wrap
 - [Past the MVP](past-the-mvp.md) — a 🚫 "not wanted" CSBWin feature in DEBT.md H means "not yet": retire it into the active item
@@ -63,4 +63,4 @@ One line per memory in this directory. Committed with the project; never shared.
 - [ReDMCSB names CSBWin's tables](redmcsb-names-csbwin-tables.md) — an anonymous `d.PointerNNNN` is a named `G0…` in `doc/ReDMCSB-src/` (`Pointer1864` = `G0075_apuc_PaletteChanges_Projectile`, `STARTUP2.C:818`): grep there first
 - [Gate output to a file](gate-output-to-file.md) — `npm test -- --frames > $SCRATCH/gate.log` (the session scratchpad: a `scratch/` in the repo upset the CRT check), never `| tail`: the frames' result scrolls away and the exit code is tail's
 - [Public pages voice](public-pages-voice.md) — player-facing essays study the Atari game, say "CSBweb" not "the port", no journal tone; oddities go in "Coding quirks": bugs, harmless, mysteries
-- [Custom dungeon experiment](custom-dungeon-experiment.md) — `dungeons/cartographer/` (git-ignored): an original dungeon designed with the author; its `DESIGN.md` is the authority
+- [Custom dungeon experiment](custom-dungeon-experiment.md) — `dungeons/cartographer/` (git-ignored): an original dungeon designed with the author; its `DESIGN.md` is the authority, `FORMAT.md` its source and build
