@@ -63,3 +63,4 @@ One line per memory in this directory. Committed with the project; never shared.
 - [ReDMCSB names CSBWin's tables](redmcsb-names-csbwin-tables.md) — an anonymous `d.PointerNNNN` is a named `G0…` in `doc/ReDMCSB-src/` (`Pointer1864` = `G0075_apuc_PaletteChanges_Projectile`, `STARTUP2.C:818`): grep there first
 - [Gate output to a file](gate-output-to-file.md) — `npm test -- --frames > $SCRATCH/gate.log` (the session scratchpad: a `scratch/` in the repo upset the CRT check), never `| tail`: the frames' result scrolls away and the exit code is tail's
 - [Public pages voice](public-pages-voice.md) — player-facing essays study the Atari game, say "CSBweb" not "the port", no journal tone; oddities go in "Coding quirks": bugs, harmless, mysteries
+- [Custom dungeon experiment](custom-dungeon-experiment.md) — `dungeons/cartographer/` (git-ignored): an original dungeon designed with the author; its `DESIGN.md` is the authority

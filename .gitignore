@@ -29,3 +29,6 @@ static/extracted
 
 # the deploy target (utils/deploy.sh)
 .env
+
+# the custom dungeons being designed, an experiment that will get its own repository
+/dungeons/
