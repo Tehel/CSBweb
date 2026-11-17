@@ -9,8 +9,8 @@
  *   what passes it cropped evenly, each pixel the average of the source area it covers;
  *   its levels stretched (the darkest and lightest 2% clipped) and its shadows lifted
  *   (gamma 0.7), for the dungeon's darkest colours are far above a photograph's shadows;
- *   then Floyd-Steinberg dithered into the dungeon's colours but `WALL_TRANSPARENT`, the
- *   nearest by luminance-weighted distance. Its bitmap is 112 wide, a multiple of 16
+ *   then Floyd-Steinberg dithered into the dungeon's colours but the monsters' two
+ *   (`MONSTER_COLOURS`), the nearest by luminance-weighted distance. Its bitmap is 112 wide, a multiple of 16
  *   (`encodePlanar`), the last 8 columns transparent.
  * - **Its placements** (`picturePlacements`) keep that view as the bitmap stands: the
  *   farther views are the front bitmap shrunk to each rectangle by `ShrinkBLT`
@@ -70,6 +70,12 @@ export const PLAQUE: PlaqueSize = { front: { width: 128, height: 32 }, side: { w
 export const BASE_SET = 4;
 /** The colour a wall decoration's blit leaves (`CSBCode.cpp:3747`). */
 export const WALL_TRANSPARENT = 10;
+/**
+ * The colours each level sets from its monster types (`ReadGraphicsForLevel`,
+ * `doc/CSBwin-src/Code390e.cpp:323-344`): a picture drawn with them would change colour
+ * from level to level. 10 is also `WALL_TRANSPARENT`.
+ */
+export const MONSTER_COLOURS = [9, WALL_TRANSPARENT];
 /** The dungeon palette's greys, darkest first: the plaques' colours. */
 export const GREYS = [0, 12, 1, 2, 13, 15];
 
@@ -163,12 +169,12 @@ function lift(image: Rgba): Rgba {
   return { width: image.width, height: image.height, rgba };
 }
 
-/** `image` Floyd-Steinberg dithered into `palette`'s (16 Atari words) colours but `WALL_TRANSPARENT`, the nearest by luminance-weighted distance. */
+/** `image` Floyd-Steinberg dithered into `palette`'s (16 Atari words) colours but `MONSTER_COLOURS`, the nearest by luminance-weighted distance. */
 function dithered(image: Rgba, palette: readonly number[]): IndexedBitmap {
   const colours = palette.map((word, i) => {
     const { r, g, b } = atariToRGB(word);
     return { i, rgb: [r, g, b] };
-  }).filter((colour) => colour.i !== WALL_TRANSPARENT);
+  }).filter((colour) => !MONSTER_COLOURS.includes(colour.i));
   const { width, height } = image;
   const wanted = Float64Array.from({ length: width * height * 3 }, (_, k) => image.rgba[Math.floor(k / 3) * 4 + (k % 3)]!);
   const pixels = new Uint8Array(width * height);

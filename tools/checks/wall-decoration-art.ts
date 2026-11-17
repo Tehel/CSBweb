@@ -6,7 +6,8 @@
  * What this asserts:
  *
  * 1. **The picture**: its bitmap 112x71, the wall two squares ahead's 104 columns then 8
- *    `WALL_TRANSPARENT`; the wall's columns never transparent, each a colour of the palette,
+ *    `WALL_TRANSPARENT`; the wall's columns never transparent nor colour 9, which the level's
+ *    monsters set (`MONSTER_COLOURS`), each a colour of the palette,
  *    and many of them (dithered, not flat).
  * 2. **The plaque**: its front 128x32 and its side 16x32, every pixel one of the greys or
  *    transparent; a magenta pixel transparent.
@@ -24,7 +25,7 @@ import { check, finish } from '../lib/check';
 import { graphicsTablesOf, stockGraphics } from '../lib/game';
 import { SAVE_DIR } from '../lib/saves';
 import {
-  BASE_SET, GREYS, PLAQUE, WALL_TRANSPARENT, greyBitmap, magentaTransparent, picturePlacements, plaquePlacements,
+  BASE_SET, GREYS, MONSTER_COLOURS, PLAQUE, WALL_TRANSPARENT, greyBitmap, magentaTransparent, picturePlacements, plaquePlacements,
   readImage, transparentBitmap, wallPicture,
 } from '../lib/wallDecorationArt';
 
@@ -55,13 +56,13 @@ const picture = wallPicture(cover, walls, palette);
     for (let x = 0; x < picture.width; x++) {
       const pixel = picture.pixels[y * picture.width + x]!;
       if (x < wallWidth) {
-        opaque &&= pixel !== WALL_TRANSPARENT && pixel < 16;
+        opaque &&= !MONSTER_COLOURS.includes(pixel) && pixel < 16;
         used.add(pixel);
       } else padding &&= pixel === WALL_TRANSPARENT;
     }
   }
   console.log(`  ${used.size} colours`);
-  check(opaque, "the wall's columns are each a palette colour, none transparent");
+  check(opaque, "the wall's columns are each a palette colour, none transparent nor the monsters' 9");
   check(padding, 'the 8 columns past it are transparent');
   check(used.size >= 12, 'dithered into most of the palette');
 }
