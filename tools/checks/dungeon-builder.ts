@@ -17,10 +17,16 @@
  *    `DSAIndex`, `DSALevelIndex`, the actuators' selectors, states and parameters. In
  *    play, a pad aimed at the DSA's square runs it at each step on, which flips the DSA's
  *    state, kept by its actuator (local state 0), from 0 to 1 and back.
+ * 5. Special locations (`BWorld.specialLocations`, `EXPOOL`'s `EDT_SpecialLocations`): DM's
+ *    dungeon given a party move filter and a level's own monster move filter, written and
+ *    read back, has them in its `EXPOOL`, as the loader reads them and as `compose` gave
+ *    them, and decomposes to the same world; a level grown moves its own. In play, the
+ *    party move filter's DSA, on a square of stone, runs at each step.
  *
  * Run: `npm test -- --only=dungeon-builder.ts`
  */
 import { DBType, Direction, OBJECT_ID_EOF, Position, RoomType } from '../../src/core/types';
+import { Esl } from '../../src/data/CsbwinExpool';
 import { ActuatorAction } from '../../src/data/actuatorHelpers';
 import { buildDungeonFile } from '../../src/data/DungeonFileWriter';
 import { DungeonLoader } from '../../src/data/DungeonLoader';
@@ -29,7 +35,8 @@ import type { Game } from '../../src/engine/Game';
 import { MovementAction } from '../../src/engine/gameTypes';
 import { check, finish } from '../lib/check';
 import { testChampion } from '../lib/champion';
-import { next } from '../lib/dsa';
+import { next, op } from '../lib/dsa';
+import { StkOp } from '../../src/engine/dsa/DsaTypes';
 import {
   actuator, actuatorAims, canonical, compose, decompose, DSA_GRAPHIC, DSA_NONE, dsaActuator, growLevel, squaresOf, type BWorld,
 } from '../lib/dungeonBuilder';
@@ -228,10 +235,67 @@ function withDsas(): void {
   console.log('');
 }
 
+function withSpecialLocations(): void {
+  console.log('=== DM with special locations ===');
+  const world = decompose(stockDungeon());
+  const level = world.levels[0];
+  // A square of stone holding nothing, for the filter's DSA, and the party's start beside
+  // an open square to step to.
+  const stone = [...squaresOf(level)].find(([x, y, chain]) => level.cellFlags[x][y] >> 5 === RoomType.STONE && chain.length === 0);
+  if (!stone) throw new Error('no empty stone on level 0');
+  const [fx, fy] = stone;
+  // The DSA adds one to global 0 at each run: `GLOBALFETCH` 0, `1+`, `GLOBALSTORE` 0
+  // (`DSACMD_GLOBALFETCH` 19, `DSACMD_GLOBALSTORE` 20, `doc/CSBwin-src/Data.h:1730-1731`).
+  world.dsas = [{
+    description: 'counts the runs', state: 0, localState: 1, groupId: 0, numStates: 1, firstDisplayedState: 0,
+    states: [{ actions: [{ column: 0, program: Uint16Array.from([19 | (0 << 6), op(StkOp.ONE_PLUS), 20 | (0 << 6)]) }] }],
+  }];
+  level.dsaSelectors = new Array<number>(32).fill(DSA_NONE);
+  level.dsaSelectors[2] = 0;
+  level.cells[fx][fy].push(dsaActuator({ selector: 2 }));
+  world.specialLocations = [
+    { esl: Esl.MONSTER_MOVE_FILTER, ownLevel: 6, at: { z: 6, x: 2, y: 3, pos: 1 } },
+    { esl: Esl.PARTY_MOVE_FILTER, at: { z: 0, x: fx, y: fy, pos: 0 } },
+  ];
+  const composed = compose(world);
+  const back = reread(composed);
+  const keys = (locations: Record<number, number> | undefined): string =>
+    Object.entries(locations ?? {}).map(([key, locr]) => `${Number(key).toString(16)}:${locr.toString(16)}`).join(' ');
+  console.log(['EXPOOL blocks', back.header.objectCounts[DBType.EXPOOL], 'special locations read', keys(back.specialLocations),
+    'composed', keys(composed.specialLocations)].join(' '));
+  check((back.header.objectCounts[DBType.EXPOOL] ?? 0) > 0 && keys(back.specialLocations) === keys(composed.specialLocations) &&
+    Object.keys(back.specialLocations ?? {}).length === 2, 'the file holds both in its EXPOOL, read as compose gave them');
+  const again = decompose(back);
+  check(canonical(again) === canonical({ ...world, specialLocations: [...world.specialLocations].reverse() }),
+    'and decomposes to the same world, the special locations in the order of their keys');
+  growLevel(again, 6, 'west', 2, 0);
+  check(JSON.stringify(again.specialLocations?.map((l) => l.at)) === JSON.stringify([{ z: 0, x: fx, y: fy, pos: 0 }, { z: 6, x: 4, y: 3, pos: 1 }]),
+    'a level grown on its west moves its own special location with its squares, and only its own');
+
+  const game = newGame(reread(compose(world)), stockGraphics());
+  game.systems.hallOfChampions.addChampion(testChampion(0));
+  game.systems.dsa.setGlobalVariables(new Array<number>(100).fill(0));
+  const party = game.ctx.party.state;
+  const runs = (): number => game.systems.dsa.getGlobalVariables()[0]!;
+  const steps: string[] = [];
+  for (const move of WALK) {
+    const from = `${party.position.x},${party.position.y}`;
+    const before = runs();
+    game.enqueueMovement(move);
+    for (let n = 0; n < 8; n++) runVbl(game, TICK_DUE);
+    if (`${party.position.x},${party.position.y}` !== from) steps.push(`${from}: ${runs() - before}`);
+  }
+  console.log(`  the filter's runs at each step: ${steps.join(', ')}`);
+  check(steps.length >= 2 && steps.every((step) => !step.endsWith(': 0')),
+    'in play the party move filter runs its DSA, on a square of stone, at each step');
+  console.log('');
+}
+
 function main(): void {
   rebuilt();
   grown();
   withDsas();
+  withSpecialLocations();
   finish();
 }
 

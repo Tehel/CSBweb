@@ -25,13 +25,20 @@
  * `Codea59a.cpp:115-128`). A DSA's program names levels by number, so a caller that
  * renumbers levels mends its programs itself.
  *
- * What it does not know about is refused rather than dropped: an `EXPOOL` record.
+ * `EXPOOL` (database 11) travels as what the builder knows of it: the special locations
+ * (`EDT_SpecialLocations`, `BWorld.specialLocations`), the squares of the DSAs a filter or
+ * the indirect actions run (`doc/CSBwin-src/CSB.h:1536-1553`). `compose` writes one record
+ * each, a `LOCATIONREL` as an integer, as CSBWin reads them (`expool.Locate`, then
+ * `locr.Integer(*pRecord)`, `Monster.cpp:1129-1137`), in the order of their keys.
+ *
+ * What it does not know about is refused rather than dropped: any other `EXPOOL` record.
  */
 import { RnMaps } from '../../src/core/RnMaps';
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position } from '../../src/core/types';
+import { DBType, locationRelFromInteger, locationRelToInteger, OBJECT_ID_EOF, OBJECT_ID_NULL, Position } from '../../src/core/types';
 import type { Direction, ObjectID } from '../../src/core/types';
 import { ActuatorAction, getActuatorType, isActuatorLocalActionOnly } from '../../src/data/actuatorHelpers';
 import { ComputeTextLength, textStart } from '../../src/data/CsbwinDungeonConversions';
+import { Esl, Expool, specialLocationKey, specialLocationsFromExpool } from '../../src/data/CsbwinExpool';
 import { rnMapsOf } from '../../src/data/CsbwinObjectIndex';
 import type {
   ActuatorRecord, DatabaseRecord, Databases, DsaDefinition, DungeonData, MapDescriptor, ScrollRecord, TeleporterRecord, TextRecord,
@@ -83,6 +90,21 @@ export const DSA_GRAPHIC = 255;
 const DSA_LEVELS = 64;
 const DSA_SELECTORS = 32;
 
+/**
+ * A special location (`EDT_SpecialLocations`, `doc/CSBwin-src/CSB.h:1536-1553`): the square
+ * whose type 47 actuators a filter, or the indirect actions, run as DSAs.
+ */
+export interface BSpecialLocation {
+  esl: Esl;
+  /**
+   * The level whose own it is, keyed `| ((level + 1) << 8)`: the monster move filter alone
+   * has one a level (`MONSTERMOVEFILTERCACHE::GetLocation`, `doc/CSBwin-src/Monster.cpp:3094`).
+   */
+  ownLevel?: number;
+  /** The square: its level, column, row and corner (`LOCATIONREL`). */
+  at: { z: number; x: number; y: number; pos: number };
+}
+
 export interface BWorld {
   randomSeed: number;
   /** On level 0. */
@@ -90,6 +112,26 @@ export interface BWorld {
   levels: BLevel[];
   /** `DSAIndex`, the DSAs by number. Absent when there are none. */
   dsas?: Array<DsaDefinition | null>;
+  /** `EXPOOL`'s special locations, in the order of their keys. Absent when there are none. */
+  specialLocations?: BSpecialLocation[];
+}
+
+/** `MONSTERMOVEFILTERCACHE`'s levels (`doc/CSBwin-src/CSB.h:451`), the most a level's own key names. */
+const OWN_LEVELS = 64;
+
+/** The `EXPOOL` key of a special location. */
+const keyOf = (location: BSpecialLocation): number => specialLocationKey(location.esl, location.ownLevel);
+
+/** A special location's `EXPOOL` key and record read back, or null for a key that names none. */
+function specialLocationOf(key: number, record: readonly number[]): BSpecialLocation | null {
+  if ((key >>> 24) !== 3 || ((key >>> 16) & 0xff) !== 0 || record.length !== 1) return null;
+  const esl = key & 0xff;
+  const own = (key >>> 8) & 0xff;
+  if (esl > Esl.DAMAGE_CHAR_FILTER) return null;
+  if (own !== 0 && (esl !== Esl.MONSTER_MOVE_FILTER || own > OWN_LEVELS)) return null;
+  const { l, x, y, p } = locationRelFromInteger(record[0]!);
+  if (locationRelToInteger({ l, x, y, p }) !== record[0]) return null;
+  return { esl, ...(own !== 0 ? { ownLevel: own - 1 } : {}), at: { z: l, x, y, pos: p } };
 }
 
 const KEYS: Partial<Record<DBType, keyof Databases>> = {
@@ -111,7 +153,19 @@ function contentsField(db: DBType): 'possession' | 'containedObject' | 'projecti
 
 /** A world read by `DungeonLoader`, taken apart. */
 export function decompose(data: DungeonData): BWorld {
-  if ((data.header.objectCounts[DBType.EXPOOL] ?? 0) !== 0) throw new Error('decompose: the dungeon has EXPOOL records');
+  const specialLocations: BSpecialLocation[] = [];
+  if ((data.header.objectCounts[DBType.EXPOOL] ?? 0) !== 0) {
+    const pool = new Expool(data);
+    const keys = pool.keys();
+    for (const key of keys) {
+      const location = specialLocationOf(key, pool.locate(key) ?? []);
+      const hex = `0x${key.toString(16).padStart(8, '0')}`;
+      if (!location) throw new Error(`decompose: the dungeon has an EXPOOL record keyed ${hex}, not a special location`);
+      if (keys.indexOf(key) !== keys.lastIndexOf(key)) throw new Error(`decompose: two EXPOOL records keyed ${hex}`);
+      specialLocations.push(location);
+    }
+    specialLocations.sort((a, b) => keyOf(a) - keyOf(b));
+  }
   if (!data.indirectText || !data.newScrolls || !data.bigActuators) throw new Error('decompose: the world is not converted');
 
   const textOf = (record: TextRecord): number[] => {
@@ -173,7 +227,10 @@ export function decompose(data: DungeonData): BWorld {
   let count = entries.length;
   while (count > 0 && !entries[count - 1]) count--;
   const dsas = count > 0 ? { dsas: clone(entries.slice(0, count)) } : {};
-  return { randomSeed, start: { x: startPosition.x, y: startPosition.y, facing }, levels, ...dsas };
+  return {
+    randomSeed, start: { x: startPosition.x, y: startPosition.y, facing }, levels, ...dsas,
+    ...(specialLocations.length > 0 ? { specialLocations } : {}),
+  };
 }
 
 /** The world `decompose` took apart, or one built from levels of several, numbered again. */
@@ -322,6 +379,27 @@ export function compose(world: BWorld): DungeonData {
       return [...selectors];
     });
   }
+  if (world.specialLocations?.length) {
+    const pool = new Expool(data);
+    const keys = new Set<number>();
+    for (const location of [...world.specialLocations].sort((a, b) => keyOf(a) - keyOf(b))) {
+      const { esl, ownLevel, at } = location;
+      if (!Number.isInteger(esl) || esl < 0 || esl > Esl.DAMAGE_CHAR_FILTER) throw new Error(`compose: no special location ${esl}`);
+      if (ownLevel !== undefined && (esl !== Esl.MONSTER_MOVE_FILTER || ownLevel < 0 || ownLevel >= OWN_LEVELS)) {
+        throw new Error(`compose: special location ${esl} of level ${ownLevel}: only the monster move filter has one a level, 0-${OWN_LEVELS - 1}`);
+      }
+      const d = maps[at.z]?.descriptor;
+      if (!d || at.x < 0 || at.x >= d.width || at.y < 0 || at.y >= d.height || at.pos < 0 || at.pos > 3) {
+        throw new Error(`compose: special location ${esl} at ${at.z}:${at.x},${at.y}/${at.pos} is not a square of the dungeon`);
+      }
+      const key = keyOf(location);
+      if (keys.has(key)) throw new Error(`compose: special location ${esl}${ownLevel === undefined ? '' : ` of level ${ownLevel}`} twice`);
+      keys.add(key);
+      pool.write(key, [locationRelToInteger({ l: at.z, x: at.x, y: at.y, p: at.pos })]);
+    }
+    // What `DungeonLoader` reads of them, so the world composed plays as the file read back.
+    data.specialLocations = specialLocationsFromExpool(data.expool!)!;
+  }
   data.rnMaps = rnMapsOf(() => data.databases, {
     length: typeMap.length, typeMap: Uint8Array.from(typeMap), indexMap: Uint16Array.from(indexMap),
   });
@@ -459,7 +537,8 @@ export function encodeMessage(text: string, escapes: Uint8Array): number[] {
  * Add `count` columns or rows of `flag` on one side of a level. On the north or west the
  * level's offset moves back by as much, so every square keeps its place in the dungeon,
  * and everything that names one of its squares follows it: actuators aimed on the level
- * (`actuatorAims`), teleporters of `world` aimed into it, and the party's start.
+ * (`actuatorAims`), teleporters of `world` aimed into it, its special locations, and the
+ * party's start.
  */
 export function growLevel(world: BWorld, z: number, side: 'north' | 'south' | 'west' | 'east', count: number, flag: number): void {
   const level = world.levels[z];
@@ -499,6 +578,11 @@ export function growLevel(world: BWorld, z: number, side: 'north' | 'south' | 'w
       const ty = ((record.word6 >> 11) & 0x1f) + dy;
       record.word6 = (record.word6 & 0x3f) | (tx << 6) | (ty << 11);
     }
+  }
+  for (const location of world.specialLocations ?? []) {
+    if (location.at.z !== z) continue;
+    location.at.x += dx;
+    location.at.y += dy;
   }
   world.levels.forEach((other) => {
     for (const object of objectsOf(other)) {
