@@ -15,8 +15,8 @@ and the build. Its pipeline imports CSBweb's `src/` and `tools/` by relative pat
 **Why:** the dungeon is outside the debt priority by the author's choice, and its history
 is its own.
 
-**How to apply:** a change in CSBweb that the dungeon needs (the builder writing `EXPOOL`
-records for a monster attack filter, a mirror whose hero is renamed) is a general fix or
+**How to apply:** a change in CSBweb that the dungeon needs (such as the builder's
+`EXPOOL` special locations, or `writeHeroText` for a renamed hero) is a general fix or
 feature of CSBweb's tools, made here as its own commit under this repository's rules.
 Moving or renaming something the pipeline imports (`tools/lib/dungeonBuilder.ts`,
 `tools/lib/game.ts`, `tools/lib/graphicsDat.ts`, `tools/lib/wallDecorationArt.ts`) breaks

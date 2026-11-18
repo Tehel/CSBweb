@@ -22,6 +22,13 @@
  *    read back, has them in its `EXPOOL`, as the loader reads them and as `compose` gave
  *    them, and decomposes to the same world; a level grown moves its own. In play, the
  *    party move filter's DSA, on a square of stone, runs at each step.
+ * 6. A hero's text (`writeHeroText`): each of DM's heroes, read (`readHeroText`) and written
+ *    again (`encodeMessage`), decodes to the bytes its mirror's square holds, which
+ *    `AddCharacter` reads (`DecodeText(…, 0x8002)`). The words themselves may differ: DM
+ *    writes "THE " as one escape where `encodeMessage` spells it, and pads its last word
+ *    after the end code with anything. Zed renamed, his text written in
+ *    place of his own, is read behind his mirror with the new name and title, and the rest
+ *    of him as he was.
  *
  * Run: `npm test -- --only=dungeon-builder.ts`
  */
@@ -38,9 +45,11 @@ import { testChampion } from '../lib/champion';
 import { next, op } from '../lib/dsa';
 import { StkOp } from '../../src/engine/dsa/DsaTypes';
 import {
-  actuator, actuatorAims, canonical, compose, decompose, DSA_GRAPHIC, DSA_NONE, dsaActuator, growLevel, squaresOf, type BWorld,
+  actuator, actuatorAims, canonical, compose, decompose, DSA_GRAPHIC, DSA_NONE, dsaActuator, encodeMessage, growLevel, squaresOf,
+  writeHeroText, type BWorld,
 } from '../lib/dungeonBuilder';
-import { newGame, runVbl, stockDungeon, stockGraphics, TICK_DUE } from '../lib/game';
+import { gameTablesOf, graphicsTablesOf, newGame, presetHeroesOf, runVbl, stockDungeon, stockGraphics, TICK_DUE } from '../lib/game';
+import { DecodeText } from '../../src/data/DecodeText';
 
 const reread = (data: DungeonData): DungeonData =>
   new DungeonLoader().loadDungeonDat(buildDungeonFile(data, { dmRules: true }));
@@ -291,11 +300,49 @@ function withSpecialLocations(): void {
   console.log('');
 }
 
+function heroTexts(): void {
+  console.log('=== DM\'s heroes, their texts written again ===');
+  const DX = [0, 1, 0, -1];
+  const DY = [-1, 0, 1, 0];
+  const graphics = stockGraphics();
+  const escapes = graphicsTablesOf(graphics).objects.textDecode.byte10016;
+  const world = decompose(stockDungeon());
+  const heroes = presetHeroesOf(stockDungeon(), graphics);
+  const textOf = (hero: (typeof heroes)[number]): { words?: number[] } => {
+    const { map, x, y, wall } = hero.location;
+    const text = world.levels[map].cells[x + DX[wall]][y + DY[wall]].find((o) => o.db === DBType.TEXT);
+    if (!text) throw new Error(`no text before ${hero.name}'s mirror`);
+    return text;
+  };
+  const tables = gameTablesOf(graphics).textDecode;
+  /** The bytes `AddCharacter` reads of a text's words (`DecodeText(…, 0x8002, 990)`). */
+  const bytes = (words: number[]): string => Array.from(DecodeText(
+    { textWords: words, indirectTextIndex: [0], compressedText: words },
+    { nextObject: OBJECT_ID_EOF, textOffset: 0, visible: false, word2Bits1_2: 0 }, 0x8002, 990, tables,
+  ) ?? []).join(',');
+  const differ = heroes.filter((hero) => bytes(encodeMessage(writeHeroText(hero), escapes)) !== bytes(textOf(hero).words!));
+  const sameWords = heroes.filter((hero) => JSON.stringify(encodeMessage(writeHeroText(hero), escapes)) === JSON.stringify(textOf(hero).words));
+  console.log(`  ${heroes.length} heroes, ${sameWords.length} written in the very words DM's are; read otherwise: ${differ.map((h) => h.name).join(' ') || 'none'}`);
+  check(heroes.length === 24 && heroes.every((h) => !h.illegal) && differ.length === 0,
+    'each of DM\'s 24 heroes, read and written again, decodes to the bytes its mirror\'s square holds');
+
+  const zed = heroes.find((h) => h.name === 'ZED')!;
+  textOf(zed).words = encodeMessage(writeHeroText({ ...zed, name: 'HESK', title: 'CAPTAIN OF A COMPANY'.slice(0, 19) }), escapes);
+  const read = presetHeroesOf(reread(compose(world)), graphics);
+  const hesk = read.find((h) => h.location.map === zed.location.map && h.location.x === zed.location.x && h.location.y === zed.location.y)!;
+  const rest = (h: typeof zed): string => JSON.stringify({ ...h, name: undefined, title: undefined, textRecordIndex: undefined, inventory: undefined });
+  console.log(`  behind Zed's mirror: ${hesk.name}, ${hesk.title}, ${hesk.male ? 'M' : 'F'}, ${hesk.health}/${hesk.stamina}/${hesk.mana}`);
+  check(hesk.name === 'HESK' && hesk.title === 'CAPTAIN OF A COMPAN' && !hesk.illegal && rest(hesk) === rest(zed),
+    'Zed renamed is read behind his mirror with the new name and title, and the rest of him as he was');
+  console.log('');
+}
+
 function main(): void {
   rebuilt();
   grown();
   withDsas();
   withSpecialLocations();
+  heroTexts();
   finish();
 }
 

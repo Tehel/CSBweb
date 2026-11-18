@@ -40,6 +40,7 @@ import { ActuatorAction, getActuatorType, isActuatorLocalActionOnly } from '../.
 import { ComputeTextLength, textStart } from '../../src/data/CsbwinDungeonConversions';
 import { Esl, Expool, specialLocationKey, specialLocationsFromExpool } from '../../src/data/CsbwinExpool';
 import { rnMapsOf } from '../../src/data/CsbwinObjectIndex';
+import type { HeroText } from '../../src/data/HeroExtractor';
 import type {
   ActuatorRecord, DatabaseRecord, Databases, DsaDefinition, DungeonData, MapDescriptor, ScrollRecord, TeleporterRecord, TextRecord,
 } from '../../src/data/dungeonTypes';
@@ -528,6 +529,44 @@ export function encodeMessage(text: string, escapes: Uint8Array): number[] {
   const words: number[] = [];
   for (let i = 0; i < codes.length; i += 3) words.push((codes[i] << 10) | (codes[i + 1] << 5) | codes[i + 2]);
   return words;
+}
+
+/**
+ * A hero's text, the one a mirror's square holds, as `AddCharacter` reads it
+ * (`readHeroText`, `src/data/HeroExtractor.ts`; `doc/CSBwin-src/Character.cpp:558-702`),
+ * for `encodeMessage`, whose code 28 is the line break `DecodeText(…, 0x8002)` makes 10.
+ * Its lines: the name, at most seven characters; the title, at most nineteen, then an
+ * empty line (the reader joins the title's two lines, and writes it on one); `M` or `F`;
+ * health, stamina and mana, four letters `A`-`P` each, a nibble a letter; the seven
+ * attributes, two letters each, Luck first, at most 224; the sixteen skill levels, a
+ * letter each from `A`, at most 17. A text that stops there reads penalties of 2 and 8
+ * and no talents, as every hero of DM's does; any other values follow the skills: the
+ * two penalties and `randomPoints` (which nothing reads, written 3) a letter each, and
+ * the talents, eight letters.
+ */
+export function writeHeroText(hero: HeroText): string {
+  const letters = (value: number, n: number, what: string, max = 16 ** n - 1): string => {
+    if (!Number.isInteger(value) || value < 0 || value > max) throw new Error(`writeHeroText: ${what} ${value} is not 0-${max}`);
+    return Array.from({ length: n }, (_, i) => String.fromCharCode(0x41 + ((value >>> (4 * (n - 1 - i))) & 15))).join('');
+  };
+  const letter = (value: number, max: number, what: string): string => {
+    if (!Number.isInteger(value) || value < 0 || value > max) throw new Error(`writeHeroText: ${what} ${value} is not 0-${max}`);
+    return String.fromCharCode(0x41 + value);
+  };
+  if (hero.name.length > 7 || hero.name.includes('\n')) throw new Error(`writeHeroText: the name ${JSON.stringify(hero.name)} is one line of 7 characters at most`);
+  if (hero.title.length > 19 || hero.title.includes('\n')) throw new Error(`writeHeroText: the title ${JSON.stringify(hero.title)} is one line of 19 characters at most`);
+  if (hero.skillLevels.length !== 16) throw new Error(`writeHeroText: ${hero.skillLevels.length} skill levels, not 16`);
+  const attributes = [hero.luck, hero.strength, hero.dexterity, hero.wisdom, hero.vitality, hero.antiMagic, hero.antiFire]
+    .map((value, i) => letters(value, 2, `attribute ${i}`, 224)).join('');
+  const tail = hero.reincarnateAttributePenalty === 2 && hero.reincarnateStatPenalty === 8 && hero.talents === 0 ? '' :
+    letter(hero.reincarnateAttributePenalty, 16, 'the attribute penalty') + letter(hero.reincarnateStatPenalty, 16, 'the stat penalty') +
+    letter(3, 25, 'randomPoints') + letters(hero.talents >>> 0, 8, 'talents');
+  return [
+    hero.name, hero.title, '', hero.male ? 'M' : 'F',
+    letters(hero.health, 4, 'health', 999) + letters(hero.stamina, 4, 'stamina', 9999) + letters(hero.mana, 4, 'mana', 900),
+    attributes,
+    hero.skillLevels.map((level, i) => letter(level, 17, `skill ${i}`)).join('') + tail,
+  ].join('\n');
 }
 
 // ---------------------------------------------------------------------------------------
